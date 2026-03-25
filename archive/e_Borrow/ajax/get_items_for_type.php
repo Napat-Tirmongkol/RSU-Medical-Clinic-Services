@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // ajax/get_items_for_type.php
 // (เนเธเธฅเนเนเธซเธกเน)
 

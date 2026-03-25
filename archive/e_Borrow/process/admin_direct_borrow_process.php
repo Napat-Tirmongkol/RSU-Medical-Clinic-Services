@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // [เนเธเนเนเธ: process/admin_direct_borrow_process.php]
 // เนเธเนเธเธทเนเธญเธเธญเธฅเธฑเธกเธเน borrower_student_id เธ•เธฒเธกเนเธเธฅเน SQL borrow_records.sql
 

@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // process/return_process.php
 // (เธญเธฑเธเน€เธ”เธ• V5 - เธฃเธญเธเธฃเธฑเธเธฃเธฐเธเธ Types/Items)
 

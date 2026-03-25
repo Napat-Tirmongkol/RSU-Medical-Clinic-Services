@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // reject_request_process.php
 // (เนเธเนเนเธ: เน€เธเธดเนเธกเธ•เธฃเธฃเธเธฐเธเธฒเธฃเธเธทเธ Item (borrow_items) เนเธฅเธฐ Type (borrow_categories) เธเธฅเธฑเธเน€เธเนเธฒเธชเธ•เนเธญเธ)
 

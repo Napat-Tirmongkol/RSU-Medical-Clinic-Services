@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // e_Borrow/admin/index.php
 declare(strict_types=1);
 include('../includes/check_session.php');

@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // 1. เน€เธฃเธดเนเธก Session เน€เธชเธกเธญ
 session_start();
 

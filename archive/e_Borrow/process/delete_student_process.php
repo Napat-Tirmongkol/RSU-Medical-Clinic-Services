@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // [เนเธเนเนเธเนเธเธฅเน: napat-tirmongkol/e-borrow/E-Borrow-c4df732f98db10bf52a8e9d7299e212b6f2abd37/process/delete_student_process.php]
 // delete_student_process.php
 // (เธญเธฑเธเน€เธเธฃเธ•: เน€เธเธดเนเธกเธเธฒเธฃเธเธฑเธเธ—เธถเธ Log)

@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // ajax/get_equipment_type_data.php
 // (เนเธเธฅเนเนเธซเธกเน)
 

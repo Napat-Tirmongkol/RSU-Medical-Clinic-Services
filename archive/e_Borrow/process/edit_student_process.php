@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // edit_student_process.php
 // (เธญเธฑเธเน€เธ”เธ•: เธฃเธฑเธ status, department, status_other)
 

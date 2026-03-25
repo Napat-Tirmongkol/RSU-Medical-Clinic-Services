@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // process/admin_send_line_process.php
 // เธชเธณเธซเธฃเธฑเธ Admin เธชเนเธเธเนเธญเธเธงเธฒเธกเธซเธฒ User เธเนเธฒเธ LINE
 

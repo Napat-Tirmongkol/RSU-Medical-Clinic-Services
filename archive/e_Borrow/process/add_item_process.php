@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // process/add_item_process.php
 // (เธญเธฑเธเน€เธ”เธ•: V2 - เธ”เธฑเธเธเธฑเธ Error Duplicate Serial Number)
 

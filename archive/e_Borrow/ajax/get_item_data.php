@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // ajax/get_item_data.php
 // (เนเธเธฅเนเนเธซเธกเน)
 

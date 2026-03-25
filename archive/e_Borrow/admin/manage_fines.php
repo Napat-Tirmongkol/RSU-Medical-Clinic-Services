@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // admin/manage_fines.php
 include('../includes/check_session.php'); 
 require_once(__DIR__ . '/../../../config/db_connect.php');

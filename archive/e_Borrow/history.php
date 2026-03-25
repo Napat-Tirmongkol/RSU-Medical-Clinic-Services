@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // e_Borrow/history.php
 declare(strict_types=1);
 @session_start();

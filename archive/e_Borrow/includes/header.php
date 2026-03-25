@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // includes/header.php
 @session_start(); 
 ?>

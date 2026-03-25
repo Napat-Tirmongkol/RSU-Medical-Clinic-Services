@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // e_Borrow/borrow.php
 declare(strict_types=1);
 @session_start();

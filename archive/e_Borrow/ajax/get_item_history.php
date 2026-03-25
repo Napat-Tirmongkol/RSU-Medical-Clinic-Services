@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // [เธชเธฃเนเธฒเธเนเธเธฅเนเนเธซเธกเน: ajax/get_item_history.php]
 
 @session_start();

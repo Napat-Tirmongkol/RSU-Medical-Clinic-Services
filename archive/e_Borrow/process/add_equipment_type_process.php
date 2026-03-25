@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // process/add_equipment_type_process.php
 // (เธเธเธฑเธเนเธเนเนเธ Path เธญเธฑเธเนเธซเธฅเธ”)
 

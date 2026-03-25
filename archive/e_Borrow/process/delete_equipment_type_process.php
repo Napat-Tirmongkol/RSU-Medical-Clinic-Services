@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // process/delete_equipment_type_process.php
 // (เนเธเธฅเนเนเธซเธกเน)
 

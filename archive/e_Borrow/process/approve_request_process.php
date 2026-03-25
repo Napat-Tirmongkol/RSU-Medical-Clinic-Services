@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // process/approve_request_process.php (เธเธเธฑเธเนเธเนเนเธ: เธฃเธญเธเธฃเธฑเธ AJAX/JSON เนเธฅเธฐ approver_id)
 include('../includes/check_session.php');
 require_once(__DIR__ . '/../../../config/db_connect.php');

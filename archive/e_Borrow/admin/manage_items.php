@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // [เนเธเนเนเธเนเธเธฅเน: napat-tirmongkol/e-borrow/E-Borrow-c4df732f98db10bf52a8e9d7299e212b6f2abd37/admin/manage_items.php]
 
 // 1. "เธเนเธฒเธเธขเธฒเธก" เนเธฅเธฐ "เน€เธเธทเนเธญเธกเธ•เนเธญ DB"

@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // edit_staff_process.php
 // (เนเธเธฅเนเนเธซเธกเน)
 
