@@ -1,25 +1,25 @@
-<?php
+﻿<?php
 // e_Borrow/admin/index.php
 declare(strict_types=1);
 include('../includes/check_session.php');
-require_once __DIR__ . '/../../../config/db_connect.php'; // ใช้ DB กลาง
+require_once __DIR__ . '/../../../config/db_connect.php'; // เนเธเน DB เธเธฅเธฒเธ
 
 try {
     $pdo = db();
-    $stmt_borrowed = $pdo->query("SELECT COUNT(*) FROM med_equipment_items WHERE status = 'borrowed'");
+    $stmt_borrowed = $pdo->query("SELECT COUNT(*) FROM borrow_items WHERE status = 'borrowed'");
     $count_borrowed = $stmt_borrowed->fetchColumn();
-    $stmt_available = $pdo->query("SELECT COUNT(*) FROM med_equipment_items WHERE status = 'available'");
+    $stmt_available = $pdo->query("SELECT COUNT(*) FROM borrow_items WHERE status = 'available'");
     $count_available = $stmt_available->fetchColumn();
-    $stmt_maintenance = $pdo->query("SELECT COUNT(*) FROM med_equipment_items WHERE status = 'maintenance'");
+    $stmt_maintenance = $pdo->query("SELECT COUNT(*) FROM borrow_items WHERE status = 'maintenance'");
     $count_maintenance = $stmt_maintenance->fetchColumn();
-    $stmt_overdue = $pdo->query("SELECT COUNT(*) FROM med_transactions WHERE status = 'borrowed' AND approval_status IN ('approved', 'staff_added') AND due_date < CURDATE()");
+    $stmt_overdue = $pdo->query("SELECT COUNT(*) FROM borrow_records WHERE status = 'borrowed' AND approval_status IN ('approved', 'staff_added') AND due_date < CURDATE()");
     $count_overdue = $stmt_overdue->fetchColumn();
 } catch (PDOException $e) {
     $count_borrowed = $count_available = $count_maintenance = $count_overdue = 0;
-    $kpi_error = "เกิดข้อผิดพลาดในการดึงข้อมูล KPI: " . $e->getMessage(); 
+    $kpi_error = "เน€เธเธดเธ”เธเนเธญเธเธดเธ”เธเธฅเธฒเธ”เนเธเธเธฒเธฃเธ”เธถเธเธเนเธญเธกเธนเธฅ KPI: " . $e->getMessage(); 
 }
 
-// 4. ดึงข้อมูล "รายการรออนุมัติ"
+// 4. เธ”เธถเธเธเนเธญเธกเธนเธฅ "เธฃเธฒเธขเธเธฒเธฃเธฃเธญเธญเธเธธเธกเธฑเธ•เธด"
 $pending_requests = [];
 try {
    $sql_pending = "SELECT 
@@ -28,9 +28,9 @@ try {
                         t.equipment_id, t.item_id,
                         et.name as equipment_name, ei.serial_number,  
                         s.full_name as student_name, u.full_name as staff_name
-                    FROM med_transactions t
-                    JOIN med_equipment_types et ON t.type_id = et.id 
-                    LEFT JOIN med_equipment_items ei ON t.equipment_id = ei.id 
+                    FROM borrow_records t
+                    JOIN borrow_categories et ON t.type_id = et.id 
+                    LEFT JOIN borrow_items ei ON t.equipment_id = ei.id 
                     LEFT JOIN sys_users s ON t.borrower_student_id = s.id
                     LEFT JOIN sys_staff u ON t.lending_staff_id = u.id
                     WHERE t.approval_status = 'pending'
@@ -40,10 +40,10 @@ try {
     $stmt_pending->execute();
     $pending_requests = $stmt_pending->fetchAll();
 } catch (PDOException $e) {
-    $pending_error = "เกิดข้อผิดพลาดในการดึงข้อมูลคำขอ: " . $e->getMessage(); 
+    $pending_error = "เน€เธเธดเธ”เธเนเธญเธเธดเธ”เธเธฅเธฒเธ”เนเธเธเธฒเธฃเธ”เธถเธเธเนเธญเธกเธนเธฅเธเธณเธเธญ: " . $e->getMessage(); 
 }
 
-// 5. ดึงข้อมูล "รายการที่เกินกำหนดคืน"
+// 5. เธ”เธถเธเธเนเธญเธกเธนเธฅ "เธฃเธฒเธขเธเธฒเธฃเธ—เธตเนเน€เธเธดเธเธเธณเธซเธเธ”เธเธทเธ"
 $overdue_items = [];
 try {
     $sql_overdue = "SELECT 
@@ -51,8 +51,8 @@ try {
                         ei.name as equipment_name, 
                         s.id as student_id, s.full_name as student_name, s.phone_number,
                         DATEDIFF(CURDATE(), t.due_date) AS days_overdue
-                    FROM med_transactions t
-                    JOIN med_equipment_items ei ON t.equipment_id = ei.id
+                    FROM borrow_records t
+                    JOIN borrow_items ei ON t.equipment_id = ei.id
                     LEFT JOIN sys_users s ON t.borrower_student_id = s.id
                     WHERE t.status = 'borrowed' 
                       AND t.approval_status IN ('approved', 'staff_added') 
@@ -63,18 +63,18 @@ try {
     $stmt_overdue->execute();
     $overdue_items = $stmt_overdue->fetchAll();
 } catch (PDOException $e) {
-    $overdue_error = "เกิดข้อผิดพลาดในการดึงข้อมูลเกินกำหนด: " . $e->getMessage(); 
+    $overdue_error = "เน€เธเธดเธ”เธเนเธญเธเธดเธ”เธเธฅเธฒเธ”เนเธเธเธฒเธฃเธ”เธถเธเธเนเธญเธกเธนเธฅเน€เธเธดเธเธเธณเธซเธเธ”: " . $e->getMessage(); 
 }
 
-// 6. ดึงข้อมูล "รายการเคลื่อนไหวล่าสุด" (5 รายการ)
+// 6. เธ”เธถเธเธเนเธญเธกเธนเธฅ "เธฃเธฒเธขเธเธฒเธฃเน€เธเธฅเธทเนเธญเธเนเธซเธงเธฅเนเธฒเธชเธธเธ”" (5 เธฃเธฒเธขเธเธฒเธฃ)
 $recent_activity = [];
 try {
     $sql_activity = "SELECT 
                         t.approval_status, t.status, t.borrow_date, t.return_date,
                         et.name as equipment_name,
                         s.full_name as student_name
-                    FROM med_transactions t
-                    JOIN med_equipment_types et ON t.type_id = et.id
+                    FROM borrow_records t
+                    JOIN borrow_categories et ON t.type_id = et.id
                     LEFT JOIN sys_users s ON t.borrower_student_id = s.id
                     ORDER BY t.id DESC
                     LIMIT 5";
@@ -82,10 +82,10 @@ try {
     $stmt_activity->execute();
     $recent_activity = $stmt_activity->fetchAll();
 } catch (PDOException $e) {
-    $activity_error = "เกิดข้อผิดพลาดในการดึงข้อมูลเคลื่อนไหว: " . $e->getMessage(); 
+    $activity_error = "เน€เธเธดเธ”เธเนเธญเธเธดเธ”เธเธฅเธฒเธ”เนเธเธเธฒเธฃเธ”เธถเธเธเนเธญเธกเธนเธฅเน€เธเธฅเธทเนเธญเธเนเธซเธง: " . $e->getMessage(); 
 }
 
-$page_title = "Dashboard - ภาพรวม";
+$page_title = "Dashboard - เธ เธฒเธเธฃเธงเธก";
 $current_page = "index";
 include('../includes/header.php'); 
 ?>
@@ -242,10 +242,10 @@ body.dark-mode .link-detail { color: #60a5fa; }
 
     <div class="dash-header">
         <div class="dash-title">
-            <h2><i class="fas fa-tachometer-alt"></i> Dashboard ภาพรวม</h2>
+            <h2><i class="fas fa-tachometer-alt"></i> Dashboard เธ เธฒเธเธฃเธงเธก</h2>
         </div>
         <a href="admin/walkin_borrow.php" class="btn-scan">
-            <i class="fas fa-qrcode"></i> สแกนยืม/คืน
+            <i class="fas fa-qrcode"></i> เธชเนเธเธเธขเธทเธก/เธเธทเธ
         </a>
     </div>
 
@@ -253,21 +253,21 @@ body.dark-mode .link-detail { color: #60a5fa; }
     <div class="kpi-row">
         <div class="kpi-card avail">
             <div class="kpi-data">
-                <h4>พร้อมใช้งาน</h4>
+                <h4>เธเธฃเนเธญเธกเนเธเนเธเธฒเธ</h4>
                 <div class="val"><?php echo $count_available; ?></div>
             </div>
             <div class="kpi-icon"><i class="fas fa-box-open"></i></div>
         </div>
         <div class="kpi-card borrow">
             <div class="kpi-data">
-                <h4>กำลังถูกยืม</h4>
+                <h4>เธเธณเธฅเธฑเธเธ–เธนเธเธขเธทเธก</h4>
                 <div class="val"><?php echo $count_borrowed; ?></div>
             </div>
             <div class="kpi-icon"><i class="fas fa-hand-holding-medical"></i></div>
         </div>
         <div class="kpi-card maint">
             <div class="kpi-data">
-                <h4>ส่งซ่อมบำรุง</h4>
+                <h4>เธชเนเธเธเนเธญเธกเธเธณเธฃเธธเธ</h4>
                 <div class="val"><?php echo $count_maintenance; ?></div>
             </div>
             <div class="kpi-icon"><i class="fas fa-tools"></i></div>
@@ -275,7 +275,7 @@ body.dark-mode .link-detail { color: #60a5fa; }
         <?php if ($count_overdue > 0): ?>
         <div class="kpi-card overdue">
             <div class="kpi-data">
-                <h4 style="color:#ef4444;">เกินกำหนดคืน (ยังไม่คืน)</h4>
+                <h4 style="color:#ef4444;">เน€เธเธดเธเธเธณเธซเธเธ”เธเธทเธ (เธขเธฑเธเนเธกเนเธเธทเธ)</h4>
                 <div class="val" style="color:#ef4444;"><?php echo $count_overdue; ?></div>
             </div>
             <div class="kpi-icon"><i class="fas fa-exclamation-triangle"></i></div>
@@ -288,24 +288,24 @@ body.dark-mode .link-detail { color: #60a5fa; }
         <!-- LEFT COLUMN -->
         <div class="col-left">
 
-            <!-- รอดำเนินการ -->
+            <!-- เธฃเธญเธ”เธณเน€เธเธดเธเธเธฒเธฃ -->
             <div class="panel">
                 <div class="panel-head">
                     <i class="fas fa-bell" style="color:#f59e0b; font-size:1.2rem;"></i>
-                    <h3>รออนุมัติ</h3>
+                    <h3>เธฃเธญเธญเธเธธเธกเธฑเธ•เธด</h3>
                     <span class="badge"><?php echo count($pending_requests); ?></span>
                 </div>
                 
                 <?php if (empty($pending_requests)): ?>
-                    <p class="empty-msg">ไม่มีคำขอยืมที่รอดำเนินการ</p>
+                    <p class="empty-msg">เนเธกเนเธกเธตเธเธณเธเธญเธขเธทเธกเธ—เธตเนเธฃเธญเธ”เธณเน€เธเธดเธเธเธฒเธฃ</p>
                 <?php else: ?>
                     <?php foreach ($pending_requests as $req): ?>
                         <div class="list-card">
                             <div class="list-icon yellow"><i class="fas fa-hourglass-half"></i></div>
                             <div class="list-info">
                                 <h4><?php echo htmlspecialchars($req['equipment_name']); ?></h4>
-                                <p>ผู้ขอ: <strong><?php echo htmlspecialchars($req['student_name'] ?? '-'); ?></strong></p>
-                                <p>คืนวันที่: <strong><?php echo date('d/m/Y', strtotime($req['due_date'])); ?></strong></p>
+                                <p>เธเธนเนเธเธญ: <strong><?php echo htmlspecialchars($req['student_name'] ?? '-'); ?></strong></p>
+                                <p>เธเธทเธเธงเธฑเธเธ—เธตเน: <strong><?php echo date('d/m/Y', strtotime($req['due_date'])); ?></strong></p>
                                 
                                 <div style="display:flex; gap:12px; align-items:center;">
                                     <a href="javascript:void(0)" class="link-detail"
@@ -317,34 +317,34 @@ body.dark-mode .link-detail { color: #60a5fa; }
                                        data-due="<?php echo date('d/m/Y', strtotime($req['due_date'])); ?>"
                                        data-reason="<?php echo htmlspecialchars($req['reason_for_borrowing']); ?>"
                                        data-attachment="<?php echo htmlspecialchars($req['attachment_url'] ?? ''); ?>">
-                                       <i class="fas fa-file-alt"></i> ดูรายละเอียด
+                                       <i class="fas fa-file-alt"></i> เธ”เธนเธฃเธฒเธขเธฅเธฐเน€เธญเธตเธขเธ”
                                     </a>
                                     <?php if (!empty($req['attachment_url'])): ?>
                                         <a href="<?php echo htmlspecialchars($req['attachment_url']); ?>" target="_blank" class="link-detail" style="color:#10b981;">
-                                            <i class="fas fa-paperclip"></i> ไฟล์แนบ
+                                            <i class="fas fa-paperclip"></i> เนเธเธฅเนเนเธเธ
                                         </a>
                                     <?php endif; ?>
                                 </div>
                             </div>
                             <div class="list-actions">
-                                <button class="btn-sm-action btn-approve" onclick="openApproveSelectionModal(<?php echo $req['transaction_id']; ?>, <?php echo $req['item_id'] ?? 0; ?>, '<?php echo htmlspecialchars($req['equipment_name'], ENT_QUOTES); ?>')"><i class="fas fa-check"></i> อนุมัติ</button>
-                                <button class="btn-sm-action btn-reject" onclick="openRejectPopup(<?php echo $req['transaction_id']; ?>)"><i class="fas fa-times"></i> ปฏิเสธ</button>
+                                <button class="btn-sm-action btn-approve" onclick="openApproveSelectionModal(<?php echo $req['transaction_id']; ?>, <?php echo $req['item_id'] ?? 0; ?>, '<?php echo htmlspecialchars($req['equipment_name'], ENT_QUOTES); ?>')"><i class="fas fa-check"></i> เธญเธเธธเธกเธฑเธ•เธด</button>
+                                <button class="btn-sm-action btn-reject" onclick="openRejectPopup(<?php echo $req['transaction_id']; ?>)"><i class="fas fa-times"></i> เธเธเธดเน€เธชเธ</button>
                             </div>
                         </div>
                     <?php endforeach; ?>
                 <?php endif; ?>
             </div>
 
-            <!-- เกินกำหนดชลอ -->
+            <!-- เน€เธเธดเธเธเธณเธซเธเธ”เธเธฅเธญ -->
             <div class="panel">
                 <div class="panel-head">
                     <i class="fas fa-exclamation-circle" style="color:#ef4444; font-size:1.2rem;"></i>
-                    <h3>เกินกำหนดคืน</h3>
+                    <h3>เน€เธเธดเธเธเธณเธซเธเธ”เธเธทเธ</h3>
                     <span class="badge"><?php echo count($overdue_items); ?></span>
                 </div>
                 
                 <?php if (empty($overdue_items)): ?>
-                    <p class="empty-msg">ยอดเยี่ยม! ไม่มีรายการเกินกำหนด</p>
+                    <p class="empty-msg">เธขเธญเธ”เน€เธขเธตเนเธขเธก! เนเธกเนเธกเธตเธฃเธฒเธขเธเธฒเธฃเน€เธเธดเธเธเธณเธซเธเธ”</p>
                 <?php else: ?>
                     <?php foreach ($overdue_items as $item): 
                         $days_overdue = max(0, (int)$item['days_overdue']);
@@ -354,9 +354,9 @@ body.dark-mode .link-detail { color: #60a5fa; }
                             <div class="list-icon red"><i class="fas fa-calendar-times"></i></div>
                             <div class="list-info">
                                 <h4><?php echo htmlspecialchars($item['equipment_name']); ?></h4>
-                                <p>ผู้ยืม: <strong><?php echo htmlspecialchars($item['student_name'] ?? '-'); ?></strong></p>
-                                <p>เบอร์โทร: <?php echo htmlspecialchars($item['phone_number'] ?? '-'); ?></p>
-                                <p style="color:#ef4444; font-weight:700; margin-top:2px;">เลยกำหนดมาแล้ว <?php echo $days_overdue; ?> วัน</p>
+                                <p>เธเธนเนเธขเธทเธก: <strong><?php echo htmlspecialchars($item['student_name'] ?? '-'); ?></strong></p>
+                                <p>เน€เธเธญเธฃเนเนเธ—เธฃ: <?php echo htmlspecialchars($item['phone_number'] ?? '-'); ?></p>
+                                <p style="color:#ef4444; font-weight:700; margin-top:2px;">เน€เธฅเธขเธเธณเธซเธเธ”เธกเธฒเนเธฅเนเธง <?php echo $days_overdue; ?> เธงเธฑเธ</p>
                             </div>
                             <div class="list-actions">
                                 <button class="btn-sm-action btn-fine" style="width:115px;"
@@ -366,7 +366,7 @@ body.dark-mode .link-detail { color: #60a5fa; }
                                         '<?php echo htmlspecialchars(addslashes($item['equipment_name'])); ?>',
                                         <?php echo $days_overdue; ?>, <?php echo $fine; ?>, <?php echo $item['equipment_id']; ?>
                                     )">
-                                    <i class="fas fa-coins"></i> คืน/ชำระปรับ
+                                    <i class="fas fa-coins"></i> เธเธทเธ/เธเธณเธฃเธฐเธเธฃเธฑเธ
                                 </button>
                             </div>
                         </div>
@@ -379,11 +379,11 @@ body.dark-mode .link-detail { color: #60a5fa; }
         <!-- RIGHT COLUMN -->
         <div class="col-right">
             
-            <!-- สัดส่วน Chart -->
+            <!-- เธชเธฑเธ”เธชเนเธงเธ Chart -->
             <div class="panel">
                 <div class="panel-head">
                     <i class="fas fa-chart-pie" style="color:#3b82f6; font-size:1.2rem;"></i>
-                    <h3>สัดส่วนอุปกรณ์</h3>
+                    <h3>เธชเธฑเธ”เธชเนเธงเธเธญเธธเธเธเธฃเธ“เน</h3>
                 </div>
                 <div style="width: 100%; max-width: 300px; margin: 0 auto;">
                     <canvas id="equipmentStatusChart"></canvas>
@@ -394,22 +394,22 @@ body.dark-mode .link-detail { color: #60a5fa; }
             <div class="panel">
                 <div class="panel-head">
                     <i class="fas fa-history" style="color:#64748b; font-size:1.2rem;"></i>
-                    <h3>ความเคลื่อนไหวล่าสุด</h3>
+                    <h3>เธเธงเธฒเธกเน€เธเธฅเธทเนเธญเธเนเธซเธงเธฅเนเธฒเธชเธธเธ”</h3>
                 </div>
                 <?php if (empty($recent_activity)): ?>
-                    <p class="empty-msg">ยังไม่มีความเคลื่อนไหว</p>
+                    <p class="empty-msg">เธขเธฑเธเนเธกเนเธกเธตเธเธงเธฒเธกเน€เธเธฅเธทเนเธญเธเนเธซเธง</p>
                 <?php else: ?>
                     <div class="act-list">
                         <?php foreach ($recent_activity as $act):
-                            $icon = '🔵'; 
+                            $icon = '๐”ต'; 
                             $name = htmlspecialchars($act['student_name'] ?? 'N/A');
                             $eq = htmlspecialchars($act['equipment_name']);
-                            if ($act['approval_status'] == 'pending') { $icon='🟡'; $txt="<strong>$name</strong> ขอยืม $eq"; }
-                            elseif ($act['approval_status'] == 'rejected') { $icon='⚪'; $txt="ปฏิเสธคำขอของ <strong>$name</strong> ($eq)"; }
-                            elseif ($act['status'] == 'returned') { $icon='🟢'; $txt="<strong>$name</strong> คืน $eq แล้ว"; }
-                            elseif ($act['approval_status'] == 'approved') { $icon='🔵'; $txt="อนุมัติให้ <strong>$name</strong> ยืม $eq"; }
-                            elseif ($act['approval_status'] == 'staff_added') { $icon='🟣'; $txt="บันทึก <strong>$name</strong> ยืม $eq (Walk-in)"; }
-                            else { $txt = "อัปเดตสถานะ $eq"; }
+                            if ($act['approval_status'] == 'pending') { $icon='๐ก'; $txt="<strong>$name</strong> เธเธญเธขเธทเธก $eq"; }
+                            elseif ($act['approval_status'] == 'rejected') { $icon='โช'; $txt="เธเธเธดเน€เธชเธเธเธณเธเธญเธเธญเธ <strong>$name</strong> ($eq)"; }
+                            elseif ($act['status'] == 'returned') { $icon='๐ข'; $txt="<strong>$name</strong> เธเธทเธ $eq เนเธฅเนเธง"; }
+                            elseif ($act['approval_status'] == 'approved') { $icon='๐”ต'; $txt="เธญเธเธธเธกเธฑเธ•เธดเนเธซเน <strong>$name</strong> เธขเธทเธก $eq"; }
+                            elseif ($act['approval_status'] == 'staff_added') { $icon='๐ฃ'; $txt="เธเธฑเธเธ—เธถเธ <strong>$name</strong> เธขเธทเธก $eq (Walk-in)"; }
+                            else { $txt = "เธญเธฑเธเน€เธ”เธ•เธชเธ–เธฒเธเธฐ $eq"; }
                         ?>
                             <div class="act-item">
                                 <div class="act-icon"><?= $icon ?></div>
@@ -425,7 +425,7 @@ body.dark-mode .link-detail { color: #60a5fa; }
 </div>
 
 <script>
-// ฟังก์ชันเปิด Modal รายละเอียด (คอยป้อนค่าให้ Swal)
+// เธเธฑเธเธเนเธเธฑเธเน€เธเธดเธ” Modal เธฃเธฒเธขเธฅเธฐเน€เธญเธตเธขเธ” (เธเธญเธขเธเนเธญเธเธเนเธฒเนเธซเน Swal)
 function openDetailModal(el) {
     const item = el.getAttribute('data-item');
     const serial = el.getAttribute('data-serial');
@@ -436,21 +436,21 @@ function openDetailModal(el) {
     const attachment = el.getAttribute('data-attachment');
 
     Swal.fire({
-        title: 'รายละเอียดการยืม',
+        title: 'เธฃเธฒเธขเธฅเธฐเน€เธญเธตเธขเธ”เธเธฒเธฃเธขเธทเธก',
         html: `
             <div style="text-align: left; padding: 10px; font-size:.9rem;">
-                <p><strong>ชื่ออุปกรณ์:</strong> ${item}</p>
-                <p><strong>Serial Number:</strong> ${serial !== '-' ? serial : 'ยังไม่ระบุ'}</p>
-                <p><strong>ผู้ขอ:</strong> ${req}</p>
-                <p><strong>วันที่ยืม:</strong> ${bDate}</p>
-                <p><strong>กำหนดคืน:</strong> <span style="color:#ef4444">${dDate}</span></p>
+                <p><strong>เธเธทเนเธญเธญเธธเธเธเธฃเธ“เน:</strong> ${item}</p>
+                <p><strong>Serial Number:</strong> ${serial !== '-' ? serial : 'เธขเธฑเธเนเธกเนเธฃเธฐเธเธธ'}</p>
+                <p><strong>เธเธนเนเธเธญ:</strong> ${req}</p>
+                <p><strong>เธงเธฑเธเธ—เธตเนเธขเธทเธก:</strong> ${bDate}</p>
+                <p><strong>เธเธณเธซเธเธ”เธเธทเธ:</strong> <span style="color:#ef4444">${dDate}</span></p>
                 <hr style="margin:10px 0;">
-                <p><strong>เหตุผล:</strong></p>
+                <p><strong>เน€เธซเธ•เธธเธเธฅ:</strong></p>
                 <div style="background:var(--color-page-bg, #f1f5f9); padding:10px; border-radius:8px; white-space:pre-wrap;">${reason}</div>
-                ${attachment ? `<div class="mt-3"><strong><i class="fas fa-paperclip"></i> เอกสาร:</strong> <a href="${attachment}" target="_blank" class="btn btn-sm" style="background:#0ea5e9; color:#fff;">ดูไฟล์แนบ</a></div>` : ''}
+                ${attachment ? `<div class="mt-3"><strong><i class="fas fa-paperclip"></i> เน€เธญเธเธชเธฒเธฃ:</strong> <a href="${attachment}" target="_blank" class="btn btn-sm" style="background:#0ea5e9; color:#fff;">เธ”เธนเนเธเธฅเนเนเธเธ</a></div>` : ''}
             </div>
         `,
-        confirmButtonText: 'ปิด', width: '500px',
+        confirmButtonText: 'เธเธดเธ”', width: '500px',
         customClass: { popup: document.body.classList.contains('dark-mode') ? 'dark-swal' : '' }
     });
 }
@@ -463,7 +463,7 @@ document.addEventListener("DOMContentLoaded", function() {
         const equipmentChart = new Chart(ctx.getContext('2d'), {
            type: 'doughnut', 
            data: {
-               labels: ['พร้อมใช้', 'ถูกยืม', 'ส่งซ่อม'],
+               labels: ['เธเธฃเนเธญเธกเนเธเน', 'เธ–เธนเธเธขเธทเธก', 'เธชเนเธเธเนเธญเธก'],
                datasets: [{
                    data: [<?= $count_available ?>, <?= $count_borrowed ?>, <?= $count_maintenance ?>],
                    backgroundColor: ['#22c55e', '#3b82f6', '#f59e0b'],

@@ -1,69 +1,69 @@
-<?php
+﻿<?php
 // get_borrow_form_data.php
-// (อัปเดต: ดึงข้อมูลจาก sys_users)
-// ดึงข้อมูลสำหรับ Popup "ยืม" (ที่ Admin กด)
+// (เธญเธฑเธเน€เธ”เธ•: เธ”เธถเธเธเนเธญเธกเธนเธฅเธเธฒเธ sys_users)
+// เธ”เธถเธเธเนเธญเธกเธนเธฅเธชเธณเธซเธฃเธฑเธ Popup "เธขเธทเธก" (เธ—เธตเน Admin เธเธ”)
 
-// 1. "จ้างยาม" และ "เชื่อมต่อ DB"
-// (เราใช้ 'check_session.php' เพราะนี่คือฟังก์ชันของ Admin/Staff)
+// 1. "เธเนเธฒเธเธขเธฒเธก" เนเธฅเธฐ "เน€เธเธทเนเธญเธกเธ•เนเธญ DB"
+// (เน€เธฃเธฒเนเธเน 'check_session.php' เน€เธเธฃเธฒเธฐเธเธตเนเธเธทเธญเธเธฑเธเธเนเธเธฑเธเธเธญเธ Admin/Staff)
 include('../includes/check_session_ajax.php');
 require_once('../includes/db_connect.php');
 
-// 2. ตั้งค่า Header ให้ตอบกลับเป็น JSON
+// 2. เธ•เธฑเนเธเธเนเธฒ Header เนเธซเนเธ•เธญเธเธเธฅเธฑเธเน€เธเนเธ JSON
 header('Content-Type: application/json');
 
-// 3. สร้างตัวแปรสำหรับเก็บคำตอบ
+// 3. เธชเธฃเนเธฒเธเธ•เธฑเธงเนเธเธฃเธชเธณเธซเธฃเธฑเธเน€เธเนเธเธเธณเธ•เธญเธ
 $response = [
     'status' => 'error', 
-    'message' => 'เกิดข้อผิดพลาดไม่ทราบสาเหตุ',
+    'message' => 'เน€เธเธดเธ”เธเนเธญเธเธดเธ”เธเธฅเธฒเธ”เนเธกเนเธ—เธฃเธฒเธเธชเธฒเน€เธซเธ•เธธ',
     'equipment_type' => null, 
-    'borrowers' => []  // (***สำคัญ: เรายังใช้ชื่อ 'borrowers' เหมือนเดิม)
+    'borrowers' => []  // (***เธชเธณเธเธฑเธ: เน€เธฃเธฒเธขเธฑเธเนเธเนเธเธทเนเธญ 'borrowers' เน€เธซเธกเธทเธญเธเน€เธ”เธดเธก)
 ];
 
-// 4. รับ ID อุปกรณ์จาก URL
+// 4. เธฃเธฑเธ ID เธญเธธเธเธเธฃเธ“เนเธเธฒเธ URL
 $type_id = isset($_GET['type_id']) ? (int)$_GET['type_id'] : 0;
 if ($type_id == 0) {
-    $response['message'] = 'ไม่ได้ระบุ ID ประเภทอุปกรณ์';
+    $response['message'] = 'เนเธกเนเนเธ”เนเธฃเธฐเธเธธ ID เธเธฃเธฐเน€เธ เธ—เธญเธธเธเธเธฃเธ“เน';
     echo json_encode($response);
     exit;
 }
 
 try {
-    // 5.1 ดึงข้อมูลอุปกรณ์ (เหมือนเดิม)
-    $stmt_equip = $pdo->prepare("SELECT id, name FROM med_equipment_types WHERE id = ? AND available_quantity > 0");
+    // 5.1 เธ”เธถเธเธเนเธญเธกเธนเธฅเธญเธธเธเธเธฃเธ“เน (เน€เธซเธกเธทเธญเธเน€เธ”เธดเธก)
+    $stmt_equip = $pdo->prepare("SELECT id, name FROM borrow_categories WHERE id = ? AND available_quantity > 0");
     $stmt_equip->execute([$type_id]);
     $equipment_type = $stmt_equip->fetch(PDO::FETCH_ASSOC);
 
     if (!$equipment_type) {
-        $response['message'] = 'ไม่พบอุปกรณ์ หรืออุปกรณ์นี้ไม่พร้อมให้ยืม';
+        $response['message'] = 'เนเธกเนเธเธเธญเธธเธเธเธฃเธ“เน เธซเธฃเธทเธญเธญเธธเธเธเธฃเธ“เนเธเธตเนเนเธกเนเธเธฃเนเธญเธกเนเธซเนเธขเธทเธก';
         echo json_encode($response);
         exit;
     }
     $response['equipment_type'] = $equipment_type;
 
-    // 5.2 (SQL ใหม่) ดึงรายชื่อผู้ใช้ทั้งหมดจาก sys_users
+    // 5.2 (SQL เนเธซเธกเน) เธ”เธถเธเธฃเธฒเธขเธเธทเนเธญเธเธนเนเนเธเนเธ—เธฑเนเธเธซเธกเธ”เธเธฒเธ sys_users
     $stmt_borrowers = $pdo->prepare("SELECT id, full_name, phone_number FROM sys_users ORDER BY full_name ASC");
     $stmt_borrowers->execute();
     $borrowers_list = $stmt_borrowers->fetchAll(PDO::FETCH_ASSOC);
     
-    // (เปลี่ยน 'phone_number' เป็น 'contact_info' เพื่อให้ JS เดิมทำงานได้)
+    // (เน€เธเธฅเธตเนเธขเธ 'phone_number' เน€เธเนเธ 'contact_info' เน€เธเธทเนเธญเนเธซเน JS เน€เธ”เธดเธกเธ—เธณเธเธฒเธเนเธ”เน)
     $borrowers_formatted = [];
     foreach ($borrowers_list as $person) {
         $borrowers_formatted[] = [
             'id' => $person['id'],
             'full_name' => $person['full_name'],
-            'contact_info' => $person['phone_number'] // (แปลงชื่อคอลัมน์)
+            'contact_info' => $person['phone_number'] // (เนเธเธฅเธเธเธทเนเธญเธเธญเธฅเธฑเธกเธเน)
         ];
     }
     
-    $response['borrowers'] = $borrowers_formatted; // (ส่งกลับในชื่อ 'borrowers')
+    $response['borrowers'] = $borrowers_formatted; // (เธชเนเธเธเธฅเธฑเธเนเธเธเธทเนเธญ 'borrowers')
     $response['status'] = 'success';
-    $response['message'] = 'ดึงข้อมูลสำเร็จ';
+    $response['message'] = 'เธ”เธถเธเธเนเธญเธกเธนเธฅเธชเธณเน€เธฃเนเธ';
 
 } catch (PDOException $e) {
-    $response['message'] = 'เกิดข้อผิดพลาด DB: ' . $e->getMessage(); // ◀️ (แก้ไข)
+    $response['message'] = 'เน€เธเธดเธ”เธเนเธญเธเธดเธ”เธเธฅเธฒเธ” DB: ' . $e->getMessage(); // โ—€๏ธ (เนเธเนเนเธ)
 }
 
-// 6. ส่งคำตอบ (JSON) กลับไปให้ JavaScript
+// 6. เธชเนเธเธเธณเธ•เธญเธ (JSON) เธเธฅเธฑเธเนเธเนเธซเน JavaScript
 echo json_encode($response);
 exit;
 ?>

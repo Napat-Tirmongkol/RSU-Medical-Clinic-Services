@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 // ajax/get_available_items_for_barcode.php
 include('../includes/check_session_ajax.php');
 require_once('../includes/db_connect.php');
@@ -11,9 +11,9 @@ if (!$type_id) {
 }
 
 try {
-    // ดึงเฉพาะที่ว่าง (available)
+    // เธ”เธถเธเน€เธเธเธฒเธฐเธ—เธตเนเธงเนเธฒเธ (available)
     $sql = "SELECT id, name, serial_number 
-            FROM med_equipment_items 
+            FROM borrow_items 
             WHERE type_id = ? AND status = 'available' 
             ORDER BY id ASC";
     $stmt = $pdo->prepare($sql);

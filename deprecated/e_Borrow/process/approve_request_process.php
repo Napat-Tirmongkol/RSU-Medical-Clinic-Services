@@ -1,24 +1,24 @@
-<?php
-// process/approve_request_process.php (ฉบับแก้ไข: รองรับ AJAX/JSON และ approver_id)
+﻿<?php
+// process/approve_request_process.php (เธเธเธฑเธเนเธเนเนเธ: เธฃเธญเธเธฃเธฑเธ AJAX/JSON เนเธฅเธฐ approver_id)
 include('../includes/check_session.php');
 require_once('../includes/db_connect.php');
 require_once('../includes/log_function.php');
 
-// ตั้งค่าให้ตอบกลับเป็น JSON
+// เธ•เธฑเนเธเธเนเธฒเนเธซเนเธ•เธญเธเธเธฅเธฑเธเน€เธเนเธ JSON
 header('Content-Type: application/json');
-$response = ['status' => 'error', 'message' => 'เกิดข้อผิดพลาดไม่ทราบสาเหตุ'];
+$response = ['status' => 'error', 'message' => 'เน€เธเธดเธ”เธเนเธญเธเธดเธ”เธเธฅเธฒเธ”เนเธกเนเธ—เธฃเธฒเธเธชเธฒเน€เธซเธ•เธธ'];
 
-// ตรวจสอบว่าเป็น POST และมีค่า transaction_id ส่งมา
+// เธ•เธฃเธงเธเธชเธญเธเธงเนเธฒเน€เธเนเธ POST เนเธฅเธฐเธกเธตเธเนเธฒ transaction_id เธชเนเธเธกเธฒ
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['transaction_id'])) {
     
     $transaction_id = $_POST['transaction_id'];
-    $selected_item_id = $_POST['selected_item_id']; // ไอเท็มที่ Admin เลือกจาก Dropdown
+    $selected_item_id = $_POST['selected_item_id']; // เนเธญเน€เธ—เนเธกเธ—เธตเน Admin เน€เธฅเธทเธญเธเธเธฒเธ Dropdown
     
-    // ดึง ID ของคนอนุมัติ
+    // เธ”เธถเธ ID เธเธญเธเธเธเธญเธเธธเธกเธฑเธ•เธด
     $admin_id = $_SESSION['user_id'] ?? $_SESSION['id'] ?? 0;
 
     if (empty($selected_item_id)) {
-        $response['message'] = "กรุณาเลือกอุปกรณ์ (Serial Number)";
+        $response['message'] = "เธเธฃเธธเธ“เธฒเน€เธฅเธทเธญเธเธญเธธเธเธเธฃเธ“เน (Serial Number)";
         echo json_encode($response);
         exit;
     }
@@ -26,42 +26,42 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['transaction_id'])) {
     try {
         $pdo->beginTransaction();
 
-        // 1. ดึงข้อมูลเดิมจาก Database โดยตรง
-        $stmt_chk = $pdo->prepare("SELECT item_id FROM med_transactions WHERE id = ?");
+        // 1. เธ”เธถเธเธเนเธญเธกเธนเธฅเน€เธ”เธดเธกเธเธฒเธ Database เนเธ”เธขเธ•เธฃเธ
+        $stmt_chk = $pdo->prepare("SELECT item_id FROM borrow_records WHERE id = ?");
         $stmt_chk->execute([$transaction_id]);
         $current_item_id = $stmt_chk->fetchColumn(); 
 
-        // 2. เปรียบเทียบของที่เลือกใหม่ (Selected) กับของเดิม (Current)
+        // 2. เน€เธเธฃเธตเธขเธเน€เธ—เธตเธขเธเธเธญเธเธ—เธตเนเน€เธฅเธทเธญเธเนเธซเธกเน (Selected) เธเธฑเธเธเธญเธเน€เธ”เธดเธก (Current)
         if ($selected_item_id != $current_item_id) {
             
-            // === กรณีมีการเปลี่ยนชิ้นอุปกรณ์ ===
+            // === เธเธฃเธ“เธตเธกเธตเธเธฒเธฃเน€เธเธฅเธตเนเธขเธเธเธดเนเธเธญเธธเธเธเธฃเธ“เน ===
             
-            // 2.1 ปล่อยของเดิมให้ว่าง (ถ้ามีค่า)
+            // 2.1 เธเธฅเนเธญเธขเธเธญเธเน€เธ”เธดเธกเนเธซเนเธงเนเธฒเธ (เธ–เนเธฒเธกเธตเธเนเธฒ)
             if (!empty($current_item_id)) {
-                $stmt_release = $pdo->prepare("UPDATE med_equipment_items SET status = 'available' WHERE id = ?");
+                $stmt_release = $pdo->prepare("UPDATE borrow_items SET status = 'available' WHERE id = ?");
                 $stmt_release->execute([$current_item_id]);
             }
 
-            // 2.2 เช็คของชิ้นใหม่ว่าว่างจริงไหม
-            $stmt_status = $pdo->prepare("SELECT status FROM med_equipment_items WHERE id = ?");
+            // 2.2 เน€เธเนเธเธเธญเธเธเธดเนเธเนเธซเธกเนเธงเนเธฒเธงเนเธฒเธเธเธฃเธดเธเนเธซเธก
+            $stmt_status = $pdo->prepare("SELECT status FROM borrow_items WHERE id = ?");
             $stmt_status->execute([$selected_item_id]);
             $new_item_status = $stmt_status->fetchColumn();
 
             if ($new_item_status !== 'available') {
-                // ถ้าสถานะไม่ใช่ available แสดงว่าถูกคนอื่นแย่งไปแล้ว
-                throw new Exception("อุปกรณ์ชิ้นที่เลือก (ID: $selected_item_id) ไม่ว่าง (สถานะ: $new_item_status)");
+                // เธ–เนเธฒเธชเธ–เธฒเธเธฐเนเธกเนเนเธเน available เนเธชเธ”เธเธงเนเธฒเธ–เธนเธเธเธเธญเธทเนเธเนเธขเนเธเนเธเนเธฅเนเธง
+                throw new Exception("เธญเธธเธเธเธฃเธ“เนเธเธดเนเธเธ—เธตเนเน€เธฅเธทเธญเธ (ID: $selected_item_id) เนเธกเนเธงเนเธฒเธ (เธชเธ–เธฒเธเธฐ: $new_item_status)");
             }
 
-            // 2.3 จองของชิ้นใหม่
-            $stmt_borrow = $pdo->prepare("UPDATE med_equipment_items SET status = 'borrowed' WHERE id = ?");
+            // 2.3 เธเธญเธเธเธญเธเธเธดเนเธเนเธซเธกเน
+            $stmt_borrow = $pdo->prepare("UPDATE borrow_items SET status = 'borrowed' WHERE id = ?");
             $stmt_borrow->execute([$selected_item_id]);
 
         } 
         
-        // 3. อัปเดตสถานะคำขอเป็น 'approved' และบันทึกข้อมูลผู้อนุมัติ (approver_id)
-        $sql = "UPDATE med_transactions 
+        // 3. เธญเธฑเธเน€เธ”เธ•เธชเธ–เธฒเธเธฐเธเธณเธเธญเน€เธเนเธ 'approved' เนเธฅเธฐเธเธฑเธเธ—เธถเธเธเนเธญเธกเธนเธฅเธเธนเนเธญเธเธธเธกเธฑเธ•เธด (approver_id)
+        $sql = "UPDATE borrow_records 
                 SET approval_status = 'approved', 
-                    approver_id = ?,    -- ✅ คอลัมน์ที่เพิ่มในขั้นตอนที่ 1
+                    approver_id = ?,    -- โ… เธเธญเธฅเธฑเธกเธเนเธ—เธตเนเน€เธเธดเนเธกเนเธเธเธฑเนเธเธ•เธญเธเธ—เธตเน 1
                     item_id = ?,      
                     equipment_id = ?  
                 WHERE id = ?";
@@ -71,26 +71,26 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['transaction_id'])) {
 
         $pdo->commit();
         
-        // บันทึก Log 
+        // เธเธฑเธเธ—เธถเธ Log 
         if(function_exists('log_action')){
             $admin_user_name = $_SESSION['full_name'] ?? 'System';
-            $log_desc = "Admin '{$admin_user_name}' (ID: {$admin_id}) ได้อนุมัติคำขอ (TID: {$transaction_id}) สำหรับอุปกรณ์ (Item ID: {$selected_item_id})";
+            $log_desc = "Admin '{$admin_user_name}' (ID: {$admin_id}) เนเธ”เนเธญเธเธธเธกเธฑเธ•เธดเธเธณเธเธญ (TID: {$transaction_id}) เธชเธณเธซเธฃเธฑเธเธญเธธเธเธเธฃเธ“เน (Item ID: {$selected_item_id})";
             log_action($pdo, $admin_id, 'approve_request', $log_desc);
         }
 
-        // ✅ ส่ง JSON ตอบกลับเมื่อสำเร็จ
+        // โ… เธชเนเธ JSON เธ•เธญเธเธเธฅเธฑเธเน€เธกเธทเนเธญเธชเธณเน€เธฃเนเธ
         $response['status'] = 'success';
-        $response['message'] = "อนุมัติเรียบร้อยแล้ว (มอบอุปกรณ์ ID: $selected_item_id)";
+        $response['message'] = "เธญเธเธธเธกเธฑเธ•เธดเน€เธฃเธตเธขเธเธฃเนเธญเธขเนเธฅเนเธง (เธกเธญเธเธญเธธเธเธเธฃเธ“เน ID: $selected_item_id)";
 
     } catch (Exception $e) {
         $pdo->rollBack();
-        $response['message'] = "เกิดข้อผิดพลาด: " . $e->getMessage();
+        $response['message'] = "เน€เธเธดเธ”เธเนเธญเธเธดเธ”เธเธฅเธฒเธ”: " . $e->getMessage();
     }
 } else {
-    $response['message'] = "ข้อมูลไม่ครบถ้วน";
+    $response['message'] = "เธเนเธญเธกเธนเธฅเนเธกเนเธเธฃเธเธ–เนเธงเธ";
 }
 
-// 4. ส่งคำตอบ JSON กลับไปเสมอ
+// 4. เธชเนเธเธเธณเธ•เธญเธ JSON เธเธฅเธฑเธเนเธเน€เธชเธกเธญ
 echo json_encode($response);
 exit();
 ?>

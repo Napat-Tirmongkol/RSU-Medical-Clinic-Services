@@ -1,19 +1,19 @@
-<?php
+﻿<?php
 include('../includes/check_session.php'); 
 require_once('../includes/db_connect.php');
 
 $allowed_roles = ['admin', 'editor'];
 if (!isset($_SESSION['role']) || !in_array($_SESSION['role'], $allowed_roles)) {
-    die("คุณไม่มีสิทธิ์เข้าถึงหน้านี้");
+    die("เธเธธเธ“เนเธกเนเธกเธตเธชเธดเธ—เธเธดเนเน€เธเนเธฒเธ–เธถเธเธซเธเนเธฒเธเธตเน");
 }
 
-// 2. รับ Payment ID
+// 2. เธฃเธฑเธ Payment ID
 $payment_id = isset($_GET['payment_id']) ? (int)$_GET['payment_id'] : 0;
 if ($payment_id == 0) {
-    die("ไม่ได้ระบุเลขที่การชำระเงิน");
+    die("เนเธกเนเนเธ”เนเธฃเธฐเธเธธเน€เธฅเธเธ—เธตเนเธเธฒเธฃเธเธณเธฃเธฐเน€เธเธดเธ");
 }
 
-// 3. [แก้ไข] ดึงข้อมูลทั้งหมดที่เกี่ยวข้อง (เพิ่ม payment_method, payment_slip_url)
+// 3. [เนเธเนเนเธ] เธ”เธถเธเธเนเธญเธกเธนเธฅเธ—เธฑเนเธเธซเธกเธ”เธ—เธตเนเน€เธเธตเนเธขเธงเธเนเธญเธ (เน€เธเธดเนเธก payment_method, payment_slip_url)
 try {
     $sql = "SELECT 
                 p.id as payment_id, p.amount_paid, p.payment_date, p.receipt_number,
@@ -23,10 +23,10 @@ try {
                 ei.name as equipment_name,
                 s.full_name as student_name, s.student_personnel_id,
                 u_staff.full_name as staff_name
-            FROM med_payments p
-            JOIN med_fines f ON p.fine_id = f.id
-            JOIN med_transactions t ON f.transaction_id = t.id
-            JOIN med_equipment_items ei ON t.equipment_id = ei.id
+            FROM borrow_payments p
+            JOIN borrow_fines f ON p.fine_id = f.id
+            JOIN borrow_records t ON f.transaction_id = t.id
+            JOIN borrow_items ei ON t.equipment_id = ei.id
             JOIN sys_users s ON f.student_id = s.id
             JOIN sys_staff u_staff ON p.received_by_staff_id = u_staff.id
             WHERE p.id = ?";
@@ -36,10 +36,10 @@ try {
     $data = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if (!$data) {
-        die("ไม่พบข้อมูลการชำระเงินนี้");
+        die("เนเธกเนเธเธเธเนเธญเธกเธนเธฅเธเธฒเธฃเธเธณเธฃเธฐเน€เธเธดเธเธเธตเน");
     }
 } catch (PDOException $e) {
-    die("เกิดข้อผิดพลาด DB: " . $e->getMessage());
+    die("เน€เธเธดเธ”เธเนเธญเธเธดเธ”เธเธฅเธฒเธ” DB: " . $e->getMessage());
 }
 ?>
 <!DOCTYPE html>
@@ -49,7 +49,7 @@ try {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <base href="<?php echo explode('/e_Borrow', $_SERVER['SCRIPT_NAME'])[0] . '/e_Borrow/'; ?>">
     
-    <title>ใบเสร็จรับเงินค่าปรับ (Payment ID: <?php echo $data['payment_id']; ?>)</title>
+    <title>เนเธเน€เธชเธฃเนเธเธฃเธฑเธเน€เธเธดเธเธเนเธฒเธเธฃเธฑเธ (Payment ID: <?php echo $data['payment_id']; ?>)</title>
     
     <link rel="stylesheet" href="assets/css/style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
@@ -115,7 +115,7 @@ try {
             color: #888;
             font-size: 0.9em;
         }
-        /* (เพิ่ม สไตล์สำหรับสลิป) */
+        /* (เน€เธเธดเนเธก เธชเนเธ•เธฅเนเธชเธณเธซเธฃเธฑเธเธชเธฅเธดเธ) */
         .payment-slip {
             margin-top: 20px;
             border-top: 1px dashed #ccc;
@@ -157,32 +157,32 @@ try {
 <body>
 
     <a href="javascript:window.print()" class="print-button">
-        <i class="fas fa-print"></i> พิมพ์ใบเสร็จ
+        <i class="fas fa-print"></i> เธเธดเธกเธเนเนเธเน€เธชเธฃเนเธ
     </a>
 
     <div class="receipt-container" id="receiptContent">
         <div class="receipt-header">
             <img src="assets/img/logo.png" alt="Logo">
-            <h1>ใบเสร็จรับเงิน (ค่าปรับ)</h1>
-            <p>ระบบยืมคืนอุปกรณ์ มหาวิทยาลัยรังสิต</p>
+            <h1>เนเธเน€เธชเธฃเนเธเธฃเธฑเธเน€เธเธดเธ (เธเนเธฒเธเธฃเธฑเธ)</h1>
+            <p>เธฃเธฐเธเธเธขเธทเธกเธเธทเธเธญเธธเธเธเธฃเธ“เน เธกเธซเธฒเธงเธดเธ—เธขเธฒเธฅเธฑเธขเธฃเธฑเธเธชเธดเธ•</p>
         </div>
 
         <div class="receipt-details">
             <div>
-                <strong>ชำระโดย:</strong> <?php echo htmlspecialchars($data['student_name']); ?><br>
-                <strong>รหัสประจำตัว:</strong> <?php echo htmlspecialchars($data['student_personnel_id'] ?? '-'); ?><br>
-                <strong>เลขที่อ้างอิง:</strong> <?php echo $data['payment_id']; ?>
+                <strong>เธเธณเธฃเธฐเนเธ”เธข:</strong> <?php echo htmlspecialchars($data['student_name']); ?><br>
+                <strong>เธฃเธซเธฑเธชเธเธฃเธฐเธเธณเธ•เธฑเธง:</strong> <?php echo htmlspecialchars($data['student_personnel_id'] ?? '-'); ?><br>
+                <strong>เน€เธฅเธเธ—เธตเนเธญเนเธฒเธเธญเธดเธ:</strong> <?php echo $data['payment_id']; ?>
             </div>
             <div>
-                <strong>วันที่ชำระ:</strong> <?php echo date('d/m/Y H:i', strtotime($data['payment_date'])); ?><br>
-                <strong>รับชำระโดย:</strong> <?php echo htmlspecialchars($data['staff_name']); ?><br>
+                <strong>เธงเธฑเธเธ—เธตเนเธเธณเธฃเธฐ:</strong> <?php echo date('d/m/Y H:i', strtotime($data['payment_date'])); ?><br>
+                <strong>เธฃเธฑเธเธเธณเธฃเธฐเนเธ”เธข:</strong> <?php echo htmlspecialchars($data['staff_name']); ?><br>
                 
-                <strong>วิธีชำระเงิน:</strong> 
+                <strong>เธงเธดเธเธตเธเธณเธฃเธฐเน€เธเธดเธ:</strong> 
                 <?php 
                     if ($data['payment_method'] == 'bank_transfer') {
-                        echo 'บัญชีธนาคาร';
+                        echo 'เธเธฑเธเธเธตเธเธเธฒเธเธฒเธฃ';
                     } else {
-                        echo 'เงินสด';
+                        echo 'เน€เธเธดเธเธชเธ”';
                     }
                 ?>
                 </div>
@@ -192,17 +192,17 @@ try {
             <table>
                 <thead>
                     <tr>
-                        <th>รายการ</th>
-                        <th>รายละเอียด</th>
-                        <th style="text-align: right;">จำนวนเงิน</th>
+                        <th>เธฃเธฒเธขเธเธฒเธฃ</th>
+                        <th>เธฃเธฒเธขเธฅเธฐเน€เธญเธตเธขเธ”</th>
+                        <th style="text-align: right;">เธเธณเธเธงเธเน€เธเธดเธ</th>
                     </tr>
                 </thead>
                 <tbody>
                     <tr>
-                        <td>ค่าปรับยืมอุปกรณ์เกินกำหนด</td>
+                        <td>เธเนเธฒเธเธฃเธฑเธเธขเธทเธกเธญเธธเธเธเธฃเธ“เนเน€เธเธดเธเธเธณเธซเธเธ”</td>
                         <td>
-                            อุปกรณ์: <?php echo htmlspecialchars($data['equipment_name']); ?><br>
-                            (กำหนดคืน: <?php echo date('d/m/Y', strtotime($data['due_date'])); ?>)
+                            เธญเธธเธเธเธฃเธ“เน: <?php echo htmlspecialchars($data['equipment_name']); ?><br>
+                            (เธเธณเธซเธเธ”เธเธทเธ: <?php echo date('d/m/Y', strtotime($data['due_date'])); ?>)
                         </td>
                         <td style="text-align: right;"><?php echo number_format($data['amount_paid'], 2); ?></td>
                     </tr>
@@ -211,12 +211,12 @@ try {
         </div>
 
         <div class="receipt-total">
-            ยอดชำระทั้งสิ้น: <?php echo number_format($data['amount_paid'], 2); ?> บาท
+            เธขเธญเธ”เธเธณเธฃเธฐเธ—เธฑเนเธเธชเธดเนเธ: <?php echo number_format($data['amount_paid'], 2); ?> เธเธฒเธ—
         </div>
 
         <?php if ($data['payment_method'] == 'bank_transfer' && !empty($data['payment_slip_url'])): ?>
             <div class="payment-slip">
-                <strong>หลักฐานการชำระเงิน (สลิป):</strong><br>
+                <strong>เธซเธฅเธฑเธเธเธฒเธเธเธฒเธฃเธเธณเธฃเธฐเน€เธเธดเธ (เธชเธฅเธดเธ):</strong><br>
                 
                 <a href="<?php echo htmlspecialchars($data['payment_slip_url']); ?>" target="_blank">
                     <img src="<?php echo htmlspecialchars($data['payment_slip_url']); ?>" alt="Payment Slip">
@@ -224,7 +224,7 @@ try {
             </div>
         <?php endif; ?>
         <div class="receipt-footer">
-            ขอขอบคุณที่ใช้บริการ
+            เธเธญเธเธญเธเธเธธเธ“เธ—เธตเนเนเธเนเธเธฃเธดเธเธฒเธฃ
         </div>
     </div>
 

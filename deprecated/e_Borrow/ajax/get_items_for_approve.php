@@ -1,34 +1,34 @@
-<?php
+﻿<?php
 // ajax/get_items_for_approve.php
-require_once('../includes/check_session_ajax.php'); // ตรวจสอบ Session
+require_once('../includes/check_session_ajax.php'); // เธ•เธฃเธงเธเธชเธญเธ Session
 require_once('../includes/db_connect.php');
 
 header('Content-Type: application/json');
 
 if (!isset($_GET['transaction_id'])) {
-    echo json_encode(['status' => 'error', 'message' => 'ไม่พบ Transaction ID']);
+    echo json_encode(['status' => 'error', 'message' => 'เนเธกเนเธเธ Transaction ID']);
     exit;
 }
 
 $trans_id = $_GET['transaction_id'];
 
 try {
-    // 1. ดูว่าคำขอนี้ จองอุปกรณ์ประเภทไหน (Type ID) และตัวเดิมคือ ID อะไร
-    $stmt = $pdo->prepare("SELECT type_id, item_id FROM med_transactions WHERE id = ?");
+    // 1. เธ”เธนเธงเนเธฒเธเธณเธเธญเธเธตเน เธเธญเธเธญเธธเธเธเธฃเธ“เนเธเธฃเธฐเน€เธ เธ—เนเธซเธ (Type ID) เนเธฅเธฐเธ•เธฑเธงเน€เธ”เธดเธกเธเธทเธญ ID เธญเธฐเนเธฃ
+    $stmt = $pdo->prepare("SELECT type_id, item_id FROM borrow_records WHERE id = ?");
     $stmt->execute([$trans_id]);
     $trans = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if (!$trans) {
-        echo json_encode(['status' => 'error', 'message' => 'ไม่พบข้อมูลคำขอ']);
+        echo json_encode(['status' => 'error', 'message' => 'เนเธกเนเธเธเธเนเธญเธกเธนเธฅเธเธณเธเธญ']);
         exit;
     }
 
     $type_id = $trans['type_id'];
     $current_item_id = $trans['item_id'];
 
-    // 2. ดึงรายการของที่ "ว่าง" (Available) หรือ "ตัวที่จองอยู่" (เพื่อไม่ให้ตัวมันเองหายไปจาก list)
+    // 2. เธ”เธถเธเธฃเธฒเธขเธเธฒเธฃเธเธญเธเธ—เธตเน "เธงเนเธฒเธ" (Available) เธซเธฃเธทเธญ "เธ•เธฑเธงเธ—เธตเนเธเธญเธเธญเธขเธนเน" (เน€เธเธทเนเธญเนเธกเนเนเธซเนเธ•เธฑเธงเธกเธฑเธเน€เธญเธเธซเธฒเธขเนเธเธเธฒเธ list)
     $sql = "SELECT id, serial_number 
-            FROM med_equipment_items 
+            FROM borrow_items 
             WHERE type_id = ? 
             AND (status = 'available' OR id = ?)";
             
