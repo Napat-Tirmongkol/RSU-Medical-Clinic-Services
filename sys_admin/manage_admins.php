@@ -2,7 +2,7 @@
 // admin/manage_admins.php
 session_start();
 require_once __DIR__ . '/../config.php';
-require_once __DIR__ . '/includes/auth.php'; // ตรวจสอบการล็อกอิน
+require_once __DIR__ . '/../admin/includes/auth.php'; // ตรวจสอบการล็อกอิน
 
 $error = '';
 $success = '';
@@ -72,7 +72,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // 2. ดึงข้อมูล Admin ทั้งหมด
 $admins = $pdo->query("SELECT * FROM sys_admins ORDER BY id DESC")->fetchAll();
 
-require_once __DIR__ . '/includes/header.php';
+require_once __DIR__ . '/../admin/includes/header.php';
 ?>
 
 <div class="max-w-6xl mx-auto">
@@ -278,5 +278,5 @@ require_once __DIR__ . '/includes/header.php';
     }
 </script>
 
-<?php require_once __DIR__ . '/includes/footer.php'; ?>
+<?php require_once __DIR__ . '/../admin/includes/footer.php'; ?>
 

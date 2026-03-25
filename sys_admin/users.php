@@ -1,6 +1,6 @@
 <?php
 // admin/users.php
-require_once __DIR__ . '/includes/auth.php';
+require_once __DIR__ . '/../admin/includes/auth.php';
 
 $pdo = db();
 $message = '';
@@ -77,7 +77,7 @@ try {
     die("Error fetching users: " . $e->getMessage());
 }
 
-require_once __DIR__ . '/includes/header.php';
+require_once __DIR__ . '/../admin/includes/header.php';
 ?>
 
 <style>
@@ -287,4 +287,4 @@ function openEditModal(id, name, studentId, citizenId, phone, status) {
 }
 </script>
 
-<?php require_once __DIR__ . '/includes/footer.php'; ?>
+<?php require_once __DIR__ . '/../admin/includes/footer.php'; ?>
