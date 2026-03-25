@@ -1,7 +1,7 @@
 <?php
 // e_Borrow/process/edit_profile_process.php
-// ไม่ใช้แล้ว — form submit ไปที่ profile.php โดยตรง
-// เปลี่ยน redirect ไปหน้า profile เพื่อความปลอดภัย
+// ��������� � form submit 价�� profile.php �µç
+// ����¹ redirect �˹�� profile ���ͤ�����ʹ���
 session_start();
 header("Location: ../profile.php");
 exit;

@@ -1,61 +1,61 @@
 <?php
 // ajax/get_items_for_type.php
-// (เนเธเธฅเนเนเธซเธกเน)
+// (ไฟล์ใหม่)
 
-// 1. "เธเนเธฒเธเธขเธฒเธก" เนเธฅเธฐ "เน€เธเธทเนเธญเธกเธ•เนเธญ DB"
-// โ—€๏ธ (เนเธเนเนเธ) เน€เธเธดเนเธก ../ โ—€๏ธ
+// 1. "จ้างยาม" และ "เชื่อมต่อ DB"
+// ◀️ (แก้ไข) เพิ่ม ../ ◀️
 include('../includes/check_session_ajax.php');
 require_once(__DIR__ . '/../../../config/db_connect.php');
 
-// 2. เธ•เธฃเธงเธเธชเธญเธเธชเธดเธ—เธเธดเน Admin เนเธฅเธฐเธ•เธฑเนเธเธเนเธฒ Header
+// 2. ตรวจสอบสิทธิ์ Admin และตั้งค่า Header
 $allowed_roles = ['admin', 'editor'];
 if (!isset($_SESSION['role']) || !in_array($_SESSION['role'], $allowed_roles)) {
     header('Content-Type: application/json');
-    echo json_encode(['status' => 'error', 'message' => 'เธเธธเธ“เนเธกเนเธกเธตเธชเธดเธ—เธเธดเนเธ”เธณเน€เธเธดเธเธเธฒเธฃ']);
+    echo json_encode(['status' => 'error', 'message' => 'คุณไม่มีสิทธิ์ดำเนินการ']);
     exit;
 }
 header('Content-Type: application/json');
 
-// 3. เธชเธฃเนเธฒเธเธ•เธฑเธงเนเธเธฃเธชเธณเธซเธฃเธฑเธเน€เธเนเธเธเธณเธ•เธญเธ
-$response = ['status' => 'error', 'message' => 'เน€เธเธดเธ”เธเนเธญเธเธดเธ”เธเธฅเธฒเธ”เนเธกเนเธ—เธฃเธฒเธเธชเธฒเน€เธซเธ•เธธ'];
+// 3. สร้างตัวแปรสำหรับเก็บคำตอบ
+$response = ['status' => 'error', 'message' => 'เกิดข้อผิดพลาดไม่ทราบสาเหตุ'];
 
-// 4. เธฃเธฑเธ ID
+// 4. รับ ID
 $type_id = isset($_GET['type_id']) ? (int)$_GET['type_id'] : 0;
 
 if ($type_id == 0) {
-    $response['message'] = 'เนเธกเนเนเธ”เนเธฃเธฐเธเธธ ID เธเธฃเธฐเน€เธ เธ—เธญเธธเธเธเธฃเธ“เน';
+    $response['message'] = 'ไม่ได้ระบุ ID ประเภทอุปกรณ์';
     echo json_encode($response);
     exit;
 }
 
 try {
-    // 5. (Query เธ—เธตเน 1) เธ”เธถเธเธเนเธญเธกเธนเธฅ "เธเธฃเธฐเน€เธ เธ—" (เน€เธเธทเนเธญเนเธเนเธเธทเนเธญ)
+    // 5. (Query ที่ 1) ดึงข้อมูล "ประเภท" (เผื่อใช้ชื่อ)
     $stmt_type = $pdo->prepare("SELECT name FROM borrow_categories WHERE id = ?");
     $stmt_type->execute([$type_id]);
     $type_data = $stmt_type->fetch(PDO::FETCH_ASSOC);
 
     if (!$type_data) {
-        throw new Exception("เนเธกเนเธเธเธเธฃเธฐเน€เธ เธ—เธญเธธเธเธเธฃเธ“เน (ID: $type_id)");
+        throw new Exception("ไม่พบประเภทอุปกรณ์ (ID: $type_id)");
     }
 
-    // 6. (Query เธ—เธตเน 2) เธ”เธถเธเธเนเธญเธกเธนเธฅ "เธเธดเนเธ" เธญเธธเธเธเธฃเธ“เน (items)
+    // 6. (Query ที่ 2) ดึงข้อมูล "ชิ้น" อุปกรณ์ (items)
     $stmt_items = $pdo->prepare("SELECT * FROM borrow_items WHERE type_id = ? ORDER BY id ASC");
     $stmt_items->execute([$type_id]);
     $items_data = $stmt_items->fetchAll(PDO::FETCH_ASSOC);
 
-    // 7. เธชเนเธเธเนเธญเธกเธนเธฅเธเธฅเธฑเธ
+    // 7. ส่งข้อมูลกลับ
     $response['status'] = 'success';
     $response['type'] = $type_data;
     $response['items'] = $items_data;
 
 
 } catch (PDOException $e) {
-    $response['message'] = 'เน€เธเธดเธ”เธเนเธญเธเธดเธ”เธเธฅเธฒเธ” DB: ' . $e->getMessage();
+    $response['message'] = 'เกิดข้อผิดพลาด DB: ' . $e->getMessage();
 } catch (Exception $e) {
     $response['message'] = $e->getMessage();
 }
 
-// 8. เธชเนเธเธเธณเธ•เธญเธ
+// 8. ส่งคำตอบ
 echo json_encode($response);
 exit;
 ?>

@@ -5,20 +5,20 @@ require_once(__DIR__ . '/../../../config/db_connect.php');
 
 $allowed_roles = ['admin', 'editor'];
 if (!isset($_SESSION['role']) || !in_array($_SESSION['role'], $allowed_roles)) {
-    die("เธเธธเธ“เนเธกเนเธกเธตเธชเธดเธ—เธเธดเนเน€เธเนเธฒเธ–เธถเธเธซเธเนเธฒเธเธตเน");
+    die("คุณไม่มีสิทธิ์เข้าถึงหน้านี้");
 }
 
-// เธฃเธฑเธเธเนเธญเธกเธนเธฅ JSON (เนเธเธฃเธเธชเธฃเนเธฒเธเนเธซเธกเน: [{ type_id: 1, selected_ids: [101, 102] }, ...])
+// รับข้อมูล JSON (โครงสร้างใหม่: [{ type_id: 1, selected_ids: [101, 102] }, ...])
 $data_json = $_GET['data'] ?? '[]';
 $requests = json_decode($data_json, true);
 
 if (empty($requests)) {
-    die("เนเธกเนเธกเธตเธเนเธญเธกเธนเธฅเธชเธณเธซเธฃเธฑเธเธเธดเธกเธเน");
+    die("ไม่มีข้อมูลสำหรับพิมพ์");
 }
 
 $items_to_print = [];
 
-// เธฃเธงเธเธฃเธงเธก ID เธ—เธฑเนเธเธซเธกเธ”เธ—เธตเนเธเธฐเธเธดเธกเธเน
+// รวบรวม ID ทั้งหมดที่จะพิมพ์
 $all_ids = [];
 foreach ($requests as $req) {
     if (!empty($req['selected_ids']) && is_array($req['selected_ids'])) {
@@ -29,7 +29,7 @@ foreach ($requests as $req) {
 }
 
 if (!empty($all_ids)) {
-    // Query เธเธฃเธฑเนเธเน€เธ”เธตเธขเธงเธ”เนเธงเธข IN (...)
+    // Query ครั้งเดียวด้วย IN (...)
     $placeholders = implode(',', array_fill(0, count($all_ids), '?'));
     $sql = "SELECT id, name, serial_number FROM borrow_items WHERE id IN ($placeholders)";
     
@@ -47,7 +47,7 @@ if (!empty($all_ids)) {
 <head>
 <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>เธเธดเธกเธเนเธเธฒเธฃเนเนเธเนเธ”เธเธณเธเธงเธเธกเธฒเธ - MedLoan</title>
+    <title>พิมพ์บาร์โค้ดจำนวนมาก - MedLoan</title>
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
     
     <style>
@@ -74,15 +74,15 @@ if (!empty($all_ids)) {
 <body>
 
     <div class="no-print">
-        <h2>เธฃเธฒเธขเธเธฒเธฃเธเธฒเธฃเนเนเธเนเธ” (<?php echo count($items_to_print); ?> เธฃเธฒเธขเธเธฒเธฃ)</h2>
-        <a href="javascript:window.print()" class="btn">๐–จ๏ธ เธชเธฑเนเธเธเธดเธกเธเน</a>
-        <a href="javascript:window.close()" class="btn" style="background: #666;">เธเธดเธ”เธซเธเนเธฒเธ•เนเธฒเธ</a>
+        <h2>รายการบาร์โค้ด (<?php echo count($items_to_print); ?> รายการ)</h2>
+        <a href="javascript:window.print()" class="btn">🖨️ สั่งพิมพ์</a>
+        <a href="javascript:window.close()" class="btn" style="background: #666;">ปิดหน้าต่าง</a>
     </div>
 
     <div class="page">
         <?php if (empty($items_to_print)): ?>
             <div style="grid-column: 1 / -1; text-align: center; padding: 50px;">
-                <h3 style="color: red;">เนเธกเนเธเธเธเนเธญเธกเธนเธฅเธญเธธเธเธเธฃเธ“เน</h3>
+                <h3 style="color: red;">ไม่พบข้อมูลอุปกรณ์</h3>
             </div>
         <?php else: ?>
             <?php foreach ($items_to_print as $item): 

@@ -11,7 +11,7 @@ if (!$type_id) {
 }
 
 try {
-    // เธ”เธถเธเน€เธเธเธฒเธฐเธ—เธตเนเธงเนเธฒเธ (available)
+    // ดึงเฉพาะที่ว่าง (available)
     $sql = "SELECT id, name, serial_number 
             FROM borrow_items 
             WHERE type_id = ? AND status = 'available' 

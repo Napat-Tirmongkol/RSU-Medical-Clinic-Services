@@ -1,23 +1,23 @@
 <?php
-// return_dashboard.php (เธญเธฑเธเน€เธ”เธ• V3.1 - เน€เธเธดเนเธก Workflow เธเนเธฒเธเธฃเธฑเธเธเนเธญเธเธเธทเธ)
+// return_dashboard.php (อัปเดต V3.1 - เพิ่ม Workflow ค่าปรับก่อนคืน)
 
-// 1. "เธเนเธฒเธเธขเธฒเธก" เนเธฅเธฐ "เน€เธเธทเนเธญเธกเธ•เนเธญ DB"
+// 1. "จ้างยาม" และ "เชื่อมต่อ DB"
 include('../includes/check_session.php'); 
 require_once(__DIR__ . '/../../../config/db_connect.php'); 
 
-// 2. เธ•เธฃเธงเธเธชเธญเธเธชเธดเธ—เธเธดเน (เธญเธเธธเธเธฒเธ• Admin, Employee เนเธฅเธฐ Editor)
+// 2. ตรวจสอบสิทธิ์ (อนุญาต Admin, Employee และ Editor)
 $allowed_roles = ['admin', 'employee', 'editor'];
 if (!isset($_SESSION['role']) || !in_array($_SESSION['role'], $allowed_roles)) {
     header("Location: index.php");
     exit;
 }
 
-// 3. (SQL) เธ”เธถเธเธเนเธญเธกเธนเธฅเธญเธธเธเธเธฃเธ“เนเธ—เธตเนเธ–เธนเธเธขเธทเธก
+// 3. (SQL) ดึงข้อมูลอุปกรณ์ที่ถูกยืม
 $borrowed_items = [];
 try {
     
-    // โ… (เนเธเนเนเธ) Query เนเธซเธกเน: เธ”เธถเธ t.id (transaction_id), s.id (student_id), 
-    //    t.fine_status, เนเธฅเธฐเธเธณเธเธงเธ“ DATEDIFF
+    // ✅ (แก้ไข) Query ใหม่: ดึง t.id (transaction_id), s.id (student_id), 
+    //    t.fine_status, และคำนวณ DATEDIFF
     $sql = "SELECT 
                 t.id as transaction_id, 
                 t.equipment_id, 
@@ -42,44 +42,44 @@ try {
     $borrowed_items = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 } catch (PDOException $e) {
-    echo "เน€เธเธดเธ”เธเนเธญเธเธดเธ”เธเธฅเธฒเธ”เนเธเธเธฒเธฃเธ”เธถเธเธเนเธญเธกเธนเธฅ: " . $e->getMessage();
+    echo "เกิดข้อผิดพลาดในการดึงข้อมูล: " . $e->getMessage();
 }
 
-// 4. เธ•เธฑเนเธเธเนเธฒเธ•เธฑเธงเนเธเธฃเธชเธณเธซเธฃเธฑเธ Header
-$page_title = "เธเธทเธเธญเธธเธเธเธฃเธ“เน";
+// 4. ตั้งค่าตัวแปรสำหรับ Header
+$page_title = "คืนอุปกรณ์";
 $current_page = "return"; 
 
-// 5. เน€เธฃเธตเธขเธเนเธเน Header
+// 5. เรียกใช้ Header
 include('../includes/header.php'); 
 ?>
 
 <div class="header-row">
-    <h2><i class="fas fa-undo-alt"></i> ๐“ฆ เธฃเธฒเธขเธเธฒเธฃเธญเธธเธเธเธฃเธ“เนเธ—เธตเนเธ•เนเธญเธเธฃเธฑเธเธเธทเธ</h2>
+    <h2><i class="fas fa-undo-alt"></i> 📦 รายการอุปกรณ์ที่ต้องรับคืน</h2>
 </div>
 
 <div class="table-container">
     <table>
         <thead>
             <tr>
-                <th>เธญเธธเธเธเธฃเธ“เน</th>
-                <th>เน€เธฅเธเธเธตเน€เธฃเธตเธขเธฅ</th>
-                <th>เธเธนเนเธขเธทเธก (User)</th>
-                <th>เธเนเธญเธกเธนเธฅเธ•เธดเธ”เธ•เนเธญ (เธเธนเนเธขเธทเธก)</th>
-                <th>เธงเธฑเธเธ—เธตเนเธขเธทเธก</th>
-                <th>เธงเธฑเธเธ—เธตเนเธเธณเธซเธเธ”เธเธทเธ</th>
-                <th>เธเธฑเธ”เธเธฒเธฃ</th>
+                <th>อุปกรณ์</th>
+                <th>เลขซีเรียล</th>
+                <th>ผู้ยืม (User)</th>
+                <th>ข้อมูลติดต่อ (ผู้ยืม)</th>
+                <th>วันที่ยืม</th>
+                <th>วันที่กำหนดคืน</th>
+                <th>จัดการ</th>
             </tr>
         </thead>
         <tbody>
             <?php if (empty($borrowed_items)): ?>
                 <tr>
-                    <td colspan="7" style="text-align: center;">เนเธกเนเธกเธตเธญเธธเธเธเธฃเธ“เนเธ—เธตเนเธเธณเธฅเธฑเธเธ–เธนเธเธขเธทเธกเนเธเธเธ“เธฐเธเธตเน</td>
+                    <td colspan="7" style="text-align: center;">ไม่มีอุปกรณ์ที่กำลังถูกยืมในขณะนี้</td>
                 </tr>
             <?php else: ?>
                 <?php foreach ($borrowed_items as $row): ?>
                     
                     <?php
-                        // โ… (เนเธซเธกเน) เธ•เธฃเธฃเธเธฐเธชเธณเธซเธฃเธฑเธเธ•เธฃเธงเธเธชเธญเธเธเนเธฒเธเธฃเธฑเธ
+                        // ✅ (ใหม่) ตรรกะสำหรับตรวจสอบค่าปรับ
                         $days_overdue = (int)$row['days_overdue'];
                         if ($days_overdue < 0) $days_overdue = 0;
                         
@@ -91,18 +91,18 @@ include('../includes/header.php');
                     <tr>
                         <td><?php echo htmlspecialchars($row['equipment_name']); ?></td>
                         <td><?php echo htmlspecialchars($row['equipment_serial'] ?? '-'); ?></td>
-                        <td><?php echo htmlspecialchars($row['borrower_name'] ?? '[เธเธนเนเนเธเนเธ–เธนเธเธฅเธ]'); ?></td>
+                        <td><?php echo htmlspecialchars($row['borrower_name'] ?? '[ผู้ใช้ถูกลบ]'); ?></td>
                         <td><?php echo htmlspecialchars($row['borrower_contact'] ?? '-'); ?></td>
                         <td><?php echo date('d/m/Y H:i', strtotime($row['borrow_date'])); ?></td>
                         
-                        <?php // (เน€เธเธฅเธตเนเธขเธเธชเธตเธงเธฑเธเธ—เธตเน เธ–เนเธฒเน€เธเธดเธเธเธณเธซเธเธ”) ?>
+                        <?php // (เปลี่ยนสีวันที่ ถ้าเกินกำหนด) ?>
                         <td style="color: <?php echo $is_overdue ? 'var(--color-danger)' : 'inherit'; ?>; font-weight: <?php echo $is_overdue ? 'bold' : 'normal'; ?>;">
                             <?php echo date('d/m/Y', strtotime($row['due_date'])); ?>
                         </td>
 
                         <td class="action-buttons">
                             
-                            <?php // โ… (เนเธซเธกเน) เธ•เธฃเธฃเธเธฐเธเธฒเธฃเน€เธเธฅเธตเนเธขเธเธเธธเนเธก ?>
+                            <?php // ✅ (ใหม่) ตรรกะการเปลี่ยนปุ่ม ?>
                             <?php if ($is_overdue && !$is_fine_paid): ?>
                                 <button type="button" class="btn btn-danger" 
                                         onclick="openFineAndReturnPopup(
@@ -114,12 +114,12 @@ include('../includes/header.php');
                                             <?php echo $calculated_fine; ?>,
                                             <?php echo $row['equipment_id']; ?> 
                                         )">
-                                    <i class="fas fa-dollar-sign"></i> เธเธณเธฃเธฐเธเนเธฒเธเธฃเธฑเธ
+                                    <i class="fas fa-dollar-sign"></i> ชำระค่าปรับ
                                 </button>
                             <?php else: ?>
                                 <button type="button" 
                                         class="btn btn-return" 
-                                        onclick="openReturnPopup(<?php echo $row['equipment_id']; ?>)">เธฃเธฑเธเธเธทเธ</button>
+                                        onclick="openReturnPopup(<?php echo $row['equipment_id']; ?>)">รับคืน</button>
                             <?php endif; ?>
 
                         </td>
@@ -131,6 +131,6 @@ include('../includes/header.php');
 </div>
 
 <?php
-// 7. เน€เธฃเธตเธขเธเนเธเนเนเธเธฅเน Footer (เธเธถเนเธเธกเธต JavaScript popups เธ—เธตเนเน€เธฃเธฒเธขเนเธฒเธขเนเธ)
+// 7. เรียกใช้ไฟล์ Footer (ซึ่งมี JavaScript popups ที่เราย้ายไป)
 include('../includes/footer.php'); 
 ?>

@@ -13,7 +13,7 @@
         /* Smooth Page Transition */
         body { opacity: 1; transition: opacity 0.25s ease-out, transform 0.25s ease-out; }
         body.page-transitioning { opacity: 0; transform: translateY(10px); }
-    </style>    <title><?php echo isset($page_title) ? $page_title : 'เธฃเธฐเธเธเธขเธทเธกเธเธทเธเธญเธธเธเธเธฃเธ“เน'; ?></title>
+    </style>    <title><?php echo isset($page_title) ? $page_title : 'ระบบยืมคืนอุปกรณ์'; ?></title>
     
     <script>
         (function() {
@@ -41,12 +41,12 @@
     window.addEventListener('DOMContentLoaded', () => document.body.classList.remove('page-transitioning'));
 </script>
     <header class="header"> 
-        <h1>E-Borrow - (เธฃเธฐเธเธ เธขเธทเธก-เธเธทเธ เธญเธธเธเธเธฃเธ“เน)</h1>
+        <h1>E-Borrow - (ระบบ ยืม-คืน อุปกรณ์)</h1>
         
         <div class="user-info"> 
             
             <div class="user-greeting">
-                เธชเธงเธฑเธชเธ”เธต, <?php echo htmlspecialchars($_SESSION['full_name']); ?>
+                สวัสดี, <?php echo htmlspecialchars($_SESSION['full_name']); ?>
                 (<?php 
                     if ($_SESSION['role'] == 'admin') {
                         echo '<span style="color: var(--color-warning); font-weight: bold;">Admin <i class="fa-solid fa-crown"></i></span>';
@@ -58,14 +58,14 @@
                 ?>)
             </div>
 
-            <button type="button" class="theme-toggle-btn" id="theme-toggle-btn" title="เธชเธฅเธฑเธเนเธซเธกเธ”">
+            <button type="button" class="theme-toggle-btn" id="theme-toggle-btn" title="สลับโหมด">
                 <i class="fas fa-moon"></i>
                 <i class="fas fa-sun"></i>
             </button>
             
-            <a href="admin/logout.php" class="btn btn-logout" title="เธญเธญเธเธเธฒเธเธฃเธฐเธเธ">
+            <a href="admin/logout.php" class="btn btn-logout" title="ออกจากระบบ">
                 <i class="fa-solid fa-arrow-right-from-bracket"></i>
-                <span class="logout-text">เธญเธญเธเธเธฒเธเธฃเธฐเธเธ</span>
+                <span class="logout-text">ออกจากระบบ</span>
             </a>
         </div>
     </header>

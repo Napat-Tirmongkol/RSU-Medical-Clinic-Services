@@ -9,23 +9,23 @@ if (!isset($_SESSION['role']) || !in_array($_SESSION['role'], $allowed_roles)) {
     exit;
 }
 
-// 1. เธชเนเธงเธ PHP: เธเธฑเธ”เธเธฒเธฃเธเนเธญเธกเธนเธฅ & AJAX Handler
+// 1. ส่วน PHP: จัดการข้อมูล & AJAX Handler
 $start_date = $_GET['start_date'] ?? null;
 $end_date = $_GET['end_date'] ?? null;
 $status_filter = $_GET['status'] ?? 'all'; 
 
 function renderOverdueRows($data) {
-    if (empty($data)) return '<tr><td colspan="6" style="text-align: center; padding: 20px; color: #999;">เนเธกเนเธกเธตเธฃเธฒเธขเธเธฒเธฃเน€เธเธดเธเธเธณเธซเธเธ”เธ—เธตเนเธ•เนเธญเธเธเธฑเธ”เธเธฒเธฃ</td></tr>';
+    if (empty($data)) return '<tr><td colspan="6" style="text-align: center; padding: 20px; color: #999;">ไม่มีรายการเกินกำหนดที่ต้องจัดการ</td></tr>';
     $html = '';
     foreach ($data as $item) {
         $days_overdue = (int)$item['days_overdue'];
         if ($days_overdue < 0) $days_overdue = 0;
         $calculated_fine = $days_overdue * FINE_RATE_PER_DAY; 
-        $s_name = htmlspecialchars(addslashes($item['student_name'] ?? '[เธเธนเนเนเธเนเธ–เธนเธเธฅเธ]'));
+        $s_name = htmlspecialchars(addslashes($item['student_name'] ?? '[ผู้ใช้ถูกลบ]'));
         $e_name = htmlspecialchars(addslashes($item['equipment_name']));
 
         $html .= '<tr>
-            <td>'.htmlspecialchars($item['student_name'] ?? '[เธเธนเนเนเธเนเธ–เธนเธเธฅเธ]').'</td>
+            <td>'.htmlspecialchars($item['student_name'] ?? '[ผู้ใช้ถูกลบ]').'</td>
             <td>'.htmlspecialchars($item['equipment_name']).'</td>
             <td style="color: var(--color-danger); font-weight: bold;">'.date('d/m/Y', strtotime($item['due_date'])).'</td>
             <td style="text-align: center; font-weight: bold; font-size: 1.1em;">'.$days_overdue.'</td>
@@ -33,7 +33,7 @@ function renderOverdueRows($data) {
             <td class="action-buttons">
                 <button type="button" class="btn btn-success" 
                     onclick="openDirectPaymentPopup('.$item['transaction_id'].', '.($item['student_id'] ?? 0).', \''.$s_name.'\', \''.$e_name.'\', '.$days_overdue.', '.$calculated_fine.')">
-                    <i class="fas fa-hand-holding-usd"></i> เธเธณเธฃเธฐเน€เธเธดเธ
+                    <i class="fas fa-hand-holding-usd"></i> ชำระเงิน
                 </button>
             </td>
         </tr>';
@@ -42,18 +42,18 @@ function renderOverdueRows($data) {
 }
 
 function renderHistoryRows($data) {
-    if (empty($data)) return '<tr><td colspan="6" style="text-align: center; padding: 20px; color: #999;">เนเธกเนเธเธเธเธฃเธฐเธงเธฑเธ•เธดเนเธเธเนเธงเธเน€เธงเธฅเธฒเธเธตเน</td></tr>';
+    if (empty($data)) return '<tr><td colspan="6" style="text-align: center; padding: 20px; color: #999;">ไม่พบประวัติในช่วงเวลานี้</td></tr>';
     $html = '';
     foreach ($data as $fine) {
         $has_line = !empty($fine['line_user_id']);
         $line_btn_class = $has_line ? 'btn-line' : 'btn-secondary disabled';
-        $line_onclick = $has_line ? 'onclick="sendLineReceipt('.$fine['payment_id'].')"' : 'disabled title="เธเธนเนเนเธเนเธเธตเนเนเธกเนเนเธ”เนเธเธนเธ LINE"';
+        $line_onclick = $has_line ? 'onclick="sendLineReceipt('.$fine['payment_id'].')"' : 'disabled title="ผู้ใช้นี้ไม่ได้ผูก LINE"';
 
         $html .= '<tr>
             <td>'.htmlspecialchars($fine['student_name'] ?? '[N/A]').'</td>
             <td>'.htmlspecialchars($fine['equipment_name']).'</td>
             <td><strong>'.number_format($fine['amount'], 2).'</strong></td>
-            <td><span class="status-badge returned"><i class="fas fa-check-circle"></i> เธเธณเธฃเธฐเนเธฅเนเธง</span>
+            <td><span class="status-badge returned"><i class="fas fa-check-circle"></i> ชำระแล้ว</span>
                 <div style="font-size: 0.9em; margin-top: 5px; color: #555;">('.date('d/m/Y', strtotime($fine['payment_date'])).')</div></td>
             <td>'.htmlspecialchars($fine['staff_name'] ?? '[N/A]').'
                 <div style="font-size: 0.9em; margin-top: 5px; color: #555;">('.date('d/m/Y H:i', strtotime($fine['created_at'])).')</div></td>
@@ -98,7 +98,7 @@ try {
     $stmt2 = $pdo->prepare($sql_history); $stmt2->execute($params_history); $fines_list = $stmt2->fetchAll(PDO::FETCH_ASSOC);
 } catch (PDOException $e) { $error_msg = "Error: " . $e->getMessage(); }
 
-$page_title = "เธเธฑเธ”เธเธฒเธฃเธเนเธฒเธเธฃเธฑเธ";
+$page_title = "จัดการค่าปรับ";
 $current_page = "manage_fines"; 
 include('../includes/header.php');
 ?>
@@ -120,28 +120,28 @@ include('../includes/header.php');
 </style>
 
 <div class="header-row" style="flex-wrap: wrap; gap: 15px; align-items: center;">
-    <h2><i class="fas fa-file-invoice-dollar"></i> เธเธฑเธ”เธเธฒเธฃเธเนเธฒเธเธฃเธฑเธ</h2>
+    <h2><i class="fas fa-file-invoice-dollar"></i> จัดการค่าปรับ</h2>
     <div class="time-filter-group">
         <button type="button" class="time-filter-btn" onclick="refreshFinesData()"><i class="fas fa-sync-alt"></i> Refresh</button>
         <span class="toolbar-separator"></span>
         <div style="display: flex; align-items: center; gap: 8px;">
             <i class="far fa-clock" style="color: #aaa;"></i>
             <select class="time-filter-select" id="timeRangeSelect" onchange="handleTimeRangeChange(this.value)">
-                <option value="" disabled selected>เน€เธฅเธทเธญเธเธเนเธงเธเน€เธงเธฅเธฒ (เธเธฃเธฐเธงเธฑเธ•เธด)</option>
-                <option value="today">เธงเธฑเธเธเธตเน (Today)</option>
-                <option value="48h">2 เธงเธฑเธเธขเนเธญเธเธซเธฅเธฑเธ</option>
-                <option value="7d">7 เธงเธฑเธเธขเนเธญเธเธซเธฅเธฑเธ</option>
-                <option value="30d">30 เธงเธฑเธเธขเนเธญเธเธซเธฅเธฑเธ</option>
-                <option value="custom">เธเธณเธซเธเธ”เน€เธญเธ (Custom range)...</option>
+                <option value="" disabled selected>เลือกช่วงเวลา (ประวัติ)</option>
+                <option value="today">วันนี้ (Today)</option>
+                <option value="48h">2 วันย้อนหลัง</option>
+                <option value="7d">7 วันย้อนหลัง</option>
+                <option value="30d">30 วันย้อนหลัง</option>
+                <option value="custom">กำหนดเอง (Custom range)...</option>
             </select>
         </div>
         <span class="toolbar-separator"></span>
         <div style="display: flex; align-items: center; gap: 8px;">
-            <span style="color: #aaa; font-size: 0.9rem;">เธชเธ–เธฒเธเธฐ:</span>
+            <span style="color: #aaa; font-size: 0.9rem;">สถานะ:</span>
             <select class="time-filter-select" id="finesStatusFilter" onchange="refreshFinesData()">
-                <option value="all">เธ—เธฑเนเธเธซเธกเธ”</option>
-                <option value="unpaid">เธขเธฑเธเนเธกเนเธเธณเธฃเธฐ (Overdue)</option>
-                <option value="paid">เธเธณเธฃเธฐเนเธฅเนเธง (History)</option>
+                <option value="all">ทั้งหมด</option>
+                <option value="unpaid">ยังไม่ชำระ (Overdue)</option>
+                <option value="paid">ชำระแล้ว (History)</option>
             </select>
         </div>
     </div>
@@ -155,12 +155,12 @@ include('../includes/header.php');
 
     <div id="overdueSection">
         <div class="header-row" style="margin-top: 0; background: none; box-shadow: none; padding-left: 0;">
-            <h3 style="font-size: 1.1rem;"><i class="fas fa-exclamation-triangle" style="color: var(--color-danger);"></i> 1. เธฃเธฒเธขเธเธฒเธฃเน€เธเธดเธเธเธณเธซเธเธ” (เธฃเธญเธเธณเธฃเธฐ)</h3>
+            <h3 style="font-size: 1.1rem;"><i class="fas fa-exclamation-triangle" style="color: var(--color-danger);"></i> 1. รายการเกินกำหนด (รอชำระ)</h3>
         </div>
         <div class="table-container">
             <table>
                 <thead>
-                    <tr><th>เธเธนเนเธขเธทเธก</th><th>เธญเธธเธเธเธฃเธ“เน</th><th>เธเธณเธซเธเธ”เธเธทเธ</th><th>เน€เธเธดเธเธเธณเธซเธเธ” (เธงเธฑเธ)</th><th>เธเนเธฒเธเธฃเธฑเธ (เธเธฒเธ—)</th><th>เธเธฑเธ”เธเธฒเธฃ</th></tr>
+                    <tr><th>ผู้ยืม</th><th>อุปกรณ์</th><th>กำหนดคืน</th><th>เกินกำหนด (วัน)</th><th>ค่าปรับ (บาท)</th><th>จัดการ</th></tr>
                 </thead>
                 <tbody id="overdueTableBody">
                     <?php echo renderOverdueRows($overdue_unfined); ?>
@@ -172,12 +172,12 @@ include('../includes/header.php');
 
     <div id="historySection">
         <div class="header-row" style="margin-top: 0; background: none; box-shadow: none; padding-left: 0;">
-            <h3 style="font-size: 1.1rem;"><i class="fas fa-history" style="color: var(--color-primary);"></i> 2. เธเธฃเธฐเธงเธฑเธ•เธดเธเธฒเธฃเธเธณเธฃเธฐเธเนเธฒเธเธฃเธฑเธ</h3>
+            <h3 style="font-size: 1.1rem;"><i class="fas fa-history" style="color: var(--color-primary);"></i> 2. ประวัติการชำระค่าปรับ</h3>
         </div>
         <div class="table-container">
             <table>
                 <thead>
-                    <tr><th>เธเธนเนเธขเธทเธก</th><th>เธญเธธเธเธเธฃเธ“เน</th><th>เธเธณเธเธงเธเน€เธเธดเธ (เธเธฒเธ—)</th><th>เธชเธ–เธฒเธเธฐ</th><th>เธเธนเนเธฃเธฑเธเธเธณเธฃเธฐ/เธงเธฑเธเธ—เธตเน</th><th>เธเธฑเธ”เธเธฒเธฃ</th></tr>
+                    <tr><th>ผู้ยืม</th><th>อุปกรณ์</th><th>จำนวนเงิน (บาท)</th><th>สถานะ</th><th>ผู้รับชำระ/วันที่</th><th>จัดการ</th></tr>
                 </thead>
                 <tbody id="historyTableBody">
                     <?php echo renderHistoryRows($fines_list); ?>
@@ -214,7 +214,7 @@ function refreshFinesData(customStart = null, customEnd = null) {
             if(customStart) document.getElementById('hidden_start_date').value = customStart;
             if(customEnd) document.getElementById('hidden_end_date').value = customEnd;
         }, 500); 
-    }).catch(err => { console.error(err); loader.style.display = 'none'; Swal.fire('Error', 'เนเธกเนเธชเธฒเธกเธฒเธฃเธ–เนเธซเธฅเธ”เธเนเธญเธกเธนเธฅเนเธ”เน', 'error'); });
+    }).catch(err => { console.error(err); loader.style.display = 'none'; Swal.fire('Error', 'ไม่สามารถโหลดข้อมูลได้', 'error'); });
 }
 function handleTimeRangeChange(value) {
     const today = new Date();
@@ -249,8 +249,8 @@ function openCustomRangePopup() {
         preConfirm: () => {
             const s = document.getElementById('swal-start-date').value;
             const e = document.getElementById('swal-end-date').value;
-            if (!s || !e) { Swal.showValidationMessage('เธเธฃเธธเธ“เธฒเน€เธฅเธทเธญเธเธงเธฑเธเธ—เธตเนเนเธซเนเธเธฃเธเธ–เนเธงเธ'); return false; }
-            if (s > e) { Swal.showValidationMessage('เธงเธฑเธเธ—เธตเนเน€เธฃเธดเนเธกเธ•เนเธ เธ•เนเธญเธเนเธกเนเธกเธฒเธเธเธงเนเธฒเธงเธฑเธเธ—เธตเนเธชเธดเนเธเธชเธธเธ”'); return false; }
+            if (!s || !e) { Swal.showValidationMessage('กรุณาเลือกวันที่ให้ครบถ้วน'); return false; }
+            if (s > e) { Swal.showValidationMessage('วันที่เริ่มต้น ต้องไม่มากกว่าวันที่สิ้นสุด'); return false; }
             return { start: s, end: e };
         }
     }).then((result) => { if (result.isConfirmed) refreshFinesData(result.value.start, result.value.end); });
@@ -272,34 +272,34 @@ function openDirectPaymentPopup(transactionId, studentId, studentName, equipName
         } catch (e) { console.error(e); }
     };
     Swal.fire({
-        title: '๐’ต เธเธฑเธเธ—เธถเธเธเธฒเธฃเธเธณเธฃเธฐเน€เธเธดเธ',
+        title: '💵 บันทึกการชำระเงิน',
         html: `
         <div class="swal-info-box">
-            <p><strong>เธเธนเนเธขเธทเธก:</strong> ${studentName}</p>
-            <p><strong>เธญเธธเธเธเธฃเธ“เน:</strong> ${equipName}</p>
-            <p class="swal-info-danger"><strong>เน€เธเธดเธเธเธณเธซเธเธ”:</strong> ${daysOverdue} เธงเธฑเธ</p>
+            <p><strong>ผู้ยืม:</strong> ${studentName}</p>
+            <p><strong>อุปกรณ์:</strong> ${equipName}</p>
+            <p class="swal-info-danger"><strong>เกินกำหนด:</strong> ${daysOverdue} วัน</p>
         </div>
         <form id="swalDirectPaymentForm" style="text-align: left; margin-top: 20px;" enctype="multipart/form-data">
             <input type="hidden" name="transaction_id" value="${transactionId}">
             <input type="hidden" name="student_id" value="${studentId}">
             <input type="hidden" name="amount" value="${calculatedFine.toFixed(2)}">
-            <div style="margin-bottom: 15px;"><label style="font-weight: bold;">เธขเธญเธ”เธเธณเธฃเธฐ:</label><input type="number" name="amount_paid" value="${calculatedFine.toFixed(2)}" step="0.01" required class="swal2-input"></div>
-            <div style="margin-bottom: 15px;"><label style="font-weight: bold;">เธงเธดเธเธตเธเธณเธฃเธฐ:</label><div style="display: flex; gap: 1rem;"><label><input type="radio" name="payment_method" id="swal_pm_cash_1" value="cash" checked> เน€เธเธดเธเธชเธ”</label><label><input type="radio" name="payment_method" id="swal_pm_bank_1" value="bank_transfer"> เนเธญเธเน€เธเธดเธ</label></div></div>
-            <div id="slipUploadGroup" style="display: none; margin-bottom: 15px;"><label style="font-weight: bold;">เนเธเธเธชเธฅเธดเธ: <span style="color:red;">*</span></label><input type="file" name="payment_slip" id="swal_payment_slip" accept="image/*" class="custom-file-input"></div>
+            <div style="margin-bottom: 15px;"><label style="font-weight: bold;">ยอดชำระ:</label><input type="number" name="amount_paid" value="${calculatedFine.toFixed(2)}" step="0.01" required class="swal2-input"></div>
+            <div style="margin-bottom: 15px;"><label style="font-weight: bold;">วิธีชำระ:</label><div style="display: flex; gap: 1rem;"><label><input type="radio" name="payment_method" id="swal_pm_cash_1" value="cash" checked> เงินสด</label><label><input type="radio" name="payment_method" id="swal_pm_bank_1" value="bank_transfer"> โอนเงิน</label></div></div>
+            <div id="slipUploadGroup" style="display: none; margin-bottom: 15px;"><label style="font-weight: bold;">แนบสลิป: <span style="color:red;">*</span></label><input type="file" name="payment_slip" id="swal_payment_slip" accept="image/*" class="custom-file-input"></div>
         </form>`,
         didOpen: setupPaymentMethodToggle,
-        showCancelButton: true, confirmButtonText: 'เธขเธทเธเธขเธฑเธ',
+        showCancelButton: true, confirmButtonText: 'ยืนยัน',
         preConfirm: () => {
             const form = document.getElementById('swalDirectPaymentForm');
             const formData = new FormData(form);
             if (formData.get('payment_method') === 'bank_transfer' && (!formData.get('payment_slip') || formData.get('payment_slip').size === 0)) {
-                Swal.showValidationMessage('เธเธฃเธธเธ“เธฒเนเธเธเธชเธฅเธดเธเธเธฒเธฃเนเธญเธ'); return false;
+                Swal.showValidationMessage('กรุณาแนบสลิปการโอน'); return false;
             }
             return fetch('process/direct_payment_process.php', { method: 'POST', body: formData }).then(r => r.json()).then(d => { if (d.status !== 'success') throw new Error(d.message); return d; }).catch(e => { Swal.showValidationMessage(e.message); });
         }
     }).then((result) => {
         if (result.isConfirmed) {
-            Swal.fire('เธชเธณเน€เธฃเนเธ!', 'เธเธฑเธเธ—เธถเธเน€เธฃเธตเธขเธเธฃเนเธญเธข', 'success').then(() => {
+            Swal.fire('สำเร็จ!', 'บันทึกเรียบร้อย', 'success').then(() => {
                 window.open(`admin/print_receipt.php?payment_id=${result.value.new_payment_id}`, '_blank');
                 refreshFinesData();
             });
@@ -308,16 +308,16 @@ function openDirectPaymentPopup(transactionId, studentId, studentName, equipName
 }
 function sendLineReceipt(paymentId) {
     Swal.fire({
-        title: 'เธขเธทเธเธขเธฑเธเธเธฒเธฃเธชเนเธ?', text: "เธ•เนเธญเธเธเธฒเธฃเธชเนเธเนเธเน€เธชเธฃเนเธเธเธตเนเนเธเธ—เธฒเธ LINE เธเธญเธเธเธนเนเนเธเนเธเธฒเธเนเธเนเธซเธฃเธทเธญเนเธกเน?", icon: 'question',
-        showCancelButton: true, confirmButtonText: 'เธชเนเธเน€เธฅเธข', cancelButtonText: 'เธขเธเน€เธฅเธดเธ', confirmButtonColor: '#06c755'
+        title: 'ยืนยันการส่ง?', text: "ต้องการส่งใบเสร็จนี้ไปทาง LINE ของผู้ใช้งานใช่หรือไม่?", icon: 'question',
+        showCancelButton: true, confirmButtonText: 'ส่งเลย', cancelButtonText: 'ยกเลิก', confirmButtonColor: '#06c755'
     }).then((result) => {
         if (result.isConfirmed) {
-            Swal.fire({ title: 'เธเธณเธฅเธฑเธเธชเนเธ...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+            Swal.fire({ title: 'กำลังส่ง...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
             const formData = new FormData(); formData.append('payment_id', paymentId);
             fetch('process/send_receipt_manual.php', { method: 'POST', body: formData }).then(r => r.json()).then(d => {
-                if (d.status === 'success') Swal.fire('เธชเธณเน€เธฃเนเธ!', 'เธชเนเธเนเธเน€เธชเธฃเนเธเน€เธเนเธฒ LINE เน€เธฃเธตเธขเธเธฃเนเธญเธขเนเธฅเนเธง', 'success');
-                else Swal.fire('เน€เธเธดเธ”เธเนเธญเธเธดเธ”เธเธฅเธฒเธ”', d.message, 'error');
-            }).catch(e => Swal.fire('เน€เธเธดเธ”เธเนเธญเธเธดเธ”เธเธฅเธฒเธ”', 'เนเธกเนเธชเธฒเธกเธฒเธฃเธ–เน€เธเธทเนเธญเธกเธ•เนเธญ Server เนเธ”เน', 'error'));
+                if (d.status === 'success') Swal.fire('สำเร็จ!', 'ส่งใบเสร็จเข้า LINE เรียบร้อยแล้ว', 'success');
+                else Swal.fire('เกิดข้อผิดพลาด', d.message, 'error');
+            }).catch(e => Swal.fire('เกิดข้อผิดพลาด', 'ไม่สามารถเชื่อมต่อ Server ได้', 'error'));
         }
     });
 }

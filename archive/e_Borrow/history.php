@@ -4,12 +4,12 @@ declare(strict_types=1);
 @session_start();
 include('includes/check_student_session.php');
 
-// เนเธเน DB เธเธฅเธฒเธ
+// ใช้ DB กลาง
 require_once __DIR__ . '/../config/db_connect.php';
 
 $student_id = (int)$_SESSION['student_id'];
 
-// เธ”เธถเธเธเธฃเธฐเธงเธฑเธ•เธดเน€เธเธเธฒเธฐเธฃเธฒเธขเธเธฒเธฃเธ—เธตเนเธเธทเธเนเธฅเนเธง, เธฃเธญเธญเธเธธเธกเธฑเธ•เธด, เธซเธฃเธทเธญเธ–เธนเธเธเธเธดเน€เธชเธ/เธขเธเน€เธฅเธดเธ
+// ดึงประวัติเฉพาะรายการที่คืนแล้ว, รออนุมัติ, หรือถูกปฏิเสธ/ยกเลิก
 try {
     $pdo = db();
     $sql_history = "SELECT t.id, t.borrow_date, t.due_date, t.return_date, 
@@ -28,10 +28,10 @@ try {
     $history = $stmt_history->fetchAll();
 } catch (PDOException $e) {
     $history = [];
-    $history_error = "เน€เธเธดเธ”เธเนเธญเธเธดเธ”เธเธฅเธฒเธ”: " . $e->getMessage();
+    $history_error = "เกิดข้อผิดพลาด: " . $e->getMessage();
 }
 
-$page_title  = "เธเธฃเธฐเธงเธฑเธ•เธดเธเธณเธเธญ";
+$page_title  = "ประวัติคำขอ";
 $active_page = 'history';
 include('includes/student_header.php');
 ?>
@@ -113,7 +113,7 @@ include('includes/student_header.php');
 }
 .status-badge i { font-size: .8rem; }
 
-/* เธชเธตเธเธญเธ Status */
+/* สีของ Status */
 .status-returned { background: #dcfce7; color: #16a34a; }
 .status-pending  { background: #fef9c3; color: #ca8a04; }
 .status-rejected { background: #f1f5f9; color: #64748b; }
@@ -163,8 +163,8 @@ body.dark-mode .empty-state { background: #1e2d25; }
 <div class="page-wrap">
     
     <div class="history-header">
-        <h2><i class="fas fa-history" style="margin-right:8px;"></i>เธเธฃเธฐเธงเธฑเธ•เธดเธเธณเธเธญ</h2>
-        <p>เธฃเธฒเธขเธเธฒเธฃเธ—เธตเนเธเธธเธ“เน€เธเธขเธชเนเธเธเธณเธเธญเธขเธทเธก เธเธเธดเน€เธชเธ เนเธฅเธฐเธเธทเธเนเธฅเนเธง</p>
+        <h2><i class="fas fa-history" style="margin-right:8px;"></i>ประวัติคำขอ</h2>
+        <p>รายการที่คุณเคยส่งคำขอยืม ปฏิเสธ และคืนแล้ว</p>
     </div>
 
     <div class="section-body">
@@ -177,13 +177,13 @@ body.dark-mode .empty-state { background: #1e2d25; }
         <?php if (empty($history)): ?>
             <div class="empty-state">
                 <i class="fas fa-clipboard-list"></i>
-                <p>เธเธธเธ“เธขเธฑเธเนเธกเนเธกเธตเธเธฃเธฐเธงเธฑเธ•เธดเธเธฒเธฃเธ—เธณเธฃเธฒเธขเธเธฒเธฃ</p>
-                <a href="borrow.php" class="btn-primary-sm">เนเธเธขเธทเธกเธญเธธเธเธเธฃเธ“เนเธเธฑเธเน€เธฅเธข</a>
+                <p>คุณยังไม่มีประวัติการทำรายการ</p>
+                <a href="borrow.php" class="btn-primary-sm">ไปยืมอุปกรณ์กันเลย</a>
             </div>
         <?php else: ?>
             <?php foreach ($history as $row): 
                 
-                // เธเธณเธซเธเธ”เธชเธ–เธฒเธเธฐ UI
+                // กำหนดสถานะ UI
                 $status       = $row['status'];
                 $app_status   = $row['approval_status'];
                 
@@ -194,30 +194,30 @@ body.dark-mode .empty-state { background: #1e2d25; }
 
                 if ($status === 'returned') {
                     $badgeClass = 'status-returned';
-                    $badgeText  = 'เธเธทเธเนเธฅเนเธง';
+                    $badgeText  = 'คืนแล้ว';
                     $badgeIcon  = 'fa-check-circle';
                 } elseif ($app_status === 'pending') {
                     $badgeClass = 'status-pending';
-                    $badgeText  = 'เธฃเธญเธ”เธณเน€เธเธดเธเธเธฒเธฃ';
+                    $badgeText  = 'รอดำเนินการ';
                     $badgeIcon  = 'fa-hourglass-half';
                     $isPending  = true;
                 } elseif ($app_status === 'rejected') {
                     $badgeClass = 'status-rejected';
-                    $badgeText  = 'เธ–เธนเธเธเธเธดเน€เธชเธ/เธขเธเน€เธฅเธดเธ';
+                    $badgeText  = 'ถูกปฏิเสธ/ยกเลิก';
                     $badgeIcon  = 'fa-ban';
                 } elseif ($status === 'cancelled') {
                     $badgeClass = 'status-cancelled';
-                    $badgeText  = 'เธขเธเน€เธฅเธดเธเนเธฅเนเธง';
+                    $badgeText  = 'ยกเลิกแล้ว';
                     $badgeIcon  = 'fa-times-circle';
                 } else {
                     $badgeClass = 'status-rejected';
-                    $badgeText  = 'เนเธกเนเธ—เธฃเธฒเธเธชเธ–เธฒเธเธฐ';
+                    $badgeText  = 'ไม่ทราบสถานะ';
                     $badgeIcon  = 'fa-question-circle';
                 }
 
-                // เธชเธฅเธฑเธเธเธทเนเธญ (เน€เธเนเธ item เธ–เนเธฒเธกเธต เนเธกเนเธเธฑเนเธเนเธเน type)
+                // สลับชื่อ (เน้น item ถ้ามี ไม่งั้นใช้ type)
                 $displayName = !empty($row['eq_name']) ? $row['eq_name'] : $row['type_name'];
-                $displayType = !empty($row['eq_name']) ? $row['type_name'] : 'เธเธฃเธฐเน€เธ เธ—เธญเธธเธเธเธฃเธ“เน';
+                $displayType = !empty($row['eq_name']) ? $row['type_name'] : 'ประเภทอุปกรณ์';
             ?>
                 
             <div class="hist-card">
@@ -239,12 +239,12 @@ body.dark-mode .empty-state { background: #1e2d25; }
 
                     <div class="hist-dates">
                         <div class="date-row">
-                            <span>เธงเธฑเธเธ—เธตเนเธชเนเธเธเธณเธเธญ</span>
+                            <span>วันที่ส่งคำขอ</span>
                             <strong><?= date('d/m/Y H:i', strtotime($row['borrow_date'])) ?></strong>
                         </div>
                         <?php if ($status === 'returned' && $row['return_date']): ?>
                             <div class="date-row">
-                                <span>เธงเธฑเธเธ—เธตเนเธเธทเธ</span>
+                                <span>วันที่คืน</span>
                                 <strong style="color:#16a34a;"><?= date('d/m/Y H:i', strtotime($row['return_date'])) ?></strong>
                             </div>
                         <?php endif; ?>
@@ -257,7 +257,7 @@ body.dark-mode .empty-state { background: #1e2d25; }
 
                         <?php if ($isPending): ?>
                             <button type="button" class="btn-cancel" onclick="confirmCancelRequest(<?= $row['id'] ?>)">
-                                เธขเธเน€เธฅเธดเธ
+                                ยกเลิก
                             </button>
                         <?php endif; ?>
                     </div>
@@ -275,14 +275,14 @@ body.dark-mode .empty-state { background: #1e2d25; }
 <script>
 function confirmCancelRequest(transactionId) {
     Swal.fire({
-        title: 'เธขเธทเธเธขเธฑเธเธเธฒเธฃเธขเธเน€เธฅเธดเธ?',
-        text: 'เธเธณเธเธญเธขเธทเธกเธญเธธเธเธเธฃเธ“เนเธเธตเนเธเธฐเธ–เธนเธเธขเธเน€เธฅเธดเธ',
+        title: 'ยืนยันการยกเลิก?',
+        text: 'คำขอยืมอุปกรณ์นี้จะถูกยกเลิก',
         icon: 'warning',
         showCancelButton: true,
         confirmButtonColor: '#dc2626',
         cancelButtonColor: '#6b7280',
-        confirmButtonText: 'เธขเธทเธเธขเธฑเธ เธขเธเน€เธฅเธดเธ',
-        cancelButtonText: 'เนเธกเนเธขเธเน€เธฅเธดเธ',
+        confirmButtonText: 'ยืนยัน ยกเลิก',
+        cancelButtonText: 'ไม่ยกเลิก',
     }).then((result) => {
         if (result.isConfirmed) {
             window.location.href = `process/cancel_request.php?id=${transactionId}`;

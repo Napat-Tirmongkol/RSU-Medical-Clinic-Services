@@ -18,14 +18,14 @@ $offset = ($page - 1) * $limit;
 
 function renderTableHeaders($type) {
     if ($type == 'signin') {
-        return '<tr><th style="width: 180px;">เน€เธงเธฅเธฒ</th><th style="width: 200px;">เธเธนเนเน€เธเนเธฒเนเธเนเธเธฒเธ</th><th style="width: 150px;">เธเธฃเธฐเน€เธ เธ—เธเธฒเธฃเน€เธเนเธฒเธชเธนเนเธฃเธฐเธเธ</th><th>เธฃเธฒเธขเธฅเธฐเน€เธญเธตเธขเธ” IP / เธชเธ–เธฒเธเธฐ</th></tr>';
+        return '<tr><th style="width: 180px;">เวลา</th><th style="width: 200px;">ผู้เข้าใช้งาน</th><th style="width: 150px;">ประเภทการเข้าสู่ระบบ</th><th>รายละเอียด IP / สถานะ</th></tr>';
     } else {
-        return '<tr><th style="width: 180px;">เน€เธงเธฅเธฒ</th><th style="width: 200px;">เธเธนเนเธ”เธณเน€เธเธดเธเธเธฒเธฃ (Admin)</th><th style="width: 150px;">เธเธฒเธฃเธเธฃเธฐเธ—เธณ (Action)</th><th>เธฃเธฒเธขเธฅเธฐเน€เธญเธตเธขเธ”เธเธฒเธฃเน€เธเธฅเธตเนเธขเธเนเธเธฅเธ</th></tr>';
+        return '<tr><th style="width: 180px;">เวลา</th><th style="width: 200px;">ผู้ดำเนินการ (Admin)</th><th style="width: 150px;">การกระทำ (Action)</th><th>รายละเอียดการเปลี่ยนแปลง</th></tr>';
     }
 }
 
 function renderTableRows($data, $type) {
-    if (empty($data)) return '<tr><td colspan="4" style="text-align: center; padding: 20px; color: #999;">เนเธกเนเธเธเธเนเธญเธกเธนเธฅเนเธเธเนเธงเธเน€เธงเธฅเธฒเธเธตเน</td></tr>';
+    if (empty($data)) return '<tr><td colspan="4" style="text-align: center; padding: 20px; color: #999;">ไม่พบข้อมูลในช่วงเวลานี้</td></tr>';
     $html = '';
     foreach ($data as $log) {
         $badge = ($type == 'signin') 
@@ -40,7 +40,7 @@ function renderPagination($current_page, $total_pages) {
     if ($total_pages <= 1) return '';
     $prev_disabled = ($current_page <= 1) ? 'disabled' : '';
     $next_disabled = ($current_page >= $total_pages) ? 'disabled' : '';
-    return '<span class="pagination-info">เธซเธเนเธฒ '.$current_page.' เธเธฒเธ '.$total_pages.'</span><div><button type="button" class="btn btn-secondary '.$prev_disabled.'" onclick="changePage('.($current_page - 1).')"><i class="fas fa-chevron-left"></i> เธเนเธญเธเธซเธเนเธฒ</button><button type="button" class="btn btn-secondary '.$next_disabled.'" onclick="changePage('.($current_page + 1).')">เธ–เธฑเธ”เนเธ <i class="fas fa-chevron-right"></i></button></div>';
+    return '<span class="pagination-info">หน้า '.$current_page.' จาก '.$total_pages.'</span><div><button type="button" class="btn btn-secondary '.$prev_disabled.'" onclick="changePage('.($current_page - 1).')"><i class="fas fa-chevron-left"></i> ก่อนหน้า</button><button type="button" class="btn btn-secondary '.$next_disabled.'" onclick="changePage('.($current_page + 1).')">ถัดไป <i class="fas fa-chevron-right"></i></button></div>';
 }
 
 $date_condition = ""; $date_params = [];
@@ -65,7 +65,7 @@ try {
     $stmt_data = $pdo->prepare($sql_data); $stmt_data->execute($date_params); $initial_logs = $stmt_data->fetchAll(PDO::FETCH_ASSOC);
 } catch (PDOException $e) { $log_error = "Database Error: " . $e->getMessage(); }
 
-$page_title = "เธเธฑเธเธ—เธถเธ Log (Admin)";
+$page_title = "บันทึก Log (Admin)";
 $current_page = "admin_log"; 
 include('../includes/header.php');
 ?>
@@ -84,25 +84,25 @@ include('../includes/header.php');
 </style>
 
 <div class="header-row" style="flex-wrap: wrap; gap: 15px; align-items: center;">
-    <h2><i class="fas fa-history"></i> ๐“ เธเธฑเธเธ—เธถเธ Log (Admin)</h2>
+    <h2><i class="fas fa-history"></i> 📜 บันทึก Log (Admin)</h2>
     <div class="time-filter-group">
         <div style="display: flex; align-items: center; gap: 8px;">
             <i class="fas fa-filter" style="color: #4dabf7;"></i>
             <select class="time-filter-select" id="logTypeSelect" onchange="refreshLogData(1)" style="font-weight: bold; min-width: 180px;">
-                <option value="signin">เธเธฃเธฐเธงเธฑเธ•เธดเธเธฒเธฃเน€เธเนเธฒเธชเธนเนเธฃเธฐเธเธ</option>
-                <option value="actions">เธเธฑเธเธ—เธถเธเธเธฒเธฃเธ”เธณเน€เธเธดเธเธเธฒเธฃเธญเธทเนเธเน</option>
+                <option value="signin">ประวัติการเข้าสู่ระบบ</option>
+                <option value="actions">บันทึกการดำเนินการอื่นๆ</option>
             </select>
         </div>
         <span class="toolbar-separator"></span>
         <div style="display: flex; align-items: center; gap: 8px;">
             <i class="far fa-clock" style="color: #aaa;"></i>
             <select class="time-filter-select" id="timeRangeSelect" onchange="handleTimeRangeChange(this.value)">
-                <option value="" disabled selected>เน€เธฅเธทเธญเธเธเนเธงเธเน€เธงเธฅเธฒ</option>
-                <option value="today">เธงเธฑเธเธเธตเน (Today)</option>
-                <option value="48h">2 เธงเธฑเธเธขเนเธญเธเธซเธฅเธฑเธ</option>
-                <option value="7d">7 เธงเธฑเธเธขเนเธญเธเธซเธฅเธฑเธ</option>
-                <option value="30d">30 เธงเธฑเธเธขเนเธญเธเธซเธฅเธฑเธ</option>
-                <option value="custom">เธเธณเธซเธเธ”เน€เธญเธ (Custom range)...</option>
+                <option value="" disabled selected>เลือกช่วงเวลา</option>
+                <option value="today">วันนี้ (Today)</option>
+                <option value="48h">2 วันย้อนหลัง</option>
+                <option value="7d">7 วันย้อนหลัง</option>
+                <option value="30d">30 วันย้อนหลัง</option>
+                <option value="custom">กำหนดเอง (Custom range)...</option>
             </select>
         </div>
         <span class="toolbar-separator"></span>
@@ -154,7 +154,7 @@ function refreshLogData(page = 1, customStart = null, customEnd = null) {
                 loader.style.display = 'none';
             }, 300);
         } else { throw new Error(d.message); }
-    }).catch(e => { console.error(e); loader.style.display = 'none'; Swal.fire('Error', 'เนเธกเนเธชเธฒเธกเธฒเธฃเธ–เนเธซเธฅเธ”เธเนเธญเธกเธนเธฅเนเธ”เน', 'error'); });
+    }).catch(e => { console.error(e); loader.style.display = 'none'; Swal.fire('Error', 'ไม่สามารถโหลดข้อมูลได้', 'error'); });
 }
 function changePage(newPage) { refreshLogData(newPage); }
 function handleTimeRangeChange(value) {
@@ -190,8 +190,8 @@ function openCustomRangePopup() {
         preConfirm: () => {
             const s = document.getElementById('swal-start-date').value;
             const e = document.getElementById('swal-end-date').value;
-            if (!s || !e) { Swal.showValidationMessage('เธเธฃเธธเธ“เธฒเน€เธฅเธทเธญเธเธงเธฑเธเธ—เธตเนเนเธซเนเธเธฃเธเธ–เนเธงเธ'); return false; }
-            if (s > e) { Swal.showValidationMessage('เธงเธฑเธเธ—เธตเนเน€เธฃเธดเนเธกเธ•เนเธ เธ•เนเธญเธเนเธกเนเธกเธฒเธเธเธงเนเธฒเธงเธฑเธเธ—เธตเนเธชเธดเนเธเธชเธธเธ”'); return false; }
+            if (!s || !e) { Swal.showValidationMessage('กรุณาเลือกวันที่ให้ครบถ้วน'); return false; }
+            if (s > e) { Swal.showValidationMessage('วันที่เริ่มต้น ต้องไม่มากกว่าวันที่สิ้นสุด'); return false; }
             return { start: s, end: e };
         }
     }).then((result) => { if (result.isConfirmed) refreshLogData(1, result.value.start, result.value.end); });

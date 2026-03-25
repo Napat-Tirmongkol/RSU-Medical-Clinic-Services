@@ -2,10 +2,10 @@
 // e_Borrow/logout.php
 session_start();
 
-// ล้าง Session ทั้งหมด (รวมทั้ง e-campaign sessions ที่ใช้ร่วมกัน)
+// ��ҧ Session ������ (������ e-campaign sessions ����������ѹ)
 $_SESSION = [];
 
-// ลบ Session Cookie ใน Browser
+// ź Session Cookie � Browser
 if (ini_get("session.use_cookies")) {
     $params = session_get_cookie_params();
     setcookie(
@@ -18,9 +18,9 @@ if (ini_get("session.use_cookies")) {
     );
 }
 
-// ทำลาย Session บน Server
+// ����� Session �� Server
 session_destroy();
 
-// ส่งกลับหน้า Login ของ e_Borrow โดยตรง (ไม่ผ่าน index.php)
+// �觡�Ѻ˹�� Login �ͧ e_Borrow �µç (����ҹ index.php)
 header("Location: login.php");
 exit;

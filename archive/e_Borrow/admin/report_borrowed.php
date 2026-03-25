@@ -3,13 +3,13 @@
 include('../includes/check_session.php');
 require_once(__DIR__ . '/../../../config/db_connect.php');
 
-// 1. เธ•เธฃเธงเธเธชเธญเธเธชเธดเธ—เธเธดเน
+// 1. ตรวจสอบสิทธิ์
 if (!isset($_SESSION['role']) || $_SESSION['role'] != 'admin') {
     header("Location: index.php");
     exit;
 }
 
-// 2. เธชเนเธงเธ PHP: เธเธฑเธ”เธเธฒเธฃเธเนเธญเธกเธนเธฅ (เธฃเธญเธเธฃเธฑเธเธ—เธฑเนเธเนเธซเธฅเธ”เธเธเธ•เธด เนเธฅเธฐ AJAX Request)
+// 2. ส่วน PHP: จัดการข้อมูล (รองรับทั้งโหลดปกติ และ AJAX Request)
 $start_date = $_GET['start_date'] ?? null;
 $end_date = $_GET['end_date'] ?? null;
 $status_filter = $_GET['status'] ?? '';
@@ -54,25 +54,25 @@ try {
     $error_message = $e->getMessage();
 }
 
-// --- เธ•เธฃเธงเธเธชเธญเธเธงเนเธฒเน€เธเนเธ AJAX Request เธซเธฃเธทเธญเนเธกเน ---
+// --- ตรวจสอบว่าเป็น AJAX Request หรือไม่ ---
 if (isset($_GET['ajax_table']) && $_GET['ajax_table'] == '1') {
     if (empty($transactions)) {
-        echo '<tr><td colspan="6" style="text-align: center; padding: 20px; color: #888;">เนเธกเนเธเธเธเนเธญเธกเธนเธฅเนเธเธเนเธงเธเน€เธงเธฅเธฒเธเธตเน</td></tr>';
+        echo '<tr><td colspan="6" style="text-align: center; padding: 20px; color: #888;">ไม่พบข้อมูลในช่วงเวลานี้</td></tr>';
     } else {
         foreach ($transactions as $item) {
             $image_path = $item['image_url'] ?? null;
             $img_html = $image_path 
-                ? '<img src="'.htmlspecialchars($image_path).'" alt="เธฃเธนเธ" class="item-thumbnail" onerror="this.style.display=\'none\'">' 
+                ? '<img src="'.htmlspecialchars($image_path).'" alt="รูป" class="item-thumbnail" onerror="this.style.display=\'none\'">' 
                 : '<div class="equipment-card-image-placeholder item-thumbnail"><i class="fas fa-camera"></i></div>';
 
             $status_badge = '';
             if ($item['status'] == 'returned') {
-                $status_badge = '<span class="status-badge returned"><i class="fas fa-check-circle"></i> เธเธทเธเนเธฅเนเธง</span>';
+                $status_badge = '<span class="status-badge returned"><i class="fas fa-check-circle"></i> คืนแล้ว</span>';
             } else {
-                $status_badge = '<span class="status-badge borrowed"><i class="fas fa-hourglass-half"></i> เธขเธทเธกเธญเธขเธนเน</span>';
+                $status_badge = '<span class="status-badge borrowed"><i class="fas fa-hourglass-half"></i> ยืมอยู่</span>';
             }
             
-            $return_date_txt = $item['return_date'] ? date('d/m/Y', strtotime($item['return_date'])) : '<span class="text-muted">เธขเธฑเธเนเธกเนเธเธทเธ</span>';
+            $return_date_txt = $item['return_date'] ? date('d/m/Y', strtotime($item['return_date'])) : '<span class="text-muted">ยังไม่คืน</span>';
 
             echo '<tr>
                 <td>
@@ -99,7 +99,7 @@ if (isset($_GET['ajax_table']) && $_GET['ajax_table'] == '1') {
     exit;
 }
 
-$page_title = "เธฃเธฒเธขเธเธฒเธเธเธฒเธฃเธขเธทเธก-เธเธทเธ";
+$page_title = "รายงานการยืม-คืน";
 $current_page = "report";
 include('../includes/header.php');
 ?>
@@ -122,7 +122,7 @@ include('../includes/header.php');
 
 <div class="main-container"> 
     <div class="header-row" style="flex-wrap: wrap; gap: 15px; align-items: center;">
-        <h2><i class="fas fa-chart-line"></i> เธฃเธฒเธขเธเธฒเธเธเธฒเธฃเธขเธทเธก-เธเธทเธ</h2>
+        <h2><i class="fas fa-chart-line"></i> รายงานการยืม-คืน</h2>
         <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
             <div class="time-filter-group">
                 <button type="button" class="time-filter-btn" onclick="refreshTable()">
@@ -132,21 +132,21 @@ include('../includes/header.php');
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <i class="far fa-clock" style="color: #aaa;"></i>
                     <select class="time-filter-select" id="timeRangeSelect" onchange="handleTimeRangeChange(this.value)">
-                        <option value="" disabled selected>เน€เธฅเธทเธญเธเธเนเธงเธเน€เธงเธฅเธฒ</option>
-                        <option value="today">เธงเธฑเธเธเธตเน (Today)</option>
-                        <option value="48h">2 เธงเธฑเธเธขเนเธญเธเธซเธฅเธฑเธ (Last 48h)</option>
-                        <option value="7d">7 เธงเธฑเธเธขเนเธญเธเธซเธฅเธฑเธ</option>
-                        <option value="30d">30 เธงเธฑเธเธขเนเธญเธเธซเธฅเธฑเธ</option>
-                        <option value="custom">เธเธณเธซเธเธ”เน€เธญเธ (Custom range)...</option>
+                        <option value="" disabled selected>เลือกช่วงเวลา</option>
+                        <option value="today">วันนี้ (Today)</option>
+                        <option value="48h">2 วันย้อนหลัง (Last 48h)</option>
+                        <option value="7d">7 วันย้อนหลัง</option>
+                        <option value="30d">30 วันย้อนหลัง</option>
+                        <option value="custom">กำหนดเอง (Custom range)...</option>
                     </select>
                 </div>
                 <span class="toolbar-separator"></span>
                 <div style="display: flex; align-items: center; gap: 8px;">
-                    <span style="color: #aaa; font-size: 0.9rem;">เธชเธ–เธฒเธเธฐ:</span>
+                    <span style="color: #aaa; font-size: 0.9rem;">สถานะ:</span>
                     <select class="time-filter-select" id="statusFilter" onchange="refreshTable()" style="min-width: 100px;">
-                        <option value="">เธ—เธฑเนเธเธซเธกเธ”</option>
-                        <option value="borrowed" <?php echo ($status_filter == 'borrowed') ? 'selected' : ''; ?>>เธเธณเธฅเธฑเธเธขเธทเธก</option>
-                        <option value="returned" <?php echo ($status_filter == 'returned') ? 'selected' : ''; ?>>เธเธทเธเนเธฅเนเธง</option>
+                        <option value="">ทั้งหมด</option>
+                        <option value="borrowed" <?php echo ($status_filter == 'borrowed') ? 'selected' : ''; ?>>กำลังยืม</option>
+                        <option value="returned" <?php echo ($status_filter == 'returned') ? 'selected' : ''; ?>>คืนแล้ว</option>
                     </select>
                     <i class="fas fa-chevron-down" style="font-size: 0.7rem; color: #aaa; margin-left: -20px; pointer-events: none;"></i>
                 </div>
@@ -164,36 +164,36 @@ include('../includes/header.php');
         <div class="table-wrapper">
             <div id="tableLoader" class="loading-overlay">
                 <div class="spinner"></div>
-                <div style="font-weight: bold; color: var(--color-primary);">เธเธณเธฅเธฑเธเนเธซเธฅเธ”เธเนเธญเธกเธนเธฅ...</div>
+                <div style="font-weight: bold; color: var(--color-primary);">กำลังโหลดข้อมูล...</div>
             </div>
 
             <div class="table-container">
                 <table>
                     <thead>
                         <tr>
-                            <th>เธญเธธเธเธเธฃเธ“เน</th>
-                            <th>เธเธนเนเธขเธทเธก</th>
-                            <th>เธงเธฑเธเธ—เธตเนเธขเธทเธก</th>
-                            <th>เธเธณเธซเธเธ”เธเธทเธ</th>
-                            <th>เธงเธฑเธเธ—เธตเนเธเธทเธเธเธฃเธดเธ</th>
-                            <th>เธชเธ–เธฒเธเธฐ</th>
+                            <th>อุปกรณ์</th>
+                            <th>ผู้ยืม</th>
+                            <th>วันที่ยืม</th>
+                            <th>กำหนดคืน</th>
+                            <th>วันที่คืนจริง</th>
+                            <th>สถานะ</th>
                         </tr>
                     </thead>
                     <tbody id="reportTableBody">
                         <?php 
                         if (empty($transactions)) {
-                            echo '<tr><td colspan="6" style="text-align: center; padding: 20px; color: #999;">เนเธกเนเธเธเธเนเธญเธกเธนเธฅเธเธฒเธฃเธ—เธณเธฃเธฒเธขเธเธฒเธฃ</td></tr>';
+                            echo '<tr><td colspan="6" style="text-align: center; padding: 20px; color: #999;">ไม่พบข้อมูลการทำรายการ</td></tr>';
                         } else {
                             foreach ($transactions as $item) {
-                                // (เน€เธซเธกเธทเธญเธเธเนเธฒเธเธเธ) ...
+                                // (เหมือนข้างบน) ...
                                 $image_path = $item['image_url'] ?? null;
                                 if ($image_path) {
-                                    $img_html = '<img src="'.htmlspecialchars($image_path).'" alt="เธฃเธนเธ" class="item-thumbnail" onerror="this.style.display=\'none\'">';
+                                    $img_html = '<img src="'.htmlspecialchars($image_path).'" alt="รูป" class="item-thumbnail" onerror="this.style.display=\'none\'">';
                                 } else {
                                     $img_html = '<div class="equipment-card-image-placeholder item-thumbnail"><i class="fas fa-camera"></i></div>';
                                 }
-                                $status_badge = ($item['status'] == 'returned') ? '<span class="status-badge returned"><i class="fas fa-check-circle"></i> เธเธทเธเนเธฅเนเธง</span>' : '<span class="status-badge borrowed"><i class="fas fa-hourglass-half"></i> เธขเธทเธกเธญเธขเธนเน</span>';
-                                $return_date_txt = $item['return_date'] ? date('d/m/Y', strtotime($item['return_date'])) : '<span class="text-muted">เธขเธฑเธเนเธกเนเธเธทเธ</span>';
+                                $status_badge = ($item['status'] == 'returned') ? '<span class="status-badge returned"><i class="fas fa-check-circle"></i> คืนแล้ว</span>' : '<span class="status-badge borrowed"><i class="fas fa-hourglass-half"></i> ยืมอยู่</span>';
+                                $return_date_txt = $item['return_date'] ? date('d/m/Y', strtotime($item['return_date'])) : '<span class="text-muted">ยังไม่คืน</span>';
 
                                 echo '<tr>
                                     <td>
@@ -225,7 +225,7 @@ include('../includes/header.php');
     </div>
     
     <div class="student-card-list mobile-only">
-         <p style="text-align: center; padding: 20px; color: #999;">(เธเธฃเธธเธ“เธฒเธ”เธนเนเธเธกเธธเธกเธกเธญเธ Desktop เน€เธเธทเนเธญเนเธเนเธเธตเน€เธเธญเธฃเน Refresh เธ•เธฒเธฃเธฒเธเนเธเธ Real-time)</p>
+         <p style="text-align: center; padding: 20px; color: #999;">(กรุณาดูในมุมมอง Desktop เพื่อใช้ฟีเจอร์ Refresh ตารางแบบ Real-time)</p>
     </div>
 </div> 
 
@@ -261,7 +261,7 @@ function refreshTable(customStartDate = null, customEndDate = null) {
         .catch(err => {
             console.error(err);
             loader.style.display = 'none';
-            Swal.fire('Error', 'เนเธกเนเธชเธฒเธกเธฒเธฃเธ–เนเธซเธฅเธ”เธเนเธญเธกเธนเธฅเนเธ”เน', 'error');
+            Swal.fire('Error', 'ไม่สามารถโหลดข้อมูลได้', 'error');
         });
 }
 
@@ -299,8 +299,8 @@ function openCustomRangePopup() {
         preConfirm: () => {
             const s = document.getElementById('swal-start-date').value;
             const e = document.getElementById('swal-end-date').value;
-            if (!s || !e) { Swal.showValidationMessage('เธเธฃเธธเธ“เธฒเน€เธฅเธทเธญเธเธงเธฑเธเธ—เธตเนเนเธซเนเธเธฃเธเธ–เนเธงเธ'); return false; }
-            if (s > e) { Swal.showValidationMessage('เธงเธฑเธเธ—เธตเนเน€เธฃเธดเนเธกเธ•เนเธ เธ•เนเธญเธเนเธกเนเธกเธฒเธเธเธงเนเธฒเธงเธฑเธเธ—เธตเนเธชเธดเนเธเธชเธธเธ”'); return false; }
+            if (!s || !e) { Swal.showValidationMessage('กรุณาเลือกวันที่ให้ครบถ้วน'); return false; }
+            if (s > e) { Swal.showValidationMessage('วันที่เริ่มต้น ต้องไม่มากกว่าวันที่สิ้นสุด'); return false; }
             return { start: s, end: e };
         }
     }).then((result) => {

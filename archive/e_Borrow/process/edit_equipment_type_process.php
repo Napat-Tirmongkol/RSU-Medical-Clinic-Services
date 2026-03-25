@@ -1,60 +1,60 @@
 <?php
 // process/edit_equipment_type_process.php
-// (เธเธเธฑเธเนเธเนเนเธ Path เธญเธฑเธเนเธซเธฅเธ”)
+// (ฉบับแก้ไข Path อัปโหลด)
 
-// 1. "เธเนเธฒเธเธขเธฒเธก" เนเธฅเธฐ "เน€เธเธทเนเธญเธกเธ•เนเธญ DB"
+// 1. "จ้างยาม" และ "เชื่อมต่อ DB"
 include('../includes/check_session_ajax.php');
 require_once(__DIR__ . '/../../../config/db_connect.php');
 require_once('../includes/log_function.php');
 
-// 2. เธ•เธฃเธงเธเธชเธญเธเธชเธดเธ—เธเธดเน Admin เนเธฅเธฐเธ•เธฑเนเธเธเนเธฒ Header
+// 2. ตรวจสอบสิทธิ์ Admin และตั้งค่า Header
 $allowed_roles = ['admin', 'editor'];
 if (!isset($_SESSION['role']) || !in_array($_SESSION['role'], $allowed_roles)) {
     header('Content-Type: application/json');
-    echo json_encode(['status' => 'error', 'message' => 'เธเธธเธ“เนเธกเนเธกเธตเธชเธดเธ—เธเธดเนเธ”เธณเน€เธเธดเธเธเธฒเธฃ']);
+    echo json_encode(['status' => 'error', 'message' => 'คุณไม่มีสิทธิ์ดำเนินการ']);
     exit;
 }
 header('Content-Type: application/json');
 
-// 3. เธชเธฃเนเธฒเธเธ•เธฑเธงเนเธเธฃเธชเธณเธซเธฃเธฑเธเน€เธเนเธเธเธณเธ•เธญเธ
-$response = ['status' => 'error', 'message' => 'เน€เธเธดเธ”เธเนเธญเธเธดเธ”เธเธฅเธฒเธ”เนเธกเนเธ—เธฃเธฒเธเธชเธฒเน€เธซเธ•เธธ'];
+// 3. สร้างตัวแปรสำหรับเก็บคำตอบ
+$response = ['status' => 'error', 'message' => 'เกิดข้อผิดพลาดไม่ทราบสาเหตุ'];
 
-// 4. เธ•เธฃเธงเธเธชเธญเธเธงเนเธฒเน€เธเนเธเธเธฒเธฃเธชเนเธเธเนเธญเธกเธนเธฅเนเธเธ POST เธซเธฃเธทเธญเนเธกเน
+// 4. ตรวจสอบว่าเป็นการส่งข้อมูลแบบ POST หรือไม่
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
-    // 5. เธฃเธฑเธเธเนเธญเธกเธนเธฅเธเธฒเธเธเธญเธฃเนเธก
+    // 5. รับข้อมูลจากฟอร์ม
     $type_id       = isset($_POST['type_id']) ? (int)$_POST['type_id'] : 0;
     $name          = isset($_POST['name']) ? trim($_POST['name']) : '';
     $description   = isset($_POST['description']) ? trim($_POST['description']) : null;
     
     if (empty($description)) $description = null;
 
-    // 6. เธ•เธฃเธงเธเธชเธญเธเธเนเธญเธกเธนเธฅ
+    // 6. ตรวจสอบข้อมูล
     if ($type_id == 0 || empty($name)) {
-        $response['message'] = 'เธเนเธญเธกเธนเธฅเนเธกเนเธเธฃเธเธ–เนเธงเธ (ID เธซเธฃเธทเธญ Name)';
+        $response['message'] = 'ข้อมูลไม่ครบถ้วน (ID หรือ Name)';
         echo json_encode($response);
         exit;
     }
     
     try {
-        // 7. เธ”เธถเธเธเนเธญเธกเธนเธฅเธฃเธนเธเธ เธฒเธเน€เธ”เธดเธกเธเนเธญเธ
+        // 7. ดึงข้อมูลรูปภาพเดิมก่อน
         $stmt_get_old = $pdo->prepare("SELECT image_url FROM borrow_categories WHERE id = ?");
         $stmt_get_old->execute([$type_id]);
         $current_data = $stmt_get_old->fetch(PDO::FETCH_ASSOC);
 
         if (!$current_data) {
-             throw new Exception("เนเธกเนเธเธเธเธฃเธฐเน€เธ เธ—เธญเธธเธเธเธฃเธ“เนเธ—เธตเนเธ•เนเธญเธเธเธฒเธฃเนเธเนเนเธ (ID: $type_id)");
+             throw new Exception("ไม่พบประเภทอุปกรณ์ที่ต้องการแก้ไข (ID: $type_id)");
         }
         
-        $image_url_to_db = $current_data['image_url']; // (เนเธเนเธฃเธนเธเน€เธ”เธดเธกเน€เธเนเธเธเนเธฒเน€เธฃเธดเนเธกเธ•เนเธ)
+        $image_url_to_db = $current_data['image_url']; // (ใช้รูปเดิมเป็นค่าเริ่มต้น)
 
-        // 8. เธ•เธฃเธงเธเธชเธญเธเธงเนเธฒเธกเธตเธเธฒเธฃเธญเธฑเธเนเธซเธฅเธ”เนเธเธฅเนเนเธซเธกเนเธซเธฃเธทเธญเนเธกเน
+        // 8. ตรวจสอบว่ามีการอัปโหลดไฟล์ใหม่หรือไม่
         if (isset($_FILES['image_file']) && $_FILES['image_file']['error'] == 0) {
             
-            // โ—€๏ธ (เนเธเนเนเธ) Path เธ—เธตเนเธเธฐ "เธขเนเธฒเธขเนเธเธฅเนเนเธเน€เธเนเธ" (เธ•เนเธญเธเธ–เธญเธขเธซเธฅเธฑเธ ../) โ—€๏ธ
+            // ◀️ (แก้ไข) Path ที่จะ "ย้ายไฟล์ไปเก็บ" (ต้องถอยหลัง ../) ◀️
             $upload_dir_server_path = '../uploads/equipment_images/'; 
             
-            // โ—€๏ธ (เนเธเนเนเธ) Path เธ—เธตเนเธเธฐ "เธเธฑเธเธ—เธถเธเธฅเธ DB" (เนเธกเนเธ•เนเธญเธเธ–เธญเธขเธซเธฅเธฑเธ เธชเธฑเธกเธเธฑเธเธเนเธเธฑเธ <base href>) โ—€๏ธ
+            // ◀️ (แก้ไข) Path ที่จะ "บันทึกลง DB" (ไม่ต้องถอยหลัง สัมพันธ์กับ <base href>) ◀️
             $upload_dir_db_path = 'uploads/equipment_images/';
 
             if (!is_dir($upload_dir_server_path)) {
@@ -72,20 +72,20 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             if ($check !== false) {
                 if (move_uploaded_file($_FILES['image_file']['tmp_name'], $target_file_server)) {
                     
-                    // โ—€๏ธ (เนเธเนเนเธ) เน€เธเธดเนเธก ../ เธ•เธญเธเน€เธเนเธเนเธเธฅเนเน€เธเนเธฒ โ—€๏ธ
+                    // ◀️ (แก้ไข) เพิ่ม ../ ตอนเช็คไฟล์เก่า ◀️
                     if (!empty($image_url_to_db) && file_exists('../' . $image_url_to_db)) {
                         @unlink('../' . $image_url_to_db);
                     }
-                    $image_url_to_db = $target_file_db; // (เนเธเน Path เธ—เธตเนเธ–เธนเธเธ•เนเธญเธ)
+                    $image_url_to_db = $target_file_db; // (ใช้ Path ที่ถูกต้อง)
                 } else {
-                    throw new Exception("เธญเธฑเธเนเธซเธฅเธ”เนเธเธฅเนเนเธซเธกเนเธฅเนเธกเน€เธซเธฅเธง (เธขเนเธฒเธขเนเธเธฅเนเนเธกเนเธชเธณเน€เธฃเนเธ)");
+                    throw new Exception("อัปโหลดไฟล์ใหม่ล้มเหลว (ย้ายไฟล์ไม่สำเร็จ)");
                 }
             } else {
-                 throw new Exception("เนเธเธฅเนเธ—เธตเนเนเธเธเธกเธฒเนเธกเนเนเธเนเนเธเธฅเนเธฃเธนเธเธ เธฒเธ");
+                 throw new Exception("ไฟล์ที่แนบมาไม่ใช่ไฟล์รูปภาพ");
             }
         }
 
-        // 9. เธ”เธณเน€เธเธดเธเธเธฒเธฃ UPDATE
+        // 9. ดำเนินการ UPDATE
         $sql = "UPDATE borrow_categories 
                 SET name = ?, description = ?, image_url = ?
                 WHERE id = ?";
@@ -94,23 +94,23 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $stmt->execute([$name, $description, $image_url_to_db, $type_id]);
 
         $response['status'] = 'success';
-        $response['message'] = 'เธเธฑเธเธ—เธถเธเธเธฒเธฃเน€เธเธฅเธตเนเธขเธเนเธเธฅเธเธชเธณเน€เธฃเนเธ';
+        $response['message'] = 'บันทึกการเปลี่ยนแปลงสำเร็จ';
 
     } catch (PDOException $e) {
         if ($e->getCode() == '23000') { 
-             $response['message'] = 'เธเธทเนเธญเธเธฃเธฐเน€เธ เธ—เธญเธธเธเธเธฃเธ“เนเธเธตเนเธกเธตเนเธเธฃเธฐเธเธเนเธฅเนเธง';
+             $response['message'] = 'ชื่อประเภทอุปกรณ์นี้มีในระบบแล้ว';
         } else {
-             $response['message'] = 'เน€เธเธดเธ”เธเนเธญเธเธดเธ”เธเธฅเธฒเธ” DB: ' . $e->getMessage();
+             $response['message'] = 'เกิดข้อผิดพลาด DB: ' . $e->getMessage();
         }
     } catch (Exception $e) {
          $response['message'] = $e->getMessage();
     }
 
 } else {
-    $response['message'] = 'เธ•เนเธญเธเนเธเนเธงเธดเธเธต POST เน€เธ—เนเธฒเธเธฑเนเธ';
+    $response['message'] = 'ต้องใช้วิธี POST เท่านั้น';
 }
 
-// 10. เธชเนเธเธเธณเธ•เธญเธ (JSON) เธเธฅเธฑเธเนเธเนเธซเน JavaScript
+// 10. ส่งคำตอบ (JSON) กลับไปให้ JavaScript
 echo json_encode($response);
 exit;
 ?>

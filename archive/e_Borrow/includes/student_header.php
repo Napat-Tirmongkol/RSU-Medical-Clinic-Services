@@ -1,6 +1,6 @@
 <?php
-// [แก้ไขไฟล์: napat-tirmongkol/e-borrow/E-Borrow-c4df732f98db10bf52a8e9d7299e212b6f2abd37/includes/student_header.php]
-// includes/student_header.php (ฉบับสมบูรณ์ที่แก้ไขแล้ว)
+// [������: napat-tirmongkol/e-borrow/E-Borrow-c4df732f98db10bf52a8e9d7299e212b6f2abd37/includes/student_header.php]
+// includes/student_header.php (��Ѻ����ó����������)
 @session_start(); 
 ?>
 <!DOCTYPE html>
@@ -11,7 +11,7 @@
 
     <base href="<?php echo explode('/e_Borrow', $_SERVER['SCRIPT_NAME'])[0] . '/e_Borrow/'; ?>">
 
-    <title><?php echo isset($page_title) ? $page_title : 'ระบบยืมคืนอุปกรณ์'; ?></title>
+    <title><?php echo isset($page_title) ? $page_title : '�к�����׹�ػ�ó�'; ?></title>
     
     <script>
         (function() {
@@ -47,24 +47,24 @@
 <body class="page-transitioning">
 
 <script>
-    // เริ่มต้นให้ fade-in เมื่อโหลดหน้าเสร็จ
+    // ���������� fade-in �������Ŵ˹������
     window.addEventListener('DOMContentLoaded', () => {
         document.body.classList.remove('page-transitioning');
     });
 </script>
 
     <header class="header">
-        <h1>MedLoan (สำหรับผู้ใช้งาน)</h1>
+        <h1>MedLoan (����Ѻ�����ҹ)</h1>
         
         <div class="user-info">
             
-            <button type="button" class="theme-toggle-btn" id="theme-toggle-btn" title="สลับโหมด">
+            <button type="button" class="theme-toggle-btn" id="theme-toggle-btn" title="��Ѻ����">
                 <i class="fas fa-moon"></i> <i class="fas fa-sun"></i>
             </button>
-            สวัสดี, <?php echo htmlspecialchars($_SESSION['student_full_name']); ?>
+            ���ʴ�, <?php echo htmlspecialchars($_SESSION['student_full_name']); ?>
             
             <a href="logout.php" class="btn btn-logout">
-                <i class="fa-solid fa-arrow-right-from-bracket"></i> ออกจากระบบ
+                <i class="fa-solid fa-arrow-right-from-bracket"></i> �͡�ҡ�к�
             </a>
         </div>
     </header>

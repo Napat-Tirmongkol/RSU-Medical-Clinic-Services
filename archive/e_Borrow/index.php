@@ -4,7 +4,7 @@ declare(strict_types=1);
 @session_start();
 include('includes/check_student_session.php');
 
-// เนเธเน DB เธเธฅเธฒเธเธเธญเธ e-campaignv2
+// ใช้ DB กลางของ e-campaignv2
 require_once __DIR__ . '/../config/db_connect.php';
 
 $student_id = (int)$_SESSION['student_id'];
@@ -12,12 +12,12 @@ $student_id = (int)$_SESSION['student_id'];
 try {
     $pdo = db();
 
-    // เธเนเธญเธกเธนเธฅเธเธฑเธเธจเธถเธเธฉเธฒ
+    // ข้อมูลนักศึกษา
     $stmt = $pdo->prepare("SELECT student_personnel_id, full_name FROM sys_users WHERE id = ? LIMIT 1");
     $stmt->execute([$student_id]);
     $student_data = $stmt->fetch();
 
-    // เธฃเธฒเธขเธเธฒเธฃ "เธขเธทเธกเธญเธขเธนเน" เนเธฅเธฐ "เธฃเธญเธญเธเธธเธกเธฑเธ•เธด"
+    // รายการ "ยืมอยู่" และ "รออนุมัติ"
     $stmt2 = $pdo->prepare(
         "SELECT t.id AS transaction_id, t.borrow_date, t.due_date,
                 t.approval_status,
@@ -35,7 +35,7 @@ try {
     $stmt2->execute([$student_id]);
     $borrowed_items = $stmt2->fetchAll();
 
-    // เธเนเธฒเธเธฃเธฑเธเธเนเธฒเธเธเธณเธฃเธฐ
+    // ค่าปรับค้างชำระ
     $stmt3 = $pdo->prepare(
         "SELECT SUM(f.amount) AS total
          FROM borrow_fines f
@@ -46,7 +46,7 @@ try {
     $fine_row  = $stmt3->fetch();
     $total_fine = (float)($fine_row['total'] ?? 0);
 
-    // เธชเธฃเธธเธเธ•เธฑเธงเน€เธฅเธ
+    // สรุปตัวเลข
     $pending_count  = count(array_filter($borrowed_items, fn($i) => $i['approval_status'] === 'pending'));
     $approved_count = count(array_filter($borrowed_items, fn($i) => $i['approval_status'] === 'approved'));
     $overdue_count  = count(array_filter($borrowed_items, fn($i) =>
@@ -54,15 +54,15 @@ try {
     ));
 
 } catch (PDOException $e) {
-    $error_message  = "เน€เธเธดเธ”เธเนเธญเธเธดเธ”เธเธฅเธฒเธ”: " . $e->getMessage();
+    $error_message  = "เกิดข้อผิดพลาด: " . $e->getMessage();
     $borrowed_items = [];
     $total_fine     = 0;
     $pending_count  = $approved_count = $overdue_count = 0;
 }
 
-$firstName    = explode(' ', trim($student_data['full_name'] ?? 'เธเธนเนเนเธเน'))[0] ?? 'เธเธนเนเนเธเน';
+$firstName    = explode(' ', trim($student_data['full_name'] ?? 'ผู้ใช้'))[0] ?? 'ผู้ใช้';
 $avatarLetter = mb_substr($student_data['full_name'] ?? '?', 0, 1);
-$page_title   = 'เธซเธเนเธฒเนเธฃเธ';
+$page_title   = 'หน้าแรก';
 $active_page  = 'home';
 include('includes/student_header.php');
 ?>
@@ -304,7 +304,7 @@ body.dark-mode .btn-cancel-sm:active { background: rgba(220,38,38,.3); }
             <div class="hero-greeting">
                 <div class="hero-avatar"><?= $avatarLetter ?></div>
                 <div class="hero-text">
-                    <p>เธชเธงเธฑเธชเธ”เธต ๐‘</p>
+                    <p>สวัสดี 👋</p>
                     <h2><?= htmlspecialchars($firstName) ?></h2>
                 </div>
             </div>
@@ -313,15 +313,15 @@ body.dark-mode .btn-cancel-sm:active { background: rgba(220,38,38,.3); }
             <div class="stats-row">
                 <div class="stat-chip">
                     <div class="num"><?= $approved_count ?></div>
-                    <div class="lbl">เธขเธทเธกเธญเธขเธนเน</div>
+                    <div class="lbl">ยืมอยู่</div>
                 </div>
                 <div class="stat-chip <?= $pending_count > 0 ? 'warn' : '' ?>">
                     <div class="num"><?= $pending_count ?></div>
-                    <div class="lbl">เธฃเธญเธญเธเธธเธกเธฑเธ•เธด</div>
+                    <div class="lbl">รออนุมัติ</div>
                 </div>
                 <div class="stat-chip <?= $overdue_count > 0 ? 'danger' : '' ?>">
                     <div class="num"><?= $overdue_count ?></div>
-                    <div class="lbl">เน€เธเธดเธเธเธณเธซเธเธ”</div>
+                    <div class="lbl">เกินกำหนด</div>
                 </div>
             </div>
         </div>
@@ -334,8 +334,8 @@ body.dark-mode .btn-cancel-sm:active { background: rgba(220,38,38,.3); }
                 <i class="fas fa-qrcode"></i>
             </div>
             <div class="qr-info">
-                <h4>เธเธฑเธ•เธฃเธเธฃเธฐเธเธณเธ•เธฑเธงเธ”เธดเธเธดเธ—เธฑเธฅ</h4>
-                <p>เนเธชเธ”เธ QR เนเธซเนเน€เธเนเธฒเธซเธเนเธฒเธ—เธตเนเธชเนเธเธเธขเธทเธกเธญเธธเธเธเธฃเธ“เน</p>
+                <h4>บัตรประจำตัวดิจิทัล</h4>
+                <p>แสดง QR ให้เจ้าหน้าที่สแกนยืมอุปกรณ์</p>
             </div>
             <i class="fas fa-chevron-right qr-arrow"></i>
         </div>
@@ -355,24 +355,24 @@ body.dark-mode .btn-cancel-sm:active { background: rgba(220,38,38,.3); }
         <div class="fine-banner">
             <i class="fas fa-exclamation-triangle"></i>
             <div class="fine-text">
-                <h4>เธกเธตเธเนเธฒเธเธฃเธฑเธเธเนเธฒเธเธเธณเธฃเธฐ</h4>
-                <p><?= number_format($total_fine, 2) ?> เธเธฒเธ— โ€” เธเธฃเธธเธ“เธฒเธ•เธดเธ”เธ•เนเธญเน€เธเนเธฒเธซเธเนเธฒเธ—เธตเน</p>
+                <h4>มีค่าปรับค้างชำระ</h4>
+                <p><?= number_format($total_fine, 2) ?> บาท — กรุณาติดต่อเจ้าหน้าที่</p>
             </div>
         </div>
         <?php endif; ?>
 
         <div class="section-head">
-            <h3><i class="fas fa-hand-holding-medical" style="color:#0B6623; margin-right:6px;"></i>เธญเธธเธเธเธฃเธ“เนเธ—เธตเนเธขเธทเธกเธญเธขเธนเน</h3>
-            <a href="history.php">เธ”เธนเธเธฃเธฐเธงเธฑเธ•เธด โ’</a>
+            <h3><i class="fas fa-hand-holding-medical" style="color:#0B6623; margin-right:6px;"></i>อุปกรณ์ที่ยืมอยู่</h3>
+            <a href="history.php">ดูประวัติ →</a>
         </div>
 
         <?php if (empty($borrowed_items)): ?>
         <div class="empty-state">
             <div class="empty-icon"><i class="fas fa-boxes-stacked" style="color:#16a34a;"></i></div>
-            <h4>เธขเธฑเธเนเธกเนเธกเธตเธเธฒเธฃเธขเธทเธกเธญเธธเธเธเธฃเธ“เน</h4>
-            <p>เธเธธเธ“เธขเธฑเธเนเธกเนเธกเธตเธฃเธฒเธขเธเธฒเธฃเธขเธทเธกเธญเธธเธเธเธฃเธ“เน<br>เนเธเธเธ“เธฐเธเธตเน</p>
+            <h4>ยังไม่มีการยืมอุปกรณ์</h4>
+            <p>คุณยังไม่มีรายการยืมอุปกรณ์<br>ในขณะนี้</p>
             <a href="borrow.php" class="btn-borrow">
-                <i class="fas fa-plus"></i> เธขเธทเธกเธญเธธเธเธเธฃเธ“เน
+                <i class="fas fa-plus"></i> ยืมอุปกรณ์
             </a>
         </div>
 
@@ -391,7 +391,7 @@ body.dark-mode .btn-cancel-sm:active { background: rgba(220,38,38,.3); }
                     <i class="fas fa-hourglass-half" style="color:#f59e0b;"></i>
                 <?php elseif (!empty($item['image_url'])): ?>
                     <img src="<?= htmlspecialchars($item['image_url']) ?>"
-                         alt="เธฃเธนเธเธญเธธเธเธเธฃเธ“เน"
+                         alt="รูปอุปกรณ์"
                          onerror="this.parentElement.innerHTML='<i class=\'fas fa-image\'></i>'">
                 <?php else: ?>
                     <i class="fas fa-stethoscope" style="color:#0B6623;"></i>
@@ -406,18 +406,18 @@ body.dark-mode .btn-cancel-sm:active { background: rgba(220,38,38,.3); }
                 <div class="due-row">
                     <?php if ($isPending): ?>
                         <span class="status-pill pill-pending">
-                            <i class="fas fa-hourglass-half" style="font-size:.6rem;"></i> เธฃเธญเธญเธเธธเธกเธฑเธ•เธด
+                            <i class="fas fa-hourglass-half" style="font-size:.6rem;"></i> รออนุมัติ
                         </span>
                     <?php elseif ($isOverdue): ?>
                         <span class="status-pill pill-overdue">
-                            <i class="fas fa-circle-exclamation" style="font-size:.6rem;"></i> เน€เธเธดเธเธเธณเธซเธเธ”
+                            <i class="fas fa-circle-exclamation" style="font-size:.6rem;"></i> เกินกำหนด
                         </span>
                         <span class="due-text overdue"><?= $dueDateFmt ?></span>
                     <?php else: ?>
                         <span class="status-pill pill-ok">
-                            <i class="fas fa-circle-check" style="font-size:.6rem;"></i> เธขเธทเธกเธญเธขเธนเน
+                            <i class="fas fa-circle-check" style="font-size:.6rem;"></i> ยืมอยู่
                         </span>
-                        <span class="due-text">เธเธทเธ <?= $dueDateFmt ?></span>
+                        <span class="due-text">คืน <?= $dueDateFmt ?></span>
                     <?php endif; ?>
                 </div>
             </div>
@@ -426,7 +426,7 @@ body.dark-mode .btn-cancel-sm:active { background: rgba(220,38,38,.3); }
             <?php if ($isPending): ?>
             <div class="item-action">
                 <button class="btn-cancel-sm" onclick="confirmCancelRequest(<?= $item['transaction_id'] ?>)">
-                    <i class="fas fa-times"></i> เธขเธเน€เธฅเธดเธ
+                    <i class="fas fa-times"></i> ยกเลิก
                 </button>
             </div>
             <?php endif; ?>
@@ -445,7 +445,7 @@ function showHomeQRCode() {
     const qrData = "MEDLOAN_STUDENT:" + studentCode + ":" + studentDbId;
 
     Swal.fire({
-        title: 'เธเธฑเธ•เธฃเธเธฃเธฐเธเธณเธ•เธฑเธงเธ”เธดเธเธดเธ—เธฑเธฅ',
+        title: 'บัตรประจำตัวดิจิทัล',
         html: `
             <div style="display:flex;flex-direction:column;align-items:center;gap:12px;">
                 <div style="padding:12px;background:#fff;border-radius:12px;box-shadow:0 2px 10px rgba(0,0,0,.08);">
@@ -456,7 +456,7 @@ function showHomeQRCode() {
                     <p style="margin:0;color:#666;font-size:.85rem;">${studentName}</p>
                 </div>
                 <p style="margin:0;font-size:.75rem;color:#0B6623;background:#f0fdf4;padding:8px 14px;border-radius:8px;">
-                    <i class="fas fa-info-circle"></i> เธขเธทเนเธเนเธซเนเน€เธเนเธฒเธซเธเนเธฒเธ—เธตเนเธชเนเธเธเน€เธเธทเนเธญเธขเธทเธกเธญเธธเธเธเธฃเธ“เน
+                    <i class="fas fa-info-circle"></i> ยื่นให้เจ้าหน้าที่สแกนเพื่อยืมอุปกรณ์
                 </p>
             </div>`,
         didOpen: () => {
@@ -465,7 +465,7 @@ function showHomeQRCode() {
                 correctLevel: QRCode.CorrectLevel.H
             });
         },
-        confirmButtonText: 'เธเธดเธ”',
+        confirmButtonText: 'ปิด',
         confirmButtonColor: '#0B6623',
         showClass: { popup: 'animate__animated animate__fadeInUp animate__faster' }
     });
@@ -473,14 +473,14 @@ function showHomeQRCode() {
 
 function confirmCancelRequest(transactionId) {
     Swal.fire({
-        title: 'เธขเธทเธเธขเธฑเธเธเธฒเธฃเธขเธเน€เธฅเธดเธ?',
-        text: 'เธเธณเธเธญเธขเธทเธกเธญเธธเธเธเธฃเธ“เนเธเธตเนเธเธฐเธ–เธนเธเธขเธเน€เธฅเธดเธ',
+        title: 'ยืนยันการยกเลิก?',
+        text: 'คำขอยืมอุปกรณ์นี้จะถูกยกเลิก',
         icon: 'warning',
         showCancelButton: true,
         confirmButtonColor: '#dc2626',
         cancelButtonColor: '#6b7280',
-        confirmButtonText: 'เธขเธทเธเธขเธฑเธ เธขเธเน€เธฅเธดเธ',
-        cancelButtonText: 'เนเธกเนเธขเธเน€เธฅเธดเธ',
+        confirmButtonText: 'ยืนยัน ยกเลิก',
+        cancelButtonText: 'ไม่ยกเลิก',
     }).then((result) => {
         if (result.isConfirmed) {
             window.location.href = `ajax/cancel_request.php?id=${transactionId}`;

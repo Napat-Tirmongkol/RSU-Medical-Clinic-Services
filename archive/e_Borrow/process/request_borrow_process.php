@@ -1,17 +1,17 @@
 <?php
-// [เนเธเนเนเธเนเธเธฅเน: process/request_borrow_process.php]
+// [แก้ไขไฟล์: process/request_borrow_process.php]
 
-// 1. "เธเนเธฒเธเธขเธฒเธก" เนเธฅเธฐ "เน€เธเธทเนเธญเธกเธ•เนเธญ DB"
+// 1. "จ้างยาม" และ "เชื่อมต่อ DB"
 require_once('../includes/check_student_session_ajax.php'); 
 require_once(__DIR__ . '/../../../config/db_connect.php');
 require_once('../includes/log_function.php');
 
 header('Content-Type: application/json');
-$response = ['status' => 'error', 'message' => 'เน€เธเธดเธ”เธเนเธญเธเธดเธ”เธเธฅเธฒเธ”เนเธกเนเธ—เธฃเธฒเธเธชเธฒเน€เธซเธ•เธธ'];
+$response = ['status' => 'error', 'message' => 'เกิดข้อผิดพลาดไม่ทราบสาเหตุ'];
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
-    // 2. เธฃเธฑเธเธเนเธญเธกเธนเธฅเธเธฒเธเธเธญเธฃเนเธก
+    // 2. รับข้อมูลจากฟอร์ม
     $type_id = isset($_POST['type_id']) ? (int)$_POST['type_id'] : 0;
     $student_id = $_SESSION['student_id']; 
     $reason = isset($_POST['reason_for_borrowing']) ? trim($_POST['reason_for_borrowing']) : '';
@@ -19,13 +19,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $due_date = isset($_POST['due_date']) ? $_POST['due_date'] : null;
 
     if ($type_id == 0 || $staff_id == 0 || empty($reason) || $due_date == null) {
-        $response['message'] = 'เธเนเธญเธกเธนเธฅเธ—เธตเนเธชเนเธเธกเธฒเนเธกเนเธเธฃเธเธ–เนเธงเธ (เน€เธซเธ•เธธเธเธฅ, เธเธนเนเธ”เธนเนเธฅ, เธซเธฃเธทเธญเธงเธฑเธเธ—เธตเนเธเธทเธ)';
+        $response['message'] = 'ข้อมูลที่ส่งมาไม่ครบถ้วน (เหตุผล, ผู้ดูแล, หรือวันที่คืน)';
         echo json_encode($response);
         exit;
     }
 
-    // โ… (3) เธชเนเธงเธเธเธฑเธ”เธเธฒเธฃเนเธเธฅเนเธญเธฑเธเนเธซเธฅเธ” (เนเธเนเนเธเนเธซเนเธฃเธญเธเธฃเธฑเธเธฃเธนเธเธ เธฒเธ + เนเธเนเธเธฒเธฃเธชเนเธเธเนเธฒเธเธฅเธฑเธเนเธเธ JSON)
-    $attachment_url = NULL; // เธเธณเธซเธเธ”เธเนเธฒเน€เธฃเธดเนเธกเธ•เนเธเน€เธเนเธ NULL
+    // ✅ (3) ส่วนจัดการไฟล์อัปโหลด (แก้ไขให้รองรับรูปภาพ + แก้การส่งค่ากลับแบบ JSON)
+    $attachment_url = NULL; // กำหนดค่าเริ่มต้นเป็น NULL
 
     if (isset($_FILES['attachment']) && $_FILES['attachment']['error'] === UPLOAD_ERR_OK) {
         
@@ -33,10 +33,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $file_name = $_FILES['attachment']['name'];
         $file_size = $_FILES['attachment']['size'];
         
-        // 1. [เนเธเนเนเธ] เน€เธเธดเนเธกเธเธฒเธกเธชเธเธธเธฅเธฃเธนเธเธ เธฒเธ (jpg, png)
+        // 1. [แก้ไข] เพิ่มนามสกุลรูปภาพ (jpg, png)
         $allowed_extensions = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'jpg', 'jpeg', 'png'];
         
-        // 2. [เนเธเนเนเธ] เน€เธเธดเนเธก MIME Types เธเธญเธเธฃเธนเธเธ เธฒเธ
+        // 2. [แก้ไข] เพิ่ม MIME Types ของรูปภาพ
         $allowed_mimes = [
             'application/pdf',
             'application/msword',
@@ -45,40 +45,40 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             'application/vnd.ms-powerpoint', 
             'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-            'image/jpeg', // เน€เธเธดเนเธก
-            'image/png'   // เน€เธเธดเนเธก
+            'image/jpeg', // เพิ่ม
+            'image/png'   // เพิ่ม
         ];
 
-        // เนเธขเธเธเธฒเธกเธชเธเธธเธฅเนเธเธฅเน
+        // แยกนามสกุลไฟล์
         $file_ext = strtolower(pathinfo($file_name, PATHINFO_EXTENSION));
 
-        // เธ•เธฃเธงเธเธชเธญเธ 1: เธเธฒเธกเธชเธเธธเธฅ
+        // ตรวจสอบ 1: นามสกุล
         if (!in_array($file_ext, $allowed_extensions)) {
-            echo json_encode(['status' => 'error', 'message' => 'เธญเธเธธเธเธฒเธ•เน€เธเธเธฒเธฐเนเธเธฅเนเน€เธญเธเธชเธฒเธฃ (PDF, Word) เนเธฅเธฐเธฃเธนเธเธ เธฒเธ (JPG, PNG) เน€เธ—เนเธฒเธเธฑเนเธ']);
+            echo json_encode(['status' => 'error', 'message' => 'อนุญาตเฉพาะไฟล์เอกสาร (PDF, Word) และรูปภาพ (JPG, PNG) เท่านั้น']);
             exit;
         }
 
-        // เธ•เธฃเธงเธเธชเธญเธ 2: MIME Type
+        // ตรวจสอบ 2: MIME Type
         $finfo = finfo_open(FILEINFO_MIME_TYPE);
         $mime_type = finfo_file($finfo, $file_tmp);
         finfo_close($finfo);
 
         if (!in_array($mime_type, $allowed_mimes)) {
-            echo json_encode(['status' => 'error', 'message' => 'เนเธเธฅเนเนเธกเนเธ–เธนเธเธ•เนเธญเธ เธซเธฃเธทเธญเธญเธฒเธเน€เธเนเธเนเธเธฅเนเธญเธฑเธเธ•เธฃเธฒเธข']);
+            echo json_encode(['status' => 'error', 'message' => 'ไฟล์ไม่ถูกต้อง หรืออาจเป็นไฟล์อันตราย']);
             exit;
         }
 
-        // เธ•เธฃเธงเธเธชเธญเธ 3: เธเธเธฒเธ”เนเธเธฅเน (5MB)
+        // ตรวจสอบ 3: ขนาดไฟล์ (5MB)
         if ($file_size > 5 * 1024 * 1024) {
-            echo json_encode(['status' => 'error', 'message' => 'เนเธเธฅเนเธกเธตเธเธเธฒเธ”เนเธซเธเนเน€เธเธดเธเนเธ (เธซเนเธฒเธกเน€เธเธดเธ 5MB)']);
+            echo json_encode(['status' => 'error', 'message' => 'ไฟล์มีขนาดใหญ่เกินไป (ห้ามเกิน 5MB)']);
             exit;
         }
 
-        // 3. เธ•เธฑเนเธเธเธทเนเธญเนเธเธฅเนเนเธซเธกเน
+        // 3. ตั้งชื่อไฟล์ใหม่
         $new_filename = "req-" . uniqid() . "." . $file_ext;
         $upload_dir = '../uploads/attachments/';
         
-        // เธชเธฃเนเธฒเธเนเธเธฅเน€เธ”เธญเธฃเนเธ–เนเธฒเธขเธฑเธเนเธกเนเธกเธต
+        // สร้างโฟลเดอร์ถ้ายังไม่มี
         if (!file_exists($upload_dir)) {
             mkdir($upload_dir, 0777, true);
         }
@@ -86,40 +86,40 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $destination = $upload_dir . $new_filename;
 
         if (move_uploaded_file($file_tmp, $destination)) {
-            // เน€เธเนเธ Path เธฅเธเธ•เธฑเธงเนเธเธฃ $attachment_url (เธ•เธฑเธงเนเธเธฃเธเธตเนเนเธซเธฅเธฐเธ—เธตเนเธ•เนเธญเธเน€เธญเธฒเนเธเนเธเน)
+            // เก็บ Path ลงตัวแปร $attachment_url (ตัวแปรนี้แหละที่ต้องเอาไปใช้)
             $attachment_url = 'uploads/attachments/' . $new_filename;
         } else {
-            echo json_encode(['status' => 'error', 'message' => 'เน€เธเธดเธ”เธเนเธญเธเธดเธ”เธเธฅเธฒเธ”เนเธเธเธฒเธฃเธญเธฑเธเนเธซเธฅเธ”เนเธเธฅเน (move_uploaded_file failed)']);
+            echo json_encode(['status' => 'error', 'message' => 'เกิดข้อผิดพลาดในการอัปโหลดไฟล์ (move_uploaded_file failed)']);
             exit;
         }
     }
 
-    // 4. เน€เธฃเธดเนเธก Transaction
+    // 4. เริ่ม Transaction
     try {
         $pdo->beginTransaction();
 
-        // 4.1 เธเนเธเธซเธฒ "เธเธดเนเธ" เธญเธธเธเธเธฃเธ“เน
+        // 4.1 ค้นหา "ชิ้น" อุปกรณ์
         $stmt_find = $pdo->prepare("SELECT id FROM borrow_items WHERE type_id = ? AND status = 'available' LIMIT 1 FOR UPDATE");
         $stmt_find->execute([$type_id]);
         $item_id = $stmt_find->fetchColumn();
 
         if (!$item_id) {
-            throw new Exception("เธญเธธเธเธเธฃเธ“เนเธเธฃเธฐเน€เธ เธ—เธเธตเนเธ–เธนเธเธขเธทเธกเนเธเธซเธกเธ”เนเธฅเนเธงเนเธเธเธ“เธฐเธเธตเน");
+            throw new Exception("อุปกรณ์ประเภทนี้ถูกยืมไปหมดแล้วในขณะนี้");
         }
 
-        // 4.2 "เธเธญเธ" เธญเธธเธเธเธฃเธ“เน
+        // 4.2 "จอง" อุปกรณ์
         $stmt_item = $pdo->prepare("UPDATE borrow_items SET status = 'borrowed' WHERE id = ?");
         $stmt_item->execute([$item_id]);
 
-        // 4.3 "เธฅเธ”" เธเธณเธเธงเธเธเธญเธเธงเนเธฒเธ
+        // 4.3 "ลด" จำนวนของว่าง
         $stmt_type = $pdo->prepare("UPDATE borrow_categories SET available_quantity = available_quantity - 1 WHERE id = ? AND available_quantity > 0");
         $stmt_type->execute([$type_id]);
         
         if ($stmt_item->rowCount() == 0 || $stmt_type->rowCount() == 0) {
-             throw new Exception("เนเธกเนเธชเธฒเธกเธฒเธฃเธ–เธญเธฑเธเน€เธ”เธ•เธชเธ•เนเธญเธเธญเธธเธเธเธฃเธ“เนเนเธ”เน");
+             throw new Exception("ไม่สามารถอัปเดตสต็อกอุปกรณ์ได้");
         }
 
-        // 4.4 "เธชเธฃเนเธฒเธ" เธเธณเธเธญเธขเธทเธก
+        // 4.4 "สร้าง" คำขอยืม
         $sql_trans = "INSERT INTO borrow_records 
                         (type_id, item_id, equipment_id, borrower_student_id, reason_for_borrowing, 
                          attachment_url, 
@@ -133,17 +133,17 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         
         $stmt_trans = $pdo->prepare($sql_trans);
         
-        // โ… [เนเธเนเนเธเธเธธเธ”เธชเธณเธเธฑเธ]: เน€เธเธฅเธตเนเธขเธเธเธฒเธ $attachment_url_to_db เน€เธเนเธ $attachment_url
+        // ✅ [แก้ไขจุดสำคัญ]: เปลี่ยนจาก $attachment_url_to_db เป็น $attachment_url
         $stmt_trans->execute([
             $type_id, $item_id, $item_id, $student_id, $reason, 
-            $attachment_url, // <-- เนเธเนเธ•เธฃเธเธเธตเน (เน€เธ”เธดเธกเนเธเนเธ•เธฑเธงเนเธเธฃเธเธดเธ”)
+            $attachment_url, // <-- แก้ตรงนี้ (เดิมใช้ตัวแปรผิด)
             $staff_id, $due_date
         ]);
 
         $pdo->commit();
 
         $response['status'] = 'success';
-        $response['message'] = 'เธชเนเธเธเธณเธเธญเธขเธทเธกเธชเธณเน€เธฃเนเธ! เธเธฃเธธเธ“เธฒเธฃเธญ Admin เธญเธเธธเธกเธฑเธ•เธด';
+        $response['message'] = 'ส่งคำขอยืมสำเร็จ! กรุณารอ Admin อนุมัติ';
 
     } catch (Exception $e) {
         $pdo->rollBack();
@@ -151,10 +151,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     }
 
 } else {
-    $response['message'] = 'เธ•เนเธญเธเนเธเนเธงเธดเธเธต POST เน€เธ—เนเธฒเธเธฑเนเธ';
+    $response['message'] = 'ต้องใช้วิธี POST เท่านั้น';
 }
 
-// เธชเนเธเธเธณเธ•เธญเธ
+// ส่งคำตอบ
 echo json_encode($response);
 exit;
 ?>

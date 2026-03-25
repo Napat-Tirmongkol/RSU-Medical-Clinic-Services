@@ -3,7 +3,7 @@
 include('../includes/check_session_ajax.php');
 require_once(__DIR__ . '/../../../config/db_connect.php');
 
-// เธฃเธฑเธเธเนเธญเธกเธนเธฅเน€เธเนเธ Array เธเธญเธ ID [1, 2, 3, ...]
+// รับข้อมูลเป็น Array ของ ID [1, 2, 3, ...]
 $data_json = $_POST['ids'] ?? '[]';
 $ids = json_decode($data_json, true);
 
@@ -13,7 +13,7 @@ if (empty($ids)) {
 }
 
 try {
-    // เนเธเธฅเธ Array เน€เธเนเธ string เธชเธณเธซเธฃเธฑเธ query (เน€เธเนเธ "1,2,3")
+    // แปลง Array เป็น string สำหรับ query (เช่น "1,2,3")
     $placeholders = implode(',', array_fill(0, count($ids), '?'));
     
     $sql = "SELECT id, name, serial_number FROM borrow_items WHERE id IN ($placeholders)";

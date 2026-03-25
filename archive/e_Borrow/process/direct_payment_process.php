@@ -8,16 +8,16 @@ require_once('../includes/line_config.php');
 $allowed_roles = ['admin', 'editor'];
 if (!isset($_SESSION['role']) || !in_array($_SESSION['role'], $allowed_roles)) {
     header('Content-Type: application/json');
-    echo json_encode(['status' => 'error', 'message' => 'เธเธธเธ“เนเธกเนเธกเธตเธชเธดเธ—เธเธดเนเธ”เธณเน€เธเธดเธเธเธฒเธฃ']);
+    echo json_encode(['status' => 'error', 'message' => 'คุณไม่มีสิทธิ์ดำเนินการ']);
     exit;
 }
 
 header('Content-Type: application/json');
-$response = ['status' => 'error', 'message' => 'เน€เธเธดเธ”เธเนเธญเธเธดเธ”เธเธฅเธฒเธ”เนเธกเนเธ—เธฃเธฒเธเธชเธฒเน€เธซเธ•เธธ'];
+$response = ['status' => 'error', 'message' => 'เกิดข้อผิดพลาดไม่ทราบสาเหตุ'];
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
-    // 1. เธฃเธฑเธเธเนเธญเธกเธนเธฅ
+    // 1. รับข้อมูล
     $transaction_id = isset($_POST['transaction_id']) ? (int)$_POST['transaction_id'] : 0;
     $student_id = isset($_POST['student_id']) ? (int)$_POST['student_id'] : 0;
     $amount = isset($_POST['amount']) ? (float)$_POST['amount'] : 0;
@@ -30,7 +30,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $receipt_number = null; 
 
     if ($transaction_id == 0 || $student_id == 0 || $amount <= 0 || $amount_paid <= 0) {
-        $response['message'] = 'เธเนเธญเธกเธนเธฅเธ—เธตเนเธชเนเธเธกเธฒเนเธกเนเธเธฃเธเธ–เนเธงเธ';
+        $response['message'] = 'ข้อมูลที่ส่งมาไม่ครบถ้วน';
         echo json_encode($response);
         exit;
     }
@@ -38,7 +38,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
    try {
         $pdo->beginTransaction();
 
-        // 2. เธเธฑเธ”เธเธฒเธฃเธญเธฑเธเนเธซเธฅเธ”เนเธเธฅเน
+        // 2. จัดการอัปโหลดไฟล์
         if ($payment_method == 'bank_transfer') {
             if (isset($_FILES['payment_slip']) && $_FILES['payment_slip']['error'] == 0) {
                 $upload_dir_server = '../uploads/slips/';
@@ -55,42 +55,42 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 if (move_uploaded_file($_FILES['payment_slip']['tmp_name'], $target_file_server)) {
                     $payment_slip_url = $target_file_db;
                 } else {
-                    throw new Exception("เนเธกเนเธชเธฒเธกเธฒเธฃเธ–เธขเนเธฒเธขเนเธเธฅเนเธชเธฅเธดเธเนเธ”เน");
+                    throw new Exception("ไม่สามารถย้ายไฟล์สลิปได้");
                 }
             } else {
-                throw new Exception("เธเธฃเธธเธ“เธฒเนเธเธเธชเธฅเธดเธเธเธฒเธฃเนเธญเธ");
+                throw new Exception("กรุณาแนบสลิปการโอน");
             }
         }
 
-        // 3. เธชเธฃเนเธฒเธเธฃเธฒเธขเธเธฒเธฃเธเนเธฒเธเธฃเธฑเธ
+        // 3. สร้างรายการค่าปรับ
         $sql_fine = "INSERT INTO borrow_fines (transaction_id, student_id, amount, notes, created_by_staff_id, status) VALUES (?, ?, ?, ?, ?, 'paid')"; 
         $stmt_fine = $pdo->prepare($sql_fine);
         $stmt_fine->execute([$transaction_id, $student_id, $amount, $notes, $staff_id]);
         $new_fine_id = $pdo->lastInsertId();
 
-        // 4. เธชเธฃเนเธฒเธเธฃเธฒเธขเธเธฒเธฃเธเธณเธฃเธฐเน€เธเธดเธ
+        // 4. สร้างรายการชำระเงิน
         $sql_pay = "INSERT INTO borrow_payments (fine_id, amount_paid, payment_method, payment_slip_url, received_by_staff_id, receipt_number) VALUES (?, ?, ?, ?, ?, ?)";
         $stmt_pay = $pdo->prepare($sql_pay);
         $stmt_pay->execute([$new_fine_id, $amount_paid, $payment_method, $payment_slip_url, $staff_id, $receipt_number]);
         $new_payment_id = $pdo->lastInsertId();
 
-        // 5. เธญเธฑเธเน€เธ”เธ• Transaction
+        // 5. อัปเดต Transaction
         $sql_trans = "UPDATE borrow_records SET fine_status = 'paid' WHERE id = ?";
         $stmt_trans = $pdo->prepare($sql_trans);
         $stmt_trans->execute([$transaction_id]);
 
-        // 6. เธเธฑเธเธ—เธถเธ Log
+        // 6. บันทึก Log
         $admin_user_name = $_SESSION['full_name'] ?? 'System';
-        $log_desc = "Admin '{$admin_user_name}' เธฃเธฑเธเธเธณเธฃเธฐเน€เธเธดเธ (Direct, {$payment_method}) เธขเธญเธ” {$amount_paid} เธเธฒเธ— (TID: {$transaction_id})";
+        $log_desc = "Admin '{$admin_user_name}' รับชำระเงิน (Direct, {$payment_method}) ยอด {$amount_paid} บาท (TID: {$transaction_id})";
         log_action($pdo, $staff_id, 'direct_payment', $log_desc);
 
-        // 7. เธชเนเธเนเธเน€เธชเธฃเนเธเธ—เธฒเธ LINE
+        // 7. ส่งใบเสร็จทาง LINE
         sendLineReceipt($pdo, $transaction_id, $student_id, $new_payment_id, $amount_paid, $payment_method);
 
         $pdo->commit();
 
         $response['status'] = 'success';
-        $response['message'] = 'เธเธฑเธเธ—เธถเธเธเธฒเธฃเธเธณเธฃเธฐเน€เธเธดเธเน€เธฃเธตเธขเธเธฃเนเธญเธข';
+        $response['message'] = 'บันทึกการชำระเงินเรียบร้อย';
         $response['new_payment_id'] = $new_payment_id;
 
     } catch (Exception $e) {
@@ -120,7 +120,7 @@ function sendLineReceipt($pdo, $transaction_id, $student_id, $payment_id, $amoun
         $line_user_id = $data['line_user_id'];
         $item_name = $data['item_name'];
         $date_now = date('d/m/Y H:i');
-        $method_text = ($method == 'bank_transfer') ? 'เนเธญเธเน€เธเธดเธ' : 'เน€เธเธดเธเธชเธ”';
+        $method_text = ($method == 'bank_transfer') ? 'โอนเงิน' : 'เงินสด';
 
         $flexData = [
             "type" => "bubble", "size" => "giga",
@@ -128,23 +128,23 @@ function sendLineReceipt($pdo, $transaction_id, $student_id, $payment_id, $amoun
                 "type" => "box", "layout" => "vertical",
                 "contents" => [
                     ["type" => "text", "text" => "RECEIPT", "weight" => "bold", "color" => "#1DB446", "size" => "sm"],
-                    ["type" => "text", "text" => "เนเธเน€เธชเธฃเนเธเธฃเธฑเธเน€เธเธดเธ", "weight" => "bold", "size" => "xl", "margin" => "md"],
+                    ["type" => "text", "text" => "ใบเสร็จรับเงิน", "weight" => "bold", "size" => "xl", "margin" => "md"],
                     ["type" => "separator", "margin" => "xxl"],
                     [
                         "type" => "box", "layout" => "vertical", "margin" => "xxl", "spacing" => "sm",
                         "contents" => [
-                            ["type" => "box", "layout" => "horizontal", "contents" => [["type" => "text", "text" => "เน€เธฅเธเธ—เธตเนเธฃเธฒเธขเธเธฒเธฃ", "size" => "sm", "color" => "#555555"], ["type" => "text", "text" => "#PAY-" . $payment_id, "size" => "sm", "color" => "#111111", "align" => "end"]]],
-                            ["type" => "box", "layout" => "horizontal", "contents" => [["type" => "text", "text" => "เธงเธฑเธเธ—เธตเนเธเธณเธฃเธฐ", "size" => "sm", "color" => "#555555"], ["type" => "text", "text" => $date_now, "size" => "sm", "color" => "#111111", "align" => "end"]]],
-                            ["type" => "box", "layout" => "horizontal", "contents" => [["type" => "text", "text" => "เธญเธธเธเธเธฃเธ“เน", "size" => "sm", "color" => "#555555"], ["type" => "text", "text" => $item_name, "size" => "sm", "color" => "#111111", "align" => "end", "wrap" => true, "flex" => 2]]],
+                            ["type" => "box", "layout" => "horizontal", "contents" => [["type" => "text", "text" => "เลขที่รายการ", "size" => "sm", "color" => "#555555"], ["type" => "text", "text" => "#PAY-" . $payment_id, "size" => "sm", "color" => "#111111", "align" => "end"]]],
+                            ["type" => "box", "layout" => "horizontal", "contents" => [["type" => "text", "text" => "วันที่ชำระ", "size" => "sm", "color" => "#555555"], ["type" => "text", "text" => $date_now, "size" => "sm", "color" => "#111111", "align" => "end"]]],
+                            ["type" => "box", "layout" => "horizontal", "contents" => [["type" => "text", "text" => "อุปกรณ์", "size" => "sm", "color" => "#555555"], ["type" => "text", "text" => $item_name, "size" => "sm", "color" => "#111111", "align" => "end", "wrap" => true, "flex" => 2]]],
                             ["type" => "separator", "margin" => "xxl"],
-                            ["type" => "box", "layout" => "horizontal", "margin" => "xxl", "contents" => [["type" => "text", "text" => "เธขเธญเธ”เธฃเธงเธกเธชเธธเธ—เธเธด", "size" => "sm", "color" => "#555555"], ["type" => "text", "text" => number_format($amount, 2) . " เธฟ", "size" => "xl", "color" => "#111111", "align" => "end", "weight" => "bold"]]]
+                            ["type" => "box", "layout" => "horizontal", "margin" => "xxl", "contents" => [["type" => "text", "text" => "ยอดรวมสุทธิ", "size" => "sm", "color" => "#555555"], ["type" => "text", "text" => number_format($amount, 2) . " ฿", "size" => "xl", "color" => "#111111", "align" => "end", "weight" => "bold"]]]
                         ]
                     ]
                 ]
             ]
         ];
 
-        $payload = ['to' => $line_user_id, 'messages' => [['type' => 'flex', 'altText' => 'เนเธเน€เธชเธฃเนเธเธฃเธฑเธเน€เธเธดเธเธเนเธฒเธเธฃเธฑเธ', 'contents' => $flexData]]];
+        $payload = ['to' => $line_user_id, 'messages' => [['type' => 'flex', 'altText' => 'ใบเสร็จรับเงินค่าปรับ', 'contents' => $flexData]]];
         $ch = curl_init('https://api.line.me/v2/bot/message/push');
         curl_setopt($ch, CURLOPT_POST, true);
         curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));

@@ -1,8 +1,8 @@
 <?php
-// [แก้ไข: process/delete_staff_process.php]
-// แก้ไขให้รับค่า user_id_to_delete และใช้ตาราง sys_staff
+// [���: process/delete_staff_process.php]
+// �������Ѻ��� user_id_to_delete �������ҧ sys_staff
 
-// 1. ตั้งค่า Error Reporting
+// 1. ��駤�� Error Reporting
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
@@ -11,56 +11,56 @@ header('Content-Type: application/json; charset=utf-8');
 
 require_once '../includes/db_connect.php';
 
-$response = ['status' => 'error', 'message' => 'เกิดข้อผิดพลาดที่ไม่ทราบสาเหตุ'];
+$response = ['status' => 'error', 'message' => '�Դ��ͼԴ��Ҵ�������Һ���˵�'];
 
 try {
     session_start();
 
-    // 2. ตรวจสอบสิทธิ์ Admin
+    // 2. ��Ǩ�ͺ�Է��� Admin
     if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
-        throw new Exception('คุณไม่มีสิทธิ์ดำเนินการนี้ (Access Denied)');
+        throw new Exception('�س������Է�����Թ��ù�� (Access Denied)');
     }
 
-    // 3. รับค่าจาก AJAX (ชื่อตัวแปรต้องตรงกับ admin_app.js: formData.append('user_id_to_delete', ...))
+    // 3. �Ѻ��Ҩҡ AJAX (���͵���õ�ͧ�ç�Ѻ admin_app.js: formData.append('user_id_to_delete', ...))
     $target_id = $_POST['user_id_to_delete'] ?? null;
 
     if (!$target_id) {
-        throw new Exception('ไม่พบข้อมูล ID ผู้ใช้งานที่จะลบ');
+        throw new Exception('��辺������ ID �����ҹ����ź');
     }
 
-    // 4. ป้องกันการลบตัวเอง
+    // 4. ��ͧ�ѹ���ź����ͧ
     if ($target_id == $_SESSION['user_id']) {
-        throw new Exception('ไม่สามารถลบบัญชีของตัวเองได้');
+        throw new Exception('�������öź�ѭ�բͧ����ͧ��');
     }
 
-    // 5. ตรวจสอบว่ามีรายการค้างอยู่หรือไม่ (Optional Check)
-    // เช็คว่าเคยอนุมัติรายการ (approver_id) หรือรับของคืน (return_staff_id) หรือไม่
-    // ถ้าซีเรียสเรื่อง Data Integrity ควรใช้การ "ระงับ" แทนการ "ลบ" 
-    // แต่ถ้าต้องการลบจริงๆ SQL จะทำงานตาม Constraint (เช่น ON DELETE SET NULL หรือ RESTRICT)
+    // 5. ��Ǩ�ͺ�������¡�ä�ҧ����������� (Optional Check)
+    // �������͹��ѵ���¡�� (approver_id) �����Ѻ�ͧ�׹ (return_staff_id) �������
+    // ��ҫ����������ͧ Data Integrity ������� "�ЧѺ" ᷹��� "ź" 
+    // ���ҵ�ͧ���ź��ԧ� SQL �зӧҹ��� Constraint (�� ON DELETE SET NULL ���� RESTRICT)
     
-    // ลองลบข้อมูล
+    // �ͧź������
     $sql = "DELETE FROM sys_staff WHERE id = :id";
     $stmt = $pdo->prepare($sql);
     
-    // ใช้ Try-Catch เฉพาะจุด Execute เพื่อดักจับ Error จาก Foreign Key (เช่น ติด Constraint)
+    // �� Try-Catch ੾�Шش Execute ���ʹѡ�Ѻ Error �ҡ Foreign Key (�� �Դ Constraint)
     try {
         $result = $stmt->execute([':id' => $target_id]);
         
         if ($result) {
             $response = [
                 'status' => 'success', 
-                'message' => 'ลบบัญชีพนักงานเรียบร้อยแล้ว'
+                'message' => 'ź�ѭ�վ�ѡ�ҹ���º��������'
             ];
         } else {
-            throw new Exception('ไม่สามารถลบข้อมูลได้ (Execute Failed)');
+            throw new Exception('�������öź�������� (Execute Failed)');
         }
 
     } catch (PDOException $e) {
-        // กรณีลบไม่ได้เพราะติด Foreign Key Constraint
+        // �ó�ź��������еԴ Foreign Key Constraint
         if ($e->getCode() == '23000') {
-            throw new Exception('ไม่สามารถลบได้ เนื่องจากพนักงานคนนี้มีประวัติการทำรายการในระบบ (แนะนำให้ใช้วิธี "ระงับการใช้งาน" แทน)');
+            throw new Exception('�������öź�� ���ͧ�ҡ��ѡ�ҹ������ջ���ѵԡ�÷���¡����к� (�й�������Ը� "�ЧѺ�����ҹ" ᷹)');
         } else {
-            throw $e; // Error อื่นๆ โยนต่อไป
+            throw $e; // Error ���� �¹����
         }
     }
 

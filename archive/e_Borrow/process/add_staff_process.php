@@ -1,32 +1,32 @@
 <?php
-// [แก้ไข: process/add_staff_process.php]
-// แก้ไขชื่อคอลัมน์ให้ตรงกับ DB: password -> password_hash และลบ created_at ออก
+// [���: process/add_staff_process.php]
+// ��䢪��ͤ���������ç�Ѻ DB: password -> password_hash ���ź created_at �͡
 
-// 1. ตั้งค่าการแสดงผล Error
+// 1. ��駤�ҡ���ʴ��� Error
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
-// 2. กำหนด Header เป็น JSON
+// 2. ��˹� Header �� JSON
 header('Content-Type: application/json; charset=utf-8');
 
 require_once '../includes/db_connect.php'; 
 session_start();
 
-$response = ['status' => 'error', 'message' => 'เกิดข้อผิดพลาดที่ไม่ทราบสาเหตุ'];
+$response = ['status' => 'error', 'message' => '�Դ��ͼԴ��Ҵ�������Һ���˵�'];
 
 try {
-    // 3. ตรวจสอบสิทธิ์ (Admin เท่านั้น)
+    // 3. ��Ǩ�ͺ�Է��� (Admin ��ҹ��)
     if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin'])) {
-        throw new Exception('คุณไม่มีสิทธิ์ดำเนินการนี้ (Access Denied)');
+        throw new Exception('�س������Է�����Թ��ù�� (Access Denied)');
     }
 
-    // 4. ตรวจสอบ Method
+    // 4. ��Ǩ�ͺ Method
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
         throw new Exception('Invalid Request Method');
     }
 
-    // 5. รับค่าจาก Form
+    // 5. �Ѻ��Ҩҡ Form
     $username  = trim($_POST['username'] ?? '');
     $password  = trim($_POST['password'] ?? '');
     $full_name = trim($_POST['full_name'] ?? '');
@@ -34,29 +34,29 @@ try {
 
     // 6. Validation
     if (empty($username) || empty($password) || empty($full_name)) {
-        throw new Exception('กรุณากรอกข้อมูลให้ครบถ้วน (Username, Password, ชื่อ-สกุล)');
+        throw new Exception('��سҡ�͡���������ú��ǹ (Username, Password, ����-ʡ��)');
     }
 
-    // 7. เช็ค Username ซ้ำ (ตาราง sys_staff)
+    // 7. �� Username ��� (���ҧ sys_staff)
     $stmt = $pdo->prepare("SELECT COUNT(*) FROM sys_staff WHERE username = ?");
     $stmt->execute([$username]);
     if ($stmt->fetchColumn() > 0) {
-        throw new Exception("Username '$username' มีผู้ใช้งานแล้ว กรุณาใช้ชื่ออื่น");
+        throw new Exception("Username '$username' �ռ����ҹ���� ��س���������");
     }
 
-    // 8. สร้าง Hash Password
+    // 8. ���ҧ Hash Password
     $hashed_password = password_hash($password, PASSWORD_DEFAULT);
 
-    // 9. บันทึกข้อมูล (แก้ไขชื่อคอลัมน์ให้ตรงกับ SQL)
-    // - เปลี่ยน password เป็น password_hash
-    // - ลบ created_at ออก (เพราะในตารางไม่มี)
+    // 9. �ѹ�֡������ (��䢪��ͤ���������ç�Ѻ SQL)
+    // - ����¹ password �� password_hash
+    // - ź created_at �͡ (����㹵��ҧ�����)
     $sql = "INSERT INTO sys_staff (username, password_hash, full_name, role) 
             VALUES (:username, :password, :full_name, :role)";
     
     $stmt = $pdo->prepare($sql);
     $result = $stmt->execute([
         ':username' => $username,
-        ':password' => $hashed_password, // map เข้ากับ password_hash
+        ':password' => $hashed_password, // map ��ҡѺ password_hash
         ':full_name' => $full_name,
         ':role' => $role
     ]);
@@ -64,17 +64,17 @@ try {
     if ($result) {
         $response = [
             'status' => 'success', 
-            'message' => 'เพิ่มบัญชีพนักงานเรียบร้อยแล้ว'
+            'message' => '�����ѭ�վ�ѡ�ҹ���º��������'
         ];
     } else {
-        throw new Exception('เกิดข้อผิดพลาดในการบันทึกข้อมูลลงฐานข้อมูล');
+        throw new Exception('�Դ��ͼԴ��Ҵ㹡�úѹ�֡������ŧ�ҹ������');
     }
 
 } catch (PDOException $e) {
-    // กรณี Database Error
+    // �ó� Database Error
     $response['message'] = 'Database Error: ' . $e->getMessage();
 } catch (Exception $e) {
-    // กรณี Error ทั่วไป
+    // �ó� Error �����
     $response['message'] = $e->getMessage();
 }
 

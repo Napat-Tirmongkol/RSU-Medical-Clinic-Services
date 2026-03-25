@@ -4,7 +4,7 @@ declare(strict_types=1);
 @session_start();
 include('includes/check_student_session.php');
 
-// เนเธเน DB เธเธฅเธฒเธ
+// ใช้ DB กลาง
 require_once __DIR__ . '/../config/db_connect.php';
 
 $student_id = (int)$_SESSION['student_id'];
@@ -19,10 +19,10 @@ try {
     $equipment_types = $stmt_equip->fetchAll();
 } catch (PDOException $e) {
     $equipment_types = [];
-    $equip_error = "เน€เธเธดเธ”เธเนเธญเธเธดเธ”เธเธฅเธฒเธ”: " . $e->getMessage();
+    $equip_error = "เกิดข้อผิดพลาด: " . $e->getMessage();
 }
 
-$page_title  = "เธขเธทเธกเธญเธธเธเธเธฃเธ“เน";
+$page_title  = "ยืมอุปกรณ์";
 $active_page = 'borrow';
 include('includes/student_header.php');
 ?>
@@ -34,7 +34,7 @@ include('includes/student_header.php');
 /* ===== TOP HEADER ===== */
 .borrow-header {
     background: linear-gradient(145deg, #0B6623 0%, #1a8c35 60%, #084C1A 100%);
-    padding: 30px 20px 45px; /* เน€เธเธทเนเธญเธ—เธตเนเนเธซเน search bar เธฅเธญเธข */
+    padding: 30px 20px 45px; /* เผื่อที่ให้ search bar ลอย */
     text-align: center;
     position: relative;
 }
@@ -106,7 +106,7 @@ include('includes/student_header.php');
 }
 .equip-card:hover { transform: translateY(-3px); box-shadow: 0 6px 16px rgba(0,0,0,.1); }
 
-/* เธฃเธนเธเธ เธฒเธ */
+/* รูปภาพ */
 .card-img-wrap {
     width: 100%; aspect-ratio: 4/3;
     background: #f8fafc;
@@ -117,7 +117,7 @@ include('includes/student_header.php');
 .card-img-wrap img { width: 100%; height: 100%; object-fit: cover; }
 .card-img-placeholder { font-size: 2.5rem; color: #cbd5e1; }
 
-/* Stock Badge เธกเธธเธกเธเธงเธฒเธเธเธเธญเธเธฃเธนเธ */
+/* Stock Badge มุมขวาบนของรูป */
 .stock-badge {
     position: absolute; top: 10px; right: 10px;
     background: rgba(255,255,255,.9); backdrop-filter: blur(4px);
@@ -127,7 +127,7 @@ include('includes/student_header.php');
     display: flex; align-items: center; gap: 4px;
 }
 
-/* เน€เธเธทเนเธญเธซเธฒ Card */
+/* เนื้อหา Card */
 .card-body { padding: 12px; flex: 1; display: flex; flex-direction: column; }
 .card-body h3 {
     font-size: .9rem; font-weight: 700; color: #1e293b;
@@ -141,7 +141,7 @@ include('includes/student_header.php');
     line-height: 1.4; flex: 1;
 }
 
-/* เธเธธเนเธกเธขเธทเธก */
+/* ปุ่มยืม */
 .btn-request {
     width: 100%; padding: 10px; border-radius: 10px;
     border: none; background: #e0f2fe; color: #0369a1;
@@ -178,15 +178,15 @@ body.dark-mode .empty-state { background: #1e2d25; }
 <div class="page-wrap">
     
     <div class="borrow-header">
-        <h2><i class="fas fa-boxes-stacked" style="margin-right:8px;"></i>เธขเธทเธกเธญเธธเธเธเธฃเธ“เน</h2>
-        <p>เน€เธฅเธทเธญเธเธญเธธเธเธเธฃเธ“เนเธเธฒเธฃเนเธเธ—เธขเนเธ—เธตเนเธ•เนเธญเธเธเธฒเธฃเธขเธทเธก</p>
+        <h2><i class="fas fa-boxes-stacked" style="margin-right:8px;"></i>ยืมอุปกรณ์</h2>
+        <p>เลือกอุปกรณ์การแพทย์ที่ต้องการยืม</p>
     </div>
 
-    <!-- เนเธ–เธเธเนเธเธซเธฒ -->
+    <!-- แถบค้นหา -->
     <div class="search-container">
         <div class="search-box">
             <i class="fas fa-search"></i>
-            <input type="text" id="liveSearchInput" placeholder="เธเธดเธกเธเนเธเธทเนเธญเธญเธธเธเธเธฃเธ“เนเน€เธเธทเนเธญเธเนเธเธซเธฒ...">
+            <input type="text" id="liveSearchInput" placeholder="พิมพ์ชื่ออุปกรณ์เพื่อค้นหา...">
             <button type="button" id="clearSearchBtn" class="btn-clear"><i class="fas fa-times"></i></button>
         </div>
     </div>
@@ -202,14 +202,14 @@ body.dark-mode .empty-state { background: #1e2d25; }
             <?php if (empty($equipment_types)): ?>
                 <div class="empty-state">
                     <i class="fas fa-box-open"></i>
-                    <p>เนเธกเนเธกเธตเธญเธธเธเธเธฃเธ“เนเธงเนเธฒเธเนเธเธเธ“เธฐเธเธตเน</p>
+                    <p>ไม่มีอุปกรณ์ว่างในขณะนี้</p>
                 </div>
             <?php else: ?>
                 <?php foreach ($equipment_types as $item): ?>
                     <div class="equip-card" data-name="<?= htmlspecialchars(strtolower($item['name'])) ?>">
                         <div class="card-img-wrap">
                             <?php if (!empty($item['image_url'])): ?>
-                                <img src="<?= htmlspecialchars($item['image_url']) ?>" alt="เธฃเธนเธเธ เธฒเธ"
+                                <img src="<?= htmlspecialchars($item['image_url']) ?>" alt="รูปภาพ"
                                      onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
                                 <div class="card-img-placeholder" style="display:none;"><i class="fas fa-image"></i></div>
                             <?php else: ?>
@@ -217,16 +217,16 @@ body.dark-mode .empty-state { background: #1e2d25; }
                             <?php endif; ?>
 
                             <div class="stock-badge">
-                                <i class="fas fa-check-circle"></i> เธงเนเธฒเธ <?= $item['available_quantity'] ?>
+                                <i class="fas fa-check-circle"></i> ว่าง <?= $item['available_quantity'] ?>
                             </div>
                         </div>
 
                         <div class="card-body">
                             <h3><?= htmlspecialchars($item['name']) ?></h3>
-                            <p><?= htmlspecialchars($item['description'] ?: 'เนเธกเนเธกเธตเธฃเธฒเธขเธฅเธฐเน€เธญเธตเธขเธ”') ?></p>
+                            <p><?= htmlspecialchars($item['description'] ?: 'ไม่มีรายละเอียด') ?></p>
                             
                             <button class="btn-request" onclick="openRequestPopup(<?= $item['id'] ?>, '<?= htmlspecialchars(addslashes($item['name'])) ?>')">
-                                <i class="fas fa-hand-holding-medical"></i> เธเธญเธขเธทเธก
+                                <i class="fas fa-hand-holding-medical"></i> ขอยืม
                             </button>
                         </div>
                     </div>
@@ -237,12 +237,12 @@ body.dark-mode .empty-state { background: #1e2d25; }
 
 </div>
 
-<!-- เนเธเน script เธเธธเธ”เน€เธ”เธดเธกเธชเธณเธซเธฃเธฑเธเธเธฒเธฃเธ—เธณเธเธฒเธเธเธญเธ Popup (student_app.js) -->
+<!-- ใช้ script ชุดเดิมสำหรับการทำงานของ Popup (student_app.js) -->
 <script src="//cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script src="assets/js/student_app.js"></script>
 
 <script>
-// Live Search เนเธเธ Client-side (เธเธฃเธญเธเธเธฒเธเธเธญเธเนเธเธซเธเนเธฒ)
+// Live Search แบบ Client-side (กรองจากของในหน้า)
 document.addEventListener('DOMContentLoaded', () => {
     const input = document.getElementById('liveSearchInput');
     const clearBtn = document.getElementById('clearSearchBtn');

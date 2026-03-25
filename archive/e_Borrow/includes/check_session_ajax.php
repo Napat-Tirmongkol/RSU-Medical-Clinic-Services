@@ -1,35 +1,35 @@
 <?php
-// [แก้ไข: includes/check_session_ajax.php]
-// เพิ่มระบบตรวจสอบ Timeout ให้เหมือนกับ check_session.php ปกติ
+// [���: includes/check_session_ajax.php]
+// �����к���Ǩ�ͺ Timeout �������͹�Ѻ check_session.php ����
 
 @session_start();
 
-// 1. ตั้งค่าเวลา Timeout (วินาที) - ต้องตั้งให้เท่ากับไฟล์ check_session.php
-$timeout_duration = 18000; // 30 นาที (หรือ 60 ตอนทดสอบ)
+// 1. ��駤������ Timeout (�Թҷ�) - ��ͧ��������ҡѺ��� check_session.php
+$timeout_duration = 18000; // 30 �ҷ� (���� 60 �͹���ͺ)
 
-// 2. ตรวจสอบ Timeout
+// 2. ��Ǩ�ͺ Timeout
 if (isset($_SESSION['LAST_ACTIVITY'])) {
     if ((time() - $_SESSION['LAST_ACTIVITY']) > $timeout_duration) {
-        // ถ้าหมดเวลา: ล้าง Session
+        // ����������: ��ҧ Session
         session_unset();     
         session_destroy();
         
-        // ส่ง Error 401 กลับไปให้ JS รู้ว่าต้องเด้งออก
+        // �� Error 401 ��Ѻ���� JS �����ҵ�ͧ���͡
         header('Content-Type: application/json');
         http_response_code(401);
-        echo json_encode(['status' => 'error', 'message' => 'Session หมดอายุ (Timeout), กรุณา Log in ใหม่']);
+        echo json_encode(['status' => 'error', 'message' => 'Session ������� (Timeout), ��س� Log in ����']);
         exit;
     }
 }
 
-// 3. อัปเดตเวลาล่าสุด (เพื่อให้การกดปุ่มต่างๆ ถือว่ายังใช้งานอยู่)
+// 3. �ѻവ��������ش (��������á�������ҧ� �������ѧ��ҹ����)
 $_SESSION['LAST_ACTIVITY'] = time();
 
-// 4. ตรวจสอบว่ามี User ID ไหม (เผื่อกรณีไม่ได้ Login เลย)
+// 4. ��Ǩ�ͺ����� User ID ��� (���͡ó������ Login ���)
 if (empty($_SESSION['user_id'])) {
     header('Content-Type: application/json');
     http_response_code(401); 
-    echo json_encode(['status' => 'error', 'message' => 'กรุณาเข้าสู่ระบบก่อนใช้งาน']);
+    echo json_encode(['status' => 'error', 'message' => '��س��������к���͹��ҹ']);
     exit;
 }
 ?>

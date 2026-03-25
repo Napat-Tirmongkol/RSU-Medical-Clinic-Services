@@ -1,8 +1,8 @@
 <?php
-// [แก้ไข: process/toggle_staff_status.php]
-// ปรับชื่อตัวแปรให้ตรงกับ admin_app.js (user_id, new_status)
+// [���: process/toggle_staff_status.php]
+// ��Ѻ���͵�������ç�Ѻ admin_app.js (user_id, new_status)
 
-// 1. ตั้งค่า Error Reporting
+// 1. ��駤�� Error Reporting
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
@@ -11,39 +11,39 @@ header('Content-Type: application/json; charset=utf-8');
 
 require_once '../includes/db_connect.php';
 
-$response = ['status' => 'error', 'message' => 'เกิดข้อผิดพลาดที่ไม่ทราบสาเหตุ'];
+$response = ['status' => 'error', 'message' => '�Դ��ͼԴ��Ҵ�������Һ���˵�'];
 
 try {
     session_start();
 
-    // 2. ตรวจสอบสิทธิ์ Admin
+    // 2. ��Ǩ�ͺ�Է��� Admin
     if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
-        throw new Exception('คุณไม่มีสิทธิ์ดำเนินการนี้ (Access Denied)');
+        throw new Exception('�س������Է�����Թ��ù�� (Access Denied)');
     }
 
-    // 3. รับค่าจาก AJAX (แก้ไขให้รองรับชื่อตัวแปรจาก admin_app.js)
-    // JS ส่ง: formData.append('user_id', userId);
-    // JS ส่ง: formData.append('new_status', newStatus);
+    // 3. �Ѻ��Ҩҡ AJAX (�������ͧ�Ѻ���͵���èҡ admin_app.js)
+    // JS ��: formData.append('user_id', userId);
+    // JS ��: formData.append('new_status', newStatus);
     
     $target_id = $_POST['user_id'] ?? $_POST['id'] ?? null; 
     $target_status = $_POST['new_status'] ?? $_POST['status'] ?? null;
 
-    // 4. Debug: ถ้าไม่เจอ ID ให้แจ้งกลับไปว่าได้รับอะไรมาบ้าง
+    // 4. Debug: �������� ID ����駡�Ѻ�������Ѻ�����Һ�ҧ
     if (!$target_id) {
-        $received_data = json_encode($_POST); // แปลงข้อมูลที่ได้รับเป็นข้อความ
-        throw new Exception("ไม่พบข้อมูล ID ผู้ใช้งาน (Server ได้รับ: $received_data)");
+        $received_data = json_encode($_POST); // �ŧ�����ŷ�����Ѻ�繢�ͤ���
+        throw new Exception("��辺������ ID �����ҹ (Server ���Ѻ: $received_data)");
     }
 
-    // 5. ป้องกันการระงับตัวเอง
+    // 5. ��ͧ�ѹ����ЧѺ����ͧ
     if ($target_id == $_SESSION['user_id']) {
-        throw new Exception('ไม่สามารถระงับบัญชีของตัวเองได้');
+        throw new Exception('�������ö�ЧѺ�ѭ�բͧ����ͧ��');
     }
 
-    // 6. กำหนดค่าสถานะที่จะบันทึก (active/disabled)
-    // admin_app.js ส่งค่ามาเป็น 'active' หรือ 'disabled' ตรงๆ อยู่แล้ว
+    // 6. ��˹����ʶҹз��кѹ�֡ (active/disabled)
+    // admin_app.js �觤������ 'active' ���� 'disabled' �ç� ��������
     $final_status = ($target_status === 'disabled') ? 'disabled' : 'active';
 
-    // 7. อัปเดตข้อมูล (ใช้ sys_staff และ account_status)
+    // 7. �ѻവ������ (�� sys_staff ��� account_status)
     $sql = "UPDATE sys_staff SET account_status = :status WHERE id = :id";
     $stmt = $pdo->prepare($sql);
     $result = $stmt->execute([
@@ -54,11 +54,11 @@ try {
     if ($result) {
         $response = [
             'status' => 'success',
-            'message' => 'อัปเดตสถานะเป็น ' . ($final_status == 'active' ? 'ปกติ (Active)' : 'ระงับ (Disabled)') . ' เรียบร้อยแล้ว',
+            'message' => '�ѻവʶҹ��� ' . ($final_status == 'active' ? '���� (Active)' : '�ЧѺ (Disabled)') . ' ���º��������',
             'new_status' => $final_status
         ];
     } else {
-        throw new Exception('เกิดข้อผิดพลาดในการอัปเดตฐานข้อมูล');
+        throw new Exception('�Դ��ͼԴ��Ҵ㹡���ѻവ�ҹ������');
     }
 
 } catch (Exception $e) {

@@ -1,72 +1,72 @@
 <?php
 // delete_equipment_process.php
 
-// 1. (เน€เธเธฅเธตเนเธขเธ) เนเธเนเธขเธฒเธกเธชเธณเธซเธฃเธฑเธ AJAX
+// 1. (เปลี่ยน) ใช้ยามสำหรับ AJAX
 include('includes/check_session_ajax.php');
 require_once(__DIR__ . '/../../../config/db_connect.php');
-require_once('includes/log_function.php'); // โ—€๏ธ (เน€เธเธดเนเธก) เน€เธฃเธตเธขเธเนเธเน Log
+require_once('includes/log_function.php'); // ◀️ (เพิ่ม) เรียกใช้ Log
 
-// 2. เธ•เธฃเธงเธเธชเธญเธเธชเธดเธ—เธเธดเน Admin
+// 2. ตรวจสอบสิทธิ์ Admin
 if (!isset($_SESSION['role']) || $_SESSION['role'] != 'admin') {
     header('Content-Type: application/json');
-    echo json_encode(['status' => 'error', 'message' => 'เธเธธเธ“เนเธกเนเธกเธตเธชเธดเธ—เธเธดเนเธ”เธณเน€เธเธดเธเธเธฒเธฃ']);
+    echo json_encode(['status' => 'error', 'message' => 'คุณไม่มีสิทธิ์ดำเนินการ']);
     exit;
 }
 
-// (เนเธซเธกเน) เธ•เธฑเนเธเธเนเธฒ Header เน€เธเนเธ JSON
+// (ใหม่) ตั้งค่า Header เป็น JSON
 header('Content-Type: application/json');
-$response = ['status' => 'error', 'message' => 'เน€เธเธดเธ”เธเนเธญเธเธดเธ”เธเธฅเธฒเธ”เนเธกเนเธ—เธฃเธฒเธเธชเธฒเน€เธซเธ•เธธ'];
+$response = ['status' => 'error', 'message' => 'เกิดข้อผิดพลาดไม่ทราบสาเหตุ'];
 
-// 3. เธฃเธฑเธ ID เธญเธธเธเธเธฃเธ“เน
-// (เน€เธเธฅเธตเนเธขเธ) เธฃเธฑเธเธเธฒเธ POST เธซเธฃเธทเธญ GET เธเนเนเธ”เน
+// 3. รับ ID อุปกรณ์
+// (เปลี่ยน) รับจาก POST หรือ GET ก็ได้
 $equipment_id = isset($_REQUEST['id']) ? (int)$_REQUEST['id'] : 0;
 
 if ($equipment_id == 0) {
-    $response['message'] = 'เนเธกเนเนเธ”เนเธฃเธฐเธเธธ ID เธญเธธเธเธเธฃเธ“เน';
+    $response['message'] = 'ไม่ได้ระบุ ID อุปกรณ์';
     echo json_encode($response);
     exit;
 }
 
-// 4. เธ•เธฃเธงเธเธชเธญเธ Foreign Key เนเธฅเธฐ เธ”เธณเน€เธเธดเธเธเธฒเธฃ
+// 4. ตรวจสอบ Foreign Key และ ดำเนินการ
 try {
-    // (เนเธเนเนเธ) เน€เธเนเธเธงเนเธฒเธกเธต "เธเธดเนเธ" เธญเธธเธเธเธฃเธ“เนเธเธนเธเธญเธขเธนเนเธซเธฃเธทเธญเนเธกเน
+    // (แก้ไข) เช็คว่ามี "ชิ้น" อุปกรณ์ผูกอยู่หรือไม่
     $sql_check = "SELECT COUNT(*) FROM borrow_items WHERE type_id = ?";
     $stmt_check = $pdo->prepare($sql_check);
     $stmt_check->execute([$equipment_id]);
     $transaction_count = $stmt_check->fetchColumn();
 
     if ($transaction_count > 0) {
-        // (เนเธเนเนเธ) เธชเนเธเน€เธเนเธ JSON error เธเธฅเธฑเธเนเธ
-        throw new Exception("เนเธกเนเธชเธฒเธกเธฒเธฃเธ–เธฅเธเนเธ”เน เน€เธเธทเนเธญเธเธเธฒเธเธขเธฑเธเธกเธตเธญเธธเธเธเธฃเธ“เนเธฃเธฒเธขเธเธดเนเธเธเธนเธเธญเธขเธนเนเธเธฑเธเธเธฃเธฐเน€เธ เธ—เธเธตเน ($transaction_count เธเธดเนเธ)");
+        // (แก้ไข) ส่งเป็น JSON error กลับไป
+        throw new Exception("ไม่สามารถลบได้ เนื่องจากยังมีอุปกรณ์รายชิ้นผูกอยู่กับประเภทนี้ ($transaction_count ชิ้น)");
     }
 
-    // โ—€๏ธ --- (เน€เธเธดเนเธกเธชเนเธงเธ Log) --- โ—€๏ธ
-    // (เธ”เธถเธเธเนเธญเธกเธนเธฅเธญเธธเธเธเธฃเธ“เน "เธเนเธญเธ" เธ—เธตเนเธเธฐเธฅเธ)
+    // ◀️ --- (เพิ่มส่วน Log) --- ◀️
+    // (ดึงข้อมูลอุปกรณ์ "ก่อน" ที่จะลบ)
     $stmt_get = $pdo->prepare("SELECT name FROM borrow_categories WHERE id = ?");
     $stmt_get->execute([$equipment_id]);
     $equip_name_for_log = $stmt_get->fetchColumn() ?: "ID: {$equipment_id}";
-    // โ—€๏ธ --- (เธเธเธชเนเธงเธเธ”เธถเธเธเนเธญเธกเธนเธฅ Log) --- โ—€๏ธ
+    // ◀️ --- (จบส่วนดึงข้อมูล Log) --- ◀️
 
 
-    // 6. เธ”เธณเน€เธเธดเธเธเธฒเธฃเธฅเธ
+    // 6. ดำเนินการลบ
     $sql_delete = "DELETE FROM borrow_categories WHERE id = ?";
     $stmt_delete = $pdo->prepare($sql_delete);
     $stmt_delete->execute([$equipment_id]);
 
-    // 7. เธ•เธฃเธงเธเธชเธญเธเธงเนเธฒเธฅเธเธชเธณเน€เธฃเนเธเธซเธฃเธทเธญเนเธกเน
+    // 7. ตรวจสอบว่าลบสำเร็จหรือไม่
     if ($stmt_delete->rowCount() > 0) {
         
-        // โ—€๏ธ --- (เน€เธเธดเนเธกเธชเนเธงเธ Log) --- โ—€๏ธ
+        // ◀️ --- (เพิ่มส่วน Log) --- ◀️
         $admin_user_id = $_SESSION['user_id'] ?? null;
         $admin_user_name = $_SESSION['full_name'] ?? 'System';
-        $log_desc = "Admin '{$admin_user_name}' (ID: {$admin_user_id}) เนเธ”เนเธฅเธเธเธฃเธฐเน€เธ เธ—เธญเธธเธเธเธฃเธ“เน: '{$equip_name_for_log}'";
+        $log_desc = "Admin '{$admin_user_name}' (ID: {$admin_user_id}) ได้ลบประเภทอุปกรณ์: '{$equip_name_for_log}'";
         log_action($pdo, $admin_user_id, 'delete_equipment_type', $log_desc);
-        // โ—€๏ธ --- (เธเธเธชเนเธงเธ Log) --- โ—€๏ธ
+        // ◀️ --- (จบส่วน Log) --- ◀️
 
         $response['status'] = 'success';
-        $response['message'] = 'เธฅเธเธเธฃเธฐเน€เธ เธ—เธญเธธเธเธเธฃเธ“เนเธชเธณเน€เธฃเนเธ';
+        $response['message'] = 'ลบประเภทอุปกรณ์สำเร็จ';
     } else {
-        throw new Exception("เนเธกเนเธเธเธเธฃเธฐเน€เธ เธ—เธญเธธเธเธเธฃเธ“เนเธ—เธตเนเธ•เนเธญเธเธเธฒเธฃเธฅเธ (ID: $equipment_id)");
+        throw new Exception("ไม่พบประเภทอุปกรณ์ที่ต้องการลบ (ID: $equipment_id)");
     }
 
 } catch (Exception $e) {

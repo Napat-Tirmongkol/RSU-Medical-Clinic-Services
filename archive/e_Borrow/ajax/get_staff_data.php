@@ -1,37 +1,37 @@
 <?php
 // get_staff_data.php
-// (เนเธเธฅเนเนเธซเธกเน)
+// (ไฟล์ใหม่)
 
-// 1. "เธเนเธฒเธเธขเธฒเธก" เนเธฅเธฐ "เน€เธเธทเนเธญเธกเธ•เนเธญ DB"
+// 1. "จ้างยาม" และ "เชื่อมต่อ DB"
 include('../includes/check_session_ajax.php');
 require_once(__DIR__ . '/../../../config/db_connect.php');
 
-// 2. เธ•เธฃเธงเธเธชเธญเธเธชเธดเธ—เธเธดเน Admin เนเธฅเธฐเธ•เธฑเนเธเธเนเธฒ Header
+// 2. ตรวจสอบสิทธิ์ Admin และตั้งค่า Header
 if (!isset($_SESSION['role']) || $_SESSION['role'] != 'admin') {
     header('Content-Type: application/json');
-    echo json_encode(['status' => 'error', 'message' => 'เธเธธเธ“เนเธกเนเธกเธตเธชเธดเธ—เธเธดเนเธ”เธณเน€เธเธดเธเธเธฒเธฃ']);
+    echo json_encode(['status' => 'error', 'message' => 'คุณไม่มีสิทธิ์ดำเนินการ']);
     exit;
 }
 header('Content-Type: application/json');
 
-// 3. เธชเธฃเนเธฒเธเธ•เธฑเธงเนเธเธฃเธชเธณเธซเธฃเธฑเธเน€เธเนเธเธเธณเธ•เธญเธ
+// 3. สร้างตัวแปรสำหรับเก็บคำตอบ
 $response = [
     'status' => 'error',
-    'message' => 'เน€เธเธดเธ”เธเนเธญเธเธดเธ”เธเธฅเธฒเธ”เนเธกเนเธ—เธฃเธฒเธเธชเธฒเน€เธซเธ•เธธ',
+    'message' => 'เกิดข้อผิดพลาดไม่ทราบสาเหตุ',
     'staff' => null 
 ];
 
-// 4. เธฃเธฑเธ ID เน€เธเนเธฒเธซเธเนเธฒเธ—เธตเน (User ID) เธเธฒเธ URL
+// 4. รับ ID เจ้าหน้าที่ (User ID) จาก URL
 $user_id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 if ($user_id == 0) {
-    $response['message'] = 'เนเธกเนเนเธ”เนเธฃเธฐเธเธธ ID เน€เธเนเธฒเธซเธเนเธฒเธ—เธตเน';
+    $response['message'] = 'ไม่ได้ระบุ ID เจ้าหน้าที่';
     echo json_encode($response);
     exit;
 }
 
 try {
-    // 5. (SQL) เธ”เธถเธเธเนเธญเธกเธนเธฅเธเธฒเธ sys_staff
-    // (เน€เธฃเธฒเนเธกเนเธ”เธถเธ password_hash เธกเธฒ)
+    // 5. (SQL) ดึงข้อมูลจาก sys_staff
+    // (เราไม่ดึง password_hash มา)
     $stmt = $pdo->prepare("SELECT id, username, full_name, role, linked_line_user_id FROM sys_staff WHERE id = ?");
     $stmt->execute([$user_id]);
     $staff = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -39,16 +39,16 @@ try {
     if ($staff) {
         $response['status'] = 'success';
         $response['staff'] = $staff; 
-        $response['message'] = 'เธ”เธถเธเธเนเธญเธกเธนเธฅเธชเธณเน€เธฃเนเธ';
+        $response['message'] = 'ดึงข้อมูลสำเร็จ';
     } else {
-        $response['message'] = 'เนเธกเนเธเธเธเนเธญเธกเธนเธฅเน€เธเนเธฒเธซเธเนเธฒเธ—เธตเน';
+        $response['message'] = 'ไม่พบข้อมูลเจ้าหน้าที่';
     }
 
 } catch (PDOException $e) {
-    $response['message'] = 'เน€เธเธดเธ”เธเนเธญเธเธดเธ”เธเธฅเธฒเธ” DB: ' . $e->getMessage(); // โ—€๏ธ (เนเธเนเนเธ)
+    $response['message'] = 'เกิดข้อผิดพลาด DB: ' . $e->getMessage(); // ◀️ (แก้ไข)
 }
 
-// 6. เธชเนเธเธเธณเธ•เธญเธ (JSON) เธเธฅเธฑเธเนเธเนเธซเน JavaScript
+// 6. ส่งคำตอบ (JSON) กลับไปให้ JavaScript
 echo json_encode($response);
 exit;
 ?>

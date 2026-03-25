@@ -1,58 +1,58 @@
 <?php
 // edit_student_process.php
-// (เธญเธฑเธเน€เธ”เธ•: เธฃเธฑเธ status, department, status_other)
+// (อัปเดต: รับ status, department, status_other)
 
-// 1. "เธเนเธฒเธเธขเธฒเธก" เนเธฅเธฐ "เน€เธเธทเนเธญเธกเธ•เนเธญ DB"
+// 1. "จ้างยาม" และ "เชื่อมต่อ DB"
 include('includes/check_session_ajax.php');
 require_once(__DIR__ . '/../../../config/db_connect.php');
-require_once('includes/log_function.php'); // โ—€๏ธ (เน€เธเธดเนเธก) เน€เธฃเธตเธขเธเนเธเน Log
+require_once('includes/log_function.php'); // ◀️ (เพิ่ม) เรียกใช้ Log
 
-// 2. เธ•เธฃเธงเธเธชเธญเธเธชเธดเธ—เธเธดเน Admin เนเธฅเธฐเธ•เธฑเนเธเธเนเธฒ Header
+// 2. ตรวจสอบสิทธิ์ Admin และตั้งค่า Header
 if (!isset($_SESSION['role']) || $_SESSION['role'] != 'admin') {
     header('Content-Type: application/json');
-    echo json_encode(['status' => 'error', 'message' => 'เธเธธเธ“เนเธกเนเธกเธตเธชเธดเธ—เธเธดเนเธ”เธณเน€เธเธดเธเธเธฒเธฃ']);
+    echo json_encode(['status' => 'error', 'message' => 'คุณไม่มีสิทธิ์ดำเนินการ']);
     exit;
 }
 header('Content-Type: application/json');
 
-// 3. เธชเธฃเนเธฒเธเธ•เธฑเธงเนเธเธฃเธชเธณเธซเธฃเธฑเธเน€เธเนเธเธเธณเธ•เธญเธ
-$response = ['status' => 'error', 'message' => 'เน€เธเธดเธ”เธเนเธญเธเธดเธ”เธเธฅเธฒเธ”เนเธกเนเธ—เธฃเธฒเธเธชเธฒเน€เธซเธ•เธธ'];
+// 3. สร้างตัวแปรสำหรับเก็บคำตอบ
+$response = ['status' => 'error', 'message' => 'เกิดข้อผิดพลาดไม่ทราบสาเหตุ'];
 
-// 4. เธ•เธฃเธงเธเธชเธญเธเธงเนเธฒเน€เธเนเธเธเธฒเธฃเธชเนเธเธเนเธญเธกเธนเธฅเนเธเธ POST เธซเธฃเธทเธญเนเธกเน
+// 4. ตรวจสอบว่าเป็นการส่งข้อมูลแบบ POST หรือไม่
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
-    // 5. เธฃเธฑเธเธเนเธญเธกเธนเธฅเธเธฒเธเธเธญเธฃเนเธก AJAX (เธญเธฑเธเน€เธ”เธ•เธ•เธฑเธงเนเธเธฃ)
+    // 5. รับข้อมูลจากฟอร์ม AJAX (อัปเดตตัวแปร)
     $student_id   = isset($_POST['student_id']) ? (int)$_POST['student_id'] : 0;
     $full_name    = isset($_POST['full_name']) ? trim($_POST['full_name']) : '';
     $phone_number = isset($_POST['phone_number']) ? trim($_POST['phone_number']) : null;
     $student_personnel_id = isset($_POST['student_personnel_id']) ? trim($_POST['student_personnel_id']) : null;
     
-    // (เธ•เธฑเธงเนเธเธฃเนเธซเธกเน)
+    // (ตัวแปรใหม่)
     $department   = isset($_POST['department']) ? trim($_POST['department']) : null;
     $status       = isset($_POST['status']) ? trim($_POST['status']) : '';
     $status_other = isset($_POST['status_other']) ? trim($_POST['status_other']) : null;
 
 
-    // (Validation เนเธซเธกเน)
+    // (Validation ใหม่)
     if ($student_id == 0 || empty($full_name) || empty($status)) {
-        $response['message'] = 'เธเนเธญเธกเธนเธฅเนเธกเนเธเธฃเธเธ–เนเธงเธ (ID, เธเธทเนเธญ-เธชเธเธธเธฅ, เธซเธฃเธทเธญเธชเธ–เธฒเธเธ เธฒเธ)';
+        $response['message'] = 'ข้อมูลไม่ครบถ้วน (ID, ชื่อ-สกุล, หรือสถานภาพ)';
         echo json_encode($response);
         exit;
     }
     if ($status == 'other' && empty($status_other)) {
-        $response['message'] = 'เธเธฃเธธเธ“เธฒเธฃเธฐเธเธธเธชเธ–เธฒเธเธ เธฒเธ "เธญเธทเนเธเน"';
+        $response['message'] = 'กรุณาระบุสถานภาพ "อื่นๆ"';
         echo json_encode($response);
         exit;
     }
     
-    // (เธ—เธณเนเธซเนเธเนเธฒเธงเนเธฒเธเน€เธเนเธ NULL)
+    // (ทำให้ค่าว่างเป็น NULL)
     if (empty($phone_number)) $phone_number = null;
     if (empty($student_personnel_id)) $student_personnel_id = null;
     if (empty($department)) $department = null;
     if ($status != 'other') $status_other = null;
 
 
-    // 6. (SQL เนเธซเธกเน) เธ”เธณเน€เธเธดเธเธเธฒเธฃ UPDATE เธ•เธฒเธฃเธฒเธ sys_users
+    // 6. (SQL ใหม่) ดำเนินการ UPDATE ตาราง sys_users
     try {
         $sql = "UPDATE sys_users 
                 SET full_name = ?, 
@@ -74,28 +74,28 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $student_id
         ]);
 
-        // โ—€๏ธ --- (เน€เธเธดเนเธกเธชเนเธงเธ Log) --- โ—€๏ธ
+        // ◀️ --- (เพิ่มส่วน Log) --- ◀️
         if ($stmt->rowCount() > 0) {
             $admin_user_id = $_SESSION['user_id'] ?? null;
             $admin_user_name = $_SESSION['full_name'] ?? 'System';
-            $log_desc = "Admin '{$admin_user_name}' (ID: {$admin_user_id}) เนเธ”เนเนเธเนเนเธเธเนเธญเธกเธนเธฅเธเธนเนเนเธเนเธเธฒเธ: '{$full_name}' (SID: {$student_id})";
+            $log_desc = "Admin '{$admin_user_name}' (ID: {$admin_user_id}) ได้แก้ไขข้อมูลผู้ใช้งาน: '{$full_name}' (SID: {$student_id})";
             log_action($pdo, $admin_user_id, 'edit_user', $log_desc);
         }
-        // โ—€๏ธ --- (เธเธเธชเนเธงเธ Log) --- โ—€๏ธ
+        // ◀️ --- (จบส่วน Log) --- ◀️
 
-        // 7. เธ–เนเธฒเธชเธณเน€เธฃเนเธ เนเธซเนเน€เธเธฅเธตเนเธขเธเธเธณเธ•เธญเธ
+        // 7. ถ้าสำเร็จ ให้เปลี่ยนคำตอบ
         $response['status'] = 'success';
-        $response['message'] = 'เธเธฑเธเธ—เธถเธเธเธฒเธฃเน€เธเธฅเธตเนเธขเธเนเธเธฅเธเธชเธณเน€เธฃเนเธ';
+        $response['message'] = 'บันทึกการเปลี่ยนแปลงสำเร็จ';
 
     } catch (PDOException $e) {
-        $response['message'] = 'เน€เธเธดเธ”เธเนเธญเธเธดเธ”เธเธฅเธฒเธ” DB: ' . $e->getMessage(); // โ—€๏ธ (เนเธเนเนเธ)
+        $response['message'] = 'เกิดข้อผิดพลาด DB: ' . $e->getMessage(); // ◀️ (แก้ไข)
     }
 
 } else {
-    $response['message'] = 'เธ•เนเธญเธเนเธเนเธงเธดเธเธต POST เน€เธ—เนเธฒเธเธฑเนเธ';
+    $response['message'] = 'ต้องใช้วิธี POST เท่านั้น';
 }
 
-// 8. เธชเนเธเธเธณเธ•เธญเธ (JSON) เธเธฅเธฑเธเนเธเนเธซเน JavaScript
+// 8. ส่งคำตอบ (JSON) กลับไปให้ JavaScript
 echo json_encode($response);
 exit;
 ?>

@@ -1,9 +1,9 @@
 <?php
 // e_Borrow/includes/check_student_session.php
-// สำหรับหน้าเว็บนักศึกษา -> ถ้าไม่มีสิทธิ์ ให้ดีดไปหน้า Login
+// ����Ѻ˹����纹ѡ�֡�� -> ���������Է��� ���մ�˹�� Login
 @session_start();
 
-$timeout_duration = 1800; // 30 นาที
+$timeout_duration = 1800; // 30 �ҷ�
 
 if (isset($_SESSION['LAST_ACTIVITY_STUDENT'])) {
     if ((time() - $_SESSION['LAST_ACTIVITY_STUDENT']) > $timeout_duration) {
@@ -15,10 +15,10 @@ if (isset($_SESSION['LAST_ACTIVITY_STUDENT'])) {
 }
 $_SESSION['LAST_ACTIVITY_STUDENT'] = time();
 
-// ตรวจสอบว่า Session ของ e_Borrow มีหรือไม่
-// Session 'student_id' ถูก set โดย line_api/callback.php ตัวกลาง
+// ��Ǩ�ͺ��� Session �ͧ e_Borrow ���������
+// Session 'student_id' �١ set �� line_api/callback.php ��ǡ�ҧ
 if (empty($_SESSION['student_id'])) {
-    // ยังไม่ได้ Login -> ส่งไปหน้า Login ของ e_Borrow
+    // �ѧ����� Login -> ���˹�� Login �ͧ e_Borrow
     header("Location: login.php");
     exit;
 }

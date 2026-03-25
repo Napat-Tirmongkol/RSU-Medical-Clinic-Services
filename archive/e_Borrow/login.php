@@ -1,22 +1,22 @@
 <?php
 // e_Borrow/login.php
-// หน้าสำหรับแสดงปุ่ม Login — ผู้ใช้ต้องกดเองเพื่อเริ่ม LINE OAuth
+// ˹������Ѻ�ʴ����� Login � ������ͧ���ͧ��������� LINE OAuth
 declare(strict_types=1);
 session_start();
 
-// ถ้า Login แล้ว ให้ Redirect ไปหน้าหลักของ e_Borrow เลย
+// ��� Login ���� ��� Redirect �˹����ѡ�ͧ e_Borrow ���
 if (!empty($_SESSION['student_id'])) {
     header('Location: index.php');
     exit;
 }
 
-// แจ้งสาเหตุถ้ามี (เช่น timeout, logged_out)
+// �����˵ض���� (�� timeout, logged_out)
 $reason = $_GET['reason'] ?? ($_GET['timeout'] ?? '');
 $timeout = $reason === 'timeout' || isset($_GET['timeout']);
 
 // =========================================================
-// สร้าง LINE Auth URL ไว้ล่วงหน้า (เพื่อใส่ใน href ปุ่ม)
-// เมื่อผู้ใช้กดปุ่ม ถึงจะเริ่ม Flow
+// ���ҧ LINE Auth URL �����ǧ˹�� (�������� href ����)
+// ����ͼ���顴���� �֧������� Flow
 // =========================================================
 $state = bin2hex(random_bytes(16));
 $_SESSION['line_login_state'] = $state;
@@ -37,7 +37,7 @@ $authUrl = "https://access.line.me/oauth2/v2.1/authorize?" . http_build_query([
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>เข้าสู่ระบบ — ระบบยืมคืนอุปกรณ์</title>
+    <title>�������к� � �к�����׹�ػ�ó�</title>
     <link rel="icon" type="image/png" href="assets/img/logo.png" sizes="any">
     <link rel="stylesheet" href="assets/css/style.css?v=2.2">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
@@ -190,50 +190,50 @@ $authUrl = "https://access.line.me/oauth2/v2.1/authorize?" . http_build_query([
                 <i class="fa-solid fa-hand-holding-medical"></i>
             </div>
             <h1>MedLoan</h1>
-            <p>ระบบยืมคืนอุปกรณ์การแพทย์</p>
+            <p>�к�����׹�ػ�ó���ᾷ��</p>
         </div>
 
         <div class="card-body">
             <?php if ($timeout): ?>
             <div class="notice">
                 <i class="fa-solid fa-clock" style="color:#e6a817; font-size:1.1rem;"></i>
-                <span>หมดเวลาการใช้งาน กรุณาเข้าสู่ระบบอีกครั้ง</span>
+                <span>������ҡ����ҹ ��س��������к��ա����</span>
             </div>
             <?php endif; ?>
 
             <!-- LINE Login Button -->
             <a href="<?= htmlspecialchars($authUrl, ENT_QUOTES) ?>" class="btn-line" id="btn-line-login">
                 <i class="fab fa-line"></i>
-                <span>เข้าสู่ระบบด้วย LINE</span>
+                <span>�������к����� LINE</span>
             </a>
 
-            <div class="divider">ข้อมูลของคุณได้รับการปกป้องโดย PDPA</div>
+            <div class="divider">�����Ţͧ�س���Ѻ��û���ͧ�� PDPA</div>
 
             <div class="badges">
                 <div class="badge-item green">
                     <i class="fa-solid fa-shield-halved"></i>
-                    <p>ปลอดภัย<br>100%</p>
+                    <p>��ʹ���<br>100%</p>
                 </div>
                 <div class="badge-item blue">
                     <i class="fa-solid fa-clock"></i>
-                    <p>รวดเร็ว<br>ทันใจ</p>
+                    <p>�Ǵ����<br>�ѹ�</p>
                 </div>
                 <div class="badge-item gold">
                     <i class="fa-solid fa-bell"></i>
-                    <p>แจ้งเตือน<br>ทาง LINE</p>
+                    <p>����͹<br>�ҧ LINE</p>
                 </div>
             </div>
 
             <a href="admin/login.php" class="btn-staff">
                 <i class="fa-solid fa-user-shield" style="margin-right:6px;"></i>
-                สำหรับพนักงาน / เจ้าหน้าที่
+                ����Ѻ��ѡ�ҹ / ���˹�ҷ��
             </a>
         </div>
     </div>
 
     <p class="footer-note">
-        การเข้าใช้งานถือว่าคุณยอมรับ<br>
-        <a href="#">นโยบายความเป็นส่วนตัว</a> และ <a href="#">ข้อกำหนดการใช้งาน</a>
+        ��������ҹ�����Ҥس����Ѻ<br>
+        <a href="#">��º�¤�������ǹ���</a> ��� <a href="#">��͡�˹������ҹ</a>
     </p>
 </div>
 </body>

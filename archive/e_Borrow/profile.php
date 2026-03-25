@@ -4,14 +4,14 @@ declare(strict_types=1);
 @session_start();
 include('includes/check_student_session.php');
 
-// ใช้ DB กลางของ e-campaignv2 (ตาราง sys_users เดียวกัน)
+// �� DB ��ҧ�ͧ e-campaignv2 (���ҧ sys_users ���ǡѹ)
 require_once __DIR__ . '/../config/db_connect.php';
 
 $student_id = (int)$_SESSION['student_id'];
 $status_msg = '';
 $status_type = '';
 
-// ---- Handle POST: บันทึกโปรไฟล์ ----
+// ---- Handle POST: �ѹ�֡����� ----
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $isAjax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) &&
                strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
@@ -30,10 +30,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!$first_name || !$last_name) {
         if ($isAjax) {
             header('Content-Type: application/json');
-            echo json_encode(['ok' => false, 'message' => 'กรุณากรอกชื่อและนามสกุลให้ครบถ้วน']);
+            echo json_encode(['ok' => false, 'message' => '��سҡ�͡������й��ʡ�����ú��ǹ']);
             exit;
         }
-        $status_msg  = 'กรุณากรอกชื่อและนามสกุลให้ครบถ้วน';
+        $status_msg  = '��سҡ�͡������й��ʡ�����ú��ǹ';
         $status_type = 'error';
     } else {
         try {
@@ -54,30 +54,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ':id'        => $student_id,
             ]);
 
-            // อัปเดต Session ด้วย
+            // �ѻവ Session ����
             $_SESSION['student_full_name'] = $full_name;
             $_SESSION['evax_full_name']    = $full_name;
 
             if ($isAjax) {
                 header('Content-Type: application/json');
-                echo json_encode(['ok' => true, 'message' => 'บันทึกข้อมูลเรียบร้อยแล้ว!', 'full_name' => $full_name]);
+                echo json_encode(['ok' => true, 'message' => '�ѹ�֡���������º��������!', 'full_name' => $full_name]);
                 exit;
             }
-            $status_msg  = 'บันทึกข้อมูลเรียบร้อยแล้ว!';
+            $status_msg  = '�ѹ�֡���������º��������!';
             $status_type = 'success';
         } catch (PDOException $e) {
             if ($isAjax) {
                 header('Content-Type: application/json');
-                echo json_encode(['ok' => false, 'message' => 'เกิดข้อผิดพลาด: ' . $e->getMessage()]);
+                echo json_encode(['ok' => false, 'message' => '�Դ��ͼԴ��Ҵ: ' . $e->getMessage()]);
                 exit;
             }
-            $status_msg  = 'เกิดข้อผิดพลาด: ' . $e->getMessage();
+            $status_msg  = '�Դ��ͼԴ��Ҵ: ' . $e->getMessage();
             $status_type = 'error';
         }
     }
 }
 
-// ---- ดึงข้อมูลปัจจุบัน ----
+// ---- �֧�����ŻѨ�غѹ ----
 try {
     $pdo  = db();
     $stmt = $pdo->prepare("SELECT * FROM sys_users WHERE id = :id LIMIT 1");
@@ -85,11 +85,11 @@ try {
     $user = $stmt->fetch();
     if (!$user) { header("Location: logout.php"); exit; }
 } catch (PDOException $e) {
-    die("เกิดข้อผิดพลาดในการดึงข้อมูล: " . $e->getMessage());
+    die("�Դ��ͼԴ��Ҵ㹡�ô֧������: " . $e->getMessage());
 }
 
-// ---- แยก prefix / ชื่อ / นามสกุล ----
-$standard_prefixes = ['นาย', 'นางสาว', 'นาง', 'ดร.', 'นพ.', 'พญ.', 'ผศ.ดร.', 'รศ.ดร.'];
+// ---- �¡ prefix / ���� / ���ʡ�� ----
+$standard_prefixes = ['���', '�ҧ���', '�ҧ', '��.', '��.', '��.', '��.��.', '��.��.'];
 $curr_full = trim($user['full_name'] ?? '');
 $parts     = explode(' ', $curr_full);
 $db_prefix = '';
@@ -106,7 +106,7 @@ if (count($parts) >= 2) {
     $db_firstname = $curr_full;
 }
 
-$page_title  = 'ตั้งค่าโปรไฟล์';
+$page_title  = '��駤�������';
 $active_page = 'settings';
 include('includes/student_header.php');
 ?>
@@ -197,13 +197,13 @@ include('includes/student_header.php');
     </div>
     <?php endif; ?>
 
-    <!-- Avatar + ชื่อ -->
+    <!-- Avatar + ���� -->
     <div class="profile-avatar">
         <?= mb_substr($user['full_name'] ?? '?', 0, 1) ?>
     </div>
-    <p class="profile-name"><?= htmlspecialchars($user['full_name'] ?: 'ยังไม่กรอกชื่อ') ?></p>
+    <p class="profile-name"><?= htmlspecialchars($user['full_name'] ?: '�ѧ����͡����') ?></p>
     <p class="profile-id">
-        <?= $user['student_personnel_id'] ? 'รหัส: ' . htmlspecialchars($user['student_personnel_id']) : 'ยังไม่กรอกรหัสนักศึกษา' ?>
+        <?= $user['student_personnel_id'] ? '����: ' . htmlspecialchars($user['student_personnel_id']) : '�ѧ����͡���ʹѡ�֡��' ?>
     </p>
 
     <!-- QR Code Card -->
@@ -211,75 +211,75 @@ include('includes/student_header.php');
     <div class="qr-card" onclick="showMyQRCode()">
         <i class="fas fa-qrcode"></i>
         <div class="qr-card-text">
-            <h4>บัตรประจำตัวดิจิทัล</h4>
-            <p>แตะเพื่อแสดง QR Code ให้เจ้าหน้าที่สแกน</p>
+            <h4>�ѵû�Шӵ�ǴԨԷ��</h4>
+            <p>�������ʴ� QR Code ������˹�ҷ���᡹</p>
         </div>
         <i class="fas fa-chevron-right" style="color:rgba(255,255,255,.5); margin-left:auto;"></i>
     </div>
     <?php endif; ?>
 
-    <!-- ฟอร์มแก้ไข -->
+    <!-- �������� -->
     <div class="form-card">
         <form method="POST" action="profile.php" id="profileForm">
 
-            <p class="form-section-title"><i class="fas fa-user" style="margin-right:6px;"></i>ข้อมูลส่วนตัว</p>
+            <p class="form-section-title"><i class="fas fa-user" style="margin-right:6px;"></i>��������ǹ���</p>
 
-            <!-- ชื่อ-นามสกุล -->
+            <!-- ����-���ʡ�� -->
             <div class="form-row triple">
                 <div class="form-group">
-                    <label>คำนำหน้า <span class="req">*</span></label>
+                    <label>�ӹ�˹�� <span class="req">*</span></label>
                     <select name="prefix" id="prefix" required onchange="togglePrefixOther(this.value)">
-                        <option value="">เลือก...</option>
-                        <?php foreach (['นาย','นางสาว','นาง','ดร.','นพ.','พญ.'] as $p): ?>
+                        <option value="">���͡...</option>
+                        <?php foreach (['���','�ҧ���','�ҧ','��.','��.','��.'] as $p): ?>
                         <option value="<?= $p ?>" <?= $db_prefix === $p ? 'selected' : '' ?>><?= $p ?></option>
                         <?php endforeach; ?>
-                        <option value="other" <?= (!in_array($db_prefix, $standard_prefixes) && $db_prefix !== '') ? 'selected' : '' ?>>อื่นๆ</option>
+                        <option value="other" <?= (!in_array($db_prefix, $standard_prefixes) && $db_prefix !== '') ? 'selected' : '' ?>>����</option>
                     </select>
                 </div>
                 <div class="form-group">
-                    <label>ชื่อจริง <span class="req">*</span></label>
-                    <input type="text" name="first_name" id="first_name" placeholder="ชื่อจริง"
+                    <label>���ͨ�ԧ <span class="req">*</span></label>
+                    <input type="text" name="first_name" id="first_name" placeholder="���ͨ�ԧ"
                            value="<?= htmlspecialchars($db_firstname) ?>" required>
                 </div>
                 <div class="form-group">
-                    <label>นามสกุล <span class="req">*</span></label>
-                    <input type="text" name="last_name" id="last_name" placeholder="นามสกุล"
+                    <label>���ʡ�� <span class="req">*</span></label>
+                    <input type="text" name="last_name" id="last_name" placeholder="���ʡ��"
                            value="<?= htmlspecialchars($db_lastname) ?>" required>
                 </div>
             </div>
 
             <!-- prefix_other -->
             <div class="form-group" id="prefix_other_wrap" style="display:<?= (!in_array($db_prefix, $standard_prefixes) && $db_prefix !== '') ? 'block' : 'none' ?>; margin-top:-4px;">
-                <label>ระบุคำนำหน้า</label>
+                <label>�кؤӹ�˹��</label>
                 <input type="text" name="prefix_other" id="prefix_other"
-                       placeholder="เช่น ผศ., รศ., พ.อ."
+                       placeholder="�� ��., ��., �.�."
                        value="<?= (!in_array($db_prefix, $standard_prefixes)) ? htmlspecialchars($db_prefix) : '' ?>">
             </div>
 
-            <p class="form-section-title"><i class="fas fa-id-card" style="margin-right:6px;"></i>ข้อมูลสำหรับยืนยันตัวตน</p>
+            <p class="form-section-title"><i class="fas fa-id-card" style="margin-right:6px;"></i>����������Ѻ�׹�ѹ��ǵ�</p>
 
             <div class="form-row">
                 <div class="form-group">
-                    <label>รหัสนักศึกษา / บุคลากร <span class="req">*</span></label>
+                    <label>���ʹѡ�֡�� / �ؤ�ҡ� <span class="req">*</span></label>
                     <input type="text" name="student_personnel_id"
-                           placeholder="เช่น 6604012345"
+                           placeholder="�� 6604012345"
                            value="<?= htmlspecialchars($user['student_personnel_id'] ?? '') ?>">
                 </div>
                 <div class="form-group">
-                    <label>เบอร์โทรศัพท์</label>
+                    <label>�������Ѿ��</label>
                     <input type="tel" name="phone_number" placeholder="0812345678" maxlength="10"
                            value="<?= htmlspecialchars($user['phone_number'] ?? '') ?>">
                 </div>
             </div>
 
             <div class="form-group">
-                <label>คณะ / หน่วยงาน</label>
-                <input type="text" name="department" placeholder="เช่น คณะแพทยศาสตร์"
+                <label>��� / ˹��§ҹ</label>
+                <input type="text" name="department" placeholder="�� ���ᾷ���ʵ��"
                        value="<?= htmlspecialchars($user['department'] ?? '') ?>">
             </div>
 
             <button type="submit" class="btn-save">
-                <i class="fas fa-save"></i> บันทึกการเปลี่ยนแปลง
+                <i class="fas fa-save"></i> �ѹ�֡�������¹�ŧ
             </button>
         </form>
     </div>
@@ -300,13 +300,13 @@ function togglePrefixOther(val) {
     }
 }
 
-// ===== AJAX Form Submit (ไม่ reload หน้า) =====
+// ===== AJAX Form Submit (��� reload ˹��) =====
 document.getElementById('profileForm').addEventListener('submit', async function(e) {
     e.preventDefault();
 
     const btn  = this.querySelector('.btn-save');
     const orig = btn.innerHTML;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> กำลังบันทึก...';
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ���ѧ�ѹ�֡...';
     btn.disabled  = true;
 
     try {
@@ -318,7 +318,7 @@ document.getElementById('profileForm').addEventListener('submit', async function
         const data = await res.json();
 
         if (data.ok) {
-            // อัปเดตชื่อในหน้าโดยไม่ reload
+            // �ѻവ�����˹������� reload
             if (data.full_name) {
                 const nameEl   = document.querySelector('.profile-name');
                 const avatarEl = document.querySelector('.profile-avatar');
@@ -347,7 +347,7 @@ document.getElementById('profileForm').addEventListener('submit', async function
             });
         }
     } catch (err) {
-        Swal.fire({ toast: true, position: 'top', icon: 'error', title: 'เกิดข้อผิดพลาดในการเชื่อมต่อ', showConfirmButton: false, timer: 3000 });
+        Swal.fire({ toast: true, position: 'top', icon: 'error', title: '�Դ��ͼԴ��Ҵ㹡����������', showConfirmButton: false, timer: 3000 });
     } finally {
         btn.innerHTML = orig;
         btn.disabled  = false;
@@ -360,7 +360,7 @@ function showMyQRCode() {
     const qrData = "MEDLOAN_STUDENT:" + studentCode + ":" + studentDbId;
 
     Swal.fire({
-        title: 'บัตรประจำตัวดิจิทัล',
+        title: '�ѵû�Шӵ�ǴԨԷ��',
         html: `
             <div style="display:flex;justify-content:center;padding:16px 0;">
                 <div id="qrcode-container"></div>
@@ -368,7 +368,7 @@ function showMyQRCode() {
             <h3 style="margin-bottom:4px;">${studentCode}</h3>
             <p style="color:#666;font-size:.9rem;">${studentName}</p>
             <p style="font-size:.8rem;color:#0B6623;margin-top:12px;">
-                <i class="fas fa-info-circle"></i> ยื่นให้เจ้าหน้าที่สแกนเพื่อยืมอุปกรณ์
+                <i class="fas fa-info-circle"></i> ���������˹�ҷ���᡹��������ػ�ó�
             </p>`,
         didOpen: () => {
             new QRCode(document.getElementById("qrcode-container"), {
@@ -376,7 +376,7 @@ function showMyQRCode() {
                 correctLevel: QRCode.CorrectLevel.H
             });
         },
-        confirmButtonText: 'ปิด',
+        confirmButtonText: '�Դ',
         confirmButtonColor: '#0B6623'
     });
 }
