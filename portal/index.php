@@ -168,8 +168,8 @@ if (!isset($_SESSION['user_id']) && isset($_SESSION['admin_username'])) {
                     </ul>
                 </div>
                 <div class="flex gap-3">
-                    <a href="../sys_admin/users.php" class="flex-1 text-center bg-gray-50 hover:bg-gray-100 py-4 rounded-2xl text-sm font-black text-gray-700 transition-all active:scale-95">Users</a>
-                    <a href="../sys_admin/manage_admins.php" class="flex-1 text-center bg-accent text-white py-4 rounded-2xl text-sm font-black shadow-lg shadow-yellow-100 hover:brightness-95 transition-all active:scale-95">Admins</a>
+                    <a href="../sys_admin/users.php?layout=none" class="flex-1 text-center bg-gray-50 hover:bg-gray-100 py-4 rounded-2xl text-sm font-black text-gray-700 transition-all active:scale-95">Users</a>
+                    <a href="../sys_admin/manage_admins.php?layout=none" class="flex-1 text-center bg-accent text-white py-4 rounded-2xl text-sm font-black shadow-lg shadow-yellow-100 hover:brightness-95 transition-all active:scale-95">Admins</a>
                 </div>
             </div>
 
