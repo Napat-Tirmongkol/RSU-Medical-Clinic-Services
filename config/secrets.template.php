@@ -9,4 +9,9 @@ return [
     'LINE_LIFF_ID'                       => '',
     'LINE_MESSAGING_CHANNEL_ACCESS_TOKEN' => '',
     'LINE_MESSAGING_CHANNEL_SECRET'       => '',
+
+    // --- Admin Panel (Google OAuth2) ---
+    'GOOGLE_CLIENT_ID'                    => '',
+    'GOOGLE_CLIENT_SECRET'                => '',
+    'GOOGLE_REDIRECT_URI'                  => '',
 ];
