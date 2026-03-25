@@ -48,10 +48,15 @@ try {
         JOIN sys_users s ON a.student_id = s.id
         JOIN camp_slots t ON a.slot_id = t.id
         JOIN camp_list c ON a.campaign_id = c.id
-        WHERE t.slot_date >= :start 
-          AND t.slot_date <= :end
+        WHERE (
+            (t.slot_date >= :start AND t.slot_date <= :end)
+            OR a.status = 'booked'
+          )
           AND a.status IN ('booked', 'confirmed') 
-        ORDER BY t.start_time ASC
+        ORDER BY 
+            CASE WHEN a.status = 'booked' THEN 0 ELSE 1 END,
+            t.slot_date ASC, 
+            t.start_time ASC
     ";
     $stmt = $pdo->prepare($sql);
     $stmt->execute([':start' => $startDate, ':end' => $endDate]);
@@ -310,14 +315,27 @@ require_once __DIR__ . '/includes/header.php';
                     $statusBadge = '';
                     $statusSort = 0;
                     switch ($b['status']) {
-                        case 'booked': $statusBadge = '<span class="bg-amber-100 text-amber-700 px-2 py-1 rounded-full text-[10px] font-bold">รออนุมัติ</span>'; $statusSort = 1; break;
-                        case 'confirmed': $statusBadge = '<span class="bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full text-[10px] font-bold">อนุมัติแล้ว</span>'; $statusSort = 2; break;
-                        case 'cancelled': $statusBadge = '<span class="bg-red-100 text-red-700 px-2 py-1 rounded-full text-[10px] font-bold">ยกเลิก (user)</span>'; $statusSort = 3; break;
-                        case 'cancelled_by_admin': $statusBadge = '<span class="bg-orange-100 text-orange-700 px-2 py-1 rounded-full text-[10px] font-bold">ระบบยกเลิก</span>'; $statusSort = 4; break;
-                        default: $statusBadge = '<span class="bg-gray-100 text-gray-600 px-2 py-1 rounded-full text-[10px] font-bold">' . htmlspecialchars($b['status']) . '</span>';
+                        case 'booked': 
+                            $statusBadge = '<span class="bg-amber-100 text-amber-700 px-3 py-1.5 rounded-full text-[11px] font-black border border-amber-200 animate-pulse">รอดำเนินการ (ใหม่)</span>'; 
+                            $statusSort = 1; 
+                            break;
+                        case 'confirmed': 
+                            $statusBadge = '<span class="bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full text-[10px] font-bold">อนุมัติแล้ว</span>'; 
+                            $statusSort = 2; 
+                            break;
+                        case 'cancelled': 
+                            $statusBadge = '<span class="bg-red-100 text-red-700 px-2 py-1 rounded-full text-[10px] font-bold">ยกเลิก (user)</span>'; 
+                            $statusSort = 3; 
+                            break;
+                        case 'cancelled_by_admin': 
+                            $statusBadge = '<span class="bg-orange-100 text-orange-700 px-2 py-1 rounded-full text-[10px] font-bold">ระบบยกเลิก</span>'; 
+                            $statusSort = 4; 
+                            break;
+                        default: 
+                            $statusBadge = '<span class="bg-gray-100 text-gray-600 px-2 py-1 rounded-full text-[10px] font-bold">' . htmlspecialchars($b['status']) . '</span>';
                     }
                 ?>
-                <tr class="border-b border-gray-100 hover:bg-gray-50 transition-colors" data-camp-id="<?= $b['campaign_id'] ?>">
+                <tr class="border-b border-gray-100 hover:bg-gray-50 transition-colors <?= $b['status'] === 'booked' ? 'bg-amber-50/30' : '' ?>" data-camp-id="<?= $b['campaign_id'] ?>">
                     <td class="p-3 font-semibold text-gray-800" data-sort="<?= $b['slot_date'] ?>"><?= $dateObj->format('d/m/Y') ?></td>
                     <td class="p-3 font-bold text-[#0052CC]"><?= substr($b['start_time'],0,5) ?> - <?= substr($b['end_time'],0,5) ?></td>
                     <td class="p-3 text-gray-600 font-medium"><?= htmlspecialchars($b['campaign_title']) ?></td>
