@@ -215,7 +215,7 @@ if (!isset($_SESSION['user_id']) && isset($_SESSION['admin_username'])) {
                         <p class="text-gray-400 text-xs mt-1">ระบบยืม-คืนอุปกรณ์ทางการแพทย์ เดิม (ตรวจสอบข้อมูลประวัติย้อนหลังได้ที่นี่)</p>
                     </div>
                 </div>
-                <a href="../deprecated/e_Borrow/admin/index.php" class="px-8 py-4 bg-white border border-gray-200 text-gray-600 rounded-2xl text-sm font-black hover:border-gray-900 hover:text-gray-900 transition-all">
+                <a href="../archive/e_Borrow/admin/index.php" class="px-8 py-4 bg-white border border-gray-200 text-gray-600 rounded-2xl text-sm font-black hover:border-gray-900 hover:text-gray-900 transition-all">
                     Access History
                 </a>
             </div>
