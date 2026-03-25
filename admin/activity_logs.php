@@ -31,14 +31,15 @@ try {
     $total_records = $stmt_count->fetchColumn();
     $total_pages = ceil($total_records / $limit);
 
-    // 3. ดึงข้อมูล Log
+    // 3. ดึงข้อมูล Log (JOIN ทั้ง sys_admins และ sys_staff เพื่อความครอบคลุม)
     $sql = "SELECT l.*, 
-                   COALESCE(a.full_name, 'System Activity') as actor_name,
-                   COALESCE(a.username, 'system') as actor_username
+                   COALESCE(a.full_name, s.full_name, 'System Activity') as actor_name,
+                   COALESCE(a.username, s.username, 'system') as actor_username
             FROM sys_activity_logs l
             LEFT JOIN sys_admins a ON l.user_id = a.id
+            LEFT JOIN sys_staff s ON l.user_id = s.id
             $where
-            ORDER BY l.created_at DESC 
+            ORDER BY l.timestamp DESC 
             LIMIT $limit OFFSET $offset";
 
     $stmt = $pdo->prepare($sql);
@@ -128,7 +129,7 @@ renderPageHeader("บันทึกกิจกรรมระบบ (Activity 
                         ?>
                             <tr class="hover:bg-gray-50/50 transition-colors group">
                                 <td class="px-6 py-4 text-xs text-gray-500 whitespace-nowrap">
-                                    <i class="fa-regular fa-clock mr-1 opacity-60"></i> <?= date('d/m/Y H:i:s', strtotime($log['created_at'])) ?>
+                                    <i class="fa-regular fa-clock mr-1 opacity-60"></i> <?= date('d/m/Y H:i:s', strtotime($log['timestamp'])) ?>
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap">
                                     <div class="flex items-center gap-2">
