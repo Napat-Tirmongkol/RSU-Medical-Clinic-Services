@@ -34,6 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $hashed = password_hash($password ?: '1234', PASSWORD_DEFAULT);
                         $stmt = $pdo->prepare("INSERT INTO sys_admins (full_name, username, email, password, role) VALUES (?, ?, ?, ?, ?)");
                         $stmt->execute([$fullName, $username, $email, $hashed, $role]);
+                        log_activity("Added Admin", "เพิ่มเจ้าหน้าที่ใหม่: $fullName ($username) [สิทธิ์: $role]");
                         $success = "เพิ่มผู้ดูแลระบบเรียบร้อยแล้ว (รหัสผ่านเริ่มต้น: 1234)";
                     }
                 } else {
@@ -48,6 +49,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $hashed = password_hash($password, PASSWORD_DEFAULT);
                         $pdo->prepare("UPDATE sys_admins SET password = ? WHERE id = ?")->execute([$hashed, $adminId]);
                     }
+                    log_activity("Updated Admin", "แก้ไขข้อมูลเจ้าหน้าที่: $fullName ($username)");
                     $success = "แก้ไขข้อมูลเรียบร้อยแล้ว";
                 }
             } catch (PDOException $e) {
@@ -64,6 +66,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error = "ไม่สามารถลบบัญชีที่กำลังใช้งานอยู่ได้";
         } else {
             $pdo->prepare("DELETE FROM sys_admins WHERE id = ?")->execute([$adminId]);
+            log_activity("Deleted Admin", "ลบเจ้าหน้าที่ ID: $adminId เรียบร้อยแล้ว");
             $success = "ลบผู้ดูแลระบบเรียบร้อยแล้ว";
         }
     }

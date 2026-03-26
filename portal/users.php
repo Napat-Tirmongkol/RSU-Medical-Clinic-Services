@@ -37,6 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ':id' => $userId
                 ]);
                 $message = "อัปเดตข้อมูลนักศึกษาเรียบร้อยแล้ว!";
+                log_activity("Updated User Profile", "แก้ไขข้อมูลงรายชื่อ: $fullName (#$studentId)");
                 $messageType = "success";
             } catch (PDOException $e) {
                 $message = "เกิดข้อผิดพลาด: " . $e->getMessage();

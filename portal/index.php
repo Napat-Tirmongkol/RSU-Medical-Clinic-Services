@@ -109,12 +109,16 @@ $projects = [
 
 /**
  * 🕒 (3) RECENT ACTIVITY FETCH
+ * ดึงความเคลื่อนไหวล่าสุดจาก sys_activity_logs มาแสดงที่ Dashboard
  */
 $recentActivity = [];
 try {
-    if ($pdo->query("SHOW TABLES LIKE 'activity_logs'")->rowCount() > 0) {
-        $recentActivity = $pdo->query("SELECT action_details, created_at FROM activity_logs ORDER BY created_at DESC LIMIT 6")->fetchAll(PDO::FETCH_ASSOC);
-    }
+    $sql = "SELECT l.action, l.description, l.timestamp as created_at, a.full_name as admin_name 
+            FROM sys_activity_logs l
+            LEFT JOIN sys_admins a ON l.user_id = a.id
+            ORDER BY l.timestamp DESC 
+            LIMIT 5";
+    $recentActivity = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
 } catch (PDOException $e) { /* silent */ }
 
 ?>
@@ -293,11 +297,15 @@ try {
                         <div class="p-5 space-y-8">
                             <?php if($recentActivity): ?>
                                 <?php foreach($recentActivity as $log): ?>
-                                    <div class="relative pl-7 border-l-2 border-blue-50 last:border-0 pb-2 group">
-                                        <div class="absolute -left-[5px] top-0 w-2 h-2 bg-blue-200 rounded-full group-hover:bg-primary transition-colors"></div>
-                                        <div class="flex flex-col">
-                                            <span class="text-[10px] font-black text-gray-300 uppercase tracking-tighter sm:tracking-widest mb-1"><?= date('H:i | d M', strtotime($log['created_at'])) ?></span>
-                                            <p class="text-[13px] font-bold text-gray-700 leading-snug"><?= htmlspecialchars($log['action_details']) ?></p>
+                                    <div class="relative pl-7 border-l-2 border-primary/10 last:border-0 pb-6 group">
+                                        <div class="absolute -left-[5px] top-1 w-2.5 h-2.5 bg-blue-100 rounded-full group-hover:bg-primary transition-all duration-300 ring-4 ring-white"></div>
+                                        <div class="flex flex-col gap-1">
+                                            <div class="flex justify-between items-center mb-0.5">
+                                                <span class="text-[11px] font-black text-primary uppercase tracking-wider"><?= htmlspecialchars($log['action']) ?></span>
+                                                <span class="text-[9px] font-bold text-gray-400 uppercase tracking-tighter opacity-70"><?= date('H:i | d M', strtotime($log['created_at'])) ?></span>
+                                            </div>
+                                            <p class="text-[13px] font-black text-gray-900 leading-snug group-hover:text-blue-700 transition-colors"><?= htmlspecialchars($log['admin_name'] ?? 'System') ?></p>
+                                            <p class="text-[11px] font-medium text-gray-400 leading-relaxed italic"><?= htmlspecialchars($log['description']) ?></p>
                                         </div>
                                     </div>
                                 <?php endforeach; ?>
