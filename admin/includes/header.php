@@ -60,6 +60,11 @@ $layout_none = isset($_GET['layout']) && $_GET['layout'] === 'none';
         </div>
         
         <nav class="flex-1 py-4 overflow-y-auto">
+            <div class="px-6 mb-4">
+                <a href="../portal/index.php" class="flex items-center justify-center gap-2 w-full p-3 rounded-xl bg-gray-50 text-gray-500 hover:bg-gray-100 hover:text-gray-900 transition-all font-bold text-xs uppercase tracking-widest border border-gray-200/50">
+                    <i class="fa-solid fa-arrow-left-long"></i> กลับหน้า Portal
+                </a>
+            </div>
             <div class="px-6 mb-2">
                 <a href="../admin/index.php" class="flex items-center gap-3 p-3 rounded-xl <?= basename($_SERVER['PHP_SELF']) == 'index.php' ? 'bg-blue-50 text-[#0052CC] font-semibold' : 'text-gray-600 hover:bg-gray-50' ?> transition-colors">
                     <i class="fa-solid fa-chart-pie w-5 text-center"></i> Dashboard
@@ -118,7 +123,12 @@ $layout_none = isset($_GET['layout']) && $_GET['layout'] === 'none';
     <main class="flex-1 flex flex-col h-screen overflow-hidden <?= $no_layout ? 'h-auto overflow-visible' : '' ?>">
         <?php if (!$no_layout): ?>
         <header class="bg-white shadow-sm p-4 flex justify-between items-center border-b border-gray-100 z-10">
-            <h2 class="text-lg font-bold text-gray-700 md:hidden flex items-center gap-2"><i class="fa-solid fa-bullhorn text-[#0052CC]"></i> camp_list</h2>
+            <div class="flex items-center gap-3 md:hidden">
+                <a href="../portal/index.php" class="w-8 h-8 flex items-center justify-center rounded-lg bg-gray-50 text-gray-400">
+                    <i class="fa-solid fa-arrow-left text-sm"></i>
+                </a>
+                <h2 class="text-lg font-bold text-gray-700">Campaign Admin</h2>
+            </div>
             <div class="hidden md:block"></div>
             <div class="flex items-center gap-3">
                 <span class="text-sm text-gray-600">ยินดีต้อนรับ, <b><?= htmlspecialchars($_SESSION['admin_username'] ?? 'Admin') ?></b></span>
