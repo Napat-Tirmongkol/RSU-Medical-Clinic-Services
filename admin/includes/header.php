@@ -6,7 +6,17 @@ $layout_none = isset($_GET['layout']) && $_GET['layout'] === 'none';
     if (!function_exists('renderPageHeader')) {
         function renderPageHeader($title, $subtitle, $actions_html = '') {
             global $layout_none;
-            if ($layout_none) return; // ซ่อน Header ทันทีถ้าอยู่ในโหมด no-layout (แสดงผลผ่าน Portal)
+            
+            if ($layout_none) {
+                // ถ้าเป็นโหมด no-layout ให้โชว์แค่ป้ามปุ่มควบคุม (Actions) ด้านขวาบน
+                echo '
+                <div class="mb-6 flex justify-end items-center animate-slide-up">
+                    <div class="flex flex-wrap gap-3 items-center">
+                        ' . $actions_html . '
+                    </div>
+                </div>';
+                return;
+            }
 
             echo '
             <div class="mb-10 flex flex-col md:flex-row md:justify-between md:items-end gap-6 animate-slide-up">
