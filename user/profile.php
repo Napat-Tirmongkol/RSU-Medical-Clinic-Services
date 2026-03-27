@@ -43,7 +43,7 @@ try {
 render_header('ข้อมูลส่วนตัว');
 ?>
 
-<div class="p-5 pb-40 flex flex-col min-h-screen animate-in fade-in slide-in-from-right-4 duration-500">
+<div class="p-5 pb-28 flex flex-col min-h-screen animate-in fade-in slide-in-from-right-4 duration-500">
   <form id="profileForm" class="flex-1 flex flex-col" method="post" action="save_profile.php">
     <?php csrf_field(); ?>
     <div class="flex-1 space-y-6">
@@ -149,9 +149,6 @@ render_header('ข้อมูลส่วนตัว');
             <span class="text-xs text-gray-600 font-bold leading-tight font-prompt">ฉันได้อ่าน และยอมรับข้อตกลงนโยบายความเป็นส่วนตัว</span>
           </label>
       </div>
-
-      <!-- 🛑 Spacer เพื่อกันปุ่มบันทึกด้านล่างมาทับ -->
-      <div class="h-32"></div>
     </div>
 
     <div class="fixed bottom-0 left-0 right-0 max-w-md mx-auto p-4 bg-white border-t border-gray-100 z-20 shadow-[0_-4px_20px_-10px_rgba(0,0,0,0.1)]">
