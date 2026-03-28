@@ -27,6 +27,7 @@ foreach ($activeCampaigns as $ac) {
 // ส่วนจัดการ AJAX / POST (เพิ่ม/ลบ รอบเวลา)
 // ==========================================
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    validate_csrf_or_die();
     $action = $_POST['action'] ?? '';
     
     // 🌟 ระบบเพิ่มรอบเวลาแบบหลายๆ วัน (Multi-Select Dates) และหลายๆ ช่วงเวลา
@@ -421,6 +422,7 @@ renderPageHeader("Campaign Time Slots", "กำหนดช่วงเวลา
         </div>
         <form id="slotForm" class="flex flex-col flex-1 overflow-hidden">
             <input type="hidden" name="action" value="add_slot">
+            <?php csrf_field(); ?>
             
             <div class="p-5 space-y-4 overflow-y-auto flex-1 scrollbar-hide">
             
@@ -528,6 +530,7 @@ renderPageHeader("Campaign Time Slots", "กำหนดช่วงเวลา
         <form id="editSlotForm" class="flex flex-col flex-1 overflow-hidden">
             <input type="hidden" name="action" value="edit_slot">
             <input type="hidden" name="slot_id" id="edit_slot_id">
+            <?php csrf_field(); ?>
             
             <div class="p-5 space-y-4 overflow-y-auto flex-1 scrollbar-hide">
             
@@ -853,6 +856,7 @@ function deleteSlot(id) {
             const formData = new FormData();
             formData.append('action', 'delete_slot');
             formData.append('slot_id', id);
+            formData.append('csrf_token', '<?= get_csrf_token() ?>');
             
             fetch('time_slots.php', { method: 'POST', body: formData })
             .then(r => r.json())
@@ -1163,6 +1167,7 @@ function deleteSelectedSlots() {
             const formData = new FormData();
             formData.append('action', 'delete_multiple_slots');
             ids.forEach(id => formData.append('slot_ids[]', id));
+            formData.append('csrf_token', '<?= get_csrf_token() ?>');
             
             fetch('time_slots.php', { method: 'POST', body: formData })
             .then(r => r.json())

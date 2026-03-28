@@ -17,9 +17,18 @@ if ($studentId <= 0 || $campaignId <= 0) {
     exit;
 }
 
-// 2. เช็ค 1 คน 1 คิว (เฉพาะแคมเปญนี้)
+// 2. เช็คสถานะแคมเปญและ 1 คน 1 คิว (เฉพาะแคมเปญนี้)
 try {
     $pdo = db();
+    
+    // ดึงข้อมูลแคมเปญมาเช็คสถานะ
+    $stmtCamp = $pdo->prepare("SELECT id FROM camp_list WHERE id = :cid AND status = 'active' AND (available_until IS NULL OR available_until >= CURDATE())");
+    $stmtCamp->execute([':cid' => $campaignId]);
+    if (!$stmtCamp->fetch()) {
+        header('Location: booking_campaign.php');
+        exit;
+    }
+
     $checkSql = "SELECT COUNT(*) FROM camp_bookings WHERE student_id = :sid AND campaign_id = :cid AND status IN ('confirmed', 'booked')";
     $stmtCheck = $pdo->prepare($checkSql);
     $stmtCheck->execute([':sid' => $studentId, ':cid' => $campaignId]);

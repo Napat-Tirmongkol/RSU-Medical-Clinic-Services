@@ -29,10 +29,10 @@ $displayDate = date('j F Y', strtotime($selectedDateStr));
 
 $pdo = db();
 
-// 1. ดึงข้อมูลแคมเปญ
+// 1. ดึงข้อมูลแคมเปญ และเช็คสถานะ
 $campaign = null;
 try {
-    $stmtCamp = $pdo->prepare("SELECT id, title FROM camp_list WHERE id = :id");
+    $stmtCamp = $pdo->prepare("SELECT id, title FROM camp_list WHERE id = :id AND status = 'active' AND (available_until IS NULL OR available_until >= CURDATE())");
     $stmtCamp->execute([':id' => $campaignId]);
     $campaign = $stmtCamp->fetch(PDO::FETCH_ASSOC);
     if (!$campaign) {
@@ -40,7 +40,7 @@ try {
         exit;
     }
 } catch (PDOException $e) {
-    die("Error fetching campaign");
+    die("Error fetching campaign: " . $e->getMessage());
 }
 
 // 2. ดึงสล็อตเวลาเริ่มต้น

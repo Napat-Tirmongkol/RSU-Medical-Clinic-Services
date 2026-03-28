@@ -47,10 +47,10 @@ try {
         (SELECT COUNT(*) FROM camp_bookings WHERE campaign_id = c.id AND status IN ('booked', 'confirmed')) as used
         FROM camp_list c 
         WHERE id = :cid AND status = 'active' 
-          AND (available_until IS NULL OR available_until >= :booking_date)
+          AND (available_until IS NULL OR available_until >= CURDATE())
     ";
     $stmtCamp = $pdo->prepare($sqlCamp);
-    $stmtCamp->execute([':cid' => $campaignId, ':booking_date' => $bookingDate]);
+    $stmtCamp->execute([':cid' => $campaignId]);
     $campData = $stmtCamp->fetch(PDO::FETCH_ASSOC);
 
     if (!$campData || $campData['used'] >= $campData['total_capacity']) {
