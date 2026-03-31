@@ -50,7 +50,7 @@ try {
     $pending_count  = count(array_filter($borrowed_items, fn($i) => $i['approval_status'] === 'pending'));
     $approved_count = count(array_filter($borrowed_items, fn($i) => $i['approval_status'] === 'approved'));
     $overdue_count  = count(array_filter($borrowed_items, fn($i) =>
-        $i['approval_status'] === 'approved' && strtotime($i['due_date']) < time()
+        $i['approval_status'] === 'approved' && strtotime($i['due_date'] . ' 23:59:59') < time()
     ));
 
 } catch (PDOException $e) {
@@ -379,7 +379,7 @@ body.dark-mode .btn-cancel-sm:active { background: rgba(220,38,38,.3); }
         <?php else: ?>
         <?php foreach ($borrowed_items as $item):
             $isPending  = $item['approval_status'] === 'pending';
-            $isOverdue  = !$isPending && strtotime($item['due_date']) < time();
+            $isOverdue  = !$isPending && strtotime($item['due_date'] . ' 23:59:59') < time();
             $cardClass  = $isPending ? 'pending' : ($isOverdue ? 'overdue' : '');
             $dueDateFmt = date('d/m/Y', strtotime($item['due_date']));
         ?>
@@ -471,22 +471,7 @@ function showHomeQRCode() {
     });
 }
 
-function confirmCancelRequest(transactionId) {
-    Swal.fire({
-        title: 'ยืนยันการยกเลิก?',
-        text: 'คำขอยืมอุปกรณ์นี้จะถูกยกเลิก',
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonColor: '#dc2626',
-        cancelButtonColor: '#6b7280',
-        confirmButtonText: 'ยืนยัน ยกเลิก',
-        cancelButtonText: 'ไม่ยกเลิก',
-    }).then((result) => {
-        if (result.isConfirmed) {
-            window.location.href = `ajax/cancel_request.php?id=${transactionId}`;
-        }
-    });
-}
+
 </script>
 
 <?php include('includes/student_footer.php'); ?>
