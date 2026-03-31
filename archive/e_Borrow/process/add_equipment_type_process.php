@@ -1,20 +1,31 @@
 <?php
 // process/add_equipment_type_process.php
-// (ฉบับแก้ไข Path อัปโหลด)
+
+ob_start();
+header('Content-Type: application/json');
 
 // 1. "จ้างยาม" และ "เชื่อมต่อ DB"
-include('../includes/check_session_ajax.php');
-require_once(__DIR__ . '/../../../config/db_connect.php');
-require_once('../includes/log_function.php');
+include(__DIR__ . '/../includes/check_session_ajax.php');
 
-// 2. ตรวจสอบสิทธิ์ Admin และตั้งค่า Header
+try {
+    require_once(__DIR__ . '/../../../config/db_connect.php');
+} catch (Throwable $e) {
+    ob_end_clean();
+    http_response_code(500);
+    echo json_encode(['status' => 'error', 'message' => 'ไม่สามารถเชื่อมต่อฐานข้อมูลได้']);
+    exit;
+}
+
+require_once(__DIR__ . '/../includes/log_function.php');
+
+// 2. ตรวจสอบสิทธิ์ Admin
 $allowed_roles = ['admin', 'editor'];
 if (!isset($_SESSION['role']) || !in_array($_SESSION['role'], $allowed_roles)) {
-    header('Content-Type: application/json');
+    ob_end_clean();
     echo json_encode(['status' => 'error', 'message' => 'คุณไม่มีสิทธิ์ดำเนินการ']);
     exit;
 }
-header('Content-Type: application/json');
+ob_end_clean();
 
 // 3. สร้างตัวแปรสำหรับเก็บคำตอบ
 $response = ['status' => 'error', 'message' => 'เกิดข้อผิดพลาดไม่ทราบสาเหตุ'];
