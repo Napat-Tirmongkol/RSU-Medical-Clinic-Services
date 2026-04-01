@@ -4,6 +4,10 @@ require_once __DIR__ . '/config/db_connect.php';
 require_once __DIR__ . '/includes/csrf.php';
 require_once __DIR__ . '/includes/error_logger.php';
 
+// ── Log Retention Settings ────────────────────────────────────────────────────
+defined('ERROR_LOG_RETENTION_DAYS')    || define('ERROR_LOG_RETENTION_DAYS',    30);  // วัน
+defined('ACTIVITY_LOG_RETENTION_DAYS') || define('ACTIVITY_LOG_RETENTION_DAYS', 90);  // วัน
+
 /**
  * 🛰️ ฟังก์ชันกลางสำหรับบันทึกกิจกรรมในระบบ (Activity Logging)
  * ย้ายมาไว้ที่ config.php เพื่อเป็นประตูที่เข้าถึงได้จากทุกทิศทาง

@@ -13,6 +13,11 @@ require_once __DIR__ . '/../config.php';
 $error = $_SESSION['login_error'] ?? '';
 unset($_SESSION['login_error']);
 
+// แสดง timeout message
+if (($_GET['reason'] ?? '') === 'timeout') {
+    $error = 'เซสชันหมดอายุเนื่องจากไม่มีการใช้งานนาน 2 ชั่วโมง กรุณาเข้าสู่ระบบใหม่';
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     validate_csrf_or_die();
     $username = $_POST['username'] ?? '';

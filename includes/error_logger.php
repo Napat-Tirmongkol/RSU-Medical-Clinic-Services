@@ -64,6 +64,11 @@ function log_error_to_db(
              VALUES (?, ?, ?, ?, ?, ?)"
         )->execute([$level, $source, $message, $context, $ip, $userId]);
 
+        // ── Auto-purge: ลบ log เก่ากว่า 30 วัน (ทำงานแบบ probabilistic ~1% ของ request)
+        if (mt_rand(1, 100) === 1) {
+            $logPdo->exec("DELETE FROM sys_error_logs WHERE created_at < DATE_SUB(NOW(), INTERVAL 30 DAY)");
+        }
+
     } catch (Throwable) {
         // ไม่ทำอะไร — ป้องกัน infinite loop ถ้า DB เองมีปัญหา
     }
