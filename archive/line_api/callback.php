@@ -113,7 +113,7 @@ try {
         $_SESSION['pending_line_id']  = $line_user_id;
         $_SESSION['pending_redirect'] = $redirectTarget; // จำ app ที่ต้องการไว้
 
-        header("Location: ../user/link_account.php");
+        header("Location: ../../user/link_account.php");
         exit;
     }
 
