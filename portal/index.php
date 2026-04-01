@@ -161,204 +161,383 @@ try {
     </script>
     
     <style>
-        body { background: #fdfdfd; min-height: 100vh; overflow-x: hidden; }
-        .bg-mesh {
-            background: 
-                radial-gradient(at 0% 0%, rgba(0, 82, 204, 0.05) 0px, transparent 50%),
-                radial-gradient(at 100% 100%, rgba(255, 171, 0, 0.05) 0px, transparent 50%);
+        /* ── Base ─────────────────────────────────────────────── */
+        *, *::before, *::after { box-sizing: border-box; }
+        body {
+            background: #f4f6fb;
+            background-image:
+                radial-gradient(circle at 18% 12%, rgba(0,82,204,.06) 0, transparent 420px),
+                radial-gradient(circle at 85% 80%, rgba(255,171,0,.05) 0, transparent 380px);
+            min-height: 100vh;
         }
-        .glass { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.4); }
-        .card-shift:hover { transform: translateY(-6px); box-shadow: 0 20px 40px -20px rgba(0, 82, 204, 0.15); border-color: rgba(0, 82, 204, 0.2); }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
-        .animate-enter { animation: fadeIn 0.5s ease-out forwards; }
+
+        /* ── Animations ───────────────────────────────────────── */
+        @keyframes up { from { opacity:0; transform:translateY(18px); } to { opacity:1; transform:translateY(0); } }
+        .au  { animation: up .5s cubic-bezier(.16,1,.3,1) both; }
+        .d1  { animation-delay: .08s; }
+        .d2  { animation-delay: .16s; }
+        .d3  { animation-delay: .24s; }
+        .d4  { animation-delay: .32s; }
+
+        /* ── Header ───────────────────────────────────────────── */
+        .portal-header {
+            background: #fff;
+            border-bottom: 1.5px solid #e8eef7;
+            box-shadow: 0 2px 12px rgba(0,82,204,.05);
+            position: sticky; top: 0; z-index: 40;
+        }
+        .brand-icon {
+            width: 44px; height: 44px;
+            background: linear-gradient(135deg, #0052CC 0%, #1a6fe8 100%);
+            border-radius: 14px;
+            display: flex; align-items: center; justify-content: center;
+            color: #fff; font-size: 1.15rem;
+            box-shadow: 0 4px 12px rgba(0,82,204,.3);
+            flex-shrink: 0;
+        }
+        .user-pill {
+            display: flex; align-items: center; gap: 10px;
+            background: #f8fafc;
+            border: 1.5px solid #e2e8f0;
+            border-radius: 99px;
+            padding: 6px 14px 6px 8px;
+        }
+        .user-avatar {
+            width: 30px; height: 30px;
+            background: linear-gradient(135deg,#0052CC,#1a6fe8);
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            color: #fff; font-size: .7rem;
+        }
+
+        /* ── KPI cards ────────────────────────────────────────── */
+        .kpi-card {
+            background: #fff;
+            border-radius: 18px;
+            padding: 22px 24px;
+            border: 1.5px solid #e8eef7;
+            box-shadow: 0 2px 8px rgba(0,0,0,.04);
+            position: relative; overflow: hidden;
+            transition: box-shadow .2s, transform .2s;
+        }
+        .kpi-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,82,204,.1); }
+        .kpi-accent { position: absolute; top:0; left:0; right:0; height:3px; border-radius:18px 18px 0 0; }
+        .kpi-icon {
+            width: 40px; height: 40px;
+            border-radius: 12px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: .95rem;
+            margin-bottom: 16px;
+        }
+        .kpi-num { font-size: 2rem; font-weight: 900; line-height: 1; margin-bottom: 4px; }
+        .kpi-label { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .12em; color: #94a3b8; }
+
+        /* ── Section heading ──────────────────────────────────── */
+        .sec-title {
+            font-size: 1rem; font-weight: 900; color: #0f172a;
+            display: flex; align-items: center; gap: 10px;
+            letter-spacing: -.01em;
+        }
+        .sec-title::before {
+            content: '';
+            display: block;
+            width: 4px; height: 20px;
+            background: linear-gradient(180deg,#0052CC,#60a5fa);
+            border-radius: 99px;
+        }
+
+        /* ── Project cards ────────────────────────────────────── */
+        .proj-card {
+            background: #fff;
+            border: 1.5px solid #e8eef7;
+            border-radius: 22px;
+            padding: 24px;
+            display: flex; flex-direction: column;
+            transition: box-shadow .25s, transform .25s, border-color .25s;
+            position: relative; overflow: hidden;
+        }
+        .proj-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 16px 40px rgba(0,82,204,.1);
+            border-color: rgba(0,82,204,.2);
+        }
+        .proj-card-icon {
+            width: 52px; height: 52px;
+            border-radius: 16px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.35rem;
+            flex-shrink: 0;
+            border-width: 1.5px; border-style: solid;
+            box-shadow: 0 2px 8px rgba(0,0,0,.07);
+            transition: transform .25s;
+        }
+        .proj-card:hover .proj-card-icon { transform: scale(1.08) rotate(-3deg); }
+        .proj-badge {
+            font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: .1em;
+            padding: 3px 8px;
+            background: #f1f5f9; color: #64748b;
+            border-radius: 99px;
+            border: 1px solid #e2e8f0;
+        }
+        .proj-action {
+            display: flex; align-items: center; justify-content: center;
+            padding: 10px 14px;
+            border-radius: 12px;
+            font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em;
+            transition: all .18s ease;
+            flex: 1;
+            text-decoration: none;
+        }
+        .proj-action.primary {
+            background: linear-gradient(135deg,#0052CC,#1a6fe8);
+            color: #fff;
+            box-shadow: 0 4px 12px rgba(0,82,204,.25);
+        }
+        .proj-action.primary:hover { box-shadow: 0 6px 18px rgba(0,82,204,.4); filter:brightness(1.07); }
+        .proj-action.secondary {
+            background: #f1f5f9; color: #475569;
+            border: 1.5px solid #e2e8f0;
+        }
+        .proj-action.secondary:hover { background: #e2e8f0; }
+
+        /* ── Activity feed ────────────────────────────────────── */
+        .feed-card {
+            background: #fff;
+            border: 1.5px solid #e8eef7;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 2px 12px rgba(0,0,0,.04);
+        }
+        .feed-item {
+            padding: 14px 18px;
+            border-bottom: 1px solid #f1f5f9;
+            display: flex; gap: 12px; align-items: flex-start;
+        }
+        .feed-item:last-child { border-bottom: none; }
+        .feed-dot {
+            width: 34px; height: 34px; border-radius: 10px;
+            background: #eff6ff; color: #0052CC;
+            display: flex; align-items: center; justify-content: center;
+            font-size: .7rem; flex-shrink: 0;
+        }
+
+        /* ── Shortcut card ────────────────────────────────────── */
+        .shortcut-card {
+            background: linear-gradient(135deg, #0052CC 0%, #1a6fe8 100%);
+            border-radius: 20px;
+            padding: 22px;
+            color: #fff;
+            position: relative; overflow: hidden;
+            box-shadow: 0 8px 24px rgba(0,82,204,.3);
+        }
+        .shortcut-link {
+            display: flex; align-items: center; gap: 10px;
+            padding: 10px 14px;
+            background: rgba(255,255,255,.12);
+            border-radius: 12px;
+            color: #fff; text-decoration: none;
+            font-size: .8rem; font-weight: 700;
+            border: 1px solid rgba(255,255,255,.1);
+            transition: background .18s;
+        }
+        .shortcut-link:hover { background: rgba(255,255,255,.22); }
+        .shortcut-link i { width: 16px; text-align: center; opacity: .8; }
+
+        /* ── Scrollbar ────────────────────────────────────────── */
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 99px; }
     </style>
 </head>
-<body class="bg-mesh font-sans text-gray-800 p-4 md:p-8">
+<body class="font-sans text-gray-800" style="min-height:100vh">
 
-    <div class="max-w-[1440px] mx-auto space-y-10">
-        
-        <!-- HEADER & COMMANDER INFO -->
-        <header class="flex flex-col md:flex-row justify-between items-center gap-6 animate-enter">
-            <div class="flex items-center gap-6">
-                <div class="w-16 h-16 bg-gradient-to-br from-primary to-blue-800 rounded-[24px] flex items-center justify-center text-white text-3xl shadow-xl shadow-blue-200">
-                    <i class="fa-solid fa-square-rss"></i>
-                </div>
+    <!-- ══════════════════ HEADER ══════════════════ -->
+    <header class="portal-header au">
+        <div class="max-w-[1280px] mx-auto px-6 py-3 flex items-center justify-between gap-4">
+            <!-- Brand -->
+            <div class="flex items-center gap-3">
+                <div class="brand-icon"><i class="fa-solid fa-square-rss"></i></div>
                 <div>
-                    <h1 class="text-3xl font-[900] text-gray-900 tracking-tight leading-none uppercase">Central HUB</h1>
-                    <p class="text-xs text-primary font-black tracking-[0.2em] uppercase mt-2 opacity-60">RSU Healthcare Management Portal</p>
+                    <div class="font-black text-gray-900 text-[17px] leading-none tracking-tight">Central HUB</div>
+                    <div class="text-[10px] font-bold text-[#0052CC] tracking-[.15em] uppercase opacity-60 mt-0.5">RSU Healthcare Portal</div>
                 </div>
             </div>
 
-            <div class="flex items-center gap-4 glass px-6 py-3 rounded-full shadow-sm">
-                <div class="w-10 h-10 bg-blue-100 text-primary rounded-full flex items-center justify-center font-bold">
-                    <i class="fa-solid fa-user-shield text-sm"></i>
-                </div>
-                <div class="text-right hidden sm:block">
-                    <p class="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-1">Administrative Node</p>
-                    <p class="text-xs font-black text-gray-900 leading-none"><?= htmlspecialchars($_SESSION['admin_username'] ?? 'Administrator') ?></p>
-                </div>
-                <div class="h-6 w-px bg-gray-200 mx-2"></div>
-                <a href="../admin/logout.php" class="text-gray-300 hover:text-red-500 transition-all"><i class="fa-solid fa-power-off"></i></a>
-            </div>
-        </header>
-
-        <!-- DASHBOARD OVERVIEW (Top Stats KPI) -->
-        <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 animate-enter" style="animation-delay: 0.1s;">
-            <div class="glass p-7 rounded-[40px] flex flex-col justify-between h-36 relative overflow-hidden group">
-                <div class="z-10 bg-amber-500/10 text-amber-600 w-10 h-10 rounded-2xl flex items-center justify-center text-lg mb-2"><i class="fa-solid fa-users"></i></div>
-                <div class="z-10">
-                    <h5 class="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">Total Members</h5>
-                    <p class="text-3xl font-black"><?= number_format($kpis['users']) ?></p>
-                </div>
-                <div class="absolute -bottom-4 -right-4 text-7xl text-gray-50 opacity-20 group-hover:scale-110 transition-all"><i class="fa-solid fa-id-card"></i></div>
-            </div>
-            <div class="glass p-7 rounded-[40px] flex flex-col justify-between h-36 relative overflow-hidden group">
-                <div class="z-10 bg-blue-500/10 text-blue-600 w-10 h-10 rounded-2xl flex items-center justify-center text-lg mb-2"><i class="fa-solid fa-bullhorn"></i></div>
-                <div class="z-10">
-                    <h5 class="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">Running Camps</h5>
-                    <p class="text-3xl font-black"><?= $kpis['camps'] ?></p>
-                </div>
-                <div class="absolute -bottom-4 -right-4 text-7xl text-gray-50 opacity-20"><i class="fa-solid fa-calendar-check"></i></div>
-            </div>
-            <div class="glass p-7 rounded-[40px] flex flex-col justify-between h-36 relative overflow-hidden group">
-                <div class="z-10 bg-red-500/10 text-red-600 w-10 h-10 rounded-2xl flex items-center justify-center text-lg mb-2"><i class="fa-solid fa-clock-rotate-left"></i></div>
-                <div class="z-10">
-                    <h5 class="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">Pending Borrows</h5>
-                    <div class="flex items-center gap-3">
-                        <p class="text-3xl font-black"><?= $kpis['borrows'] ?></p>
-                        <?php if($kpis['borrows'] > 0): ?>
-                            <span class="px-2 py-1 bg-red-500 text-white text-[9px] font-black rounded-lg animate-pulse">URGENT</span>
-                        <?php endif; ?>
+            <!-- Right: user + logout -->
+            <div class="flex items-center gap-3">
+                <div class="user-pill">
+                    <div class="user-avatar"><i class="fa-solid fa-user-shield text-[11px]"></i></div>
+                    <div class="hidden sm:block">
+                        <div class="text-[9px] font-bold text-gray-400 uppercase tracking-wider leading-none mb-0.5">Admin</div>
+                        <div class="text-xs font-black text-gray-900 leading-none"><?= htmlspecialchars($_SESSION['admin_username'] ?? 'Administrator') ?></div>
                     </div>
                 </div>
+                <a href="../admin/logout.php"
+                   class="w-9 h-9 rounded-xl bg-red-50 text-red-400 hover:bg-red-500 hover:text-white flex items-center justify-center transition-all border border-red-100"
+                   title="ออกจากระบบ">
+                    <i class="fa-solid fa-power-off text-sm"></i>
+                </a>
             </div>
-            <div class="glass p-7 rounded-[40px] flex flex-col justify-between h-36 relative overflow-hidden group border-2 border-primary/5">
-                <div class="z-10 bg-primary/10 text-primary w-10 h-10 rounded-2xl flex items-center justify-center text-lg mb-2"><i class="fa-solid fa-bolt"></i></div>
-                <div class="z-10">
-                    <h5 class="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">System Health</h5>
-                    <p class="text-3xl font-black text-primary">Healthy</p>
+        </div>
+    </header>
+
+    <!-- ══════════════════ PAGE BODY ══════════════════ -->
+    <div class="max-w-[1280px] mx-auto px-5 md:px-8 py-8 space-y-8">
+
+        <!-- KPI STRIP -->
+        <section class="grid grid-cols-2 lg:grid-cols-4 gap-4 au d1">
+            <!-- Total Members -->
+            <div class="kpi-card">
+                <div class="kpi-accent" style="background:linear-gradient(90deg,#f59e0b,#fbbf24)"></div>
+                <div class="kpi-icon" style="background:#fffbeb; color:#d97706">
+                    <i class="fa-solid fa-users"></i>
                 </div>
+                <div class="kpi-num text-gray-900"><?= number_format($kpis['users']) ?></div>
+                <div class="kpi-label">Total Members</div>
+            </div>
+
+            <!-- Running Campaigns -->
+            <div class="kpi-card">
+                <div class="kpi-accent" style="background:linear-gradient(90deg,#0052CC,#60a5fa)"></div>
+                <div class="kpi-icon" style="background:#eff6ff; color:#0052CC">
+                    <i class="fa-solid fa-bullhorn"></i>
+                </div>
+                <div class="kpi-num text-gray-900"><?= $kpis['camps'] ?></div>
+                <div class="kpi-label">Active Campaigns</div>
+            </div>
+
+            <!-- Pending Borrows -->
+            <div class="kpi-card">
+                <div class="kpi-accent" style="background:linear-gradient(90deg,#ef4444,#fca5a5)"></div>
+                <div class="kpi-icon" style="background:#fff1f2; color:#ef4444">
+                    <i class="fa-solid fa-clock-rotate-left"></i>
+                </div>
+                <div class="flex items-end gap-2">
+                    <div class="kpi-num text-gray-900"><?= $kpis['borrows'] ?></div>
+                    <?php if($kpis['borrows'] > 0): ?>
+                        <span class="mb-1 px-1.5 py-0.5 bg-red-500 text-white text-[8px] font-black rounded-md leading-none animate-pulse">URGENT</span>
+                    <?php endif; ?>
+                </div>
+                <div class="kpi-label">Pending Borrows</div>
+            </div>
+
+            <!-- System Health -->
+            <div class="kpi-card">
+                <div class="kpi-accent" style="background:linear-gradient(90deg,#10b981,#6ee7b7)"></div>
+                <div class="kpi-icon" style="background:#ecfdf5; color:#059669">
+                    <i class="fa-solid fa-heart-pulse"></i>
+                </div>
+                <div class="kpi-num" style="color:#059669; font-size:1.5rem">Healthy</div>
+                <div class="kpi-label">System Status</div>
             </div>
         </section>
 
-        <!-- MAIN LAYOUT: GRID & SIDEBAR -->
-        <main class="grid grid-cols-1 lg:grid-cols-12 gap-10">
-            
-            <!-- (App Launcher Structure - 8 of 12 columns) -->
-            <section class="lg:col-span-8 space-y-8 animate-enter" style="animation-delay: 0.2s;">
-                <h2 class="text-2xl font-black text-gray-900 tracking-tight flex items-center gap-3">
-                    <span class="w-1.5 h-7 bg-primary rounded-full"></span> 
-                    Project Command Grid
-                </h2>
+        <!-- MAIN GRID -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    
-                    <?php 
-                    /** 
-                     * 🚀 DYNAMIC LOOP: เรนเดอร์การ์ดโปรเจกต์ตามสิทธิที่ระบุใน Array
-                     */
-                    foreach($projects as $proj):
-                        $hasAccess = in_array($adminRole, $proj['allowed_roles']);
-                        if (!$hasAccess) continue; // ซ่อนโปรเจกต์ถ้าแอดมินคนนี้ไม่มีสิทธิ์เข้า
+            <!-- PROJECT CARDS (8/12) -->
+            <section class="lg:col-span-8 au d2">
+                <div class="sec-title mb-5">Project Command Grid</div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                    <?php foreach($projects as $proj):
+                        if (!in_array($adminRole, $proj['allowed_roles'])) continue;
                     ?>
-                    
-                    <div class="group relative bg-white border border-gray-100 p-8 rounded-[48px] flex flex-col justify-between card-shift transition-all duration-500 overflow-hidden">
-                        <div>
-                            <!-- Icon & Badges -->
-                            <div class="flex justify-between items-start mb-8">
-                                <div class="w-16 h-16 <?= $proj['bg_color'] ?> <?= $proj['icon_color'] ?> rounded-[24px] flex items-center justify-center text-3xl shadow-sm group-hover:scale-110 transition-all duration-500">
-                                    <i class="fa-solid <?= $proj['icon'] ?>"></i>
-                                </div>
-                                <div class="flex flex-col gap-1 items-end">
-                                    <?php foreach($proj['badges'] as $badge): ?>
-                                        <span class="px-3 py-1 bg-gray-50 text-gray-400 rounded-full text-[9px] font-black uppercase tracking-widest border border-gray-100"><?= $badge ?></span>
-                                    <?php endforeach; ?>
-                                </div>
+                    <div class="proj-card">
+                        <!-- Card top row -->
+                        <div class="flex items-start justify-between mb-4">
+                            <div class="proj-card-icon <?= $proj['bg_color'] ?> <?= $proj['icon_color'] ?> <?= $proj['border_color'] ?>">
+                                <i class="fa-solid <?= $proj['icon'] ?>"></i>
                             </div>
-                            
-                            <!-- Title & Desc -->
-                            <h3 class="text-2xl font-black text-gray-900 mb-3 tracking-tight group-hover:text-primary transition-colors"><?= $proj['title'] ?></h3>
-                            <p class="text-gray-500 text-xs leading-relaxed mb-10 opacity-80"><?= $proj['description'] ?></p>
+                            <div class="flex flex-wrap justify-end gap-1">
+                                <?php foreach($proj['badges'] as $b): ?>
+                                    <span class="proj-badge"><?= $b ?></span>
+                                <?php endforeach; ?>
+                            </div>
                         </div>
 
-                        <!-- Actions Grid -->
-                        <div class="flex gap-3">
+                        <!-- Title & description -->
+                        <h3 class="text-[15px] font-black text-gray-900 mb-1.5 leading-tight"><?= $proj['title'] ?></h3>
+                        <p class="text-[12px] text-gray-500 leading-relaxed mb-5 flex-1"><?= $proj['description'] ?></p>
+
+                        <!-- Actions -->
+                        <div class="flex gap-2 mt-auto">
                             <?php foreach($proj['actions'] as $act): ?>
-                                <a href="<?= $act['url'] ?>" class="flex-1 px-4 py-4 rounded-[20px] text-[10px] font-black uppercase tracking-widest text-center transition-all active:scale-95 
-                                    <?= $act['primary'] ? 'bg-primary text-white shadow-lg shadow-blue-200 hover:brightness-110' : 'bg-gray-100 text-gray-600 hover:bg-gray-200' ?>">
+                                <a href="<?= $act['url'] ?>" class="proj-action <?= $act['primary'] ? 'primary' : 'secondary' ?>">
+                                    <?php if($act['primary']): ?><i class="fa-solid fa-arrow-up-right-from-square mr-1.5 text-[10px]"></i><?php endif; ?>
                                     <?= $act['label'] ?>
                                 </a>
                             <?php endforeach; ?>
                         </div>
-
-                        <!-- Decoration Element -->
-                        <div class="absolute -top-10 -right-10 w-24 h-24 bg-gray-50 rounded-full opacity-50 blur-3xl group-hover:bg-primary/10 transition-all"></div>
                     </div>
-
                     <?php endforeach; ?>
                 </div>
             </section>
 
-            <!-- (Quick Action & Activity Feed - 4 of 12 columns) -->
-            <aside class="lg:col-span-4 space-y-10 animate-enter" style="animation-delay: 0.3s;">
-                
+            <!-- SIDEBAR (4/12) -->
+            <aside class="lg:col-span-4 flex flex-col gap-5 au d3">
+
+                <!-- Activity Feed -->
                 <div>
-                    <h2 class="text-xl font-black text-gray-900 tracking-tight flex items-center gap-3 mb-6">
-                        <i class="fa-solid fa-bolt-lightning text-accent"></i> Activity Center
-                    </h2>
-
-                    <div class="bg-white border border-gray-100 rounded-[40px] shadow-sm overflow-hidden p-3 shadow-xl shadow-gray-200/50">
-                        <div class="p-5 space-y-8">
-                            <?php if($recentActivity): ?>
-                                <?php foreach($recentActivity as $log): ?>
-                                    <div class="relative pl-7 border-l-2 border-primary/10 last:border-0 pb-6 group">
-                                        <div class="absolute -left-[5px] top-1 w-2.5 h-2.5 bg-blue-100 rounded-full group-hover:bg-primary transition-all duration-300 ring-4 ring-white"></div>
-                                        <div class="flex flex-col gap-1">
-                                            <div class="flex justify-between items-center mb-0.5">
-                                                <span class="text-[11px] font-black text-primary uppercase tracking-wider"><?= htmlspecialchars($log['action']) ?></span>
-                                                <span class="text-[9px] font-bold text-gray-400 uppercase tracking-tighter opacity-70"><?= date('H:i | d M', strtotime($log['created_at'])) ?></span>
-                                            </div>
-                                            <p class="text-[13px] font-black text-gray-900 leading-snug group-hover:text-blue-700 transition-colors"><?= htmlspecialchars($log['admin_name'] ?? 'System') ?></p>
-                                            <p class="text-[11px] font-medium text-gray-400 leading-relaxed italic"><?= htmlspecialchars($log['description']) ?></p>
-                                        </div>
+                    <div class="sec-title mb-4">
+                        Recent Activity
+                        <span class="ml-auto text-[10px] font-bold text-[#0052CC] bg-blue-50 px-2 py-0.5 rounded-md">LIVE</span>
+                    </div>
+                    <div class="feed-card">
+                        <?php if($recentActivity): ?>
+                            <?php foreach($recentActivity as $log): ?>
+                                <div class="feed-item">
+                                    <div class="feed-dot">
+                                        <i class="fa-solid fa-bolt text-[11px]"></i>
                                     </div>
-                                <?php endforeach; ?>
-                            <?php else: ?>
-                                <div class="text-center py-10 opacity-30">
-                                    <i class="fa-solid fa-ghost text-4xl mb-3"></i>
-                                    <p class="text-xs font-bold uppercase tracking-widest">Quiet in the hub...</p>
+                                    <div class="min-w-0 flex-1">
+                                        <div class="flex items-center justify-between gap-2 mb-0.5">
+                                            <span class="text-[10px] font-black text-[#0052CC] uppercase tracking-wider truncate"><?= htmlspecialchars($log['action']) ?></span>
+                                            <span class="text-[9px] text-gray-400 whitespace-nowrap"><?= date('d M H:i', strtotime($log['created_at'])) ?></span>
+                                        </div>
+                                        <p class="text-[12px] font-bold text-gray-800 leading-snug truncate"><?= htmlspecialchars($log['admin_name'] ?? 'System') ?></p>
+                                        <p class="text-[11px] text-gray-400 leading-snug mt-0.5 line-clamp-1"><?= htmlspecialchars($log['description']) ?></p>
+                                    </div>
                                 </div>
-                            <?php endif; ?>
-                        </div>
-
-                        <div class="bg-gray-50/50 p-5 text-center border-t border-gray-50 rounded-b-[40px]">
-                            <a href="../admin/activity_logs.php" class="text-[10px] font-black uppercase tracking-widest text-primary hover:underline transition-all underline-offset-4">View Operational Logs <i class="fa-solid fa-chevron-right ml-1"></i></a>
-                        </div>
+                            <?php endforeach; ?>
+                        <?php else: ?>
+                            <div class="py-12 text-center text-gray-300">
+                                <i class="fa-solid fa-ghost text-3xl mb-2 block"></i>
+                                <p class="text-[11px] font-bold uppercase tracking-widest">No activity yet</p>
+                            </div>
+                        <?php endif; ?>
+                        <a href="../admin/activity_logs.php"
+                           class="flex items-center justify-center gap-1.5 py-3 text-[10px] font-black text-[#0052CC] uppercase tracking-wider hover:bg-blue-50 transition-colors border-t border-gray-50">
+                            View all logs <i class="fa-solid fa-chevron-right text-[9px]"></i>
+                        </a>
                     </div>
                 </div>
 
-                <!-- QUICK SHORTCUTS -->
-                <div class="bg-primary bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] p-8 rounded-[40px] text-white shadow-2xl shadow-blue-200 relative overflow-hidden">
-                    <h4 class="text-lg font-black mb-4 relative z-10">System Shortcut</h4>
-                    <div class="space-y-3 relative z-10">
-                        <a href="users.php" class="flex items-center gap-3 p-3 bg-white/10 rounded-2xl hover:bg-white/20 transition-all text-sm font-bold border border-white/5">
-                            <i class="fa-solid fa-users w-5"></i> Users Center
+                <!-- Quick Shortcuts -->
+                <div class="shortcut-card au d4">
+                    <div class="text-xs font-black uppercase tracking-widest opacity-70 mb-1">Quick Access</div>
+                    <div class="font-black text-lg mb-4">System Shortcuts</div>
+                    <div class="space-y-2">
+                        <a href="users.php" class="shortcut-link">
+                            <i class="fa-solid fa-users"></i> Users Center
                         </a>
-                        <a href="../admin/campaigns.php" class="flex items-center gap-3 p-3 bg-white/10 rounded-2xl hover:bg-white/20 transition-all text-sm font-bold">
-                            <i class="fa-solid fa-plus w-5"></i> New Campaign
+                        <a href="../admin/campaigns.php" class="shortcut-link">
+                            <i class="fa-solid fa-bullhorn"></i> Campaign Manager
+                        </a>
+                        <a href="../admin/error_logs.php" class="shortcut-link">
+                            <i class="fa-solid fa-bug"></i> Error Logs
                         </a>
                     </div>
-                    <i class="fa-solid fa-screwdriver-wrench absolute -bottom-10 -right-10 text-9xl text-white/5 rotate-12"></i>
+                    <i class="fa-solid fa-screwdriver-wrench absolute -bottom-6 -right-6 text-[6rem] opacity-5 rotate-12 pointer-events-none"></i>
                 </div>
 
             </aside>
-        </main>
+        </div>
 
-        <!-- FOOTER & BRANDING -->
-        <footer class="pt-20 pb-10 text-center animate-enter" style="animation-delay: 0.5s;">
-            <div class="flex flex-col items-center gap-4 opacity-30">
-                <i class="fa-solid fa-shield-halved text-primary text-2xl"></i>
-                <p class="text-[10px] font-black uppercase tracking-[0.5em]">Central Command v3.0 Powered by Antigravity</p>
+        <!-- FOOTER -->
+        <footer class="pt-6 pb-4 text-center">
+            <div class="flex items-center justify-center gap-2 opacity-25">
+                <i class="fa-solid fa-shield-halved text-[#0052CC]"></i>
+                <span class="text-[10px] font-black uppercase tracking-[.4em]">Central Command v3.0 · RSU Healthcare</span>
             </div>
         </footer>
 
