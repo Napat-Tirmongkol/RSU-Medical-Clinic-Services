@@ -108,6 +108,12 @@ $layout_none = isset($_GET['layout']) && $_GET['layout'] === 'none';
                     </div>
                     <span class="text-sm">บันทึกกิจกรรมระบบ</span>
                 </a>
+                <a href="../admin/error_logs.php" class="flex items-center gap-3 p-3 rounded-xl <?= basename($_SERVER['PHP_SELF']) == 'error_logs.php' ? 'bg-red-50 text-red-600 font-bold shadow-sm' : 'text-gray-500 hover:bg-gray-50' ?> transition-all group">
+                    <div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 <?= basename($_SERVER['PHP_SELF']) == 'error_logs.php' ? 'bg-red-100' : 'bg-gray-50 group-hover:bg-red-50' ?> transition-colors">
+                        <i class="fa-solid fa-bug text-[13px]"></i>
+                    </div>
+                    <span class="text-sm">Error Logs</span>
+                </a>
             </div>
         </nav>
 
