@@ -2,7 +2,7 @@
 /**
  * includes/error_logger.php
  * Central error logging to sys_error_logs table.
- * Include this file once (via config.php) to auto-capture PHP errors/exceptions.
+ * Safe to include from any subfolder — loads its own DB connection if db() is unavailable.
  */
 declare(strict_types=1);
 
@@ -10,17 +10,28 @@ declare(strict_types=1);
 
 function log_error_to_db(
     string $message,
-    string $level   = 'error',   // error | warning | info
+    string $level   = 'error',
     string $source  = '',
     string $context = ''
 ): void {
     static $tableReady = false;
+    static $logPdo     = null;
 
     try {
-        $pdo = db();
+        // ใช้ db() ถ้ามี ไม่งั้นสร้าง connection ไปยัง main DB เอง
+        if ($logPdo === null) {
+            if (function_exists('db')) {
+                $logPdo = db();
+            } else {
+                $configPath = __DIR__ . '/../config/db_connect.php';
+                if (!file_exists($configPath)) return;
+                require_once $configPath;
+                $logPdo = db();
+            }
+        }
 
         if (!$tableReady) {
-            $pdo->exec("CREATE TABLE IF NOT EXISTS sys_error_logs (
+            $logPdo->exec("CREATE TABLE IF NOT EXISTS sys_error_logs (
                 id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
                 level      ENUM('error','warning','info') NOT NULL DEFAULT 'error',
                 source     VARCHAR(300)  NOT NULL DEFAULT '',
@@ -35,80 +46,74 @@ function log_error_to_db(
             $tableReady = true;
         }
 
-        // ตัด message ยาวเกินไป
         $message = mb_substr($message, 0, 5000);
         $context = mb_substr($context, 0, 2000);
         $source  = mb_substr($source,  0, 300);
 
-        $ip      = $_SERVER['REMOTE_ADDR'] ?? '';
-        $userId  = null;
+        $ip     = $_SERVER['REMOTE_ADDR'] ?? '';
+        $userId = null;
         if (session_status() === PHP_SESSION_ACTIVE) {
-            $userId = $_SESSION['admin_id']      ??
-                      $_SESSION['evax_student_id'] ??
-                      $_SESSION['user_id']          ?? null;
+            $userId = $_SESSION['admin_id']        ??
+                      $_SESSION['evax_student_id']  ??
+                      $_SESSION['user_id']           ??
+                      $_SESSION['student_id']        ?? null;
         }
 
-        $stmt = $pdo->prepare(
+        $logPdo->prepare(
             "INSERT INTO sys_error_logs (level, source, message, context, ip_address, user_id)
              VALUES (?, ?, ?, ?, ?, ?)"
-        );
-        $stmt->execute([$level, $source, $message, $context, $ip, $userId]);
+        )->execute([$level, $source, $message, $context, $ip, $userId]);
 
     } catch (Throwable) {
         // ไม่ทำอะไร — ป้องกัน infinite loop ถ้า DB เองมีปัญหา
     }
 }
 
-// ─── PHP error handler ────────────────────────────────────────────────────────
+// ─── ติดตั้ง handlers เพียงครั้งเดียว ────────────────────────────────────────
+if (!defined('_ERROR_LOGGER_HANDLERS_SET')) {
+    define('_ERROR_LOGGER_HANDLERS_SET', true);
 
-set_error_handler(function (int $errno, string $errstr, string $errfile, int $errline): bool {
-    // ละเว้น error ที่ถูก suppress ด้วย @ operator
-    if (!(error_reporting() & $errno)) {
+    set_error_handler(function (int $errno, string $errstr, string $errfile, int $errline): bool {
+        if (!(error_reporting() & $errno)) return false;
+
+        $levelMap = [
+            E_ERROR             => 'error',   E_WARNING           => 'warning',
+            E_NOTICE            => 'info',    E_USER_ERROR        => 'error',
+            E_USER_WARNING      => 'warning', E_USER_NOTICE       => 'info',
+            E_DEPRECATED        => 'info',    E_USER_DEPRECATED   => 'info',
+            E_RECOVERABLE_ERROR => 'error',
+        ];
+
+        log_error_to_db(
+            $errstr,
+            $levelMap[$errno] ?? 'warning',
+            basename($errfile) . ':' . $errline,
+            $errfile . ':' . $errline
+        );
         return false;
-    }
+    });
 
-    $levelMap = [
-        E_ERROR             => 'error',
-        E_WARNING           => 'warning',
-        E_NOTICE            => 'info',
-        E_USER_ERROR        => 'error',
-        E_USER_WARNING      => 'warning',
-        E_USER_NOTICE       => 'info',
-        E_DEPRECATED        => 'info',
-        E_USER_DEPRECATED   => 'info',
-        E_RECOVERABLE_ERROR => 'error',
-    ];
+    set_exception_handler(function (Throwable $e): void {
+        log_error_to_db(
+            get_class($e) . ': ' . $e->getMessage(),
+            'error',
+            basename($e->getFile()) . ':' . $e->getLine(),
+            $e->getFile() . ':' . $e->getLine() . "\n" . $e->getTraceAsString()
+        );
+        if (!headers_sent()) http_response_code(500);
+        echo '<p style="font-family:sans-serif;color:#c00;padding:2rem">เกิดข้อผิดพลาดภายในระบบ กรุณาลองใหม่อีกครั้ง</p>';
+    });
 
-    $level  = $levelMap[$errno] ?? 'warning';
-    $source = basename($errfile) . ':' . $errline;
+    register_shutdown_function(function (): void {
+        $err = error_get_last();
+        if ($err && in_array($err['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR], true)) {
+            log_error_to_db(
+                $err['message'], 'error',
+                basename($err['file']) . ':' . $err['line'],
+                $err['file'] . ':' . $err['line']
+            );
+        }
+    });
+}
 
-    log_error_to_db($errstr, $level, $source, $errfile . ':' . $errline);
 
-    // คืน false = ให้ PHP จัดการ error ปกติด้วย (แสดงบน screen ถ้า display_errors=On)
-    return false;
-});
-
-// ─── Uncaught exception handler ───────────────────────────────────────────────
-
-set_exception_handler(function (Throwable $e): void {
-    $source  = basename($e->getFile()) . ':' . $e->getLine();
-    $context = $e->getFile() . ':' . $e->getLine() . "\n" . $e->getTraceAsString();
-    log_error_to_db(get_class($e) . ': ' . $e->getMessage(), 'error', $source, $context);
-
-    // แสดง generic error แทน stack trace
-    if (!headers_sent()) {
-        http_response_code(500);
-    }
-    echo '<p style="font-family:sans-serif;color:#c00;padding:2rem">เกิดข้อผิดพลาดภายในระบบ กรุณาลองใหม่อีกครั้ง</p>';
-});
-
-// ─── Fatal error catcher (shutdown) ──────────────────────────────────────────
-
-register_shutdown_function(function (): void {
-    $err = error_get_last();
-    if ($err && in_array($err['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR], true)) {
-        $source  = basename($err['file']) . ':' . $err['line'];
-        $context = $err['file'] . ':' . $err['line'];
-        log_error_to_db($err['message'], 'error', $source, $context);
-    }
-});

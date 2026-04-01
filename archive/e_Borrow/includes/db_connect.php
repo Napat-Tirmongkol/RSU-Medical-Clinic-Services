@@ -32,4 +32,7 @@ try {
 
 // ��˹��ѵ�Ҥ�һ�Ѻ (�ҷ ��� �ѹ)
 define('FINE_RATE_PER_DAY', 10.00);
+
+// ─── Error Logger (main DB) ───────────────────────────────────────────────────
+require_once __DIR__ . '/../../../includes/error_logger.php';
 ?>
