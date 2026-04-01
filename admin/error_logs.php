@@ -41,6 +41,67 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'clear
     }
 }
 
+// ─── Export action ────────────────────────────────────────────────────────────
+$exportFormat = $_GET['export'] ?? '';
+if (in_array($exportFormat, ['csv', 'json'], true)) {
+    // ใช้ filter เดิม แต่ดึงข้อมูลทั้งหมด (ไม่ paginate)
+    $expSearch = trim($_GET['search'] ?? '');
+    $expLevel  = $_GET['level']  ?? '';
+    $expDate   = $_GET['date']   ?? '';
+
+    $expWhere  = "WHERE 1=1";
+    $expParams = [];
+    if ($expSearch !== '') {
+        $expWhere   .= " AND (message LIKE ? OR source LIKE ?)";
+        $expParams[] = "%$expSearch%";
+        $expParams[] = "%$expSearch%";
+    }
+    if (in_array($expLevel, ['error','warning','info'], true)) {
+        $expWhere   .= " AND level = ?";
+        $expParams[] = $expLevel;
+    }
+    if ($expDate !== '') {
+        $expWhere   .= " AND DATE(created_at) = ?";
+        $expParams[] = $expDate;
+    }
+
+    $expStmt = $pdo->prepare("SELECT id, level, source, message, context, ip_address, user_id, created_at FROM sys_error_logs $expWhere ORDER BY created_at DESC LIMIT 10000");
+    $expStmt->execute($expParams);
+    $expRows = $expStmt->fetchAll(PDO::FETCH_ASSOC);
+
+    $filename = 'error_logs_' . date('Ymd_His');
+
+    if ($exportFormat === 'csv') {
+        header('Content-Type: text/csv; charset=utf-8');
+        header("Content-Disposition: attachment; filename={$filename}.csv");
+        header('Cache-Control: no-cache');
+        $out = fopen('php://output', 'w');
+        fprintf($out, chr(0xEF).chr(0xBB).chr(0xBF)); // UTF-8 BOM สำหรับ Excel
+        fputcsv($out, ['ID','Level','Source','Message','Context','IP Address','User ID','Created At']);
+        foreach ($expRows as $r) {
+            fputcsv($out, [
+                $r['id'], $r['level'], $r['source'], $r['message'],
+                $r['context'], $r['ip_address'], $r['user_id'], $r['created_at']
+            ]);
+        }
+        fclose($out);
+        exit;
+    }
+
+    if ($exportFormat === 'json') {
+        header('Content-Type: application/json; charset=utf-8');
+        header("Content-Disposition: attachment; filename={$filename}.json");
+        header('Cache-Control: no-cache');
+        echo json_encode([
+            'exported_at' => date('Y-m-d H:i:s'),
+            'total'       => count($expRows),
+            'filters'     => ['search' => $expSearch, 'level' => $expLevel, 'date' => $expDate],
+            'logs'        => $expRows,
+        ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+}
+
 // ─── Filters ──────────────────────────────────────────────────────────────────
 $page        = max(1, (int)($_GET['page']   ?? 1));
 $limit       = 50;
@@ -216,6 +277,23 @@ renderPageHeader(
             <i class="fa-solid fa-xmark text-xs"></i> ล้าง
         </a>
         <?php endif; ?>
+
+        <!-- Export buttons -->
+        <div class="ml-auto flex gap-2">
+            <?php
+            $exportQs = http_build_query(array_filter([
+                'search' => $search, 'level' => $filterLevel, 'date' => $filterDate
+            ]));
+            ?>
+            <a href="error_logs.php?export=csv<?= $exportQs ? '&'.$exportQs : '' ?>"
+               class="px-4 py-2.5 bg-emerald-50 text-emerald-700 border border-emerald-200 text-sm font-bold rounded-xl hover:bg-emerald-100 transition-colors flex items-center gap-1.5">
+                <i class="fa-solid fa-file-csv text-sm"></i> Export CSV
+            </a>
+            <a href="error_logs.php?export=json<?= $exportQs ? '&'.$exportQs : '' ?>"
+               class="px-4 py-2.5 bg-violet-50 text-violet-700 border border-violet-200 text-sm font-bold rounded-xl hover:bg-violet-100 transition-colors flex items-center gap-1.5">
+                <i class="fa-solid fa-file-code text-sm"></i> Export JSON
+            </a>
+        </div>
     </form>
 </div>
 
