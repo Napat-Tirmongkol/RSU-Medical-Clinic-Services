@@ -87,6 +87,21 @@ $projects = [
             ['label' => 'Open System', 'url' => '../archive/e_Borrow/admin/index.php', 'primary' => true],
         ]
     ],
+    [
+        'id'            => 'system_logs',
+        'title'         => 'System Logs',
+        'description'   => 'ติดตาม Error Log และ Activity Log ของระบบแบบ Real-time เพื่อตรวจสอบและแก้ไขปัญหาได้ทันที',
+        'icon'          => 'fa-bug',
+        'bg_color'      => 'bg-red-50',
+        'icon_color'    => 'text-red-500',
+        'border_color'  => 'border-red-100',
+        'allowed_roles' => ['admin', 'superadmin'],
+        'badges'        => [ 'Monitoring', 'Debug' ],
+        'actions'       => [
+            ['label' => 'Error Logs',    'url' => '../admin/error_logs.php',    'primary' => true],
+            ['label' => 'Activity Logs', 'url' => '../admin/activity_logs.php', 'primary' => false],
+        ]
+    ],
     /**
      * ตัวอย่างการเพิ่มโปรเจกต์ในอนาคต:
      * เพียงแค่ก๊อปปี้บล็อกนี้แล้วเปลี่ยน URL/Icon ระบบจะวาดหน้า Layout ให้เองทันที
