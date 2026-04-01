@@ -39,6 +39,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             throw new Exception("ไม่สามารถลบอุปกรณ์ที่กำลังถูกยืมได้");
         }
 
+        // 1b. ตรวจสอบประวัติการยืม (FK constraint กับ borrow_records)
+        $stmt_check_records = $pdo->prepare("SELECT COUNT(*) FROM borrow_records WHERE equipment_id = ?");
+        $stmt_check_records->execute([$item_id]);
+        if ((int)$stmt_check_records->fetchColumn() > 0) {
+            throw new Exception("ไม่สามารถลบอุปกรณ์ได้ เนื่องจากมีประวัติการยืมที่เชื่อมโยงอยู่");
+        }
+
         // 2. ดำเนินการลบ
         $stmt_delete = $pdo->prepare("DELETE FROM borrow_items WHERE id = ?");
         $stmt_delete->execute([$item_id]);
