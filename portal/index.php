@@ -154,6 +154,13 @@ try {
 </head>
 <body class="font-sans text-gray-800" style="min-height:100vh">
 
+    <!-- Ambient background dots -->
+    <div class="amb-dot" style="width:320px;height:320px;background:rgba(0,82,204,.07);top:5%;left:10%;--dur:16s;--delay:0s;--dx:40px;--dy:-30px"></div>
+    <div class="amb-dot" style="width:240px;height:240px;background:rgba(255,171,0,.06);top:60%;right:8%;--dur:20s;--delay:-5s;--dx:-35px;--dy:25px"></div>
+    <div class="amb-dot" style="width:180px;height:180px;background:rgba(16,185,129,.05);bottom:15%;left:30%;--dur:13s;--delay:-8s;--dx:25px;--dy:30px"></div>
+    <div class="amb-dot" style="width:200px;height:200px;background:rgba(139,92,246,.05);top:35%;right:25%;--dur:17s;--delay:-3s;--dx:-20px;--dy:-25px"></div>
+    <div class="amb-dot" style="width:150px;height:150px;background:rgba(239,68,68,.04);top:80%;left:55%;--dur:22s;--delay:-11s;--dx:30px;--dy:-20px"></div>
+
     <!-- ══════════════════ HEADER ══════════════════ -->
     <header class="portal-header au">
         <div class="max-w-[1280px] mx-auto px-6 py-3 flex items-center justify-between gap-4">
@@ -195,7 +202,7 @@ try {
                 <div class="kpi-icon" style="background:#fffbeb; color:#d97706">
                     <i class="fa-solid fa-users"></i>
                 </div>
-                <div class="kpi-num text-gray-900"><?= number_format($kpis['users']) ?></div>
+                <div class="kpi-num text-gray-900" data-counter="<?= $kpis['users'] ?>">0</div>
                 <div class="kpi-label">Total Members</div>
             </div>
 
@@ -205,7 +212,7 @@ try {
                 <div class="kpi-icon" style="background:#eff6ff; color:#0052CC">
                     <i class="fa-solid fa-bullhorn"></i>
                 </div>
-                <div class="kpi-num text-gray-900"><?= $kpis['camps'] ?></div>
+                <div class="kpi-num text-gray-900" data-counter="<?= $kpis['camps'] ?>">0</div>
                 <div class="kpi-label">Active Campaigns</div>
             </div>
 
@@ -216,7 +223,7 @@ try {
                     <i class="fa-solid fa-clock-rotate-left"></i>
                 </div>
                 <div class="flex items-end gap-2">
-                    <div class="kpi-num text-gray-900"><?= $kpis['borrows'] ?></div>
+                    <div class="kpi-num text-gray-900" data-counter="<?= $kpis['borrows'] ?>">0</div>
                     <?php if($kpis['borrows'] > 0): ?>
                         <span class="mb-1 px-1.5 py-0.5 bg-red-500 text-white text-[8px] font-black rounded-md leading-none animate-pulse">URGENT</span>
                     <?php endif; ?>
@@ -242,10 +249,12 @@ try {
             <section class="lg:col-span-8 au d2">
                 <div class="sec-title mb-5">Project Command Grid</div>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                    <?php foreach($projects as $proj):
+                    <?php $cardIdx = 0; foreach($projects as $proj):
                         if (!in_array($adminRole, $proj['allowed_roles'])) continue;
+                        $cardDelay = round(0.1 + $cardIdx * 0.12, 2);
+                        $cardIdx++;
                     ?>
-                    <div class="proj-card">
+                    <div class="proj-card" style="animation-delay:<?= $cardDelay ?>s">
                         <!-- Card top row -->
                         <div class="flex items-start justify-between mb-4">
                             <div class="proj-card-icon <?= $proj['bg_color'] ?> <?= $proj['icon_color'] ?> <?= $proj['border_color'] ?>">
@@ -345,6 +354,52 @@ try {
         </footer>
 
     </div>
+
+<script>
+/* ── 1. KPI Number Counter ──────────────────────────────── */
+document.querySelectorAll('[data-counter]').forEach(el => {
+    const target = parseInt(el.dataset.counter, 10) || 0;
+    if (target === 0) { el.textContent = '0'; return; }
+    const duration = 1200;
+    const start = performance.now();
+    const easeOut = t => 1 - Math.pow(1 - t, 3);
+    function tick(now) {
+        const p = Math.min((now - start) / duration, 1);
+        el.textContent = Math.floor(easeOut(p) * target).toLocaleString();
+        if (p < 1) requestAnimationFrame(tick);
+        else el.textContent = target.toLocaleString();
+    }
+    requestAnimationFrame(tick);
+});
+
+/* ── 2. Ripple on buttons ──────────────────────────────── */
+document.querySelectorAll('.proj-action').forEach(btn => {
+    btn.addEventListener('click', function(e) {
+        const r = this.getBoundingClientRect();
+        const size = Math.max(r.width, r.height);
+        const el = document.createElement('span');
+        el.className = 'ripple-wave';
+        el.style.cssText = `width:${size}px;height:${size}px;left:${e.clientX-r.left-size/2}px;top:${e.clientY-r.top-size/2}px`;
+        this.appendChild(el);
+        el.addEventListener('animationend', () => el.remove());
+    });
+});
+
+/* ── 3. 3D Tilt on project cards ───────────────────────── */
+document.querySelectorAll('.proj-card').forEach(card => {
+    card.addEventListener('mousemove', function(e) {
+        const r = this.getBoundingClientRect();
+        const x = (e.clientX - r.left) / r.width  - .5;
+        const y = (e.clientY - r.top)  / r.height - .5;
+        this.style.transform = `translateY(-5px) rotateX(${-y*8}deg) rotateY(${x*8}deg)`;
+        this.style.transition = 'transform .1s ease';
+    });
+    card.addEventListener('mouseleave', function() {
+        this.style.transform = '';
+        this.style.transition = 'transform .4s ease, box-shadow .25s, border-color .25s';
+    });
+});
+</script>
 
 </body>
 </html>
