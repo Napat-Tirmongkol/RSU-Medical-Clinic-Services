@@ -6,6 +6,7 @@ require_once __DIR__ . '/includes/auth.php';
 $pdo = db();
 
 $activeCampaigns = $pdo->query("SELECT id, title FROM camp_list WHERE status = 'active' ORDER BY title ASC")->fetchAll();
+$allCampaigns    = $pdo->query("SELECT id, title FROM camp_list ORDER BY title ASC")->fetchAll();
 
 $colors = [
     ['bg' => 'bg-blue-50', 'border' => 'border-blue-100', 'text' => 'text-blue-700', 'badge' => 'text-blue-500'],
@@ -412,7 +413,8 @@ renderPageHeader("Campaign Time Slots", "กำหนดช่วงเวลา
                 <div class="flex justify-between items-center mb-2">
                     <div class="flex items-center gap-1.5">
                         <input type="checkbox" class="day-select-cb w-3.5 h-3.5 text-red-500 rounded border-gray-300 focus:ring-red-500 cursor-pointer opacity-40 hover:opacity-100 checked:opacity-100 transition-opacity" onchange="toggleDaySlots(this)" title="เลือกทั้งหมดในวันนี้">
-                        <span class="cal-date <?= $isToday ? 'today' : '' ?>"><?= $day ?></span>
+                        <span class="cal-date <?= $isToday ? 'today' : '' ?> <?= isset($calendarData[$currentDate]) ? 'cursor-pointer hover:ring-2 hover:ring-[#0052CC]/40' : '' ?>"
+                              <?= isset($calendarData[$currentDate]) ? "onclick=\"openDailyModal('{$currentDate}')\" title=\"ดูรอบวันนี้\"" : '' ?>><?= $day ?></span>
                     </div>
                     <button onclick="openAddSlotModal('<?= $currentDate ?>')" class="cal-add-btn" title="เพิ่มรอบ">
                         <i class="fa-solid fa-plus"></i>
@@ -665,7 +667,7 @@ renderPageHeader("Campaign Time Slots", "กำหนดช่วงเวลา
                 <label class="block text-sm font-semibold text-gray-700 mb-1">แคมเปญ <span class="text-red-500">*</span></label>
                 <div class="relative">
                     <select name="campaign_id" id="edit_campaign_id" required class="w-full px-4 py-2 border border-gray-200 rounded-xl font-prompt text-sm outline-none focus:ring-2 focus:ring-yellow-500 bg-gray-50 appearance-none pointer-events-none text-gray-500">
-                        <?php foreach ($activeCampaigns as $ac): ?>
+                        <?php foreach ($allCampaigns as $ac): ?>
                             <option value="<?= $ac['id'] ?>"><?= htmlspecialchars($ac['title']) ?></option>
                         <?php endforeach; ?>
                     </select>
@@ -1321,6 +1323,263 @@ function deleteSelectedSlots() {
                 Swal.fire('Error', 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้', 'error');
             });
         }
+    });
+}
+</script>
+
+<!-- ========================================================
+     DAILY SLOTS MODAL
+     ======================================================== -->
+<div id="dailyModal" class="fixed inset-0 z-[999] flex items-center justify-center p-4" style="display:none!important">
+    <div class="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" onclick="closeDailyModal()"></div>
+    <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col overflow-hidden animate-slide-up">
+
+        <!-- Header -->
+        <div class="modal-hdr-blue px-6 py-4 flex items-center justify-between shrink-0">
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center">
+                    <i class="fa-solid fa-calendar-day text-white"></i>
+                </div>
+                <div>
+                    <h3 class="text-white font-black text-lg leading-none" id="dailyModalTitle">รอบเวลาประจำวัน</h3>
+                    <p class="text-blue-100 text-xs mt-0.5" id="dailyModalSub"></p>
+                </div>
+            </div>
+            <button onclick="closeDailyModal()" class="w-8 h-8 bg-white/20 hover:bg-white/30 rounded-full flex items-center justify-center text-white transition-colors">
+                <i class="fa-solid fa-times"></i>
+            </button>
+        </div>
+
+        <!-- Body -->
+        <div class="overflow-y-auto flex-1 p-5" id="dailyModalBody">
+            <div class="flex items-center justify-center py-12 text-gray-400">
+                <i class="fa-solid fa-spinner fa-spin text-2xl mr-3 text-[#0052CC]"></i>
+                <span class="font-prompt">กำลังโหลด...</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let _dailyDate = '';
+
+function openDailyModal(date) {
+    _dailyDate = date;
+    const modal = document.getElementById('dailyModal');
+    modal.style.setProperty('display', 'flex', 'important');
+
+    // Format date for display
+    const d = new Date(date + 'T00:00:00');
+    const opts = { weekday:'long', year:'numeric', month:'long', day:'numeric' };
+    document.getElementById('dailyModalTitle').textContent = 'รอบเวลาประจำวัน';
+    document.getElementById('dailyModalSub').textContent   = d.toLocaleDateString('th-TH', opts);
+
+    loadDailySlots(date);
+}
+
+function closeDailyModal() {
+    document.getElementById('dailyModal').style.setProperty('display', 'none', 'important');
+}
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDailyModal(); });
+
+function loadDailySlots(date) {
+    document.getElementById('dailyModalBody').innerHTML = `
+        <div class="flex items-center justify-center py-12 text-gray-400">
+            <i class="fa-solid fa-spinner fa-spin text-2xl mr-3 text-[#0052CC]"></i>
+            <span class="font-prompt">กำลังโหลด...</span>
+        </div>`;
+
+    const fd = new FormData();
+    fd.append('action', 'get');
+    fd.append('date', date);
+    fd.append('csrf_token', '<?= get_csrf_token() ?>');
+
+    fetch('ajax_get_daily_slots.php', { method: 'POST', body: fd })
+    .then(r => r.json())
+    .then(data => {
+        if (data.status !== 'success') {
+            document.getElementById('dailyModalBody').innerHTML =
+                `<p class="text-center text-red-500 py-8 font-prompt">${data.message}</p>`;
+            return;
+        }
+        renderDailySlots(data.slots, date);
+    })
+    .catch(() => {
+        document.getElementById('dailyModalBody').innerHTML =
+            '<p class="text-center text-red-500 py-8 font-prompt">ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้</p>';
+    });
+}
+
+function renderDailySlots(slots, date) {
+    if (!slots.length) {
+        document.getElementById('dailyModalBody').innerHTML = `
+            <div class="text-center py-12">
+                <i class="fa-solid fa-calendar-xmark text-4xl text-gray-300 mb-3 block"></i>
+                <p class="text-gray-400 font-prompt">ไม่มีรอบเวลาในวันนี้</p>
+                <button onclick="openAddSlotModal('${date}'); closeDailyModal();"
+                    class="mt-4 px-5 py-2 bg-[#0052CC] text-white rounded-xl text-sm font-bold font-prompt hover:bg-blue-700 transition-colors">
+                    <i class="fa-solid fa-plus mr-1"></i> สร้างรอบเวลา
+                </button>
+            </div>`;
+        return;
+    }
+
+    let rows = slots.map(s => {
+        const pct     = s.max_capacity > 0 ? (s.booked_count / s.max_capacity) * 100 : 0;
+        const badgeSt = pct >= 100 ? 'background:#fee2e2;color:#b91c1c'
+                      : pct >= 80  ? 'background:#fef9c3;color:#a16207'
+                      :              'background:#dcfce7;color:#15803d';
+        const barClr  = pct >= 100 ? '#ef4444' : pct >= 80 ? '#facc15' : '#22c55e';
+
+        return `
+        <tr id="drow-${s.id}" class="border-b border-gray-50 hover:bg-gray-50/80 transition-colors">
+            <td class="px-4 py-3">
+                <span class="font-semibold text-gray-800 text-sm">${escHtml(s.campaign_title)}</span>
+            </td>
+            <td class="px-4 py-3">
+                <span class="font-black text-[#0052CC] bg-blue-50 px-2.5 py-1 rounded-lg text-xs">
+                    ${s.start_time.slice(0,5)} – ${s.end_time.slice(0,5)}
+                </span>
+            </td>
+            <td class="px-4 py-3">
+                <div class="flex items-center gap-2">
+                    <span class="text-xs font-bold rounded-full px-2.5 py-1" style="${badgeSt}">
+                        ${s.booked_count} / ${s.max_capacity}
+                    </span>
+                    <div style="width:60px;height:4px;background:#e5e7eb;border-radius:99px;overflow:hidden">
+                        <div style="width:${Math.min(pct,100)}%;height:100%;background:${barClr};border-radius:99px"></div>
+                    </div>
+                </div>
+            </td>
+            <td class="px-4 py-3 text-right">
+                <button onclick="dailyEditRow(${s.id},'${s.start_time.slice(0,5)}','${s.end_time.slice(0,5)}',${s.max_capacity})"
+                    class="w-8 h-8 rounded-lg bg-amber-50 border border-amber-100 text-amber-500 hover:bg-amber-500 hover:text-white transition-all mr-1" title="แก้ไข">
+                    <i class="fa-solid fa-pen text-xs"></i>
+                </button>
+                <button onclick="dailyDeleteSlot(${s.id},'${date}')"
+                    class="w-8 h-8 rounded-lg bg-red-50 border border-red-100 text-red-500 hover:bg-red-500 hover:text-white transition-all" title="ลบ">
+                    <i class="fa-solid fa-trash text-xs"></i>
+                </button>
+            </td>
+        </tr>`;
+    }).join('');
+
+    document.getElementById('dailyModalBody').innerHTML = `
+        <div class="flex justify-between items-center mb-4">
+            <p class="text-sm text-gray-500 font-prompt">พบ <b class="text-gray-800">${slots.length}</b> รอบเวลา</p>
+            <button onclick="openAddSlotModal('${date}'); closeDailyModal();"
+                class="px-4 py-1.5 bg-[#0052CC] text-white rounded-xl text-xs font-bold font-prompt hover:bg-blue-700 transition-colors flex items-center gap-1.5">
+                <i class="fa-solid fa-plus"></i> สร้างรอบเวลา
+            </button>
+        </div>
+        <div class="overflow-x-auto rounded-xl border border-gray-100">
+            <table class="w-full text-left">
+                <thead>
+                    <tr style="background:linear-gradient(135deg,#0052CC,#0070f3)">
+                        <th class="px-4 py-3 text-xs font-bold text-white/80 uppercase tracking-wider">แคมเปญ</th>
+                        <th class="px-4 py-3 text-xs font-bold text-white/80 uppercase tracking-wider">เวลา</th>
+                        <th class="px-4 py-3 text-xs font-bold text-white/80 uppercase tracking-wider">ยอดจอง</th>
+                        <th class="px-4 py-3 text-xs font-bold text-white/80 uppercase tracking-wider text-right">จัดการ</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white">${rows}</tbody>
+            </table>
+        </div>`;
+}
+
+function escHtml(str) {
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ---- Inline edit row ------------------------------------------------
+function dailyEditRow(id, start, end, cap) {
+    const row = document.getElementById('drow-' + id);
+    if (!row) return;
+    row.innerHTML = `
+        <td class="px-4 py-2" colspan="2">
+            <div class="flex gap-2 items-center flex-wrap">
+                <input type="time" id="de_start_${id}" value="${start}"
+                    class="border border-gray-200 rounded-lg px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-[#0052CC]">
+                <span class="text-gray-400 text-sm">–</span>
+                <input type="time" id="de_end_${id}" value="${end}"
+                    class="border border-gray-200 rounded-lg px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-[#0052CC]">
+                <input type="number" id="de_cap_${id}" value="${cap}" min="1"
+                    class="border border-gray-200 rounded-lg px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-[#0052CC] w-20"
+                    placeholder="ที่นั่ง">
+            </div>
+        </td>
+        <td class="px-4 py-2" colspan="2">
+            <div class="flex gap-2 justify-end">
+                <button onclick="dailySaveEdit(${id})"
+                    class="px-3 py-1.5 bg-[#0052CC] text-white rounded-lg text-xs font-bold hover:bg-blue-700 transition-colors font-prompt">
+                    <i class="fa-solid fa-save mr-1"></i>บันทึก
+                </button>
+                <button onclick="loadDailySlots('${_dailyDate}')"
+                    class="px-3 py-1.5 bg-gray-100 text-gray-600 rounded-lg text-xs font-bold hover:bg-gray-200 transition-colors font-prompt">
+                    ยกเลิก
+                </button>
+            </div>
+        </td>`;
+}
+
+function dailySaveEdit(id) {
+    const start = document.getElementById('de_start_' + id)?.value;
+    const end   = document.getElementById('de_end_'   + id)?.value;
+    const cap   = document.getElementById('de_cap_'   + id)?.value;
+
+    if (!start || !end || !cap) {
+        Swal.fire({ icon:'warning', title:'กรอกข้อมูลให้ครบ', confirmButtonColor:'#0052CC', customClass:{title:'font-prompt'} });
+        return;
+    }
+
+    const fd = new FormData();
+    fd.append('action', 'edit');
+    fd.append('slot_id', id);
+    fd.append('start_time', start);
+    fd.append('end_time', end);
+    fd.append('max_capacity', cap);
+    fd.append('csrf_token', '<?= get_csrf_token() ?>');
+
+    fetch('ajax_get_daily_slots.php', { method:'POST', body:fd })
+    .then(r => r.json())
+    .then(data => {
+        if (data.status === 'success') {
+            loadDailySlots(_dailyDate);
+        } else {
+            Swal.fire({ icon:'error', title:'เกิดข้อผิดพลาด', text:data.message, confirmButtonColor:'#ef4444', customClass:{title:'font-prompt',htmlContainer:'font-prompt'} });
+        }
+    });
+}
+
+function dailyDeleteSlot(id, date) {
+    Swal.fire({
+        icon: 'warning',
+        title: 'ยืนยันการลบ?',
+        text: 'รอบเวลานี้จะถูกลบถาวร (เฉพาะรอบที่ไม่มีผู้จอง)',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        cancelButtonColor: '#6b7280',
+        confirmButtonText: 'ลบเลย',
+        cancelButtonText: 'ยกเลิก',
+        customClass: { title:'font-prompt', htmlContainer:'font-prompt', confirmButton:'font-prompt', cancelButton:'font-prompt' }
+    }).then(r => {
+        if (!r.isConfirmed) return;
+
+        const fd = new FormData();
+        fd.append('action', 'delete');
+        fd.append('slot_id', id);
+        fd.append('csrf_token', '<?= get_csrf_token() ?>');
+
+        fetch('ajax_get_daily_slots.php', { method:'POST', body:fd })
+        .then(r => r.json())
+        .then(data => {
+            if (data.status === 'success') {
+                loadDailySlots(date);
+            } else {
+                Swal.fire({ icon:'error', title:'ลบไม่ได้', text:data.message, confirmButtonColor:'#ef4444', customClass:{title:'font-prompt',htmlContainer:'font-prompt'} });
+            }
+        });
     });
 }
 </script>
