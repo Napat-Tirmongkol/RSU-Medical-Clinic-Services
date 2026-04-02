@@ -246,7 +246,7 @@ renderPageHeader("System Governance", "Hub บริหารจัดการ:
 </div>
 
 <!-- Modal -->
-<div id="adminModal" class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+<div id="adminModal" class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm hidden flex items-center justify-center p-4" style="z-index:200">
     <div class="bg-white rounded-[32px] shadow-2xl w-full max-w-md overflow-hidden transform transition-all scale-95 opacity-0 duration-300 animate-in fade-in zoom-in-95">
         <form method="POST">
             <?php csrf_field(); ?>
