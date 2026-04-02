@@ -149,17 +149,6 @@ try {
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="stylesheet" href="../assets/css/tailwind.min.css">
     
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: { sans: ['Outfit', 'Prompt', 'sans-serif'], prompt: ['Prompt', 'sans-serif'] },
-                    colors: { primary: '#0052CC', secondary: '#0747A6', accent: '#FFAB00', surface: '#F8FAFC' }
-                }
-            }
-        }
-    </script>
-    
     <style>
         /* ── Base ─────────────────────────────────────────────── */
         *, *::before, *::after { box-sizing: border-box; }
