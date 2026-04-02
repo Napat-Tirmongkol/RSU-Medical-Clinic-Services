@@ -32,20 +32,10 @@ $layout_none = isset($_GET['layout']) && $_GET['layout'] === 'none';
     <title>Campaign Management - Admin</title>
 
     <link rel="icon" href="data:,">
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="../assets/css/tailwind.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     
-    <script>
-        if (window.console && window.console.log) {
-            const originalLog = console.log;
-            console.log = function() {
-                if (arguments[0] && typeof arguments[0] === 'string' && arguments[0].includes('cdn.tailwindcss.com')) return;
-                originalLog.apply(console, arguments);
-            };
-        }
-    </script>
-
-    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style> body { font-family: 'Prompt', sans-serif; } </style>
 </head>
 <body class="bg-gray-100 flex min-h-screen font-prompt <?= $layout_none ? 'flex-col' : '' ?>">

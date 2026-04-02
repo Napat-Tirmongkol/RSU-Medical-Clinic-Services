@@ -1,0 +1,20 @@
+{
+  "name": "rsu-healthcare-services",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build:css": "tailwindcss -i ./assets/css/tailwind.src.css -o ./assets/css/tailwind.min.css --minify",
+    "watch:css": "tailwindcss -i ./assets/css/tailwind.src.css -o ./assets/css/tailwind.min.css --watch"
+  },
+  "repository": {
+    "type": "git",
+    "url": "http://local_proxy@127.0.0.1:44233/git/Napat-Tirmongkol/RSU-Healthcare-Services"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "tailwindcss": "^3.4.19"
+  }
+}
