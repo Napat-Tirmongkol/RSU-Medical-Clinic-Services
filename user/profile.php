@@ -123,11 +123,17 @@ render_header('ข้อมูลส่วนตัว');
             class="w-full p-4 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0052CC] focus:border-transparent outline-none transition-all placeholder:text-gray-400 font-prompt" />
         </div>
         <div class="space-y-1.5">
-          <label class="text-sm font-semibold text-gray-700 font-prompt" for="email">อีเมล (สำหรับรับยืนยันการจอง) <span
-              class="text-red-500">*</span></label>
-          <input id="email" name="email" type="email" required value="<?= htmlspecialchars($userData['email']) ?>"
+          <label class="text-sm font-semibold text-gray-700 font-prompt" for="email">
+            อีเมล
+            <span class="text-gray-400 font-normal text-xs ml-1">(ไม่บังคับ)</span>
+          </label>
+          <input id="email" name="email" type="email" value="<?= htmlspecialchars($userData['email']) ?>"
             placeholder="example@email.com"
             class="w-full p-4 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0052CC] focus:border-transparent outline-none transition-all placeholder:text-gray-400 font-prompt" />
+          <p class="text-xs text-amber-600 flex items-start gap-1.5 mt-1 font-prompt">
+            <i class="fa-solid fa-triangle-exclamation shrink-0 mt-0.5"></i>
+            หากไม่กรอกอีเมล คุณจะไม่ได้รับการแจ้งเตือนยืนยันการจองและผลอนุมัติ
+          </p>
         </div>
         <div class="space-y-1.5">
           <label class="text-sm font-semibold text-gray-700 font-prompt" for="phone_number">เบอร์โทรศัพท์</label>

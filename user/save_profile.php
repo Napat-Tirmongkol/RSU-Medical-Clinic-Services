@@ -31,7 +31,7 @@ if ($status === '') {
     exit;
 }
 
-if ($fullName === '' || $citizenId === '' || $phoneNumber === '' || $email === '') {
+if ($fullName === '' || $citizenId === '' || $phoneNumber === '') {
     header('Location: profile.php?error=empty', true, 303);
     exit;
 }
