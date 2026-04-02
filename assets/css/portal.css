@@ -1,0 +1,186 @@
+/* ── Base ─────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+body {
+    background: #f4f6fb;
+    background-image:
+        radial-gradient(circle at 18% 12%, rgba(0,82,204,.06) 0, transparent 420px),
+        radial-gradient(circle at 85% 80%, rgba(255,171,0,.05) 0, transparent 380px);
+    min-height: 100vh;
+}
+
+/* ── Animations ───────────────────────────────────────── */
+@keyframes up { from { opacity:0; transform:translateY(18px); } to { opacity:1; transform:translateY(0); } }
+.au  { animation: up .5s cubic-bezier(.16,1,.3,1) both; }
+.d1  { animation-delay: .08s; }
+.d2  { animation-delay: .16s; }
+.d3  { animation-delay: .24s; }
+.d4  { animation-delay: .32s; }
+
+/* ── Header ───────────────────────────────────────────── */
+.portal-header {
+    background: #fff;
+    border-bottom: 1.5px solid #e8eef7;
+    box-shadow: 0 2px 12px rgba(0,82,204,.05);
+    position: sticky; top: 0; z-index: 40;
+}
+.brand-icon {
+    width: 44px; height: 44px;
+    background: linear-gradient(135deg, #0052CC 0%, #1a6fe8 100%);
+    border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 1.15rem;
+    box-shadow: 0 4px 12px rgba(0,82,204,.3);
+    flex-shrink: 0;
+}
+.user-pill {
+    display: flex; align-items: center; gap: 10px;
+    background: #f8fafc;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 99px;
+    padding: 6px 14px 6px 8px;
+}
+.user-avatar {
+    width: 30px; height: 30px;
+    background: linear-gradient(135deg,#0052CC,#1a6fe8);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: .7rem;
+}
+
+/* ── KPI cards ────────────────────────────────────────── */
+.kpi-card {
+    background: #fff;
+    border-radius: 18px;
+    padding: 22px 24px;
+    border: 1.5px solid #e8eef7;
+    box-shadow: 0 2px 8px rgba(0,0,0,.04);
+    position: relative; overflow: hidden;
+    transition: box-shadow .2s, transform .2s;
+}
+.kpi-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,82,204,.1); }
+.kpi-accent { position: absolute; top:0; left:0; right:0; height:3px; border-radius:18px 18px 0 0; }
+.kpi-icon {
+    width: 40px; height: 40px;
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: .95rem;
+    margin-bottom: 16px;
+}
+.kpi-num { font-size: 2rem; font-weight: 900; line-height: 1; margin-bottom: 4px; }
+.kpi-label { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .12em; color: #94a3b8; }
+
+/* ── Section heading ──────────────────────────────────── */
+.sec-title {
+    font-size: 1rem; font-weight: 900; color: #0f172a;
+    display: flex; align-items: center; gap: 10px;
+    letter-spacing: -.01em;
+}
+.sec-title::before {
+    content: '';
+    display: block;
+    width: 4px; height: 20px;
+    background: linear-gradient(180deg,#0052CC,#60a5fa);
+    border-radius: 99px;
+}
+
+/* ── Project cards ────────────────────────────────────── */
+.proj-card {
+    background: #fff;
+    border: 1.5px solid #e8eef7;
+    border-radius: 22px;
+    padding: 24px;
+    display: flex; flex-direction: column;
+    transition: box-shadow .25s, transform .25s, border-color .25s;
+    position: relative; overflow: hidden;
+}
+.proj-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 16px 40px rgba(0,82,204,.1);
+    border-color: rgba(0,82,204,.2);
+}
+.proj-card-icon {
+    width: 52px; height: 52px;
+    border-radius: 16px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.35rem;
+    flex-shrink: 0;
+    border-width: 1.5px; border-style: solid;
+    box-shadow: 0 2px 8px rgba(0,0,0,.07);
+    transition: transform .25s;
+}
+.proj-card:hover .proj-card-icon { transform: scale(1.08) rotate(-3deg); }
+.proj-badge {
+    font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: .1em;
+    padding: 3px 8px;
+    background: #f1f5f9; color: #64748b;
+    border-radius: 99px;
+    border: 1px solid #e2e8f0;
+}
+.proj-action {
+    display: flex; align-items: center; justify-content: center;
+    padding: 10px 14px;
+    border-radius: 12px;
+    font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em;
+    transition: all .18s ease;
+    flex: 1;
+    text-decoration: none;
+}
+.proj-action.primary {
+    background: linear-gradient(135deg,#0052CC,#1a6fe8);
+    color: #fff;
+    box-shadow: 0 4px 12px rgba(0,82,204,.25);
+}
+.proj-action.primary:hover { box-shadow: 0 6px 18px rgba(0,82,204,.4); filter:brightness(1.07); }
+.proj-action.secondary {
+    background: #f1f5f9; color: #475569;
+    border: 1.5px solid #e2e8f0;
+}
+.proj-action.secondary:hover { background: #e2e8f0; }
+
+/* ── Activity feed ────────────────────────────────────── */
+.feed-card {
+    background: #fff;
+    border: 1.5px solid #e8eef7;
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 2px 12px rgba(0,0,0,.04);
+}
+.feed-item {
+    padding: 14px 18px;
+    border-bottom: 1px solid #f1f5f9;
+    display: flex; gap: 12px; align-items: flex-start;
+}
+.feed-item:last-child { border-bottom: none; }
+.feed-dot {
+    width: 34px; height: 34px; border-radius: 10px;
+    background: #eff6ff; color: #0052CC;
+    display: flex; align-items: center; justify-content: center;
+    font-size: .7rem; flex-shrink: 0;
+}
+
+/* ── Shortcut card ────────────────────────────────────── */
+.shortcut-card {
+    background: linear-gradient(135deg, #0052CC 0%, #1a6fe8 100%);
+    border-radius: 20px;
+    padding: 22px;
+    color: #fff;
+    position: relative; overflow: hidden;
+    box-shadow: 0 8px 24px rgba(0,82,204,.3);
+}
+.shortcut-link {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 14px;
+    background: rgba(255,255,255,.12);
+    border-radius: 12px;
+    color: #fff; text-decoration: none;
+    font-size: .8rem; font-weight: 700;
+    border: 1px solid rgba(255,255,255,.1);
+    transition: background .18s;
+}
+.shortcut-link:hover { background: rgba(255,255,255,.22); }
+.shortcut-link i { width: 16px; text-align: center; opacity: .8; }
+
+/* ── Scrollbar ────────────────────────────────────────── */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 99px; }
