@@ -18,21 +18,30 @@ if (isset($_SESSION['evax_student_id'])) {
         $stmtCheck->execute([':sid' => $_SESSION['evax_student_id']]);
         $hasBooking = (int)$stmtCheck->fetchColumn() > 0;
 
-        // ถ้ามี invite_token ค้างอยู่ใน session ให้กลับไปหน้าแคมเปญนั้นก่อน
         $inviteToken = $_SESSION['invite_token'] ?? '';
-        unset($_SESSION['invite_token']);
+        $profileComplete = (
+            !empty($row['full_name']) &&
+            !empty($row['phone_number']) &&
+            !empty($row['status']) &&
+            !empty($row['email']) &&
+            ($row['status'] === 'other' || !empty($row['student_personnel_id']))
+        );
 
-        if ($hasBooking) {
+        if ($inviteToken !== '') {
+            if ($profileComplete) {
+                // โปรไฟล์ครบ → ไปหน้า campaign invite โดยตรง (ไม่สนใจ hasBooking)
+                unset($_SESSION['invite_token']);
+                header('Location: c.php?t=' . urlencode($inviteToken));
+            } else {
+                // โปรไฟล์ยังไม่ครบ → ไปกรอก profile ก่อน (เก็บ token ไว้ใน session)
+                // save_profile.php จะ redirect กลับ campaign หลังบันทึก
+                header('Location: profile.php');
+            }
+        } elseif ($hasBooking) {
             header('Location: my_bookings.php');
-        }
-        elseif (!empty($row['full_name']) &&
-                !empty($row['phone_number']) &&
-                !empty($row['status']) &&
-                !empty($row['email']) &&
-                ($row['status'] === 'other' || !empty($row['student_personnel_id']))) {
-            header('Location: ' . ($inviteToken !== '' ? 'c.php?t=' . urlencode($inviteToken) : 'booking_campaign.php'));
-        }
-        else {
+        } elseif ($profileComplete) {
+            header('Location: booking_campaign.php');
+        } else {
             header('Location: profile.php');
         }
         exit;

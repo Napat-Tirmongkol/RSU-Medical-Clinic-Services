@@ -101,9 +101,16 @@ try {
 
         session_regenerate_id(true); // ป้องกัน Session Fixation
 
+        // ตรวจสอบว่ามี invite_token ค้างอยู่หรือไม่ (มาจาก c.php?t=TOKEN)
+        $inviteToken = $_SESSION['invite_token'] ?? '';
+
         // Redirect ตามแอปที่ผู้ใช้มาจาก
         if ($redirectTarget === 'eborrow') {
             header("Location: ../e_Borrow/index.php");
+        } elseif ($inviteToken !== '') {
+            // มี invite token → ไปหน้า campaign นั้นโดยตรง ไม่ต้องผ่าน index
+            unset($_SESSION['invite_token']);
+            header("Location: ../../user/c.php?t=" . urlencode($inviteToken));
         } else {
             header("Location: ../../index.php");
         }
