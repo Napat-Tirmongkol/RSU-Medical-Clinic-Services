@@ -107,17 +107,25 @@ try {
     $stmtCheck->execute([':student_id' => $studentPkId]);
     $hasBooking = (int) $stmtCheck->fetchColumn() > 0;
 
-    // ถ้ามี redirect_back ที่ปลอดภัยให้ใช้
+    // ลำดับความสำคัญของ redirect:
+    // 1. redirect_back (แก้ไขโปรไฟล์จากหน้าใดหน้าหนึ่ง)
+    // 2. invite_token (มาจากลิงก์ campaign เฉพาะ)
+    // 3. hasBooking → my_bookings
+    // 4. default → booking_campaign
     $safeRedirectBack = '';
     if ($redirectBack !== '') {
-        // อนุญาตเฉพาะ relative path ภายใน user/ เท่านั้น
         if (preg_match('/^[a-zA-Z0-9_\-\.]+\.php(\?[^\s]*)?$/', $redirectBack)) {
             $safeRedirectBack = $redirectBack;
         }
     }
 
+    $inviteToken = $_SESSION['invite_token'] ?? '';
+    unset($_SESSION['invite_token']);
+
     if ($safeRedirectBack !== '') {
         header('Location: ' . $safeRedirectBack, true, 303);
+    } elseif ($inviteToken !== '') {
+        header('Location: c.php?t=' . urlencode($inviteToken), true, 303);
     } elseif ($hasBooking) {
         header('Location: my_bookings.php', true, 303);
     } else {
