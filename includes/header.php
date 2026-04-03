@@ -73,5 +73,41 @@ function render_header(string $title = 'E-Vax'): void {
       </div>
       
       <main class="w-full max-w-md h-full bg-white shadow-xl relative overflow-y-auto overflow-x-hidden custom-scrollbar">
+
+        <?php if ($isUserFolder && !in_array($currentPage, ['index.php', 'profile.php', 'save_profile.php', 'consent.php', 'logout.php'])): ?>
+        <div class="fixed top-3 right-3 z-50" style="right: max(12px, calc(50vw - 224px + 12px))">
+          <button onclick="document.getElementById('logoutConfirm').classList.remove('hidden')"
+            class="w-9 h-9 flex items-center justify-center rounded-full bg-white/80 backdrop-blur-sm border border-gray-200 text-gray-400 hover:text-red-500 hover:border-red-200 hover:bg-red-50 shadow-sm transition-all"
+            title="ออกจากระบบ">
+            <i class="fa-solid fa-right-from-bracket text-sm"></i>
+          </button>
+        </div>
+
+        <!-- Logout confirmation overlay -->
+        <div id="logoutConfirm" class="hidden fixed inset-0 z-[200] bg-black/40 backdrop-blur-sm flex items-end justify-center p-4"
+          onclick="if(event.target===this) this.classList.add('hidden')">
+          <div class="w-full max-w-md bg-white rounded-3xl p-6 shadow-2xl animate-in slide-in-from-bottom-4 duration-300">
+            <div class="flex items-center gap-3 mb-4">
+              <div class="w-11 h-11 bg-red-100 rounded-2xl flex items-center justify-center shrink-0">
+                <i class="fa-solid fa-right-from-bracket text-red-500 text-lg"></i>
+              </div>
+              <div>
+                <p class="font-black text-gray-900 text-base">ออกจากระบบ?</p>
+                <p class="text-xs text-gray-500 mt-0.5">คุณจะต้อง Login ผ่าน LINE ใหม่อีกครั้ง</p>
+              </div>
+            </div>
+            <div class="flex gap-3 mt-5">
+              <button onclick="document.getElementById('logoutConfirm').classList.add('hidden')"
+                class="flex-1 py-3 border-2 border-gray-200 rounded-2xl font-bold text-gray-600 hover:bg-gray-50 transition-all text-sm">
+                ยกเลิก
+              </button>
+              <a href="logout.php"
+                class="flex-1 py-3 bg-red-500 hover:bg-red-600 text-white rounded-2xl font-bold text-center transition-all text-sm shadow-md shadow-red-200 active:scale-[0.98]">
+                ออกจากระบบ
+              </a>
+            </div>
+          </div>
+        </div>
+        <?php endif; ?>
   <?php
 }
