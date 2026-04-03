@@ -73,11 +73,14 @@ $layout_none = isset($_GET['layout']) && $_GET['layout'] === 'none';
                     <a href="../admin/time_slots.php" class="flex items-center gap-3 p-3 rounded-xl <?= basename($_SERVER['PHP_SELF']) == 'time_slots.php' ? 'bg-blue-50 text-[#0052CC] font-semibold' : 'text-gray-600 hover:bg-gray-50' ?> transition-colors">
                         <i class="fa-solid fa-calendar-alt w-5 text-center"></i> จัดการรอบเวลาแคมเปญ
                     </a>
+                    <a href="../admin/campaign_overview.php" class="flex items-center gap-3 p-3 rounded-xl <?= basename($_SERVER['PHP_SELF']) == 'campaign_overview.php' ? 'bg-blue-50 text-[#0052CC] font-semibold' : 'text-gray-600 hover:bg-gray-50' ?> transition-colors">
+                        <i class="fa-solid fa-chart-bar w-5 text-center"></i> ภาพรวมแคมเปญ
+                    </a>
                     <a href="../admin/bookings.php" class="flex items-center gap-3 p-3 rounded-xl <?= basename($_SERVER['PHP_SELF']) == 'bookings.php' ? 'bg-blue-50 text-[#0052CC] font-semibold' : 'text-gray-600 hover:bg-gray-50' ?> transition-colors">
                         <i class="fa-solid fa-clipboard-check w-5 text-center"></i> รายชื่อผู้เข้าร่วมแคมเปญ
                     </a>
-					    <a href="../admin/reports.php" class="flex items-center gap-3 p-3 rounded-xl <?= basename($_SERVER['PHP_SELF']) == 'bookings.php' ? 'bg-blue-50 text-[#0052CC] font-semibold' : 'text-gray-600 hover:bg-gray-50' ?> transition-colors">
-                        <i class="fa-solid fa-clipboard-check w-5 text-center"></i> รายงาน/สถิติ
+                    <a href="../admin/reports.php" class="flex items-center gap-3 p-3 rounded-xl <?= basename($_SERVER['PHP_SELF']) == 'reports.php' ? 'bg-blue-50 text-[#0052CC] font-semibold' : 'text-gray-600 hover:bg-gray-50' ?> transition-colors">
+                        <i class="fa-solid fa-file-chart-column w-5 text-center"></i> รายงาน/สถิติ
                     </a>
                 </div>
             </div>
