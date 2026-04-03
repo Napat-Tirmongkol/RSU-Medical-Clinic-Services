@@ -110,6 +110,8 @@ $search      = trim($_GET['search']  ?? '');
 $filterLevel = $_GET['level']   ?? '';
 $filterDate  = $_GET['date']    ?? '';
 
+$filterSource = $_GET['source'] ?? ''; // 'js' หรือ 'php' หรือ ''
+
 $where  = "WHERE 1=1";
 $params = [];
 
@@ -125,6 +127,11 @@ if (in_array($filterLevel, ['error','warning','info'], true)) {
 if ($filterDate !== '') {
     $where   .= " AND DATE(created_at) = ?";
     $params[] = $filterDate;
+}
+if ($filterSource === 'js') {
+    $where   .= " AND source LIKE '[JS]%'";
+} elseif ($filterSource === 'php') {
+    $where   .= " AND source NOT LIKE '[JS]%'";
 }
 
 try {
@@ -267,11 +274,21 @@ renderPageHeader(
                 class="py-2.5 px-3 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400">
         </div>
 
+        <!-- Source: JS / PHP -->
+        <div>
+            <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 block">แหล่งที่มา</label>
+            <select name="source" class="py-2.5 px-3 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 bg-white">
+                <option value="">ทั้งหมด</option>
+                <option value="js"  <?= $filterSource==='js'  ? 'selected':'' ?>>🌐 JavaScript (Frontend)</option>
+                <option value="php" <?= $filterSource==='php' ? 'selected':'' ?>>🐘 PHP (Backend)</option>
+            </select>
+        </div>
+
         <button type="submit"
             class="px-5 py-2.5 bg-[#0052CC] text-white text-sm font-bold rounded-xl hover:bg-blue-700 transition-colors shadow-sm">
             <i class="fa-solid fa-filter mr-1"></i> กรอง
         </button>
-        <?php if ($search || $filterLevel || $filterDate): ?>
+        <?php if ($search || $filterLevel || $filterDate || $filterSource): ?>
         <a href="error_logs.php"
             class="px-4 py-2.5 bg-gray-100 text-gray-600 text-sm font-medium rounded-xl hover:bg-gray-200 transition-colors flex items-center gap-1">
             <i class="fa-solid fa-xmark text-xs"></i> ล้าง
