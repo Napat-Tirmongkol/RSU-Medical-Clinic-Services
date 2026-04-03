@@ -17,7 +17,7 @@ $layout_none = isset($_GET['layout']) && $_GET['layout'] === 'none';
                     </h1>
                     <p class="text-[11px] text-gray-400 font-black uppercase tracking-[0.25em] mt-3 ml-6 opacity-70">' . $subtitle . '</p>
                 </div>
-                <div class="flex flex-wrap gap-3 items-center ml-6 md:ml-0">
+                <div class="flex flex-wrap gap-3 items-center ml-6 md:ml-0" style="position:relative;z-index:100">
                     ' . $actions_html . '
                 </div>
             </div>';
@@ -32,20 +32,10 @@ $layout_none = isset($_GET['layout']) && $_GET['layout'] === 'none';
     <title>Campaign Management - Admin</title>
 
     <link rel="icon" href="data:,">
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="../assets/css/tailwind.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     
-    <script>
-        if (window.console && window.console.log) {
-            const originalLog = console.log;
-            console.log = function() {
-                if (arguments[0] && typeof arguments[0] === 'string' && arguments[0].includes('cdn.tailwindcss.com')) return;
-                originalLog.apply(console, arguments);
-            };
-        }
-    </script>
-
-    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style> body { font-family: 'Prompt', sans-serif; } </style>
 </head>
 <body class="bg-gray-100 flex min-h-screen font-prompt <?= $layout_none ? 'flex-col' : '' ?>">
@@ -107,6 +97,12 @@ $layout_none = isset($_GET['layout']) && $_GET['layout'] === 'none';
                         <i class="fa-solid fa-file-lines text-[13px]"></i>
                     </div>
                     <span class="text-sm">บันทึกกิจกรรมระบบ</span>
+                </a>
+                <a href="../admin/error_logs.php" class="flex items-center gap-3 p-3 rounded-xl <?= basename($_SERVER['PHP_SELF']) == 'error_logs.php' ? 'bg-red-50 text-red-600 font-bold shadow-sm' : 'text-gray-500 hover:bg-gray-50' ?> transition-all group">
+                    <div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 <?= basename($_SERVER['PHP_SELF']) == 'error_logs.php' ? 'bg-red-100' : 'bg-gray-50 group-hover:bg-red-50' ?> transition-colors">
+                        <i class="fa-solid fa-bug text-[13px]"></i>
+                    </div>
+                    <span class="text-sm">Error Logs</span>
                 </a>
             </div>
         </nav>

@@ -6,6 +6,7 @@ session_start();
 // ดึงการตั้งค่า LINE และเชื่อมต่อ Database ของระบบหลัก (Correct path to Root)
 require_once __DIR__ . '/line_config.php';
 require_once __DIR__ . '/../../config/db_connect.php';
+require_once __DIR__ . '/../../includes/error_logger.php';
 
 // ตรวจสอบว่า User จะไปหน้าไหนหลัง Login (e-campaign หรือ e_Borrow)
 $redirectTarget = $_SESSION['redirect_to'] ?? 'ecampaign';
@@ -109,11 +110,11 @@ try {
         exit;
 
     } else {
-        // ❌ ไม่พบ User — บันทึก LINE ID ชั่วคราวและส่งไปยืนยันตัวตน
-        $_SESSION['pending_line_id']  = $line_user_id;
-        $_SESSION['pending_redirect'] = $redirectTarget; // จำ app ที่ต้องการไว้
+        // ❌ ไม่พบ User — ผู้ใช้ใหม่ ให้กรอกข้อมูลส่วนตัวครั้งแรก
+        $_SESSION['line_user_id']      = $line_user_id;
+        $_SESSION['pending_redirect']  = $redirectTarget;
 
-        header("Location: ../user/link_account.php");
+        header("Location: ../../user/profile.php");
         exit;
     }
 

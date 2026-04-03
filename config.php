@@ -2,6 +2,11 @@
 // Bridge file: ป้องกันอดีตไฟล์ที่อ้างอิงถึง config.php เดิมพัง
 require_once __DIR__ . '/config/db_connect.php';
 require_once __DIR__ . '/includes/csrf.php';
+require_once __DIR__ . '/includes/error_logger.php';
+
+// ── Log Retention Settings ────────────────────────────────────────────────────
+defined('ERROR_LOG_RETENTION_DAYS')    || define('ERROR_LOG_RETENTION_DAYS',    30);  // วัน
+defined('ACTIVITY_LOG_RETENTION_DAYS') || define('ACTIVITY_LOG_RETENTION_DAYS', 90);  // วัน
 
 /**
  * 🛰️ ฟังก์ชันกลางสำหรับบันทึกกิจกรรมในระบบ (Activity Logging)
@@ -47,7 +52,7 @@ if (!function_exists('check_user_profile')) {
             $stmt->execute([':id' => $studentId]);
             $u = $stmt->fetch();
 
-            if (!$u || empty($u['email']) || empty($u['full_name']) || empty($u['phone_number']) || empty($u['status']) || ($u['status'] !== 'external' && empty($u['student_personnel_id']))) {
+            if (!$u || empty($u['full_name']) || empty($u['phone_number']) || empty($u['status']) || ($u['status'] !== 'other' && empty($u['student_personnel_id']))) {
                 header('Location: profile.php');
                 exit;
             }

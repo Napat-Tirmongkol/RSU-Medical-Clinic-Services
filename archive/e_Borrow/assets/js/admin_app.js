@@ -998,21 +998,28 @@ function openEditItemPopup(itemId) {
         });
 }
 
-function confirmDeleteItem(itemId, typeId) {
+function confirmDeleteItem(itemId, typeId, forceDelete = false) {
+    const title   = forceDelete ? "ยืนยันการลบพร้อมประวัติ?" : "คุณแน่ใจหรือไม่?";
+    const text    = forceDelete
+        ? "การดำเนินการนี้จะลบอุปกรณ์และประวัติการยืมทั้งหมดอย่างถาวร ไม่สามารถกู้คืนได้!"
+        : "คุณกำลังจะลบอุปกรณ์ชิ้นนี้ (ID: " + itemId + ") ออกจากระบบอย่างถาวร";
+    const confirmText = forceDelete ? "ลบทั้งหมดเลย" : "ใช่, ลบเลย";
+
     Swal.fire({
-        title: "คุณแน่ใจหรือไม่?",
-        text: "คุณกำลังจะลบอุปกรณ์ชิ้นนี้ (ID: " + itemId + ") ออกจากระบบอย่างถาวร",
+        title: title,
+        text: text,
         icon: "warning",
         showCancelButton: true,
         confirmButtonColor: "#d33",
         cancelButtonColor: "#3085d6",
-        confirmButtonText: "ใช่, ลบเลย",
+        confirmButtonText: confirmText,
         cancelButtonText: "ยกเลิก"
     }).then((result) => {
         if (result.isConfirmed) {
             const formData = new FormData();
             formData.append('item_id', itemId);
             formData.append('type_id', typeId);
+            if (forceDelete) formData.append('force_delete', '1');
 
             fetch('process/delete_item_process.php', {
                 method: 'POST',
@@ -1022,8 +1029,24 @@ function confirmDeleteItem(itemId, typeId) {
             .then(data => {
                 if (data.status === 'success') {
                     Swal.fire('ลบสำเร็จ!', data.message, 'success').then(() => {
-                         Swal.close();
-                         openManageItemsPopup(typeId);
+                        Swal.close();
+                        openManageItemsPopup(typeId);
+                    });
+                } else if (data.status === 'has_history') {
+                    // มีประวัติการยืม — ถามว่าจะ force delete ไหม
+                    Swal.fire({
+                        title: "พบประวัติการยืม!",
+                        text: data.message,
+                        icon: "warning",
+                        showCancelButton: true,
+                        confirmButtonColor: "#d33",
+                        cancelButtonColor: "#6c757d",
+                        confirmButtonText: "ลบทั้งหมด (รวมประวัติ)",
+                        cancelButtonText: "ยกเลิก"
+                    }).then((forceResult) => {
+                        if (forceResult.isConfirmed) {
+                            confirmDeleteItem(itemId, typeId, true);
+                        }
                     });
                 } else {
                     Swal.fire('เกิดข้อผิดพลาด!', data.message, 'error');

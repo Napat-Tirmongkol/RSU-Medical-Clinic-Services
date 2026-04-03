@@ -6,6 +6,7 @@ require_once __DIR__ . '/includes/auth.php';
 $pdo = db();
 
 $activeCampaigns = $pdo->query("SELECT id, title FROM camp_list WHERE status = 'active' ORDER BY title ASC")->fetchAll();
+$allCampaigns    = $pdo->query("SELECT id, title FROM camp_list ORDER BY title ASC")->fetchAll();
 
 $colors = [
     ['bg' => 'bg-blue-50', 'border' => 'border-blue-100', 'text' => 'text-blue-700', 'badge' => 'text-blue-500'],
@@ -191,11 +192,11 @@ $header_actions = '
     <i class="fa-solid fa-trash-can"></i> ลบที่เลือก (<span id="selectedSlotCount">0</span>)
 </button>
 <div class="relative" id="multiSelectContainer">
-    <button type="button" onclick="toggleMultiSelect()" class="px-4 py-2 border border-gray-200 rounded-xl bg-white font-prompt text-sm shadow-sm hover:bg-gray-50 text-gray-700 flex items-center justify-between w-56 transition-colors gap-2">
+    <button type="button" onclick="toggleMultiSelect(event)" class="px-4 py-2 border border-gray-200 rounded-xl bg-white font-prompt text-sm shadow-sm hover:bg-gray-50 text-gray-700 flex items-center justify-between w-56 transition-colors gap-2">
         <span id="multiSelectLabel" class="truncate font-semibold text-[#0052CC]">แสดงทุกแคมเปญ</span>
         <i class="fa-solid fa-chevron-down text-[10px] text-gray-400"></i>
     </button>
-    <div id="multiSelectDropdown" class="absolute z-50 mt-2 w-64 bg-white rounded-xl shadow-xl border border-gray-100 hidden flex flex-col top-full overflow-hidden right-0 origin-top-right transform transition-all">
+    <div id="multiSelectDropdown" class="w-64 bg-white rounded-xl shadow-xl border border-gray-100 flex-col overflow-hidden" style="display:none;position:fixed;z-index:9999" onclick="event.stopPropagation()">
         <div class="p-2 border-b border-gray-100 bg-gray-50">
             <div class="relative">
                 <i class="fa-solid fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
@@ -242,112 +243,234 @@ renderPageHeader("Campaign Time Slots", "กำหนดช่วงเวลา
 ?>
 
 <style>
-/* Animations & Glass Effects */
 @keyframes slideUpFade {
-    0% { opacity: 0; transform: translateY(15px); }
+    0%   { opacity: 0; transform: translateY(12px); }
     100% { opacity: 1; transform: translateY(0); }
 }
-.animate-slide-up { animation: slideUpFade 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-.delay-100 { animation-delay: 0.1s; }
+.animate-slide-up  { animation: slideUpFade .45s cubic-bezier(.16,1,.3,1) both; }
+.delay-100         { animation-delay: .08s; }
 
-.custom-scrollbar::-webkit-scrollbar { width: 6px; }
-.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-.custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
-.custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+/* ── Scrollbar ───────────────────────────────── */
+::-webkit-scrollbar       { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+.scrollbar-hide { scrollbar-width: none; }
+.scrollbar-hide::-webkit-scrollbar { display: none; }
 
-.glass-modal {
-    background: rgba(255, 255, 255, 0.98);
-    backdrop-filter: blur(16px);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+/* ── Calendar container ──────────────────────── */
+.cal-wrap {
+    background: #fff;
+    border-radius: 20px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.06), 0 4px 16px rgba(0,0,0,.04);
+    border: 1px solid #f0f2f5;
+    overflow: hidden;
 }
+
+/* ── Day-header row ──────────────────────────── */
+.cal-head {
+    background: linear-gradient(135deg, #0052CC 0%, #0070f3 100%);
+    color: #fff;
+    padding: 10px 0;
+    text-align: center;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+}
+.cal-head.sunday { color: #fca5a5; }
+
+/* ── Day cell ────────────────────────────────── */
+.cal-cell {
+    background: #fff;
+    min-height: 130px;
+    padding: 8px;
+    border-top: 1px solid #f0f2f5;
+    border-right: 1px solid #f0f2f5;
+    display: flex;
+    flex-direction: column;
+    transition: background .15s;
+    position: relative;
+}
+.cal-cell:hover { background: #f8faff; }
+.cal-cell.empty { background: #fafbfc; }
+
+/* ── Date number ─────────────────────────────── */
+.cal-date {
+    width: 26px; height: 26px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 700; border-radius: 50%;
+    color: #374151;
+    flex-shrink: 0;
+}
+.cal-date.today {
+    background: linear-gradient(135deg, #0052CC, #0070f3);
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(0,82,204,.35);
+}
+
+/* ── Add-slot hover button ───────────────────── */
+.cal-add-btn {
+    opacity: 0; transition: opacity .15s;
+    width: 24px; height: 24px;
+    background: #e8f0fe; color: #0052CC;
+    border-radius: 7px; border: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px;
+}
+.cal-cell:hover .cal-add-btn { opacity: 1; }
+
+/* ── Slot card inside cell ───────────────────── */
+.slot-card {
+    border-radius: 8px;
+    padding: 5px 7px;
+    margin-bottom: 4px;
+    border: 1px solid transparent;
+    position: relative;
+    transition: box-shadow .15s, transform .15s;
+    cursor: default;
+}
+.slot-card:hover {
+    box-shadow: 0 2px 8px rgba(0,0,0,.1);
+    transform: translateY(-1px);
+    z-index: 1;
+}
+.slot-card .slot-actions {
+    position: absolute; top: 4px; right: 4px;
+    display: none; gap: 3px;
+}
+.slot-card:hover .slot-actions { display: flex; }
+.slot-act-btn {
+    width: 18px; height: 18px;
+    border-radius: 5px; border: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 8px; transition: all .15s;
+}
+
+/* ── Capacity bar ────────────────────────────── */
+.cap-bar { height: 3px; border-radius: 99px; background: rgba(0,0,0,.08); overflow: hidden; margin: 3px 0; }
+.cap-bar-fill { height: 100%; border-radius: 99px; transition: width .3s; }
+
+/* ── Table ───────────────────────────────────── */
+.slots-table { width: 100%; border-collapse: separate; border-spacing: 0; }
+.slots-table thead th {
+    background: linear-gradient(135deg, #0052CC 0%, #0070f3 100%);
+    color: rgba(255,255,255,.85);
+    font-size: 11px; font-weight: 800;
+    letter-spacing: .08em; text-transform: uppercase;
+    padding: 14px 20px;
+}
+.slots-table thead th:first-child { border-radius: 14px 0 0 0; }
+.slots-table thead th:last-child  { border-radius: 0 14px 0 0; }
+.slots-table tbody tr { transition: background .12s; }
+.slots-table tbody tr:hover td { background: #f5f8ff; }
+.slots-table tbody td {
+    padding: 14px 20px;
+    border-bottom: 1px solid #f3f4f6;
+    font-size: 13.5px;
+    background: #fff;
+}
+
+/* ── Status badge ────────────────────────────── */
+.stat-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 4px 10px; border-radius: 99px;
+    font-size: 11px; font-weight: 700; white-space: nowrap;
+}
+
+/* ── Modal glass ─────────────────────────────── */
+.glass-modal {
+    background: #fff;
+    border: 1px solid rgba(255,255,255,.3);
+    box-shadow: 0 24px 48px -8px rgba(0,0,0,.2);
+}
+
+/* ── Modal header strips ─────────────────────── */
+.modal-hdr-blue   { background: linear-gradient(135deg,#0052CC,#0070f3); }
+.modal-hdr-amber  { background: linear-gradient(135deg,#f59e0b,#d97706); }
 </style>
 
 <div id="calendarViewContainer" class="animate-slide-up delay-100 mb-10">
-    <div class="bg-white rounded-t-3xl shadow-sm border border-gray-100 p-6">
-        <div class="grid grid-cols-7 gap-px bg-gray-200 border border-gray-200 rounded-xl overflow-hidden">
+    <div class="cal-wrap">
+        <div class="grid grid-cols-7">
         <?php
         $daysInMonth = cal_days_in_month(CAL_GREGORIAN, $month, $year);
         $firstDay = date('N', strtotime("$year-$month-01"));
         $weekdays = ['จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.', 'อา.'];
 
-        // หัวตารางวัน จ-อา
         foreach ($weekdays as $index => $day) {
-            $color = ($index == 6) ? 'text-red-500' : 'text-gray-500';
-            echo "<div class='bg-gray-50 p-3 text-center text-xs font-bold {$color} uppercase'>$day</div>";
+            $sunday = ($index == 6) ? 'sunday' : '';
+            echo "<div class='cal-head {$sunday}'>$day</div>";
         }
-        
-        // ช่องว่างก่อนเริ่มวันที่ 1
-        for ($i = 1; $i < $firstDay; $i++) echo "<div class='bg-gray-50/50 min-h-[120px]'></div>";
 
-        // วาดปฏิทิน
+        for ($i = 1; $i < $firstDay; $i++) echo "<div class='cal-cell empty'></div>";
+
         for ($day = 1; $day <= $daysInMonth; $day++) {
             $currentDate = "$year-" . str_pad($month, 2, '0', STR_PAD_LEFT) . "-" . str_pad($day, 2, '0', STR_PAD_LEFT);
             $isToday = $currentDate == date('Y-m-d');
             ?>
-            <div class="bg-white min-h-[120px] p-2 border-t hover:bg-gray-50 transition-colors group relative flex flex-col">
-                <div class="flex justify-between items-center mb-1">
-                    <div class="flex items-center gap-2">
-                        <!-- Checkbox สำหรับเลือก Time Slot ทั้งหมดใน วันนี้ -->
-                        <input type="checkbox" class="day-select-cb w-3.5 h-3.5 text-red-500 rounded border-gray-300 focus:ring-red-500 cursor-pointer transition-opacity opacity-50 hover:opacity-100 checked:opacity-100" onchange="toggleDaySlots(this)" title="เลือกทั้งหมดในวันนี้">
-                        <span class="text-sm font-bold <?= $isToday ? 'bg-[#0052CC] text-white w-7 h-7 flex items-center justify-center rounded-full' : 'text-gray-700' ?>"><?= $day ?></span>
+            <div class="cal-cell">
+                <div class="flex justify-between items-center mb-2">
+                    <div class="flex items-center gap-1.5">
+                        <input type="checkbox" class="day-select-cb w-3.5 h-3.5 text-red-500 rounded border-gray-300 focus:ring-red-500 cursor-pointer opacity-40 hover:opacity-100 checked:opacity-100 transition-opacity" onchange="toggleDaySlots(this)" title="เลือกทั้งหมดในวันนี้">
+                        <span class="cal-date <?= $isToday ? 'today' : '' ?> <?= isset($calendarData[$currentDate]) ? 'cursor-pointer hover:ring-2 hover:ring-[#0052CC]/40' : '' ?>"
+                              <?= isset($calendarData[$currentDate]) ? "onclick=\"openDailyModal('{$currentDate}')\" title=\"ดูรอบวันนี้\"" : '' ?>><?= $day ?></span>
                     </div>
-                    <button onclick="openAddSlotModal('<?= $currentDate ?>')" class="opacity-0 group-hover:opacity-100 text-[#0052CC] hover:bg-blue-100 w-7 h-7 rounded-lg transition-all" title="เพิ่มรอบในวันนี้">
+                    <button onclick="openAddSlotModal('<?= $currentDate ?>')" class="cal-add-btn" title="เพิ่มรอบ">
                         <i class="fa-solid fa-plus"></i>
                     </button>
                 </div>
-                
-                <div class="space-y-1 overflow-y-auto max-h-[100px] scrollbar-hide mt-1">
+
+                <div class="overflow-y-auto scrollbar-hide" style="max-height:110px">
                     <?php if (isset($calendarData[$currentDate])): ?>
-                        <?php foreach ($calendarData[$currentDate] as $s): 
-                            $cId = $s['campaign_id'] ?? 0;
-                            $cc = $campaignColors[$cId] ?? ['bg'=>'bg-gray-50', 'border'=>'border-gray-100', 'text'=>'text-gray-700', 'badge'=>'text-gray-500'];
-                            
-                            // คำนวณยอดการจอง
-                            $booked = (int)($s['booked_count'] ?? 0);
-                            $max = (int)$s['max_capacity'];
+                        <?php foreach ($calendarData[$currentDate] as $s):
+                            $cId   = $s['campaign_id'] ?? 0;
+                            $cc    = $campaignColors[$cId] ?? ['bg'=>'bg-gray-50','border'=>'border-gray-100','text'=>'text-gray-600','badge'=>'text-gray-500'];
+                            $booked  = (int)($s['booked_count'] ?? 0);
+                            $max     = (int)$s['max_capacity'];
                             $percent = $max > 0 ? ($booked / $max) * 100 : 0;
-                            
+
                             if ($percent >= 100) {
-                                $badgeClass = 'bg-red-100 text-red-700 border border-red-200';
-                                $icon = '<i class="fa-solid fa-user-times mr-0.5"></i>';
-                                $barColor = 'bg-red-500';
+                                $badgeCls = 'background:#fee2e2;color:#b91c1c';
+                                $barClr   = '#ef4444';
                             } elseif ($percent >= 80) {
-                                $badgeClass = 'bg-yellow-100 text-yellow-700 border border-yellow-200';
-                                $icon = '<i class="fa-solid fa-user-clock mr-0.5"></i>';
-                                $barColor = 'bg-yellow-400';
+                                $badgeCls = 'background:#fef9c3;color:#a16207';
+                                $barClr   = '#facc15';
                             } else {
-                                $badgeClass = 'bg-green-100 text-green-700 border border-green-200';
-                                $icon = '<i class="fa-solid fa-user-check mr-0.5"></i>';
-                                $barColor = 'bg-green-500';
+                                $badgeCls = 'background:#dcfce7;color:#15803d';
+                                $barClr   = '#22c55e';
                             }
                         ?>
-                            <div class="slot-item filter-camp-<?= $cId ?> text-[10px] p-1.5 <?= $cc['bg'] ?> <?= $cc['border'] ?> border rounded-md <?= $cc['text'] ?> leading-tight relative group/slot shadow-sm transition-all duration-300">
-                                <div class="flex justify-between items-start mb-0.5">
-                                    <div class="flex items-center gap-1.5 z-10">
-                                        <!-- Checkbox สำหรับเลือกรายการที่จะลบ -->
-                                        <input type="checkbox" value="<?= $s['id'] ?>" class="slot-select-cb calendar-slot-cb flex-shrink-0 w-3 h-3 text-red-500 rounded border-gray-300 focus:ring-red-500 cursor-pointer transition-opacity opacity-50 hover:opacity-100 checked:opacity-100" onchange="toggleSlotSelection(this)">
-                                        <b class="<?= $percent >= 100 ? 'line-through text-gray-500' : '' ?>"><?= substr($s['start_time'], 0, 5) ?></b>
-                                    </div>
-                                    <span class="px-1 py-0.5 rounded text-[9px] z-10 font-bold shadow-sm whitespace-nowrap <?= $badgeClass ?>" title="<?= $booked ?> จองแล้ว / <?= $max ?> รับได้">
-                                        <?= $icon ?><?= $booked ?>/<?= $max ?>
-                                    </span>
+                        <div class="slot-item slot-card filter-camp-<?= $cId ?> <?= $cc['bg'] ?> <?= $cc['text'] ?>"
+                             style="border-color: rgba(0,0,0,.06)">
+                            <div class="flex justify-between items-center">
+                                <div class="flex items-center gap-1.5">
+                                    <input type="checkbox" value="<?= $s['id'] ?>"
+                                        class="slot-select-cb calendar-slot-cb w-3 h-3 text-red-500 rounded border-gray-300 focus:ring-red-500 cursor-pointer opacity-40 hover:opacity-100 checked:opacity-100 transition-opacity flex-shrink-0"
+                                        onchange="toggleSlotSelection(this)">
+                                    <span class="text-[11px] font-black <?= $percent >= 100 ? 'line-through opacity-50' : '' ?>"><?= substr($s['start_time'], 0, 5) ?></span>
                                 </div>
-                                <div class="w-full bg-gray-200/50 rounded-full h-1 mt-0.5 mb-1 overflow-hidden">
-                                    <div class="h-1 rounded-full <?= $barColor ?> transition-all" style="width: <?= min($percent, 100) ?>%"></div>
-                                </div>
-                                <div class="truncate font-semibold text-[9px]" title="<?= htmlspecialchars($s['campaign_title']) ?>">
-                                    <?= htmlspecialchars($s['campaign_title']) ?>
-                                </div>
-                                <div class="absolute top-1 right-1 hidden group-hover/slot:flex gap-1">
-                                    <button onclick="openEditSlotModal(<?= $s['id'] ?>, <?= $cId ?>, '<?= substr($s['start_time'], 0, 5) ?>', '<?= substr($s['end_time'], 0, 5) ?>', <?= $s['max_capacity'] ?>)" class="w-4 h-4 bg-white flex items-center justify-center rounded text-yellow-500 hover:text-white hover:bg-yellow-500 shadow-sm transition-colors cursor-pointer" title="แก้ไข">
-                                        <i class="fa-solid fa-pen text-[8px]"></i>
-                                    </button>
-                                    <button onclick="deleteSlot(<?= $s['id'] ?>)" class="w-4 h-4 bg-white flex items-center justify-center rounded text-red-500 hover:text-white hover:bg-red-500 shadow-sm transition-colors cursor-pointer" title="ลบ">
-                                        <i class="fa-solid fa-times text-[8px]"></i>
-                                    </button>
-                                </div>
+                                <span class="text-[10px] font-bold rounded-full px-1.5 py-0.5" style="<?= $badgeCls ?>" title="<?= $booked ?>/<?= $max ?>">
+                                    +<?= $booked ?>/<?= $max ?>
+                                </span>
                             </div>
+                            <div class="cap-bar mt-1">
+                                <div class="cap-bar-fill" style="width:<?= min($percent,100) ?>%;background:<?= $barClr ?>"></div>
+                            </div>
+                            <div class="truncate text-[9px] font-semibold opacity-70 mt-0.5" title="<?= htmlspecialchars($s['campaign_title']) ?>">
+                                <?= htmlspecialchars($s['campaign_title']) ?>
+                            </div>
+                            <div class="slot-actions">
+                                <button onclick="openEditSlotModal(<?= $s['id'] ?>,<?= $cId ?>,'<?= substr($s['start_time'],0,5) ?>','<?= substr($s['end_time'],0,5) ?>',<?= $max ?>)"
+                                    class="slot-act-btn" style="background:#fef3c7;color:#d97706" title="แก้ไข">
+                                    <i class="fa-solid fa-pen"></i>
+                                </button>
+                                <button onclick="deleteSlot(<?= $s['id'] ?>)"
+                                    class="slot-act-btn" style="background:#fee2e2;color:#dc2626" title="ลบ">
+                                    <i class="fa-solid fa-times"></i>
+                                </button>
+                            </div>
+                        </div>
                         <?php endforeach; ?>
                     <?php endif; ?>
                 </div>
@@ -359,48 +482,54 @@ renderPageHeader("Campaign Time Slots", "กำหนดช่วงเวลา
     </div>
 </div>
 
-<div id="tableViewContainer" class="hidden bg-white rounded-3xl shadow-sm border border-gray-100 p-6 animate-slide-up delay-100 mb-10 overflow-hidden">
+<div id="tableViewContainer" class="hidden animate-slide-up delay-100 mb-10 overflow-hidden" style="background:#fff;border-radius:20px;box-shadow:0 1px 3px rgba(0,0,0,.06),0 4px 16px rgba(0,0,0,.04);border:1px solid #f0f2f5">
     <div class="overflow-x-auto">
-        <table id="slotsTable" class="w-full text-left border-collapse whitespace-nowrap">
-            <thead class="bg-gray-50/90 text-gray-600 font-bold border-b border-gray-100 uppercase tracking-wider text-[11px]">
+        <table id="slotsTable" class="slots-table">
+            <thead>
                 <tr>
-                    <th class="p-4 w-10 text-center" data-sortable="false">
-                        <input type="checkbox" id="selectAllTable" class="w-4 h-4 text-[#0052CC] rounded border-gray-300 focus:ring-[#0052CC] cursor-pointer" onchange="toggleAllTableSlots(this)">
+                    <th class="text-center w-10" data-sortable="false">
+                        <input type="checkbox" id="selectAllTable" class="w-4 h-4 rounded border-white/40 cursor-pointer" onchange="toggleAllTableSlots(this)">
                     </th>
-                    <th class="px-5 py-4"><i class="fa-regular fa-calendar mr-1"></i> วันที่</th>
-                    <th class="px-5 py-4"><i class="fa-regular fa-clock mr-1"></i> เวลา</th>
-                    <th class="px-5 py-4"><i class="fa-solid fa-bookmark mr-1"></i> แคมเปญ</th>
-                    <th class="px-5 py-4 text-center"><i class="fa-solid fa-users mr-1"></i> ยอดจอง</th>
-                    <th class="px-5 py-4 text-center"><i class="fa-solid fa-gear mr-1"></i> จัดการ</th>
+                    <th><i class="fa-regular fa-calendar mr-1.5 opacity-70"></i>วันที่</th>
+                    <th><i class="fa-regular fa-clock mr-1.5 opacity-70"></i>เวลา</th>
+                    <th><i class="fa-solid fa-bookmark mr-1.5 opacity-70"></i>แคมเปญ</th>
+                    <th class="text-center"><i class="fa-solid fa-users mr-1.5 opacity-70"></i>ยอดจอง</th>
+                    <th class="text-center"><i class="fa-solid fa-gear mr-1.5 opacity-70"></i>จัดการ</th>
                 </tr>
             </thead>
             <tbody class="text-sm">
-                <?php foreach ($slots as $s): 
-                    $booked = (int)($s['booked_count'] ?? 0);
-                    $max = (int)$s['max_capacity'];
+                <?php foreach ($slots as $s):
+                    $booked  = (int)($s['booked_count'] ?? 0);
+                    $max     = (int)$s['max_capacity'];
                     $percent = $max > 0 ? ($booked / $max) * 100 : 0;
-                    $badgeClass = $percent >= 100 ? 'bg-red-100 text-red-700' : ($percent >= 80 ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700');
+                    if ($percent >= 100)     { $badgeSt = 'background:#fee2e2;color:#b91c1c'; }
+                    elseif ($percent >= 80)  { $badgeSt = 'background:#fef9c3;color:#a16207'; }
+                    else                     { $badgeSt = 'background:#dcfce7;color:#15803d'; }
                     $dateObj = new DateTime($s['slot_date']);
                 ?>
-                <tr class="border-b border-gray-50 hover:bg-gray-50/80 transition-colors group" data-camp-id="<?= $s['campaign_id'] ?>">
-                    <td class="px-5 py-4 text-center">
+                <tr data-camp-id="<?= $s['campaign_id'] ?>">
+                    <td class="text-center">
                         <input type="checkbox" value="<?= $s['id'] ?>" class="slot-select-cb table-slot-cb w-4 h-4 text-[#0052CC] rounded border-gray-300 focus:ring-[#0052CC] cursor-pointer opacity-50 hover:opacity-100 checked:opacity-100 transition-opacity" onchange="toggleSlotSelection(this)">
                     </td>
-                    <td class="px-5 py-4 font-bold text-gray-800" data-sort="<?= $s['slot_date'] ?>"><?= $dateObj->format('d/m/Y') ?></td>
-                    <td class="px-5 py-4 font-black text-[#0052CC] bg-blue-50/10"><?= substr($s['start_time'], 0, 5) ?> - <?= substr($s['end_time'], 0, 5) ?></td>
-                    <td class="px-5 py-4 text-gray-600 font-bold"><?= htmlspecialchars($s['campaign_title']) ?></td>
-                    <td class="px-5 py-4 text-center" data-sort="<?= $percent ?>">
-                        <span class="px-3 py-1.5 rounded-md font-bold text-[11px] <?= $badgeClass ?> border border-current shadow-sm shadow-[currentcolor]/10">
-                            <?= $booked ?> / <?= $max ?>
-                        </span>
+                    <td data-sort="<?= $s['slot_date'] ?>">
+                        <span class="font-bold text-gray-800"><?= $dateObj->format('d/m/Y') ?></span>
                     </td>
-                    <td class="px-5 py-4 text-center">
+                    <td>
+                        <span class="font-black text-[#0052CC] bg-blue-50 px-2.5 py-1 rounded-lg text-[12px]"><?= substr($s['start_time'],0,5) ?> – <?= substr($s['end_time'],0,5) ?></span>
+                    </td>
+                    <td class="text-gray-600 font-medium max-w-[220px] truncate"><?= htmlspecialchars($s['campaign_title']) ?></td>
+                    <td class="text-center" data-sort="<?= $percent ?>">
+                        <span class="stat-badge" style="<?= $badgeSt ?>"><?= $booked ?> / <?= $max ?></span>
+                    </td>
+                    <td class="text-center">
                         <div class="flex items-center justify-center gap-2">
-                            <button onclick="openEditSlotModal(<?= $s['id'] ?>, <?= $s['campaign_id'] ?>, '<?= substr($s['start_time'], 0, 5) ?>', '<?= substr($s['end_time'], 0, 5) ?>', <?= $max ?>)" class="text-amber-500 hover:text-white bg-amber-50 border border-amber-100 hover:bg-amber-500 w-9 h-9 rounded-xl transition-all shadow-sm" title="แก้ไข">
-                                <i class="fa-solid fa-pen text-sm"></i>
+                            <button onclick="openEditSlotModal(<?= $s['id'] ?>,<?= $s['campaign_id'] ?>,'<?= substr($s['start_time'],0,5) ?>','<?= substr($s['end_time'],0,5) ?>',<?= $max ?>)"
+                                class="w-8 h-8 rounded-xl text-amber-500 bg-amber-50 border border-amber-100 hover:bg-amber-500 hover:text-white transition-all shadow-sm" title="แก้ไข">
+                                <i class="fa-solid fa-pen text-xs"></i>
                             </button>
-                            <button onclick="deleteSlot(<?= $s['id'] ?>)" class="text-red-500 hover:text-white bg-red-50 border border-red-100 hover:bg-red-500 w-9 h-9 rounded-xl transition-all shadow-sm" title="ลบ">
-                                <i class="fa-solid fa-trash text-sm"></i>
+                            <button onclick="deleteSlot(<?= $s['id'] ?>)"
+                                class="w-8 h-8 rounded-xl text-red-500 bg-red-50 border border-red-100 hover:bg-red-500 hover:text-white transition-all shadow-sm" title="ลบ">
+                                <i class="fa-solid fa-trash text-xs"></i>
                             </button>
                         </div>
                     </td>
@@ -413,12 +542,12 @@ renderPageHeader("Campaign Time Slots", "กำหนดช่วงเวลา
 
 <div id="slotModal" class="fixed inset-0 z-50 bg-gray-900/60 backdrop-blur-sm hidden flex items-center justify-center p-4">
     <div class="glass-modal rounded-[24px] w-full max-w-lg flex flex-col max-h-[90vh] overflow-hidden animate-slide-up border border-white/50">
-        <div class="p-6 border-b border-gray-100 flex justify-between items-center bg-white/50 shrink-0">
-            <h3 class="text-xl font-black text-[#0052CC] flex items-center gap-3">
-                <div class="w-10 h-10 bg-blue-100 text-[#0052CC] rounded-[14px] flex items-center justify-center text-lg shadow-inner"><i class="fa-solid fa-calendar-plus"></i></div>
+        <div class="modal-hdr-blue p-5 flex justify-between items-center shrink-0">
+            <h3 class="text-lg font-black text-white flex items-center gap-3">
+                <div class="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center"><i class="fa-solid fa-calendar-plus"></i></div>
                 สร้างรอบเวลาแคมเปญ
             </h3>
-            <button type="button" onclick="document.getElementById('slotModal').classList.add('hidden')" class="w-8 h-8 flex items-center justify-center bg-gray-100 text-gray-500 rounded-full hover:bg-gray-200 hover:text-gray-800 transition-colors shadow-sm focus:outline-none"><i class="fa-solid fa-times font-bold text-lg"></i></button>
+            <button type="button" onclick="document.getElementById('slotModal').classList.add('hidden')" class="w-8 h-8 flex items-center justify-center bg-white/20 text-white rounded-full hover:bg-white/30 transition-colors focus:outline-none"><i class="fa-solid fa-times"></i></button>
         </div>
         <form id="slotForm" class="flex flex-col flex-1 overflow-hidden">
             <input type="hidden" name="action" value="add_slot">
@@ -520,12 +649,12 @@ renderPageHeader("Campaign Time Slots", "กำหนดช่วงเวลา
 
 <div id="editSlotModal" class="fixed inset-0 z-50 bg-gray-900/60 backdrop-blur-sm hidden flex items-center justify-center p-4">
     <div class="glass-modal rounded-[24px] w-full max-w-lg flex flex-col max-h-[90vh] overflow-hidden animate-slide-up border border-white/50">
-        <div class="p-6 border-b border-gray-100 flex justify-between items-center bg-white/50 shrink-0">
-            <h3 class="text-xl font-black text-amber-600 flex items-center gap-3">
-                <div class="w-10 h-10 bg-amber-100 text-amber-600 rounded-[14px] flex items-center justify-center text-lg shadow-inner"><i class="fa-solid fa-pen-to-square"></i></div>
+        <div class="modal-hdr-amber p-5 flex justify-between items-center shrink-0">
+            <h3 class="text-lg font-black text-white flex items-center gap-3">
+                <div class="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center"><i class="fa-solid fa-pen-to-square"></i></div>
                 แก้ไขข้อมูลรอบเวลา
             </h3>
-            <button type="button" onclick="document.getElementById('editSlotModal').classList.add('hidden')" class="w-8 h-8 flex items-center justify-center bg-gray-100 text-gray-500 rounded-full hover:bg-gray-200 hover:text-gray-800 transition-colors shadow-sm focus:outline-none"><i class="fa-solid fa-times font-bold text-lg"></i></button>
+            <button type="button" onclick="document.getElementById('editSlotModal').classList.add('hidden')" class="w-8 h-8 flex items-center justify-center bg-white/20 text-white rounded-full hover:bg-white/30 transition-colors focus:outline-none"><i class="fa-solid fa-times"></i></button>
         </div>
         <form id="editSlotForm" class="flex flex-col flex-1 overflow-hidden">
             <input type="hidden" name="action" value="edit_slot">
@@ -538,7 +667,7 @@ renderPageHeader("Campaign Time Slots", "กำหนดช่วงเวลา
                 <label class="block text-sm font-semibold text-gray-700 mb-1">แคมเปญ <span class="text-red-500">*</span></label>
                 <div class="relative">
                     <select name="campaign_id" id="edit_campaign_id" required class="w-full px-4 py-2 border border-gray-200 rounded-xl font-prompt text-sm outline-none focus:ring-2 focus:ring-yellow-500 bg-gray-50 appearance-none pointer-events-none text-gray-500">
-                        <?php foreach ($activeCampaigns as $ac): ?>
+                        <?php foreach ($allCampaigns as $ac): ?>
                             <option value="<?= $ac['id'] ?>"><?= htmlspecialchars($ac['title']) ?></option>
                         <?php endforeach; ?>
                     </select>
@@ -658,12 +787,17 @@ function switchView(view) {
 }
 
 // ฟังก์ชันปิด/เปิด Dropdown และ Multi-Select Logic
-function toggleMultiSelect() {
+function toggleMultiSelect(e) {
+    if (e) e.stopPropagation();
     const dropdown = document.getElementById('multiSelectDropdown');
-    if (dropdown.classList.contains('hidden')) {
-        dropdown.classList.remove('hidden');
+    if (dropdown.style.display === 'none' || dropdown.style.display === '') {
+        const btn = document.querySelector('#multiSelectContainer button');
+        const rect = btn.getBoundingClientRect();
+        dropdown.style.top  = (rect.bottom + 8) + 'px';
+        dropdown.style.right = (window.innerWidth - rect.right) + 'px';
+        dropdown.style.display = 'flex';
     } else {
-        dropdown.classList.add('hidden');
+        dropdown.style.display = 'none';
     }
 }
 
@@ -671,7 +805,7 @@ function toggleMultiSelect() {
 document.addEventListener('click', function(event) {
     const container = document.getElementById('multiSelectContainer');
     if (container && !container.contains(event.target)) {
-        document.getElementById('multiSelectDropdown').classList.add('hidden');
+        document.getElementById('multiSelectDropdown').style.display = 'none';
     }
 });
 
@@ -932,7 +1066,7 @@ function toggleAllTableSlots(masterCb) {
 
 // เลือกลบทั้งวัน (จากมุมมองปฏิทิน)
 function toggleDaySlots(dayCheckbox) {
-    const dayContainer = dayCheckbox.closest('.group');
+    const dayContainer = dayCheckbox.closest('.cal-cell');
     const slotsCb = dayContainer.querySelectorAll('.calendar-slot-cb');
     const isChecked = dayCheckbox.checked;
 
@@ -1190,6 +1324,265 @@ function deleteSelectedSlots() {
                 Swal.fire('Error', 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้', 'error');
             });
         }
+    });
+}
+</script>
+
+<!-- ========================================================
+     DAILY SLOTS MODAL
+     ======================================================== -->
+<div id="dailyModal" class="fixed inset-0 flex items-center justify-center p-4" style="display:none;z-index:9999">
+    <div class="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" onclick="closeDailyModal()"></div>
+    <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col overflow-hidden animate-slide-up">
+
+        <!-- Header -->
+        <div class="modal-hdr-blue px-6 py-4 flex items-center justify-between shrink-0">
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center">
+                    <i class="fa-solid fa-calendar-day text-white"></i>
+                </div>
+                <div>
+                    <h3 class="text-white font-black text-lg leading-none" id="dailyModalTitle">รอบเวลาประจำวัน</h3>
+                    <p class="text-blue-100 text-xs mt-0.5" id="dailyModalSub"></p>
+                </div>
+            </div>
+            <button onclick="closeDailyModal()" class="w-8 h-8 bg-white/20 hover:bg-white/30 rounded-full flex items-center justify-center text-white transition-colors">
+                <i class="fa-solid fa-times"></i>
+            </button>
+        </div>
+
+        <!-- Body -->
+        <div class="overflow-y-auto flex-1 p-5" id="dailyModalBody">
+            <div class="flex items-center justify-center py-12 text-gray-400">
+                <i class="fa-solid fa-spinner fa-spin text-2xl mr-3 text-[#0052CC]"></i>
+                <span class="font-prompt">กำลังโหลด...</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let _dailyDate = '';
+
+function openDailyModal(date) {
+    _dailyDate = date;
+    const modal = document.getElementById('dailyModal');
+    modal.style.display = 'flex';
+
+    // Format date for display
+    const d = new Date(date + 'T00:00:00');
+    const opts = { weekday:'long', year:'numeric', month:'long', day:'numeric' };
+    document.getElementById('dailyModalTitle').textContent = 'รอบเวลาประจำวัน';
+    document.getElementById('dailyModalSub').textContent   = d.toLocaleDateString('th-TH', opts);
+
+    loadDailySlots(date);
+}
+
+function closeDailyModal() {
+    document.getElementById('dailyModal').style.display = 'none';
+}
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDailyModal(); });
+
+function loadDailySlots(date) {
+    document.getElementById('dailyModalBody').innerHTML = `
+        <div class="flex items-center justify-center py-12 text-gray-400">
+            <i class="fa-solid fa-spinner fa-spin text-2xl mr-3 text-[#0052CC]"></i>
+            <span class="font-prompt">กำลังโหลด...</span>
+        </div>`;
+
+    const fd = new FormData();
+    fd.append('action', 'get');
+    fd.append('date', date);
+    fd.append('csrf_token', '<?= get_csrf_token() ?>');
+
+    fetch('ajax_get_daily_slots.php', { method: 'POST', body: fd })
+    .then(r => r.json())
+    .then(data => {
+        if (data.status !== 'success') {
+            document.getElementById('dailyModalBody').innerHTML =
+                `<p class="text-center text-red-500 py-8 font-prompt">${data.message}</p>`;
+            return;
+        }
+        renderDailySlots(data.slots, date);
+    })
+    .catch(() => {
+        document.getElementById('dailyModalBody').innerHTML =
+            '<p class="text-center text-red-500 py-8 font-prompt">ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้</p>';
+    });
+}
+
+function renderDailySlots(slots, date) {
+    if (!slots.length) {
+        document.getElementById('dailyModalBody').innerHTML = `
+            <div class="text-center py-12">
+                <i class="fa-solid fa-calendar-xmark text-4xl text-gray-300 mb-3 block"></i>
+                <p class="text-gray-400 font-prompt">ไม่มีรอบเวลาในวันนี้</p>
+                <button onclick="openAddSlotModal('${date}'); closeDailyModal();"
+                    class="mt-4 px-5 py-2 bg-[#0052CC] text-white rounded-xl text-sm font-bold font-prompt hover:bg-blue-700 transition-colors">
+                    <i class="fa-solid fa-plus mr-1"></i> สร้างรอบเวลา
+                </button>
+            </div>`;
+        return;
+    }
+
+    let rows = slots.map(s => {
+        const pct     = s.max_capacity > 0 ? (s.booked_count / s.max_capacity) * 100 : 0;
+        const badgeSt = pct >= 100 ? 'background:#fee2e2;color:#b91c1c'
+                      : pct >= 80  ? 'background:#fef9c3;color:#a16207'
+                      :              'background:#dcfce7;color:#15803d';
+        const barClr  = pct >= 100 ? '#ef4444' : pct >= 80 ? '#facc15' : '#22c55e';
+
+        return `
+        <tr id="drow-${s.id}" class="border-b border-gray-50 hover:bg-gray-50/80 transition-colors">
+            <td class="px-4 py-3">
+                <span class="font-semibold text-gray-800 text-sm">${escHtml(s.campaign_title)}</span>
+            </td>
+            <td class="px-4 py-3" style="white-space:nowrap">
+                <span class="font-black text-[#0052CC] bg-blue-50 px-2.5 py-1 rounded-lg text-xs" style="white-space:nowrap;display:inline-block">
+                    ${s.start_time.slice(0,5)} – ${s.end_time.slice(0,5)}
+                </span>
+            </td>
+            <td class="px-4 py-3" style="white-space:nowrap">
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:nowrap">
+                    <span class="text-xs font-bold rounded-full px-2.5 py-1" style="${badgeSt};white-space:nowrap;display:inline-block">
+                        ${s.booked_count} / ${s.max_capacity}
+                    </span>
+                    <div style="width:60px;min-width:60px;height:4px;background:#e5e7eb;border-radius:99px;overflow:hidden">
+                        <div style="width:${Math.min(pct,100)}%;height:100%;background:${barClr};border-radius:99px"></div>
+                    </div>
+                </div>
+            </td>
+            <td class="px-4 py-3" style="white-space:nowrap">
+                <div style="display:flex;gap:4px;justify-content:flex-end;align-items:center">
+                    <button onclick="dailyEditRow(${s.id},'${s.start_time.slice(0,5)}','${s.end_time.slice(0,5)}',${s.max_capacity})"
+                        class="w-8 h-8 rounded-lg bg-amber-50 border border-amber-100 text-amber-500 hover:bg-amber-500 hover:text-white transition-all" title="แก้ไข" style="flex-shrink:0">
+                        <i class="fa-solid fa-pen text-xs"></i>
+                    </button>
+                    <button onclick="dailyDeleteSlot(${s.id},'${date}')"
+                        class="w-8 h-8 rounded-lg bg-red-50 border border-red-100 text-red-500 hover:bg-red-500 hover:text-white transition-all" title="ลบ" style="flex-shrink:0">
+                        <i class="fa-solid fa-trash text-xs"></i>
+                    </button>
+                </div>
+            </td>
+        </tr>`;
+    }).join('');
+
+    document.getElementById('dailyModalBody').innerHTML = `
+        <div class="flex justify-between items-center mb-4">
+            <p class="text-sm text-gray-500 font-prompt">พบ <b class="text-gray-800">${slots.length}</b> รอบเวลา</p>
+            <button onclick="openAddSlotModal('${date}'); closeDailyModal();"
+                class="px-4 py-1.5 bg-[#0052CC] text-white rounded-xl text-xs font-bold font-prompt hover:bg-blue-700 transition-colors flex items-center gap-1.5">
+                <i class="fa-solid fa-plus"></i> สร้างรอบเวลา
+            </button>
+        </div>
+        <div class="overflow-x-auto rounded-xl border border-gray-100">
+            <table class="w-full text-left">
+                <thead>
+                    <tr style="background:linear-gradient(135deg,#0052CC,#0070f3)">
+                        <th class="px-4 py-3 text-xs font-bold text-white/80 uppercase tracking-wider">แคมเปญ</th>
+                        <th class="px-4 py-3 text-xs font-bold text-white/80 uppercase tracking-wider" style="white-space:nowrap;width:120px">เวลา</th>
+                        <th class="px-4 py-3 text-xs font-bold text-white/80 uppercase tracking-wider" style="white-space:nowrap;width:160px">ยอดจอง</th>
+                        <th class="px-4 py-3 text-xs font-bold text-white/80 uppercase tracking-wider text-right" style="white-space:nowrap;width:90px">จัดการ</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white">${rows}</tbody>
+            </table>
+        </div>`;
+}
+
+function escHtml(str) {
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ---- Inline edit row ------------------------------------------------
+function dailyEditRow(id, start, end, cap) {
+    const row = document.getElementById('drow-' + id);
+    if (!row) return;
+    row.innerHTML = `
+        <td class="px-4 py-2" colspan="2">
+            <div class="flex gap-2 items-center flex-wrap">
+                <input type="time" id="de_start_${id}" value="${start}"
+                    class="border border-gray-200 rounded-lg px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-[#0052CC]">
+                <span class="text-gray-400 text-sm">–</span>
+                <input type="time" id="de_end_${id}" value="${end}"
+                    class="border border-gray-200 rounded-lg px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-[#0052CC]">
+                <input type="number" id="de_cap_${id}" value="${cap}" min="1"
+                    class="border border-gray-200 rounded-lg px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-[#0052CC] w-20"
+                    placeholder="ที่นั่ง">
+            </div>
+        </td>
+        <td class="px-4 py-2" colspan="2">
+            <div class="flex gap-2 justify-end">
+                <button onclick="dailySaveEdit(${id})"
+                    class="px-3 py-1.5 bg-[#0052CC] text-white rounded-lg text-xs font-bold hover:bg-blue-700 transition-colors font-prompt">
+                    <i class="fa-solid fa-save mr-1"></i>บันทึก
+                </button>
+                <button onclick="loadDailySlots('${_dailyDate}')"
+                    class="px-3 py-1.5 bg-gray-100 text-gray-600 rounded-lg text-xs font-bold hover:bg-gray-200 transition-colors font-prompt">
+                    ยกเลิก
+                </button>
+            </div>
+        </td>`;
+}
+
+function dailySaveEdit(id) {
+    const start = document.getElementById('de_start_' + id)?.value;
+    const end   = document.getElementById('de_end_'   + id)?.value;
+    const cap   = document.getElementById('de_cap_'   + id)?.value;
+
+    if (!start || !end || !cap) {
+        Swal.fire({ icon:'warning', title:'กรอกข้อมูลให้ครบ', confirmButtonColor:'#0052CC', customClass:{title:'font-prompt'} });
+        return;
+    }
+
+    const fd = new FormData();
+    fd.append('action', 'edit');
+    fd.append('slot_id', id);
+    fd.append('start_time', start);
+    fd.append('end_time', end);
+    fd.append('max_capacity', cap);
+    fd.append('csrf_token', '<?= get_csrf_token() ?>');
+
+    fetch('ajax_get_daily_slots.php', { method:'POST', body:fd })
+    .then(r => r.json())
+    .then(data => {
+        if (data.status === 'success') {
+            loadDailySlots(_dailyDate);
+        } else {
+            Swal.fire({ icon:'error', title:'เกิดข้อผิดพลาด', text:data.message, confirmButtonColor:'#ef4444', customClass:{title:'font-prompt',htmlContainer:'font-prompt'} });
+        }
+    });
+}
+
+function dailyDeleteSlot(id, date) {
+    Swal.fire({
+        icon: 'warning',
+        title: 'ยืนยันการลบ?',
+        text: 'รอบเวลานี้จะถูกลบถาวร (เฉพาะรอบที่ไม่มีผู้จอง)',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        cancelButtonColor: '#6b7280',
+        confirmButtonText: 'ลบเลย',
+        cancelButtonText: 'ยกเลิก',
+        customClass: { title:'font-prompt', htmlContainer:'font-prompt', confirmButton:'font-prompt', cancelButton:'font-prompt' }
+    }).then(r => {
+        if (!r.isConfirmed) return;
+
+        const fd = new FormData();
+        fd.append('action', 'delete');
+        fd.append('slot_id', id);
+        fd.append('csrf_token', '<?= get_csrf_token() ?>');
+
+        fetch('ajax_get_daily_slots.php', { method:'POST', body:fd })
+        .then(r => r.json())
+        .then(data => {
+            if (data.status === 'success') {
+                loadDailySlots(date);
+            } else {
+                Swal.fire({ icon:'error', title:'ลบไม่ได้', text:data.message, confirmButtonColor:'#ef4444', customClass:{title:'font-prompt',htmlContainer:'font-prompt'} });
+            }
+        });
     });
 }
 </script>

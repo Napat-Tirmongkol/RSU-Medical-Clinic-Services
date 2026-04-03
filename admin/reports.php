@@ -205,7 +205,7 @@ require_once __DIR__ . '/includes/header.php';
                             <tr class="hover:bg-gray-50 transition-colors <?= $p['calc_status'] === 'cancelled' ? 'opacity-50' : '' ?>">
                                 <td class="px-6 py-4">
                                     <div class="font-bold text-gray-900"><?= htmlspecialchars($p['full_name']) ?></div>
-                                    <div class="text-xs text-[#0052CC] font-medium mt-0.5"><?= htmlspecialchars($p['student_personnel_id']) ?></div>
+                                    <div class="text-xs text-[#0052CC] font-medium mt-0.5"><?= htmlspecialchars($p['student_personnel_id'] ?? '—') ?></div>
                                 </td>
                                 <td class="px-6 py-4 text-gray-600"><?= htmlspecialchars($p['phone_number']) ?></td>
                                 <td class="px-6 py-4">

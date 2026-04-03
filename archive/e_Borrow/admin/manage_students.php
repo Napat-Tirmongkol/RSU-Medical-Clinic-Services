@@ -90,21 +90,26 @@ include('../includes/header.php');
                     <th style="padding:15px;">Username</th>
                     <th>ชื่อ-นามสกุล</th>
                     <th>ระดับสิทธิ์</th>
+                    <th style="width:100px;">จัดการ</th>
                 </tr>
             </thead>
             <tbody>
                 <?php if (empty($staff_accounts)): ?>
-                    <tr><td colspan="3" style="text-align: center; padding:40px;" class="text-muted">ไม่พบข้อมูลบัญชีพนักงาน</td></tr>
+                    <tr><td colspan="4" style="text-align: center; padding:40px;" class="text-muted">ไม่พบข้อมูลบัญชีพนักงาน</td></tr>
                 <?php else: ?>
                     <?php foreach ($staff_accounts as $staff): ?>
                         <tr>
                             <td style="padding:15px;"><code><?php echo htmlspecialchars($staff['username']); ?></code></td>
                             <td><strong><?php echo htmlspecialchars($staff['full_name']); ?></strong></td>
                             <td>
-                                <?php 
-                                    $role_badge = ($staff['role'] == 'admin') ? 'red' : 'borrowed-ok';
+                                <?php
+                                    $role_badge = ($staff['role'] == 'admin') ? 'red' : (($staff['role'] == 'editor') ? 'blue' : 'borrowed-ok');
                                     echo '<span class="badge status-badge '.$role_badge.'">'.strtoupper($staff['role']).'</span>';
                                 ?>
+                            </td>
+                            <td>
+                                <button onclick="openEditStaffPopup(<?php echo $staff['id']; ?>, <?php echo htmlspecialchars(json_encode($staff), ENT_QUOTES); ?>)"
+                                        class="btn btn-secondary btn-sm">แก้ไข</button>
                             </td>
                         </tr>
                     <?php endforeach; ?>
@@ -121,6 +126,70 @@ function openEditStudentPopup(id) {
         title: 'แก้ไขข้อมูลผู้ใช้งาน',
         text: 'ฟังก์ชันแก้ไขข้อมูลส่วนบุคคลกำลังปรับปรุงให้เชื่อมโยงกับโปรไฟล์พอร์ทัล',
         icon: 'info'
+    });
+}
+
+function openEditStaffPopup(id, staff) {
+    const isLineLinked = !!staff.linked_line_user_id;
+    const roleOptions = ['admin', 'employee', 'editor']
+        .map(r => `<option value="${r}" ${staff.role === r ? 'selected' : ''}>${r.charAt(0).toUpperCase() + r.slice(1)}</option>`)
+        .join('');
+
+    Swal.fire({
+        title: '<i class="fas fa-user-edit"></i> แก้ไขบัญชีพนักงาน',
+        html: `
+            <div style="text-align:left; font-size:14px;">
+                <label style="font-weight:600; display:block; margin-bottom:4px;">Username</label>
+                <input id="swal-username" class="swal2-input" style="margin:0 0 12px 0;"
+                       value="${staff.username}" placeholder="Username">
+
+                <label style="font-weight:600; display:block; margin-bottom:4px;">
+                    ชื่อ-นามสกุล ${isLineLinked ? '<span style="color:#aaa;font-weight:400;">(ผูก LINE — แก้ไขไม่ได้)</span>' : ''}
+                </label>
+                <input id="swal-fullname" class="swal2-input" style="margin:0 0 12px 0;"
+                       value="${staff.full_name ?? ''}" placeholder="ชื่อ-นามสกุล" ${isLineLinked ? 'disabled' : ''}>
+
+                <label style="font-weight:600; display:block; margin-bottom:4px;">
+                    ระดับสิทธิ์ ${isLineLinked ? '<span style="color:#aaa;font-weight:400;">(ผูก LINE — แก้ไขไม่ได้)</span>' : ''}
+                </label>
+                <select id="swal-role" class="swal2-select" style="margin:0 0 12px 0; width:100%;" ${isLineLinked ? 'disabled' : ''}>
+                    ${roleOptions}
+                </select>
+
+                <label style="font-weight:600; display:block; margin-bottom:4px;">รหัสผ่านใหม่ <span style="color:#aaa;font-weight:400;">(เว้นว่างถ้าไม่เปลี่ยน)</span></label>
+                <input id="swal-password" class="swal2-input" style="margin:0;" type="password" placeholder="รหัสผ่านใหม่">
+            </div>`,
+        showCancelButton: true,
+        confirmButtonText: 'บันทึก',
+        cancelButtonText: 'ยกเลิก',
+        confirmButtonColor: '#3085d6',
+        focusConfirm: false,
+        preConfirm: () => {
+            const username = document.getElementById('swal-username').value.trim();
+            if (!username) {
+                Swal.showValidationMessage('กรุณากรอก Username');
+                return false;
+            }
+            const formData = new FormData();
+            formData.append('user_id',      id);
+            formData.append('username',     username);
+            formData.append('full_name',    document.getElementById('swal-fullname').value.trim());
+            formData.append('role',         document.getElementById('swal-role').value);
+            formData.append('new_password', document.getElementById('swal-password').value.trim());
+
+            return fetch('../process/edit_staff_process.php', { method: 'POST', body: formData })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.status !== 'success') Swal.showValidationMessage(data.message);
+                    return data;
+                })
+                .catch(() => Swal.showValidationMessage('เกิดข้อผิดพลาดในการเชื่อมต่อ'));
+        }
+    }).then(result => {
+        if (result.isConfirmed && result.value?.status === 'success') {
+            Swal.fire('บันทึกสำเร็จ!', 'แก้ไขข้อมูลบัญชีพนักงานเรียบร้อย', 'success')
+                .then(() => location.reload());
+        }
     });
 }
 </script>

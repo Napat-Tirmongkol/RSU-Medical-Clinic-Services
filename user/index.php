@@ -29,7 +29,7 @@ if (isset($_SESSION['evax_student_id'])) {
                 !empty($row['phone_number']) &&
                 !empty($row['status']) &&
                 !empty($row['email']) &&
-                ($row['status'] === 'external' || !empty($row['student_personnel_id']))) {
+                ($row['status'] === 'other' || !empty($row['student_personnel_id']))) {
             header('Location: ' . ($inviteToken !== '' ? 'c.php?t=' . urlencode($inviteToken) : 'booking_campaign.php'));
         }
         else {

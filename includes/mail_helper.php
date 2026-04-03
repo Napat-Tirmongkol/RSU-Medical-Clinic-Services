@@ -1,139 +1,257 @@
 <?php
 /**
  * includes/mail_helper.php
- * ระบบส่งอีเมลแจ้งเตือนการจอง (Confirmation, Reschedule, Cancellation)
+ * ระบบส่งอีเมลแจ้งเตือนการจอง — รองรับ SMTP (ไม่ต้องใช้ library ภายนอก)
+ *
+ * ── ตั้งค่า SMTP ใน config/secrets.php ──────────────────────────────────────
+ * 'SMTP_HOST'       => 'smtp.gmail.com'      // หรือ SMTP ของมหาวิทยาลัย
+ * 'SMTP_PORT'       => 587                   // 587=TLS, 465=SSL, 25=plain
+ * 'SMTP_USER'       => 'your@email.com'
+ * 'SMTP_PASS'       => 'your_app_password'
+ * 'SMTP_FROM_EMAIL' => 'noreply@rsu.ac.th'
+ * 'SMTP_FROM_NAME'  => 'RSU Healthcare'
+ * ────────────────────────────────────────────────────────────────────────────
  */
 
 if (!function_exists('get_secrets')) {
-    function get_secrets() {
+    function get_secrets(): array {
         $path = __DIR__ . '/../config/secrets.php';
-        return file_exists($path) ? require $path : [];
+        return file_exists($path) ? (require $path) : [];
     }
 }
 
-/**
- * 📧 ฟังก์ชันหลักสำหรับส่งอีเมล
- * @param string $to อีเมลผู้รับ
- * @param string $subject หัวข้ออีเมล
- * @param string $body เนื้อหา HTML
- * @return bool
- */
+// ─── SMTP sender (ไม่ต้องใช้ library ภายนอก) ─────────────────────────────────
+function smtp_send(string $to, string $subject, string $htmlBody, array $cfg): bool {
+    $host    = $cfg['SMTP_HOST'];
+    $port    = (int)($cfg['SMTP_PORT'] ?? 587);
+    $user    = $cfg['SMTP_USER']       ?? '';
+    $pass    = $cfg['SMTP_PASS']       ?? '';
+    $from    = $cfg['SMTP_FROM_EMAIL'] ?? $user;
+    $name    = $cfg['SMTP_FROM_NAME']  ?? 'RSU Healthcare';
+    $timeout = 15;
+
+    // เลือก transport
+    $useSsl = ($port === 465);
+    $host_connect = ($useSsl ? 'ssl://' : '') . $host;
+
+    $sock = @fsockopen($host_connect, $port, $errno, $errstr, $timeout);
+    if (!$sock) {
+        error_log("SMTP connect failed ({$host}:{$port}): {$errstr}");
+        return false;
+    }
+
+    $read = fn() => fgets($sock, 515);
+    $send = function(string $cmd) use ($sock, &$read): string {
+        fwrite($sock, $cmd . "\r\n");
+        return $read();
+    };
+
+    try {
+        $read(); // 220 greeting
+
+        // EHLO
+        $ehlo = $send("EHLO " . ($_SERVER['SERVER_NAME'] ?? 'localhost'));
+
+        // STARTTLS (port 587)
+        if ($port === 587 && str_contains($ehlo . $read() . $read() . $read() . $read(), 'STARTTLS')) {
+            $send("STARTTLS");
+            if (!stream_socket_enable_crypto($sock, true, STREAM_CRYPTO_METHOD_TLS_CLIENT)) {
+                error_log("SMTP STARTTLS failed");
+                fclose($sock);
+                return false;
+            }
+            $send("EHLO " . ($_SERVER['SERVER_NAME'] ?? 'localhost'));
+        }
+
+        // AUTH LOGIN
+        $send("AUTH LOGIN");
+        $send(base64_encode($user));
+        $authResp = $send(base64_encode($pass));
+        if (!str_starts_with(trim($authResp), '235')) {
+            error_log("SMTP auth failed: {$authResp}");
+            fclose($sock);
+            return false;
+        }
+
+        // MAIL FROM / RCPT TO / DATA
+        $send("MAIL FROM:<{$from}>");
+        $send("RCPT TO:<{$to}>");
+        $send("DATA");
+
+        // Headers + body
+        $boundary = md5(uniqid((string)time(), true));
+        $encodedSubject = '=?UTF-8?B?' . base64_encode($subject) . '?=';
+        $encodedName    = '=?UTF-8?B?' . base64_encode($name)    . '?=';
+
+        $message  = "From: {$encodedName} <{$from}>\r\n";
+        $message .= "To: {$to}\r\n";
+        $message .= "Subject: {$encodedSubject}\r\n";
+        $message .= "MIME-Version: 1.0\r\n";
+        $message .= "Content-Type: multipart/alternative; boundary=\"{$boundary}\"\r\n";
+        $message .= "\r\n";
+        $message .= "--{$boundary}\r\n";
+        $message .= "Content-Type: text/html; charset=UTF-8\r\n";
+        $message .= "Content-Transfer-Encoding: base64\r\n\r\n";
+        $message .= chunk_split(base64_encode($htmlBody)) . "\r\n";
+        $message .= "--{$boundary}--\r\n";
+        $message .= ".";
+
+        $dataResp = $send($message);
+        $send("QUIT");
+        fclose($sock);
+
+        if (!str_starts_with(trim($dataResp), '250')) {
+            error_log("SMTP DATA error: {$dataResp}");
+            return false;
+        }
+        return true;
+
+    } catch (Throwable $e) {
+        error_log("SMTP exception: " . $e->getMessage());
+        @fclose($sock);
+        return false;
+    }
+}
+
+// ─── ฟังก์ชันหลักสำหรับส่งอีเมล ──────────────────────────────────────────────
 function send_campaign_email(string $to, string $subject, string $body): bool {
     if (empty($to)) return false;
 
     $secrets = get_secrets();
-    $host = $secrets['SMTP_HOST'] ?? '';
-    
-    // ถ้าไม่ได้ตั้งค่า SMTP ให้ใช้ php mail() เป็น fallback (แต่อาจจะลงถังขยะหรือส่งไม่ไปถ้า server ไม่ได้ config ไว้)
-    if (empty($host)) {
-        $headers = "MIME-Version: 1.0" . "\r\n";
-        $headers .= "Content-type:text/html;charset=UTF-8" . "\r\n";
-        $headers .= "From: " . ($secrets['SMTP_FROM_NAME'] ?? 'RSU Healthcare') . " <" . ($secrets['SMTP_FROM_EMAIL'] ?? 'no-reply@rsu.ac.th') . ">" . "\r\n";
-        return mail($to, $subject, $body, $headers);
+    $host    = $secrets['SMTP_HOST'] ?? '';
+
+    // ถ้ามี SMTP config → ส่งผ่าน SMTP
+    if (!empty($host) && !empty($secrets['SMTP_USER']) && !empty($secrets['SMTP_PASS'])) {
+        return smtp_send($to, $subject, $body, $secrets);
     }
 
-    // ในกรณีที่มี PHPMailer (แนะนำให้ติดตั้งผ่าน Composer)
-    // สามารถเพิ่ม code ตรงนี้เพื่อใช้การส่งผ่าน SMTP ที่มั่นคงกว่าได้
-    // สำหรับเครื่อง User ผมจะเตรียมเป็น Skeleton ไว้ให้หากต้องการต่อยอด
-    
-    $headers = "MIME-Version: 1.0" . "\r\n";
-    $headers .= "Content-type:text/html;charset=UTF-8" . "\r\n";
-    $headers .= "From: " . $secrets['SMTP_FROM_NAME'] . " <" . $secrets['SMTP_FROM_EMAIL'] . ">" . "\r\n";
-    
-    return mail($to, $subject, $body, $headers);
+    // Fallback: php mail() (ใช้ได้ถ้า server ตั้งค่า sendmail ไว้)
+    $fromEmail = $secrets['SMTP_FROM_EMAIL'] ?? 'no-reply@rsu.ac.th';
+    $fromName  = $secrets['SMTP_FROM_NAME']  ?? 'RSU Healthcare';
+    $headers   = implode("\r\n", [
+        'MIME-Version: 1.0',
+        'Content-Type: text/html; charset=UTF-8',
+        'From: =?UTF-8?B?' . base64_encode($fromName) . "?= <{$fromEmail}>",
+        'X-Mailer: PHP/' . PHP_VERSION,
+    ]);
+    return mail($to, '=?UTF-8?B?' . base64_encode($subject) . '?=', $body, $headers);
 }
 
-/**
- * 🎨 สร้าง HTML Template สำหรับอีเมล
- */
-function get_email_template(string $title, string $message, array $details = []): string {
+// ─── HTML Email Template ──────────────────────────────────────────────────────
+function get_email_template(string $title, string $message, array $details = [], string $type = 'info'): string {
+    $accentColor = match($type) {
+        'success'  => '#059669',
+        'approved' => '#0052CC',
+        'cancel'   => '#dc2626',
+        default    => '#0052CC',
+    };
+    $iconEmoji = match($type) {
+        'success'  => '✅',
+        'approved' => '🎉',
+        'cancel'   => '❌',
+        default    => 'ℹ️',
+    };
+
     $detailRows = '';
     foreach ($details as $label => $value) {
-        $detailRows .= "<tr>
-            <td style='padding: 10px; border-bottom: 1px solid #eee; font-weight: bold; color: #555;'>{$label}</td>
-            <td style='padding: 10px; border-bottom: 1px solid #eee; color: #333;'>{$value}</td>
+        $detailRows .= "
+        <tr>
+            <td style='padding:10px 14px;border-bottom:1px solid #f0f0f0;font-weight:700;color:#555;width:35%;white-space:nowrap'>{$label}</td>
+            <td style='padding:10px 14px;border-bottom:1px solid #f0f0f0;color:#222'>{$value}</td>
         </tr>";
     }
 
-    return "
+    return <<<HTML
     <!DOCTYPE html>
-    <html lang='th'>
-    <head>
-        <meta charset='UTF-8'>
-        <style>
-            .container { max-width: 600px; margin: 0 auto; font-family: 'Prompt', sans-serif, Tahoma; line-height: 1.6; color: #333; }
-            .header { background: #0052CC; color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
-            .content { padding: 30px; border: 1px solid #eee; border-top: none; background: #fff; }
-            .footer { padding: 20px; text-align: center; font-size: 12px; color: #999; }
-            .btn { display: inline-block; padding: 12px 25px; background: #0052CC; color: white !important; text-decoration: none; border-radius: 5px; font-weight: bold; margin-top: 20px; }
-            table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-        </style>
-    </head>
-    <body>
-        <div class='container'>
-            <div class='header'>
-                <h1 style='margin:0;'>RSU Healthcare Services</h1>
+    <html lang="th">
+    <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+    <body style="margin:0;padding:0;background:#f4f6fb;font-family:Tahoma,sans-serif">
+        <div style="max-width:580px;margin:32px auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.08)">
+
+            <!-- Header -->
+            <div style="background:{$accentColor};padding:28px 32px;text-align:center">
+                <div style="font-size:2.2rem;margin-bottom:8px">{$iconEmoji}</div>
+                <div style="color:#fff;font-size:11px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;opacity:.8;margin-bottom:4px">RSU Healthcare Services</div>
+                <h1 style="color:#fff;margin:0;font-size:1.35rem;font-weight:900">{$title}</h1>
             </div>
-            <div class='content'>
-                <h2 style='color: #0052CC;'>{$title}</h2>
-                <p>{$message}</p>
-                <table>
-                    {$detailRows}
-                </table>
-                <p style='margin-top:20px;'>ขอบคุณที่ใช้บริการของเรา</p>
+
+            <!-- Body -->
+            <div style="padding:28px 32px">
+                <p style="color:#444;line-height:1.7;margin:0 0 20px">{$message}</p>
+
+                <!-- Details table -->
+                <div style="border:1.5px solid #e8eef7;border-radius:12px;overflow:hidden;margin-bottom:24px">
+                    <table style="width:100%;border-collapse:collapse;font-size:14px">
+                        {$detailRows}
+                    </table>
+                </div>
+
+                <p style="color:#888;font-size:13px;margin:0">ขอบคุณที่ใช้บริการของเรา หากมีข้อสงสัยกรุณาติดต่อเจ้าหน้าที่</p>
             </div>
-            <div class='footer'>
-                <p>© 2026 มหาวิทยาลัยรังสิต | คลินิกเวชกรรม มหาวิทยาลัยรังสิต</p>
-                <p>อีเมลฉบับนี้เป็นการแจ้งเตือนอัตโนมัติ กรุณาอย่าตอบกลับ</p>
+
+            <!-- Footer -->
+            <div style="background:#f8fafc;padding:16px 32px;text-align:center;border-top:1px solid #eef0f4">
+                <p style="color:#aaa;font-size:11px;margin:0">© 2026 มหาวิทยาลัยรังสิต · คลินิกเวชกรรม</p>
+                <p style="color:#bbb;font-size:11px;margin:4px 0 0">อีเมลนี้เป็นการแจ้งเตือนอัตโนมัติ กรุณาอย่าตอบกลับ</p>
             </div>
         </div>
     </body>
-    </html>";
+    </html>
+    HTML;
 }
 
-/**
- * 🚀 ฟังก์ชันส่งอีเมลตามประเภท (Notification Types)
- */
+// ─── Notification Types ───────────────────────────────────────────────────────
 function notify_booking_status(string $to, string $type, array $data): bool {
-    $subject = "";
-    $title = "";
-    $message = "";
+    $title   = $data['campaign_title'] ?? '-';
+    $date    = $data['date']           ?? '-';
+    $time    = $data['time']           ?? '-';
+    $name    = $data['full_name']      ?? '';
+
+    $greeting = $name ? "สวัสดีคุณ {$name}" : "สวัสดี";
+
     $details = [
-        "กิจกรรม" => $data['campaign_title'] ?? '-',
-        "วันที่" => $data['date'] ?? '-',
-        "เวลา" => $data['time'] ?? '-'
+        '📋 กิจกรรม' => $title,
+        '📅 วันที่'   => $date,
+        '🕐 เวลา'    => $time,
     ];
+    if (!empty($data['status_label'])) {
+        $details['📌 สถานะ'] = $data['status_label'];
+    }
 
     switch ($type) {
         case 'confirmation':
-            $subject = "ยืนยันการเริ่มจองกิจกรรม: " . ($data['campaign_title'] ?? '');
-            $title = "ยืนยันการจองสำเร็จ!";
-            $message = "คุณได้ลงทะเบียนเข้าร่วมกิจกรรมเรียบร้อยแล้ว กรุณาตรวจสอบรายละเอียดด้านล่าง:";
+            $subject = "✅ ยืนยันการจองกิจกรรม: {$title}";
+            $emailTitle = 'จองกิจกรรมสำเร็จ!';
+            $message  = "{$greeting} ระบบได้รับการลงทะเบียนของคุณเรียบร้อยแล้ว กรุณาตรวจสอบรายละเอียดด้านล่าง";
+            $tplType  = 'success';
             break;
-            
+
+        case 'approved':
+            $subject = "🎉 การจองได้รับการอนุมัติ: {$title}";
+            $emailTitle = 'การจองได้รับการอนุมัติแล้ว!';
+            $message  = "{$greeting} เจ้าหน้าที่ได้อนุมัติคิวการจองของคุณเรียบร้อยแล้ว กรุณาเตรียมตัวเข้าร่วมตามวันและเวลาที่กำหนด";
+            $tplType  = 'approved';
+            break;
+
         case 'cancelled_by_user':
-            $subject = "ยกเลิกการจองกิจกรรม: " . ($data['campaign_title'] ?? '');
-            $title = "ยกเลิกการจองแล้ว";
-            $message = "คุณได้ทำการยกเลิกการจองกิจกรรมต่อไปนี้เมื่อสักครู่:";
+            $subject = "❌ ยกเลิกการจอง: {$title}";
+            $emailTitle = 'ยกเลิกการจองแล้ว';
+            $message  = "{$greeting} การจองกิจกรรมต่อไปนี้ถูกยกเลิกตามคำขอของคุณเรียบร้อยแล้ว";
+            $tplType  = 'cancel';
             break;
 
         case 'cancelled_by_admin':
-            $subject = "แจ้งเปลี่ยนรอบเวลาการจอง: " . ($data['campaign_title'] ?? '');
-            $title = "ขออภัย! มีการเลื่อนรอบกิจกรรม";
-            $message = "เนื่องจากมีผู้จองเต็มจำนวนหรือมีเหตุจำเป็น เจ้าหน้าที่จึงขอยกเลิกคิวเดิมของคุณ เพื่อให้คุณเลือกจองรอบเวลาใหม่ที่สะดวกอีกครั้ง";
-            $details["สถานะปัจจุบัน"] = "คิวเดิมถูกยกเลิก (กรุณาจองใหม่)";
-            break;
-            
-        case 'approved':
-            $subject = "การจองของคุณได้รับการอนุมัติ: " . ($data['campaign_title'] ?? '');
-            $title = "การจองได้รับการอนุมัติแล้ว!";
-            $message = "เจ้าหน้าที่ได้อนุมัติคิวการจองของคุณเรียบร้อยแล้ว กรุณาเตรียมตัวเข้าร่วมตามวันและเวลาที่กำหนด";
+            $subject = "⚠️ แจ้งยกเลิกคิวกิจกรรม: {$title}";
+            $emailTitle = 'ขออภัย — มีการยกเลิกคิวของคุณ';
+            $message  = "{$greeting} เจ้าหน้าที่ขอยกเลิกคิวเดิมของคุณ เนื่องจากมีเหตุจำเป็น กรุณาเข้าสู่ระบบเพื่อจองรอบเวลาใหม่";
+            $details['📌 สถานะ'] = 'คิวถูกยกเลิก (กรุณาจองใหม่)';
+            $tplType  = 'cancel';
             break;
 
         default:
             return false;
     }
 
-    $body = get_email_template($title, $message, $details);
+    $body = get_email_template($emailTitle, $message, $details, $tplType);
     return send_campaign_email($to, $subject, $body);
 }

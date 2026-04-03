@@ -25,12 +25,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($stmt->rowCount() > 0) {
                 // 📧 ส่งอีเมลแจ้งเตือนการอนุมัติ
                 try {
-                    $stmtInfo = $pdo->prepare("SELECT u.email, c.title, s.slot_date, s.start_time, s.end_time 
-                                               FROM camp_bookings b 
-                                               JOIN sys_users u ON b.student_id = u.id 
-                                               JOIN camp_list c ON b.campaign_id = c.id 
-                                               JOIN camp_slots s ON b.slot_id = s.id 
-                                               WHERE b.id = :id");
+                    $stmtInfo = $pdo->prepare("
+                        SELECT u.email, u.full_name, c.title,
+                               s.slot_date, s.start_time, s.end_time
+                        FROM camp_bookings b
+                        JOIN sys_users  u ON b.student_id  = u.id
+                        JOIN camp_list  c ON b.campaign_id = c.id
+                        JOIN camp_slots s ON b.slot_id     = s.id
+                        WHERE b.id = :id");
                     $stmtInfo->execute([':id' => $appointmentId]);
                     $bInfo = $stmtInfo->fetch(PDO::FETCH_ASSOC);
 
@@ -38,8 +40,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         require_once __DIR__ . '/../includes/mail_helper.php';
                         notify_booking_status($bInfo['email'], 'approved', [
                             'campaign_title' => $bInfo['title'],
-                            'date' => date('d/m/Y', strtotime($bInfo['slot_date'])),
-                            'time' => substr($bInfo['start_time'], 0, 5) . ' - ' . substr($bInfo['end_time'], 0, 5)
+                            'full_name'      => $bInfo['full_name'],
+                            'date'           => date('d M Y', strtotime($bInfo['slot_date'])),
+                            'time'           => substr($bInfo['start_time'], 0, 5) . ' - ' . substr($bInfo['end_time'], 0, 5),
                         ]);
                     }
                 } catch (Exception $ex) {

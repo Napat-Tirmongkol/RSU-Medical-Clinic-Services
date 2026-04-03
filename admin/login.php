@@ -13,6 +13,11 @@ require_once __DIR__ . '/../config.php';
 $error = $_SESSION['login_error'] ?? '';
 unset($_SESSION['login_error']);
 
+// แสดง timeout message
+if (($_GET['reason'] ?? '') === 'timeout') {
+    $error = 'เซสชันหมดอายุเนื่องจากไม่มีการใช้งานนาน 2 ชั่วโมง กรุณาเข้าสู่ระบบใหม่';
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     validate_csrf_or_die();
     $username = $_POST['username'] ?? '';
@@ -50,7 +55,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Login - E-Vax</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="../assets/css/tailwind.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style> body { font-family: 'Prompt', sans-serif; } </style>
 </head>

@@ -27,7 +27,7 @@ if ($isUserFolder && !in_array($currentPage, $excludedPages)) {
             $stmtCheck->execute([':lid' => $lineUserId]);
             $uProf = $stmtCheck->fetch();
 
-            if (!$uProf || empty($uProf['full_name']) || empty($uProf['citizen_id']) || empty($uProf['phone_number']) || empty($uProf['status']) || ($uProf['status'] !== 'external' && empty($uProf['student_personnel_id']))) {
+            if (!$uProf || empty($uProf['full_name']) || empty($uProf['citizen_id']) || empty($uProf['phone_number']) || empty($uProf['status']) || ($uProf['status'] !== 'other' && empty($uProf['student_personnel_id']))) {
                 header('Location: profile.php');
                 exit;
             }
@@ -48,19 +48,9 @@ function render_header(string $title = 'E-Vax'): void {
 
       <link rel="icon" href="data:,">
 
-      <script src="https://cdn.tailwindcss.com"></script>
+      <link rel="stylesheet" href="../assets/css/tailwind.min.css">
 	  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-      <script>
-        // ปิด Warning ของ Tailwind
-        if (window.console && window.console.log) {
-          const originalLog = console.log;
-          console.log = function() {
-            if (arguments[0] && typeof arguments[0] === 'string' && arguments[0].includes('cdn.tailwindcss.com')) return;
-            originalLog.apply(console, arguments);
-          };
-        }
-      </script>
-      <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
       
       <link rel="preconnect" href="https://fonts.googleapis.com">
       <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

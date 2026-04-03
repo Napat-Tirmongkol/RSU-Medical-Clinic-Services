@@ -133,11 +133,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $camp_list = [];
 try {
     $sql = "
-        SELECT 
+        SELECT
             c.*,
             (SELECT COUNT(*) FROM camp_bookings a WHERE a.campaign_id = c.id AND a.status IN ('booked', 'confirmed')) AS used_capacity
         FROM camp_list c
-        ORDER BY c.status ASC, c.created_at DESC
+        ORDER BY
+            CASE
+                WHEN c.status = 'active' AND (c.available_until IS NULL OR c.available_until >= CURDATE()) THEN 0
+                ELSE 1
+            END ASC,
+            c.created_at DESC
     ";
     $stmt = $pdo->query($sql);
     $camp_list = $stmt->fetchAll();
@@ -168,73 +173,247 @@ require_once __DIR__ . '/includes/header.php';
 ?>
 
 <style>
-    /* Animation */
+    /* ── Animations ───────────────────────────────────────────── */
     @keyframes slideUpFade {
-        0% {
-            opacity: 0;
-            transform: translateY(15px);
-        }
-
-        100% {
-            opacity: 1;
-            transform: translateY(0);
-        }
+        from { opacity: 0; transform: translateY(16px); }
+        to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes pulse-dot {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50%       { opacity: 0.6; transform: scale(1.4); }
     }
 
-    .animate-slide-up {
-        animation: slideUpFade 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-    }
+    .animate-slide-up { animation: slideUpFade 0.45s cubic-bezier(0.16, 1, 0.3, 1) both; }
+    .delay-100 { animation-delay: 0.08s; }
+    .delay-200 { animation-delay: 0.16s; }
 
-    .delay-100 {
-        animation-delay: 0.1s;
-    }
+    /* ── Scrollbar ────────────────────────────────────────────── */
+    .custom-scrollbar::-webkit-scrollbar { width: 5px; height: 5px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 99px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 
-    /* Custom Scrollbar */
-    .custom-scrollbar::-webkit-scrollbar {
-        width: 6px;
-    }
-
-    .custom-scrollbar::-webkit-scrollbar-track {
-        background: transparent;
-    }
-
-    .custom-scrollbar::-webkit-scrollbar-thumb {
-        background: #cbd5e1;
-        border-radius: 4px;
-    }
-
-    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-        background: #94a3b8;
-    }
-
-    /* Table enhancements */
+    /* ── Table container ──────────────────────────────────────── */
     .glass-table-container {
-        background: #ffffff;
-        border-radius: 24px;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
-        border: 1px solid #f1f5f9;
+        background: #fff;
+        border-radius: 20px;
+        box-shadow: 0 1px 3px rgba(0,0,0,.04), 0 8px 32px rgba(0,82,204,.05);
+        border: 1px solid #e8eef7;
         overflow: hidden;
     }
 
-    .glass-tr {
-        transition: all 0.3s ease;
+    /* Gradient thead strip */
+    .glass-table-container thead tr {
+        background: linear-gradient(135deg, #0052CC 0%, #1565d8 60%, #2474e8 100%);
+    }
+    .glass-table-container thead th {
+        color: rgba(255,255,255,0.85) !important;
+        font-size: 10px;
+        letter-spacing: .12em;
+        padding-top: 18px;
+        padding-bottom: 18px;
+        border-bottom: none !important;
+    }
+    .glass-table-container thead th i {
+        opacity: .7;
     }
 
+    /* Divider colour */
+    .glass-table-container tbody { border-color: #f0f4fa; }
+    .glass-table-container tbody tr + tr { border-top: 1px solid #f0f4fa; }
+
+    /* ── Row hover ────────────────────────────────────────────── */
+    .glass-tr { transition: background .18s ease, box-shadow .18s ease; }
     .glass-tr:hover {
-        background: #f8fafc;
-        transform: scale(1.002);
-        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02);
-        z-index: 10;
-        position: relative;
+        background: #f5f8ff !important;
+        box-shadow: inset 3px 0 0 #0052CC;
     }
 
-    /* Modal styling */
-    .modal-glass {
-        background: rgba(255, 255, 255, 0.98);
-        backdrop-filter: blur(16px);
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    /* ── Campaign-type icon ───────────────────────────────────── */
+    .camp-icon {
+        width: 46px; height: 46px;
+        border-radius: 14px;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 1.2rem;
+        flex-shrink: 0;
+        box-shadow: 0 2px 8px rgba(0,0,0,.08);
     }
+
+    /* ── Capacity bar ─────────────────────────────────────────── */
+    .cap-bar-wrap {
+        width: 64px; height: 6px;
+        background: #e8f0fe;
+        border-radius: 99px;
+        overflow: hidden;
+        margin: 0 auto;
+    }
+    .cap-bar-fill {
+        height: 100%;
+        border-radius: 99px;
+        transition: width .4s ease;
+    }
+
+    /* Remaining seats ring */
+    .seat-ring {
+        display: inline-flex; flex-direction: column; align-items: center; gap: 4px;
+    }
+    .seat-circle {
+        width: 50px; height: 50px;
+        border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        font-weight: 900;
+        font-size: 1.1rem;
+        border-width: 2px;
+        border-style: solid;
+        transition: transform .2s;
+    }
+    .glass-tr:hover .seat-circle { transform: scale(1.08); }
+
+    /* ── Status badges ────────────────────────────────────────── */
+    .status-badge {
+        display: inline-flex; align-items: center; gap: 5px;
+        padding: 4px 10px;
+        border-radius: 8px;
+        font-size: 11px;
+        font-weight: 800;
+        white-space: nowrap;
+        border-width: 1px;
+        border-style: solid;
+    }
+    .status-dot {
+        width: 7px; height: 7px;
+        border-radius: 50%;
+        display: inline-block;
+        flex-shrink: 0;
+    }
+    .dot-active { background: #10b981; animation: pulse-dot 2s ease-in-out infinite; }
+    .dot-inactive { background: #9ca3af; }
+    .dot-expired { background: #ef4444; }
+
+    .badge-active   { background: #ecfdf5; color: #065f46; border-color: #a7f3d0; }
+    .badge-inactive { background: #f9fafb; color: #4b5563; border-color: #d1d5db; }
+    .badge-expired  { background: #fff1f2; color: #9f1239; border-color: #fecdd3; }
+
+    .approve-badge {
+        display: inline-flex; align-items: center; gap: 4px;
+        padding: 2px 8px;
+        border-radius: 6px;
+        font-size: 10px;
+        font-weight: 700;
+        margin-top: 4px;
+    }
+    .approve-auto   { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
+    .approve-manual { background: #f8fafc; color: #64748b; border: 1px solid #e2e8f0; }
+
+    /* ── Action buttons ───────────────────────────────────────── */
+    .act-btn {
+        width: 36px; height: 36px;
+        border-radius: 10px;
+        display: inline-flex; align-items: center; justify-content: center;
+        font-size: 14px;
+        transition: all .18s ease;
+        border-width: 1px;
+        border-style: solid;
+        cursor: pointer;
+    }
+    .act-btn-edit {
+        background: #fffbeb; color: #d97706; border-color: #fde68a;
+    }
+    .act-btn-edit:hover { background: #f59e0b; color: #fff; border-color: #f59e0b; box-shadow: 0 4px 12px rgba(245,158,11,.35); transform: translateY(-1px); }
+    .act-btn-delete {
+        background: #fff1f2; color: #e11d48; border-color: #fecdd3;
+    }
+    .act-btn-delete:hover { background: #e11d48; color: #fff; border-color: #e11d48; box-shadow: 0 4px 12px rgba(225,29,72,.3); transform: translateY(-1px); }
+    .act-btn-disabled {
+        background: #f9fafb; color: #d1d5db; border-color: #e5e7eb; cursor: not-allowed;
+    }
+
+    /* ── Modal ────────────────────────────────────────────────── */
+    .modal-glass {
+        background: #fff;
+        box-shadow: 0 32px 64px rgba(0,0,0,.22), 0 0 0 1px rgba(0,0,0,.04);
+        border-radius: 22px;
+    }
+    .modal-header {
+        background: linear-gradient(135deg, #0052CC 0%, #1a6fe8 100%);
+        padding: 22px 24px;
+        border-bottom: none;
+    }
+    .modal-header h3 { color: #fff; font-size: 1.2rem; font-weight: 900; display: flex; align-items: center; gap: 12px; }
+    .modal-header .modal-icon {
+        width: 40px; height: 40px;
+        background: rgba(255,255,255,.15);
+        border-radius: 12px;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 1.1rem;
+        color: #fff;
+    }
+    .modal-close-btn {
+        width: 32px; height: 32px;
+        border-radius: 8px;
+        background: rgba(255,255,255,.15);
+        color: rgba(255,255,255,.9);
+        display: flex; align-items: center; justify-content: center;
+        transition: background .15s;
+        cursor: pointer;
+        border: none;
+    }
+    .modal-close-btn:hover { background: rgba(255,255,255,.28); }
+
+    /* Form inputs */
+    .form-input {
+        width: 100%;
+        padding: 11px 14px 11px 42px;
+        background: #f8fafc;
+        border: 1.5px solid #e2e8f0;
+        border-radius: 14px;
+        font-family: 'Prompt', sans-serif;
+        color: #1e293b;
+        font-size: .9rem;
+        transition: border-color .15s, background .15s, box-shadow .15s;
+        outline: none;
+    }
+    .form-input:focus {
+        background: #fff;
+        border-color: #0052CC;
+        box-shadow: 0 0 0 3px rgba(0,82,204,.1);
+    }
+    .form-input-no-icon {
+        padding-left: 14px;
+    }
+    .form-input-icon {
+        position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+        color: #94a3b8; pointer-events: none; font-size: .85rem;
+    }
+    .form-label {
+        display: block;
+        font-size: .8rem;
+        font-weight: 700;
+        color: #374151;
+        margin-bottom: 6px;
+    }
+    .form-section-card {
+        background: #f8fafc;
+        border: 1.5px solid #e8eef7;
+        border-radius: 14px;
+        padding: 14px;
+    }
+
+    /* Toggle label */
+    .toggle-label {
+        display: inline-flex; align-items: center; gap: 10px;
+        background: #fff;
+        padding: 8px 16px;
+        border-radius: 12px;
+        border: 1.5px solid #e2e8f0;
+        cursor: pointer;
+        font-size: .82rem;
+        font-weight: 700;
+        color: #475569;
+        box-shadow: 0 1px 4px rgba(0,0,0,.04);
+        transition: border-color .15s, box-shadow .15s;
+    }
+    .toggle-label:hover { border-color: #0052CC; box-shadow: 0 2px 8px rgba(0,82,204,.1); }
 </style>
 
 <?php
@@ -254,31 +433,32 @@ renderPageHeader("จัดการแคมเปญ", "สร้างแค�
 <?php endif; ?>
 
 <div class="flex justify-end mb-4 animate-slide-up delay-100">
-    <label for="toggleInactive"
-        class="flex items-center cursor-pointer bg-white px-4 py-2 rounded-xl border border-gray-200 shadow-sm hover:bg-gray-50 transition-colors">
+    <label for="toggleInactive" class="toggle-label">
         <div class="relative">
             <input type="checkbox" id="toggleInactive" class="sr-only peer" onchange="toggleInactiveCampaigns()">
-            <div
-                class="w-11 h-6 bg-gray-200 rounded-full peer peer-focus:ring-4 peer-focus:ring-blue-300 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#0052CC]">
-            </div>
+            <div class="w-10 h-5 bg-gray-200 rounded-full peer peer-checked:bg-[#0052CC] after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border after:border-gray-300 after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-5 peer-checked:after:border-white"></div>
         </div>
-        <span class="ml-3 text-sm font-bold text-gray-700"><i class="fa-solid fa-eye-slash mr-1 text-gray-400"></i>
-            ซ่อนแคมเปญที่ปิด/หมดเขต</span>
+        <i id="toggleIcon" class="fa-solid fa-eye-slash text-gray-400 text-xs"></i>
+        <span id="toggleLabel">แสดงแคมเปญที่ปิด/หมดเขต</span>
     </label>
 </div>
 
 <div class="glass-table-container animate-slide-up delay-100 mb-10 overflow-x-auto">
-    <table class="w-full text-left text-sm whitespace-nowrap">
-        <thead
-            class="bg-gray-50/80 text-gray-600 font-bold border-b border-gray-100 uppercase tracking-wider text-[11px]">
+    <table class="w-full text-left text-sm" style="table-layout:fixed; min-width:680px">
+        <colgroup>
+            <col><!-- title: flexible -->
+            <col style="width:150px"><!-- date -->
+            <col style="width:120px"><!-- seats -->
+            <col style="width:150px"><!-- status -->
+            <col style="width:100px"><!-- actions -->
+        </colgroup>
+        <thead>
             <tr>
-                <th class="px-6 py-5 rounded-tl-2xl">ชื่อแคมเปญ / ประเภท</th>
-                <th class="px-6 py-5 text-center items-center"><i class="fa-regular fa-calendar mr-1"></i>
-                    เปิดรับถึงวันที่</th>
-                <th class="px-6 py-5 text-center"><i class="fa-solid fa-users-viewfinder mr-1"></i> ที่นั่งคงเหลือ</th>
-                <th class="px-6 py-5 text-center"><i class="fa-solid fa-toggle-on mr-1"></i> สถานะ</th>
-                <th
-                    class="px-6 py-5 text-center rounded-tr-2xl sticky right-0 bg-gray-50/90 z-20 shadow-[-4px_0_10px_rgba(0,0,0,0.02)] border-l border-gray-100 backdrop-blur-sm">
+                <th class="px-5 py-[18px] text-left">ชื่อแคมเปญ / ประเภท</th>
+                <th class="px-4 py-[18px] text-center whitespace-nowrap"><i class="fa-regular fa-calendar mr-1"></i> เปิดรับถึงวันที่</th>
+                <th class="px-4 py-[18px] text-center whitespace-nowrap"><i class="fa-solid fa-users-viewfinder mr-1"></i> ที่นั่งคงเหลือ</th>
+                <th class="px-4 py-[18px] text-center whitespace-nowrap"><i class="fa-solid fa-toggle-on mr-1"></i> สถานะ</th>
+                <th class="px-4 py-[18px] text-center whitespace-nowrap sticky right-0 z-20" style="background:linear-gradient(135deg,#0052CC,#2474e8);">
                     <i class="fa-solid fa-gear mr-1"></i> จัดการ</th>
             </tr>
         </thead>
@@ -304,73 +484,79 @@ renderPageHeader("จัดการแคมเปญ", "สร้างแค�
                     $isExpired = $c['available_until'] && (strtotime($c['available_until']) < strtotime(date('Y-m-d')));
                     $isInactive = ($c['status'] === 'inactive' || $isExpired);
                     ?>
-                    <tr
-                        class="glass-tr group campaign-row <?= $isInactive ? 'opacity-60 bg-gray-50/50 is-inactive' : 'is-active' ?>">
-                        <td class="px-6 py-5">
-                            <div class="flex items-start gap-4">
-                                <div
-                                    class="w-12 h-12 <?= $typeDetails['bg'] ?> <?= $typeDetails['color'] ?> rounded-[14px] flex items-center justify-center text-xl shrink-0 border <?= $typeDetails['border'] ?> shadow-inner">
+                    <?php
+                        $usedPct = $c['total_capacity'] > 0 ? min(100, round($c['used_capacity'] / $c['total_capacity'] * 100)) : 0;
+                        $barColor = $usedPct >= 90 ? '#ef4444' : ($usedPct >= 60 ? '#f59e0b' : '#10b981');
+                    ?>
+                    <tr class="glass-tr group campaign-row <?= $isInactive ? 'is-inactive' : 'is-active' ?>" style="<?= $isInactive ? 'opacity:.55' : '' ?>">
+                        <td class="px-5 py-4">
+                            <div class="flex items-center gap-3">
+                                <div class="camp-icon <?= $typeDetails['bg'] ?> <?= $typeDetails['color'] ?> border <?= $typeDetails['border'] ?>" style="flex-shrink:0;width:40px;height:40px;border-radius:12px;font-size:1rem">
                                     <i class="fa-solid <?= $typeDetails['icon'] ?>"></i>
                                 </div>
-                                <div>
-                                    <div class="font-extrabold text-gray-900 text-base mb-0.5">
-                                        <?= htmlspecialchars($c['title']) ?></div>
-                                    <div class="flex items-center gap-2 mb-1.5">
-                                        <span
-                                            class="px-2 py-0.5 rounded-md text-[10px] font-bold <?= $typeDetails['bg'] ?> <?= $typeDetails['color'] ?> uppercase tracking-wider">
-                                            <?= $typeDetails['label'] ?>
-                                        </span>
+                                <div class="min-w-0">
+                                    <div class="font-extrabold text-gray-900 text-[14px] leading-snug mb-1 break-words">
+                                        <?= htmlspecialchars($c['title']) ?>
                                     </div>
-                                    <div class="text-[12px] font-medium text-gray-500 flex items-center gap-2">
-                                        <span class="bg-gray-100 px-2 py-0.5 rounded-md"><i
-                                                class="fa-solid fa-users text-gray-400 mr-1"></i> รวม
-                                            <?= number_format($c['total_capacity']) ?></span>
-                                        <span class="bg-gray-100 px-2 py-0.5 rounded-md"><i
-                                                class="fa-solid fa-user-check text-green-500 mr-1"></i> จองแล้ว
-                                            <?= number_format($c['used_capacity']) ?></span>
+                                    <span class="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold <?= $typeDetails['bg'] ?> <?= $typeDetails['color'] ?> uppercase tracking-wider mb-1.5">
+                                        <?= $typeDetails['label'] ?>
+                                    </span>
+                                    <div class="flex flex-wrap items-center gap-1 text-[11px] text-gray-500 font-semibold">
+                                        <span class="bg-gray-100 px-2 py-0.5 rounded-md whitespace-nowrap">
+                                            <i class="fa-solid fa-users text-gray-400 mr-1"></i><?= number_format($c['total_capacity']) ?>
+                                        </span>
+                                        <span class="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-md whitespace-nowrap">
+                                            <i class="fa-solid fa-user-check mr-1"></i><?= number_format($c['used_capacity']) ?> จอง
+                                        </span>
                                     </div>
                                 </div>
                             </div>
                         </td>
-                        <td class="px-6 py-5 text-center font-bold <?= $isExpired ? 'text-red-500' : 'text-gray-700' ?>">
-                            <?= $c['available_until'] ? date('d / m / Y', strtotime($c['available_until'])) : '<span class="text-gray-300 font-medium">ไม่มีกำหนด</span>' ?>
-                            <?php if ($isExpired): ?>
-                                <div
-                                    class="text-[11px] text-red-500 font-medium mt-1 bg-red-50 inline-block px-2 py-0.5 rounded-md">
-                                    หมดเขตแล้ว</div><?php endif; ?>
-                        </td>
-                        <td class="px-6 py-5 text-center">
-                            <div
-                                class="inline-flex items-center justify-center w-12 h-12 rounded-full <?= $isLow ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-green-50 text-green-600 border border-green-100' ?> shadow-inner">
-                                <span class="font-black text-lg"><?= number_format($remaining) ?></span>
-                            </div>
-                        </td>
-                        <td class="px-6 py-5 text-center flex flex-col items-center justify-center gap-1.5 mt-2">
-                            <?php if ($c['status'] === 'active' && !$isExpired): ?>
-                                <span
-                                    class="px-3 py-1 text-xs font-extrabold rounded-lg bg-emerald-100 text-emerald-700 border border-emerald-200 shadow-sm w-max">🟢
-                                    เปิดรับสมัคร</span>
-                                <?php if ($c['is_auto_approve']): ?>
-                                    <span
-                                        class="text-[10px] text-blue-600 font-bold bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100"><i
-                                            class="fa-solid fa-bolt text-yellow-500"></i> อนุมัติอัตโนมัติ</span>
-                                <?php else: ?>
-                                    <span
-                                        class="text-[10px] text-gray-500 font-bold bg-gray-50 px-2 py-0.5 rounded-md border border-gray-100"><i
-                                            class="fa-solid fa-user-shield text-gray-400"></i> แอดมินอนุมัติ</span>
+                        <td class="px-4 py-4 text-center">
+                            <?php if ($c['available_until']): ?>
+                                <div class="font-bold text-sm <?= $isExpired ? 'text-red-500' : 'text-gray-700' ?>">
+                                    <?= date('d M Y', strtotime($c['available_until'])) ?>
+                                </div>
+                                <?php if ($isExpired): ?>
+                                    <span class="inline-block mt-1 text-[10px] font-bold text-red-600 bg-red-50 border border-red-100 px-2 py-0.5 rounded-md">หมดเขตแล้ว</span>
                                 <?php endif; ?>
-                            <?php elseif ($isExpired): ?>
-                                <span
-                                    class="px-3 py-1 text-xs font-extrabold rounded-lg bg-red-100 text-red-600 border border-red-200 shadow-sm w-max">❌
-                                    หมดเขต</span>
                             <?php else: ?>
-                                <span
-                                    class="px-3 py-1 text-xs font-extrabold rounded-lg bg-gray-200 text-gray-600 border border-gray-300 shadow-sm w-max">⚪
-                                    ปิดชั่วคราว</span>
+                                <span class="text-gray-300 font-medium text-sm">ไม่มีกำหนด</span>
                             <?php endif; ?>
                         </td>
-                        <td
-                            class="px-6 py-5 text-center sticky right-0 <?= ($c['status'] === 'inactive' || $isExpired) ? 'bg-gray-50' : 'bg-white' ?> group-hover:bg-[#f8fafc] z-10 transition-colors shadow-[-4px_0_10px_rgba(0,0,0,0.02)] border-l border-gray-50">
+                        <td class="px-4 py-4 text-center">
+                            <div class="seat-ring">
+                                <div class="seat-circle <?= $isLow ? 'bg-red-50 text-red-600 border-red-200' : 'bg-emerald-50 text-emerald-600 border-emerald-200' ?>">
+                                    <?= number_format($remaining) ?>
+                                </div>
+                                <div class="cap-bar-wrap">
+                                    <div class="cap-bar-fill" style="width:<?= $usedPct ?>%; background:<?= $barColor ?>"></div>
+                                </div>
+                                <div class="text-[10px] text-gray-400 font-bold"><?= $usedPct ?>%</div>
+                            </div>
+                        </td>
+                        <td class="px-4 py-4 text-center">
+                            <div class="flex flex-col items-center gap-1">
+                            <?php if ($c['status'] === 'active' && !$isExpired): ?>
+                                <span class="status-badge badge-active">
+                                    <span class="status-dot dot-active"></span> เปิดรับสมัคร
+                                </span>
+                                <span class="approve-badge <?= $c['is_auto_approve'] ? 'approve-auto' : 'approve-manual' ?>">
+                                    <i class="fa-solid <?= $c['is_auto_approve'] ? 'fa-bolt text-yellow-400' : 'fa-user-shield text-gray-400' ?>"></i>
+                                    <?= $c['is_auto_approve'] ? 'Auto อนุมัติ' : 'แอดมินอนุมัติ' ?>
+                                </span>
+                            <?php elseif ($isExpired): ?>
+                                <span class="status-badge badge-expired">
+                                    <span class="status-dot dot-expired"></span> หมดเขต
+                                </span>
+                            <?php else: ?>
+                                <span class="status-badge badge-inactive">
+                                    <span class="status-dot dot-inactive"></span> ปิดชั่วคราว
+                                </span>
+                            <?php endif; ?>
+                            </div>
+                        </td>
+                        <td class="px-3 py-4 text-center sticky right-0 bg-white group-hover:bg-[#f5f8ff] z-10 transition-colors" style="box-shadow:-4px 0 12px rgba(0,0,0,.04); border-left:1px solid #f0f4fa">
                             <div class="flex items-center justify-center gap-2">
                                 <!-- Share URL button -->
                                 <?php if (!empty($c['share_token'])): ?>
@@ -393,7 +579,7 @@ renderPageHeader("จัดการแคมเปญ", "สร้างแค�
                                 </form>
                                 <?php endif; ?>
                                 <button
-                                    class="edit-btn w-9 h-9 bg-yellow-50 text-yellow-600 rounded-xl flex items-center justify-center hover:bg-yellow-400 hover:text-white transition-all shadow-sm border border-yellow-100"
+                                    class="act-btn act-btn-edit edit-btn"
                                     title="แก้ไขแคมเปญ" data-id="<?= htmlspecialchars($c['id']) ?>"
                                     data-title="<?= htmlspecialchars($c['title']) ?>"
                                     data-type="<?= htmlspecialchars($c['type']) ?>"
@@ -410,16 +596,12 @@ renderPageHeader("จัดการแคมเปญ", "สร้างแค�
                                         <?php csrf_field(); ?>
                                         <input type="hidden" name="action" value="delete">
                                         <input type="hidden" name="campaign_id" value="<?= $c['id'] ?>">
-                                        <button type="submit"
-                                            class="w-9 h-9 bg-red-50 text-red-500 rounded-xl flex items-center justify-center hover:bg-red-500 hover:text-white transition-all shadow-sm border border-red-100"
-                                            title="ลบแคมเปญ">
+                                        <button type="submit" class="act-btn act-btn-delete" title="ลบแคมเปญ">
                                             <i class="fa-solid fa-trash-can"></i>
                                         </button>
                                     </form>
                                 <?php else: ?>
-                                    <button
-                                        class="w-9 h-9 bg-gray-100 text-gray-300 rounded-xl flex items-center justify-center cursor-not-allowed border border-gray-200"
-                                        title="ไม่สามารถลบได้ มีผู้ลงทะเบียนแล้ว">
+                                    <button class="act-btn act-btn-disabled" title="ไม่สามารถลบได้ มีผู้ลงทะเบียนแล้ว">
                                         <i class="fa-solid fa-trash-can"></i>
                                     </button>
                                 <?php endif; ?>
@@ -433,131 +615,113 @@ renderPageHeader("จัดการแคมเปญ", "สร้างแค�
 </div>
 
 <div id="campaignModal"
-    class="fixed inset-0 z-50 bg-gray-900/60 backdrop-blur-sm hidden flex items-center justify-center p-4 overflow-y-auto">
-    <div
-        class="modal-glass rounded-[24px] w-full max-w-xl overflow-hidden animate-slide-up my-8 border border-white/50">
+    class="fixed inset-0 z-50 bg-gray-900/70 backdrop-blur-sm hidden items-center justify-center p-3 overflow-y-auto"
+    style="display:none">
+    <div class="modal-glass w-full max-w-lg mx-auto my-6 overflow-hidden animate-slide-up">
 
-        <div class="p-6 border-b border-gray-100 flex justify-between items-center bg-white/50">
-            <h3 class="text-2xl font-black text-gray-900 flex items-center gap-3" id="modal_title">
-                <div class="w-10 h-10 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center text-lg"><i
-                        class="fa-solid fa-bullhorn"></i></div>
+        <!-- Modal Header -->
+        <div class="modal-header flex justify-between items-center">
+            <h3 id="modal_title">
+                <span class="modal-icon"><i class="fa-solid fa-bullhorn"></i></span>
                 สร้างแคมเปญใหม่
             </h3>
-            <button onclick="document.getElementById('campaignModal').classList.add('hidden')"
-                class="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-gray-800 transition-colors">
-                <i class="fa-solid fa-times font-bold"></i>
+            <button onclick="document.getElementById('campaignModal').style.display='none'"
+                class="modal-close-btn">
+                <i class="fa-solid fa-times text-sm"></i>
             </button>
         </div>
 
-        <form method="POST" class="p-6 space-y-5 bg-white">
+        <!-- Modal Form -->
+        <form method="POST" class="p-5 space-y-4 bg-white overflow-y-auto custom-scrollbar" style="max-height:calc(100vh - 140px)">
             <?php csrf_field(); ?>
             <input type="hidden" name="action" id="modal_action" value="add">
             <input type="hidden" name="campaign_id" id="modal_campaign_id">
 
+            <!-- Title -->
             <div>
-                <label class="block text-sm font-bold text-gray-700 mb-1.5">ชื่อแคมเปญ/กิจกรรม <span
-                        class="text-red-500">*</span></label>
+                <label class="form-label">ชื่อแคมเปญ/กิจกรรม <span class="text-red-500">*</span></label>
                 <div class="relative">
-                    <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-400">
-                        <i class="fa-solid fa-heading"></i>
-                    </div>
+                    <i class="form-input-icon fa-solid fa-heading"></i>
                     <input type="text" id="modal_title_input" name="title" required placeholder="เช่น อบรม CPR รุ่น 1"
-                        class="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none font-prompt text-gray-800 transition-all font-medium placeholder-gray-400">
+                        class="form-input">
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <!-- Type + Capacity -->
+            <div class="grid grid-cols-2 gap-3">
                 <div>
-                    <label class="block text-sm font-bold text-gray-700 mb-1.5">ประเภทแคมเปญ <span
-                            class="text-red-500">*</span></label>
+                    <label class="form-label">ประเภท <span class="text-red-500">*</span></label>
                     <div class="relative">
-                        <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-400">
-                            <i class="fa-solid fa-layer-group"></i>
-                        </div>
-                        <select id="modal_type" name="type" required
-                            class="w-full pl-11 pr-10 py-3 bg-gray-50 border border-gray-200 rounded-2xl focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none font-prompt text-gray-800 appearance-none font-medium cursor-pointer transition-all">
+                        <i class="form-input-icon fa-solid fa-layer-group"></i>
+                        <select id="modal_type" name="type" required class="form-input appearance-none pr-8">
                             <option value="vaccine">💉 ฉีดวัคซีน</option>
                             <option value="training">👨‍🏫 อบรม/สัมมนา</option>
                             <option value="health_check">🩺 ตรวจสุขภาพ</option>
                             <option value="other">⭐ กิจกรรมอื่นๆ</option>
                         </select>
-                        <div
-                            class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-4 text-gray-400">
-                            <i class="fa-solid fa-chevron-down text-sm"></i></div>
+                        <i class="fa-solid fa-chevron-down text-xs text-gray-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"></i>
                     </div>
                 </div>
                 <div>
-                    <label class="block text-sm font-bold text-gray-700 mb-1.5">โควต้าผู้เข้าร่วม (คน) <span
-                            class="text-red-500">*</span></label>
+                    <label class="form-label">โควต้า (คน) <span class="text-red-500">*</span></label>
                     <div class="relative">
-                        <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-400">
-                            <i class="fa-solid fa-users"></i>
-                        </div>
+                        <i class="form-input-icon fa-solid fa-users"></i>
                         <input type="number" id="modal_total_capacity" name="total_capacity" required min="0"
-                            class="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none font-prompt text-gray-800 transition-all font-medium">
+                            class="form-input">
                     </div>
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div class="bg-gray-50 p-4 rounded-2xl border border-gray-100">
-                    <label class="block text-sm font-bold text-gray-700 mb-2">สถานะแคมเปญ</label>
+            <!-- Status + Auto-approve -->
+            <div class="grid grid-cols-2 gap-3">
+                <div class="form-section-card">
+                    <label class="form-label">สถานะแคมเปญ</label>
                     <div class="relative">
-                        <select id="modal_status" name="status"
-                            class="w-full pl-4 pr-10 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none font-prompt text-gray-800 appearance-none font-medium cursor-pointer">
+                        <select id="modal_status" name="status" class="form-input form-input-no-icon appearance-none pr-8 py-2 text-sm">
                             <option value="active">🟢 เปิดให้ลงทะเบียน</option>
                             <option value="inactive">⚪ ปิดชั่วคราว</option>
                         </select>
-                        <div
-                            class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400">
-                            <i class="fa-solid fa-caret-down"></i></div>
+                        <i class="fa-solid fa-caret-down text-xs text-gray-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"></i>
                     </div>
                 </div>
-                <div class="bg-blue-50/50 p-4 rounded-2xl border border-blue-100/50">
-                    <label class="block text-sm font-bold text-gray-700 mb-2">การอนุมัติรายชื่อผู้จอง</label>
+                <div class="form-section-card" style="background:#eff6ff; border-color:#bfdbfe">
+                    <label class="form-label">การอนุมัติ</label>
                     <div class="relative">
-                        <select id="modal_is_auto_approve" name="is_auto_approve"
-                            class="w-full pl-4 pr-10 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none font-prompt text-gray-800 appearance-none font-medium cursor-pointer">
-                            <option value="0">✋ ให้แอดมินพิจารณาอนุมัติ</option>
-                            <option value="1" class="text-blue-600 font-bold">⚡ อนุมัติสิทธิ์อัตโนมัติ (Auto)</option>
+                        <select id="modal_is_auto_approve" name="is_auto_approve" class="form-input form-input-no-icon appearance-none pr-8 py-2 text-sm">
+                            <option value="0">✋ แอดมินอนุมัติ</option>
+                            <option value="1">⚡ Auto อนุมัติ</option>
                         </select>
-                        <div
-                            class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400">
-                            <i class="fa-solid fa-caret-down"></i></div>
+                        <i class="fa-solid fa-caret-down text-xs text-gray-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"></i>
                     </div>
                 </div>
             </div>
 
+            <!-- Date -->
             <div>
-                <label class="block text-sm font-bold text-gray-700 mb-1.5">เปิดรับถึงวันที่ (ไม่บังคับ -
-                    ปล่อยว่างถ้าไม่มีกำหนด)</label>
+                <label class="form-label">เปิดรับถึงวันที่ <span class="text-gray-400 font-normal">(ไม่บังคับ)</span></label>
                 <div class="relative">
-                    <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-400">
-                        <i class="fa-regular fa-calendar-xmark"></i>
-                    </div>
-                    <input type="date" id="modal_available_until" name="available_until"
-                        class="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none font-prompt text-gray-800 transition-all font-medium">
+                    <i class="form-input-icon fa-regular fa-calendar-xmark"></i>
+                    <input type="date" id="modal_available_until" name="available_until" class="form-input">
                 </div>
             </div>
 
+            <!-- Description -->
             <div>
-                <label class="block text-sm font-bold text-gray-700 mb-1.5">รายละเอียดเงื่อนไข / สถานที่จัดงาน
-                    (ไม่บังคับ)</label>
+                <label class="form-label">รายละเอียด / สถานที่ <span class="text-gray-400 font-normal">(ไม่บังคับ)</span></label>
                 <div class="relative">
-                    <div class="absolute top-4 left-4 pointer-events-none text-gray-400">
-                        <i class="fa-solid fa-align-left"></i>
-                    </div>
-                    <textarea id="modal_description" name="description" rows="3"
+                    <i class="fa-solid fa-align-left text-gray-400 absolute top-3.5 left-3.5 text-sm pointer-events-none"></i>
+                    <textarea id="modal_description" name="description" rows="2"
                         placeholder="ระบุข้อมูลที่ผู้เข้าร่วมควรทราบ..."
-                        class="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none font-prompt text-gray-800 resize-none transition-all custom-scrollbar font-medium placeholder-gray-400"></textarea>
+                        class="form-input resize-none custom-scrollbar" style="padding-top:10px;padding-bottom:10px"></textarea>
                 </div>
             </div>
 
-            <div class="pt-2 flex gap-3">
-                <button type="button" onclick="document.getElementById('campaignModal').classList.add('hidden')"
-                    class="w-1/3 bg-white border-2 border-gray-200 text-gray-700 font-bold py-3.5 rounded-2xl hover:bg-gray-50 hover:border-gray-300 transition-all">ยกเลิก</button>
+            <!-- Buttons -->
+            <div class="flex gap-3 pt-1">
+                <button type="button" onclick="document.getElementById('campaignModal').style.display='none'"
+                    class="flex-none px-5 py-2.5 bg-white border-2 border-gray-200 text-gray-700 font-bold rounded-xl hover:bg-gray-50 hover:border-gray-300 transition-all text-sm">ยกเลิก</button>
                 <button type="submit" id="modal_submit_btn"
-                    class="w-2/3 bg-gradient-to-r from-[#0052CC] to-[#0043a8] text-white font-bold py-3.5 rounded-2xl hover:shadow-lg hover:shadow-blue-500/30 hover:-translate-y-0.5 transition-all text-lg tracking-wide shadow-sm flex items-center justify-center gap-2">
+                    class="flex-1 bg-gradient-to-r from-[#0052CC] to-[#1a6fe8] text-white font-bold py-2.5 rounded-xl hover:shadow-lg hover:shadow-blue-500/30 hover:-translate-y-0.5 transition-all text-sm shadow-sm flex items-center justify-center gap-2">
                     <i class="fa-solid fa-save"></i> <span>สร้างแคมเปญ</span>
                 </button>
             </div>
@@ -566,22 +730,34 @@ renderPageHeader("จัดการแคมเปญ", "สร้างแค�
 </div>
 
 <script>
-    // ฟังก์ชันสำหรับสวิตช์เปิดปิด ซ่อน/แสดง แคมเปญที่ Inactive/หมดเขต
-    function toggleInactiveCampaigns() {
-        const isChecked = document.getElementById('toggleInactive').checked;
-        const inactiveRows = document.querySelectorAll('.campaign-row.is-inactive');
+    // ซ่อน inactive rows ตั้งแต่โหลดหน้า
+    document.addEventListener('DOMContentLoaded', function () {
+        document.querySelectorAll('.campaign-row.is-inactive').forEach(r => r.classList.add('hidden'));
+    });
 
-        inactiveRows.forEach(row => {
-            if (isChecked) {
-                row.classList.add('hidden');
-            } else {
-                row.classList.remove('hidden');
-            }
+    function toggleInactiveCampaigns() {
+        const show = document.getElementById('toggleInactive').checked;
+        document.querySelectorAll('.campaign-row.is-inactive').forEach(r => {
+            r.classList.toggle('hidden', !show);
         });
+        document.getElementById('toggleIcon').className = show
+            ? 'fa-solid fa-eye text-[#0052CC] text-xs'
+            : 'fa-solid fa-eye-slash text-gray-400 text-xs';
+        document.getElementById('toggleLabel').textContent = show
+            ? 'ซ่อนแคมเปญที่ปิด/หมดเขต'
+            : 'แสดงแคมเปญที่ปิด/หมดเขต';
     }
 
+    function showModal() { document.getElementById('campaignModal').style.display = 'flex'; }
+    function hideModal() { document.getElementById('campaignModal').style.display = 'none'; }
+
+    // Close on backdrop click
+    document.getElementById('campaignModal').addEventListener('click', function(e) {
+        if (e.target === this) hideModal();
+    });
+
     function openAddModal() {
-        document.getElementById('modal_title').innerHTML = '<div class="w-10 h-10 bg-blue-100 text-[#0052CC] rounded-[14px] flex items-center justify-center text-xl shadow-inner"><i class="fa-solid fa-bullhorn"></i></div> สร้างแคมเปญใหม่';
+        document.getElementById('modal_title').innerHTML = '<span class="modal-icon"><i class="fa-solid fa-bullhorn"></i></span> สร้างแคมเปญใหม่';
         document.getElementById('modal_action').value = 'add';
         document.getElementById('modal_campaign_id').value = '';
         document.getElementById('modal_title_input').value = '';
@@ -594,9 +770,10 @@ renderPageHeader("จัดการแคมเปญ", "สร้างแค�
 
         let btn = document.getElementById('modal_submit_btn');
         btn.innerHTML = '<i class="fa-solid fa-plus-circle"></i> <span>สร้างแคมเปญ</span>';
-        btn.className = 'w-2/3 bg-gradient-to-r from-[#0052CC] to-[#0043a8] text-white font-bold py-3.5 rounded-2xl hover:shadow-lg hover:shadow-blue-500/30 hover:-translate-y-0.5 transition-all text-lg tracking-wide shadow-sm flex items-center justify-center gap-2';
+        btn.style.background = 'linear-gradient(135deg,#0052CC,#1a6fe8)';
 
-        document.getElementById('campaignModal').classList.remove('hidden');
+        document.querySelector('.modal-header').style.background = '';
+        showModal();
     }
 
     // ── Share URL copy-to-clipboard ──────────────────────────────
@@ -609,7 +786,6 @@ renderPageHeader("จัดการแคมเปญ", "สร้างแค�
                 navigator.clipboard.writeText(url).then(function() {
                     showShareToast(url);
                 }).catch(function() {
-                    // fallback สำหรับ browser เก่า
                     const ta = document.createElement('textarea');
                     ta.value = url;
                     ta.style.position = 'fixed';
@@ -640,40 +816,34 @@ renderPageHeader("จัดการแคมเปญ", "สร้างแค�
             toast.style.opacity = '0';
         }, 3000);
     }
-
-    // Event Listener ให้ปุ่มแก้ไขทั้งหมดแทนการใช้ onclick
     document.addEventListener('DOMContentLoaded', function () {
-        const editBtns = document.querySelectorAll('.edit-btn');
-
-        editBtns.forEach(btn => {
+        document.querySelectorAll('.edit-btn').forEach(btn => {
             btn.addEventListener('click', function () {
-                const id = this.getAttribute('data-id');
-                const title = this.getAttribute('data-title');
-                const type = this.getAttribute('data-type');
-                const capacity = this.getAttribute('data-capacity');
-                const until = this.getAttribute('data-until');
-                const status = this.getAttribute('data-status');
-                const desc = this.getAttribute('data-desc');
-                const autoApprove = this.getAttribute('data-auto');
-
-                document.getElementById('modal_title').innerHTML = '<div class="w-10 h-10 bg-amber-100 text-amber-600 rounded-[14px] flex items-center justify-center text-xl shadow-inner"><i class="fa-solid fa-pen-to-square"></i></div> <span class="text-amber-600">แก้ไขข้อมูลแคมเปญ</span>';
+                document.getElementById('modal_title').innerHTML = '<span class="modal-icon" style="background:rgba(255,255,255,.2)"><i class="fa-solid fa-pen-to-square"></i></span> แก้ไขแคมเปญ';
 
                 document.getElementById('modal_action').value = 'edit';
-                document.getElementById('modal_campaign_id').value = id;
-                document.getElementById('modal_title_input').value = title;
-                document.getElementById('modal_type').value = type;
-                document.getElementById('modal_total_capacity').value = capacity;
-                document.getElementById('modal_available_until').value = until || '';
-                document.getElementById('modal_status').value = status;
-                document.getElementById('modal_is_auto_approve').value = autoApprove;
-                document.getElementById('modal_description').value = desc;
+                document.getElementById('modal_campaign_id').value = this.dataset.id;
+                document.getElementById('modal_title_input').value = this.dataset.title;
+                document.getElementById('modal_type').value = this.dataset.type;
+                document.getElementById('modal_total_capacity').value = this.dataset.capacity;
+                document.getElementById('modal_available_until').value = this.dataset.until || '';
+                document.getElementById('modal_status').value = this.dataset.status;
+                document.getElementById('modal_is_auto_approve').value = this.dataset.auto;
+                document.getElementById('modal_description').value = this.dataset.desc;
 
                 let submitBtn = document.getElementById('modal_submit_btn');
                 submitBtn.innerHTML = '<i class="fa-solid fa-save"></i> <span>บันทึกการแก้ไข</span>';
-                submitBtn.className = 'w-2/3 bg-gradient-to-r from-amber-500 to-amber-600 text-white font-bold py-3.5 rounded-2xl hover:shadow-lg hover:shadow-amber-500/30 hover:-translate-y-0.5 transition-all text-lg tracking-wide shadow-sm flex items-center justify-center gap-2';
+                submitBtn.style.background = 'linear-gradient(135deg,#d97706,#f59e0b)';
 
-                document.getElementById('campaignModal').classList.remove('hidden');
+                // Tint the modal header to amber for edit mode
+                document.querySelector('.modal-header').style.background = 'linear-gradient(135deg,#b45309,#d97706)';
+                showModal();
             });
+        });
+
+        // Reset header colour when opening add modal
+        document.querySelector('[onclick="openAddModal()"]')?.addEventListener('click', function() {
+            document.querySelector('.modal-header').style.background = '';
         });
     });
 </script>

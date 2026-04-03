@@ -46,7 +46,7 @@ try {
         JOIN sys_users u ON b.student_id = u.id
         JOIN camp_slots s ON b.slot_id = s.id
         JOIN camp_list c ON b.campaign_id = c.id
-        WHERE ( (s.slot_date >= :start AND s.slot_date <= :end) OR b.status = 'booked' )
+        WHERE ( (s.slot_date >= :start AND s.slot_date <= :end) OR b.status IN ('booked', 'confirmed') )
           AND b.status IN ('booked', 'confirmed', 'cancelled', 'cancelled_by_admin') 
         ORDER BY 
             CASE WHEN b.status = 'booked' THEN 0 ELSE 1 END,
@@ -202,7 +202,7 @@ require_once __DIR__ . '/includes/header.php';
                                     class="font-black text-gray-900 group-hover:text-blue-600 tracking-tight transition-colors">
                                     <?= htmlspecialchars($b['full_name']) ?></div>
                                 <div class="text-[10px] text-gray-400 font-bold uppercase tracking-widest">
-                                    <?= htmlspecialchars($b['student_personnel_id']) ?></div>
+                                    <?= htmlspecialchars($b['student_personnel_id'] ?? '—') ?></div>
                             </td>
                             <td class="p-6">
                                 <div class="text-sm font-bold text-gray-700 max-w-[200px] truncate">
@@ -254,9 +254,9 @@ require_once __DIR__ . '/includes/header.php';
 </div>
 
 <!-- 📦 SIDE DRAWER COMPONENT (Slide-over Details) -->
-<div id="drawerOverlay" class="fixed inset-0 z-[60] drawer-overlay hidden opacity-0" onclick="closeDrawer()"></div>
+<div id="drawerOverlay" class="fixed inset-0 drawer-overlay hidden opacity-0" style="z-index:150" onclick="closeDrawer()"></div>
 <aside id="sideDrawer"
-    class="fixed top-0 right-0 h-screen w-full md:w-[480px] bg-white z-[70] shadow-2xl translate-x-full hidden flex flex-col transition-all duration-300">
+    class="fixed top-0 right-0 h-screen w-full md:w-[480px] bg-white shadow-2xl translate-x-full hidden flex flex-col transition-all duration-300" style="z-index:200">
     <div class="p-8 border-b border-gray-100 flex justify-between items-center">
         <h3 class="text-2xl font-black text-gray-900 tracking-tight">Booking Info</h3>
         <button onclick="closeDrawer()"

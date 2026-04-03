@@ -36,7 +36,8 @@ if (!empty($_SESSION['line_user_id']) || !empty($_SESSION['evax_student_id'])) {
             if ($hasBooking) {
                 header('Location: ' . USER_BASE . 'my_bookings.php', true, 302);
             }
-            elseif (!empty($profile['full_name']) && !empty($profile['student_personnel_id']) && !empty($profile['phone_number']) && !empty($profile['status'])) {
+            elseif (!empty($profile['full_name']) && !empty($profile['phone_number']) && !empty($profile['status']) &&
+                    ($profile['status'] === 'other' || !empty($profile['student_personnel_id']))) {
                 header('Location: ' . USER_BASE . 'booking_campaign.php', true, 302);
             }
             else {

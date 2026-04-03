@@ -1,5 +1,6 @@
 <?php
 // admin/users.php
+require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../admin/includes/auth.php';
 
 $pdo = db();
@@ -144,11 +145,19 @@ require_once __DIR__ . '/../admin/includes/header.php';
                 </div>
                 <div>
                     <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Active Accounts</p>
-                    <p class="text-2xl font-black text-gray-900">
-                        <?php 
-                            echo number_format(count(array_filter($users, fn($u) => ($u['status'] ?? 'active') === 'active')));
-                        ?>
-                    </p>
+<p class="text-2xl font-black text-gray-900">
+    <?php 
+        // นับเฉพาะ User ที่มีประวัติจองแคมเปญ (camp_bookings) หรือ ประวัติยืมของ (borrow_records)
+        $activeSql = "
+            SELECT COUNT(DISTINCT id) 
+            FROM sys_users 
+            WHERE id IN (SELECT student_id FROM camp_bookings WHERE student_id IS NOT NULL)
+               OR id IN (SELECT borrower_student_id FROM borrow_records WHERE borrower_student_id IS NOT NULL)
+        ";
+        $activeCount = $pdo->query($activeSql)->fetchColumn();
+        echo number_format($activeCount);
+    ?>
+</p>
                 </div>
             </div>
         </div>
@@ -219,7 +228,7 @@ require_once __DIR__ . '/../admin/includes/header.php';
                                     <div class="font-black text-gray-900 group-hover/row:text-blue-700 transition-colors uppercase tracking-tight"><?= htmlspecialchars($user['full_name']) ?></div>
                                     <div class="flex items-center gap-2">
                                         <div class="text-[10px] font-black text-gray-400 uppercase tracking-widest bg-gray-50 px-2 py-0.5 rounded-md border border-gray-100">
-                                            #<?= htmlspecialchars($user['student_personnel_id']) ?>
+                                            #<?= htmlspecialchars($user['student_personnel_id'] ?? '—') ?>
                                         </div>
                                         <span class="w-1 h-1 rounded-full bg-gray-300"></span>
                                         <span class="text-[10px] text-gray-400 font-bold uppercase tracking-wider"><?= htmlspecialchars($user['status'] ?? 'Registered') ?></span>
@@ -312,7 +321,7 @@ require_once __DIR__ . '/../admin/includes/header.php';
                         <option value="">-- เลือกประเภท --</option>
                         <option value="student">นักศึกษา</option>
                         <option value="staff">บุคลากร/อาจารย์</option>
-                        <option value="external">บุคคลทั่วไป</option>
+                        <option value="other">บุคคลทั่วไป</option>
                     </select>
                 </div>
             </div>

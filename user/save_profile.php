@@ -27,13 +27,18 @@ $status = trim((string) ($_POST['status'] ?? ''));
 $email = trim((string) ($_POST['email'] ?? ''));
 $redirectBack = trim((string) ($_POST['redirect_back'] ?? ''));
 
-if ($fullName === '' || $citizenId === '' || $phoneNumber === '' || $status === '' || $email === '') {
+if ($status === '') {
+    header('Location: profile.php?error=no_status', true, 303);
+    exit;
+}
+
+if ($fullName === '' || $citizenId === '' || $phoneNumber === '') {
     header('Location: profile.php?error=empty', true, 303);
     exit;
 }
 
-// ถ้าไม่ใช่ external ต้องมีรหัส 7 หลัก
-if ($status !== 'external' && $idNumber === '') {
+// ถ้าไม่ใช่ other ต้องมีรหัส
+if ($status !== 'other' && $idNumber === '') {
     header('Location: profile.php?error=empty_student', true, 303);
     exit;
 }
@@ -41,29 +46,41 @@ if ($status !== 'external' && $idNumber === '') {
 try {
     $pdo = db();
 
-    // 3. อัปเดตข้อมูลนักศึกษาลงใน Record ที่มี line_user_id ตรงกับ Session
-    // (ซึ่ง Record นี้ถูกสร้างไว้แล้วตั้งแต่หน้า index.php)
-    $sql = "UPDATE sys_users 
-            SET full_name = :name, 
-                student_personnel_id = :sid, 
-                citizen_id = :cid,
-                phone_number = :phone,
-                status = :status,
-                email = :email
-            WHERE line_user_id = :line_id";
+    $sidValue = ($status === 'other') ? null : $idNumber;
+
+    // 3. ตรวจสอบว่ามี Record อยู่แล้วหรือไม่
+    $stmtCheck = $pdo->prepare("SELECT id FROM sys_users WHERE line_user_id = :line_id LIMIT 1");
+    $stmtCheck->execute([':line_id' => $lineUserId]);
+    $existingUser = $stmtCheck->fetch();
+
+    if ($existingUser) {
+        // --- UPDATE สำหรับผู้ใช้ที่มีอยู่แล้ว ---
+        $sql = "UPDATE sys_users
+                SET full_name = :name,
+                    student_personnel_id = :sid,
+                    citizen_id = :cid,
+                    phone_number = :phone,
+                    status = :status,
+                    email = :email
+                WHERE line_user_id = :line_id";
+    } else {
+        // --- INSERT สำหรับผู้ใช้ใหม่ที่ยังไม่เคยลงทะเบียน ---
+        $sql = "INSERT INTO sys_users (line_user_id, full_name, student_personnel_id, citizen_id, phone_number, status, email)
+                VALUES (:line_id, :name, :sid, :cid, :phone, :status, :email)";
+    }
 
     $stmt = $pdo->prepare($sql);
     $stmt->execute([
-        ':name' => $fullName,
-        ':sid' => ($status === 'external') ? null : $idNumber,
-        ':cid' => $citizenId,
-        ':phone' => $phoneNumber,
-        ':status' => $status,
-        ':email' => $email,
-        ':line_id' => $lineUserId
+        ':name'    => $fullName,
+        ':sid'     => $sidValue,
+        ':cid'     => $citizenId,
+        ':phone'   => $phoneNumber,
+        ':status'  => $status,
+        ':email'   => $email,
+        ':line_id' => $lineUserId,
     ]);
 
-    // 4. ดึง ID (PK) ของนักศึกษาเก็บใส่ Session เพื่อใช้งานในหน้าถัดไป
+    // 4. ดึง ID (PK) ของผู้ใช้เพื่อเก็บใส่ Session
     $stmtGetId = $pdo->prepare("SELECT id FROM sys_users WHERE line_user_id = :line_id LIMIT 1");
     $stmtGetId->execute([':line_id' => $lineUserId]);
     $user = $stmtGetId->fetch();
@@ -72,6 +89,9 @@ try {
         $studentPkId = (int) $user['id'];
         $_SESSION['evax_student_id'] = $studentPkId;
         $_SESSION['evax_full_name'] = $fullName;
+        // sync session สำหรับ e_Borrow ด้วย
+        $_SESSION['student_id']        = $studentPkId;
+        $_SESSION['student_full_name'] = $fullName;
     } else {
         throw new Exception("ไม่พบข้อมูลผู้ใช้งานในระบบ");
     }
