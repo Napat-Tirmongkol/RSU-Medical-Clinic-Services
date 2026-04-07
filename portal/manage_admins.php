@@ -84,6 +84,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // 2. ดึงข้อมูล Admin ทั้งหมด
 $admins = $pdo->query("SELECT * FROM sys_admins ORDER BY id DESC")->fetchAll();
 
+// 3. ดึงข้อมูล Staff จาก sys_staff
+$staffList = [];
+try {
+    $staffList = $pdo->query("SELECT id, username, full_name, role, account_status, linked_line_user_id FROM sys_staff ORDER BY role ASC, full_name ASC")->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) { /* table may not exist */ }
+
 require_once __DIR__ . '/../admin/includes/header.php';
 ?>
 
@@ -103,40 +109,52 @@ renderPageHeader("System Governance", "Hub บริหารจัดการ:
 ?>
 
     <!-- 📊 สรุปภาพรวม (Admin KPIs) -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 animate-slide-up">
-        <div class="bg-gradient-to-br from-white to-gray-50/50 p-6 rounded-[28px] border border-gray-100 shadow-sm">
-            <div class="flex items-center gap-4">
-                <div class="w-12 h-12 bg-blue-100 rounded-2xl flex items-center justify-center text-[#0052CC]">
-                    <i class="fa-solid fa-users-gear text-xl"></i>
+    <?php
+    $super_count  = count(array_filter($admins, fn($a) => ($a['role'] ?? '') === 'superadmin'));
+    $staff_active = count(array_filter($staffList, fn($s) => ($s['account_status'] ?? '') === 'active'));
+    ?>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8 animate-slide-up">
+        <div class="bg-gradient-to-br from-white to-gray-50/50 p-5 rounded-[24px] border border-gray-100 shadow-sm">
+            <div class="flex items-center gap-3">
+                <div class="w-11 h-11 bg-green-100 rounded-2xl flex items-center justify-center text-green-600 shrink-0">
+                    <i class="fa-solid fa-users-gear text-lg"></i>
                 </div>
                 <div>
-                    <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Total Admins</p>
+                    <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">System Admins</p>
                     <p class="text-2xl font-black text-gray-900"><?= count($admins) ?></p>
                 </div>
             </div>
         </div>
-        <div class="bg-gradient-to-br from-white to-gray-50/50 p-6 rounded-[28px] border border-gray-100 shadow-sm">
-            <div class="flex items-center gap-4">
-                <div class="w-12 h-12 bg-rose-100 rounded-2xl flex items-center justify-center text-rose-600">
-                    <i class="fa-solid fa-shield-halved text-xl"></i>
+        <div class="bg-gradient-to-br from-white to-gray-50/50 p-5 rounded-[24px] border border-gray-100 shadow-sm">
+            <div class="flex items-center gap-3">
+                <div class="w-11 h-11 bg-purple-100 rounded-2xl flex items-center justify-center text-purple-600 shrink-0">
+                    <i class="fa-solid fa-shield-halved text-lg"></i>
                 </div>
-                <?php 
-                    $super_count = count(array_filter($admins, fn($a) => ($a['role'] ?? '') === 'superadmin'));
-                ?>
                 <div>
-                    <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">System Privileged</p>
+                    <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Privileged</p>
                     <p class="text-2xl font-black text-gray-900"><?= $super_count ?></p>
                 </div>
             </div>
         </div>
-        <div class="bg-gradient-to-br from-white to-gray-50/50 p-6 rounded-[28px] border border-gray-100 shadow-sm border-dashed">
-            <div class="flex items-center gap-4 opacity-50">
-                <div class="w-12 h-12 bg-gray-100 rounded-2xl flex items-center justify-center text-gray-400">
-                    <i class="fa-solid fa-clock-rotate-left text-xl"></i>
+        <div class="bg-gradient-to-br from-white to-gray-50/50 p-5 rounded-[24px] border border-gray-100 shadow-sm">
+            <div class="flex items-center gap-3">
+                <div class="w-11 h-11 bg-blue-100 rounded-2xl flex items-center justify-center text-blue-600 shrink-0">
+                    <i class="fa-solid fa-id-badge text-lg"></i>
                 </div>
                 <div>
-                    <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Last Activity</p>
-                    <p class="text-sm font-bold text-gray-900">Today, 07:44</p>
+                    <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">e-Borrow Staff</p>
+                    <p class="text-2xl font-black text-gray-900"><?= count($staffList) ?></p>
+                </div>
+            </div>
+        </div>
+        <div class="bg-gradient-to-br from-white to-gray-50/50 p-5 rounded-[24px] border border-gray-100 shadow-sm">
+            <div class="flex items-center gap-3">
+                <div class="w-11 h-11 bg-emerald-100 rounded-2xl flex items-center justify-center text-emerald-600 shrink-0">
+                    <i class="fa-solid fa-circle-dot text-lg"></i>
+                </div>
+                <div>
+                    <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Staff Active</p>
+                    <p class="text-2xl font-black text-gray-900"><?= $staff_active ?></p>
                 </div>
             </div>
         </div>
@@ -154,12 +172,27 @@ renderPageHeader("System Governance", "Hub บริหารจัดการ:
         </div>
     <?php endif; ?>
 
-    <div class="bg-white rounded-[32px] shadow-2xl shadow-gray-200/40 border border-gray-100/50 overflow-hidden animate-slide-up" style="animation-delay: 100ms;">
+    <!-- Tabs -->
+    <div class="flex gap-2 mb-4 animate-slide-up" style="animation-delay:80ms">
+        <button id="tabAdmins" onclick="switchTab('admins')"
+            class="tab-btn px-5 py-2.5 rounded-xl text-sm font-black transition-all bg-green-600 text-white shadow-md">
+            <i class="fa-solid fa-users-gear mr-1.5"></i> System Admins
+            <span class="ml-1.5 bg-white/25 text-white text-[10px] px-1.5 py-0.5 rounded-md"><?= count($admins) ?></span>
+        </button>
+        <button id="tabStaff" onclick="switchTab('staff')"
+            class="tab-btn px-5 py-2.5 rounded-xl text-sm font-black transition-all bg-white border border-gray-200 text-gray-500 hover:bg-gray-50">
+            <i class="fa-solid fa-id-badge mr-1.5"></i> e-Borrow Staff
+            <span class="ml-1.5 bg-gray-100 text-gray-500 text-[10px] px-1.5 py-0.5 rounded-md"><?= count($staffList) ?></span>
+        </button>
+    </div>
+
+    <!-- ═══ TABLE: ADMINS ═══ -->
+    <div id="panelAdmins" class="bg-white rounded-[32px] shadow-2xl shadow-gray-200/40 border border-gray-100/50 overflow-hidden animate-slide-up" style="animation-delay: 100ms;">
         <div class="px-8 py-6 border-b border-gray-50 bg-gray-50/30 flex justify-between items-center">
             <h3 class="font-black text-gray-900 text-sm uppercase tracking-widest">Administrative Roster</h3>
             <div class="relative group">
-                <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-blue-500 transition-colors"></i>
-                <input type="text" placeholder="ค้นหาแอดมิน..." class="pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all w-64 shadow-sm" onkeyup="filterAdmins(this.value)">
+                <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-green-500 transition-colors"></i>
+                <input type="text" placeholder="ค้นหาแอดมิน..." class="pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-green-100 focus:border-green-400 transition-all w-64 shadow-sm" onkeyup="filterAdmins(this.value)">
             </div>
         </div>
         <table class="w-full text-left border-collapse" id="adminTable">
@@ -242,6 +275,98 @@ renderPageHeader("System Governance", "Hub บริหารจัดการ:
                 <?php endforeach; ?>
             </tbody>
         </table>
+    </div>
+
+    <!-- ═══ TABLE: STAFF ═══ -->
+    <div id="panelStaff" class="hidden bg-white rounded-[32px] shadow-2xl shadow-gray-200/40 border border-gray-100/50 overflow-hidden animate-slide-up" style="animation-delay: 100ms;">
+        <div class="px-8 py-6 border-b border-gray-50 bg-gray-50/30 flex justify-between items-center">
+            <h3 class="font-black text-gray-900 text-sm uppercase tracking-widest">
+                e-Borrow Staff Roster
+                <span class="ml-2 text-[10px] font-bold text-gray-400 normal-case">(ข้อมูลจาก sys_staff)</span>
+            </h3>
+            <div class="relative group">
+                <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-blue-500 transition-colors"></i>
+                <input type="text" placeholder="ค้นหาเจ้าหน้าที่..." class="pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all w-64 shadow-sm" onkeyup="filterStaff(this.value)">
+            </div>
+        </div>
+        <?php if (empty($staffList)): ?>
+        <div class="py-16 text-center text-gray-300">
+            <i class="fa-solid fa-users-slash text-4xl mb-3 block"></i>
+            <p class="text-sm font-bold">ไม่พบข้อมูล Staff หรือตาราง sys_staff ยังไม่มีในระบบ</p>
+        </div>
+        <?php else: ?>
+        <table class="w-full text-left border-collapse" id="staffTable">
+            <thead>
+                <tr class="bg-white/50 border-b border-gray-50 text-[10px] uppercase tracking-[0.2em] font-black text-gray-400">
+                    <th class="px-8 py-5">Staff Details</th>
+                    <th class="px-8 py-5">Username</th>
+                    <th class="px-8 py-5">Role</th>
+                    <th class="px-8 py-5">Status</th>
+                    <th class="px-8 py-5">LINE</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-50" id="staffTbody">
+                <?php foreach ($staffList as $st):
+                    $isActive = ($st['account_status'] ?? '') === 'active';
+                    $roleLabel = match($st['role'] ?? '') {
+                        'admin'     => ['label' => 'Admin',    'css' => 'bg-purple-50 border-purple-200 text-purple-700', 'icon' => 'fa-bolt'],
+                        'librarian' => ['label' => 'Librarian','css' => 'bg-blue-50 border-blue-200 text-blue-700',       'icon' => 'fa-book'],
+                        default     => ['label' => ucfirst($st['role'] ?? 'Staff'), 'css' => 'bg-gray-50 border-gray-200 text-gray-600', 'icon' => 'fa-user-tie'],
+                    };
+                ?>
+                <tr class="hover:bg-blue-50/20 transition-all group/row">
+                    <td class="px-8 py-5">
+                        <div class="flex items-center gap-4">
+                            <div class="w-11 h-11 rounded-2xl flex items-center justify-center font-black text-sm shadow-sm transition-all duration-300
+                                <?= $isActive ? 'bg-gradient-to-br from-blue-400 to-blue-600 text-white' : 'bg-gray-100 text-gray-400' ?>">
+                                <?= mb_substr($st['full_name'] ?? '?', 0, 1) ?>
+                            </div>
+                            <div>
+                                <div class="font-black text-gray-900 tracking-tight"><?= htmlspecialchars($st['full_name'] ?? '—') ?></div>
+                                <div class="text-[10px] text-gray-400 font-bold">ID: <?= (int)$st['id'] ?></div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-8 py-5">
+                        <div class="flex items-center gap-2">
+                            <i class="fa-solid fa-user-circle text-gray-300 text-xs"></i>
+                            <span class="font-black text-gray-800 text-sm"><?= htmlspecialchars($st['username'] ?? '—') ?></span>
+                        </div>
+                    </td>
+                    <td class="px-8 py-5">
+                        <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border <?= $roleLabel['css'] ?> shadow-sm">
+                            <i class="fa-solid <?= $roleLabel['icon'] ?> text-[10px]"></i>
+                            <span class="text-[10px] font-black uppercase tracking-widest"><?= $roleLabel['label'] ?></span>
+                        </div>
+                    </td>
+                    <td class="px-8 py-5">
+                        <?php if ($isActive): ?>
+                        <div class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                            <span class="text-[10px] font-black uppercase tracking-widest">Active</span>
+                        </div>
+                        <?php else: ?>
+                        <div class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gray-50 border border-gray-200 text-gray-400">
+                            <span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
+                            <span class="text-[10px] font-black uppercase tracking-widest"><?= htmlspecialchars($st['account_status'] ?? 'inactive') ?></span>
+                        </div>
+                        <?php endif; ?>
+                    </td>
+                    <td class="px-8 py-5">
+                        <?php if (!empty($st['linked_line_user_id'])): ?>
+                        <div class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-green-50 border border-green-200 text-green-700">
+                            <i class="fa-brands fa-line text-sm"></i>
+                            <span class="text-[10px] font-black uppercase tracking-widest">Linked</span>
+                        </div>
+                        <?php else: ?>
+                        <span class="text-gray-300 text-xs font-bold">—</span>
+                        <?php endif; ?>
+                    </td>
+                </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+        <?php endif; ?>
     </div>
 </div>
 
@@ -375,9 +500,33 @@ renderPageHeader("System Governance", "Hub บริหารจัดการ:
         const rows = document.querySelectorAll('#adminTable tbody tr');
         val = val.toLowerCase();
         rows.forEach(row => {
-            const text = row.innerText.toLowerCase();
-            row.style.display = text.includes(val) ? '' : 'none';
+            row.style.display = row.innerText.toLowerCase().includes(val) ? '' : 'none';
         });
+    }
+
+    function filterStaff(val) {
+        const rows = document.querySelectorAll('#staffTbody tr');
+        val = val.toLowerCase();
+        rows.forEach(row => {
+            row.style.display = row.innerText.toLowerCase().includes(val) ? '' : 'none';
+        });
+    }
+
+    function switchTab(tab) {
+        const isAdmins = tab === 'admins';
+        document.getElementById('panelAdmins').classList.toggle('hidden', !isAdmins);
+        document.getElementById('panelStaff').classList.toggle('hidden', isAdmins);
+
+        const btnAdmins = document.getElementById('tabAdmins');
+        const btnStaff  = document.getElementById('tabStaff');
+
+        if (isAdmins) {
+            btnAdmins.className = 'tab-btn px-5 py-2.5 rounded-xl text-sm font-black transition-all bg-green-600 text-white shadow-md';
+            btnStaff.className  = 'tab-btn px-5 py-2.5 rounded-xl text-sm font-black transition-all bg-white border border-gray-200 text-gray-500 hover:bg-gray-50';
+        } else {
+            btnStaff.className  = 'tab-btn px-5 py-2.5 rounded-xl text-sm font-black transition-all bg-blue-600 text-white shadow-md';
+            btnAdmins.className = 'tab-btn px-5 py-2.5 rounded-xl text-sm font-black transition-all bg-white border border-gray-200 text-gray-500 hover:bg-gray-50';
+        }
     }
 </script>
 
