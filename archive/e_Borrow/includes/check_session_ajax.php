@@ -25,11 +25,23 @@ if (isset($_SESSION['LAST_ACTIVITY'])) {
 // 3. �ѻവ��������ش (��������á�������ҧ� �������ѧ��ҹ����)
 $_SESSION['LAST_ACTIVITY'] = time();
 
-// 4. ��Ǩ�ͺ����� User ID ��� (���͡ó������ Login ���)
+// 4. ตรวจสอบว่า User ID มีอยู่ (กรณีที่ยังไม่ได้ Login)
 if (empty($_SESSION['user_id'])) {
     header('Content-Type: application/json');
-    http_response_code(401); 
-    echo json_encode(['status' => 'error', 'message' => '��س��������к���͹��ҹ']);
+    http_response_code(401);
+    echo json_encode(['status' => 'error', 'message' => 'กรุณาเข้าสู่ระบบก่อน']);
     exit;
+}
+
+// 5. CSRF Validation สำหรับทุก POST request
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $submitted = $_POST['csrf_token'] ?? ($_SERVER['HTTP_X_CSRF_TOKEN'] ?? '');
+    $expected  = $_SESSION['csrf_token'] ?? '';
+    if (!$expected || !hash_equals($expected, $submitted)) {
+        header('Content-Type: application/json');
+        http_response_code(403);
+        echo json_encode(['status' => 'error', 'message' => 'คำขอไม่ถูกต้อง (CSRF token ผิดพลาด)']);
+        exit;
+    }
 }
 ?>

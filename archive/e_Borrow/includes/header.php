@@ -31,6 +31,7 @@ $base_url = explode('/archive/e_Borrow', $_SERVER['SCRIPT_NAME'])[0] . '/archive
         })();
     </script>
     
+    <meta name="csrf-token" content="<?= htmlspecialchars($_SESSION['csrf_token'] ?? '', ENT_QUOTES) ?>">
     <link rel="icon" type="image/png" href="assets/img/logo.png" sizes="any">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="assets/css/style.css?v=2.5">

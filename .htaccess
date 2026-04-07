@@ -2,6 +2,33 @@
 
 Options -Indexes
 
+# ─── Security Headers ─────────────────────────────────────────────────────
+<IfModule mod_headers.c>
+    # ป้องกัน Clickjacking
+    Header always set X-Frame-Options "SAMEORIGIN"
+
+    # ป้องกัน MIME sniffing
+    Header always set X-Content-Type-Options "nosniff"
+
+    # บังคับ HTTPS (HSTS) — 1 ปี
+    Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
+
+    # XSS Protection (browsers เก่า)
+    Header always set X-XSS-Protection "1; mode=block"
+
+    # Referrer Policy
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+
+    # Content Security Policy — อนุญาต CDN ที่ระบบใช้อยู่
+    Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://cdn.onesignal.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src 'self' https://cdnjs.cloudflare.com https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://onesignal.com; frame-src 'none';"
+</IfModule>
+
+# ─── Force HTTPS ──────────────────────────────────────────────────────────
+<IfModule mod_rewrite.c>
+    RewriteCond %{HTTPS} off
+    RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+</IfModule>
+
 # Enable Rewrite
 RewriteEngine On
 

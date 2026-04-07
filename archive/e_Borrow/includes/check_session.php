@@ -39,6 +39,11 @@ if (!isset($_SESSION['user_id'])
     }
 }
 
+// ── CSRF Token Generation ──────────────────────────────────────────────────
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+
 // ── Centralized role helper ────────────────────────────────────────────────
 // ใช้แทนการเรียก in_array ซ้ำๆ ทั่วระบบ e-Borrow
 if (!function_exists('require_eborrow_role')) {
