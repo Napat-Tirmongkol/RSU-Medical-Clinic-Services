@@ -36,10 +36,19 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 exit;
             }
 
-            // 8. Log in สำเร็จ!
-            $_SESSION['user_id'] = $user['id'];
+            // 8. Log in สำเร็จ — ตั้ง e-Borrow session
+            $_SESSION['user_id']   = $user['id'];
             $_SESSION['full_name'] = $user['full_name'];
-            $_SESSION['role'] = $user['role'];
+            $_SESSION['role']      = $user['role'];
+
+            // 8.1 SSO Bridge → e-Campaign (ถ้า staff มีสิทธิ์)
+            if (!empty($user['access_ecampaign'])) {
+                $_SESSION['admin_logged_in']     = true;
+                $_SESSION['admin_id']            = $user['id'];
+                $_SESSION['admin_username']      = $user['full_name'];
+                $_SESSION['admin_role']          = $user['ecampaign_role'] ?? 'admin';
+                $_SESSION['_admin_last_activity'] = time();
+            }
 
             $log_desc = "พนักงาน '{$user['full_name']}' (Username: {$user['username']}) ได้เข้าสู่ระบบ (ผ่าน Password)";
             log_action($pdo, $user['id'], 'login_password', $log_desc);
