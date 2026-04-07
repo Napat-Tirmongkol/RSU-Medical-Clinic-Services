@@ -7,8 +7,26 @@
 
 // ดักจับการเรียกใช้ข้อมูล (Fetch) ทั้งหมดในระบบ
 const originalFetch = window.fetch;
-window.fetch = function() {
-    return originalFetch.apply(this, arguments).then(async response => {
+window.fetch = function(url, options = {}) {
+    // --- CSRF: Inject token into every POST request ---
+    if (options && options.method && options.method.toUpperCase() === 'POST') {
+        const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+        const csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : null;
+        if (csrfToken) {
+            if (options.body instanceof FormData) {
+                // ป้องกัน duplicate (กรณี retry)
+                if (!options.body.has('csrf_token')) {
+                    options.body.append('csrf_token', csrfToken);
+                }
+            } else {
+                // ส่งเป็น Header สำหรับ JSON body หรือ body ที่ไม่ใช่ FormData
+                options.headers = Object.assign({}, options.headers, {
+                    'X-CSRF-Token': csrfToken
+                });
+            }
+        }
+    }
+    return originalFetch(url, options).then(async response => {
         // ถ้า Server ตอบกลับมาว่า 401 (Session หมดอายุ)
         if (response.status === 401) {
             // แจ้งเตือนสวยๆ

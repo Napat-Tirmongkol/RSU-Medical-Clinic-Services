@@ -8,6 +8,7 @@ header('Content-Type: application/json; charset=utf-8');
 
 require_once '../includes/db_connect.php';
 session_start();
+require_once '../includes/csrf_validate.php';
 
 $response = ['status' => 'error', 'message' => 'เกิดข้อผิดพลาดที่ไม่ทราบสาเหตุ'];
 

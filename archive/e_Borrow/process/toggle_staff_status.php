@@ -15,8 +15,9 @@ $response = ['status' => 'error', 'message' => '�Դ��ͼԴ��Ҵ���
 
 try {
     session_start();
+    require_once '../includes/csrf_validate.php';
 
-    // 2. ��Ǩ�ͺ�Է��� Admin
+    // 2. ตรวจสอบสิทธิ์ Admin
     if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
         throw new Exception('�س������Է�����Թ��ù�� (Access Denied)');
     }

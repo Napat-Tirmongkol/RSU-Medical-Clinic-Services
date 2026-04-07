@@ -10,10 +10,11 @@ error_reporting(E_ALL);
 // 2. ��˹� Header �� JSON
 header('Content-Type: application/json; charset=utf-8');
 
-require_once '../includes/db_connect.php'; 
+require_once '../includes/db_connect.php';
 session_start();
+require_once '../includes/csrf_validate.php';
 
-$response = ['status' => 'error', 'message' => '�Դ��ͼԴ��Ҵ�������Һ���˵�'];
+$response = ['status' => 'error', 'message' => 'เกิดข้อผิดพลาดที่ไม่ทราบสาเหตุ'];
 
 try {
     // 3. ��Ǩ�ͺ�Է��� (Admin ��ҹ��)
