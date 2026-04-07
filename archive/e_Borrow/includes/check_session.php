@@ -3,6 +3,23 @@
 // สำหรับ "หน้าหลัก" (HTML Pages) ของระบบยืมคืนเดิม
 // ปรับปรุงใหม่: รองรับ SSO จาก Hub Portal และระบบพนักงานกลาง
 
+// ── Absolute URL helper ──────────────────────────────────────────────────────
+// ป้องกัน chrome-error:// origin mismatch เมื่อหน้าถูก embed ใน iframe
+if (!function_exists('_eborrow_abs_url')) {
+    function _eborrow_abs_url(string $relativePath): string {
+        $proto = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+        $host  = $_SERVER['HTTP_HOST'] ?? 'localhost';
+        // __DIR__ = .../archive/e_Borrow/includes
+        $adminDir = rtrim(str_replace(
+            str_replace('/', DIRECTORY_SEPARATOR, $_SERVER['DOCUMENT_ROOT']),
+            '',
+            realpath(__DIR__ . '/../admin')
+        ), DIRECTORY_SEPARATOR);
+        $adminUrl = $proto . '://' . $host . '/' . ltrim(str_replace(DIRECTORY_SEPARATOR, '/', $adminDir), '/');
+        return $adminUrl . '/' . ltrim($relativePath, '/');
+    }
+}
+
 @session_start();
 
 // --- [NEW] SSO Sync from Hub Portal ---
@@ -29,12 +46,12 @@ if (!isset($_SESSION['user_id'])
             $_SESSION['role']      = in_array($row['role'], $allowedRoles, true) ? $row['role'] : 'employee';
         } else {
             // ไม่มีบัญชี staff → ไม่อนุญาต (แทนที่จะ grant admin โดยอัตโนมัติ)
-            header("Location: ../admin/login.php?error=no_staff_account");
+            header('Location: ' . _eborrow_abs_url('login.php?error=no_staff_account'));
             exit;
         }
     } catch (Exception $e) {
         // DB ไม่พร้อม → ปฏิเสธการเข้าถึงแบบ fail-secure
-        header("Location: ../admin/login.php?error=sso_failed");
+        header('Location: ' . _eborrow_abs_url('login.php?error=sso_failed'));
         exit;
     }
 }
@@ -59,7 +76,7 @@ if (isset($_SESSION['LAST_ACTIVITY'])) {
     if ((time() - $_SESSION['LAST_ACTIVITY']) > $timeout_duration) {
         session_unset();     
         session_destroy();
-        header("Location: ../admin/login.php?timeout=1"); 
+        header('Location: ' . _eborrow_abs_url('login.php?timeout=1'));
         exit;
     }
 }
@@ -69,7 +86,7 @@ $_SESSION['LAST_ACTIVITY'] = time();
 
 // 4. บังคับย้อนกลับไป Login หากไม่มีตัวตนในเซสชัน
 if (!isset($_SESSION['user_id'])) {
-    header("Location: ../admin/login.php");
+    header('Location: ' . _eborrow_abs_url('login.php'));
     exit;
 }
 ?>
