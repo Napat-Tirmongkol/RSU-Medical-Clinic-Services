@@ -7,30 +7,47 @@
 
 // --- [NEW] SSO Sync from Hub Portal ---
 // เมื่อมีการ Login ผ่านระบบใหม่ ให้ Sync สิทธิ์เข้ามาที่ระบบยืมคืนโดยอัตโนมัติ
-if (!isset($_SESSION['user_id']) && (isset($_SESSION['admin_logged_in']) || isset($_SESSION['admin_id']))) {
+// SSO Sync: Portal Admin → e-Borrow (เฉพาะที่มีบัญชี sys_staff จริงเท่านั้น)
+if (!isset($_SESSION['user_id'])
+    && isset($_SESSION['admin_logged_in'], $_SESSION['admin_id'])
+    && $_SESSION['admin_logged_in'] === true) {
     try {
         require_once __DIR__ . '/../../../config/db_connect.php';
         $p = db();
         $uname = $_SESSION['admin_username'] ?? '';
-        
-        // ค้นหาใน sys_staff ว่ามีคนนี้ไหม
-        $s = $p->prepare("SELECT id, full_name, role FROM sys_staff WHERE username = :u LIMIT 1");
+
+        // ค้นหาใน sys_staff — ต้องมีบัญชีจริงและสถานะ active
+        $s = $p->prepare("SELECT id, full_name, role FROM sys_staff WHERE username = :u AND account_status = 'active' LIMIT 1");
         $s->execute([':u' => $uname]);
         $row = $s->fetch();
-        
+
         if ($row) {
-            $_SESSION['user_id'] = $row['id'];
+            // Whitelist role ก่อน set session
+            $allowedRoles = ['admin', 'editor', 'employee', 'librarian'];
+            $_SESSION['user_id']   = $row['id'];
             $_SESSION['full_name'] = $row['full_name'];
-            $_SESSION['role'] = $row['role'];
+            $_SESSION['role']      = in_array($row['role'], $allowedRoles, true) ? $row['role'] : 'employee';
         } else {
-            // กรณีเป็นแอดมินใน Portal แต่ไม่มีรายชื่อในโครงการยืมคืน (Staff) 
-            // ให้ใช้สสิทธิ์ Admin เสมือนเพื่อให้ดูประวัติได้
-            $_SESSION['user_id'] = $_SESSION['admin_id'] ?? 999;
-            $_SESSION['full_name'] = $_SESSION['admin_username'] ?? 'Administrator';
-            $_SESSION['role'] = 'admin';
+            // ไม่มีบัญชี staff → ไม่อนุญาต (แทนที่จะ grant admin โดยอัตโนมัติ)
+            header("Location: ../admin/login.php?error=no_staff_account");
+            exit;
         }
     } catch (Exception $e) {
-        // เงียบไว้หาก DB ไม่พร้อม
+        // DB ไม่พร้อม → ปฏิเสธการเข้าถึงแบบ fail-secure
+        header("Location: ../admin/login.php?error=sso_failed");
+        exit;
+    }
+}
+
+// ── Centralized role helper ────────────────────────────────────────────────
+// ใช้แทนการเรียก in_array ซ้ำๆ ทั่วระบบ e-Borrow
+if (!function_exists('require_eborrow_role')) {
+    function require_eborrow_role($roles) {
+        if (!is_array($roles)) $roles = [$roles];
+        if (!isset($_SESSION['role']) || !in_array($_SESSION['role'], $roles, true)) {
+            header("Location: index.php");
+            exit;
+        }
     }
 }
 

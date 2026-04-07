@@ -36,17 +36,25 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 exit;
             }
 
-            // 8. Log in สำเร็จ — ตั้ง e-Borrow session
+            // 8. Log in สำเร็จ — regenerate session ก่อน (ป้องกัน session fixation)
+            session_regenerate_id(true);
+
             $_SESSION['user_id']   = $user['id'];
             $_SESSION['full_name'] = $user['full_name'];
             $_SESSION['role']      = $user['role'];
 
             // 8.1 SSO Bridge → e-Campaign (ถ้า staff มีสิทธิ์)
             if (!empty($user['access_ecampaign'])) {
-                $_SESSION['admin_logged_in']     = true;
-                $_SESSION['admin_id']            = $user['id'];
-                $_SESSION['admin_username']      = $user['full_name'];
-                $_SESSION['admin_role']          = $user['ecampaign_role'] ?? 'admin';
+                // Whitelist role ก่อน set session ป้องกัน privilege escalation
+                $allowedCampRoles = ['admin', 'editor', 'superadmin'];
+                $campRole = in_array($user['ecampaign_role'] ?? '', $allowedCampRoles, true)
+                    ? $user['ecampaign_role']
+                    : 'admin';
+
+                $_SESSION['admin_logged_in']      = true;
+                $_SESSION['admin_id']             = $user['id'];
+                $_SESSION['admin_username']       = $user['full_name'];
+                $_SESSION['admin_role']           = $campRole;
                 $_SESSION['_admin_last_activity'] = time();
             }
 

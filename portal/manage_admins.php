@@ -28,23 +28,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $username = trim($_POST['username'] ?? '');
         $email    = trim($_POST['email'] ?? '');
         $password = $_POST['password'] ?? '';
-        $role     = $_POST['role'] ?? 'admin';
-        $adminId  = $_POST['admin_id'] ?? null;
+        // Whitelist role ป้องกัน privilege escalation
+        $allowedAdminRoles = ['admin', 'editor', 'superadmin'];
+        $role    = in_array($_POST['role'] ?? '', $allowedAdminRoles, true) ? $_POST['role'] : 'admin';
+        $adminId = $_POST['admin_id'] ?? null;
 
         if ($fullName && $username && $email) {
             try {
                 if ($action === 'add') {
+                    // บังคับกรอก password — ไม่มี default
+                    if (empty($password)) {
+                        $error = "กรุณาตั้งรหัสผ่านสำหรับ Admin ใหม่";
+                    } elseif (strlen($password) < 8) {
+                        $error = "รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร";
+                    } else {
                     // ตรวจสอบ Username ซ้ำ
                     $check = $pdo->prepare("SELECT id FROM sys_admins WHERE username = ? OR email = ?");
                     $check->execute([$username, $email]);
                     if ($check->fetch()) {
                         $error = "ชื่อผู้ใช้ หรือ อีเมล นี้มีในระบบแล้ว";
                     } else {
-                        $hashed = password_hash($password ?: '1234', PASSWORD_DEFAULT);
+                        $hashed = password_hash($password, PASSWORD_DEFAULT);
                         $stmt = $pdo->prepare("INSERT INTO sys_admins (full_name, username, email, password, role) VALUES (?, ?, ?, ?, ?)");
                         $stmt->execute([$fullName, $username, $email, $hashed, $role]);
                         log_activity("Added Admin", "เพิ่มเจ้าหน้าที่ใหม่: $fullName ($username) [สิทธิ์: $role]");
-                        $success = "เพิ่มผู้ดูแลระบบเรียบร้อยแล้ว (รหัสผ่านเริ่มต้น: 1234)";
+                        $success = "เพิ่มผู้ดูแลระบบเรียบร้อยแล้ว";
+                    }
                     }
                 } else {
                     // Edit
@@ -699,7 +708,7 @@ renderPageHeader("System Governance", "Hub บริหารจัดการ:
         document.getElementById('modalUsername').value = '';
         document.getElementById('modalEmail').value = '';
         document.getElementById('modalRole').value = 'admin';
-        document.getElementById('modalPassword').placeholder = 'ใส่รหัสผ่าน (เริ่มต้น 1234)';
+        document.getElementById('modalPassword').placeholder = 'กรุณาตั้งรหัสผ่านอย่างน้อย 8 ตัว *';
         
         modal.classList.remove('hidden');
         setTimeout(() => modalContent.classList.remove('scale-95', 'opacity-0'), 10);

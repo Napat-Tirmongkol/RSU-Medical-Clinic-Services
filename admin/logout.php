@@ -2,13 +2,17 @@
 // admin/logout.php
 session_start();
 
-// ลบข้อมูล Session ของ Admin ออกทั้งหมด
-unset($_SESSION['admin_logged_in']);
-unset($_SESSION['admin_username']);
-
-// ทำลาย Session 
+// ล้าง session ทุก key ก่อน destroy (ป้องกัน session fixation)
+session_unset();
 session_destroy();
 
-// เด้งกลับไปที่หน้า Login ของ Admin
+// ลบ session cookie
+if (ini_get('session.use_cookies')) {
+    $p = session_get_cookie_params();
+    setcookie(session_name(), '', time() - 86400,
+        $p['path'], $p['domain'], $p['secure'], $p['httponly']
+    );
+}
+
 header('Location: login.php');
 exit;
