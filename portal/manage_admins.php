@@ -512,27 +512,27 @@ renderPageHeader("System Governance", "Hub บริหารจัดการ:
         });
     }
 
-    const ACTIVE_STYLE  = 'padding:.6rem 1.25rem;border-radius:.75rem;font-size:.875rem;font-weight:900;transition:all .2s;border:none;cursor:pointer;display:inline-flex;align-items:center;gap:.4rem;';
-    const INACTIVE_STYLE = 'padding:.6rem 1.25rem;border-radius:.75rem;font-size:.875rem;font-weight:900;transition:all .2s;background:#fff;color:#6b7280;border:1.5px solid #e5e7eb;cursor:pointer;display:inline-flex;align-items:center;gap:.4rem;';
+    const ACTIVE_S  = 'padding:.6rem 1.25rem;border-radius:.75rem;font-size:.875rem;font-weight:900;transition:all .2s;border:none;cursor:pointer;display:inline-flex;align-items:center;gap:.4rem;';
+    const INACTIVE_S = 'padding:.6rem 1.25rem;border-radius:.75rem;font-size:.875rem;font-weight:900;transition:all .2s;background:#fff;color:#6b7280;border:1.5px solid #e5e7eb;cursor:pointer;display:inline-flex;align-items:center;gap:.4rem;';
 
     function switchTab(tab) {
         const isAdmins = tab === 'admins';
         document.getElementById('panelAdmins').classList.toggle('hidden', !isAdmins);
         document.getElementById('panelStaff').classList.toggle('hidden', isAdmins);
 
-        const btnAdmins = document.getElementById('tabAdmins');
-        const btnStaff  = document.getElementById('tabStaff');
+        const btnAdmins   = document.getElementById('tabAdmins');
+        const btnStaff    = document.getElementById('tabStaff');
         const badgeAdmins = btnAdmins.querySelector('span');
         const badgeStaff  = btnStaff.querySelector('span');
 
         if (isAdmins) {
-            btnAdmins.style.cssText = ACTIVE_STYLE + 'background:#2e9e63;color:#fff;box-shadow:0 4px 12px rgba(46,158,99,.3);';
-            btnStaff.style.cssText  = INACTIVE_STYLE;
+            btnAdmins.style.cssText = ACTIVE_S + 'background:#2e9e63;color:#fff;box-shadow:0 4px 12px rgba(46,158,99,.3);';
+            btnStaff.style.cssText  = INACTIVE_S;
             badgeAdmins.style.cssText = 'background:rgba(255,255,255,.25);color:#fff;font-size:.65rem;padding:.15rem .5rem;border-radius:.4rem;font-weight:900';
             badgeStaff.style.cssText  = 'background:#f3f4f6;color:#6b7280;font-size:.65rem;padding:.15rem .5rem;border-radius:.4rem;font-weight:900';
         } else {
-            btnStaff.style.cssText  = ACTIVE_STYLE + 'background:#2563eb;color:#fff;box-shadow:0 4px 12px rgba(37,99,235,.3);';
-            btnAdmins.style.cssText = INACTIVE_STYLE;
+            btnStaff.style.cssText  = ACTIVE_S + 'background:#2563eb;color:#fff;box-shadow:0 4px 12px rgba(37,99,235,.3);';
+            btnAdmins.style.cssText = INACTIVE_S;
             badgeStaff.style.cssText  = 'background:rgba(255,255,255,.25);color:#fff;font-size:.65rem;padding:.15rem .5rem;border-radius:.4rem;font-weight:900';
             badgeAdmins.style.cssText = 'background:#f3f4f6;color:#6b7280;font-size:.65rem;padding:.15rem .5rem;border-radius:.4rem;font-weight:900';
         }
