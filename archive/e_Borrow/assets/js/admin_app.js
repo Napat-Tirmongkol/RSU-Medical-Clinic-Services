@@ -887,6 +887,83 @@ function openApproveSelectionModal(transId, currentItemId, equipName) {
         });
 }
 
+// Re-render items table in-place without page reload (called after add/edit/delete item)
+function openManageItemsPopup(typeId) {
+    fetch('ajax/get_items_for_type.php?type_id=' + typeId)
+        .then(r => r.json())
+        .then(data => {
+            if (data.status !== 'success') {
+                // fallback: reload page if AJAX fails
+                window.location.href = 'manage_items.php?type_id=' + typeId;
+                return;
+            }
+
+            const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+            const statusColor = s => s === 'available' ? 'green' : s === 'borrowed' ? 'blue' : 'yellow';
+            const statusIcon  = s => s === 'available' ? 'fa-check-circle' : s === 'borrowed' ? 'fa-user-tag' : 'fa-wrench';
+            const formatDate  = d => d ? new Date(d).toLocaleDateString('th-TH', {day:'2-digit',month:'2-digit',year:'numeric'}) : '-';
+
+            const buildDeleteBtn = (item) => item.status !== 'borrowed'
+                ? `<button type="button" class="btn btn-danger btn-sm" title="ลบ" onclick="confirmDeleteItem(${item.id},${item.type_id})"><i class="fas fa-trash"></i></button>`
+                : '';
+
+            // ── Desktop table tbody ─────────────────────────────────────────
+            const tbody = document.querySelector('.table-container table tbody');
+            if (tbody) {
+                if (data.items.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;">ยังไม่มีอุปกรณ์รายชิ้นในประเภทนี้</td></tr>`;
+                } else {
+                    tbody.innerHTML = data.items.map(item => `
+                        <tr>
+                            <td data-label="ID"><strong>${item.id}</strong></td>
+                            <td data-label="ชื่อเฉพาะ" class="truncate-text" title="${esc(item.name)}">${esc(item.name)}</td>
+                            <td data-label="Serial">${esc(item.serial_number) || '-'}</td>
+                            <td data-label="สถานะ"><span class="status-badge ${statusColor(item.status)}">${esc(item.status)}</span></td>
+                            <td data-label="ข้อมูลยืม">${item.status === 'borrowed' && item.student_name
+                                ? `<strong>ผู้ยืม:</strong> ${esc(item.student_name)}<br><small>กำหนดคืน: ${formatDate(item.due_date)}</small>`
+                                : '<span class="text-muted">-</span>'}</td>
+                            <td data-label="จัดการ" class="action-buttons">
+                                <button type="button" class="btn btn-manage btn-sm" title="แก้ไข" onclick="openEditItemPopup(${item.id})"><i class="fas fa-edit"></i></button>
+                                <button type="button" class="btn btn-secondary btn-sm" title="ดูประวัติ" onclick="openItemHistoryPopup(${item.id},'${esc(item.name)}')"><i class="fas fa-history"></i></button>
+                                <button type="button" class="btn btn-dark btn-sm" title="บาร์โค้ด" onclick="openItemBarcodePopup(${item.id},'${esc(item.name)}','${esc(item.serial_number||'-')}')"><i class="fas fa-barcode"></i></button>
+                                ${buildDeleteBtn(item)}
+                            </td>
+                        </tr>`).join('');
+                }
+            }
+
+            // ── Mobile card list ────────────────────────────────────────────
+            const cardList = document.querySelector('.student-card-list');
+            if (cardList) {
+                if (data.items.length === 0) {
+                    cardList.innerHTML = `<div class="history-card"><p style="text-align:center;width:100%;">ยังไม่มีอุปกรณ์รายชิ้นในประเภทนี้</p></div>`;
+                } else {
+                    cardList.innerHTML = data.items.map(item => `
+                        <div class="history-card">
+                            <div class="history-card-icon">
+                                <span class="status-badge ${statusColor(item.status)}"><i class="fas ${statusIcon(item.status)}"></i></span>
+                            </div>
+                            <div class="history-card-info">
+                                <h4 class="truncate-text" title="${esc(item.name)}">${esc(item.name)}</h4>
+                                <p>S/N: ${esc(item.serial_number) || '-'}</p>
+                                <p>สถานะ: <strong>${esc(item.status)}</strong></p>
+                                ${item.status === 'borrowed' && item.student_name ? `<p style="font-size:0.9em;">ผู้ยืม: <strong>${esc(item.student_name)}</strong></p>` : ''}
+                            </div>
+                            <div class="action-buttons" style="flex-wrap:wrap;">
+                                <button type="button" class="btn btn-manage btn-sm" onclick="openEditItemPopup(${item.id})"><i class="fas fa-edit"></i></button>
+                                <button type="button" class="btn btn-dark btn-sm" onclick="openItemBarcodePopup(${item.id},'${esc(item.name)}','${esc(item.serial_number||'-')}')"><i class="fas fa-barcode"></i></button>
+                                <button type="button" class="btn btn-secondary btn-sm" onclick="openItemHistoryPopup(${item.id},'${esc(item.name)}')"><i class="fas fa-history"></i></button>
+                                ${buildDeleteBtn(item)}
+                            </div>
+                        </div>`).join('');
+                }
+            }
+        })
+        .catch(() => {
+            window.location.href = 'manage_items.php?type_id=' + typeId;
+        });
+}
+
 function openAddItemPopup(typeId, typeName) {
     Swal.fire({
         title: `➕ เพิ่มชิ้นอุปกรณ์ใหม่`,

@@ -38,8 +38,17 @@ try {
         throw new Exception("ไม่พบประเภทอุปกรณ์ (ID: $type_id)");
     }
 
-    // 6. (Query ที่ 2) ดึงข้อมูล "ชิ้น" อุปกรณ์ (items)
-    $stmt_items = $pdo->prepare("SELECT * FROM borrow_items WHERE type_id = ? ORDER BY id ASC");
+    // 6. (Query ที่ 2) ดึงข้อมูล "ชิ้น" อุปกรณ์ พร้อมข้อมูลผู้ยืม
+    $stmt_items = $pdo->prepare("
+        SELECT i.*,
+               s.full_name AS student_name,
+               t.borrow_date, t.due_date
+        FROM borrow_items i
+        LEFT JOIN borrow_records t ON i.id = t.item_id AND t.status = 'borrowed'
+        LEFT JOIN sys_users s ON t.borrower_student_id = s.id
+        WHERE i.type_id = ?
+        ORDER BY i.status ASC, i.id ASC
+    ");
     $stmt_items->execute([$type_id]);
     $items_data = $stmt_items->fetchAll(PDO::FETCH_ASSOC);
 
