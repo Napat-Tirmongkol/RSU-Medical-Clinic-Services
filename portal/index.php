@@ -175,6 +175,18 @@ try {
 
             <!-- Right: user + logout -->
             <div class="flex items-center gap-3">
+
+                <?php if ($adminRole === 'superadmin'): ?>
+                <!-- Git Pull Button (Superadmin only) -->
+                <button id="btnGitPull"
+                        onclick="triggerGitPull()"
+                        title="Pull โค้ดล่าสุดจาก Git"
+                        style="display:flex;align-items:center;gap:6px;padding:6px 14px;border-radius:10px;border:1px solid #d1fae5;background:#f0fdf4;color:#16a34a;font-size:12px;font-weight:700;cursor:pointer;transition:all .2s;">
+                    <i class="fa-solid fa-code-branch"></i>
+                    <span>Git Pull</span>
+                </button>
+                <?php endif; ?>
+
                 <div class="user-pill">
                     <div class="user-avatar"><i class="fa-solid fa-user-shield text-[11px]"></i></div>
                     <div class="hidden sm:block">
@@ -400,6 +412,49 @@ document.querySelectorAll('.proj-card').forEach(card => {
     });
 });
 </script>
+
+<?php if ($adminRole === 'superadmin'): ?>
+<script>
+function triggerGitPull() {
+    const btn = document.getElementById('btnGitPull');
+    btn.disabled = true;
+    btn.style.opacity = '0.6';
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> <span>Pulling...</span>';
+
+    fetch('../admin/ajax_git_pull.php', { method: 'POST' })
+        .then(r => r.json())
+        .then(data => {
+            if (data.status === 'success') {
+                btn.style.background = '#dcfce7';
+                btn.style.color = '#15803d';
+                btn.innerHTML = '<i class="fa-solid fa-check"></i> <span>สำเร็จ!</span>';
+            } else {
+                btn.style.background = '#fef2f2';
+                btn.style.color = '#dc2626';
+                btn.style.borderColor = '#fecaca';
+                btn.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> <span>ล้มเหลว</span>';
+                alert('Git Pull ล้มเหลว: ' + data.message);
+            }
+        })
+        .catch(() => {
+            btn.style.background = '#fef2f2';
+            btn.style.color = '#dc2626';
+            btn.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> <span>Error</span>';
+        })
+        .finally(() => {
+            // Reset button หลัง 3 วินาที
+            setTimeout(() => {
+                btn.disabled = false;
+                btn.style.opacity = '1';
+                btn.style.background = '#f0fdf4';
+                btn.style.color = '#16a34a';
+                btn.style.borderColor = '#d1fae5';
+                btn.innerHTML = '<i class="fa-solid fa-code-branch"></i> <span>Git Pull</span>';
+            }, 3000);
+        });
+}
+</script>
+<?php endif; ?>
 
 </body>
 </html>
