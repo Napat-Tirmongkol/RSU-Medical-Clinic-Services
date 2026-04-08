@@ -71,18 +71,24 @@ try {
         exit;
     }
 
-    // ── ยังไม่ถึงวันรับบริการ ────────────────────────────────────────────
+    // ── เช็คอินได้เฉพาะตรงวันนัดเท่านั้น ──────────────────────────────────
     if (!empty($booking['slot_date'])) {
-        $today    = new DateTimeImmutable('today', new DateTimeZone('Asia/Bangkok'));
-        $slotDay  = new DateTimeImmutable($booking['slot_date'], new DateTimeZone('Asia/Bangkok'));
+        $tz      = new DateTimeZone('Asia/Bangkok');
+        $today   = (new DateTimeImmutable('today', $tz))->format('Y-m-d');
+        $slotDay = (new DateTimeImmutable($booking['slot_date'], $tz))->format('Y-m-d');
+        $dateStr = date('d/m/Y', strtotime($booking['slot_date']));
+
         if ($slotDay > $today) {
-            $dateStr = date('d/m/Y', strtotime($booking['slot_date']));
-            $timeStr = !empty($booking['start_time'])
-                ? ' เวลา ' . substr($booking['start_time'], 0, 5) . ' น.'
-                : '';
             echo json_encode([
                 'status'  => 'error',
-                'message' => "ยังไม่ถึงวันรับบริการ — นัดหมาย {$dateStr}{$timeStr}",
+                'message' => "ยังไม่ถึงวันรับบริการ — นัดหมายวันที่ {$dateStr}",
+            ]);
+            exit;
+        }
+        if ($slotDay < $today) {
+            echo json_encode([
+                'status'  => 'error',
+                'message' => "เลยวันรับบริการไปแล้ว — นัดหมายวันที่ {$dateStr}",
             ]);
             exit;
         }
