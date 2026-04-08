@@ -64,11 +64,11 @@ render_header('เลือกรอบเวลา');
     <div class="flex-1">
         <div class="flex items-center gap-3 mb-6">
             <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center text-xl shrink-0">
-                <i class="fa-solid fa-clock text-[#0052CC]"></i>
+                <i class="fa-solid fa-clock text-[#2e9e63]"></i>
             </div>
             <div>
                 <h2 class="text-xl font-bold text-gray-900 leading-tight">เลือกรอบเวลา</h2>
-                <p class="text-sm text-[#0052CC] font-semibold mt-0.5"><?= $displayDate ?></p>
+                <p class="text-sm text-[#2e9e63] font-semibold mt-0.5"><?= $displayDate ?></p>
             </div>
         </div>
 
@@ -99,10 +99,10 @@ render_header('เลือกรอบเวลา');
                         $remaining = $slot['max_capacity'] - $slot['booked_count'];
                         $isFull = $remaining <= 0;
                     ?>
-                        <label id="slot-label-<?= $slot['id'] ?>" class="relative block bg-white border <?= $isFull ? 'border-red-200 opacity-60' : 'border-gray-200 cursor-pointer hover:border-[#0052CC] hover:bg-blue-50/50 hover:shadow-sm' ?> rounded-2xl p-4 transition-all duration-300">
+                        <label id="slot-label-<?= $slot['id'] ?>" class="relative block bg-white border <?= $isFull ? 'border-red-200 opacity-60' : 'border-gray-200 cursor-pointer hover:border-[#2e9e63] hover:bg-blue-50/50 hover:shadow-sm' ?> rounded-2xl p-4 transition-all duration-300">
                             <div class="flex justify-between items-center">
                                 <div class="flex items-center gap-3">
-                                    <input type="radio" id="slot-radio-<?= $slot['id'] ?>" name="slot_id" value="<?= $slot['id'] ?>" <?= $isFull ? 'disabled' : 'required' ?> class="w-5 h-5 text-[#0052CC] focus:ring-[#0052CC] border-gray-300 cursor-pointer disabled:cursor-not-allowed" data-time="<?= $timeStr ?>">
+                                    <input type="radio" id="slot-radio-<?= $slot['id'] ?>" name="slot_id" value="<?= $slot['id'] ?>" <?= $isFull ? 'disabled' : 'required' ?> class="w-5 h-5 text-[#2e9e63] focus:ring-[#2e9e63] border-gray-300 cursor-pointer disabled:cursor-not-allowed" data-time="<?= $timeStr ?>">
                                     <span class="font-bold text-gray-900 text-lg font-prompt"><?= $timeStr ?></span>
                                 </div>
                                 <div>
@@ -118,7 +118,7 @@ render_header('เลือกรอบเวลา');
 
             <div class="fixed bottom-0 left-0 right-0 max-w-md mx-auto p-4 bg-white border-t border-gray-100 z-20 flex gap-3 shadow-[0_-4px_20px_-10px_rgba(0,0,0,0.1)]">
                 <a href="booking_date.php?year=<?= $year ?>&month=<?= $month ?>&campaign_id=<?= $campaignId ?>" class="px-6 py-4 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl transition-colors text-center shadow-sm active:scale-95">ย้อนกลับ</a>
-                <button type="submit" class="flex-1 bg-[#0052CC] hover:bg-blue-700 text-white font-bold py-4 rounded-xl transition-colors text-center shadow-sm active:scale-95">
+                <button type="submit" class="flex-1 bg-[#2e9e63] hover:bg-green-700 text-white font-bold py-4 rounded-xl transition-colors text-center shadow-sm active:scale-95">
                     ยืนยันรอบเวลา
                 </button>
             </div>
@@ -147,10 +147,10 @@ document.addEventListener('DOMContentLoaded', function() {
         
         Swal.fire({
             title: 'ยืนยันรอบเวลา?',
-            html: `คุณต้องการจอง <b><?= htmlspecialchars($campaign['title']) ?></b><br>รอบเวลา <span class="text-[#0052CC] font-bold">${selectedTimeText}</span> ใช่หรือไม่?`,
+            html: `คุณต้องการจอง <b><?= htmlspecialchars($campaign['title']) ?></b><br>รอบเวลา <span class="text-[#2e9e63] font-bold">${selectedTimeText}</span> ใช่หรือไม่?`,
             icon: 'question',
             showCancelButton: true,
-            confirmButtonColor: '#0052CC',
+            confirmButtonColor: '#2e9e63',
             cancelButtonColor: '#6B7280',
             confirmButtonText: 'ใช่, ยืนยันการจอง',
             cancelButtonText: 'ยกเลิก',
@@ -190,7 +190,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                     title: 'คิวเต็มแล้ว!',
                                     text: 'ขออภัย รอบเวลาที่คุณเลือกเพิ่งถูกจองเต็มไปเมื่อสักครู่ กรุณาเลือกรอบอื่นครับ',
                                     icon: 'warning',
-                                    confirmButtonColor: '#0052CC',
+                                    confirmButtonColor: '#2e9e63',
                                     confirmButtonText: 'ตกลง',
                                     customClass: { title: 'font-prompt', popup: 'font-prompt rounded-2xl', confirmButton: 'font-prompt rounded-xl' }
                                 });
@@ -201,7 +201,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             statusBadge.innerText = "เต็มแล้ว";
                         } else {
                             radio.disabled = false;
-                            label.className = "relative block bg-white border border-gray-200 cursor-pointer hover:border-[#0052CC] hover:bg-blue-50/50 hover:shadow-sm rounded-2xl p-4 transition-all duration-300";
+                            label.className = "relative block bg-white border border-gray-200 cursor-pointer hover:border-[#2e9e63] hover:bg-blue-50/50 hover:shadow-sm rounded-2xl p-4 transition-all duration-300";
                             statusBadge.className = "text-xs font-bold text-green-600 bg-green-50 px-3 py-1.5 rounded-lg border border-green-100 transition-colors";
                             statusBadge.innerText = `ว่าง ${remaining} ที่`;
                         }

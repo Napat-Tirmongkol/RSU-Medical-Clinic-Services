@@ -102,7 +102,7 @@ render_header('ข้อมูลส่วนตัว');
           <label class="text-sm font-semibold text-gray-700 font-prompt" for="full_name">ชื่อ-นามสกุล <span class="text-red-500">*</span></label>
           <input id="full_name" name="full_name" type="text" required
             value="<?= htmlspecialchars($userData['full_name']) ?>" placeholder="เช่น นายสมชาย ใจดี"
-            class="w-full p-4 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0052CC] focus:border-transparent outline-none transition-all placeholder:text-gray-400 font-prompt" />
+            class="w-full p-4 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#2e9e63] focus:border-transparent outline-none transition-all placeholder:text-gray-400 font-prompt" />
         </div>
 
         <div class="space-y-2">
@@ -113,21 +113,21 @@ render_header('ข้อมูลส่วนตัว');
               <input type="radio" name="status" value="student" required class="peer hidden"
                 <?= $userData['status'] === 'student' ? 'checked' : '' ?>>
               <div
-                class="py-3 px-1 text-center border border-gray-200 rounded-xl peer-checked:bg-[#E6F0FF] peer-checked:border-[#0052CC] peer-checked:text-[#0052CC] font-prompt text-[11px] font-bold transition-all h-full flex items-center justify-center">
+                class="py-3 px-1 text-center border border-gray-200 rounded-xl peer-checked:bg-[#E6F0FF] peer-checked:border-[#2e9e63] peer-checked:text-[#2e9e63] font-prompt text-[11px] font-bold transition-all h-full flex items-center justify-center">
                 นักศึกษา</div>
             </label>
             <label class="cursor-pointer">
               <input type="radio" name="status" value="staff" required class="peer hidden"
                 <?= $userData['status'] === 'staff' ? 'checked' : '' ?>>
               <div
-                class="py-3 px-1 text-center border border-gray-200 rounded-xl peer-checked:bg-[#E6F0FF] peer-checked:border-[#0052CC] peer-checked:text-[#0052CC] font-prompt text-[11px] font-bold transition-all h-full flex items-center justify-center">
+                class="py-3 px-1 text-center border border-gray-200 rounded-xl peer-checked:bg-[#E6F0FF] peer-checked:border-[#2e9e63] peer-checked:text-[#2e9e63] font-prompt text-[11px] font-bold transition-all h-full flex items-center justify-center">
                 บุคลากร/อาจารย์</div>
             </label>
             <label class="cursor-pointer">
               <input type="radio" name="status" value="other" required class="peer hidden"
                 <?= $userData['status'] === 'other' ? 'checked' : '' ?>>
               <div
-                class="py-3 px-1 text-center border border-gray-200 rounded-xl peer-checked:bg-[#E6F0FF] peer-checked:border-[#0052CC] peer-checked:text-[#0052CC] font-prompt text-[11px] font-bold transition-all h-full flex items-center justify-center">
+                class="py-3 px-1 text-center border border-gray-200 rounded-xl peer-checked:bg-[#E6F0FF] peer-checked:border-[#2e9e63] peer-checked:text-[#2e9e63] font-prompt text-[11px] font-bold transition-all h-full flex items-center justify-center">
                 บุคคลทั่วไป</div>
             </label>
           </div>
@@ -143,7 +143,7 @@ render_header('ข้อมูลส่วนตัว');
               <input type="radio" name="id_type" value="citizen" class="peer hidden"
                 <?= !$isPassport ? 'checked' : '' ?>>
               <div class="flex items-center justify-center gap-1.5 py-2 px-3 border border-gray-200 rounded-xl
-                          peer-checked:bg-[#E6F0FF] peer-checked:border-[#0052CC] peer-checked:text-[#0052CC]
+                          peer-checked:bg-[#E6F0FF] peer-checked:border-[#2e9e63] peer-checked:text-[#2e9e63]
                           font-prompt text-[11px] font-bold transition-all text-gray-500">
                 <i class="fa-solid fa-id-card text-xs"></i>
                 บัตรประชาชน (TH)
@@ -153,7 +153,7 @@ render_header('ข้อมูลส่วนตัว');
               <input type="radio" name="id_type" value="passport" class="peer hidden"
                 <?= $isPassport ? 'checked' : '' ?>>
               <div class="flex items-center justify-center gap-1.5 py-2 px-3 border border-gray-200 rounded-xl
-                          peer-checked:bg-[#E6F0FF] peer-checked:border-[#0052CC] peer-checked:text-[#0052CC]
+                          peer-checked:bg-[#E6F0FF] peer-checked:border-[#2e9e63] peer-checked:text-[#2e9e63]
                           font-prompt text-[11px] font-bold transition-all text-gray-500">
                 <i class="fa-solid fa-passport text-xs"></i>
                 Passport
@@ -164,7 +164,7 @@ render_header('ข้อมูลส่วนตัว');
           <input id="citizen_id" name="citizen_id" type="text" required
             value="<?= htmlspecialchars($citizenIdValue) ?>"
             placeholder="<?= $isPassport ? 'เช่น A1234567 (Passport No.)' : 'กรอกเลขบัตรประชาชน 13 หลัก' ?>"
-            class="w-full p-4 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0052CC] focus:border-transparent outline-none transition-all placeholder:text-gray-400 font-prompt" />
+            class="w-full p-4 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#2e9e63] focus:border-transparent outline-none transition-all placeholder:text-gray-400 font-prompt" />
           <p id="citizen_id_hint" class="text-xs text-gray-400 font-prompt">
             <?= $isPassport ? 'กรอกเลขหนังสือเดินทาง (ตัวอักษรและตัวเลข)' : 'กรอกเลขบัตรประชาชน 13 หลัก ไม่มีขีด' ?>
           </p>
@@ -175,7 +175,7 @@ render_header('ข้อมูลส่วนตัว');
               class="text-red-500">*</span></label>
           <input id="id_number" name="id_number" type="text" maxlength="7"
             value="<?= htmlspecialchars($userData['id_number']) ?>" placeholder="กรอกรหัสตัวเลข 7 หลัก"
-            class="w-full p-4 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0052CC] focus:border-transparent outline-none transition-all placeholder:text-gray-400 font-prompt" />
+            class="w-full p-4 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#2e9e63] focus:border-transparent outline-none transition-all placeholder:text-gray-400 font-prompt" />
         </div>
         <div class="space-y-1.5">
           <label class="text-sm font-semibold text-gray-700 font-prompt" for="email">
@@ -184,7 +184,7 @@ render_header('ข้อมูลส่วนตัว');
           </label>
           <input id="email" name="email" type="email" value="<?= htmlspecialchars($userData['email']) ?>"
             placeholder="example@email.com"
-            class="w-full p-4 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0052CC] focus:border-transparent outline-none transition-all placeholder:text-gray-400 font-prompt" />
+            class="w-full p-4 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#2e9e63] focus:border-transparent outline-none transition-all placeholder:text-gray-400 font-prompt" />
           <p class="text-xs text-amber-600 flex items-start gap-1.5 mt-1 font-prompt">
             <i class="fa-solid fa-triangle-exclamation shrink-0 mt-0.5"></i>
             หากไม่กรอกอีเมล คุณจะไม่ได้รับการแจ้งเตือนยืนยันการจองและผลอนุมัติ
@@ -194,13 +194,13 @@ render_header('ข้อมูลส่วนตัว');
           <label class="text-sm font-semibold text-gray-700 font-prompt" for="phone_number">เบอร์โทรศัพท์ <span class="text-red-500">*</span></label>
           <input id="phone_number" name="phone_number" type="tel" required
             value="<?= htmlspecialchars($userData['phone']) ?>" placeholder="08X-XXX-XXXX"
-            class="w-full p-4 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0052CC] focus:border-transparent outline-none transition-all placeholder:text-gray-400 font-prompt" />
+            class="w-full p-4 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#2e9e63] focus:border-transparent outline-none transition-all placeholder:text-gray-400 font-prompt" />
         </div>
       </div>
 
       <!-- 🛡️ PDPA Section -->
       <div class="space-y-4 pt-4 border-t border-gray-100">
-        <div class="flex items-center gap-2 text-[#0052CC] mb-2 text-sm font-bold">
+        <div class="flex items-center gap-2 text-[#2e9e63] mb-2 text-sm font-bold">
           <i class="fa-solid fa-shield-halved"></i>
           <span>ข้อตกลงและเงื่อนไข (PDPA)</span>
         </div>
@@ -224,7 +224,7 @@ render_header('ข้อมูลส่วนตัว');
           class="flex items-center gap-4 p-4 bg-white rounded-2xl border border-gray-100 shadow-sm cursor-pointer hover:bg-gray-50 transition-all active:scale-[0.98] select-none">
           <input type="checkbox" id="pdpa_agreed" name="agreed" value="1"
             <?= $isEditing ? 'checked' : 'required' ?>
-            class="shrink-0 w-6 h-6 rounded-lg border-gray-300 text-[#0052CC] focus:ring-[#0052CC] transition-all" />
+            class="shrink-0 w-6 h-6 rounded-lg border-gray-300 text-[#2e9e63] focus:ring-[#2e9e63] transition-all" />
           <span class="text-xs text-gray-600 font-bold leading-tight font-prompt">ฉันได้อ่าน
             และยอมรับข้อตกลงนโยบายความเป็นส่วนตัว</span>
         </label>
@@ -240,13 +240,13 @@ render_header('ข้อมูลส่วนตัว');
           ยกเลิก
         </a>
         <button type="submit"
-          class="flex-1 bg-[#0052CC] hover:bg-blue-700 text-white font-bold py-4 rounded-xl transition-all shadow-sm active:scale-[0.98] font-prompt">
+          class="flex-1 bg-[#2e9e63] hover:bg-green-700 text-white font-bold py-4 rounded-xl transition-all shadow-sm active:scale-[0.98] font-prompt">
           บันทึกการเปลี่ยนแปลง
         </button>
       </div>
       <?php else: ?>
       <button type="submit"
-        class="w-full bg-[#0052CC] hover:bg-blue-700 text-white font-bold py-4 rounded-xl transition-all shadow-sm active:scale-[0.98] font-prompt">
+        class="w-full bg-[#2e9e63] hover:bg-green-700 text-white font-bold py-4 rounded-xl transition-all shadow-sm active:scale-[0.98] font-prompt">
         บันทึกและดำเนินการต่อ
       </button>
       <?php endif; ?>

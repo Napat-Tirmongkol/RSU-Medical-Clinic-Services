@@ -55,14 +55,14 @@ if (isset($_SESSION['evax_student_id'])) {
 render_header('เข้าสู่ระบบ');
 ?>
 
-<div class="flex flex-col items-center justify-center min-h-screen bg-[#f4f7fa] p-5">
+<div class="flex flex-col items-center justify-center min-h-screen bg-[#e2f4ea] p-5">
 
     <div class="w-full max-w-sm animate-in fade-in slide-in-from-bottom-4 duration-500">
 
         <!-- Header Logo -->
         <div class="text-center mb-8">
             <div class="mx-auto w-20 h-20 bg-white rounded-3xl flex items-center justify-center shadow-lg mb-5 rotate-3 hover:rotate-0 transition-transform duration-300">
-                <i class="fa-solid fa-syringe text-4xl text-[#0052CC]"></i>
+                <i class="fa-solid fa-syringe text-4xl text-[#2e9e63]"></i>
             </div>
             <h1 class="text-2xl font-bold text-gray-900 font-prompt">ระบบจองคิว E-Vax</h1>
             <p class="text-gray-500 text-sm mt-1 font-prompt">มหาวิทยาลัยรังสิต</p>
@@ -72,9 +72,9 @@ render_header('เข้าสู่ระบบ');
         <div class="bg-white rounded-3xl shadow-[0_8px_40px_rgba(0,0,0,0.06)] border border-gray-100 overflow-hidden">
 
             <!-- Header Strip -->
-            <div class="bg-gradient-to-r from-[#0052CC] to-[#0070f3] p-6 text-center">
+            <div class="bg-gradient-to-r from-[#2e9e63] to-[#3bba7a] p-6 text-center">
                 <p class="text-white text-sm font-prompt opacity-90">เข้าสู่ระบบด้วยบัญชี LINE ของคุณ</p>
-                <p class="text-blue-100 text-xs mt-1 font-prompt opacity-75">เพื่อดำเนินการจองคิวรับวัคซีน</p>
+                <p class="text-green-100 text-xs mt-1 font-prompt opacity-75">เพื่อดำเนินการจองคิวรับวัคซีน</p>
             </div>
 
             <div class="p-7">
@@ -95,8 +95,8 @@ render_header('เข้าสู่ระบบ');
 
                 <!-- Info Badges -->
                 <div class="grid grid-cols-3 gap-3 text-center">
-                    <div class="p-3 bg-blue-50 rounded-2xl">
-                        <i class="fa-solid fa-shield-halved text-[#0052CC] text-lg mb-1 block"></i>
+                    <div class="p-3 bg-green-50 rounded-2xl">
+                        <i class="fa-solid fa-shield-halved text-[#2e9e63] text-lg mb-1 block"></i>
                         <p class="text-xs text-gray-600 font-prompt leading-tight">ปลอดภัย<br>100%</p>
                     </div>
                     <div class="p-3 bg-green-50 rounded-2xl">
@@ -114,7 +114,7 @@ render_header('เข้าสู่ระบบ');
         <!-- Footer Note -->
         <p class="text-center text-xs text-gray-400 mt-6 font-prompt leading-relaxed px-4">
             การเข้าใช้งานถือว่าคุณยอมรับ<br>
-            <span class="text-[#0052CC] font-medium">นโยบายความเป็นส่วนตัว</span> และ <span class="text-[#0052CC] font-medium">ข้อกำหนดการใช้งาน</span>
+            <span class="text-[#2e9e63] font-medium">นโยบายความเป็นส่วนตัว</span> และ <span class="text-[#2e9e63] font-medium">ข้อกำหนดการใช้งาน</span>
         </p>
     </div>
 </div>

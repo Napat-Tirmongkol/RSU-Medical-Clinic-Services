@@ -27,7 +27,7 @@ $camp_list = $stmt->fetchAll();
 // ฟังก์ชันช่วยแสดงผลประเภทกิจกรรม
 function getBadge($type) {
     return match($type) {
-        'vaccine' => ['label' => 'ฉีดวัคซีน', 'class' => 'bg-blue-100 text-blue-700', 'icon' => 'fa-syringe'],
+        'vaccine' => ['label' => 'ฉีดวัคซีน', 'class' => 'bg-blue-100 text-[#267d50]', 'icon' => 'fa-syringe'],
         'training' => ['label' => 'อบรม/สัมมนา', 'class' => 'bg-purple-100 text-purple-700', 'icon' => 'fa-chalkboard-user'],
         'health_check' => ['label' => 'ตรวจสุขภาพ', 'class' => 'bg-green-100 text-green-700', 'icon' => 'fa-stethoscope'],
         default => ['label' => 'กิจกรรม', 'class' => 'bg-gray-100 text-gray-700', 'icon' => 'fa-star'],
@@ -40,7 +40,7 @@ render_header('เลือกแคมเปญ - E-Campaign');
 
 <div class="max-w-md mx-auto px-4 py-6 pb-24">
     <div class="mb-8">
-        <h1 class="text-2xl font-black text-gray-900 leading-tight">เลือกแคมเปญ <br><span class="text-[#0052CC]">ที่คุณสนใจ</span></h1>
+        <h1 class="text-2xl font-black text-gray-900 leading-tight">เลือกแคมเปญ <br><span class="text-[#2e9e63]">ที่คุณสนใจ</span></h1>
         <p class="text-gray-500 mt-2 text-sm">เลือกกิจกรรมด้านล่างเพื่อทำการจองรอบเวลา</p>
     </div>
 
@@ -87,7 +87,7 @@ render_header('เลือกแคมเปญ - E-Campaign');
                             </div>
                             
                             <?php if (!$isFull): ?>
-                                <a href="booking_date.php?campaign_id=<?= $c['id'] ?>" class="bg-[#0052CC] hover:bg-blue-700 text-white w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-200 transition-all active:scale-95">
+                                <a href="booking_date.php?campaign_id=<?= $c['id'] ?>" class="bg-[#2e9e63] hover:bg-green-700 text-white w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-200 transition-all active:scale-95">
                                     <i class="fa-solid fa-chevron-right"></i>
                                 </a>
                             <?php else: ?>
@@ -103,7 +103,7 @@ render_header('เลือกแคมเปญ - E-Campaign');
     <?php endif; ?>
 
     <div class="mt-10 text-center">
-        <a href="my_bookings.php" class="text-sm font-bold text-gray-400 hover:text-[#0052CC] transition-colors">
+        <a href="my_bookings.php" class="text-sm font-bold text-gray-400 hover:text-[#2e9e63] transition-colors">
             <i class="fa-solid fa-receipt mr-1"></i> ตรวจสอบสถานะการจองของฉัน
         </a>
     </div>

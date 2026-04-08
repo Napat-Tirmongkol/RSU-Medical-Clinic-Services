@@ -34,9 +34,9 @@ try {
 render_header('Booking Details');
 ?>
 
-<div class="p-5 flex flex-col min-h-screen bg-[#f4f7fa]">
+<div class="p-5 flex flex-col min-h-screen bg-[#e2f4ea]">
     <div class="mb-6">
-        <a href="my_bookings.php" class="text-[#0052CC] font-bold flex items-center gap-2">
+        <a href="my_bookings.php" class="text-[#2e9e63] font-bold flex items-center gap-2">
             ← กลับไปหน้าประวัติ
         </a>
     </div>
@@ -55,7 +55,7 @@ render_header('Booking Details');
             </div>
             <div>
                 <p class="text-xs text-gray-400 uppercase tracking-wider font-bold">เวลา</p>
-                <p class="text-lg font-bold text-[#0052CC]"><?= substr($booking['start_time'], 0, 5) ?> - <?= substr($booking['end_time'], 0, 5) ?></p>
+                <p class="text-lg font-bold text-[#2e9e63]"><?= substr($booking['start_time'], 0, 5) ?> - <?= substr($booking['end_time'], 0, 5) ?></p>
             </div>
         </div>
     </div>

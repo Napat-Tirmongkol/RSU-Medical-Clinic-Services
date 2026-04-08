@@ -62,14 +62,14 @@ function render_header(string $title = 'E-Vax'): void {
       </style>
     </head>
     
-    <body class="bg-[#f4f7fa] h-[100dvh] w-full overflow-hidden flex justify-center text-gray-900 font-prompt">
-      
-      <div id="page-loader" class="fixed inset-0 z-[9999] bg-[#f4f7fa] flex flex-col items-center justify-center transition-opacity duration-300">
+    <body class="bg-[#e2f4ea] h-[100dvh] w-full overflow-hidden flex justify-center text-gray-900 font-prompt">
+
+      <div id="page-loader" class="fixed inset-0 z-[9999] bg-[#e2f4ea] flex flex-col items-center justify-center transition-opacity duration-300">
         <div class="relative w-16 h-16">
-          <div class="absolute inset-0 rounded-full border-4 border-blue-100"></div>
-          <div class="absolute inset-0 rounded-full border-4 border-[#0052CC] border-t-transparent animate-spin"></div>
+          <div class="absolute inset-0 rounded-full border-4 border-green-100"></div>
+          <div class="absolute inset-0 rounded-full border-4 border-[#2e9e63] border-t-transparent animate-spin"></div>
         </div>
-        <p class="mt-4 text-[#0052CC] font-semibold text-sm animate-pulse font-prompt">กำลังโหลดข้อมูล...</p>
+        <p class="mt-4 text-[#2e9e63] font-semibold text-sm animate-pulse font-prompt">กำลังโหลดข้อมูล...</p>
       </div>
       
       <main class="w-full max-w-md h-full bg-white shadow-xl relative overflow-y-auto overflow-x-hidden custom-scrollbar">
