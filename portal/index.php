@@ -46,7 +46,7 @@ try {
 $projects = [
     [
         'id'            => 'identity_governance',
-        'title'         => 'Identity & Governance',
+        'title'         => 'User & Access Management',
         'description'   => 'ศูนย์กลางจัดการข้อมูลผู้ใช้งานและควบคุมสิทธิ์การเข้าถึงระบบสำหรับเจ้าหน้าที่และแอดมินระดับสูง',
         'icon'          => 'fa-id-card-clip',
         'bg_color'      => 'bg-amber-50',
@@ -72,7 +72,7 @@ $projects = [
         'allowed_roles' => ['admin', 'superadmin'],
         'badges'        => [ 'Campaigns', 'Activity' ],
         'actions'       => [
-            ['label' => 'Launch Campaign Manager', 'url' => '../admin/index.php', 'primary' => true],
+            ['label' => 'Open e-Campaign', 'url' => '../admin/index.php', 'primary' => true],
         ]
     ],
     [
@@ -86,7 +86,7 @@ $projects = [
         'allowed_roles' => ['admin', 'superadmin'],
         'badges'        => [ 'Inventory', 'Asset Tracking' ],
         'actions'       => [
-            ['label' => 'Open System', 'url' => '../archive/e_Borrow/admin/index.php', 'primary' => true],
+            ['label' => 'Manage Inventory', 'url' => '../archive/e_Borrow/admin/index.php', 'primary' => true],
         ]
     ],
     [
@@ -110,7 +110,7 @@ $projects = [
      */
     [
         'id'            => 'future_app',
-        'title'         => 'Upcoming Project...',
+        'title'         => 'Future Modules',
         'description'   => 'ระบบใหม่ที่กำลังอยู่ในระหว่างการพัฒนา เพื่อเสริมสร้างศักยภาพการจัดการข้อมูลในอนาคต',
         'icon'          => 'fa-plus-circle',
         'bg_color'      => 'bg-gray-50',
@@ -169,7 +169,7 @@ try {
                 <div class="brand-icon"><i class="fa-solid fa-heart"></i></div>
                 <div>
                     <div class="font-black text-gray-900 text-[17px] leading-none tracking-tight">Central HUB</div>
-                    <div class="text-[10px] font-bold tracking-[.15em] uppercase opacity-70 mt-0.5" style="color:#2e9e63">RSU Healthcare Portal</div>
+                    <div class="text-[10px] font-bold tracking-[.15em] uppercase opacity-70 mt-0.5" style="color:#2e9e63">RSU Medical Clinic Services</div>
                 </div>
             </div>
 
@@ -240,7 +240,7 @@ try {
                         <span class="mb-1 px-1.5 py-0.5 bg-red-500 text-white text-[8px] font-black rounded-md leading-none animate-pulse">URGENT</span>
                     <?php endif; ?>
                 </div>
-                <div class="kpi-label">Pending Borrows</div>
+                <div class="kpi-label">Borrow Requests</div>
             </div>
 
             <!-- System Health -->
@@ -259,7 +259,7 @@ try {
 
             <!-- PROJECT CARDS (8/12) -->
             <section class="lg:col-span-8 au d2">
-                <div class="sec-title mb-5">Project Command Grid</div>
+                <div class="sec-title mb-5">Applications</div>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
                     <?php $cardIdx = 0; foreach($projects as $proj):
                         if (!in_array($adminRole, $proj['allowed_roles'])) continue;
