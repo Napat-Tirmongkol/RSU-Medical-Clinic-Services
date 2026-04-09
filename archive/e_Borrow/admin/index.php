@@ -260,6 +260,12 @@ include('../includes/header.php');
         echo "<div class='bg-red-50 text-red-500 p-3 rounded-xl mb-4 text-sm font-bold border border-red-100'><i class='fas fa-exclamation-triangle'></i> $overdue_error</div>"; ?>
 
     <!-- HEADER SECTION แบบใหม่ -->
+    <div class="mb-4">
+        <a href="../../portal/index.php" class="inline-flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl text-sm font-bold text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-300 dark:hover:border-blue-500/50 hover:shadow-md transition-all w-max mb-2">
+            <i class="fas fa-arrow-left"></i> กลับสู่หน้าพอร์ทัลหลัก
+        </a>
+    </div>
+    
     <div class="mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
         <div>
             <h2 class="text-3xl font-black text-gray-900 flex items-center gap-3">
