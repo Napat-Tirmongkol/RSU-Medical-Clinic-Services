@@ -414,22 +414,53 @@ document.querySelectorAll('.proj-card').forEach(card => {
 </script>
 
 <?php if ($adminRole === 'superadmin'): ?>
+<style>
+/* CSS Animations สำหรับปุ่ม Git Pull */
+@keyframes btnPop {
+    0%   { transform: scale(1); }
+    40%  { transform: scale(1.12); }
+    100% { transform: scale(1); }
+}
+@keyframes btnShake {
+    0%, 100% { transform: translateX(0); }
+    20%, 60% { transform: translateX(-4px); }
+    40%, 80% { transform: translateX(4px); }
+}
+.btn-animate-pop {
+    animation: btnPop 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+.btn-animate-shake {
+    animation: btnShake 0.4s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+</style>
 <script>
 function triggerGitPull() {
     const btn = document.getElementById('btnGitPull');
     btn.disabled = true;
-    btn.style.opacity = '0.6';
+    
+    // เคลียร์คลาสแอนิเมชันก่อนเผื่อมีตกค้าง
+    btn.classList.remove('btn-animate-pop', 'btn-animate-shake');
+    // บังคับให้เบราว์เซอร์ล้างสถานะ (Reflow) เพื่อให้เล่นแอนิเมชันซ้ำได้
+    void btn.offsetWidth;
+    
+    // เปลี่ยนเป็นสถานะกำลังโหลด (Loading)
+    btn.style.opacity = '0.8';
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> <span>Pulling...</span>';
 
     fetch('../admin/ajax_git_pull.php', { method: 'POST' })
         .then(r => r.json())
         .then(data => {
+            btn.style.opacity = '1'; // คืนความสว่าง 100%
+            
             if (data.status === 'success') {
-                btn.style.background = '#dcfce7';
-                btn.style.color = '#15803d';
+                // สำเร็จ -> เด้ง Pop
+                btn.classList.add('btn-animate-pop');
+                btn.style.background = '#dcfce7'; 
+                btn.style.color = '#15803d';      
                 btn.innerHTML = '<i class="fa-solid fa-check"></i> <span>สำเร็จ!</span>';
+                
                 if (data.detail && !data.detail.includes('Already up to date')) {
-                    // มีโค้ดใหม่ — แจ้งให้ refresh
+                    // ดีเลย์ alert เล็กน้อยเพื่อให้แอนิเมชันทำงานจบก่อน
                     setTimeout(() => {
                         if (confirm('Git Pull สำเร็จ!\n\n' + data.detail + '\n\nรีโหลดหน้าเพื่อใช้งานโค้ดใหม่?')) {
                             location.reload();
@@ -437,28 +468,34 @@ function triggerGitPull() {
                     }, 500);
                 }
             } else {
-                btn.style.background = '#fef2f2';
-                btn.style.color = '#dc2626';
-                btn.style.borderColor = '#fecaca';
+                // ล้มเหลว -> สั่น Shake
+                btn.classList.add('btn-animate-shake');
+                btn.style.background = '#fef2f2';  
+                btn.style.borderColor = '#fecaca'; 
+                btn.style.color = '#dc2626';       
                 btn.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> <span>ล้มเหลว</span>';
-                alert('Git Pull ล้มเหลว:\n' + data.message + (data.detail ? '\n\n' + data.detail : ''));
+                setTimeout(() => alert('Git Pull ล้มเหลว:\n' + data.message + (data.detail ? '\n\n' + data.detail : '')), 300);
             }
         })
         .catch(() => {
+            btn.style.opacity = '1';
+            // ล้มเหลว -> สั่น Shake
+            btn.classList.add('btn-animate-shake');
             btn.style.background = '#fef2f2';
+            btn.style.borderColor = '#fecaca'; 
             btn.style.color = '#dc2626';
             btn.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> <span>Error</span>';
         })
         .finally(() => {
-            // Reset button หลัง 3 วินาที
+            // Reset ปุ่มกลับสภาพเดิมในอีก 3.5 วินาที
             setTimeout(() => {
+                btn.classList.remove('btn-animate-pop', 'btn-animate-shake');
                 btn.disabled = false;
-                btn.style.opacity = '1';
                 btn.style.background = '#f0fdf4';
                 btn.style.color = '#16a34a';
                 btn.style.borderColor = '#d1fae5';
                 btn.innerHTML = '<i class="fa-solid fa-code-branch"></i> <span>Git Pull</span>';
-            }, 3000);
+            }, 3500);
         });
 }
 </script>
