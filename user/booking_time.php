@@ -36,7 +36,9 @@ try {
         exit;
     }
 } catch (PDOException $e) {
-    die("Error fetching campaign: " . $e->getMessage());
+    error_log("booking_time campaign fetch error: " . $e->getMessage());
+    header('Location: booking_campaign.php');
+    exit;
 }
 
 // 2. ดึงสล็อตเวลาเริ่มต้น
@@ -54,7 +56,8 @@ try {
     $stmt->execute([':date' => $selectedDateStr, ':cid' => $campaignId]);
     $timeSlots = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
-    die("Error fetching time slots: " . $e->getMessage());
+    error_log("booking_time slots fetch error: " . $e->getMessage());
+    $timeSlots = [];
 }
 
 render_header('เลือกรอบเวลา');

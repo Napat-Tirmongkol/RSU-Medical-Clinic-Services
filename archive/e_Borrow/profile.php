@@ -85,7 +85,7 @@ try {
     $user = $stmt->fetch();
     if (!$user) { header("Location: logout.php"); exit; }
 } catch (PDOException $e) {
-    die("เกิดข้อผิดพลาดในการดึงข้อมูล: " . $e->getMessage());
+    error_log("eborrow profile error: " . $e->getMessage()); exit("เกิดข้อผิดพลาด");
 }
 
 // ---- แยก prefix / ชื่อ / นามสกุล ----

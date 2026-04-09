@@ -1,0 +1,19 @@
+# Block access to test/debug/setup files in /archive/
+# (legitimate app files like line_api/ and e_Borrow/ remain accessible)
+
+<FilesMatch "(test|debug|setup|install|dump|backup|seed)\.(php|sql|txt|log)$">
+    Order Deny,Allow
+    Deny from all
+</FilesMatch>
+
+# Block .sql files entirely
+<FilesMatch "\.sql$">
+    Order Deny,Allow
+    Deny from all
+</FilesMatch>
+
+# Block direct access to raw config/include files
+<FilesMatch "^(db_connect|config|secrets|env)\.(php|ini|cfg)$">
+    Order Deny,Allow
+    Deny from all
+</FilesMatch>

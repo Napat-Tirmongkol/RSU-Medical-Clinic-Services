@@ -33,7 +33,7 @@ try {
   $stmt->execute([':student_id' => $studentId]);
   $bookings = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
-  die("Error fetching bookings: " . $e->getMessage());
+  error_log("my_bookings error: " . $e->getMessage()); $upcomingBookings = []; $historyBookings = [];
 }
 
 // แยกหมวดหมู่

@@ -77,7 +77,7 @@ try {
     if ($e->getCode() == '23000') {
          die("เกิดข้อผิดพลาด: LINE User ID นี้ถูกลงทะเบียนในระบบแล้ว <a href='../login.php'>กลับไปหน้า Login</a>");
     } else {
-         die("เกิดข้อผิดพลาดในการบันทึกฐานข้อมูล: " . $e->getMessage());
+         error_log("eborrow save_profile error: " . $e->getMessage()); exit("เกิดข้อผิดพลาด กรุณาลองใหม่");
     }
 }
 ?>

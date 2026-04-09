@@ -32,7 +32,7 @@ try {
         exit;
     }
 } catch (PDOException $e) {
-    die("เกิดข้อผิดพลาดในการดึงข้อมูลประเภท: " . $e->getMessage());
+    error_log("manage_items error: " . $e->getMessage()); $categories = [];
 }
 
 // 5. (Query ที่ 2) ดึงข้อมูล "ชิ้น" อุปกรณ์ (items)

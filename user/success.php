@@ -38,7 +38,7 @@ try {
     $stmt->execute([':sid' => $studentId]);
     $booking = $stmt->fetch(PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
-    die("เกิดข้อผิดพลาดในการดึงข้อมูล: " . $e->getMessage());
+    error_log("success.php error: " . $e->getMessage()); header("Location: my_bookings.php"); exit;
 }
 
 // ถ้าไม่มีประวัติการจองเลย ให้เด้งกลับไปหน้า My Bookings

@@ -7,6 +7,8 @@ if (session_status() === PHP_SESSION_NONE) {
     ini_set('session.cookie_lifetime', 0);
     ini_set('session.cookie_httponly', 1);
     ini_set('session.cookie_samesite', 'Lax');
+    // Only send session cookie over HTTPS
+    ini_set('session.cookie_secure', isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? '1' : '0');
     session_start();
 }
 

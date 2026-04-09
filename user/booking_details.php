@@ -28,7 +28,7 @@ try {
         die("ไม่พบข้อมูลการจอง");
     }
 } catch (PDOException $e) {
-    die("Error: " . $e->getMessage());
+    error_log("booking_details error: " . $e->getMessage()); header("Location: my_bookings.php"); exit;
 }
 
 render_header('Booking Details');

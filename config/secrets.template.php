@@ -4,6 +4,20 @@
 // คัดลอกไฟล์นี้ไปเป็น config/secrets.php และเติมค่าจริงให้ครบถ้วน
 
 return [
+    // --- Main Database ---
+    'DB_HOST' => '127.0.0.1',
+    'DB_PORT' => 3306,
+    'DB_USER' => '',
+    'DB_PASS' => '',
+    'DB_NAME' => '',
+
+    // --- e-Borrow Database (leave empty to inherit DB_* above) ---
+    'EBORROW_DB_HOST' => '',
+    'EBORROW_DB_PORT' => 3306,
+    'EBORROW_DB_USER' => '',
+    'EBORROW_DB_PASS' => '',
+    'EBORROW_DB_NAME' => 'e_Borrow',
+
     'LINE_LOGIN_CHANNEL_ID'               => '',
     'LINE_LOGIN_CHANNEL_SECRET'           => '',
     'LINE_LIFF_ID'                       => '',

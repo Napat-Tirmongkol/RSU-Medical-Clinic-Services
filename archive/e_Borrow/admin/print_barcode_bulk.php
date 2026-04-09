@@ -39,7 +39,7 @@ if (!empty($all_ids)) {
         $stmt->execute($all_ids);
         $items_to_print = $stmt->fetchAll(PDO::FETCH_ASSOC);
     } catch (PDOException $e) {
-        die("Error: " . $e->getMessage());
+        error_log("print_barcode error: " . $e->getMessage()); exit("เกิดข้อผิดพลาด");
     }
 }
 ?>

@@ -1,9 +1,9 @@
 <?php
 declare(strict_types=1);
 
-// 1. ดัก Error พื้นฐาน (เปิดไว้ตอน Test ถ้าแก้เสร็จแล้วให้ปิด)
-ini_set('display_errors', '1');
-error_reporting(E_ALL);
+// ปิด display_errors ใน production — error ไป error_log แทน
+ini_set('display_errors', '0');
+error_reporting(0);
 
 $appId = isset($_GET['id']) ? (string)$_GET['id'] : '';
 if ($appId === '') {
@@ -13,7 +13,8 @@ if ($appId === '') {
 // 2. เช็คว่าไฟล์ qrlib.php อยู่ที่นี่จริงไหม
 $libPath = __DIR__ . '/../assets/phpqrcode/qrlib.php';
 if (!file_exists($libPath)) {
-    die("Error: ไม่พบไฟล์ไลบรารีที่ $libPath");
+    http_response_code(500);
+    exit;
 }
 
 require_once $libPath;

@@ -35,6 +35,13 @@ RewriteEngine On
 # Suppress favicon.ico 404 — return empty 204 No Content
 RewriteRule ^favicon\.ico$ - [R=204,L]
 
+# ─── Session Security (PHP) ───────────────────────────────────
+<IfModule mod_php.c>
+    php_flag session.cookie_secure   On
+    php_flag session.cookie_httponly On
+    php_value session.cookie_samesite Lax
+</IfModule>
+
 # DirectoryIndex
 DirectoryIndex index.php index.html
 

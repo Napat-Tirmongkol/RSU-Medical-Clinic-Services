@@ -126,6 +126,6 @@ try {
     }
 
 } catch (PDOException $e) {
-    die("Database Error: " . $e->getMessage());
+    error_log("LINE callback DB error: " . $e->getMessage()); http_response_code(500); exit("เกิดข้อผิดพลาด กรุณาลองใหม่");
 }
 

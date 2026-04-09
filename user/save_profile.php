@@ -134,5 +134,5 @@ try {
     exit;
 
 } catch (Exception $e) {
-    die("เกิดข้อผิดพลาด: " . $e->getMessage());
+    error_log("save_profile error: " . $e->getMessage()); http_response_code(500); exit("เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง");
 }

@@ -56,7 +56,7 @@ try {
   }
 
 } catch (PDOException $e) {
-  die("Error cancelling booking: " . $e->getMessage());
+  error_log("cancel_booking error: " . $e->getMessage()); echo json_encode(["status" => "error", "message" => "เกิดข้อผิดพลาด กรุณาลองใหม่"]);
 }
 
 // ยกเลิกเสร็จ เด้งกลับไปหน้าประวัติการจอง

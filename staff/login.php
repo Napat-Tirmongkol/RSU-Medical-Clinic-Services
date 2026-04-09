@@ -2,6 +2,9 @@
 // staff/login.php
 session_start();
 require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../includes/rate_limit.php';
+
+rate_limit_check('staff_login', 5, 300, 'login.php');
 
 $redirect = $_GET['redirect'] ?? 'index.php';
 // Whitelist: ให้ redirect ได้เฉพาะ path ใน /staff/ เท่านั้น
@@ -15,6 +18,10 @@ if (isset($_SESSION['staff_logged_in']) && $_SESSION['staff_logged_in'] === true
 }
 
 $error = '';
+if (($_GET['error'] ?? '') === 'too_many_attempts') {
+    $wait = max(1, (int)($_GET['wait'] ?? 300));
+    $error = 'พยายามเข้าสู่ระบบหลายครั้งเกินไป กรุณารอ ' . ceil($wait / 60) . ' นาทีแล้วลองใหม่';
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     validate_csrf_or_die();
@@ -40,6 +47,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($staff['account_status'] === 'disabled') {
                     $error = 'บัญชีนี้ถูกระงับการใช้งาน กรุณาติดต่อผู้ดูแลระบบ';
                 } else {
+                    rate_limit_clear('staff_login');
                     session_regenerate_id(true);
                     $_SESSION['staff_logged_in'] = true;
                     $_SESSION['staff_id']        = (int)$staff['id'];
@@ -49,6 +57,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     exit;
                 }
             } else {
+                rate_limit_hit('staff_login', 5, 300);
                 $error = 'เลขประจำตัว หรือ รหัสผ่านไม่ถูกต้อง';
             }
         } catch (PDOException $e) {

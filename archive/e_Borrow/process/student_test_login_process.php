@@ -45,7 +45,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             }
 
         } catch (PDOException $e) {
-            die("Database Error: " . $e->getMessage());
+            error_log("student_login error: " . $e->getMessage()); header("Location: ../index.php?error=db"); exit;
         }
 
     } else {

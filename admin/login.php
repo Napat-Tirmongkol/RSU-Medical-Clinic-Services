@@ -8,12 +8,21 @@ if (isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true
 }
 
 require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../includes/rate_limit.php';
+
+// Check rate limit (5 attempts per 5 minutes)
+rate_limit_check('admin_login', 5, 300, 'login.php');
 
 $error = $_SESSION['login_error'] ?? '';
 unset($_SESSION['login_error']);
 
 if (($_GET['reason'] ?? '') === 'timeout') {
     $error = 'เซสชันหมดอายุเนื่องจากไม่มีการใช้งานนาน 2 ชั่วโมง กรุณาเข้าสู่ระบบใหม่';
+}
+if (($_GET['error'] ?? '') === 'too_many_attempts') {
+    $wait = max(1, (int)($_GET['wait'] ?? 300));
+    $mins = ceil($wait / 60);
+    $error = "พยายามเข้าสู่ระบบหลายครั้งเกินไป กรุณารอ {$mins} นาทีแล้วลองใหม่";
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -28,6 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $admin = $stmt->fetch();
 
         if ($admin && password_verify($password, $admin['password'])) {
+            rate_limit_clear('admin_login');
             $_SESSION['admin_logged_in'] = true;
             $_SESSION['admin_id'] = $admin['id'];
             $_SESSION['admin_username'] = $admin['full_name'] ?: $admin['username'];
@@ -37,6 +47,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             header('Location: ../portal/index.php');
             exit;
         } else {
+            rate_limit_hit('admin_login', 5, 300);
             $error = 'ชื่อผู้ใช้ หรือ รหัสผ่านไม่ถูกต้อง';
         }
     } catch (PDOException $e) {

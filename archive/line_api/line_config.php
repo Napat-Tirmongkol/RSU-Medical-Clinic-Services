@@ -28,8 +28,8 @@ $secrets = file_exists($secretsPath) ? require $secretsPath : [];
 
 // 1. LINE Login Channel (Using the main channel ID or specific e-borrow keys)
 // Change keys to 'LINE_LOGIN_CHANNEL_ID' to use the new unified channel
-define('LINE_LOGIN_CHANNEL_ID', $secrets['LINE_LOGIN_CHANNEL_ID'] ?? '2009560824');
-define('LINE_LOGIN_CHANNEL_SECRET', $secrets['LINE_LOGIN_CHANNEL_SECRET'] ?? '50870e1645c14089b28897caaf3a1a84');
+define('LINE_LOGIN_CHANNEL_ID', $secrets['LINE_LOGIN_CHANNEL_ID'] ?? '');
+define('LINE_LOGIN_CHANNEL_SECRET', $secrets['LINE_LOGIN_CHANNEL_SECRET'] ?? '');
 
 // ⚠️ ต้องตรงกับ Callback URL ที่ลงทะเบียนใน LINE Developers Console เป๊ะๆ (เพิ่ม /archive/)
 define('LINE_LOGIN_CALLBACK_URL', 'https://healthycampus.rsu.ac.th/e-campaignv2/archive/line_api/callback.php');

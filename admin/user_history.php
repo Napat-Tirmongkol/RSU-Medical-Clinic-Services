@@ -20,7 +20,7 @@ try {
         exit;
     }
 } catch (PDOException $e) {
-    die("Error: " . $e->getMessage());
+    error_log("admin error: " . $e->getMessage()); http_response_code(500); exit("เกิดข้อผิดพลาด");
 }
 
 // ดึงประวัติการจองทั้งหมดของ User นี้
@@ -46,7 +46,7 @@ try {
     $stmtBookings->execute([':uid' => $userId]);
     $bookings = $stmtBookings->fetchAll();
 } catch (PDOException $e) {
-    die("Error fetching history: " . $e->getMessage());
+    error_log("user_history error: " . $e->getMessage()); $history = [];
 }
 
 // สรุปสถิติ
