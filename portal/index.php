@@ -155,6 +155,8 @@ try {
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="stylesheet" href="../assets/css/tailwind.min.css">
     <link rel="stylesheet" href="../assets/css/portal.css">
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="../archive/e_Borrow/assets/img/logo.png">
     <!-- SweetAlert2 -->
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </head>
@@ -185,7 +187,8 @@ try {
             <div class="flex items-center gap-3">
                 <div class="brand-icon"><i class="fa-solid fa-heart"></i></div>
                 <div>
-                    <div class="font-black text-gray-900 text-[17px] leading-none tracking-tight">Central HUB</div>
+                    <div class="font-black text-gray-900 text-[17px] leading-none tracking-tight">Management Console
+                    </div>
                     <div class="text-[10px] font-bold tracking-[.15em] uppercase opacity-70 mt-0.5"
                         style="color:#2e9e63">RSU Medical Clinic Services</div>
                 </div>
@@ -477,18 +480,41 @@ try {
         <style>
             /* CSS Animations สำหรับปุ่ม Git Pull */
             @keyframes btnPop {
-                0%   { transform: scale(1); }
-                40%  { transform: scale(1.12); }
-                100% { transform: scale(1); }
+                0% {
+                    transform: scale(1);
+                }
+
+                40% {
+                    transform: scale(1.12);
+                }
+
+                100% {
+                    transform: scale(1);
+                }
             }
+
             @keyframes btnShake {
-                0%, 100% { transform: translateX(0); }
-                20%, 60% { transform: translateX(-4px); }
-                40%, 80% { transform: translateX(4px); }
+
+                0%,
+                100% {
+                    transform: translateX(0);
+                }
+
+                20%,
+                60% {
+                    transform: translateX(-4px);
+                }
+
+                40%,
+                80% {
+                    transform: translateX(4px);
+                }
             }
+
             .btn-animate-pop {
                 animation: btnPop 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
             }
+
             .btn-animate-shake {
                 animation: btnShake 0.4s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
             }
@@ -497,12 +523,12 @@ try {
             function triggerGitPull() {
                 const btn = document.getElementById('btnGitPull');
                 btn.disabled = true;
-                
+
                 // เคลียร์คลาสแอนิเมชันก่อนเผื่อมีตกค้าง
                 btn.classList.remove('btn-animate-pop', 'btn-animate-shake');
                 // บังคับให้เบราว์เซอร์ล้างสถานะ (Reflow) เพื่อให้เล่นแอนิเมชันซ้ำได้
                 void btn.offsetWidth;
-                
+
                 // เปลี่ยนเป็นสถานะกำลังโหลด (Loading)
                 btn.style.opacity = '0.8';
                 btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> <span>Pulling...</span>';
@@ -517,7 +543,7 @@ try {
                             btn.style.background = '#dcfce7';
                             btn.style.color = '#15803d';
                             btn.innerHTML = '<i class="fa-solid fa-check"></i> <span>สำเร็จ!</span>';
-                            
+
                             if (data.detail && !data.detail.includes('Already up to date')) {
                                 // ใช้ SweetAlert2 แทน confirm
                                 setTimeout(() => {
@@ -550,7 +576,7 @@ try {
                             btn.style.color = '#dc2626';
                             btn.style.borderColor = '#fecaca';
                             btn.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> <span>ล้มเหลว</span>';
-                            
+
                             setTimeout(() => {
                                 Swal.fire({
                                     title: 'Git Pull ล้มเหลว',
