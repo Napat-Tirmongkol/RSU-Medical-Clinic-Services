@@ -151,6 +151,9 @@ try {
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="stylesheet" href="../assets/css/tailwind.min.css">
     <link rel="stylesheet" href="../assets/css/portal.css">
+    
+    <!-- SweetAlert2 -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </head>
 <body class="font-sans text-gray-800" style="min-height:100vh">
 
@@ -460,12 +463,29 @@ function triggerGitPull() {
                 btn.innerHTML = '<i class="fa-solid fa-check"></i> <span>สำเร็จ!</span>';
                 
                 if (data.detail && !data.detail.includes('Already up to date')) {
-                    // ดีเลย์ alert เล็กน้อยเพื่อให้แอนิเมชันทำงานจบก่อน
+                    // ใช้ SweetAlert2 แทน confirm
                     setTimeout(() => {
-                        if (confirm('Git Pull สำเร็จ!\n\n' + data.detail + '\n\nรีโหลดหน้าเพื่อใช้งานโค้ดใหม่?')) {
-                            location.reload();
-                        }
-                    }, 500);
+                        Swal.fire({
+                            title: 'Git Pull สำเร็จ!',
+                            html: `<div class="text-xs text-left mb-4 text-gray-600 font-mono p-3 bg-gray-50 rounded border max-h-32 overflow-y-auto">${data.detail.replace(/\n/g, '<br>')}</div><p class="font-bold text-gray-800 text-sm font-prompt">ต้องการรีโหลดหน้าเพื่อใช้งานโค้ดใหม่หรือไม่?</p>`,
+                            icon: 'success',
+                            showCancelButton: true,
+                            confirmButtonColor: '#10b981',
+                            cancelButtonColor: '#f3f4f6',
+                            confirmButtonText: '<i class="fa-solid fa-rotate-right mr-1"></i> รีโหลดเลย',
+                            cancelButtonText: '<span class="text-gray-700">ไว้ทีหลัง</span>',
+                            customClass: {
+                                title: 'font-prompt font-bold text-gray-800 text-xl',
+                                confirmButton: 'font-prompt font-bold rounded-xl px-4 py-2 border-none',
+                                cancelButton: 'font-prompt font-bold rounded-xl px-4 py-2 border border-gray-200',
+                                popup: 'rounded-2xl shadow-2xl'
+                            }
+                        }).then((result) => {
+                            if (result.isConfirmed) {
+                                location.reload();
+                            }
+                        });
+                    }, 300);
                 }
             } else {
                 // ล้มเหลว -> สั่น Shake
@@ -474,7 +494,20 @@ function triggerGitPull() {
                 btn.style.borderColor = '#fecaca'; 
                 btn.style.color = '#dc2626';       
                 btn.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> <span>ล้มเหลว</span>';
-                setTimeout(() => alert('Git Pull ล้มเหลว:\n' + data.message + (data.detail ? '\n\n' + data.detail : '')), 300);
+                setTimeout(() => {
+                    Swal.fire({
+                        title: 'Git Pull ล้มเหลว',
+                        text: data.message + (data.detail ? '\n\n' + data.detail : ''),
+                        icon: 'error',
+                        confirmButtonColor: '#dc2626',
+                        confirmButtonText: 'รับทราบ',
+                        customClass: {
+                            title: 'font-prompt font-bold text-gray-800',
+                            confirmButton: 'font-prompt rounded-xl shadow-md',
+                            popup: 'rounded-2xl shadow-2xl'
+                        }
+                    });
+                }, 300);
             }
         })
         .catch(() => {
