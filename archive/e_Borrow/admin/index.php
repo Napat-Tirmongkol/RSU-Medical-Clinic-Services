@@ -90,7 +90,7 @@ $current_page = "index";
 include('../includes/header.php');
 ?>
 
-<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="../../assets/css/tailwind.min.css">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <!-- SweetAlert2 สำหรับแจ้งเตือน (กรณีไม่ได้เรียกใน header) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
@@ -182,7 +182,7 @@ include('../includes/header.php');
             <p class="text-gray-500 mt-2 text-sm font-medium">สถิติการยืม-คืน อุปกรณ์ทางการแพทย์ และเวชภัณฑ์ (Real-time)
             </p>
         </div>
-        <a href="walkin_borrow.php"
+        <a href="admin/walkin_borrow.php"
             class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:shadow-lg hover:shadow-blue-500/30 hover:-translate-y-0.5 transition-all flex items-center gap-2">
             <i class="fas fa-qrcode"></i> สแกนยืม/คืน (Walk-in)
         </a>
