@@ -263,3 +263,20 @@ body {
     background-size: 300% 300%;
     animation: bgShift 20s ease infinite;
 }
+
+/* ── Mobile (< 640px) ────────────────────────────────────── */
+@media (max-width: 639px) {
+    /* KPI cards — tighter on small screens */
+    .kpi-card   { padding: 14px 14px; }
+    .kpi-num    { font-size: 1.5rem; }
+    .kpi-icon   { width: 32px; height: 32px; font-size: .8rem; margin-bottom: 10px; }
+
+    /* Project cards */
+    .proj-card  { padding: 18px; }
+
+    /* Shortcut card */
+    .shortcut-card { padding: 18px; }
+
+    /* Ambient dots — hide to prevent horizontal overflow */
+    .amb-dot { display: none; }
+}

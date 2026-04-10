@@ -163,35 +163,35 @@ try {
 
     <!-- ══════════════════ HEADER ══════════════════ -->
     <header class="portal-header au">
-        <div class="max-w-[1280px] mx-auto px-6 py-3 flex items-center justify-between gap-4">
+        <div class="max-w-[1280px] mx-auto px-3 sm:px-6 py-3 flex items-center justify-between gap-2 sm:gap-4">
             <!-- Brand -->
-            <div class="flex items-center gap-3">
+            <div class="flex items-center gap-2 sm:gap-3">
                 <div class="brand-icon"><i class="fa-solid fa-heart"></i></div>
                 <div>
-                    <div class="font-black text-gray-900 text-[17px] leading-none tracking-tight">Central HUB</div>
-                    <div class="text-[10px] font-bold tracking-[.15em] uppercase opacity-70 mt-0.5" style="color:#2e9e63">RSU Healthcare Portal</div>
+                    <div class="font-black text-gray-900 text-[15px] sm:text-[17px] leading-none tracking-tight">Central HUB</div>
+                    <div class="hidden sm:block text-[10px] font-bold tracking-[.15em] uppercase opacity-70 mt-0.5" style="color:#2e9e63">RSU Healthcare Portal</div>
                 </div>
             </div>
 
             <!-- Right: user + logout -->
-            <div class="flex items-center gap-3">
+            <div class="flex items-center gap-2 sm:gap-3">
 
                 <?php if ($adminRole === 'superadmin'): ?>
                 <!-- Git Pull Button (Superadmin only) -->
                 <button id="btnGitPull"
                         onclick="triggerGitPull()"
                         title="Pull โค้ดล่าสุดจาก Git"
-                        style="display:flex;align-items:center;gap:6px;padding:6px 14px;border-radius:10px;border:1px solid #d1fae5;background:#f0fdf4;color:#16a34a;font-size:12px;font-weight:700;cursor:pointer;transition:all .2s;">
+                        style="display:flex;align-items:center;gap:6px;padding:6px 10px;border-radius:10px;border:1px solid #d1fae5;background:#f0fdf4;color:#16a34a;font-size:12px;font-weight:700;cursor:pointer;transition:all .2s;">
                     <i class="fa-solid fa-code-branch"></i>
-                    <span>Git Pull</span>
+                    <span class="hidden sm:inline">Git Pull</span>
                 </button>
                 <?php endif; ?>
 
                 <!-- Live connection badge -->
                 <div id="ws-badge" title="Real-time connection status"
-                     style="display:flex;align-items:center;gap:5px;padding:5px 10px;border-radius:8px;font-size:10px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;border:1px solid #c7e8d5;background:#f0fdf4;color:#16a34a;transition:all .3s">
+                     style="display:flex;align-items:center;gap:5px;padding:5px 8px;border-radius:8px;font-size:10px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;border:1px solid #c7e8d5;background:#f0fdf4;color:#16a34a;transition:all .3s">
                     <span id="ws-dot" style="width:7px;height:7px;border-radius:50%;background:#22c55e;display:inline-block;animation:livePulse 1.6s infinite"></span>
-                    <span id="ws-label">Live</span>
+                    <span id="ws-label" class="hidden sm:inline">Live</span>
                 </div>
 
                 <div class="user-pill">
