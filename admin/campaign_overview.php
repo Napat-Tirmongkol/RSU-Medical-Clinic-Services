@@ -74,7 +74,7 @@ if ($campaignId > 0) {
         $stmt4->execute([':id' => $campaignId]);
         $slotUtil = $stmt4->fetchAll(PDO::FETCH_ASSOC);
 
-        // รายชื่อผู้จองล่าสุด — ดึงทั้งหมด (pagination ทำฝั่ง JS)
+        // รายชื่อผู้จองล่าสุด
         $stmt5 = $pdo->prepare("
             SELECT b.id, b.status, b.created_at,
                 u.full_name, u.student_personnel_id, u.phone_number,
@@ -84,6 +84,7 @@ if ($campaignId > 0) {
             JOIN camp_slots s ON b.slot_id = s.id
             WHERE b.campaign_id = :id
             ORDER BY b.created_at DESC
+            LIMIT 100
         ");
         $stmt5->execute([':id' => $campaignId]);
         $recentBookings = $stmt5->fetchAll(PDO::FETCH_ASSOC);
@@ -320,7 +321,7 @@ foreach ($slotUtil as $sl) {
         <h3 class="font-bold text-gray-700 flex items-center gap-2">
             <i class="fa-solid fa-list text-gray-400"></i>
             รายชื่อผู้จอง
-            <span id="bookingCountBadge" class="ml-1 text-xs font-semibold bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full"><?= count($recentBookings) ?></span>
+            <span class="ml-1 text-xs font-semibold bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full"><?= count($recentBookings) ?></span>
         </h3>
         <div class="flex gap-2">
             <input id="bookingSearch" type="text" placeholder="ค้นหาชื่อ / รหัส..."
@@ -349,10 +350,8 @@ foreach ($slotUtil as $sl) {
             </thead>
             <tbody class="divide-y divide-gray-50" id="bookingTbody">
                 <?php foreach ($recentBookings as $i => $bk): ?>
-                <tr class="hover:bg-gray-50 transition-colors booking-row"
-                    data-search="<?= strtolower(htmlspecialchars($bk['full_name'].' '.$bk['student_personnel_id'])) ?>"
-                    data-idx="<?= $i ?>">
-                    <td class="py-3 pr-4 text-gray-400 font-mono text-xs row-num"><?= $i+1 ?></td>
+                <tr class="hover:bg-gray-50 transition-colors" data-search="<?= strtolower(htmlspecialchars($bk['full_name'].' '.$bk['student_personnel_id'])) ?>">
+                    <td class="py-3 pr-4 text-gray-400 font-mono text-xs"><?= $i+1 ?></td>
                     <td class="py-3 pr-4 font-semibold text-gray-800"><?= htmlspecialchars($bk['full_name'] ?: '—') ?></td>
                     <td class="py-3 pr-4 text-gray-500 font-mono text-xs"><?= htmlspecialchars($bk['student_personnel_id'] ?: '—') ?></td>
                     <td class="py-3 pr-4 text-gray-500"><?= htmlspecialchars($bk['phone_number'] ?: '—') ?></td>
@@ -374,22 +373,6 @@ foreach ($slotUtil as $sl) {
                 <?php endforeach; ?>
             </tbody>
         </table>
-    </div>
-
-    <!-- Pagination Controls -->
-    <div class="flex items-center justify-between mt-4 pt-4 border-t border-gray-100">
-        <span id="pageInfo" class="text-xs text-gray-400 font-medium"></span>
-        <div class="flex items-center gap-2">
-            <button id="btnPrev"
-                class="flex items-center gap-1.5 px-3 py-2 text-sm font-semibold rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-all">
-                <i class="fa-solid fa-chevron-left text-xs"></i> ก่อนหน้า
-            </button>
-            <div id="pageNumbers" class="flex gap-1"></div>
-            <button id="btnNext"
-                class="flex items-center gap-1.5 px-3 py-2 text-sm font-semibold rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-all">
-                ถัดไป <i class="fa-solid fa-chevron-right text-xs"></i>
-            </button>
-        </div>
     </div>
     <?php endif; ?>
 </div>
@@ -485,90 +468,13 @@ new Chart(document.getElementById('slotChart'), {
 });
 <?php endif; ?>
 
-// ── Booking table pagination + search ────────────────────────
-(function () {
-    const PAGE_SIZE = 20;
-    let currentPage = 0;
-    let filteredRows = [];
-
-    const allRows   = Array.from(document.querySelectorAll('.booking-row'));
-    const tbody     = document.getElementById('bookingTbody');
-    const btnPrev   = document.getElementById('btnPrev');
-    const btnNext   = document.getElementById('btnNext');
-    const pageInfo  = document.getElementById('pageInfo');
-    const pageNums  = document.getElementById('pageNumbers');
-    const badge     = document.getElementById('bookingCountBadge');
-    const searchEl  = document.getElementById('bookingSearch');
-
-    if (!allRows.length) return;
-
-    function totalPages() { return Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE)); }
-
-    function renderPage(page) {
-        currentPage = Math.max(0, Math.min(page, totalPages() - 1));
-
-        const start = currentPage * PAGE_SIZE;
-        const end   = start + PAGE_SIZE;
-
-        allRows.forEach(tr => tr.style.display = 'none');
-        filteredRows.slice(start, end).forEach((tr, i) => {
-            tr.style.display = '';
-            tr.querySelector('.row-num').textContent = start + i + 1;
-        });
-
-        const tp = totalPages();
-        const showing = Math.min(end, filteredRows.length);
-        pageInfo.textContent = `แสดง ${start + 1}–${showing} จาก ${filteredRows.length} รายการ`;
-        if (badge) badge.textContent = filteredRows.length;
-
-        btnPrev.disabled = currentPage === 0;
-        btnNext.disabled = currentPage >= tp - 1;
-
-        // Page number buttons (show up to 5 around current)
-        pageNums.innerHTML = '';
-        const range = [];
-        for (let p = 0; p < tp; p++) {
-            if (p === 0 || p === tp - 1 || Math.abs(p - currentPage) <= 1) range.push(p);
-            else if (range[range.length - 1] !== '…') range.push('…');
-        }
-        range.forEach(p => {
-            if (p === '…') {
-                const sp = document.createElement('span');
-                sp.textContent = '…';
-                sp.className = 'text-xs text-gray-400 px-1';
-                pageNums.appendChild(sp);
-                return;
-            }
-            const btn = document.createElement('button');
-            btn.textContent = p + 1;
-            btn.className = `w-8 h-8 rounded-lg text-xs font-bold transition-all ${
-                p === currentPage
-                    ? 'bg-[#2e9e63] text-white shadow-sm'
-                    : 'border border-gray-200 text-gray-600 hover:bg-gray-50'
-            }`;
-            btn.addEventListener('click', () => renderPage(p));
-            pageNums.appendChild(btn);
-        });
-    }
-
-    function applySearch(q) {
-        filteredRows = q
-            ? allRows.filter(tr => tr.dataset.search.includes(q))
-            : allRows.slice();
-        currentPage = 0;
-        renderPage(0);
-    }
-
-    filteredRows = allRows.slice();
-    renderPage(0);
-
-    btnPrev.addEventListener('click', () => renderPage(currentPage - 1));
-    btnNext.addEventListener('click', () => renderPage(currentPage + 1));
-
-    searchEl?.addEventListener('input', function () {
-        applySearch(this.value.toLowerCase().trim());
+// Live search for booking table
+document.getElementById('bookingSearch')?.addEventListener('input', function() {
+    const q = this.value.toLowerCase();
+    document.querySelectorAll('#bookingTbody tr').forEach(tr => {
+        tr.style.display = tr.dataset.search.includes(q) ? '' : 'none';
     });
-})();
+});
 </script>
 
 <?php endif; // end if $campaign ?>
