@@ -90,7 +90,7 @@ foreach ($projects as $p) {
         .toggle-track {
             position:absolute; inset:0;
             background:#e2e8f0; border-radius:99px;
-            transition:background .25s;
+            transition:background .25s cubic-bezier(.25,1,.5,1);
         }
         .toggle input:checked ~ .toggle-track { background:#2e9e63; }
         .toggle-thumb {
@@ -98,16 +98,30 @@ foreach ($projects as $p) {
             width:20px; height:20px;
             background:#fff; border-radius:50%;
             box-shadow:0 1px 4px rgba(0,0,0,.2);
-            transition:transform .25s;
+            transition:transform .3s cubic-bezier(.25,1,.5,1);
         }
         .toggle input:checked ~ .toggle-thumb { transform:translateX(24px); }
+
+        /* spring ring on toggle change */
+        @keyframes toggleRingOn {
+            0%   { box-shadow:0 0 0 0   rgba(46,158,99,.4); }
+            50%  { box-shadow:0 0 0 6px rgba(46,158,99,.15); }
+            100% { box-shadow:0 0 0 0   rgba(46,158,99,.0); }
+        }
+        @keyframes toggleRingOff {
+            0%   { box-shadow:0 0 0 0   rgba(239,68,68,.35); }
+            50%  { box-shadow:0 0 0 6px rgba(239,68,68,.12); }
+            100% { box-shadow:0 0 0 0   rgba(239,68,68,.0); }
+        }
+        .toggle-ring-on  { animation:toggleRingOn  .45s cubic-bezier(.25,1,.5,1) both; }
+        .toggle-ring-off { animation:toggleRingOff .45s cubic-bezier(.25,1,.5,1) both; }
 
         /* ── Status badge ──────────────────────────────────────────────────── */
         .status-badge {
             display:inline-flex; align-items:center; gap:5px;
             padding:2px 9px; border-radius:99px;
             font-size:10px; font-weight:700;
-            transition:all .2s;
+            transition:background .2s, color .2s, border-color .2s;
         }
         .status-badge.on  { background:#f0fdf4; color:#16a34a; border:1px solid #bbf7d0; }
         .status-badge.off { background:#fef2f2; color:#dc2626; border:1px solid #fecaca; }
@@ -116,18 +130,60 @@ foreach ($projects as $p) {
         .status-badge.off .status-dot { background:#ef4444; }
         @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
 
+        /* badge cross-fade on state change */
+        @keyframes badgePop {
+            0%   { opacity:.35; transform:scale(.82); }
+            60%  { transform:scale(1.07); }
+            100% { opacity:1;   transform:scale(1); }
+        }
+        .badge-pop { animation:badgePop .3s cubic-bezier(.25,1,.5,1) both; }
+
+        /* maintenance card shake */
+        @keyframes maintShake {
+            0%,100% { transform:translateX(0); }
+            18%     { transform:translateX(-6px); }
+            36%     { transform:translateX(5px); }
+            54%     { transform:translateX(-3px); }
+            72%     { transform:translateX(2px); }
+        }
+        .maint-shake { animation:maintShake .42s cubic-bezier(.25,1,.5,1) both; }
+
+        /* ── Status banner (CSS-driven state) ─────────────────────────────── */
+        #status-banner {
+            background:#fffbeb; border-color:#fde68a;
+            transition:background .3s, border-color .3s;
+        }
+        #status-banner[data-state="ok"] { background:#f0fdf4; border-color:#bbf7d0; }
+        #status-banner .banner-icon-wrap {
+            background:#fef3c7; color:#d97706;
+            transition:background .3s, color .3s;
+        }
+        #status-banner[data-state="ok"] .banner-icon-wrap { background:#dcfce7; color:#16a34a; }
+        #status-banner .banner-title { color:#92400e; transition:color .3s; }
+        #status-banner[data-state="ok"] .banner-title { color:#14532d; }
+        #status-banner .banner-desc { color:#b45309; transition:color .3s; }
+        #status-banner[data-state="ok"] .banner-desc { color:#166534; }
+
         /* ── Log card ──────────────────────────────────────────────────────── */
         .log-card {
             background:#fff; border-radius:20px;
             border:1.5px solid #e5e7eb;
             padding:24px;
-            transition:border-color .2s, box-shadow .2s;
+            transition:border-color .25s cubic-bezier(.25,1,.5,1),
+                        box-shadow   .25s cubic-bezier(.25,1,.5,1),
+                        transform    .22s cubic-bezier(.25,1,.5,1);
             text-decoration:none; display:block; color:inherit;
         }
         .log-card:hover {
             border-color:#c7e8d5;
-            box-shadow:0 6px 24px rgba(46,158,99,.10);
+            box-shadow:0 8px 28px rgba(46,158,99,.11);
+            transform:translateY(-2px);
         }
+        .log-card-arrow {
+            display:inline-block;
+            transition:transform .28s cubic-bezier(.25,1,.5,1), color .2s;
+        }
+        .log-card:hover .log-card-arrow { transform:translateX(6px); color:#2e9e63; }
 
         /* ── Toast ─────────────────────────────────────────────────────────── */
         #toast {
@@ -142,6 +198,18 @@ foreach ($projects as $p) {
         #toast.show { transform:translateY(0); opacity:1; }
         #toast.success { background:#f0fdf4; color:#16a34a; border:1.5px solid #bbf7d0; }
         #toast.error   { background:#fef2f2; color:#dc2626; border:1.5px solid #fecaca; }
+
+        /* ── Reduced motion ────────────────────────────────────────────────── */
+        @media (prefers-reduced-motion: reduce) {
+            .au, .au.d1, .au.d2, .au.d3 { animation:none; opacity:1; }
+            .toggle-track, .toggle-thumb, .log-card, .log-card-arrow,
+            .status-badge, #status-banner, #status-banner .banner-icon-wrap,
+            #status-banner .banner-title, #status-banner .banner-desc,
+            #toast { transition:none; }
+            .status-badge.on .status-dot,
+            .badge-pop, .maint-shake,
+            .toggle-ring-on, .toggle-ring-off { animation:none; }
+        }
     </style>
 </head>
 <body>
@@ -190,19 +258,17 @@ foreach ($projects as $p) {
     </div>
 
     <!-- ── System Status Banner ─────────────────────────────────────────────── -->
-    <div class="au d1 rounded-2xl border px-5 py-4 flex items-center gap-4
-        <?= $allOnline
-            ? 'bg-green-50 border-green-200'
-            : 'bg-amber-50 border-amber-200' ?>">
-        <div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0
-            <?= $allOnline ? 'bg-green-100 text-green-600' : 'bg-amber-100 text-amber-600' ?>">
-            <i class="fa-solid <?= $allOnline ? 'fa-circle-check' : 'fa-triangle-exclamation' ?> text-base"></i>
+    <div id="status-banner"
+         class="au d1 rounded-2xl border px-5 py-4 flex items-center gap-4"
+         data-state="<?= $allOnline ? 'ok' : 'warn' ?>">
+        <div class="banner-icon-wrap w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0">
+            <i data-banner-icon class="fa-solid <?= $allOnline ? 'fa-circle-check' : 'fa-triangle-exclamation' ?> text-base"></i>
         </div>
         <div class="flex-1 min-w-0">
-            <div class="font-bold text-sm <?= $allOnline ? 'text-green-800' : 'text-amber-800' ?>">
+            <div data-banner-title class="banner-title font-bold text-sm">
                 <?= $allOnline ? 'ระบบทุกโปรเจคพร้อมใช้งาน' : 'มีโปรเจคที่ปิดปรับปรุงอยู่' ?>
             </div>
-            <div class="text-xs <?= $allOnline ? 'text-green-600' : 'text-amber-600' ?> mt-0.5">
+            <div data-banner-desc class="banner-desc text-xs mt-0.5">
                 <?= $allOnline
                     ? 'User ทุกคนสามารถเข้าใช้งานได้ตามปกติ'
                     : 'User จะเห็นหน้า "ระบบอยู่ในขั้นตอนการปรับปรุง" สำหรับโปรเจคที่ปิดไว้' ?>
@@ -320,7 +386,7 @@ foreach ($projects as $p) {
                         </div>
                         <?php endif; ?>
                     </div>
-                    <i class="fa-solid fa-arrow-right text-gray-300 group-hover:text-gray-500 group-hover:translate-x-0.5 transition-all text-sm flex-shrink-0 mt-1"></i>
+                    <i class="fa-solid fa-arrow-right log-card-arrow text-gray-300 text-sm flex-shrink-0 mt-1"></i>
                 </div>
             </a>
 
@@ -359,7 +425,7 @@ foreach ($projects as $p) {
                         </div>
                         <?php endif; ?>
                     </div>
-                    <i class="fa-solid fa-arrow-right text-gray-300 group-hover:text-gray-500 group-hover:translate-x-0.5 transition-all text-sm flex-shrink-0 mt-1"></i>
+                    <i class="fa-solid fa-arrow-right log-card-arrow text-gray-300 text-sm flex-shrink-0 mt-1"></i>
                 </div>
             </a>
         </section>
@@ -382,13 +448,52 @@ function showToast(msg, type = 'success') {
     t._tid = setTimeout(() => { t.className = t.className.replace('show', '').trim(); }, 2800);
 }
 
+// Update a single project's status badge with a cross-fade pop
+function updateBadge(project, active) {
+    const badge = document.getElementById('badge-' + project);
+    if (!badge) return;
+    badge.className = 'status-badge ' + (active ? 'on' : 'off');
+    badge.innerHTML = `<span class="status-dot"></span>${active ? 'เปิดใช้งาน' : 'ปรับปรุง'}`;
+    badge.classList.remove('badge-pop');
+    void badge.offsetWidth; // force reflow so animation re-triggers
+    badge.classList.add('badge-pop');
+    badge.addEventListener('animationend', () => badge.classList.remove('badge-pop'), { once: true });
+}
+
+// Spring ring feedback on toggle track
+function ringToggle(input) {
+    const track = input.parentElement?.querySelector('.toggle-track');
+    if (!track) return;
+    track.classList.remove('toggle-ring-on', 'toggle-ring-off');
+    void track.offsetWidth;
+    track.classList.add(input.checked ? 'toggle-ring-on' : 'toggle-ring-off');
+    track.addEventListener('animationend', () => {
+        track.classList.remove('toggle-ring-on', 'toggle-ring-off');
+    }, { once: true });
+}
+
+// Update the status banner by checking all toggle states
+function updateStatusBanner() {
+    const allOn  = Array.from(document.querySelectorAll('[data-project]')).every(c => c.checked);
+    const banner = document.getElementById('status-banner');
+    if (!banner) return;
+    banner.dataset.state = allOn ? 'ok' : 'warn';
+    banner.querySelector('[data-banner-icon]').className =
+        `fa-solid ${allOn ? 'fa-circle-check' : 'fa-triangle-exclamation'} text-base`;
+    banner.querySelector('[data-banner-title]').textContent =
+        allOn ? 'ระบบทุกโปรเจคพร้อมใช้งาน' : 'มีโปรเจคที่ปิดปรับปรุงอยู่';
+    banner.querySelector('[data-banner-desc]').textContent = allOn
+        ? 'User ทุกคนสามารถเข้าใช้งานได้ตามปกติ'
+        : 'User จะเห็นหน้า "ระบบอยู่ในขั้นตอนการปรับปรุง" สำหรับโปรเจคที่ปิดไว้';
+}
+
 function toggleMaintenance(input) {
     const project = input.dataset.project;
     const active  = input.checked;
 
-    const badge = document.getElementById('badge-' + project);
-    badge.className = 'status-badge ' + (active ? 'on' : 'off');
-    badge.innerHTML = `<span class="status-dot"></span>${active ? 'เปิดใช้งาน' : 'ปรับปรุง'}`;
+    // Optimistic UI + spring ring feedback
+    ringToggle(input);
+    updateBadge(project, active);
 
     const fd = new FormData();
     fd.append('action',     'set');
@@ -400,6 +505,16 @@ function toggleMaintenance(input) {
         .then(r => r.json())
         .then(d => {
             if (d.ok) {
+                // Shake card when entering maintenance
+                if (!active) {
+                    const card = document.getElementById('card-' + project);
+                    if (card) {
+                        card.classList.remove('maint-shake');
+                        void card.offsetWidth;
+                        card.classList.add('maint-shake');
+                        card.addEventListener('animationend', () => card.classList.remove('maint-shake'), { once: true });
+                    }
+                }
                 updateStatusBanner();
                 showToast(
                     active
@@ -408,44 +523,18 @@ function toggleMaintenance(input) {
                     active ? 'success' : 'error'
                 );
             } else {
-                showToast('เกิดข้อผิดพลาด: ' + (d.message || ''), 'error');
+                // Rollback
                 input.checked = !active;
-                badge.className = 'status-badge ' + (!active ? 'on' : 'off');
-                badge.innerHTML = `<span class="status-dot"></span>${!active ? 'เปิดใช้งาน' : 'ปรับปรุง'}`;
+                updateBadge(project, !active);
+                showToast('เกิดข้อผิดพลาด: ' + (d.message || ''), 'error');
             }
         })
         .catch(() => {
-            showToast('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้', 'error');
+            // Rollback
             input.checked = !active;
-            badge.className = 'status-badge ' + (!active ? 'on' : 'off');
-            badge.innerHTML = `<span class="status-dot"></span>${!active ? 'เปิดใช้งาน' : 'ปรับปรุง'}`;
+            updateBadge(project, !active);
+            showToast('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้', 'error');
         });
-}
-
-function updateStatusBanner() {
-    // Re-check all toggles to update the banner
-    const checks = document.querySelectorAll('[data-project]');
-    const allOn  = Array.from(checks).every(c => c.checked);
-    const banner = document.querySelector('.au.d1.rounded-2xl');
-    if (!banner) return;
-
-    if (allOn) {
-        banner.className = banner.className.replace(/bg-amber-\d+ border-amber-\d+/g, '').trim()
-            + ' bg-green-50 border-green-200';
-        banner.querySelector('.w-10').className = banner.querySelector('.w-10').className
-            .replace(/bg-amber-\d+ text-amber-\d+/g, 'bg-green-100 text-green-600');
-        banner.querySelector('.w-10 i').className = 'fa-solid fa-circle-check text-base';
-        banner.querySelector('.font-bold').textContent = 'ระบบทุกโปรเจคพร้อมใช้งาน';
-        banner.querySelector('.text-xs').textContent   = 'User ทุกคนสามารถเข้าใช้งานได้ตามปกติ';
-    } else {
-        banner.className = banner.className.replace(/bg-green-\d+ border-green-\d+/g, '').trim()
-            + ' bg-amber-50 border-amber-200';
-        banner.querySelector('.w-10').className = banner.querySelector('.w-10').className
-            .replace(/bg-green-\d+ text-green-\d+/g, 'bg-amber-100 text-amber-600');
-        banner.querySelector('.w-10 i').className = 'fa-solid fa-triangle-exclamation text-base';
-        banner.querySelector('.font-bold').textContent = 'มีโปรเจคที่ปิดปรับปรุงอยู่';
-        banner.querySelector('.text-xs').textContent   = 'User จะเห็นหน้า "ระบบอยู่ในขั้นตอนการปรับปรุง" สำหรับโปรเจคที่ปิดไว้';
-    }
 }
 </script>
 

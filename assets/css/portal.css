@@ -264,6 +264,25 @@ body {
     animation: bgShift 20s ease infinite;
 }
 
+/* ── Reduced motion ──────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+    .au, .au.d1, .au.d2, .au.d3, .au.d4 {
+        animation: none;
+        opacity: 1;
+    }
+    .proj-card {
+        animation: none;
+        opacity: 1;
+    }
+    .proj-card:hover { transform: none; }
+    .kpi-card:hover  { transform: none; }
+    .kpi-accent { animation: none; }
+    .feed-item { animation: none; opacity: 1; }
+    .amb-dot   { animation: none; }
+    body       { animation: none; }
+    .ripple-wave { display: none; }
+}
+
 /* ── Mobile (< 640px) ────────────────────────────────────── */
 @media (max-width: 639px) {
     /* KPI cards — tighter on small screens */
