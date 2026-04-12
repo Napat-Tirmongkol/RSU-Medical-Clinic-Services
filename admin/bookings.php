@@ -62,7 +62,7 @@ try {
 require_once __DIR__ . '/includes/header.php';
 ?>
 
-<!-- 🎨 CUSTOM STYLES & ANIMATIONS -->
+<!-- CUSTOM STYLES & ANIMATIONS -->
 <style>
     @keyframes sideIn {
         from {
@@ -253,7 +253,7 @@ require_once __DIR__ . '/includes/header.php';
     </div>
 </div>
 
-<!-- 📦 SIDE DRAWER COMPONENT (Slide-over Details) -->
+<!-- SIDE DRAWER COMPONENT (Slide-over Details) -->
 <div id="drawerOverlay" class="fixed inset-0 drawer-overlay hidden opacity-0" style="z-index:150" onclick="closeDrawer()"></div>
 <aside id="sideDrawer"
     class="fixed top-0 right-0 h-screen w-full md:w-[480px] bg-white shadow-2xl translate-x-full hidden flex flex-col transition-all duration-300" style="z-index:200">
@@ -273,7 +273,7 @@ require_once __DIR__ . '/includes/header.php';
     </div>
 </aside>
 
-<!-- ⚡ FLOATING ACTION BAR -->
+<!-- FLOATING ACTION BAR -->
 <div id="actionBar"
     class="fixed bottom-10 left-1/2 -translate-x-1/2 z-[50] glass-card px-8 py-4 rounded-[32px] shadow-2xl border-2 border-blue-600/10 hidden translate-y-full flex items-center gap-10">
     <div class="flex flex-col">
@@ -289,10 +289,10 @@ require_once __DIR__ . '/includes/header.php';
     </div>
 </div>
 
-<!-- 🚀 JS INTERACTION ENGINE -->
+<!-- JS INTERACTION ENGINE -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-    /** 🔄 TAB FILTERING SYSTEM */
+    /** TAB FILTERING SYSTEM */
     function filterByStatus(status) {
         const tabs = document.querySelectorAll('.status-tab');
         const rows = document.querySelectorAll('.booking-row');
@@ -314,7 +314,7 @@ require_once __DIR__ . '/includes/header.php';
         });
     }
 
-    /** 🔎 SEARCH FILTERING (Real-time) */
+    /** SEARCH FILTERING (Real-time) */
     document.getElementById('globalSearch').addEventListener('input', (e) => {
         const term = e.target.value.toLowerCase();
         const rows = document.querySelectorAll('.booking-row');
@@ -328,7 +328,7 @@ require_once __DIR__ . '/includes/header.php';
         });
     });
 
-    /** 📦 DRAWER LOGIC (Slide-over) */
+    /** DRAWER LOGIC (Slide-over) */
     function openDrawer(dataStr) {
         const data = JSON.parse(dataStr);
         const drawer = document.getElementById('sideDrawer');
@@ -410,7 +410,7 @@ require_once __DIR__ . '/includes/header.php';
         }, 300);
     }
 
-    /** ⚡ BULK ACTION MANAGEMENT */
+    /** BULK ACTION MANAGEMENT */
     function toggleAllRows(master) {
         document.querySelectorAll('.row-checkbox').forEach(cb => {
             if (cb.closest('tr').style.display !== 'none') cb.checked = master.checked;
@@ -433,7 +433,7 @@ require_once __DIR__ . '/includes/header.php';
         }
     }
 
-    /** 🛠️ API ACTIONS (Approve/Reject) */
+    /** API ACTIONS (Approve/Reject) */
     function approveOne(id) {
         Swal.fire({
             title: 'ยืนยันการอนุมัติ?',

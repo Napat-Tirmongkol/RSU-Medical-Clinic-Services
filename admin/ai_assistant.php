@@ -260,7 +260,7 @@ renderPageHeader(
         <div class="msg ai" id="welcomeMsg">
             <div class="msg-avatar"><i class="fa-solid fa-robot"></i></div>
             <div class="msg-bubble">
-                <strong>สวัสดีครับ! ผม AI Campaign Analyst</strong> 🤖<br>
+                <strong>สวัสดีครับ! ผม AI Campaign Analyst</strong> <i class="fa-solid fa-robot"></i><br>
                 ผมสามารถวิเคราะห์ข้อมูลแคมเปญ RSU Medical Clinic ได้แบบเรียลไทม์<br><br>
                 ลองกดปุ่ม <strong>คำถามด่วน</strong> ด้านบน หรือพิมพ์คำถามของคุณได้เลย เช่น<br>
                 <ul style="margin-top:6px">
@@ -491,7 +491,7 @@ function showRateLimited(resetIn) {
 
     function tick() {
         resetEl.textContent = left;
-        sendEl.innerHTML = `<span style="font-size:.65rem;font-weight:800">🚫${left}s</span>`;
+        sendEl.innerHTML = `<span style="font-size:.65rem;font-weight:800"><i class='fa-solid fa-ban'></i> ${left}s</span>`;
         if (left <= 0) {
             clearInterval(rlInterval);
             sendEl.disabled = false;

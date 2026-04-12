@@ -175,7 +175,7 @@ require_once __DIR__ . '/../admin/includes/header.php';
         </div>
     </div>
 
-    <!-- 📋 Main User Table Content -->
+    <!-- Main User Table Content -->
     <div class="bg-white rounded-[32px] shadow-2xl shadow-gray-200/40 border border-gray-100/50 overflow-hidden animate-slide-up" style="animation-delay: 100ms;">
         <div class="px-8 py-7 border-b border-gray-50 flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div class="flex items-center gap-3">

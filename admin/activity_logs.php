@@ -70,7 +70,7 @@ require_once __DIR__ . '/includes/header.php';
         <div class="mt-4 p-3 bg-white/50 rounded-xl text-xs font-mono text-red-800 break-all">
             SQL Error: <?= htmlspecialchars($db_error) ?>
         </div>
-        <p class="mt-4 text-xs text-red-500 font-bold">⚠️ คำแนะนำ: ตรวจสอบว่ามีตาราง "sys_activity_logs" ในฐานข้อมูล "e-campaignv2_db" หรือยัง</p>
+        <p class="mt-4 text-xs text-red-500 font-bold"><i class="fa-solid fa-triangle-exclamation text-red-500 mr-1"></i> คำแนะนำ: ตรวจสอบว่ามีตาราง "sys_activity_logs" ในฐานข้อมูล "e-campaignv2_db" หรือยัง</p>
     </div>
 <?php endif; ?>
 

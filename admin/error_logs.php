@@ -279,8 +279,8 @@ renderPageHeader(
             <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 block">แหล่งที่มา</label>
             <select name="source" class="py-2.5 px-3 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 bg-white">
                 <option value="">ทั้งหมด</option>
-                <option value="js"  <?= $filterSource==='js'  ? 'selected':'' ?>>🌐 JavaScript (Frontend)</option>
-                <option value="php" <?= $filterSource==='php' ? 'selected':'' ?>>🐘 PHP (Backend)</option>
+                <option value="js"  <?= $filterSource==='js'  ? 'selected':'' ?>>JavaScript (Frontend)</option>
+                <option value="php" <?= $filterSource==='php' ? 'selected':'' ?>>PHP (Backend)</option>
             </select>
         </div>
 

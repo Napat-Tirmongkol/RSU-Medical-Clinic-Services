@@ -43,7 +43,7 @@ render_header('Booking Details');
 
     <div class="bg-white rounded-3xl p-8 shadow-sm text-center border border-gray-100">
         <div class="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-            <span class="text-4xl text-green-500">✓</span>
+            <i class="fa-solid fa-circle-check text-4xl text-green-500"></i>
         </div>
         <h2 class="text-2xl font-bold text-gray-900 mb-2">รายละเอียดการจอง</h2>
         <p class="text-gray-500 mb-8">สถานะ: <?= $booking['status'] === 'cancelled' ? 'ยกเลิกแล้ว' : 'ยืนยันการจองเรียบร้อย' ?></p>

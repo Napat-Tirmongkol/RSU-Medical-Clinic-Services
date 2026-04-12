@@ -146,10 +146,10 @@ function get_email_template(string $title, string $message, array $details = [],
         default    => '#0052CC',
     };
     $iconEmoji = match($type) {
-        'success'  => '✅',
-        'approved' => '🎉',
-        'cancel'   => '❌',
-        default    => 'ℹ️',
+        'success'  => '',
+        'approved' => '',
+        'cancel'   => '',
+        default    => '',
     };
 
     $detailRows = '';
@@ -210,41 +210,41 @@ function notify_booking_status(string $to, string $type, array $data): bool {
     $greeting = $name ? "สวัสดีคุณ {$name}" : "สวัสดี";
 
     $details = [
-        '📋 กิจกรรม' => $title,
-        '📅 วันที่'   => $date,
-        '🕐 เวลา'    => $time,
+        'กิจกรรม' => $title,
+        'วันที่'   => $date,
+        'เวลา'    => $time,
     ];
     if (!empty($data['status_label'])) {
-        $details['📌 สถานะ'] = $data['status_label'];
+        $details['สถานะ'] = $data['status_label'];
     }
 
     switch ($type) {
         case 'confirmation':
-            $subject = "✅ ยืนยันการจองกิจกรรม: {$title}";
+            $subject = "ยืนยันการจองกิจกรรม: {$title}";
             $emailTitle = 'จองกิจกรรมสำเร็จ!';
             $message  = "{$greeting} ระบบได้รับการลงทะเบียนของคุณเรียบร้อยแล้ว กรุณาตรวจสอบรายละเอียดด้านล่าง";
             $tplType  = 'success';
             break;
 
         case 'approved':
-            $subject = "🎉 การจองได้รับการอนุมัติ: {$title}";
+            $subject = "การจองได้รับการอนุมัติ: {$title}";
             $emailTitle = 'การจองได้รับการอนุมัติแล้ว!';
             $message  = "{$greeting} เจ้าหน้าที่ได้อนุมัติคิวการจองของคุณเรียบร้อยแล้ว กรุณาเตรียมตัวเข้าร่วมตามวันและเวลาที่กำหนด";
             $tplType  = 'approved';
             break;
 
         case 'cancelled_by_user':
-            $subject = "❌ ยกเลิกการจอง: {$title}";
+            $subject = "ยกเลิกการจอง: {$title}";
             $emailTitle = 'ยกเลิกการจองแล้ว';
             $message  = "{$greeting} การจองกิจกรรมต่อไปนี้ถูกยกเลิกตามคำขอของคุณเรียบร้อยแล้ว";
             $tplType  = 'cancel';
             break;
 
         case 'cancelled_by_admin':
-            $subject = "⚠️ แจ้งยกเลิกคิวกิจกรรม: {$title}";
+            $subject = "แจ้งยกเลิกคิวกิจกรรม: {$title}";
             $emailTitle = 'ขออภัย — มีการยกเลิกคิวของคุณ';
             $message  = "{$greeting} เจ้าหน้าที่ขอยกเลิกคิวเดิมของคุณ เนื่องจากมีเหตุจำเป็น กรุณาเข้าสู่ระบบเพื่อจองรอบเวลาใหม่";
-            $details['📌 สถานะ'] = 'คิวถูกยกเลิก (กรุณาจองใหม่)';
+            $details['สถานะ'] = 'คิวถูกยกเลิก (กรุณาจองใหม่)';
             $tplType  = 'cancel';
             break;
 

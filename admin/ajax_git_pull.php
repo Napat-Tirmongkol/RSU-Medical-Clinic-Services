@@ -53,7 +53,7 @@ if ($curlErr) {
 if ($httpCode >= 200 && $httpCode < 300) {
     echo json_encode([
         'status'  => 'success',
-        'message' => 'Git Pull สำเร็จ ✓',
+        'message' => 'Git Pull สำเร็จ',
         'detail'  => 'Plesk webhook ตอบกลับ HTTP ' . $httpCode,
     ]);
 } else {

@@ -205,7 +205,7 @@ $header_actions = '
 renderPageHeader("System Governance", "Hub บริหารจัดการ: เพิ่ม แก้ไข และควบคุมสิทธิ์การเข้าถึงระบบกลางของเจ้าหน้าที่", $header_actions); 
 ?>
 
-    <!-- 📊 สรุปภาพรวม (Admin KPIs) -->
+    <!-- สรุปภาพรวม (Admin KPIs) -->
     <?php
     $super_count  = count(array_filter($admins, fn($a) => ($a['role'] ?? '') === 'superadmin'));
     $staff_active = count(array_filter($staffList, fn($s) => ($s['account_status'] ?? '') === 'active'));

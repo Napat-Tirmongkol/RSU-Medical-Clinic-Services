@@ -226,8 +226,8 @@ $projects = [
             .then(d => {
                 if (d.ok) {
                     showToast(active
-                        ? `✓ ${project} เปิดใช้งานแล้ว`
-                        : `⚠ ${project} ปิดปรับปรุงแล้ว — User จะเห็นหน้าปรับปรุง`,
+                        ? `[สำเร็จ] ${project} เปิดใช้งานแล้ว`
+                        : `[แจ้งเตือน] ${project} ปิดปรับปรุงแล้ว — User จะเห็นหน้าปรับปรุง`,
                         active ? 'success' : 'error'
                     );
                 } else {
