@@ -240,7 +240,7 @@ render_header('ข้อมูลส่วนตัว');
         </div>
       </div>
 
-      <!-- 🛡️ PDPA Section -->
+      <!-- PDPA Section -->
       <div class="space-y-4 pt-4 border-t border-gray-100">
         <div class="flex items-center gap-2 text-[#0052CC] mb-2 text-sm font-bold">
           <i class="fa-solid fa-shield-halved"></i>

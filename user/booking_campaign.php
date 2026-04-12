@@ -34,7 +34,7 @@ function getBadge($type) {
     };
 }
 
-// 🌟 เรียกใช้ฟังก์ชันเพื่อวาด Header (โหลด CSS/Font)
+// เรียกใช้ฟังก์ชันเพื่อวาด Header (โหลด CSS/Font)
 render_header('เลือกแคมเปญ - E-Campaign');
 ?>
 
@@ -110,6 +110,6 @@ render_header('เลือกแคมเปญ - E-Campaign');
 </div>
 
 <?php 
-// 🌟 เรียกใช้ฟังก์ชันเพื่อปิด Tag HTML
+// เรียกใช้ฟังก์ชันเพื่อปิด Tag HTML
 render_footer(); 
 ?>

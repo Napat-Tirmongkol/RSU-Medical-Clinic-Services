@@ -61,7 +61,7 @@ try {
     $updateStmt = $pdo->prepare("UPDATE camp_bookings SET status = 'cancelled_by_admin' WHERE id = :id");
     $updateStmt->execute([':id' => $appointmentId]);
 
-    // 📧 3. ส่งอีเมลแจ้งเตือน (ถ้ามีอีเมล)
+    // 3. ส่งอีเมลแจ้งเตือน (ถ้ามีอีเมล)
     if (!empty($booking['email'])) {
         try {
             require_once __DIR__ . '/../includes/mail_helper.php';
@@ -75,7 +75,7 @@ try {
         }
     }
 
-    // 💬 4. Send LINE Message (Messaging API)
+    // 4. Send LINE Message (Messaging API)
     if (!empty($booking['line_user_id'])) {
         $lineUserId = $booking['line_user_id'];
         $campaignTitle = $booking['campaign_title'];
@@ -102,7 +102,7 @@ try {
                             'contents' => [
                                 [
                                     'type' => 'text',
-                                    'text' => '⚠️ แจ้งยกเลิกคิว (คิวเต็ม)',
+                                    'text' => '[แจ้งเตือน] ยกเลิกคิว (คิวเต็ม)',
                                     'color' => '#FFFFFF',
                                     'weight' => 'bold',
                                     'size' => 'lg',

@@ -12,7 +12,7 @@ $pdo = db();
 $adminRole = $_SESSION['admin_role'] ?? 'admin'; // ตัวแปรบทบาทสำหรับเช็คสิทธิ์ (Mock role)
 
 /**
- * 📊 (1) LIVE DATA & ROBUST STATS
+ * (1) LIVE DATA & ROBUST STATS
  * ดึงสถิจริง พร้อมระบบป้องกันถ้าตารางในอนาคตยังไม่พร้อม
  */
 $kpis = [
@@ -40,7 +40,7 @@ try {
 }
 
 /**
- * 🧩 (2) PROJECT CATALOG (SCALABLE STRUCTURE)
+ * (2) PROJECT CATALOG (SCALABLE STRUCTURE)
  * โครงสร้างอาเรย์สำหรับวนลูปโปรเจกต์ รองรับการเพิ่มโมดูลในอนาคตได้ทันที
  */
 $projects = [
@@ -139,7 +139,7 @@ $projects = [
 ];
 
 /**
- * 🕒 (3) RECENT ACTIVITY FETCH
+ * (3) RECENT ACTIVITY FETCH
  * ดึงความเคลื่อนไหวล่าสุดจาก sys_activity_logs มาแสดงที่ Dashboard
  */
 $recentActivity = [];

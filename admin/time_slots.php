@@ -31,7 +31,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     validate_csrf_or_die();
     $action = $_POST['action'] ?? '';
     
-    // 🌟 ระบบเพิ่มรอบเวลาแบบหลายๆ วัน (Multi-Select Dates) และหลายๆ ช่วงเวลา
+    // ระบบเพิ่มรอบเวลาแบบหลายๆ วัน (Multi-Select Dates) และหลายๆ ช่วงเวลา
     if ($action === 'add_slot') {
         $campaign_id = (int)$_POST['campaign_id'];
         $selected_dates = $_POST['selected_dates'] ?? '';
@@ -85,7 +85,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    // 🌟 ระบบแก้ไขรอบเวลา
+    // ระบบแก้ไขรอบเวลา
     if ($action === 'edit_slot') {
         $id = (int)$_POST['slot_id'];
         $campaign_id = (int)$_POST['campaign_id'];

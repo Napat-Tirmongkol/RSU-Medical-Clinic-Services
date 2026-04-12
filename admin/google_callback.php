@@ -74,7 +74,7 @@ $stmt->execute([':email' => $email]);
 $admin = $stmt->fetch();
 
 if ($admin) {
-    // ✅ พบแอดมินในระบบ -> ล็อกอินสำเร็จ
+    // พบแอดมินในระบบ -> ล็อกอินสำเร็จ
     $_SESSION['admin_logged_in'] = true;
     $_SESSION['admin_id'] = $admin['id'];
     $_SESSION['admin_username'] = $admin['full_name'] ?: $name;
@@ -85,7 +85,7 @@ if ($admin) {
     header("Location: ../portal/index.php");
     exit;
 } else {
-    // ❌ ไม่พบอีเมลนี้ในรายชื่อแอดมินที่ได้รับอนุญาต
+    // ไม่พบอีเมลนี้ในรายชื่อแอดมินที่ได้รับอนุญาต
     $_SESSION['login_error'] = "ขออภัย อีเมล $email ไม่ได้รับอนุญาตให้เข้าสู่ระบบจัดการหลังบ้าน";
     header("Location: login.php");
     exit;

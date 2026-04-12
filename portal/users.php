@@ -62,7 +62,7 @@ try {
     $sql = "SELECT * FROM sys_users WHERE 1=1";
     
     if ($search !== '') {
-        // 🌟 แยกชื่อ Parameter ให้ไม่ซ้ำกัน
+        // แยกชื่อ Parameter ให้ไม่ซ้ำกัน
         $sql .= " AND (full_name LIKE :search1 OR student_personnel_id LIKE :search2 OR phone_number LIKE :search3)";
         $searchTerm = "%{$search}%";
         $params[':search1'] = $searchTerm;
@@ -122,7 +122,7 @@ require_once __DIR__ . '/../admin/includes/header.php';
     renderPageHeader("User Directory", "ศูนย์กลางจัดการรายชื่อ: ค้นหา ตรวจสอบความถูกต้อง และจัดการประวัติผู้ใช้งานทั้งแคมเปญ", $header_actions); 
 ?>
 
-    <!-- 📊 User Stats Summary -->
+    <!-- User Stats Summary -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 animate-slide-up">
         <div class="bg-gradient-to-br from-white to-gray-50/50 p-6 rounded-[28px] border border-gray-100 shadow-sm">
             <div class="flex items-center gap-4">

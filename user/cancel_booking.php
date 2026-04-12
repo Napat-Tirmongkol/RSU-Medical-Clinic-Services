@@ -23,7 +23,7 @@ if ($studentId <= 0 || $appointmentId <= 0) {
 try {
   $pdo = db();
   
-  // 📧 ดึงข้อมูลก่อนลบเพื่อนำไปใส่ในอีเมล
+  // ดึงข้อมูลก่อนลบเพื่อนำไปใส่ในอีเมล
   $stmtInfo = $pdo->prepare("SELECT u.email, c.title, s.slot_date, s.start_time, s.end_time 
                              FROM camp_bookings b 
                              JOIN sys_users u ON b.student_id = u.id 

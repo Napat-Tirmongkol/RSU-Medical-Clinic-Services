@@ -23,7 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->execute([':id' => $appointmentId]);
 
             if ($stmt->rowCount() > 0) {
-                // 📧 ส่งอีเมลแจ้งเตือนการอนุมัติ
+                // ส่งอีเมลแจ้งเตือนการอนุมัติ
                 try {
                     $stmtInfo = $pdo->prepare("
                         SELECT u.email, u.full_name, c.title,

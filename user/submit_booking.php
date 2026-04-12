@@ -74,7 +74,7 @@ try {
         exit;
     }
 
-    // 6. 🌟 กำหนดสถานะตามการตั้งค่าแคมเปญ 🌟
+    // 6. กำหนดสถานะตามการตั้งค่าแคมเปญ
     // ถ้า is_auto_approve = 1 (อนุมัติอัตโนมัติ) ให้ใช้สถานะ 'confirmed' ข้ามการรอไปเลย
     $bookingStatus = ($campData['is_auto_approve'] == 1) ? 'confirmed' : 'booked';
 
@@ -88,7 +88,7 @@ try {
         ':status' => $bookingStatus
     ]);
 
-    // 8. 📧 ส่งอีเมลแจ้งเตือนการจองสำเร็จ
+    // 8. ส่งอีเมลแจ้งเตือนการจองสำเร็จ
     try {
         $stmtUser = $pdo->prepare("SELECT email, full_name FROM sys_users WHERE id = :sid LIMIT 1");
         $stmtUser->execute([':sid' => $studentId]);

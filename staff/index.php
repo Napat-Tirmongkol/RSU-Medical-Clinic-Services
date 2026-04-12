@@ -53,7 +53,7 @@ require_once __DIR__ . '/../config.php';
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // 🌟 ใช้ Html5Qrcode เพื่อบังคับเลนส์กล้องหลังหลัก
+    // ใช้ Html5Qrcode เพื่อบังคับเลนส์กล้องหลังหลัก
     const html5QrCode = new Html5Qrcode("reader");
     let isProcessing = false;
 
@@ -97,7 +97,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }));
     }
 
-    // 🌟 เริ่มเปิดกล้อง โดยบังคับใช้กล้องหลัง (environment)
+    // เริ่มเปิดกล้อง โดยบังคับใช้กล้องหลัง (environment)
     html5QrCode.start(
         { facingMode: "environment" }, 
         { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 },

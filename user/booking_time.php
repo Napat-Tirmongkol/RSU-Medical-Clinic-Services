@@ -136,7 +136,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const dateStr = '<?= $selectedDateStr ?>';
     const campId = <?= $campaignId ?>;
     
-    // 🌟 ระบบแจ้งเตือนยืนยันก่อนบันทึก (SweetAlert2)
+    // ระบบแจ้งเตือนยืนยันก่อนบันทึก (SweetAlert2)
     const bookingForm = document.getElementById('bookingForm');
     bookingForm.addEventListener('submit', function(e) {
         e.preventDefault(); // หยุดการส่งฟอร์มทันที
@@ -173,7 +173,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // 🌟 ระบบดึงข้อมูล Real-time อัปเดตที่นั่ง
+    // ระบบดึงข้อมูล Real-time อัปเดตที่นั่ง
     function updateSlotsRealtime() {
         fetch(`api_get_slots.php?date=${dateStr}&campaign_id=${campId}`)
             .then(response => response.json())
