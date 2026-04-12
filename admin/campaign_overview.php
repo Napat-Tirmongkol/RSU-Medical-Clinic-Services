@@ -125,25 +125,30 @@ require_once __DIR__ . '/includes/header.php';
 ); ?>
 
 <!-- Campaign Selector -->
-<div class="card p-5 mb-6 fade-up flex flex-col md:flex-row gap-4 items-center">
-    <label class="text-sm font-bold text-gray-600 whitespace-nowrap">เลือกแคมเปญ :</label>
-    <form method="get" class="flex gap-3 flex-1 flex-wrap">
-        <select name="id" onchange="this.form.submit()"
-            class="flex-1 min-w-[220px] border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-medium outline-none focus:ring-2 focus:ring-blue-400 bg-white">
-            <option value="">— เลือกแคมเปญ —</option>
-            <?php foreach ($allCampaigns as $c): ?>
-            <option value="<?= $c['id'] ?>" <?= $c['id'] == $campaignId ? 'selected' : '' ?>>
-                <?= htmlspecialchars($c['title']) ?>
-                <?= $c['status'] !== 'active' ? ' ['.htmlspecialchars($c['status']).']' : '' ?>
-            </option>
-            <?php endforeach; ?>
-        </select>
-    </form>
-    <?php if ($campaign): ?>
-    <a href="campaigns.php" class="text-sm text-blue-600 hover:underline whitespace-nowrap">
-        <i class="fa-solid fa-pen-to-square mr-1"></i>แก้ไขแคมเปญ
-    </a>
-    <?php endif; ?>
+<div class="card p-4 sm:p-5 mb-6 fade-up">
+    <div style="display:flex; flex-direction:column; gap:10px;">
+        <label class="text-sm font-bold text-gray-600">เลือกแคมเปญ :</label>
+        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+            <form method="get" style="flex:1; min-width:0;">
+                <select name="id" onchange="this.form.submit()"
+                    class="border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-medium outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+                    style="width:100%; min-width:0;">
+                    <option value="">— เลือกแคมเปญ —</option>
+                    <?php foreach ($allCampaigns as $c): ?>
+                    <option value="<?= $c['id'] ?>" <?= $c['id'] == $campaignId ? 'selected' : '' ?>>
+                        <?= htmlspecialchars($c['title']) ?>
+                        <?= $c['status'] !== 'active' ? ' ['.htmlspecialchars($c['status']).']' : '' ?>
+                    </option>
+                    <?php endforeach; ?>
+                </select>
+            </form>
+            <?php if ($campaign): ?>
+            <a href="campaigns.php" class="text-sm text-blue-600 hover:underline whitespace-nowrap flex-shrink-0">
+                <i class="fa-solid fa-pen-to-square mr-1"></i>แก้ไขแคมเปญ
+            </a>
+            <?php endif; ?>
+        </div>
+    </div>
 </div>
 
 <?php if (!$campaign && $campaignId > 0): ?>
