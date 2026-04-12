@@ -205,50 +205,51 @@ try {
     exit;
 }
 
-// ── Build Data Context ────────────────────────────────────────────────────────
-$lines = [];
-$lines[] = "=== ภาพรวมระบบ RSU Healthcare Campaign ===";
-$lines[] = "แคมเปญทั้งหมด     : {$overall['total_campaigns']} รายการ";
-$lines[] = "แคมเปญที่เปิดอยู่  : {$overall['active_campaigns']} รายการ";
-$lines[] = "โควต้ารวม          : {$overall['total_capacity']} ที่นั่ง";
-$lines[] = "การจองทั้งหมด      : {$overall['total_bookings']} รายการ";
-$lines[] = "  ยืนยันแล้ว      : {$overall['confirmed']}";
-$lines[] = "  รอยืนยัน        : {$overall['pending']}";
-$lines[] = "  ยกเลิก          : {$overall['cancelled']}";
-$lines[] = "";
-$lines[] = "=== 10 อันดับแคมเปญที่มีผู้จองมากที่สุด ===";
+// ── Build Structured JSON Data ────────────────────────────────────────────────
+$dbData = [
+    'ภาพรวมระบบ' => [
+        'แคมเปญทั้งหมด'    => (int)$overall['total_campaigns'],
+        'แคมเปญที่เปิดอยู่' => (int)$overall['active_campaigns'],
+        'โควต้ารวม'         => (int)$overall['total_capacity'],
+        'การจองทั้งหมด'     => (int)$overall['total_bookings'],
+        'ยืนยันแล้ว'        => (int)$overall['confirmed'],
+        'รอยืนยัน'          => (int)$overall['pending'],
+        'ยกเลิก'            => (int)$overall['cancelled'],
+    ],
+    'top10_แคมเปญจองมากสุด' => array_map(fn($c) => [
+        'ชื่อแคมเปญ'          => $c['title'],
+        'สถานะ'               => $c['status'],
+        'โควต้า'              => (int)$c['total_capacity'],
+        'จองทั้งหมด'          => (int)$c['total_bookings'],
+        'ยืนยันแล้ว'          => (int)$c['confirmed'],
+        'รอยืนยัน'            => (int)$c['pending'],
+        'ยกเลิก'              => (int)$c['cancelled'],
+        'อัตราเติมโควต้า_pct' => (float)($c['fill_pct'] ?? 0),
+    ], $top10),
+    'แนวโน้ม_7_วันล่าสุด' => array_map(fn($t) => [
+        'วันที่'       => $t['day'],
+        'จำนวนการจอง' => (int)$t['cnt'],
+    ], $trend7),
+];
 
-foreach ($top10 as $i => $c) {
-    $rank  = $i + 1;
-    $fill  = $c['fill_pct'] ?? 0;
-    $lines[] = "อันดับ {$rank}: {$c['title']}";
-    $lines[] = "  สถานะ: {$c['status']} | โควต้า: {$c['total_capacity']}";
-    $lines[] = "  จองทั้งหมด: {$c['total_bookings']} | ยืนยัน: {$c['confirmed']} | รอยืนยัน: {$c['pending']} | ยกเลิก: {$c['cancelled']}";
-    $lines[] = "  อัตราการเติมโควต้า: {$fill}%";
-    $lines[] = "";
-}
+$dbJson = json_encode($dbData, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
 
-if (!empty($trend7)) {
-    $lines[] = "=== แนวโน้มการจอง 7 วันล่าสุด ===";
-    foreach ($trend7 as $t) {
-        $lines[] = "  {$t['day']}: {$t['cnt']} การจอง";
-    }
-}
-
-$dataContext = implode("\n", $lines);
-
-// ── Build Prompt ──────────────────────────────────────────────────────────────
+// ── Build Prompt (template-based) ────────────────────────────────────────────
 $systemPrompt = <<<PROMPT
-คุณคือ AI Assistant ผู้เชี่ยวชาญวิเคราะห์ข้อมูลแคมเปญสุขภาพของ RSU Healthcare Services
-ตอบเป็นภาษาไทยเสมอ กระชับ ชัดเจน มีประโยชน์
-ใช้ Markdown ในการจัดรูปแบบ: **ตัวหนา**, รายการ (- bullet), ตาราง (|col|col|)
-ห้ามประดิษฐ์ข้อมูลที่ไม่มีใน context ด้านล่าง
+คุณคือ AI ผู้เชี่ยวชาญด้านการวิเคราะห์ข้อมูล (Data Analyst Assistant) ประจำระบบ RSU Healthcare
+หน้าที่ของคุณคือการวิเคราะห์ สรุปผล หรือตอบคำถามของแอดมิน โดยยึดกฎเหล็กดังต่อไปนี้อย่างเคร่งครัด:
 
----
-{$dataContext}
----
+[เงื่อนไขการทำงาน]
+1. ห้ามจินตนาการหรือสร้างข้อมูลขึ้นมาเองเด็ดขาด คุณต้องอ้างอิงคำตอบจาก "ข้อมูลจากฐานข้อมูล" ที่ระบบแนบมาให้ด้านล่างนี้เท่านั้น
+2. หากคำถามของแอดมินไม่สามารถหาคำตอบได้จากข้อมูลที่แนบมา ให้ตอบตรงๆ ว่า "ไม่สามารถวิเคราะห์ได้ เนื่องจากข้อมูลที่ระบบส่งมาไม่เพียงพอ"
+3. จัดรูปแบบคำตอบให้อ่านง่าย สบายตา หากมีการเปรียบเทียบหรือสรุปตัวเลข แนะนำให้ใช้ตาราง (Markdown Table) หรือ Bullet points
+4. ตอบคำถามด้วยความเป็นมืออาชีพ กระชับ และตรงประเด็น ตอบเป็นภาษาไทยเสมอ
 
-คำถามจากแอดมิน: {$query}
+[ข้อมูลจากฐานข้อมูล]
+{$dbJson}
+
+[คำสั่ง/คำถามจากแอดมิน]
+{$query}
 PROMPT;
 
 // ── Auto-discover best available Gemini model ─────────────────────────────────
