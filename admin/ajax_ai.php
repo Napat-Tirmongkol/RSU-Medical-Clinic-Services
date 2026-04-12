@@ -135,7 +135,8 @@ $systemPrompt = <<<PROMPT
 PROMPT;
 
 // ── Call Gemini API ───────────────────────────────────────────────────────────
-$model = 'gemini-2.0-flash';
+// gemini-1.5-flash มี free tier ที่กว้างกว่าและรองรับทุก region
+$model = 'gemini-1.5-flash';
 $url   = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$apiKey}";
 
 $body = json_encode([
@@ -172,8 +173,15 @@ if ($curlErr) {
 
 if ($httpCode !== 200) {
     error_log("Gemini API HTTP {$httpCode}: {$raw}");
-    $errMsg = json_decode($raw, true)['error']['message'] ?? "HTTP {$httpCode}";
-    echo json_encode(['ok' => false, 'error' => "Gemini ตอบกลับ: {$errMsg}"]);
+    $errData = json_decode($raw, true);
+    $errMsg  = $errData['error']['message'] ?? "HTTP {$httpCode}";
+    // แปล quota error ให้เข้าใจง่าย
+    if ($httpCode === 429 || stripos($errMsg, 'quota') !== false || stripos($errMsg, 'RESOURCE_EXHAUSTED') !== false) {
+        $userMsg = 'API Key หมด quota หรือ free tier ไม่รองรับ — กรุณา:\n1. ตรวจสอบ quota ที่ https://ai.dev/rate-limit\n2. เปิด billing บน Google Cloud project\n3. หรือสร้าง API Key ใหม่จาก https://aistudio.google.com/apikey';
+    } else {
+        $userMsg = "Gemini ตอบกลับ: {$errMsg}";
+    }
+    echo json_encode(['ok' => false, 'error' => $userMsg]);
     exit;
 }
 
