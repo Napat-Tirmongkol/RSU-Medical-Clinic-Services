@@ -135,9 +135,8 @@ $systemPrompt = <<<PROMPT
 PROMPT;
 
 // ── Call Gemini API ───────────────────────────────────────────────────────────
-// gemini-1.5-flash มี free tier ที่กว้างกว่าและรองรับทุก region
-$model = 'gemini-1.5-flash';
-$url   = "https://generativelanguage.googleapis.com/v1/models/{$model}:generateContent?key={$apiKey}";
+$model = 'gemini-2.0-flash-lite';
+$url   = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$apiKey}";
 
 $body = json_encode([
     'contents'         => [
