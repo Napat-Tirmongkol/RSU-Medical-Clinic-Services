@@ -6,15 +6,15 @@ if (!function_exists('renderPageHeader')) {
     function renderPageHeader($title, $subtitle, $actions_html = '') {
         global $layout_none;
         echo '
-        <div class="mb-10 flex flex-col md:flex-row md:justify-between md:items-end gap-6 au d1">
+        <div class="mb-6 md:mb-10 flex flex-col md:flex-row md:justify-between md:items-end gap-4 md:gap-6 au d1">
             <div class="relative">
-                <h1 class="text-3xl md:text-4xl font-[950] text-gray-900 tracking-tight flex items-center gap-4">
-                    <div class="w-2 h-10 rounded-full shadow-lg" style="background:linear-gradient(180deg,#2e9e63,#6ee7b7);box-shadow:0 4px 10px rgba(46,158,99,.3)"></div>
+                <h1 class="text-xl sm:text-3xl md:text-4xl font-[950] text-gray-900 tracking-tight flex items-center gap-3 sm:gap-4">
+                    <div class="w-1.5 h-8 sm:w-2 sm:h-10 rounded-full shadow-lg flex-shrink-0" style="background:linear-gradient(180deg,#2e9e63,#6ee7b7);box-shadow:0 4px 10px rgba(46,158,99,.3)"></div>
                     ' . $title . '
                 </h1>
-                <p class="text-[11px] font-black uppercase tracking-[0.25em] mt-3 ml-6 opacity-60" style="color:#2e7d52">' . $subtitle . '</p>
+                <p class="text-[10px] sm:text-[11px] font-black uppercase tracking-[0.25em] mt-2 sm:mt-3 ml-5 sm:ml-6 opacity-60" style="color:#2e7d52">' . $subtitle . '</p>
             </div>
-            <div class="flex flex-wrap gap-3 items-center ml-6 md:ml-0" style="position:relative;z-index:100">
+            <div class="flex flex-wrap gap-3 items-center ml-5 sm:ml-6 md:ml-0" style="position:relative;z-index:100">
                 ' . $actions_html . '
             </div>
         </div>';
@@ -117,6 +117,35 @@ if (!function_exists('renderPageHeader')) {
             to   { opacity:1; transform:translateY(0); }
         }
         .animate-slide-up { animation: adminSlideUp .4s cubic-bezier(.16,1,.3,1) both; }
+
+        /* ── Mobile sidebar overlay ───────────────────────────── */
+        .sidebar-backdrop {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,.4);
+            z-index: 45;
+            backdrop-filter: blur(2px);
+            -webkit-backdrop-filter: blur(2px);
+        }
+        .sidebar-backdrop.show { display: block; }
+
+        @media (max-width: 767px) {
+            .admin-sidebar.mobile-open {
+                display: flex !important;
+                position: fixed;
+                top: 0; left: 0; bottom: 0;
+                width: 280px;
+                z-index: 50;
+                box-shadow: 4px 0 24px rgba(0,0,0,.15);
+                animation: slideInSidebar .25s ease both;
+            }
+            .admin-content { padding: 16px; }
+        }
+        @keyframes slideInSidebar {
+            from { transform: translateX(-100%); }
+            to   { transform: translateX(0); }
+        }
     </style>
 </head>
 <body style="display:flex; min-height:100vh; background:#e2f4ea;">
@@ -207,6 +236,22 @@ if (!function_exists('renderPageHeader')) {
     </div>
 
 </aside>
+<!-- Mobile backdrop -->
+<div id="sidebarBackdrop" class="sidebar-backdrop" onclick="closeMobileSidebar()"></div>
+<script>
+function toggleMobileSidebar(){
+    var sb=document.querySelector('.admin-sidebar'),bd=document.getElementById('sidebarBackdrop');
+    if(!sb||!bd)return;
+    if(sb.classList.contains('mobile-open')){closeMobileSidebar();}
+    else{sb.classList.add('mobile-open');bd.classList.add('show');document.body.style.overflow='hidden';}
+}
+function closeMobileSidebar(){
+    var sb=document.querySelector('.admin-sidebar'),bd=document.getElementById('sidebarBackdrop');
+    if(sb)sb.classList.remove('mobile-open');
+    if(bd)bd.classList.remove('show');
+    document.body.style.overflow='';
+}
+</script>
 <?php endif; ?>
 
 <!-- ── Main ─────────────────────────────────────────────────────────────── -->
@@ -215,13 +260,13 @@ if (!function_exists('renderPageHeader')) {
     <?php if (!$layout_none): ?>
     <!-- Top bar -->
     <div class="admin-topbar">
-        <!-- Mobile: back + title -->
+        <!-- Mobile: hamburger + title -->
         <div class="flex items-center gap-3 md:hidden">
-            <a href="../portal/index.php"
-                class="w-8 h-8 flex items-center justify-center rounded-lg"
-                style="background:#f0faf4; color:#2e9e63;">
-                <i class="fa-solid fa-arrow-left text-sm"></i>
-            </a>
+            <button onclick="toggleMobileSidebar()"
+                class="w-9 h-9 flex items-center justify-center rounded-lg border"
+                style="background:#f0faf4; color:#2e9e63; border-color:#c7e8d5;">
+                <i class="fa-solid fa-bars text-sm"></i>
+            </button>
             <span class="text-sm font-bold text-gray-700">e-Campaign</span>
         </div>
         <div class="hidden md:block"></div>
