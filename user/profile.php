@@ -27,7 +27,8 @@ $userData = [
 
 try {
   $pdo = db();
-  $stmt = $pdo->prepare("SELECT full_name, student_personnel_id, citizen_id, phone_number, status, email, gender FROM sys_users WHERE line_user_id = :line_id LIMIT 1");
+  // query หลัก — ไม่รวม gender เพื่อป้องกัน column not found ทำให้ข้อมูลหายทั้งฟอร์ม
+  $stmt = $pdo->prepare("SELECT full_name, student_personnel_id, citizen_id, phone_number, status, email FROM sys_users WHERE line_user_id = :line_id LIMIT 1");
   $stmt->execute([':line_id' => $lineUserId]);
   $user = $stmt->fetch();
 
@@ -38,7 +39,16 @@ try {
     $userData['phone'] = $user['phone_number'] ?? '';
     $userData['status'] = $user['status'] ?? '';
     $userData['email'] = $user['email'] ?? '';
-    $userData['gender'] = $user['gender'] ?? '';
+
+    // gender อยู่ใน query แยก — ถ้า column ยังไม่มีใน DB ข้อมูลหลักยังโหลดได้ปกติ
+    try {
+      $gStmt = $pdo->prepare("SELECT gender FROM sys_users WHERE line_user_id = :line_id LIMIT 1");
+      $gStmt->execute([':line_id' => $lineUserId]);
+      $gRow = $gStmt->fetch();
+      $userData['gender'] = $gRow['gender'] ?? '';
+    } catch (PDOException $e) {
+      // column gender ยังไม่ถูก migrate — ปล่อยเป็น ''
+    }
   }
 } catch (PDOException $e) {
   // กรณี Error ให้ปล่อยผ่านไปกรอกใหม่
