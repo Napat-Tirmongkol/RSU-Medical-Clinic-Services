@@ -226,7 +226,7 @@ if (!function_exists('renderPageHeader')) {
             <?php navLink('../admin/time_slots.php',       'fa-calendar-alt',     'จัดการรอบเวลา',         $cur); ?>
             <?php navLink('../admin/campaign_overview.php','fa-chart-bar',        'ภาพรวมแคมเปญ',          $cur); ?>
             <?php navLink('../admin/bookings.php',         'fa-clipboard-check',  'รายชื่อผู้เข้าร่วม',    $cur); ?>
-            <?php navLink('../admin/reports.php',          'fa-file-chart-column','รายงาน / สถิติ',        $cur); ?>
+            <?php navLink('../admin/reports.php',          'fa-file-lines',       'รายงาน / สถิติ',        $cur); ?>
         </div>
 
         <!-- User Management -->
