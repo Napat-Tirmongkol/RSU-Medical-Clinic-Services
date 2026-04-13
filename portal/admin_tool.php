@@ -428,6 +428,30 @@ foreach ($projects as $p) {
                     <i class="fa-solid fa-arrow-right log-card-arrow text-gray-300 text-sm flex-shrink-0 mt-1"></i>
                 </div>
             </a>
+            <!-- Sentry card -->
+            <?php $sentryConfigured = defined('SENTRY_BROWSER_KEY') && SENTRY_BROWSER_KEY !== ''; ?>
+            <a href="../admin/sentry_test.php" class="log-card group">
+                <div class="flex items-start gap-4">
+                    <div class="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0
+                                <?= $sentryConfigured ? 'bg-violet-50 text-violet-600' : 'bg-gray-100 text-gray-400' ?>
+                                group-hover:scale-105 transition-transform">
+                        <i class="fa-brands fa-sentry text-base"></i>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center justify-between gap-2 mb-1">
+                            <span class="font-black text-gray-900 text-sm">Sentry Monitoring</span>
+                            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full border flex-shrink-0
+                                <?= $sentryConfigured
+                                    ? 'bg-violet-50 text-violet-700 border-violet-200'
+                                    : 'bg-gray-100 text-gray-500 border-gray-200' ?>">
+                                <?= $sentryConfigured ? 'เชื่อมต่อแล้ว' : 'ยังไม่ตั้งค่า' ?>
+                            </span>
+                        </div>
+                        <p class="text-xs text-gray-400">ติดตาม error และ performance แบบ real-time</p>
+                    </div>
+                    <i class="fa-solid fa-arrow-right log-card-arrow text-gray-300 text-sm flex-shrink-0 mt-1"></i>
+                </div>
+            </a>
         </section>
 
     </div><!-- /grid -->
