@@ -12,6 +12,63 @@ $pdo = db();
 $adminRole = $_SESSION['admin_role'] ?? 'admin'; // ตัวแปรบทบาทสำหรับเช็คสิทธิ์ (Mock role)
 
 /**
+ * (0) IDENTITY SECTION — POST HANDLER (edit user)
+ */
+$idSaved  = isset($_GET['saved']) && $_GET['saved'] === '1';
+$idError  = '';
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'portal_edit_user') {
+    $userId   = (int)($_POST['user_id']              ?? 0);
+    $fullName = trim($_POST['full_name']              ?? '');
+    $studentId = trim($_POST['student_personnel_id'] ?? '');
+    $citizenId = trim($_POST['citizen_id']           ?? '');
+    $phone    = trim($_POST['phone_number']           ?? '');
+    $status   = trim($_POST['status']                ?? '');
+    if ($userId > 0 && $fullName !== '') {
+        try {
+            $pdo->prepare("UPDATE sys_users SET full_name=:n, student_personnel_id=:s, citizen_id=:c, phone_number=:p, status=:st WHERE id=:id")
+                ->execute([':n'=>$fullName,':s'=>$studentId,':c'=>$citizenId,':p'=>$phone,':st'=>$status,':id'=>$userId]);
+            header('Location: index.php?section=identity&saved=1');
+            exit;
+        } catch (PDOException $e) {
+            error_log("portal edit_user error: " . $e->getMessage());
+            $idError = 'บันทึกไม่สำเร็จ กรุณาลองใหม่';
+        }
+    } else {
+        $idError = 'ข้อมูลไม่ครบถ้วน';
+    }
+}
+
+/**
+ * (0b) IDENTITY SECTION — USER QUERY
+ */
+$idSearch     = trim($_GET['id_search'] ?? '');
+$idUsers      = [];
+$idActiveCount = 0;
+try {
+    $idSql = "SELECT id, full_name, student_personnel_id, citizen_id, phone_number, email, status, created_at FROM sys_users";
+    if ($idSearch !== '') {
+        $idSql .= " WHERE full_name LIKE :s OR student_personnel_id LIKE :s2 OR citizen_id LIKE :s3";
+    }
+    $idSql .= " ORDER BY created_at DESC LIMIT 300";
+    $idStmt = $pdo->prepare($idSql);
+    if ($idSearch !== '') {
+        $like = "%{$idSearch}%";
+        $idStmt->execute([':s'=>$like,':s2'=>$like,':s3'=>$like]);
+    } else {
+        $idStmt->execute();
+    }
+    $idUsers = $idStmt->fetchAll(PDO::FETCH_ASSOC);
+
+    $idActiveCount = (int)$pdo->query("
+        SELECT COUNT(DISTINCT id) FROM sys_users
+        WHERE id IN (SELECT student_id FROM camp_bookings WHERE student_id IS NOT NULL)
+           OR id IN (SELECT borrower_student_id FROM borrow_records WHERE borrower_student_id IS NOT NULL)
+    ")->fetchColumn();
+} catch (PDOException $e) {
+    $idUsers = [];
+}
+
+/**
  * (1) LIVE DATA & ROBUST STATS
  * ดึงสถิจริง พร้อมระบบป้องกันถ้าตารางในอนาคตยังไม่พร้อม
  */
@@ -548,84 +605,222 @@ try {
 
         <!-- ════════════ SECTION: IDENTITY & GOVERNANCE ════════════ -->
         <div id="section-identity" class="portal-section" style="display:none">
-        <div class="max-w-[1280px] mx-auto px-5 md:px-8 py-8 space-y-8">
+        <div class="max-w-[1280px] mx-auto px-5 md:px-8 py-8">
 
-            <div class="au d1">
-                <div class="sec-title mb-1">Identity &amp; Governance</div>
-                <p style="font-size:13px;color:#64748b;margin-bottom:24px">ศูนย์กลางจัดการผู้ใช้งาน สิทธิ์การเข้าถึง และความปลอดภัยของระบบ</p>
+            <?php if ($idSaved): ?>
+            <div id="id-toast" style="display:flex;align-items:center;gap:10px;background:#f0fdf4;border:1.5px solid #bbf7d0;border-radius:14px;padding:12px 18px;margin-bottom:20px;font-size:13px;font-weight:700;color:#15803d">
+                <i class="fa-solid fa-circle-check"></i> บันทึกข้อมูลสำเร็จ
+            </div>
+            <?php endif; ?>
+            <?php if ($idError): ?>
+            <div style="display:flex;align-items:center;gap:10px;background:#fff1f2;border:1.5px solid #fecaca;border-radius:14px;padding:12px 18px;margin-bottom:20px;font-size:13px;font-weight:700;color:#dc2626">
+                <i class="fa-solid fa-circle-exclamation"></i> <?= htmlspecialchars($idError) ?>
+            </div>
+            <?php endif; ?>
 
-                <!-- Quick-access cards -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 mb-8">
-                    <a href="users.php" class="proj-card" style="text-decoration:none;display:flex;flex-direction:column;gap:10px">
-                        <div class="proj-card-header">
-                            <div class="proj-card-icon bg-amber-50 text-amber-500 border-amber-100">
-                                <i class="fa-solid fa-users"></i>
-                            </div>
-                            <div class="proj-card-badges"><span class="proj-badge">Directory</span></div>
-                        </div>
-                        <div class="proj-card-body">
-                            <h3 class="text-[15px] font-black text-gray-900 mb-1">Users Center</h3>
-                            <p class="text-[12px] text-gray-500">ค้นหา แก้ไข และจัดการข้อมูลผู้ใช้งานทั้งหมด</p>
-                        </div>
-                        <div class="proj-card-actions">
-                            <span class="proj-action primary"><i class="fa-solid fa-arrow-up-right-from-square mr-1.5 text-[10px]"></i>เปิด Users Center</span>
-                        </div>
-                    </a>
-                    <?php if ($adminRole === 'superadmin'): ?>
-                    <a href="manage_admins.php" class="proj-card" style="text-decoration:none;display:flex;flex-direction:column;gap:10px">
-                        <div class="proj-card-header">
-                            <div class="proj-card-icon bg-red-50 text-red-500 border-red-100">
-                                <i class="fa-solid fa-shield-halved"></i>
-                            </div>
-                            <div class="proj-card-badges"><span class="proj-badge">Superadmin</span></div>
-                        </div>
-                        <div class="proj-card-body">
-                            <h3 class="text-[15px] font-black text-gray-900 mb-1">Manage Admins</h3>
-                            <p class="text-[12px] text-gray-500">เพิ่ม แก้ไข หรือลบบัญชีแอดมินและกำหนดสิทธิ์</p>
-                        </div>
-                        <div class="proj-card-actions">
-                            <span class="proj-action primary"><i class="fa-solid fa-arrow-up-right-from-square mr-1.5 text-[10px]"></i>จัดการแอดมิน</span>
-                        </div>
-                    </a>
-                    <?php endif; ?>
-                    <a href="../admin/activity_logs.php" class="proj-card" style="text-decoration:none;display:flex;flex-direction:column;gap:10px">
-                        <div class="proj-card-header">
-                            <div class="proj-card-icon bg-slate-100 text-slate-600 border-slate-200">
-                                <i class="fa-solid fa-clock-rotate-left"></i>
-                            </div>
-                            <div class="proj-card-badges"><span class="proj-badge">Audit</span></div>
-                        </div>
-                        <div class="proj-card-body">
-                            <h3 class="text-[15px] font-black text-gray-900 mb-1">Activity Logs</h3>
-                            <p class="text-[12px] text-gray-500">ดูประวัติการใช้งาน การเปลี่ยนแปลง และเหตุการณ์สำคัญ</p>
-                        </div>
-                        <div class="proj-card-actions">
-                            <span class="proj-action secondary">ดู Audit Trail</span>
-                        </div>
-                    </a>
+            <!-- Header row -->
+            <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:24px">
+                <div>
+                    <div class="sec-title" style="margin-bottom:2px">Identity &amp; Governance</div>
+                    <p style="font-size:13px;color:#64748b">ศูนย์กลางจัดการผู้ใช้งาน สิทธิ์การเข้าถึง และความปลอดภัยของระบบ</p>
                 </div>
+                <!-- Search form -->
+                <form method="GET" style="display:flex;gap:8px;align-items:center" onsubmit="event.preventDefault();idFilterUsers(document.getElementById('id-search-input').value)">
+                    <input type="hidden" name="section" value="identity">
+                    <div style="position:relative">
+                        <i class="fa-solid fa-magnifying-glass" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:11px;pointer-events:none"></i>
+                        <input id="id-search-input" type="text" name="id_search" value="<?= htmlspecialchars($idSearch) ?>"
+                               placeholder="ค้นหาชื่อ / รหัส..."
+                               style="padding:8px 12px 8px 30px;border:1.5px solid #d0ead9;border-radius:12px;font-size:12px;font-family:inherit;outline:none;width:200px;transition:border-color .2s"
+                               oninput="idFilterUsers(this.value)"
+                               onfocus="this.style.borderColor='#2e9e63'" onblur="this.style.borderColor='#d0ead9'">
+                    </div>
+                </form>
+            </div>
 
-                <!-- Stats summary -->
-                <div style="background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:16px;padding:20px 24px;display:flex;gap:32px;flex-wrap:wrap">
-                    <div>
-                        <div style="font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px">ผู้ใช้งานทั้งหมด</div>
-                        <div style="font-size:28px;font-weight:900;color:#0f172a" id="id-users-count"><?= number_format($kpis['users']) ?></div>
-                    </div>
-                    <div style="width:1px;background:#e2e8f0;align-self:stretch"></div>
-                    <div>
-                        <div style="font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px">แคมเปญ Active</div>
-                        <div style="font-size:28px;font-weight:900;color:#0f172a"><?= number_format($kpis['camps']) ?></div>
-                    </div>
-                    <div style="width:1px;background:#e2e8f0;align-self:stretch"></div>
-                    <div>
-                        <div style="font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px">โควต้าที่จองแล้ว</div>
-                        <div style="font-size:28px;font-weight:900;color:#0f172a"><?= number_format($kpis['used_quota']) ?> <span style="font-size:14px;font-weight:600;color:#94a3b8">/ <?= number_format($kpis['total_quota']) ?></span></div>
-                    </div>
+            <!-- Stats bar -->
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:16px;margin-bottom:24px">
+                <div class="kpi-card" style="padding:18px 20px">
+                    <div class="kpi-accent" style="background:linear-gradient(90deg,#6366f1,#a5b4fc)"></div>
+                    <div class="kpi-icon" style="background:#eef2ff;color:#4f46e5"><i class="fa-solid fa-users"></i></div>
+                    <div class="kpi-num" style="font-size:1.6rem"><?= number_format(count($idUsers) ?: $kpis['users']) ?></div>
+                    <div class="kpi-label">ผู้ใช้งานทั้งหมด</div>
+                </div>
+                <div class="kpi-card" style="padding:18px 20px">
+                    <div class="kpi-accent" style="background:linear-gradient(90deg,#0ea5e9,#7dd3fc)"></div>
+                    <div class="kpi-icon" style="background:#e0f2fe;color:#0284c7"><i class="fa-solid fa-id-card-clip"></i></div>
+                    <div class="kpi-num" style="font-size:1.6rem"><?= number_format($idActiveCount) ?></div>
+                    <div class="kpi-label">Active Accounts</div>
+                </div>
+                <div class="kpi-card" style="padding:18px 20px">
+                    <div class="kpi-accent" style="background:linear-gradient(90deg,#2e9e63,#6ee7b7)"></div>
+                    <div class="kpi-icon" style="background:#e8f8f0;color:#2e9e63"><i class="fa-solid fa-bullhorn"></i></div>
+                    <div class="kpi-num" style="font-size:1.6rem"><?= number_format($kpis['camps']) ?></div>
+                    <div class="kpi-label">แคมเปญ Active</div>
+                </div>
+                <div class="kpi-card" style="padding:18px 20px">
+                    <div class="kpi-accent" style="background:linear-gradient(90deg,#8b5cf6,#c4b5fd)"></div>
+                    <div class="kpi-icon" style="background:#f5f3ff;color:#7c3aed"><i class="fa-solid fa-chart-pie"></i></div>
+                    <div class="kpi-num" style="font-size:1.6rem"><?= $kpis['booking_rate'] ?>%</div>
+                    <div class="kpi-label">อัตราการจอง</div>
+                </div>
+            </div>
+
+            <!-- User table -->
+            <div style="background:#fff;border-radius:20px;border:1.5px solid #e2e8f0;overflow:hidden">
+                <div style="padding:18px 24px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;gap:8px">
+                    <div style="width:4px;height:18px;background:linear-gradient(180deg,#6366f1,#a5b4fc);border-radius:99px;flex-shrink:0"></div>
+                    <span style="font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.14em;color:#374151">Master Records</span>
+                    <span style="margin-left:auto;font-size:11px;font-weight:700;color:#94a3b8"><?= number_format(count($idUsers)) ?> รายการ</span>
+                </div>
+                <div style="overflow-x:auto">
+                <table style="width:100%;border-collapse:collapse;font-size:13px" id="idUserTable">
+                    <thead>
+                        <tr style="background:#f8fafc;border-bottom:1px solid #f1f5f9">
+                            <th style="padding:12px 20px;text-align:left;font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.14em">ผู้ใช้งาน</th>
+                            <th style="padding:12px 20px;text-align:left;font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.14em">ติดต่อ</th>
+                            <th style="padding:12px 20px;text-align:left;font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.14em">วันที่ลงทะเบียน</th>
+                            <th style="padding:12px 20px;text-align:right;font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.14em">จัดการ</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    <?php if (empty($idUsers)): ?>
+                        <tr><td colspan="4" style="padding:60px 20px;text-align:center;color:#cbd5e1">
+                            <i class="fa-solid fa-ghost" style="font-size:2.5rem;display:block;margin-bottom:12px"></i>
+                            <p style="font-weight:800;font-size:12px;text-transform:uppercase;letter-spacing:.1em">ไม่พบรายชื่อที่ค้นหา</p>
+                        </td></tr>
+                    <?php else: ?>
+                    <?php foreach ($idUsers as $u):
+                        $initial  = mb_substr($u['full_name'], 0, 1);
+                        $statusTH = match($u['status'] ?? '') { 'student'=>'นักศึกษา','staff'=>'บุคลากร','other'=>'บุคคลทั่วไป', default=>($u['status']??'—') };
+                    ?>
+                        <tr class="id-user-row" style="border-bottom:1px solid #f8fafc;transition:background .15s" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background=''">
+                            <td style="padding:14px 20px">
+                                <div style="display:flex;align-items:center;gap:12px">
+                                    <div style="width:36px;height:36px;border-radius:10px;background:#eef2ff;color:#4f46e5;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:14px;flex-shrink:0"><?= htmlspecialchars($initial) ?></div>
+                                    <div>
+                                        <div style="font-weight:800;color:#0f172a;line-height:1.2"><?= htmlspecialchars($u['full_name']) ?></div>
+                                        <div style="font-size:10px;color:#94a3b8;font-weight:700;margin-top:2px">#<?= htmlspecialchars($u['student_personnel_id'] ?? '—') ?> · <?= htmlspecialchars($statusTH) ?></div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td style="padding:14px 20px">
+                                <div style="font-size:12px;color:#374151;font-weight:600"><?= htmlspecialchars($u['phone_number'] ?: '—') ?></div>
+                                <div style="font-size:11px;color:#94a3b8;margin-top:2px"><?= htmlspecialchars($u['email'] ?? '—') ?></div>
+                            </td>
+                            <td style="padding:14px 20px">
+                                <div style="font-size:12px;font-weight:700;color:#374151"><?= date('d M Y', strtotime($u['created_at'])) ?></div>
+                                <div style="font-size:10px;color:#94a3b8;margin-top:1px"><?= date('H:i', strtotime($u['created_at'])) ?></div>
+                            </td>
+                            <td style="padding:14px 20px;text-align:right">
+                                <div style="display:flex;gap:6px;justify-content:flex-end">
+                                    <button onclick='idOpenView(<?= json_encode($u, JSON_HEX_APOS|JSON_HEX_TAG) ?>)'
+                                            style="width:32px;height:32px;border-radius:8px;border:1px solid #e2e8f0;background:#fff;color:#64748b;cursor:pointer;transition:all .15s"
+                                            onmouseover="this.style.background='#eef2ff';this.style.color='#4f46e5'" onmouseout="this.style.background='#fff';this.style.color='#64748b'"
+                                            title="ดูข้อมูล">
+                                        <i class="fa-solid fa-eye" style="font-size:11px"></i>
+                                    </button>
+                                    <button onclick='idOpenEdit(<?= json_encode($u, JSON_HEX_APOS|JSON_HEX_TAG) ?>)'
+                                            style="width:32px;height:32px;border-radius:8px;border:1px solid #e2e8f0;background:#fff;color:#64748b;cursor:pointer;transition:all .15s"
+                                            onmouseover="this.style.background='#fffbeb';this.style.color='#d97706'" onmouseout="this.style.background='#fff';this.style.color='#64748b'"
+                                            title="แก้ไข">
+                                        <i class="fa-solid fa-pen" style="font-size:11px"></i>
+                                    </button>
+                                    <a href="../admin/user_history.php?id=<?= $u['id'] ?>"
+                                       style="width:32px;height:32px;border-radius:8px;border:1px solid #e2e8f0;background:#fff;color:#64748b;display:flex;align-items:center;justify-content:center;text-decoration:none;transition:all .15s"
+                                       onmouseover="this.style.background='#fffbeb';this.style.color='#d97706'" onmouseout="this.style.background='#fff';this.style.color='#64748b'"
+                                       title="ประวัติการใช้งาน">
+                                        <i class="fa-solid fa-clock-rotate-left" style="font-size:11px"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                    <?php endif; ?>
+                    </tbody>
+                </table>
                 </div>
             </div>
 
         </div>
         </div><!-- /section-identity -->
+
+        <!-- Edit Modal (Identity) -->
+        <div id="idEditModal" style="display:none;position:fixed;inset:0;z-index:200;background:rgba(15,23,42,.55);backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:20px">
+            <div style="background:#fff;border-radius:24px;width:100%;max-width:480px;overflow:hidden;box-shadow:0 25px 50px -12px rgba(0,0,0,.25)">
+                <div style="padding:20px 24px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;justify-content:space-between">
+                    <div style="display:flex;align-items:center;gap:10px">
+                        <div style="width:36px;height:36px;background:#fffbeb;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#d97706"><i class="fa-solid fa-user-pen"></i></div>
+                        <span style="font-size:15px;font-weight:900;color:#d97706">แก้ไขข้อมูลผู้ใช้</span>
+                    </div>
+                    <button onclick="document.getElementById('idEditModal').style.display='none'"
+                            style="width:30px;height:30px;border-radius:8px;border:1px solid #e2e8f0;background:#f8fafc;color:#64748b;cursor:pointer">
+                        <i class="fa-solid fa-times" style="font-size:12px"></i>
+                    </button>
+                </div>
+                <form method="POST" style="padding:20px 24px;display:flex;flex-direction:column;gap:14px">
+                    <input type="hidden" name="action" value="portal_edit_user">
+                    <input type="hidden" name="user_id" id="id_edit_uid">
+                    <?php if (function_exists('csrf_field')) csrf_field(); ?>
+                    <div>
+                        <label style="display:block;font-size:10px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.1em;margin-bottom:5px">ชื่อ-นามสกุล <span style="color:#ef4444">*</span></label>
+                        <input id="id_edit_name" name="full_name" required style="width:100%;padding:10px 14px;border:1.5px solid #e2e8f0;border-radius:12px;font-size:13px;font-family:inherit;font-weight:600;outline:none;box-sizing:border-box" onfocus="this.style.borderColor='#6366f1'" onblur="this.style.borderColor='#e2e8f0'">
+                    </div>
+                    <div>
+                        <label style="display:block;font-size:10px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.1em;margin-bottom:5px">เลขบัตรประชาชน</label>
+                        <input id="id_edit_citizen" name="citizen_id" maxlength="13" style="width:100%;padding:10px 14px;border:1.5px solid #e2e8f0;border-radius:12px;font-size:13px;font-family:inherit;font-weight:600;outline:none;box-sizing:border-box;letter-spacing:.1em" onfocus="this.style.borderColor='#6366f1'" onblur="this.style.borderColor='#e2e8f0'">
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                        <div>
+                            <label style="display:block;font-size:10px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.1em;margin-bottom:5px">รหัสนักศึกษา</label>
+                            <input id="id_edit_sid" name="student_personnel_id" maxlength="7" style="width:100%;padding:10px 14px;border:1.5px solid #e2e8f0;border-radius:12px;font-size:13px;font-family:inherit;font-weight:600;outline:none;box-sizing:border-box" onfocus="this.style.borderColor='#6366f1'" onblur="this.style.borderColor='#e2e8f0'">
+                        </div>
+                        <div>
+                            <label style="display:block;font-size:10px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.1em;margin-bottom:5px">เบอร์โทร</label>
+                            <input id="id_edit_phone" name="phone_number" style="width:100%;padding:10px 14px;border:1.5px solid #e2e8f0;border-radius:12px;font-size:13px;font-family:inherit;font-weight:600;outline:none;box-sizing:border-box" onfocus="this.style.borderColor='#6366f1'" onblur="this.style.borderColor='#e2e8f0'">
+                        </div>
+                    </div>
+                    <div>
+                        <label style="display:block;font-size:10px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.1em;margin-bottom:5px">ประเภท <span style="color:#ef4444">*</span></label>
+                        <select id="id_edit_status" name="status" style="width:100%;padding:10px 14px;border:1.5px solid #e2e8f0;border-radius:12px;font-size:13px;font-family:inherit;font-weight:600;outline:none;background:#fff">
+                            <option value="">-- เลือก --</option>
+                            <option value="student">นักศึกษา</option>
+                            <option value="staff">บุคลากร/อาจารย์</option>
+                            <option value="other">บุคคลทั่วไป</option>
+                        </select>
+                    </div>
+                    <div style="display:flex;gap:10px;padding-top:6px">
+                        <button type="button" onclick="document.getElementById('idEditModal').style.display='none'"
+                                style="flex:1;padding:11px;border-radius:12px;border:1.5px solid #e2e8f0;background:#f8fafc;color:#374151;font-size:13px;font-weight:700;cursor:pointer">ยกเลิก</button>
+                        <button type="submit"
+                                style="flex:2;padding:11px;border-radius:12px;border:none;background:linear-gradient(90deg,#d97706,#f59e0b);color:#fff;font-size:13px;font-weight:800;cursor:pointer">
+                            <i class="fa-solid fa-floppy-disk" style="margin-right:6px"></i>บันทึก
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- View Modal (Identity) -->
+        <div id="idViewModal" style="display:none;position:fixed;inset:0;z-index:200;background:rgba(15,23,42,.55);backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:20px">
+            <div style="background:#fff;border-radius:24px;width:100%;max-width:420px;overflow:hidden;box-shadow:0 25px 50px -12px rgba(0,0,0,.25)">
+                <div style="padding:20px 24px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;justify-content:space-between">
+                    <div style="display:flex;align-items:center;gap:10px">
+                        <div style="width:36px;height:36px;background:#eef2ff;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#4f46e5"><i class="fa-solid fa-user"></i></div>
+                        <span style="font-size:15px;font-weight:900;color:#4f46e5">ข้อมูลผู้ใช้งาน</span>
+                    </div>
+                    <button onclick="document.getElementById('idViewModal').style.display='none'"
+                            style="width:30px;height:30px;border-radius:8px;border:1px solid #e2e8f0;background:#f8fafc;color:#64748b;cursor:pointer">
+                        <i class="fa-solid fa-times" style="font-size:12px"></i>
+                    </button>
+                </div>
+                <div style="padding:20px 24px;display:flex;flex-direction:column;gap:12px" id="idViewBody"></div>
+                <div style="padding:14px 24px;border-top:1px solid #f1f5f9;text-align:right">
+                    <button onclick="document.getElementById('idViewModal').style.display='none'"
+                            style="padding:9px 22px;border-radius:10px;border:1.5px solid #e2e8f0;background:#f8fafc;color:#374151;font-size:13px;font-weight:700;cursor:pointer">ปิด</button>
+                </div>
+            </div>
+        </div>
 
         <!-- ════════════ SECTION: SETTINGS ════════════ -->
         <div id="section-settings" class="portal-section" style="display:none">
@@ -964,6 +1159,57 @@ function poll() {
             applyFilters();
         });
     }
+})();
+
+/* ── Identity & Governance ─────────────────────────────────────────────── */
+function idOpenEdit(u) {
+    document.getElementById('id_edit_uid').value    = u.id;
+    document.getElementById('id_edit_name').value   = u.full_name    || '';
+    document.getElementById('id_edit_citizen').value = u.citizen_id  || '';
+    document.getElementById('id_edit_sid').value    = u.student_personnel_id || '';
+    document.getElementById('id_edit_phone').value  = u.phone_number || '';
+    document.getElementById('id_edit_status').value = u.status       || '';
+    var m = document.getElementById('idEditModal');
+    m.style.display = 'flex';
+}
+function idOpenView(u) {
+    var map = [
+        ['ชื่อ-นามสกุล', u.full_name],
+        ['เลขบัตรประชาชน', u.citizen_id],
+        ['รหัสนักศึกษา / บุคลากร', u.student_personnel_id],
+        ['เบอร์โทรศัพท์', u.phone_number],
+        ['ประเภท', u.status === 'student' ? 'นักศึกษา' : (u.status === 'staff' ? 'บุคลากร/อาจารย์' : (u.status || '—'))],
+        ['วันที่ลงทะเบียน', u.created_at ? new Date(u.created_at.replace(' ','T')).toLocaleString('th-TH',{year:'numeric',month:'long',day:'numeric',hour:'2-digit',minute:'2-digit'}) : '—'],
+    ];
+    document.getElementById('idViewBody').innerHTML = map.map(function(r) {
+        return '<div><div style="font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.1em;margin-bottom:3px">'+r[0]+'</div>'
+             + '<div style="padding:10px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;font-size:13px;font-weight:700;color:#0f172a">'+(r[1]||'—')+'</div></div>';
+    }).join('');
+    document.getElementById('idViewModal').style.display = 'flex';
+}
+function idFilterUsers(val) {
+    val = val.toLowerCase();
+    document.querySelectorAll('#idUserTable tbody .id-user-row').forEach(function(row) {
+        row.style.display = row.innerText.toLowerCase().includes(val) ? '' : 'none';
+    });
+}
+// Close modals on backdrop click
+['idEditModal','idViewModal'].forEach(function(id) {
+    document.getElementById(id).addEventListener('click', function(e) {
+        if (e.target === this) this.style.display = 'none';
+    });
+});
+// Auto-switch section from URL ?section=identity
+(function() {
+    var params = new URLSearchParams(window.location.search);
+    var sec = params.get('section');
+    if (sec) {
+        var btn = document.querySelector('.psb-item[data-section="'+sec+'"]');
+        if (btn) switchSection(sec, btn);
+    }
+    // Auto-dismiss toast
+    var toast = document.getElementById('id-toast');
+    if (toast) setTimeout(function() { toast.style.transition='opacity .5s'; toast.style.opacity='0'; setTimeout(function(){toast.remove();},500); }, 3000);
 })();
 
 /* ── Sidebar Controls ────────────────────────────────────────────────────── */
