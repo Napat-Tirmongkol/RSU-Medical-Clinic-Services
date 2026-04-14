@@ -232,19 +232,6 @@ try {
                     <span id="ws-dot" style="width:7px;height:7px;border-radius:50%;background:#22c55e;display:inline-block;animation:livePulse 1.6s infinite"></span>
                     <span id="ws-label" class="hidden sm:inline">Live</span>
                 </div>
-
-                <div class="user-pill">
-                    <div class="user-avatar"><i class="fa-solid fa-user-shield text-[11px]"></i></div>
-                    <div class="hidden sm:block">
-                        <div class="text-[9px] font-bold text-gray-400 uppercase tracking-wider leading-none mb-0.5">Admin</div>
-                        <div class="text-xs font-black text-gray-900 leading-none"><?= htmlspecialchars($_SESSION['admin_username'] ?? 'Administrator') ?></div>
-                    </div>
-                </div>
-                <a href="../admin/logout.php"
-                   class="w-9 h-9 rounded-xl bg-red-50 text-red-400 hover:bg-red-500 hover:text-white flex items-center justify-center transition-all border border-red-100"
-                   title="ออกจากระบบ">
-                    <i class="fa-solid fa-power-off text-sm"></i>
-                </a>
             </div>
         </div>
     </header>
@@ -279,9 +266,38 @@ try {
                 </button>
             </div>
 
-            <!-- Bottom version note -->
-            <div id="psb-version" style="padding:10px 14px;font-size:9px;color:#cbd5e1;font-weight:700;letter-spacing:.08em;text-transform:uppercase;border-top:1px solid #f0faf4;white-space:nowrap;overflow:hidden;transition:opacity .2s">
-                v3.0 · RSU
+            <!-- Bottom: user identity + logout -->
+            <div id="psb-user-footer" style="border-top:1px solid #f0faf4;padding:10px">
+                <!-- Expanded state: avatar + name + logout -->
+                <div id="psb-user-expanded" style="display:flex;align-items:center;gap:10px;padding:8px 6px;border-radius:12px;background:#f8fafc;overflow:hidden;transition:opacity .2s">
+                    <div style="width:32px;height:32px;border-radius:9px;background:#e8f8f0;color:#2e9e63;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                        <i class="fa-solid fa-user-shield" style="font-size:13px"></i>
+                    </div>
+                    <div class="psb-label" style="flex:1;min-width:0">
+                        <div style="font-size:9px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.1em;line-height:1;margin-bottom:2px">Admin</div>
+                        <div style="font-size:12px;font-weight:900;color:#0f172a;line-height:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><?= htmlspecialchars($_SESSION['admin_username'] ?? 'Administrator') ?></div>
+                    </div>
+                    <a href="../admin/logout.php" class="psb-label"
+                       title="ออกจากระบบ"
+                       style="width:28px;height:28px;border-radius:8px;background:#fff1f2;color:#ef4444;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .18s;text-decoration:none"
+                       onmouseover="this.style.background='#ef4444';this.style.color='#fff'"
+                       onmouseout="this.style.background='#fff1f2';this.style.color='#ef4444'">
+                        <i class="fa-solid fa-power-off" style="font-size:11px"></i>
+                    </a>
+                </div>
+                <!-- Collapsed state: avatar only (centered) -->
+                <div id="psb-user-collapsed" style="display:none;flex-direction:column;align-items:center;gap:6px">
+                    <div style="width:32px;height:32px;border-radius:9px;background:#e8f8f0;color:#2e9e63;display:flex;align-items:center;justify-content:center">
+                        <i class="fa-solid fa-user-shield" style="font-size:13px"></i>
+                    </div>
+                    <a href="../admin/logout.php"
+                       title="ออกจากระบบ"
+                       style="width:28px;height:28px;border-radius:8px;background:#fff1f2;color:#ef4444;display:flex;align-items:center;justify-content:center;transition:background .18s;text-decoration:none"
+                       onmouseover="this.style.background='#ef4444';this.style.color='#fff'"
+                       onmouseout="this.style.background='#fff1f2';this.style.color='#ef4444'">
+                        <i class="fa-solid fa-power-off" style="font-size:11px"></i>
+                    </a>
+                </div>
             </div>
         </nav>
 
@@ -952,13 +968,15 @@ function poll() {
 
 /* ── Sidebar Controls ────────────────────────────────────────────────────── */
 function toggleSidebar() {
-    var sidebar = document.getElementById('portal-sidebar');
-    var icon    = document.getElementById('sidebar-toggle-icon');
-    var version = document.getElementById('psb-version');
+    var sidebar   = document.getElementById('portal-sidebar');
+    var icon      = document.getElementById('sidebar-toggle-icon');
+    var expanded  = document.getElementById('psb-user-expanded');
+    var collapsed = document.getElementById('psb-user-collapsed');
     sidebar.classList.toggle('collapsed');
-    var collapsed = sidebar.classList.contains('collapsed');
-    icon.style.transform  = collapsed ? 'rotate(180deg)' : '';
-    if (version) version.style.opacity = collapsed ? '0' : '1';
+    var isCollapsed = sidebar.classList.contains('collapsed');
+    icon.style.transform = isCollapsed ? 'rotate(180deg)' : '';
+    if (expanded)  expanded.style.display  = isCollapsed ? 'none'  : 'flex';
+    if (collapsed) collapsed.style.display = isCollapsed ? 'flex'  : 'none';
 }
 
 function switchSection(sectionId, btn) {
