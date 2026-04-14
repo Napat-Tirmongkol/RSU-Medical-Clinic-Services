@@ -184,13 +184,15 @@ function levelIcon(string $level): string {
     <link rel="stylesheet" href="../assets/css/tailwind.min.css">
     <link rel="stylesheet" href="../assets/css/portal.css">
 </head>
-<body class="bg-slate-50 min-h-screen text-slate-800 font-prompt p-4 sm:p-6 lg:p-8">
+<body class="bg-slate-50 min-h-screen text-slate-800 font-prompt <?= isset($_GET['embed']) ? 'p-0 sm:p-0 lg:p-0' : 'p-4 sm:p-6 lg:p-8' ?>">
 
-<div class="max-w-7xl mx-auto animate-fade-in" style="animation: fadeIn .4s cubic-bezier(0.16, 1, 0.3, 1) both;">
+<div class="max-w-7xl mx-auto animate-fade-in <?= isset($_GET['embed']) ? 'px-4 sm:px-6 lg:px-8 py-6 max-w-none' : '' ?>" style="animation: fadeIn .4s cubic-bezier(0.16, 1, 0.3, 1) both;">
     <!-- Back btn -->
+    <?php if (!isset($_GET['embed'])): ?>
     <a href="index.php" class="inline-flex items-center gap-2 px-5 py-2.5 bg-white border border-slate-200 text-slate-600 rounded-2xl hover:bg-slate-50 hover:text-emerald-600 transition-all font-bold text-sm shadow-sm mb-6 group">
         <i class="fa-solid fa-arrow-left-long group-hover:-translate-x-1 transition-transform"></i> กลับหน้า Portal
     </a>
+    <?php endif; ?>
 
     <!-- Header -->
     <div class="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
@@ -232,19 +234,19 @@ function levelIcon(string $level): string {
 
     <!-- Summary Grid -->
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <a href="?level=error" class="bg-white border border-slate-100 rounded-2xl p-4 flex items-center gap-4 hover:border-rose-300 hover:shadow-md transition-all">
+        <a href="?level=error<?= isset($_GET['embed']) ? '&embed=1' : '' ?>" class="bg-white border border-slate-100 rounded-2xl p-4 flex items-center gap-4 hover:border-rose-300 hover:shadow-md transition-all">
             <div class="w-10 h-10 rounded-xl bg-rose-50 text-rose-500 flex items-center justify-center text-lg"><i class="fa-solid fa-circle-xmark"></i></div>
             <div><div class="text-[10px] font-black uppercase tracking-widest text-slate-400">Error</div><div class="text-xl font-black text-slate-800"><?= number_format($summary['error'] ?? 0) ?></div></div>
         </a>
-        <a href="?level=warning" class="bg-white border border-slate-100 rounded-2xl p-4 flex items-center gap-4 hover:border-amber-300 hover:shadow-md transition-all">
+        <a href="?level=warning<?= isset($_GET['embed']) ? '&embed=1' : '' ?>" class="bg-white border border-slate-100 rounded-2xl p-4 flex items-center gap-4 hover:border-amber-300 hover:shadow-md transition-all">
             <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-500 flex items-center justify-center text-lg"><i class="fa-solid fa-triangle-exclamation"></i></div>
             <div><div class="text-[10px] font-black uppercase tracking-widest text-slate-400">Warning</div><div class="text-xl font-black text-slate-800"><?= number_format($summary['warning'] ?? 0) ?></div></div>
         </a>
-        <a href="?level=info" class="bg-white border border-slate-100 rounded-2xl p-4 flex items-center gap-4 hover:border-blue-300 hover:shadow-md transition-all">
+        <a href="?level=info<?= isset($_GET['embed']) ? '&embed=1' : '' ?>" class="bg-white border border-slate-100 rounded-2xl p-4 flex items-center gap-4 hover:border-blue-300 hover:shadow-md transition-all">
             <div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-500 flex items-center justify-center text-lg"><i class="fa-solid fa-info-circle"></i></div>
             <div><div class="text-[10px] font-black uppercase tracking-widest text-slate-400">Info</div><div class="text-xl font-black text-slate-800"><?= number_format($summary['info'] ?? 0) ?></div></div>
         </a>
-        <a href="?" class="bg-white border border-slate-100 rounded-2xl p-4 flex items-center gap-4 hover:border-emerald-300 hover:shadow-md transition-all">
+        <a href="?<?= isset($_GET['embed']) ? 'embed=1' : '' ?>" class="bg-white border border-slate-100 rounded-2xl p-4 flex items-center gap-4 hover:border-emerald-300 hover:shadow-md transition-all">
             <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-500 flex items-center justify-center text-lg"><i class="fa-solid fa-globe"></i></div>
             <div><div class="text-[10px] font-black uppercase tracking-widest text-slate-400">Total</div><div class="text-xl font-black text-slate-800"><?= number_format(array_sum($summary)) ?></div></div>
         </a>
@@ -253,6 +255,9 @@ function levelIcon(string $level): string {
     <!-- Filters -->
     <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 mb-6">
         <form method="GET" class="flex flex-wrap gap-3 items-end">
+            <?php if (isset($_GET['embed'])): ?>
+                <input type="hidden" name="embed" value="1">
+            <?php endif; ?>
             <div class="flex-1 min-w-[200px]">
                 <label class="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5 ml-1">ค้นหาข้อความ</label>
                 <div class="relative">
@@ -283,7 +288,7 @@ function levelIcon(string $level): string {
             </div>
             <button type="submit" class="bg-emerald-600 text-white px-5 py-2 rounded-xl text-sm font-black uppercase tracking-wider hover:bg-emerald-700 transition-colors shadow-sm">กรอง</button>
             <?php if ($search || $filterLevel || $filterDate || $filterSource): ?>
-                <a href="error_logs.php" class="bg-slate-200 text-slate-600 px-4 py-2 rounded-xl text-sm font-black uppercase tracking-wider hover:bg-slate-300 transition-colors shadow-sm">ล้างค่า</a>
+                <a href="error_logs.php<?= isset($_GET['embed']) ? '?embed=1' : '' ?>" class="bg-slate-200 text-slate-600 px-4 py-2 rounded-xl text-sm font-black uppercase tracking-wider hover:bg-slate-300 transition-colors shadow-sm">ล้างค่า</a>
             <?php endif; ?>
         </form>
     </div>
@@ -345,7 +350,7 @@ function levelIcon(string $level): string {
             </div>
             <div class="flex gap-1.5">
                 <?php if ($page > 1): ?>
-                    <a href="?page=<?= $page - 1 ?>&search=<?= urlencode($search) ?>&level=<?= urlencode($filterLevel) ?>&date=<?= urlencode($filterDate) ?>&source=<?= urlencode($filterSource) ?>" class="w-8 h-8 flex flex-center rounded-xl bg-white border border-slate-200 hover:bg-slate-100 text-slate-500 transition-colors flex items-center justify-center font-bold text-xs"><i class="fa-solid fa-chevron-left"></i></a>
+                    <a href="?page=<?= $page - 1 ?>&search=<?= urlencode($search) ?>&level=<?= urlencode($filterLevel) ?>&date=<?= urlencode($filterDate) ?>&source=<?= urlencode($filterSource) ?><?= isset($_GET['embed']) ? '&embed=1' : '' ?>" class="w-8 h-8 flex flex-center rounded-xl bg-white border border-slate-200 hover:bg-slate-100 text-slate-500 transition-colors flex items-center justify-center font-bold text-xs"><i class="fa-solid fa-chevron-left"></i></a>
                 <?php endif; ?>
 
                 <?php
@@ -353,14 +358,14 @@ function levelIcon(string $level): string {
                 $end = min($totalPages, $page + 2);
                 for ($i = $start; $i <= $end; $i++):
                 ?>
-                    <a href="?page=<?= $i ?>&search=<?= urlencode($search) ?>&level=<?= urlencode($filterLevel) ?>&date=<?= urlencode($filterDate) ?>&source=<?= urlencode($filterSource) ?>" 
+                    <a href="?page=<?= $i ?>&search=<?= urlencode($search) ?>&level=<?= urlencode($filterLevel) ?>&date=<?= urlencode($filterDate) ?>&source=<?= urlencode($filterSource) ?><?= isset($_GET['embed']) ? '&embed=1' : '' ?>" 
                         class="w-8 h-8 flex items-center justify-center rounded-xl text-xs font-black transition-all <?= $i == $page ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/20 border-none' : 'bg-white border border-slate-200 hover:bg-slate-100 text-slate-600' ?>">
                         <?= $i ?>
                     </a>
                 <?php endfor; ?>
 
                 <?php if ($page < $totalPages): ?>
-                    <a href="?page=<?= $page + 1 ?>&search=<?= urlencode($search) ?>&level=<?= urlencode($filterLevel) ?>&date=<?= urlencode($filterDate) ?>&source=<?= urlencode($filterSource) ?>" class="w-8 h-8 flex flex-center rounded-xl bg-white border border-slate-200 hover:bg-slate-100 text-slate-500 transition-colors flex items-center justify-center font-bold text-xs"><i class="fa-solid fa-chevron-right"></i></a>
+                    <a href="?page=<?= $page + 1 ?>&search=<?= urlencode($search) ?>&level=<?= urlencode($filterLevel) ?>&date=<?= urlencode($filterDate) ?>&source=<?= urlencode($filterSource) ?><?= isset($_GET['embed']) ? '&embed=1' : '' ?>" class="w-8 h-8 flex flex-center rounded-xl bg-white border border-slate-200 hover:bg-slate-100 text-slate-500 transition-colors flex items-center justify-center font-bold text-xs"><i class="fa-solid fa-chevron-right"></i></a>
                 <?php endif; ?>
             </div>
         </div>

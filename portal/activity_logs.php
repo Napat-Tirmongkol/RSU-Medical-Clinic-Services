@@ -63,13 +63,15 @@ try {
     <link rel="stylesheet" href="../assets/css/tailwind.min.css">
     <link rel="stylesheet" href="../assets/css/portal.css">
 </head>
-<body class="bg-slate-50 min-h-screen text-slate-800 font-prompt p-4 sm:p-6 lg:p-8">
+<body class="bg-slate-50 min-h-screen text-slate-800 font-prompt <?= isset($_GET['embed']) ? 'p-0 sm:p-0 lg:p-0' : 'p-4 sm:p-6 lg:p-8' ?>">
 
-<div class="max-w-7xl mx-auto animate-fade-in" style="animation: fadeIn .4s cubic-bezier(0.16, 1, 0.3, 1) both;">
+<div class="max-w-7xl mx-auto animate-fade-in <?= isset($_GET['embed']) ? 'px-4 sm:px-6 lg:px-8 py-6 max-w-none' : '' ?>" style="animation: fadeIn .4s cubic-bezier(0.16, 1, 0.3, 1) both;">
     <!-- Back btn -->
+    <?php if (!isset($_GET['embed'])): ?>
     <a href="index.php" class="inline-flex items-center gap-2 px-5 py-2.5 bg-white border border-slate-200 text-slate-600 rounded-2xl hover:bg-slate-50 hover:text-emerald-600 transition-all font-bold text-sm shadow-sm mb-6 group">
         <i class="fa-solid fa-arrow-left-long group-hover:-translate-x-1 transition-transform"></i> กลับหน้า Portal
     </a>
+    <?php endif; ?>
 
     <!-- Header -->
     <div class="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
@@ -84,6 +86,9 @@ try {
         </div>
         
         <form action="" method="GET" class="flex gap-2">
+            <?php if (isset($_GET['embed'])): ?>
+                <input type="hidden" name="embed" value="1">
+            <?php endif; ?>
             <div class="relative">
                 <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
                 <input type="text" name="search" value="<?= htmlspecialchars($search) ?>" 
@@ -182,7 +187,7 @@ try {
             </div>
             <div class="flex gap-1.5">
                 <?php if ($page > 1): ?>
-                    <a href="?page=<?= $page - 1 ?>&search=<?= urlencode($search) ?>" class="w-8 h-8 flex flex-center rounded-xl bg-white border border-slate-200 hover:bg-slate-100 text-slate-500 transition-colors flex items-center justify-center font-bold text-xs"><i class="fa-solid fa-chevron-left"></i></a>
+                    <a href="?page=<?= $page - 1 ?>&search=<?= urlencode($search) ?><?= isset($_GET['embed']) ? '&embed=1' : '' ?>" class="w-8 h-8 flex flex-center rounded-xl bg-white border border-slate-200 hover:bg-slate-100 text-slate-500 transition-colors flex items-center justify-center font-bold text-xs"><i class="fa-solid fa-chevron-left"></i></a>
                 <?php endif; ?>
 
                 <?php
@@ -190,14 +195,14 @@ try {
                 $end = min($total_pages, $page + 2);
                 for ($i = $start; $i <= $end; $i++):
                 ?>
-                    <a href="?page=<?= $i ?>&search=<?= urlencode($search) ?>" 
+                    <a href="?page=<?= $i ?>&search=<?= urlencode($search) ?><?= isset($_GET['embed']) ? '&embed=1' : '' ?>" 
                         class="w-8 h-8 flex items-center justify-center rounded-xl text-xs font-black transition-all <?= $i == $page ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/20 border-none' : 'bg-white border border-slate-200 hover:bg-slate-100 text-slate-600' ?>">
                         <?= $i ?>
                     </a>
                 <?php endfor; ?>
 
                 <?php if ($page < $total_pages): ?>
-                    <a href="?page=<?= $page + 1 ?>&search=<?= urlencode($search) ?>" class="w-8 h-8 flex flex-center rounded-xl bg-white border border-slate-200 hover:bg-slate-100 text-slate-500 transition-colors flex items-center justify-center font-bold text-xs"><i class="fa-solid fa-chevron-right"></i></a>
+                    <a href="?page=<?= $page + 1 ?>&search=<?= urlencode($search) ?><?= isset($_GET['embed']) ? '&embed=1' : '' ?>" class="w-8 h-8 flex flex-center rounded-xl bg-white border border-slate-200 hover:bg-slate-100 text-slate-500 transition-colors flex items-center justify-center font-bold text-xs"><i class="fa-solid fa-chevron-right"></i></a>
                 <?php endif; ?>
             </div>
         </div>
