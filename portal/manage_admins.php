@@ -580,71 +580,60 @@ renderPageHeader("System Governance", "Hub บริหารจัดการ:
                 </button>
             </div>
 
-            <div class="p-7 space-y-5 max-h-[70vh] overflow-y-auto">
-                <!-- ชื่อ + Username -->
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">ชื่อ-นามสกุล *</label>
-                        <input type="text" name="sf_full_name" id="sfFullName" required
-                            class="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-blue-400 focus:bg-white outline-none text-sm font-medium transition-all">
+            <div class="p-7 max-h-[70vh] overflow-y-auto custom-scrollbar">
+                
+                <h4 class="text-sm font-black text-gray-800 border-b border-gray-100 pb-2 mb-4"><i class="fa-solid fa-address-card text-gray-400 mr-2"></i> ข้อมูลบัญชีผู้ใช้</h4>
+                
+                <div class="space-y-4 mb-8">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">ชื่อ-นามสกุล *</label>
+                            <input type="text" name="sf_full_name" id="sfFullName" required
+                                class="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-blue-400 focus:bg-white outline-none text-sm font-medium transition-all">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Username *</label>
+                            <input type="text" name="sf_username" id="sfUsername" required
+                                class="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-blue-400 focus:bg-white outline-none text-sm font-medium transition-all">
+                        </div>
                     </div>
-                    <div>
-                        <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Username *</label>
-                        <input type="text" name="sf_username" id="sfUsername" required
-                            class="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-blue-400 focus:bg-white outline-none text-sm font-medium transition-all">
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <div class="flex justify-between items-center mb-2">
+                                <label class="text-xs font-bold text-gray-400 uppercase tracking-widest" id="sfPwLabel">Password *</label>
+                                <button type="button" onclick="genSfPw()" class="text-[10px] font-bold text-blue-500 hover:underline flex items-center gap-1">
+                                    <i class="fa-solid fa-wand-magic-sparkles"></i> สุ่มรหัส
+                                </button>
+                            </div>
+                            <div class="relative">
+                                <input type="password" name="sf_password" id="sfPassword"
+                                    class="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-blue-400 focus:bg-white outline-none text-sm font-medium transition-all pr-12"
+                                    placeholder="••••••••">
+                                <button type="button" onclick="toggleSfPw()" class="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                                    <i id="sfEyeIcon" class="fa-solid fa-eye-slash text-sm"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">สถานะบัญชี (Global)</label>
+                            <select name="sf_status" id="sfStatus"
+                                class="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-blue-400 focus:bg-white outline-none text-sm font-medium transition-all">
+                                <option value="active">🟢 Active (ใช้งานได้)</option>
+                                <option value="inactive">⚪ Inactive (ปิดการใช้งาน)</option>
+                                <option value="disabled">🔴 Disabled (ระงับบัญชี)</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
 
-                <!-- Password -->
-                <div>
-                    <div class="flex justify-between items-center mb-2">
-                        <label class="text-xs font-bold text-gray-400 uppercase tracking-widest" id="sfPwLabel">Password *</label>
-                        <button type="button" onclick="genSfPw()" class="text-[10px] font-bold text-blue-500 hover:underline flex items-center gap-1">
-                            <i class="fa-solid fa-wand-magic-sparkles"></i> สร้างอัตโนมัติ
-                        </button>
-                    </div>
-                    <div class="relative">
-                        <input type="password" name="sf_password" id="sfPassword"
-                            class="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-blue-400 focus:bg-white outline-none text-sm font-medium transition-all pr-12"
-                            placeholder="••••••••">
-                        <button type="button" onclick="toggleSfPw()" class="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-                            <i id="sfEyeIcon" class="fa-solid fa-eye-slash text-sm"></i>
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Role + Status -->
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">บทบาทใน e-Borrow</label>
-                        <select name="sf_role" id="sfRole"
-                            class="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-blue-400 focus:bg-white outline-none text-sm font-medium transition-all">
-                            <option value="employee">Employee</option>
-                            <option value="librarian">Librarian</option>
-                            <option value="admin">Admin</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">สถานะบัญชี</label>
-                        <select name="sf_status" id="sfStatus"
-                            class="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-blue-400 focus:bg-white outline-none text-sm font-medium transition-all">
-                            <option value="active">Active</option>
-                            <option value="inactive">Inactive</option>
-                            <option value="disabled">Disabled</option>
-                        </select>
-                    </div>
-                </div>
-
-                <!-- Access Permissions -->
-                <div class="rounded-2xl border border-gray-100 overflow-hidden">
-                    <div class="px-5 py-3 bg-gray-50 border-b border-gray-100">
-                        <p class="text-xs font-black text-gray-600 uppercase tracking-widest">สิทธิ์การเข้าถึงระบบ</p>
-                    </div>
-                    <div class="p-5 space-y-4">
-                        <!-- e-Borrow (always on) -->
-                        <div class="flex items-center justify-between">
+                <h4 class="text-sm font-black text-gray-800 border-b border-gray-100 pb-2 mb-4"><i class="fa-solid fa-key text-gray-400 mr-2"></i> สิทธิ์การเข้าถึงระบบ</h4>
+                
+                <div class="space-y-4">
+                    <div class="border border-gray-100 rounded-2xl p-4 bg-gray-50/30">
+                        <div class="flex items-center justify-between mb-3">
                             <div class="flex items-center gap-3">
-                                <div class="w-9 h-9 rounded-xl bg-orange-100 flex items-center justify-center">
+                                <div class="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center">
                                     <i class="fa-solid fa-toolbox text-orange-500"></i>
                                 </div>
                                 <div>
@@ -652,15 +641,25 @@ renderPageHeader("System Governance", "Hub บริหารจัดการ:
                                     <p class="text-[10px] text-gray-400">ระบบยืม-คืนอุปกรณ์</p>
                                 </div>
                             </div>
-                            <div class="px-3 py-1 rounded-full bg-orange-50 border border-orange-200 text-orange-600 text-[10px] font-black">
-                                เปิดเสมอ
-                            </div>
+                            <span class="px-3 py-1 rounded-full bg-orange-50 border border-orange-200 text-orange-600 text-[10px] font-black">
+                                สิทธิ์พื้นฐาน (เปิดเสมอ)
+                            </span>
                         </div>
+                        <div class="pl-13 w-full md:w-2/3">
+                            <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">บทบาทหน้าที่ในระบบนี้</label>
+                            <select name="sf_role" id="sfRole"
+                                class="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-400 outline-none text-sm font-medium transition-all shadow-sm">
+                                <option value="employee">Employee (ผู้ยืมทั่วไป)</option>
+                                <option value="librarian">Librarian (เจ้าหน้าที่จ่ายของ)</option>
+                                <option value="admin">Admin (ผู้ดูแลคลัง)</option>
+                            </select>
+                        </div>
+                    </div>
 
-                        <!-- e-Campaign toggle -->
+                    <div class="border border-gray-100 rounded-2xl p-4 transition-all hover:border-blue-200" id="ecampaignBox">
                         <div class="flex items-center justify-between">
                             <div class="flex items-center gap-3">
-                                <div class="w-9 h-9 rounded-xl bg-blue-100 flex items-center justify-center">
+                                <div class="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center">
                                     <i class="fa-solid fa-bullhorn text-blue-500"></i>
                                 </div>
                                 <div>
@@ -670,22 +669,22 @@ renderPageHeader("System Governance", "Hub บริหารจัดการ:
                             </div>
                             <label class="relative inline-flex items-center cursor-pointer">
                                 <input type="checkbox" name="sf_access_ecampaign" id="sfAccessEcamp" value="1" onchange="toggleEcampRole(this.checked)" class="sr-only peer">
-                                <div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:bg-blue-500 transition-colors after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-5"></div>
+                                <div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:bg-blue-500 transition-colors after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-5 shadow-inner"></div>
                             </label>
                         </div>
 
-                        <!-- e-Campaign role (hidden until toggle on) -->
-                        <div id="sfEcampRoleWrap" class="hidden pl-12">
-                            <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">บทบาทใน e-Campaign</label>
+                        <div id="sfEcampRoleWrap" class="hidden pl-13 w-full md:w-2/3 mt-3 pt-3 border-t border-gray-50">
+                            <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">บทบาทหน้าที่ในระบบนี้</label>
                             <select name="sf_ecampaign_role" id="sfEcampRole"
-                                class="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-blue-400 focus:bg-white outline-none text-sm font-medium transition-all">
-                                <option value="admin">Admin</option>
-                                <option value="editor">Editor</option>
-                                <option value="superadmin">System Privileged</option>
+                                class="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-400 outline-none text-sm font-medium transition-all shadow-sm">
+                                <option value="editor">Editor (จัดการเนื้อหา)</option>
+                                <option value="admin">Admin (ผู้ดูแลแคมเปญ)</option>
+                                <option value="superadmin">System Privileged (ควบคุมทั้งหมด)</option>
                             </select>
                         </div>
                     </div>
                 </div>
+
             </div>
 
             <div class="p-7 bg-gray-50/50 border-t border-gray-100 flex gap-3">
