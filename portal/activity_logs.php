@@ -76,7 +76,7 @@ try {
     <!-- Header -->
     <div class="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
-            <div class="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center text-xl mb-4 shadow-inner">
+            <div class="w-12 h-12 bg-gradient-to-br from-emerald-50 to-emerald-200 text-emerald-600 rounded-2xl flex items-center justify-center text-xl mb-4 shadow-inner border border-emerald-100">
                 <i class="fa-solid fa-file-lines"></i>
             </div>
             <h1 class="text-3xl md:text-4xl font-[900] text-slate-900 tracking-tight flex items-center gap-3">
@@ -140,12 +140,12 @@ try {
                         </tr>
                     <?php else: ?>
                         <?php foreach ($logs as $log): 
-                            $actionColor = "bg-slate-100 text-slate-600 border-slate-200";
-                            $icon = "fa-bolt";
-                            if (strpos($log['action'], 'login') !== false) { $actionColor = "bg-emerald-50 text-emerald-700 border-emerald-100"; $icon = "fa-right-to-bracket"; }
-                            if (strpos($log['action'], 'delete') !== false) { $actionColor = "bg-rose-50 text-rose-700 border-rose-100"; $icon = "fa-trash"; }
-                            if (strpos($log['action'], 'update') !== false) { $actionColor = "bg-blue-50 text-blue-700 border-blue-100"; $icon = "fa-pen"; }
-                            if (strpos($log['action'], 'campaign') !== false) { $actionColor = "bg-purple-50 text-purple-700 border-purple-100"; $icon = "fa-bullhorn"; }
+                            $actionColor = "bg-gradient-to-br from-slate-50 to-slate-100 text-slate-600 border-slate-200 shadow-inner";
+                            $icon = "fa-bolt text-[10px]";
+                            if (strpos($log['action'], 'login') !== false) { $actionColor = "bg-gradient-to-br from-emerald-50 to-emerald-100 text-emerald-700 border-emerald-200 shadow-inner"; $icon = "fa-right-to-bracket text-emerald-600"; }
+                            if (strpos($log['action'], 'delete') !== false) { $actionColor = "bg-gradient-to-br from-rose-50 to-rose-100 text-rose-700 border-rose-200 shadow-inner"; $icon = "fa-trash text-rose-500"; }
+                            if (strpos($log['action'], 'update') !== false) { $actionColor = "bg-gradient-to-br from-blue-50 to-blue-100 text-blue-700 border-blue-200 shadow-inner"; $icon = "fa-pen text-blue-500"; }
+                            if (strpos($log['action'], 'campaign') !== false) { $actionColor = "bg-gradient-to-br from-purple-50 to-purple-100 text-purple-700 border-purple-200 shadow-inner"; $icon = "fa-bullhorn text-purple-500"; }
                         ?>
                             <tr class="hover:bg-slate-50/80 transition-colors group">
                                 <td class="px-6 py-5 text-xs text-slate-500 font-bold whitespace-nowrap">
@@ -163,12 +163,12 @@ try {
                                     </div>
                                 </td>
                                 <td class="px-6 py-5 whitespace-nowrap">
-                                    <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-[10px] font-black uppercase tracking-wider <?= $actionColor ?>">
-                                        <i class="fa-solid <?= $icon ?> opacity-50"></i> <?= htmlspecialchars($log['action']) ?>
+                                    <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-[10px] font-black uppercase tracking-widest <?= $actionColor ?>">
+                                        <i class="fa-solid <?= $icon ?>"></i> <?= htmlspecialchars($log['action']) ?>
                                     </span>
                                 </td>
                                 <td class="px-6 py-5">
-                                    <p class="text-sm text-slate-600 max-w-xl font-medium leading-relaxed"><?= htmlspecialchars($log['description']) ?></p>
+                                    <p class="text-xs md:text-sm text-slate-800 font-bold max-w-xl leading-relaxed break-words"><?= htmlspecialchars($log['description']) ?></p>
                                 </td>
                                 <td class="px-6 py-5 whitespace-nowrap">
                                     <code class="text-[10px] bg-white border border-slate-200 px-2.5 py-1.5 rounded-xl text-slate-500 font-mono font-bold shadow-sm"><?= htmlspecialchars($log['ip_address'] ?? 'unknown') ?></code>
