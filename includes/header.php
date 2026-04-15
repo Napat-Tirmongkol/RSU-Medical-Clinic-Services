@@ -36,11 +36,11 @@ if ($isUserFolder) {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ระบบปรับปรุง — RSU Medical Clinic</title>
-  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../assets/css/rsufont.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <style>
-    *{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:'Prompt',sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center;
+    *{box-sizing:border-box;margin:0;padding:0;font-family:'rsufont',sans-serif !important;}
+    body{min-height:100vh;display:flex;align-items:center;justify-content:center;
          background:#e8f4ec;background-image:radial-gradient(circle at 20% 20%,rgba(46,158,99,.1) 0,transparent 400px),
          radial-gradient(circle at 80% 80%,rgba(77,201,138,.07) 0,transparent 350px);}
     .card{background:#fff;border-radius:28px;padding:48px 36px;max-width:420px;width:90%;text-align:center;
@@ -108,11 +108,8 @@ function render_header(string $title = 'E-Vax'): void {
 
       <link rel="stylesheet" href="../assets/css/tailwind.min.css">
 	  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+      <link rel="stylesheet" href="../assets/css/rsufont.css">
 <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
-      
-      <link rel="preconnect" href="https://fonts.googleapis.com">
-      <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-      <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
       
       <style>
         .custom-scrollbar::-webkit-scrollbar { display: none; }
@@ -124,7 +121,7 @@ function render_header(string $title = 'E-Vax'): void {
       <?php endif; ?>
     </head>
     
-    <body class="bg-[#f4f7fa] h-[100dvh] w-full overflow-hidden flex justify-center text-gray-900 font-prompt">
+    <body class="bg-[#f4f7fa] h-[100dvh] w-full overflow-hidden flex justify-center text-gray-900">
       
       <div id="page-loader" class="fixed inset-0 z-[9999] bg-[#f4f7fa] flex flex-col items-center justify-center transition-opacity duration-300">
         <div class="relative w-16 h-16">

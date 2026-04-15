@@ -186,10 +186,10 @@ function levelIconColor(string $level): string {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Error Logs - Portal</title>
-    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../assets/css/rsufont.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 </head>
-<body style="background:#f4f7f5;min-height:100vh;font-family:'Prompt',sans-serif;color:#0f172a;<?= isset($_GET['embed']) ? 'padding:0' : 'padding:24px 28px' ?>">
+<body style="background:#f4f7f5;min-height:100vh;font-family:'rsufont',sans-serif;color:#0f172a;<?= isset($_GET['embed']) ? 'padding:0' : 'padding:24px 28px' ?>">
 
 <div style="max-width:1200px;margin:0 auto">
 

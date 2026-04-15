@@ -1,0 +1,31 @@
+@font-face {
+    font-family: 'rsufont';
+    src: url('../fonts/RSU_Regular.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+}
+@font-face {
+    font-family: 'rsufont';
+    src: url('../fonts/RSU_BOLD.ttf') format('truetype');
+    font-weight: bold;
+    font-style: normal;
+}
+@font-face {
+    font-family: 'rsufont';
+    src: url('../fonts/RSU_light.ttf') format('truetype');
+    font-weight: 300;
+    font-style: normal;
+}
+
+:root {
+    --rsu-font: 'rsufont', 'Prompt', sans-serif;
+}
+
+* {
+    font-family: var(--rsu-font) !important;
+}
+
+/* Fix for icons which should not use RSU font */
+.fa, .fas, .far, .fal, .fad, .fab, .fa-solid, .fa-regular, .fa-light, .fa-thin, .fa-duotone, .fa-brands {
+    font-family: 'Font Awesome 6 Free', 'Font Awesome 6 Brands' !important;
+}

@@ -1,8 +1,11 @@
+@import url('rsufont.css');
+
 /* ── Base ─────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; }
 body {
     background: #f4f7f5;
     min-height: 100vh;
+    font-family: 'rsufont', 'Prompt', sans-serif !important;
 }
 
 /* ── Animations ───────────────────────────────────────── */
