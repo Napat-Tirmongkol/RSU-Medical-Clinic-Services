@@ -75,6 +75,21 @@ try {
 }
 
 /**
+ * (0c) GIT PULL LOG — ดึงประวัติการ pull ล่าสุด 30 รายการ
+ */
+$gitPullLogs = [];
+try {
+    $gitPullLogs = $pdo->query(
+        "SELECT triggered_by, status, message, detail, created_at
+         FROM sys_git_pull_log
+         ORDER BY created_at DESC
+         LIMIT 30"
+    )->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    // ตารางอาจยังไม่มี (ยังไม่เคยกด pull ครั้งแรก) — ปล่อยผ่าน
+}
+
+/**
  * (1) LIVE DATA & ROBUST STATS
  * ดึงสถิจริง พร้อมระบบป้องกันถ้าตารางในอนาคตยังไม่พร้อม
  */
@@ -932,6 +947,67 @@ try {
                         </div>
                     </div>
                 </div>
+            </div>
+
+            <!-- Git Pull History -->
+            <div style="background:#fff;border:1.5px solid #e2e8f0;border-radius:20px;padding:24px;margin-top:24px">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+                    <div style="display:flex;align-items:center;gap:10px">
+                        <div style="width:32px;height:32px;background:#f0fdf4;border-radius:9px;display:flex;align-items:center;justify-content:center;color:#16a34a">
+                            <i class="fa-solid fa-code-branch" style="font-size:13px"></i>
+                        </div>
+                        <div>
+                            <div style="font-size:11px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.12em">Git Pull History</div>
+                            <div style="font-size:11px;color:#94a3b8;margin-top:1px">ประวัติการอัพเดทระบบ (30 รายการล่าสุด)</div>
+                        </div>
+                    </div>
+                    <?php if ($adminRole === 'superadmin'): ?>
+                    <button onclick="triggerGitPull()" id="btnGitPullHistory"
+                            style="display:flex;align-items:center;gap:8px;padding:8px 16px;border-radius:10px;border:1.5px solid #d1fae5;background:#f0fdf4;color:#16a34a;font-size:12px;font-weight:700;cursor:pointer;transition:all .2s">
+                        <i class="fa-solid fa-rotate"></i> Pull Now
+                    </button>
+                    <?php endif; ?>
+                </div>
+
+                <?php if (empty($gitPullLogs)): ?>
+                <div style="text-align:center;padding:40px 20px;color:#94a3b8">
+                    <i class="fa-solid fa-inbox" style="font-size:32px;margin-bottom:12px;display:block;opacity:.4"></i>
+                    <div style="font-size:13px;font-weight:700">ยังไม่มีประวัติการ Pull</div>
+                    <div style="font-size:11px;margin-top:4px">กด "Pull Now" เพื่อเริ่มบันทึกประวัติ</div>
+                </div>
+                <?php else: ?>
+                <div style="display:flex;flex-direction:column;gap:0;border:1px solid #f1f5f9;border-radius:14px;overflow:hidden">
+                    <?php foreach ($gitPullLogs as $i => $log):
+                        $isOk    = $log['status'] === 'success';
+                        $bgColor = $i % 2 === 0 ? '#fff' : '#fafafa';
+                        $dt      = new DateTime($log['created_at']);
+                    ?>
+                    <div style="display:flex;align-items:center;gap:14px;padding:11px 16px;background:<?= $bgColor ?>;border-bottom:1px solid #f1f5f9">
+                        <!-- Status dot -->
+                        <div style="width:28px;height:28px;border-radius:8px;background:<?= $isOk ? '#f0fdf4' : '#fef2f2' ?>;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                            <i class="fa-solid <?= $isOk ? 'fa-check' : 'fa-xmark' ?>"
+                               style="font-size:11px;color:<?= $isOk ? '#16a34a' : '#dc2626' ?>"></i>
+                        </div>
+                        <!-- Info -->
+                        <div style="flex:1;min-width:0">
+                            <div style="font-size:12px;font-weight:700;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+                                <?= htmlspecialchars($log['message'] ?? '') ?>
+                            </div>
+                            <div style="font-size:11px;color:#94a3b8;margin-top:2px">
+                                <i class="fa-solid fa-user" style="font-size:9px;margin-right:3px"></i><?= htmlspecialchars($log['triggered_by']) ?>
+                                <span style="margin:0 6px;opacity:.4">·</span>
+                                <?= htmlspecialchars($log['detail'] ?? '') ?>
+                            </div>
+                        </div>
+                        <!-- Timestamp -->
+                        <div style="font-size:11px;color:#94a3b8;white-space:nowrap;text-align:right;flex-shrink:0">
+                            <div style="font-weight:700;color:#374151"><?= $dt->format('d M Y') ?></div>
+                            <div><?= $dt->format('H:i:s') ?></div>
+                        </div>
+                    </div>
+                    <?php endforeach; ?>
+                </div>
+                <?php endif; ?>
             </div>
 
         </div>

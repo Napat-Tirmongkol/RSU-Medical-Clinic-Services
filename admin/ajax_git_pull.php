@@ -41,25 +41,43 @@ $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
 $curlErr  = curl_error($ch);
 curl_close($ch);
 
+$isSuccess = !$curlErr && ($httpCode >= 200 && $httpCode < 300);
+$logStatus  = $isSuccess ? 'success' : 'error';
+$logMessage = $curlErr
+    ? 'เชื่อมต่อ Plesk ไม่ได้: ' . $curlErr
+    : ($isSuccess ? 'Git Pull สำเร็จ' : 'Plesk webhook ตอบกลับ HTTP ' . $httpCode);
+$logDetail  = $curlErr ? 'curl error' : ('HTTP ' . $httpCode . ($result ? ' — ' . mb_substr($result, 0, 500) : ''));
+
+// บันทึกลง DB
+try {
+    $pdo = db();
+    $pdo->exec("CREATE TABLE IF NOT EXISTS sys_git_pull_log (
+        id          int          NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        triggered_by varchar(100) NOT NULL DEFAULT '',
+        status      enum('success','error') NOT NULL,
+        message     varchar(500) DEFAULT NULL,
+        detail      text         DEFAULT NULL,
+        created_at  timestamp    NULL DEFAULT current_timestamp()
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci");
+
+    $pdo->prepare("INSERT INTO sys_git_pull_log (triggered_by, status, message, detail) VALUES (:by, :st, :msg, :det)")
+        ->execute([
+            ':by'  => $_SESSION['admin_username'] ?? 'unknown',
+            ':st'  => $logStatus,
+            ':msg' => $logMessage,
+            ':det' => $logDetail,
+        ]);
+} catch (Exception $e) {
+    // ล้มเหลว log ก็ไม่ block response
+}
+
 if ($curlErr) {
-    echo json_encode([
-        'status'  => 'error',
-        'message' => 'เชื่อมต่อ Plesk ไม่ได้: ' . $curlErr,
-        'detail'  => 'ลอง localhost:8443 แต่ล้มเหลว',
-    ]);
+    echo json_encode(['status' => 'error', 'message' => $logMessage, 'detail' => 'ลอง localhost:8443 แต่ล้มเหลว']);
     exit;
 }
 
-if ($httpCode >= 200 && $httpCode < 300) {
-    echo json_encode([
-        'status'  => 'success',
-        'message' => 'Git Pull สำเร็จ',
-        'detail'  => 'Plesk webhook ตอบกลับ HTTP ' . $httpCode,
-    ]);
+if ($isSuccess) {
+    echo json_encode(['status' => 'success', 'message' => $logMessage, 'detail' => 'Plesk webhook ตอบกลับ HTTP ' . $httpCode]);
 } else {
-    echo json_encode([
-        'status'  => 'error',
-        'message' => 'Plesk webhook ตอบกลับ HTTP ' . $httpCode,
-        'detail'  => $result,
-    ]);
+    echo json_encode(['status' => 'error', 'message' => $logMessage, 'detail' => $result]);
 }
