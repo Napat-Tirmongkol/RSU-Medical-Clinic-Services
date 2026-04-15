@@ -271,13 +271,6 @@ try {
 </head>
 <body class="font-sans text-gray-800" style="height:100vh;overflow:hidden;display:flex;flex-direction:column">
 
-    <!-- Ambient background dots -->
-    <div class="amb-dot" style="width:320px;height:320px;background:rgba(46,158,99,.1);top:5%;left:10%;--dur:16s;--delay:0s;--dx:40px;--dy:-30px"></div>
-    <div class="amb-dot" style="width:240px;height:240px;background:rgba(77,201,138,.07);top:60%;right:8%;--dur:20s;--delay:-5s;--dx:-35px;--dy:25px"></div>
-    <div class="amb-dot" style="width:180px;height:180px;background:rgba(59,186,122,.07);bottom:15%;left:30%;--dur:13s;--delay:-8s;--dx:25px;--dy:30px"></div>
-    <div class="amb-dot" style="width:200px;height:200px;background:rgba(13,61,34,.05);top:35%;right:25%;--dur:17s;--delay:-3s;--dx:-20px;--dy:-25px"></div>
-    <div class="amb-dot" style="width:150px;height:150px;background:rgba(110,231,183,.06);top:80%;left:55%;--dur:22s;--delay:-11s;--dx:30px;--dy:-20px"></div>
-
     <!-- ══════════════════ HEADER ══════════════════ -->
     <header class="portal-header au">
         <div class="max-w-[1280px] mx-auto px-3 sm:px-6 py-3 flex items-center justify-between gap-2 sm:gap-4">
@@ -344,7 +337,7 @@ try {
                 </button>
                 <button class="psb-item" data-section="activity_logs" onclick="switchSection('activity_logs',this)">
                     <div class="psb-icon"><i class="fa-solid fa-file-lines"></i></div>
-                    <span class="psb-label">บันทึกกิจกรรมระบบ</span>
+                    <span class="psb-label">Activity Logs</span>
                 </button>
                 <button class="psb-item" data-section="error_logs" onclick="switchSection('error_logs',this)">
                     <div class="psb-icon"><i class="fa-solid fa-bug"></i></div>
@@ -394,76 +387,76 @@ try {
         <div id="section-dashboard" class="portal-section">
         <div class="max-w-[1280px] mx-auto px-5 md:px-8 py-8 space-y-8">
 
-        <!-- KPI STRIP -->
+        <!-- KPI COMPACT STRIP -->
         <?php $borrowUrgent = $kpis['borrows'] > 0; ?>
-        <section class="grid grid-cols-2 lg:grid-cols-4 gap-4 au d1">
+        <section class="au d1">
+            <div class="kpi-strip">
 
-            <!-- 1. Total Members -->
-            <div class="kpi-card">
-                <div class="kpi-accent" style="background:linear-gradient(90deg,#f59e0b,#fbbf24)"></div>
-                <div class="kpi-icon" style="background:#fffbeb;color:#d97706">
-                    <i class="fa-solid fa-users"></i>
-                </div>
-                <div class="kpi-num text-gray-900" id="kpi-users" data-counter="<?= $kpis['users'] ?>">0</div>
-                <div class="kpi-label" style="margin-bottom:10px">บุคลากรและนักศึกษา</div>
-                <div style="display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:800;color:#d97706;background:#fffbeb;border:1px solid #fde68a;padding:2px 8px;border-radius:99px;">
-                    <i class="fa-solid fa-users" style="font-size:8px"></i> Total Members
-                </div>
-            </div>
-
-            <!-- 2. Active Campaigns -->
-            <div class="kpi-card">
-                <div class="kpi-accent" style="background:linear-gradient(90deg,#2e9e63,#6ee7b7)"></div>
-                <div class="kpi-icon" style="background:#e8f8f0;color:#2e9e63">
-                    <i class="fa-solid fa-bullhorn"></i>
-                </div>
-                <div class="kpi-num text-gray-900" id="kpi-camps" data-counter="<?= $kpis['camps'] ?>">0</div>
-                <div class="kpi-label" style="margin-bottom:10px">แคมเปญสุขภาพ (Active)</div>
-                <div style="font-size:10px;color:#94a3b8;font-weight:600">
-                    โควต้ารวม <span id="kpi-quota" style="font-weight:900;color:#374151"><?= number_format($kpis['total_quota']) ?></span> ที่นั่ง
-                </div>
-            </div>
-
-            <!-- 3. Pending Borrows -->
-            <div class="kpi-card">
-                <div class="kpi-accent" style="background:linear-gradient(90deg,<?= $borrowUrgent ? '#ef4444,#fca5a5' : '#94a3b8,#cbd5e1' ?>)"></div>
-                <div class="kpi-icon" style="background:<?= $borrowUrgent ? '#fff1f2' : '#f8fafc' ?>;color:<?= $borrowUrgent ? '#ef4444' : '#94a3b8' ?>">
-                    <i class="fa-solid fa-box-open"></i>
-                </div>
-                <div style="display:flex;align-items:flex-end;gap:6px">
-                    <div class="kpi-num text-gray-900" id="kpi-borrows" data-counter="<?= $kpis['borrows'] ?>">0</div>
-                    <span id="borrows-urgent" style="margin-bottom:4px;padding:2px 6px;background:#ef4444;color:#fff;font-size:8px;font-weight:900;border-radius:6px;line-height:1;<?= $borrowUrgent ? '' : 'display:none' ?>" class="animate-pulse">URGENT</span>
-                </div>
-                <div class="kpi-label" style="margin-bottom:10px">คำขอยืมอุปกรณ์</div>
-                <div id="borrows-sub" style="font-size:10px;font-weight:700;color:<?= $borrowUrgent ? '#ef4444' : '#94a3b8' ?>">
-                    <?php if ($borrowUrgent): ?>
-                        <i class="fa-solid fa-circle-exclamation" style="margin-right:3px"></i>รอการตรวจสอบ
-                    <?php else: ?>
-                        ไม่มีรายการค้างในระบบ
-                    <?php endif; ?>
-                </div>
-            </div>
-
-            <!-- 4. Booking Rate -->
-            <div class="kpi-card">
-                <div class="kpi-accent" style="background:linear-gradient(90deg,#8b5cf6,#c4b5fd)"></div>
-                <div class="kpi-icon" style="background:#f5f3ff;color:#7c3aed">
-                    <i class="fa-solid fa-chart-pie"></i>
-                </div>
-                <div class="kpi-num text-gray-900" style="display:flex;align-items:baseline;gap:2px">
-                    <span id="kpi-rate"><?= $kpis['booking_rate'] ?></span><span style="font-size:.875rem;font-weight:700;color:#9ca3af">%</span>
-                </div>
-                <div class="kpi-label" style="margin-bottom:10px">อัตราการจองโควต้า</div>
-                <div>
-                    <div style="width:100%;background:#f1f5f9;border-radius:99px;height:5px;overflow:hidden;margin-bottom:4px">
-                        <div id="kpi-rate-bar" style="height:5px;border-radius:99px;transition:width .7s ease;width:<?= $kpis['booking_rate'] ?>%;background:linear-gradient(90deg,#8b5cf6,#c4b5fd)"></div>
+                <!-- Users -->
+                <div class="kpi-stat">
+                    <div class="kpi-stat-icon" style="background:#f0fdf4;color:#2e9e63">
+                        <i class="fa-solid fa-users"></i>
                     </div>
-                    <p style="font-size:9px;color:#94a3b8;font-weight:600;text-align:right">
-                        <span id="kpi-used"><?= number_format($kpis['used_quota']) ?></span> / <span id="kpi-total-quota"><?= number_format($kpis['total_quota']) ?></span> ที่นั่ง
-                    </p>
+                    <div>
+                        <div class="kpi-stat-num" id="kpi-users" data-counter="<?= $kpis['users'] ?>">0</div>
+                        <div class="kpi-stat-label">บุคลากรและนักศึกษา</div>
+                    </div>
                 </div>
-            </div>
 
+                <!-- Campaigns -->
+                <div class="kpi-stat">
+                    <div class="kpi-stat-icon" style="background:#f0fdf4;color:#2e9e63">
+                        <i class="fa-solid fa-bullhorn"></i>
+                    </div>
+                    <div>
+                        <div style="display:flex;align-items:baseline;gap:7px">
+                            <span class="kpi-stat-num" id="kpi-camps" data-counter="<?= $kpis['camps'] ?>">0</span>
+                            <span style="font-size:10px;font-weight:800;color:#2e9e63;background:#f0fdf4;padding:1px 7px;border-radius:99px;border:1px solid #c7e8d5">Active</span>
+                        </div>
+                        <div class="kpi-stat-label">โควต้า <strong style="color:#0f172a;font-weight:900"><?= number_format($kpis['total_quota']) ?></strong> ที่นั่ง</div>
+                    </div>
+                </div>
+
+                <!-- Borrows -->
+                <div class="kpi-stat">
+                    <div class="kpi-stat-icon" style="background:<?= $borrowUrgent ? '#fff1f2' : '#f8fafc' ?>;color:<?= $borrowUrgent ? '#ef4444' : '#94a3b8' ?>">
+                        <i class="fa-solid fa-box-open"></i>
+                    </div>
+                    <div>
+                        <div style="display:flex;align-items:center;gap:7px">
+                            <span class="kpi-stat-num" id="kpi-borrows" data-counter="<?= $kpis['borrows'] ?>">0</span>
+                            <?php if ($borrowUrgent): ?>
+                            <span style="font-size:9px;font-weight:900;color:#fff;background:#ef4444;padding:2px 6px;border-radius:5px;letter-spacing:.04em">URGENT</span>
+                            <?php endif; ?>
+                        </div>
+                        <div class="kpi-stat-label" style="color:<?= $borrowUrgent ? '#ef4444' : '' ?>">
+                            <?= $borrowUrgent ? 'รอการตรวจสอบ' : 'ไม่มีรายการค้าง' ?>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Booking Rate -->
+                <div class="kpi-stat" style="flex:1.3">
+                    <div class="kpi-stat-icon" style="background:#f5f3ff;color:#7c3aed">
+                        <i class="fa-solid fa-chart-pie"></i>
+                    </div>
+                    <div style="flex:1;min-width:0">
+                        <div style="display:flex;align-items:baseline;gap:2px">
+                            <span class="kpi-stat-num" id="kpi-rate"><?= $kpis['booking_rate'] ?></span>
+                            <span style="font-size:12px;font-weight:700;color:#94a3b8">%</span>
+                        </div>
+                        <div style="margin-top:6px">
+                            <div style="width:100%;background:#f1f5f9;border-radius:99px;height:3px;overflow:hidden">
+                                <div id="kpi-rate-bar" style="height:3px;border-radius:99px;width:<?= $kpis['booking_rate'] ?>%;background:#7c3aed;transition:width .7s ease"></div>
+                            </div>
+                            <div class="kpi-stat-label" style="margin-top:3px">
+                                <span id="kpi-used"><?= number_format($kpis['used_quota']) ?></span> / <span id="kpi-total-quota"><?= number_format($kpis['total_quota']) ?></span> ที่นั่ง
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
         </section>
 
         <!-- MAIN GRID -->
@@ -475,7 +468,7 @@ try {
                 <!-- Control Bar -->
                 <div style="margin-bottom:20px">
                     <div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px">
-                        <div class="sec-title">Project Command Grid</div>
+                        <div class="sec-title">Systems</div>
 
                         <div style="display:flex;align-items:center;gap:10px">
                             <!-- Search -->
