@@ -404,8 +404,15 @@ try {
         }
 
         @keyframes idFadeIn {
-            from { opacity: 0; transform: translateY(5px); }
-            to { opacity: 1; transform: translateY(0); }
+            from {
+                opacity: 0;
+                transform: translateY(5px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
 
         /* ── Premium Form Inputs ────────────────────────────────────────────── */
@@ -436,8 +443,15 @@ try {
             transition: all .2s;
         }
 
-        .premium-role-card.blue { border-color: #dbeafe; background: #f0f7ff; }
-        .premium-role-card.orange { border-color: #ffedd5; background: #fffaf5; }
+        .premium-role-card.blue {
+            border-color: #dbeafe;
+            background: #f0f7ff;
+        }
+
+        .premium-role-card.orange {
+            border-color: #ffedd5;
+            background: #fffaf5;
+        }
 
         .role-icon {
             width: 40px;
@@ -447,7 +461,7 @@ try {
             align-items: center;
             justify-content: center;
             background: #fff;
-            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
         }
     </style>
 </head>
@@ -457,16 +471,19 @@ try {
     <!-- ── Collapsible Sidebar ── -->
     <nav id="portal-sidebar">
         <!-- Brand / Toggle -->
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px 12px;border-bottom:1px solid #f0faf4;min-height:60px">
+        <div
+            style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px 12px;border-bottom:1px solid #f0faf4;min-height:60px">
             <div class="flex items-center gap-2" id="psb-brand-text">
-                <div class="brand-icon" style="width:30px;height:30px;font-size:12px;border-radius:10px;"><i class="fa-solid fa-heart"></i></div>
+                <div class="brand-icon" style="width:30px;height:30px;font-size:12px;border-radius:10px;"><i
+                        class="fa-solid fa-heart"></i></div>
                 <div>
                     <div class="font-black text-gray-900 text-[15px] leading-tight tracking-tight">Central HUB</div>
                 </div>
             </div>
             <button onclick="toggleSidebar()" id="sidebar-toggle" title="Toggle sidebar"
                 style="width:28px;height:28px;border-radius:8px;border:none;cursor:pointer;background:#f0faf4;color:#2e9e63;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .18s">
-                <i id="sidebar-toggle-icon" class="fa-solid fa-chevron-left" style="font-size:11px;transition:transform .3s"></i>
+                <i id="sidebar-toggle-icon" class="fa-solid fa-chevron-left"
+                    style="font-size:11px;transition:transform .3s"></i>
             </button>
         </div>
 
@@ -496,19 +513,21 @@ try {
     </nav>
 
     <!-- ══════════════════ APP SHELL (Header + Main) ══════════════════ -->
-    <div id="app-shell" style="display:flex;flex:1;flex-direction:column;min-width:0;overflow:hidden;background:#f4f7f5;">
+    <div id="app-shell"
+        style="display:flex;flex:1;flex-direction:column;min-width:0;overflow:hidden;background:#f4f7f5;">
 
         <!-- ══════════════════ HEADER ══════════════════ -->
         <header class="portal-header au">
             <div class="w-full px-5 sm:px-8 py-3 flex items-center justify-between gap-4" style="min-height:60px">
-                
+
                 <!-- Left: Global Search -->
                 <div class="flex-1 max-w-[400px]">
                     <div class="relative group">
-                        <i class="fa-solid fa-search absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[#2e9e63] transition-colors text-sm"></i>
-                        <input type="text" placeholder="ค้นหาเมนู หรือแคมเปญ... (Ctrl + K)" 
-                            class="w-full pl-10 pr-14 py-2 bg-gray-50/50 border border-gray-200 rounded-xl text-[13px] font-semibold text-gray-700 outline-none focus:bg-white focus:border-[#2e9e63] focus:ring-4 focus:ring-[#2e9e63]/10 transition-all font-prompt">
-                        <div class="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-gray-400 border border-gray-200 px-1.5 py-0.5 rounded-md bg-white">Ctrl+K</div>
+                        <input type="text" placeholder="ค้นหาเมนู หรือแคมเปญ"
+                            class="w-full pl-5 pr-10 py-2 bg-gray-50/50 border border-gray-200 rounded-xl text-[13px] font-semibold text-gray-700 outline-none focus:bg-white focus:border-[#2e9e63] focus:ring-4 focus:ring-[#2e9e63]/10 transition-all font-prompt">
+                        <button class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#2e9e63] transition-colors flex items-center justify-center">
+                            <i class="fa-solid fa-magnifying-glass text-sm"></i>
+                        </button>
                     </div>
                 </div>
 
@@ -527,7 +546,8 @@ try {
                     <!-- Live connection badge -->
                     <div id="ws-badge" title="Real-time connection status"
                         style="display:flex;align-items:center;gap:5px;padding:4px 8px;border-radius:8px;font-size:10px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;border:1px solid #c7e8d5;background:#f0fdf4;color:#16a34a;transition:all .3s">
-                        <span id="ws-dot" style="width:6px;height:6px;border-radius:50%;background:#22c55e;display:inline-block;animation:livePulse 1.6s infinite"></span>
+                        <span id="ws-dot"
+                            style="width:6px;height:6px;border-radius:50%;background:#22c55e;display:inline-block;animation:livePulse 1.6s infinite"></span>
                         <span id="ws-label" class="hidden sm:inline">Live</span>
                     </div>
 
@@ -537,10 +557,14 @@ try {
                     <!-- User Identity & Logout -->
                     <div class="flex items-center gap-2 sm:gap-3">
                         <div class="text-right hidden sm:block">
-                            <div class="text-[9px] font-extrabold uppercase tracking-widest text-gray-400 leading-none mb-1">Admin</div>
-                            <div class="text-[13px] font-black text-gray-800 leading-none"><?= htmlspecialchars($_SESSION['admin_username'] ?? 'Administrator') ?></div>
+                            <div
+                                class="text-[9px] font-extrabold uppercase tracking-widest text-gray-400 leading-none mb-1">
+                                Admin</div>
+                            <div class="text-[13px] font-black text-gray-800 leading-none">
+                                <?= htmlspecialchars($_SESSION['admin_username'] ?? 'Administrator') ?></div>
                         </div>
-                        <div class="w-9 h-9 rounded-xl flex flex-shrink-0 items-center justify-center shadow-md shadow-emerald-500/20 text-sm" style="background: linear-gradient(135deg, #2e9e63, #10b981); color:#fff;">
+                        <div class="w-9 h-9 rounded-xl flex flex-shrink-0 items-center justify-center shadow-md shadow-emerald-500/20 text-sm"
+                            style="background: linear-gradient(135deg, #2e9e63, #10b981); color:#fff;">
                             <i class="fa-solid fa-user-shield"></i>
                         </div>
                         <a href="../admin/logout.php" title="ออกจากระบบ"
@@ -843,34 +867,41 @@ try {
                 <div class="max-w-[1280px] mx-auto px-5 md:px-8 py-8">
 
                     <?php if ($idSaved): ?>
-                        <div id="id-toast" style="display:flex;align-items:center;gap:10px;background:#f0fdf4;border:1.5px solid #bbf7d0;border-radius:14px;padding:12px 18px;margin-bottom:20px;font-size:13px;font-weight:700;color:#15803d">
+                        <div id="id-toast"
+                            style="display:flex;align-items:center;gap:10px;background:#f0fdf4;border:1.5px solid #bbf7d0;border-radius:14px;padding:12px 18px;margin-bottom:20px;font-size:13px;font-weight:700;color:#15803d">
                             <i class="fa-solid fa-circle-check"></i> บันทึกข้อมูลสำเร็จ
                         </div>
                     <?php endif; ?>
                     <?php if ($idError): ?>
-                        <div style="display:flex;align-items:center;gap:10px;background:#fff1f2;border:1.5px solid #fecaca;border-radius:14px;padding:12px 18px;margin-bottom:20px;font-size:13px;font-weight:700;color:#dc2626">
+                        <div
+                            style="display:flex;align-items:center;gap:10px;background:#fff1f2;border:1.5px solid #fecaca;border-radius:14px;padding:12px 18px;margin-bottom:20px;font-size:13px;font-weight:700;color:#dc2626">
                             <i class="fa-solid fa-circle-exclamation"></i> <?= htmlspecialchars($idError) ?>
                         </div>
                     <?php endif; ?>
 
                     <!-- Header row -->
-                    <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:24px">
+                    <div
+                        style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:24px">
                         <div>
                             <div class="sec-title" style="margin-bottom:2px">Identity &amp; Governance</div>
-                            <p style="font-size:13px;color:#64748b">ศูนย์กลางจัดการผู้ใช้งาน สิทธิ์การเข้าถึง และความปลอดภัยของระบบ</p>
+                            <p style="font-size:13px;color:#64748b">ศูนย์กลางจัดการผู้ใช้งาน สิทธิ์การเข้าถึง
+                                และความปลอดภัยของระบบ</p>
                         </div>
                         <div style="display:flex;gap:10px;align-items:center">
                             <?php if ($adminRole === 'superadmin'): ?>
-                                <button id="id-btn-add-admin" onclick="openAddAdminModal()" style="display:none;background:#2e9e63;color:#fff;padding:8px 16px;border-radius:11px;font-size:12px;font-weight:700;border:none;cursor:pointer;box-shadow:0 4px 12px rgba(46,158,99,.25)">
+                                <button id="id-btn-add-admin" onclick="openAddAdminModal()"
+                                    style="display:none;background:#2e9e63;color:#fff;padding:8px 16px;border-radius:11px;font-size:12px;font-weight:700;border:none;cursor:pointer;box-shadow:0 4px 12px rgba(46,158,99,.25)">
                                     <i class="fa-solid fa-user-plus mr-1"></i> เพิ่ม Admin
                                 </button>
-                                <button id="id-btn-add-staff" onclick="openAddStaffModal()" style="display:none;background:#2563eb;color:#fff;padding:8px 16px;border-radius:11px;font-size:12px;font-weight:700;border:none;cursor:pointer;box-shadow:0 4px 12px rgba(37,99,235,.25)">
+                                <button id="id-btn-add-staff" onclick="openAddStaffModal()"
+                                    style="display:none;background:#2563eb;color:#fff;padding:8px 16px;border-radius:11px;font-size:12px;font-weight:700;border:none;cursor:pointer;box-shadow:0 4px 12px rgba(37,99,235,.25)">
                                     <i class="fa-solid fa-id-badge mr-1"></i> เพิ่ม Staff
                                 </button>
                             <?php endif; ?>
                             <div id="id-search-wrap" style="position:relative">
-                                <i class="fa-solid fa-magnifying-glass" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:11px;pointer-events:none"></i>
-                                <input id="id-search-input" type="text" placeholder="ค้นหาข้อมูล..." 
+                                <i class="fa-solid fa-magnifying-glass"
+                                    style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:11px;pointer-events:none"></i>
+                                <input id="id-search-input" type="text" placeholder="ค้นหาข้อมูล..."
                                     style="padding:8px 12px 8px 30px;border:1.5px solid #d0ead9;border-radius:12px;font-size:12px;font-family:inherit;outline:none;width:200px;transition:border-color .2s"
                                     oninput="idUniversalFilter(this.value)">
                             </div>
@@ -878,61 +909,96 @@ try {
                     </div>
 
                     <!-- Tabs -->
-                    <div style="display:flex;gap:6px;margin-bottom:20px;padding-bottom:2px;border-bottom:1px solid #f1f5f9">
-                        <button class="id-tab active" data-tab="users" onclick="switchIdTab('users',this)">System Users (<?= count($idUsers) ?>)</button>
+                    <div
+                        style="display:flex;gap:6px;margin-bottom:20px;padding-bottom:2px;border-bottom:1px solid #f1f5f9">
+                        <button class="id-tab active" data-tab="users" onclick="switchIdTab('users',this)">System Users
+                            (<?= count($idUsers) ?>)</button>
                         <?php if ($adminRole === 'superadmin'): ?>
-                            <button class="id-tab" data-tab="admins" onclick="switchIdTab('admins',this)">System Admins (<?= count($allAdmins) ?>)</button>
-                            <button class="id-tab" data-tab="staff" onclick="switchIdTab('staff',this)">e-Borrow Staff (<?= count($allStaff) ?>)</button>
+                            <button class="id-tab" data-tab="admins" onclick="switchIdTab('admins',this)">System Admins
+                                (<?= count($allAdmins) ?>)</button>
+                            <button class="id-tab" data-tab="staff" onclick="switchIdTab('staff',this)">e-Borrow Staff
+                                (<?= count($allStaff) ?>)</button>
                         <?php endif; ?>
                     </div>
 
                     <!-- PANEL: Master Users -->
                     <div id="id-panel-users" class="id-panel active">
                         <div style="background:#fff;border-radius:20px;border:1.5px solid #e2e8f0;overflow:hidden">
-                            <div style="padding:18px 24px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;gap:8px">
-                                <div style="width:4px;height:18px;background:linear-gradient(180deg,#6366f1,#a5b4fc);border-radius:99px;flex-shrink:0"></div>
-                                <span style="font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.14em;color:#374151">Master Records</span>
-                                <span style="margin-left:auto;font-size:11px;font-weight:700;color:#94a3b8"><?= number_format(count($idUsers)) ?> รายการ</span>
+                            <div
+                                style="padding:18px 24px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;gap:8px">
+                                <div
+                                    style="width:4px;height:18px;background:linear-gradient(180deg,#6366f1,#a5b4fc);border-radius:99px;flex-shrink:0">
+                                </div>
+                                <span
+                                    style="font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.14em;color:#374151">Master
+                                    Records</span>
+                                <span
+                                    style="margin-left:auto;font-size:11px;font-weight:700;color:#94a3b8"><?= number_format(count($idUsers)) ?>
+                                    รายการ</span>
                             </div>
                             <div style="overflow-x:auto" id="idTableWrap">
                                 <table style="width:100%;border-collapse:collapse;font-size:13px" id="idUserTable">
                                     <thead>
                                         <tr style="background:#f8fafc;border-bottom:1px solid #f1f5f9">
-                                            <th style="padding:12px 20px;text-align:left;font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.14em">ผู้ใช้งาน</th>
-                                            <th style="padding:12px 20px;text-align:left;font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.14em">ติดต่อ</th>
-                                            <th style="padding:12px 20px;text-align:left;font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.14em">วันที่ลงทะเบียน</th>
-                                            <th style="padding:12px 20px;text-align:right;font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.14em">จัดการ</th>
+                                            <th
+                                                style="padding:12px 20px;text-align:left;font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.14em">
+                                                ผู้ใช้งาน</th>
+                                            <th
+                                                style="padding:12px 20px;text-align:left;font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.14em">
+                                                ติดต่อ</th>
+                                            <th
+                                                style="padding:12px 20px;text-align:left;font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.14em">
+                                                วันที่ลงทะเบียน</th>
+                                            <th
+                                                style="padding:12px 20px;text-align:right;font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.14em">
+                                                จัดการ</th>
                                         </tr>
                                     </thead>
                                     <tbody id="idUserTbody">
                                         <?php foreach ($idUsers as $u):
-                                            $statusTH = match ($u['status']) { 'student' => 'นักศึกษา', 'staff' => 'บุคลากร', 'other' => $u['status_other'] ?: 'บุคคลทั่วไป', default => 'ไม่ระบุ' };
+                                            $statusTH = match ($u['status']) { 'student' => 'นักศึกษา', 'staff' => 'บุคลากร', 'other' => $u['status_other'] ?: 'บุคคลทั่วไป', default => 'ไม่ระบุ'};
                                             $initial = mb_substr($u['full_name'], 0, 1);
                                             ?>
                                             <tr style="border-bottom:1px solid #f1f5f9" class="id-user-row">
                                                 <td style="padding:14px 20px">
                                                     <div style="display:flex;align-items:center;gap:12px">
-                                                        <div style="width:38px;height:38px;border-radius:11px;background:#f1f5f9;color:#64748b;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;flex-shrink:0"><?= htmlspecialchars($initial) ?></div>
+                                                        <div
+                                                            style="width:38px;height:38px;border-radius:11px;background:#f1f5f9;color:#64748b;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;flex-shrink:0">
+                                                            <?= htmlspecialchars($initial) ?></div>
                                                         <div>
-                                                            <div style="font-weight:750;color:#0f172a"><?= htmlspecialchars($u['full_name']) ?></div>
-                                                            <div style="font-size:10px;color:#94a3b8;font-weight:700;margin-top:2px">#<?= htmlspecialchars($u['student_personnel_id'] ?? '—') ?> · <?= htmlspecialchars($statusTH) ?></div>
+                                                            <div style="font-weight:750;color:#0f172a">
+                                                                <?= htmlspecialchars($u['full_name']) ?></div>
+                                                            <div
+                                                                style="font-size:10px;color:#94a3b8;font-weight:700;margin-top:2px">
+                                                                #<?= htmlspecialchars($u['student_personnel_id'] ?? '—') ?>
+                                                                · <?= htmlspecialchars($statusTH) ?></div>
                                                         </div>
                                                     </div>
                                                 </td>
                                                 <td style="padding:14px 20px">
-                                                    <div style="font-size:12px;color:#374151;font-weight:600"><?= htmlspecialchars($u['phone_number'] ?: '—') ?></div>
-                                                    <div style="font-size:11px;color:#94a3b8;margin-top:2px"><?= htmlspecialchars($u['email'] ?? '—') ?></div>
+                                                    <div style="font-size:12px;color:#374151;font-weight:600">
+                                                        <?= htmlspecialchars($u['phone_number'] ?: '—') ?></div>
+                                                    <div style="font-size:11px;color:#94a3b8;margin-top:2px">
+                                                        <?= htmlspecialchars($u['email'] ?? '—') ?></div>
                                                 </td>
                                                 <td style="padding:14px 20px">
-                                                    <div style="font-size:12px;font-weight:700;color:#374151"><?= date('d M Y', strtotime($u['created_at'])) ?></div>
-                                                    <div style="font-size:10px;color:#94a3b8;margin-top:1px"><?= date('H:i', strtotime($u['created_at'])) ?></div>
+                                                    <div style="font-size:12px;font-weight:700;color:#374151">
+                                                        <?= date('d M Y', strtotime($u['created_at'])) ?></div>
+                                                    <div style="font-size:10px;color:#94a3b8;margin-top:1px">
+                                                        <?= date('H:i', strtotime($u['created_at'])) ?></div>
                                                 </td>
                                                 <td style="padding:14px 20px;text-align:right">
                                                     <div style="display:flex;gap:6px;justify-content:flex-end">
-                                                        <button onclick='idOpenView(<?= json_encode($u, JSON_HEX_APOS | JSON_HEX_TAG) ?>)' style="width:32px;height:32px;border-radius:8px;border:1px solid #e2e8f0;background:#fff;color:#64748b;cursor:pointer;transition:all .15s" title="ดูข้อมูล">
+                                                        <button
+                                                            onclick='idOpenView(<?= json_encode($u, JSON_HEX_APOS | JSON_HEX_TAG) ?>)'
+                                                            style="width:32px;height:32px;border-radius:8px;border:1px solid #e2e8f0;background:#fff;color:#64748b;cursor:pointer;transition:all .15s"
+                                                            title="ดูข้อมูล">
                                                             <i class="fa-solid fa-eye" style="font-size:11px"></i>
                                                         </button>
-                                                        <button onclick='idOpenEdit(<?= json_encode($u, JSON_HEX_APOS | JSON_HEX_TAG) ?>)' style="width:32px;height:32px;border-radius:8px;border:1px solid #e2e8f0;background:#fff;color:#64748b;cursor:pointer;transition:all .15s" title="แก้ไข">
+                                                        <button
+                                                            onclick='idOpenEdit(<?= json_encode($u, JSON_HEX_APOS | JSON_HEX_TAG) ?>)'
+                                                            style="width:32px;height:32px;border-radius:8px;border:1px solid #e2e8f0;background:#fff;color:#64748b;cursor:pointer;transition:all .15s"
+                                                            title="แก้ไข">
                                                             <i class="fa-solid fa-pen" style="font-size:11px"></i>
                                                         </button>
                                                         <a href="../admin/user_history.php?id=<?= $u['id'] ?>"
@@ -940,7 +1006,8 @@ try {
                                                             onmouseover="this.style.background='#fffbeb';this.style.color='#d97706'"
                                                             onmouseout="this.style.background='#fff';this.style.color='#64748b'"
                                                             title="ประวัติการใช้งาน">
-                                                            <i class="fa-solid fa-clock-rotate-left" style="font-size:11px"></i>
+                                                            <i class="fa-solid fa-clock-rotate-left"
+                                                                style="font-size:11px"></i>
                                                         </a>
                                                     </div>
                                                 </td>
@@ -950,7 +1017,8 @@ try {
                                 </table>
                             </div>
                             <!-- Pagination bar -->
-                            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;padding:14px 20px;border-top:1px solid #f1f5f9">
+                            <div
+                                style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;padding:14px 20px;border-top:1px solid #f1f5f9">
                                 <div style="display:flex;align-items:center;gap:6px">
                                     <span style="font-size:11px;font-weight:700;color:#94a3b8">แสดง</span>
                                     <?php foreach ([25, 50, 100] as $sz): ?>
@@ -977,40 +1045,60 @@ try {
                     <!-- PANEL: System Admins -->
                     <div id="id-panel-admins" class="id-panel">
                         <div style="background:#fff;border-radius:20px;border:1.5px solid #e2e8f0;overflow:hidden">
-                            <div style="padding:18px 24px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;gap:8px">
-                                <div style="width:4px;height:18px;background:#2e9e63;border-radius:99px;flex-shrink:0"></div>
-                                <span style="font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.14em;color:#374151">Admin Accounts</span>
+                            <div
+                                style="padding:18px 24px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;gap:8px">
+                                <div style="width:4px;height:18px;background:#2e9e63;border-radius:99px;flex-shrink:0">
+                                </div>
+                                <span
+                                    style="font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.14em;color:#374151">Admin
+                                    Accounts</span>
                             </div>
                             <div style="overflow-x:auto">
                                 <table style="width:100%;border-collapse:collapse;font-size:13px" id="idAdminTable">
                                     <thead>
                                         <tr style="background:#f8fafc;border-bottom:1px solid #f1f5f9">
-                                            <th style="padding:12px 20px;text-align:left;font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.14em">Admin Detail</th>
-                                            <th style="padding:12px 20px;text-align:left;font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.14em">Privileges</th>
-                                            <th style="padding:12px 20px;text-align:right;font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.14em">จัดการ</th>
+                                            <th
+                                                style="padding:12px 20px;text-align:left;font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.14em">
+                                                Admin Detail</th>
+                                            <th
+                                                style="padding:12px 20px;text-align:left;font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.14em">
+                                                Privileges</th>
+                                            <th
+                                                style="padding:12px 20px;text-align:right;font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.14em">
+                                                จัดการ</th>
                                         </tr>
                                     </thead>
                                     <tbody id="idAdminTbody">
                                         <?php foreach ($allAdmins as $adm):
-                                            $roleClass = match($adm['role']) { 'superadmin' => 'bg-purple-100 text-purple-700', 'editor' => 'bg-rose-100 text-rose-700', default => 'bg-blue-100 text-blue-700' };
+                                            $roleClass = match ($adm['role']) { 'superadmin' => 'bg-purple-100 text-purple-700', 'editor' => 'bg-rose-100 text-rose-700', default => 'bg-blue-100 text-blue-700'};
                                             ?>
                                             <tr style="border-bottom:1px solid #f1f5f9" class="id-admin-row">
                                                 <td style="padding:14px 20px">
-                                                    <div style="font-weight:750;color:#0f172a"><?= htmlspecialchars($adm['full_name']) ?></div>
-                                                    <div style="font-size:11px;color:#94a3b8">@<?= htmlspecialchars($adm['username']) ?> · <?= htmlspecialchars($adm['email']) ?></div>
+                                                    <div style="font-weight:750;color:#0f172a">
+                                                        <?= htmlspecialchars($adm['full_name']) ?></div>
+                                                    <div style="font-size:11px;color:#94a3b8">
+                                                        @<?= htmlspecialchars($adm['username']) ?> ·
+                                                        <?= htmlspecialchars($adm['email']) ?></div>
                                                 </td>
                                                 <td style="padding:14px 20px">
-                                                    <span style="font-size:10px;font-weight:800;padding:3px 8px;border-radius:6px;text-transform:uppercase" class="<?= $roleClass ?>"><?= htmlspecialchars($adm['role']) ?></span>
+                                                    <span
+                                                        style="font-size:10px;font-weight:800;padding:3px 8px;border-radius:6px;text-transform:uppercase"
+                                                        class="<?= $roleClass ?>"><?= htmlspecialchars($adm['role']) ?></span>
                                                 </td>
                                                 <td style="padding:14px 20px;text-align:right">
                                                     <div style="display:flex;gap:6px;justify-content:flex-end">
-                                                        <button onclick='openEditAdminModal(<?= json_encode($adm) ?>)' style="width:32px;height:32px;border-radius:8px;border:1px solid #e2e8f0;background:#fff;color:#64748b;cursor:pointer"><i class="fa-solid fa-pen"></i></button>
+                                                        <button onclick='openEditAdminModal(<?= json_encode($adm) ?>)'
+                                                            style="width:32px;height:32px;border-radius:8px;border:1px solid #e2e8f0;background:#fff;color:#64748b;cursor:pointer"><i
+                                                                class="fa-solid fa-pen"></i></button>
                                                         <?php if ($adm['id'] != $_SESSION['admin_id']): ?>
-                                                            <form method="POST" style="display:inline" onsubmit="return confirm('ยืนยันการลบ Admin ท่านนี้?')">
+                                                            <form method="POST" style="display:inline"
+                                                                onsubmit="return confirm('ยืนยันการลบ Admin ท่านนี้?')">
                                                                 <input type="hidden" name="action" value="delete_admin">
                                                                 <input type="hidden" name="admin_id" value="<?= $adm['id'] ?>">
                                                                 <?php csrf_field(); ?>
-                                                                <button type="submit" style="width:32px;height:32px;border-radius:8px;border:1px solid #fee2e2;background:#fff;color:#ef4444;cursor:pointer"><i class="fa-solid fa-trash"></i></button>
+                                                                <button type="submit"
+                                                                    style="width:32px;height:32px;border-radius:8px;border:1px solid #fee2e2;background:#fff;color:#ef4444;cursor:pointer"><i
+                                                                        class="fa-solid fa-trash"></i></button>
                                                             </form>
                                                         <?php endif; ?>
                                                     </div>
@@ -1026,17 +1114,27 @@ try {
                     <!-- PANEL: e-Borrow Staff -->
                     <div id="id-panel-staff" class="id-panel">
                         <div style="background:#fff;border-radius:20px;border:1.5px solid #e2e8f0;overflow:hidden">
-                            <div style="padding:18px 24px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;gap:8px">
-                                <div style="width:4px;height:18px;background:#2563eb;border-radius:99px;flex-shrink:0"></div>
-                                <span style="font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.14em;color:#374151">Staff Roster (e-Borrow)</span>
+                            <div
+                                style="padding:18px 24px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;gap:8px">
+                                <div style="width:4px;height:18px;background:#2563eb;border-radius:99px;flex-shrink:0">
+                                </div>
+                                <span
+                                    style="font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.14em;color:#374151">Staff
+                                    Roster (e-Borrow)</span>
                             </div>
                             <div style="overflow-x:auto">
                                 <table style="width:100%;border-collapse:collapse;font-size:13px" id="idStaffTable">
                                     <thead>
                                         <tr style="background:#f8fafc;border-bottom:1px solid #f1f5f9">
-                                            <th style="padding:12px 20px;text-align:left;font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.14em">Staff</th>
-                                            <th style="padding:12px 20px;text-align:left;font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.14em">System Access</th>
-                                            <th style="padding:12px 20px;text-align:right;font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.14em">จัดการ</th>
+                                            <th
+                                                style="padding:12px 20px;text-align:left;font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.14em">
+                                                Staff</th>
+                                            <th
+                                                style="padding:12px 20px;text-align:left;font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.14em">
+                                                System Access</th>
+                                            <th
+                                                style="padding:12px 20px;text-align:right;font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.14em">
+                                                จัดการ</th>
                                         </tr>
                                     </thead>
                                     <tbody id="idStaffTbody">
@@ -1045,26 +1143,39 @@ try {
                                             ?>
                                             <tr style="border-bottom:1px solid #f1f5f9" class="id-staff-row">
                                                 <td style="padding:14px 20px">
-                                                    <div style="font-weight:750;color:#0f172a"><?= htmlspecialchars($st['full_name']) ?></div>
-                                                    <div style="font-size:11px;color:#94a3b8">@<?= htmlspecialchars($st['username']) ?> · <span style="font-weight:700"><?= htmlspecialchars($st['role']) ?></span></div>
+                                                    <div style="font-weight:750;color:#0f172a">
+                                                        <?= htmlspecialchars($st['full_name']) ?></div>
+                                                    <div style="font-size:11px;color:#94a3b8">
+                                                        @<?= htmlspecialchars($st['username']) ?> · <span
+                                                            style="font-weight:700"><?= htmlspecialchars($st['role']) ?></span>
+                                                    </div>
                                                 </td>
                                                 <td style="padding:14px 20px">
                                                     <div style="display:flex;gap:4px">
-                                                        <span title="e-Borrow Status" style="font-size:9px;font-weight:800;padding:2px 6px;border-radius:5px;background:#fff7ed;color:#ea580c;border:1px solid #fed7aa">e-Borrow</span>
+                                                        <span title="e-Borrow Status"
+                                                            style="font-size:9px;font-weight:800;padding:2px 6px;border-radius:5px;background:#fff7ed;color:#ea580c;border:1px solid #fed7aa">e-Borrow</span>
                                                         <?php if ($st['access_ecampaign']): ?>
-                                                            <span title="e-Campaign Role" style="font-size:9px;font-weight:800;padding:2px 6px;border-radius:5px;background:#eff6ff;color:#2563eb;border:1px solid #bfdbfe">e-Camp (<?= $st['ecampaign_role'] ?>)</span>
+                                                            <span title="e-Campaign Role"
+                                                                style="font-size:9px;font-weight:800;padding:2px 6px;border-radius:5px;background:#eff6ff;color:#2563eb;border:1px solid #bfdbfe">e-Camp
+                                                                (<?= $st['ecampaign_role'] ?>)</span>
                                                         <?php endif; ?>
-                                                        <span style="font-size:9px;font-weight:800;padding:2px 6px;border-radius:5px;background:<?= $isActive ? '#f0fdf4;color:#16a34a;border:1px solid #bbf7d0' : '#fef2f2;color:#dc2626;border:1px solid #fecaca' ?>"><?= strtoupper($st['account_status']) ?></span>
+                                                        <span
+                                                            style="font-size:9px;font-weight:800;padding:2px 6px;border-radius:5px;background:<?= $isActive ? '#f0fdf4;color:#16a34a;border:1px solid #bbf7d0' : '#fef2f2;color:#dc2626;border:1px solid #fecaca' ?>"><?= strtoupper($st['account_status']) ?></span>
                                                     </div>
                                                 </td>
                                                 <td style="padding:14px 20px;text-align:right">
                                                     <div style="display:flex;gap:6px;justify-content:flex-end">
-                                                        <button onclick='openEditStaffModal(<?= json_encode($st) ?>)' style="width:32px;height:32px;border-radius:8px;border:1px solid #e2e8f0;background:#fff;color:#64748b;cursor:pointer"><i class="fa-solid fa-pen"></i></button>
-                                                        <form method="POST" style="display:inline" onsubmit="return confirm('ยืนยันการลบ Staff ท่านนี้?')">
+                                                        <button onclick='openEditStaffModal(<?= json_encode($st) ?>)'
+                                                            style="width:32px;height:32px;border-radius:8px;border:1px solid #e2e8f0;background:#fff;color:#64748b;cursor:pointer"><i
+                                                                class="fa-solid fa-pen"></i></button>
+                                                        <form method="POST" style="display:inline"
+                                                            onsubmit="return confirm('ยืนยันการลบ Staff ท่านนี้?')">
                                                             <input type="hidden" name="action" value="delete_staff">
                                                             <input type="hidden" name="sf_id" value="<?= $st['id'] ?>">
                                                             <?php csrf_field(); ?>
-                                                            <button type="submit" style="width:32px;height:32px;border-radius:8px;border:1px solid #fee2e2;background:#fff;color:#ef4444;cursor:pointer"><i class="fa-solid fa-trash"></i></button>
+                                                            <button type="submit"
+                                                                style="width:32px;height:32px;border-radius:8px;border:1px solid #fee2e2;background:#fff;color:#ef4444;cursor:pointer"><i
+                                                                    class="fa-solid fa-trash"></i></button>
                                                         </form>
                                                     </div>
                                                 </td>
@@ -1201,143 +1312,197 @@ try {
             </div>
 
             <!-- View Modal (Identity) -->
-            <div id="idViewModal" style="display:none;position:fixed;inset:0;z-index:200;background:rgba(15,23,42,.55);backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:20px">
-                <div style="background:#fff;border-radius:24px;width:100%;max-width:420px;overflow:hidden;box-shadow:0 25px 50px -12px rgba(0,0,0,.25)">
-                    <div style="padding:20px 24px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;justify-content:space-between">
+            <div id="idViewModal"
+                style="display:none;position:fixed;inset:0;z-index:200;background:rgba(15,23,42,.55);backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:20px">
+                <div
+                    style="background:#fff;border-radius:24px;width:100%;max-width:420px;overflow:hidden;box-shadow:0 25px 50px -12px rgba(0,0,0,.25)">
+                    <div
+                        style="padding:20px 24px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;justify-content:space-between">
                         <div style="display:flex;align-items:center;gap:10px">
-                            <div style="width:36px;height:36px;background:#eef2ff;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#4f46e5"><i class="fa-solid fa-user"></i></div>
+                            <div
+                                style="width:36px;height:36px;background:#eef2ff;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#4f46e5">
+                                <i class="fa-solid fa-user"></i></div>
                             <span style="font-size:15px;font-weight:900;color:#4f46e5">ข้อมูลผู้ใช้งาน</span>
                         </div>
-                        <button onclick="document.getElementById('idViewModal').style.display='none'" style="width:30px;height:30px;border-radius:8px;border:1px solid #e2e8f0;background:#f8fafc;color:#64748b;cursor:pointer"><i class="fa-solid fa-times" style="font-size:12px"></i></button>
+                        <button onclick="document.getElementById('idViewModal').style.display='none'"
+                            style="width:30px;height:30px;border-radius:8px;border:1px solid #e2e8f0;background:#f8fafc;color:#64748b;cursor:pointer"><i
+                                class="fa-solid fa-times" style="font-size:12px"></i></button>
                     </div>
                     <div style="padding:20px 24px;display:flex;flex-direction:column;gap:12px" id="idViewBody"></div>
                     <div style="padding:14px 24px;border-top:1px solid #f1f5f9;text-align:right">
-                        <button onclick="document.getElementById('idViewModal').style.display='none'" style="padding:9px 22px;border-radius:10px;border:1.5px solid #e2e8f0;background:#f8fafc;color:#374151;font-size:13px;font-weight:700;cursor:pointer">ปิด</button>
+                        <button onclick="document.getElementById('idViewModal').style.display='none'"
+                            style="padding:9px 22px;border-radius:10px;border:1.5px solid #e2e8f0;background:#f8fafc;color:#374151;font-size:13px;font-weight:700;cursor:pointer">ปิด</button>
                     </div>
                 </div>
             </div>
 
             <?php if ($adminRole === 'superadmin'): ?>
-            <!-- Admin Modal -->
-            <div id="admModal" style="display:none;position:fixed;inset:0;z-index:200;background:rgba(15,23,42,.55);backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:20px">
-                <div style="background:#fff;border-radius:24px;width:100%;max-width:480px;overflow:hidden;box-shadow:0 25px 50px -12px rgba(0,0,0,.25)">
-                    <div style="padding:20px 24px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;justify-content:space-between">
-                        <span id="admModalTitle" style="font-size:16px;font-weight:900;color:#0f172a">จัดการ Admin</span>
-                        <button onclick="document.getElementById('admModal').style.display='none'" style="background:none;border:none;cursor:pointer;color:#94a3b8"><i class="fa-solid fa-times"></i></button>
+                <!-- Admin Modal -->
+                <div id="admModal"
+                    style="display:none;position:fixed;inset:0;z-index:200;background:rgba(15,23,42,.55);backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:20px">
+                    <div
+                        style="background:#fff;border-radius:24px;width:100%;max-width:480px;overflow:hidden;box-shadow:0 25px 50px -12px rgba(0,0,0,.25)">
+                        <div
+                            style="padding:20px 24px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;justify-content:space-between">
+                            <span id="admModalTitle" style="font-size:16px;font-weight:900;color:#0f172a">จัดการ
+                                Admin</span>
+                            <button onclick="document.getElementById('admModal').style.display='none'"
+                                style="background:none;border:none;cursor:pointer;color:#94a3b8"><i
+                                    class="fa-solid fa-times"></i></button>
+                        </div>
+                        <form method="POST" style="padding:24px" id="admForm">
+                            <input type="hidden" name="action" id="admAction" value="add_admin">
+                            <input type="hidden" name="admin_id" id="admId">
+                            <?php csrf_field(); ?>
+                            <div style="display:flex;flex-direction:column;gap:16px">
+                                <div>
+                                    <label
+                                        style="display:block;font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;margin-bottom:6px">ชื่อ-นามสกุล</label>
+                                    <input type="text" name="full_name" id="admFullName" required class="premium-input">
+                                </div>
+                                <div>
+                                    <label
+                                        style="display:block;font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;margin-bottom:6px">ชื่อผู้ใช้
+                                        (Username)</label>
+                                    <input type="text" name="username" id="admUsername" required class="premium-input">
+                                </div>
+                                <div>
+                                    <label
+                                        style="display:block;font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;margin-bottom:6px">อีเมล</label>
+                                    <input type="email" name="email" id="admEmail" required class="premium-input">
+                                </div>
+                                <div>
+                                    <label
+                                        style="display:block;font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;margin-bottom:6px">รหัสผ่าน
+                                        <span id="pwdNotice"
+                                            style="font-weight:normal;color:#94a3b8;font-size:9px">(เว้นว่างหากไม่ต้องการเปลี่ยน)</span></label>
+                                    <input type="password" name="password" id="admPassword" class="premium-input">
+                                </div>
+                                <div>
+                                    <label
+                                        style="display:block;font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;margin-bottom:6px">ระดับสิทธิ์
+                                        (Role)</label>
+                                    <select name="role" id="admRole" class="premium-input">
+                                        <option value="admin">Admin</option>
+                                        <option value="editor">Editor</option>
+                                        <option value="superadmin">Superadmin</option>
+                                    </select>
+                                </div>
+                                <div style="display:flex;gap:10px;margin-top:8px">
+                                    <button type="button" onclick="document.getElementById('admModal').style.display='none'"
+                                        style="flex:1;padding:12px;border-radius:12px;background:#f1f5f9;color:#475569;font-weight:800;font-size:13px;border:none">ยกเลิก</button>
+                                    <button type="submit"
+                                        style="flex:1;padding:12px;border-radius:12px;background:#2e9e63;color:#fff;font-weight:800;font-size:13px;border:none">บันทึกข้อมูล</button>
+                                </div>
+                            </div>
+                        </form>
                     </div>
-                    <form method="POST" style="padding:24px" id="admForm">
-                        <input type="hidden" name="action" id="admAction" value="add_admin">
-                        <input type="hidden" name="admin_id" id="admId">
-                        <?php csrf_field(); ?>
-                        <div style="display:flex;flex-direction:column;gap:16px">
-                            <div>
-                                <label style="display:block;font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;margin-bottom:6px">ชื่อ-นามสกุล</label>
-                                <input type="text" name="full_name" id="admFullName" required class="premium-input">
-                            </div>
-                            <div>
-                                <label style="display:block;font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;margin-bottom:6px">ชื่อผู้ใช้ (Username)</label>
-                                <input type="text" name="username" id="admUsername" required class="premium-input">
-                            </div>
-                            <div>
-                                <label style="display:block;font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;margin-bottom:6px">อีเมล</label>
-                                <input type="email" name="email" id="admEmail" required class="premium-input">
-                            </div>
-                            <div>
-                                <label style="display:block;font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;margin-bottom:6px">รหัสผ่าน <span id="pwdNotice" style="font-weight:normal;color:#94a3b8;font-size:9px">(เว้นว่างหากไม่ต้องการเปลี่ยน)</span></label>
-                                <input type="password" name="password" id="admPassword" class="premium-input">
-                            </div>
-                            <div>
-                                <label style="display:block;font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;margin-bottom:6px">ระดับสิทธิ์ (Role)</label>
-                                <select name="role" id="admRole" class="premium-input">
-                                    <option value="admin">Admin</option>
-                                    <option value="editor">Editor</option>
-                                    <option value="superadmin">Superadmin</option>
-                                </select>
-                            </div>
-                            <div style="display:flex;gap:10px;margin-top:8px">
-                                <button type="button" onclick="document.getElementById('admModal').style.display='none'" style="flex:1;padding:12px;border-radius:12px;background:#f1f5f9;color:#475569;font-weight:800;font-size:13px;border:none">ยกเลิก</button>
-                                <button type="submit" style="flex:1;padding:12px;border-radius:12px;background:#2e9e63;color:#fff;font-weight:800;font-size:13px;border:none">บันทึกข้อมูล</button>
-                            </div>
-                        </div>
-                    </form>
                 </div>
-            </div>
 
-            <!-- Staff Modal (e-Borrow) -->
-            <div id="sfModal" style="display:none;position:fixed;inset:0;z-index:200;background:rgba(15,23,42,.55);backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:20px">
-                <div style="background:#fff;border-radius:24px;width:100%;max-width:600px;overflow:hidden;box-shadow:0 25px 50px -12px rgba(0,0,0,.25)">
-                    <div style="padding:20px 24px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;justify-content:space-between">
-                        <span id="sfModalTitle" style="font-size:16px;font-weight:900;color:#0f172a">จัดการเจ้าหน้าที่ e-Borrow</span>
-                        <button onclick="document.getElementById('sfModal').style.display='none'" style="background:none;border:none;cursor:pointer;color:#94a3b8"><i class="fa-solid fa-times"></i></button>
+                <!-- Staff Modal (e-Borrow) -->
+                <div id="sfModal"
+                    style="display:none;position:fixed;inset:0;z-index:200;background:rgba(15,23,42,.55);backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:20px">
+                    <div
+                        style="background:#fff;border-radius:24px;width:100%;max-width:600px;overflow:hidden;box-shadow:0 25px 50px -12px rgba(0,0,0,.25)">
+                        <div
+                            style="padding:20px 24px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;justify-content:space-between">
+                            <span id="sfModalTitle" style="font-size:16px;font-weight:900;color:#0f172a">จัดการเจ้าหน้าที่
+                                e-Borrow</span>
+                            <button onclick="document.getElementById('sfModal').style.display='none'"
+                                style="background:none;border:none;cursor:pointer;color:#94a3b8"><i
+                                    class="fa-solid fa-times"></i></button>
+                        </div>
+                        <form method="POST" style="padding:24px" id="sfForm">
+                            <input type="hidden" name="action" id="sfAction" value="add_staff">
+                            <input type="hidden" name="sf_id" id="sfId">
+                            <?php csrf_field(); ?>
+                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+                                <div style="display:flex;flex-direction:column;gap:14px">
+                                    <div
+                                        style="font-size:10px;font-weight:900;color:#94a3b8;text-transform:uppercase;letter-spacing:.1em">
+                                        General Info</div>
+                                    <div>
+                                        <label
+                                            style="display:block;font-size:11px;font-weight:800;color:#64748b;margin-bottom:6px">ชื่อ-นามสกุล</label>
+                                        <input type="text" name="sf_full_name" id="sfFullName" required
+                                            class="premium-input">
+                                    </div>
+                                    <div>
+                                        <label
+                                            style="display:block;font-size:11px;font-weight:800;color:#64748b;margin-bottom:6px">Username</label>
+                                        <input type="text" name="sf_username" id="sfUsername" required
+                                            class="premium-input">
+                                    </div>
+                                    <div>
+                                        <label
+                                            style="display:block;font-size:11px;font-weight:800;color:#64748b;margin-bottom:6px">รหัสผ่าน</label>
+                                        <input type="password" name="sf_password" id="sfPassword" class="premium-input"
+                                            placeholder="••••••••">
+                                    </div>
+                                    <div>
+                                        <label
+                                            style="display:block;font-size:11px;font-weight:800;color:#64748b;margin-bottom:6px">สถานะบัญชี</label>
+                                        <select name="sf_status" id="sfStatus" class="premium-input"
+                                            style="background-image:none">
+                                            <option value="active">Active (เข้าใช้งานได้ปกติ)</option>
+                                            <option value="suspended">Suspended (ระงับการใช้งาน)</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div style="display:flex;flex-direction:column;gap:14px">
+                                    <div
+                                        style="font-size:10px;font-weight:900;color:#94a3b8;text-transform:uppercase;letter-spacing:.1em">
+                                        Permissions & Roles</div>
+
+                                    <div class="premium-role-card orange p-3">
+                                        <div class="flex items-center gap-3 mb-2">
+                                            <div class="role-icon" style="color:#f59e0b"><i
+                                                    class="fa-solid fa-box-archive"></i></div>
+                                            <div class="font-black text-xs">e-Borrow System</div>
+                                        </div>
+                                        <label
+                                            style="display:block;font-size:11px;font-weight:800;color:#475569;margin-bottom:4px">สิทธิ์ในระบบยืม-คืน</label>
+                                        <select name="sf_role" id="sfRole" class="premium-input"
+                                            style="padding:8px 12px; font-size:12px">
+                                            <option value="employee">Employee (เจ้าหน้าที่ทั่วไป)</option>
+                                            <option value="technician">Technician (ช่างเทคนิค)</option>
+                                            <option value="supervisor">Supervisor (หัวหน้างาน)</option>
+                                            <option value="admin">e-Borrow Admin (ผู้ดูแลสูงสุด)</option>
+                                        </select>
+                                    </div>
+
+                                    <div class="premium-role-card blue p-3">
+                                        <div class="flex items-center gap-3 mb-2">
+                                            <div class="role-icon" style="color:#2563eb"><i
+                                                    class="fa-solid fa-bullhorn"></i></div>
+                                            <div class="font-black text-xs">e-Campaign System</div>
+                                        </div>
+                                        <div class="flex items-center gap-2 mb-3">
+                                            <input type="checkbox" name="sf_access_ecampaign" id="sfAccessEc" value="1"
+                                                style="width:16px;height:16px">
+                                            <label for="sfAccessEc"
+                                                style="font-size:12px;font-weight:700;color:#1e40af;cursor:pointer">อนุญาตให้จัดการแคมเปญ</label>
+                                        </div>
+                                        <label
+                                            style="display:block;font-size:11px;font-weight:800;color:#1e40af;margin-bottom:4px">สิทธิ์ใน
+                                            e-Campaign</label>
+                                        <select name="sf_ecampaign_role" id="sfEcRole" class="premium-input"
+                                            style="padding:8px 12px; font-size:12px">
+                                            <option value="admin">Admin (จัดการได้ทุกอย่าง)</option>
+                                            <option value="editor">Editor (ดูและแก้ไขข้อมูล)</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                            <div style="display:flex;gap:10px;margin-top:24px">
+                                <button type="button" onclick="document.getElementById('sfModal').style.display='none'"
+                                    style="flex:1;padding:12px;border-radius:12px;background:#f1f5f9;color:#475569;font-weight:800;font-size:13px;border:none">ยกเลิก</button>
+                                <button type="submit"
+                                    style="flex:1;padding:12px;border-radius:12px;background:#2563eb;color:#fff;font-weight:800;font-size:13px;border:none">บันทึกข้อมูลเจ้าหน้าที่</button>
+                            </div>
+                        </form>
                     </div>
-                    <form method="POST" style="padding:24px" id="sfForm">
-                        <input type="hidden" name="action" id="sfAction" value="add_staff">
-                        <input type="hidden" name="sf_id" id="sfId">
-                        <?php csrf_field(); ?>
-                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
-                            <div style="display:flex;flex-direction:column;gap:14px">
-                                <div style="font-size:10px;font-weight:900;color:#94a3b8;text-transform:uppercase;letter-spacing:.1em">General Info</div>
-                                <div>
-                                    <label style="display:block;font-size:11px;font-weight:800;color:#64748b;margin-bottom:6px">ชื่อ-นามสกุล</label>
-                                    <input type="text" name="sf_full_name" id="sfFullName" required class="premium-input">
-                                </div>
-                                <div>
-                                    <label style="display:block;font-size:11px;font-weight:800;color:#64748b;margin-bottom:6px">Username</label>
-                                    <input type="text" name="sf_username" id="sfUsername" required class="premium-input">
-                                </div>
-                                <div>
-                                    <label style="display:block;font-size:11px;font-weight:800;color:#64748b;margin-bottom:6px">รหัสผ่าน</label>
-                                    <input type="password" name="sf_password" id="sfPassword" class="premium-input" placeholder="••••••••">
-                                </div>
-                                <div>
-                                    <label style="display:block;font-size:11px;font-weight:800;color:#64748b;margin-bottom:6px">สถานะบัญชี</label>
-                                    <select name="sf_status" id="sfStatus" class="premium-input" style="background-image:none">
-                                        <option value="active">Active (เข้าใช้งานได้ปกติ)</option>
-                                        <option value="suspended">Suspended (ระงับการใช้งาน)</option>
-                                    </select>
-                                </div>
-                            </div>
-                            <div style="display:flex;flex-direction:column;gap:14px">
-                                <div style="font-size:10px;font-weight:900;color:#94a3b8;text-transform:uppercase;letter-spacing:.1em">Permissions & Roles</div>
-                                
-                                <div class="premium-role-card orange p-3">
-                                    <div class="flex items-center gap-3 mb-2">
-                                        <div class="role-icon" style="color:#f59e0b"><i class="fa-solid fa-box-archive"></i></div>
-                                        <div class="font-black text-xs">e-Borrow System</div>
-                                    </div>
-                                    <label style="display:block;font-size:11px;font-weight:800;color:#475569;margin-bottom:4px">สิทธิ์ในระบบยืม-คืน</label>
-                                    <select name="sf_role" id="sfRole" class="premium-input" style="padding:8px 12px; font-size:12px">
-                                        <option value="employee">Employee (เจ้าหน้าที่ทั่วไป)</option>
-                                        <option value="technician">Technician (ช่างเทคนิค)</option>
-                                        <option value="supervisor">Supervisor (หัวหน้างาน)</option>
-                                        <option value="admin">e-Borrow Admin (ผู้ดูแลสูงสุด)</option>
-                                    </select>
-                                </div>
-
-                                <div class="premium-role-card blue p-3">
-                                    <div class="flex items-center gap-3 mb-2">
-                                        <div class="role-icon" style="color:#2563eb"><i class="fa-solid fa-bullhorn"></i></div>
-                                        <div class="font-black text-xs">e-Campaign System</div>
-                                    </div>
-                                    <div class="flex items-center gap-2 mb-3">
-                                        <input type="checkbox" name="sf_access_ecampaign" id="sfAccessEc" value="1" style="width:16px;height:16px">
-                                        <label for="sfAccessEc" style="font-size:12px;font-weight:700;color:#1e40af;cursor:pointer">อนุญาตให้จัดการแคมเปญ</label>
-                                    </div>
-                                    <label style="display:block;font-size:11px;font-weight:800;color:#1e40af;margin-bottom:4px">สิทธิ์ใน e-Campaign</label>
-                                    <select name="sf_ecampaign_role" id="sfEcRole" class="premium-input" style="padding:8px 12px; font-size:12px">
-                                        <option value="admin">Admin (จัดการได้ทุกอย่าง)</option>
-                                        <option value="editor">Editor (ดูและแก้ไขข้อมูล)</option>
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
-                        <div style="display:flex;gap:10px;margin-top:24px">
-                            <button type="button" onclick="document.getElementById('sfModal').style.display='none'" style="flex:1;padding:12px;border-radius:12px;background:#f1f5f9;color:#475569;font-weight:800;font-size:13px;border:none">ยกเลิก</button>
-                            <button type="submit" style="flex:1;padding:12px;border-radius:12px;background:#2563eb;color:#fff;font-weight:800;font-size:13px;border:none">บันทึกข้อมูลเจ้าหน้าที่</button>
-                        </div>
-                    </form>
                 </div>
-            </div>
             <?php endif; ?>
 
             <!-- ════════════ SECTION: SETTINGS ════════════ -->
@@ -1515,7 +1680,8 @@ try {
                                                 <i class="fa-solid fa-user"
                                                     style="font-size:9px;margin-right:3px"></i><?= htmlspecialchars($log['triggered_by']) ?>
                                                 <span style="margin:0 6px;opacity:.4">·</span>
-                                                <div style="margin-top:4px; opacity:0.8; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; line-height: 1.4; white-space: pre-wrap; font-size: 10px;">
+                                                <div
+                                                    style="margin-top:4px; opacity:0.8; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; line-height: 1.4; white-space: pre-wrap; font-size: 10px;">
                                                     <?= nl2br(htmlspecialchars($log['detail'] ?? '')) ?>
                                                 </div>
                                             </div>
@@ -1844,12 +2010,12 @@ try {
             const isUsers = tab === 'users';
             const isAdmins = tab === 'admins';
             const isStaff = tab === 'staff';
-            
+
             const btnAdmin = document.getElementById('id-btn-add-admin');
             const btnStaff = document.getElementById('id-btn-add-staff');
             if (btnAdmin) btnAdmin.style.display = isAdmins ? 'block' : 'none';
             if (btnStaff) btnStaff.style.display = isStaff ? 'block' : 'none';
-            
+
             // Search behavior
             const search = document.getElementById('id-search-input');
             if (search) {
