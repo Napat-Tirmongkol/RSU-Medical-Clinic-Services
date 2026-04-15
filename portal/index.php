@@ -104,25 +104,28 @@ $mFile = __DIR__ . '/../config/maintenance.json';
 $mData = (file_exists($mFile) && ($d = json_decode(file_get_contents($mFile), true))) ? $d : [];
 $mProjects = [
     [
-        'key'        => 'e_campaign',
-        'title'      => 'e-Campaign',
-        'desc'       => 'ระบบจองและลงทะเบียนกิจกรรมสำหรับ User',
-        'icon'       => 'fa-bullhorn',
+        'key' => 'e_campaign',
+        'title' => 'e-Campaign',
+        'desc' => 'ระบบจองและลงทะเบียนกิจกรรมสำหรับ User',
+        'icon' => 'fa-bullhorn',
         'icon_color' => '#2563eb',
-        'icon_bg'    => '#eff6ff',
+        'icon_bg' => '#eff6ff',
     ],
     [
-        'key'        => 'e_borrow',
-        'title'      => 'e-Borrow & Inventory',
-        'desc'       => 'ระบบยืม-คืนอุปกรณ์ทางการแพทย์',
-        'icon'       => 'fa-toolbox',
+        'key' => 'e_borrow',
+        'title' => 'e-Borrow & Inventory',
+        'desc' => 'ระบบยืม-คืนอุปกรณ์ทางการแพทย์',
+        'icon' => 'fa-toolbox',
         'icon_color' => '#475569',
-        'icon_bg'    => '#f1f5f9',
+        'icon_bg' => '#f1f5f9',
     ],
 ];
 $allOnline = true;
 foreach ($mProjects as $p) {
-    if (($mData[$p['key']] ?? true) === false) { $allOnline = false; break; }
+    if (($mData[$p['key']] ?? true) === false) {
+        $allOnline = false;
+        break;
+    }
 }
 
 /**
@@ -310,56 +313,143 @@ try {
     <link rel="stylesheet" href="../assets/css/portal.css">
     <style>
         /* ── Toggle Switch (Maintenance Mode) ──────────────────────────────── */
-        .toggle-wrap { display:flex; align-items:center; gap:10px; flex-shrink:0; }
-        .toggle { position:relative; width:46px; height:24px; cursor:pointer; }
-        .toggle input { opacity:0; width:0; height:0; position:absolute; }
+        .toggle-wrap {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-shrink: 0;
+        }
+
+        .toggle {
+            position: relative;
+            width: 46px;
+            height: 24px;
+            cursor: pointer;
+        }
+
+        .toggle input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+            position: absolute;
+        }
+
         .toggle-track {
-            position:absolute; inset:0;
-            background:#e2e8f0; border-radius:99px;
-            transition:background .25s cubic-bezier(.25,1,.5,1);
+            position: absolute;
+            inset: 0;
+            background: #e2e8f0;
+            border-radius: 99px;
+            transition: background .25s cubic-bezier(.25, 1, .5, 1);
         }
-        .toggle input:checked ~ .toggle-track { background:#2e9e63; }
+
+        .toggle input:checked~.toggle-track {
+            background: #2e9e63;
+        }
+
         .toggle-thumb {
-            position:absolute; top:3px; left:3px;
-            width:18px; height:18px;
-            background:#fff; border-radius:50%;
-            box-shadow:0 1px 3px rgba(0,0,0,.15);
-            transition:transform .3s cubic-bezier(.25,1,.5,1);
+            position: absolute;
+            top: 3px;
+            left: 3px;
+            width: 18px;
+            height: 18px;
+            background: #fff;
+            border-radius: 50%;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, .15);
+            transition: transform .3s cubic-bezier(.25, 1, .5, 1);
         }
-        .toggle input:checked ~ .toggle-thumb { transform:translateX(22px); }
+
+        .toggle input:checked~.toggle-thumb {
+            transform: translateX(22px);
+        }
 
         @keyframes toggleRingOn {
-            0%   { box-shadow:0 0 0 0   rgba(46,158,99,.4); }
-            50%  { box-shadow:0 0 0 6px rgba(46,158,99,.15); }
-            100% { box-shadow:0 0 0 0   rgba(46,158,99,.0); }
+            0% {
+                box-shadow: 0 0 0 0 rgba(46, 158, 99, .4);
+            }
+
+            50% {
+                box-shadow: 0 0 0 6px rgba(46, 158, 99, .15);
+            }
+
+            100% {
+                box-shadow: 0 0 0 0 rgba(46, 158, 99, .0);
+            }
         }
-        .toggle-ring-on  { animation:toggleRingOn .45s cubic-bezier(.25,1,.5,1) both; }
+
+        .toggle-ring-on {
+            animation: toggleRingOn .45s cubic-bezier(.25, 1, .5, 1) both;
+        }
 
         /* ── Status badge ──────────────────────────────────────────────────── */
         .status-badge {
-            display:inline-flex; align-items:center; gap:5px;
-            padding:2px 9px; border-radius:99px;
-            font-size:10px; font-weight:700;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 2px 9px;
+            border-radius: 99px;
+            font-size: 10px;
+            font-weight: 700;
         }
-        .status-badge.on  { background:#f0fdf4; color:#16a34a; border:1px solid #bbf7d0; }
-        .status-badge.off { background:#fef2f2; color:#dc2626; border:1px solid #fecaca; }
-        .status-dot { width:6px; height:6px; border-radius:50%; flex-shrink:0; }
-        .status-badge.on  .status-dot { background:#22c55e; animation:livePulse 1.5s infinite; }
-        .status-badge.off .status-dot { background:#ef4444; }
+
+        .status-badge.on {
+            background: #f0fdf4;
+            color: #16a34a;
+            border: 1px solid #bbf7d0;
+        }
+
+        .status-badge.off {
+            background: #fef2f2;
+            color: #dc2626;
+            border: 1px solid #fecaca;
+        }
+
+        .status-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .status-badge.on .status-dot {
+            background: #22c55e;
+            animation: livePulse 1.5s infinite;
+        }
+
+        .status-badge.off .status-dot {
+            background: #ef4444;
+        }
 
         @keyframes badgePop {
-            0%   { opacity:.35; transform:scale(.82); }
-            60%  { transform:scale(1.07); }
-            100% { opacity:1;   transform:scale(1); }
+            0% {
+                opacity: .35;
+                transform: scale(.82);
+            }
+
+            60% {
+                transform: scale(1.07);
+            }
+
+            100% {
+                opacity: 1;
+                transform: scale(1);
+            }
         }
-        .badge-pop { animation:badgePop .3s cubic-bezier(.25,1,.5,1) both; }
+
+        .badge-pop {
+            animation: badgePop .3s cubic-bezier(.25, 1, .5, 1) both;
+        }
 
         /* ── Status banner (Settings) ───────────────────────────────────────── */
         #status-banner {
-            background:#fffbeb; border:1.5px solid #fde68a;
-            transition:all .3s ease;
+            background: #fffbeb;
+            border: 1.5px solid #fde68a;
+            transition: all .3s ease;
         }
-        #status-banner[data-state="ok"] { background:#f0fdf4; border-color:#bbf7d0; }
+
+        #status-banner[data-state="ok"] {
+            background: #f0fdf4;
+            border-color: #bbf7d0;
+        }
     </style>
 </head>
 
@@ -458,7 +548,8 @@ try {
                             Admin</div>
                         <div
                             style="font-size:12px;font-weight:900;color:#0f172a;line-height:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
-                            <?= htmlspecialchars($_SESSION['admin_username'] ?? 'Administrator') ?></div>
+                            <?= htmlspecialchars($_SESSION['admin_username'] ?? 'Administrator') ?>
+                        </div>
                     </div>
                     <a href="../admin/logout.php" class="psb-label" title="ออกจากระบบ"
                         style="width:28px;height:28px;border-radius:8px;background:#fff1f2;color:#ef4444;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .18s;text-decoration:none"
@@ -655,7 +746,8 @@ try {
 
                                         <div class="proj-card-body">
                                             <h3 class="text-[15px] font-black text-gray-900 mb-1.5 leading-tight">
-                                                <?= $proj['title'] ?></h3>
+                                                <?= $proj['title'] ?>
+                                            </h3>
                                             <p class="text-[12px] text-gray-500 leading-relaxed"><?= $proj['description'] ?>
                                             </p>
                                         </div>
@@ -710,9 +802,11 @@ try {
                                                             class="text-[9px] text-gray-400 whitespace-nowrap"><?= date('d M H:i', strtotime($log['created_at'])) ?></span>
                                                     </div>
                                                     <p class="text-[12px] font-bold text-gray-800 leading-snug truncate">
-                                                        <?= htmlspecialchars($log['admin_name'] ?? 'System') ?></p>
+                                                        <?= htmlspecialchars($log['admin_name'] ?? 'System') ?>
+                                                    </p>
                                                     <p class="text-[11px] text-gray-400 leading-snug mt-0.5 line-clamp-1">
-                                                        <?= htmlspecialchars($log['description']) ?></p>
+                                                        <?= htmlspecialchars($log['description']) ?>
+                                                    </p>
                                                 </div>
                                             </div>
                                         <?php endforeach; ?>
@@ -815,7 +909,8 @@ try {
                             <div class="kpi-icon" style="background:#eef2ff;color:#4f46e5"><i
                                     class="fa-solid fa-users"></i></div>
                             <div class="kpi-num" style="font-size:1.6rem">
-                                <?= number_format(count($idUsers) ?: $kpis['users']) ?></div>
+                                <?= number_format(count($idUsers) ?: $kpis['users']) ?>
+                            </div>
                             <div class="kpi-label">ผู้ใช้งานทั้งหมด</div>
                         </div>
                         <div class="kpi-card" style="padding:18px 20px">
@@ -897,28 +992,35 @@ try {
                                                     <div style="display:flex;align-items:center;gap:12px">
                                                         <div
                                                             style="width:36px;height:36px;border-radius:10px;background:#eef2ff;color:#4f46e5;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:14px;flex-shrink:0">
-                                                            <?= htmlspecialchars($initial) ?></div>
+                                                            <?= htmlspecialchars($initial) ?>
+                                                        </div>
                                                         <div>
                                                             <div style="font-weight:800;color:#0f172a;line-height:1.2">
-                                                                <?= htmlspecialchars($u['full_name']) ?></div>
+                                                                <?= htmlspecialchars($u['full_name']) ?>
+                                                            </div>
                                                             <div
                                                                 style="font-size:10px;color:#94a3b8;font-weight:700;margin-top:2px">
                                                                 #<?= htmlspecialchars($u['student_personnel_id'] ?? '—') ?> ·
-                                                                <?= htmlspecialchars($statusTH) ?></div>
+                                                                <?= htmlspecialchars($statusTH) ?>
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 </td>
                                                 <td style="padding:14px 20px">
                                                     <div style="font-size:12px;color:#374151;font-weight:600">
-                                                        <?= htmlspecialchars($u['phone_number'] ?: '—') ?></div>
+                                                        <?= htmlspecialchars($u['phone_number'] ?: '—') ?>
+                                                    </div>
                                                     <div style="font-size:11px;color:#94a3b8;margin-top:2px">
-                                                        <?= htmlspecialchars($u['email'] ?? '—') ?></div>
+                                                        <?= htmlspecialchars($u['email'] ?? '—') ?>
+                                                    </div>
                                                 </td>
                                                 <td style="padding:14px 20px">
                                                     <div style="font-size:12px;font-weight:700;color:#374151">
-                                                        <?= date('d M Y', strtotime($u['created_at'])) ?></div>
+                                                        <?= date('d M Y', strtotime($u['created_at'])) ?>
+                                                    </div>
                                                     <div style="font-size:10px;color:#94a3b8;margin-top:1px">
-                                                        <?= date('H:i', strtotime($u['created_at'])) ?></div>
+                                                        <?= date('H:i', strtotime($u['created_at'])) ?>
+                                                    </div>
                                                 </td>
                                                 <td style="padding:14px 20px;text-align:right">
                                                     <div style="display:flex;gap:6px;justify-content:flex-end">
@@ -992,7 +1094,8 @@ try {
                         <div style="display:flex;align-items:center;gap:10px">
                             <div
                                 style="width:36px;height:36px;background:#fffbeb;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#d97706">
-                                <i class="fa-solid fa-user-pen"></i></div>
+                                <i class="fa-solid fa-user-pen"></i>
+                            </div>
                             <span style="font-size:15px;font-weight:900;color:#d97706">แก้ไขข้อมูลผู้ใช้</span>
                         </div>
                         <button onclick="document.getElementById('idEditModal').style.display='none'"
@@ -1112,7 +1215,8 @@ try {
                         <div style="display:flex;align-items:center;gap:10px">
                             <div
                                 style="width:36px;height:36px;background:#eef2ff;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#4f46e5">
-                                <i class="fa-solid fa-user"></i></div>
+                                <i class="fa-solid fa-user"></i>
+                            </div>
                             <span style="font-size:15px;font-weight:900;color:#4f46e5">ข้อมูลผู้ใช้งาน</span>
                         </div>
                         <button onclick="document.getElementById('idViewModal').style.display='none'"
@@ -1134,13 +1238,17 @@ try {
 
                     <div class="au d1">
                         <div class="sec-title mb-1">Settings &amp; Maintenance</div>
-                        <p style="font-size:13px;color:#64748b;margin-bottom:24px">การตั้งค่าระบบและควบคุมสถานะการให้บริการของโปรเจกต์ต่างๆ
+                        <p style="font-size:13px;color:#64748b;margin-bottom:24px">
+                            การตั้งค่าระบบและควบคุมสถานะการให้บริการของโปรเจกต์ต่างๆ
                         </p>
 
                         <!-- System Status Banner (Quick Glance) -->
-                        <div id="status-banner" class="rounded-2xl border px-5 py-4 mb-6 flex items-center gap-4" data-state="<?= $allOnline ? 'ok' : 'warn' ?>">
-                            <div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style="<?= $allOnline ? 'background:#dcfce7;color:#16a34a' : 'background:#fef3c7;color:#d97706' ?>">
-                                <i id="banner-icon" class="fa-solid <?= $allOnline ? 'fa-circle-check' : 'fa-triangle-exclamation' ?> text-base"></i>
+                        <div id="status-banner" class="rounded-2xl border px-5 py-4 mb-6 flex items-center gap-4"
+                            data-state="<?= $allOnline ? 'ok' : 'warn' ?>">
+                            <div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                                style="<?= $allOnline ? 'background:#dcfce7;color:#16a34a' : 'background:#fef3c7;color:#d97706' ?>">
+                                <i id="banner-icon"
+                                    class="fa-solid <?= $allOnline ? 'fa-circle-check' : 'fa-triangle-exclamation' ?> text-base"></i>
                             </div>
                             <div class="flex-1 min-w-0">
                                 <div id="banner-title" class="font-bold text-sm text-gray-900">
@@ -1154,31 +1262,35 @@ try {
 
                         <!-- Maintenance Mode Grid -->
                         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-                            <?php foreach ($mProjects as $p): 
+                            <?php foreach ($mProjects as $p):
                                 $isActive = $mData[$p['key']] ?? true;
-                            ?>
-                            <div class="bg-white rounded-2xl border border-gray-100 p-4 flex items-center gap-4 shadow-sm hover:shadow-md transition-shadow" id="card-<?= $p['key'] ?>">
-                                <div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style="background:<?= $p['icon_bg'] ?>; color:<?= $p['icon_color'] ?>;">
-                                    <i class="fa-solid <?= $p['icon'] ?> text-sm"></i>
-                                </div>
-                                <div class="flex-1 min-w-0">
-                                    <div class="flex items-center gap-2 mb-0.5">
-                                        <span class="font-black text-gray-900 text-sm"><?= htmlspecialchars($p['title']) ?></span>
-                                        <span class="status-badge <?= $isActive ? 'on' : 'off' ?>" id="badge-<?= $p['key'] ?>">
-                                            <span class="status-dot"></span>
-                                            <?= $isActive ? 'เปิดใช้งาน' : 'ปรับปรุง' ?>
-                                        </span>
+                                ?>
+                                <div class="bg-white rounded-2xl border border-gray-100 p-4 flex items-center gap-4 shadow-sm hover:shadow-md transition-shadow"
+                                    id="card-<?= $p['key'] ?>">
+                                    <div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                                        style="background:<?= $p['icon_bg'] ?>; color:<?= $p['icon_color'] ?>;">
+                                        <i class="fa-solid <?= $p['icon'] ?> text-sm"></i>
                                     </div>
-                                    <p class="text-xs text-gray-400"><?= htmlspecialchars($p['desc']) ?></p>
+                                    <div class="flex-1 min-w-0">
+                                        <div class="flex items-center gap-2 mb-0.5">
+                                            <span
+                                                class="font-black text-gray-900 text-sm"><?= htmlspecialchars($p['title']) ?></span>
+                                            <span class="status-badge <?= $isActive ? 'on' : 'off' ?>"
+                                                id="badge-<?= $p['key'] ?>">
+                                                <span class="status-dot"></span>
+                                                <?= $isActive ? 'เปิดใช้งาน' : 'ปรับปรุง' ?>
+                                            </span>
+                                        </div>
+                                        <p class="text-xs text-gray-400"><?= htmlspecialchars($p['desc']) ?></p>
+                                    </div>
+                                    <div class="toggle-wrap">
+                                        <label class="toggle" title="<?= $p['title'] ?>">
+                                            <input type="checkbox" data-project="<?= $p['key'] ?>" <?= $isActive ? 'checked' : '' ?> onchange="toggleMaintenance(this)">
+                                            <div class="toggle-track"></div>
+                                            <div class="toggle-thumb"></div>
+                                        </label>
+                                    </div>
                                 </div>
-                                <div class="toggle-wrap">
-                                    <label class="toggle" title="<?= $p['title'] ?>">
-                                        <input type="checkbox" data-project="<?= $p['key'] ?>" <?= $isActive ? 'checked' : '' ?> onchange="toggleMaintenance(this)">
-                                        <div class="toggle-track"></div>
-                                        <div class="toggle-thumb"></div>
-                                    </label>
-                                </div>
-                            </div>
                             <?php endforeach; ?>
                         </div>
 
@@ -1782,7 +1894,7 @@ try {
             t.style.background = type === 'success' ? '#f0fdf4' : '#fef2f2';
             t.style.color = type === 'success' ? '#16a34a' : '#dc2626';
             t.style.border = type === 'success' ? '1.5px solid #bbf7d0' : '1.5px solid #fecaca';
-            
+
             t.style.transform = 'translateY(0)';
             t.style.opacity = '1';
             clearTimeout(t._tid);
@@ -1811,11 +1923,11 @@ try {
                 const icon = document.getElementById('banner-icon');
                 const title = document.getElementById('banner-title');
                 const desc = document.getElementById('banner-desc');
-                
+
                 if (icon) icon.className = `fa-solid ${allOn ? 'fa-circle-check' : 'fa-triangle-exclamation'} text-base`;
                 if (title) title.textContent = allOn ? 'ระบบทุกโปรเจกต์พร้อมใช้งาน' : 'มีบางโปรเจกต์ปิดปรับปรุงอยู่';
                 if (desc) desc.textContent = allOn ? 'User ทุกคนสามารถเข้าใช้งานได้ตามปกติ' : 'คุณสามารถคลิกเปิดระบบได้จากรายการด้านล่าง';
-                
+
                 const iconWrap = icon?.parentElement;
                 if (iconWrap) iconWrap.style.cssText = allOn ? 'background:#dcfce7;color:#16a34a' : 'background:#fef3c7;color:#d97706';
             }
