@@ -44,6 +44,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['admin_email'] = $admin['email'];
             $_SESSION['admin_role'] = $admin['role'];
             session_regenerate_id(true);
+
+            // บันทึกกิจกรรม: เข้าสู่ระบบ
+            log_activity('Login', "Admin '{$admin['username']}' เข้าสู่ระบบระบบจัดการกลาง (Portal)", (int)$admin['id']);
+
             header('Location: ../portal/index.php');
             exit;
         } else {

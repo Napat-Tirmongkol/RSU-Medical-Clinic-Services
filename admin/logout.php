@@ -1,6 +1,12 @@
 <?php
 // admin/logout.php
 session_start();
+require_once __DIR__ . '/../config.php';
+
+// บันทึกกิจกรรม: ออกจากระบบ (ทำก่อนล้าง session)
+if (isset($_SESSION['admin_id'])) {
+    log_activity('Logout', "Admin '" . ($_SESSION['admin_username'] ?? 'Unknown') . "' ออกจากระบบ");
+}
 
 // ล้าง session ทุก key ก่อน destroy (ป้องกัน session fixation)
 session_unset();

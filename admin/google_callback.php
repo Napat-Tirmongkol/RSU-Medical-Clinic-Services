@@ -82,6 +82,10 @@ if ($admin) {
     $_SESSION['admin_role'] = $admin['role'];
 
     session_regenerate_id(true);
+
+    // บันทึกกิจกรรม: เข้าสู่ระบบ (Google)
+    log_activity('Login', "Admin '{$_SESSION['admin_username']}' เข้าสู่ระบบเสร็จสมบูรณ์ผ่าน Google Login", (int)$admin['id']);
+
     header("Location: ../portal/index.php");
     exit;
 } else {
