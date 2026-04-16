@@ -102,6 +102,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $password         = $_POST['sf_password'] ?? '';
         $role             = $_POST['sf_role'] ?? 'employee';
         $status           = $_POST['sf_status'] ?? 'active';
+        $accessEborrow    = (int)($_POST['sf_access_eborrow']   ?? 0);
         $accessEcampaign  = (int)($_POST['sf_access_ecampaign'] ?? 0);
         $ecampaignRole    = $_POST['sf_ecampaign_role'] ?? 'admin';
 
@@ -113,8 +114,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $error = "Username '$username' มีในระบบแล้ว";
                 } else {
                     $hashed = password_hash($password, PASSWORD_DEFAULT);
-                    $pdo->prepare("INSERT INTO sys_staff (username, password_hash, full_name, role, account_status, access_ecampaign, ecampaign_role) VALUES (?,?,?,?,?,?,?)")
-                        ->execute([$username, $hashed, $fullName, $role, $status, $accessEcampaign, $ecampaignRole]);
+                    $pdo->prepare("INSERT INTO sys_staff (username, password_hash, full_name, role, account_status, access_eborrow, access_ecampaign, ecampaign_role) VALUES (?,?,?,?,?,?,?,?)")
+                        ->execute([$username, $hashed, $fullName, $role, $status, $accessEborrow, $accessEcampaign, $ecampaignRole]);
                     log_activity("Added Staff", "เพิ่มเจ้าหน้าที่ใหม่: $fullName ($username) [role: $role]");
                     $success = "เพิ่มเจ้าหน้าที่เรียบร้อยแล้ว";
                 }
@@ -134,13 +135,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $password         = $_POST['sf_password'] ?? '';
         $role             = $_POST['sf_role'] ?? 'employee';
         $status           = $_POST['sf_status'] ?? 'active';
+        $accessEborrow    = (int)($_POST['sf_access_eborrow']   ?? 0);
         $accessEcampaign  = (int)($_POST['sf_access_ecampaign'] ?? 0);
         $ecampaignRole    = $_POST['sf_ecampaign_role'] ?? 'admin';
 
         if ($staffId > 0 && $fullName && $username) {
             try {
-                $pdo->prepare("UPDATE sys_staff SET full_name=?, username=?, role=?, account_status=?, access_ecampaign=?, ecampaign_role=? WHERE id=?")
-                    ->execute([$fullName, $username, $role, $status, $accessEcampaign, $ecampaignRole, $staffId]);
+                $pdo->prepare("UPDATE sys_staff SET full_name=?, username=?, role=?, account_status=?, access_eborrow=?, access_ecampaign=?, ecampaign_role=? WHERE id=?")
+                    ->execute([$fullName, $username, $role, $status, $accessEborrow, $accessEcampaign, $ecampaignRole, $staffId]);
                 if (!empty($password)) {
                     $pdo->prepare("UPDATE sys_staff SET password_hash=? WHERE id=?")
                         ->execute([password_hash($password, PASSWORD_DEFAULT), $staffId]);
@@ -176,11 +178,26 @@ $staffList = [];
 try {
     $staffList = $pdo->query("
         SELECT id, username, full_name, role, account_status, linked_line_user_id,
+               IFNULL(access_eborrow,   1) AS access_eborrow,
                IFNULL(access_ecampaign, 0) AS access_ecampaign,
                IFNULL(ecampaign_role, 'admin') AS ecampaign_role
         FROM sys_staff ORDER BY role ASC, full_name ASC
     ")->fetchAll(PDO::FETCH_ASSOC);
-} catch (PDOException $e) { /* table may not exist */ }
+} catch (PDOException $e) {
+    // access_eborrow column ยังไม่มี — เพิ่มอัตโนมัติแล้ว retry
+    if (str_contains($e->getMessage(), 'access_eborrow')) {
+        try {
+            $pdo->exec("ALTER TABLE sys_staff ADD COLUMN access_eborrow TINYINT(1) NOT NULL DEFAULT 1");
+            $staffList = $pdo->query("
+                SELECT id, username, full_name, role, account_status, linked_line_user_id,
+                       access_eborrow,
+                       IFNULL(access_ecampaign, 0) AS access_ecampaign,
+                       IFNULL(ecampaign_role, 'admin') AS ecampaign_role
+                FROM sys_staff ORDER BY role ASC, full_name ASC
+            ")->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e2) { /* ignore */ }
+    }
+}
 
 require_once __DIR__ . '/../admin/includes/header.php';
 ?>
@@ -239,7 +256,7 @@ renderPageHeader("System Governance", "Hub บริหารจัดการ:
                     <i class="fa-solid fa-id-badge text-lg"></i>
                 </div>
                 <div>
-                    <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">e-Borrow Staff</p>
+                    <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Staff</p>
                     <p class="text-2xl font-black text-gray-900"><?= count($staffList) ?></p>
                 </div>
             </div>
@@ -278,7 +295,7 @@ renderPageHeader("System Governance", "Hub บริหารจัดการ:
         </button>
         <button id="tabStaff" onclick="switchTab('staff')"
             style="padding:.6rem 1.25rem;border-radius:.75rem;font-size:.875rem;font-weight:900;transition:all .2s;background:#fff;color:#6b7280;border:1.5px solid #e5e7eb;cursor:pointer;display:inline-flex;align-items:center;gap:.4rem">
-            <i class="fa-solid fa-id-badge"></i> e-Borrow Staff
+            <i class="fa-solid fa-id-badge"></i> Staff
             <span style="background:#f3f4f6;color:#6b7280;font-size:.65rem;padding:.15rem .5rem;border-radius:.4rem;font-weight:900"><?= count($staffList) ?></span>
         </button>
     </div>
@@ -415,6 +432,7 @@ renderPageHeader("System Governance", "Hub บริหารจัดการ:
             <tbody class="divide-y divide-gray-50" id="staffTbody">
                 <?php foreach ($staffList as $st):
                     $isActive        = ($st['account_status'] ?? 'active') === 'active';
+                    $hasEborrow      = (int)($st['access_eborrow']   ?? 1) === 1;
                     $hasEcampaign    = (int)($st['access_ecampaign'] ?? 0) === 1;
                     $ecRole          = $st['ecampaign_role'] ?? 'admin';
                     $roleLabel = match($st['role'] ?? '') {
@@ -449,10 +467,11 @@ renderPageHeader("System Governance", "Hub บริหารจัดการ:
                     </td>
                     <td class="px-6 py-4">
                         <div class="flex flex-wrap gap-1.5">
-                            <!-- e-Borrow always accessible -->
+                            <?php if ($hasEborrow): ?>
                             <span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-black bg-orange-50 border border-orange-200 text-orange-600">
                                 <i class="fa-solid fa-toolbox"></i> e-Borrow
                             </span>
+                            <?php endif; ?>
                             <?php if ($hasEcampaign): ?>
                             <span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-black bg-blue-50 border border-blue-200 text-blue-600">
                                 <i class="fa-solid fa-bullhorn"></i> e-Camp <span class="opacity-70">(<?= htmlspecialchars($ecRoleMap[$ecRole] ?? $ecRole) ?>)</span>
@@ -637,8 +656,8 @@ renderPageHeader("System Governance", "Hub บริหารจัดการ:
                 <div>
                     <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">สิทธิ์การเข้าถึงระบบ</p>
                     <div class="space-y-4">
-                        <!-- e-Borrow (always enabled) -->
-                        <div class="premium-role-card orange">
+                        <!-- e-Borrow (toggleable) -->
+                        <div class="premium-role-card orange" id="eborrowBox">
                             <div class="flex items-center justify-between px-5 py-4">
                                 <div class="flex items-center gap-4">
                                     <div class="role-icon">
@@ -649,19 +668,22 @@ renderPageHeader("System Governance", "Hub บริหารจัดการ:
                                         <p class="text-[10px] font-bold text-gray-400 mt-1 uppercase tracking-tighter">ระบบยืม-คืนอุปกรณ์</p>
                                     </div>
                                 </div>
-                                <span class="status-badge orange">
-                                    <i class="fa-solid fa-check-circle mr-1"></i> เปิดเสมอ
-                                </span>
+                                <label class="premium-toggle">
+                                    <input type="checkbox" name="sf_access_eborrow" id="sfAccessEborrow" value="1" onchange="toggleEborrowRole(this.checked)" class="sr-only peer">
+                                    <div class="toggle-slider"></div>
+                                </label>
                             </div>
-                            <div class="role-config px-5 pb-5">
-                                <label class="block text-[10px] font-black text-gray-400 uppercase tracking-[0.15em] mb-2">บทบาทในระบบนี้</label>
-                                <div class="relative">
-                                    <select name="sf_role" id="sfRole" class="premium-select">
-                                        <option value="employee">Employee — ผู้ยืมทั่วไป</option>
-                                        <option value="librarian">Librarian — เจ้าหน้าที่จ่ายของ</option>
-                                        <option value="admin">Admin — ผู้ดูแลคลัง</option>
-                                    </select>
-                                    <i class="fa-solid fa-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-gray-300 pointer-events-none text-[10px]"></i>
+                            <div id="sfEborrowRoleWrap" style="display:none" class="animate-in fade-in slide-in-from-top-2 duration-300">
+                                <div class="role-config px-5 pb-5 border-t border-orange-50">
+                                    <label class="block text-[10px] font-black text-gray-400 uppercase tracking-[0.15em] mt-3 mb-2">บทบาทในระบบนี้</label>
+                                    <div class="relative">
+                                        <select name="sf_role" id="sfRole" class="premium-select">
+                                            <option value="employee">Employee — ผู้ยืมทั่วไป</option>
+                                            <option value="librarian">Librarian — เจ้าหน้าที่จ่ายของ</option>
+                                            <option value="admin">Admin — ผู้ดูแลคลัง</option>
+                                        </select>
+                                        <i class="fa-solid fa-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-gray-300 pointer-events-none text-[10px]"></i>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -839,16 +861,16 @@ renderPageHeader("System Governance", "Hub บริหารจัดการ:
         document.getElementById('sfUsername').value   = '';
         document.getElementById('sfPassword').value   = '';
         document.getElementById('sfPassword').placeholder = 'กรุณากรอก Password *';
-        document.getElementById('sfRole').value       = 'employee';
         document.getElementById('sfStatus').value     = 'active';
-        document.getElementById('sfAccessEcamp').checked = false;
+        document.getElementById('sfAccessEborrow').checked = false;
+        document.getElementById('sfRole').value       = 'employee';
+        document.getElementById('sfAccessEcamp').checked   = false;
         document.getElementById('sfEcampRole').value  = 'admin';
+        toggleEborrowRole(false);
         toggleEcampRole(false);
         document.getElementById('sfPwLabel').innerText = 'Password *';
         staffModal.style.display = 'flex';
-        setTimeout(() => {
-            staffModalBox.classList.remove('scale-95', 'opacity-0');
-        }, 10);
+        setTimeout(() => { staffModalBox.classList.remove('scale-95', 'opacity-0'); }, 10);
     }
 
     function openEditStaffModal(st) {
@@ -859,22 +881,38 @@ renderPageHeader("System Governance", "Hub บริหารจัดการ:
         document.getElementById('sfUsername').value   = st.username || '';
         document.getElementById('sfPassword').value   = '';
         document.getElementById('sfPassword').placeholder = 'เว้นว่างไว้หากไม่เปลี่ยน';
-        document.getElementById('sfRole').value       = st.role || 'employee';
         document.getElementById('sfStatus').value     = st.account_status || 'active';
+        const hasEborrow = parseInt(st.access_eborrow) === 1;
+        document.getElementById('sfAccessEborrow').checked = hasEborrow;
+        document.getElementById('sfRole').value       = st.role || 'employee';
         const hasEcamp = parseInt(st.access_ecampaign) === 1;
         document.getElementById('sfAccessEcamp').checked = hasEcamp;
         document.getElementById('sfEcampRole').value  = st.ecampaign_role || 'admin';
+        toggleEborrowRole(hasEborrow);
         toggleEcampRole(hasEcamp);
         document.getElementById('sfPwLabel').innerText = 'Password (เว้นว่างไว้หากไม่เปลี่ยน)';
         staffModal.style.display = 'flex';
-        setTimeout(() => {
-            staffModalBox.classList.remove('scale-95', 'opacity-0');
-        }, 10);
+        setTimeout(() => { staffModalBox.classList.remove('scale-95', 'opacity-0'); }, 10);
     }
 
     function closeStaffModal() {
         staffModalBox.classList.add('scale-95', 'opacity-0');
         setTimeout(() => { staffModal.style.display = 'none'; }, 300);
+    }
+
+    function toggleEborrowRole(checked) {
+        var wrap = document.getElementById('sfEborrowRoleWrap');
+        var box  = document.getElementById('eborrowBox');
+        wrap.style.display = checked ? 'block' : 'none';
+        if (checked) {
+            box.style.borderColor     = '#f97316';
+            box.style.backgroundColor = '#fff7ed';
+            box.style.boxShadow       = '0 10px 15px -3px rgba(249,115,22,0.15)';
+        } else {
+            box.style.borderColor     = '#ffedd5';
+            box.style.backgroundColor = '#fffaf5';
+            box.style.boxShadow       = 'none';
+        }
     }
 
     function toggleEcampRole(checked) {

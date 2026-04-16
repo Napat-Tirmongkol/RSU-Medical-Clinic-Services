@@ -927,7 +927,7 @@ try {
                         <?php if ($adminRole === 'superadmin'): ?>
                             <button class="id-tab" data-tab="admins" onclick="switchIdTab('admins',this)">System Admins
                                 (<?= count($allAdmins) ?>)</button>
-                            <button class="id-tab" data-tab="staff" onclick="switchIdTab('staff',this)">e-Borrow Staff
+                            <button class="id-tab" data-tab="staff" onclick="switchIdTab('staff',this)">Staff
                                 (<?= count($allStaff) ?>)</button>
                         <?php endif; ?>
                     </div>
@@ -1130,7 +1130,7 @@ try {
                         </div>
                     </div>
 
-                    <!-- PANEL: e-Borrow Staff -->
+                    <!-- PANEL: Staff -->
                     <div id="id-panel-staff" class="id-panel">
                         <div style="background:#fff;border-radius:20px;border:1.5px solid #e2e8f0;overflow:hidden">
                             <div
