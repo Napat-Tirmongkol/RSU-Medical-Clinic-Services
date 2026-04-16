@@ -124,10 +124,7 @@ $projects = [
         'actions' => array_filter([
             ['label' => 'Search Users', 'url' => 'users.php?layout=none', 'primary' => false],
             $adminRole === 'superadmin'
-            ? ['label' => 'Manage Admins', 'url' => 'manage_admins.php?layout=none', 'primary' => false]
-            : null,
-            $adminRole === 'superadmin'
-            ? ['label' => 'SMTP Settings', 'url' => '../admin/smtp_settings.php', 'primary' => true]
+            ? ['label' => 'Manage Admins', 'url' => 'manage_admins.php?layout=none', 'primary' => true]
             : null,
         ])
     ],
@@ -1628,6 +1625,10 @@ try {
                                             style="display:flex;align-items:center;gap:10px;padding:12px 16px;border-radius:12px;border:1.5px solid #d1fae5;background:#f0fdf4;color:#16a34a;font-size:13px;font-weight:700;cursor:pointer;transition:all .2s;text-align:left">
                                             <i class="fa-solid fa-code-branch"></i> <span>Git Pull — Update System</span>
                                         </button>
+                                        <a href="../admin/smtp_settings.php"
+                                            style="display:flex;align-items:center;gap:10px;padding:12px 16px;border-radius:12px;border:1.5px solid #dbeafe;background:#eff6ff;color:#1d4ed8;font-size:13px;font-weight:700;text-decoration:none;transition:all .2s">
+                                            <i class="fa-solid fa-envelope-circle-check"></i> SMTP Settings (Email)
+                                        </a>
                                     <?php endif; ?>
                                     <a href="../admin/error_logs.php"
                                         style="display:flex;align-items:center;gap:10px;padding:12px 16px;border-radius:12px;border:1.5px solid #e2e8f0;background:#f8fafc;color:#374151;font-size:13px;font-weight:700;text-decoration:none;transition:all .2s">
