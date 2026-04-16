@@ -10,11 +10,11 @@
  */
 declare(strict_types=1);
 
-// ─── Security Guard ───────────────────────────────────────────────────────────
-$allowedIPs = ['127.0.0.1', '::1'];
-if (!in_array($_SERVER['REMOTE_ADDR'] ?? '', $allowedIPs, true)) {
+// ─── Security Guard (token-based) ───────────────────────────────────────────
+define('DIAG_TOKEN', 'rsu-diag-2026');
+if (($_GET['token'] ?? '') !== DIAG_TOKEN) {
     http_response_code(403);
-    die('Access denied — localhost only.');
+    die('Access denied — ต้องระบุ ?token=rsu-diag-2026');
 }
 
 require_once __DIR__ . '/../config/db_connect.php';
