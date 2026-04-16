@@ -12,8 +12,12 @@ if (!preg_match('#^/?(staff/)#', $redirect)) {
     $redirect = 'index.php';
 }
 
-if (isset($_SESSION['staff_logged_in']) && $_SESSION['staff_logged_in'] === true) {
-    header('Location: ' . $redirect);
+$viaStaffLogin  = !empty($_SESSION['staff_logged_in']) && $_SESSION['staff_logged_in'] === true;
+$viaPortalLogin = !empty($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true
+               && !empty($_SESSION['is_ecampaign_staff']);
+
+if ($viaStaffLogin || $viaPortalLogin) {
+    header('Location: index.php');
     exit;
 }
 
