@@ -1,11 +1,22 @@
 <?php
-// admin/ajax_test_smtp.php — ทดสอบการส่งอีเมลผ่าน SMTP
+// portal/ajax_test_smtp.php — ทดสอบการส่งอีเมลผ่าน SMTP
 declare(strict_types=1);
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/includes/auth.php';
 
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
+
+// CSRF check
+if (!function_exists('validate_csrf_or_die')) {
+    // Fallback if not loaded
+    function validate_csrf_or_die() {
+        $token = $_POST['csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
+        if (empty($token) || $token !== ($_SESSION['csrf_token'] ?? '')) {
+            http_response_code(403); exit(json_encode(['ok' => false, 'error' => 'Invalid CSRF token']));
+        }
+    }
+}
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405); exit(json_encode(['ok' => false, 'error' => 'Method not allowed']));

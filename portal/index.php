@@ -1625,7 +1625,7 @@ try {
                                             style="display:flex;align-items:center;gap:10px;padding:12px 16px;border-radius:12px;border:1.5px solid #d1fae5;background:#f0fdf4;color:#16a34a;font-size:13px;font-weight:700;cursor:pointer;transition:all .2s;text-align:left">
                                             <i class="fa-solid fa-code-branch"></i> <span>Git Pull — Update System</span>
                                         </button>
-                                        <a href="../admin/smtp_settings.php"
+                                        <a href="smtp_settings.php"
                                             style="display:flex;align-items:center;gap:10px;padding:12px 16px;border-radius:12px;border:1.5px solid #dbeafe;background:#eff6ff;color:#1d4ed8;font-size:13px;font-weight:700;text-decoration:none;transition:all .2s">
                                             <i class="fa-solid fa-envelope-circle-check"></i> SMTP Settings (Email)
                                         </a>
@@ -1748,6 +1748,13 @@ try {
             <div id="section-email_logs" class="portal-section"
                 style="display:none; height:100%; border-radius:inherit; background:#f8fafc;">
                 <iframe src="email_logs.php?embed=1"
+                    style="width:100%; height:100%; border:none; border-radius:inherit;"></iframe>
+            </div>
+
+            <!-- ════════════ SECTION: SMTP SETTINGS ════════════ -->
+            <div id="section-smtp_settings" class="portal-section"
+                style="display:none; height:100%; border-radius:inherit; background:#f8fafc;">
+                <iframe src="smtp_settings.php?embed=1"
                     style="width:100%; height:100%; border:none; border-radius:inherit;"></iframe>
             </div>
 

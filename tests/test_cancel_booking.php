@@ -23,16 +23,20 @@ require_once __DIR__ . '/../includes/mail_helper.php';
 // ─── Result Collector ────────────────────────────────────────────────────────
 $results = [];
 
-function pass(string $label, string $detail = ''): array {
+function pass(string $label, string $detail = ''): array
+{
     return ['status' => 'PASS', 'label' => $label, 'detail' => $detail];
 }
-function fail(string $label, string $detail = ''): array {
+function fail(string $label, string $detail = ''): array
+{
     return ['status' => 'FAIL', 'label' => $label, 'detail' => $detail];
 }
-function warn(string $label, string $detail = ''): array {
+function warn(string $label, string $detail = ''): array
+{
     return ['status' => 'WARN', 'label' => $label, 'detail' => $detail];
 }
-function info(string $label, string $detail = ''): array {
+function info(string $label, string $detail = ''): array
+{
     return ['status' => 'INFO', 'label' => $label, 'detail' => $detail];
 }
 
@@ -54,7 +58,7 @@ try {
 try {
     $cols = $pdo->query("DESCRIBE camp_bookings")->fetchAll(PDO::FETCH_COLUMN);
     $required = ['id', 'student_id', 'campaign_id', 'slot_id', 'status'];
-    $missing  = array_diff($required, $cols);
+    $missing = array_diff($required, $cols);
     if (empty($missing)) {
         $results[] = pass('ตาราง camp_bookings', 'columns: ' . implode(', ', $cols));
     } else {
@@ -116,8 +120,8 @@ if ($sampleBooking) {
             WHERE id = :aid AND student_id = :sid
         ");
         $ok = $stmt->execute([
-            ':aid' => (int)$sampleBooking['id'],
-            ':sid' => (int)$sampleBooking['student_id'],
+            ':aid' => (int) $sampleBooking['id'],
+            ':sid' => (int) $sampleBooking['student_id'],
         ]);
         $rowsAffected = $stmt->rowCount();
 
@@ -129,7 +133,8 @@ if ($sampleBooking) {
             $results[] = fail('UPDATE status = cancelled', "rows affected = {$rowsAffected}");
         }
     } catch (Exception $e) {
-        if ($pdo->inTransaction()) $pdo->rollBack();
+        if ($pdo->inTransaction())
+            $pdo->rollBack();
         $results[] = fail('UPDATE status = cancelled', $e->getMessage());
     }
 } else {
@@ -139,7 +144,7 @@ if ($sampleBooking) {
 // ═════════════════════════════════════════════════════════════════════════════
 // TEST 5 — ตรวจสอบ SMTP Config
 // ═════════════════════════════════════════════════════════════════════════════
-$secrets  = get_secrets();
+$secrets = get_secrets();
 $smtpHost = $secrets['SMTP_HOST'] ?? '';
 $smtpUser = $secrets['SMTP_USER'] ?? '';
 $smtpPass = $secrets['SMTP_PASS'] ?? '';
@@ -148,9 +153,12 @@ if (!empty($smtpHost) && !empty($smtpUser) && !empty($smtpPass)) {
     $results[] = pass('SMTP Config', "Host: {$smtpHost} | Port: " . ($secrets['SMTP_PORT'] ?? 587) . " | From: " . ($secrets['SMTP_FROM_EMAIL'] ?? ''));
 } else {
     $missing = [];
-    if (empty($smtpHost)) $missing[] = 'SMTP_HOST';
-    if (empty($smtpUser)) $missing[] = 'SMTP_USER';
-    if (empty($smtpPass)) $missing[] = 'SMTP_PASS';
+    if (empty($smtpHost))
+        $missing[] = 'SMTP_HOST';
+    if (empty($smtpUser))
+        $missing[] = 'SMTP_USER';
+    if (empty($smtpPass))
+        $missing[] = 'SMTP_PASS';
     $results[] = fail('SMTP Config', 'ค่าว่างใน secrets.php: ' . implode(', ', $missing) . ' → ระบบจะ fallback เป็น php mail() ซึ่งส่งไม่ได้บน XAMPP');
 }
 
@@ -163,8 +171,8 @@ try {
         'สวัสดีคุณทดสอบ การจองกิจกรรมต่อไปนี้ถูกยกเลิกตามคำขอของคุณเรียบร้อยแล้ว',
         [
             'กิจกรรม' => 'Test Campaign',
-            'วันที่'   => '16/04/2569',
-            'เวลา'    => '09:00 - 10:00',
+            'วันที่' => '16/04/2569',
+            'เวลา' => '09:00 - 10:00',
         ],
         'cancel'
     );
@@ -189,9 +197,9 @@ if ($sampleBooking && !empty($smtpHost) && !empty($smtpUser) && !empty($smtpPass
             'cancelled_by_user',
             [
                 'campaign_title' => $sampleBooking['title'] . ' [TEST - ไม่ใช่การยกเลิกจริง]',
-                'date'           => date('d/m/Y', strtotime($sampleBooking['slot_date'])),
-                'time'           => substr($sampleBooking['start_time'], 0, 5) . ' - ' . substr($sampleBooking['end_time'], 0, 5),
-                'full_name'      => $sampleBooking['full_name'],
+                'date' => date('d/m/Y', strtotime($sampleBooking['slot_date'])),
+                'time' => substr($sampleBooking['start_time'], 0, 5) . ' - ' . substr($sampleBooking['end_time'], 0, 5),
+                'full_name' => $sampleBooking['full_name'],
             ]
         );
         if ($ok) {
@@ -227,93 +235,273 @@ if (str_contains($cancelSrc, 'full_name') && str_contains($cancelSrc, 'notify_bo
 // ─── Render ───────────────────────────────────────────────────────────────────
 renderAndExit($results);
 
-function renderAndExit(array $results): never {
+function renderAndExit(array $results): never
+{
     $totalPass = count(array_filter($results, fn($r) => $r['status'] === 'PASS'));
     $totalFail = count(array_filter($results, fn($r) => $r['status'] === 'FAIL'));
     $totalWarn = count(array_filter($results, fn($r) => $r['status'] === 'WARN'));
-    $total     = count($results);
+    $total = count($results);
 
     $statusColor = $totalFail > 0 ? '#dc2626' : ($totalWarn > 0 ? '#d97706' : '#059669');
-    $statusText  = $totalFail > 0 ? "❌ มีปัญหา {$totalFail} จาก {$total}" : ($totalWarn > 0 ? "⚠️ ผ่าน แต่มีคำเตือน {$totalWarn}" : "✅ ผ่านทั้งหมด {$total}/{$total}");
+    $statusText = $totalFail > 0 ? "❌ มีปัญหา {$totalFail} จาก {$total}" : ($totalWarn > 0 ? "⚠️ ผ่าน แต่มีคำเตือน {$totalWarn}" : "✅ ผ่านทั้งหมด {$total}/{$total}");
     ?>
-<!DOCTYPE html>
-<html lang="th">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>🧪 Cancel Booking — Diagnostic</title>
-    <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #f1f5f9; min-height: 100vh; padding: 24px 16px; }
-        .container { max-width: 860px; margin: 0 auto; }
-        .header { background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%); border-radius: 16px; padding: 28px 32px; margin-bottom: 20px; color: white; }
-        .header h1 { font-size: 1.5rem; font-weight: 800; margin-bottom: 4px; }
-        .header p  { font-size: 0.85rem; opacity: 0.7; }
-        .summary { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
-        .stat { flex: 1; min-width: 120px; background: white; border-radius: 12px; padding: 16px; text-align: center; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
-        .stat .num { font-size: 2rem; font-weight: 900; }
-        .stat .lbl { font-size: 0.75rem; color: #94a3b8; margin-top: 2px; }
-        .result-card { background: white; border-radius: 12px; padding: 16px 20px; margin-bottom: 10px; display: flex; align-items: flex-start; gap: 14px; box-shadow: 0 1px 4px rgba(0,0,0,.06); border-left: 4px solid transparent; }
-        .result-card.PASS { border-color: #059669; }
-        .result-card.FAIL { border-color: #dc2626; background: #fff5f5; }
-        .result-card.WARN { border-color: #d97706; background: #fffbeb; }
-        .result-card.INFO { border-color: #0052CC; background: #f0f7ff; }
-        .badge { font-size: 0.65rem; font-weight: 800; padding: 3px 8px; border-radius: 20px; white-space: nowrap; flex-shrink: 0; margin-top: 2px; letter-spacing: .05em; }
-        .PASS .badge { background: #d1fae5; color: #065f46; }
-        .FAIL .badge { background: #fee2e2; color: #991b1b; }
-        .WARN .badge { background: #fef3c7; color: #92400e; }
-        .INFO .badge { background: #dbeafe; color: #1e40af; }
-        .label { font-weight: 700; font-size: 0.9rem; color: #1e293b; }
-        .detail { font-size: 0.78rem; color: #64748b; margin-top: 4px; line-height: 1.5; word-break: break-all; }
-        .overall { background: white; border-radius: 12px; padding: 18px 24px; margin-bottom: 20px; text-align: center; border: 2px solid <?= $statusColor ?>; }
-        .overall .text { font-size: 1.15rem; font-weight: 800; color: <?= $statusColor ?>; }
-        .actions { text-align: center; margin-top: 8px; }
-        .btn { display: inline-block; background: #0052CC; color: white; padding: 10px 22px; border-radius: 10px; font-weight: 700; font-size: 0.85rem; text-decoration: none; margin: 4px; transition: background .2s; }
-        .btn:hover { background: #003d99; }
-        .btn.secondary { background: #64748b; }
-        .ts { font-size: 0.72rem; color: #94a3b8; text-align: right; margin-top: 16px; }
-    </style>
-</head>
-<body>
-<div class="container">
+    <!DOCTYPE html>
+    <html lang="th">
 
-    <div class="header">
-        <h1>🧪 Cancel Booking — Diagnostic</h1>
-        <p>ตรวจสอบระบบ User Cancel Booking + Email | <?= date('d/m/Y H:i:s') ?></p>
-    </div>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>🧪 Cancel Booking — Diagnostic</title>
+        <style>
+            * {
+                box-sizing: border-box;
+                margin: 0;
+                padding: 0;
+            }
 
-    <div class="overall">
-        <div class="text"><?= $statusText ?></div>
-    </div>
+            body {
+                font-family: 'Segoe UI', Tahoma, sans-serif;
+                background: #f1f5f9;
+                min-height: 100vh;
+                padding: 24px 16px;
+            }
 
-    <div class="summary">
-        <div class="stat"><div class="num" style="color:#059669"><?= $totalPass ?></div><div class="lbl">PASS</div></div>
-        <div class="stat"><div class="num" style="color:#dc2626"><?= $totalFail ?></div><div class="lbl">FAIL</div></div>
-        <div class="stat"><div class="num" style="color:#d97706"><?= $totalWarn ?></div><div class="lbl">WARN</div></div>
-        <div class="stat"><div class="num" style="color:#64748b"><?= $total ?></div><div class="lbl">ทั้งหมด</div></div>
-    </div>
+            .container {
+                max-width: 860px;
+                margin: 0 auto;
+            }
 
-    <?php foreach ($results as $i => $r): ?>
-    <div class="result-card <?= $r['status'] ?>">
-        <span class="badge"><?= $r['status'] ?></span>
-        <div>
-            <div class="label"><?= ($i + 1) ?>. <?= htmlspecialchars($r['label']) ?></div>
-            <?php if ($r['detail']): ?>
-            <div class="detail"><?= $r['detail'] /* already safe or HTML */ ?></div>
-            <?php endif; ?>
+            .header {
+                background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%);
+                border-radius: 16px;
+                padding: 28px 32px;
+                margin-bottom: 20px;
+                color: white;
+            }
+
+            .header h1 {
+                font-size: 1.5rem;
+                font-weight: 800;
+                margin-bottom: 4px;
+            }
+
+            .header p {
+                font-size: 0.85rem;
+                opacity: 0.7;
+            }
+
+            .summary {
+                display: flex;
+                gap: 12px;
+                margin-bottom: 20px;
+                flex-wrap: wrap;
+            }
+
+            .stat {
+                flex: 1;
+                min-width: 120px;
+                background: white;
+                border-radius: 12px;
+                padding: 16px;
+                text-align: center;
+                box-shadow: 0 1px 4px rgba(0, 0, 0, .06);
+            }
+
+            .stat .num {
+                font-size: 2rem;
+                font-weight: 900;
+            }
+
+            .stat .lbl {
+                font-size: 0.75rem;
+                color: #94a3b8;
+                margin-top: 2px;
+            }
+
+            .result-card {
+                background: white;
+                border-radius: 12px;
+                padding: 16px 20px;
+                margin-bottom: 10px;
+                display: flex;
+                align-items: flex-start;
+                gap: 14px;
+                box-shadow: 0 1px 4px rgba(0, 0, 0, .06);
+                border-left: 4px solid transparent;
+            }
+
+            .result-card.PASS {
+                border-color: #059669;
+            }
+
+            .result-card.FAIL {
+                border-color: #dc2626;
+                background: #fff5f5;
+            }
+
+            .result-card.WARN {
+                border-color: #d97706;
+                background: #fffbeb;
+            }
+
+            .result-card.INFO {
+                border-color: #0052CC;
+                background: #f0f7ff;
+            }
+
+            .badge {
+                font-size: 0.65rem;
+                font-weight: 800;
+                padding: 3px 8px;
+                border-radius: 20px;
+                white-space: nowrap;
+                flex-shrink: 0;
+                margin-top: 2px;
+                letter-spacing: .05em;
+            }
+
+            .PASS .badge {
+                background: #d1fae5;
+                color: #065f46;
+            }
+
+            .FAIL .badge {
+                background: #fee2e2;
+                color: #991b1b;
+            }
+
+            .WARN .badge {
+                background: #fef3c7;
+                color: #92400e;
+            }
+
+            .INFO .badge {
+                background: #dbeafe;
+                color: #1e40af;
+            }
+
+            .label {
+                font-weight: 700;
+                font-size: 0.9rem;
+                color: #1e293b;
+            }
+
+            .detail {
+                font-size: 0.78rem;
+                color: #64748b;
+                margin-top: 4px;
+                line-height: 1.5;
+                word-break: break-all;
+            }
+
+            .overall {
+                background: white;
+                border-radius: 12px;
+                padding: 18px 24px;
+                margin-bottom: 20px;
+                text-align: center;
+                border: 2px solid
+                    <?= $statusColor ?>
+                ;
+            }
+
+            .overall .text {
+                font-size: 1.15rem;
+                font-weight: 800;
+                color:
+                    <?= $statusColor ?>
+                ;
+            }
+
+            .actions {
+                text-align: center;
+                margin-top: 8px;
+            }
+
+            .btn {
+                display: inline-block;
+                background: #0052CC;
+                color: white;
+                padding: 10px 22px;
+                border-radius: 10px;
+                font-weight: 700;
+                font-size: 0.85rem;
+                text-decoration: none;
+                margin: 4px;
+                transition: background .2s;
+            }
+
+            .btn:hover {
+                background: #003d99;
+            }
+
+            .btn.secondary {
+                background: #64748b;
+            }
+
+            .ts {
+                font-size: 0.72rem;
+                color: #94a3b8;
+                text-align: right;
+                margin-top: 16px;
+            }
+        </style>
+    </head>
+
+    <body>
+        <div class="container">
+
+            <div class="header">
+                <h1>🧪 Cancel Booking — Diagnostic</h1>
+                <p>ตรวจสอบระบบ User Cancel Booking + Email | <?= date('d/m/Y H:i:s') ?></p>
+            </div>
+
+            <div class="overall">
+                <div class="text"><?= $statusText ?></div>
+            </div>
+
+            <div class="summary">
+                <div class="stat">
+                    <div class="num" style="color:#059669"><?= $totalPass ?></div>
+                    <div class="lbl">PASS</div>
+                </div>
+                <div class="stat">
+                    <div class="num" style="color:#dc2626"><?= $totalFail ?></div>
+                    <div class="lbl">FAIL</div>
+                </div>
+                <div class="stat">
+                    <div class="num" style="color:#d97706"><?= $totalWarn ?></div>
+                    <div class="lbl">WARN</div>
+                </div>
+                <div class="stat">
+                    <div class="num" style="color:#64748b"><?= $total ?></div>
+                    <div class="lbl">ทั้งหมด</div>
+                </div>
+            </div>
+
+            <?php foreach ($results as $i => $r): ?>
+                <div class="result-card <?= $r['status'] ?>">
+                    <span class="badge"><?= $r['status'] ?></span>
+                    <div>
+                        <div class="label"><?= ($i + 1) ?>. <?= htmlspecialchars($r['label']) ?></div>
+                        <?php if ($r['detail']): ?>
+                            <div class="detail"><?= $r['detail'] /* already safe or HTML */ ?></div>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            <?php endforeach; ?>
+
+            <div class="actions">
+                <a href="?" class="btn secondary">🔄 รัน Diagnostic อีกครั้ง</a>
+                <a href="../portal/smtp_settings.php" class="btn" target="_blank">⚙️ ตั้งค่า SMTP</a>
+            </div>
+
+            <div class="ts">Generated at <?= date('Y-m-d H:i:s') ?> | Server: <?= php_uname('n') ?> | PHP <?= PHP_VERSION ?>
+            </div>
         </div>
-    </div>
-    <?php endforeach; ?>
+    </body>
 
-    <div class="actions">
-        <a href="?" class="btn secondary">🔄 รัน Diagnostic อีกครั้ง</a>
-        <a href="../admin/smtp_settings.php" class="btn" target="_blank">⚙️ ตั้งค่า SMTP</a>
-    </div>
-
-    <div class="ts">Generated at <?= date('Y-m-d H:i:s') ?> | Server: <?= php_uname('n') ?> | PHP <?= PHP_VERSION ?></div>
-</div>
-</body>
-</html>
+    </html>
     <?php
     exit;
 }

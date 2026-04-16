@@ -1,5 +1,5 @@
 <?php
-// admin/smtp_settings.php — ตั้งค่า SMTP และทดสอบส่งอีเมล (Superadmin only)
+// portal/smtp_settings.php — ตั้งค่า SMTP และทดสอบส่งอีเมล (Superadmin only)
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/../includes/mail_helper.php';
@@ -13,8 +13,10 @@ $hasConfig   = !empty($secrets['SMTP_HOST']) && !empty($secrets['SMTP_USER']);
 $secretsPath = __DIR__ . '/../config/secrets.php';
 $fileExists  = file_exists($secretsPath);
 $fileWritable= $fileExists ? is_writable($secretsPath) : is_writable(dirname($secretsPath));
+$embed       = isset($_GET['embed']);
 
-require_once __DIR__ . '/includes/header.php';
+// ใช้ Header/Footer จาก Admin เพื่อความสม่ำเสมอ
+if (!$embed) require_once __DIR__ . '/../admin/includes/header.php';
 ?>
 
 <style>
@@ -29,14 +31,16 @@ require_once __DIR__ . '/includes/header.php';
     .smtp-card  { background:#fff; border-radius:1.5rem; border:1.5px solid #e5e7eb; padding:1.75rem; margin-bottom:1.25rem; }
 </style>
 
-<div class="max-w-3xl mx-auto px-4 py-8">
+<div class="<?= $embed ? 'p-0' : 'max-w-3xl mx-auto px-4 py-8' ?>">
 
+    <?php if (!$embed): ?>
     <?php
     $header_actions = '<a href="index.php" class="bg-white border border-gray-100 hover:bg-gray-50 text-gray-500 px-5 py-2.5 rounded-2xl font-bold flex items-center gap-2 transition-all shadow-sm text-sm group">
         <i class="fa-solid fa-arrow-left group-hover:-translate-x-1 transition-transform"></i> กลับ Dashboard
     </a>';
     renderPageHeader('SMTP Settings', 'ตั้งค่าและทดสอบระบบส่งอีเมลแจ้งเตือน', $header_actions);
     ?>
+    <?php endif; ?>
 
     <!-- Status Banner -->
     <div class="flex items-start gap-4 p-5 rounded-2xl mb-6 <?= $hasConfig ? 'bg-emerald-50 border border-emerald-100' : 'bg-amber-50 border border-amber-100' ?>">
@@ -181,30 +185,6 @@ require_once __DIR__ . '/includes/header.php';
         <div id="testResult" class="hidden mt-4 p-4 rounded-xl text-sm font-semibold flex items-start gap-3"></div>
     </div>
 
-    <!-- What happens when email sends -->
-    <div class="smtp-card bg-gray-50/50 shadow-sm">
-        <h3 class="font-black text-gray-700 text-sm mb-3 flex items-center gap-2">
-            <i class="fa-solid fa-bell text-gray-400"></i> อีเมลจะถูกส่งเมื่อ...
-        </h3>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-            <?php
-            $triggers = [
-                ['icon'=>'fa-calendar-check','color'=>'text-blue-500','label'=>'ผู้ใช้จองกิจกรรมสำเร็จ','file'=>'user/submit_booking.php'],
-                ['icon'=>'fa-check-circle',  'color'=>'text-green-500','label'=>'Admin อนุมัติคิว',     'file'=>'admin/ajax_approve_booking.php'],
-                ['icon'=>'fa-ban',           'color'=>'text-red-500',  'label'=>'ผู้ใช้ยกเลิกการจอง', 'file'=>'user/cancel_booking.php'],
-                ['icon'=>'fa-user-slash',    'color'=>'text-orange-500','label'=>'Admin ยกเลิกคิวบังคับ','file'=>'admin/ajax_force_cancel.php'],
-            ];
-            foreach ($triggers as $t): ?>
-            <div class="flex items-center gap-3 bg-white p-3 rounded-xl border border-gray-100">
-                <i class="fa-solid <?= $t['icon'] ?> <?= $t['color'] ?>"></i>
-                <div>
-                    <p class="font-bold text-gray-800 text-xs"><?= $t['label'] ?></p>
-                    <p class="text-[10px] text-gray-400"><?= $t['file'] ?></p>
-                </div>
-            </div>
-            <?php endforeach; ?>
-        </div>
-    </div>
 </div>
 
 <script>
@@ -299,4 +279,4 @@ function togglePass() {
 }
 </script>
 
-<?php require_once __DIR__ . '/includes/footer.php'; ?>
+<?php if (!$embed) require_once __DIR__ . '/../admin/includes/footer.php'; ?>
