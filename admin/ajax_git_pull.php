@@ -28,7 +28,7 @@ try {
 } catch (Exception $e) {}
 
 // 4. เรียก Plesk webhook ผ่าน localhost
-$webhookUuid = 'dd095230-b1b5-111b-594e-1ce4dd1ec34f';
+$webhookUuid = 'bd4d08cc-a594-54de-3c44-37ab0ee3b638';
 $webhookUrl  = 'https://127.0.0.1:8443/modules/git/public/web-hook.php?uuid=' . $webhookUuid;
 
 $ch = curl_init($webhookUrl);
