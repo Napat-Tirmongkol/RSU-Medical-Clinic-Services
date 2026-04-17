@@ -27,11 +27,22 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
-// CSRF check — return JSON on failure (not plain-text die)
-$csrfToken = $_POST['csrf_token'] ?? '';
-if (!verify_csrf_token($csrfToken)) {
+// CSRF protection — dual strategy:
+// 1) Origin header check (reliable for same-origin AJAX, no session needed)
+// 2) Session token fallback (for old browsers / proxies that strip Origin)
+$requestOrigin = $_SERVER['HTTP_ORIGIN'] ?? '';
+$serverHost    = $_SERVER['HTTP_HOST'] ?? '';
+$proto = !empty($_SERVER['HTTP_X_FORWARDED_PROTO'])
+    ? $_SERVER['HTTP_X_FORWARDED_PROTO']
+    : (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' ? 'https' : 'http');
+$expectedOrigin = $proto . '://' . $serverHost;
+
+$originOk  = ($requestOrigin !== '' && $requestOrigin === $expectedOrigin);
+$sessionOk = verify_csrf_token($_POST['csrf_token'] ?? '');
+
+if (!$originOk && !$sessionOk) {
     http_response_code(403);
-    echo json_encode(['status' => 'error', 'message' => 'CSRF token ไม่ถูกต้อง กรุณาโหลดหน้าใหม่']);
+    echo json_encode(['status' => 'error', 'message' => 'CSRF validation failed กรุณาโหลดหน้าใหม่']);
     exit;
 }
 
