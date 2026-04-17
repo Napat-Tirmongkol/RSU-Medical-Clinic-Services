@@ -1,11 +1,12 @@
 <?php
 // portal/ajax_insurance_sync.php
 declare(strict_types=1);
-session_start();
+
+// Let auth.php handle session_start() with correct cookie settings (secure, samesite)
+require_once __DIR__ . '/includes/auth.php';
 header('Content-Type: application/json; charset=utf-8');
 
 require_once __DIR__ . '/../config.php';
-require_once __DIR__ . '/includes/auth.php';
 
 // Staff ที่ไม่ใช่ admin/superadmin ไม่มีสิทธิ์
 $adminRole = $_SESSION['admin_role'] ?? '';
@@ -26,7 +27,13 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
-validate_csrf_or_die();
+// CSRF check — return JSON on failure (not plain-text die)
+$csrfToken = $_POST['csrf_token'] ?? '';
+if (!verify_csrf_token($csrfToken)) {
+    http_response_code(403);
+    echo json_encode(['status' => 'error', 'message' => 'CSRF token ไม่ถูกต้อง กรุณาโหลดหน้าใหม่']);
+    exit;
+}
 
 $action = $_POST['action'] ?? '';
 $pdo    = db();
