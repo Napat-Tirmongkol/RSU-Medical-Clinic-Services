@@ -176,7 +176,7 @@ $csrfToken = get_csrf_token();
                     <div class="flex items-center gap-2 mb-2">
                         <span class="w-5 h-5 rounded-full bg-[#0052CC] text-white text-xs flex items-center justify-center font-bold">1</span>
                         <span class="text-sm font-bold text-gray-700">ไฟล์บริษัทประกัน</span>
-                        <span class="text-xs text-red-500 font-bold">* บังคับ</span>
+                        <span class="text-xs text-gray-400">(ไม่บังคับ)</span>
                     </div>
                     <div class="text-xs text-gray-400 mb-2">คอลัมน์หลัก: <code>member_id, policy_number, coverage_start, coverage_end</code></div>
                     <div class="upload-area text-center py-8 px-4" id="insUploadArea" onclick="document.getElementById('insFile').click()">
@@ -396,21 +396,22 @@ const regFileLabel  = document.getElementById('regFileLabel');
 const btnDryRun     = document.getElementById('btnDryRun');
 
 function updateDryRunBtn() {
-    btnDryRun.disabled = !insFileInput.files[0];
+    btnDryRun.disabled = !insFileInput.files[0] && !regFileInput.files[0];
 }
 
 insFileInput.addEventListener('change', () => {
     if (insFileInput.files[0]) {
         insFileLabel.textContent = insFileInput.files[0].name;
         insFileLabel.className = 'text-xs font-semibold text-blue-600 mt-1';
-        updateDryRunBtn();
     }
+    updateDryRunBtn();
 });
 regFileInput.addEventListener('change', () => {
     if (regFileInput.files[0]) {
         regFileLabel.textContent = regFileInput.files[0].name;
         regFileLabel.className = 'text-xs font-semibold text-green-600 mt-1';
     }
+    updateDryRunBtn();
 });
 
 function setupDrop(area, input, labelEl, labelClass) {

@@ -235,35 +235,46 @@ function release_sync_lock(): void {
 // ─ Parse CSV, compute diff groups, return preview (no DB writes)
 // ═════════════════════════════════════════════════════════════════════════════
 if ($action === 'dryrun') {
-    // ── ไฟล์บริษัทประกัน (บังคับ) ──
-    if (!isset($_FILES['insurance_file']) || $_FILES['insurance_file']['error'] !== UPLOAD_ERR_OK) {
-        echo json_encode(['status' => 'error', 'message' => 'กรุณาอัปโหลดไฟล์บริษัทประกัน']);
+    $hasIns = isset($_FILES['insurance_file']) && $_FILES['insurance_file']['error'] === UPLOAD_ERR_OK;
+    $hasReg = isset($_FILES['registry_file'])  && $_FILES['registry_file']['error']  === UPLOAD_ERR_OK;
+
+    if (!$hasIns && !$hasReg) {
+        echo json_encode(['status' => 'error', 'message' => 'กรุณาอัปโหลดไฟล์อย่างน้อย 1 ไฟล์']);
         exit;
     }
-    $insRaw = file_get_contents($_FILES['insurance_file']['tmp_name']);
-    $insParsed = parse_insurance_csv(decode_csv_content($insRaw), ['member_id']);
-    if (isset($insParsed['error'])) {
-        echo json_encode(['status' => 'error', 'message' => '[ไฟล์ประกัน] ' . $insParsed['error']]);
-        exit;
+
+    // ── ไฟล์บริษัทประกัน (ไม่บังคับ) ──
+    $insRaw    = '';
+    $insRows   = [];
+    $insIdSet  = [];
+    $insRowMap = [];
+    if ($hasIns) {
+        $insRaw    = file_get_contents($_FILES['insurance_file']['tmp_name']);
+        $insParsed = parse_insurance_csv(decode_csv_content($insRaw), ['member_id']);
+        if (isset($insParsed['error'])) {
+            echo json_encode(['status' => 'error', 'message' => '[ไฟล์ประกัน] ' . $insParsed['error']]);
+            exit;
+        }
+        $insRows   = $insParsed['rows'];
+        $insIds    = array_map(fn($r) => (string)$r['member_id'], $insRows);
+        $insIdSet  = array_flip($insIds);
+        $insRowMap = array_column($insRows, null, 'member_id');
     }
 
     // ── ไฟล์ทะเบียน (ไม่บังคับ) ──
-    $regRaw = '';
+    $regRaw      = '';
     $registryMap = [];
-    if (isset($_FILES['registry_file']) && $_FILES['registry_file']['error'] === UPLOAD_ERR_OK) {
-        $regRaw = file_get_contents($_FILES['registry_file']['tmp_name']);
+    if ($hasReg) {
+        $regRaw    = file_get_contents($_FILES['registry_file']['tmp_name']);
         $regParsed = parse_insurance_csv(decode_csv_content($regRaw), ['member_id']);
-        if (!isset($regParsed['error'])) {
-            foreach ($regParsed['rows'] as $r) {
-                $registryMap[$r['member_id']] = $r;
-            }
+        if (isset($regParsed['error'])) {
+            echo json_encode(['status' => 'error', 'message' => '[ไฟล์ทะเบียน] ' . $regParsed['error']]);
+            exit;
+        }
+        foreach ($regParsed['rows'] as $r) {
+            $registryMap[$r['member_id']] = $r;
         }
     }
-
-    $insRows   = $insParsed['rows'];
-    $insIds    = array_map(fn($r) => (string)$r['member_id'], $insRows);
-    $insIdSet  = array_flip($insIds);
-    $insRowMap = array_column($insRows, null, 'member_id');
 
     ensure_insurance_tables($pdo);
 
@@ -275,8 +286,8 @@ if ($action === 'dryrun') {
 
     $matched = $newcomers = $inactivated = [];
 
-    if (!empty($registryMap)) {
-        // Registry-driven mode: registry = master roster, insurance = coverage indicator
+    if (!empty($registryMap) && !empty($insIdSet)) {
+        // Both files: registry = master roster, insurance = coverage indicator
         foreach ($registryMap as $mid => $regRow) {
             $coveredByIns = isset($insIdSet[$mid]);
             $newStatus    = $coveredByIns ? 'Active' : 'Inactive';
@@ -301,7 +312,41 @@ if ($action === 'dryrun') {
                 ];
             }
         }
-        // DB Active members absent from registry → Inactive
+        // DB Active absent from registry → Inactive
+        foreach ($existing as $mid => $ex) {
+            if ($ex['insurance_status'] === 'Active' && !isset($registryMap[$mid])) {
+                $inactivated[] = [
+                    'member_id'           => $mid,
+                    'full_name'           => $ex['full_name'],
+                    'old_status'          => 'Active',
+                    'new_status'          => 'Inactive',
+                    'manually_overridden' => (int)$ex['manually_overridden'],
+                ];
+            }
+        }
+    } elseif (!empty($registryMap)) {
+        // Registry-only: everyone in registry = Active (no insurance file to cross-check)
+        foreach ($registryMap as $mid => $regRow) {
+            $merged = merge_member_data(['member_id' => $mid], $regRow);
+            if (isset($existing[$mid])) {
+                $matched[] = [
+                    'member_id'           => $mid,
+                    'full_name'           => $merged['full_name'] ?: $existing[$mid]['full_name'],
+                    'position'            => $merged['position'],
+                    'old_status'          => $existing[$mid]['insurance_status'],
+                    'new_status'          => 'Active',
+                    'manually_overridden' => (int)$existing[$mid]['manually_overridden'],
+                ];
+            } else {
+                $newcomers[] = [
+                    'member_id'  => $mid,
+                    'full_name'  => $merged['full_name'],
+                    'position'   => $merged['position'],
+                    'new_status' => 'Active',
+                ];
+            }
+        }
+        // DB Active absent from registry → Inactive
         foreach ($existing as $mid => $ex) {
             if ($ex['insurance_status'] === 'Active' && !isset($registryMap[$mid])) {
                 $inactivated[] = [
@@ -314,7 +359,7 @@ if ($action === 'dryrun') {
             }
         }
     } else {
-        // Insurance-only mode (no registry file): insurance drives everything
+        // Insurance-only mode: insurance drives everything
         foreach ($insRows as $row) {
             $mid    = $row['member_id'];
             $merged = merge_member_data($row, []);
@@ -367,9 +412,9 @@ if ($action === 'dryrun') {
     echo json_encode([
         'status'               => 'ok',
         'has_registry'         => !empty($registryMap),
-        'ins_filename'         => htmlspecialchars($_FILES['insurance_file']['name']),
-        'reg_filename'         => $regRaw ? htmlspecialchars($_FILES['registry_file']['name']) : null,
-        'total_csv'            => count($insRows),
+        'ins_filename'         => $hasIns ? htmlspecialchars($_FILES['insurance_file']['name']) : null,
+        'reg_filename'         => $hasReg ? htmlspecialchars($_FILES['registry_file']['name']) : null,
+        'total_csv'            => !empty($registryMap) ? count($registryMap) : count($insRows),
         'total_matched'        => count($matched),
         'total_newcomers'      => count($newcomers),
         'total_inactivated'    => count($inactivated),
@@ -397,8 +442,8 @@ if ($action === 'execute') {
     $insFilename   = trim($_POST['ins_filename'] ?? 'insurance.csv');
     $regFilename   = trim($_POST['reg_filename'] ?? '');
 
-    if (!$insB64) {
-        echo json_encode(['status' => 'error', 'message' => 'ไม่พบข้อมูลไฟล์ประกัน (กรุณา Dry Run ใหม่)']);
+    if (!$insB64 && !$regB64) {
+        echo json_encode(['status' => 'error', 'message' => 'ไม่พบข้อมูลไฟล์ (กรุณา Dry Run ใหม่)']);
         exit;
     }
 
@@ -410,15 +455,22 @@ if ($action === 'execute') {
     try {
         ensure_insurance_tables($pdo);
 
-        $insParsed = parse_insurance_csv(decode_csv_content(base64_decode($insB64)), ['member_id']);
-        if (isset($insParsed['error'])) {
-            release_sync_lock();
-            echo json_encode(['status' => 'error', 'message' => '[ไฟล์ประกัน] ' . $insParsed['error']]);
-            exit;
+        $insRows   = [];
+        $csvIds    = [];
+        $insIdSet  = [];
+        $insRowMap = [];
+        if ($insB64) {
+            $insParsed = parse_insurance_csv(decode_csv_content(base64_decode($insB64)), ['member_id']);
+            if (isset($insParsed['error'])) {
+                release_sync_lock();
+                echo json_encode(['status' => 'error', 'message' => '[ไฟล์ประกัน] ' . $insParsed['error']]);
+                exit;
+            }
+            $insRows   = $insParsed['rows'];
+            $csvIds    = array_column($insRows, 'member_id');
+            $insIdSet  = array_flip($csvIds);
+            $insRowMap = array_column($insRows, null, 'member_id');
         }
-        $insRows   = $insParsed['rows'];
-        $csvIds    = array_column($insRows, 'member_id');
-        $insIdSet  = array_flip($csvIds);
         $insRowMap = array_column($insRows, null, 'member_id');
 
         // Registry map (optional)
@@ -442,13 +494,22 @@ if ($action === 'execute') {
         // 30% guard: count all Active→Inactive transitions
         $currentActiveCount = count(array_filter($existing, fn($e) => $e['insurance_status'] === 'Active'));
         $willInactivate = 0;
-        if (!empty($registryMap)) {
+        if (!empty($registryMap) && !empty($insIdSet)) {
+            // Both files
             foreach ($existing as $mid => $ex) {
                 if ($ex['insurance_status'] !== 'Active' || $ex['manually_overridden']) continue;
-                if (!isset($registryMap[$mid])) { $willInactivate++; continue; } // removed from roster
-                if (!isset($insIdSet[$mid])) $willInactivate++;                  // in roster but not covered
+                if (!isset($registryMap[$mid])) { $willInactivate++; continue; }
+                if (!isset($insIdSet[$mid])) $willInactivate++;
+            }
+        } elseif (!empty($registryMap)) {
+            // Registry-only: those not in registry become Inactive
+            foreach ($existing as $mid => $ex) {
+                if ($ex['insurance_status'] === 'Active' && !isset($registryMap[$mid]) && !$ex['manually_overridden']) {
+                    $willInactivate++;
+                }
             }
         } else {
+            // Insurance-only
             foreach ($existing as $mid => $ex) {
                 if ($ex['insurance_status'] === 'Active' && !isset($insIdSet[$mid]) && !$ex['manually_overridden']) {
                     $willInactivate++;
@@ -517,8 +578,8 @@ if ($action === 'execute') {
             WHERE member_id = :mid AND manually_overridden = 0
         ");
 
-        if (!empty($registryMap)) {
-            // Registry-driven: registry = master roster, insurance = coverage indicator
+        if (!empty($registryMap) && !empty($insIdSet)) {
+            // Both files: registry = master roster, insurance = coverage indicator
             foreach ($registryMap as $mid => $regRow) {
                 $coveredByIns = isset($insIdSet[$mid]);
                 $newStatus    = $coveredByIns ? 'Active' : 'Inactive';
@@ -556,6 +617,56 @@ if ($action === 'execute') {
             }
 
             // DB Active members absent from registry → Inactive
+            foreach ($existing as $mid => $ex) {
+                if ($ex['insurance_status'] === 'Active' && !isset($registryMap[$mid])) {
+                    $inactivateStmt->execute([':sid' => $syncId, ':mid' => $mid]);
+                    $histStmt->execute([
+                        ':mid'  => $mid,
+                        ':sid'  => $syncId,
+                        ':ct'   => 'inactivated',
+                        ':old'  => 'Active',
+                        ':new'  => 'Inactive',
+                        ':snap' => json_encode($ex),
+                    ]);
+                    $cntInactivated++;
+                }
+            }
+        } elseif (!empty($registryMap)) {
+            // Registry-only: everyone in registry = Active
+            foreach ($registryMap as $mid => $regRow) {
+                $merged     = merge_member_data(['member_id' => $mid], $regRow);
+                $oldStatus  = $existing[$mid]['insurance_status'] ?? 'new';
+                $changeType = isset($existing[$mid]) ? 'matched' : 'inserted';
+
+                $upsertStmt->execute([
+                    ':mid'        => $mid,
+                    ':fn'         => $merged['full_name'],
+                    ':ms'         => $merged['member_status'],
+                    ':pos'        => $merged['position'],
+                    ':cid'        => $merged['citizen_id'],
+                    ':dob'        => normalise_date($merged['date_of_birth'] ?: null),
+                    ':ins_status' => 'Active',
+                    ':cs'         => normalise_date($merged['coverage_start'] ?: null),
+                    ':ce'         => normalise_date($merged['coverage_end'] ?: null),
+                    ':pn'         => $merged['policy_number'],
+                    ':rem'        => $merged['remarks'],
+                    ':sid'        => $syncId,
+                ]);
+
+                $histStmt->execute([
+                    ':mid'  => $mid,
+                    ':sid'  => $syncId,
+                    ':ct'   => $changeType,
+                    ':old'  => $oldStatus,
+                    ':new'  => 'Active',
+                    ':snap' => json_encode($merged),
+                ]);
+
+                if ($changeType === 'inserted') $cntNewcomers++;
+                else $cntMatched++;
+            }
+
+            // DB Active absent from registry → Inactive
             foreach ($existing as $mid => $ex) {
                 if ($ex['insurance_status'] === 'Active' && !isset($registryMap[$mid])) {
                     $inactivateStmt->execute([':sid' => $syncId, ':mid' => $mid]);
