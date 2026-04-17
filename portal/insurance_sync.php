@@ -166,24 +166,46 @@ $csrfToken = get_csrf_token();
     <!-- ─────────────────────── TAB: SYNC ─────────────────────────────── -->
     <div id="tab-sync" class="tab-content active">
         <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-            <h2 class="text-base font-bold text-gray-800 mb-1">อัปโหลด CSV จากสำนักทะเบียน</h2>
+            <h2 class="text-base font-bold text-gray-800 mb-1">อัปโหลดไฟล์ข้อมูลประกัน</h2>
             <p class="text-sm text-gray-400 mb-5">รองรับ UTF-8 และ TIS-620 / Windows-874 (ไทย) — ระบบจะแปลงให้อัตโนมัติ</p>
 
-            <!-- CSV Format hint -->
-            <div class="bg-blue-50 border border-blue-100 rounded-xl p-4 mb-5 text-xs text-blue-700">
-                <div class="font-bold mb-1"><i class="fa-solid fa-circle-info mr-1"></i>รูปแบบที่รองรับ (.csv / .xlsx / .xls)</div>
-                <code class="text-blue-800">member_id, full_name, member_status, position, citizen_id, date_of_birth, coverage_start, coverage_end, policy_number, remarks</code>
-                <div class="mt-1 text-blue-500">* คอลัมน์ที่จำเป็น: <strong>member_id</strong> และ <strong>full_name</strong></div>
-            </div>
+            <!-- Two-file upload grid -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-5">
 
-            <!-- Upload area -->
-            <div class="upload-area text-center py-10 px-6 mb-5" id="uploadArea" onclick="document.getElementById('csvFile').click()">
-                <i class="fa-solid fa-cloud-arrow-up text-3xl text-blue-300 mb-3 block"></i>
-                <p class="text-sm font-bold text-gray-600">คลิกหรือลากไฟล์ CSV / Excel มาวางที่นี่</p>
-                <p class="text-xs text-gray-400 mt-1">รองรับ .csv, .xlsx, .xls</p>
-                <p class="text-xs text-gray-400 mt-1" id="fileNameLabel">ยังไม่ได้เลือกไฟล์</p>
+                <!-- ① Insurance file -->
+                <div>
+                    <div class="flex items-center gap-2 mb-2">
+                        <span class="w-5 h-5 rounded-full bg-[#0052CC] text-white text-xs flex items-center justify-center font-bold">1</span>
+                        <span class="text-sm font-bold text-gray-700">ไฟล์บริษัทประกัน</span>
+                        <span class="text-xs text-red-500 font-bold">* บังคับ</span>
+                    </div>
+                    <div class="text-xs text-gray-400 mb-2">คอลัมน์หลัก: <code>member_id, policy_number, coverage_start, coverage_end</code></div>
+                    <div class="upload-area text-center py-8 px-4" id="insUploadArea" onclick="document.getElementById('insFile').click()">
+                        <i class="fa-solid fa-file-shield text-2xl text-blue-300 mb-2 block"></i>
+                        <p class="text-xs font-bold text-gray-600">คลิกหรือลากไฟล์มาวาง</p>
+                        <p class="text-xs text-gray-400 mt-1">.csv / .xlsx / .xls</p>
+                        <p class="text-xs font-semibold text-blue-600 mt-1" id="insFileLabel">ยังไม่ได้เลือกไฟล์</p>
+                    </div>
+                    <input type="file" id="insFile" accept=".csv,.xlsx,.xls" class="hidden">
+                </div>
+
+                <!-- ② Registry file -->
+                <div>
+                    <div class="flex items-center gap-2 mb-2">
+                        <span class="w-5 h-5 rounded-full bg-green-600 text-white text-xs flex items-center justify-center font-bold">2</span>
+                        <span class="text-sm font-bold text-gray-700">ไฟล์ทะเบียนบุคลากร</span>
+                        <span class="text-xs text-gray-400">(อัปเดตรายเดือน)</span>
+                    </div>
+                    <div class="text-xs text-gray-400 mb-2">คอลัมน์หลัก: <code>member_id, full_name, position, citizen_id, date_of_birth</code></div>
+                    <div class="upload-area text-center py-8 px-4 border-green-200 bg-green-50" id="regUploadArea" onclick="document.getElementById('regFile').click()">
+                        <i class="fa-solid fa-address-book text-2xl text-green-300 mb-2 block"></i>
+                        <p class="text-xs font-bold text-gray-600">คลิกหรือลากไฟล์มาวาง</p>
+                        <p class="text-xs text-gray-400 mt-1">.csv / .xlsx / .xls</p>
+                        <p class="text-xs font-semibold text-green-600 mt-1" id="regFileLabel">ยังไม่ได้เลือกไฟล์ (ไม่บังคับ)</p>
+                    </div>
+                    <input type="file" id="regFile" accept=".csv,.xlsx,.xls" class="hidden">
+                </div>
             </div>
-            <input type="file" id="csvFile" accept=".csv,.xlsx,.xls" class="hidden">
 
             <button id="btnDryRun" onclick="doDryRun()" disabled
                 class="w-full bg-[#0052CC] hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold py-3 rounded-xl transition-all flex items-center justify-center gap-2">
@@ -364,32 +386,51 @@ function switchTab(name) {
 }
 
 // ── File upload ────────────────────────────────────────────────────────────
-const csvFileInput = document.getElementById('csvFile');
-const uploadArea   = document.getElementById('uploadArea');
-const fileNameLbl  = document.getElementById('fileNameLabel');
-const btnDryRun    = document.getElementById('btnDryRun');
+const insFileInput = document.getElementById('insFile');
+const regFileInput = document.getElementById('regFile');
+const insUploadArea = document.getElementById('insUploadArea');
+const regUploadArea = document.getElementById('regUploadArea');
+const insFileLabel  = document.getElementById('insFileLabel');
+const regFileLabel  = document.getElementById('regFileLabel');
+const btnDryRun     = document.getElementById('btnDryRun');
 
-csvFileInput.addEventListener('change', () => {
-    if (csvFileInput.files[0]) {
-        fileNameLbl.textContent = csvFileInput.files[0].name;
-        btnDryRun.disabled = false;
+function updateDryRunBtn() {
+    btnDryRun.disabled = !insFileInput.files[0];
+}
+
+insFileInput.addEventListener('change', () => {
+    if (insFileInput.files[0]) {
+        insFileLabel.textContent = insFileInput.files[0].name;
+        insFileLabel.className = 'text-xs font-semibold text-blue-600 mt-1';
+        updateDryRunBtn();
+    }
+});
+regFileInput.addEventListener('change', () => {
+    if (regFileInput.files[0]) {
+        regFileLabel.textContent = regFileInput.files[0].name;
+        regFileLabel.className = 'text-xs font-semibold text-green-600 mt-1';
     }
 });
 
-uploadArea.addEventListener('dragover', e => { e.preventDefault(); uploadArea.classList.add('drag-over'); });
-uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('drag-over'));
-uploadArea.addEventListener('drop', e => {
-    e.preventDefault();
-    uploadArea.classList.remove('drag-over');
-    const file = e.dataTransfer.files[0];
-    if (file) {
-        const dt = new DataTransfer();
-        dt.items.add(file);
-        csvFileInput.files = dt.files;
-        fileNameLbl.textContent = file.name;
-        btnDryRun.disabled = false;
-    }
-});
+function setupDrop(area, input, labelEl, labelClass) {
+    area.addEventListener('dragover', e => { e.preventDefault(); area.classList.add('drag-over'); });
+    area.addEventListener('dragleave', () => area.classList.remove('drag-over'));
+    area.addEventListener('drop', e => {
+        e.preventDefault();
+        area.classList.remove('drag-over');
+        const file = e.dataTransfer.files[0];
+        if (file) {
+            const dt = new DataTransfer();
+            dt.items.add(file);
+            input.files = dt.files;
+            labelEl.textContent = file.name;
+            labelEl.className = labelClass;
+            if (input === insFileInput) updateDryRunBtn();
+        }
+    });
+}
+setupDrop(insUploadArea, insFileInput, insFileLabel, 'text-xs font-semibold text-blue-600 mt-1');
+setupDrop(regUploadArea, regFileInput, regFileLabel, 'text-xs font-semibold text-green-600 mt-1');
 
 // ── Excel → CSV conversion ─────────────────────────────────────────────────
 function isExcelFile(file) {
@@ -424,15 +465,18 @@ async function fileToCSVBlob(file) {
 let dryRunData = null;
 
 async function doDryRun() {
-    const rawFile = csvFileInput.files[0];
-    if (!rawFile) return;
+    const rawIns = insFileInput.files[0];
+    if (!rawIns) return;
 
     btnDryRun.disabled = true;
     btnDryRun.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>กำลังตรวจสอบ...';
 
-    let file;
+    let insFile, regFile = null;
     try {
-        file = await fileToCSVBlob(rawFile);
+        insFile = await fileToCSVBlob(rawIns);
+        if (regFileInput.files[0]) {
+            regFile = await fileToCSVBlob(regFileInput.files[0]);
+        }
     } catch (err) {
         Swal.fire('ข้อผิดพลาด', err.message, 'error');
         btnDryRun.disabled = false;
@@ -443,7 +487,8 @@ async function doDryRun() {
     const fd = new FormData();
     fd.append('action', 'dryrun');
     fd.append('csrf_token', CSRF);
-    fd.append('csv_file', file);
+    fd.append('insurance_file', insFile);
+    if (regFile) fd.append('registry_file', regFile);
 
     try {
         const res  = await fetch('ajax_insurance_sync.php', { method: 'POST', body: fd });
@@ -465,7 +510,7 @@ async function doDryRun() {
     }
 
     btnDryRun.innerHTML = '<i class="fa-solid fa-magnifying-glass mr-2"></i>ตรวจสอบ (Dry Run)';
-    btnDryRun.disabled = !csvFileInput.files[0];
+    btnDryRun.disabled = !insFileInput.files[0];
 }
 
 function renderDryRunResult(data) {
@@ -542,8 +587,10 @@ async function doExecute(forceOverride) {
     const fd = new FormData();
     fd.append('action', 'execute');
     fd.append('csrf_token', CSRF);
-    fd.append('csv_base64', dryRunData.csv_base64);
-    fd.append('filename', dryRunData.filename);
+    fd.append('insurance_b64', dryRunData.insurance_b64);
+    fd.append('registry_b64',  dryRunData.registry_b64 ?? '');
+    fd.append('ins_filename',  dryRunData.ins_filename);
+    fd.append('reg_filename',  dryRunData.reg_filename ?? '');
     fd.append('force_override', forceOverride ? '1' : '0');
 
     Swal.fire({ title: 'กำลังซิงค์...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });

@@ -103,11 +103,9 @@ function decode_csv_content(string $raw): string {
 
 /**
  * Parse CSV string into array of assoc rows.
- * Expected columns (case-insensitive header match):
- *   member_id, full_name, member_status, position, citizen_id, date_of_birth,
- *   coverage_start, coverage_end, policy_number, remarks
+ * @param string[] $required  required column names (default: ['member_id'])
  */
-function parse_insurance_csv(string $csvText): array {
+function parse_insurance_csv(string $csvText, array $required = ['member_id']): array {
     $lines = preg_split('/\r\n|\r|\n/', trim($csvText));
     if (count($lines) < 2) {
         return ['error' => 'ไฟล์ CSV ต้องมีอย่างน้อย 1 แถวข้อมูล (ไม่นับหัวตาราง)'];
@@ -120,7 +118,6 @@ function parse_insurance_csv(string $csvText): array {
     $headers = str_getcsv($headerLine);
     $headers = array_map(fn($h) => strtolower(trim($h)), $headers);
 
-    $required = ['member_id', 'full_name'];
     foreach ($required as $r) {
         if (!in_array($r, $headers, true)) {
             return ['error' => "ไม่พบคอลัมน์ที่จำเป็น: {$r}"];
@@ -173,6 +170,25 @@ function normalise_date(?string $d): ?string {
     return null;
 }
 
+/**
+ * Merge insurance row + registry row into one record.
+ * Registry is authoritative for personal info; insurance for coverage info.
+ */
+function merge_member_data(array $ins, array $reg): array {
+    return [
+        'member_id'      => $ins['member_id'],
+        'full_name'      => ($reg['full_name'] ?? '') ?: ($ins['full_name'] ?? ''),
+        'member_status'  => ($reg['member_status'] ?? '') ?: ($ins['member_status'] ?? ''),
+        'position'       => ($reg['position'] ?? '') ?: ($ins['position'] ?? ''),
+        'citizen_id'     => ($reg['citizen_id'] ?? '') ?: ($ins['citizen_id'] ?? ''),
+        'date_of_birth'  => ($reg['date_of_birth'] ?? '') ?: ($ins['date_of_birth'] ?? ''),
+        'coverage_start' => $ins['coverage_start'] ?? '',
+        'coverage_end'   => $ins['coverage_end'] ?? '',
+        'policy_number'  => $ins['policy_number'] ?? '',
+        'remarks'        => ($ins['remarks'] ?? '') ?: ($reg['remarks'] ?? ''),
+    ];
+}
+
 // ── Sync Lock helpers ─────────────────────────────────────────────────────────
 define('SYNC_LOCK_FILE', sys_get_temp_dir() . '/insurance_sync.lock');
 
@@ -194,65 +210,67 @@ function release_sync_lock(): void {
 // ─ Parse CSV, compute diff groups, return preview (no DB writes)
 // ═════════════════════════════════════════════════════════════════════════════
 if ($action === 'dryrun') {
-    if (!isset($_FILES['csv_file']) || $_FILES['csv_file']['error'] !== UPLOAD_ERR_OK) {
-        echo json_encode(['status' => 'error', 'message' => 'กรุณาอัปโหลดไฟล์ CSV']);
+    // ── ไฟล์บริษัทประกัน (บังคับ) ──
+    if (!isset($_FILES['insurance_file']) || $_FILES['insurance_file']['error'] !== UPLOAD_ERR_OK) {
+        echo json_encode(['status' => 'error', 'message' => 'กรุณาอัปโหลดไฟล์บริษัทประกัน']);
+        exit;
+    }
+    $insRaw = file_get_contents($_FILES['insurance_file']['tmp_name']);
+    $insParsed = parse_insurance_csv(decode_csv_content($insRaw), ['member_id']);
+    if (isset($insParsed['error'])) {
+        echo json_encode(['status' => 'error', 'message' => '[ไฟล์ประกัน] ' . $insParsed['error']]);
         exit;
     }
 
-    $rawContent = file_get_contents($_FILES['csv_file']['tmp_name']);
-    if ($rawContent === false) {
-        echo json_encode(['status' => 'error', 'message' => 'อ่านไฟล์ไม่ได้']);
-        exit;
+    // ── ไฟล์ทะเบียน (ไม่บังคับ) ──
+    $regRaw = '';
+    $registryMap = [];
+    if (isset($_FILES['registry_file']) && $_FILES['registry_file']['error'] === UPLOAD_ERR_OK) {
+        $regRaw = file_get_contents($_FILES['registry_file']['tmp_name']);
+        $regParsed = parse_insurance_csv(decode_csv_content($regRaw), ['member_id']);
+        if (!isset($regParsed['error'])) {
+            foreach ($regParsed['rows'] as $r) {
+                $registryMap[$r['member_id']] = $r;
+            }
+        }
     }
 
-    $csvText = decode_csv_content($rawContent);
-    $parsed  = parse_insurance_csv($csvText);
-
-    if (isset($parsed['error'])) {
-        echo json_encode(['status' => 'error', 'message' => $parsed['error']]);
-        exit;
-    }
-
-    $csvRows = $parsed['rows'];
-    $csvIds  = array_column($csvRows, 'member_id');
-    $csvIds  = array_map(fn($id) => (string)$id, $csvIds);
+    $insRows = $insParsed['rows'];
+    $insIds  = array_map(fn($r) => (string)$r['member_id'], $insRows);
 
     ensure_insurance_tables($pdo);
 
-    // Load existing active members
     $existingStmt = $pdo->query("SELECT member_id, full_name, insurance_status, manually_overridden FROM insurance_members");
-    $existing     = [];
+    $existing = [];
     while ($row = $existingStmt->fetch(PDO::FETCH_ASSOC)) {
         $existing[$row['member_id']] = $row;
     }
 
-    $matched      = [];
-    $newcomers    = [];
-    $inactivated  = [];
+    $matched = $newcomers = $inactivated = [];
 
-    // Check each CSV row
-    foreach ($csvRows as $row) {
-        $mid = $row['member_id'];
+    foreach ($insRows as $row) {
+        $mid    = $row['member_id'];
+        $merged = merge_member_data($row, $registryMap[$mid] ?? []);
         if (isset($existing[$mid])) {
             $matched[] = [
-                'member_id'  => $mid,
-                'full_name'  => $row['full_name'] ?: $existing[$mid]['full_name'],
-                'old_status' => $existing[$mid]['insurance_status'],
-                'new_status' => 'Active',
+                'member_id'           => $mid,
+                'full_name'           => $merged['full_name'] ?: $existing[$mid]['full_name'],
+                'position'            => $merged['position'],
+                'old_status'          => $existing[$mid]['insurance_status'],
+                'new_status'          => 'Active',
                 'manually_overridden' => (int)$existing[$mid]['manually_overridden'],
             ];
         } else {
             $newcomers[] = [
                 'member_id' => $mid,
-                'full_name' => $row['full_name'],
-                'position'  => $row['position'] ?? '',
+                'full_name' => $merged['full_name'],
+                'position'  => $merged['position'],
             ];
         }
     }
 
-    // Active members NOT in CSV → will be inactivated (skip manually_overridden)
     foreach ($existing as $mid => $ex) {
-        if ($ex['insurance_status'] === 'Active' && !in_array($mid, $csvIds, true)) {
+        if ($ex['insurance_status'] === 'Active' && !in_array($mid, $insIds, true)) {
             $inactivated[] = [
                 'member_id'           => $mid,
                 'full_name'           => $ex['full_name'],
@@ -263,29 +281,30 @@ if ($action === 'dryrun') {
         }
     }
 
-    // 30% Inactive guard
     $currentActiveCount = count(array_filter($existing, fn($e) => $e['insurance_status'] === 'Active'));
     $inactivateCount    = count(array_filter($inactivated, fn($i) => !$i['manually_overridden']));
-    $guardTriggered     = false;
-    $guardPercent       = 0;
+    $guardTriggered = false;
+    $guardPercent   = 0;
     if ($currentActiveCount > 0) {
         $guardPercent   = round($inactivateCount / $currentActiveCount * 100, 1);
         $guardTriggered = $guardPercent >= 30;
     }
 
     echo json_encode([
-        'status'           => 'ok',
-        'filename'         => htmlspecialchars($_FILES['csv_file']['name']),
-        'total_csv'        => count($csvRows),
-        'total_matched'    => count($matched),
-        'total_newcomers'  => count($newcomers),
-        'total_inactivated'=> count($inactivated),
-        'guard_triggered'  => $guardTriggered,
-        'guard_percent'    => $guardPercent,
-        'matched'          => array_slice($matched, 0, 100),
-        'newcomers'        => array_slice($newcomers, 0, 100),
-        'inactivated'      => array_slice($inactivated, 0, 100),
-        'csv_base64'       => base64_encode($rawContent), // pass back for execute step
+        'status'            => 'ok',
+        'ins_filename'      => htmlspecialchars($_FILES['insurance_file']['name']),
+        'reg_filename'      => $regRaw ? htmlspecialchars($_FILES['registry_file']['name']) : null,
+        'total_csv'         => count($insRows),
+        'total_matched'     => count($matched),
+        'total_newcomers'   => count($newcomers),
+        'total_inactivated' => count($inactivated),
+        'guard_triggered'   => $guardTriggered,
+        'guard_percent'     => $guardPercent,
+        'matched'           => array_slice($matched, 0, 100),
+        'newcomers'         => array_slice($newcomers, 0, 100),
+        'inactivated'       => array_slice($inactivated, 0, 100),
+        'insurance_b64'     => base64_encode($insRaw),
+        'registry_b64'      => $regRaw ? base64_encode($regRaw) : '',
     ]);
     exit;
 }
@@ -295,12 +314,14 @@ if ($action === 'dryrun') {
 // ─ Commit sync — write to DB, log history
 // ═════════════════════════════════════════════════════════════════════════════
 if ($action === 'execute') {
-    $csvBase64    = $_POST['csv_base64'] ?? '';
+    $insB64       = $_POST['insurance_b64'] ?? '';
+    $regB64       = $_POST['registry_b64'] ?? '';
     $forceOverride = ($_POST['force_override'] ?? '0') === '1';
-    $filename      = trim($_POST['filename'] ?? 'upload.csv');
+    $insFilename   = trim($_POST['ins_filename'] ?? 'insurance.csv');
+    $regFilename   = trim($_POST['reg_filename'] ?? '');
 
-    if (!$csvBase64) {
-        echo json_encode(['status' => 'error', 'message' => 'ไม่พบข้อมูล CSV (กรุณา Dry Run ใหม่)']);
+    if (!$insB64) {
+        echo json_encode(['status' => 'error', 'message' => 'ไม่พบข้อมูลไฟล์ประกัน (กรุณา Dry Run ใหม่)']);
         exit;
     }
 
@@ -312,18 +333,27 @@ if ($action === 'execute') {
     try {
         ensure_insurance_tables($pdo);
 
-        $rawContent = base64_decode($csvBase64);
-        $csvText    = decode_csv_content($rawContent);
-        $parsed     = parse_insurance_csv($csvText);
-
-        if (isset($parsed['error'])) {
+        $insParsed = parse_insurance_csv(decode_csv_content(base64_decode($insB64)), ['member_id']);
+        if (isset($insParsed['error'])) {
             release_sync_lock();
-            echo json_encode(['status' => 'error', 'message' => $parsed['error']]);
+            echo json_encode(['status' => 'error', 'message' => '[ไฟล์ประกัน] ' . $insParsed['error']]);
             exit;
         }
+        $insRows = $insParsed['rows'];
+        $csvIds  = array_column($insRows, 'member_id');
 
-        $csvRows = $parsed['rows'];
-        $csvIds  = array_column($csvRows, 'member_id');
+        // Registry map (optional)
+        $registryMap = [];
+        if ($regB64) {
+            $regParsed = parse_insurance_csv(decode_csv_content(base64_decode($regB64)), ['member_id']);
+            if (!isset($regParsed['error'])) {
+                foreach ($regParsed['rows'] as $r) {
+                    $registryMap[$r['member_id']] = $r;
+                }
+            }
+        }
+
+        $csvRows = $insRows; // alias for compatibility below
 
         // Load existing
         $existingStmt = $pdo->query("SELECT * FROM insurance_members");
@@ -360,9 +390,10 @@ if ($action === 'execute') {
             INSERT INTO insurance_sync_logs (synced_by, filename, total_matched, total_inactivated, total_newcomers, total_active, notes)
             VALUES (:uid, :fn, 0, 0, 0, 0, '')
         ");
+        $combinedFilename = $insFilename . ($regFilename ? ' + ' . $regFilename : '');
         $logStmt->execute([
             ':uid' => $_SESSION['admin_id'] ?? 0,
-            ':fn'  => $filename,
+            ':fn'  => $combinedFilename,
         ]);
         $syncId = (int)$pdo->lastInsertId();
 
@@ -397,21 +428,22 @@ if ($action === 'execute') {
         ");
 
         foreach ($csvRows as $row) {
-            $mid       = $row['member_id'];
-            $oldStatus = $existing[$mid]['insurance_status'] ?? 'new';
+            $mid        = $row['member_id'];
+            $merged     = merge_member_data($row, $registryMap[$mid] ?? []);
+            $oldStatus  = $existing[$mid]['insurance_status'] ?? 'new';
             $changeType = isset($existing[$mid]) ? 'matched' : 'inserted';
 
             $upsertStmt->execute([
                 ':mid' => $mid,
-                ':fn'  => $row['full_name'] ?? '',
-                ':ms'  => $row['member_status'] ?? '',
-                ':pos' => $row['position'] ?? '',
-                ':cid' => $row['citizen_id'] ?? '',
-                ':dob' => normalise_date($row['date_of_birth'] ?? null),
-                ':cs'  => normalise_date($row['coverage_start'] ?? null),
-                ':ce'  => normalise_date($row['coverage_end'] ?? null),
-                ':pn'  => $row['policy_number'] ?? '',
-                ':rem' => $row['remarks'] ?? '',
+                ':fn'  => $merged['full_name'],
+                ':ms'  => $merged['member_status'],
+                ':pos' => $merged['position'],
+                ':cid' => $merged['citizen_id'],
+                ':dob' => normalise_date($merged['date_of_birth'] ?: null),
+                ':cs'  => normalise_date($merged['coverage_start'] ?: null),
+                ':ce'  => normalise_date($merged['coverage_end'] ?: null),
+                ':pn'  => $merged['policy_number'],
+                ':rem' => $merged['remarks'],
                 ':sid' => $syncId,
             ]);
 
@@ -421,7 +453,7 @@ if ($action === 'execute') {
                 ':ct'   => $changeType,
                 ':old'  => $oldStatus,
                 ':new'  => 'Active',
-                ':snap' => json_encode($row),
+                ':snap' => json_encode($merged),
             ]);
 
             if ($changeType === 'inserted') $cntNewcomers++;
