@@ -193,13 +193,15 @@ function get_email_template(string $title, string $message, array $details = [],
         'success'  => '#059669',
         'approved' => '#0052CC',
         'cancel'   => '#dc2626',
+        'reminder' => '#d97706',
         default    => '#0052CC',
     };
     $iconEmoji = match($type) {
-        'success'  => '',
-        'approved' => '',
-        'cancel'   => '',
-        default    => '',
+        'success'  => '✅',
+        'approved' => '✅',
+        'cancel'   => '❌',
+        'reminder' => '⏰',
+        default    => 'ℹ️',
     };
 
     $detailRows = '';
@@ -296,6 +298,13 @@ function notify_booking_status(string $to, string $type, array $data): bool {
             $message  = "{$greeting} เจ้าหน้าที่ขอยกเลิกคิวเดิมของคุณ เนื่องจากมีเหตุจำเป็น กรุณาเข้าสู่ระบบเพื่อจองรอบเวลาใหม่";
             $details['สถานะ'] = 'คิวถูกยกเลิก (กรุณาจองใหม่)';
             $tplType  = 'cancel';
+            break;
+
+        case 'reminder':
+            $subject    = "⏰ แจ้งเตือน: นัดหมายพรุ่งนี้ — {$title}";
+            $emailTitle = 'แจ้งเตือนนัดหมายพรุ่งนี้';
+            $message    = "{$greeting} ขอเตือนว่าคุณมีนัดหมายกิจกรรม <strong>{$title}</strong> ในวันพรุ่งนี้ กรุณาเตรียมตัวและมาตามนัดหมายด้วยนะคะ";
+            $tplType    = 'reminder';
             break;
 
         default:
