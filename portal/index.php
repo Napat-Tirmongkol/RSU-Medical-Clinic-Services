@@ -169,6 +169,21 @@ $projects = [
         ]
     ],
 
+    [
+        'id' => 'insurance_sync',
+        'title' => 'Insurance Sync Hub',
+        'description' => 'ศูนย์กลางอัปเดตสิทธิ์ประกัน — นำเข้า CSV จากสำนักทะเบียน ตรวจสอบ Dry Run และจัดการสมาชิก Active/Inactive',
+        'icon' => 'fa-shield-halved',
+        'bg_color' => 'bg-indigo-50',
+        'icon_color' => 'text-indigo-600',
+        'border_color' => 'border-indigo-100',
+        'allowed_roles' => ['admin', 'superadmin', 'editor'],
+        'badges' => ['Insurance', 'Sync'],
+        'actions' => [
+            ['label' => 'Open Insurance Sync Hub', 'url' => 'insurance_sync.php', 'primary' => true],
+        ]
+    ],
+
     /**
      * ตัวอย่างการเพิ่มโปรเจกต์ในอนาคต:
      * เพียงแค่ก๊อปปี้บล็อกนี้แล้วเปลี่ยน URL/Icon ระบบจะวาดหน้า Layout ให้เองทันที
@@ -194,6 +209,7 @@ $categoryMap = [
     'identity_governance' => 'core',
     'e_campaign' => 'core',
     'e_borrow' => 'core',
+    'insurance_sync' => 'core',
     'system_logs' => 'tools',
     'admin_tool' => 'tools',
     'future_app' => 'dev',

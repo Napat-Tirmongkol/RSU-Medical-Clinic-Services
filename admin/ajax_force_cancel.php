@@ -84,68 +84,80 @@ try {
         
         $messageText = "ขออภัยค่ะ เนื่องจากวันนี้มีผู้เข้าร่วมกิจกรรม {$campaignTitle} เกินจำนวนที่รองรับได้ หรือมีเหตุจำเป็น ระบบจึงขออนุญาตยกเลิกคิวของคุณในวันที่ {$dateLabel} เวลา {$timeLabel} น. \n\nกรุณากดปุ่มด้านล่างเพื่อทำการจองรอบเวลาใหม่ค่ะ";
         
-        $liffUrl = "https://liff.line.me/YOUR_LIFF_ID_HERE"; // Replace with actual LIFF URL or external URL
-        
-        $postData = [
-            'to' => $lineUserId,
-            'messages' => [
-                [
-                    'type' => 'flex',
-                    'altText' => "แจ้งเตือนการยกเลิกคิว (เพื่อเลื่อนวัน) - กิจกรรม {$campaignTitle}",
-                    'contents' => [
-                        'type' => 'bubble',
-                        'size' => 'giga',
-                        'header' => [
-                            'type' => 'box',
-                            'layout' => 'vertical',
-                            'backgroundColor' => '#EF4444',
-                            'contents' => [
-                                [
-                                    'type' => 'text',
-                                    'text' => '[แจ้งเตือน] ยกเลิกคิว (คิวเต็ม)',
-                                    'color' => '#FFFFFF',
-                                    'weight' => 'bold',
-                                    'size' => 'lg',
-                                    'align' => 'center'
-                                ]
-                            ]
-                        ],
-                        'body' => [
-                            'type' => 'box',
-                            'layout' => 'vertical',
-                            'contents' => [
-                                [
-                                    'type' => 'text',
-                                    'text' => $messageText,
-                                    'wrap' => true,
-                                    'size' => 'sm',
-                                    'color' => '#666666'
-                                ]
-                            ]
-                        ],
-                        'footer' => [
-                            'type' => 'box',
-                            'layout' => 'vertical',
-                            'contents' => [
-                                [
-                                    'type' => 'button',
-                                    'style' => 'primary',
-                                    'color' => '#0052CC',
-                                    'action' => [
-                                        'type' => 'uri',
-                                        'label' => 'จองรอบเวลาใหม่',
-                                        'uri' => $liffUrl
-                                    ]
-                                ]
-                            ]
-                        ]
+        // Load LINE config and LIFF URL from secrets
+        $lineSecrets = file_exists(__DIR__ . '/../config/secrets.php') ? require __DIR__ . '/../config/secrets.php' : [];
+        $liffId  = $lineSecrets['LINE_LIFF_ID'] ?? '';
+        $lineToken = $lineSecrets['EBORROW_LINE_MESSAGE_TOKEN'] ?? $lineSecrets['LINE_MESSAGING_CHANNEL_ACCESS_TOKEN'] ?? '';
+        $liffUrl = $liffId ? "https://liff.line.me/{$liffId}" : "https://healthycampus.rsu.ac.th/e-campaignv2/user/index.php";
+
+        $lineMessages = [
+            [
+                'type' => 'flex',
+                'altText' => "แจ้งเตือนการยกเลิกคิว (เพื่อเลื่อนวัน) - กิจกรรม {$campaignTitle}",
+                'contents' => [
+                    'type' => 'bubble',
+                    'size' => 'giga',
+                    'header' => [
+                        'type' => 'box',
+                        'layout' => 'vertical',
+                        'backgroundColor' => '#EF4444',
+                        'contents' => [[
+                            'type' => 'text',
+                            'text' => '[แจ้งเตือน] ยกเลิกคิว (คิวเต็ม)',
+                            'color' => '#FFFFFF',
+                            'weight' => 'bold',
+                            'size' => 'lg',
+                            'align' => 'center',
+                        ]]
+                    ],
+                    'body' => [
+                        'type' => 'box',
+                        'layout' => 'vertical',
+                        'contents' => [[
+                            'type' => 'text',
+                            'text' => $messageText,
+                            'wrap' => true,
+                            'size' => 'sm',
+                            'color' => '#666666',
+                        ]]
+                    ],
+                    'footer' => [
+                        'type' => 'box',
+                        'layout' => 'vertical',
+                        'contents' => [[
+                            'type' => 'button',
+                            'style' => 'primary',
+                            'color' => '#0052CC',
+                            'action' => ['type' => 'uri', 'label' => 'จองรอบเวลาใหม่', 'uri' => $liffUrl],
+                        ]]
                     ]
                 ]
             ]
         ];
 
-        // If you have LINE API set up, you would do curl out here:
-        // ... (as in the original file)
+        if (!empty($lineToken)) {
+            try {
+                $ch = curl_init('https://api.line.me/v2/bot/message/push');
+                curl_setopt_array($ch, [
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_POST           => true,
+                    CURLOPT_POSTFIELDS     => json_encode(['to' => $lineUserId, 'messages' => $lineMessages]),
+                    CURLOPT_HTTPHEADER     => [
+                        'Content-Type: application/json',
+                        'Authorization: Bearer ' . $lineToken,
+                    ],
+                    CURLOPT_TIMEOUT        => 10,
+                ]);
+                curl_exec($ch);
+                $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                curl_close($ch);
+                if ($httpCode !== 200) {
+                    error_log("Force Cancel LINE push failed (HTTP {$httpCode}) for user {$lineUserId}");
+                }
+            } catch (Exception $e) {
+                error_log("Force Cancel LINE Error: " . $e->getMessage());
+            }
+        }
     }
     
     $pdo->commit();
