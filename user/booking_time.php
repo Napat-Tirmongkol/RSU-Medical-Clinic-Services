@@ -21,8 +21,8 @@ if ($year == 0 || $month == 0 || $day == 0 || $campaignId == 0) {
 }
 
 $selectedDateStr = sprintf('%04d-%02d-%02d', $year, $month, $day);
-$months      = __('bookings.months_short');
-$isBuddhist  = __('bookings.date_buddhist');
+$months      = $GLOBALS['_tr']['bookings.months_short'] ?? [];
+$isBuddhist  = $GLOBALS['_tr']['bookings.date_buddhist'] ?? false;
 $displayYear = $isBuddhist ? $year + 543 : $year;
 $displayDate = (int)$day . ' ' . $months[(int)$month] . ' ' . $displayYear;
 
