@@ -94,6 +94,24 @@ if ($isUserFolder && !in_array($currentPage, $excludedPages)) {
             }
             // Store global user data for header
             $GLOBALS['HEADER_USER_DATA'] = $uProf;
+
+            // --- กำหนดสีธีมตามสถานะ ---
+            $userStatus = $uProf['status'] ?? 'student';
+            if ($userStatus === 'staff' || $userStatus === 'faculty') {
+                // โทนสี Indigo สำหรับบุคลากร/อาจารย์
+                $GLOBALS['THEME_COLOR'] = [
+                    'bg' => 'from-[#312e81] to-[#4338ca]', // Indigo 900 to 700
+                    'accent' => 'bg-white/10',
+                    'loader' => '#4338ca'
+                ];
+            } else {
+                // โทนสี Blue เดิมสำหรับนักศึกษาและอื่นๆ
+                $GLOBALS['THEME_COLOR'] = [
+                    'bg' => 'from-[#0052CC] to-[#0070f3]',
+                    'accent' => 'bg-white/15',
+                    'loader' => '#0052CC'
+                ];
+            }
         } catch (Exception $e) { }
     }
 }
@@ -142,9 +160,14 @@ function render_header(string $title = 'E-Vax'): void {
       </style>
     </head>
     <body class="bg-[#f4f7fa] h-[100dvh] w-full overflow-hidden flex justify-center text-gray-900">
+      <?php 
+        $tBg     = $GLOBALS['THEME_COLOR']['bg'] ?? 'from-[#0052CC] to-[#0070f3]';
+        $tLoader = $GLOBALS['THEME_COLOR']['loader'] ?? '#0052CC';
+        $tAccent = $GLOBALS['THEME_COLOR']['accent'] ?? 'bg-white/15';
+      ?>
       <div id="page-loader" class="fixed inset-0 z-[9999] bg-[#f4f7fa] flex flex-col items-center justify-center transition-opacity duration-300">
-        <div class="relative w-16 h-16"><div class="absolute inset-0 rounded-full border-4 border-blue-100"></div><div class="absolute inset-0 rounded-full border-4 border-[#0052CC] border-t-transparent animate-spin"></div></div>
-        <p class="mt-4 text-[#0052CC] font-semibold text-sm animate-pulse font-prompt"><?= htmlspecialchars(__('loading')) ?></p>
+        <div class="relative w-16 h-16"><div class="absolute inset-0 rounded-full border-4 border-gray-100"></div><div class="absolute inset-0 rounded-full border-4 border-[<?= $tLoader ?>] border-t-transparent animate-spin"></div></div>
+        <p class="mt-4 text-[<?= $tLoader ?>] font-semibold text-sm animate-pulse font-prompt"><?= htmlspecialchars(__('loading')) ?></p>
       </div>
 
       <main class="w-full max-w-md h-full bg-white shadow-xl relative overflow-y-auto overflow-x-hidden custom-scrollbar">
@@ -155,7 +178,7 @@ function render_header(string $title = 'E-Vax'): void {
             $displayName = ($user['prefix'] ?? '') . ($user['full_name'] ?? 'ผู้ใช้');
           ?>
           <!-- ── Global User Header ────────────────────────────────────────── -->
-          <div class="bg-gradient-to-br from-[#0052CC] to-[#0070f3] p-6 pb-11 flex-shrink-0 relative overflow-hidden">
+          <div class="bg-gradient-to-br <?= $tBg ?> p-6 pb-11 flex-shrink-0 relative overflow-hidden transition-colors duration-500">
             <!-- Ambient Light Effect -->
             <div class="absolute -right-10 -top-10 w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
             
@@ -193,7 +216,7 @@ function render_header(string $title = 'E-Vax'): void {
               <div class="flex-1">
                 <h2 class="text-[17px] font-extrabold text-white leading-tight">สวัสดี, <?= htmlspecialchars($displayName) ?> 👋</h2>
                 <div class="flex items-center gap-1.5 mt-1.5">
-                  <span class="inline-flex items-center gap-1.5 px-3 py-1 bg-white/10 border border-white/20 rounded-full text-[10px] font-black text-white uppercase tracking-wider shadow-sm backdrop-blur-md">
+                  <span class="inline-flex items-center gap-1.5 px-3 py-1 <?= $tAccent ?> border border-white/20 rounded-full text-[10px] font-black text-white uppercase tracking-wider shadow-sm backdrop-blur-md">
                     <span class="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span>
                     <?= htmlspecialchars($statusLabel) ?>
                   </span>
