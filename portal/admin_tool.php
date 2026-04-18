@@ -430,7 +430,7 @@ foreach ($projects as $p) {
             </a>
             <!-- Sentry card -->
             <?php $sentryConfigured = defined('SENTRY_BROWSER_KEY') && SENTRY_BROWSER_KEY !== ''; ?>
-            <a href="../admin/sentry_test.php" class="log-card group">
+            <a href="index.php?section=sentry_test" class="log-card group">
                 <div class="flex items-start gap-4">
                     <div class="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0
                                 <?= $sentryConfigured ? 'bg-violet-50 text-violet-600' : 'bg-gray-100 text-gray-400' ?>
