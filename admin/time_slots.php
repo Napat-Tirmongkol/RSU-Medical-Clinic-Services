@@ -241,7 +241,7 @@ $header_actions = '
         <i class="fa-solid fa-list-ul"></i>
     </button>
 </div>
-<button id="addSlotBtn" onclick="openAddSlotModal(\'' . date('Y-m-d') . '\')" class="bg-gradient-to-r from-emerald-600 to-[#2e9e63] text-white px-5 py-2.5 rounded-xl font-prompt text-sm font-bold shadow-md hover:shadow-emerald-500/30 hover:-translate-y-0.5 transition-all flex items-center gap-2">
+<button id="addSlotBtn" onclick="openAddSlotModal('<?= date('Y-m-d') ?>')" class="bg-[#2e9e63] text-white px-5 py-2.5 rounded-xl font-prompt text-sm font-bold shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/40 hover:-translate-y-0.5 transition-all flex items-center gap-2" style="background-color: #2e9e63;">
     <i class="fa-solid fa-plus-circle"></i><span class="btn-add-text"> สร้างรอบเวลา</span>
 </button>
 <select id="monthSelect" onchange="location.href=\'?month=\'+this.value.split(\'-\')[1]+\'&year=\'+this.value.split(\'-\')[0]" class="px-4 py-2.5 border border-gray-200 rounded-xl bg-white font-prompt text-sm font-bold text-gray-700 outline-none shadow-sm cursor-pointer hover:bg-gray-50">';
@@ -424,9 +424,6 @@ renderPageHeader("Campaign Time Slots", "กำหนดช่วงเวลา
     <p class="text-gray-500 font-medium mb-6 text-center text-sm max-w-sm">
         เลือกเดือนและปี จากแถบเครื่องมือด้านบน<br>แล้วกดสร้างรอบเวลาแคมเปญ เพื่อเริ่มต้นเพิ่มคิวจอง
     </p>
-    <button onclick="openAddSlotModal('<?= date('Y-m-d') ?>')" class="bg-[#2e9e63] text-white px-6 py-2.5 rounded-xl font-prompt text-sm font-bold shadow-md hover:shadow-emerald-500/30 hover:-translate-y-0.5 transition-all flex items-center gap-2">
-        <i class="fa-solid fa-plus-circle"></i> สร้างรอบเวลาแรก
-    </button>
 </div>
 <?php endif; ?>
 
@@ -580,7 +577,7 @@ renderPageHeader("Campaign Time Slots", "กำหนดช่วงเวลา
     </div>
 </div>
 
-<div id="slotModal" class="fixed inset-0 z-50 bg-gray-900/60 backdrop-blur-sm hidden flex items-center justify-center p-4">
+<div id="slotModal" class="fixed inset-0 z-[1000] bg-gray-900/60 backdrop-blur-sm hidden flex items-center justify-center p-4">
     <div class="glass-modal rounded-[24px] w-full max-w-lg flex flex-col max-h-[90vh] overflow-hidden animate-slide-up border border-white/50">
         <div class="modal-hdr-blue p-5 flex justify-between items-center shrink-0">
             <h3 class="text-lg font-black text-white flex items-center gap-3">
@@ -681,13 +678,13 @@ renderPageHeader("Campaign Time Slots", "กำหนดช่วงเวลา
             
             <div class="p-5 border-t border-gray-100 bg-gray-50/50 shrink-0 flex gap-3">
                 <button type="button" onclick="document.getElementById('slotModal').classList.add('hidden')" class="w-1/3 bg-white border-2 border-gray-200 text-gray-700 font-bold py-3.5 rounded-2xl hover:bg-gray-50 hover:border-gray-300 transition-colors shadow-sm">ยกเลิก</button>
-                <button type="submit" class="w-2/3 bg-gradient-to-r from-emerald-600 to-[#2e9e63] text-white font-bold py-3.5 rounded-2xl hover:shadow-lg hover:shadow-emerald-500/30 hover:-translate-y-0.5 transition-all text-lg tracking-wide shadow-sm flex items-center justify-center gap-2"><i class="fa-solid fa-save"></i> บันทึกรอบเวลา</button>
+                <button type="submit" class="w-2/3 bg-[#2e9e63] text-white font-bold py-3.5 rounded-2xl hover:shadow-lg hover:shadow-emerald-500/30 hover:-translate-y-0.5 transition-all text-lg tracking-wide shadow-sm flex items-center justify-center gap-2" style="background-color: #2e9e63;"><i class="fa-solid fa-save"></i> บันทึกรอบเวลา</button>
             </div>
         </form>
     </div>
 </div>
 
-<div id="editSlotModal" class="fixed inset-0 z-50 bg-gray-900/60 backdrop-blur-sm hidden flex items-center justify-center p-4">
+<div id="editSlotModal" class="fixed inset-0 z-[1000] bg-gray-900/60 backdrop-blur-sm hidden flex items-center justify-center p-4">
     <div class="glass-modal rounded-[24px] w-full max-w-lg flex flex-col max-h-[90vh] overflow-hidden animate-slide-up border border-white/50">
         <div class="modal-hdr-amber p-5 flex justify-between items-center shrink-0">
             <h3 class="text-lg font-black text-white flex items-center gap-3">
@@ -735,7 +732,7 @@ renderPageHeader("Campaign Time Slots", "กำหนดช่วงเวลา
 
             <div class="p-5 border-t border-gray-100 bg-gray-50/50 shrink-0 flex gap-3">
                 <button type="button" onclick="document.getElementById('editSlotModal').classList.add('hidden')" class="w-1/3 bg-white border-2 border-gray-200 text-gray-700 font-bold py-3.5 rounded-2xl hover:bg-gray-50 hover:border-gray-300 transition-colors shadow-sm">ยกเลิก</button>
-                <button type="submit" class="w-2/3 bg-gradient-to-r from-amber-500 to-amber-600 text-white font-bold py-3.5 rounded-2xl hover:shadow-lg hover:shadow-amber-500/30 hover:-translate-y-0.5 transition-all text-lg tracking-wide shadow-sm flex items-center justify-center gap-2"><i class="fa-solid fa-save"></i> บันทึกการแก้ไข</button>
+                <button type="submit" class="w-2/3 bg-[#f59e0b] text-white font-bold py-3.5 rounded-2xl hover:shadow-lg hover:shadow-amber-500/30 hover:-translate-y-0.5 transition-all text-lg tracking-wide shadow-sm flex items-center justify-center gap-2" style="background-color: #f59e0b;"><i class="fa-solid fa-save"></i> บันทึกการแก้ไข</button>
             </div>
         </form>
     </div>

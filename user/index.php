@@ -63,7 +63,7 @@ render_header('เข้าสู่ระบบ');
                 <i class="fa-solid fa-syringe text-4xl text-[#0052CC]"></i>
             </div>
             <h1 class="text-2xl font-bold text-gray-900 font-prompt">RSU Medical Clinic Portal</h1>
-            <p class="text-gray-500 text-sm mt-1 font-prompt">มหาวิทยาลัยรังสิต</p>
+            <p class="text-gray-500 text-sm mt-1 font-prompt">คลินิกเวชกรรม มหาวิทยาลัยรังสิต</p>
         </div>
 
         <!-- Login Card -->
