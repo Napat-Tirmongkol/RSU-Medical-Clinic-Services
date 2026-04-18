@@ -406,9 +406,9 @@ render_header('ข้อมูลส่วนตัว');
 
     <div class="mt-8 pt-4 border-t border-gray-100 flex gap-3 w-full">
       <?php if ($isEditing): ?>
-        <a href="<?= $redirectBack !== '' ? htmlspecialchars($redirectBack) : 'my_bookings.php' ?>"
+        <a href="<?= $redirectBack !== '' ? htmlspecialchars($redirectBack) : 'hub.php' ?>"
            class="flex-none flex items-center justify-center px-5 py-4 border border-gray-200 rounded-xl text-gray-600 font-bold font-prompt transition-all hover:bg-gray-50 active:scale-[0.98]">
-          ยกเลิก
+          ย้อนกลับ
         </a>
         <button type="submit"
           class="flex-1 bg-[#0052CC] hover:bg-blue-700 text-white font-bold py-4 rounded-xl transition-all shadow-sm active:scale-[0.98] font-prompt">

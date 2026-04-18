@@ -136,7 +136,14 @@ function render_header(string $title = 'E-Vax'): void {
             <div class="absolute -right-10 -top-10 w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
             
             <div class="flex items-center justify-between mb-5 relative z-10">
-              <span class="text-[10px] font-black uppercase tracking-[0.2em] text-white/60">RSU Medical Hub</span>
+              <div class="flex items-center gap-3">
+                <?php if ($currentPage !== 'hub.php'): ?>
+                  <a href="javascript:history.length > 1 ? history.back() : location.href='hub.php'" class="w-8 h-8 flex items-center justify-center bg-white/10 hover:bg-white/20 rounded-full text-white transition-all">
+                    <i class="fa-solid fa-chevron-left text-sm"></i>
+                  </a>
+                <?php endif; ?>
+                <span class="text-[10px] font-black uppercase tracking-[0.2em] text-white/60">RSU Medical Hub</span>
+              </div>
               <div class="flex items-center gap-2">
                 <!-- Language Switcher -->
                 <a href="<?= htmlspecialchars(lang_switch_url()) ?>" class="flex items-center gap-1.5 py-1.5 px-3 bg-white/10 hover:bg-white/20 border border-white/10 rounded-full text-[10px] font-black text-white transition-all">
