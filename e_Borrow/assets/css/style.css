@@ -24,8 +24,8 @@
 
 /* 1. CSS Variables (ตัวแปรสี) */
 :root {
-    --color-primary: #18B659; 
-    --color-primary-dark: #138F46; 
+    --color-primary: #0052CC;
+    --color-primary-dark: #003d99;
     --color-page-bg: #f5f6fa; 
     --color-content-bg: #FFFFFF; 
     --color-header-bg: #f9fafb;
@@ -67,10 +67,10 @@ body {
 
 /* 3. Layout (โครงสร้าง) */
 .header {
-    background-color: var(--color-primary);
+    background: linear-gradient(135deg, #0052CC 0%, #0070f3 100%);
     color: var(--color-text-light);
     padding: 15px 30px;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    box-shadow: 0 2px 12px rgba(0,82,204,0.25);
     position: fixed;
     width: 100%;
     top: 0;
@@ -612,7 +612,7 @@ body {
 
 /* สไตล์สำหรับปุ่มที่ "Active" (หน้าปัจจุบัน) */
 .footer-nav a.active {
-    color: var(--color-primary, #0B6623); /* ใช้สีหลักของเว็บ */
+    color: var(--color-primary, #0052CC); /* ใช้สีหลักของเว็บ */
     font-weight: bold;
 }
 
