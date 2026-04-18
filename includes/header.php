@@ -198,7 +198,8 @@ if ($isUserFolder && !in_array($currentPage, $excludedPages)) {
           (($uProf['status'] ?? 'other') !== 'other' && trim((string)($uProf['student_personnel_id'] ?? '')) === '')
       );
 
-      if ($isProfileIncomplete) {
+      // [Safety Bypass] หากเป็นหน้า hub.php ให้ผ่านเข้ามาก่อน เพื่อเลิกการวนซ้ำ (Redirect Loop)
+      if ($isProfileIncomplete && $currentPage !== 'hub.php') {
           header('Location: profile.php');
           exit;
       }
