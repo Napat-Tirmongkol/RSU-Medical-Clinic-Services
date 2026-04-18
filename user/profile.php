@@ -36,7 +36,8 @@ try {
   try { $pdo->exec("ALTER TABLE sys_users ADD COLUMN IF NOT EXISTS first_name VARCHAR(100) NOT NULL DEFAULT ''"); } catch (PDOException) {}
   try { $pdo->exec("ALTER TABLE sys_users ADD COLUMN IF NOT EXISTS last_name  VARCHAR(100) NOT NULL DEFAULT ''"); } catch (PDOException) {}
 
-  $stmt = $pdo->prepare("SELECT prefix, first_name, last_name, full_name, student_personnel_id, citizen_id, phone_number, status, email, gender FROM sys_users WHERE line_user_id = :line_id LIMIT 1");
+  try { $pdo->exec("ALTER TABLE sys_users ADD COLUMN IF NOT EXISTS department VARCHAR(150) NOT NULL DEFAULT ''"); } catch (PDOException) {}
+  $stmt = $pdo->prepare("SELECT prefix, first_name, last_name, full_name, student_personnel_id, citizen_id, phone_number, status, email, gender, department FROM sys_users WHERE line_user_id = :line_id LIMIT 1");
   $stmt->execute([':line_id' => $lineUserId]);
   $user = $stmt->fetch();
 
@@ -51,6 +52,7 @@ try {
     $userData['status']     = $user['status']               ?? '';
     $userData['email']      = $user['email']                ?? '';
     $userData['gender']     = $user['gender']               ?? '';
+    $userData['department'] = $user['department']           ?? '';
   }
 } catch (PDOException $e) {
   // กรณี Error ให้ปล่อยผ่านไปกรอกใหม่
@@ -335,6 +337,16 @@ render_header('ข้อมูลส่วนตัว');
               class="text-red-500">*</span></label>
           <input id="id_number" name="id_number" type="text" maxlength="7"
             value="<?= htmlspecialchars($userData['id_number']) ?>" placeholder="กรอกรหัสตัวเลข 7 หลัก"
+            class="w-full p-4 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0052CC] focus:border-transparent outline-none transition-all placeholder:text-gray-400 font-prompt" />
+        </div>
+        <div class="space-y-1.5">
+          <label class="text-sm font-semibold text-gray-700 font-prompt" for="department">
+            คณะ / หน่วยงาน
+            <span class="text-gray-400 font-normal text-xs ml-1">(ไม่บังคับ)</span>
+          </label>
+          <input id="department" name="department" type="text"
+            value="<?= htmlspecialchars($userData['department']) ?>"
+            placeholder="เช่น วิทยาลัยแพทยศาสตร์"
             class="w-full p-4 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0052CC] focus:border-transparent outline-none transition-all placeholder:text-gray-400 font-prompt" />
         </div>
         <div class="space-y-1.5">

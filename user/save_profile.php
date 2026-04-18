@@ -32,6 +32,7 @@ $phoneNumber = trim((string) ($_POST['phone_number'] ?? ''));
 $status      = trim((string) ($_POST['status']       ?? ''));
 $email       = trim((string) ($_POST['email']        ?? ''));
 $gender      = trim((string) ($_POST['gender']       ?? ''));
+$department  = trim((string) ($_POST['department']   ?? ''));
 $redirectBack = trim((string) ($_POST['redirect_back'] ?? ''));
 
 if ($prefix === '') {
@@ -87,14 +88,15 @@ try {
                     phone_number = :phone,
                     status = :status,
                     email  = :email,
-                    gender = :gender
+                    gender = :gender,
+                    department = :dept
                 WHERE line_user_id = :line_id";
     } else {
         // --- INSERT ---
         $sql = "INSERT INTO sys_users
-                    (line_user_id, prefix, first_name, last_name, full_name, student_personnel_id, citizen_id, phone_number, status, email, gender)
+                    (line_user_id, prefix, first_name, last_name, full_name, student_personnel_id, citizen_id, phone_number, status, email, gender, department)
                 VALUES
-                    (:line_id, :prefix, :first_name, :last_name, :name, :sid, :cid, :phone, :status, :email, :gender)";
+                    (:line_id, :prefix, :first_name, :last_name, :name, :sid, :cid, :phone, :status, :email, :gender, :dept)";
     }
 
     $stmt = $pdo->prepare($sql);
@@ -109,6 +111,7 @@ try {
         ':status'     => $status,
         ':email'      => $email,
         ':gender'     => $gender,
+        ':dept'       => $department,
         ':line_id'    => $lineUserId,
     ]);
 
