@@ -79,6 +79,9 @@ if (!$line_user_id) {
 
 try {
     $pdo = db();
+    
+    // Migration: เพิ่ม column picture_url ถ้ายังไม่มี
+    try { $pdo->exec("ALTER TABLE sys_users ADD COLUMN IF NOT EXISTS picture_url TEXT"); } catch (PDOException $e) {}
 
     // 3. ตรวจสอบว่าผู้ใช้ใน LINE นี้มีอยู่ในฐานข้อมูลหรือไม่
     $stmt = $pdo->prepare("SELECT id, full_name, line_user_id FROM sys_users WHERE line_user_id = :line_user_id LIMIT 1");
@@ -86,8 +89,15 @@ try {
     $user = $stmt->fetch();
 
     if ($user) {
+        // อัปเดตรูปโปรไฟล์ล่าสุดเสมอ
+        if (!empty($profile['pictureUrl'])) {
+            $stmtUpdate = $pdo->prepare("UPDATE sys_users SET picture_url = :pic WHERE id = :id");
+            $stmtUpdate->execute([':pic' => $profile['pictureUrl'], ':id' => $user['id']]);
+        }
+
         // ✅ พบ User เดิม — ตั้ง Session ร่วมที่รองรับทั้ง e-campaign และ e_Borrow
         $_SESSION['line_user_id']      = $user['line_user_id'];
+        $_SESSION['line_picture']      = $profile['pictureUrl'] ?? '';
 
         // Session สำหรับ e-campaign
         $_SESSION['evax_student_id']   = (int)$user['id'];

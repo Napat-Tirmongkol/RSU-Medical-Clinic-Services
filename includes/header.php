@@ -80,7 +80,7 @@ if ($isUserFolder && !in_array($currentPage, $excludedPages)) {
         try {
             require_once __DIR__ . '/../config/db_connect.php';
             $pdoCheck = db();
-            $stmtCheck = $pdoCheck->prepare("SELECT prefix, full_name, student_personnel_id, citizen_id, phone_number, status FROM sys_users WHERE line_user_id = :lid LIMIT 1");
+            $stmtCheck = $pdoCheck->prepare("SELECT prefix, full_name, student_personnel_id, citizen_id, phone_number, status, picture_url FROM sys_users WHERE line_user_id = :lid LIMIT 1");
             $stmtCheck->execute([':lid' => $lineUserId]);
             $uProf = $stmtCheck->fetch();
 
@@ -149,8 +149,15 @@ function render_header(string $title = 'E-Vax'): void {
             </div>
 
             <div class="flex items-center gap-4 relative z-10">
-              <div class="w-14 h-14 rounded-2xl bg-white/15 backdrop-blur-md flex items-center justify-center border-2 border-white/20 shadow-lg">
-                <i class="fa-solid fa-user-astronaut text-2xl text-white"></i>
+              <div class="w-14 h-14 rounded-2xl bg-white/15 backdrop-blur-md flex items-center justify-center border-2 border-white/20 shadow-lg overflow-hidden">
+                <?php 
+                  $profilePic = $user['picture_url'] ?? $_SESSION['line_picture'] ?? '';
+                  if (!empty($profilePic)): 
+                ?>
+                  <img src="<?= htmlspecialchars($profilePic) ?>" alt="Profile" class="w-full h-full object-cover">
+                <?php else: ?>
+                  <i class="fa-solid fa-user-astronaut text-2xl text-white"></i>
+                <?php endif; ?>
               </div>
               <div class="flex-1">
                 <h2 class="text-[17px] font-extrabold text-white leading-tight">สวัสดี, <?= htmlspecialchars($displayName) ?> 👋</h2>
