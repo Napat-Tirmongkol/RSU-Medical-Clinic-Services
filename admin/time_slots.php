@@ -241,7 +241,7 @@ $header_actions = '
         <i class="fa-solid fa-list-ul"></i>
     </button>
 </div>
-<button id="addSlotBtn" onclick="openAddSlotModal('<?= date('Y-m-d') ?>')" class="bg-[#2e9e63] text-white px-5 py-2.5 rounded-xl font-prompt text-sm font-bold shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/40 hover:-translate-y-0.5 transition-all flex items-center gap-2" style="background-color: #2e9e63;">
+<button id="addSlotBtn" onclick="openAddSlotModal(\'' . date('Y-m-d') . '\')" class="bg-[#2e9e63] text-white px-5 py-2.5 rounded-xl font-prompt text-sm font-bold shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/40 hover:-translate-y-0.5 transition-all flex items-center gap-2" style="background-color: #2e9e63;">
     <i class="fa-solid fa-plus-circle"></i><span class="btn-add-text"> สร้างรอบเวลา</span>
 </button>
 <select id="monthSelect" onchange="location.href=\'?month=\'+this.value.split(\'-\')[1]+\'&year=\'+this.value.split(\'-\')[0]" class="px-4 py-2.5 border border-gray-200 rounded-xl bg-white font-prompt text-sm font-bold text-gray-700 outline-none shadow-sm cursor-pointer hover:bg-gray-50">';
