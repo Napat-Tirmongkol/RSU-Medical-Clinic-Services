@@ -176,6 +176,24 @@ if (!function_exists('renderPageHeader')) {
     <script>window.sentryOnLoad = function() { Sentry.init({ tracesSampleRate: 0.1 }); };</script>
     <script src="https://js.sentry-cdn.com/<?= htmlspecialchars(SENTRY_BROWSER_KEY, ENT_QUOTES) ?>.min.js" crossorigin="anonymous" defer></script>
     <?php endif; ?>
+
+    <!-- Theme Sync Support -->
+    <script>
+        window.addEventListener('message', function(e) {
+            if (e.data && e.data.type === 'THEME_CHANGE') {
+                if (e.data.theme === 'dark') {
+                    document.body.setAttribute('data-theme', 'dark');
+                } else {
+                    document.body.removeAttribute('data-theme');
+                }
+            }
+        });
+        document.addEventListener('DOMContentLoaded', () => {
+            if (localStorage.getItem('ecampaign_theme') === 'dark') {
+                document.body.setAttribute('data-theme', 'dark');
+            }
+        });
+    </script>
 </head>
 <body style="display:flex; min-height:100vh; background:#e2f4ea;">
 

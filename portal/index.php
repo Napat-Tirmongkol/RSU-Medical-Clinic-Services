@@ -580,6 +580,12 @@ try {
                         <span id="ws-label" class="hidden sm:inline">Live</span>
                     </div>
 
+                    <!-- Dark Mode Toggle Button -->
+                    <button id="darkModeToggle" onclick="toggleDarkMode()" title="สลับโหมดมืด/สว่าง"
+                        class="w-9 h-9 flex items-center justify-center rounded-xl bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-gray-800 transition-colors shadow-sm dark-mode-btn">
+                        <i class="fa-solid fa-moon"></i>
+                    </button>
+
                     <!-- Divider -->
                     <div class="w-px h-6 bg-gray-200 hidden sm:block"></div>
 
@@ -1863,6 +1869,38 @@ try {
 
         </main><!-- /portal-main -->
     </div><!-- /app-shell -->
+
+    <!-- Theme Handling Script -->
+    <script>
+        function toggleDarkMode() {
+            const isDark = document.body.getAttribute('data-theme') === 'dark';
+            applyTheme(isDark ? 'light' : 'dark');
+        }
+
+        function applyTheme(theme) {
+            if (theme === 'dark') {
+                document.body.setAttribute('data-theme', 'dark');
+                document.getElementById('darkModeToggle').innerHTML = '<i class="fa-solid fa-sun text-amber-500"></i>';
+                localStorage.setItem('ecampaign_theme', 'dark');
+            } else {
+                document.body.removeAttribute('data-theme');
+                document.getElementById('darkModeToggle').innerHTML = '<i class="fa-solid fa-moon"></i>';
+                localStorage.setItem('ecampaign_theme', 'light');
+            }
+            
+            // Send message to all iframes to update their theme
+            document.querySelectorAll('iframe').forEach(iframe => {
+                if(iframe.contentWindow) {
+                    iframe.contentWindow.postMessage({ type: 'THEME_CHANGE', theme: theme }, '*');
+                }
+            });
+        }
+
+        // Apply theme on load
+        if (localStorage.getItem('ecampaign_theme') === 'dark') {
+            applyTheme('dark');
+        }
+    </script>
 
     <script>
         /* ── 1. KPI Number Counter ──────────────────────────────── */
