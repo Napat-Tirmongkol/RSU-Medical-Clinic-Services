@@ -85,7 +85,7 @@ render_header('RSU Medical Hub');
   <div class="mb-6">
     <div class="flex items-center gap-3 mb-1">
       <div class="w-1.5 h-6 bg-orange-500 rounded-full"></div>
-      <h1 class="text-2xl font-black text-gray-900 font-prompt tracking-tight">Service Hub</h1>
+      <h1 class="text-2xl font-black text-gray-900 font-prompt tracking-tight">ศูนย์รวมบริการ</h1>
     </div>
     <p class="text-[13px] text-gray-400 font-medium font-prompt ml-4">
       เข้าถึงทุกบริการด้านสุขภาพของคุณได้ง่ายๆ ในที่เดียว
