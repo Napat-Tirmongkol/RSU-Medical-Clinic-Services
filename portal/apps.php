@@ -34,7 +34,7 @@ try {
         $stmt = $pdo->prepare("INSERT INTO sys_app_links (category, title, description, url, icon, color_theme, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)");
         
         $stmt->execute(['system', 'หน้าเว็บ E-Campaign เบื้องหน้า', 'ระบบลงทะเบียนกิจกรรมและจองคิว', '/e-campaignv2/', 'fa-hospital-user', 'emerald', 1]);
-        $stmt->execute(['system', 'ระบบ E-Borrow', 'ค้นหาและทำรายการยืม-คืน อุปกรณ์', '/e-campaignv2/archive/e_Borrow/', 'fa-box-open', 'blue', 2]);
+        $stmt->execute(['system', 'ระบบ E-Borrow', 'ค้นหาและทำรายการยืม-คืน อุปกรณ์', '/e-campaignv2/e_Borrow/', 'fa-box-open', 'blue', 2]);
         $stmt->execute(['system', 'Admin Login Portal', 'ทางเข้าการจัดการสำหรับเจ้าหน้าที่', '/e-campaignv2/login.php', 'fa-shield-halved', 'amber', 3]);
         
         $stmt->execute(['liff', 'LINE LIFF - ลงทะเบียนผู้ป่วยใหม่', 'ระบบฝังใน LINE OA สำหรับผู้ป่วยใหม่', 'https://liff.line.me/1234567890-abcdef', 'fa-line', 'line', 4]);
@@ -75,7 +75,7 @@ try {
     <link rel="stylesheet" href="../assets/css/tailwind.min.css">
     <link rel="stylesheet" href="../assets/css/portal.css">
     <!-- Favicon -->
-    <link rel="icon" type="image/png" href="../archive/e_Borrow/assets/img/logo.png">
+    <link rel="icon" type="image/png" href="../e_Borrow/assets/img/logo.png">
     
     <style>
         .theme-blue { --tc: #3b82f6; --bgc: rgba(59, 130, 246, 0.15); }

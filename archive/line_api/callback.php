@@ -105,7 +105,7 @@ try {
 
         // Redirect ตามแอปที่ผู้ใช้มาจาก
         if ($redirectTarget === 'eborrow') {
-            header("Location: ../e_Borrow/index.php");
+            header("Location: ../../e_Borrow/index.php");
         } elseif ($inviteToken !== '') {
             // มี invite token → ไปหน้า campaign นั้นโดยตรง ไม่ต้องผ่าน index
             unset($_SESSION['invite_token']);

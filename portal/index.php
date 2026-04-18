@@ -169,7 +169,7 @@ $projects = [
         'allowed_roles' => ['admin', 'superadmin'],
         'badges' => ['Inventory', 'Asset Tracking'],
         'actions' => [
-            ['label' => 'Open System', 'url' => '../archive/e_Borrow/admin/index.php', 'primary' => true],
+            ['label' => 'Open System', 'url' => '../e_Borrow/admin/index.php', 'primary' => true],
         ]
     ],
     [
