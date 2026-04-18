@@ -12,8 +12,38 @@ function render_footer(): void {
   $scriptDir = dirname($_SERVER['SCRIPT_NAME'] ?? '/index.php');
   $depth = max(0, substr_count(trim($scriptDir, '/'), '/'));
   $jsApiEndpoint = str_repeat('../', $depth) . 'api/log_js_error.php';
+
+  // Bottom nav — แสดงเฉพาะหน้า user ที่ login แล้ว
+  $showNav = !empty($_SESSION['evax_student_id'])
+    && strpos($_SERVER['SCRIPT_NAME'] ?? '', '/user/') !== false;
+
+  $currentPage = basename($_SERVER['PHP_SELF'] ?? '');
+  $navItems = [
+    ['file' => 'hub.php',              'icon' => 'fa-solid fa-house',          'label' => 'หน้าหลัก'],
+    ['file' => 'booking_campaign.php', 'icon' => 'fa-solid fa-syringe',        'label' => 'จองคิว'],
+    ['file' => 'my_bookings.php',      'icon' => 'fa-solid fa-calendar-check', 'label' => 'นัดหมาย'],
+    ['file' => 'profile.php',          'icon' => 'fa-solid fa-user',           'label' => 'โปรไฟล์'],
+  ];
   ?>
       </main>
+
+  <?php if ($showNav): ?>
+  <!-- ── Bottom Navigation ────────────────────────────────────────────────── -->
+  <nav style="position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:448px;background:#fff;border-top:1px solid #e8edf5;display:flex;z-index:999;padding-bottom:env(safe-area-inset-bottom,0);">
+    <?php foreach ($navItems as $item):
+      $active = ($currentPage === $item['file']);
+      $color  = $active ? '#0052CC' : '#94a3b8';
+    ?>
+    <a href="<?= $item['file'] ?>" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:10px 0 8px;text-decoration:none;color:<?= $color ?>;">
+      <i class="<?= $item['icon'] ?>" style="font-size:18px;<?= $active ? 'filter:drop-shadow(0 0 4px rgba(0,82,204,.35));' : '' ?>"></i>
+      <span style="font-size:10px;font-weight:<?= $active ? '800' : '600' ?>;"><?= $item['label'] ?></span>
+      <?php if ($active): ?><span style="width:18px;height:3px;background:#0052CC;border-radius:2px;margin-top:1px;"></span><?php endif; ?>
+    </a>
+    <?php endforeach; ?>
+  </nav>
+  <!-- bottom spacer so content isn't hidden behind nav -->
+  <div style="height:64px;"></div>
+  <?php endif; ?>
 
       <script>
         /* ── JS Error Tracker ─────────────────────────────────── */

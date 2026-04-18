@@ -111,7 +111,7 @@ try {
             unset($_SESSION['invite_token']);
             header("Location: ../../user/c.php?t=" . urlencode($inviteToken));
         } else {
-            header("Location: ../../index.php");
+            header("Location: ../../user/hub.php");
         }
         exit;
 
