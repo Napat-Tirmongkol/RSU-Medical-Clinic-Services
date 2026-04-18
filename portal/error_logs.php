@@ -9,7 +9,7 @@ require_once __DIR__ . '/includes/auth.php';
 
 $pdo = db();
 
-// ─── Auto-create table if not exists ─────────────────────────────────────────
+// ─── Auto-create tables ───────────────────────────────────────────────────────
 try {
     $pdo->exec("CREATE TABLE IF NOT EXISTS sys_error_logs (
         id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -20,12 +20,38 @@ try {
         ip_address VARCHAR(45)   NOT NULL DEFAULT '',
         user_id    INT UNSIGNED  NULL,
         created_at TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        notified_at DATETIME     NULL DEFAULT NULL,
         INDEX idx_level      (level),
         INDEX idx_created_at (created_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    $pdo->exec("CREATE TABLE IF NOT EXISTS sys_settings (
+        `key`       VARCHAR(100) NOT NULL PRIMARY KEY,
+        `value`     TEXT         NOT NULL DEFAULT '',
+        updated_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 } catch (PDOException $e) {
     $fatal = $e->getMessage();
 }
+
+// ─── Save alert email setting ─────────────────────────────────────────────────
+$savedOk = false;
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_alert_email') {
+    $emailVal = trim($_POST['alert_email'] ?? '');
+    if ($emailVal !== '' && !filter_var($emailVal, FILTER_VALIDATE_EMAIL)) {
+        $setting_error = 'รูปแบบอีเมลไม่ถูกต้อง';
+    } else {
+        $pdo->prepare("INSERT INTO sys_settings (`key`, `value`) VALUES ('admin_alert_email', ?)
+                       ON DUPLICATE KEY UPDATE `value` = VALUES(`value`)")->execute([$emailVal]);
+        $savedOk = true;
+        header('Location: error_logs.php?saved=1' . (isset($_GET['embed']) ? '&embed=1' : ''));
+        exit;
+    }
+}
+
+// ─── Load current alert email ─────────────────────────────────────────────────
+$currentAlertEmail = (string)($pdo->query(
+    "SELECT `value` FROM sys_settings WHERE `key` = 'admin_alert_email' LIMIT 1"
+)->fetchColumn() ?: '');
 
 // ─── Clear logs action ────────────────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'clear') {
@@ -231,6 +257,12 @@ function levelIconColor(string $level): string {
     </div>
     <?php endif; ?>
 
+    <?php if (isset($_GET['saved'])): ?>
+    <div style="margin-bottom:16px;padding:12px 18px;background:#f0fdf4;border:1.5px solid #c7e8d5;border-radius:12px;color:#166534;font-size:13px;font-weight:700;display:flex;align-items:center;gap:8px">
+        <i class="fa-solid fa-check-circle" style="color:#2e9e63"></i> บันทึกการตั้งค่าเรียบร้อยแล้ว
+    </div>
+    <?php endif; ?>
+
     <!-- Summary strip -->
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px">
         <a href="?level=error<?= isset($_GET['embed']) ? '&embed=1' : '' ?>" style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:#fff;border:1.5px solid #e2e8f0;border-radius:14px;text-decoration:none;transition:border-color .18s" onmouseover="this.style.borderColor='#fecaca'" onmouseout="this.style.borderColor='#e2e8f0'">
@@ -249,6 +281,46 @@ function levelIconColor(string $level): string {
             <div style="width:36px;height:36px;border-radius:10px;background:#f0faf4;display:flex;align-items:center;justify-content:center;flex-shrink:0"><i class="fa-solid fa-globe" style="color:#2e9e63;font-size:16px"></i></div>
             <div><div style="font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.1em">Total</div><div style="font-size:1.4rem;font-weight:900;color:#0f172a;line-height:1.1"><?= number_format(array_sum($summary)) ?></div></div>
         </a>
+    </div>
+
+    <!-- Alert Email Settings -->
+    <div style="background:#fff;border:1.5px solid #e2e8f0;border-radius:14px;padding:16px 20px;margin-bottom:14px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+            <div style="width:28px;height:28px;background:#eff6ff;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                <i class="fa-solid fa-bell" style="color:#3b82f6;font-size:12px"></i>
+            </div>
+            <div>
+                <div style="font-size:12px;font-weight:800;color:#0f172a">แจ้งเตือน Error ทางอีเมล</div>
+                <div style="font-size:10px;color:#94a3b8;font-weight:600">ส่ง Error Digest ทุก 30 นาทีเมื่อมี error ใหม่</div>
+            </div>
+        </div>
+        <form method="POST" style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end">
+            <input type="hidden" name="action" value="save_alert_email">
+            <?php if (isset($_GET['embed'])): ?><input type="hidden" name="embed" value="1"><?php endif; ?>
+            <div style="flex:1;min-width:220px">
+                <label style="display:block;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.14em;color:#94a3b8;margin-bottom:5px">อีเมล Admin (ว่างเปล่า = ปิดการแจ้งเตือน)</label>
+                <div style="position:relative">
+                    <i class="fa-solid fa-envelope" style="position:absolute;left:9px;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:10px"></i>
+                    <input type="email" name="alert_email" value="<?= htmlspecialchars($currentAlertEmail) ?>" placeholder="admin@example.com"
+                        style="width:100%;padding:8px 12px 8px 28px;border:1.5px solid #e2e8f0;border-radius:9px;font-size:13px;font-weight:500;font-family:'rsufont',sans-serif;outline:none;background:#f8fafc;color:#0f172a;box-sizing:border-box">
+                </div>
+                <?php if (isset($setting_error)): ?>
+                    <div style="font-size:11px;color:#dc2626;margin-top:4px;font-weight:600"><?= htmlspecialchars($setting_error) ?></div>
+                <?php endif; ?>
+            </div>
+            <button type="submit" style="background:#3b82f6;color:#fff;border:none;padding:8px 18px;border-radius:9px;font-size:12px;font-weight:700;font-family:'rsufont',sans-serif;cursor:pointer;white-space:nowrap">
+                <i class="fa-solid fa-floppy-disk" style="margin-right:5px"></i>บันทึก
+            </button>
+            <?php if ($currentAlertEmail): ?>
+            <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:#059669;font-weight:700;padding:8px 12px;background:#f0fdf4;border:1.5px solid #c7e8d5;border-radius:9px">
+                <i class="fa-solid fa-circle-check"></i> กำลังส่งไปยัง <?= htmlspecialchars($currentAlertEmail) ?>
+            </div>
+            <?php else: ?>
+            <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:#94a3b8;font-weight:700;padding:8px 12px;background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:9px">
+                <i class="fa-solid fa-bell-slash"></i> ปิดการแจ้งเตือน
+            </div>
+            <?php endif; ?>
+        </form>
     </div>
 
     <!-- Filters -->

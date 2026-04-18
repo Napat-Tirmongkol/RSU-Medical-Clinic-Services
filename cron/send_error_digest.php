@@ -28,15 +28,24 @@ require_once $projectRoot . '/includes/mail_helper.php';
 
 date_default_timezone_set('Asia/Bangkok');
 
-$secrets    = get_secrets();
-$adminEmail = trim($secrets['ADMIN_ALERT_EMAIL'] ?? '');
+$pdo = db();
+
+// ── Read admin email: DB setting takes priority, fallback to secrets.php ──────
+$adminEmail = '';
+try {
+    $row = $pdo->query("SELECT `value` FROM sys_settings WHERE `key` = 'admin_alert_email' LIMIT 1")->fetchColumn();
+    $adminEmail = trim((string)($row ?: ''));
+} catch (PDOException) { /* table may not exist yet */ }
+
+if ($adminEmail === '') {
+    $secrets    = get_secrets();
+    $adminEmail = trim($secrets['ADMIN_ALERT_EMAIL'] ?? '');
+}
 
 if ($adminEmail === '') {
     echo "SKIP: ADMIN_ALERT_EMAIL not configured\n";
     exit;
 }
-
-$pdo = db();
 
 // ── Auto-migrate: เพิ่มคอลัมน์ notified_at ถ้ายังไม่มี ────────────────────────
 try {
