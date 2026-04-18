@@ -156,14 +156,14 @@ render_header('RSU Medical Hub');
           </div>
           <span style="font-size:14px;font-weight:800;color:#0f172a;">อุปกรณ์ที่ยืมอยู่</span>
         </div>
-        <a href="../e_Borrow/" style="font-size:11px;font-weight:700;color:#f97316;text-decoration:none;">ดูทั้งหมด →</a>
+        <a href="../e_Borrow/auth_bridge.php?to=history.php" style="font-size:11px;font-weight:700;color:#f97316;text-decoration:none;">ดูทั้งหมด →</a>
       </div>
 
       <?php if (empty($activeBorrows)): ?>
         <div style="text-align:center;padding:16px 0 8px;">
           <i class="fa-solid fa-box-open" style="font-size:32px;color:#e2e8f0;display:block;margin-bottom:8px;"></i>
           <p style="font-size:13px;color:#94a3b8;margin:0 0 14px;">ไม่มีรายการยืมอุปกรณ์</p>
-          <a href="../e_Borrow/" style="display:inline-block;background:#f97316;color:#fff;font-size:12px;font-weight:700;padding:9px 22px;border-radius:12px;text-decoration:none;">
+          <a href="../e_Borrow/auth_bridge.php" style="display:inline-block;background:#f97316;color:#fff;font-size:12px;font-weight:700;padding:9px 22px;border-radius:12px;text-decoration:none;">
             ยืมอุปกรณ์
           </a>
         </div>
@@ -195,7 +195,7 @@ render_header('RSU Medical Hub');
           <div style="font-size:11px;color:#94a3b8;margin-top:2px;">จอง / ดูประวัติ</div>
         </div>
       </a>
-      <a href="../e_Borrow/" style="background:#fff;border-radius:20px;padding:18px 14px;text-decoration:none;box-shadow:0 4px 20px rgba(0,0,0,.06);display:flex;flex-direction:column;gap:10px;">
+      <a href="../e_Borrow/auth_bridge.php" style="background:#fff;border-radius:20px;padding:18px 14px;text-decoration:none;box-shadow:0 4px 20px rgba(0,0,0,.06);display:flex;flex-direction:column;gap:10px;">
         <div style="width:44px;height:44px;background:linear-gradient(135deg,#f97316,#fb923c);border-radius:14px;display:flex;align-items:center;justify-content:center;">
           <i class="fa-solid fa-box-open" style="font-size:17px;color:#fff;"></i>
         </div>
