@@ -346,7 +346,7 @@ render_header('ข้อมูลส่วนตัว');
             <span class="text-gray-400 font-normal text-xs ml-1">(ไม่บังคับ)</span>
           </label>
           <input id="department" name="department" type="text"
-            value="<?= htmlspecialchars($userData['department']) ?>"
+            value="<?= htmlspecialchars((string)($userData['department'] ?? '')) ?>"
             placeholder="เช่น วิทยาลัยแพทยศาสตร์"
             class="w-full p-4 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0052CC] focus:border-transparent outline-none transition-all placeholder:text-gray-400 font-prompt" />
         </div>
