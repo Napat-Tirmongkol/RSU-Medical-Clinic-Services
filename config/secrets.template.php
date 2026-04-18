@@ -42,4 +42,7 @@ return [
     'SMTP_PASS'                           => '',
     'SMTP_FROM_EMAIL'                     => '',
     'SMTP_FROM_NAME'                      => 'RSU Medical Clinic Services',
+
+    // --- Admin Alert ---
+    'ADMIN_ALERT_EMAIL'                   => '', // อีเมลที่รับแจ้งเตือน Error Digest (ว่างเปล่า = ปิดการแจ้งเตือน)
 ];
