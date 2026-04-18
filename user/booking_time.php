@@ -21,7 +21,10 @@ if ($year == 0 || $month == 0 || $day == 0 || $campaignId == 0) {
 }
 
 $selectedDateStr = sprintf('%04d-%02d-%02d', $year, $month, $day);
-$displayDate     = date('j F Y', strtotime($selectedDateStr));
+$months      = __('bookings.months_short');
+$isBuddhist  = __('bookings.date_buddhist');
+$displayYear = $isBuddhist ? $year + 543 : $year;
+$displayDate = (int)$day . ' ' . $months[(int)$month] . ' ' . $displayYear;
 
 $pdo = db();
 
@@ -68,6 +71,7 @@ $jsT = [
     'swal_full_title'=> __('time.swal_full_title'),
     'swal_full_text' => __('time.swal_full_text'),
     'swal_ok'        => __('time.swal_ok'),
+    'swal_html'      => __('time.swal_html'),
     'full_badge'     => __('time.full_badge'),
     'available'      => __('time.available'),  // sprintf pattern: "ว่าง %d ที่" / "%d seats left"
 ];
@@ -167,9 +171,11 @@ document.addEventListener('DOMContentLoaded', function () {
         const timeText = radio ? radio.getAttribute('data-time') : '';
 
 
+        const confirmText = T.swal_html.replace('%s', campaignTitle).replace('%s', timeText);
+
         Swal.fire({
             title: T.swal_title,
-            html: `คุณต้องการจอง <b>${campaignTitle}</b><br>รอบเวลา <span style="color:#0052CC;font-weight:bold">${timeText}</span> ใช่หรือไม่?`,
+            html: confirmText,
             icon: 'question',
             showCancelButton: true,
             confirmButtonColor: '#0052CC',

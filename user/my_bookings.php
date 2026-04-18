@@ -57,30 +57,32 @@ foreach ($bookings as $b) {
 usort($upcomingBookings, fn($a, $b) => strtotime($a['slot_date'].' '.$a['start_time']) <=> strtotime($b['slot_date'].' '.$b['start_time']));
 usort($historyBookings,  fn($a, $b) => strtotime($b['slot_date'].' '.$b['start_time']) <=> strtotime($a['slot_date'].' '.$a['start_time']));
 
-render_header('ประวัติการจอง - E-Campaign');
+render_header(__('bookings.page_title'));
 
-// Helper: Thai month
-function thaiDate(string $dateStr): string {
-    $months = ['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+function formatDate(string $dateStr): string {
+    $months     = __('bookings.months_short');
+    $isBuddhist = __('bookings.date_buddhist');
     [$y, $m, $d] = explode('-', $dateStr);
-    return (int)$d . ' ' . $months[(int)$m] . ' ' . ((int)$y + 543);
+    $year = $isBuddhist ? (int)$y + 543 : (int)$y;
+    return (int)$d . ' ' . $months[(int)$m] . ' ' . $year;
 }
 
 function renderBookingCard($b): void {
-    $dateLabel  = thaiDate($b['slot_date']);
+    $dateLabel  = formatDate($b['slot_date']);
     $timeLabel  = substr($b['start_time'], 0, 5) . ' – ' . substr($b['end_time'], 0, 5);
-    $dow        = ['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัสฯ','ศุกร์','เสาร์'][date('w', strtotime($b['slot_date']))];
+    $dows       = __('bookings.dow');
+    $dow        = $dows[date('w', strtotime($b['slot_date']))];
     $isAttended      = !empty($b['attended_at']);
     $isConfirmed        = ($b['status'] === 'confirmed');
     $isPending          = ($b['status'] === 'booked');      // รอ Admin อนุมัติ
     $isCancelled        = ($b['status'] === 'cancelled');
     $isCancelledByAdmin = ($b['status'] === 'cancelled_by_admin');
 
-    $patientName   = htmlspecialchars($_SESSION['evax_full_name'] ?? 'ไม่ระบุชื่อ', ENT_QUOTES);
+    $patientName   = htmlspecialchars($_SESSION['evax_full_name'] ?? __('bookings.no_name'), ENT_QUOTES);
     $campaignTitle = htmlspecialchars($b['campaign_title'], ENT_QUOTES);
     $safeDate      = htmlspecialchars($dateLabel, ENT_QUOTES);
     $safeTime      = htmlspecialchars($timeLabel, ENT_QUOTES);
-    $locationDesc  = trim(preg_replace('/\s+/', ' ', $b['campaign_desc'] ?? 'ไม่ระบุสถานที่'));
+    $locationDesc  = trim(preg_replace('/\s+/', ' ', $b['campaign_desc'] ?? __('bookings.modal_no_location')));
     $safeLocation  = htmlspecialchars($locationDesc, ENT_QUOTES);
     $isAttendedJs  = $isAttended ? 'true' : 'false';
 
@@ -88,31 +90,31 @@ function renderBookingCard($b): void {
     if ($isAttended) {
         $badgeBg    = 'bg-sky-100 text-sky-700 border-sky-200';
         $badgeIcon  = 'fa-check-double';
-        $badgeText  = 'เช็คอินแล้ว';
+        $badgeText  = __('bookings.status_attended');
         $accentGrad = 'from-sky-400 to-blue-500';
         $dotColor   = 'bg-sky-500';
     } elseif ($isPending) {
         $badgeBg    = 'bg-amber-100 text-amber-700 border-amber-200';
         $badgeIcon  = 'fa-hourglass-half';
-        $badgeText  = 'รออนุมัติ';
+        $badgeText  = __('bookings.status_pending');
         $accentGrad = 'from-amber-400 to-yellow-400';
         $dotColor   = 'bg-amber-400';
     } elseif ($isCancelledByAdmin) {
-        $badgeBg    = 'bg-orange-100 text-orange-700 border-orange-200';
-        $badgeIcon  = 'fa-rotate-right';
-        $badgeText  = 'เลื่อนคิว';
-        $accentGrad = 'from-orange-400 to-red-400';
-        $dotColor   = 'bg-orange-500';
+        $badgeBg    = 'bg-rose-100 text-rose-700 border-rose-200';
+        $badgeIcon  = 'fa-calendar-xmark';
+        $badgeText  = __('bookings.status_reschedule');
+        $accentGrad = 'from-rose-400 to-pink-500';
+        $dotColor   = 'bg-rose-500';
     } elseif ($isCancelled) {
-        $badgeBg    = 'bg-red-100 text-red-600 border-red-200';
-        $badgeIcon  = 'fa-xmark';
-        $badgeText  = 'ยกเลิกแล้ว';
-        $accentGrad = 'from-red-400 to-rose-500';
-        $dotColor   = 'bg-red-500';
+        $badgeBg    = 'bg-gray-100 text-gray-600 border-gray-200';
+        $badgeIcon  = 'fa-ban';
+        $badgeText  = __('bookings.status_cancelled');
+        $accentGrad = 'from-gray-400 to-slate-500';
+        $dotColor   = 'bg-gray-400';
     } else { // confirmed
         $badgeBg    = 'bg-emerald-100 text-emerald-700 border-emerald-200';
-        $badgeIcon  = 'fa-circle-check';
-        $badgeText  = 'ยืนยันแล้ว';
+        $badgeIcon  = 'fa-calendar-check';
+        $badgeText  = __('bookings.status_confirmed');
         $accentGrad = 'from-emerald-400 to-teal-500';
         $dotColor   = 'bg-emerald-500';
     }
@@ -185,7 +187,7 @@ function renderBookingCard($b): void {
                 </p>
                 <a href="booking_campaign.php"
                    class="block text-center w-full py-2 text-[12px] font-bold text-white bg-gradient-to-r from-amber-500 to-orange-500 rounded-xl shadow-sm transition-all active:scale-[0.97] hover:shadow-md">
-                    <i class="fa-solid fa-calendar-plus mr-1"></i> จองรอบใหม่เลย
+                    <i class="fa-solid fa-calendar-plus mr-1"></i> <?= __('bookings.rebook_btn') ?>
                 </a>
             </div>
             <?php endif; ?>
@@ -202,10 +204,10 @@ function renderBookingCard($b): void {
     <div class="px-6 mb-8">
         <div class="flex items-center gap-3 mb-1">
             <div class="w-1.5 h-6 bg-orange-500 rounded-full"></div>
-            <h1 class="text-2xl font-black text-gray-900 font-prompt tracking-tight">ประวัติการจอง</h1>
+            <h1 class="text-2xl font-black text-gray-900 font-prompt tracking-tight"><?= __('bookings.heading') ?></h1>
         </div>
         <p class="text-[13px] text-gray-400 font-medium font-prompt ml-4">
-            ตรวจสอบคิวที่รอดำเนินการและประวัติการรับบริการย้อนหลังของคุณ
+            <?= __('bookings.sub') ?>
         </p>
     </div>
 
@@ -214,16 +216,16 @@ function renderBookingCard($b): void {
         <div class="bg-gray-50/80 backdrop-blur-md border border-gray-100 rounded-3xl p-4 shadow-sm flex gap-3">
             <div class="flex-1 bg-white rounded-2xl p-3 text-center border border-blue-100/50 shadow-sm">
                 <p class="text-xl font-black text-[#0052CC]"><?= count($upcomingBookings) ?></p>
-                <p class="text-[10px] text-gray-400 font-bold uppercase tracking-wider mt-0.5">คิวที่รอ</p>
+                <p class="text-[10px] text-gray-400 font-bold uppercase tracking-wider mt-0.5"><?= __('bookings.stat_pending') ?></p>
             </div>
             <div class="flex-1 bg-white rounded-2xl p-3 text-center border border-gray-100 shadow-sm">
                 <p class="text-xl font-black text-gray-900"><?= count($historyBookings) ?></p>
-                <p class="text-[10px] text-gray-400 font-bold uppercase tracking-wider mt-0.5">ประวัติ</p>
+                <p class="text-[10px] text-gray-400 font-bold uppercase tracking-wider mt-0.5"><?= __('bookings.stat_history') ?></p>
             </div>
             <div class="flex-1 bg-white rounded-2xl p-3 text-center border border-emerald-100/50 shadow-sm">
                 <?php $attended = count(array_filter($historyBookings, fn($b) => !empty($b['attended_at']))); ?>
                 <p class="text-xl font-black text-emerald-600"><?= $attended ?></p>
-                <p class="text-[10px] text-gray-400 font-bold uppercase tracking-wider mt-0.5">เช็คอิน</p>
+                <p class="text-[10px] text-gray-400 font-bold uppercase tracking-wider mt-0.5"><?= __('bookings.stat_checkin') ?></p>
             </div>
         </div>
     </div>
@@ -236,15 +238,15 @@ function renderBookingCard($b): void {
                 onclick="switchTab('upcoming')"
                 class="flex-1 py-2.5 text-sm font-bold rounded-xl bg-[#0052CC] text-white shadow-md transition-all">
             <i class="fa-solid fa-calendar-clock mr-1.5 text-xs"></i>
-            กำลังจะมาถึง
+            <?= __('bookings.tab_upcoming') ?>
             <span class="ml-1 bg-white/25 text-white px-2 py-0.5 rounded-full text-[10px]"><?= count($upcomingBookings) ?></span>
         </button>
         <button id="tab-history"
                 onclick="switchTab('history')"
                 class="flex-1 py-2.5 text-sm font-bold rounded-xl text-gray-500 hover:text-gray-700 transition-all">
             <i class="fa-solid fa-clock-rotate-left mr-1.5 text-xs"></i>
-            ประวัติ
-            <span class="ml-1 bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full text-[10px]"><?= count($historyBookings) ?></span>
+            <?= __('bookings.tab_history') ?>
+            <span class="ml-1 bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full text-[100px]"><?= count($historyBookings) ?></span>
         </button>
     </div>
 
@@ -255,8 +257,8 @@ function renderBookingCard($b): void {
             <div class="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mb-4">
                 <i class="fa-regular fa-calendar-check text-3xl text-blue-300"></i>
             </div>
-            <p class="font-bold text-gray-700 text-base">ไม่มีคิวที่รออยู่</p>
-            <p class="text-sm text-gray-400 mt-1">กดปุ่มด้านล่างเพื่อจองคิวใหม่</p>
+            <p class="font-bold text-gray-700 text-base"><?= __('bookings.no_upcoming') ?></p>
+            <p class="text-sm text-gray-400 mt-1"><?= __('bookings.no_upcoming_sub') ?></p>
         </div>
         <?php else: ?>
             <?php foreach ($upcomingBookings as $b) renderBookingCard($b); ?>
@@ -270,8 +272,8 @@ function renderBookingCard($b): void {
             <div class="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mb-4">
                 <i class="fa-solid fa-clock-rotate-left text-3xl text-gray-300"></i>
             </div>
-            <p class="font-bold text-gray-700 text-base">ยังไม่มีประวัติ</p>
-            <p class="text-sm text-gray-400 mt-1">ประวัติการจองจะแสดงที่นี่</p>
+            <p class="font-bold text-gray-700 text-base"><?= __('bookings.no_history') ?></p>
+            <p class="text-sm text-gray-400 mt-1"><?= __('bookings.no_history_sub') ?></p>
         </div>
         <?php else: ?>
             <?php foreach ($historyBookings as $b) renderBookingCard($b); ?>
@@ -286,7 +288,7 @@ function renderBookingCard($b): void {
         <a href="booking_campaign.php"
            class="flex w-full items-center justify-center gap-2 bg-gradient-to-r from-[#0052CC] to-[#0070f3] hover:from-[#0047b3] hover:to-[#005fd9] text-white font-bold py-3.5 rounded-xl transition-all shadow-lg shadow-blue-200 active:scale-[0.97]">
             <i class="fa-solid fa-plus"></i>
-            <span class="font-prompt">จองกิจกรรมเพิ่ม</span>
+            <span class="font-prompt"><?= __('bookings.add_btn') ?></span>
         </a>
     </div>
 </div>
@@ -305,7 +307,7 @@ function renderBookingCard($b): void {
         <!-- Drag Handle -->
         <div class="sticky top-0 z-10 bg-white pt-3 pb-2 px-6 flex items-center justify-between border-b border-gray-50">
             <div class="absolute left-1/2 top-2.5 -translate-x-1/2 w-10 h-1 bg-gray-200 rounded-full"></div>
-            <h2 class="text-[17px] font-bold text-gray-900 font-prompt mt-2">รายละเอียดการจอง</h2>
+            <h2 class="text-[17px] font-bold text-gray-900 font-prompt mt-2"><?= __('bookings.modal_title') ?></h2>
             <button onclick="closeModal()"
                     class="mt-2 w-8 h-8 bg-gray-100 hover:bg-gray-200 rounded-full flex items-center justify-center text-gray-500 transition-colors">
                 <i class="fa-solid fa-xmark text-sm"></i>
@@ -326,7 +328,7 @@ function renderBookingCard($b): void {
             <div class="bg-gray-50 rounded-2xl p-4 space-y-4 border border-gray-100 mb-5">
                 <div>
                     <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">
-                        <i class="fa-solid fa-layer-group mr-1"></i>กิจกรรม
+                        <i class="fa-solid fa-layer-group mr-1"></i><?= __('bookings.modal_lbl_activity') ?>
                     </p>
                     <p id="modal-campaign" class="font-bold text-[#0052CC] text-base font-prompt"></p>
                 </div>
@@ -334,14 +336,14 @@ function renderBookingCard($b): void {
                 <div class="grid grid-cols-2 gap-4">
                     <div>
                         <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">
-                            <i class="fa-regular fa-calendar mr-1"></i>วันที่
+                            <i class="fa-regular fa-calendar mr-1"></i><?= __('bookings.modal_lbl_date') ?>
                         </p>
                         <p id="modal-date" class="font-bold text-gray-900 text-sm font-prompt"></p>
                         <p id="modal-dow" class="text-xs text-gray-400"></p>
                     </div>
                     <div>
                         <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">
-                            <i class="fa-regular fa-clock mr-1"></i>เวลา
+                            <i class="fa-regular fa-clock mr-1"></i><?= __('bookings.modal_lbl_time') ?>
                         </p>
                         <p id="modal-time" class="font-bold text-gray-900 text-sm font-prompt"></p>
                     </div>
@@ -349,7 +351,7 @@ function renderBookingCard($b): void {
                 <div class="h-px bg-gray-200"></div>
                 <div>
                     <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">
-                        <i class="fa-solid fa-location-dot mr-1"></i>สถานที่ / รายละเอียด
+                        <i class="fa-solid fa-location-dot mr-1"></i><?= __('bookings.modal_lbl_location') ?>
                     </p>
                     <p id="modal-location" class="text-sm text-gray-700 font-prompt font-medium leading-relaxed"></p>
                 </div>
@@ -364,7 +366,7 @@ function renderBookingCard($b): void {
                         <div class="w-14 h-14 bg-sky-100 rounded-full flex items-center justify-center">
                             <i class="fa-solid fa-circle-check text-3xl text-sky-500"></i>
                         </div>
-                        <p class="font-bold text-sm text-sky-600 bg-white px-4 py-1.5 rounded-full shadow-sm">ใช้งานแล้ว</p>
+                        <p class="font-bold text-sm text-sky-600 bg-white px-4 py-1.5 rounded-full shadow-sm"><?= __('bookings.modal_used') ?></p>
                     </div>
                 </div>
                 <p class="text-[10px] text-gray-400 font-mono">REF: <span id="modal-id" class="font-bold"></span></p>
@@ -387,15 +389,15 @@ function switchTab(tab) {
     if (tab === 'upcoming') {
         btnUp.className  = activeClass;
         btnHis.className = inactiveClass;
-        btnUp.innerHTML  = `<i class="fa-solid fa-calendar-clock mr-1.5 text-xs"></i>กำลังจะมาถึง <span class="ml-1 bg-white/25 text-white px-2 py-0.5 rounded-full text-[10px]"><?= count($upcomingBookings) ?></span>`;
-        btnHis.innerHTML = `<i class="fa-solid fa-clock-rotate-left mr-1.5 text-xs"></i>ประวัติ <span class="ml-1 bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full text-[10px]"><?= count($historyBookings) ?></span>`;
+        btnUp.innerHTML  = `<i class="fa-solid fa-calendar-clock mr-1.5 text-xs"></i><?= __('bookings.tab_upcoming') ?> <span class="ml-1 bg-white/25 text-white px-2 py-0.5 rounded-full text-[10px]"><?= count($upcomingBookings) ?></span>`;
+        btnHis.innerHTML = `<i class="fa-solid fa-clock-rotate-left mr-1.5 text-xs"></i><?= __('bookings.tab_history') ?> <span class="ml-1 bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full text-[10px]"><?= count($historyBookings) ?></span>`;
         contUp.classList.remove('hidden');
         contHis.classList.add('hidden');
     } else {
         btnHis.className = activeClass;
         btnUp.className  = inactiveClass;
-        btnHis.innerHTML = `<i class="fa-solid fa-clock-rotate-left mr-1.5 text-xs"></i>ประวัติ <span class="ml-1 bg-white/25 text-white px-2 py-0.5 rounded-full text-[10px]"><?= count($historyBookings) ?></span>`;
-        btnUp.innerHTML  = `<i class="fa-solid fa-calendar-clock mr-1.5 text-xs"></i>กำลังจะมาถึง <span class="ml-1 bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full text-[10px]"><?= count($upcomingBookings) ?></span>`;
+        btnHis.innerHTML = `<i class="fa-solid fa-clock-rotate-left mr-1.5 text-xs"></i><?= __('bookings.tab_history') ?> <span class="ml-1 bg-white/25 text-white px-2 py-0.5 rounded-full text-[10px]"><?= count($historyBookings) ?></span>`;
+        btnUp.innerHTML  = `<i class="fa-solid fa-calendar-clock mr-1.5 text-xs"></i><?= __('bookings.tab_upcoming') ?> <span class="ml-1 bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full text-[10px]"><?= count($upcomingBookings) ?></span>`;
         contHis.classList.remove('hidden');
         contUp.classList.add('hidden');
     }
@@ -403,9 +405,9 @@ function switchTab(tab) {
 
 <?php if (isset($_GET['error']) && $_GET['error'] === 'already_booked'): ?>
 Swal.fire({
-    title: 'ไม่สามารถจองซ้ำได้',
-    text: 'คุณมีคิวของกิจกรรมนี้อยู่แล้ว หากต้องการเปลี่ยนวัน กรุณายกเลิกคิวเดิมก่อน',
-    icon: 'warning', confirmButtonColor: '#0052CC', confirmButtonText: 'ตกลง',
+    title: '<?= __('bookings.swal_dup_title') ?>',
+    text: '<?= __('bookings.swal_dup_text') ?>',
+    icon: 'warning', confirmButtonColor: '#0052CC', confirmButtonText: '<?= __('bookings.swal_dup_btn') ?>',
     customClass: { popup: 'font-prompt rounded-2xl', confirmButton: 'font-prompt rounded-xl px-5' }
 });
 window.history.replaceState(null, null, window.location.pathname);
@@ -416,14 +418,14 @@ document.querySelectorAll('.cancel-form').forEach(form => {
     form.addEventListener('submit', function(e) {
         e.preventDefault();
         Swal.fire({
-            title: 'ต้องการยกเลิกคิว?',
-            text: 'หากยกเลิกแล้ว คุณจะต้องทำการจองรอบเวลาใหม่',
+            title: '<?= __('bookings.swal_cancel_title') ?>',
+            text: '<?= __('bookings.swal_cancel_text') ?>',
             icon: 'warning',
             showCancelButton: true,
             confirmButtonColor: '#EF4444',
             cancelButtonColor: '#6B7280',
-            confirmButtonText: 'ใช่, ยกเลิกคิว',
-            cancelButtonText: 'ไม่ยกเลิก',
+            confirmButtonText: '<?= __('bookings.swal_cancel_confirm') ?>',
+            cancelButtonText: '<?= __('bookings.swal_cancel_deny') ?>',
             reverseButtons: true,
             customClass: {
                 popup: 'font-prompt rounded-3xl',
@@ -444,7 +446,8 @@ function openModal(name, date, time, appId, status, campaign, isAttended, locati
     document.getElementById('modal-campaign').innerText = campaign;
     document.getElementById('modal-location').innerText = location;
     document.getElementById('modal-id').innerText       = appId;
-    document.getElementById('modal-dow').innerText      = 'วัน' + dow;
+    // Note: dow in modal-dow for English can vary but let's keep simple or dynamic
+    document.getElementById('modal-dow').innerText      = (lang === 'th' ? 'วัน' : '') + dow;
 
     const qrImg     = document.getElementById('modal-qrcode');
     const qrOverlay = document.getElementById('modal-qr-overlay');
@@ -459,18 +462,18 @@ function openModal(name, date, time, appId, status, campaign, isAttended, locati
     if (isAttended) {
         iconWrap.className = 'w-16 h-16 rounded-full flex items-center justify-center mb-3 bg-sky-100';
         icon.className     = 'fa-solid fa-check-double text-2xl text-sky-500';
-        text.innerText     = 'เข้าร่วมกิจกรรมแล้ว';
+        text.innerText     = '<?= __('bookings.mstatus_attended') ?>';
         text.className     = 'font-bold text-base text-sky-600';
-        sub.innerText      = 'คิวนี้ถูกเช็คอินเรียบร้อยแล้ว';
+        sub.innerText      = '<?= __('bookings.mstatus_attended_sub') ?>';
         statusBg.className = 'flex flex-col items-center text-center mb-6 py-5 rounded-2xl bg-sky-50';
         qrOverlay.classList.remove('hidden'); qrOverlay.classList.add('flex');
     } else if (status === 'booked') {
         // รอการอนุมัติจาก Admin
         iconWrap.className = 'w-16 h-16 rounded-full flex items-center justify-center mb-3 bg-amber-100';
         icon.className     = 'fa-solid fa-hourglass-half text-2xl text-amber-500';
-        text.innerText     = 'รอการอนุมัติจากเจ้าหน้าที่';
+        text.innerText     = '<?= __('bookings.mstatus_pending') ?>';
         text.className     = 'font-bold text-base text-amber-600';
-        sub.innerText      = 'ระบบจะแจ้งผลการอนุมัติผ่าน LINE';
+        sub.innerText      = '<?= __('bookings.mstatus_pending_sub') ?>';
         statusBg.className = 'flex flex-col items-center text-center mb-6 py-5 rounded-2xl bg-amber-50';
         qrOverlay.classList.remove('hidden'); qrOverlay.classList.add('flex');
         // ซ่อน QR section เพราะยังไม่อนุมัติ
@@ -479,27 +482,27 @@ function openModal(name, date, time, appId, status, campaign, isAttended, locati
         document.getElementById('modal-qr-section').classList.remove('hidden');
         iconWrap.className = 'w-16 h-16 rounded-full flex items-center justify-center mb-3 bg-emerald-100';
         icon.className     = 'fa-solid fa-check text-2xl text-emerald-500';
-        text.innerText     = 'ยืนยันการจองเรียบร้อย';
+        text.innerText     = '<?= __('bookings.mstatus_confirmed') ?>';
         text.className     = 'font-bold text-base text-emerald-600';
-        sub.innerText      = 'กรุณาแสดง QR Code แก่เจ้าหน้าที่';
+        sub.innerText      = '<?= __('bookings.mstatus_confirmed_sub') ?>';
         statusBg.className = 'flex flex-col items-center text-center mb-6 py-5 rounded-2xl bg-emerald-50';
         qrOverlay.classList.add('hidden'); qrOverlay.classList.remove('flex');
     } else if (status === 'cancelled_by_admin') {
         document.getElementById('modal-qr-section').classList.remove('hidden');
         iconWrap.className = 'w-16 h-16 rounded-full flex items-center justify-center mb-3 bg-orange-100';
         icon.className     = 'fa-solid fa-triangle-exclamation text-2xl text-orange-500';
-        text.innerText     = 'เจ้าหน้าที่ยกเลิกเพื่อเลื่อนวันคิว';
+        text.innerText     = '<?= __('bookings.mstatus_reschedule') ?>';
         text.className     = 'font-bold text-base text-orange-600';
-        sub.innerText      = 'กรุณาทำการจองรอบเวลาใหม่';
+        sub.innerText      = '<?= __('bookings.mstatus_reschedule_sub') ?>';
         statusBg.className = 'flex flex-col items-center text-center mb-6 py-5 rounded-2xl bg-orange-50';
         qrOverlay.classList.remove('hidden'); qrOverlay.classList.add('flex');
     } else {
         document.getElementById('modal-qr-section').classList.remove('hidden');
         iconWrap.className = 'w-16 h-16 rounded-full flex items-center justify-center mb-3 bg-red-100';
         icon.className     = 'fa-solid fa-xmark text-2xl text-red-500';
-        text.innerText     = 'ยกเลิกการจองแล้ว';
+        text.innerText     = '<?= __('bookings.mstatus_cancelled') ?>';
         text.className     = 'font-bold text-base text-red-500';
-        sub.innerText      = 'คิวนี้ถูกยกเลิกแล้ว ไม่สามารถใช้งานได้';
+        sub.innerText      = '<?= __('bookings.mstatus_cancelled_sub') ?>';
         statusBg.className = 'flex flex-col items-center text-center mb-6 py-5 rounded-2xl bg-red-50';
         qrOverlay.classList.add('hidden'); qrOverlay.classList.remove('flex');
     }
@@ -524,18 +527,18 @@ function closeModal() {
                 <i class="fa-solid fa-right-from-bracket text-red-500 text-lg"></i>
             </div>
             <div>
-                <p class="font-black text-gray-900 text-base">ออกจากระบบ?</p>
-                <p class="text-xs text-gray-500 mt-0.5">คุณจะต้อง Login ผ่าน LINE ใหม่อีกครั้ง</p>
+                <p class="font-black text-gray-900 text-base"><?= __('bookings.logout_title') ?></p>
+                <p class="text-xs text-gray-500 mt-0.5"><?= __('bookings.logout_sub') ?></p>
             </div>
         </div>
         <div class="flex gap-3 mt-5">
             <button onclick="document.getElementById('logoutConfirm').style.display='none'"
                 class="flex-1 py-3 border-2 border-gray-200 rounded-2xl font-bold text-gray-600 text-sm">
-                ยกเลิก
+                <?= __('bookings.logout_cancel') ?>
             </button>
             <a href="logout.php"
                 class="flex-1 py-3 bg-red-500 text-white rounded-2xl font-bold text-center text-sm shadow-md shadow-red-200">
-                ออกจากระบบ
+                <?= __('bookings.logout_confirm') ?>
             </a>
         </div>
     </div>

@@ -107,7 +107,10 @@ render_header(__('date.page_title'));
                class="w-10 h-10 flex items-center justify-center rounded-xl bg-gray-50 text-gray-600 hover:bg-[#0052CC] hover:text-white transition-colors">
                 <i class="fa-solid fa-chevron-left"></i>
             </a>
-            <h3 class="text-lg font-bold text-gray-900 font-prompt"><?= date('F Y', mktime(0,0,0,$month,1,$year)) ?></h3>
+            <h3 class="text-lg font-bold text-gray-900 font-prompt">
+                <?= __('bookings.months_short')[(int)$month] ?>
+                <?= __('bookings.date_buddhist') ? $year + 543 : $year ?>
+            </h3>
             <a href="?year=<?= $nextYear ?>&month=<?= $nextMonth ?>&campaign_id=<?= $campaignId ?>"
                class="w-10 h-10 flex items-center justify-center rounded-xl bg-gray-50 text-gray-600 hover:bg-[#0052CC] hover:text-white transition-colors">
                 <i class="fa-solid fa-chevron-right"></i>
@@ -115,7 +118,7 @@ render_header(__('date.page_title'));
         </div>
 
         <div class="grid grid-cols-7 gap-y-4 text-center">
-            <?php foreach (['Sun','Mon','Tue','Wed','Thu','Fri','Sat'] as $d): ?>
+            <?php foreach (__('bookings.dow') as $d): ?>
                 <div class="text-xs font-bold text-gray-400 uppercase"><?= $d ?></div>
             <?php endforeach; ?>
 

@@ -46,7 +46,7 @@ if (!$booking) {
     exit;
 }
 
-$fullName      = (string)($_SESSION['evax_full_name'] ?? 'ไม่ระบุชื่อ');
+$fullName      = (string)($_SESSION['evax_full_name'] ?? __('bookings.no_name'));
 $appointmentId = $booking['appointment_id'];
 $campaignTitle = $booking['campaign_title'];
 $slotDate      = (string)$booking['slot_date'];

@@ -112,9 +112,9 @@ $isPassport = ($citizenIdValue !== '' && (!ctype_digit($citizenIdValue) || strle
 
 // รับ redirect_back เพื่อรู้ว่ามาจากหน้าไหน
 $redirectBack = $_GET['redirect_back'] ?? '';
-
 $error_param = $_GET['error'] ?? '';
-render_header('ข้อมูลส่วนตัว');
+
+render_header($isEditing ? __('profile.heading_edit') : __('profile.heading'));
 ?>
 
 <div
@@ -124,7 +124,7 @@ render_header('ข้อมูลส่วนตัว');
     <div
       class="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800 font-prompt flex items-start gap-3">
       <i class="fa-solid fa-triangle-exclamation mt-0.5 shrink-0 text-amber-500"></i>
-      <span>ระบบได้แยกชื่อและนามสกุลจากข้อมูลเดิมให้อัตโนมัติ กรุณาตรวจสอบและบันทึกใหม่อีกครั้ง</span>
+      <span><?= __('profile.msg_name_review') ?></span>
     </div>
   <?php endif; ?>
 
@@ -159,11 +159,11 @@ render_header('ข้อมูลส่วนตัว');
         <div class="flex items-center gap-3 mb-1">
           <div class="w-1.5 h-6 bg-orange-500 rounded-full"></div>
           <h2 class="text-2xl font-black text-gray-900 font-prompt tracking-tight">
-            <?= $isEditing ? 'แก้ไขข้อมูลส่วนตัว' : 'ข้อมูลส่วนตัว' ?>
+            <?= $isEditing ? __('profile.heading_edit') : __('profile.heading') ?>
           </h2>
         </div>
         <p class="text-[13px] text-gray-400 font-medium font-prompt ml-4">
-          <?= $isEditing ? 'ปรับปรุงข้อมูลของคุณให้เป็นปัจจุบันเพื่อให้การนัดหมายราบรื่น' : 'กรุณากรอกข้อมูลของคุณเพื่อใช้ในการเข้าถึงบริการต่างๆ' ?>
+          <?= $isEditing ? __('profile.desc_edit') : __('profile.desc') ?>
         </p>
       </div>
 
@@ -175,7 +175,7 @@ render_header('ข้อมูลส่วนตัว');
             <div class="flex items-center gap-2">
               <i
                 class="fa-solid fa-chart-simple text-sm <?= $completenessPercent === 100 ? 'text-green-500' : 'text-[#0052CC]' ?>"></i>
-              <span class="text-sm font-bold text-gray-800 font-prompt">ความครบถ้วนของโปรไฟล์</span>
+              <span class="text-sm font-bold text-gray-800 font-prompt"><?= __('profile.completeness') ?></span>
             </div>
             <span
               class="text-sm font-black font-prompt <?= $completenessPercent === 100 ? 'text-green-600' : 'text-[#0052CC]' ?>"><?= $completenessPercent ?>%</span>
@@ -210,11 +210,11 @@ render_header('ข้อมูลส่วนตัว');
 
         <!-- คำนำหน้าชื่อ -->
         <div class="space-y-1.5">
-          <label for="name_title" class="text-sm font-semibold text-gray-700 font-prompt">คำนำหน้าชื่อ <span
+          <label for="name_title" class="text-sm font-semibold text-gray-700 font-prompt"><?= __('profile.lbl_prefix') ?> <span
               class="text-red-500">*</span></label>
           <select name="name_title" id="name_title" onchange="toggleCustomTitle()" required
             class="w-full px-4 py-3.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0052CC] focus:border-transparent outline-none transition-all text-sm bg-white font-prompt">
-            <option value="" disabled <?= $_selectVal === '' ? 'selected' : '' ?>>-- กรุณาเลือก --</option>
+            <option value="" disabled <?= $_selectVal === '' ? 'selected' : '' ?>><?= __('profile.select_placeholder') ?></option>
             <option value="นาย" <?= $_selectVal === 'นาย' ? 'selected' : '' ?>>นาย</option>
             <option value="นาง" <?= $_selectVal === 'นาง' ? 'selected' : '' ?>>นาง</option>
             <option value="นางสาว" <?= $_selectVal === 'นางสาว' ? 'selected' : '' ?>>นางสาว</option>
@@ -234,34 +234,34 @@ render_header('ข้อมูลส่วนตัว');
               <option value="รศ." <?= $_selectVal === 'รศ.' ? 'selected' : '' ?>>รศ.</option>
               <option value="ศ." <?= $_selectVal === 'ศ.' ? 'selected' : '' ?>>ศ.</option>
             </optgroup>
-            <option value="other" <?= $_selectVal === 'other' ? 'selected' : '' ?>>อื่นๆ (โปรดระบุ)...</option>
+            <option value="other" <?= $_selectVal === 'other' ? 'selected' : '' ?>><?= __('profile.gender_other') ?> (<?= __('profile.msg_specify') ?>)...</option>
           </select>
           <div id="custom_title_container" class="<?= $_isCustomPrefix ? '' : 'hidden' ?>">
             <input type="text" id="custom_title" name="custom_title" value="<?= htmlspecialchars($_customVal) ?>"
-              placeholder="พิมพ์คำนำหน้าชื่อของคุณ..." <?= $_isCustomPrefix ? 'required' : '' ?>
+              placeholder="<?= __('profile.custom_prefix_placeholder') ?>" <?= $_isCustomPrefix ? 'required' : '' ?>
               class="w-full px-4 py-3.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0052CC] focus:border-transparent outline-none transition-all text-sm bg-gray-50 font-prompt mt-2" />
           </div>
         </div>
 
         <div class="grid grid-cols-2 gap-3">
           <div class="space-y-1.5">
-            <label class="text-sm font-semibold text-gray-700 font-prompt" for="first_name">ชื่อ <span
+            <label class="text-sm font-semibold text-gray-700 font-prompt" for="first_name"><?= __('profile.lbl_first_name') ?> <span
                 class="text-red-500">*</span></label>
             <input id="first_name" name="first_name" type="text" required
-              value="<?= htmlspecialchars($userData['first_name']) ?>" placeholder="เช่น สมชาย"
+              value="<?= htmlspecialchars($userData['first_name']) ?>" placeholder="Ex. Somchai"
               class="w-full p-4 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0052CC] focus:border-transparent outline-none transition-all placeholder:text-gray-400 font-prompt" />
           </div>
           <div class="space-y-1.5">
-            <label class="text-sm font-semibold text-gray-700 font-prompt" for="last_name">นามสกุล <span
+            <label class="text-sm font-semibold text-gray-700 font-prompt" for="last_name"><?= __('profile.lbl_last_name') ?> <span
                 class="text-red-500">*</span></label>
             <input id="last_name" name="last_name" type="text" required
-              value="<?= htmlspecialchars($userData['last_name']) ?>" placeholder="เช่น ใจดี"
+              value="<?= htmlspecialchars($userData['last_name']) ?>" placeholder="Ex. Jaidee"
               class="w-full p-4 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0052CC] focus:border-transparent outline-none transition-all placeholder:text-gray-400 font-prompt" />
           </div>
         </div>
 
         <div class="space-y-2">
-          <label class="text-sm font-semibold text-gray-700 font-prompt">ประเภทผู้ใช้งาน <span
+          <label class="text-sm font-semibold text-gray-700 font-prompt"><?= __('profile.lbl_user_type') ?> <span
               class="text-red-500">*</span></label>
           <div class="grid grid-cols-3 gap-2">
             <label class="cursor-pointer">
@@ -269,35 +269,35 @@ render_header('ข้อมูลส่วนตัว');
                 <?= $userData['status'] === 'student' ? 'checked' : '' ?>>
               <div
                 class="py-3 px-1 text-center border border-gray-200 rounded-xl peer-checked:bg-[#E6F0FF] peer-checked:border-[#0052CC] peer-checked:text-[#0052CC] font-prompt text-[11px] font-bold transition-all h-full flex items-center justify-center">
-                นักศึกษา</div>
+                <?= __('profile.type_student') ?></div>
             </label>
             <label class="cursor-pointer">
               <input type="radio" name="status" value="staff" required class="peer hidden"
                 <?= $userData['status'] === 'staff' ? 'checked' : '' ?>>
               <div
                 class="py-3 px-1 text-center border border-gray-200 rounded-xl peer-checked:bg-[#E6F0FF] peer-checked:border-[#0052CC] peer-checked:text-[#0052CC] font-prompt text-[11px] font-bold transition-all h-full flex items-center justify-center">
-                บุคลากร/อาจารย์</div>
+                <?= __('profile.type_staff') ?></div>
             </label>
             <label class="cursor-pointer">
               <input type="radio" name="status" value="other" required class="peer hidden"
                 <?= $userData['status'] === 'other' ? 'checked' : '' ?>>
               <div
                 class="py-3 px-1 text-center border border-gray-200 rounded-xl peer-checked:bg-[#E6F0FF] peer-checked:border-[#0052CC] peer-checked:text-[#0052CC] font-prompt text-[11px] font-bold transition-all h-full flex items-center justify-center">
-                บุคคลทั่วไป</div>
+                <?= __('profile.type_other') ?></div>
             </label>
           </div>
         </div>
 
         <!-- เพศ -->
         <div class="space-y-2">
-          <label class="text-sm font-semibold text-gray-700 font-prompt">เพศ <span class="text-red-500">*</span></label>
+          <label class="text-sm font-semibold text-gray-700 font-prompt"><?= __('profile.lbl_gender') ?> <span class="text-red-500">*</span></label>
           <div class="grid grid-cols-3 gap-2">
             <label class="cursor-pointer">
               <input type="radio" name="gender" value="male" required class="peer hidden"
                 <?= $userData['gender'] === 'male' ? 'checked' : '' ?>>
               <div
                 class="py-3 px-1 text-center border border-gray-200 rounded-xl peer-checked:bg-[#E6F0FF] peer-checked:border-[#0052CC] peer-checked:text-[#0052CC] font-prompt text-[11px] font-bold transition-all h-full flex items-center justify-center gap-1.5">
-                <i class="fa-solid fa-mars text-xs"></i> ชาย
+                <i class="fa-solid fa-mars text-xs"></i> <?= __('profile.gender_male') ?>
               </div>
             </label>
             <label class="cursor-pointer">
@@ -305,7 +305,7 @@ render_header('ข้อมูลส่วนตัว');
                 <?= $userData['gender'] === 'female' ? 'checked' : '' ?>>
               <div
                 class="py-3 px-1 text-center border border-gray-200 rounded-xl peer-checked:bg-[#E6F0FF] peer-checked:border-[#0052CC] peer-checked:text-[#0052CC] font-prompt text-[11px] font-bold transition-all h-full flex items-center justify-center gap-1.5">
-                <i class="fa-solid fa-venus text-xs"></i> หญิง
+                <i class="fa-solid fa-venus text-xs"></i> <?= __('profile.gender_female') ?>
               </div>
             </label>
             <label class="cursor-pointer">
@@ -313,7 +313,7 @@ render_header('ข้อมูลส่วนตัว');
                 <?= $userData['gender'] === 'other' ? 'checked' : '' ?>>
               <div
                 class="py-3 px-1 text-center border border-gray-200 rounded-xl peer-checked:bg-[#E6F0FF] peer-checked:border-[#0052CC] peer-checked:text-[#0052CC] font-prompt text-[11px] font-bold transition-all h-full flex items-center justify-center">
-                ไม่ระบุ
+                <?= __('profile.gender_other') ?>
               </div>
             </label>
           </div>
@@ -321,7 +321,7 @@ render_header('ข้อมูลส่วนตัว');
 
         <!-- เลขประจำตัว: บัตรประชาชน / Passport -->
         <div class="space-y-2">
-          <label class="text-sm font-semibold text-gray-700 font-prompt">เลขประจำตัว <span
+          <label class="text-sm font-semibold text-gray-700 font-prompt"><?= __('profile.lbl_citizen_id') ?> <span
               class="text-red-500">*</span></label>
 
           <!-- ปุ่มเลือกประเภท -->
@@ -355,37 +355,37 @@ render_header('ข้อมูลส่วนตัว');
         </div>
 
         <div class="space-y-1.5" id="student_id_container">
-          <label class="text-sm font-semibold text-gray-700 font-prompt" for="id_number">รหัสนักศึกษา / บุคลากร <span
+          <label class="text-sm font-semibold text-gray-700 font-prompt" for="id_number"><?= __('profile.lbl_id') ?> <span
               class="text-red-500">*</span></label>
           <input id="id_number" name="id_number" type="text" maxlength="7"
-            value="<?= htmlspecialchars($userData['id_number']) ?>" placeholder="กรอกรหัสตัวเลข 7 หลัก"
+            value="<?= htmlspecialchars($userData['id_number']) ?>" placeholder="<?= __('profile.id_placeholder') ?>"
             class="w-full p-4 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0052CC] focus:border-transparent outline-none transition-all placeholder:text-gray-400 font-prompt" />
         </div>
         <div class="space-y-1.5">
           <label class="text-sm font-semibold text-gray-700 font-prompt" for="department">
-            คณะ / หน่วยงาน
-            <span class="text-gray-400 font-normal text-xs ml-1">(ไม่บังคับ)</span>
+            <?= __('profile.lbl_department') ?>
+            <span class="text-gray-400 font-normal text-xs ml-1"><?= __('profile.optional') ?></span>
           </label>
           <input id="department" name="department" type="text"
             value="<?= htmlspecialchars((string) ($userData['department'] ?? '')) ?>"
-            placeholder="เช่น วิทยาลัยแพทยศาสตร์"
+            placeholder="Ex. College of Medicine"
             class="w-full p-4 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0052CC] focus:border-transparent outline-none transition-all placeholder:text-gray-400 font-prompt" />
         </div>
         <div class="space-y-1.5">
           <label class="text-sm font-semibold text-gray-700 font-prompt" for="email">
-            อีเมล
-            <span class="text-gray-400 font-normal text-xs ml-1">(ไม่บังคับ)</span>
+            <?= __('profile.lbl_email') ?>
+            <span class="text-gray-400 font-normal text-xs ml-1"><?= __('profile.optional') ?></span>
           </label>
           <input id="email" name="email" type="email" value="<?= htmlspecialchars($userData['email']) ?>"
             placeholder="example@email.com"
             class="w-full p-4 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0052CC] focus:border-transparent outline-none transition-all placeholder:text-gray-400 font-prompt" />
           <p class="text-xs text-amber-600 flex items-start gap-1.5 mt-1 font-prompt">
             <i class="fa-solid fa-triangle-exclamation shrink-0 mt-0.5"></i>
-            หากไม่กรอกอีเมล คุณจะไม่ได้รับการแจ้งเตือนยืนยันการจองและผลอนุมัติ
+            <?= __('profile.email_note') ?>
           </p>
         </div>
         <div class="space-y-1.5">
-          <label class="text-sm font-semibold text-gray-700 font-prompt" for="phone_number">เบอร์โทรศัพท์ <span
+          <label class="text-sm font-semibold text-gray-700 font-prompt" for="phone_number"><?= __('profile.lbl_phone') ?> <span
               class="text-red-500">*</span></label>
           <input id="phone_number" name="phone_number" type="tel" required
             value="<?= htmlspecialchars($userData['phone']) ?>" placeholder="08X-XXX-XXXX"
@@ -397,30 +397,26 @@ render_header('ข้อมูลส่วนตัว');
       <div class="space-y-4 pt-4 border-t border-gray-100">
         <div class="flex items-center gap-2 text-[#0052CC] mb-2 text-sm font-bold">
           <i class="fa-solid fa-shield-halved"></i>
-          <span>ข้อตกลงและเงื่อนไข (PDPA)</span>
+          <span><?= __('profile.pdpa_title') ?></span>
         </div>
         <div
           class="bg-gray-50 border border-gray-100 p-4 rounded-xl text-[12px] text-gray-500 font-prompt leading-relaxed h-44 overflow-y-auto custom-scrollbar">
-          <p class="font-bold text-gray-800 mb-2">ยินดีต้อนรับเข้าสู่ระบบ E-Campaign (RSU Medical Clinic Services)</p>
-          <p class="mb-2">มหาวิทยาลัยรังสิต ขอขอบพระคุณในความไว้วางใจใช้บริการ ข้อมูลส่วนบุคคลที่ท่านกรอก (ชื่อ-นามสกุล,
-            เลขบัตรประชาชน, รหัสนักศึกษา/บุคลากร, และเบอร์โทรศัพท์) รวมถึง LINE User ID
-            จะถูกประมวลผลภายใต้เงื่อนไขดังนี้:</p>
+          <p class="font-bold text-gray-800 mb-2"><?= __('profile.pdpa_welcome') ?></p>
+          <p class="mb-2"><?= __('profile.pdpa_intro') ?></p>
           <ul class="list-disc pl-4 space-y-1 mb-2">
-            <li><strong>เพื่อการยืนยันตัวตน:</strong> ตรวจสอบสิทธิ์ในการรับบริการตามเงื่อนไขของแต่ละโครงการ</li>
-            <li><strong>เพื่อการบริหารจัดการ:</strong> จัดลำดับคิวและอำนวยความสะดวกในวันนัดหมาย</li>
-            <li><strong>เพื่อการแจ้งเตือน:</strong> ส่งข้อความยืนยันการจองและแจ้งเตือนผ่าน LINE Notify/Message</li>
-            <li><strong>เพื่อความปลอดภัย:</strong> ปฏิบัติตามมาตรฐานการระบุตัวตนในระบบบริการสุขภาพ</li>
+            <li><strong><?= __('profile.pdpa_item1_title') ?></strong> <?= __('profile.pdpa_item1_desc') ?></li>
+            <li><strong><?= __('profile.pdpa_item2_title') ?></strong> <?= __('profile.pdpa_item2_desc') ?></li>
+            <li><strong><?= __('profile.pdpa_item3_title') ?></strong> <?= __('profile.pdpa_item3_desc') ?></li>
+            <li><strong><?= __('profile.pdpa_item4_title') ?></strong> <?= __('profile.pdpa_item4_desc') ?></li>
           </ul>
-          <p>เราขอรับรองว่าข้อมูลของท่านจะถูกเก็บเป็นความลับสูงสุดตามมาตรฐาน PDPA
-            และจะไม่ถูกนำไปเผยแพร่หรือขายข้อมูลให้แก่บุคคลภายนอกโดยไม่ได้รับอนุญาต</p>
+          <p><?= __('profile.pdpa_footer') ?></p>
         </div>
 
         <label
           class="flex items-center gap-4 p-4 bg-white rounded-2xl border border-gray-100 shadow-sm cursor-pointer hover:bg-gray-50 transition-all active:scale-[0.98] select-none">
           <input type="checkbox" id="pdpa_agreed" name="agreed" value="1" <?= $isEditing ? 'checked' : 'required' ?>
             class="shrink-0 w-6 h-6 rounded-lg border-gray-300 text-[#0052CC] focus:ring-[#0052CC] transition-all" />
-          <span class="text-xs text-gray-600 font-bold leading-tight font-prompt">ฉันได้อ่าน
-            และยอมรับข้อตกลงนโยบายความเป็นส่วนตัว</span>
+          <span class="text-xs text-gray-600 font-bold leading-tight font-prompt"><?= __('profile.pdpa_agree') ?></span>
         </label>
       </div>
     </div>
@@ -429,16 +425,16 @@ render_header('ข้อมูลส่วนตัว');
       <?php if ($isEditing): ?>
         <a href="<?= $redirectBack !== '' ? htmlspecialchars($redirectBack) : 'hub.php' ?>"
           class="flex-none flex items-center justify-center px-5 py-4 border border-gray-200 rounded-xl text-gray-600 font-bold font-prompt transition-all hover:bg-gray-50 active:scale-[0.98]">
-          ย้อนกลับ
+          <?= __('profile.back_btn') ?>
         </a>
         <button type="submit"
           class="flex-1 bg-[#0052CC] hover:bg-blue-700 text-white font-bold py-4 rounded-xl transition-all shadow-sm active:scale-[0.98] font-prompt">
-          บันทึกการเปลี่ยนแปลง
+          <?= __('profile.save_changes_btn') ?>
         </button>
       <?php else: ?>
         <button type="submit"
           class="w-full bg-[#0052CC] hover:bg-blue-700 text-white font-bold py-4 rounded-xl transition-all shadow-sm active:scale-[0.98] font-prompt">
-          บันทึกและดำเนินการต่อ
+          <?= __('profile.save_continue_btn') ?>
         </button>
       <?php endif; ?>
     </div>
@@ -528,7 +524,7 @@ render_header('ข้อมูลส่วนตัว');
           errEl = document.createElement('p');
           errEl.id = 'status-error';
           errEl.className = 'text-xs text-red-500 mt-1 font-prompt';
-          errEl.textContent = 'กรุณาเลือกประเภทผู้ใช้งาน';
+          errEl.textContent = '<?= __('profile.lbl_user_type_error') ?>';
           if (statusSection) statusSection.insertAdjacentElement('afterend', errEl);
         }
       }

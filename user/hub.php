@@ -77,7 +77,7 @@ $statusLabel = $statusMap[$user['status'] ?? ''] ?? ($user['status'] ?? '');
 $displayName = ($user['prefix'] ?? '') . ($user['full_name'] ?? 'ผู้ใช้');
 
 require_once __DIR__ . '/../includes/header.php';
-render_header('RSU Medical Hub');
+render_header(__('hub.page_title'));
 ?>
 
 <div class="flex-1 p-6 pt-10 pb-20 relative z-10 bg-white rounded-t-[32px] animate-in fade-in duration-500">
@@ -85,10 +85,10 @@ render_header('RSU Medical Hub');
   <div class="mb-6">
     <div class="flex items-center gap-3 mb-1">
       <div class="w-1.5 h-6 bg-orange-500 rounded-full"></div>
-      <h1 class="text-2xl font-black text-gray-900 font-prompt tracking-tight">ศูนย์รวมบริการ</h1>
+      <h1 class="text-2xl font-black text-gray-900 font-prompt tracking-tight"><?= __('hub.heading') ?></h1>
     </div>
     <p class="text-[13px] text-gray-400 font-medium font-prompt ml-4">
-      เข้าถึงทุกบริการด้านสุขภาพของคุณได้ง่ายๆ ในที่เดียว
+      <?= __('hub.desc') ?>
     </p>
   </div>
 
@@ -99,19 +99,19 @@ render_header('RSU Medical Hub');
         <div class="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center shrink-0">
           <i class="fa-solid fa-calendar-check text-sm text-[#0052CC]"></i>
         </div>
-        <span class="text-[15px] font-bold text-gray-900">นัดหมายที่กำลังมา</span>
+        <span class="text-[15px] font-bold text-gray-900"><?= __('hub.upcoming_section') ?></span>
       </div>
-      <a href="my_bookings.php" class="text-xs font-bold text-[#0052CC] hover:underline">ดูทั้งหมด <i
+      <a href="my_bookings.php" class="text-xs font-bold text-[#0052CC] hover:underline"><?= __('hub.view_all') ?> <i
           class="fa-solid fa-arrow-right ml-1"></i></a>
     </div>
 
     <?php if (empty($upcomingBookings)): ?>
       <div class="text-center pt-6 pb-4 bg-gray-50/50 rounded-2xl border-2 border-dashed border-gray-100">
         <i class="fa-regular fa-calendar-xmark text-4xl text-gray-300 block mb-3"></i>
-        <p class="text-sm text-gray-400 mb-4 font-medium">ยังไม่มีนัดหมายที่กำลังมา</p>
+        <p class="text-sm text-gray-400 mb-4 font-medium"><?= __('hub.no_upcoming') ?></p>
         <a href="booking_campaign.php"
           class="inline-block bg-[#0052CC] hover:bg-blue-700 text-white text-xs font-bold py-3 px-6 rounded-xl shadow-sm hover:shadow active:scale-[0.98] transition-all">
-          + จองนัดหมายใหม่
+          <?= __('hub.add_booking') ?>
         </a>
       </div>
     <?php else: ?>
@@ -150,20 +150,20 @@ render_header('RSU Medical Hub');
         <div class="w-10 h-10 bg-orange-50 rounded-xl flex items-center justify-center shrink-0">
           <i class="fa-solid fa-box-open text-sm text-orange-500"></i>
         </div>
-        <span class="text-[15px] font-bold text-gray-900">อุปกรณ์ที่ยืมอยู่</span>
+        <span class="text-[15px] font-bold text-gray-900"><?= __('hub.borrow_section') ?></span>
       </div>
       <a href="../e_Borrow/auth_bridge.php?to=history.php"
-        class="text-xs font-bold text-orange-500 hover:underline">ดูทั้งหมด <i
+        class="text-xs font-bold text-orange-500 hover:underline"><?= __('hub.view_all') ?> <i
           class="fa-solid fa-arrow-right ml-1"></i></a>
     </div>
 
     <?php if (empty($activeBorrows)): ?>
       <div class="text-center pt-6 pb-4 bg-gray-50/50 rounded-2xl border-2 border-dashed border-gray-100">
         <i class="fa-solid fa-box-open text-4xl text-gray-300 block mb-3"></i>
-        <p class="text-sm text-gray-400 mb-4 font-medium">ไม่มีรายการยืมอุปกรณ์</p>
+        <p class="text-sm text-gray-400 mb-4 font-medium"><?= __('hub.no_borrow') ?></p>
         <a href="../e_Borrow/auth_bridge.php"
           class="inline-block bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold py-3 px-6 rounded-xl shadow-sm hover:shadow active:scale-[0.98] transition-all">
-          ทำรายการยืมอุปกรณ์
+          <?= __('hub.do_borrow') ?>
         </a>
       </div>
     <?php else: ?>
@@ -178,7 +178,7 @@ render_header('RSU Medical Hub');
           <div class="text-[11px] text-gray-500 flex items-center justify-between font-medium">
             <span><?= htmlspecialchars($borrow['category_name']) ?></span>
             <span class="<?= $urgColor ?> font-bold bg-white px-2 py-0.5 rounded-md shadow-sm border border-white/50">
-              <i class="fa-solid fa-clock-rotate-left mr-1"></i> คืนภายใน <?= $daysLeft ?> วัน
+              <i class="fa-solid fa-clock-rotate-left mr-1"></i> <?= sprintf(__('hub.days_left'), $daysLeft) ?>
             </span>
           </div>
         </div>
@@ -195,8 +195,8 @@ render_header('RSU Medical Hub');
         <i class="fa-solid fa-notes-medical text-2xl text-white"></i>
       </div>
       <div>
-        <div class="text-sm font-bold text-gray-900">นัดหมายสุขภาพ</div>
-        <div class="text-[10px] font-bold text-gray-400 mt-0.5 uppercase tracking-wider">จอง / ดูประวัติ</div>
+        <div class="text-sm font-bold text-gray-900"><?= __('hub.quick_health') ?></div>
+        <div class="text-[10px] font-bold text-gray-400 mt-0.5 uppercase tracking-wider"><?= __('hub.quick_health_sub') ?></div>
       </div>
     </a>
     <a href="../e_Borrow/auth_bridge.php"
@@ -206,8 +206,8 @@ render_header('RSU Medical Hub');
         <i class="fa-solid fa-wheelchair text-2xl text-white"></i>
       </div>
       <div>
-        <div class="text-sm font-bold text-gray-900">ยืมอุปกรณ์</div>
-        <div class="text-[10px] font-bold text-gray-400 mt-0.5 uppercase tracking-wider">ระบบ e-Borrow</div>
+        <div class="text-sm font-bold text-gray-900"><?= __('hub.quick_borrow') ?></div>
+        <div class="text-[10px] font-bold text-gray-400 mt-0.5 uppercase tracking-wider"><?= __('hub.quick_borrow_sub') ?></div>
       </div>
     </a>
   </div>
