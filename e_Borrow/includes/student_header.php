@@ -52,15 +52,22 @@
 </script>
 
     <header class="header">
-        <h1>MedLoan (สำหรับนักศึกษา)</h1>
-        
+        <div style="display:flex;flex-direction:column;gap:4px;">
+            <?php if (!empty($_SESSION['evax_student_id'])): ?>
+            <a href="../user/hub.php" style="display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;color:rgba(255,255,255,.75);text-decoration:none;background:rgba(255,255,255,.15);padding:3px 10px;border-radius:20px;width:fit-content;margin-bottom:2px;">
+                <i class="fas fa-arrow-left" style="font-size:10px;"></i> RSU Medical Hub
+            </a>
+            <?php endif; ?>
+            <h1 style="margin:0;">MedLoan (สำหรับนักศึกษา)</h1>
+        </div>
+
         <div class="user-info">
-            
+
             <button type="button" class="theme-toggle-btn" id="theme-toggle-btn" title="ปรับธีม">
                 <i class="fas fa-moon"></i> <i class="fas fa-sun"></i>
             </button>
             <?php echo htmlspecialchars($_SESSION['student_full_name'] ?? 'ผู้ใช้'); ?>
-            
+
             <a href="logout.php" class="btn btn-logout">
                 <i class="fa-solid fa-arrow-right-from-bracket"></i> ออกจากระบบ
             </a>
