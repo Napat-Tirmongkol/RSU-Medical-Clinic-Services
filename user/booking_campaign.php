@@ -35,13 +35,18 @@ function getBadge($type): array {
 render_header(__('campaign.page_title'));
 ?>
 
-<div class="max-w-md mx-auto px-4 py-6 pb-24 -mt-6 relative z-10">
+<div class="p-6 pt-10 pb-24 relative z-10 flex flex-col min-h-screen bg-white rounded-t-[32px] animate-in fade-in slide-in-from-right-4 duration-500">
+    <!-- Header Section -->
     <div class="mb-8">
-        <h1 class="text-2xl font-black text-gray-900 leading-tight">
-            <?= htmlspecialchars(__('campaign.heading')) ?><br>
-            <span class="text-[#0052CC]"><?= htmlspecialchars(__('campaign.heading_accent')) ?></span>
-        </h1>
-        <p class="text-gray-500 mt-2 text-sm"><?= htmlspecialchars(__('campaign.desc')) ?></p>
+        <div class="flex items-center gap-3 mb-1">
+            <div class="w-1.5 h-6 bg-orange-500 rounded-full"></div>
+            <h1 class="text-2xl font-black text-gray-900 font-prompt tracking-tight">
+                <?= htmlspecialchars(__('campaign.heading')) ?> <span class="text-[#0052CC]"><?= htmlspecialchars(__('campaign.heading_accent')) ?></span>
+            </h1>
+        </div>
+        <p class="text-[13px] text-gray-400 font-medium font-prompt ml-4">
+            <?= htmlspecialchars(__('campaign.desc')) ?>
+        </p>
     </div>
 
     <?php if (count($camp_list) === 0): ?>

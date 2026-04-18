@@ -196,28 +196,40 @@ function renderBookingCard($b): void {
 ?>
 
 <!-- ===== PAGE STRUCTURE ===== -->
+<div class="flex flex-col min-h-screen bg-white rounded-t-[32px] pt-10 pb-28 relative z-10 animate-in fade-in slide-in-from-right-4 duration-500">
 
-<!-- Quick stats panel (floats under global header) -->
-<div class="px-4 -mt-5 relative z-20 mb-6">
-    <div class="bg-white/90 backdrop-blur-md border border-white rounded-[2rem] p-4 shadow-xl flex gap-3">
-        <div class="flex-1 bg-blue-50/50 rounded-2xl p-3 text-center border border-blue-100/50">
-            <p class="text-xl font-black text-[#0052CC]"><?= count($upcomingBookings) ?></p>
-            <p class="text-[10px] text-gray-500 font-bold uppercase tracking-wider mt-0.5">คิวที่รอ</p>
+    <!-- Header Section -->
+    <div class="px-6 mb-8">
+        <div class="flex items-center gap-3 mb-1">
+            <div class="w-1.5 h-6 bg-orange-500 rounded-full"></div>
+            <h1 class="text-2xl font-black text-gray-900 font-prompt tracking-tight">ประวัติการจอง</h1>
         </div>
-        <div class="flex-1 bg-gray-50/50 rounded-2xl p-3 text-center border border-gray-100">
-            <p class="text-xl font-black text-gray-900"><?= count($historyBookings) ?></p>
-            <p class="text-[10px] text-gray-500 font-bold uppercase tracking-wider mt-0.5">ประวัติ</p>
-        </div>
-        <div class="flex-1 bg-emerald-50/50 rounded-2xl p-3 text-center border border-emerald-100/50">
-            <?php $attended = count(array_filter($historyBookings, fn($b) => !empty($b['attended_at']))); ?>
-            <p class="text-xl font-black text-emerald-600"><?= $attended ?></p>
-            <p class="text-[10px] text-gray-500 font-bold uppercase tracking-wider mt-0.5">เช็คอิน</p>
+        <p class="text-[13px] text-gray-400 font-medium font-prompt ml-4">
+            ตรวจสอบคิวที่รอดำเนินการและประวัติการรับบริการย้อนหลังของคุณ
+        </p>
+    </div>
+
+    <!-- Quick stats panel -->
+    <div class="px-6 mb-8">
+        <div class="bg-gray-50/80 backdrop-blur-md border border-gray-100 rounded-3xl p-4 shadow-sm flex gap-3">
+            <div class="flex-1 bg-white rounded-2xl p-3 text-center border border-blue-100/50 shadow-sm">
+                <p class="text-xl font-black text-[#0052CC]"><?= count($upcomingBookings) ?></p>
+                <p class="text-[10px] text-gray-400 font-bold uppercase tracking-wider mt-0.5">คิวที่รอ</p>
+            </div>
+            <div class="flex-1 bg-white rounded-2xl p-3 text-center border border-gray-100 shadow-sm">
+                <p class="text-xl font-black text-gray-900"><?= count($historyBookings) ?></p>
+                <p class="text-[10px] text-gray-400 font-bold uppercase tracking-wider mt-0.5">ประวัติ</p>
+            </div>
+            <div class="flex-1 bg-white rounded-2xl p-3 text-center border border-emerald-100/50 shadow-sm">
+                <?php $attended = count(array_filter($historyBookings, fn($b) => !empty($b['attended_at']))); ?>
+                <p class="text-xl font-black text-emerald-600"><?= $attended ?></p>
+                <p class="text-[10px] text-gray-400 font-bold uppercase tracking-wider mt-0.5">เช็คอิน</p>
+            </div>
         </div>
     </div>
-</div>
 
-<!-- Main Content (pulls up over the hero) -->
-<div class="relative -mt-6 pb-28 px-4">
+    <!-- Main Content -->
+    <div class="px-6">
     <!-- Tab Switcher -->
     <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-1.5 mb-5 flex">
         <button id="tab-upcoming"
@@ -264,6 +276,7 @@ function renderBookingCard($b): void {
         <?php else: ?>
             <?php foreach ($historyBookings as $b) renderBookingCard($b); ?>
         <?php endif; ?>
+    </div>
     </div>
 </div>
 
