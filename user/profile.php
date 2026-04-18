@@ -16,59 +16,44 @@ if ($lineUserId === '') {
 
 // 2. ดึงข้อมูลเดิมจากฐานข้อมูล (ถ้ามี) มาแสดงในฟอร์ม
 $userData = [
-  'prefix' => '',
+  'prefix'     => '',
   'first_name' => '',
-  'last_name' => '',
-  'full_name' => '',
-  'id_number' => '',
+  'last_name'  => '',
+  'full_name'  => '',
+  'id_number'  => '',
   'citizen_id' => '',
-  'phone' => '',
-  'status' => '',
-  'email' => '',
-  'gender' => '',
+  'phone'      => '',
+  'status'     => '',
+  'email'      => '',
+  'gender'     => '',
   'department' => '',
 ];
 
 try {
   $pdo = db();
   // migration อัตโนมัติ
-  try {
-    $pdo->exec("ALTER TABLE sys_users ADD COLUMN IF NOT EXISTS prefix     VARCHAR(20)  NOT NULL DEFAULT ''");
-  } catch (PDOException) {
-  }
-  try {
-    $pdo->exec("ALTER TABLE sys_users ADD COLUMN IF NOT EXISTS gender     VARCHAR(20)  NOT NULL DEFAULT ''");
-  } catch (PDOException) {
-  }
-  try {
-    $pdo->exec("ALTER TABLE sys_users ADD COLUMN IF NOT EXISTS first_name VARCHAR(100) NOT NULL DEFAULT ''");
-  } catch (PDOException) {
-  }
-  try {
-    $pdo->exec("ALTER TABLE sys_users ADD COLUMN IF NOT EXISTS last_name  VARCHAR(100) NOT NULL DEFAULT ''");
-  } catch (PDOException) {
-  }
+  try { $pdo->exec("ALTER TABLE sys_users ADD COLUMN IF NOT EXISTS prefix     VARCHAR(20)  NOT NULL DEFAULT ''"); } catch (PDOException) {}
+  try { $pdo->exec("ALTER TABLE sys_users ADD COLUMN IF NOT EXISTS gender     VARCHAR(20)  NOT NULL DEFAULT ''"); } catch (PDOException) {}
+  try { $pdo->exec("ALTER TABLE sys_users ADD COLUMN IF NOT EXISTS first_name VARCHAR(100) NOT NULL DEFAULT ''"); } catch (PDOException) {}
+  try { $pdo->exec("ALTER TABLE sys_users ADD COLUMN IF NOT EXISTS last_name  VARCHAR(100) NOT NULL DEFAULT ''"); } catch (PDOException) {}
 
-  try {
-    $pdo->exec("ALTER TABLE sys_users ADD COLUMN IF NOT EXISTS department VARCHAR(150) NOT NULL DEFAULT ''");
-  } catch (PDOException) {
-  }
+  try { $pdo->exec("ALTER TABLE sys_users ADD COLUMN IF NOT EXISTS department VARCHAR(150) NOT NULL DEFAULT ''"); } catch (PDOException) {}
   $stmt = $pdo->prepare("SELECT prefix, first_name, last_name, full_name, student_personnel_id, citizen_id, phone_number, status, email, gender, department FROM sys_users WHERE line_user_id = :line_id LIMIT 1");
   $stmt->execute([':line_id' => $lineUserId]);
   $user = $stmt->fetch();
 
   if ($user) {
-    $userData['prefix'] = $user['prefix'] ?? '';
-    $userData['first_name'] = $user['first_name'] ?? '';
-    $userData['last_name'] = $user['last_name'] ?? '';
-    $userData['full_name'] = $user['full_name'] ?? '';
-    $userData['id_number'] = $user['student_personnel_id'] ?? '';
-    $userData['citizen_id'] = $user['citizen_id'] ?? '';
-    $userData['phone'] = $user['phone_number'] ?? '';
-    $userData['status'] = $user['status'] ?? '';
-    $userData['email'] = $user['email'] ?? '';
-    $userData['gender'] = $user['gender'] ?? '';
-    $userData['department'] = $user['department'] ?? '';
+    $userData['prefix']     = $user['prefix']               ?? '';
+    $userData['first_name'] = $user['first_name']           ?? '';
+    $userData['last_name']  = $user['last_name']            ?? '';
+    $userData['full_name']  = $user['full_name']            ?? '';
+    $userData['id_number']  = $user['student_personnel_id'] ?? '';
+    $userData['citizen_id'] = $user['citizen_id']           ?? '';
+    $userData['phone']      = $user['phone_number']         ?? '';
+    $userData['status']     = $user['status']               ?? '';
+    $userData['email']      = $user['email']                ?? '';
+    $userData['gender']     = $user['gender']               ?? '';
+    $userData['department'] = $user['department']           ?? '';
   }
 } catch (PDOException $e) {
   // กรณี Error ให้ปล่อยผ่านไปกรอกใหม่
@@ -77,33 +62,33 @@ try {
 // ── Auto-split full_name → first_name / last_name สำหรับ user เดิม ─────────
 $_nameNeedsReview = false;
 if ($userData['full_name'] !== '' && $userData['first_name'] === '' && $userData['last_name'] === '') {
-  $parts = explode(' ', trim($userData['full_name']), 2);
-  $userData['first_name'] = $parts[0] ?? '';
-  $userData['last_name'] = $parts[1] ?? '';
-  $_nameNeedsReview = true; // แสดง banner ให้ user ตรวจสอบ
+    $parts = explode(' ', trim($userData['full_name']), 2);
+    $userData['first_name'] = $parts[0] ?? '';
+    $userData['last_name']  = $parts[1] ?? '';
+    $_nameNeedsReview = true; // แสดง banner ให้ user ตรวจสอบ
 }
 
 // ตรวจสอบว่าเป็นการแก้ไขหรือลงทะเบียนใหม่
 $isEditing = !empty($userData['full_name']);
 
 // ── Profile completeness (แสดงเฉพาะตอนแก้ไข) ────────────────────────────────
-$completenessItems = [];
+$completenessItems   = [];
 $completenessPercent = 0;
 if ($isEditing) {
-  $completenessItems = [
-    ['label' => 'คำนำหน้า', 'done' => !empty($userData['prefix'])],
-    ['label' => 'ชื่อ', 'done' => !empty($userData['first_name'])],
-    ['label' => 'นามสกุล', 'done' => !empty($userData['last_name'])],
-    ['label' => 'เบอร์โทรศัพท์', 'done' => !empty($userData['phone'])],
-    ['label' => 'เพศ', 'done' => !empty($userData['gender'])],
-    ['label' => 'เลขประจำตัว', 'done' => !empty($userData['citizen_id'])],
-  ];
-  if ($userData['status'] !== 'other' && $userData['status'] !== '') {
-    $completenessItems[] = ['label' => 'รหัสนักศึกษา/บุคลากร', 'done' => !empty($userData['id_number'])];
-  }
-  $completenessTotal = count($completenessItems);
-  $completenessDone = count(array_filter(array_column($completenessItems, 'done')));
-  $completenessPercent = $completenessTotal > 0 ? (int) round($completenessDone / $completenessTotal * 100) : 0;
+    $completenessItems = [
+        ['label' => 'คำนำหน้า',    'done' => !empty($userData['prefix'])],
+        ['label' => 'ชื่อ',        'done' => !empty($userData['first_name'])],
+        ['label' => 'นามสกุล',     'done' => !empty($userData['last_name'])],
+        ['label' => 'เบอร์โทรศัพท์','done' => !empty($userData['phone'])],
+        ['label' => 'เพศ',         'done' => !empty($userData['gender'])],
+        ['label' => 'เลขประจำตัว', 'done' => !empty($userData['citizen_id'])],
+    ];
+    if ($userData['status'] !== 'other' && $userData['status'] !== '') {
+        $completenessItems[] = ['label' => 'รหัสนักศึกษา/บุคลากร', 'done' => !empty($userData['id_number'])];
+    }
+    $completenessTotal   = count($completenessItems);
+    $completenessDone    = count(array_filter(array_column($completenessItems, 'done')));
+    $completenessPercent = $completenessTotal > 0 ? (int)round($completenessDone / $completenessTotal * 100) : 0;
 }
 
 // ตรวจสอบว่า citizen_id เป็น passport หรือเลขบัตร (passport = มีตัวอักษรหรือความยาว > 13)
@@ -117,35 +102,32 @@ $error_param = $_GET['error'] ?? '';
 render_header('ข้อมูลส่วนตัว');
 ?>
 
-<div
-  class="p-5 pb-56 -mt-6 relative z-10 flex flex-col min-h-screen animate-in fade-in slide-in-from-right-4 duration-500">
+<div class="p-5 pb-56 -mt-6 relative z-10 flex flex-col min-h-screen animate-in fade-in slide-in-from-right-4 duration-500">
 
   <?php if ($isEditing && $_nameNeedsReview): ?>
-    <div
-      class="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800 font-prompt flex items-start gap-3">
-      <i class="fa-solid fa-triangle-exclamation mt-0.5 shrink-0 text-amber-500"></i>
-      <span>ระบบได้แยกชื่อและนามสกุลจากข้อมูลเดิมให้อัตโนมัติ กรุณาตรวจสอบและบันทึกใหม่อีกครั้ง</span>
-    </div>
+  <div class="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800 font-prompt flex items-start gap-3">
+    <i class="fa-solid fa-triangle-exclamation mt-0.5 shrink-0 text-amber-500"></i>
+    <span>ระบบได้แยกชื่อและนามสกุลจากข้อมูลเดิมให้อัตโนมัติ กรุณาตรวจสอบและบันทึกใหม่อีกครั้ง</span>
+  </div>
   <?php endif; ?>
 
   <?php if ($error_param !== ''): ?>
-    <div
-      class="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700 font-prompt flex items-start gap-3">
-      <i class="fa-solid fa-circle-exclamation mt-0.5 shrink-0"></i>
-      <span>
-        <?php if ($error_param === 'no_prefix'): ?>
-          กรุณาเลือกคำนำหน้าชื่อ
-        <?php elseif ($error_param === 'no_status'): ?>
-          กรุณาเลือกประเภทผู้ใช้งาน (นักศึกษา / บุคลากร / บุคคลทั่วไป)
-        <?php elseif ($error_param === 'no_gender'): ?>
-          กรุณาเลือกเพศ
-        <?php elseif ($error_param === 'empty_student'): ?>
-          กรุณากรอกรหัสนักศึกษา / บุคลากร
-        <?php else: ?>
-          กรุณากรอกข้อมูลให้ครบถ้วนทุกช่อง
-        <?php endif; ?>
-      </span>
-    </div>
+  <div class="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700 font-prompt flex items-start gap-3">
+    <i class="fa-solid fa-circle-exclamation mt-0.5 shrink-0"></i>
+    <span>
+      <?php if ($error_param === 'no_prefix'): ?>
+        กรุณาเลือกคำนำหน้าชื่อ
+      <?php elseif ($error_param === 'no_status'): ?>
+        กรุณาเลือกประเภทผู้ใช้งาน (นักศึกษา / บุคลากร / บุคคลทั่วไป)
+      <?php elseif ($error_param === 'no_gender'): ?>
+        กรุณาเลือกเพศ
+      <?php elseif ($error_param === 'empty_student'): ?>
+        กรุณากรอกรหัสนักศึกษา / บุคลากร
+      <?php else: ?>
+        กรุณากรอกข้อมูลให้ครบถ้วนทุกช่อง
+      <?php endif; ?>
+    </span>
+  </div>
   <?php endif; ?>
 
   <form id="profileForm" class="flex-1 flex flex-col" method="post" action="save_profile.php">
@@ -161,53 +143,47 @@ render_header('ข้อมูลส่วนตัว');
             <?= $isEditing ? 'แก้ไขข้อมูลส่วนตัว' : 'ข้อมูลส่วนตัว' ?>
           </h2>
           <p class="text-sm text-gray-500 mt-1 font-prompt">
-            <?= $isEditing ?: 'กรุณากรอกข้อมูลของคุณเพื่อใช้ในการจองคิว' ?>
+            <?= $isEditing ? 'แก้ไขข้อมูลของคุณได้ตามต้องการ' : 'กรุณากรอกข้อมูลของคุณเพื่อใช้ในการจองคิว' ?>
           </p>
         </div>
         <?php if ($isEditing): ?>
-          <a href="<?= $redirectBack !== '' ? htmlspecialchars($redirectBack) : 'my_bookings.php' ?>"
-            class="shrink-0 flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 font-prompt font-semibold border border-gray-200 rounded-xl px-3 py-2 transition-all hover:bg-gray-50">
-            <i class="fa-solid fa-arrow-left text-xs"></i> กลับ
-          </a>
+        <a href="<?= $redirectBack !== '' ? htmlspecialchars($redirectBack) : 'my_bookings.php' ?>"
+           class="shrink-0 flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 font-prompt font-semibold border border-gray-200 rounded-xl px-3 py-2 transition-all hover:bg-gray-50">
+          <i class="fa-solid fa-arrow-left text-xs"></i> กลับ
+        </a>
         <?php endif; ?>
       </div>
 
       <?php if ($isEditing): ?>
-        <!-- Profile Completeness Badge -->
-        <div
-          class="bg-white border <?= $completenessPercent === 100 ? 'border-green-100' : 'border-blue-100' ?> rounded-2xl p-4 shadow-sm">
-          <div class="flex items-center justify-between mb-2.5">
-            <div class="flex items-center gap-2">
-              <i
-                class="fa-solid fa-chart-simple text-sm <?= $completenessPercent === 100 ? 'text-green-500' : 'text-[#0052CC]' ?>"></i>
-              <span class="text-sm font-bold text-gray-800 font-prompt">ความครบถ้วนของโปรไฟล์</span>
-            </div>
-            <span
-              class="text-sm font-black font-prompt <?= $completenessPercent === 100 ? 'text-green-600' : 'text-[#0052CC]' ?>"><?= $completenessPercent ?>%</span>
+      <!-- Profile Completeness Badge -->
+      <div class="bg-white border <?= $completenessPercent === 100 ? 'border-green-100' : 'border-blue-100' ?> rounded-2xl p-4 shadow-sm">
+        <div class="flex items-center justify-between mb-2.5">
+          <div class="flex items-center gap-2">
+            <i class="fa-solid fa-chart-simple text-sm <?= $completenessPercent === 100 ? 'text-green-500' : 'text-[#0052CC]' ?>"></i>
+            <span class="text-sm font-bold text-gray-800 font-prompt">ความครบถ้วนของโปรไฟล์</span>
           </div>
-          <div class="w-full h-2 bg-gray-100 rounded-full overflow-hidden mb-3">
-            <div
-              class="h-full rounded-full transition-all duration-700 <?= $completenessPercent === 100 ? 'bg-green-500' : 'bg-[#0052CC]' ?>"
-              style="width:<?= $completenessPercent ?>%"></div>
-          </div>
-          <div class="grid grid-cols-2 gap-x-3 gap-y-1.5">
-            <?php foreach ($completenessItems as $item): ?>
-              <div
-                class="flex items-center gap-1.5 text-xs font-prompt <?= $item['done'] ? 'text-gray-700' : 'text-gray-400' ?>">
-                <i
-                  class="fa-solid <?= $item['done'] ? 'fa-circle-check text-green-500' : 'fa-circle-xmark text-red-400' ?> text-[11px] flex-shrink-0"></i>
-                <?= htmlspecialchars($item['label']) ?>
-              </div>
-            <?php endforeach; ?>
-          </div>
+          <span class="text-sm font-black font-prompt <?= $completenessPercent === 100 ? 'text-green-600' : 'text-[#0052CC]' ?>"><?= $completenessPercent ?>%</span>
         </div>
+        <div class="w-full h-2 bg-gray-100 rounded-full overflow-hidden mb-3">
+          <div class="h-full rounded-full transition-all duration-700 <?= $completenessPercent === 100 ? 'bg-green-500' : 'bg-[#0052CC]' ?>"
+               style="width:<?= $completenessPercent ?>%"></div>
+        </div>
+        <div class="grid grid-cols-2 gap-x-3 gap-y-1.5">
+          <?php foreach ($completenessItems as $item): ?>
+          <div class="flex items-center gap-1.5 text-xs font-prompt <?= $item['done'] ? 'text-gray-700' : 'text-gray-400' ?>">
+            <i class="fa-solid <?= $item['done'] ? 'fa-circle-check text-green-500' : 'fa-circle-xmark text-red-400' ?> text-[11px] flex-shrink-0"></i>
+            <?= htmlspecialchars($item['label']) ?>
+          </div>
+          <?php endforeach; ?>
+        </div>
+      </div>
       <?php endif; ?>
 
       <div class="space-y-5">
 
         <?php
         // ตรวจว่า prefix ที่เก็บไว้เป็น custom หรือ standard
-        $_stdPrefixes = ['นาย', 'นาง', 'นางสาว', 'นพ.', 'พญ.', 'ทพ.', 'ทญ.', 'ภก.', 'ภญ.', 'พย.', 'ดร.', 'อ.', 'ผศ.', 'รศ.', 'ศ.'];
+        $_stdPrefixes = ['นาย','นาง','นางสาว','นพ.','พญ.','ทพ.','ทญ.','ภก.','ภญ.','พย.','ดร.','อ.','ผศ.','รศ.','ศ.'];
         $_isCustomPrefix = ($userData['prefix'] !== '' && !in_array($userData['prefix'], $_stdPrefixes, true));
         $_selectVal = $_isCustomPrefix ? 'other' : $userData['prefix'];
         $_customVal = $_isCustomPrefix ? $userData['prefix'] : '';
@@ -215,13 +191,12 @@ render_header('ข้อมูลส่วนตัว');
 
         <!-- คำนำหน้าชื่อ -->
         <div class="space-y-1.5">
-          <label for="name_title" class="text-sm font-semibold text-gray-700 font-prompt">คำนำหน้าชื่อ <span
-              class="text-red-500">*</span></label>
+          <label for="name_title" class="text-sm font-semibold text-gray-700 font-prompt">คำนำหน้าชื่อ <span class="text-red-500">*</span></label>
           <select name="name_title" id="name_title" onchange="toggleCustomTitle()" required
             class="w-full px-4 py-3.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0052CC] focus:border-transparent outline-none transition-all text-sm bg-white font-prompt">
             <option value="" disabled <?= $_selectVal === '' ? 'selected' : '' ?>>-- กรุณาเลือก --</option>
-            <option value="นาย" <?= $_selectVal === 'นาย' ? 'selected' : '' ?>>นาย</option>
-            <option value="นาง" <?= $_selectVal === 'นาง' ? 'selected' : '' ?>>นาง</option>
+            <option value="นาย"    <?= $_selectVal === 'นาย'    ? 'selected' : '' ?>>นาย</option>
+            <option value="นาง"    <?= $_selectVal === 'นาง'    ? 'selected' : '' ?>>นาง</option>
             <option value="นางสาว" <?= $_selectVal === 'นางสาว' ? 'selected' : '' ?>>นางสาว</option>
             <optgroup label="บุคลากรทางการแพทย์">
               <option value="นพ." <?= $_selectVal === 'นพ.' ? 'selected' : '' ?>>นพ.</option>
@@ -233,32 +208,32 @@ render_header('ข้อมูลส่วนตัว');
               <option value="พย." <?= $_selectVal === 'พย.' ? 'selected' : '' ?>>พย.</option>
             </optgroup>
             <optgroup label="สายวิชาการ">
-              <option value="ดร." <?= $_selectVal === 'ดร.' ? 'selected' : '' ?>>ดร.</option>
-              <option value="อ." <?= $_selectVal === 'อ.' ? 'selected' : '' ?>>อ.</option>
-              <option value="ผศ." <?= $_selectVal === 'ผศ.' ? 'selected' : '' ?>>ผศ.</option>
-              <option value="รศ." <?= $_selectVal === 'รศ.' ? 'selected' : '' ?>>รศ.</option>
-              <option value="ศ." <?= $_selectVal === 'ศ.' ? 'selected' : '' ?>>ศ.</option>
+              <option value="ดร."  <?= $_selectVal === 'ดร.'  ? 'selected' : '' ?>>ดร.</option>
+              <option value="อ."   <?= $_selectVal === 'อ.'   ? 'selected' : '' ?>>อ.</option>
+              <option value="ผศ."  <?= $_selectVal === 'ผศ.'  ? 'selected' : '' ?>>ผศ.</option>
+              <option value="รศ."  <?= $_selectVal === 'รศ.'  ? 'selected' : '' ?>>รศ.</option>
+              <option value="ศ."   <?= $_selectVal === 'ศ.'   ? 'selected' : '' ?>>ศ.</option>
             </optgroup>
             <option value="other" <?= $_selectVal === 'other' ? 'selected' : '' ?>>อื่นๆ (โปรดระบุ)...</option>
           </select>
           <div id="custom_title_container" class="<?= $_isCustomPrefix ? '' : 'hidden' ?>">
-            <input type="text" id="custom_title" name="custom_title" value="<?= htmlspecialchars($_customVal) ?>"
-              placeholder="พิมพ์คำนำหน้าชื่อของคุณ..." <?= $_isCustomPrefix ? 'required' : '' ?>
+            <input type="text" id="custom_title" name="custom_title"
+              value="<?= htmlspecialchars($_customVal) ?>"
+              placeholder="พิมพ์คำนำหน้าชื่อของคุณ..."
+              <?= $_isCustomPrefix ? 'required' : '' ?>
               class="w-full px-4 py-3.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0052CC] focus:border-transparent outline-none transition-all text-sm bg-gray-50 font-prompt mt-2" />
           </div>
         </div>
 
         <div class="grid grid-cols-2 gap-3">
           <div class="space-y-1.5">
-            <label class="text-sm font-semibold text-gray-700 font-prompt" for="first_name">ชื่อ <span
-                class="text-red-500">*</span></label>
+            <label class="text-sm font-semibold text-gray-700 font-prompt" for="first_name">ชื่อ <span class="text-red-500">*</span></label>
             <input id="first_name" name="first_name" type="text" required
               value="<?= htmlspecialchars($userData['first_name']) ?>" placeholder="เช่น สมชาย"
               class="w-full p-4 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0052CC] focus:border-transparent outline-none transition-all placeholder:text-gray-400 font-prompt" />
           </div>
           <div class="space-y-1.5">
-            <label class="text-sm font-semibold text-gray-700 font-prompt" for="last_name">นามสกุล <span
-                class="text-red-500">*</span></label>
+            <label class="text-sm font-semibold text-gray-700 font-prompt" for="last_name">นามสกุล <span class="text-red-500">*</span></label>
             <input id="last_name" name="last_name" type="text" required
               value="<?= htmlspecialchars($userData['last_name']) ?>" placeholder="เช่น ใจดี"
               class="w-full p-4 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0052CC] focus:border-transparent outline-none transition-all placeholder:text-gray-400 font-prompt" />
@@ -300,24 +275,21 @@ render_header('ข้อมูลส่วนตัว');
             <label class="cursor-pointer">
               <input type="radio" name="gender" value="male" required class="peer hidden"
                 <?= $userData['gender'] === 'male' ? 'checked' : '' ?>>
-              <div
-                class="py-3 px-1 text-center border border-gray-200 rounded-xl peer-checked:bg-[#E6F0FF] peer-checked:border-[#0052CC] peer-checked:text-[#0052CC] font-prompt text-[11px] font-bold transition-all h-full flex items-center justify-center gap-1.5">
+              <div class="py-3 px-1 text-center border border-gray-200 rounded-xl peer-checked:bg-[#E6F0FF] peer-checked:border-[#0052CC] peer-checked:text-[#0052CC] font-prompt text-[11px] font-bold transition-all h-full flex items-center justify-center gap-1.5">
                 <i class="fa-solid fa-mars text-xs"></i> ชาย
               </div>
             </label>
             <label class="cursor-pointer">
               <input type="radio" name="gender" value="female" required class="peer hidden"
                 <?= $userData['gender'] === 'female' ? 'checked' : '' ?>>
-              <div
-                class="py-3 px-1 text-center border border-gray-200 rounded-xl peer-checked:bg-[#E6F0FF] peer-checked:border-[#0052CC] peer-checked:text-[#0052CC] font-prompt text-[11px] font-bold transition-all h-full flex items-center justify-center gap-1.5">
+              <div class="py-3 px-1 text-center border border-gray-200 rounded-xl peer-checked:bg-[#E6F0FF] peer-checked:border-[#0052CC] peer-checked:text-[#0052CC] font-prompt text-[11px] font-bold transition-all h-full flex items-center justify-center gap-1.5">
                 <i class="fa-solid fa-venus text-xs"></i> หญิง
               </div>
             </label>
             <label class="cursor-pointer">
               <input type="radio" name="gender" value="other" required class="peer hidden"
                 <?= $userData['gender'] === 'other' ? 'checked' : '' ?>>
-              <div
-                class="py-3 px-1 text-center border border-gray-200 rounded-xl peer-checked:bg-[#E6F0FF] peer-checked:border-[#0052CC] peer-checked:text-[#0052CC] font-prompt text-[11px] font-bold transition-all h-full flex items-center justify-center">
+              <div class="py-3 px-1 text-center border border-gray-200 rounded-xl peer-checked:bg-[#E6F0FF] peer-checked:border-[#0052CC] peer-checked:text-[#0052CC] font-prompt text-[11px] font-bold transition-all h-full flex items-center justify-center">
                 ไม่ระบุ
               </div>
             </label>
@@ -326,13 +298,13 @@ render_header('ข้อมูลส่วนตัว');
 
         <!-- เลขประจำตัว: บัตรประชาชน / Passport -->
         <div class="space-y-2">
-          <label class="text-sm font-semibold text-gray-700 font-prompt">เลขประจำตัว <span
-              class="text-red-500">*</span></label>
+          <label class="text-sm font-semibold text-gray-700 font-prompt">เลขประจำตัว <span class="text-red-500">*</span></label>
 
           <!-- ปุ่มเลือกประเภท -->
           <div class="flex gap-2 mb-2">
             <label class="flex-1 cursor-pointer">
-              <input type="radio" name="id_type" value="citizen" class="peer hidden" <?= !$isPassport ? 'checked' : '' ?>>
+              <input type="radio" name="id_type" value="citizen" class="peer hidden"
+                <?= !$isPassport ? 'checked' : '' ?>>
               <div class="flex items-center justify-center gap-1.5 py-2 px-3 border border-gray-200 rounded-xl
                           peer-checked:bg-[#E6F0FF] peer-checked:border-[#0052CC] peer-checked:text-[#0052CC]
                           font-prompt text-[11px] font-bold transition-all text-gray-500">
@@ -341,7 +313,8 @@ render_header('ข้อมูลส่วนตัว');
               </div>
             </label>
             <label class="flex-1 cursor-pointer">
-              <input type="radio" name="id_type" value="passport" class="peer hidden" <?= $isPassport ? 'checked' : '' ?>>
+              <input type="radio" name="id_type" value="passport" class="peer hidden"
+                <?= $isPassport ? 'checked' : '' ?>>
               <div class="flex items-center justify-center gap-1.5 py-2 px-3 border border-gray-200 rounded-xl
                           peer-checked:bg-[#E6F0FF] peer-checked:border-[#0052CC] peer-checked:text-[#0052CC]
                           font-prompt text-[11px] font-bold transition-all text-gray-500">
@@ -351,7 +324,8 @@ render_header('ข้อมูลส่วนตัว');
             </label>
           </div>
 
-          <input id="citizen_id" name="citizen_id" type="text" required value="<?= htmlspecialchars($citizenIdValue) ?>"
+          <input id="citizen_id" name="citizen_id" type="text" required
+            value="<?= htmlspecialchars($citizenIdValue) ?>"
             placeholder="<?= $isPassport ? 'เช่น A1234567 (Passport No.)' : 'กรอกเลขบัตรประชาชน 13 หลัก' ?>"
             class="w-full p-4 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0052CC] focus:border-transparent outline-none transition-all placeholder:text-gray-400 font-prompt" />
           <p id="citizen_id_hint" class="text-xs text-gray-400 font-prompt">
@@ -372,7 +346,7 @@ render_header('ข้อมูลส่วนตัว');
             <span class="text-gray-400 font-normal text-xs ml-1">(ไม่บังคับ)</span>
           </label>
           <input id="department" name="department" type="text"
-            value="<?= htmlspecialchars((string) ($userData['department'] ?? '')) ?>"
+            value="<?= htmlspecialchars((string)($userData['department'] ?? '')) ?>"
             placeholder="เช่น วิทยาลัยแพทยศาสตร์"
             class="w-full p-4 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0052CC] focus:border-transparent outline-none transition-all placeholder:text-gray-400 font-prompt" />
         </div>
@@ -390,8 +364,7 @@ render_header('ข้อมูลส่วนตัว');
           </p>
         </div>
         <div class="space-y-1.5">
-          <label class="text-sm font-semibold text-gray-700 font-prompt" for="phone_number">เบอร์โทรศัพท์ <span
-              class="text-red-500">*</span></label>
+          <label class="text-sm font-semibold text-gray-700 font-prompt" for="phone_number">เบอร์โทรศัพท์ <span class="text-red-500">*</span></label>
           <input id="phone_number" name="phone_number" type="tel" required
             value="<?= htmlspecialchars($userData['phone']) ?>" placeholder="08X-XXX-XXXX"
             class="w-full p-4 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0052CC] focus:border-transparent outline-none transition-all placeholder:text-gray-400 font-prompt" />
@@ -422,7 +395,8 @@ render_header('ข้อมูลส่วนตัว');
 
         <label
           class="flex items-center gap-4 p-4 bg-white rounded-2xl border border-gray-100 shadow-sm cursor-pointer hover:bg-gray-50 transition-all active:scale-[0.98] select-none">
-          <input type="checkbox" id="pdpa_agreed" name="agreed" value="1" <?= $isEditing ? 'checked' : 'required' ?>
+          <input type="checkbox" id="pdpa_agreed" name="agreed" value="1"
+            <?= $isEditing ? 'checked' : 'required' ?>
             class="shrink-0 w-6 h-6 rounded-lg border-gray-300 text-[#0052CC] focus:ring-[#0052CC] transition-all" />
           <span class="text-xs text-gray-600 font-bold leading-tight font-prompt">ฉันได้อ่าน
             และยอมรับข้อตกลงนโยบายความเป็นส่วนตัว</span>
@@ -433,7 +407,7 @@ render_header('ข้อมูลส่วนตัว');
     <div class="mt-8 pt-4 border-t border-gray-100 flex gap-3 w-full">
       <?php if ($isEditing): ?>
         <a href="<?= $redirectBack !== '' ? htmlspecialchars($redirectBack) : 'hub.php' ?>"
-          class="flex-none flex items-center justify-center px-5 py-4 border border-gray-200 rounded-xl text-gray-600 font-bold font-prompt transition-all hover:bg-gray-50 active:scale-[0.98]">
+           class="flex-none flex items-center justify-center px-5 py-4 border border-gray-200 rounded-xl text-gray-600 font-bold font-prompt transition-all hover:bg-gray-50 active:scale-[0.98]">
           ย้อนกลับ
         </a>
         <button type="submit"
@@ -441,10 +415,10 @@ render_header('ข้อมูลส่วนตัว');
           บันทึกการเปลี่ยนแปลง
         </button>
       <?php else: ?>
-        <button type="submit"
-          class="w-full bg-[#0052CC] hover:bg-blue-700 text-white font-bold py-4 rounded-xl transition-all shadow-sm active:scale-[0.98] font-prompt">
-          บันทึกและดำเนินการต่อ
-        </button>
+      <button type="submit"
+        class="w-full bg-[#0052CC] hover:bg-blue-700 text-white font-bold py-4 rounded-xl transition-all shadow-sm active:scale-[0.98] font-prompt">
+        บันทึกและดำเนินการต่อ
+      </button>
       <?php endif; ?>
     </div>
   </form>
@@ -492,8 +466,8 @@ render_header('ข้อมูลส่วนตัว');
       }
     }
 
-    idTypeInputs.forEach(function (input) {
-      input.addEventListener('change', function () { applyIdType(this.value); });
+    idTypeInputs.forEach(function(input) {
+      input.addEventListener('change', function() { applyIdType(this.value); });
     });
 
     // ตั้งค่าเริ่มต้นตามที่ PHP ส่งมา
