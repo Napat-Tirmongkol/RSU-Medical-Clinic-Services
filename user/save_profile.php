@@ -158,10 +158,8 @@ try {
         header('Location: ' . $safeRedirectBack, true, 303);
     } elseif ($inviteToken !== '') {
         header('Location: c.php?t=' . urlencode($inviteToken), true, 303);
-    } elseif ($hasBooking) {
-        header('Location: my_bookings.php', true, 303);
     } else {
-        header('Location: booking_campaign.php', true, 303);
+        header('Location: hub.php', true, 303);
     }
     exit;
 

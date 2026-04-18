@@ -37,10 +37,8 @@ if (isset($_SESSION['evax_student_id'])) {
                 // save_profile.php จะ redirect กลับ campaign หลังบันทึก
                 header('Location: profile.php');
             }
-        } elseif ($hasBooking) {
-            header('Location: my_bookings.php');
-        } elseif ($profileComplete) {
-            header('Location: booking_campaign.php');
+        } elseif ($hasBooking || $profileComplete) {
+            header('Location: hub.php');
         } else {
             header('Location: profile.php');
         }
