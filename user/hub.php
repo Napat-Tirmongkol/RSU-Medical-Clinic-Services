@@ -163,8 +163,8 @@ render_header('RSU Medical Hub');
 
     <!-- Quick Access -->
     <div class="grid grid-cols-2 gap-4 mb-4">
-      <a href="booking_campaign.php" class="bg-white rounded-3xl p-5 no-underline shadow-sm border border-gray-100 flex flex-col items-center justify-center text-center gap-3 active:scale-95 transition-all hover:border-blue-500">
-        <div class="w-12 h-12 bg-gradient-to-br from-blue-700 to-blue-500 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-200">
+      <a href="booking_campaign.php" class="bg-white rounded-3xl p-5 no-underline shadow-sm border border-gray-100 flex flex-col items-center justify-center text-center gap-3 active:scale-95 transition-all hover:border-[#0052CC]">
+        <div class="w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-200" style="background: linear-gradient(135deg, #0052CC, #0070f3);">
           <i class="fa-solid fa-notes-medical text-2xl text-white"></i>
         </div>
         <div>
@@ -173,7 +173,7 @@ render_header('RSU Medical Hub');
         </div>
       </a>
       <a href="../e_Borrow/auth_bridge.php" class="bg-white rounded-3xl p-5 no-underline shadow-sm border border-gray-100 flex flex-col items-center justify-center text-center gap-3 active:scale-95 transition-all hover:border-orange-500">
-        <div class="w-12 h-12 bg-gradient-to-br from-orange-500 to-orange-400 rounded-2xl flex items-center justify-center shadow-lg shadow-orange-200">
+        <div class="w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg shadow-orange-200" style="background: linear-gradient(135deg, #f97316, #fb923c);">
           <i class="fa-solid fa-wheelchair text-2xl text-white"></i>
         </div>
         <div>
