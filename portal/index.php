@@ -955,6 +955,52 @@ try {
 
                     <!-- PANEL: Master Users -->
                     <div id="id-panel-users" class="id-panel active">
+                        <?php
+                        $statsUserType = ['student' => 0, 'staff' => 0, 'other' => 0];
+                        foreach ($idUsers as $u) {
+                            $statKey = in_array($u['status'], ['student', 'staff']) ? $u['status'] : 'other';
+                            $statsUserType[$statKey]++;
+                        }
+                        $totalUsersCalc = count($idUsers);
+                        $pctStudent = $totalUsersCalc > 0 ? round(($statsUserType['student'] / $totalUsersCalc) * 100) : 0;
+                        $pctStaff = $totalUsersCalc > 0 ? round(($statsUserType['staff'] / $totalUsersCalc) * 100) : 0;
+                        $pctOther = $totalUsersCalc > 0 ? (100 - $pctStudent - $pctStaff) : 0;
+                        ?>
+                        
+                        <!-- Statistics Bar -->
+                        <div style="background:#fff;border-radius:20px;padding:20px;margin-bottom:20px;border:1.5px solid #e2e8f0;box-shadow:0 4px 15px rgba(0,0,0,0.02)">
+                            <div style="font-size:12px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:15px;display:flex;align-items:center;gap:6px;">
+                                <i class="fa-solid fa-chart-pie" style="color:#2e9e63"></i> สัดส่วนประเภทผู้ใช้งาน
+                            </div>
+                            
+                            <!-- Visual Bar -->
+                            <div style="width:100%;height:14px;border-radius:99px;background:#f1f5f9;display:flex;overflow:hidden;margin-bottom:12px;box-shadow:inset 0 2px 4px rgba(0,0,0,0.04)">
+                                <?php if($totalUsersCalc > 0): ?>
+                                    <div style="width:<?= $pctStudent ?>%;background:linear-gradient(90deg, #3b82f6, #60a5fa);transition:width 1s;border-right:2px solid #fff" title="นักศึกษา: <?= number_format($statsUserType['student']) ?> คน"></div>
+                                    <div style="width:<?= $pctStaff ?>%;background:linear-gradient(90deg, #f59e0b, #fbbf24);transition:width 1s;border-right:2px solid #fff" title="บุคลากร: <?= number_format($statsUserType['staff']) ?> คน"></div>
+                                    <div style="width:<?= $pctOther ?>%;background:linear-gradient(90deg, #8b5cf6, #a78bfa);transition:width 1s" title="บุคคลทั่วไป/อื่นๆ: <?= number_format($statsUserType['other']) ?> คน"></div>
+                                <?php else: ?>
+                                    <div style="width:100%;background:#e2e8f0;"></div>
+                                <?php endif; ?>
+                            </div>
+                            
+                            <!-- Legend -->
+                            <div style="display:flex;flex-wrap:wrap;gap:20px;font-size:12px;font-weight:700">
+                                <div style="display:flex;align-items:center;gap:8px">
+                                    <div style="width:12px;height:12px;border-radius:4px;background:#3b82f6;box-shadow:0 2px 4px rgba(59,130,246,0.3)"></div>
+                                    <span style="color:#334155">นักศึกษา <span style="opacity:0.6;font-size:11px">(<?= $pctStudent ?>%)</span></span>
+                                </div>
+                                <div style="display:flex;align-items:center;gap:8px">
+                                    <div style="width:12px;height:12px;border-radius:4px;background:#f59e0b;box-shadow:0 2px 4px rgba(245,158,11,0.3)"></div>
+                                    <span style="color:#334155">บุคลากร <span style="opacity:0.6;font-size:11px">(<?= $pctStaff ?>%)</span></span>
+                                </div>
+                                <div style="display:flex;align-items:center;gap:8px">
+                                    <div style="width:12px;height:12px;border-radius:4px;background:#8b5cf6;box-shadow:0 2px 4px rgba(139,92,246,0.3)"></div>
+                                    <span style="color:#334155">บุคคลทั่วไป/อื่นๆ <span style="opacity:0.6;font-size:11px">(<?= $pctOther ?>%)</span></span>
+                                </div>
+                            </div>
+                        </div>
+
                         <div style="background:#fff;border-radius:20px;border:1.5px solid #e2e8f0;overflow:hidden">
                             <div
                                 style="padding:18px 24px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;gap:8px">
