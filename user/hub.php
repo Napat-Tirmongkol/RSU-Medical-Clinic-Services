@@ -20,10 +20,9 @@ function hub_fmt_date(string $d, array $m): string {
 }
 
 // ── DB queries ────────────────────────────────────────────────────────────────
-$user = null;
+$user             = null;
 $upcomingBookings = [];
 $activeBorrows    = [];
-$borrowTablesExist = false;
 
 try {
     $pdo = db();
@@ -48,139 +47,222 @@ try {
     $s->execute([':id' => $userId]);
     $upcomingBookings = $s->fetchAll();
 
-    // Active borrows จาก e_Borrow (optional — ถ้าตารางยังไม่มีจะ skip)
+    // Active borrows (optional — ถ้าตารางยังไม่มีจะ skip)
     try {
         $s = $pdo->prepare("
             SELECT br.id, bc.name AS category_name, bi.name AS item_name, br.due_date
             FROM borrow_records br
-            JOIN borrow_items      bi ON br.item_id    = bi.id
-            JOIN borrow_categories bc ON bi.type_id    = bc.id
+            JOIN borrow_items      bi ON br.item_id = bi.id
+            JOIN borrow_categories bc ON bi.type_id = bc.id
             WHERE br.borrower_student_id = :id
               AND br.status IN ('borrowed','approved')
             ORDER BY br.due_date ASC
             LIMIT 3
         ");
         $s->execute([':id' => $userId]);
-        $activeBorrows    = $s->fetchAll();
-        $borrowTablesExist = true;
-    } catch (PDOException) { /* e_Borrow ยังไม่ได้ setup */ }
+        $activeBorrows = $s->fetchAll();
+    } catch (PDOException) {}
 
 } catch (PDOException $e) {
     error_log('Hub DB error: ' . $e->getMessage());
 }
 
 $statusMap   = ['student' => 'นักศึกษา', 'faculty' => 'อาจารย์', 'staff' => 'เจ้าหน้าที่', 'other' => 'บุคคลทั่วไป'];
-$statusLabel = $statusMap[$user['status'] ?? ''] ?? ($user['status'] ?? '');
-$displayName = ($user['prefix'] ?? '') . ($user['full_name'] ?? 'ผู้ใช้');
+$statusLabel = $statusMap[$user['status'] ?? ''] ?? ($user['status'] ?? 'ผู้ใช้');
+$displayName = trim(($user['prefix'] ?? '') . ' ' . ($user['full_name'] ?? 'ผู้ใช้'));
+
+$hour     = (int)date('H');
+$greeting = $hour < 12 ? 'อรุณสวัสดิ์' : ($hour < 17 ? 'สวัสดีตอนบ่าย' : 'สวัสดีตอนเย็น');
+
+$linePicture = $_SESSION['line_picture'] ?? $_SESSION['line_picture_url'] ?? '';
 
 require_once __DIR__ . '/../includes/header.php';
 render_header('RSU Medical Hub');
 ?>
 
-<div class="flex flex-col min-h-full">
+<div style="display:flex;flex-direction:column;min-height:100%;padding-bottom:80px">
 
-  <!-- ── Cards (pulls up over header gradient) ─────────────────────────── -->
-  <div class="flex-1 px-3.5 -mt-5">
+  <!-- ── Hero Header ───────────────────────────────────────────────────────── -->
+  <div style="background:linear-gradient(135deg,#003fa3 0%,#0052CC 50%,#1a6de0 100%);padding:48px 20px 24px;position:relative;overflow:hidden">
 
-    <!-- นัดหมายที่กำลังมา -->
-    <div class="bg-white rounded-2xl p-[18px] mb-3.5 shadow-[0_4px_24px_rgba(0,0,0,.07)]">
-      <div class="flex items-center justify-between mb-3.5">
-        <div class="flex items-center gap-2.5">
-          <div class="w-[30px] h-[30px] bg-blue-50 rounded-[9px] flex items-center justify-center shrink-0">
-            <i class="fa-solid fa-calendar-check text-xs text-[#0052CC]"></i>
-          </div>
-          <span class="text-sm font-extrabold text-slate-900">นัดหมายที่กำลังมา</span>
-        </div>
-        <a href="my_bookings.php" class="text-[11px] font-bold text-[#0052CC] no-underline">ดูทั้งหมด →</a>
+    <!-- decorative blobs -->
+    <div style="position:absolute;top:-50px;right:-50px;width:200px;height:200px;border-radius:50%;background:rgba(255,255,255,.06);pointer-events:none"></div>
+    <div style="position:absolute;bottom:-30px;left:-30px;width:140px;height:140px;border-radius:50%;background:rgba(255,255,255,.04);pointer-events:none"></div>
+
+    <!-- brand row -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;position:relative">
+      <div style="display:flex;align-items:center;gap:6px">
+        <i class="fa-solid fa-heart-pulse" style="color:rgba(255,255,255,.7);font-size:12px"></i>
+        <span style="color:rgba(255,255,255,.7);font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase">RSU Medical Hub</span>
       </div>
-
-      <?php if (empty($upcomingBookings)): ?>
-        <div class="text-center pt-4 pb-2">
-          <i class="fa-regular fa-calendar text-4xl text-slate-200 block mb-2"></i>
-          <p class="text-[13px] text-slate-400 mb-3.5">ยังไม่มีนัดหมายที่กำลังมา</p>
-          <a href="booking_campaign.php" class="inline-block bg-[#0052CC] text-white text-xs font-bold py-2.5 px-[22px] rounded-xl no-underline">
-            + จองนัดหมายใหม่
-          </a>
-        </div>
-      <?php else: ?>
-        <?php foreach ($upcomingBookings as $appt): ?>
-          <a href="my_bookings.php" class="block p-3 bg-[#f8faff] rounded-[13px] mb-2 no-underline border border-[#e8f0ff]">
-            <div class="text-[13px] font-bold text-slate-800 mb-1"><?= htmlspecialchars($appt['title']) ?></div>
-            <div class="text-[11px] text-slate-500 flex items-center gap-1.5 flex-wrap">
-              <i class="fa-regular fa-clock"></i>
-              <?= hub_fmt_date($appt['slot_date'], $thaiMonths) ?>
-              &nbsp;·&nbsp;<?= substr($appt['start_time'],0,5) ?>–<?= substr($appt['end_time'],0,5) ?> น.
-              <?php if ($appt['status'] === 'confirmed'): ?>
-                <span class="ml-auto bg-green-100 text-green-700 text-[10px] font-extrabold py-0.5 px-2 rounded">ยืนยันแล้ว</span>
-              <?php else: ?>
-                <span class="ml-auto bg-yellow-100 text-yellow-700 text-[10px] font-extrabold py-0.5 px-2 rounded">รอยืนยัน</span>
-              <?php endif; ?>
-            </div>
-          </a>
-        <?php endforeach; ?>
-      <?php endif; ?>
-    </div>
-
-    <!-- อุปกรณ์ที่ยืมอยู่ -->
-    <div class="bg-white rounded-2xl p-[18px] mb-3.5 shadow-[0_4px_24px_rgba(0,0,0,.07)]">
-      <div class="flex items-center justify-between mb-3.5">
-        <div class="flex items-center gap-2.5">
-          <div class="w-[30px] h-[30px] bg-orange-50 rounded-[9px] flex items-center justify-center shrink-0">
-            <i class="fa-solid fa-box-open text-xs text-orange-500"></i>
-          </div>
-          <span class="text-sm font-extrabold text-slate-900">อุปกรณ์ที่ยืมอยู่</span>
-        </div>
-        <a href="../archive/e_Borrow/" class="text-[11px] font-bold text-orange-500 no-underline">ดูทั้งหมด →</a>
-      </div>
-
-      <?php if (empty($activeBorrows)): ?>
-        <div class="text-center pt-4 pb-2">
-          <i class="fa-solid fa-box-open text-4xl text-slate-200 block mb-2"></i>
-          <p class="text-[13px] text-slate-400 mb-3.5">ไม่มีรายการยืมอุปกรณ์</p>
-          <a href="../archive/e_Borrow/" class="inline-block bg-orange-500 text-white text-xs font-bold py-2.5 px-[22px] rounded-xl no-underline">
-            ยืมอุปกรณ์
-          </a>
-        </div>
-      <?php else: ?>
-        <?php foreach ($activeBorrows as $borrow): ?>
-          <?php
-            $daysLeft = (int)ceil((strtotime($borrow['due_date']) - time()) / 86400);
-            $urgColor = $daysLeft <= 2 ? '#ef4444' : ($daysLeft <= 5 ? '#f97316' : '#16a34a');
-          ?>
-          <div class="p-3 bg-[#fff8f5] rounded-[13px] mb-2 border border-[#ffe4cc]">
-            <div class="text-[13px] font-bold text-slate-800 mb-1"><?= htmlspecialchars($borrow['item_name']) ?></div>
-            <div class="text-[11px] text-slate-500 flex items-center justify-between">
-              <span><?= htmlspecialchars($borrow['category_name']) ?></span>
-              <span style="color:<?= $urgColor ?>" class="font-extrabold">คืนภายใน <?= $daysLeft ?> วัน</span>
-            </div>
-          </div>
-        <?php endforeach; ?>
-      <?php endif; ?>
-    </div>
-
-    <!-- Quick Access -->
-    <div class="grid grid-cols-2 gap-3 mb-3.5">
-      <a href="booking_campaign.php" class="bg-white rounded-2xl p-[18px_14px] no-underline shadow-[0_4px_20px_rgba(0,0,0,.06)] flex flex-col gap-2.5">
-        <div class="w-11 h-11 bg-gradient-to-br from-[#0052CC] to-[#0070f3] rounded-[14px] flex items-center justify-center">
-          <i class="fa-solid fa-syringe text-[17px] text-white"></i>
-        </div>
-        <div>
-          <div class="text-[13px] font-extrabold text-slate-800">นัดหมายสุขภาพ</div>
-          <div class="text-[11px] text-slate-400 mt-0.5">จอง / ดูประวัติ</div>
-        </div>
-      </a>
-      <a href="../archive/e_Borrow/" class="bg-white rounded-2xl p-[18px_14px] no-underline shadow-[0_4px_20px_rgba(0,0,0,.06)] flex flex-col gap-2.5">
-        <div class="w-11 h-11 bg-gradient-to-br from-[#f97316] to-[#fb923c] rounded-[14px] flex items-center justify-center">
-          <i class="fa-solid fa-box-open text-[17px] text-white"></i>
-        </div>
-        <div>
-          <div class="text-[13px] font-extrabold text-slate-800">ยืมอุปกรณ์</div>
-          <div class="text-[11px] text-slate-400 mt-0.5">e-Borrow</div>
-        </div>
+      <a href="logout.php" style="width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;text-decoration:none">
+        <i class="fa-solid fa-power-off" style="color:#fff;font-size:12px"></i>
       </a>
     </div>
 
-  </div><!-- /cards -->
+    <!-- profile row -->
+    <div style="display:flex;align-items:center;gap:14px;position:relative">
+      <!-- avatar -->
+      <div style="width:58px;height:58px;border-radius:18px;background:rgba(255,255,255,.15);border:2px solid rgba(255,255,255,.35);overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center">
+        <?php if ($linePicture !== ''): ?>
+          <img src="<?= htmlspecialchars($linePicture) ?>" alt="" style="width:100%;height:100%;object-fit:cover">
+        <?php else: ?>
+          <i class="fa-solid fa-user" style="color:rgba(255,255,255,.7);font-size:22px"></i>
+        <?php endif; ?>
+      </div>
+      <!-- name/status -->
+      <div style="flex:1;min-width:0">
+        <p style="color:rgba(255,255,255,.65);font-size:11px;font-weight:600;margin:0 0 3px"><?= htmlspecialchars($greeting) ?></p>
+        <h1 style="color:#fff;font-size:18px;font-weight:900;margin:0 0 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.2"><?= htmlspecialchars($displayName) ?></h1>
+        <span style="background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.28);color:#fff;font-size:10px;font-weight:700;padding:3px 11px;border-radius:20px;display:inline-block">
+          <?= htmlspecialchars($statusLabel) ?>
+        </span>
+      </div>
+    </div>
+
+    <!-- stats strip -->
+    <div style="background:rgba(255,255,255,.13);border-radius:14px;display:flex;margin-top:20px;position:relative">
+      <div style="flex:1;text-align:center;padding:12px 0;border-right:1px solid rgba(255,255,255,.15)">
+        <div style="color:#fff;font-size:22px;font-weight:900;line-height:1"><?= count($upcomingBookings) ?></div>
+        <div style="color:rgba(255,255,255,.65);font-size:10px;font-weight:600;margin-top:3px">นัดหมายที่รอ</div>
+      </div>
+      <div style="flex:1;text-align:center;padding:12px 0">
+        <div style="color:#fff;font-size:22px;font-weight:900;line-height:1"><?= count($activeBorrows) ?></div>
+        <div style="color:rgba(255,255,255,.65);font-size:10px;font-weight:600;margin-top:3px">รายการยืม</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Content ──────────────────────────────────────────────────────────── -->
+  <div style="flex:1;padding:16px;display:flex;flex-direction:column;gap:14px">
+
+    <!-- ── นัดหมายที่กำลังมา ─────────────────────────────────────────────── -->
+    <div style="background:#fff;border-radius:20px;box-shadow:0 2px 16px rgba(0,0,0,.06);overflow:hidden">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px 12px;border-bottom:1px solid #f1f5f9">
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="width:30px;height:30px;border-radius:9px;background:#EFF6FF;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+            <i class="fa-solid fa-calendar-check" style="color:#3B82F6;font-size:11px"></i>
+          </div>
+          <span style="font-size:13px;font-weight:800;color:#0f172a">นัดหมายที่กำลังมา</span>
+        </div>
+        <a href="my_bookings.php" style="color:#3B82F6;font-size:11px;font-weight:700;text-decoration:none">ดูทั้งหมด →</a>
+      </div>
+
+      <div style="padding:12px 16px">
+        <?php if (empty($upcomingBookings)): ?>
+          <div style="display:flex;flex-direction:column;align-items:center;padding:20px 0;gap:8px">
+            <i class="fa-regular fa-calendar" style="font-size:32px;color:#e2e8f0"></i>
+            <p style="font-size:12px;color:#94a3b8;font-weight:600;margin:0">ยังไม่มีนัดหมายที่กำลังมา</p>
+            <a href="booking_campaign.php" style="background:#3B82F6;color:#fff;font-size:11px;font-weight:700;padding:8px 20px;border-radius:10px;text-decoration:none;margin-top:4px">
+              + จองนัดหมายใหม่
+            </a>
+          </div>
+        <?php else: ?>
+          <?php foreach ($upcomingBookings as $appt): ?>
+            <a href="my_bookings.php" style="text-decoration:none;display:block;margin-bottom:8px">
+              <div style="background:#F8FAFF;border:1px solid #DBEAFE;border-radius:13px;padding:12px 14px">
+                <div style="font-size:13px;font-weight:700;color:#1e293b;margin-bottom:7px;line-height:1.35">
+                  <?= htmlspecialchars($appt['title']) ?>
+                </div>
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap">
+                  <div style="display:flex;align-items:center;gap:5px;color:#64748b;font-size:11px">
+                    <i class="fa-regular fa-clock"></i>
+                    <?= hub_fmt_date($appt['slot_date'], $thaiMonths) ?>
+                    &middot;
+                    <?= substr($appt['start_time'],0,5) ?>–<?= substr($appt['end_time'],0,5) ?> น.
+                  </div>
+                  <?php if ($appt['status'] === 'confirmed'): ?>
+                    <span style="background:#DCFCE7;color:#16A34A;font-size:10px;font-weight:800;padding:3px 9px;border-radius:6px;white-space:nowrap">ยืนยันแล้ว</span>
+                  <?php else: ?>
+                    <span style="background:#FEF9C3;color:#A16207;font-size:10px;font-weight:800;padding:3px 9px;border-radius:6px;white-space:nowrap">รอยืนยัน</span>
+                  <?php endif; ?>
+                </div>
+              </div>
+            </a>
+          <?php endforeach; ?>
+        <?php endif; ?>
+      </div>
+    </div>
+
+    <!-- ── อุปกรณ์ที่ยืมอยู่ ──────────────────────────────────────────────── -->
+    <div style="background:#fff;border-radius:20px;box-shadow:0 2px 16px rgba(0,0,0,.06);overflow:hidden">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px 12px;border-bottom:1px solid #f1f5f9">
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="width:30px;height:30px;border-radius:9px;background:#FFF7ED;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+            <i class="fa-solid fa-boxes-stacked" style="color:#F97316;font-size:11px"></i>
+          </div>
+          <span style="font-size:13px;font-weight:800;color:#0f172a">อุปกรณ์ที่ยืมอยู่</span>
+        </div>
+        <a href="../archive/e_Borrow/" style="color:#F97316;font-size:11px;font-weight:700;text-decoration:none">ดูทั้งหมด →</a>
+      </div>
+
+      <div style="padding:12px 16px">
+        <?php if (empty($activeBorrows)): ?>
+          <div style="display:flex;flex-direction:column;align-items:center;padding:20px 0;gap:8px">
+            <i class="fa-solid fa-box-open" style="font-size:32px;color:#e2e8f0"></i>
+            <p style="font-size:12px;color:#94a3b8;font-weight:600;margin:0">ไม่มีรายการยืมอุปกรณ์</p>
+            <a href="../archive/e_Borrow/" style="background:#F97316;color:#fff;font-size:11px;font-weight:700;padding:8px 20px;border-radius:10px;text-decoration:none;margin-top:4px">
+              ยืมอุปกรณ์
+            </a>
+          </div>
+        <?php else: ?>
+          <?php foreach ($activeBorrows as $borrow): ?>
+            <?php
+              $daysLeft = (int)ceil((strtotime($borrow['due_date']) - time()) / 86400);
+              if ($daysLeft < 0) {
+                  $bg = '#FEF2F2'; $border = '#FECACA'; $textColor = '#DC2626';
+                  $dueText = 'เกินกำหนด ' . abs($daysLeft) . ' วัน';
+              } elseif ($daysLeft <= 2) {
+                  $bg = '#FFF7ED'; $border = '#FED7AA'; $textColor = '#EA580C';
+                  $dueText = 'คืนภายใน ' . $daysLeft . ' วัน';
+              } else {
+                  $bg = '#F0FDF4'; $border = '#BBF7D0'; $textColor = '#16A34A';
+                  $dueText = 'คืนภายใน ' . $daysLeft . ' วัน';
+              }
+            ?>
+            <div style="background:<?= $bg ?>;border:1px solid <?= $border ?>;border-radius:13px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:12px">
+              <div style="flex:1;min-width:0">
+                <div style="font-size:13px;font-weight:700;color:#1e293b;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+                  <?= htmlspecialchars($borrow['item_name']) ?>
+                </div>
+                <div style="font-size:11px;color:#94a3b8"><?= htmlspecialchars($borrow['category_name']) ?></div>
+              </div>
+              <span style="color:<?= $textColor ?>;font-size:11px;font-weight:800;white-space:nowrap;flex-shrink:0"><?= $dueText ?></span>
+            </div>
+          <?php endforeach; ?>
+        <?php endif; ?>
+      </div>
+    </div>
+
+    <!-- ── บริการด่วน ─────────────────────────────────────────────────────── -->
+    <div>
+      <p style="font-size:11px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.08em;margin:0 0 10px">บริการด่วน</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+
+        <a href="booking_campaign.php" style="text-decoration:none;background:#fff;border-radius:18px;padding:16px 14px;box-shadow:0 2px 16px rgba(0,0,0,.06);display:flex;flex-direction:column;gap:12px">
+          <div style="width:44px;height:44px;background:linear-gradient(135deg,#0052CC,#338ef7);border-radius:14px;display:flex;align-items:center;justify-content:center">
+            <i class="fa-solid fa-syringe" style="color:#fff;font-size:17px"></i>
+          </div>
+          <div>
+            <div style="font-size:13px;font-weight:800;color:#1e293b">นัดหมายสุขภาพ</div>
+            <div style="font-size:11px;color:#94a3b8;margin-top:2px">จอง / ดูประวัติ</div>
+          </div>
+        </a>
+
+        <a href="../archive/e_Borrow/" style="text-decoration:none;background:#fff;border-radius:18px;padding:16px 14px;box-shadow:0 2px 16px rgba(0,0,0,.06);display:flex;flex-direction:column;gap:12px">
+          <div style="width:44px;height:44px;background:linear-gradient(135deg,#f97316,#fb923c);border-radius:14px;display:flex;align-items:center;justify-content:center">
+            <i class="fa-solid fa-boxes-stacked" style="color:#fff;font-size:16px"></i>
+          </div>
+          <div>
+            <div style="font-size:13px;font-weight:800;color:#1e293b">ยืมอุปกรณ์</div>
+            <div style="font-size:11px;color:#94a3b8;margin-top:2px">e-Borrow</div>
+          </div>
+        </a>
+
+      </div>
+    </div>
+
+  </div><!-- /content -->
 </div>
 
 <?php
