@@ -1779,7 +1779,11 @@ try {
                                         style="display:flex;align-items:center;gap:10px;padding:12px 16px;border-radius:12px;border:1.5px solid #e2e8f0;background:#f8fafc;color:#374151;font-size:13px;font-weight:700;text-decoration:none;transition:all .2s">
                                         <i class="fa-brands fa-sentry" style="color:#94a3b8"></i> Sentry Monitoring
                                     </a>
-                                    <a href="../admin/auth/logout.php"
+                                    <a href="javascript:switchSection('clinic_data')"
+                                        style="display:flex;align-items:center;gap:10px;padding:12px 16px;border-radius:12px;border:1.5px solid #ccfbf1;background:#f0fdfa;color:#0f766e;font-size:13px;font-weight:700;text-decoration:none;transition:all .2s">
+                                        <i class="fa-solid fa-hospital" style="color:#14b8a6"></i> ข้อมูลคลีนิค
+                                    </a>
+                                    <a href="../admin/logout.php"
                                         style="display:flex;align-items:center;gap:10px;padding:12px 16px;border-radius:12px;border:1.5px solid #fee2e2;background:#fff1f2;color:#dc2626;font-size:13px;font-weight:700;text-decoration:none;transition:all .2s">
                                         <i class="fa-solid fa-right-from-bracket"></i> ออกจากระบบ
                                     </a>
@@ -1895,6 +1899,12 @@ try {
 
                 </div>
             </div><!-- /section-settings -->
+
+            <!-- ════════════ SECTION: CLINIC DATA ════════════ -->
+            <div id="section-clinic_data" class="portal-section"
+                style="<?= $activeSection==='clinic_data'?'':'display:none;' ?> background:#f8fafc; overflow-y:auto;">
+                <?php include __DIR__ . '/_partials/clinic_data.php'; ?>
+            </div>
 
             <!-- ════════════ SECTION: ACTIVITY LOGS ════════════ -->
             <div id="section-activity_logs" class="portal-section"
@@ -2529,7 +2539,7 @@ try {
             if (btn) btn.classList.add('psb-active');
             var url = new URL(window.location.href);
             url.searchParams.set('section', sectionId);
-            ['page','el_search','el_level','el_date','el_source','al_q','eml_q','eml_type','eml_status'].forEach(function(k){ url.searchParams.delete(k); });
+            ['page','el_search','el_level','el_date','el_source','al_q','eml_q','eml_type','eml_status','cd_search'].forEach(function(k){ url.searchParams.delete(k); });
             history.pushState({section: sectionId}, '', url.toString());
         };
 

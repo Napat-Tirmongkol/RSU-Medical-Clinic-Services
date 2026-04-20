@@ -25,9 +25,11 @@ function render_footer(): void {
     ['file' => 'profile.php',          'icon' => 'fa-solid fa-user',           'label' => 'โปรไฟล์'],
   ];
   ?>
-<?php if ($showNav): ?>
+      </main>
+
+  <?php if ($showNav): ?>
   <!-- ── Bottom Navigation ────────────────────────────────────────────────── -->
-  <nav class="fixed bottom-0 left-1/2 -translate-x-1/2 w-full md:max-w-2xl lg:max-w-4xl bg-white border-t border-[#eef2f6] flex z-[999] rounded-t-[20px] shadow-[0_-5px_20px_rgba(0,0,0,0.04)]"
+  <nav class="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[448px] bg-white border-t border-[#eef2f6] flex z-[999] rounded-t-[20px] shadow-[0_-5px_20px_rgba(0,0,0,0.04)]"
        style="padding-bottom:env(safe-area-inset-bottom,0)">
     <?php foreach ($navItems as $item):
       $active = ($currentPage === $item['file']);
@@ -41,9 +43,8 @@ function render_footer(): void {
     <?php endforeach; ?>
   </nav>
   <!-- bottom spacer so content isn't hidden behind nav -->
-  <div class="h-32"></div>
+  <div class="h-16"></div>
   <?php endif; ?>
-  </main>
 
       <script>
         /* ── JS Error Tracker ─────────────────────────────────── */
