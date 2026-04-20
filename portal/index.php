@@ -1629,13 +1629,13 @@ try {
                                         style="display:flex;align-items:center;gap:10px;padding:12px 16px;border-radius:12px;border:1.5px solid #e2e8f0;background:#f8fafc;color:#374151;font-size:13px;font-weight:700;text-decoration:none;transition:all .2s">
                                         <i class="fa-solid fa-envelope-open-text" style="color:#94a3b8"></i> Email Logs
                                     </a>
-                                    <a href="javascript:switchSection('faculty_import')"
-                                        style="display:flex;align-items:center;gap:10px;padding:12px 16px;border-radius:12px;border:1.5px solid #ede9fe;background:#faf5ff;color:#7c3aed;font-size:13px;font-weight:700;text-decoration:none;transition:all .2s">
-                                        <i class="fa-solid fa-building-columns" style="color:#a78bfa"></i> นำเข้าคณะ / หน่วยงาน
-                                    </a>
                                     <a href="javascript:switchSection('sentry_test')"
                                         style="display:flex;align-items:center;gap:10px;padding:12px 16px;border-radius:12px;border:1.5px solid #e2e8f0;background:#f8fafc;color:#374151;font-size:13px;font-weight:700;text-decoration:none;transition:all .2s">
                                         <i class="fa-brands fa-sentry" style="color:#94a3b8"></i> Sentry Monitoring
+                                    </a>
+                                    <a href="javascript:switchSection('clinic_data')"
+                                        style="display:flex;align-items:center;gap:10px;padding:12px 16px;border-radius:12px;border:1.5px solid #ccfbf1;background:#f0fdfa;color:#0f766e;font-size:13px;font-weight:700;text-decoration:none;transition:all .2s">
+                                        <i class="fa-solid fa-hospital" style="color:#14b8a6"></i> ข้อมูลคลีนิค
                                     </a>
                                     <a href="../admin/logout.php"
                                         style="display:flex;align-items:center;gap:10px;padding:12px 16px;border-radius:12px;border:1.5px solid #fee2e2;background:#fff1f2;color:#dc2626;font-size:13px;font-weight:700;text-decoration:none;transition:all .2s">
@@ -1725,10 +1725,10 @@ try {
                 </div>
             </div><!-- /section-settings -->
 
-            <!-- ════════════ SECTION: FACULTY IMPORT ════════════ -->
-            <div id="section-faculty_import" class="portal-section"
-                style="<?= $activeSection==='faculty_import'?'':'display:none;' ?> background:#f8fafc; overflow-y:auto;">
-                <?php include __DIR__ . '/_partials/faculty_import.php'; ?>
+            <!-- ════════════ SECTION: CLINIC DATA ════════════ -->
+            <div id="section-clinic_data" class="portal-section"
+                style="<?= $activeSection==='clinic_data'?'':'display:none;' ?> background:#f8fafc; overflow-y:auto;">
+                <?php include __DIR__ . '/_partials/clinic_data.php'; ?>
             </div>
 
             <!-- ════════════ SECTION: ACTIVITY LOGS ════════════ -->
