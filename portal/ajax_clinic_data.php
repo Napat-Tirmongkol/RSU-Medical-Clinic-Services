@@ -24,11 +24,16 @@ try {
             code       VARCHAR(50)  NULL,
             name_th    VARCHAR(255) NOT NULL,
             name_en    VARCHAR(255) NULL,
+            type       ENUM('faculty','department') NOT NULL DEFAULT 'faculty',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             UNIQUE KEY uk_name_th (name_th)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     ");
+    // Add column if doesn't exist (for existing tables)
+    try {
+        $pdo->exec("ALTER TABLE sys_faculties ADD COLUMN type ENUM('faculty','department') NOT NULL DEFAULT 'faculty'");
+    } catch (PDOException) {}
 } catch (PDOException $e) {
     echo json_encode(['status' => 'error', 'message' => 'ไม่สามารถสร้างตารางได้: ' . $e->getMessage()]);
     exit;
@@ -43,6 +48,7 @@ if ($action === 'add') {
     $code    = trim($_POST['code']    ?? '') ?: null;
     $nameTh  = trim($_POST['name_th'] ?? '');
     $nameEn  = trim($_POST['name_en'] ?? '') ?: null;
+    $type    = in_array($_POST['type'] ?? 'faculty', ['faculty', 'department'], true) ? $_POST['type'] : 'faculty';
 
     if ($nameTh === '') {
         echo json_encode(['status' => 'error', 'message' => 'กรุณากรอกชื่อ (ภาษาไทย)']);
@@ -51,11 +57,11 @@ if ($action === 'add') {
 
     try {
         $stmt = $pdo->prepare("
-            INSERT INTO sys_faculties (code, name_th, name_en)
-            VALUES (:code, :name_th, :name_en)
+            INSERT INTO sys_faculties (code, name_th, name_en, type)
+            VALUES (:code, :name_th, :name_en, :type)
         ");
-        $stmt->execute([':code' => $code, ':name_th' => $nameTh, ':name_en' => $nameEn]);
-        log_activity('clinic_data', "เพิ่มคณะ/หน่วยงาน: {$nameTh}");
+        $stmt->execute([':code' => $code, ':name_th' => $nameTh, ':name_en' => $nameEn, ':type' => $type]);
+        log_activity('clinic_data', "เพิ่ม{($type === 'faculty' ? 'คณะ' : 'หน่วยงาน')}: {$nameTh}");
         echo json_encode(['status' => 'ok', 'message' => 'เพิ่มข้อมูลเรียบร้อย', 'id' => (int)$pdo->lastInsertId()]);
     } catch (PDOException $e) {
         if ((int)$e->errorInfo[1] === 1062) {
@@ -75,6 +81,7 @@ if ($action === 'update') {
     $code    = trim($_POST['code']    ?? '') ?: null;
     $nameTh  = trim($_POST['name_th'] ?? '');
     $nameEn  = trim($_POST['name_en'] ?? '') ?: null;
+    $type    = in_array($_POST['type'] ?? 'faculty', ['faculty', 'department'], true) ? $_POST['type'] : 'faculty';
 
     if ($id <= 0 || $nameTh === '') {
         echo json_encode(['status' => 'error', 'message' => 'ข้อมูลไม่ครบถ้วน']);
@@ -84,11 +91,11 @@ if ($action === 'update') {
     try {
         $stmt = $pdo->prepare("
             UPDATE sys_faculties
-            SET code = :code, name_th = :name_th, name_en = :name_en
+            SET code = :code, name_th = :name_th, name_en = :name_en, type = :type
             WHERE id = :id
         ");
-        $stmt->execute([':code' => $code, ':name_th' => $nameTh, ':name_en' => $nameEn, ':id' => $id]);
-        log_activity('clinic_data', "แก้ไขคณะ/หน่วยงาน #{$id}: {$nameTh}");
+        $stmt->execute([':code' => $code, ':name_th' => $nameTh, ':name_en' => $nameEn, ':type' => $type, ':id' => $id]);
+        log_activity('clinic_data', "แก้ไข{($type === 'faculty' ? 'คณะ' : 'หน่วยงาน')} #{$id}: {$nameTh}");
         echo json_encode(['status' => 'ok', 'message' => 'บันทึกเรียบร้อย']);
     } catch (PDOException $e) {
         if ((int)$e->errorInfo[1] === 1062) {
@@ -172,9 +179,9 @@ if ($action === 'import') {
     }
 
     $stmt = $pdo->prepare("
-        INSERT INTO sys_faculties (code, name_th, name_en)
-        VALUES (:code, :name_th, :name_en)
-        ON DUPLICATE KEY UPDATE code = VALUES(code), name_en = VALUES(name_en), updated_at = CURRENT_TIMESTAMP
+        INSERT INTO sys_faculties (code, name_th, name_en, type)
+        VALUES (:code, :name_th, :name_en, :type)
+        ON DUPLICATE KEY UPDATE code = VALUES(code), name_en = VALUES(name_en), type = VALUES(type), updated_at = CURRENT_TIMESTAMP
     ");
 
     $inserted = 0; $skipped = 0; $errors = [];
@@ -183,22 +190,24 @@ if ($action === 'import') {
         if ($cols === 0) { $skipped++; continue; }
 
         if ($cols === 1) {
-            $code = null; $nameTh = trim($row[0]); $nameEn = null;
+            $code = null; $nameTh = trim($row[0]); $nameEn = null; $type = 'faculty';
         } elseif ($cols === 2) {
             $isCode = strlen(trim($row[0])) <= 20 && !preg_match('/[\x{0E00}-\x{0E7F}]/u', $row[0]);
             $code   = $isCode ? (trim($row[0]) ?: null) : null;
             $nameTh = $isCode ? trim($row[1]) : trim($row[0]);
             $nameEn = $isCode ? null : trim($row[1]);
+            $type   = 'faculty';
         } else {
             $code = trim($row[0]) ?: null;
             $nameTh = trim($row[1]);
             $nameEn = trim($row[2]) ?: null;
+            $type   = 'faculty';
         }
 
         if ($nameTh === '') { $skipped++; continue; }
 
         try {
-            $stmt->execute([':code' => $code, ':name_th' => $nameTh, ':name_en' => $nameEn]);
+            $stmt->execute([':code' => $code, ':name_th' => $nameTh, ':name_en' => $nameEn, ':type' => $type]);
             $inserted++;
         } catch (PDOException $e) {
             $skipped++;

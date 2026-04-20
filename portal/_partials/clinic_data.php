@@ -11,10 +11,12 @@ try {
         code       VARCHAR(50)  NULL,
         name_th    VARCHAR(255) NOT NULL,
         name_en    VARCHAR(255) NULL,
+        type       ENUM('faculty','department') NOT NULL DEFAULT 'faculty',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         UNIQUE KEY uk_name_th (name_th)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    try { $pdo->exec("ALTER TABLE sys_faculties ADD COLUMN type ENUM('faculty','department') NOT NULL DEFAULT 'faculty'"); } catch (PDOException) {}
 } catch (PDOException) {}
 
 // Filter
@@ -31,13 +33,18 @@ if ($_cd_search !== '') {
 $_cd_rows = [];
 $_cd_total = 0;
 $_cd_totalAll = 0;
+$_cd_faculties = 0;
+$_cd_departments = 0;
 try {
     $_cd_totalAll = (int)$pdo->query("SELECT COUNT(*) FROM sys_faculties")->fetchColumn();
+    $_cd_faculties = (int)$pdo->query("SELECT COUNT(*) FROM sys_faculties WHERE type='faculty'")->fetchColumn();
+    $_cd_departments = (int)$pdo->query("SELECT COUNT(*) FROM sys_faculties WHERE type='department'")->fetchColumn();
+
     $sc = $pdo->prepare("SELECT COUNT(*) FROM sys_faculties $_cd_where");
     $sc->execute($_cd_params);
     $_cd_total = (int)$sc->fetchColumn();
 
-    $sr = $pdo->prepare("SELECT id, code, name_th, name_en, created_at FROM sys_faculties $_cd_where ORDER BY name_th ASC");
+    $sr = $pdo->prepare("SELECT id, code, name_th, name_en, type, created_at FROM sys_faculties $_cd_where ORDER BY type ASC, name_th ASC");
     $sr->execute($_cd_params);
     $_cd_rows = $sr->fetchAll(PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
@@ -77,12 +84,13 @@ foreach ($_cd_rows as $r) {
     </div>
 
     <!-- Summary Cards -->
-    <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <?php
         $cards = [
             ['label'=>'ทั้งหมด',           'val'=>$_cd_totalAll, 'icon'=>'fa-building-columns', 'bg'=>'#f0fdfa', 'ic'=>'#14b8a6'],
-            ['label'=>'มีรหัสย่อ',         'val'=>$_cd_withCode, 'icon'=>'fa-hashtag',          'bg'=>'#eff6ff', 'ic'=>'#3b82f6'],
-            ['label'=>'มีชื่อภาษาอังกฤษ',  'val'=>$_cd_withEn,   'icon'=>'fa-language',         'bg'=>'#faf5ff', 'ic'=>'#8b5cf6'],
+            ['label'=>'คณะ',              'val'=>$_cd_faculties, 'icon'=>'fa-building',        'bg'=>'#eff6ff', 'ic'=>'#3b82f6'],
+            ['label'=>'หน่วยงาน',         'val'=>$_cd_departments, 'icon'=>'fa-sitemap',       'bg'=>'#fef3c7', 'ic'=>'#d97706'],
+            ['label'=>'มีชื่อ EN',        'val'=>$_cd_withEn,   'icon'=>'fa-language',         'bg'=>'#faf5ff', 'ic'=>'#8b5cf6'],
         ];
         foreach ($cards as $c): ?>
         <div class="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm flex items-center gap-4">
@@ -110,6 +118,13 @@ foreach ($_cd_rows as $r) {
         </div>
         <form id="cd-add-form" onsubmit="cdAdd(event)" class="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
             <div class="md:col-span-2">
+                <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 block">ประเภท <span class="text-red-400">*</span></label>
+                <select name="type" required class="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-teal-100 focus:border-teal-400 transition-all bg-gray-50">
+                    <option value="faculty">คณะ</option>
+                    <option value="department">หน่วยงาน</option>
+                </select>
+            </div>
+            <div class="md:col-span-2">
                 <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 block">รหัส</label>
                 <input name="code" type="text" maxlength="50" placeholder="เช่น ICT"
                     class="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-teal-100 focus:border-teal-400 transition-all bg-gray-50">
@@ -119,12 +134,12 @@ foreach ($_cd_rows as $r) {
                 <input name="name_th" type="text" required maxlength="255" placeholder="คณะ/หน่วยงาน ภาษาไทย"
                     class="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-teal-100 focus:border-teal-400 transition-all bg-gray-50">
             </div>
-            <div class="md:col-span-4">
+            <div class="md:col-span-3">
                 <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 block">ชื่อ (English)</label>
                 <input name="name_en" type="text" maxlength="255" placeholder="Name in English"
                     class="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-teal-100 focus:border-teal-400 transition-all bg-gray-50">
             </div>
-            <div class="md:col-span-2">
+            <div class="md:col-span-1">
                 <button type="submit" class="w-full px-5 py-2.5 bg-teal-600 text-white text-sm font-bold rounded-xl hover:bg-teal-700 flex items-center justify-center gap-2 shadow-sm">
                     <i class="fa-solid fa-plus"></i> เพิ่ม
                 </button>
@@ -184,16 +199,24 @@ foreach ($_cd_rows as $r) {
                 <thead class="bg-gray-50 border-b border-gray-100">
                     <tr class="text-[10px] font-black text-gray-500 uppercase tracking-widest">
                         <th class="py-3 px-4 text-left w-12">#</th>
-                        <th class="py-3 px-4 text-left w-28">รหัส</th>
+                        <th class="py-3 px-4 text-left w-20">ประเภท</th>
+                        <th class="py-3 px-4 text-left w-24">รหัส</th>
                         <th class="py-3 px-4 text-left">ชื่อ (ภาษาไทย)</th>
                         <th class="py-3 px-4 text-left">ชื่อ (English)</th>
                         <th class="py-3 px-4 text-right w-32">การกระทำ</th>
                     </tr>
                 </thead>
                 <tbody id="cd-tbody">
-                    <?php foreach ($_cd_rows as $i => $r): ?>
+                    <?php foreach ($_cd_rows as $i => $r):
+                        $isF = $r['type'] === 'faculty';
+                    ?>
                     <tr class="border-b border-gray-50 hover:bg-gray-50/50 transition-colors" data-id="<?= (int)$r['id'] ?>">
                         <td class="py-3 px-4 text-xs text-gray-400 font-semibold"><?= $i + 1 ?></td>
+                        <td class="py-3 px-4">
+                            <span class="inline-block text-[11px] font-black px-2.5 py-1 rounded-full <?= $isF ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700' ?>">
+                                <?= $isF ? 'คณะ' : 'หน่วยงาน' ?>
+                            </span>
+                        </td>
                         <td class="py-3 px-4">
                             <?php if (!empty($r['code'])): ?>
                                 <span class="inline-block text-[11px] font-black px-2 py-0.5 rounded-md bg-gray-100 text-gray-700 font-mono"><?= htmlspecialchars($r['code']) ?></span>
@@ -276,6 +299,13 @@ foreach ($_cd_rows as $r) {
         </div>
         <form id="cd-edit-form" onsubmit="cdSaveEdit(event)" class="p-6 space-y-4">
             <input type="hidden" name="id" id="cd-edit-id">
+            <div>
+                <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 block">ประเภท <span class="text-red-400">*</span></label>
+                <select name="type" id="cd-edit-type" required class="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all bg-gray-50">
+                    <option value="faculty">คณะ</option>
+                    <option value="department">หน่วยงาน</option>
+                </select>
+            </div>
             <div>
                 <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 block">รหัส</label>
                 <input name="code" id="cd-edit-code" type="text" maxlength="50"
@@ -364,6 +394,7 @@ foreach ($_cd_rows as $r) {
     // ── Edit ─────────────────────────────────────────────────────────────────
     const modal  = document.getElementById('cd-edit-modal');
     const eIdEl  = document.getElementById('cd-edit-id');
+    const eType  = document.getElementById('cd-edit-type');
     const eCode  = document.getElementById('cd-edit-code');
     const eTh    = document.getElementById('cd-edit-name-th');
     const eEn    = document.getElementById('cd-edit-name-en');
@@ -371,6 +402,7 @@ foreach ($_cd_rows as $r) {
 
     window.cdEditRow = function (row) {
         eIdEl.value = row.id;
+        eType.value = row.type || 'faculty';
         eCode.value = row.code || '';
         eTh.value   = row.name_th || '';
         eEn.value   = row.name_en || '';
