@@ -5,7 +5,7 @@ declare(strict_types=1);
 include('includes/check_student_session.php');
 
 // ใช้ DB กลาง (Correct path to Root)
-require_once __DIR__ . '/../config/db_connect.php';
+require_once __DIR__ . '/includes/db_connect.php';
 
 $student_id = (int)$_SESSION['student_id'];
 

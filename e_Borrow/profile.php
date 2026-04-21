@@ -17,7 +17,7 @@ if (empty($_SESSION['student_id'])) {
 
 // กรณีหายาก: student_id มีแต่ไม่มี line_user_id (login ตรงผ่านทาง e_Borrow เก่า)
 // ดึง line_user_id จาก DB แล้ว set session เพื่อให้ user/profile.php ทำงานได้
-require_once __DIR__ . '/../config/db_connect.php';
+require_once __DIR__ . '/includes/db_connect.php';
 try {
     $pdo  = db();
     $stmt = $pdo->prepare("SELECT line_user_id FROM sys_users WHERE id = :id LIMIT 1");
