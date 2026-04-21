@@ -66,301 +66,314 @@ foreach ($_cd_rows as $r) {
 // Build base querystring for pagination links
 $_cd_qs = http_build_query(array_filter(['section' => 'clinic_data', 'cd_search' => $_cd_search]));
 ?>
-
 <div class="p-6">
-
-    <!-- Section Header -->
-    <div class="mb-6 flex flex-wrap items-center justify-between gap-4">
+    <!-- Header -->
+    <div class="mb-8 flex items-center justify-between">
         <div>
-            <h2 class="text-2xl font-black text-gray-900 flex items-center gap-2">
-                <i class="fa-solid fa-hospital text-teal-500"></i> ข้อมูลคลีนิค
+            <h2 class="text-2xl font-black text-slate-800 flex items-center gap-3">
+                <div class="w-10 h-10 bg-teal-50 text-teal-600 rounded-xl flex items-center justify-center shadow-sm">
+                    <i class="fa-solid fa-hospital"></i>
+                </div>
+                ข้อมูลคลีนิค
             </h2>
-            <p class="text-xs text-gray-400 mt-1">จัดการรายชื่อคณะและหน่วยงานที่ใช้ในระบบ (เพิ่มเอง / แก้ไข / นำเข้าจาก Excel)</p>
-        </div>
-        <div class="flex gap-2">
-            <button onclick="document.getElementById('cd-import-card').scrollIntoView({behavior:'smooth'})"
-                class="px-3 py-2 bg-violet-50 text-violet-700 border border-violet-200 text-xs font-bold rounded-xl hover:bg-violet-100 flex items-center gap-1.5">
-                <i class="fa-solid fa-file-import"></i> นำเข้าไฟล์
-            </button>
-            <?php if ($_cd_totalAll > 0): ?>
-            <button onclick="cdClearAll()"
-                class="px-3 py-2 bg-red-50 text-red-700 border border-red-200 text-xs font-bold rounded-xl hover:bg-red-100 flex items-center gap-1.5">
-                <i class="fa-solid fa-trash-can"></i> ล้างทั้งหมด
-            </button>
-            <?php endif; ?>
+            <p class="text-slate-500 text-sm font-medium mt-1">ตั้งค่าโครงสร้างพื้นฐานและข้อมูลบุคลากรของคลีนิค</p>
         </div>
     </div>
 
-    <!-- Summary Cards -->
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <?php
-        $cards = [
-            ['label'=>'ทั้งหมด',           'val'=>$_cd_totalAll, 'icon'=>'fa-building-columns', 'bg'=>'#f0fdfa', 'ic'=>'#14b8a6'],
-            ['label'=>'คณะ',              'val'=>$_cd_faculties, 'icon'=>'fa-building',        'bg'=>'#eff6ff', 'ic'=>'#3b82f6'],
-            ['label'=>'หน่วยงาน',         'val'=>$_cd_departments, 'icon'=>'fa-sitemap',       'bg'=>'#fef3c7', 'ic'=>'#d97706'],
-            ['label'=>'มีชื่อ EN',        'val'=>$_cd_withEn,   'icon'=>'fa-language',         'bg'=>'#faf5ff', 'ic'=>'#8b5cf6'],
-        ];
-        foreach ($cards as $c): ?>
-        <div class="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm flex items-center gap-4">
-            <div class="w-11 h-11 rounded-xl flex items-center justify-center shrink-0" style="background:<?= $c['bg'] ?>">
-                <i class="fa-solid <?= $c['icon'] ?> text-lg" style="color:<?= $c['ic'] ?>"></i>
-            </div>
-            <div>
-                <p class="text-2xl font-black text-gray-900"><?= number_format((int)$c['val']) ?></p>
-                <p class="text-xs text-gray-400 font-semibold mt-0.5"><?= $c['label'] ?></p>
-            </div>
-        </div>
-        <?php endforeach; ?>
+    <!-- Main Tab Navigation -->
+    <div class="flex flex-wrap items-center gap-1 bg-slate-100 p-1 rounded-2xl mb-8 w-fit border border-slate-200">
+        <button onclick="switchClinicTab('faculties')" id="tab-btn-faculties" 
+                class="clinic-tab-btn active px-6 py-2.5 rounded-xl text-sm font-black bg-white shadow-sm text-slate-800 transition-all flex items-center gap-2">
+            <i class="fa-solid fa-building-columns"></i> คณะ/หน่วยงาน
+        </button>
+        <button onclick="switchClinicTab('rooms')" id="tab-btn-rooms" 
+                class="clinic-tab-btn px-6 py-2.5 rounded-xl text-sm font-black text-slate-500 hover:text-slate-700 hover:bg-white/50 transition-all flex items-center gap-2">
+            <i class="fa-solid fa-door-open"></i> ห้องตรวจ (อนาคต)
+        </button>
+        <button onclick="switchClinicTab('staff')" id="tab-btn-staff" 
+                class="clinic-tab-btn px-6 py-2.5 rounded-xl text-sm font-black text-slate-500 hover:text-slate-700 hover:bg-white/50 transition-all flex items-center gap-2">
+            <i class="fa-solid fa-user-doctor"></i> แพทย์/บุคลากร
+        </button>
+        <button class="px-4 py-2.5 rounded-xl text-sm font-black text-slate-400 cursor-not-allowed flex items-center gap-2 italic">
+            <i class="fa-solid fa-plus-circle text-xs"></i> เพิ่ม tab ใหม่
+        </button>
     </div>
 
-    <!-- Add Row Form -->
-    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-6">
-        <div class="flex items-center gap-3 mb-4">
-            <div class="w-9 h-9 bg-teal-50 rounded-xl flex items-center justify-center shrink-0">
-                <i class="fa-solid fa-plus text-teal-500 text-sm"></i>
-            </div>
-            <div>
-                <p class="text-sm font-bold text-gray-800">เพิ่มข้อมูลเอง</p>
-                <p class="text-xs text-gray-400">กรอกข้อมูลคณะ/หน่วยงานทีละรายการ</p>
-            </div>
-        </div>
-        <form id="cd-add-form" onsubmit="cdAdd(event)" class="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
-            <div class="md:col-span-2">
-                <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 block">ประเภท <span class="text-red-400">*</span></label>
-                <select name="type" required class="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-teal-100 focus:border-teal-400 transition-all bg-gray-50">
-                    <option value="faculty">คณะ</option>
-                    <option value="department">หน่วยงาน</option>
-                </select>
-            </div>
-            <div class="md:col-span-2">
-                <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 block">รหัส</label>
-                <input name="code" type="text" maxlength="50" placeholder="เช่น ICT"
-                    class="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-teal-100 focus:border-teal-400 transition-all bg-gray-50">
-            </div>
-            <div class="md:col-span-4">
-                <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 block">ชื่อ (ภาษาไทย) <span class="text-red-400">*</span></label>
-                <input name="name_th" type="text" required maxlength="255" placeholder="คณะ/หน่วยงาน ภาษาไทย"
-                    class="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-teal-100 focus:border-teal-400 transition-all bg-gray-50">
-            </div>
-            <div class="md:col-span-3">
-                <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 block">ชื่อ (English)</label>
-                <input name="name_en" type="text" maxlength="255" placeholder="Name in English"
-                    class="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-teal-100 focus:border-teal-400 transition-all bg-gray-50">
-            </div>
-            <div class="md:col-span-1">
-                <button type="submit" class="w-full px-5 py-2.5 bg-teal-600 text-white text-sm font-bold rounded-xl hover:bg-teal-700 flex items-center justify-center gap-2 shadow-sm">
-                    <i class="fa-solid fa-plus"></i> เพิ่ม
-                </button>
-            </div>
-        </form>
-        <div id="cd-add-result" class="hidden mt-3 text-xs font-bold"></div>
-    </div>
-
-    <!-- Filter Bar -->
-    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 mb-6">
-        <form method="GET" class="flex flex-wrap gap-3 items-end">
-            <input type="hidden" name="section" value="clinic_data">
-            <div class="flex-1 min-w-[200px]">
-                <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 block">ค้นหา</label>
-                <div class="relative">
-                    <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-300 text-xs"></i>
-                    <input type="text" name="cd_search" value="<?= htmlspecialchars($_cd_search) ?>"
-                        placeholder="ชื่อ หรือ รหัส..."
-                        class="w-full pl-8 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-teal-100 transition-all bg-gray-50">
+    <!-- Tab Contents Container -->
+    <div class="clinic-tab-content active" id="tab-content-faculties">
+        
+        <!-- Summary Cards (Inner Tab) -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+            <?php
+            $cards = [
+                ['label'=>'ทั้งหมด',           'val'=>$_cd_totalAll, 'icon'=>'fa-building-columns', 'bg'=>'#f0fdf4', 'ic'=>'#10b981'],
+                ['label'=>'คณะ',              'val'=>$_cd_faculties, 'icon'=>'fa-building',        'bg'=>'#eff6ff', 'ic'=>'#3b82f6'],
+                ['label'=>'หน่วยงาน',         'val'=>$_cd_departments, 'icon'=>'fa-sitemap',       'bg'=>'#fef3c7', 'ic'=>'#f59e0b'],
+                ['label'=>'ข้อมูลสมบูรณ์',        'val'=>$_cd_withEn,   'icon'=>'fa-check-double',     'bg'=>'#faf5ff', 'ic'=>'#a855f7'],
+            ];
+            foreach ($cards as $c): ?>
+            <div class="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm flex items-center gap-5 transition-all hover:shadow-md hover:-translate-y-1">
+                <div class="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-inner" style="background:<?= $c['bg'] ?>">
+                    <i class="fa-solid <?= $c['icon'] ?> text-xl" style="color:<?= $c['ic'] ?>"></i>
+                </div>
+                <div>
+                    <p class="text-2xl font-black text-slate-800"><?= number_format((int)$c['val']) ?></p>
+                    <p class="text-[11px] text-slate-400 font-bold uppercase tracking-wider mt-0.5"><?= $c['label'] ?></p>
                 </div>
             </div>
-            <button type="submit" class="px-5 py-2.5 bg-[#0052CC] text-white text-sm font-bold rounded-xl hover:bg-blue-700 transition-colors shadow-sm">
-                <i class="fa-solid fa-filter mr-1"></i> ค้นหา
-            </button>
-            <?php if ($_cd_search !== ''): ?>
-            <a href="?section=clinic_data" class="px-4 py-2.5 bg-gray-100 text-gray-600 text-sm font-medium rounded-xl hover:bg-gray-200 flex items-center gap-1">
-                <i class="fa-solid fa-xmark text-xs"></i> ล้าง
-            </a>
+            <?php endforeach; ?>
+        </div>
+
+        <!-- 2 Column Layout for Form & Import -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+            <!-- Left: Add Form -->
+            <div class="lg:col-span-2 bg-white rounded-3xl border border-slate-100 shadow-sm p-6">
+                <div class="flex items-center gap-3 mb-6">
+                    <div class="w-10 h-10 bg-teal-50 rounded-xl flex items-center justify-center shrink-0">
+                        <i class="fa-solid fa-plus text-teal-600"></i>
+                    </div>
+                    <div>
+                        <p class="text-base font-black text-slate-800">เพิ่มข้อมูลคณะ/หน่วยงาน</p>
+                        <p class="text-xs text-slate-400 font-medium">ระบุชื่อคณะหรือหน่วยงานเพื่อใช้ในระบบคัดกรอง</p>
+                    </div>
+                </div>
+                
+                <form id="cd-add-form" onsubmit="cdAdd(event)" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="space-y-4">
+                        <div>
+                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">ประเภทข้อมูล <span class="text-red-500">*</span></label>
+                            <select name="type" required class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 outline-none focus:ring-2 focus:ring-teal-100 focus:border-teal-400 transition-all">
+                                <option value="faculty">คณะ (Faculty)</option>
+                                <option value="department">หน่วยงาน (Department)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">รหัสย่อ (ถ้ามี)</label>
+                            <input name="code" type="text" maxlength="50" placeholder="เช่น ICT, MED"
+                                class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 outline-none focus:ring-2 focus:ring-teal-100 focus:border-teal-400 transition-all">
+                        </div>
+                    </div>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">ชื่อภาษาไทย <span class="text-red-500">*</span></label>
+                            <input name="name_th" type="text" required maxlength="255" placeholder="ระบุชื่อเต็มภาษาไทย"
+                                class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 outline-none focus:ring-2 focus:ring-teal-100 focus:border-teal-400 transition-all">
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">ชื่อภาษาอังกฤษ</label>
+                            <input name="name_en" type="text" maxlength="255" placeholder="English Name"
+                                class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 outline-none focus:ring-2 focus:ring-teal-100 focus:border-teal-400 transition-all">
+                        </div>
+                    </div>
+                    <div class="md:col-span-2 pt-2 flex justify-end">
+                        <button type="submit" class="px-8 py-3 bg-teal-600 text-white text-sm font-black rounded-xl hover:bg-teal-700 flex items-center justify-center gap-2 shadow-lg shadow-teal-100 transition-all">
+                            <i class="fa-solid fa-save"></i> บันทึกข้อมูล
+                        </button>
+                    </div>
+                </form>
+                <div id="cd-add-result" class="hidden mt-4 p-4 rounded-xl text-xs font-bold bg-slate-50 border border-slate-100"></div>
+            </div>
+
+            <!-- Right: Import -->
+            <div class="bg-white rounded-3xl border border-slate-100 shadow-sm p-6 flex flex-col">
+                <div class="flex items-center gap-3 mb-6">
+                    <div class="w-10 h-10 bg-violet-50 rounded-xl flex items-center justify-center shrink-0">
+                        <i class="fa-solid fa-file-excel text-violet-600"></i>
+                    </div>
+                    <div>
+                        <p class="text-base font-black text-slate-800">นำเข้าไฟล์</p>
+                        <p class="text-xs text-slate-400 font-medium">รองรับไฟล์ .xlsx และ .csv</p>
+                    </div>
+                </div>
+
+                <!-- Simple Type Radio -->
+                <div class="mb-4 flex gap-2">
+                    <label class="flex-1 cursor-pointer">
+                        <input type="radio" name="cd-import-type" value="faculty" checked class="hidden peer">
+                        <div class="p-2.5 text-center rounded-xl border border-slate-200 text-xs font-black text-slate-400 peer-checked:bg-blue-50 peer-checked:border-blue-200 peer-checked:text-blue-600 transition-all italic">คณะ</div>
+                    </label>
+                    <label class="flex-1 cursor-pointer">
+                        <input type="radio" name="cd-import-type" value="department" class="hidden peer">
+                        <div class="p-2.5 text-center rounded-xl border border-slate-200 text-xs font-black text-slate-400 peer-checked:bg-amber-50 peer-checked:border-amber-200 peer-checked:text-amber-600 transition-all italic">หน่วยงาน</div>
+                    </label>
+                </div>
+
+                <div id="cd-drop-zone"
+                    class="flex-1 border-2 border-dashed border-slate-100 rounded-2xl p-6 text-center cursor-pointer transition-all hover:border-violet-300 hover:bg-violet-50/50 flex flex-col items-center justify-center min-h-[150px]"
+                    onclick="document.getElementById('cd-file-input').click()">
+                    <i class="fa-solid fa-cloud-arrow-up text-3xl text-slate-200 mb-2"></i>
+                    <p class="text-slate-500 font-bold text-xs uppercase tracking-wider">ลากไฟล์วางที่นี่</p>
+                    <p class="text-[10px] text-slate-400 mt-1 font-medium">Excel / CSV เท่านั้น</p>
+                </div>
+                <input type="file" id="cd-file-input" accept=".xlsx,.csv" class="hidden">
+
+                <div id="cd-file-info" class="hidden mt-4 p-3 bg-emerald-50 border border-emerald-100 rounded-xl flex items-center gap-3">
+                    <i class="fa-solid fa-file-circle-check text-emerald-500"></i>
+                    <div class="flex-1 min-w-0">
+                        <p id="cd-file-name" class="font-bold text-xs text-slate-800 truncate"></p>
+                    </div>
+                    <button onclick="cdClearFile()" class="text-slate-300 hover:text-red-500 transition-colors"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+
+                <div id="cd-import-btn-wrap" class="mt-4 hidden">
+                    <button id="cd-import-btn" onclick="cdImport()" class="w-full py-3 bg-slate-800 text-white rounded-xl text-xs font-black hover:bg-black transition-all flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-upload"></i> เริ่มนำเข้าข้อมูล
+                    </button>
+                </div>
+                <div id="cd-import-result" class="hidden mt-3 p-3 rounded-xl text-xs font-bold text-center italic"></div>
+            </div>
+        </div>
+
+        <!-- Filter & Data Table -->
+        <div class="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden mb-12">
+            <div class="px-6 py-4 bg-slate-50 border-b border-slate-100 flex flex-wrap items-center justify-between gap-4">
+                <div class="flex items-center gap-3">
+                    <h3 class="text-sm font-black text-slate-700 uppercase tracking-wider">รายการข้อมูล</h3>
+                    <span class="px-2.5 py-1 bg-white border border-slate-200 text-[10px] font-black text-teal-600 rounded-lg">
+                        <?= number_format($_cd_total) ?> TOTAL
+                    </span>
+                </div>
+                
+                <form method="GET" class="flex items-center gap-2 max-w-md w-full">
+                    <input type="hidden" name="section" value="clinic_data">
+                    <div class="relative flex-1">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-300 text-xs"></i>
+                        <input type="text" name="cd_search" value="<?= htmlspecialchars($_cd_search) ?>" placeholder="ค้นหาชื่อ หรือ รหัส..."
+                            class="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all">
+                    </div>
+                    <button type="submit" class="px-4 py-2 bg-slate-800 text-white rounded-xl text-xs font-black hover:bg-black transition-all">ค้นหา</button>
+                    <?php if ($_cd_search !== ''): ?>
+                    <a href="?section=clinic_data" class="w-9 h-9 flex items-center justify-center bg-slate-100 text-slate-500 rounded-xl hover:bg-slate-200 transition-all">
+                        <i class="fa-solid fa-xmark"></i>
+                    </a>
+                    <?php endif; ?>
+                </form>
+            </div>
+
+            <?php if (isset($_cd_dbError)): ?>
+                <div class="p-12 text-center text-red-500 font-bold italic"><?= htmlspecialchars($_cd_dbError) ?></div>
+            <?php elseif (empty($_cd_rows)): ?>
+                <div class="py-20 text-center">
+                    <div class="w-16 h-16 bg-slate-50 text-slate-200 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
+                        <i class="fa-solid fa-folder-open"></i>
+                    </div>
+                    <p class="text-slate-400 font-black text-sm uppercase tracking-widest">ไม่พบข้อมูลในขณะนี้</p>
+                </div>
+            <?php else: ?>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm border-collapse">
+                        <thead>
+                            <tr class="bg-slate-50/50 border-b border-slate-100">
+                                <th class="py-4 px-6 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest w-12">#</th>
+                                <th class="py-4 px-6 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest w-24">ประเภท</th>
+                                <th class="py-4 px-6 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest w-24">รหัส</th>
+                                <th class="py-4 px-6 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">ชื่อคณะ / หน่วยงาน</th>
+                                <th class="py-4 px-6 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest w-32">เครื่องมือ</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($_cd_rows as $i => $r): 
+                                $isF = $r['type'] === 'faculty';
+                            ?>
+                            <tr class="border-b border-slate-50 hover:bg-slate-50/50 transition-all group" data-id="<?= (int)$r['id'] ?>">
+                                <td class="py-4 px-6 text-[11px] font-bold text-slate-400"><?= $_cd_offset + $i + 1 ?></td>
+                                <td class="py-4 px-6">
+                                    <span class="inline-block text-[10px] font-black px-2.5 py-1 rounded-lg <?= $isF ? 'bg-blue-50 text-blue-600' : 'bg-amber-50 text-amber-600' ?>">
+                                        <?= $isF ? 'FACULTY' : 'DEPT' ?>
+                                    </span>
+                                </td>
+                                <td class="py-4 px-6">
+                                    <?php if (!empty($r['code'])): ?>
+                                        <span class="inline-block text-[10px] font-mono font-black px-2 py-0.5 rounded-md bg-slate-100 text-slate-600"><?= htmlspecialchars($r['code']) ?></span>
+                                    <?php else: ?>
+                                        <span class="text-slate-200">—</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td class="py-4 px-6">
+                                    <div class="font-black text-slate-800 text-sm"><?= htmlspecialchars($r['name_th']) ?></div>
+                                    <div class="text-[10px] text-slate-400 font-bold uppercase tracking-tight"><?= htmlspecialchars($r['name_en'] ?? '') ?: '— NO ENGLISH NAME —' ?></div>
+                                </td>
+                                <td class="py-4 px-6 text-right">
+                                    <div class="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-all">
+                                        <button onclick='cdEditRow(<?= json_encode($r, JSON_UNESCAPED_UNICODE|JSON_HEX_APOS|JSON_HEX_QUOT) ?>)'
+                                                class="w-8 h-8 flex items-center justify-center bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-all">
+                                            <i class="fa-solid fa-pen text-[10px]"></i>
+                                        </button>
+                                        <button onclick="cdDelete(<?= (int)$r['id'] ?>, <?= htmlspecialchars(json_encode($r['name_th'], JSON_UNESCAPED_UNICODE), ENT_QUOTES) ?>)"
+                                                class="w-8 h-8 flex items-center justify-center bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-all">
+                                            <i class="fa-solid fa-trash text-[10px]"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Pagination (Improved) -->
+                <?php if ($_cd_totalPages > 1): ?>
+                <div class="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
+                    <p class="text-[11px] font-black text-slate-400 uppercase tracking-widest">
+                        PAGE <?= $_cd_page ?> / <?= $_cd_totalPages ?>
+                    </p>
+                    <div class="flex items-center gap-1.5">
+                        <?php
+                        $prevPage = max(1, $_cd_page - 1);
+                        $nextPage = min($_cd_totalPages, $_cd_page + 1);
+                        $makeUrl  = fn(int $p) => '?' . $_cd_qs . '&cd_page=' . $p;
+                        ?>
+                        <a href="<?= $makeUrl(1) ?>" class="w-8 h-8 flex items-center justify-center bg-white border border-slate-200 rounded-lg text-xs font-black text-slate-400 hover:bg-slate-100 transition-all"><i class="fa-solid fa-angles-left text-[10px]"></i></a>
+                        <a href="<?= $makeUrl($prevPage) ?>" class="w-8 h-8 flex items-center justify-center bg-white border border-slate-200 rounded-lg text-xs font-black text-slate-400 hover:bg-slate-100 transition-all"><i class="fa-solid fa-angle-left text-[10px]"></i></a>
+                        
+                        <?php
+                        $start = max(1, $_cd_page - 2);
+                        $end   = min($_cd_totalPages, $_cd_page + 2);
+                        for ($p = $start; $p <= $end; $p++):
+                            $isActive = $p === $_cd_page;
+                        ?>
+                        <a href="<?= $makeUrl($p) ?>" class="w-8 h-8 flex items-center justify-center rounded-lg text-xs font-black transition-all <?= $isActive ? 'bg-slate-800 text-white' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100' ?>">
+                            <?= $p ?>
+                        </a>
+                        <?php endfor; ?>
+
+                        <a href="<?= $makeUrl($nextPage) ?>" class="w-8 h-8 flex items-center justify-center bg-white border border-slate-200 rounded-lg text-xs font-black text-slate-400 hover:bg-slate-100 transition-all"><i class="fa-solid fa-angle-right text-[10px]"></i></a>
+                        <a href="<?= $makeUrl($_cd_totalPages) ?>" class="w-8 h-8 flex items-center justify-center bg-white border border-slate-200 rounded-lg text-xs font-black text-slate-400 hover:bg-slate-100 transition-all"><i class="fa-solid fa-angles-right text-[10px]"></i></a>
+                    </div>
+                </div>
+                <?php endif; ?>
             <?php endif; ?>
-        </form>
+        </div>
     </div>
 
-    <!-- Table -->
-    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden mb-6">
-        <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
-            <p class="text-sm font-bold text-gray-700">
-                พบ <span class="text-teal-600"><?= number_format($_cd_total) ?></span> รายการ
-                <?php if ($_cd_search !== ''): ?><span class="text-gray-400 font-normal">(กรองแล้ว)</span><?php endif; ?>
-            </p>
-        </div>
-
-        <?php if (isset($_cd_dbError)): ?>
-        <div class="p-6 text-red-600 text-sm"><i class="fa-solid fa-triangle-exclamation mr-2"></i> <?= htmlspecialchars($_cd_dbError) ?></div>
-        <?php elseif (empty($_cd_rows)): ?>
-        <div class="py-16 text-center text-gray-400">
-            <i class="fa-solid fa-building-columns text-4xl text-gray-300 mb-3 block"></i>
-            <p class="font-semibold">
-                <?= $_cd_search !== '' ? 'ไม่พบข้อมูลตามเงื่อนไขที่ค้นหา' : 'ยังไม่มีข้อมูลในระบบ' ?>
-            </p>
-            <p class="text-xs mt-1">
-                <?= $_cd_search !== '' ? 'ลองเปลี่ยนคำค้นหา' : 'เริ่มเพิ่มข้อมูลด้วยฟอร์มด้านบน หรือนำเข้าจากไฟล์' ?>
-            </p>
-        </div>
-        <?php else: ?>
-        <div class="overflow-x-auto">
-            <table class="w-full text-sm">
-                <thead class="bg-gray-50 border-b border-gray-100">
-                    <tr class="text-[10px] font-black text-gray-500 uppercase tracking-widest">
-                        <th class="py-3 px-4 text-left w-12">#</th>
-                        <th class="py-3 px-4 text-left w-20">ประเภท</th>
-                        <th class="py-3 px-4 text-left w-24">รหัส</th>
-                        <th class="py-3 px-4 text-left">ชื่อ (ภาษาไทย)</th>
-                        <th class="py-3 px-4 text-left">ชื่อ (English)</th>
-                        <th class="py-3 px-4 text-right w-32">การกระทำ</th>
-                    </tr>
-                </thead>
-                <tbody id="cd-tbody">
-                    <?php foreach ($_cd_rows as $i => $r):
-                        $isF = $r['type'] === 'faculty';
-                    ?>
-                    <tr class="border-b border-gray-50 hover:bg-gray-50/50 transition-colors" data-id="<?= (int)$r['id'] ?>">
-                        <td class="py-3 px-4 text-xs text-gray-400 font-semibold"><?= $i + 1 ?></td>
-                        <td class="py-3 px-4">
-                            <span class="inline-block text-[11px] font-black px-2.5 py-1 rounded-full <?= $isF ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700' ?>">
-                                <?= $isF ? 'คณะ' : 'หน่วยงาน' ?>
-                            </span>
-                        </td>
-                        <td class="py-3 px-4">
-                            <?php if (!empty($r['code'])): ?>
-                                <span class="inline-block text-[11px] font-black px-2 py-0.5 rounded-md bg-gray-100 text-gray-700 font-mono"><?= htmlspecialchars($r['code']) ?></span>
-                            <?php else: ?>
-                                <span class="text-gray-300">—</span>
-                            <?php endif; ?>
-                        </td>
-                        <td class="py-3 px-4 font-semibold text-gray-800"><?= htmlspecialchars($r['name_th']) ?></td>
-                        <td class="py-3 px-4 text-gray-500"><?= htmlspecialchars($r['name_en'] ?? '') ?: '<span class="text-gray-300">—</span>' ?></td>
-                        <td class="py-3 px-4 text-right">
-                            <button onclick='cdEditRow(<?= json_encode($r, JSON_UNESCAPED_UNICODE|JSON_HEX_APOS|JSON_HEX_QUOT) ?>)'
-                                class="inline-flex items-center gap-1 px-3 py-1.5 bg-blue-50 text-blue-600 border border-blue-100 text-xs font-bold rounded-lg hover:bg-blue-100 transition-colors">
-                                <i class="fa-solid fa-pen-to-square"></i> แก้ไข
-                            </button>
-                            <button onclick="cdDelete(<?= (int)$r['id'] ?>, <?= htmlspecialchars(json_encode($r['name_th'], JSON_UNESCAPED_UNICODE), ENT_QUOTES) ?>)"
-                                class="inline-flex items-center gap-1 px-3 py-1.5 bg-red-50 text-red-600 border border-red-100 text-xs font-bold rounded-lg hover:bg-red-100 transition-colors ml-1">
-                                <i class="fa-solid fa-trash-can"></i>
-                            </button>
-                        </td>
-                    </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
-        </div>
-
-        <?php if ($_cd_totalPages > 1): ?>
-        <!-- Pagination -->
-        <div class="px-6 py-4 border-t border-gray-100 flex items-center justify-between gap-4 flex-wrap">
-            <p class="text-xs text-gray-500 font-semibold">
-                หน้า <span class="text-gray-800"><?= $_cd_page ?></span> / <?= $_cd_totalPages ?>
-                &nbsp;·&nbsp; รวม <?= number_format($_cd_total) ?> รายการ
-            </p>
-            <div class="flex items-center gap-1">
-                <?php
-                // Prev
-                $prevPage = $_cd_page - 1;
-                $nextPage = $_cd_page + 1;
-                $makeUrl  = fn(int $p) => '?' . $_cd_qs . '&cd_page=' . $p;
-                ?>
-                <a href="<?= $makeUrl(1) ?>"
-                   class="w-8 h-8 flex items-center justify-center rounded-lg text-xs font-bold <?= $_cd_page <= 1 ? 'text-gray-300 pointer-events-none' : 'text-gray-600 hover:bg-gray-100' ?>">
-                    <i class="fa-solid fa-angles-left"></i>
-                </a>
-                <a href="<?= $makeUrl($prevPage) ?>"
-                   class="w-8 h-8 flex items-center justify-center rounded-lg text-xs font-bold <?= $_cd_page <= 1 ? 'text-gray-300 pointer-events-none' : 'text-gray-600 hover:bg-gray-100' ?>">
-                    <i class="fa-solid fa-angle-left"></i>
-                </a>
-
-                <?php
-                $start = max(1, $_cd_page - 2);
-                $end   = min($_cd_totalPages, $_cd_page + 2);
-                if ($start > 1) echo '<span class="w-8 h-8 flex items-center justify-center text-gray-400 text-xs">…</span>';
-                for ($p = $start; $p <= $end; $p++):
-                    $isActive = $p === $_cd_page;
-                ?>
-                <a href="<?= $makeUrl($p) ?>"
-                   class="w-8 h-8 flex items-center justify-center rounded-lg text-xs font-bold transition-colors <?= $isActive ? 'bg-teal-600 text-white' : 'text-gray-600 hover:bg-gray-100' ?>">
-                    <?= $p ?>
-                </a>
-                <?php endfor;
-                if ($end < $_cd_totalPages) echo '<span class="w-8 h-8 flex items-center justify-center text-gray-400 text-xs">…</span>';
-                ?>
-
-                <a href="<?= $makeUrl($nextPage) ?>"
-                   class="w-8 h-8 flex items-center justify-center rounded-lg text-xs font-bold <?= $_cd_page >= $_cd_totalPages ? 'text-gray-300 pointer-events-none' : 'text-gray-600 hover:bg-gray-100' ?>">
-                    <i class="fa-solid fa-angle-right"></i>
-                </a>
-                <a href="<?= $makeUrl($_cd_totalPages) ?>"
-                   class="w-8 h-8 flex items-center justify-center rounded-lg text-xs font-bold <?= $_cd_page >= $_cd_totalPages ? 'text-gray-300 pointer-events-none' : 'text-gray-600 hover:bg-gray-100' ?>">
-                    <i class="fa-solid fa-angles-right"></i>
-                </a>
+    <!-- Tab 2: Rooms (Placeholder) -->
+    <div class="clinic-tab-content hidden" id="tab-content-rooms">
+        <div class="bg-white rounded-3xl border border-slate-100 shadow-sm p-20 text-center">
+            <div class="w-20 h-20 bg-blue-50 text-blue-400 rounded-full flex items-center justify-center mx-auto mb-6 text-4xl">
+                <i class="fa-solid fa-door-open"></i>
+            </div>
+            <h3 class="text-xl font-black text-slate-800 mb-2">ระบบจัดการห้องตรวจ</h3>
+            <p class="text-slate-500 max-w-sm mx-auto font-medium">ส่วนนี้กำลังอยู่ในขั้นตอนการพัฒนา เพื่อรองรับการจองคิวและการจัดการห้องตรวจในอนาคต</p>
+            <div class="mt-8">
+                <span class="px-4 py-2 bg-blue-50 text-blue-600 rounded-xl text-xs font-black uppercase tracking-widest italic">Coming Soon</span>
             </div>
         </div>
-        <?php endif; ?>
-
-        <?php endif; ?>
     </div>
 
-    <!-- Import from file -->
-    <div id="cd-import-card" class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-        <div class="flex items-center gap-3 mb-4">
-            <div class="w-9 h-9 bg-violet-50 rounded-xl flex items-center justify-center shrink-0">
-                <i class="fa-solid fa-file-import text-violet-500 text-sm"></i>
+    <!-- Tab 3: Staff (Placeholder) -->
+    <div class="clinic-tab-content hidden" id="tab-content-staff">
+        <div class="bg-white rounded-3xl border border-slate-100 shadow-sm p-20 text-center">
+            <div class="w-20 h-20 bg-emerald-50 text-emerald-400 rounded-full flex items-center justify-center mx-auto mb-6 text-4xl">
+                <i class="fa-solid fa-user-doctor"></i>
             </div>
-            <div>
-                <p class="text-sm font-bold text-gray-800">นำเข้าจากไฟล์ Excel / CSV</p>
-                <p class="text-xs text-gray-400">เลือกประเภท แล้วอัพโหลด — ไฟล์ต้องมี: ชื่อ TH | ชื่อ EN (รหัสถ้ามี) — Header row ข้ามอัตโนมัติ</p>
-            </div>
-        </div>
-
-        <!-- Type Selection -->
-        <div class="mb-4 p-4 bg-gray-50 rounded-xl border border-gray-100">
-            <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 block">เลือกประเภท <span class="text-red-400">*</span></label>
-            <div class="flex gap-3">
-                <label class="flex items-center gap-2 px-4 py-2.5 bg-white border-2 border-gray-200 rounded-xl cursor-pointer transition-all hover:border-blue-300"
-                       style="flex: 1;">
-                    <input type="radio" name="cd-import-type" value="faculty" checked class="w-4 h-4">
-                    <span class="font-semibold text-gray-700 text-sm">คณะ</span>
-                </label>
-                <label class="flex items-center gap-2 px-4 py-2.5 bg-white border-2 border-gray-200 rounded-xl cursor-pointer transition-all hover:border-amber-300"
-                       style="flex: 1;">
-                    <input type="radio" name="cd-import-type" value="department" class="w-4 h-4">
-                    <span class="font-semibold text-gray-700 text-sm">หน่วยงาน</span>
-                </label>
+            <h3 class="text-xl font-black text-slate-800 mb-2">รายชื่อแพทย์และบุคลากร</h3>
+            <p class="text-slate-500 max-w-sm mx-auto font-medium">ระบบกำลังพัฒนาระบบฐานข้อมูลแพทย์และตารางเวร เพื่อเชื่อมต่อกับระบบนัดหมาย</p>
+            <div class="mt-8">
+                <span class="px-4 py-2 bg-emerald-50 text-emerald-600 rounded-xl text-xs font-black uppercase tracking-widest italic">Under Development</span>
             </div>
         </div>
-
-        <div id="cd-drop-zone"
-            class="border-2 border-dashed border-gray-200 rounded-xl p-8 text-center cursor-pointer transition-all hover:border-violet-300 hover:bg-violet-50/40"
-            onclick="document.getElementById('cd-file-input').click()">
-            <i class="fa-solid fa-cloud-arrow-up text-3xl text-gray-300 mb-2"></i>
-            <p class="text-gray-500 font-semibold text-sm">คลิก หรือลากไฟล์มาวางที่นี่</p>
-            <p class="text-gray-400 text-xs mt-1">.xlsx / .csv</p>
-        </div>
-        <input type="file" id="cd-file-input" accept=".xlsx,.csv" class="hidden">
-
-        <div id="cd-file-info" class="hidden mt-3 flex items-center gap-3 p-3 bg-emerald-50 border border-emerald-100 rounded-xl">
-            <i class="fa-solid fa-file-excel text-emerald-500 text-xl"></i>
-            <div class="flex-1 min-w-0">
-                <p id="cd-file-name" class="font-bold text-sm text-gray-900 truncate"></p>
-                <p id="cd-file-size" class="text-xs text-gray-500"></p>
-            </div>
-            <button onclick="cdClearFile()" class="text-gray-400 hover:text-red-500 transition-colors">
-                <i class="fa-solid fa-xmark"></i>
-            </button>
-        </div>
-
-        <div id="cd-import-btn-wrap" class="mt-4 hidden">
-            <button id="cd-import-btn" onclick="cdImport()" type="button"
-                style="width:100%;background:#7c3aed;color:#fff;font-weight:700;padding:12px 20px;border-radius:12px;border:none;font-size:13px;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;transition:background .2s"
-                onmouseover="this.style.background='#6d28d9'" onmouseout="this.style.background='#7c3aed'">
-                <i class="fa-solid fa-file-import"></i> นำเข้าข้อมูลจากไฟล์
-            </button>
-        </div>
-        <div id="cd-import-result" class="hidden mt-3 p-3 rounded-xl text-sm font-semibold"></div>
     </div>
+</div>
 </div>
 
 <!-- Edit Modal -->
@@ -415,6 +428,33 @@ $_cd_qs = http_build_query(array_filter(['section' => 'clinic_data', 'cd_search'
 (function () {
     const CSRF = '<?= htmlspecialchars(get_csrf_token()) ?>';
     const ENDPOINT = 'ajax_clinic_data.php';
+
+    // ── Tab Switcher ─────────────────────────────────────────────────────────
+    window.switchClinicTab = function (tabId) {
+        // Hide all contents
+        document.querySelectorAll('.clinic-tab-content').forEach(el => el.classList.add('hidden'));
+        document.querySelectorAll('.clinic-tab-content').forEach(el => el.classList.remove('active'));
+        
+        // Deactivate all buttons
+        document.querySelectorAll('.clinic-tab-btn').forEach(btn => {
+            btn.classList.remove('active', 'bg-white', 'shadow-sm', 'text-slate-800');
+            btn.classList.add('text-slate-500', 'hover:text-slate-700', 'hover:bg-white/50');
+        });
+
+        // Show selected content
+        const targetContent = document.getElementById('tab-content-' + tabId);
+        if (targetContent) {
+            targetContent.classList.remove('hidden');
+            targetContent.classList.add('active');
+        }
+
+        // Activate selected button
+        const targetBtn = document.getElementById('tab-btn-' + tabId);
+        if (targetBtn) {
+            targetBtn.classList.add('active', 'bg-white', 'shadow-sm', 'text-slate-800');
+            targetBtn.classList.remove('text-slate-500', 'hover:text-slate-700', 'hover:bg-white/50');
+        }
+    };
 
     // ── Add ──────────────────────────────────────────────────────────────────
     window.cdAdd = async function (e) {
