@@ -130,6 +130,10 @@ $_el_filterQs = http_build_query(array_filter([
             <p class="text-xs text-gray-400 mt-1">บันทึกข้อผิดพลาดและ PHP errors ทั้งหมดในระบบ</p>
         </div>
         <div class="flex gap-2">
+            <button onclick="document.getElementById('errorLogUploadInput').click()"
+               class="px-3 py-2 bg-blue-50 text-blue-700 border border-blue-200 text-xs font-bold rounded-xl hover:bg-blue-100 flex items-center gap-1.5">
+                <i class="fa-solid fa-cloud-arrow-up"></i> Upload
+            </button>
             <a href="?section=error_logs&export=csv<?= $_el_filterQs ? '&'.$_el_filterQs : '' ?>"
                class="px-3 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold rounded-xl hover:bg-emerald-100 flex items-center gap-1.5">
                 <i class="fa-solid fa-file-csv"></i> CSV
@@ -138,6 +142,34 @@ $_el_filterQs = http_build_query(array_filter([
                class="px-3 py-2 bg-violet-50 text-violet-700 border border-violet-200 text-xs font-bold rounded-xl hover:bg-violet-100 flex items-center gap-1.5">
                 <i class="fa-solid fa-file-code"></i> JSON
             </a>
+        </div>
+    </div>
+
+    <!-- Hidden file input -->
+    <input type="file" id="errorLogUploadInput" style="display:none" accept=".json,.csv,.txt,.log" onchange="uploadErrorLog(this)">
+
+    <!-- Upload Progress Card -->
+    <div id="uploadProgressCard" class="hidden mb-6 p-4 bg-blue-50 border border-blue-200 rounded-2xl">
+        <div class="flex items-center justify-between mb-3">
+            <span class="text-sm font-bold text-blue-900">กำลังอัพโหลด...</span>
+            <i class="fa-solid fa-spinner fa-spin text-blue-500"></i>
+        </div>
+        <div class="w-full bg-blue-200 rounded-full h-2">
+            <div id="uploadProgressBar" class="bg-blue-600 h-2 rounded-full transition-all" style="width:0%"></div>
+        </div>
+    </div>
+
+    <!-- Upload Results -->
+    <div id="uploadResultCard" class="hidden mb-6 p-4 border rounded-2xl">
+        <div class="flex items-start gap-3 mb-3">
+            <i id="uploadResultIcon" class="fa-solid fa-check-circle text-green-500 mt-0.5"></i>
+            <div class="flex-1">
+                <p id="uploadResultMsg" class="text-sm font-bold text-gray-900 mb-2"></p>
+                <div id="uploadAnalysis" class="text-xs text-gray-600 space-y-1"></div>
+            </div>
+            <button onclick="document.getElementById('uploadResultCard').classList.add('hidden')" class="text-gray-400 hover:text-gray-600">
+                <i class="fa-solid fa-times"></i>
+            </button>
         </div>
     </div>
 
@@ -364,3 +396,93 @@ $_el_filterQs = http_build_query(array_filter([
     </div>
 
 </div>
+
+<script>
+async function uploadErrorLog(input) {
+    const file = input.files[0];
+    if (!file) return;
+
+    // Show progress
+    document.getElementById('uploadProgressCard').classList.remove('hidden');
+    document.getElementById('uploadProgressBar').style.width = '0%';
+    document.getElementById('uploadResultCard').classList.add('hidden');
+
+    const fd = new FormData();
+    fd.append('error_log_file', file);
+    fd.append('csrf_token', '<?= get_csrf_token() ?>');
+
+    try {
+        // Simulate progress
+        let progress = 0;
+        const progressInterval = setInterval(() => {
+            if (progress < 90) {
+                progress += Math.random() * 30;
+                document.getElementById('uploadProgressBar').style.width = Math.min(progress, 90) + '%';
+            }
+        }, 100);
+
+        const res = await fetch('ajax/ajax_upload_error_logs.php', {
+            method: 'POST',
+            body: fd
+        });
+
+        clearInterval(progressInterval);
+        document.getElementById('uploadProgressBar').style.width = '100%';
+
+        const data = await res.json();
+
+        // Hide progress
+        setTimeout(() => {
+            document.getElementById('uploadProgressCard').classList.add('hidden');
+        }, 500);
+
+        // Show results
+        const resultCard = document.getElementById('uploadResultCard');
+        const resultIcon = document.getElementById('uploadResultIcon');
+        const resultMsg = document.getElementById('uploadResultMsg');
+        const analysisDiv = document.getElementById('uploadAnalysis');
+
+        if (data.ok) {
+            resultIcon.className = 'fa-solid fa-check-circle text-green-500 mt-0.5';
+            resultCard.className = 'mb-6 p-4 border border-green-200 rounded-2xl bg-green-50';
+            resultMsg.textContent = `✓ ${data.message}`;
+
+            if (data.analysis) {
+                let html = `<p><strong>📊 Analysis Results:</strong></p>`;
+                if (data.analysis.total_errors) {
+                    html += `<p>• Total Errors: ${data.analysis.total_errors}</p>`;
+                }
+                if (data.analysis.error_types && Object.keys(data.analysis.error_types).length > 0) {
+                    html += `<p>• Error Types: ${Object.entries(data.analysis.error_types).map(([k,v]) => `${k} (${v})`).join(', ')}</p>`;
+                }
+                if (data.analysis.failed_recipients && data.analysis.failed_recipients.length > 0) {
+                    html += `<p>• Failed Recipients: ${data.analysis.failed_recipients.slice(0,3).join(', ')}${data.analysis.failed_recipients.length > 3 ? '...' : ''}</p>`;
+                }
+                analysisDiv.innerHTML = html;
+            }
+        } else {
+            resultIcon.className = 'fa-solid fa-exclamation-circle text-red-500 mt-0.5';
+            resultCard.className = 'mb-6 p-4 border border-red-200 rounded-2xl bg-red-50';
+            resultMsg.textContent = `✗ ${data.error}`;
+            analysisDiv.innerHTML = '';
+        }
+
+        resultCard.classList.remove('hidden');
+
+        // Reset input
+        input.value = '';
+
+    } catch (err) {
+        document.getElementById('uploadProgressCard').classList.add('hidden');
+
+        const resultCard = document.getElementById('uploadResultCard');
+        resultCard.className = 'mb-6 p-4 border border-red-200 rounded-2xl bg-red-50';
+        document.getElementById('uploadResultIcon').className = 'fa-solid fa-exclamation-circle text-red-500 mt-0.5';
+        document.getElementById('uploadResultMsg').textContent = '✗ ' + (err.message || 'Upload failed');
+        document.getElementById('uploadAnalysis').innerHTML = '';
+        resultCard.classList.remove('hidden');
+
+        input.value = '';
+    }
+}
+</script>
