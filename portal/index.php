@@ -1701,252 +1701,373 @@ try {
                 </div>
             <?php endif; ?>
 
-            <!-- ════════════ SECTION: SETTINGS ════════════ -->
-            <div id="section-settings" class="portal-section" style="display:none">
-                <div class="max-w-[1280px] mx-auto px-5 md:px-8 py-8 space-y-8">
-
-                    <div class="au d1">
-                        <div class="sec-title mb-1">Settings &amp; Maintenance</div>
-                        <p style="font-size:13px;color:#64748b;margin-bottom:24px">
-                            การตั้งค่าระบบและควบคุมสถานะการให้บริการของโปรเจกต์ต่างๆ
-                        </p>
-
-                        <!-- System Status Banner (Quick Glance) -->
-                        <div id="status-banner" class="rounded-2xl border px-5 py-4 mb-6 flex items-center gap-4"
-                            data-state="<?= $allOnline ? 'ok' : 'warn' ?>">
-                            <div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                                style="<?= $allOnline ? 'background:#dcfce7;color:#16a34a' : 'background:#fef3c7;color:#d97706' ?>">
-                                <i id="banner-icon"
-                                    class="fa-solid <?= $allOnline ? 'fa-circle-check' : 'fa-triangle-exclamation' ?> text-base"></i>
+            <!-- ════════════ SECTION: SETTINGS (RE-DESIGNED V4.0) ════════════ -->
+            <div id="section-settings" class="portal-section" style="display:none; background:#f8fafc;">
+                <div class="max-w-[1200px] mx-auto px-6 md:px-10 py-10">
+                    
+                    <!-- Header -->
+                    <div class="mb-10">
+                        <h2 class="text-3xl font-black text-gray-900 flex items-center gap-3">
+                            <div class="w-12 h-12 bg-white rounded-2xl shadow-sm border border-gray-100 flex items-center justify-center text-blue-600">
+                                <i class="fa-solid fa-gear"></i>
                             </div>
-                            <div class="flex-1 min-w-0">
-                                <div id="banner-title" class="font-bold text-sm text-gray-900">
-                                    <?= $allOnline ? 'ระบบทุกโปรเจกต์พร้อมใช้งาน' : 'มีบางโปรเจกต์ปิดปรับปรุงอยู่' ?>
-                                </div>
-                                <div id="banner-desc" class="text-xs text-gray-500 mt-0.5">
-                                    <?= $allOnline ? 'User ทุกคนสามารถเข้าใช้งานได้ตามปกติ' : 'คุณสามารถคลิกเปิดระบบได้จากรายการด้านล่าง' ?>
+                            Settings & Maintenance
+                        </h2>
+                        <p class="text-gray-500 mt-2 font-medium">จัดการหัวใจสำคัญของระบบและการตั้งค่าแอปพลิเคชันทั้งหมด</p>
+                    </div>
+
+                    <div class="grid grid-cols-1 xl:grid-cols-12 gap-8 items-start">
+                        
+                        <!-- Left Column: Navigation/Summary (Sticky) -->
+                        <div class="xl:col-span-3 space-y-4 sticky top-10">
+                            <div class="bg-white rounded-3xl border border-gray-100 p-2 shadow-sm">
+                                <nav class="flex flex-col gap-1">
+                                    <a href="javascript:void(0)" onclick="document.getElementById('group-maintenance').scrollIntoView({behavior:'smooth', block:'center'})" 
+                                       class="flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-bold text-gray-600 hover:bg-slate-50 hover:text-blue-600 transition-all group">
+                                        <i class="fa-solid fa-server w-5 group-hover:scale-110 transition-transform"></i> Services & Status
+                                    </a>
+                                    <a href="javascript:void(0)" onclick="document.getElementById('group-branding').scrollIntoView({behavior:'smooth', block:'center'})" 
+                                       class="flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-bold text-gray-600 hover:bg-slate-50 hover:text-blue-600 transition-all group">
+                                        <i class="fa-solid fa-palette w-5 group-hover:scale-110 transition-transform"></i> Identity & Branding
+                                    </a>
+                                    <a href="javascript:void(0)" onclick="document.getElementById('group-integrations').scrollIntoView({behavior:'smooth', block:'center'})" 
+                                       class="flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-bold text-gray-600 hover:bg-slate-50 hover:text-blue-600 transition-all group">
+                                        <i class="fa-solid fa-plug w-5 group-hover:scale-110 transition-transform"></i> Integrations & AI
+                                    </a>
+                                    <a href="javascript:void(0)" onclick="document.getElementById('group-advanced').scrollIntoView({behavior:'smooth', block:'center'})" 
+                                       class="flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-bold text-gray-600 hover:bg-slate-50 hover:text-blue-600 transition-all group">
+                                        <i class="fa-solid fa-microchip w-5 group-hover:scale-110 transition-transform"></i> Advanced Tools
+                                    </a>
+                                </nav>
+                            </div>
+
+                            <!-- Mini Stats / Activity -->
+                            <div class="bg-gradient-to-br from-slate-900 to-slate-800 rounded-3xl p-6 text-white shadow-xl">
+                                <div class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4">Quick Status</div>
+                                <div class="space-y-4">
+                                    <div class="flex justify-between items-center">
+                                        <span class="text-xs text-slate-300">PHP Version</span>
+                                        <span class="text-xs font-mono font-bold"><?= phpversion() ?></span>
+                                    </div>
+                                    <div class="flex justify-between items-center text-xs">
+                                        <span class="text-slate-300">Environment</span>
+                                        <span class="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 rounded-full font-bold">Production</span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Maintenance Mode Grid -->
-                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-                            <?php foreach ($mProjects as $p):
-                                $isActive = $mData[$p['key']] ?? true;
-                                ?>
-                                <div class="bg-white rounded-2xl border border-gray-100 p-4 flex items-center gap-4 shadow-sm hover:shadow-md transition-shadow"
-                                    id="card-<?= $p['key'] ?>">
-                                    <div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                                        style="background:<?= $p['icon_bg'] ?>; color:<?= $p['icon_color'] ?>;">
-                                        <i class="fa-solid <?= $p['icon'] ?> text-sm"></i>
-                                    </div>
-                                    <div class="flex-1 min-w-0">
-                                        <div class="flex items-center gap-2 mb-0.5">
-                                            <span
-                                                class="font-black text-gray-900 text-sm"><?= htmlspecialchars($p['title']) ?></span>
-                                            <span class="status-badge <?= $isActive ? 'on' : 'off' ?>"
-                                                id="badge-<?= $p['key'] ?>">
-                                                <span class="status-dot"></span>
-                                                <?= $isActive ? 'เปิดใช้งาน' : 'ปรับปรุง' ?>
-                                            </span>
-                                        </div>
-                                        <p class="text-xs text-gray-400"><?= htmlspecialchars($p['desc']) ?></p>
-                                    </div>
-                                    <div class="toggle-wrap">
-                                        <label class="toggle" title="<?= $p['title'] ?>">
-                                            <input type="checkbox" data-project="<?= $p['key'] ?>" <?= $isActive ? 'checked' : '' ?> onchange="toggleMaintenance(this)">
-                                            <div class="toggle-track"></div>
-                                            <div class="toggle-thumb"></div>
-                                        </label>
-                                    </div>
+                        <!-- Right Column: Settings Groups -->
+                        <div class="xl:col-span-9 space-y-10">
+                            
+                            <!-- Group 1: Maintenance & Status -->
+                            <section id="group-maintenance" class="space-y-6">
+                                <div class="flex items-center gap-4 mb-2">
+                                    <div class="h-px flex-1 bg-gray-200"></div>
+                                    <span class="text-xs font-black text-gray-400 uppercase tracking-widest">Services & Maintenance</span>
+                                    <div class="h-px flex-1 bg-gray-200"></div>
                                 </div>
-                            <?php endforeach; ?>
-                        </div>
 
-                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                            <!-- System Info -->
-                            <div style="background:#fff;border:1.5px solid #e2e8f0;border-radius:20px;padding:24px">
-                                <div
-                                    style="font-size:11px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.12em;margin-bottom:16px">
-                                    System Information</div>
-                                <div style="display:flex;flex-direction:column;gap:12px">
-                                    <?php $sysInfo = [
-                                        ['PHP Version', phpversion()],
-                                        ['Server', $_SERVER['SERVER_SOFTWARE'] ?? 'N/A'],
-                                        ['Memory Limit', ini_get('memory_limit')],
-                                        ['Max Upload', ini_get('upload_max_filesize')],
-                                        ['Date / Time', date('d M Y · H:i')],
-                                    ]; ?>
-                                    <?php foreach ($sysInfo as [$label, $val]): ?>
-                                        <div
-                                            style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f1f5f9">
-                                            <span
-                                                style="font-size:12px;font-weight:700;color:#64748b"><?= htmlspecialchars($label) ?></span>
-                                            <span
-                                                style="font-size:12px;font-weight:800;color:#0f172a;font-family:monospace"><?= htmlspecialchars($val) ?></span>
+                                <!-- System Status Banner -->
+                                <div id="status-banner" class="group bg-white rounded-3xl border border-gray-100 p-6 shadow-sm hover:shadow-md transition-all flex flex-col md:flex-row items-center gap-6"
+                                     data-state="<?= $allOnline ? 'ok' : 'warn' ?>">
+                                    <div class="w-16 h-16 rounded-2xl flex items-center justify-center flex-shrink-0 text-2xl transition-transform group-hover:scale-110"
+                                         style="<?= $allOnline ? 'background:#dcfce7;color:#16a34a' : 'background:#fef3c7;color:#d97706' ?>">
+                                        <i id="banner-icon" class="fa-solid <?= $allOnline ? 'fa-circle-check' : 'fa-triangle-exclamation' ?>"></i>
+                                    </div>
+                                    <div class="flex-1 text-center md:text-left">
+                                        <h3 id="banner-title" class="text-xl font-black text-gray-900">
+                                            <?= $allOnline ? 'ระบบทุกโปรเจกต์พร้อมใช้งาน' : 'มีบางโปรเจกต์ปิดปรับปรุงอยู่' ?>
+                                        </h3>
+                                        <p id="banner-desc" class="text-gray-500 text-sm mt-1 font-medium">
+                                            <?= $allOnline ? 'User ทุกคนสามารถเข้าใช้งานได้ตามปกติ' : 'กรุณาตรวจสอบสถานะและเปิดระบบจากรายการด้านล่าง' ?>
+                                        </p>
+                                    </div>
+                                    <?php if ($adminRole === 'superadmin'): ?>
+                                    <button onclick="triggerGitPull()" class="w-full md:w-auto px-6 py-3 bg-slate-900 text-white rounded-2xl font-bold text-sm hover:bg-black transition-colors shadow-lg shadow-slate-200 flex items-center justify-center gap-2">
+                                        <i class="fa-solid fa-code-branch"></i> Git Pull Update
+                                    </button>
+                                    <?php endif; ?>
+                                </div>
+
+                                <!-- Maintenance Mode Grid -->
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <?php foreach ($mProjects as $p):
+                                        $isActive = $mData[$p['key']] ?? true;
+                                        ?>
+                                        <div class="bg-white rounded-3xl border border-gray-100 p-5 flex items-center gap-5 shadow-sm hover:border-blue-200 transition-all group" id="card-<?= $p['key'] ?>">
+                                            <div class="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 text-xl shadow-inner transition-transform group-hover:rotate-6"
+                                                 style="background:<?= $p['icon_bg'] ?>; color:<?= $p['icon_color'] ?>;">
+                                                <i class="fa-solid <?= $p['icon'] ?>"></i>
+                                            </div>
+                                            <div class="flex-1 min-w-0">
+                                                <div class="flex items-center gap-2 mb-1">
+                                                    <span class="font-black text-gray-900 text-base"><?= htmlspecialchars($p['title']) ?></span>
+                                                </div>
+                                                <span class="status-badge <?= $isActive ? 'on' : 'off' ?> inline-flex mb-2" id="badge-<?= $p['key'] ?>">
+                                                    <span class="status-dot"></span>
+                                                    <?= $isActive ? 'ONLINE' : 'MAINTENANCE' ?>
+                                                </span>
+                                                <p class="text-[11px] text-gray-400 font-medium line-clamp-1"><?= htmlspecialchars($p['desc']) ?></p>
+                                            </div>
+                                            <div class="toggle-wrap">
+                                                <label class="toggle" title="<?= $p['title'] ?>">
+                                                    <input type="checkbox" data-project="<?= $p['key'] ?>" <?= $isActive ? 'checked' : '' ?> onchange="toggleMaintenance(this)">
+                                                    <div class="toggle-track"></div>
+                                                    <div class="toggle-thumb"></div>
+                                                </label>
+                                            </div>
                                         </div>
                                     <?php endforeach; ?>
                                 </div>
-                            </div>
+                            </section>
 
-                            <!-- Quick Actions -->
-                            <div style="background:#fff;border:1.5px solid #e2e8f0;border-radius:20px;padding:24px">
-                                <div
-                                    style="font-size:11px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.12em;margin-bottom:16px">
-                                    Quick Actions</div>
-                                <div style="display:flex;flex-direction:column;gap:10px">
-                                    <?php if ($adminRole === 'superadmin'): ?>
-                                        <button onclick="triggerGitPull()" id="btnGitPull"
-                                            style="display:flex;align-items:center;gap:10px;padding:12px 16px;border-radius:12px;border:1.5px solid #d1fae5;background:#f0fdf4;color:#16a34a;font-size:13px;font-weight:700;cursor:pointer;transition:all .2s;text-align:left">
-                                            <i class="fa-solid fa-code-branch"></i> <span>Git Pull — Update System</span>
-                                        </button>
-                                        <a href="javascript:switchSection('smtp_settings')"
-                                            style="display:flex;align-items:center;gap:10px;padding:12px 16px;border-radius:12px;border:1.5px solid #dbeafe;background:#eff6ff;color:#1d4ed8;font-size:13px;font-weight:700;text-decoration:none;transition:all .2s">
-                                            <i class="fa-solid fa-envelope-circle-check"></i> SMTP Settings (Email)
-                                        </a>
-                                    <?php endif; ?>
-                                    <a href="javascript:switchSection('error_logs')"
-                                        style="display:flex;align-items:center;gap:10px;padding:12px 16px;border-radius:12px;border:1.5px solid #e2e8f0;background:#f8fafc;color:#374151;font-size:13px;font-weight:700;text-decoration:none;transition:all .2s">
-                                        <i class="fa-solid fa-bug" style="color:#94a3b8"></i> Error Logs
-                                    </a>
-                                    <a href="javascript:switchSection('email_logs')"
-                                        style="display:flex;align-items:center;gap:10px;padding:12px 16px;border-radius:12px;border:1.5px solid #e2e8f0;background:#f8fafc;color:#374151;font-size:13px;font-weight:700;text-decoration:none;transition:all .2s">
-                                        <i class="fa-solid fa-envelope-open-text" style="color:#94a3b8"></i> Email Logs
-                                    </a>
-                                    <a href="javascript:switchSection('sentry_test')"
-                                        style="display:flex;align-items:center;gap:10px;padding:12px 16px;border-radius:12px;border:1.5px solid #e2e8f0;background:#f8fafc;color:#374151;font-size:13px;font-weight:700;text-decoration:none;transition:all .2s">
-                                        <i class="fa-brands fa-sentry" style="color:#94a3b8"></i> Sentry Monitoring
-                                    </a>
-                                     <a href="javascript:void(0)" onclick="document.getElementById('gemini_api_key').focus(); document.getElementById('gemini_api_key').scrollIntoView({behavior:'smooth', block:'center'});"
-                                        style="display:flex;align-items:center;gap:10px;padding:12px 16px;border-radius:12px;border:1.5px solid #fdf2f8;background:#fdf2f8;color:#be185d;font-size:13px;font-weight:700;text-decoration:none;transition:all .2s">
-                                        <i class="fa-solid fa-wand-magic-sparkles"></i> Gemini AI Settings
-                                     </a>
-                                    <a href="javascript:switchSection('clinic_data')"
-                                        style="display:flex;align-items:center;gap:10px;padding:12px 16px;border-radius:12px;border:1.5px solid #ccfbf1;background:#f0fdfa;color:#0f766e;font-size:13px;font-weight:700;text-decoration:none;transition:all .2s">
-                                        <i class="fa-solid fa-hospital" style="color:#14b8a6"></i> ข้อมูลคลีนิค
-                                    </a>
-                                    <a href="../admin/logout.php"
-                                        style="display:flex;align-items:center;gap:10px;padding:12px 16px;border-radius:12px;border:1.5px solid #fee2e2;background:#fff1f2;color:#dc2626;font-size:13px;font-weight:700;text-decoration:none;transition:all .2s">
-                                        <i class="fa-solid fa-right-from-bracket"></i> ออกจากระบบ
-                                    </a>
+                            <!-- Group 2: Branding & Settings -->
+                            <section id="group-branding" class="space-y-6">
+                                <div class="flex items-center gap-4 mb-2">
+                                    <div class="h-px flex-1 bg-gray-200"></div>
+                                    <span class="text-xs font-black text-gray-400 uppercase tracking-widest">Identity & Branding</span>
+                                    <div class="h-px flex-1 bg-gray-200"></div>
                                 </div>
-                            </div>
-                        </div>
 
-                        <!-- Site Settings & Logo Upload -->
-                        <div style="background:#fff;border:1.5px solid #e2e8f0;border-radius:20px;padding:24px;margin-top:24px">
-                            <div style="font-size:11px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.12em;margin-bottom:16px">
-                                Configuration & Branding
-                            </div>
-                            <form id="siteSettingsForm" method="POST" action="ajax_site_settings.php" enctype="multipart/form-data" style="display:flex;flex-direction:column;gap:16px;">
-                                <?php csrf_field(); ?>
-                                <div>
-                                    <label style="display:block;font-size:12px;font-weight:800;color:#475569;margin-bottom:6px">ชื่อเว็บไซต์ (Site Name)</label>
-                                    <input type="text" name="site_name" value="<?= htmlspecialchars(SITE_NAME) ?>" class="premium-input" style="width:100%;max-width:400px;">
-                                </div>
-                                <div>
-                                    <label style="display:block;font-size:12px;font-weight:800;color:#475569;margin-bottom:6px">Gemini API Key</label>
-                                    <div style="position:relative; max-width:400px;">
-                                        <input type="password" id="gemini_api_key" name="gemini_api_key" value="<?= htmlspecialchars(GEMINI_API_KEY) ?>" class="premium-input" style="width:100%; padding-right:40px;">
-                                        <button type="button" onclick="const p = document.getElementById('gemini_api_key'); p.type = p.type==='password'?'text':'password'; this.querySelector('i').className = p.type==='password'?'fa-solid fa-eye':'fa-solid fa-eye-slash';" style="position:absolute; right:10px; top:50%; transform:translateY(-50%); background:none; border:none; color:#94a3b8; cursor:pointer;">
-                                            <i class="fa-solid fa-eye"></i>
-                                        </button>
-                                    </div>
-                                    <p style="font-size:11px; color:#94a3b8; margin-top:4px;">ใช้สำหรับฟีเจอร์ AI ภายในระบบ (เช่น การวิเคราะห์ข้อมูลหรือการช่วยเหลือผู้ใช้)</p>
-                                </div>
-                                <div>
-                                    <label style="display:block;font-size:12px;font-weight:800;color:#475569;margin-bottom:6px">โลโก้เว็บไซต์ (Site Logo)</label>
-                                    <?php if (defined('SITE_LOGO') && SITE_LOGO !== ''): ?>
-                                        <div style="padding:10px;border:1px solid #e2e8f0;border-radius:8px;display:inline-block;background:#f8fafc;">
-                                            <img src="../<?= htmlspecialchars(SITE_LOGO) ?>" style="max-height:60px;" alt="Current Site Logo">
-                                        </div>
-                                    <?php endif; ?>
-                                </div>
-                                <div>
-                                    <button type="submit" style="padding:12px 24px;border-radius:12px;border:none;background:#2563eb;color:#fff;font-size:13px;font-weight:800;cursor:pointer;display:inline-flex;align-items:center;gap:8px;">
-                                        <i class="fa-solid fa-floppy-disk"></i> บันทึกการตั้งค่า
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-
-                    <!-- Git Pull History -->
-                    <div
-                        style="background:#fff;border:1.5px solid #e2e8f0;border-radius:20px;padding:24px;margin-top:24px">
-                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
-                            <div style="display:flex;align-items:center;gap:10px">
-                                <div
-                                    style="width:32px;height:32px;background:#f0fdf4;border-radius:9px;display:flex;align-items:center;justify-content:center;color:#16a34a">
-                                    <i class="fa-solid fa-code-branch" style="font-size:13px"></i>
-                                </div>
-                                <div>
-                                    <div
-                                        style="font-size:11px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.12em">
-                                        Git Pull History</div>
-                                    <div style="font-size:11px;color:#94a3b8;margin-top:1px">ประวัติการอัพเดทระบบ (30
-                                        รายการล่าสุด)</div>
-                                </div>
-                            </div>
-                            <?php if ($adminRole === 'superadmin'): ?>
-                                <button onclick="triggerGitPull()" id="btnGitPullHistory"
-                                    style="display:flex;align-items:center;gap:8px;padding:8px 16px;border-radius:10px;border:1.5px solid #d1fae5;background:#f0fdf4;color:#16a34a;font-size:12px;font-weight:700;cursor:pointer;transition:all .2s">
-                                    <i class="fa-solid fa-rotate"></i> Pull Now
-                                </button>
-                            <?php endif; ?>
-                        </div>
-
-                        <?php if (empty($gitPullLogs)): ?>
-                            <div style="text-align:center;padding:40px 20px;color:#94a3b8">
-                                <i class="fa-solid fa-inbox"
-                                    style="font-size:32px;margin-bottom:12px;display:block;opacity:.4"></i>
-                                <div style="font-size:13px;font-weight:700">ยังไม่มีประวัติการ Pull</div>
-                                <div style="font-size:11px;margin-top:4px">กด "Pull Now" เพื่อเริ่มบันทึกประวัติ</div>
-                            </div>
-                        <?php else: ?>
-                            <div
-                                style="display:flex;flex-direction:column;gap:0;border:1px solid #f1f5f9;border-radius:14px;overflow:hidden">
-                                <?php foreach ($gitPullLogs as $i => $log):
-                                    $isOk = $log['status'] === 'success';
-                                    $bgColor = $i % 2 === 0 ? '#fff' : '#fafafa';
-                                    $dt = new DateTime($log['created_at']);
-                                    ?>
-                                    <div
-                                        style="display:flex;align-items:center;gap:14px;padding:11px 16px;background:<?= $bgColor ?>;border-bottom:1px solid #f1f5f9">
-                                        <!-- Status dot -->
-                                        <div
-                                            style="width:28px;height:28px;border-radius:8px;background:<?= $isOk ? '#f0fdf4' : '#fef2f2' ?>;display:flex;align-items:center;justify-content:center;flex-shrink:0">
-                                            <i class="fa-solid <?= $isOk ? 'fa-check' : 'fa-xmark' ?>"
-                                                style="font-size:11px;color:<?= $isOk ? '#16a34a' : '#dc2626' ?>"></i>
-                                        </div>
-                                        <!-- Info -->
-                                        <div style="flex:1;min-width:0">
-                                            <div
-                                                style="font-size:12px;font-weight:700;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
-                                                <?= htmlspecialchars($log['message'] ?? '') ?>
+                                <div class="bg-white rounded-[2rem] border border-gray-100 p-8 shadow-sm">
+                                    <form id="siteSettingsForm" method="POST" action="ajax_site_settings.php" enctype="multipart/form-data" class="space-y-8">
+                                        <?php csrf_field(); ?>
+                                        
+                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                            <!-- Site Name -->
+                                            <div class="space-y-2">
+                                                <label class="block text-sm font-black text-gray-700">Site Display Name</label>
+                                                <input type="text" name="site_name" value="<?= htmlspecialchars(SITE_NAME) ?>" 
+                                                       class="w-full px-5 py-4 bg-slate-50 border border-gray-200 rounded-2xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all font-bold text-gray-900 outline-none"
+                                                       placeholder="เช่น RSU Medical Clinic">
+                                                <p class="text-[10px] text-gray-400 font-bold uppercase tracking-wider">ชื่อที่จะปรากฏบนแถบชื่อเรื่องและ Dashboard</p>
                                             </div>
-                                            <div style="font-size:11px;color:#94a3b8;margin-top:2px">
-                                                <i class="fa-solid fa-user"
-                                                    style="font-size:9px;margin-right:3px"></i><?= htmlspecialchars($log['triggered_by']) ?>
-                                                <span style="margin:0 6px;opacity:.4">·</span>
-                                                <div
-                                                    style="margin-top:4px; opacity:0.8; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; line-height: 1.4; white-space: pre-wrap; font-size: 10px;">
-                                                    <?= nl2br(htmlspecialchars($log['detail'] ?? '')) ?>
+
+                                            <!-- Site Logo -->
+                                            <div class="space-y-4">
+                                                <label class="block text-sm font-black text-gray-700">Application Logo</label>
+                                                <div class="flex items-center gap-6">
+                                                    <?php if (defined('SITE_LOGO') && SITE_LOGO !== ''): ?>
+                                                        <div class="w-20 h-20 bg-slate-50 border-2 border-dashed border-gray-200 rounded-2xl flex items-center justify-center p-2 overflow-hidden group/logo relative">
+                                                            <img src="../<?= htmlspecialchars(SITE_LOGO) ?>" class="max-w-full max-h-full object-contain" alt="Current Logo">
+                                                            <div class="absolute inset-0 bg-black/40 opacity-0 group-hover/logo:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-bold">
+                                                                Current
+                                                            </div>
+                                                        </div>
+                                                    <?php endif; ?>
+                                                    <div class="flex-1">
+                                                        <input type="file" name="site_logo" id="site_logo_input" class="hidden">
+                                                        <button type="button" onclick="document.getElementById('site_logo_input').click()" 
+                                                                class="w-full px-5 py-4 bg-white border-2 border-dashed border-gray-200 rounded-2xl text-gray-500 font-bold text-sm hover:border-blue-400 hover:text-blue-600 transition-all flex items-center justify-center gap-2">
+                                                            <i class="fa-solid fa-cloud-arrow-up"></i> Upload New Logo
+                                                        </button>
+                                                        <p class="text-[10px] text-gray-400 mt-2 text-center">แนะนำไฟล์ PNG หรือ SVG ขนาดไม่เกิน 2MB</p>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
-                                        <!-- Timestamp -->
-                                        <div
-                                            style="font-size:11px;color:#94a3b8;white-space:nowrap;text-align:right;flex-shrink:0">
-                                            <div style="font-weight:700;color:#374151"><?= $dt->format('d M Y') ?></div>
-                                            <div><?= $dt->format('H:i:s') ?></div>
+
+                                        <div class="pt-4 flex justify-end">
+                                            <button type="submit" class="px-8 py-4 bg-blue-600 text-white rounded-2xl font-black text-sm hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20 flex items-center gap-2">
+                                                <i class="fa-solid fa-floppy-disk"></i> Save Branding Settings
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </section>
+
+                            <!-- Group 3: Integrations & AI -->
+                            <section id="group-integrations" class="space-y-6">
+                                <div class="flex items-center gap-4 mb-2">
+                                    <div class="h-px flex-1 bg-gray-200"></div>
+                                    <span class="text-xs font-black text-gray-400 uppercase tracking-widest">Integrations & AI</span>
+                                    <div class="h-px flex-1 bg-gray-200"></div>
+                                </div>
+
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                    <!-- Gemini AI -->
+                                    <div class="md:col-span-2 bg-white rounded-3xl border border-gray-100 p-8 shadow-sm flex flex-col justify-between">
+                                        <div>
+                                            <div class="flex items-center gap-3 mb-6">
+                                                <div class="w-12 h-12 bg-pink-50 text-pink-600 rounded-2xl flex items-center justify-center text-xl">
+                                                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+                                                </div>
+                                                <div>
+                                                    <h4 class="font-black text-gray-900">Gemini AI Settings</h4>
+                                                    <p class="text-xs text-gray-400 font-medium">เชื่อมต่อสมองกลเพื่อช่วยวิเคราะห์ข้อมูลระบบ</p>
+                                                </div>
+                                            </div>
+                                            <div class="space-y-4">
+                                                <div class="relative">
+                                                    <input type="password" id="gemini_api_key_v2" name="gemini_api_key" value="<?= htmlspecialchars(GEMINI_API_KEY) ?>" 
+                                                           form="siteSettingsForm"
+                                                           class="w-full px-5 py-4 bg-slate-50 border border-gray-200 rounded-2xl focus:ring-4 focus:ring-pink-500/10 focus:border-pink-500 transition-all font-mono text-sm font-bold text-gray-900 outline-none pr-12"
+                                                           placeholder="Enter Gemini API Key...">
+                                                    <button type="button" onclick="const p = document.getElementById('gemini_api_key_v2'); p.type = p.type==='password'?'text':'password'; this.querySelector('i').className = p.type==='password'?'fa-solid fa-eye':'fa-solid fa-eye-slash';" 
+                                                            class="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-pink-500 transition-colors">
+                                                        <i class="fa-solid fa-eye"></i>
+                                                    </button>
+                                                </div>
+                                                <div class="bg-slate-50 rounded-2xl p-4 border border-gray-100">
+                                                    <p class="text-[11px] text-gray-500 leading-relaxed font-medium">
+                                                        <i class="fa-solid fa-circle-info mr-1 text-blue-500"></i> API Key นี้จะถูกนำไปใช้ในฟีเจอร์ AI Assistant, การสรุปรายงาน และการช่วยเหลือด้านการวินิจฉัยเบื้องต้น
+                                                    </p>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
-                                <?php endforeach; ?>
-                            </div>
-                        <?php endif; ?>
-                    </div>
 
+                                    <!-- Quick Links for Integrations -->
+                                    <div class="space-y-4">
+                                        <a href="javascript:switchSection('smtp_settings')" class="block p-5 bg-white border border-gray-100 rounded-[1.5rem] shadow-sm hover:border-blue-200 hover:shadow-md transition-all group">
+                                            <div class="flex items-center gap-4">
+                                                <div class="w-10 h-10 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center text-sm group-hover:scale-110 transition-transform">
+                                                    <i class="fa-solid fa-envelope"></i>
+                                                </div>
+                                                <div>
+                                                    <div class="text-xs font-black text-gray-900 uppercase">SMTP Settings</div>
+                                                    <div class="text-[10px] text-gray-400 font-bold uppercase">Email Service</div>
+                                                </div>
+                                            </div>
+                                        </a>
+                                        <a href="javascript:switchSection('sentry_test')" class="block p-5 bg-white border border-gray-100 rounded-[1.5rem] shadow-sm hover:border-purple-200 hover:shadow-md transition-all group">
+                                            <div class="flex items-center gap-4">
+                                                <div class="w-10 h-10 bg-purple-50 text-purple-600 rounded-xl flex items-center justify-center text-sm group-hover:scale-110 transition-transform">
+                                                    <i class="fa-brands fa-sentry"></i>
+                                                </div>
+                                                <div>
+                                                    <div class="text-xs font-black text-gray-900 uppercase">Sentry Monitor</div>
+                                                    <div class="text-[10px] text-gray-400 font-bold uppercase">Performance</div>
+                                                </div>
+                                            </div>
+                                        </a>
+                                        <a href="javascript:switchSection('clinic_data')" class="block p-5 bg-white border border-gray-100 rounded-[1.5rem] shadow-sm hover:border-teal-200 hover:shadow-md transition-all group">
+                                            <div class="flex items-center gap-4">
+                                                <div class="w-10 h-10 bg-teal-50 text-teal-600 rounded-xl flex items-center justify-center text-sm group-hover:scale-110 transition-transform">
+                                                    <i class="fa-solid fa-hospital"></i>
+                                                </div>
+                                                <div>
+                                                    <div class="text-xs font-black text-gray-900 uppercase">Clinic Data</div>
+                                                    <div class="text-[10px] text-gray-400 font-bold uppercase">Profile Info</div>
+                                                </div>
+                                            </div>
+                                        </a>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <!-- Group 4: Advanced Tools & Audit -->
+                            <section id="group-advanced" class="space-y-6 pb-20">
+                                <div class="flex items-center gap-4 mb-2">
+                                    <div class="h-px flex-1 bg-gray-200"></div>
+                                    <span class="text-xs font-black text-gray-400 uppercase tracking-widest">Advanced Tools & Audit</span>
+                                    <div class="h-px flex-1 bg-gray-200"></div>
+                                </div>
+
+                                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                                    <!-- Log Access Grid -->
+                                    <div class="lg:col-span-1 grid grid-cols-1 gap-4">
+                                        <div class="bg-slate-900 rounded-3xl p-6 text-white shadow-xl flex flex-col justify-between overflow-hidden relative group">
+                                            <div class="absolute -right-4 -bottom-4 w-24 h-24 bg-white/5 rounded-full blur-2xl group-hover:bg-white/10 transition-all"></div>
+                                            <div>
+                                                <h4 class="text-sm font-black uppercase tracking-widest mb-4">Diagnostic Logs</h4>
+                                                <div class="space-y-3">
+                                                    <a href="javascript:switchSection('error_logs')" class="flex items-center justify-between p-3 bg-white/10 rounded-2xl hover:bg-white/20 transition-all group/item">
+                                                        <span class="text-xs font-bold"><i class="fa-solid fa-bug mr-2 text-red-400"></i> Error Logs</span>
+                                                        <i class="fa-solid fa-chevron-right text-[10px] opacity-0 group-hover/item:opacity-100 transition-all -translate-x-2 group-hover/item:translate-x-0"></i>
+                                                    </a>
+                                                    <a href="javascript:switchSection('email_logs')" class="flex items-center justify-between p-3 bg-white/10 rounded-2xl hover:bg-white/20 transition-all group/item">
+                                                        <span class="text-xs font-bold"><i class="fa-solid fa-envelope mr-2 text-blue-400"></i> Email Logs</span>
+                                                        <i class="fa-solid fa-chevron-right text-[10px] opacity-0 group-hover/item:opacity-100 transition-all -translate-x-2 group-hover/item:translate-x-0"></i>
+                                                    </a>
+                                                    <a href="javascript:switchSection('activity_logs')" class="flex items-center justify-between p-3 bg-white/10 rounded-2xl hover:bg-white/20 transition-all group/item">
+                                                        <span class="text-xs font-bold"><i class="fa-solid fa-clock-rotate-left mr-2 text-emerald-400"></i> Activity Logs</span>
+                                                        <i class="fa-solid fa-chevron-right text-[10px] opacity-0 group-hover/item:opacity-100 transition-all -translate-x-2 group-hover/item:translate-x-0"></i>
+                                                    </a>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Server Detail -->
+                                        <div class="bg-white rounded-3xl border border-gray-100 p-6 shadow-sm">
+                                            <h4 class="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-4">Environment Details</h4>
+                                            <div class="space-y-3">
+                                                <div class="flex justify-between items-center text-[11px]">
+                                                    <span class="font-bold text-gray-500">Max Upload</span>
+                                                    <span class="font-mono text-gray-900"><?= ini_get('upload_max_filesize') ?></span>
+                                                </div>
+                                                <div class="flex justify-between items-center text-[11px]">
+                                                    <span class="font-bold text-gray-500">Memory Limit</span>
+                                                    <span class="font-mono text-gray-900"><?= ini_get('memory_limit') ?></span>
+                                                </div>
+                                                <div class="flex justify-between items-center text-[11px]">
+                                                    <span class="font-bold text-gray-500">Server Time</span>
+                                                    <span class="font-mono text-gray-900"><?= date('H:i:s') ?></span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Git History -->
+                                    <div class="lg:col-span-2 bg-white rounded-3xl border border-gray-100 shadow-sm flex flex-col h-full overflow-hidden">
+                                        <div class="p-6 border-b border-gray-50 flex items-center justify-between bg-slate-50/50">
+                                            <div class="flex items-center gap-3">
+                                                <div class="w-8 h-8 bg-emerald-50 text-emerald-600 rounded-lg flex items-center justify-center text-xs shadow-sm">
+                                                    <i class="fa-solid fa-code-branch"></i>
+                                                </div>
+                                                <div>
+                                                    <h4 class="text-sm font-black text-gray-900">Git Update History</h4>
+                                                    <p class="text-[10px] text-gray-400 font-bold uppercase tracking-wider">30 Latest Syncs</p>
+                                                </div>
+                                            </div>
+                                            <?php if ($adminRole === 'superadmin'): ?>
+                                                <button onclick="triggerGitPull()" id="btnGitPullHistory" class="px-4 py-2 bg-white border border-emerald-100 text-emerald-600 rounded-xl text-[11px] font-black hover:bg-emerald-50 transition-all shadow-sm">
+                                                    PULL NOW
+                                                </button>
+                                            <?php endif; ?>
+                                        </div>
+
+                                        <div class="flex-1 overflow-y-auto max-h-[400px] custom-scrollbar">
+                                            <?php if (empty($gitPullLogs)): ?>
+                                                <div class="flex flex-col items-center justify-center py-20 text-gray-300">
+                                                    <i class="fa-solid fa-box-open text-4xl mb-4"></i>
+                                                    <p class="text-sm font-bold">ยังไม่มีประวัติการบันทึก</p>
+                                                </div>
+                                            <?php else: ?>
+                                                <div class="divide-y divide-gray-50">
+                                                    <?php foreach ($gitPullLogs as $log):
+                                                        $isOk = $log['status'] === 'success';
+                                                        $dt = new DateTime($log['created_at']);
+                                                        ?>
+                                                        <div class="p-4 hover:bg-slate-50/50 transition-all flex items-start gap-4 group">
+                                                            <div class="mt-1 w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 <?= $isOk ? 'bg-emerald-50 text-emerald-500' : 'bg-red-50 text-red-500' ?>">
+                                                                <i class="fa-solid <?= $isOk ? 'fa-check' : 'fa-xmark' ?> text-[10px]"></i>
+                                                            </div>
+                                                            <div class="flex-1 min-w-0">
+                                                                <div class="flex justify-between items-start gap-4">
+                                                                    <div class="text-[12px] font-bold text-gray-900 truncate"><?= htmlspecialchars($log['message'] ?? 'Git Update') ?></div>
+                                                                    <div class="text-[10px] font-black text-gray-400 whitespace-nowrap"><?= $dt->format('d/m H:i') ?></div>
+                                                                </div>
+                                                                <div class="flex items-center gap-2 mt-1">
+                                                                    <span class="text-[9px] font-black px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded uppercase tracking-wider"><?= htmlspecialchars($log['triggered_by']) ?></span>
+                                                                    <?php if ($log['detail']): ?>
+                                                                        <button onclick="Swal.fire({title:'Update Detail', html:'<pre style=\'text-align:left;font-size:11px;background:#f8fafc;padding:15px;border-radius:10px;font-family:monospace;overflow:auto;max-height:400px\'>' + <?= json_encode(htmlspecialchars($log['detail'])) ?> + '</pre>', confirmButtonColor:'#0f172a'})" 
+                                                                                class="text-[9px] font-black text-blue-500 hover:underline">VIEW DETAIL</button>
+                                                                    <?php endif; ?>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    <?php endforeach; ?>
+                                                </div>
+                                            <?php endif; ?>
+                                        </div>
+                                    </div>
+                                </div>
+                            </section>
+
+                        </div>
+                    </div>
                 </div>
             </div><!-- /section-settings -->
 
