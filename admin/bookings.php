@@ -37,7 +37,7 @@ try {
 /** (3) DATA FETCHING (Universal Pending + Current Month) */
 try {
     $sql = "
-        SELECT 
+        SELECT
             b.id AS booking_id, b.status, b.created_at, b.campaign_id,
             u.full_name, u.student_personnel_id, u.phone_number,
             s.slot_date, s.start_time, s.end_time,
@@ -46,9 +46,11 @@ try {
         JOIN sys_users u ON b.student_id = u.id
         JOIN camp_slots s ON b.slot_id = s.id
         JOIN camp_list c ON b.campaign_id = c.id
-        WHERE ( (s.slot_date >= :start AND s.slot_date <= :end) OR b.status IN ('booked', 'confirmed') )
-          AND b.status IN ('booked', 'confirmed', 'cancelled', 'cancelled_by_admin') 
-        ORDER BY 
+        WHERE (
+            (s.slot_date >= :start AND s.slot_date <= :end AND b.status IN ('booked', 'confirmed'))
+            OR b.status IN ('cancelled', 'cancelled_by_admin')
+        )
+        ORDER BY
             CASE WHEN b.status = 'booked' THEN 0 ELSE 1 END,
             s.slot_date ASC, s.start_time ASC
     ";
