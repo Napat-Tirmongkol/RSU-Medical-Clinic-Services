@@ -544,7 +544,7 @@ try {
                     <?php endif; ?>
                 </div>
                 <div>
-                    <div class="font-black text-gray-900 text-[15px] leading-tight tracking-tight"><?= htmlspecialchars(SITE_NAME ?: 'Central HUB') ?></div>
+                    <div class="font-black text-slate-800 text-[15px] leading-tight tracking-tight"><?= htmlspecialchars(SITE_NAME ?: 'Central HUB') ?></div>
                 </div>
             </div>
             <button onclick="toggleSidebar()" id="sidebar-toggle" title="Toggle sidebar"
@@ -597,7 +597,7 @@ try {
                         <input type="text" placeholder="ค้นหาเมนู หรือแคมเปญ"
                             class="w-full pl-5 pr-10 py-2 bg-gray-50/50 border border-gray-200 rounded-xl text-[13px] font-semibold text-gray-700 outline-none focus:bg-white focus:border-[#2e9e63] focus:ring-4 focus:ring-[#2e9e63]/10 transition-all font-prompt">
                         <button
-                            class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#2e9e63] transition-colors flex items-center justify-center">
+                            class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-emerald-600 transition-colors flex items-center justify-center">
                             <i class="fa-solid fa-magnifying-glass text-sm"></i>
                         </button>
                     </div>
@@ -625,7 +625,7 @@ try {
 
                     <!-- Dark Mode Toggle Button -->
                     <button id="darkModeToggle" onclick="toggleDarkMode()" title="สลับโหมดมืด/สว่าง"
-                        class="w-9 h-9 flex items-center justify-center rounded-xl bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-gray-800 transition-colors shadow-sm dark-mode-btn">
+                        class="w-9 h-9 flex items-center justify-center rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900 transition-colors shadow-sm dark-mode-btn">
                         <i class="fa-solid fa-moon"></i>
                     </button>
 
@@ -636,9 +636,9 @@ try {
                     <div class="flex items-center gap-2 sm:gap-3">
                         <div class="text-right hidden sm:block">
                             <div
-                                class="text-[9px] font-extrabold uppercase tracking-widest text-gray-400 leading-none mb-1">
+                                class="text-[9px] font-extrabold uppercase tracking-widest text-slate-500 leading-none mb-1">
                                 Admin</div>
-                            <div class="text-[13px] font-black text-gray-800 leading-none">
+                            <div class="text-[13px] font-black text-slate-900 leading-none">
                                 <?= htmlspecialchars($_SESSION['admin_username'] ?? 'Administrator') ?>
                             </div>
                         </div>
@@ -647,7 +647,7 @@ try {
                             <i class="fa-solid fa-user-shield"></i>
                         </div>
                         <a href="../admin/auth/logout.php" title="ออกจากระบบ"
-                            class="w-9 h-9 rounded-xl bg-red-50 text-red-500 flex flex-shrink-0 items-center justify-center hover:bg-red-500 hover:text-white transition-colors border border-red-100 ml-1">
+                            class="w-9 h-9 rounded-xl bg-rose-50 text-rose-600 flex flex-shrink-0 items-center justify-center hover:bg-rose-500 hover:text-white transition-colors border border-rose-100 ml-1">
                             <i class="fa-solid fa-power-off text-xs"></i>
                         </a>
                     </div>
