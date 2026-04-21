@@ -1042,8 +1042,10 @@ function bulkCancelSlot(slotId, campaign, date, time, count) {
         title: 'ยกเลิกการจองทั้งหมด?',
         html: `<p class="font-prompt text-sm text-gray-700">${campaign}</p>
                <p class="font-prompt text-sm text-gray-600">${date} เวลา ${time}</p>
-               <p class="font-prompt text-base font-bold text-red-600 mt-2">จะยกเลิก ${count} รายการ</p>
-               <p class="font-prompt text-xs text-gray-500 mt-2">ผู้ใช้ทั้งหมดจะได้รับอีเมลแจ้งเตือน</p>`,
+               <p class="font-prompt text-base font-bold text-red-600 mt-3">จะยกเลิก ${count} รายการ</p>
+               <div class="mt-4 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                 <p class="font-prompt text-sm font-semibold text-orange-700">📧 ระบบจะส่งอีเมลแจ้งเตือนให้กับผู้ใช้ทั้งหมดที่ถูกยกเลิก</p>
+               </div>`,
         confirmButtonColor: '#0284c7',
         cancelButtonColor: '#6b7280',
         confirmButtonText: 'ยกเลิกเลย',
