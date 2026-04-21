@@ -3,6 +3,7 @@
 declare(strict_types=1);
 session_start();
 require_once __DIR__ . '/../config.php';
+check_maintenance('e_campaign');
 
 // ── Auth check ────────────────────────────────────────────────────────────────
 if (empty($_SESSION['evax_student_id'])) {

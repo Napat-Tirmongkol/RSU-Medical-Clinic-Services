@@ -4,6 +4,7 @@ declare(strict_types=1)
 ;
 session_start();
 require_once __DIR__ . '/../config.php';
+check_maintenance('e_campaign');
 require_once __DIR__ . '/../includes/header.php';
 
 // ถ้า Login แล้ว ให้ Redirect ไปหน้าที่เหมาะสมเลย ไม่ต้องให้มาที่นี่อีก

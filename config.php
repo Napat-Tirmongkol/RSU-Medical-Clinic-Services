@@ -97,4 +97,59 @@ if (!function_exists('check_user_profile')) {
         }
     }
 }
+/**
+ * ตรวจสอบสถานะการปิดปรับปรุงระบบ (Maintenance Mode)
+ */
+if (!function_exists('check_maintenance')) {
+    function check_maintenance(string $project_key): void {
+        // ถ้าเป็น Admin ให้เข้าได้ปกติเสมอ
+        if (isset($_SESSION['admin_id'])) return;
+
+        $mFile = __DIR__ . '/config/maintenance.json';
+        if (file_exists($mFile)) {
+            $mData = json_decode(file_get_contents($mFile), true);
+            $isActive = $mData[$project_key] ?? true;
+            
+            if (!$isActive) {
+                // ถ้าปิดระบบ ให้แสดงหน้า Maintenance
+                // ค้นหา path ของหน้า maintenance
+                $root = (strpos($_SERVER['SCRIPT_NAME'], '/admin/') !== false || strpos($_SERVER['SCRIPT_NAME'], '/portal/') !== false) ? '../' : '';
+                
+                // ถ้าอยู่ใน subdir ของโปรเจกต์ เช่น e_Borrow/index.php
+                // เราต้องหาทางออกไปที่ root/errors/maintenance.php
+                // เพื่อความง่าย เราจะแสดงข้อความง่ายๆ หรือ redirect
+                http_response_code(503);
+                ?>
+                <!DOCTYPE html>
+                <html lang="th">
+                <head>
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <title>ปิดปรับปรุงระบบ - System Maintenance</title>
+                    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;700&display=swap" rel="stylesheet">
+                    <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
+                    <style>
+                        body { font-family: 'Prompt', sans-serif; background: #f4f7fa; color: #334155; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; text-align: center; padding: 20px; }
+                        .card { background: white; padding: 40px; border-radius: 30px; shadow: 0 10px 30px rgba(0,0,0,0.05); max-width: 500px; width: 100%; box-shadow: 0 20px 40px rgba(0,0,0,0.05); }
+                        .icon { font-size: 60px; color: #f59e0b; margin-bottom: 20px; }
+                        h1 { font-size: 24px; font-weight: 700; margin: 0 0 10px; color: #1e293b; }
+                        p { font-size: 15px; color: #64748b; line-height: 1.6; margin-bottom: 25px; }
+                        .timer { font-size: 13px; font-weight: 700; color: #2563eb; background: #eff6ff; padding: 8px 16px; border-radius: 99px; display: inline-block; }
+                    </style>
+                </head>
+                <body>
+                    <div class="card">
+                        <div class="icon">🚧</div>
+                        <h1>ขออภัย ระบบปิดปรับปรุงชั่วคราว</h1>
+                        <p>ขณะนี้ระบบ <strong><?= htmlspecialchars($project_key === 'e_borrow' ? 'e-Borrow & Inventory' : 'e-Campaign') ?></strong> กำลังอยู่ระหว่างการเพิ่มประสิทธิภาพและปรับปรุงข้อมูล <br>กรุณากลับมาใช้งานใหม่อีกครั้งในภายหลัง</p>
+                        <div class="timer">ขอบคุณที่ท่านให้ความร่วมมือ</div>
+                    </div>
+                </body>
+                </html>
+                <?php
+                exit;
+            }
+        }
+    }
+}
 ?>

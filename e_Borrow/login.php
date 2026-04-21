@@ -3,6 +3,8 @@
 // หน้าหลักสำหรับแสดงผล Login ของฝั่งนักศึกษา โดยเชื่อมต่อกับ LINE OAuth
 declare(strict_types=1);
 session_start();
+require_once __DIR__ . '/../config.php';
+check_maintenance('e_borrow');
 
 // หาก Login อยู่แล้ว ให้ Redirect ไปหน้าหลักของ e_Borrow
 if (!empty($_SESSION['student_id'])) {

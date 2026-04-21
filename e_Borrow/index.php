@@ -4,8 +4,11 @@ declare(strict_types=1);
 @session_start();
 include('includes/check_student_session.php');
 
-// ใช้ DB กลางของ e-campaignv2 (Correct path to Root)
-require_once __DIR__ . '/../config/db_connect.php';
+// ใช้ไฟล์ Config กลาง
+require_once __DIR__ . '/../config.php';
+
+// ตรวจสอบ Maintenance Mode
+check_maintenance('e_borrow');
 
 $student_id = (int)$_SESSION['student_id'];
 
