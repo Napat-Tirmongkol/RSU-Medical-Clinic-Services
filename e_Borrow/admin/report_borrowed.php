@@ -1,7 +1,7 @@
 <?php
 // admin/report_borrowed.php (แก้ไข V3.4 - กู้ชีพหน้าประวัติรายงาน V2)
 include('../includes/check_session.php');
-require_once(__DIR__ . '/../../config/db_connect.php');
+require_once(__DIR__ . '/../includes/db_connect.php');
 
 $pdo = db();
 

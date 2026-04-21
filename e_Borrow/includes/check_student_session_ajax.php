@@ -8,7 +8,7 @@
 // --- [NEW] Sync จากระบบ LINE Login (e-Campaign V2) ---
 if (!isset($_SESSION['student_id']) && isset($_SESSION['line_user_id'])) {
     try {
-        require_once __DIR__ . '/../../config/db_connect.php';
+        require_once __DIR__ . '/../includes/db_connect.php';
         $p = db();
         $lineId = $_SESSION['line_user_id'];
         

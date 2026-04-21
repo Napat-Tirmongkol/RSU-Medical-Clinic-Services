@@ -10,7 +10,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../includes/check_student_session_ajax.php';
 
 // 2. เชื่อมต่อฐานข้อมูล (พาธ 3 ชั้นจาก /process/ ถึง root)
-require_once __DIR__ . '/../../config/db_connect.php';
+require_once __DIR__ . '/../includes/db_connect.php';
 
 // ตั้งค่า Header เป็น JSON และ UTF-8
 header('Content-Type: application/json; charset=utf-8');

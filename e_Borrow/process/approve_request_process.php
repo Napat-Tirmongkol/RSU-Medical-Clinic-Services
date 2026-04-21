@@ -1,7 +1,7 @@
 <?php
 // process/approve_request_process.php (ฉบับแก้ไข: รองรับ AJAX/JSON และ approver_id)
 include('../includes/check_session.php');
-require_once(__DIR__ . '/../../config/db_connect.php');
+require_once(__DIR__ . '/../includes/db_connect.php');
 require_once('../includes/log_function.php');
 
 // ตั้งค่าให้ตอบกลับเป็น JSON

@@ -4,7 +4,7 @@
 @session_start();
 // (1. ตรวจสอบ Session Admin และเชื่อมต่อ DB)
 include('../includes/check_session_ajax.php');
-require_once(__DIR__ . '/../../config/db_connect.php');
+require_once(__DIR__ . '/../includes/db_connect.php');
 
 header('Content-Type: application/json');
 

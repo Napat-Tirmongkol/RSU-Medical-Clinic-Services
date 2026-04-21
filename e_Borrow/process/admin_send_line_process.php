@@ -3,7 +3,7 @@
 // สำหรับ Admin ส่งข้อความหา User ผ่าน LINE
 
 include('../includes/check_session_ajax.php');
-require_once(__DIR__ . '/../../config/db_connect.php');
+require_once(__DIR__ . '/../includes/db_connect.php');
 require_once('../includes/log_function.php');
 require_once('../includes/line_config.php');
 

@@ -1,7 +1,7 @@
 <?php
 // 1. "จ้างยาม" และ "เชื่อมต่อ DB"
 include('../includes/check_session_ajax.php');
-require_once(__DIR__ . '/../../config/db_connect.php');
+require_once(__DIR__ . '/../includes/db_connect.php');
 
 // 2. ตรวจสอบสิทธิ์ Admin
 if (!isset($_SESSION['role']) || $_SESSION['role'] != 'admin') {

@@ -14,7 +14,7 @@ declare(strict_types=1);
 header('Content-Type: application/json; charset=utf-8');
 
 // 3. เชื่อมต่อฐานข้อมูล (พาธกระโดดออกไป 3 ชั้นจาก ajax/ ไปถึง root)
-$dbPath = __DIR__ . '/../../config/db_connect.php';
+$dbPath = __DIR__ . '/../includes/db_connect.php';
 
 if (!file_exists($dbPath)) {
     http_response_code(500);

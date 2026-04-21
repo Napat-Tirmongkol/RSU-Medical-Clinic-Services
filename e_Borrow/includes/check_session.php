@@ -29,7 +29,7 @@ if (!isset($_SESSION['user_id'])
     && isset($_SESSION['admin_logged_in'], $_SESSION['admin_id'])
     && $_SESSION['admin_logged_in'] === true) {
     try {
-        require_once __DIR__ . '/../../config/db_connect.php';
+        require_once __DIR__ . '/../includes/db_connect.php';
         $p = db();
         $uname = $_SESSION['admin_username'] ?? '';
 

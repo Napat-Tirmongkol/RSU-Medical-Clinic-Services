@@ -3,7 +3,7 @@
 // (Version: สมบูรณ์ที่สุด - กรอกรหัสเองได้ + สแกน QR ได้ + บันทึกไม่ Error)
 
 include('../includes/check_session.php');
-require_once(__DIR__ . '/../../config/db_connect.php');
+require_once(__DIR__ . '/../includes/db_connect.php');
 $pdo = db();
 
 if (!in_array($_SESSION['role'], ['admin', 'employee', 'editor'])) {

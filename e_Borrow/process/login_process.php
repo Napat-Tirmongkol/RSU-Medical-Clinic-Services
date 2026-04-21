@@ -7,7 +7,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
     // 3. เรียกใช้ไฟล์เชื่อมต่อฐานข้อมูล
     try {
-        require_once(__DIR__ . '/../../config/db_connect.php');
+        require_once(__DIR__ . '/../includes/db_connect.php');
         require_once('../includes/log_function.php');
     } catch (Throwable $e) {
         header("Location: ../admin/staff_login.php?error=db");

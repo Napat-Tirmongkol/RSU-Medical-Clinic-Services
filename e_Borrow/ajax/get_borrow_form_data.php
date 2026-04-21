@@ -6,7 +6,7 @@
 // 1. "จ้างยาม" และ "เชื่อมต่อ DB"
 // (เราใช้ 'check_session.php' เพราะนี่คือฟังก์ชันของ Admin/Staff)
 include('../includes/check_session_ajax.php');
-require_once(__DIR__ . '/../../config/db_connect.php');
+require_once(__DIR__ . '/../includes/db_connect.php');
 
 // 2. ตั้งค่า Header ให้ตอบกลับเป็น JSON
 header('Content-Type: application/json');

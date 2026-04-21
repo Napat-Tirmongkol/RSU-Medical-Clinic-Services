@@ -1,6 +1,6 @@
 <?php
 include('../includes/check_session.php'); 
-require_once(__DIR__ . '/../../config/db_connect.php');
+require_once(__DIR__ . '/../includes/db_connect.php');
 $pdo = db();
 
 $allowed_roles = ['admin', 'editor'];

@@ -4,7 +4,7 @@
 
 session_start();
 require_once('../includes/line_config.php');
-require_once(__DIR__ . '/../../config/db_connect.php'); //
+require_once(__DIR__ . '/../includes/db_connect.php'); //
 
 if (!isset($_POST['terms_agree']) || $_POST['terms_agree'] != 'yes') {
     // (ถ้าไม่ยอมรับ ให้เด้งกลับไปหน้าเดิมพร้อม Error)

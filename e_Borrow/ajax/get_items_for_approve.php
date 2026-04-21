@@ -1,7 +1,7 @@
 <?php
 // ajax/get_items_for_approve.php
 require_once('../includes/check_session_ajax.php'); // ตรวจสอบ Session
-require_once(__DIR__ . '/../../config/db_connect.php');
+require_once(__DIR__ . '/../includes/db_connect.php');
 
 header('Content-Type: application/json');
 

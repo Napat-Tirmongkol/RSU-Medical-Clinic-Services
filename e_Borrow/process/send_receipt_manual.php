@@ -3,7 +3,7 @@
 // สำหรับแอดมินกดส่งใบเสร็จย้อนหลัง
 
 include('../includes/check_session_ajax.php');
-require_once(__DIR__ . '/../../config/db_connect.php');
+require_once(__DIR__ . '/../includes/db_connect.php');
 require_once('../includes/log_function.php');
 require_once('../includes/line_config.php');
 

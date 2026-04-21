@@ -1,7 +1,7 @@
 <?php
 // manage_equipment.php (กู้ชีพ: แก้ไข SQL ให้คำนวณจำนวนอุปกรณ์อัตโนมัติ)
 include('../includes/check_session.php');
-require_once(__DIR__ . '/../../config/db_connect.php');
+require_once(__DIR__ . '/../includes/db_connect.php');
 
 $pdo = db();
 

@@ -1,7 +1,7 @@
 <?php
 // admin/manage_students.php (แก้ไข V3.4 - กู้ชีพหน้าผู้ใช้งานและพนักงาน V2)
 include('../includes/check_session.php'); 
-require_once(__DIR__ . '/../../config/db_connect.php');
+require_once(__DIR__ . '/../includes/db_connect.php');
 
 $pdo = db();
 

@@ -1,7 +1,7 @@
 <?php
 // ajax/get_available_items_for_barcode.php
 include('../includes/check_session_ajax.php');
-require_once(__DIR__ . '/../../config/db_connect.php');
+require_once(__DIR__ . '/../includes/db_connect.php');
 
 $type_id = $_GET['type_id'] ?? 0;
 
