@@ -989,10 +989,46 @@ function openEditSlotModal(slotId, campaignId, startTime, endTime, maxCap) {
     document.getElementById('editSlotModal').classList.remove('hidden');
 }
 
+// Refresh calendar + table in-place without full page reload
+async function refreshCalendar() {
+    const url = new URL(window.location.href);
+    const month = url.searchParams.get('month') || '<?= $month ?>';
+    const year  = url.searchParams.get('year')  || '<?= $year ?>';
+
+    const calEl = document.getElementById('calendarViewContainer');
+    const tblEl = document.getElementById('tableViewContainer');
+    const isTable = tblEl && !tblEl.classList.contains('hidden');
+
+    try {
+        const res  = await fetch(`time_slots.php?month=${month}&year=${year}`);
+        const html = await res.text();
+        const doc  = new DOMParser().parseFromString(html, 'text/html');
+
+        const newCal = doc.getElementById('calendarViewContainer');
+        const newTbl = doc.getElementById('tableViewContainer');
+        if (newCal) calEl.innerHTML = newCal.innerHTML;
+        if (newTbl) tblEl.innerHTML = newTbl.innerHTML;
+
+        // Restore view mode
+        if (isTable) {
+            calEl.classList.add('hidden');
+            tblEl.classList.remove('hidden');
+        } else {
+            calEl.classList.remove('hidden');
+            tblEl.classList.add('hidden');
+        }
+
+        globalSelectedSlots.clear();
+        updateSelectionUI();
+    } catch (e) {
+        console.error('refreshCalendar failed:', e);
+    }
+}
+
 // ใช้ Fetch API เพื่อบันทึกข้อมูล Add Slot
 document.getElementById('slotForm').addEventListener('submit', function(e) {
     e.preventDefault();
-    
+
     Swal.fire({ title: 'กำลังบันทึกข้อมูล...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
 
     const formData = new FormData(this);
@@ -1000,22 +1036,22 @@ document.getElementById('slotForm').addEventListener('submit', function(e) {
     .then(r => r.json())
     .then(data => {
         if (data.status === 'success') {
+            document.getElementById('slotModal').classList.add('hidden');
+            document.getElementById('slotForm').reset();
             Swal.fire({
-                title: 'สำเร็จ!',
+                title: 'บันทึกสำเร็จ!',
                 text: data.message,
                 icon: 'success',
-                confirmButtonColor: '#2e9e63',
+                timer: 1800,
+                showConfirmButton: false,
                 customClass: { title: 'font-prompt', popup: 'font-prompt rounded-2xl' }
-            }).then(() => {
-                location.reload();
             });
+            refreshCalendar();
         } else {
             Swal.fire('เกิดข้อผิดพลาด', data.message, 'error');
         }
     })
-    .catch(err => {
-        Swal.fire('Error', 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้', 'error');
-    });
+    .catch(() => Swal.fire('Error', 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้', 'error'));
 });
 
 // ใช้ Fetch API เพื่อบันทึกข้อมูล Edit Slot
@@ -1028,12 +1064,20 @@ document.getElementById('editSlotForm').addEventListener('submit', function(e) {
     .then(r => r.json())
     .then(data => {
         if (data.status === 'success') {
-            Swal.fire({ title: 'สำเร็จ!', text: data.message, icon: 'success', confirmButtonColor: '#2e9e63', customClass: { title: 'font-prompt', popup: 'font-prompt rounded-2xl' }
-            }).then(() => location.reload());
+            document.getElementById('editSlotModal').classList.add('hidden');
+            Swal.fire({
+                title: 'แก้ไขสำเร็จ!',
+                text: data.message,
+                icon: 'success',
+                timer: 1800,
+                showConfirmButton: false,
+                customClass: { title: 'font-prompt', popup: 'font-prompt rounded-2xl' }
+            });
+            refreshCalendar();
         } else {
             Swal.fire('เกิดข้อผิดพลาด', data.message, 'error');
         }
-    }).catch(err => Swal.fire('Error', 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้', 'error'));
+    }).catch(() => Swal.fire('Error', 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้', 'error'));
 });
 
 function bulkCancelSlot(slotId, campaign, date, time, count) {
@@ -1070,11 +1114,11 @@ function bulkCancelSlot(slotId, campaign, date, time, count) {
                     title: 'ยกเลิกเรียบร้อย',
                     html: `<p class="font-prompt">${data.message}</p>
                            ${data.failed_count > 0 ? '<p class="font-prompt text-sm text-orange-600 mt-2">⚠️ ' + data.failed_count + ' รายการล้มเหลว</p>' : ''}`,
-                    confirmButtonColor: '#0284c7',
-                    customClass: { title:'font-prompt', htmlContainer:'font-prompt', confirmButton:'font-prompt' }
-                }).then(() => {
-                    location.reload();
+                    timer: 2000,
+                    showConfirmButton: false,
+                    customClass: { title:'font-prompt', htmlContainer:'font-prompt' }
                 });
+                refreshCalendar();
             } else {
                 Swal.fire({
                     icon: 'error',
@@ -1119,7 +1163,14 @@ function deleteSlot(id) {
             .then(r => r.json())
             .then(data => {
                 if (data.status === 'success') {
-                    location.reload();
+                    Swal.fire({
+                        title: 'ลบสำเร็จ!',
+                        icon: 'success',
+                        timer: 1500,
+                        showConfirmButton: false,
+                        customClass: { title: 'font-prompt', popup: 'font-prompt rounded-2xl' }
+                    });
+                    refreshCalendar();
                 } else {
                     Swal.fire('เกิดข้อผิดพลาด', data.message, 'error');
                 }
@@ -1434,11 +1485,11 @@ function deleteSelectedSlots() {
                         title: 'ดำเนินการเสร็จสิ้น',
                         text: data.message,
                         icon: 'success',
-                        confirmButtonColor: '#2e9e63',
+                        timer: 1800,
+                        showConfirmButton: false,
                         customClass: { title: 'font-prompt', popup: 'font-prompt rounded-2xl' }
-                    }).then(() => {
-                        location.reload();
                     });
+                    refreshCalendar();
                 } else {
                     Swal.fire('เกิดข้อผิดพลาด', data.message, 'error');
                 }

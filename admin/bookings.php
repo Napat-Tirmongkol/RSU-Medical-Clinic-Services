@@ -450,7 +450,7 @@ require_once __DIR__ . '/includes/header.php';
             cancelButtonText: 'ยกเลิก'
         }).then((result) => {
             if (result.isConfirmed) {
-                performApiCall('ajax/ajax_approve_booking.php', id, 'อนุมัติเรียบร้อย!', 'success');
+                performApiCall('ajax/ajax_approve_booking.php', id, 'อนุมัติเรียบร้อย!', 'success', 'confirmed');
             }
         });
     }
@@ -481,7 +481,9 @@ require_once __DIR__ . '/includes/header.php';
                 });
 
                 Promise.all(requests).then(results => {
-                    Swal.fire('สำเร็จ!', `อนุมัติข้อมูลทั้งหมด ${ids.length} รายการแล้ว`, 'success').then(() => location.reload());
+                    Swal.fire({ title: 'สำเร็จ!', text: `อนุมัติข้อมูลทั้งหมด ${ids.length} รายการแล้ว`, icon: 'success',
+                        timer: 1800, showConfirmButton: false, customClass: { title:'font-prompt', popup:'font-prompt rounded-2xl' } });
+                    refreshBookingsTable();
                 }).catch(err => {
                     Swal.fire('Error', 'เกิดข้อผิดพลาดบางรายการ', 'error');
                 });
@@ -516,7 +518,9 @@ require_once __DIR__ . '/includes/header.php';
                 });
 
                 Promise.all(requests).then(results => {
-                    Swal.fire('สำเร็จ!', 'ยกเลิกข้อมูลที่เลือกเรียบร้อยแล้ว', 'success').then(() => location.reload());
+                    Swal.fire({ title: 'สำเร็จ!', text: 'ยกเลิกข้อมูลที่เลือกเรียบร้อยแล้ว', icon: 'success',
+                        timer: 1800, showConfirmButton: false, customClass: { title:'font-prompt', popup:'font-prompt rounded-2xl' } });
+                    refreshBookingsTable();
                 });
             }
         });
@@ -537,7 +541,7 @@ require_once __DIR__ . '/includes/header.php';
             customClass: { title:'font-prompt', htmlContainer:'font-prompt', confirmButton:'font-prompt', cancelButton:'font-prompt' }
         }).then((result) => {
             if (result.isConfirmed) {
-                performApiCall('ajax/ajax_force_cancel.php', id, 'Rejected', 'error');
+                performApiCall('ajax/ajax_force_cancel.php', id, 'ปฏิเสธการจองสำเร็จ', 'success', 'cancelled_by_admin');
             }
         });
     }
@@ -557,12 +561,46 @@ require_once __DIR__ . '/includes/header.php';
             customClass: { title:'font-prompt', htmlContainer:'font-prompt', confirmButton:'font-prompt', cancelButton:'font-prompt' }
         }).then((result) => {
             if (result.isConfirmed) {
-                performApiCall('ajax/ajax_force_cancel.php', id, 'แจ้งเลื่อนคิวสำเร็จ!', 'success');
+                performApiCall('ajax/ajax_force_cancel.php', id, 'แจ้งเลื่อนคิวสำเร็จ!', 'success', 'cancelled_by_admin');
             }
         });
     }
 
-    function performApiCall(url, id, successTitle, icon) {
+    // Refresh bookings table without full page reload
+    async function refreshBookingsTable() {
+        try {
+            const res  = await fetch(window.location.href);
+            const html = await res.text();
+            const doc  = new DOMParser().parseFromString(html, 'text/html');
+            const newTbody = doc.getElementById('bookingTbody');
+            if (newTbody) document.getElementById('bookingTbody').innerHTML = newTbody.innerHTML;
+            document.querySelectorAll('.row-checkbox').forEach(cb => cb.checked = false);
+            updateActionBar();
+        } catch(e) { console.error('refreshBookingsTable failed:', e); }
+    }
+
+    // Update single row status inline
+    function updateRowStatus(id, newStatus) {
+        const tr = document.querySelector(`tr[data-id="${id}"]`);
+        if (!tr) return;
+        tr.dataset.status = newStatus;
+        const statusTd = tr.cells[4];
+        const actionDiv = tr.querySelector('td:last-child div');
+        if (statusTd) {
+            if (newStatus === 'confirmed')
+                statusTd.innerHTML = '<span class="px-4 py-1.5 bg-emerald-50 text-emerald-600 text-[10px] font-black uppercase rounded-full border border-emerald-100 tracking-widest">Confirmed</span>';
+            else
+                statusTd.innerHTML = `<span class="px-4 py-1.5 bg-gray-50 text-gray-400 text-[10px] font-black uppercase rounded-full tracking-widest">${newStatus}</span>`;
+        }
+        if (actionDiv) {
+            if (newStatus === 'confirmed')
+                actionDiv.innerHTML = `<button onclick="rescheduleOne(${id})" class="w-9 h-9 bg-orange-50 text-orange-600 border border-orange-100 rounded-xl flex items-center justify-center hover:bg-orange-500 hover:text-white hover:scale-110 active:scale-95 transition-all shadow-sm" title="แจ้งเลื่อนคิว"><i class="fa-solid fa-clock-rotate-left"></i></button>`;
+            else
+                actionDiv.innerHTML = `<button onclick='openDrawer(this.closest("tr").dataset.details)' class="text-gray-400 hover:text-blue-600 text-lg transition-colors"><i class="fa-solid fa-circle-info"></i></button>`;
+        }
+    }
+
+    function performApiCall(url, id, successTitle, icon, newStatus) {
         Swal.fire({ title: 'กำลังดำเนินการ...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
         fetch(url, {
             method: 'POST',
@@ -572,7 +610,9 @@ require_once __DIR__ . '/includes/header.php';
             .then(res => res.json())
             .then(data => {
                 if (data.status === 'success') {
-                    Swal.fire({ title: successTitle, icon: icon, timer: 1500 }).then(() => location.reload());
+                    if (newStatus) updateRowStatus(id, newStatus);
+                    Swal.fire({ title: successTitle, icon: icon, timer: 1500, showConfirmButton: false,
+                        customClass: { title:'font-prompt', popup:'font-prompt rounded-2xl' } });
                 } else {
                     Swal.fire('Error', data.message || 'เกิดข้อผิดพลาด', 'error');
                 }
