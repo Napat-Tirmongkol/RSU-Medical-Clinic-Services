@@ -1,6 +1,5 @@
-            <!-- ════════════ SECTION: SETTINGS (FIXED & SIMPLIFIED) ════════════ -->
-            <div id="section-settings" class="portal-section" style="display:none; background:#f1f5f9; min-height: 100vh;">
-                <div class="max-w-[1000px] mx-auto px-4 py-8">
+            <!-- ════════════ SECTION: SETTINGS (CONTENT ONLY) ════════════ -->
+            <div class="max-w-[1000px] mx-auto px-4 py-8">
                     
                     <!-- Header -->
                     <div class="mb-8 flex items-center justify-between">
@@ -215,4 +214,4 @@
 
                     </div>
                 </div>
-            </div><!-- /section-settings -->
+                </div>

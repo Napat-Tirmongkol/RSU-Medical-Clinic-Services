@@ -585,7 +585,7 @@ try {
 
     <!-- ══════════════════ APP SHELL (Header + Main) ══════════════════ -->
     <div id="app-shell"
-        style="display: flex !important; flex: 1 !important; flex-direction: column !important; min-width: 0 !important; overflow: hidden !important; background: #f4f7f5;">
+        style="display: grid !important; grid-template-rows: auto 1fr !important; flex: 1 !important; min-width: 0 !important; overflow: hidden !important; background: #f4f7f5;">
 
         <!-- ══════════════════ HEADER ══════════════════ -->
         <header class="portal-header au" style="background: #ffffff !important; border-bottom: 1.5px solid #e2e8f0 !important; box-shadow: 0 1px 3px rgba(0,0,0,0.05) !important; width: 100% !important; display: block !important; position: relative !important; z-index: 50 !important;">
@@ -1642,8 +1642,19 @@ try {
                 </div>
             <?php endif; ?>
 
+            <!-- 
+                DEVELOPER NOTE: HOW TO ADD NEW SECTIONS
+                To add a new page/section, follow this template to ensure layout stability:
+                <div id="section-NAME" class="portal-section" style="<?= $activeSection==='NAME'?'':'display:none;' ?> background:#f8fafc; overflow-y:auto;">
+                    <?php include __DIR__ . '/_partials/NAME.php'; ?>
+                </div>
+            -->
+
             <!-- ════════════ SECTION: SETTINGS ════════════ -->
-            <?php include __DIR__ . '/_partials/settings.php'; ?>
+            <div id="section-settings" class="portal-section"
+                style="<?= $activeSection==='settings'?'':'display:none;' ?> background:#f1f5f9; overflow-y:auto;">
+                <?php include __DIR__ . '/_partials/settings.php'; ?>
+            </div>
 
             <!-- ════════════ SECTION: AI ASSISTANT ════════════ -->
             <div id="section-ai_assistant" class="portal-section"
