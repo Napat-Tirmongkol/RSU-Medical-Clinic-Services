@@ -287,7 +287,7 @@ $header_actions = '
         <span id="multiSelectLabel" class="truncate font-semibold text-[#2e9e63]">แสดงทุกแคมเปญ</span>
         <i class="fa-solid fa-chevron-down text-[10px] text-gray-400 flex-shrink-0"></i>
     </button>
-    <div id="multiSelectDropdown" class="w-64 bg-white rounded-xl shadow-xl border border-gray-100 flex-col overflow-hidden" style="display:none;position:fixed;z-index:9999" onclick="event.stopPropagation()">
+    <div id="multiSelectDropdown" class="w-64 bg-white rounded-xl shadow-xl border border-gray-100 flex-col overflow-hidden" style="display:none;position:fixed;z-index:1000" onclick="event.stopPropagation()">
         <div class="p-2 border-b border-gray-100 bg-gray-50">
             <div class="relative">
                 <i class="fa-solid fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
@@ -661,7 +661,7 @@ renderPageHeader("Campaign Time Slots", "กำหนดช่วงเวลา
     </div>
 </div>
 
-<div id="slotModal" class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm hidden flex items-center justify-center p-4" style="z-index: 9999;">
+<div id="slotModal" class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm hidden flex items-center justify-center p-4" style="z-index: 1000;">
     <div class="glass-modal rounded-[24px] w-full max-w-lg flex flex-col max-h-[90vh] overflow-hidden animate-slide-up border border-white/50">
         <div class="modal-hdr-blue p-5 flex justify-between items-center shrink-0">
             <h3 class="text-lg font-black text-white flex items-center gap-3">
@@ -768,7 +768,7 @@ renderPageHeader("Campaign Time Slots", "กำหนดช่วงเวลา
     </div>
 </div>
 
-<div id="editSlotModal" class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm hidden flex items-center justify-center p-4" style="z-index: 9999;">
+<div id="editSlotModal" class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm hidden flex items-center justify-center p-4" style="z-index: 1000;">
     <div class="glass-modal rounded-[24px] w-full max-w-lg flex flex-col max-h-[90vh] overflow-hidden animate-slide-up border border-white/50">
         <div class="modal-hdr-amber p-5 flex justify-between items-center shrink-0">
             <h3 class="text-lg font-black text-white flex items-center gap-3">
@@ -928,7 +928,7 @@ function toggleMultiSelect(e) {
 
         dropdown.style.width    = dw + 'px';
         dropdown.style.position = 'fixed';
-        dropdown.style.zIndex   = '9999';
+        dropdown.style.zIndex   = '1000';
         dropdown.style.top      = (rect.bottom + 8) + 'px';
         dropdown.style.left     = left + 'px';
         dropdown.style.right    = 'auto';
@@ -1097,7 +1097,7 @@ async function refreshCalendar() {
         }
 
         globalSelectedSlots.clear();
-        updateSelectionUI();
+        updateMultiDeleteBtn();
     } catch (e) {
         console.error('refreshCalendar failed:', e);
     }
