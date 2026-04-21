@@ -26,11 +26,12 @@ try {
 
     $sr = $pdo->prepare("
         SELECT l.*,
-               COALESCE(a.full_name, s.full_name, 'System Activity') AS actor_name,
-               COALESCE(a.username, s.username, 'system') AS actor_username
+               COALESCE(a.full_name, s.full_name, u.full_name, 'System Activity') AS actor_name,
+               COALESCE(a.username, s.username, u.student_personnel_id, 'system') AS actor_username
         FROM sys_activity_logs l
         LEFT JOIN sys_admins a ON l.user_id = a.id
         LEFT JOIN sys_staff s ON l.user_id = s.id
+        LEFT JOIN sys_users u ON l.user_id = u.id
         $_al_where
         ORDER BY l.timestamp DESC
         LIMIT $_al_limit OFFSET $_al_offset
