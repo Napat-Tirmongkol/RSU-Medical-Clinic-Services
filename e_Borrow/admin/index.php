@@ -90,6 +90,14 @@ $current_page = "index";
 include('../includes/header.php');
 ?>
 
+<script>
+  // Suppress Tailwind CDN production warning (intentional use for development)
+  const originalWarn = console.warn;
+  console.warn = function(...args) {
+    if (typeof args[0] === 'string' && args[0].includes('cdn.tailwindcss.com')) return;
+    originalWarn.apply(console, args);
+  };
+</script>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <!-- SweetAlert2 สำหรับแจ้งเตือน (กรณีไม่ได้เรียกใน header) -->
