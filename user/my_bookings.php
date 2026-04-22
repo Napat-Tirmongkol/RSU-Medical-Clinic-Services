@@ -369,6 +369,7 @@ function renderBookingCard($b): void {
 <!-- ===== SCRIPTS ===== -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
+const lang = '<?= current_lang() ?>';
 // Tab Switcher
 function switchTab(tab) {
     const btnUp  = document.getElementById('tab-upcoming');
