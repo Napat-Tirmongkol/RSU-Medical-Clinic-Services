@@ -213,11 +213,11 @@ $_el_filterQs = http_build_query(array_filter([
         <form method="POST" action="index.php?section=error_logs" class="flex flex-wrap gap-3 items-end">
             <input type="hidden" name="action" value="save_alert_email">
             <div class="flex-1 min-w-[220px]">
-                <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 block">อีเมล Admin (ว่างเปล่า = ปิดการแจ้งเตือน)</label>
+                <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 block">อีเมล Admin (คั่นด้วยคอมม่า , เพื่อส่งหลายคน)</label>
                 <div class="relative">
                     <i class="fa-solid fa-envelope absolute left-3 top-1/2 -translate-y-1/2 text-gray-300 text-xs"></i>
-                    <input type="email" name="alert_email" value="<?= htmlspecialchars($_el_alertEmail) ?>"
-                        placeholder="admin@example.com"
+                    <input type="text" name="alert_email" value="<?= htmlspecialchars($_el_alertEmail) ?>"
+                        placeholder="admin1@example.com, admin2@example.com"
                         class="w-full pl-8 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all">
                 </div>
                 <?php if ($_el_emailError): ?>

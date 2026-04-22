@@ -21,7 +21,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
             if ($sectionAction === 'save_alert_email') {
                 $emailVal = trim($_POST['alert_email'] ?? '');
-                if ($emailVal !== '' && !filter_var($emailVal, FILTER_VALIDATE_EMAIL)) {
+                $isValid = true;
+                if ($emailVal !== '') {
+                    $emails = array_map('trim', explode(',', $emailVal));
+                    foreach ($emails as $e) {
+                        if (!filter_var($e, FILTER_VALIDATE_EMAIL)) {
+                            $isValid = false; break;
+                        }
+                    }
+                }
+                
+                if (!$isValid) {
                     header('Location: index.php?section=error_logs&email_error=1');
                 } else {
                     $pdo->prepare("INSERT INTO sys_settings (`key`,`value`) VALUES ('admin_alert_email',?) ON DUPLICATE KEY UPDATE `value`=VALUES(`value`)")->execute([$emailVal]);

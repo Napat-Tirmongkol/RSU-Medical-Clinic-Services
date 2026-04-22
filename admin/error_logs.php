@@ -33,8 +33,18 @@ try {
 // ─── Save alert email setting ─────────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_alert_email') {
     $emailVal = trim($_POST['alert_email'] ?? '');
-    if ($emailVal !== '' && !filter_var($emailVal, FILTER_VALIDATE_EMAIL)) {
-        $setting_error = 'รูปแบบอีเมลไม่ถูกต้อง';
+    $isValid = true;
+    if ($emailVal !== '') {
+        $emails = array_map('trim', explode(',', $emailVal));
+        foreach ($emails as $e) {
+            if (!filter_var($e, FILTER_VALIDATE_EMAIL)) {
+                $isValid = false; break;
+            }
+        }
+    }
+    
+    if (!$isValid) {
+        $setting_error = 'รูปแบบอีเมลไม่ถูกต้อง (กรณีหลายอีเมลให้คั่นด้วยคอมม่า)';
     } else {
         $pdo->prepare("INSERT INTO sys_settings (`key`, `value`) VALUES ('admin_alert_email', ?)
                        ON DUPLICATE KEY UPDATE `value` = VALUES(`value`)")->execute([$emailVal]);
@@ -286,11 +296,11 @@ renderPageHeader(
     <form method="POST" class="flex flex-wrap gap-3 items-end">
         <input type="hidden" name="action" value="save_alert_email">
         <div class="flex-1 min-w-[220px]">
-            <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 block">อีเมล Admin (ว่างเปล่า = ปิดการแจ้งเตือน)</label>
+            <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 block">อีเมล Admin (คั่นด้วยคอมม่า , เพื่อส่งหลายคน)</label>
             <div class="relative">
                 <i class="fa-solid fa-envelope absolute left-3 top-1/2 -translate-y-1/2 text-gray-300 text-xs"></i>
-                <input type="email" name="alert_email" value="<?= htmlspecialchars($currentAlertEmail) ?>"
-                    placeholder="admin@example.com"
+                <input type="text" name="alert_email" value="<?= htmlspecialchars($currentAlertEmail) ?>"
+                    placeholder="admin1@example.com, admin2@example.com"
                     class="w-full pl-8 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all">
             </div>
             <?php if (isset($setting_error)): ?>

@@ -159,32 +159,43 @@ function log_email(string $to, string $subject, string $type, bool $ok, string $
 function send_campaign_email(string $to, string $subject, string $body, string $type = ''): bool {
     if (empty($to)) return false;
 
+    // รองรับการส่งหลายอีเมล (คั่นด้วย comma)
+    $recipients = array_map('trim', explode(',', $to));
+    $recipients = array_filter($recipients, fn($e) => filter_var($e, FILTER_VALIDATE_EMAIL));
+    
+    if (empty($recipients)) return false;
+
     $secrets = get_secrets();
     $host    = $secrets['SMTP_HOST'] ?? '';
-    $ok      = false;
-    $errMsg  = '';
+    $allOk   = true;
 
-    // ถ้ามี SMTP config → ส่งผ่าน SMTP
-    if (!empty($host) && !empty($secrets['SMTP_USER']) && !empty($secrets['SMTP_PASS'])) {
-        // จับ error_log ชั่วคราวเพื่อดักข้อความ error
-        $ok = smtp_send($to, $subject, $body, $secrets);
-        if (!$ok) $errMsg = 'SMTP send failed — check PHP error_log for details';
-    } else {
-        // Fallback: php mail()
-        $fromEmail = $secrets['SMTP_FROM_EMAIL'] ?? 'no-reply@rsu.ac.th';
-        $fromName  = $secrets['SMTP_FROM_NAME']  ?? 'RSU Medical Clinic';
-        $headers   = implode("\r\n", [
-            'MIME-Version: 1.0',
-            'Content-Type: text/html; charset=UTF-8',
-            'From: =?UTF-8?B?' . base64_encode($fromName) . "?= <{$fromEmail}>",
-            'X-Mailer: PHP/' . PHP_VERSION,
-        ]);
-        $ok = mail($to, '=?UTF-8?B?' . base64_encode($subject) . '?=', $body, $headers);
-        if (!$ok) $errMsg = 'php mail() returned false — sendmail not configured';
+    foreach ($recipients as $recipient) {
+        $ok     = false;
+        $errMsg = '';
+
+        // ถ้ามี SMTP config → ส่งผ่าน SMTP
+        if (!empty($host) && !empty($secrets['SMTP_USER']) && !empty($secrets['SMTP_PASS'])) {
+            $ok = smtp_send($recipient, $subject, $body, $secrets);
+            if (!$ok) $errMsg = 'SMTP send failed — check PHP error_log for details';
+        } else {
+            // Fallback: php mail()
+            $fromEmail = $secrets['SMTP_FROM_EMAIL'] ?? 'no-reply@rsu.ac.th';
+            $fromName  = $secrets['SMTP_FROM_NAME']  ?? 'RSU Medical Clinic';
+            $headers   = implode("\r\n", [
+                'MIME-Version: 1.0',
+                'Content-Type: text/html; charset=UTF-8',
+                'From: =?UTF-8?B?' . base64_encode($fromName) . "?= <{$fromEmail}>",
+                'X-Mailer: PHP/' . PHP_VERSION,
+            ]);
+            $ok = mail($recipient, '=?UTF-8?B?' . base64_encode($subject) . '?=', $body, $headers);
+            if (!$ok) $errMsg = 'php mail() returned false — sendmail not configured';
+        }
+
+        log_email($recipient, $subject, $type, $ok, $errMsg);
+        if (!$ok) $allOk = false;
     }
 
-    log_email($to, $subject, $type, $ok, $errMsg);
-    return $ok;
+    return $allOk;
 }
 
 // ─── HTML Email Template ──────────────────────────────────────────────────────
