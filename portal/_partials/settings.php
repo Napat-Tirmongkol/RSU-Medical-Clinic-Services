@@ -163,12 +163,12 @@
                                         <i class="fa-solid fa-chevron-right text-[10px] text-slate-300"></i>
                                     </a>
                                     <a href="javascript:switchSection('line_settings')" class="flex items-center justify-between p-4 bg-slate-50 rounded-2xl hover:bg-green-50 hover:border-green-200 border border-transparent transition-all group">
-                                        <div class="flex items-center gap-4">
-                                            <i class="fa-brands fa-line text-slate-400 group-hover:text-green-500"></i>
-                                            <span class="text-xs font-bold text-slate-700">LINE Messaging API</span>
-                                        </div>
-                                        <i class="fa-solid fa-chevron-right text-[10px] text-slate-300"></i>
-                                    </a>
+                                         <div class="flex items-center gap-4">
+                                             <i class="fa-brands fa-line text-slate-400 group-hover:text-green-500"></i>
+                                             <span class="text-xs font-bold text-slate-700">LINE Messaging API</span>
+                                         </div>
+                                         <i class="fa-solid fa-chevron-right text-[10px] text-slate-300"></i>
+                                     </a>
 
                                     <a href="javascript:switchSection('clinic_data')" class="flex items-center justify-between p-4 bg-slate-50 rounded-2xl hover:bg-teal-50 hover:border-teal-200 border border-transparent transition-all group">
                                         <div class="flex items-center gap-4">
