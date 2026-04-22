@@ -353,17 +353,9 @@ $thaiDate = $days[date('w')] . ", " . date('j') . " " . $months[date('n')-1] . "
                 <div class="bg-slate-900 rounded-[3rem] p-8 shadow-2xl relative overflow-hidden premium-shadow">
                     <div class="absolute -right-8 -bottom-8 w-40 h-40 bg-white/5 rounded-full blur-3xl"></div>
                     <div class="flex items-start justify-between mb-10">
-                        <div class="flex items-center gap-4">
-                            <div class="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center text-white border border-white/10 shadow-inner">
-                                <i class="fa-solid fa-passport text-lg"></i>
-                            </div>
-                            <div>
-                                <h4 class="text-white font-black text-sm tracking-tight">Student Insurance (INTL)</h4>
-                                <p class="text-white/30 text-[9px] font-black uppercase tracking-[0.2em] mt-1.5 leading-none">Muang Thai Insurance</p>
-                            </div>
-                        </div>
-                        <div class="w-12 h-8 rounded-lg bg-[#F83821] flex items-center justify-center border border-white/10 shadow-lg">
-                            <span class="text-white font-black text-[8px]">MTI</span>
+                        <div>
+                            <h4 class="text-white font-black text-sm tracking-tight">Student Insurance (INTL)</h4>
+                            <p class="text-white/30 text-[9px] font-black uppercase tracking-[0.2em] mt-1.5 leading-none">Muang Thai Insurance</p>
                         </div>
                     </div>
                     
@@ -386,7 +378,7 @@ $thaiDate = $days[date('w')] . ", " . date('j') . " " . $months[date('n')-1] . "
                         </div>
                         <div class="text-right">
                             <p class="text-white/30 text-[8px] font-black uppercase tracking-[0.2em] mb-1.5">Expires</p>
-                            <p class="text-white text-[11px] font-mono font-black tracking-tighter">12 / 25</p>
+                            <p class="text-white text-[11px] font-black uppercase tracking-widest">Coming Soon</p>
                         </div>
                     </div>
                 </div>
