@@ -162,36 +162,39 @@ $thaiDate = $days[date('w')] . ", " . date('j') . " " . $months[date('n')-1] . "
                 </div>
             </div>
 
-            <!-- ── Premium Profile Card ── -->
+            <!-- ── Premium Identity Card (Wallet Style) ── -->
             <div onclick="showProfile()" class="relative overflow-hidden bg-gradient-to-br from-[#0052CC] via-[#0066FF] to-[#0052CC] rounded-[3rem] p-8 shadow-[0_25px_50px_-12px_rgba(0,82,204,0.3)] group active:scale-[0.97] transition-all cursor-pointer">
                 <!-- Abstract Decorations -->
-                <div class="absolute -right-10 -top-10 w-48 h-48 bg-white/10 rounded-full blur-3xl group-hover:scale-150 transition-transform duration-1000"></div>
+                <div class="absolute -right-6 -top-6 w-48 h-48 bg-white/10 rounded-full blur-3xl group-hover:scale-150 transition-transform duration-1000"></div>
                 <div class="absolute -left-12 -bottom-12 w-56 h-56 bg-blue-400/20 rounded-full blur-3xl"></div>
                 
                 <div class="relative z-10">
-                    <div class="flex items-start justify-between mb-10">
-                        <div class="bg-white/15 backdrop-blur-xl px-5 py-2 rounded-2xl border border-white/20 flex items-center gap-2.5 shadow-xl">
-                            <div class="w-2 h-2 bg-emerald-400 rounded-full animate-pulse shadow-[0_0_10px_#4ade80]"></div>
-                            <span class="text-white text-[10px] font-black uppercase tracking-[0.2em] leading-none">Online System</span>
+                    <div class="flex items-center gap-5 mb-10">
+                        <div class="relative">
+                            <div class="w-20 h-20 rounded-[2rem] overflow-hidden border-2 border-white/20 shadow-2xl">
+                                <img src="<?= $user['picture_url'] ?? 'https://ui-avatars.com/api/?name='.urlencode($user['full_name']); ?>" class="w-full h-full object-cover">
+                            </div>
+                            <div class="absolute -bottom-1 -right-1 w-6 h-6 bg-emerald-400 rounded-full border-4 border-[#005edb] animate-pulse"></div>
                         </div>
-                        <div class="w-10 h-10 bg-white/15 rounded-2xl flex items-center justify-center border border-white/20">
-                            <i class="fa-solid fa-arrow-right-long text-white text-sm"></i>
+                        <div class="flex-1 min-w-0">
+                            <p class="text-blue-100/80 text-sm font-bold mb-1">สวัสดี 👋</p>
+                            <h3 class="text-white text-2xl font-black tracking-tight leading-tight mb-1 truncate"><?= $user['full_name'] ?></h3>
+                            <p class="text-blue-100/60 text-[11px] font-black uppercase tracking-[0.1em]">ID: <?= !empty($user['student_personnel_id']) ? $user['student_personnel_id'] : 'N/A' ?></p>
                         </div>
-                    </div>
-                    
-                    <div class="space-y-1 mb-8">
-                        <p class="text-blue-100/60 text-[10px] font-black uppercase tracking-[0.2em]">Medical Identity</p>
-                        <h3 class="text-white text-xl font-black tracking-tight uppercase"><?= !empty($user['student_personnel_id']) ? $user['student_personnel_id'] : '6401234567' ?></h3>
+                        <div class="w-12 h-12 bg-white/15 backdrop-blur-xl rounded-2xl flex items-center justify-center border border-white/20 shadow-xl group-hover:translate-x-1 transition-transform">
+                            <i class="fa-solid fa-chevron-right text-white text-sm"></i>
+                        </div>
                     </div>
 
                     <div class="relative flex items-center justify-between pt-6 border-t border-white/10">
                         <div class="flex items-center gap-3 text-white">
-                            <div class="w-8 h-8 bg-white/10 rounded-xl flex items-center justify-center border border-white/10">
-                                <i class="fa-solid fa-graduation-cap text-blue-200 text-xs"></i>
-                            </div>
-                            <p class="text-blue-50 text-[11px] font-bold tracking-wide"><?= !empty($user['department']) ? $user['department'] : 'วิทยาลัยนวัตกรรมดิจิทัลเทคโนโลยี' ?></p>
+                            <i class="fa-solid fa-graduation-cap text-blue-200 text-sm"></i>
+                            <p class="text-blue-50 text-[11px] font-bold tracking-wide truncate max-w-[200px]">
+                                <?= !empty($user['department']) ? $user['department'] : 'วิทยาลัยนวัตกรรมดิจิทัลเทคโนโลยี' ?> · <?= $user['status'] ?>
+                            </p>
                         </div>
-                        <div class="bg-emerald-500/20 border border-emerald-400/30 rounded-full px-4 py-1.5 backdrop-blur-md">
+                        <div class="bg-emerald-400/20 border border-emerald-400/30 rounded-full px-4 py-1.5 backdrop-blur-md flex items-center gap-2">
+                            <i class="fa-solid fa-circle-check text-emerald-300 text-[10px]"></i>
                             <span class="text-emerald-200 text-[9px] font-black uppercase tracking-[0.15em]">Verified</span>
                         </div>
                     </div>
