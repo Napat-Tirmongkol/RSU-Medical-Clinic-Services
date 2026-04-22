@@ -144,7 +144,7 @@ if (!function_exists('check_maintenance')) {
                     <meta name="viewport" content="width=device-width, initial-scale=1.0">
                     <title>ปิดปรับปรุงระบบ - System Maintenance</title>
                     <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;700&display=swap" rel="stylesheet">
-                    <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
+                    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
                     <style>
                         body { font-family: 'Prompt', sans-serif; background: #f4f7fa; color: #334155; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; text-align: center; padding: 20px; }
                         .card { background: white; padding: 40px; border-radius: 30px; shadow: 0 10px 30px rgba(0,0,0,0.05); max-width: 500px; width: 100%; box-shadow: 0 20px 40px rgba(0,0,0,0.05); }
