@@ -5,6 +5,14 @@ declare(strict_types=1);
 ini_set('display_errors', '0');
 error_reporting(0);
 
+if (session_status() === PHP_SESSION_NONE) session_start();
+require_once __DIR__ . '/../config.php';
+
+if (empty($_SESSION['evax_student_id']) && empty($_SESSION['line_user_id'])) {
+    http_response_code(401);
+    exit;
+}
+
 $appId = isset($_GET['id']) ? (string)$_GET['id'] : '';
 if ($appId === '') {
     exit;

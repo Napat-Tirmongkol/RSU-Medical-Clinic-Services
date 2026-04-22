@@ -1,10 +1,16 @@
 <?php
 // user/api_faculty_suggest.php — Faculty/department autocomplete & Gemini normalization
 declare(strict_types=1);
+if (session_status() === PHP_SESSION_NONE) session_start();
 require_once __DIR__ . '/../config.php';
 
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
+
+if (empty($_SESSION['evax_student_id']) && empty($_SESSION['line_user_id'])) {
+    http_response_code(401);
+    exit(json_encode(['status' => 'error', 'message' => 'Unauthorized']));
+}
 
 $pdo = db();
 
@@ -78,7 +84,7 @@ $prompt = <<<PROMPT
 ตอบเป็น JSON เท่านั้น ห้ามมีข้อความอื่น
 PROMPT;
 
-$model = $_SESSION['_gemini_model'] ?? 'gemini-2.0-flash';
+$model = (isset($_SESSION['_gemini_model']) && is_string($_SESSION['_gemini_model'])) ? $_SESSION['_gemini_model'] : 'gemini-2.0-flash';
 $url   = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$apiKey}";
 $body  = json_encode([
     'contents'         => [['role' => 'user', 'parts' => [['text' => $prompt]]]],

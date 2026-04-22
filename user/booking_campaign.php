@@ -8,20 +8,26 @@ require_once __DIR__ . '/../includes/footer.php';
 session_start();
 check_user_profile((int)($_SESSION['evax_student_id'] ?? 0));
 
-$pdo = db();
-
-$today = date('Y-m-d');
-$sql = "
-    SELECT c.*,
-           (SELECT COUNT(*) FROM camp_bookings a WHERE a.campaign_id = c.id AND a.status IN ('booked', 'confirmed')) as used_seats
-    FROM camp_list c
-    WHERE c.status = 'active'
-    AND (c.available_until IS NULL OR c.available_until >= :today)
-    ORDER BY c.created_at DESC
-";
-$stmt = $pdo->prepare($sql);
-$stmt->execute([':today' => $today]);
-$camp_list = $stmt->fetchAll();
+$camp_list = [];
+$camp_error = null;
+try {
+    $pdo = db();
+    $today = date('Y-m-d');
+    $sql = "
+        SELECT c.*,
+               (SELECT COUNT(*) FROM camp_bookings a WHERE a.campaign_id = c.id AND a.status IN ('booked', 'confirmed')) as used_seats
+        FROM camp_list c
+        WHERE c.status = 'active'
+        AND (c.available_until IS NULL OR c.available_until >= :today)
+        ORDER BY c.created_at DESC
+    ";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute([':today' => $today]);
+    $camp_list = $stmt->fetchAll();
+} catch (PDOException $e) {
+    error_log("booking_campaign DB error: " . $e->getMessage());
+    $camp_error = true;
+}
 
 function getBadge($type): array {
     return match($type) {
@@ -49,7 +55,12 @@ render_header(__('campaign.page_title'));
         </p>
     </div>
 
-    <?php if (count($camp_list) === 0): ?>
+    <?php if ($camp_error): ?>
+        <div class="bg-red-50 rounded-3xl p-10 text-center border-2 border-dashed border-red-200">
+            <div class="text-4xl mb-4 text-red-300"><i class="fa-solid fa-triangle-exclamation"></i></div>
+            <p class="text-red-500 font-medium">ไม่สามารถโหลดข้อมูลได้ กรุณาลองใหม่อีกครั้ง</p>
+        </div>
+    <?php elseif (count($camp_list) === 0): ?>
         <div class="bg-gray-50 rounded-3xl p-10 text-center border-2 border-dashed border-gray-200">
             <div class="text-4xl mb-4 text-gray-300"><i class="fa-solid fa-calendar-xmark"></i></div>
             <p class="text-gray-500 font-medium"><?= __('campaign.empty') ?></p>

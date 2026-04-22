@@ -1,9 +1,15 @@
 <?php
 // user/api_get_slots.php
 declare(strict_types=1);
+if (session_status() === PHP_SESSION_NONE) session_start();
 require_once __DIR__ . '/../config.php';
 
 header('Content-Type: application/json');
+
+if (empty($_SESSION['evax_student_id']) && empty($_SESSION['line_user_id'])) {
+    http_response_code(401);
+    exit(json_encode(['status' => 'error', 'message' => 'Unauthorized']));
+}
 
 $date = $_GET['date'] ?? '';
 $campaignId = (int)($_GET['campaign_id'] ?? 0);
@@ -11,6 +17,12 @@ $campaignId = (int)($_GET['campaign_id'] ?? 0);
 if (!$date || !$campaignId) {
     echo json_encode(['status' => 'error', 'message' => 'ข้อมูลไม่ครบถ้วน']);
     exit;
+}
+
+// ตรวจสอบ format วันที่
+if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) || !strtotime($date)) {
+    http_response_code(400);
+    exit(json_encode(['status' => 'error', 'message' => 'รูปแบบวันที่ไม่ถูกต้อง']));
 }
 
 try {
@@ -34,5 +46,7 @@ try {
     
     echo json_encode(['status' => 'success', 'data' => $result]);
 } catch (PDOException $e) {
-    echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+    error_log("api_get_slots error: " . $e->getMessage());
+    http_response_code(500);
+    echo json_encode(['status' => 'error', 'message' => 'เกิดข้อผิดพลาดของระบบ']);
 }
