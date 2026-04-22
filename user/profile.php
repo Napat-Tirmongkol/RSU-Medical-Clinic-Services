@@ -55,16 +55,16 @@ $isPassport = ($citizenIdValue !== '' && (!ctype_digit($citizenIdValue) || strle
 
 require_once __DIR__ . '/../includes/header.php';
 require_once __DIR__ . '/../includes/footer.php';
-render_header(__('profile.title_edit'));
+render_header(__('profile.heading_edit'));
 ?>
 
 <div class="min-h-screen bg-gray-50 pb-24">
   <div class="max-w-xl mx-auto px-4 pt-8">
     
     <div class="flex items-center justify-between mb-8">
-      <h1 class="text-2xl font-bold text-gray-900 font-prompt"><?= __('profile.title_edit') ?></h1>
+      <h1 class="text-2xl font-bold text-gray-900 font-prompt"><?= __('profile.heading_edit') ?></h1>
       <a href="<?= htmlspecialchars($redirectBack) ?>" class="text-sm font-medium text-blue-600 hover:text-blue-500 font-prompt">
-        <i class="fa-solid fa-arrow-left mr-1"></i> <?= __('profile.btn_back') ?>
+        <i class="fa-solid fa-arrow-left mr-1"></i> <?= __('profile.back_btn') ?>
       </a>
     </div>
 
@@ -150,31 +150,31 @@ render_header(__('profile.title_edit'));
       <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-6">
         
         <div class="space-y-1.5">
-          <label class="text-sm font-semibold text-gray-700 font-prompt"><?= __('profile.lbl_status') ?> <span class="text-red-500">*</span></label>
+          <label class="text-sm font-semibold text-gray-700 font-prompt"><?= __('profile.lbl_user_type') ?> <span class="text-red-500">*</span></label>
           <div class="grid grid-cols-3 gap-3">
             <label class="flex items-center justify-center h-12 bg-gray-50 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-100 transition-all has-[:checked]:bg-emerald-50 has-[:checked]:border-emerald-200 has-[:checked]:text-emerald-600 font-prompt">
               <input type="radio" name="status" value="student" required class="hidden" <?= $userData['status'] === 'student' ? 'checked' : '' ?>>
-              <span class="text-sm"><?= __('profile.status_student') ?></span>
+              <span class="text-sm"><?= __('profile.type_student') ?></span>
             </label>
             <label class="flex items-center justify-center h-12 bg-gray-50 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-100 transition-all has-[:checked]:bg-emerald-50 has-[:checked]:border-emerald-200 has-[:checked]:text-emerald-600 font-prompt">
               <input type="radio" name="status" value="staff" required class="hidden" <?= $userData['status'] === 'staff' ? 'checked' : '' ?>>
-              <span class="text-sm"><?= __('profile.status_staff') ?></span>
+              <span class="text-sm"><?= __('profile.type_staff') ?></span>
             </label>
             <label class="flex items-center justify-center h-12 bg-gray-50 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-100 transition-all has-[:checked]:bg-emerald-50 has-[:checked]:border-emerald-200 has-[:checked]:text-emerald-600 font-prompt">
               <input type="radio" name="status" value="other" required class="hidden" <?= $userData['status'] === 'other' ? 'checked' : '' ?>>
-              <span class="text-sm"><?= __('profile.status_other') ?></span>
+              <span class="text-sm"><?= __('profile.type_other') ?></span>
             </label>
           </div>
         </div>
 
         <div id="id_section" class="space-y-4">
           <div class="space-y-1.5">
-            <label class="text-sm font-semibold text-gray-700 font-prompt"><?= __('profile.lbl_id_card') ?> <span class="text-red-500">*</span></label>
+            <label class="text-sm font-semibold text-gray-700 font-prompt"><?= __('profile.lbl_citizen_id') ?> <span class="text-red-500">*</span></label>
             <div class="flex gap-2 mb-2">
                 <label class="flex-1">
                     <input type="radio" name="id_type" value="citizen" class="sr-only peer" <?= !$isPassport ? 'checked' : '' ?>>
                     <div class="py-2 text-center text-xs font-medium border border-gray-100 rounded-lg bg-gray-50 peer-checked:bg-blue-50 peer-checked:border-blue-200 peer-checked:text-blue-600 cursor-pointer transition-all font-prompt">
-                        <?= __('profile.lbl_citizen_id') ?>
+                        <?= __('profile.lbl_identity_th') ?>
                     </div>
                 </label>
                 <label class="flex-1">
@@ -186,19 +186,19 @@ render_header(__('profile.title_edit'));
             </div>
             <input type="text" id="citizen_id" name="citizen_id" required value="<?= htmlspecialchars($userData['citizen_id']) ?>"
               class="w-full h-12 px-4 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-prompt" 
-              placeholder="<?= __('profile.ph_citizen_id') ?>">
+              placeholder="<?= __('profile.lbl_citizen_id') ?>">
           </div>
 
           <div id="student_id_container" class="space-y-1.5">
-            <label for="id_number" class="text-sm font-semibold text-gray-700 font-prompt"><?= __('profile.lbl_student_id') ?> <span class="text-red-500">*</span></label>
+            <label for="id_number" class="text-sm font-semibold text-gray-700 font-prompt"><?= __('profile.lbl_id') ?> <span class="text-red-500">*</span></label>
             <input type="text" id="id_number" name="id_number" value="<?= htmlspecialchars($userData['id_number']) ?>"
               class="w-full h-12 px-4 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-prompt"
-              placeholder="<?= __('profile.ph_student_id') ?>">
+              placeholder="<?= __('profile.id_placeholder') ?>">
           </div>
         </div>
 
         <div class="space-y-1.5">
-          <label for="department" class="text-sm font-semibold text-gray-700 font-prompt"><?= __('profile.lbl_faculty') ?> <span class="text-red-500">*</span></label>
+          <label for="department" class="text-sm font-semibold text-gray-700 font-prompt">คณะ / หน่วยงาน <span class="text-red-500">*</span></label>
           <div class="relative">
             <?php
             $_facultyList = [];
@@ -209,7 +209,7 @@ render_header(__('profile.title_edit'));
             ?>
             <input type="text" id="department" name="department" list="faculty-datalist" value="<?= htmlspecialchars($userData['department']) ?>"
               class="w-full h-12 px-4 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-prompt"
-              placeholder="<?= __('profile.ph_faculty') ?>">
+              placeholder="<?= __('profile.dept_placeholder') ?>">
             <datalist id="faculty-datalist">
               <?php foreach ($_facultyList as $_f): ?>
                 <option value="<?= htmlspecialchars($_f['name_th']) ?>">
@@ -274,11 +274,11 @@ render_header(__('profile.title_edit'));
       <div class="flex gap-4">
         <button type="button" onclick="window.history.back()"
           class="flex-1 h-14 bg-white border border-gray-200 text-gray-700 font-bold rounded-2xl hover:bg-gray-50 transition-all font-prompt">
-          <?= __('profile.btn_cancel') ?>
+          <?= __('profile.back_btn') ?>
         </button>
         <button type="submit"
           class="flex-[2] h-14 bg-blue-600 text-white font-bold rounded-2xl shadow-lg shadow-blue-200 hover:bg-blue-700 active:scale-95 transition-all font-prompt">
-          <?= __('profile.btn_save') ?>
+          <?= __('profile.save_btn') ?>
         </button>
       </div>
 
@@ -310,7 +310,7 @@ document.addEventListener('DOMContentLoaded', function () {
             citizenIdInput.setAttribute('placeholder', 'Passport Number');
             citizenIdInput.removeAttribute('maxlength');
         } else {
-            citizenIdInput.setAttribute('placeholder', '<?= __('profile.ph_citizen_id') ?>');
+            citizenIdInput.setAttribute('placeholder', '<?= __('profile.lbl_citizen_id') ?>');
             citizenIdInput.setAttribute('maxlength', '13');
         }
     }
