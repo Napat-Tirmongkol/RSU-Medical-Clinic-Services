@@ -107,7 +107,8 @@ $webhookUrl = "$protocol://$host$uri";
 
                     <div class="flex gap-3 pt-2">
                         <button type="button" onclick="saveLineConfigP()"
-                                class="px-6 py-3 bg-gray-900 text-white rounded-xl font-bold text-sm hover:bg-black transition-all active:scale-95 shadow-lg flex items-center gap-2">
+                                style="background-color: #0f172a !important; color: #ffffff !important;"
+                                class="px-6 py-3 rounded-xl font-black text-sm hover:opacity-90 transition-all active:scale-95 shadow-lg flex items-center gap-2">
                             <i class="fa-solid fa-floppy-disk"></i> บันทึกข้อมูล
                         </button>
                         <div id="saveStatusP" class="hidden flex items-center gap-2 text-sm font-bold text-emerald-600">
@@ -139,7 +140,8 @@ $webhookUrl = "$protocol://$host$uri";
                 </div>
 
                 <button onclick="sendTestLineP()" id="btnTestP"
-                        class="w-full py-3 bg-[#06C755] text-white rounded-xl font-bold text-sm hover:bg-[#05b14c] transition-all active:scale-[0.98] shadow-lg flex items-center justify-center gap-2">
+                        style="background-color: #06C755 !important; color: #ffffff !important;"
+                        class="w-full py-3 rounded-xl font-black text-sm hover:opacity-90 transition-all active:scale-[0.98] shadow-lg flex items-center justify-center gap-2">
                     <i class="fa-solid fa-flask"></i> ส่งข้อความทดสอบ
                 </button>
 
