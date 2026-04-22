@@ -451,17 +451,13 @@ function statusIcon(string $s): string {
                                     </div>
                                 </td>
                                 <td style="padding:13px 20px">
-                                    <?php 
-                                        $statusClass = match($log['status']) {
-                                            'New' => 'status-new',
-                                            'Active' => 'status-active',
-                                            'Resolved' => 'status-resolved',
-                                            default => 'status-new'
-                                        };
-                                    ?>
                                     <button onclick="openStatusModal(<?= $log['id'] ?>, '<?= $log['status'] ?>', <?= htmlspecialchars(json_encode($log['resolve_comment'] ?: '')) ?>)" 
                                         id="status-btn-<?= $log['id'] ?>"
-                                        class="btn-status <?= $statusClass ?>">
+                                        style="display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:10px;<?= statusBadge($log['status']) ?>;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;cursor:pointer;transition:all .15s"
+                                        onmouseover="this.style.transform='scale(1.05)';this.style.boxShadow='0 4px 6px -1px rgba(0,0,0,0.1)'"
+                                        onmouseout="this.style.transform='scale(1)';this.style.boxShadow='none'"
+                                        onmousedown="this.style.transform='scale(0.95)'"
+                                        onmouseup="this.style.transform='scale(1.05)'">
                                         <i class="fa-solid <?= statusIcon($log['status']) ?>" style="font-size:9px"></i> <span class="status-label"><?= $log['status'] ?></span>
                                     </button>
                                 </td>
@@ -600,77 +596,6 @@ function statusIcon(string $s): string {
 </div>
 
 <style>
-/* Status Button Styles & States */
-.btn-status {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 6px 12px;
-    border-radius: 12px;
-    font-size: 10px;
-    font-weight: 800;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-    cursor: pointer;
-    border: 1px solid transparent;
-    white-space: nowrap;
-}
-
-/* New Status */
-.status-new {
-    background: #f8fafc;
-    border-color: #e2e8f0;
-    color: #64748b;
-}
-.status-new:hover {
-    background: #f1f5f9;
-    border-color: #cbd5e1;
-    color: #475569;
-    transform: translateY(-1px);
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-}
-.status-new:active {
-    background: #e2e8f0;
-    transform: translateY(0) scale(0.95);
-}
-
-/* Active Status */
-.status-active {
-    background: #eff6ff;
-    border-color: #bfdbfe;
-    color: #1d4ed8;
-}
-.status-active:hover {
-    background: #dbeafe;
-    border-color: #93c5fd;
-    color: #1e40af;
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px -2px rgba(59, 130, 246, 0.15);
-}
-.status-active:active {
-    background: #bfdbfe;
-    transform: translateY(0) scale(0.95);
-}
-
-/* Resolved Status */
-.status-resolved {
-    background: #f0fdf4;
-    border-color: #bbf7d0;
-    color: #15803d;
-}
-.status-resolved:hover {
-    background: #dcfce7;
-    border-color: #86efac;
-    color: #166534;
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px -2px rgba(34, 197, 94, 0.15);
-}
-.status-resolved:active {
-    background: #bbf7d0;
-    transform: translateY(0) scale(0.95);
-}
-
 .status-radio:checked + .status-box { border-color: #3b82f6; background: #eff6ff; color: #1d4ed8; }
 .status-radio:checked + .status-box i { opacity: 1 !important; color: #3b82f6; }
 #radio_active:checked + .status-box { border-color: #3b82f6; background: #eff6ff; color: #1d4ed8; }
@@ -750,28 +675,20 @@ function updateStatusUI(id, status, comment) {
     const label = btn.querySelector('.status-label');
     const icon = btn.querySelector('i');
     
-    // Reset and Update Classes
-    btn.classList.remove('status-new', 'status-active', 'status-resolved');
-    
+    let styles = '';
     let iconClass = '';
     if (status === 'New') {
-        btn.classList.add('status-new');
+        styles = 'background:#f8fafc;border:1px solid #e2e8f0;color:#64748b';
         iconClass = 'fa-solid fa-sparkles';
     } else if (status === 'Active') {
-        btn.classList.add('status-active');
+        styles = 'background:#eff6ff;border:1px solid #bfdbfe;color:#1d4ed8';
         iconClass = 'fa-solid fa-spinner fa-spin';
     } else {
-        btn.classList.add('status-resolved');
+        styles = 'background:#f0fdf4;border:1px solid #bbf7d0;color:#15803d';
         iconClass = 'fa-solid fa-check-circle';
     }
     
-    // Reset style attribute if any from old versions
-    btn.removeAttribute('style');
-    btn.onmouseover = null;
-    btn.onmouseout = null;
-    btn.onmousedown = null;
-    btn.onmouseup = null;
-
+    btn.style.cssText = 'display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:10px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;cursor:pointer;transition:all .15s;' + styles;
     label.textContent = status;
     icon.className = iconClass;
     
