@@ -7,7 +7,7 @@ require_once __DIR__ . '/includes/auth.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+if ($_SERVER['REQUEST_METHOD'] !== 'POST' && ($_GET['action'] ?? '') !== 'search') {
     echo json_encode(['status' => 'error', 'message' => 'Method not allowed']);
     exit;
 }
@@ -36,6 +36,115 @@ try {
     } catch (PDOException) {}
 } catch (PDOException $e) {
     echo json_encode(['status' => 'error', 'message' => 'ไม่สามารถสร้างตารางได้: ' . $e->getMessage()]);
+    exit;
+}
+
+$action = $_POST['action'] ?? $_GET['action'] ?? '';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SEARCH / LISTING (AJAX)
+// ─────────────────────────────────────────────────────────────────────────────
+if ($action === 'search') {
+    $search = trim($_GET['cd_search'] ?? '');
+    $page   = max(1, (int)($_GET['cd_page'] ?? 1));
+    $limit  = 20;
+    $offset = ($page - 1) * $limit;
+    
+    $where  = 'WHERE 1=1';
+    $params = [];
+    if ($search !== '') {
+        $where .= ' AND (name_th LIKE ? OR name_en LIKE ? OR code LIKE ?)';
+        $params[] = "%$search%";
+        $params[] = "%$search%";
+        $params[] = "%$search%";
+    }
+
+    try {
+        $sc = $pdo->prepare("SELECT COUNT(*) FROM sys_faculties $where");
+        $sc->execute($params);
+        $total = (int)$sc->fetchColumn();
+        $totalPages = (int)ceil($total / $limit);
+
+        $sr = $pdo->prepare("SELECT id, code, name_th, name_en, type FROM sys_faculties $where ORDER BY type ASC, name_th ASC LIMIT $limit OFFSET $offset");
+        $sr->execute($params);
+        $rows = $sr->fetchAll(PDO::FETCH_ASSOC);
+
+        // Generate Rows HTML
+        $rowsHtml = '';
+        if (empty($rows)) {
+            $rowsHtml = '<tr><td colspan="5" class="py-20 text-center">
+                <div class="w-16 h-16 bg-slate-50 text-slate-200 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
+                    <i class="fa-solid fa-folder-open"></i>
+                </div>
+                <p class="text-slate-400 font-black text-sm uppercase tracking-widest">ไม่พบข้อมูลที่ค้นหา</p>
+            </td></tr>';
+        } else {
+            foreach ($rows as $i => $r) {
+                $isF = $r['type'] === 'faculty';
+                $idx = $offset + $i + 1;
+                $codeLabel = !empty($r['code']) ? '<span class="inline-block text-[10px] font-mono font-black px-2 py-0.5 rounded-md bg-slate-100 text-slate-600">'.htmlspecialchars($r['code']).'</span>' : '<span class="text-slate-200">—</span>';
+                $enLabel = htmlspecialchars($r['name_en'] ?? '') ?: '— NO ENGLISH NAME —';
+                $typeBadge = $isF ? 'bg-blue-50 text-blue-600' : 'bg-amber-50 text-amber-600';
+                $typeText  = $isF ? 'FACULTY' : 'DEPT';
+                $rowJson = json_encode($r, JSON_UNESCAPED_UNICODE|JSON_HEX_APOS|JSON_HEX_QUOT);
+                $nameThEnc = htmlspecialchars(json_encode($r['name_th'], JSON_UNESCAPED_UNICODE), ENT_QUOTES);
+
+                $rowsHtml .= "
+                <tr class='border-b border-slate-50 hover:bg-slate-50/50 transition-all group' data-id='{$r['id']}'>
+                    <td class='py-4 px-6 text-[11px] font-bold text-slate-400'>{$idx}</td>
+                    <td class='py-4 px-6'>
+                        <span class='inline-block text-[10px] font-black px-2.5 py-1 rounded-lg {$typeBadge}'>{$typeText}</span>
+                    </td>
+                    <td class='py-4 px-6'>{$codeLabel}</td>
+                    <td class='py-4 px-6'>
+                        <div class='font-black text-slate-800 text-sm'>".htmlspecialchars($r['name_th'])."</div>
+                        <div class='text-[10px] text-slate-400 font-bold uppercase tracking-tight'>{$enLabel}</div>
+                    </td>
+                    <td class='py-4 px-6 text-right'>
+                        <div class='flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-all'>
+                            <button onclick='cdEditRow({$rowJson})' class='w-8 h-8 flex items-center justify-center bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-all'><i class='fa-solid fa-pen text-[10px]'></i></button>
+                            <button onclick='cdDelete({$r['id']}, {$nameThEnc})' class='w-8 h-8 flex items-center justify-center bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-all'><i class='fa-solid fa-trash text-[10px]'></i></button>
+                        </div>
+                    </td>
+                </tr>";
+            }
+        }
+
+        // Generate Pagination HTML
+        $pagiHtml = '';
+        if ($totalPages > 1) {
+            $prevPage = max(1, $page - 1);
+            $nextPage = min($totalPages, $page + 1);
+            
+            $pagiHtml = "<p class='text-[11px] font-black text-slate-400 uppercase tracking-widest'>PAGE $page / $totalPages</p>";
+            $pagiHtml .= "<div class='flex items-center gap-1.5'>";
+            
+            // First & Prev
+            $pagiHtml .= "<button onclick='cdDoSearch(1)' class='w-8 h-8 flex items-center justify-center bg-white border border-slate-200 rounded-lg text-xs font-black text-slate-400 hover:bg-slate-100 transition-all'><i class='fa-solid fa-angles-left text-[10px]'></i></button>";
+            $pagiHtml .= "<button onclick='cdDoSearch($prevPage)' class='w-8 h-8 flex items-center justify-center bg-white border border-slate-200 rounded-lg text-xs font-black text-slate-400 hover:bg-slate-100 transition-all'><i class='fa-solid fa-angle-left text-[10px]'></i></button>";
+
+            $startP = max(1, $page - 2);
+            $endP   = min($totalPages, $page + 2);
+            for ($p = $startP; $p <= $endP; $p++) {
+                $activeClass = $p === $page ? 'bg-slate-800 text-white' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100';
+                $pagiHtml .= "<button onclick='cdDoSearch($p)' class='w-8 h-8 flex items-center justify-center rounded-lg text-xs font-black transition-all $activeClass'>$p</button>";
+            }
+
+            // Next & Last
+            $pagiHtml .= "<button onclick='cdDoSearch($nextPage)' class='w-8 h-8 flex items-center justify-center bg-white border border-slate-200 rounded-lg text-xs font-black text-slate-400 hover:bg-slate-100 transition-all'><i class='fa-solid fa-angle-right text-[10px]'></i></button>";
+            $pagiHtml .= "<button onclick='cdDoSearch($totalPages)' class='w-8 h-8 flex items-center justify-center bg-white border border-slate-200 rounded-lg text-xs font-black text-slate-400 hover:bg-slate-100 transition-all'><i class='fa-solid fa-angles-right text-[10px]'></i></button>";
+            $pagiHtml .= "</div>";
+        }
+
+        echo json_encode([
+            'status' => 'ok',
+            'rows' => $rowsHtml,
+            'pagi' => $pagiHtml,
+            'total' => number_format($total)
+        ]);
+    } catch (PDOException $e) {
+        echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+    }
     exit;
 }
 

@@ -232,16 +232,15 @@ $_cd_qs = http_build_query(array_filter(['section' => 'clinic_data', 'cd_search'
             <div class="px-6 py-4 bg-slate-50 border-b border-slate-100 flex flex-wrap items-center justify-between gap-4">
                 <div class="flex items-center gap-3">
                     <h3 class="text-sm font-black text-slate-700 uppercase tracking-wider">รายการข้อมูล</h3>
-                    <span class="px-2.5 py-1 bg-white border border-slate-200 text-[10px] font-black text-teal-600 rounded-lg">
+                    <span id="cd-total-count" class="px-2.5 py-1 bg-white border border-slate-200 text-[10px] font-black text-teal-600 rounded-lg">
                         <?= number_format($_cd_total) ?> TOTAL
                     </span>
                 </div>
                 
-                <form method="GET" class="flex items-center gap-2 max-w-md w-full">
-                    <input type="hidden" name="section" value="clinic_data">
+                <form onsubmit="event.preventDefault(); cdDoSearch(1);" class="flex items-center gap-2 max-w-md w-full">
                     <div class="relative flex-1">
                         <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-300 text-xs"></i>
-                        <input type="text" name="cd_search" value="<?= htmlspecialchars($_cd_search) ?>" placeholder="ค้นหาชื่อ หรือ รหัส..."
+                        <input type="text" id="cd-search-input" value="<?= htmlspecialchars($_cd_search) ?>" placeholder="ค้นหาชื่อ หรือ รหัส..."
                             class="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all">
                     </div>
                     <button type="submit" class="px-4 py-2 bg-slate-800 text-white rounded-xl text-xs font-black hover:bg-black transition-all">ค้นหา</button>
@@ -274,7 +273,7 @@ $_cd_qs = http_build_query(array_filter(['section' => 'clinic_data', 'cd_search'
                                 <th class="py-4 px-6 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest w-32">เครื่องมือ</th>
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody id="cd-table-body" class="divide-y divide-slate-50">
                             <?php foreach ($_cd_rows as $i => $r): 
                                 $isF = $r['type'] === 'faculty';
                             ?>
@@ -316,7 +315,7 @@ $_cd_qs = http_build_query(array_filter(['section' => 'clinic_data', 'cd_search'
 
                 <!-- Pagination (Improved) -->
                 <?php if ($_cd_totalPages > 1): ?>
-                <div class="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
+                <div id="cd-pagination-container" class="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
                     <p class="text-[11px] font-black text-slate-400 uppercase tracking-widest">
                         PAGE <?= $_cd_page ?> / <?= $_cd_totalPages ?>
                     </p>
@@ -632,6 +631,32 @@ $_cd_qs = http_build_query(array_filter(['section' => 'clinic_data', 'cd_search'
             impRes.innerHTML = '<i class="fa-solid fa-triangle-exclamation mr-2"></i>' + msg;
         }
     }
+
+    // ── Live Search & AJAX Listing ──────────────────────────────────────────
+    let searchTimer;
+    const searchIn = document.getElementById('cd-search-input');
+    const tableBody = document.getElementById('cd-table-body');
+    const pagiCont = document.getElementById('cd-pagination-container');
+    const totalSpan = document.getElementById('cd-total-count');
+
+    window.cdDoSearch = async function (page = 1) {
+        const query = searchIn.value;
+        const res = await fetch(`${ENDPOINT}?action=search&cd_search=${encodeURIComponent(query)}&cd_page=${page}`);
+        const data = await res.json();
+        if (data.status === 'ok') {
+            tableBody.innerHTML = data.rows;
+            pagiCont.innerHTML = data.pagi || '';
+            totalSpan.innerHTML = `${data.total} TOTAL`;
+            // Hide pagination container if no pagination
+            if (!data.pagi) pagiCont.classList.add('hidden');
+            else pagiCont.classList.remove('hidden');
+        }
+    };
+
+    searchIn.addEventListener('input', () => {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(() => cdDoSearch(1), 300);
+    });
 
     // ── Set Import Type Logic ──────────────────────────────────────────────
     window.cdSetImportType = function(type) {
