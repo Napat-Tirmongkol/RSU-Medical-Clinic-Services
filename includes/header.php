@@ -304,12 +304,12 @@ function render_header(string $title = 'E-Vax'): void
       $_mFile = __DIR__ . '/../config/maintenance.json';
       $_mData = file_exists($_mFile) ? json_decode(file_get_contents($_mFile), true) : [];
       if (!empty($_mData['announcement_active']) && !empty($_mData['announcement_message'])): ?>
-        <div class="bg-[#d97706] px-4 py-3 flex items-center gap-3 shadow-lg relative z-[70] border-b border-white/10">
-            <div class="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center text-white shrink-0 shadow-inner">
-                <i class="fa-solid fa-bullhorn text-sm"></i>
+        <div style="background-color: #d97706 !important; color: #ffffff !important;" class="px-4 py-3 flex items-center gap-3 shadow-lg relative z-[70] border-b border-white/10">
+            <div style="background-color: rgba(255,255,255,0.2) !important;" class="w-9 h-9 rounded-full flex items-center justify-center shrink-0 shadow-inner">
+                <i class="fa-solid fa-bullhorn text-sm" style="color: #ffffff !important;"></i>
             </div>
             <div class="flex-1 min-w-0">
-                <p class="text-xs md:text-sm font-black text-white leading-tight drop-shadow-sm">
+                <p style="color: #ffffff !important; font-weight: 900 !important;" class="text-xs md:text-sm leading-tight drop-shadow-sm">
                     <?= htmlspecialchars($_mData['announcement_message']) ?>
                 </p>
             </div>
