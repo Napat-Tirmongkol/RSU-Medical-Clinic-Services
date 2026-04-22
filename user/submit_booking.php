@@ -88,6 +88,9 @@ try {
         ':status' => $bookingStatus
     ]);
 
+    // ✅ บันทึก Log: จองคิวสำเร็จ
+    log_activity('New Booking', "ผู้ป่วยจองกิจกรรม '{$campData['title']}' สำเร็จ (Status: $bookingStatus)", $studentId);
+
     // 8. ส่งอีเมลแจ้งเตือนการจองสำเร็จ
     try {
         $stmtUser = $pdo->prepare("SELECT email, full_name FROM sys_users WHERE id = :sid LIMIT 1");

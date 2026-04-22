@@ -71,6 +71,9 @@ try {
 
 require_once __DIR__ . '/../includes/header.php';
 render_header('RSU Medical Hub');
+
+// ✅ บันทึก Log: เข้าดูหน้า Hub
+log_activity('Access Hub', "ผู้ป่วย '{$user['full_name']}' เข้าดูหน้าศูนย์กลางสุขภาพ", $userId);
 ?>
 
 <div style="display:flex;flex-direction:column;min-height:100%;padding-bottom:80px">

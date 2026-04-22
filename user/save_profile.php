@@ -115,6 +115,11 @@ try {
         ':line_id'    => $lineUserId,
     ]);
 
+    // ✅ บันทึก Log: ลงทะเบียนหรือแก้ไขโปรไฟล์
+    $logAction = $existingUser ? 'Update Profile' : 'Register';
+    $logDesc = $existingUser ? "ผู้ป่วยอัปเดตข้อมูลส่วนตัว '{$fullName}'" : "ผู้ป่วยลงทะเบียนเข้าใช้งานครั้งแรก '{$fullName}'";
+    log_activity($logAction, $logDesc, (int)($existingUser['id'] ?? $pdo->lastInsertId()));
+
     // 4. ดึง ID (PK) ของผู้ใช้เพื่อเก็บใส่ Session
     $stmtGetId = $pdo->prepare("SELECT id FROM sys_users WHERE line_user_id = :line_id LIMIT 1");
     $stmtGetId->execute([':line_id' => $lineUserId]);

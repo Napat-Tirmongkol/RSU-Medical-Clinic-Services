@@ -84,7 +84,7 @@ try {
     // Migration: เพิ่ม column picture_url ถ้ายังไม่มี
     try { $pdo->exec("ALTER TABLE sys_users ADD COLUMN IF NOT EXISTS picture_url TEXT"); } catch (PDOException $e) {}
 
-    // 3. ตรวจสอบว่าผู้ใช้ใน LINE นี้มีอยู่ในฐานข้อมูลหรือไม่
+    // ตรวจสอบว่าผู้ใช้ใน LINE นี้มีอยู่ในฐานข้อมูลหรือไม่
     $stmt = $pdo->prepare("SELECT id, full_name, line_user_id FROM sys_users WHERE line_user_id = :line_user_id LIMIT 1");
     $stmt->execute([':line_user_id' => $line_user_id]);
     $user = $stmt->fetch();
@@ -110,6 +110,9 @@ try {
         $_SESSION['student_line_id']   = $user['line_user_id'];
 
         session_regenerate_id(true); // ป้องกัน Session Fixation
+
+        // ✅ บันทึก Log: ผู้ใช้งานเข้าสู่ระบบ
+        log_activity('Login', "ผู้ป่วย '{$user['full_name']}' เข้าสู่ระบบผ่าน LINE Success", (int)$user['id']);
 
         // ตรวจสอบว่ามี invite_token ค้างอยู่หรือไม่ (มาจาก c.php?t=TOKEN)
         $inviteToken = $_SESSION['invite_token'] ?? '';
