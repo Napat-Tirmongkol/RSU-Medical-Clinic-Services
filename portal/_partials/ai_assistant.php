@@ -22,6 +22,35 @@
     </div>
 </div>
 
+<script>
+(function() {
+    const iframe = document.getElementById('aiAssistantIframe');
+    function syncTheme() {
+        const isDark = document.body.getAttribute('data-theme') === 'dark';
+        const currentSrc = new URL(iframe.src);
+        if (isDark) currentSrc.searchParams.set('theme', 'dark');
+        else currentSrc.searchParams.delete('theme');
+        
+        if (iframe.src !== currentSrc.href) {
+            iframe.src = currentSrc.href;
+        }
+    }
+    
+    // Initial sync
+    syncTheme();
+    
+    // Listen for theme changes (using MutationObserver since theme is on body)
+    const observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+            if (mutation.type === 'attributes' && mutation.attributeName === 'data-theme') {
+                syncTheme();
+            }
+        });
+    });
+    observer.observe(document.body, { attributes: true });
+})();
+</script>
+
 <style>
 #section-ai_assistant {
     height: 100vh;

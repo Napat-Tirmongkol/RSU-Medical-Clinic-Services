@@ -18,7 +18,9 @@ if (!$isEmbed) {
     // เมื่อ Embed ให้โหลด FontAwesome และ Font ที่จำเป็นด้วย
     echo '<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">';
     echo '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700;800;900&display=swap">';
+    $themeVal = (isset($_GET['theme']) && $_GET['theme'] === 'dark') ? 'dark' : 'light';
     echo '<style>body { font-family: "Prompt", sans-serif; }</style>';
+    echo "<script>document.documentElement.setAttribute('data-theme', '{$themeVal}');</script>";
 }
 ?>
 
@@ -210,6 +212,21 @@ if (!$isEmbed) {
     .prompt-chip { font-size:.73rem; padding:6px 11px; }
     #chatMessages { padding:14px; gap:12px; }
 }
+
+/* ── Dark Mode Overrides ────────────────────────── */
+[data-theme='dark'] body { background: #0f172a; color: #cbd5e1; }
+[data-theme='dark'] .chat-wrap { background: #1e293b; border-color: #334155; box-shadow: 0 4px 20px rgba(0,0,0,.3); }
+[data-theme='dark'] .msg.ai .msg-bubble { background: #334155; color: #f1f5f9; border-color: #475569; }
+[data-theme='dark'] .msg.ai .msg-bubble th { background: #1e293b; color: #fff; }
+[data-theme='dark'] .msg.ai .msg-bubble td { border-color: #475569; }
+[data-theme='dark'] .prompt-chip { background: #334155; color: #a78bfa; border-color: #475569; }
+[data-theme='dark'] .prompt-chip:hover { background: #475569; border-color: #8b5cf6; color: #fff; }
+[data-theme='dark'] #regenChipsBtn { background: #334155; border-color: #475569; color: #a78bfa; }
+[data-theme='dark'] #chatInput { background: #0f172a; border-color: #334155; color: #fff; }
+[data-theme='dark'] .chat-input-area { background: #1e293b; border-top-color: #334155; }
+[data-theme='dark'] .rate-bar { background: #1e293b; border-top-color: #334155; color: #94a3b8; }
+[data-theme='dark'] .api-warn { background: rgba(245, 158, 11, 0.1); border-color: rgba(245, 158, 11, 0.3); color: #fbbf24; }
+[data-theme='dark'] .chip-skeleton { background: linear-gradient(90deg,#1e293b 25%,#334155 50%,#1e293b 75%); }
 </style>
 
 <?php if (!$apiKeySet): ?>
