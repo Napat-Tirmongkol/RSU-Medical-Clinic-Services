@@ -126,7 +126,44 @@ $thaiDate = $days[date('w')] . ", " . date('j') . " " . $months[date('n')-1] . "
         .animate-float { animation: float 6s ease-in-out infinite; }
         @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
     </style>
-</head>
+
+    <!-- Modal Functions (defined early to prevent ReferenceError on button clicks) -->
+    <script>
+        function showQR() {
+            const modal = document.getElementById('qr-modal');
+            const qrContainer = document.getElementById('qrcode');
+            modal.classList.remove('hidden'); modal.classList.add('flex');
+            if (typeof qr === 'undefined' || !qr) {
+                qrContainer.innerHTML = '';
+                qr = new QRCode(qrContainer, { text: "<?= htmlspecialchars($user['student_personnel_id'] ?? '') ?>", width: 180, height: 180, colorDark : "#0f172a", colorLight : "#ffffff", correctLevel : QRCode.CorrectLevel.H });
+            }
+        }
+        function hideQR() { document.getElementById('qr-modal').classList.add('hidden'); }
+        function showNotifications() { document.getElementById('notif-modal').classList.remove('hidden'); document.getElementById('notif-modal').classList.add('flex'); }
+        function hideNotifications() { document.getElementById('notif-modal').classList.add('hidden'); }
+        function showProfile() { document.getElementById('profile-modal').classList.remove('hidden'); document.getElementById('profile-modal').classList.add('flex'); }
+        function hideProfile() { document.getElementById('profile-modal').classList.add('hidden'); }
+        function showCampaigns() { document.getElementById('camps-modal').classList.remove('hidden'); document.getElementById('camps-modal').classList.add('flex'); }
+        function hideCampaigns() { document.getElementById('camps-modal').classList.add('hidden'); }
+        function showHistory() { document.getElementById('history-modal').classList.remove('hidden'); document.getElementById('history-modal').classList.add('flex'); }
+        function hideHistory() { document.getElementById('history-modal').classList.add('hidden'); }
+        function showContact() { document.getElementById('contact-modal').classList.remove('hidden'); document.getElementById('contact-modal').classList.add('flex'); }
+        function hideContact() { document.getElementById('contact-modal').classList.add('hidden'); }
+        function showChat() { document.getElementById('chat-modal').classList.remove('hidden'); document.getElementById('chat-modal').classList.add('flex'); const content = document.getElementById('chat-content'); content.scrollTop = content.scrollHeight; }
+        function hideChat() { document.getElementById('chat-modal').classList.add('hidden'); }
+        function showUpcoming(name) { document.getElementById('upcoming-name').innerText = name; document.getElementById('upcoming-modal').classList.remove('hidden'); document.getElementById('upcoming-modal').classList.add('flex'); }
+        function hideUpcoming() { document.getElementById('upcoming-modal').classList.add('hidden'); }
+
+        // Suppress Tailwind CDN production warning
+        (function() {
+            const originalWarn = console.warn;
+            console.warn = function(...args) {
+                if (args[0]?.includes?.('cdn.tailwindcss.com')) return;
+                originalWarn.apply(console, args);
+            };
+        })();
+        let qr = null;
+    </script>
 <body class="text-slate-900 pb-32">
 
     <div class="max-w-md mx-auto relative min-h-screen">
@@ -447,33 +484,7 @@ $thaiDate = $days[date('w')] . ", " . date('j') . " " . $months[date('n')-1] . "
     <!-- (I will preserve all modal logic and structures here for production safety) -->
     
     <script>
-        // Modal Logic
-        let qr = null;
-        function showQR() {
-            const modal = document.getElementById('qr-modal');
-            const qrContainer = document.getElementById('qrcode');
-            modal.classList.remove('hidden'); modal.classList.add('flex');
-            if (!qr) {
-                qrContainer.innerHTML = '';
-                qr = new QRCode(qrContainer, { text: "<?= $user['student_personnel_id'] ?>", width: 180, height: 180, colorDark : "#0f172a", colorLight : "#ffffff", correctLevel : QRCode.CorrectLevel.H });
-            }
-        }
-        function hideQR() { document.getElementById('qr-modal').classList.add('hidden'); }
-        function showNotifications() { document.getElementById('notif-modal').classList.remove('hidden'); document.getElementById('notif-modal').classList.add('flex'); }
-        function hideNotifications() { document.getElementById('notif-modal').classList.add('hidden'); }
-        function showProfile() { document.getElementById('profile-modal').classList.remove('hidden'); document.getElementById('profile-modal').classList.add('flex'); }
-        function hideProfile() { document.getElementById('profile-modal').classList.add('hidden'); }
-        function showCampaigns() { document.getElementById('camps-modal').classList.remove('hidden'); document.getElementById('camps-modal').classList.add('flex'); }
-        function hideCampaigns() { document.getElementById('camps-modal').classList.add('hidden'); }
-        function showHistory() { document.getElementById('history-modal').classList.remove('hidden'); document.getElementById('history-modal').classList.add('flex'); }
-        function hideHistory() { document.getElementById('history-modal').classList.add('hidden'); }
-        function showContact() { document.getElementById('contact-modal').classList.remove('hidden'); document.getElementById('contact-modal').classList.add('flex'); }
-        function hideContact() { document.getElementById('contact-modal').classList.add('hidden'); }
-        function showChat() { document.getElementById('chat-modal').classList.remove('hidden'); document.getElementById('chat-modal').classList.add('flex'); const content = document.getElementById('chat-content'); content.scrollTop = content.scrollHeight; }
-        function hideChat() { document.getElementById('chat-modal').classList.add('hidden'); }
-        function showUpcoming(name) { document.getElementById('upcoming-name').innerText = name; document.getElementById('upcoming-modal').classList.remove('hidden'); document.getElementById('upcoming-modal').classList.add('flex'); }
-        function hideUpcoming() { document.getElementById('upcoming-modal').classList.add('hidden'); }
-
+        // Chat functionality
         function handleChatSubmit(e) {
             e.preventDefault();
             const input = document.getElementById('chat-input');
