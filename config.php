@@ -111,6 +111,11 @@ if (!function_exists('check_maintenance')) {
         $mFile = __DIR__ . '/config/maintenance.json';
         if (file_exists($mFile)) {
             $mData = json_decode(file_get_contents($mFile), true);
+            
+            // ตรวจสอบ Whitelist (LINE ID)
+            $whitelist = $mData['whitelist'] ?? [];
+            if (!empty($_SESSION['line_user_id']) && in_array($_SESSION['line_user_id'], $whitelist)) return;
+            
             $isActive = $mData[$project_key] ?? true;
             
             if (!$isActive) {

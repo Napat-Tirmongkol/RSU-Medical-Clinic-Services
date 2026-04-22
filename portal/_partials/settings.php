@@ -4,6 +4,8 @@
             $_mData = file_exists($_mFile) ? json_decode(file_get_contents($_mFile), true) : [];
             $announcementActive = (bool)($_mData['announcement_active'] ?? false);
             $announcementMsg = $_mData['announcement_message'] ?? '';
+            $whitelistArr = $_mData['whitelist'] ?? [];
+            $whitelistText = implode("\n", $whitelistArr);
             ?>
             <div class="max-w-[1000px] mx-auto px-4 py-8">
                     
@@ -234,6 +236,34 @@
                             </div>
                         </div>
 
+                            </div>
+                        </div>
+
+                        <!-- 3.6. Maintenance Whitelist -->
+                        <div class="bg-white rounded-3xl border border-gray-200 p-6 shadow-sm mb-8">
+                            <div class="flex items-center gap-3 mb-6">
+                                <div class="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center text-blue-600">
+                                    <i class="fa-solid fa-user-shield"></i>
+                                </div>
+                                <div>
+                                    <h4 class="text-base font-black text-slate-800">Maintenance Whitelist</h4>
+                                    <p class="text-xs text-slate-400 font-medium">ระบุ LINE User ID ของผู้ที่อนุญาตให้เข้าใช้งานได้ขณะปิดปรับปรุง (1 รายการต่อบรรทัด)</p>
+                                </div>
+                            </div>
+                            
+                            <div class="space-y-4">
+                                <textarea id="maintenance-whitelist" rows="3" 
+                                          placeholder="Ua1234567890abcdef..."
+                                          class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-mono font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all"><?= htmlspecialchars($whitelistText) ?></textarea>
+                                
+                                <div class="flex justify-end">
+                                    <button onclick="saveWhitelist()" class="px-6 py-2.5 bg-blue-600 text-white rounded-xl text-xs font-black hover:bg-blue-700 transition-all flex items-center gap-2 shadow-lg">
+                                        <i class="fa-solid fa-check-double text-white"></i> อัปเดต Whitelist
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- 4. Git History -->
                         <div class="bg-white rounded-3xl border border-gray-200 shadow-sm overflow-hidden mb-12">
                             <div class="px-6 py-4 bg-slate-50 border-b border-gray-100 flex justify-between items-center">
@@ -297,6 +327,27 @@
                     fd.append('action', 'set_announcement');
                     fd.append('message', message);
                     fd.append('active', active ? '1' : '0');
+                    fd.append('csrf_token', portal_CSRF);
+                    
+                    try {
+                        const res = await fetch('ajax_maintenance.php', { method: 'POST', body: fd });
+                        const data = await res.json();
+                        if (data.ok) {
+                            showPortalToast(data.message, 'success');
+                        } else {
+                            Swal.fire('Error', data.message || 'บันทึกไม่สำเร็จ', 'error');
+                        }
+                    } catch (e) {
+                        Swal.fire('Error', 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้', 'error');
+                    }
+                }
+
+                async function saveWhitelist() {
+                    const ids = document.getElementById('maintenance-whitelist').value;
+                    
+                    const fd = new FormData();
+                    fd.append('action', 'set_whitelist');
+                    fd.append('ids', ids);
                     fd.append('csrf_token', portal_CSRF);
                     
                     try {
