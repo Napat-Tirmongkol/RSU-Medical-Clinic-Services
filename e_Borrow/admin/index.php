@@ -412,7 +412,7 @@ include('../includes/header.php');
         </div>
     <?php else: ?>
         <!-- STAFF QUICK ACTIONS (Mobile First) -->
-        <div class="grid grid-cols-2 gap-4 mb-8 animate-slide-up">
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-8 animate-slide-up">
             <a href="admin/return_dashboard.php"
                 class="bg-blue-600 text-white p-5 rounded-[20px] shadow-lg shadow-blue-600/30 flex flex-col items-center justify-center text-center hover:bg-blue-700 transition-colors">
                 <i class="fas fa-undo-alt text-3xl mb-2 opacity-90"></i>
@@ -422,6 +422,11 @@ include('../includes/header.php');
                 class="bg-emerald-600 text-white p-5 rounded-[20px] shadow-lg shadow-emerald-600/30 flex flex-col items-center justify-center text-center hover:bg-emerald-700 transition-colors">
                 <i class="fas fa-qrcode text-3xl mb-2 opacity-90"></i>
                 <span class="font-bold text-[15px]">จ่ายอุปกรณ์</span>
+            </a>
+            <a href="../portal/profile.php"
+                class="col-span-2 sm:col-span-1 bg-indigo-600 text-white p-5 rounded-[20px] shadow-lg shadow-indigo-600/30 flex flex-col items-center justify-center text-center hover:bg-indigo-700 transition-colors">
+                <i class="fas fa-user-cog text-3xl mb-2 opacity-90"></i>
+                <span class="font-bold text-[15px]">จัดการโปรไฟล์</span>
             </a>
         </div>
     <?php endif; ?>
