@@ -9,14 +9,16 @@ if (!function_exists('_eborrow_abs_url')) {
     function _eborrow_abs_url(string $relativePath): string {
         $proto = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
         $host  = $_SERVER['HTTP_HOST'] ?? 'localhost';
-        // __DIR__ = .../archive/e_Borrow/includes
-        $adminDir = rtrim(str_replace(
-            str_replace('/', DIRECTORY_SEPARATOR, $_SERVER['DOCUMENT_ROOT']),
-            '',
-            realpath(__DIR__ . '/..')
-        ), DIRECTORY_SEPARATOR);
-        $adminUrl = $proto . '://' . $host . '/' . ltrim(str_replace(DIRECTORY_SEPARATOR, '/', $adminDir), '/');
-        return $adminUrl . '/' . ltrim($relativePath, '/');
+        
+        // Normalize slashes for robust replacement
+        $docRoot = str_replace('\\', '/', $_SERVER['DOCUMENT_ROOT']);
+        $targetDir = str_replace('\\', '/', realpath(__DIR__ . '/..'));
+        
+        // Use str_ireplace to handle case differences on Windows (e.g. C: vs c:)
+        $relativeDir = str_ireplace($docRoot, '', $targetDir);
+        
+        $adminUrl = $proto . '://' . $host . '/' . ltrim($relativeDir, '/');
+        return rtrim($adminUrl, '/') . '/' . ltrim($relativePath, '/');
     }
 }
 
