@@ -32,6 +32,9 @@ Options -Indexes
 # Enable Rewrite
 RewriteEngine On
 
+# ─── Redirects (Legacy Paths) ───────────────────────────────────────────
+RewriteRule ^archive/e_Borrow/login\.php$ e_Borrow/login.php [R=301,L,NC]
+
 # Suppress favicon.ico 404 — return empty 204 No Content
 RewriteRule ^favicon\.ico$ - [R=204,L]
 
