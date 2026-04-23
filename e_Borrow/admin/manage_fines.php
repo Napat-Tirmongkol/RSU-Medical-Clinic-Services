@@ -77,10 +77,11 @@ $sql_history = "SELECT
                     s.full_name as student_name, 
                     stf.full_name as staff_name 
                 FROM borrow_payments p
-                JOIN borrow_records t ON p.transaction_id = t.id
-                JOIN borrow_categories bc ON t.type_id = bc.id
+                LEFT JOIN borrow_fines f ON p.fine_id = f.id
+                LEFT JOIN borrow_records t ON f.transaction_id = t.id
+                LEFT JOIN borrow_categories bc ON t.type_id = bc.id
                 LEFT JOIN sys_users s ON t.borrower_student_id = s.id
-                LEFT JOIN sys_staff stf ON p.staff_id = stf.id
+                LEFT JOIN sys_staff stf ON p.received_by_staff_id = stf.id
                 ORDER BY p.payment_date DESC";
 
 // AJAX Handler

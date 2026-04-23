@@ -41,21 +41,11 @@ try {
     $data = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if (!$data) {
-        // Fallback check: Does the payment even exist in this DB?
-        $check = $pdo->prepare("SELECT * FROM borrow_payments WHERE id = ?");
-        $check->execute([$payment_id]);
-        $raw = $check->fetch();
-        if ($raw) {
-            echo "พบรายการ ID $payment_id ในตาราง borrow_payments แต่ JOIN ข้อมูลอื่นไม่สำเร็จ<br>";
-            echo "<pre>Raw Data: "; print_r($raw); echo "</pre>";
-            die();
-        } else {
-            die("ไม่พบ ID $payment_id ในตาราง borrow_payments ของฐานข้อมูลนี้เลย");
-        }
+        die("ไม่พบข้อมูลการชำระเงินนี้ (ID: $payment_id)");
     }
 } catch (PDOException $e) {
     error_log("print_receipt error: " . $e->getMessage()); 
-    exit("เกิดข้อผิดพลาดในการดึงข้อมูล (ID: $payment_id)");
+    exit("เกิดข้อผิดพลาดในการดึงข้อมูล");
 }
 ?>
 <!DOCTYPE html>
