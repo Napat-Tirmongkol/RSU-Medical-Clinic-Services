@@ -267,25 +267,27 @@ try {
         </main>
 
         <!-- ── Premium Bottom Navigation ── -->
-        <nav class="fixed bottom-0 left-0 right-0 z-[60] bg-white/80 backdrop-blur-xl border-t border-slate-100 px-8 py-4 flex items-center justify-between safe-area-bottom">
-            <button onclick="window.location.href='hub.php'" class="flex flex-col items-center gap-1 nav-item-inactive">
-                <i class="fa-solid fa-house text-xl"></i>
-                <span class="text-[10px] font-black uppercase tracking-widest">หน้าหลัก</span>
+        <nav class="fixed bottom-0 left-0 right-0 z-[70] bg-white/90 backdrop-blur-2xl border-t border-slate-50 px-8 py-4 pb-10 flex justify-between items-center max-w-md mx-auto shadow-[0_-20px_40px_rgba(0,0,0,0.04)]">
+            <button onclick="window.location.href='hub.php'" class="flex flex-col items-center gap-1.5 text-slate-300 transition-all hover:text-slate-500">
+                <i class="fa-solid fa-house-chimney text-xl"></i>
+                <span class="text-[8px] font-black uppercase tracking-[0.1em]">Home</span>
             </button>
-            <button onclick="window.location.href='hub.php#camps'" class="flex flex-col items-center gap-1 nav-item-inactive">
-                <i class="fa-solid fa-syringe text-xl"></i>
-                <span class="text-[10px] font-black uppercase tracking-widest">จองคิว</span>
+            <button onclick="window.location.href='my_bookings.php'" class="flex flex-col items-center gap-1.5 text-slate-300 transition-all hover:text-slate-500">
+                <i class="fa-solid fa-calendar-day text-xl"></i>
+                <span class="text-[8px] font-black uppercase tracking-[0.1em]">Booking</span>
             </button>
-            <button onclick="window.location.href='my_bookings.php'" class="flex flex-col items-center gap-1 nav-item-inactive">
-                <i class="fa-solid fa-calendar-days text-xl"></i>
-                <span class="text-[10px] font-black uppercase tracking-widest">นัดหมาย</span>
+            <div class="relative -mt-14">
+                <button onclick="window.location.href='hub.php#camps'" class="w-16 h-16 bg-blue-600 rounded-[1.8rem] rotate-45 flex items-center justify-center text-white shadow-[0_15px_30px_rgba(0,82,204,0.4)] border-[6px] border-[#F8FAFF] active:scale-90 transition-all group">
+                    <i class="fa-solid fa-plus text-2xl -rotate-45 group-hover:scale-125 transition-transform"></i>
+                </button>
+            </div>
+            <button onclick="window.location.href='hub.php#health'" class="flex flex-col items-center gap-1.5 text-slate-300 transition-all hover:text-slate-500">
+                <i class="fa-solid fa-heart-pulse text-xl"></i>
+                <span class="text-[8px] font-black uppercase tracking-[0.1em]">Health</span>
             </button>
-            <button onclick="window.location.href='profile.php'" class="flex flex-col items-center gap-1 nav-item-active">
-                <div class="relative">
-                    <i class="fa-solid fa-user-gear text-xl"></i>
-                    <div class="absolute -top-1 -right-1 w-2 h-2 bg-blue-600 rounded-full"></div>
-                </div>
-                <span class="text-[10px] font-black uppercase tracking-widest">โปรไฟล์</span>
+            <button onclick="window.location.href='profile.php'" class="flex flex-col items-center gap-1.5 text-blue-600 transition-all scale-110">
+                <i class="fa-solid fa-user-ninja text-xl"></i>
+                <span class="text-[8px] font-black uppercase tracking-[0.1em]">Account</span>
             </button>
         </nav>
 
