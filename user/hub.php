@@ -206,7 +206,7 @@ $thaiDate = $days[date('w')] . ", " . date('j') . " " . $months[date('n')-1] . "
                 <div class="relative z-10 text-left">
                     <div class="flex items-center gap-5 mb-10">
                         <div class="w-20 h-20 rounded-[2rem] overflow-hidden border-2 border-white/20 shadow-2xl">
-                            <img src="<?= $user['picture_url'] ?? 'https://ui-avatars.com/api/?name='.urlencode($user['full_name']); ?>" class="w-full h-full object-cover" />
+                            <img src="<?= $user['picture_url'] ?? 'https://ui-avatars.com/api/?name='.urlencode((string)($user['full_name'] ?? 'Guest')); ?>" class="w-full h-full object-cover" />
                         </div>
                         <div class="flex-1 min-w-0">
                             <p class="text-blue-100/80 text-sm font-bold mb-1">สวัสดี 👋</p>
