@@ -96,6 +96,7 @@ try {
             <div class="w-11 h-11"></div>
         </header>
 
+<?php
 // Pass translated strings to JavaScript
 $jsT = [
     'swal_title'     => __('time.swal_title'),
