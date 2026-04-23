@@ -128,7 +128,20 @@
                                                 <i class="fa-solid fa-eye"></i>
                                             </button>
                                         </div>
-                                        <p class="text-[10px] text-slate-400 mt-2 font-medium">ใช้สำหรับ AI Assistant และการวิเคราะห์ Log</p>
+                                    <!-- Insurance Toggle -->
+                                    <div class="pt-6 border-t border-gray-50 flex items-center justify-between">
+                                        <div>
+                                            <label class="block text-xs font-black text-slate-500 uppercase tracking-wider mb-1">Feature: Medical Coverage Card</label>
+                                            <p class="text-[10px] text-slate-400 font-medium">เปิด/ปิดการแสดงผลการ์ดประกันสุขภาพ (Student Insurance) ในหน้า Hub ของผู้ใช้</p>
+                                        </div>
+                                        <div class="toggle-wrap">
+                                            <label class="toggle">
+                                                <input type="hidden" name="show_insurance" value="0">
+                                                <input type="checkbox" name="show_insurance" value="1" <?= (defined('SITE_SHOW_INSURANCE') && SITE_SHOW_INSURANCE) ? 'checked' : '' ?>>
+                                                <div class="toggle-track"></div>
+                                                <div class="toggle-thumb"></div>
+                                            </label>
+                                        </div>
                                     </div>
 
                                     <div class="pt-4">
