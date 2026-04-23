@@ -100,7 +100,7 @@ $months = ["มกราคม", "กุมภาพันธ์", "มีนา
             <h1 class="text-lg font-black text-slate-900 tracking-tight">รายการนัดหมาย</h1>
             <div class="w-11 h-11"></div>
         </header>
-
+<?php
 function renderBookingCard($b): void {
     $dateLabel  = ecampaign_format_date($b['slot_date']);
     $timeLabel  = substr($b['start_time'], 0, 5) . ' – ' . substr($b['end_time'], 0, 5);
