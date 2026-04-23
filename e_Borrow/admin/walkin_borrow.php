@@ -24,50 +24,69 @@ include('../includes/header.php');
         gap: 20px;
     }
     
-    /* สไตล์สำหรับช่องค้นหาผู้ยืม */
+    /* Modern Section Card */
+    .section-card {
+        background: white;
+        border-radius: 24px;
+        padding: 24px;
+        box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        border: 1px solid #f1f5f9;
+        transition: all 0.3s ease;
+    }
+
+    body.dark-mode .section-card {
+        background: #1e293b !important;
+        border-color: #334155 !important;
+        box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.3);
+    }
+
+    /* Input Styles */
+    .form-control {
+        border-radius: 12px;
+        border: 1px solid #e2e8f0;
+        padding: 10px 15px;
+        transition: all 0.2s;
+    }
+
+    body.dark-mode .form-control {
+        background: #0f172a;
+        border-color: #334155;
+        color: #f8fafc;
+    }
+
     .search-input-group {
         display: flex;
-        gap: 5px;
+        gap: 8px;
     }
+
     .search-input-group input {
         flex: 1;
-        padding: 10px;
-        border: 1px solid #ccc;
-        border-radius: 4px;
-        font-size: 1rem;
-    }
-    .search-input-group button {
-        padding: 0 15px;
+        border-radius: 12px !important;
     }
 
-    /* Dark Mode Overrides for Walk-in Page Components */
-    body.dark-mode #student-info-box,
-    body.dark-mode #item-info-box {
-        background-color: var(--color-page-bg) !important; 
-        border-left-color: var(--border-color) !important; 
-        color: var(--color-text-dark) !important;
-    }
-    body.dark-mode .search-input-group input {
-        background-color: var(--color-page-bg);
-        border-color: var(--border-color);
-        color: var(--color-text-dark);
-    }
-    body.dark-mode #student-code-display {
-        color: var(--color-text-muted) !important;
-    }
-    body.dark-mode .table-container thead {
-        background: var(--color-page-bg) !important;
-    }
-    body.dark-mode .table-container tr {
-        border-bottom-color: var(--border-color) !important;
+    /* Dark Mode Text */
+    body.dark-mode h2, body.dark-mode h3 { color: #f8fafc !important; }
+    body.dark-mode label { color: #cbd5e1 !important; }
+    body.dark-mode .text-muted { color: #94a3b8 !important; }
+
+    /* Info Boxes */
+    #student-info-box {
+        background: #f8fafc;
+        border-radius: 16px;
+        border: 1px solid #e2e8f0;
+        transition: all 0.3s;
     }
 
-    /* Mobile */
+    body.dark-mode #student-info-box {
+        background: rgba(15, 23, 42, 0.5) !important;
+        border-color: #334155 !important;
+    }
+
+    /* Mobile Responsive */
     @media (max-width: 768px) {
-        .dashboard-grid { grid-template-columns: 1fr !important; display: flex !important; flex-direction: column; gap: 15px; }
-        body { display: flex; flex-direction: column; min-height: 100vh; padding-bottom: 0 !important; }
-        .main-container { flex: 1; padding-bottom: 80px !important; overflow-y: auto; }
-        .footer-nav { position: fixed !important; bottom: 0 !important; left: 0 !important; right: 0 !important; width: 100% !important; height: 60px; z-index: 9999 !important; display: flex !important; }
+        .dashboard-grid { grid-template-columns: 1fr !important; gap: 15px; }
+        .section-card { padding: 16px; border-radius: 20px; }
+        .main-container { padding: 10px; }
     }
 </style>
 
