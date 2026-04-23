@@ -25,7 +25,7 @@ try {
                 COALESCE(bc.name, ei.name, 'ไม่ระบุชื่ออุปกรณ์') as equipment_name,
                 COALESCE(s.full_name, s2.full_name, 'ไม่ระบุชื่อผู้ยืม') as student_name, 
                 COALESCE(s.student_personnel_id, s2.student_personnel_id, '-') as student_personnel_id,
-                COALESCE(u_staff.full_name, 'เจ้าหน้าที่') as staff_name
+                COALESCE(u_staff.full_name, u_admins.full_name, 'เจ้าหน้าที่') as staff_name
             FROM borrow_payments p
             LEFT JOIN borrow_fines f ON p.fine_id = f.id
             LEFT JOIN borrow_records t ON f.transaction_id = t.id
@@ -34,6 +34,7 @@ try {
             LEFT JOIN sys_users s ON f.student_id = s.id
             LEFT JOIN sys_users s2 ON t.borrower_student_id = s2.id
             LEFT JOIN sys_staff u_staff ON p.received_by_staff_id = u_staff.id
+            LEFT JOIN sys_admins u_admins ON p.received_by_staff_id = u_admins.id
             WHERE p.id = ?";
             
     $stmt = $pdo->prepare($sql);

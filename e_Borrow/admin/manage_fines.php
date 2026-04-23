@@ -75,13 +75,14 @@ $sql_history = "SELECT
                     p.id as payment_id, p.payment_date, p.amount_paid,
                     bc.name as equipment_name, 
                     s.full_name as student_name, 
-                    stf.full_name as staff_name 
+                    COALESCE(stf.full_name, adm.full_name, '[N/A]') as staff_name 
                 FROM borrow_payments p
                 LEFT JOIN borrow_fines f ON p.fine_id = f.id
                 LEFT JOIN borrow_records t ON f.transaction_id = t.id
                 LEFT JOIN borrow_categories bc ON t.type_id = bc.id
                 LEFT JOIN sys_users s ON t.borrower_student_id = s.id
                 LEFT JOIN sys_staff stf ON p.received_by_staff_id = stf.id
+                LEFT JOIN sys_admins adm ON p.received_by_staff_id = adm.id
                 ORDER BY p.payment_date DESC";
 
 // AJAX Handler
