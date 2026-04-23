@@ -34,6 +34,7 @@ if ($adminRole === 'superadmin') {
     try {
         $allStaff = $pdo->query("
             SELECT id, username, full_name, role, account_status, linked_line_user_id,
+                   IFNULL(access_eborrow, 1) AS access_eborrow,
                    IFNULL(access_ecampaign, 0) AS access_ecampaign,
                    IFNULL(ecampaign_role, 'admin') AS ecampaign_role
             FROM sys_staff ORDER BY role ASC, full_name ASC
