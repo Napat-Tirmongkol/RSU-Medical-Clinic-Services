@@ -31,7 +31,17 @@ $allStaff  = [];
 
 if ($adminRole === 'superadmin') {
     $allAdmins = $pdo->query("SELECT * FROM sys_admins ORDER BY id DESC")->fetchAll(PDO::FETCH_ASSOC);
+    
+    // Auto-migrate sys_staff columns if missing (only check once per load)
     try {
+        $cols = $pdo->query("DESCRIBE sys_staff")->fetchAll(PDO::FETCH_COLUMN);
+        if (!in_array('access_eborrow', $cols)) {
+            $pdo->exec("ALTER TABLE sys_staff ADD COLUMN access_eborrow TINYINT(1) DEFAULT 1 AFTER role");
+        }
+        if (!in_array('email', $cols)) {
+            $pdo->exec("ALTER TABLE sys_staff ADD COLUMN email VARCHAR(255) NULL AFTER full_name");
+        }
+        
         $allStaff = $pdo->query("
             SELECT id, username, full_name, email, role, account_status, linked_line_user_id,
                    IFNULL(access_eborrow, 1) AS access_eborrow,
@@ -39,5 +49,10 @@ if ($adminRole === 'superadmin') {
                    IFNULL(ecampaign_role, 'admin') AS ecampaign_role
             FROM sys_staff ORDER BY role ASC, full_name ASC
         ")->fetchAll(PDO::FETCH_ASSOC);
-    } catch (PDOException $e) { /* silent */ }
+    } catch (PDOException $e) {
+        // Fallback for safety: if something still fails, try query without new columns
+        try {
+            $allStaff = $pdo->query("SELECT id, username, full_name, role, account_status FROM sys_staff ORDER BY full_name ASC")->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e2) { /* silent */ }
+    }
 }
