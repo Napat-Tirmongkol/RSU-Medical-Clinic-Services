@@ -168,13 +168,24 @@ include('../includes/header.php');
 
 <style>
     /* CSS เพิ่มเติมสำหรับหน้านี้โดยเฉพาะ */
-    .admin-wrap { background: #f8fafc !important; } /* ปรับพื้นหลังให้ดูสบายตา */
+    .admin-wrap { background: transparent !important; }
+    
     @keyframes slide-up {
         from { opacity: 0; transform: translateY(20px); }
         to { opacity: 1; transform: translateY(0); }
     }
     .animate-slide-up { animation: slide-up 0.5s ease-out forwards; }
     .delay-100 { animation-delay: 0.1s; }
+
+    /* Dark Mode Support */
+    body.dark-mode .text-gray-900 { color: #f8fafc !important; }
+    body.dark-mode .text-gray-600 { color: #cbd5e1 !important; }
+    body.dark-mode .text-gray-500 { color: #94a3b8 !important; }
+    body.dark-mode .bg-white { background-color: #1e293b !important; border-color: #334155 !important; }
+    body.dark-mode .bg-slate-50\/50 { background-color: rgba(30, 41, 59, 0.5) !important; }
+    body.dark-mode .border-gray-100, 
+    body.dark-mode .border-gray-50 { border-color: #334155 !important; }
+    body.dark-mode .bg-gray-50 { background-color: #0f172a !important; color: #94a3b8 !important; }
 </style>
 
 <?php
