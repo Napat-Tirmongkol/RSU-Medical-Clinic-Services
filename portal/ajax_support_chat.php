@@ -1,15 +1,20 @@
 <?php
 // portal/ajax_support_chat.php — Staff Chat Controller
 declare(strict_types=1);
-session_start();
+// NOTE: session_start() is handled by auth.php below
 require_once __DIR__ . '/../config.php';
-require_once __DIR__ . '/includes/auth.php'; // Ensure staff auth
 
 header('Content-Type: application/json');
+header('Cache-Control: no-cache');
+
+// Load auth — but catch redirects gracefully for AJAX context
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 $staffId = $_SESSION['admin_id'] ?? null;
-if (!$staffId) {
-    echo json_encode(['success' => false, 'error' => 'Unauthorized']);
+if (!$staffId || empty($_SESSION['admin_logged_in'])) {
+    echo json_encode(['success' => false, 'error' => 'Unauthorized — not logged in as admin']);
     exit;
 }
 

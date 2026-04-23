@@ -585,14 +585,30 @@ $pdo = db();
         async function loadUsers() {
             try {
                 const res = await fetch('ajax_support_chat.php?action=list_users');
-                const data = await res.json();
+                const text = await res.text();
+                let data;
+                try {
+                    data = JSON.parse(text);
+                } catch (parseErr) {
+                    console.error('Response is not JSON (likely auth redirect):', text.substring(0, 200));
+                    document.getElementById('user-list-container').innerHTML =
+                        `<div style="padding:24px;text-align:center;color:#EF4444;font-size:13px;font-weight:700">
+                            <i class="fa-solid fa-triangle-exclamation" style="margin-bottom:8px;display:block;font-size:24px"></i>
+                            Session หมดอายุ<br><a href="index.php" style="color:#2563EB">กลับหน้าหลัก</a>
+                        </div>`;
+                    return;
+                }
                 if (data.success) {
                     allUsers = data.users;
                     const query = document.getElementById('search-input').value;
                     filterUsers(query);
+                } else {
+                    console.warn('API error:', data.error);
+                    document.getElementById('user-list-container').innerHTML =
+                        `<div style="padding:24px;text-align:center;color:#EF4444;font-size:12px;font-weight:700">${data.error}</div>`;
                 }
             } catch(e) {
-                console.error('loadUsers error:', e);
+                console.error('loadUsers network error:', e);
             }
         }
 
