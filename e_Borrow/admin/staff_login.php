@@ -243,6 +243,9 @@ $error = isset($_GET['error']) ? ($errors[$_GET['error']] ?? 'เกิดข้
                             <i class="fa-solid fa-eye" id="pw-eye"></i>
                         </button>
                     </div>
+                    <div style="text-align:right; margin-top:8px;">
+                        <a href="../../admin/auth/forgot_password.php?type=staff" style="font-size:0.75rem; color:#6b7280; text-decoration:none; font-weight:600;">ลืมรหัสผ่าน?</a>
+                    </div>
                 </div>
 
                 <button type="submit" class="btn-login">
