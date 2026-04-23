@@ -1,5 +1,5 @@
 <?php
-// user/hub.php — Premium Command Center (Production)
+// user/hub.php — User Hub Dashboard (Bento Grid Design)
 declare(strict_types=1);
 session_start();
 require_once __DIR__ . '/../config.php';
@@ -16,15 +16,23 @@ $camp_list = [];
 $booking_list = [];
 $upcoming_count = 0;
 $borrow_count = 0;
+$next_appt = null;
 
 try {
     $pdo = db();
     $today = date('Y-m-d');
 
+    // User profile
     $stmt = $pdo->prepare("SELECT * FROM sys_users WHERE line_user_id = :line_id LIMIT 1");
     $stmt->execute([':line_id' => $lineUserId]);
     $user = $stmt->fetch();
 
+    if (!$user) {
+        header('Location: index.php');
+        exit;
+    }
+
+    // Campaigns (all active)
     $stmt = $pdo->prepare("
         SELECT c.*,
                (SELECT COUNT(*) FROM camp_bookings a WHERE a.campaign_id = c.id AND a.status IN ('booked', 'confirmed')) as used_seats
@@ -36,56 +44,73 @@ try {
     $stmt->execute([':today' => $today]);
     $camp_list = $stmt->fetchAll();
 
+    // Bookings (all)
     $stmt = $pdo->prepare("
-        SELECT b.*, c.title as camp_name, c.type as camp_type, s.slot_date, s.start_time
+        SELECT b.*, c.title as camp_name, c.type as camp_type, s.slot_date, s.start_time, s.end_time
         FROM camp_bookings b
         JOIN camp_list c ON b.campaign_id = c.id
         JOIN camp_slots s ON b.slot_id = s.id
         WHERE b.student_id = :sid
         ORDER BY s.slot_date DESC, s.start_time DESC
-        LIMIT 5
     ");
     $stmt->execute([':sid' => $user['id']]);
     $booking_list = $stmt->fetchAll();
-    
+
+    // Next upcoming appointment (for appointment card)
+    foreach ($booking_list as $b) {
+        if (in_array($b['status'], ['booked', 'confirmed']) && $b['slot_date'] >= $today) {
+            $next_appt = $b;
+            break;
+        }
+    }
+
+    // Upcoming count
     $stmt = $pdo->prepare("SELECT COUNT(*) FROM camp_bookings b JOIN camp_slots s ON b.slot_id = s.id WHERE b.student_id = :sid AND s.slot_date >= :today AND b.status != 'cancelled'");
     $stmt->execute([':sid' => $user['id'], ':today' => $today]);
     $upcoming_count = (int)$stmt->fetchColumn();
 
+    // Borrow count (optional)
     try {
         $stmt = $pdo->prepare("
-            SELECT COUNT(*) FROM borrow_records 
+            SELECT COUNT(*) FROM borrow_records
             WHERE borrower_student_id = :sid AND status IN ('borrowed','approved')
         ");
-        $stmt->execute([':sid' => $user['student_personnel_id']]); // borrow_records uses personnel_id
+        $stmt->execute([':sid' => $user['student_personnel_id']]);
         $borrow_count = (int)$stmt->fetchColumn();
-    } catch (Exception $e) { $borrow_count = 0; }
+    } catch (Exception $e) {
+        $borrow_count = 0;
+    }
 
-} catch (Exception $e) { }
+} catch (Exception $e) {
+    error_log("Hub DB error: " . $e->getMessage());
+}
 
-function getCampStyle($type): array {
+// Helpers
+function getInitials($name) {
+    $parts = explode(' ', trim($name));
+    return strtoupper(substr($parts[0], 0, 1) . (isset($parts[1]) ? substr($parts[1], 0, 1) : ''));
+}
+
+function formatThaiDate($date) {
+    $days = ["อาทิตย์", "จันทร์", "อังคาร", "พุธ", "พฤหัสบดี", "ศุกร์", "เสาร์"];
+    $months = ["", "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"];
+    $ts = strtotime($date);
+    return $days[date('w', $ts)] . ", " . date('j', $ts) . " " . $months[date('n', $ts)] . " " . (date('Y', $ts) + 543);
+}
+
+function campIcon($type) {
     return match($type) {
-        'vaccine'      => ['label' => 'วัคซีน', 'class' => 'bg-blue-50 text-blue-600 border-blue-100', 'icon' => 'fa-syringe'],
-        'health_check' => ['label' => 'ตรวจสุขภาพ', 'class' => 'bg-emerald-50 text-emerald-600 border-emerald-100', 'icon' => 'fa-stethoscope'],
-        default        => ['label' => 'ทั่วไป', 'class' => 'bg-gray-50 text-gray-600 border-gray-100', 'icon' => 'fa-star'],
+        'vaccine' => '💉',
+        'health_check' => '🩺',
+        'training' => '📋',
+        default => '📅'
     };
 }
 
-function getStatusStyle($status): array {
-    return match($status) {
-        'confirmed', 'booked' => ['label' => 'ยืนยันแล้ว', 'class' => 'bg-blue-50 text-blue-600'],
-        'completed'           => ['label' => 'สำเร็จแล้ว', 'class' => 'bg-emerald-50 text-emerald-600'],
-        'cancelled'           => ['label' => 'ยกเลิกแล้ว', 'class' => 'bg-red-50 text-red-600'],
-        default               => ['label' => 'รอดำเนินการ', 'class' => 'bg-gray-50 text-gray-600'],
-    };
-}
-
-date_default_timezone_set('Asia/Bangkok');
-$hour = date('H');
-$greeting = ($hour >= 5 && $hour < 12) ? "อรุณสวัสดิ์" : (($hour >= 12 && $hour < 17) ? "สวัสดีตอนบ่าย" : (($hour >= 17 && $hour < 21) ? "สวัสดีตอนเย็น" : "สวัสดีตอนค่ำ"));
-$days = ["อาทิตย์", "จันทร์", "อังคาร", "พุธ", "พฤหัสบดี", "ศุกร์", "เสาร์"];
-$months = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"];
-$thaiDate = $days[date('w')] . ", " . date('j') . " " . $months[date('n')-1] . " " . (date('Y') + 543);
+$thaiDate = formatThaiDate($today);
+$userInitials = getInitials($user['full_name']);
+$hour = (int)date('H');
+$greeting = ($hour >= 5 && $hour < 12) ? "สวัสดีตอนเช้า" : (($hour >= 12 && $hour < 17) ? "สวัสดีตอนบ่าย" : (($hour >= 17 && $hour < 21) ? "สวัสดีตอนเย็น" : "สวัสดีตอนค่ำ"));
 ?>
 <!DOCTYPE html>
 <html lang="th">
@@ -94,426 +119,1498 @@ $thaiDate = $days[date('w')] . ", " . date('j') . " " . $months[date('n')-1] . "
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>RSU Medical Hub</title>
     <link rel="icon" type="image/x-icon" href="../favicon.ico">
-    <script src="https://cdn.tailwindcss.com/3.4.1"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
-        @font-face {
-            font-family: 'RSU';
-            src: url('../assets/fonts/RSU_Regular.ttf') format('truetype');
-            font-weight: normal;
-            font-style: normal;
+        :root {
+            --accent: #2563eb;
+            --accent-600: #1d4ed8;
+            --accent-50: #eff6ff;
+            --accent-100: #dbeafe;
+            --accent-200: #bfdbfe;
+            --bg: #f5f7fb;
+            --surface: #ffffff;
+            --ink: #0f172a;
+            --ink-2: #334155;
+            --ink-3: #64748b;
+            --ink-4: #94a3b8;
+            --line: #e5e8ef;
+            --line-2: #eef1f6;
+            --ok: #16a34a;
+            --ok-bg: #dcfce7;
+            --warn: #ca8a04;
+            --warn-bg: #fef9c3;
+            --danger: #dc2626;
+            --danger-bg: #fee2e2;
+            --radius: 16px;
+            --radius-sm: 10px;
+            --gap: 18px;
+            --shadow-card: 0 1px 2px rgba(15,23,42,.04), 0 1px 0 rgba(15,23,42,.02);
+            --shadow-hover: 0 10px 30px -12px rgba(37,99,235,.25), 0 2px 6px rgba(15,23,42,.06);
         }
-        @font-face {
-            font-family: 'RSU';
-            src: url('../assets/fonts/RSU_BOLD.ttf') format('truetype');
-            font-weight: bold;
-            font-style: normal;
-        }
-        @font-face {
-            font-family: 'RSU';
-            src: url('../assets/fonts/RSU_light.ttf') format('truetype');
-            font-weight: 300;
-            font-style: normal;
-        }
-        
-        body { font-family: 'RSU', sans-serif; -webkit-tap-highlight-color: transparent; background-color: #F8FAFF; }
-        .glass-header { background: rgba(0, 82, 204, 0.95); backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px); }
-        .custom-scrollbar::-webkit-scrollbar { display: none; }
-        .premium-shadow { box-shadow: 0 20px 40px -15px rgba(0, 82, 204, 0.15); }
-        .card-glow { position: relative; overflow: hidden; }
-        .card-glow::after { content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%); pointer-events: none; }
-        .animate-float { animation: float 6s ease-in-out infinite; }
-        @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
-    </style>
 
-    <!-- Modal Functions (defined early to prevent ReferenceError on button clicks) -->
-    <script>
-        function showQR() {
-            const modal = document.getElementById('qr-modal');
-            const qrContainer = document.getElementById('qrcode');
-            modal.classList.remove('hidden'); modal.classList.add('flex');
-            if (typeof qr === 'undefined' || !qr) {
-                qrContainer.innerHTML = '';
-                qr = new QRCode(qrContainer, { text: "<?= htmlspecialchars($user['student_personnel_id'] ?? '') ?>", width: 180, height: 180, colorDark : "#0f172a", colorLight : "#ffffff", correctLevel : QRCode.CorrectLevel.H });
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Prompt', 'Inter', ui-sans-serif, system-ui, sans-serif;
+            background-color: var(--bg);
+            color: var(--ink);
+            -webkit-tap-highlight-color: transparent;
+            line-height: 1.5;
+        }
+
+        .hub {
+            min-height: 100vh;
+            background: var(--bg);
+        }
+
+        /* ─── TopBar (Desktop only) ─── */
+        .topbar {
+            display: grid;
+            grid-template-columns: 200px 1fr 300px 1fr auto auto;
+            align-items: center;
+            gap: 20px;
+            padding: 14px 28px;
+            border-bottom: 1px solid var(--line);
+            background: var(--surface);
+            position: sticky;
+            top: 0;
+            z-index: 50;
+        }
+
+        .topbar__brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 600;
+            color: var(--ink);
+        }
+
+        .topbar__nav {
+            display: flex;
+            gap: 4px;
+        }
+
+        .topbar__nav a {
+            padding: 8px 14px;
+            border-radius: 10px;
+            color: var(--ink-2);
+            font-size: 14px;
+            font-weight: 500;
+            text-decoration: none;
+            cursor: pointer;
+            transition: background .15s, color .15s;
+        }
+
+        .topbar__nav a:hover {
+            background: var(--line-2);
+            color: var(--ink);
+        }
+
+        .topbar__nav a.is-active {
+            background: var(--accent-50);
+            color: var(--accent-600);
+        }
+
+        .topbar__search {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 0 12px;
+            height: 38px;
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            background: var(--bg);
+        }
+
+        .topbar__search input {
+            flex: 1;
+            border: 0;
+            background: transparent;
+            outline: none;
+            color: var(--ink);
+            font-family: inherit;
+            font-size: 13px;
+        }
+
+        .topbar__tools {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn-icon {
+            width: 38px;
+            height: 38px;
+            border-radius: 10px;
+            border: 0;
+            background: transparent;
+            color: var(--ink-2);
+            cursor: pointer;
+            transition: background .15s, color .15s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        .btn-icon:hover {
+            background: var(--line-2);
+            color: var(--ink);
+        }
+
+        .topbar__ping {
+            position: absolute;
+            top: 6px;
+            right: 6px;
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--danger);
+            box-shadow: 0 0 0 2px var(--surface);
+        }
+
+        .avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--accent-100);
+            color: var(--accent-600);
+            font-weight: 600;
+            font-size: 11px;
+            cursor: pointer;
+        }
+
+        /* ─── Main Content ─── */
+        .hub__main {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 28px 28px 48px;
+        }
+
+        .hub__greet {
+            margin-bottom: 28px;
+        }
+
+        .hub__greet h1 {
+            font-size: 28px;
+            font-weight: 600;
+            letter-spacing: -0.015em;
+            margin-bottom: 6px;
+        }
+
+        .hub__greet p {
+            font-size: 14px;
+            color: var(--ink-3);
+        }
+
+        /* ─── Bento Grid ─── */
+        .bento-grid {
+            display: grid;
+            grid-template-columns: repeat(12, 1fr);
+            gap: var(--gap);
+        }
+
+        .g-profile { grid-column: span 8; }
+        .g-wallet { grid-column: span 4; }
+        .g-appt { grid-column: span 5; }
+        .g-qa { grid-column: span 4; }
+        .g-notif { grid-column: span 3; }
+        .g-stats { grid-column: span 8; }
+        .g-camp { grid-column: span 4; }
+        .g-well { grid-column: span 12; }
+
+        @media (max-width: 1024px) {
+            .topbar { grid-template-columns: auto 1fr auto; }
+            .topbar__search { display: none; }
+            .g-profile, .g-stats, .g-well { grid-column: span 12; }
+            .g-wallet, .g-appt, .g-qa, .g-notif, .g-camp { grid-column: span 6; }
+        }
+
+        @media (max-width: 640px) {
+            .topbar { display: none; }
+            .hub__main { padding: 16px 16px 100px; }
+            .bento-grid > * { grid-column: span 12; }
+            .hub__greet h1 { font-size: 22px; }
+        }
+
+        /* ─── Bento Card ─── */
+        .bento {
+            background: var(--surface);
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            padding: 20px;
+            box-shadow: var(--shadow-card);
+            transition: border-color .2s, box-shadow .2s, transform .2s;
+            overflow: hidden;
+        }
+
+        .bento:hover {
+            border-color: var(--accent-200);
+            box-shadow: var(--shadow-hover);
+            transform: translateY(-1px);
+        }
+
+        .card-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 14px;
+        }
+
+        .card-head h3 {
+            margin: 0;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--ink-3);
+            text-transform: uppercase;
+            letter-spacing: .06em;
+        }
+
+        .card-head a {
+            color: var(--accent);
+            font-size: 12px;
+            font-weight: 600;
+            text-decoration: none;
+        }
+
+        /* ─── Profile Card ─── */
+        .profile {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            min-height: 220px;
+            padding: 0;
+        }
+
+        .profile__bg {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            opacity: 0.5;
+        }
+
+        .profile__row {
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 22px 22px 10px;
+        }
+
+        .profile__avatar {
+            position: relative;
+            width: 56px;
+            height: 56px;
+            border-radius: 16px;
+            background: var(--accent-100);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--accent-600);
+            font-weight: 600;
+            font-size: 18px;
+            flex-shrink: 0;
+        }
+
+        .profile__tick {
+            position: absolute;
+            right: -4px;
+            bottom: -4px;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: var(--ok);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 2.5px solid var(--surface);
+            font-size: 10px;
+        }
+
+        .profile__meta {
+            flex: 1;
+        }
+
+        .profile__hello {
+            font-size: 12px;
+            color: var(--ink-3);
+            margin-bottom: 2px;
+        }
+
+        .profile__name {
+            font-size: 22px;
+            font-weight: 600;
+            letter-spacing: -0.01em;
+        }
+
+        .profile__id {
+            font-size: 12px;
+            color: var(--ink-3);
+        }
+
+        .profile__qr {
+            flex-shrink: 0;
+            cursor: pointer;
+            opacity: 0.6;
+            transition: opacity .2s;
+        }
+
+        .profile__qr:hover {
+            opacity: 1;
+        }
+
+        .profile__verified {
+            position: relative;
+            margin: auto 22px 22px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 14px;
+            border-radius: 12px;
+            background: var(--accent-50);
+            color: var(--accent-600);
+            font-size: 12px;
+            font-weight: 500;
+            border: 1px solid var(--accent-100);
+        }
+
+        .profile__shield {
+            width: 22px;
+            height: 22px;
+            border-radius: 6px;
+            background: var(--accent);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+        }
+
+        /* ─── Appointment Card ─── */
+        .appt {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .appt__empty {
+            display: flex;
+            align-items: center;
+            gap: 18px;
+            flex: 1;
+            padding: 20px 0;
+        }
+
+        .appt__empty-art {
+            width: 120px;
+            height: 90px;
+            background: var(--accent-50);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 48px;
+            flex-shrink: 0;
+        }
+
+        .appt__empty-copy {
+            flex: 1;
+        }
+
+        .appt__empty-copy strong {
+            display: block;
+            font-size: 15px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .appt__empty-copy span {
+            display: block;
+            font-size: 13px;
+            color: var(--ink-3);
+            margin-bottom: 12px;
+        }
+
+        .btn-primary {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 0 14px;
+            height: 38px;
+            border-radius: 10px;
+            border: 0;
+            background: var(--accent);
+            color: white;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background .15s, transform .1s;
+            font-family: inherit;
+        }
+
+        .btn-primary:hover {
+            background: var(--accent-600);
+        }
+
+        .btn-primary:active {
+            transform: translateY(1px);
+        }
+
+        .appt__body {
+            display: flex;
+            gap: 18px;
+            align-items: flex-start;
+            flex: 1;
+            margin-bottom: 14px;
+        }
+
+        .appt__date {
+            flex-shrink: 0;
+            width: 72px;
+            text-align: center;
+            border-radius: 12px;
+            border: 1px solid var(--line);
+            overflow: hidden;
+        }
+
+        .appt__mo {
+            background: var(--accent);
+            color: white;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: .12em;
+            padding: 4px 0;
+        }
+
+        .appt__d {
+            font-size: 28px;
+            font-weight: 700;
+            padding: 6px 0 0;
+        }
+
+        .appt__dow {
+            font-size: 11px;
+            color: var(--ink-3);
+            padding: 0 0 6px;
+        }
+
+        .appt__info {
+            flex: 1;
+        }
+
+        .appt__service {
+            font-size: 15px;
+            font-weight: 600;
+            margin-bottom: 2px;
+        }
+
+        .appt__doc {
+            font-size: 13px;
+            color: var(--ink-3);
+            margin-bottom: 12px;
+        }
+
+        .chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 4px 9px;
+            border-radius: 999px;
+            font-size: 11.5px;
+            font-weight: 500;
+            background: var(--line-2);
+            color: var(--ink-2);
+            margin-right: 6px;
+            margin-bottom: 6px;
+        }
+
+        .chip--accent {
+            background: var(--accent-50);
+            color: var(--accent-600);
+        }
+
+        .appt__actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 16px;
+            border-top: 1px solid var(--line);
+            padding-top: 14px;
+        }
+
+        .btn-ghost {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 0 10px;
+            height: 34px;
+            border-radius: 10px;
+            border: 1px solid var(--line);
+            background: var(--surface);
+            color: var(--ink-2);
+            font-size: 12.5px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background .15s, border-color .15s, color .15s;
+            font-family: inherit;
+            text-decoration: none;
+        }
+
+        .btn-ghost:hover {
+            border-color: var(--accent-200);
+            color: var(--ink);
+            background: var(--accent-50);
+        }
+
+        .btn-ghost-danger:hover {
+            border-color: #fecaca;
+            color: var(--danger);
+            background: var(--danger-bg);
+        }
+
+        /* ─── Wallet Card ─── */
+        .wallet {
+            color: white;
+            background: linear-gradient(135deg, var(--accent) 0%, var(--accent-600) 100%);
+            border-color: transparent;
+            min-height: 220px;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        .wallet__deco {
+            position: absolute;
+            inset: 0;
+            opacity: 0.15;
+            pointer-events: none;
+        }
+
+        .wallet__top {
+            position: relative;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .wallet__brand {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 600;
+            background: rgba(255,255,255,.18);
+            color: white;
+        }
+
+        .pill__dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--ok);
+        }
+
+        .wallet__label {
+            position: relative;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+            color: rgba(255,255,255,.7);
+            margin-bottom: 4px;
+        }
+
+        .wallet__amount {
+            position: relative;
+            display: flex;
+            align-items: baseline;
+            gap: 4px;
+            margin-bottom: 10px;
+        }
+
+        .wallet__currency {
+            font-size: 18px;
+            font-weight: 500;
+            opacity: .85;
+        }
+
+        .wallet__num {
+            font-size: 34px;
+            font-weight: 600;
+            letter-spacing: -0.02em;
+        }
+
+        .wallet__per {
+            font-size: 13px;
+            opacity: .7;
+            margin-left: 4px;
+        }
+
+        .wallet__progress {
+            position: relative;
+            height: 5px;
+            border-radius: 99px;
+            background: rgba(255,255,255,.2);
+            overflow: hidden;
+            margin-bottom: 16px;
+        }
+
+        .wallet__progress-bar {
+            height: 100%;
+            background: white;
+            border-radius: 99px;
+            width: 48%;
+        }
+
+        .wallet__foot {
+            position: relative;
+            padding-top: 16px;
+            display: flex;
+            align-items: flex-end;
+            gap: 18px;
+            margin-top: auto;
+            font-size: 12px;
+        }
+
+        .wallet__foot-col {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .wallet__foot-col small {
+            color: rgba(255,255,255,.65);
+            font-size: 10.5px;
+            text-transform: uppercase;
+            letter-spacing: .07em;
+            margin-bottom: 2px;
+        }
+
+        /* ─── Quick Actions ─── */
+        .qa__grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        .qa__item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            border-radius: 12px;
+            background: var(--line-2);
+            border: 1px solid transparent;
+            cursor: pointer;
+            text-align: left;
+            transition: background .15s, border-color .15s, transform .15s;
+            font-family: inherit;
+            border: 0;
+        }
+
+        .qa__item:hover {
+            background: var(--surface);
+            border-color: var(--accent-200);
+            transform: translateY(-1px);
+        }
+
+        .qa__ic {
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            color: white;
+            font-size: 20px;
+        }
+
+        .qa__item--accent .qa__ic { background: var(--accent-100); color: var(--accent-600); }
+        .qa__item--teal .qa__ic { background: #ccfbf1; color: #0d9488; }
+        .qa__item--violet .qa__ic { background: #ede9fe; color: #7c3aed; }
+        .qa__item--slate .qa__ic { background: #e2e8f0; color: #475569; }
+
+        .qa__txt {
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+            flex: 1;
+        }
+
+        .qa__txt strong {
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 2px;
+        }
+
+        .qa__txt small {
+            font-size: 11.5px;
+            color: var(--ink-3);
+        }
+
+        /* ─── Notifications ─── */
+        .notif__list {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .notif__item {
+            position: relative;
+            display: flex;
+            gap: 10px;
+            padding: 10px 10px 10px 14px;
+            border-radius: 10px;
+            background: var(--line-2);
+        }
+
+        .notif__dot {
+            position: absolute;
+            left: 6px;
+            top: 14px;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+        }
+
+        .notif__item--accent .notif__dot { background: var(--accent); }
+        .notif__item--ok .notif__dot { background: var(--ok); }
+        .notif__item--warn .notif__dot { background: var(--warn); }
+
+        .notif__body {
+            flex: 1;
+        }
+
+        .notif__row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 2px;
+        }
+
+        .notif__row strong {
+            font-size: 12.5px;
+            font-weight: 600;
+        }
+
+        .notif__row time {
+            font-size: 11px;
+            color: var(--ink-4);
+            white-space: nowrap;
+        }
+
+        .notif__body p {
+            font-size: 11.5px;
+            color: var(--ink-3);
+            margin: 0;
+        }
+
+        /* ─── Campaigns ─── */
+        .camp__list {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .camp__row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px;
+            border-radius: 10px;
+            cursor: pointer;
+            color: var(--ink-2);
+            transition: background .15s;
+            text-decoration: none;
+        }
+
+        .camp__row:hover {
+            background: var(--line-2);
+        }
+
+        .camp__ic {
+            width: 30px;
+            height: 30px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            font-size: 16px;
+        }
+
+        .camp__row--accent .camp__ic { background: var(--accent-100); color: var(--accent-600); }
+        .camp__row--teal .camp__ic { background: #ccfbf1; color: #0d9488; }
+        .camp__row--violet .camp__ic { background: #ede9fe; color: #7c3aed; }
+
+        .camp__txt {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .camp__txt strong {
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .camp__txt small {
+            font-size: 11px;
+            color: var(--ink-3);
+            margin-top: 1px;
+        }
+
+        /* ─── Stats ─── */
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            align-items: center;
+        }
+
+        .stat {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            padding-right: 20px;
+            border-right: 1px solid var(--line);
+        }
+
+        .stat:last-child {
+            border-right: 0;
+        }
+
+        .stat small {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+            color: var(--ink-3);
+            font-weight: 600;
+        }
+
+        .stat strong {
+            font-size: 22px;
+            font-weight: 600;
+            letter-spacing: -0.01em;
+        }
+
+        .stat span {
+            font-size: 11.5px;
+            color: var(--ink-4);
+        }
+
+        @media (max-width: 640px) {
+            .stats {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 14px;
+            }
+            .stat {
+                padding-right: 0;
+                border-right: 0;
             }
         }
-        function hideQR() { document.getElementById('qr-modal').classList.add('hidden'); }
-        function showNotifications() { document.getElementById('notif-modal').classList.remove('hidden'); document.getElementById('notif-modal').classList.add('flex'); }
-        function hideNotifications() { document.getElementById('notif-modal').classList.add('hidden'); }
-        function showProfile() { document.getElementById('profile-modal').classList.remove('hidden'); document.getElementById('profile-modal').classList.add('flex'); }
-        function hideProfile() { document.getElementById('profile-modal').classList.add('hidden'); }
-        function showCampaigns() { document.getElementById('camps-modal').classList.remove('hidden'); document.getElementById('camps-modal').classList.add('flex'); }
-        function hideCampaigns() { document.getElementById('camps-modal').classList.add('hidden'); }
-        function showHistory() { document.getElementById('history-modal').classList.remove('hidden'); document.getElementById('history-modal').classList.add('flex'); }
-        function hideHistory() { document.getElementById('history-modal').classList.add('hidden'); }
-        function showContact() { document.getElementById('contact-modal').classList.remove('hidden'); document.getElementById('contact-modal').classList.add('flex'); }
-        function hideContact() { document.getElementById('contact-modal').classList.add('hidden'); }
-        function showChat() { document.getElementById('chat-modal').classList.remove('hidden'); document.getElementById('chat-modal').classList.add('flex'); const content = document.getElementById('chat-content'); content.scrollTop = content.scrollHeight; }
-        function hideChat() { document.getElementById('chat-modal').classList.add('hidden'); }
-        function showUpcoming(name) { document.getElementById('upcoming-name').innerText = name; document.getElementById('upcoming-modal').classList.remove('hidden'); document.getElementById('upcoming-modal').classList.add('flex'); }
-        function hideUpcoming() { document.getElementById('upcoming-modal').classList.add('hidden'); }
 
-        // Suppress Tailwind CDN production warning
-        (function() {
-            const originalWarn = console.warn;
-            console.warn = function(...args) {
-                if (args[0]?.includes?.('cdn.tailwindcss.com')) return;
-                originalWarn.apply(console, args);
-            };
-        })();
-        let qr = null;
-    </script>
-<body class="text-slate-900 pb-32">
+        /* ─── Wellness ─── */
+        .wellness {
+            display: flex;
+            gap: 14px;
+            align-items: center;
+            background: linear-gradient(90deg, var(--accent-50) 0%, var(--surface) 60%);
+            border-color: var(--accent-100);
+        }
 
-    <div class="max-w-md mx-auto relative min-h-screen">
-        
-        <!-- ── Clean White Header (Target Design) ── -->
-        <header class="bg-white/80 backdrop-blur-xl sticky top-0 z-[60] px-6 py-4 flex items-center justify-between border-b border-slate-50 shadow-sm shadow-slate-100">
-            <div class="flex items-center gap-4">
-                <button onclick="showCampaigns()" class="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-blue-100 active:scale-90 transition-all">
-                    <i class="fa-solid fa-plus text-xl"></i>
-                </button>
-                <div class="flex flex-col">
-                    <h1 class="text-slate-900 font-black text-lg leading-none mb-1 tracking-tight">RSU Medical</h1>
-                    <p class="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em] leading-none">User Hub</p>
-                </div>
+        .wellness__ic {
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            background: var(--accent);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            font-size: 18px;
+        }
+
+        .wellness__body {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .wellness__body small {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: .07em;
+            color: var(--accent-600);
+            font-weight: 600;
+        }
+
+        .wellness__body strong {
+            font-size: 13.5px;
+            font-weight: 500;
+            line-height: 1.45;
+        }
+
+        /* ─── Mobile Bottom Nav ─── */
+        .mnav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            background: var(--surface);
+            border-top: 1px solid var(--line);
+            padding: 8px 8px calc(8px + env(safe-area-inset-bottom, 0));
+            z-index: 40;
+        }
+
+        .mnav a {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2px;
+            padding: 6px;
+            color: var(--ink-3);
+            font-size: 10.5px;
+            font-weight: 500;
+            cursor: pointer;
+            border-radius: 10px;
+            text-decoration: none;
+            transition: color .15s;
+        }
+
+        .mnav a:hover {
+            color: var(--accent);
+        }
+
+        .mnav__fab {
+            background: var(--accent);
+            color: white !important;
+            width: 52px;
+            height: 52px;
+            border-radius: 50%;
+            align-self: center;
+            justify-self: center;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 6px 16px -4px rgba(37,99,235,.5);
+            transform: translateY(-12px);
+        }
+
+        @media (max-width: 640px) {
+            .mnav {
+                display: grid;
+            }
+        }
+
+        @media (min-width: 641px) {
+            .mnav {
+                display: none;
+            }
+        }
+
+        /* ─── Modals ─── */
+        .modal {
+            position: fixed;
+            inset: 0;
+            z-index: 100;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal__overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(15,23,42,.4);
+            backdrop-filter: blur(4px);
+        }
+
+        .modal__content {
+            position: relative;
+            background: var(--surface);
+            border-radius: var(--radius);
+            box-shadow: 0 30px 60px rgba(0,0,0,.15);
+            max-width: 400px;
+            width: 100%;
+            padding: 20px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .modal__head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--line);
+        }
+
+        .modal__head h3 {
+            font-size: 18px;
+            font-weight: 600;
+            margin: 0;
+        }
+
+        .modal__close {
+            background: none;
+            border: 0;
+            font-size: 24px;
+            cursor: pointer;
+            color: var(--ink-3);
+            padding: 0;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        @media (max-width: 640px) {
+            .modal__content {
+                max-width: none;
+            }
+        }
+
+        /* ─── QR Modal ─── */
+        #qrcode {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="hub">
+        <!-- Top Bar -->
+        <header class="topbar">
+            <div class="topbar__brand">
+                <i class="fas fa-shield-heart" style="font-size: 24px; color: var(--accent);"></i>
+                <span>RSU Medical</span>
             </div>
-            <div class="flex items-center gap-3">
-                <button onclick="showQR()" class="w-10 h-10 flex items-center justify-center text-slate-600 hover:text-blue-600 transition-colors">
-                    <i class="fa-solid fa-qrcode text-lg"></i>
-                </button>
-                <button onclick="showNotifications()" class="w-10 h-10 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors relative">
-                    <i class="fa-solid fa-bell text-lg"></i>
+            <nav class="topbar__nav">
+                <a href="#" class="is-active">หน้าหลัก</a>
+                <a href="#">บริการ</a>
+                <a href="#">นัดหมาย</a>
+                <a href="#">ช่วยเหลือ</a>
+            </nav>
+            <div class="topbar__search">
+                <i class="fas fa-search" style="color: var(--ink-3);"></i>
+                <input type="text" placeholder="ค้นหาบริการ ประวัติ แคมเปญ…">
+            </div>
+            <div style="flex: 1;"></div>
+            <div class="topbar__tools">
+                <button class="btn-icon">
+                    <i class="fas fa-bell" style="font-size: 18px;"></i>
                     <?php if ($upcoming_count > 0): ?>
-                        <span class="absolute top-1.5 right-1.5 w-4 h-4 bg-red-500 text-white text-[9px] font-black rounded-full border-2 border-white flex items-center justify-center"><?= $upcoming_count ?></span>
+                        <span class="topbar__ping"></span>
                     <?php endif; ?>
+                </button>
+                <button class="avatar" title="Account">
+                    <?= htmlspecialchars($userInitials) ?>
                 </button>
             </div>
         </header>
 
-        <main class="px-6 pt-8 space-y-8">
-            
-            <!-- ── Title Section ── -->
-            <div class="px-1">
-                <p class="text-slate-400 text-[10px] font-black uppercase tracking-[0.3em] mb-2 opacity-70"><?= $thaiDate ?></p>
-                <div class="flex items-end justify-between">
-                    <h2 class="text-3xl font-black text-slate-900 tracking-tight">Command Center</h2>
-                    <div class="w-2 h-2 bg-blue-600 rounded-full mb-2 animate-pulse"></div>
-                </div>
+        <!-- Main Content -->
+        <main class="hub__main">
+            <!-- Greeting -->
+            <div class="hub__greet">
+                <h1><?= htmlspecialchars($greeting) ?> <?= htmlspecialchars(explode(' ', $user['full_name'])[0]) ?></h1>
+                <p><?= htmlspecialchars($thaiDate) ?> · <?= $upcoming_count ?> นัดหมาย</p>
             </div>
 
-            <!-- ── Premium Identity Card (Wallet Style) ── -->
-            <div onclick="showProfile()" class="relative overflow-hidden bg-gradient-to-br from-[#0052CC] via-[#0066FF] to-[#0052CC] rounded-[3rem] p-8 shadow-[0_25px_50px_-12px_rgba(0,82,204,0.3)] group active:scale-[0.97] transition-all cursor-pointer">
-                <!-- Abstract Decorations -->
-                <div class="absolute -right-6 -top-6 w-48 h-48 bg-white/10 rounded-full blur-3xl group-hover:scale-150 transition-transform duration-1000"></div>
-                <div class="absolute -left-12 -bottom-12 w-56 h-56 bg-blue-400/20 rounded-full blur-3xl"></div>
-                
-                <div class="relative z-10">
-                    <div class="flex items-center gap-5 mb-10">
-                        <div class="relative">
-                            <div class="w-20 h-20 rounded-[2rem] overflow-hidden border-2 border-white/20 shadow-2xl">
-                                <img src="<?= $user['picture_url'] ?? 'https://ui-avatars.com/api/?name='.urlencode($user['full_name']); ?>" class="w-full h-full object-cover">
+            <!-- Bento Grid -->
+            <div class="bento-grid">
+                <!-- Profile Card -->
+                <div class="g-profile">
+                    <div class="bento profile">
+                        <svg class="profile__bg" viewBox="0 0 400 220" preserveAspectRatio="xMidYMid slice">
+                            <defs>
+                                <radialGradient id="pb1" cx="15%" cy="10%" r="60%">
+                                    <stop offset="0" stopColor="var(--accent)" stopOpacity=".28"/>
+                                    <stop offset="1" stopColor="var(--accent)" stopOpacity="0"/>
+                                </radialGradient>
+                            </defs>
+                            <rect width="400" height="220" fill="url(#pb1)"/>
+                            <g stroke="var(--accent)" strokeOpacity=".08" fill="none">
+                                <circle cx="360" cy="40" r="80"/>
+                                <circle cx="360" cy="40" r="120"/>
+                            </g>
+                        </svg>
+                        <div class="profile__row">
+                            <div class="profile__avatar">
+                                <?= htmlspecialchars($userInitials) ?>
+                                <span class="profile__tick">✓</span>
                             </div>
-                            <div class="absolute -bottom-1 -right-1 w-6 h-6 bg-emerald-400 rounded-full border-4 border-[#005edb] animate-pulse"></div>
-                        </div>
-                        <div class="flex-1 min-w-0">
-                            <p class="text-blue-100/80 text-sm font-bold mb-1">สวัสดี 👋</p>
-                            <h3 class="text-white text-2xl font-black tracking-tight leading-tight mb-1 truncate"><?= $user['full_name'] ?></h3>
-                            <p class="text-blue-100/60 text-[11px] font-black uppercase tracking-[0.1em]">ID: <?= !empty($user['student_personnel_id']) ? $user['student_personnel_id'] : 'N/A' ?></p>
-                        </div>
-                        <div class="w-12 h-12 bg-white/15 backdrop-blur-xl rounded-2xl flex items-center justify-center border border-white/20 shadow-xl group-hover:translate-x-1 transition-transform">
-                            <i class="fa-solid fa-chevron-right text-white text-sm"></i>
-                        </div>
-                    </div>
-
-                    <div class="relative flex items-center justify-between pt-6 border-t border-white/10">
-                        <div class="flex items-center gap-3 text-white">
-                            <i class="fa-solid fa-graduation-cap text-blue-200 text-sm"></i>
-                            <p class="text-blue-50 text-[11px] font-bold tracking-wide truncate max-w-[200px]">
-                                <?= !empty($user['department']) ? $user['department'] : 'วิทยาลัยนวัตกรรมดิจิทัลเทคโนโลยี' ?> · <?= $user['status'] ?>
-                            </p>
-                        </div>
-                        <div class="bg-emerald-400/20 border border-emerald-400/30 rounded-full px-4 py-1.5 backdrop-blur-md flex items-center gap-2">
-                            <i class="fa-solid fa-circle-check text-emerald-300 text-[10px]"></i>
-                            <span class="text-emerald-200 text-[9px] font-black uppercase tracking-[0.15em]">Verified</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- ── Health Stats ── -->
-            <div class="grid grid-cols-2 gap-4">
-                <button onclick="showUpcoming('ประวัติการเข้าพบ')" class="bg-white rounded-[2.5rem] p-6 border border-slate-100 shadow-[0_15px_30px_rgba(0,0,0,0.03)] flex flex-col items-center text-center active:scale-95 transition-all group">
-                    <div class="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-                        <i class="fa-solid fa-calendar-check text-blue-600 text-lg"></i>
-                    </div>
-                    <p class="font-black text-xl text-slate-900 mb-0.5"><?= count($booking_list) ?></p>
-                    <p class="text-slate-400 text-[10px] font-bold uppercase tracking-widest">การเข้าพบ</p>
-                </button>
-                <button onclick="showUpcoming('รายการยืมอุปกรณ์')" class="bg-white rounded-[2.5rem] p-6 border border-slate-100 shadow-[0_15px_30px_rgba(0,0,0,0.03)] flex flex-col items-center text-center active:scale-95 transition-all group">
-                    <div class="w-12 h-12 bg-orange-50 rounded-2xl flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-                        <i class="fa-solid fa-boxes-stacked text-orange-600 text-lg"></i>
-                    </div>
-                    <p class="font-black text-xl text-slate-900 mb-0.5"><?= $borrow_count ?></p>
-                    <p class="text-slate-400 text-[10px] font-bold uppercase tracking-widest">รายการยืม</p>
-                </button>
-            </div>
-
-            <!-- ── Quick Services Menu ── -->
-            <div class="space-y-4">
-                <div class="flex items-center justify-between px-1">
-                    <h3 class="text-slate-900 font-black text-sm uppercase tracking-widest">Main Menu</h3>
-                    <button onclick="showUpcoming('เมนูทั้งหมด')" class="text-blue-600 text-[10px] font-black uppercase tracking-widest bg-blue-50 px-3 py-1.5 rounded-full">All Services</button>
-                </div>
-                
-                <div class="bg-white rounded-[3rem] border border-slate-100 shadow-[0_20px_50px_rgba(0,0,0,0.04)] p-6 pt-8">
-                    <div class="grid grid-cols-2 gap-4 mb-8">
-                        <button onclick="showCampaigns()" class="relative flex flex-col items-start p-6 rounded-[2.2rem] bg-[#0052CC] shadow-[0_15px_30px_rgba(0,82,204,0.25)] active:scale-95 transition-all text-white overflow-hidden text-left group">
-                            <div class="absolute -right-4 -top-4 w-16 h-16 bg-white/10 rounded-full blur-xl group-hover:scale-150 transition-transform"></div>
-                            <div class="w-11 h-11 rounded-2xl bg-white/20 flex items-center justify-center mb-4 border border-white/20">
-                                <i class="fa-solid fa-calendar-plus text-white text-base"></i>
+                            <div class="profile__meta">
+                                <div class="profile__hello">สวัสดี 👋</div>
+                                <div class="profile__name"><?= htmlspecialchars($user['full_name']) ?></div>
+                                <div class="profile__id"><?= htmlspecialchars($user['student_personnel_id'] ?? 'N/A') ?> · Student</div>
                             </div>
-                            <p class="text-[13px] font-black leading-tight tracking-wide">จองคิว /<br>แคมเปญ</p>
-                        </button>
-                        
-                        <a href="../e_Borrow/" class="relative flex flex-col items-start p-6 rounded-[2.2rem] bg-amber-50 border border-amber-100 shadow-sm active:scale-95 transition-all text-amber-600 group">
-                            <div class="w-11 h-11 rounded-2xl bg-white flex items-center justify-center mb-4 shadow-sm border border-amber-50 group-hover:scale-110 transition-transform">
-                                <i class="fa-solid fa-box-archive text-amber-500 text-base"></i>
-                            </div>
-                            <p class="text-[13px] font-black leading-tight tracking-wide text-slate-800">ยืม-คืน<br>e-Borrow</p>
-                        </a>
-
-                        <button onclick="showHistory()" class="relative flex flex-col items-start p-6 rounded-[2.2rem] bg-indigo-50 border border-indigo-100 shadow-sm active:scale-95 transition-all text-indigo-600 group">
-                            <?php if ($upcoming_count > 0): ?>
-                                <span class="absolute top-4 right-4 w-6 h-6 bg-red-500 text-white text-[10px] font-black rounded-full flex items-center justify-center border-2 border-white shadow-lg animate-bounce"><?= $upcoming_count ?></span>
-                            <?php endif; ?>
-                            <div class="w-11 h-11 rounded-2xl bg-white flex items-center justify-center mb-4 shadow-sm border border-indigo-50 group-hover:scale-110 transition-transform">
-                                <i class="fa-solid fa-clipboard-list text-indigo-500 text-base"></i>
-                            </div>
-                            <p class="text-[13px] font-black leading-tight tracking-wide text-slate-800">ประวัติ<br>การรักษา</p>
-                        </button>
-
-                        <button onclick="showProfile()" class="relative flex flex-col items-start p-6 rounded-[2.2rem] bg-slate-50 border border-slate-100 shadow-sm active:scale-95 transition-all text-slate-600 group">
-                            <div class="w-11 h-11 rounded-2xl bg-white flex items-center justify-center mb-4 shadow-sm border border-slate-50 group-hover:scale-110 transition-transform">
-                                <i class="fa-solid fa-gear text-slate-400 text-base"></i>
-                            </div>
-                            <p class="text-[13px] font-black leading-tight tracking-wide text-slate-800">ตั้งค่า<br>โปรไฟล์</p>
-                        </button>
-                    </div>
-
-                    <div class="pt-6 border-t border-slate-50">
-                        <p class="text-slate-400 text-[9px] font-black uppercase tracking-[0.3em] mb-5 text-center">External Services</p>
-                        <div class="grid grid-cols-4 gap-4">
-                            <a href="https://lin.ee/C3CJ2A9" target="_blank" class="flex flex-col items-center gap-2 active:scale-90 transition-all">
-                                <div class="w-12 h-12 bg-purple-50 rounded-2xl flex items-center justify-center text-purple-600 shadow-sm hover:shadow-purple-100 transition-all">
-                                    <i class="fa-solid fa-comment-dots text-lg"></i>
-                                </div>
-                                <span class="text-slate-500 text-[8px] font-black text-center leading-tight uppercase tracking-widest">Counseling</span>
-                            </a>
-                            <a href="https://line.me/R/ti/p/@115vbibe?oat_content=url&ts=12222134" target="_blank" class="flex flex-col items-center gap-2 active:scale-90 transition-all">
-                                <div class="w-12 h-12 bg-cyan-50 rounded-2xl flex items-center justify-center text-cyan-600 shadow-sm hover:shadow-cyan-100 transition-all">
-                                    <i class="fa-solid fa-heart-pulse text-lg"></i>
-                                </div>
-                                <span class="text-slate-500 text-[8px] font-black text-center leading-tight uppercase tracking-widest">NCD Clinic</span>
-                            </a>
-                            <button onclick="showContact()" class="flex flex-col items-center gap-2 active:scale-90 transition-all">
-                                <div class="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600 shadow-sm hover:shadow-emerald-100 transition-all">
-                                    <i class="fa-solid fa-phone-flip text-base"></i>
-                                </div>
-                                <span class="text-slate-500 text-[8px] font-black text-center leading-tight uppercase tracking-widest">Contact</span>
-                            </button>
-                            <button onclick="showChat()" class="flex flex-col items-center gap-2 active:scale-90 transition-all">
-                                <div class="w-12 h-12 bg-orange-50 rounded-2xl flex items-center justify-center text-orange-600 shadow-sm hover:shadow-orange-100 transition-all">
-                                    <i class="fa-solid fa-circle-question text-lg"></i>
-                                </div>
-                                <span class="text-slate-500 text-[8px] font-black text-center leading-tight uppercase tracking-widest">Help</span>
+                            <button class="profile__qr" title="QR Code" onclick="openModal('qr-modal')">
+                                <i class="fas fa-qrcode" style="font-size: 18px; color: var(--ink-3);"></i>
                             </button>
                         </div>
+                        <div class="profile__verified">
+                            <span class="profile__shield"><i class="fas fa-shield-check" style="font-size: 11px;"></i></span>
+                            <span>Identity Verified</span>
+                            <span style="width: 3px; height: 3px; border-radius: 50%; background: currentColor; opacity: 0.5;"></span>
+                            <span style="font-size: 11px; color: var(--ink-3); font-weight: 400;">Thai National ID</span>
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            <!-- ── Active Appointments ── -->
-            <div class="space-y-4">
-                <p class="text-slate-500 text-[10px] font-black uppercase tracking-[0.3em] px-1">Upcoming Appointments</p>
-                <div class="bg-white rounded-[3rem] border border-slate-100 shadow-[0_20px_50px_rgba(0,0,0,0.04)] overflow-hidden">
-                    <div class="flex items-center justify-between px-7 pt-7 pb-4 border-b border-slate-50">
-                        <h3 class="text-slate-900 font-black text-xs uppercase tracking-widest">Latest Queue</h3>
-                        <span class="bg-blue-50 text-blue-600 text-[9px] font-black px-3 py-1 rounded-full uppercase"><?= $upcoming_count ?> Active</span>
+                <!-- Insurance Wallet -->
+                <div class="g-wallet">
+                    <div class="bento wallet">
+                        <div class="wallet__deco">
+                            <svg viewBox="0 0 300 180" preserveAspectRatio="xMidYMid slice">
+                                <circle cx="260" cy="30" r="80" fill="white" opacity=".25"/>
+                                <circle cx="280" cy="140" r="40" fill="white" opacity=".08"/>
+                            </svg>
+                        </div>
+                        <div class="wallet__top">
+                            <div class="wallet__brand">
+                                <i class="fas fa-heart-pulse"></i>
+                                <span>RSU Accident Care</span>
+                            </div>
+                            <div class="pill">
+                                <span class="pill__dot"></span>
+                                ใช้งานได้
+                            </div>
+                        </div>
+                        <div class="wallet__label">ยอดคงเหลือ</div>
+                        <div class="wallet__amount">
+                            <span class="wallet__currency">฿</span>
+                            <span class="wallet__num">48,250</span>
+                            <span class="wallet__per">/ 100,000</span>
+                        </div>
+                        <div class="wallet__progress">
+                            <div class="wallet__progress-bar"></div>
+                        </div>
+                        <div class="wallet__foot">
+                            <div class="wallet__foot-col">
+                                <small>Policy</small>
+                                <span>RSU-24-U-0815</span>
+                            </div>
+                            <div class="wallet__foot-col">
+                                <small>Coverage</small>
+                                <span>31 ส.ค. 2569</span>
+                            </div>
+                        </div>
                     </div>
-                    <div class="p-6 space-y-4">
-                        <?php if (empty($booking_list)): ?>
-                            <div class="py-12 text-center text-slate-300 font-bold text-sm italic">ไม่มีนัดหมายในเร็วๆ นี้</div>
+                </div>
+
+                <!-- Appointment Card -->
+                <div class="g-appt">
+                    <div class="bento appt">
+                        <div class="card-head">
+                            <h3>นัดหมายถัดไป</h3>
+                        </div>
+                        <?php if ($next_appt): ?>
+                            <div class="appt__body">
+                                <div class="appt__date">
+                                    <div class="appt__mo"><?= strtoupper(date('M', strtotime($next_appt['slot_date']))) ?></div>
+                                    <div class="appt__d"><?= date('d', strtotime($next_appt['slot_date'])) ?></div>
+                                    <div class="appt__dow"><?= ['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์'][date('w', strtotime($next_appt['slot_date']))] ?></div>
+                                </div>
+                                <div class="appt__info">
+                                    <div class="appt__service"><?= htmlspecialchars($next_appt['camp_name']) ?></div>
+                                    <div class="appt__doc"><?= htmlspecialchars($next_appt['slot_date']) ?> · <?= htmlspecialchars(substr($next_appt['start_time'], 0, 5)) ?></div>
+                                    <div>
+                                        <span class="chip chip--accent"><i class="fas fa-clock"></i> <?= htmlspecialchars(substr($next_appt['start_time'], 0, 5)) ?> – <?= htmlspecialchars(substr($next_appt['end_time'], 0, 5)) ?></span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="appt__actions">
+                                <a href="cancel_booking.php?id=<?= htmlspecialchars($next_appt['id']) ?>" class="btn-ghost btn-ghost-danger"><i class="fas fa-x-mark"></i> ยกเลิก</a>
+                                <a href="my_bookings.php" class="btn-ghost"><i class="fas fa-calendar-plus"></i> ดูทั้งหมด</a>
+                            </div>
                         <?php else: ?>
-                            <?php foreach ($booking_list as $b): 
-                                if (!in_array($b['status'], ['booked', 'confirmed'])) continue;
-                                $status = getStatusStyle($b['status']);
-                            ?>
-                            <div class="bg-slate-50/50 rounded-[2.2rem] p-6 border border-slate-100 relative group active:scale-[0.98] transition-all">
-                                <div class="flex items-start justify-between mb-5">
-                                    <div class="flex items-center gap-4">
-                                        <div class="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm text-blue-600 border border-slate-100">
-                                            <i class="fa-solid fa-calendar-check text-base"></i>
-                                        </div>
-                                        <div>
-                                            <h4 class="text-slate-900 font-black text-sm leading-tight mb-1.5"><?= htmlspecialchars($b['camp_name']) ?></h4>
-                                            <div class="flex items-center gap-2">
-                                                <span class="w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
-                                                <p class="text-slate-400 text-[9px] font-black uppercase tracking-[0.1em]">Confirmed Slot</p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <span class="px-3 py-1.5 rounded-xl <?= $status['class'] ?> text-[9px] font-black uppercase tracking-widest"><?= $status['label'] ?></span>
-                                </div>
-                                <div class="grid grid-cols-2 gap-4">
-                                    <div class="bg-white p-4 rounded-2xl border border-slate-100/50 shadow-sm flex items-center gap-3">
-                                        <i class="fa-regular fa-calendar text-blue-500 text-xs"></i>
-                                        <div>
-                                            <p class="text-slate-400 text-[8px] font-black uppercase tracking-widest leading-none mb-1">Date</p>
-                                            <p class="text-slate-800 font-black text-xs leading-none"><?= date('d M Y', strtotime($b['booking_date'])) ?></p>
-                                        </div>
-                                    </div>
-                                    <div class="bg-white p-4 rounded-2xl border border-slate-100/50 shadow-sm flex items-center gap-3">
-                                        <i class="fa-regular fa-clock text-blue-500 text-xs"></i>
-                                        <div>
-                                            <p class="text-slate-400 text-[8px] font-black uppercase tracking-widest leading-none mb-1">Time</p>
-                                            <p class="text-slate-800 font-black text-xs leading-none"><?= date('H:i', strtotime($b['booking_time'])) ?> น.</p>
-                                        </div>
-                                    </div>
+                            <div class="appt__empty">
+                                <div class="appt__empty-art">📅</div>
+                                <div class="appt__empty-copy">
+                                    <strong>ยังไม่มีนัดหมาย</strong>
+                                    <span>จองคิวคลินิกหรือฉีดวัคซีนได้ในไม่กี่คลิก</span>
+                                    <a href="booking_campaign.php" class="btn-primary"><i class="fas fa-plus"></i> จองเลย</a>
                                 </div>
                             </div>
-                            <?php endforeach; ?>
                         <?php endif; ?>
                     </div>
                 </div>
+
+                <!-- Quick Actions -->
+                <div class="g-qa">
+                    <div class="bento">
+                        <div class="card-head">
+                            <h3>ทางลัด</h3>
+                        </div>
+                        <div class="qa__grid">
+                            <a href="booking_campaign.php" class="qa__item qa__item--accent">
+                                <span class="qa__ic">💉</span>
+                                <div class="qa__txt">
+                                    <strong>จองแคมเปญ</strong>
+                                    <small>วัคซีนและคลินิก</small>
+                                </div>
+                            </a>
+                            <a href="my_bookings.php" class="qa__item qa__item--violet">
+                                <span class="qa__ic">📋</span>
+                                <div class="qa__txt">
+                                    <strong>ประวัติ</strong>
+                                    <small><?= count($booking_list) ?> ครั้ง</small>
+                                </div>
+                            </a>
+                            <a href="my_bookings.php" class="qa__item qa__item--teal">
+                                <span class="qa__ic">📊</span>
+                                <div class="qa__txt">
+                                    <strong>เวชระเบียน</strong>
+                                    <small>ผลแล็บ</small>
+                                </div>
+                            </a>
+                            <a href="profile.php" class="qa__item qa__item--slate">
+                                <span class="qa__ic">⚙️</span>
+                                <div class="qa__txt">
+                                    <strong>ตั้งค่า</strong>
+                                    <small>โปรไฟล์</small>
+                                </div>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Notifications -->
+                <div class="g-notif">
+                    <div class="bento">
+                        <div class="card-head">
+                            <h3>การแจ้งเตือน</h3>
+                            <a href="#">ดูทั้งหมด</a>
+                        </div>
+                        <ul class="notif__list">
+                            <li class="notif__item notif__item--accent">
+                                <span class="notif__dot"></span>
+                                <div class="notif__body">
+                                    <div class="notif__row">
+                                        <strong><?php if ($upcoming_count > 0): ?>เตือนนัดหมาย<?php else: ?>ไม่มีนัดหมายใหม่<?php endif; ?></strong>
+                                        <time>เมื่อสักครู่</time>
+                                    </div>
+                                    <p><?php if ($upcoming_count > 0): ?>คุณมีนัดหมาย <?= $upcoming_count ?> รายการรอการรักษา<?php else: ?>ยังไม่มีนัดหมายที่รอดำเนินการ<?php endif; ?></p>
+                                </div>
+                            </li>
+                            <li class="notif__item notif__item--ok">
+                                <span class="notif__dot"></span>
+                                <div class="notif__body">
+                                    <div class="notif__row">
+                                        <strong>รายการยืมอุปกรณ์</strong>
+                                        <time>เมื่อสักครู่</time>
+                                    </div>
+                                    <p>คุณมีรายการยืม <?= $borrow_count ?> รายการ</p>
+                                </div>
+                            </li>
+                            <li class="notif__item notif__item--warn">
+                                <span class="notif__dot"></span>
+                                <div class="notif__body">
+                                    <div class="notif__row">
+                                        <strong>คำแนะนำสุขภาพ</strong>
+                                        <time>เมื่อวาน</time>
+                                    </div>
+                                    <p>ตรวจสุขภาพประจำปี ครบกำหนด เดือน ส.ค.</p>
+                                </div>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Stats Strip -->
+                <div class="g-stats">
+                    <div class="bento">
+                        <div class="stats">
+                            <div class="stat">
+                                <small>นัดหมายถัดไป</small>
+                                <strong><?php if ($next_appt): ?><?= htmlspecialchars(substr($next_appt['slot_date'], 5, 2)) ?>/<?= htmlspecialchars(substr($next_appt['slot_date'], 8, 2)) ?><?php else: ?>—<?php endif; ?></strong>
+                                <span><?php if ($next_appt): ?><?= htmlspecialchars($next_appt['camp_name']) ?><?php else: ?>ยังไม่มี<?php endif; ?></span>
+                            </div>
+                            <div class="stat">
+                                <small>เข้าพบแล้ว</small>
+                                <strong><?= count($booking_list) ?></strong>
+                                <span>ครั้ง</span>
+                            </div>
+                            <div class="stat">
+                                <small>ยืมอุปกรณ์</small>
+                                <strong><?= $borrow_count ?></strong>
+                                <span>รายการ</span>
+                            </div>
+                            <div class="stat">
+                                <small>ยอดประกัน</small>
+                                <strong>฿48,250</strong>
+                                <span>48% ของวงเงิน</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Campaigns -->
+                <div class="g-camp">
+                    <div class="bento">
+                        <div class="card-head">
+                            <h3>แคมเปญเปิดรับ</h3>
+                            <a href="booking_campaign.php">ดูทั้งหมด</a>
+                        </div>
+                        <?php if (empty($camp_list)): ?>
+                            <p style="text-align: center; color: var(--ink-3); padding: 20px 0;">ยังไม่มีแคมเปญในขณะนี้</p>
+                        <?php else: ?>
+                            <ul class="camp__list">
+                                <?php foreach (array_slice($camp_list, 0, 3) as $c):
+                                    $tone = match($c['type']) {
+                                        'vaccine' => 'accent',
+                                        'health_check' => 'teal',
+                                        'training' => 'violet',
+                                        default => 'accent'
+                                    };
+                                    $icon = campIcon($c['type']);
+                                ?>
+                                    <a href="booking_date.php?campaign_id=<?= htmlspecialchars($c['id']) ?>" class="camp__row camp__row--<?= $tone ?>">
+                                        <span class="camp__ic"><?= $icon ?></span>
+                                        <div class="camp__txt">
+                                            <strong><?= htmlspecialchars($c['title']) ?></strong>
+                                            <small><?= htmlspecialchars($c['available_until'] ? 'ถึง ' . date('j M', strtotime($c['available_until'])) : 'ไม่มีกำหนด') ?></small>
+                                        </div>
+                                    </a>
+                                <?php endforeach; ?>
+                            </ul>
+                        <?php endif; ?>
+                    </div>
+                </div>
+
+                <!-- Wellness Banner -->
+                <div class="g-well">
+                    <div class="bento wellness">
+                        <div class="wellness__ic">✨</div>
+                        <div class="wellness__body">
+                            <small>คำแนะนำสุขภาพ</small>
+                            <strong>ตรวจสุขภาพประจำปี ครบกำหนดเดือน ส.ค. จองเช้าได้คิวไว</strong>
+                        </div>
+                    </div>
+                </div>
             </div>
-
-            <!-- ── Insurance Card ── -->
-            <div class="space-y-4">
-                <p class="text-slate-500 text-[10px] font-black uppercase tracking-[0.3em] px-1">Medical Coverage</p>
-                <div class="bg-slate-900 rounded-[3rem] p-8 shadow-2xl relative overflow-hidden premium-shadow">
-                    <div class="absolute -right-8 -bottom-8 w-40 h-40 bg-white/5 rounded-full blur-3xl"></div>
-                    <div class="flex items-start justify-between mb-10">
-                        <div>
-                            <h4 class="text-white font-black text-sm tracking-tight">Student Insurance (INTL)</h4>
-                            <p class="text-white/30 text-[9px] font-black uppercase tracking-[0.2em] mt-1.5 leading-none">Muang Thai Insurance</p>
-                        </div>
-                    </div>
-                    
-                    <div class="space-y-2 mb-8">
-                        <div class="flex items-center gap-2 opacity-40">
-                            <p class="text-white text-[10px] font-black uppercase tracking-[0.3em]">Remaining Balance</p>
-                            <i class="fa-solid fa-eye-low-vision text-[10px]"></i>
-                        </div>
-                        <div class="flex items-baseline gap-1">
-                            <span class="text-white text-[18px] font-black opacity-50">฿</span>
-                            <span class="text-white text-4xl font-black tracking-tighter">40,000</span>
-                        </div>
-                        <p class="text-white/20 text-[10px] font-bold">Max Limit per Incident: ฿ 40,000</p>
-                    </div>
-
-                    <div class="flex items-end justify-between pt-6 border-t border-white/10 relative z-10">
-                        <div>
-                            <p class="text-white/30 text-[8px] font-black uppercase tracking-[0.2em] mb-1.5">Primary Holder</p>
-                            <p class="text-white text-[11px] font-black uppercase tracking-wider truncate max-w-[180px]"><?= $user['full_name'] ?></p>
-                        </div>
-                        <div class="text-right">
-                            <p class="text-white/30 text-[8px] font-black uppercase tracking-[0.2em] mb-1.5">Expires</p>
-                            <p class="text-white text-[11px] font-black uppercase tracking-widest">Coming Soon</p>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Info Banner -->
-                <div class="bg-blue-600 rounded-[2.2rem] p-6 shadow-xl shadow-blue-100 relative overflow-hidden group">
-                    <div class="absolute -right-4 -top-4 w-20 h-20 bg-white/10 rounded-full blur-xl group-hover:scale-150 transition-transform"></div>
-                    <div class="flex items-start gap-4 relative z-10">
-                        <div class="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center text-white shrink-0">
-                            <i class="fa-solid fa-circle-exclamation"></i>
-                        </div>
-                        <div class="space-y-1">
-                            <h5 class="text-white font-black text-xs uppercase tracking-widest">Required Documents</h5>
-                            <p class="text-white/80 text-[11px] leading-relaxed">Please present your <b>Original Passport</b> at the hospital to receive medical services.</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- ── Footer ── -->
-            <footer class="pt-10 pb-16 text-center space-y-2 opacity-30">
-                <p class="text-slate-400 text-[10px] font-black uppercase tracking-[0.3em]">© 2568 RSU Medical Services</p>
-                <div class="flex items-center justify-center gap-3">
-                    <span class="w-1 h-1 bg-slate-400 rounded-full"></span>
-                    <p class="text-slate-400 text-[9px] font-bold uppercase tracking-widest">Hospital OS v3.2</p>
-                    <span class="w-1 h-1 bg-slate-400 rounded-full"></span>
-                </div>
-            </footer>
-
         </main>
-
-        <!-- ── Premium Bottom Navigation ── -->
-        <nav class="fixed bottom-0 left-0 right-0 z-[70] bg-white/90 backdrop-blur-2xl border-t border-slate-50 px-8 py-4 pb-10 flex justify-between items-center max-w-md mx-auto shadow-[0_-20px_40px_rgba(0,0,0,0.04)]">
-            <button onclick="location.reload()" class="flex flex-col items-center gap-1.5 text-blue-600 transition-all scale-110">
-                <i class="fa-solid fa-house-chimney text-xl"></i>
-                <span class="text-[8px] font-black uppercase tracking-[0.1em]">Home</span>
-            </button>
-            <button onclick="showHistory()" class="flex flex-col items-center gap-1.5 text-slate-300 transition-all hover:text-slate-500">
-                <i class="fa-solid fa-calendar-day text-xl"></i>
-                <span class="text-[8px] font-black uppercase tracking-[0.1em]">Booking</span>
-            </button>
-            <div class="relative -mt-14">
-                <button onclick="showCampaigns()" class="w-16 h-16 bg-blue-600 rounded-[1.8rem] rotate-45 flex items-center justify-center text-white shadow-[0_15px_30px_rgba(0,82,204,0.4)] border-[6px] border-[#F8FAFF] active:scale-90 transition-all group">
-                    <i class="fa-solid fa-plus text-2xl -rotate-45 group-hover:scale-125 transition-transform"></i>
-                </button>
-            </div>
-            <button onclick="showUpcoming('ภาพรวมสุขภาพ')" class="flex flex-col items-center gap-1.5 text-slate-300 transition-all hover:text-slate-500">
-                <i class="fa-solid fa-heart-pulse text-xl"></i>
-                <span class="text-[8px] font-black uppercase tracking-[0.1em]">Health</span>
-            </button>
-            <button onclick="showProfile()" class="flex flex-col items-center gap-1.5 text-slate-300 transition-all hover:text-slate-500">
-                <i class="fa-solid fa-user-ninja text-xl"></i>
-                <span class="text-[8px] font-black uppercase tracking-[0.1em]">Account</span>
-            </button>
-        </nav>
-
     </div>
 
-    <!-- ── Modals (Keep from previous version but ensure text-left alignment) ── -->
-    <!-- [QR, Notifications, Profile, Campaigns, History, Contact, Chat, Upcoming] -->
-    <!-- (I will preserve all modal logic and structures here for production safety) -->
-    
+    <!-- Mobile Bottom Nav -->
+    <nav class="mnav">
+        <a href="#" title="หน้าหลัก"><i class="fas fa-house-chimney" style="font-size: 20px;"></i> หน้าหลัก</a>
+        <a href="my_bookings.php" title="นัดหมาย"><i class="fas fa-calendar-day" style="font-size: 20px;"></i> นัดหมาย</a>
+        <a href="booking_campaign.php" class="mnav__fab" title="จอง"><i class="fas fa-plus" style="font-size: 24px;"></i></a>
+        <a href="#" title="สุขภาพ"><i class="fas fa-heart-pulse" style="font-size: 20px;"></i> สุขภาพ</a>
+        <a href="profile.php" title="บัญชี"><i class="fas fa-user-circle" style="font-size: 20px;"></i> บัญชี</a>
+    </nav>
+
+    <!-- QR Modal -->
+    <div class="modal" id="qr-modal">
+        <div class="modal__overlay" onclick="closeModal('qr-modal')"></div>
+        <div class="modal__content">
+            <div class="modal__head">
+                <h3>QR Code</h3>
+                <button class="modal__close" onclick="closeModal('qr-modal')">✕</button>
+            </div>
+            <div style="text-align: center; padding: 20px 0;">
+                <div id="qrcode"></div>
+                <p style="margin-top: 16px; font-size: 12px; color: var(--ink-3);">
+                    ID: <?= htmlspecialchars($user['student_personnel_id'] ?? 'N/A') ?>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script>
-        // Chat functionality
-        function handleChatSubmit(e) {
-            e.preventDefault();
-            const input = document.getElementById('chat-input');
-            const message = input.value.trim();
-            if (!message) return;
-            const chatContent = document.getElementById('chat-content');
-            const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            const userBubble = `
-                <div class="flex flex-row-reverse items-start gap-3 max-w-[85%] ml-auto animate-in slide-in-from-right-2 duration-300">
-                    <div class="space-y-1 text-right">
-                        <div class="bg-blue-600 p-4 rounded-2xl rounded-tr-none shadow-lg shadow-blue-100"><p class="text-white text-xs leading-relaxed text-left">${message}</p></div>
-                        <span class="text-[9px] text-white/40 font-black mr-1 uppercase">${time}</span>
-                    </div>
-                </div>
-            `;
-            chatContent.insertAdjacentHTML('beforeend', userBubble);
-            input.value = ''; chatContent.scrollTop = chatContent.scrollHeight;
+        let qrGenerated = false;
+
+        function openModal(id) {
+            const modal = document.getElementById(id);
+            if (modal) {
+                modal.classList.add('active');
+                if (id === 'qr-modal' && !qrGenerated) {
+                    const qrcodeDiv = document.getElementById('qrcode');
+                    qrcodeDiv.innerHTML = '';
+                    new QRCode(qrcodeDiv, {
+                        text: "<?= htmlspecialchars($user['student_personnel_id'] ?? '') ?>",
+                        width: 180,
+                        height: 180,
+                        colorDark: "#0f172a",
+                        colorLight: "#ffffff",
+                        correctLevel: QRCode.CorrectLevel.H
+                    });
+                    qrGenerated = true;
+                }
+            }
         }
+
+        function closeModal(id) {
+            const modal = document.getElementById(id);
+            if (modal) {
+                modal.classList.remove('active');
+            }
+        }
+
+        // Close modal on outside click
+        document.querySelectorAll('.modal').forEach(modal => {
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal.querySelector('.modal__overlay')) {
+                    closeModal(modal.id);
+                }
+            });
+        });
+
+        // Keyboard shortcut for search
+        document.addEventListener('keydown', (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+                e.preventDefault();
+                const search = document.querySelector('.topbar__search input');
+                if (search) search.focus();
+            }
+        });
     </script>
-
-    <!-- [Modal structures continue below - omitted for brevity but remain in file] -->
-    <div id="qr-modal" class="fixed inset-0 z-[100] hidden flex items-center justify-center p-6"><div class="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onclick="hideQR()"></div><div class="relative bg-white w-full max-w-[340px] rounded-[3rem] p-10 text-center shadow-2xl animate-in zoom-in duration-300"><div class="w-12 h-1.5 bg-slate-100 rounded-full mx-auto mb-8"></div><div class="bg-slate-50 rounded-[2.5rem] p-8 mb-8 shadow-inner"><div id="qrcode" class="flex justify-center bg-white p-5 rounded-[2rem] shadow-xl border border-slate-100 mx-auto"></div></div><h3 class="text-slate-900 font-black text-xl mb-1.5">Identity QR Code</h3><p class="text-blue-600 font-mono font-black text-sm tracking-[0.2em] mb-8"><?= $user['student_personnel_id'] ?></p><button onclick="hideQR()" class="w-full h-16 bg-slate-900 text-white font-black rounded-2xl active:scale-95 transition-all shadow-xl shadow-slate-200">ปิดหน้าต่าง</button></div></div>
-    <div id="notif-modal" class="fixed inset-0 z-[100] hidden flex items-end sm:items-center justify-center p-0 sm:p-6"><div class="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onclick="hideNotifications()"></div><div class="relative bg-white w-full max-w-[430px] rounded-t-[3rem] sm:rounded-[3rem] max-h-[85vh] flex flex-col shadow-2xl animate-in slide-in-from-bottom duration-300"><div class="w-12 h-1.5 bg-slate-100 rounded-full mx-auto mt-5 mb-3 flex-shrink-0"></div><div class="px-8 py-5 border-b border-slate-50 flex items-center justify-between"><h3 class="text-slate-900 font-black text-lg tracking-tight">Notifications</h3><span class="bg-blue-50 text-blue-600 text-[10px] font-black px-3 py-1.5 rounded-full uppercase tracking-widest"><?= $upcoming_count ?> NEW</span></div><div class="flex-1 overflow-y-auto custom-scrollbar divide-y divide-slate-50"><div class="flex gap-5 p-6 bg-blue-50/30 relative"><div class="absolute left-0 top-0 bottom-0 w-1.5 bg-blue-600"></div><div class="w-12 h-12 rounded-2xl bg-blue-100 flex items-center justify-center shrink-0 border border-blue-200/50 shadow-sm"><i class="fa-solid fa-calendar-check text-blue-600 text-base"></i></div><div class="flex-1 min-w-0 text-left"><div class="flex justify-between items-start mb-1.5"><p class="text-slate-900 font-black text-sm">System Alert</p><span class="text-slate-400 text-[9px] font-bold">RECENT</span></div><p class="text-slate-500 text-[11px] font-medium leading-relaxed">คุณมีนัดหมายสุขภาพที่กำลังจะถึงจำนวน <?= $upcoming_count ?> รายการ กรุณาตรวจสอบเวลาอีกครั้ง</p></div></div></div><div class="p-8 border-t border-slate-50 bg-slate-50/50"><button onclick="hideNotifications()" class="w-full h-16 bg-white text-slate-900 font-black rounded-[1.5rem] border border-slate-200 active:scale-95 transition-all shadow-sm">ปิดหน้าต่าง</button></div></div></div>
-    <div id="profile-modal" class="fixed inset-0 z-[100] hidden flex items-end sm:items-center justify-center p-0 sm:p-6"><div class="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onclick="hideProfile()"></div><div class="relative bg-white w-full max-w-[430px] rounded-t-[3rem] sm:rounded-[3rem] shadow-2xl animate-in slide-in-from-bottom duration-300 overflow-hidden"><div class="w-12 h-1.5 bg-slate-100 rounded-full mx-auto mt-5 mb-2 relative z-10"></div><div class="p-10 text-center relative z-10"><div class="relative inline-block mb-6"><div class="w-28 h-28 rounded-[2.5rem] overflow-hidden border-4 border-white shadow-2xl mx-auto"><img src="<?= $user['picture_url'] ?? 'https://ui-avatars.com/api/?name='.urlencode($user['full_name']); ?>" class="w-full h-full object-cover"></div><div class="absolute -bottom-1 -right-1 w-10 h-10 bg-emerald-500 rounded-2xl border-4 border-white flex items-center justify-center text-white shadow-lg"><i class="fa-solid fa-check-double text-xs"></i></div></div><h3 class="text-slate-900 font-black text-2xl mb-1 tracking-tight"><?= $user['full_name'] ?></h3><p class="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em] mb-10"><?= $user['status'] ?> · RSU MEDICAL</p><div class="space-y-4 mb-10"><div class="flex items-center gap-5 p-5 bg-slate-50 rounded-[1.8rem] border border-slate-100 text-left"><div class="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm text-blue-600 border border-slate-50"><i class="fa-solid fa-id-card-clip text-lg"></i></div><div><p class="text-slate-400 text-[9px] font-black uppercase tracking-[0.2em] mb-1">User Identity</p><p class="text-slate-900 font-black text-base tracking-widest"><?= $user['student_personnel_id'] ?></p></div></div></div><div class="grid grid-cols-2 gap-4"><button onclick="window.location.href='profile.php'" class="flex items-center justify-center gap-2 h-16 bg-blue-600 text-white font-black rounded-2xl shadow-[0_15px_30px_rgba(0,82,204,0.3)] active:scale-95 transition-all text-sm tracking-wide"><i class="fa-solid fa-user-pen"></i> แก้ไขข้อมูล</button><a href="logout.php" class="flex items-center justify-center gap-2 h-16 bg-red-50 text-red-600 font-black rounded-2xl border border-red-100 active:scale-95 transition-all text-sm tracking-wide"><i class="fa-solid fa-power-off"></i> ออกจากระบบ</a></div></div><div class="px-10 pb-10"><button onclick="hideProfile()" class="w-full h-16 bg-slate-50 text-slate-400 font-black rounded-2xl active:scale-95 transition-all uppercase tracking-[0.2em] text-[10px]">Close Panel</button></div></div></div>
-    <div id="camps-modal" class="fixed inset-0 z-[100] hidden flex items-end sm:items-center justify-center p-0 sm:p-6"><div class="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onclick="hideCampaigns()"></div><div class="relative bg-white w-full max-w-[480px] rounded-t-[3.5rem] sm:rounded-[3.5rem] shadow-2xl animate-in slide-in-from-bottom duration-300 flex flex-col max-h-[92vh] overflow-hidden"><div class="w-14 h-1.5 bg-slate-100 rounded-full mx-auto mt-6 mb-2 flex-shrink-0"></div><div class="px-10 pt-8 pb-6 border-b border-slate-50 flex-shrink-0"><div class="flex items-center gap-4 mb-2"><div class="w-2 h-6 bg-blue-600 rounded-full"></div><h3 class="text-slate-900 font-black text-2xl tracking-tight text-left">เลือกแคมเปญ</h3></div><p class="text-slate-400 text-xs font-bold tracking-wide text-left opacity-70">AVAILABLE MEDICAL CAMPAIGNS</p></div><div class="flex-1 overflow-y-auto custom-scrollbar px-8 py-6 space-y-5 bg-slate-50/30 text-left"><?php if (empty($camp_list)): ?><div class="py-16 text-center text-slate-300 font-black text-sm italic">ขออภัย ยังไม่มีแคมเปญที่เปิดรับจอง</div><?php else: ?><?php foreach ($camp_list as $c): $style = getCampStyle($c['type']); $remaining = $c['total_capacity'] - $c['used_seats']; $isFull = ($remaining <= 0); ?><div class="bg-white rounded-[2.5rem] p-7 border border-slate-100 shadow-[0_15px_30px_rgba(0,0,0,0.03)] relative transition-all hover:shadow-xl <?= $isFull ? 'opacity-60' : '' ?>"><div class="flex justify-between items-start mb-5"><span class="px-4 py-1.5 rounded-xl border <?= $style['class'] ?> text-[10px] font-black uppercase tracking-widest"><?= $style['label'] ?></span><?php if ($isFull): ?><span class="text-red-500 text-[10px] font-black uppercase tracking-widest">Fully Booked</span><?php else: ?><div class="flex items-center gap-2"><span class="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></span><span class="text-blue-600 text-[10px] font-black uppercase tracking-widest"><?= $remaining ?> SLOTS LEFT</span></div><?php endif; ?></div><h4 class="text-slate-900 font-black text-base mb-6 leading-snug"><?= htmlspecialchars($c['title']) ?></h4><?php if (!$isFull): ?><a href="booking_date.php?campaign_id=<?= $c['id'] ?>" class="w-full h-16 bg-blue-600 text-white font-black rounded-2xl flex items-center justify-center gap-3 active:scale-95 transition-all text-sm shadow-lg shadow-blue-100">BOOK THIS CAMPAIGN <i class="fa-solid fa-chevron-right text-[10px]"></i></a><?php else: ?><button disabled class="w-full h-16 bg-slate-100 text-slate-400 font-black rounded-2xl cursor-not-allowed text-sm">NOT AVAILABLE</button><?php endif; ?></div><?php endforeach; ?><?php endif; ?></div><div class="p-8 border-t border-slate-50 flex-shrink-0 bg-white"><button onclick="hideCampaigns()" class="w-full h-16 bg-slate-50 text-slate-400 font-black rounded-2xl active:scale-95 transition-all uppercase tracking-widest text-[10px]">Back to Dashboard</button></div></div></div>
-    <div id="history-modal" class="fixed inset-0 z-[100] hidden flex items-end sm:items-center justify-center p-0 sm:p-6"><div class="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onclick="hideHistory()"></div><div class="relative bg-white w-full max-w-[480px] rounded-t-[3.5rem] sm:rounded-[3.5rem] shadow-2xl animate-in slide-in-from-bottom duration-300 flex flex-col max-h-[92vh] overflow-hidden text-left"><div class="w-14 h-1.5 bg-slate-100 rounded-full mx-auto mt-6 mb-2 flex-shrink-0"></div><div class="px-10 pt-8 pb-6 border-b border-slate-50 flex-shrink-0"><div class="flex items-center gap-4 mb-2"><div class="w-2 h-6 bg-indigo-600 rounded-full"></div><h3 class="text-slate-900 font-black text-2xl tracking-tight">Service History</h3></div><p class="text-slate-400 text-xs font-bold tracking-wide opacity-70">YOUR MEDICAL RECORDS & QUEUES</p></div><div class="flex-1 overflow-y-auto custom-scrollbar px-8 py-6 space-y-5 bg-slate-50/30 text-left"><?php if (empty($booking_list)): ?><div class="py-16 text-center text-slate-300 font-black text-sm italic">ยังไม่มีประวัติการนัดหมายในขณะนี้</div><?php else: ?><?php foreach ($booking_list as $b): $status = getStatusStyle($b['status']); $campIcon = getCampStyle($b['camp_type'])['icon']; ?><div class="bg-white rounded-[2.5rem] p-7 border border-slate-100 shadow-[0_15px_30px_rgba(0,0,0,0.03)]"><div class="flex justify-between items-start mb-5"><div class="flex items-center gap-3"><div class="w-10 h-10 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-400 border border-slate-100"><i class="fa-solid <?= $campIcon ?> text-sm"></i></div><span class="text-slate-900 font-black text-sm tracking-tight"><?= htmlspecialchars($b['camp_name']) ?></span></div><span class="px-3 py-1.5 rounded-xl <?= $status['class'] ?> text-[10px] font-black uppercase tracking-widest"><?= $status['label'] ?></span></div><div class="flex items-center justify-between pt-4 border-t border-slate-50"><div class="flex items-center gap-2 text-slate-400 font-bold text-[11px] uppercase tracking-wider"><i class="fa-regular fa-calendar-days text-indigo-500"></i><?= date('d M Y', strtotime($b['booking_date'])) ?></div><div class="flex items-center gap-2 text-slate-400 font-bold text-[11px] uppercase tracking-wider"><i class="fa-regular fa-clock text-indigo-500"></i><?= date('H:i', strtotime($b['booking_time'])) ?> น.</div></div></div><?php endforeach; ?><?php endif; ?></div><div class="p-8 border-t border-slate-50 flex-shrink-0 bg-white"><a href="my_bookings.php" class="w-full h-16 bg-indigo-50 text-indigo-600 font-black rounded-2xl flex items-center justify-center mb-4 active:scale-95 transition-all text-sm tracking-widest uppercase shadow-sm">View Full Records</a><button onclick="hideHistory()" class="w-full h-16 bg-slate-50 text-slate-400 font-black rounded-2xl active:scale-95 transition-all uppercase tracking-widest text-[10px]">Back</button></div></div></div>
-    <div id="contact-modal" class="fixed inset-0 z-[100] hidden flex items-end sm:items-center justify-center p-0 sm:p-6"><div class="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onclick="hideContact()"></div><div class="relative bg-white w-full max-w-[430px] rounded-t-[3.5rem] sm:rounded-[3.5rem] shadow-2xl animate-in slide-in-from-bottom duration-300 overflow-hidden text-left"><div class="w-12 h-1.5 bg-slate-100 rounded-full mx-auto mt-5 mb-4 relative z-10"></div><div class="p-10 relative z-10 text-left"><div class="flex items-center gap-5 mb-10"><div class="w-16 h-16 bg-emerald-50 rounded-[1.8rem] flex items-center justify-center text-emerald-600 text-2xl shadow-inner border border-emerald-100"><i class="fa-solid fa-headset"></i></div><div><h3 class="text-slate-900 font-black text-2xl tracking-tight leading-none mb-2">RSU Health</h3><p class="text-slate-400 text-[10px] font-black uppercase tracking-[0.3em]">Contact Center</p></div></div><div class="mb-10 rounded-[2.5rem] overflow-hidden border border-slate-100 shadow-2xl scale-105 transform origin-center"><img src="../assets/images/clinic_map.png" class="w-full h-auto object-cover" alt="Clinic Map"></div><div class="space-y-4 mb-10"><a href="tel:027916000,4499" class="flex items-center gap-6 p-6 bg-slate-50 rounded-[2rem] border border-slate-100 active:scale-95 transition-all group"><div class="w-14 h-14 bg-white rounded-2xl flex items-center justify-center text-emerald-600 shadow-xl border border-slate-50 group-hover:bg-emerald-600 group-hover:text-white transition-all"><i class="fa-solid fa-phone-volume text-lg"></i></div><div><p class="text-slate-400 text-[9px] font-black uppercase tracking-[0.2em] mb-2 leading-none">Emergency Call</p><p class="text-slate-900 font-black text-base tracking-tighter">02-791-6000 <span class="text-emerald-600 ml-1">EXT. 4499</span></p></div></a><div class="flex items-start gap-6 p-6 bg-slate-50 rounded-[2rem] border border-slate-100"><div class="w-14 h-14 bg-white rounded-2xl flex items-center justify-center text-blue-600 shadow-xl border border-slate-50 shrink-0"><i class="fa-solid fa-map-location-dot text-lg"></i></div><div><p class="text-slate-400 text-[9px] font-black uppercase tracking-[0.2em] mb-2 leading-none">Location</p><p class="text-slate-800 font-bold text-[11px] leading-relaxed">อาคาร 12/1 มหาวิทยาลัยรังสิต ต.หลักหก จ.ปทุมธานี</p></div></div></div><a href="https://maps.app.goo.gl/xNNrWmsQyUsdWnHB9" target="_blank" class="flex items-center justify-center gap-4 w-full h-20 bg-slate-900 text-white font-black rounded-3xl shadow-[0_20px_40px_rgba(0,0,0,0.15)] active:scale-95 transition-all mb-4 text-sm tracking-widest uppercase"><i class="fa-solid fa-diamond-turn-right"></i> Open in Google Maps</a><button onclick="hideContact()" class="w-full h-16 bg-slate-50 text-slate-400 font-black rounded-2xl active:scale-95 transition-all text-[10px] uppercase tracking-widest">Dismiss</button></div></div></div>
-    <div id="chat-modal" class="fixed inset-0 z-[110] hidden flex items-end sm:items-center justify-center p-0 sm:p-6"><div class="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onclick="hideChat()"></div><div class="relative bg-white w-full max-w-[430px] rounded-t-[3.5rem] sm:rounded-[3.5rem] shadow-2xl animate-in slide-in-from-bottom duration-300 flex flex-col h-[88vh] sm:h-[650px] overflow-hidden text-left"><div class="px-10 py-7 border-b border-slate-50 flex items-center justify-between flex-shrink-0 bg-white relative z-20"><div class="flex items-center gap-4"><div class="relative"><div class="w-12 h-12 bg-orange-100 rounded-2xl flex items-center justify-center text-orange-600 shadow-sm border border-orange-50"><i class="fa-solid fa-headset text-lg"></i></div><span class="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full border-[3px] border-white shadow-sm"></span></div><div><h3 class="text-slate-900 font-black text-base tracking-tight leading-none mb-1.5">Support Team</h3><div class="flex items-center gap-1.5 leading-none"><span class="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span><span class="text-emerald-500 text-[10px] font-black uppercase tracking-[0.2em]">Live Support</span></div></div></div><button onclick="hideChat()" class="w-10 h-10 bg-slate-50 rounded-xl text-slate-300 hover:text-slate-500 transition-all flex items-center justify-center"><i class="fa-solid fa-times"></i></button></div><div id="chat-content" class="flex-1 overflow-y-auto p-8 space-y-8 custom-scrollbar bg-[#F8FAFF] relative z-10 text-left"><div class="text-center py-4"><span class="bg-white/60 backdrop-blur-md px-5 py-2 rounded-full text-[9px] font-black text-slate-300 border border-slate-100 uppercase tracking-[0.3em]">Session Started</span></div><div class="flex items-start gap-4 max-w-[90%] animate-in slide-in-from-left duration-500"><div class="w-9 h-9 bg-orange-100 rounded-xl flex items-center justify-center text-orange-600 text-sm shrink-0 shadow-sm border border-orange-50 mt-1"><i class="fa-solid fa-headset"></i></div><div class="space-y-2"><div class="bg-white p-5 rounded-[1.8rem] rounded-tl-none border border-slate-100 shadow-[0_10px_30px_rgba(0,0,0,0.02)]"><p class="text-slate-700 text-[13px] leading-relaxed font-medium">สวัสดีครับ เจ้าหน้าที่ศูนย์บริการสุขภาพยินดีให้บริการครับ มีส่วนใดให้เราช่วยเหลือไหมครับ?</p></div><span class="text-[9px] text-slate-300 font-black ml-1 uppercase tracking-widest"><?= date('H:i') ?></span></div></div></div><div class="p-8 border-t border-slate-50 bg-white relative z-20 flex-shrink-0 shadow-[0_-20px_40px_rgba(0,0,0,0.02)]"><form id="chat-form" onsubmit="handleChatSubmit(event)" class="relative"><input type="text" id="chat-input" placeholder="Type your message..." class="w-full h-18 bg-slate-50 border-none rounded-[1.8rem] pl-7 pr-20 text-[13px] font-bold focus:ring-4 focus:ring-blue-100 transition-all placeholder:text-slate-200 shadow-inner"><button type="submit" class="absolute right-2.5 top-2.5 w-13 h-13 bg-blue-600 text-white rounded-2xl shadow-[0_10px_25px_rgba(0,82,204,0.3)] active:scale-90 transition-all flex items-center justify-center overflow-hidden"><i class="fa-solid fa-paper-plane-top text-sm"></i></button></form></div></div></div>
-    <div id="upcoming-modal" class="fixed inset-0 z-[110] hidden flex items-center justify-center p-6"><div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onclick="hideUpcoming()"></div><div class="relative bg-white w-full max-w-[340px] rounded-[3.5rem] shadow-[0_30px_60px_rgba(0,0,0,0.15)] p-10 text-center animate-in zoom-in duration-300 overflow-hidden"><div class="absolute -right-10 -top-10 w-32 h-32 bg-blue-50 rounded-full blur-2xl"></div><div class="w-24 h-24 bg-blue-50 rounded-[2.5rem] flex items-center justify-center mx-auto mb-8 text-blue-600 text-4xl shadow-inner border border-blue-100/50"><i class="fa-solid fa-rocket animate-float"></i></div><h3 class="text-slate-900 font-black text-2xl mb-3 tracking-tight">Coming Soon</h3><p class="text-slate-400 text-sm font-bold mb-10 leading-relaxed px-2">ฟีเจอร์ <span id="upcoming-name" class="text-blue-600 font-black bg-blue-50 px-2 py-0.5 rounded-lg"></span> อยู่ในแผนการพัฒนา และจะพร้อมให้คุณใช้งานในเร็วๆ นี้ครับ</p><button onclick="hideUpcoming()" class="w-full h-18 bg-blue-600 text-white font-black rounded-2xl shadow-[0_15px_30px_rgba(0,82,204,0.3)] active:scale-95 transition-all text-sm tracking-widest">GOT IT</button></div></div>
-
 </body>
 </html>
+
+<?php
+function campIcon($type) {
+    return match($type) {
+        'vaccine' => '💉',
+        'health_check' => '🩺',
+        'training' => '📋',
+        default => '📅'
+    };
+}
+?>
