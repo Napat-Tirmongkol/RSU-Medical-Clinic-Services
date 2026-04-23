@@ -629,7 +629,12 @@ $pdo = db();
             if (!currentUserId) return;
             try {
                 const res = await fetch(`ajax_support_chat.php?action=get_messages&user_id=${currentUserId}`);
-                const data = await res.json();
+                const text = await res.text();
+                let data;
+                try { data = JSON.parse(text); } catch(e) {
+                    console.error('loadMessages: non-JSON response:', text.substring(0, 150));
+                    return;
+                }
                 if (data.success) {
                     const container = document.getElementById('messages-container');
                     container.innerHTML = data.messages.map(m => {
@@ -666,7 +671,12 @@ $pdo = db();
                     method: 'POST',
                     body: formData
                 });
-                const data = await res.json();
+                const text = await res.text();
+                let data;
+                try { data = JSON.parse(text); } catch(e) {
+                    console.error('sendReply: non-JSON response:', text.substring(0, 150));
+                    return;
+                }
                 if (data.success) {
                     input.value = '';
                     loadMessages();
