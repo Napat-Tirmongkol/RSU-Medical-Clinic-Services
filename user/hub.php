@@ -272,7 +272,7 @@ $greeting = ($hour >= 5 && $hour < 12) ? "สวัสดีตอนเช้�
                     <i class="fa-solid fa-plus text-xl"></i>
                 </button>
                 <div class="flex flex-col">
-                    <h1 class="text-slate-900 font-black text-lg leading-none mb-1 tracking-tight">RSU Medical</h1>
+                    <h1 class="text-slate-900 font-black text-lg leading-none mb-1 tracking-tight">RSU Medical Clinic</h1>
                     <p class="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em] leading-none">User Hub
                     </p>
                 </div>
