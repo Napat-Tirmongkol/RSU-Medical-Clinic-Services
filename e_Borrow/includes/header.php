@@ -57,9 +57,12 @@ $base_url = explode('/e_Borrow', $_SERVER['SCRIPT_NAME'])[0] . '/e_Borrow/';
         <h1>E-Borrow</h1>
         
         <a href="../portal/index.php"
-                class="flex-1 sm:flex-none justify-center bg-white border border-gray-200 text-gray-800 px-5 py-2.5 rounded-xl font-bold text-sm hover:shadow-lg hover:border-gray-300 hover:text-blue-600 hover:-translate-y-0.5 transition-all flex items-center gap-2">
-                <i class="fas fa-arrow-left"></i> กลับหน้าหลัก
-            </a>
+            class="flex items-center gap-2 px-4 py-2 text-sm font-bold transition-all bg-white border border-gray-100 rounded-2xl text-slate-700 hover:text-indigo-600 hover:border-indigo-200 hover:shadow-xl hover:shadow-indigo-500/10 hover:-translate-y-0.5 active:scale-95 group dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300 dark:hover:text-white">
+            <div class="flex items-center justify-center w-8 h-8 transition-colors bg-indigo-50 rounded-xl group-hover:bg-indigo-100 dark:bg-indigo-900/30 dark:group-hover:bg-indigo-900/50">
+                <i class="fas fa-home text-indigo-500 text-[14px] dark:text-indigo-400"></i>
+            </div>
+            <span class="hidden sm:inline">หน้าหลัก Portal</span>
+        </a>
 
         <div class="user-info">
             <div class="user-greeting">
