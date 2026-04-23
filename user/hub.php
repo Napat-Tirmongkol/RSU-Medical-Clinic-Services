@@ -1603,14 +1603,3 @@ $greeting = ($hour >= 5 && $hour < 12) ? "สวัสดีตอนเช้�
     </script>
 </body>
 </html>
-
-<?php
-function campIcon($type) {
-    return match($type) {
-        'vaccine' => '💉',
-        'health_check' => '🩺',
-        'training' => '📋',
-        default => '📅'
-    };
-}
-?>
