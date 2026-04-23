@@ -24,9 +24,15 @@ try {
     $today = date('Y-m-d');
 
     if ($isTest) {
-        $user = ['id' => 0, 'full_name' => 'Test Automation', 'student_personnel_id' => 'TEST001'];
+        $user = ['id' => 0, 'full_name' => 'Test Automation', 'student_personnel_id' => 'TEST001', 'status' => 'Testing', 'faculty_name' => 'คณะจำลองการทดสอบ'];
     } else {
-        $stmt = $pdo->prepare("SELECT * FROM sys_users WHERE line_user_id = :line_id LIMIT 1");
+        $stmt = $pdo->prepare("
+            SELECT u.*, f.name_th as faculty_name 
+            FROM sys_users u 
+            LEFT JOIN sys_faculties f ON u.faculty_id = f.id 
+            WHERE u.line_user_id = :line_id 
+            LIMIT 1
+        ");
         $stmt->execute([':line_id' => $lineUserId]);
         $user = $stmt->fetch();
     }
@@ -209,7 +215,7 @@ $thaiDate = $days[date('w')] . ", " . date('j') . " " . $months[date('n')-1] . "
                     <div class="relative flex items-center justify-between pt-6 border-t border-white/10">
                         <div class="flex items-center gap-3 text-white">
                             <i class="fa-solid fa-graduation-cap text-blue-200 text-sm"></i>
-                            <p class="text-blue-50 text-[11px] font-bold tracking-wide truncate max-w-[180px]"><?= $user['status'] ?> · RSU</p>
+                            <p class="text-blue-50 text-[11px] font-bold tracking-wide truncate max-w-[180px]"><?= $user['faculty_name'] ?? $user['status'] ?> · RSU</p>
                         </div>
                         <div class="bg-emerald-400/20 border border-emerald-400/30 rounded-full px-4 py-1.5 backdrop-blur-md flex items-center gap-2">
                             <i class="fa-solid fa-circle-check text-emerald-300 text-[10px]"></i>
@@ -224,7 +230,7 @@ $thaiDate = $days[date('w')] . ", " . date('j') . " " . $months[date('n')-1] . "
                 <button onclick="showHistory()" class="bg-white rounded-[2.5rem] p-6 border border-slate-100 shadow-sm flex flex-col items-center text-center active:scale-95 transition-all group">
                     <div class="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center mb-3 group-hover:scale-110 transition-transform"><i class="fa-solid fa-calendar-check text-blue-600 text-lg"></i></div>
                     <p class="font-black text-xl text-slate-900 mb-0.5"><?= count($booking_list) ?></p>
-                    <p class="text-slate-400 text-[10px] font-bold uppercase tracking-widest">การเข้าพบ</p>
+                    <p class="text-slate-400 text-[10px] font-bold uppercase tracking-widest">การเข้ารับบริการ</p>
                 </button>
                 <button onclick="showUpcoming('รายการยืมอุปกรณ์')" class="bg-white rounded-[2.5rem] p-6 border border-slate-100 shadow-sm flex flex-col items-center text-center active:scale-95 transition-all group">
                     <div class="w-12 h-12 bg-orange-50 rounded-2xl flex items-center justify-center mb-3 group-hover:scale-110 transition-transform"><i class="fa-solid fa-boxes-stacked text-orange-600 text-lg"></i></div>
