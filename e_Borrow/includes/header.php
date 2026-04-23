@@ -24,6 +24,32 @@ $base_url = explode('/e_Borrow', $_SERVER['SCRIPT_NAME'])[0] . '/e_Borrow/';
             opacity: 0;
             transform: translateY(10px);
         }
+
+        /* Theme Toggle Button visibility fix */
+        .theme-toggle-btn {
+            width: 38px;
+            height: 38px;
+            border-radius: 12px;
+            border: 1px solid rgba(0, 0, 0, 0.08) !important;
+            background: #f1f5f9 !important;
+            color: #475569 !important;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        body.dark-mode .theme-toggle-btn {
+            background: rgba(30, 41, 59, 0.5) !important;
+            border-color: rgba(255, 255, 255, 0.1) !important;
+            color: #f59e0b !important;
+        }
+
+        .theme-toggle-btn:hover {
+            transform: scale(1.05);
+            border-color: #3b82f6 !important;
+        }
     </style>
 
     <title><?php echo isset($page_title) ? $page_title : 'ระบบยืม-คืนอุปกรณ์'; ?></title>
