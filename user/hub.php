@@ -246,7 +246,6 @@ $greeting = ($hour >= 5 && $hour < 12) ? "สวัสดีตอนเช้�
                 <p class="text-slate-400 text-[10px] font-black uppercase tracking-[0.3em] mb-2 opacity-70"><?= $thaiDate ?></p>
                 <div class="flex items-end justify-between">
                     <h2 class="text-3xl font-black text-slate-900 tracking-tight">Health Hub</h2>
-                    <div class="w-2 h-2 bg-blue-600 rounded-full mb-2 animate-pulse"></div>
                 </div>
             </div>
 
