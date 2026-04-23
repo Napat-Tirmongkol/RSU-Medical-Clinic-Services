@@ -1484,170 +1484,142 @@ $adminListForSelect = $pdo->query("SELECT id, full_name, username FROM sys_admin
             </div>
 
             <?php if ($adminRole === 'superadmin'): ?>
-                <!-- Admin Modal -->
-                <div id="admModal"
-                    style="display:none;position:fixed;inset:0;z-index:200;background:rgba(15,23,42,.55);backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:20px">
-                    <div
-                        style="background:#fff;border-radius:24px;width:100%;max-width:480px;overflow:hidden;box-shadow:0 25px 50px -12px rgba(0,0,0,.25)">
-                        <div
-                            style="padding:20px 24px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;justify-content:space-between">
-                            <span id="admModalTitle" style="font-size:16px;font-weight:900;color:#0f172a">จัดการ
-                                Admin</span>
-                            <button onclick="document.getElementById('admModal').style.display='none'"
-                                style="background:none;border:none;cursor:pointer;color:#94a3b8"><i
-                                    class="fa-solid fa-times"></i></button>
-                        </div>
-                        <form method="POST" style="padding:24px" id="admForm">
-                            <input type="hidden" name="action" id="admAction" value="add_admin">
-                            <input type="hidden" name="admin_id" id="admId">
-                            <?php csrf_field(); ?>
-                            <div style="display:flex;flex-direction:column;gap:16px">
-                                <div>
-                                    <label
-                                        style="display:block;font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;margin-bottom:6px">ชื่อ-นามสกุล</label>
-                                    <input type="text" name="full_name" id="admFullName" required class="premium-input">
+                <!-- UNIFIED IDENTITY GOVERNANCE MODAL (ISO 27001 COMPLIANT) -->
+                <div id="idGovModal" style="display:none;position:fixed;inset:0;z-index:300;background:rgba(15,23,42,.6);backdrop-filter:blur(8px);align-items:center;justify-content:center;padding:20px">
+                    <div style="background:#fff;border-radius:28px;width:100%;max-width:720px;overflow:hidden;box-shadow:0 25px 50px -12px rgba(0,0,0,.3);display:flex;flex-direction:column;max-height:90vh">
+                        <!-- Modal Header -->
+                        <div style="padding:24px 30px;background:linear-gradient(90deg,#f8fafc,#fff);border-bottom:1px solid #f1f5f9;display:flex;align-items:center;justify-content:space-between">
+                            <div style="display:flex;align-items:center;gap:15px">
+                                <div id="govModalIcon" style="width:45px;height:45px;border-radius:14px;background:#eff6ff;color:#2563eb;display:flex;align-items:center;justify-content:center;font-size:20px;box-shadow:0 4px 10px rgba(37,99,235,0.1)">
+                                    <i class="fa-solid fa-user-shield"></i>
                                 </div>
                                 <div>
-                                    <label
-                                        style="display:block;font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;margin-bottom:6px">ชื่อผู้ใช้
-                                        (Username)</label>
-                                    <input type="text" name="username" id="admUsername" required class="premium-input">
-                                </div>
-                                <div>
-                                    <label
-                                        style="display:block;font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;margin-bottom:6px">อีเมล</label>
-                                    <input type="email" name="email" id="admEmail" required class="premium-input">
-                                </div>
-                                <div>
-                                    <label
-                                        style="display:block;font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;margin-bottom:6px">รหัสผ่าน
-                                        <span id="pwdNotice"
-                                            style="font-weight:normal;color:#94a3b8;font-size:9px">(เว้นว่างหากไม่ต้องการเปลี่ยน)</span></label>
-                                    <input type="password" name="password" id="admPassword" class="premium-input">
-                                </div>
-                                <div>
-                                    <label
-                                        style="display:block;font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;margin-bottom:6px">ระดับสิทธิ์
-                                        (Role)</label>
-                                    <select name="role" id="admRole" class="premium-input">
-                                        <option value="admin">Admin</option>
-                                        <option value="editor">Editor</option>
-                                        <option value="superadmin">Superadmin</option>
-                                    </select>
-                                </div>
-                                <div style="display:flex;gap:10px;margin-top:8px">
-                                    <button type="button" onclick="document.getElementById('admModal').style.display='none'"
-                                        style="flex:1;padding:12px;border-radius:12px;background:#f1f5f9;color:#475569;font-weight:800;font-size:13px;border:none">ยกเลิก</button>
-                                    <button type="submit"
-                                        style="flex:1;padding:12px;border-radius:12px;background:#2e9e63;color:#fff;font-weight:800;font-size:13px;border:none">บันทึกข้อมูล</button>
+                                    <h3 id="govModalTitle" style="margin:0;font-size:18px;font-weight:900;color:#0f172a">จัดการสิทธิ์ผู้ใช้งานระบบ</h3>
+                                    <p style="margin:2px 0 0;font-size:12px;color:#64748b;font-weight:600">Identity & Access Governance Interface</p>
                                 </div>
                             </div>
-                        </form>
-                    </div>
-                </div>
-
-                <!-- Staff Modal (e-Borrow) -->
-                <div id="sfModal"
-                    style="display:none;position:fixed;inset:0;z-index:200;background:rgba(15,23,42,.55);backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:20px">
-                    <div
-                        style="background:#fff;border-radius:24px;width:100%;max-width:600px;overflow:hidden;box-shadow:0 25px 50px -12px rgba(0,0,0,.25)">
-                        <div
-                            style="padding:20px 24px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;justify-content:space-between">
-                            <span id="sfModalTitle" style="font-size:16px;font-weight:900;color:#0f172a">จัดการเจ้าหน้าที่
-                                e-Borrow</span>
-                            <button onclick="document.getElementById('sfModal').style.display='none'"
-                                style="background:none;border:none;cursor:pointer;color:#94a3b8"><i
-                                    class="fa-solid fa-times"></i></button>
+                            <button onclick="document.getElementById('idGovModal').style.display='none'" style="width:36px;height:36px;border-radius:10px;border:1.5px solid #e2e8f0;background:#fff;color:#94a3b8;cursor:pointer;transition:all 0.2s" onmouseover="this.style.color='#ef4444';this.style.borderColor='#fecaca'" onmouseout="this.style.color='#94a3b8';this.style.borderColor='#e2e8f0'">
+                                <i class="fa-solid fa-xmark"></i>
+                            </button>
                         </div>
-                        <form method="POST" style="padding:24px" id="sfForm">
-                            <input type="hidden" name="action" id="sfAction" value="add_staff">
-                            <input type="hidden" name="sf_id" id="sfId">
+
+                        <!-- Modal Body (Scrollable) -->
+                        <form method="POST" id="idGovForm" style="overflow-y:auto;padding:30px">
+                            <input type="hidden" name="action" id="govAction" value="save_identity_gov">
+                            <input type="hidden" name="target_id" id="govTargetId">
+                            <input type="hidden" name="target_type" id="govTargetType"> <!-- 'admin' or 'staff' -->
                             <?php csrf_field(); ?>
-                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
-                                <div style="display:flex;flex-direction:column;gap:14px">
-                                    <div
-                                        style="font-size:10px;font-weight:900;color:#94a3b8;text-transform:uppercase;letter-spacing:.1em">
-                                        General Info</div>
-                                    <div>
-                                        <label
-                                            style="display:block;font-size:11px;font-weight:800;color:#64748b;margin-bottom:6px">ชื่อ-นามสกุล</label>
-                                        <input type="text" name="sf_full_name" id="sfFullName" required
-                                            class="premium-input">
+
+                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:30px">
+                                <!-- Column 1: Core Identity -->
+                                <div style="display:flex;flex-direction:column;gap:20px">
+                                    <div style="font-size:11px;font-weight:900;color:#94a3b8;text-transform:uppercase;letter-spacing:.1em;display:flex;align-items:center;gap:8px">
+                                        <i class="fa-solid fa-id-card"></i> ข้อมูลพื้นฐานบัญชี
                                     </div>
+                                    
                                     <div>
-                                        <label
-                                            style="display:block;font-size:11px;font-weight:800;color:#64748b;margin-bottom:6px">Username</label>
-                                        <input type="text" name="sf_username" id="sfUsername" required
-                                            class="premium-input">
+                                        <label style="display:block;font-size:12px;font-weight:800;color:#475569;margin-bottom:6px">ชื่อ-นามสกุล <span style="color:#ef4444">*</span></label>
+                                        <input type="text" name="full_name" id="govFullName" required class="premium-input" style="width:100%">
                                     </div>
-                                    <div>
-                                        <label
-                                            style="display:block;font-size:11px;font-weight:800;color:#64748b;margin-bottom:6px">รหัสผ่าน</label>
-                                        <input type="password" name="sf_password" id="sfPassword" class="premium-input"
-                                            placeholder="••••••••">
+                                    
+                                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                                        <div>
+                                            <label style="display:block;font-size:12px;font-weight:800;color:#475569;margin-bottom:6px">Username</label>
+                                            <input type="text" name="username" id="govUsername" required class="premium-input" style="width:100%">
+                                        </div>
+                                        <div>
+                                            <label style="display:block;font-size:12px;font-weight:800;color:#475569;margin-bottom:6px">สถานะบัญชี</label>
+                                            <select name="status" id="govStatus" class="premium-input" style="width:100%;background-image:none">
+                                                <option value="active">Active</option>
+                                                <option value="suspended">Suspended</option>
+                                            </select>
+                                        </div>
                                     </div>
+
                                     <div>
-                                        <label
-                                            style="display:block;font-size:11px;font-weight:800;color:#64748b;margin-bottom:6px">สถานะบัญชี</label>
-                                        <select name="sf_status" id="sfStatus" class="premium-input"
-                                            style="background-image:none">
-                                            <option value="active">Active (เข้าใช้งานได้ปกติ)</option>
-                                            <option value="suspended">Suspended (ระงับการใช้งาน)</option>
-                                        </select>
+                                        <label style="display:block;font-size:12px;font-weight:800;color:#475569;margin-bottom:6px">อีเมล</label>
+                                        <input type="email" name="email" id="govEmail" class="premium-input" style="width:100%" placeholder="— ไม่มีข้อมูล —">
+                                    </div>
+
+                                    <div>
+                                        <label style="display:block;font-size:12px;font-weight:800;color:#475569;margin-bottom:6px">รหัสผ่าน <span style="font-weight:normal;color:#94a3b8;font-size:11px">(เว้นว่างหากไม่เปลี่ยน)</span></label>
+                                        <input type="password" name="password" id="govPassword" class="premium-input" style="width:100%" placeholder="••••••••">
                                     </div>
                                 </div>
-                                <div style="display:flex;flex-direction:column;gap:14px">
-                                    <div
-                                        style="font-size:10px;font-weight:900;color:#94a3b8;text-transform:uppercase;letter-spacing:.1em">
-                                        Permissions & Roles</div>
 
-                                    <div class="premium-role-card orange p-3">
-                                        <div class="flex items-center gap-3 mb-2">
-                                            <div class="role-icon" style="color:#f59e0b"><i
-                                                    class="fa-solid fa-box-archive"></i></div>
-                                            <div class="font-black text-xs">e-Borrow System</div>
+                                <!-- Column 2: System Roles -->
+                                <div style="display:flex;flex-direction:column;gap:20px">
+                                    <div style="font-size:11px;font-weight:900;color:#94a3b8;text-transform:uppercase;letter-spacing:.1em;display:flex;align-items:center;gap:8px">
+                                        <i class="fa-solid fa-shield-halved"></i> กำหนดสิทธิ์รายระบบ
+                                    </div>
+
+                                    <!-- e-Borrow Card -->
+                                    <div id="govEbCard" class="premium-role-card orange p-4" style="border-radius:18px;border:1.5px solid #fed7aa;background:#fffaf5">
+                                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+                                            <div style="display:flex;align-items:center;gap:10px">
+                                                <div style="width:32px;height:32px;background:#ffedd5;color:#ea580c;border-radius:8px;display:flex;align-items:center;justify-content:center"><i class="fa-solid fa-box-archive"></i></div>
+                                                <span style="font-weight:900;font-size:13px;color:#9a3412">e-Borrow & Inventory</span>
+                                            </div>
+                                            <div class="toggle-wrap">
+                                                <input type="checkbox" id="govEbAccess" name="eb_access" value="1" checked style="display:none">
+                                            </div>
                                         </div>
-                                        <label
-                                            style="display:block;font-size:11px;font-weight:800;color:#475569;margin-bottom:4px">สิทธิ์ในระบบยืม-คืน</label>
-                                        <select name="sf_role" id="sfRole" class="premium-input"
-                                            style="padding:8px 12px; font-size:12px">
+                                        <select name="eb_role" id="govEbRole" class="premium-input" style="width:100%;font-size:12px;border-color:#fed7aa">
                                             <option value="employee">Employee (เจ้าหน้าที่ทั่วไป)</option>
+                                            <option value="librarian">Librarian (บรรณารักษ์)</option>
                                             <option value="technician">Technician (ช่างเทคนิค)</option>
                                             <option value="supervisor">Supervisor (หัวหน้างาน)</option>
-                                            <option value="admin">e-Borrow Admin (ผู้ดูแลสูงสุด)</option>
+                                            <option value="admin">System Administrator (ผู้ดูแลสูงสุด)</option>
                                         </select>
                                     </div>
 
-                                    <div class="premium-role-card blue p-3">
-                                        <div class="flex items-center gap-3 mb-2">
-                                            <div class="role-icon" style="color:#2563eb"><i
-                                                    class="fa-solid fa-bullhorn"></i></div>
-                                            <div class="font-black text-xs">e-Campaign System</div>
+                                    <!-- e-Campaign Card -->
+                                    <div id="govEcCard" class="premium-role-card blue p-4" style="border-radius:18px;border:1.5px solid #bfdbfe;background:#f0f7ff">
+                                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+                                            <div style="display:flex;align-items:center;gap:10px">
+                                                <div style="width:32px;height:32px;background:#dbeafe;color:#2563eb;border-radius:8px;display:flex;align-items:center;justify-content:center"><i class="fa-solid fa-bullhorn"></i></div>
+                                                <span style="font-weight:900;font-size:13px;color:#1e40af">e-Campaign System</span>
+                                            </div>
+                                            <input type="checkbox" name="ec_access" id="govEcAccess" value="1" style="width:18px;height:18px;cursor:pointer">
                                         </div>
-                                        <div class="flex items-center gap-2 mb-3">
-                                            <input type="checkbox" name="sf_access_ecampaign" id="sfAccessEc" value="1"
-                                                style="width:16px;height:16px">
-                                            <label for="sfAccessEc"
-                                                style="font-size:12px;font-weight:700;color:#1e40af;cursor:pointer">อนุญาตให้จัดการแคมเปญ</label>
+                                        <select name="ec_role" id="govEcRole" class="premium-input" style="width:100%;font-size:12px;border-color:#bfdbfe">
+                                            <option value="editor">Content Editor (จัดการกิจกรรม)</option>
+                                            <option value="admin">System Administrator (ผู้ดูแลสูงสุด)</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <!-- Portal Role Card (Only for Admins) -->
+                                    <div id="govAdminOnlyCard" style="display:none;background:#f5f3ff;border:1.5px solid #ddd6fe;border-radius:18px;padding:15px">
+                                        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+                                            <div style="width:30px;height:30px;background:#ede9fe;color:#7c3aed;border-radius:8px;display:flex;align-items:center;justify-content:center"><i class="fa-solid fa-crown"></i></div>
+                                            <span style="font-weight:900;font-size:13px;color:#5b21b6">Portal Management</span>
                                         </div>
-                                        <label
-                                            style="display:block;font-size:11px;font-weight:800;color:#1e40af;margin-bottom:4px">สิทธิ์ใน
-                                            e-Campaign</label>
-                                        <select name="sf_ecampaign_role" id="sfEcRole" class="premium-input"
-                                            style="padding:8px 12px; font-size:12px">
-                                            <option value="admin">Admin (จัดการได้ทุกอย่าง)</option>
-                                            <option value="editor">Editor (ดูและแก้ไขข้อมูล)</option>
+                                        <select name="admin_role" id="govAdminRole" class="premium-input" style="width:100%;font-size:12px;border-color:#ddd6fe">
+                                            <option value="admin">Standard Admin</option>
+                                            <option value="editor">Standard Editor</option>
+                                            <option value="superadmin">Super Administrator (FULL CONTROL)</option>
                                         </select>
                                     </div>
                                 </div>
                             </div>
-                            <div style="display:flex;gap:10px;margin-top:24px">
-                                <button type="button" onclick="document.getElementById('sfModal').style.display='none'"
-                                    style="flex:1;padding:12px;border-radius:12px;background:#f1f5f9;color:#475569;font-weight:800;font-size:13px;border:none">ยกเลิก</button>
-                                <button type="submit"
-                                    style="flex:1;padding:12px;border-radius:12px;background:#2563eb;color:#fff;font-weight:800;font-size:13px;border:none">บันทึกข้อมูลเจ้าหน้าที่</button>
+
+                            <!-- Audit Justification -->
+                            <div style="margin-top:30px;padding-top:20px;border-top:1.5px dashed #e2e8f0">
+                                <label style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:900;color:#dc2626;margin-bottom:8px">
+                                    <i class="fa-solid fa-shield-check"></i> เหตุผลความจำเป็นในการปรับสิทธิ์ (Justification) <span style="color:#ef4444">*</span>
+                                </label>
+                                <textarea name="justification" id="govJustification" required class="premium-input" style="width:100%;height:70px;padding:12px;font-size:13px;border-color:#fecaca" placeholder="ตัวอย่าง: ได้รับมอบหมายให้ดูแลระบบ e-Borrow เพิ่มเติมตามคำสั่งคณะ..."></textarea>
+                                <p style="margin:6px 0 0;font-size:10px;color:#94a3b8;font-weight:700"><i class="fa-solid fa-info-circle"></i> ISO 27001 Requirement: ทุกการปรับเปลี่ยนสิทธิ์ต้องมีการระบุเหตุผลความจำเป็นทางธุรกิจ</p>
                             </div>
                         </form>
+
+                        <!-- Modal Footer -->
+                        <div style="padding:24px 30px;background:#f8fafc;border-top:1px solid #f1f5f9;display:flex;gap:12px">
+                            <button type="button" onclick="document.getElementById('idGovModal').style.display='none'" style="flex:1;padding:13px;border-radius:14px;border:1.5px solid #e2e8f0;background:#fff;color:#475569;font-weight:800;font-size:14px;cursor:pointer">ยกเลิก</button>
+                            <button type="submit" form="idGovForm" style="flex:2;padding:13px;border-radius:14px;border:none;background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;font-weight:900;font-size:14px;cursor:pointer;box-shadow:0 10px 20px -5px rgba(37,99,235,0.3);display:flex;align-items:center;justify-content:center;gap:8px">
+                                <i class="fa-solid fa-check-double"></i> ยืนยันการปรับปรุงสิทธิ์
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -2309,26 +2281,72 @@ $adminListForSelect = $pdo->query("SELECT id, full_name, username FROM sys_admin
         }
 
         function openAddAdminModal() {
-            document.getElementById('admAction').value = 'add_admin';
-            document.getElementById('admModalTitle').textContent = 'เพิ่ม System Admin';
-            document.getElementById('admForm').reset();
-            document.getElementById('admPassword').placeholder = '';
-            document.getElementById('pwdNotice').style.display = 'none';
-            document.getElementById('admModal').style.display = 'flex';
+            openGovModal('admin', 'add');
+        }
+
+        function openAddStaffModal() {
+            openGovModal('staff', 'add');
         }
 
         function openEditAdminModal(adm) {
-            document.getElementById('admAction').value = 'edit_admin';
-            document.getElementById('admModalTitle').textContent = 'แก้ไข System Admin';
-            document.getElementById('admId').value = adm.id;
-            document.getElementById('admFullName').value = adm.full_name;
-            document.getElementById('admUsername').value = adm.username;
-            document.getElementById('admEmail').value = adm.email;
-            document.getElementById('admRole').value = adm.role;
-            document.getElementById('admPassword').value = '';
-            document.getElementById('admPassword').placeholder = '••••••••';
-            document.getElementById('pwdNotice').style.display = 'inline';
-            document.getElementById('admModal').style.display = 'flex';
+            openGovModal('admin', 'edit', adm);
+        }
+
+        function openEditStaffModal(st) {
+            openGovModal('staff', 'edit', st);
+        }
+
+        /**
+         * Unified Governance Modal Handler
+         */
+        function openGovModal(type, mode, data = null) {
+            const m = document.getElementById('idGovModal');
+            const f = document.getElementById('idGovForm');
+            const title = document.getElementById('govModalTitle');
+            const icon = document.getElementById('govModalIcon');
+            
+            f.reset();
+            document.getElementById('govJustification').value = '';
+            document.getElementById('govTargetType').value = type;
+            document.getElementById('govTargetId').value = data ? data.id : '';
+            document.getElementById('govAction').value = (mode === 'add' ? 'add_identity_gov' : 'save_identity_gov');
+            
+            // Set visuals based on type
+            if (type === 'admin') {
+                title.textContent = (mode === 'add' ? 'เพิ่ม System Admin' : 'จัดการสิทธิ์ System Admin');
+                icon.style.background = '#f5f3ff';
+                icon.style.color = '#7c3aed';
+                icon.innerHTML = '<i class="fa-solid fa-crown"></i>';
+                document.getElementById('govAdminOnlyCard').style.display = 'block';
+                document.getElementById('govEbCard').style.opacity = '0.5'; // Adms might not need borrow roles
+                document.getElementById('govEcCard').style.opacity = '1';
+            } else {
+                title.textContent = (mode === 'add' ? 'เพิ่ม Staff Record' : 'จัดการสิทธิ์ Staff & Roles');
+                icon.style.background = '#eff6ff';
+                icon.style.color = '#2563eb';
+                icon.innerHTML = '<i class="fa-solid fa-id-card-clip"></i>';
+                document.getElementById('govAdminOnlyCard').style.display = 'none';
+                document.getElementById('govEbCard').style.opacity = '1';
+                document.getElementById('govEcCard').style.opacity = '1';
+            }
+
+            // Fill data if editing
+            if (data) {
+                document.getElementById('govFullName').value = data.full_name || '';
+                document.getElementById('govUsername').value = data.username || '';
+                document.getElementById('govEmail').value = data.email || '';
+                document.getElementById('govStatus').value = data.account_status || data.status || 'active';
+                
+                if (type === 'admin') {
+                    document.getElementById('govAdminRole').value = data.role || 'admin';
+                } else {
+                    document.getElementById('govEbRole').value = data.role || 'employee';
+                    document.getElementById('govEcAccess').checked = parseInt(data.access_ecampaign) === 1;
+                    document.getElementById('govEcRole').value = data.ecampaign_role || 'editor';
+                }
+            }
+
+            m.style.display = 'flex';
         }
 
         function openAddStaffModal() {
