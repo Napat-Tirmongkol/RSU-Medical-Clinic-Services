@@ -84,10 +84,12 @@ function verifyResetToken(string $token, string $type): ?array {
     $table = ($type === 'admin') ? 'sys_admins' : 'sys_staff';
     
     try {
-        $stmt = $pdo->prepare("SELECT id, full_name, email FROM $table WHERE reset_token = ? AND reset_expiry > NOW() LIMIT 1");
-        $stmt->execute([$token]);
+        $now = date('Y-m-d H:i:s');
+        $stmt = $pdo->prepare("SELECT id, full_name, email FROM $table WHERE reset_token = ? AND reset_expiry > ? LIMIT 1");
+        $stmt->execute([$token, $now]);
         return $stmt->fetch() ?: null;
     } catch (Exception $e) {
+        error_log("verifyResetToken Error ($type): " . $e->getMessage());
         return null;
     }
 }
