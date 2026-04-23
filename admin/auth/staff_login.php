@@ -386,6 +386,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </button>
             </div>
 
+            <div class="flex justify-end mb-4" style="margin-top:-0.5rem;">
+                <a href="forgot_password.php?type=staff" class="text-xs font-semibold text-gray-400 hover:text-indigo-600 transition-colors">
+                    ลืมรหัสผ่าน?
+                </a>
+            </div>
+
             <button type="submit" class="btn-login">
                 <i class="fa-solid fa-right-to-bracket"></i> เข้าสู่ระบบ
             </button>
