@@ -1162,51 +1162,65 @@ $adminListForSelect = $pdo->query("SELECT id, full_name, username FROM sys_admin
                             <div style="overflow-x:auto">
                                 <table style="width:100%;border-collapse:collapse;font-size:13px" id="idAdminTable">
                                     <thead>
-                                        <tr style="background:#f8fafc;border-bottom:1px solid #f1f5f9">
-                                            <th
-                                                style="padding:12px 20px;text-align:left;font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.14em">
-                                                Admin Detail</th>
-                                            <th
-                                                style="padding:12px 20px;text-align:left;font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.14em">
-                                                Privileges</th>
-                                            <th
-                                                style="padding:12px 20px;text-align:right;font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.14em">
-                                                จัดการ</th>
+                                        <tr style="background:#f8fafc;border-bottom:1.5px solid #e2e8f0">
+                                            <th style="padding:16px 20px;text-align:left;font-size:10px;font-weight:900;color:#64748b;text-transform:uppercase;letter-spacing:.15em"><i class="fa-solid fa-user-shield mr-2"></i>Admin Detail</th>
+                                            <th style="padding:16px 20px;text-align:center;font-size:10px;font-weight:900;color:#64748b;text-transform:uppercase;letter-spacing:.15em;width:150px"><i class="fa-solid fa-key mr-2"></i>Access Level</th>
+                                            <th style="padding:16px 20px;text-align:right;font-size:10px;font-weight:900;color:#64748b;text-transform:uppercase;letter-spacing:.15em">Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody id="idAdminTbody">
-                                        <?php foreach ($allAdmins as $adm):
-                                            $roleClass = match ($adm['role']) { 'superadmin' => 'bg-purple-100 text-purple-700', 'editor' => 'bg-rose-100 text-rose-700', default => 'bg-blue-100 text-blue-700'};
-                                            ?>
-                                            <tr style="border-bottom:1px solid #f1f5f9" class="id-admin-row">
-                                                <td style="padding:14px 20px">
-                                                    <div style="font-weight:750;color:#0f172a">
-                                                        <?= htmlspecialchars($adm['full_name']) ?>
-                                                    </div>
-                                                    <div style="font-size:11px;color:#94a3b8">
-                                                        @<?= htmlspecialchars($adm['username']) ?> ·
-                                                        <?= htmlspecialchars($adm['email']) ?>
+                                        <?php foreach ($allAdmins as $adm): 
+                                            $role = $adm['role'] ?? 'admin';
+                                            $roleIcon = '<i class="fa-solid fa-user-shield"></i>';
+                                            $roleLabel = 'Standard Admin';
+                                            $roleColor = '#3b82f6';
+                                            $roleBg = '#eff6ff';
+                                            $roleBorder = '#bfdbfe';
+
+                                            if ($role === 'superadmin') {
+                                                $roleIcon = '<i class="fa-solid fa-crown"></i>';
+                                                $roleLabel = 'Super Administrator';
+                                                $roleColor = '#7c3aed';
+                                                $roleBg = '#f5f3ff';
+                                                $roleBorder = '#ddd6fe';
+                                            } elseif ($role === 'editor') {
+                                                $roleIcon = '<i class="fa-solid fa-pen-to-square"></i>';
+                                                $roleLabel = 'Content Editor';
+                                                $roleColor = '#e11d48';
+                                                $roleBg = '#fff1f2';
+                                                $roleBorder = '#fecdd3';
+                                            }
+                                        ?>
+                                            <tr style="border-bottom:1px solid #f1f5f9" class="id-admin-row hover:bg-slate-50/50 transition-colors">
+                                                <td style="padding:16px 20px">
+                                                    <div style="display:flex;align-items:center;gap:12px">
+                                                        <div style="width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg, <?= $roleColor ?>, <?= $roleColor ?>dd);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:14px;box-shadow:0 4px 10px -2px <?= $roleColor ?>66">
+                                                            <?= mb_substr($adm['full_name'], 0, 1) ?>
+                                                        </div>
+                                                        <div>
+                                                            <div style="font-weight:800;color:#1e293b;font-size:13.5px"><?= htmlspecialchars($adm['full_name']) ?></div>
+                                                            <div style="font-size:11px;color:#64748b;font-weight:600">@<?= htmlspecialchars($adm['username']) ?> · <?= htmlspecialchars($adm['email']) ?></div>
+                                                        </div>
                                                     </div>
                                                 </td>
-                                                <td style="padding:14px 20px">
-                                                    <span
-                                                        style="font-size:10px;font-weight:800;padding:3px 8px;border-radius:6px;text-transform:uppercase"
-                                                        class="<?= $roleClass ?>"><?= htmlspecialchars($adm['role']) ?></span>
+                                                <td style="padding:16px 20px;text-align:center">
+                                                    <div style="display:inline-flex;align-items:center;gap:8px;padding:4px 12px;border-radius:8px;background:<?= $roleBg ?>;color:<?= $roleColor ?>;border:1.5px solid <?= $roleBorder ?>;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:0.05em">
+                                                        <?= $roleIcon ?> <?= $roleLabel ?>
+                                                    </div>
                                                 </td>
-                                                <td style="padding:14px 20px;text-align:right">
-                                                    <div style="display:flex;gap:6px;justify-content:flex-end">
-                                                        <button onclick='openEditAdminModal(<?= json_encode($adm) ?>)'
-                                                            style="width:32px;height:32px;border-radius:8px;border:1px solid #e2e8f0;background:#fff;color:#64748b;cursor:pointer"><i
-                                                                class="fa-solid fa-pen"></i></button>
+                                                <td style="padding:16px 20px;text-align:right">
+                                                    <div style="display:flex;gap:8px;justify-content:flex-end">
+                                                        <button onclick='openEditAdminModal(<?= json_encode($adm) ?>)' 
+                                                            class="id-action-btn"
+                                                            style="width:34px;height:34px;border-radius:10px;border:1.5px solid #e2e8f0;background:#fff;color:#64748b;cursor:pointer;transition:all 0.2s"><i class="fa-solid fa-pen-to-square"></i></button>
                                                         <?php if ($adm['id'] != $_SESSION['admin_id']): ?>
-                                                            <form method="POST" style="display:inline"
-                                                                onsubmit="return confirm('ยืนยันการลบ Admin ท่านนี้?')">
+                                                            <form method="POST" style="display:inline" onsubmit="return confirm('ยืนยันการลบ Admin ท่านนี้?')">
                                                                 <input type="hidden" name="action" value="delete_admin">
                                                                 <input type="hidden" name="admin_id" value="<?= $adm['id'] ?>">
                                                                 <?php csrf_field(); ?>
-                                                                <button type="submit"
-                                                                    style="width:32px;height:32px;border-radius:8px;border:1px solid #fee2e2;background:#fff;color:#ef4444;cursor:pointer"><i
-                                                                        class="fa-solid fa-trash"></i></button>
+                                                                <button type="submit" 
+                                                                    class="id-action-btn-danger"
+                                                                    style="width:34px;height:34px;border-radius:10px;border:1.5px solid #fee2e2;background:#fff;color:#ef4444;cursor:pointer;transition:all 0.2s"><i class="fa-solid fa-trash-can"></i></button>
                                                             </form>
                                                         <?php endif; ?>
                                                     </div>
@@ -1219,72 +1233,76 @@ $adminListForSelect = $pdo->query("SELECT id, full_name, username FROM sys_admin
                         </div>
                     </div>
 
-                    <!-- PANEL: Staff -->
-                    <div id="id-panel-staff" class="id-panel">
+                    <!-- PANEL: Staff Matrix -->
+                    <div id="id-panel-staff" class="id-panel" style="display:none">
                         <div style="background:#fff;border-radius:20px;border:1.5px solid #e2e8f0;overflow:hidden">
-                            <div
-                                style="padding:18px 24px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;gap:8px">
-                                <div style="width:4px;height:18px;background:#2563eb;border-radius:99px;flex-shrink:0">
-                                </div>
-                                <span
-                                    style="font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.14em;color:#374151">Staff
-                                    Roster (e-Borrow)</span>
+                            <div style="padding:18px 24px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;gap:8px">
+                                <div style="width:4px;height:18px;background:#2563eb;border-radius:99px;flex-shrink:0"></div>
+                                <span style="font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.14em;color:#374151">Staff Permission Matrix</span>
                             </div>
                             <div style="overflow-x:auto">
                                 <table style="width:100%;border-collapse:collapse;font-size:13px" id="idStaffTable">
                                     <thead>
-                                        <tr style="background:#f8fafc;border-bottom:1px solid #f1f5f9">
-                                            <th
-                                                style="padding:12px 20px;text-align:left;font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.14em">
-                                                Staff</th>
-                                            <th
-                                                style="padding:12px 20px;text-align:left;font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.14em">
-                                                System Access</th>
-                                            <th
-                                                style="padding:12px 20px;text-align:right;font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.14em">
-                                                จัดการ</th>
+                                        <tr style="background:#f8fafc;border-bottom:1.5px solid #e2e8f0">
+                                            <th style="padding:16px 20px;text-align:left;font-size:10px;font-weight:900;color:#64748b;text-transform:uppercase;letter-spacing:.15em"><i class="fa-solid fa-user-gear mr-2"></i>Staff Details</th>
+                                            <th style="padding:16px 20px;text-align:center;font-size:10px;font-weight:900;color:#64748b;text-transform:uppercase;letter-spacing:.15em;width:120px"><i class="fa-solid fa-box-archive mr-2"></i>e-Borrow</th>
+                                            <th style="padding:16px 20px;text-align:center;font-size:10px;font-weight:900;color:#64748b;text-transform:uppercase;letter-spacing:.15em;width:120px"><i class="fa-solid fa-bullhorn mr-2"></i>e-Campaign</th>
+                                            <th style="padding:16px 20px;text-align:center;font-size:10px;font-weight:900;color:#64748b;text-transform:uppercase;letter-spacing:.15em;width:100px">Status</th>
+                                            <th style="padding:16px 20px;text-align:right;font-size:10px;font-weight:900;color:#64748b;text-transform:uppercase;letter-spacing:.15em">Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody id="idStaffTbody">
                                         <?php foreach ($allStaff as $st):
                                             $isActive = ($st['account_status'] ?? 'active') === 'active';
+                                            
+                                            // e-Borrow Matrix Mapping
+                                            $ebRole = $st['role'] ?? 'none';
+                                            $ebIcon = '<i class="fa-solid fa-circle-xmark" style="color:#cbd5e1;font-size:14px"></i>';
+                                            if ($ebRole === 'admin') {
+                                                $ebIcon = '<div style="background:#fff7ed;color:#ea580c;border:1px solid #fed7aa;width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;margin:0 auto" title="e-Borrow: Administrator"><i class="fa-solid fa-shield-halved"></i></div>';
+                                            } elseif ($ebRole === 'librarian' || $ebRole === 'technician' || $ebRole === 'supervisor') {
+                                                $ebIcon = '<div style="background:#f0f9ff;color:#0369a1;border:1px solid #bae6fd;width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;margin:0 auto" title="e-Borrow: Staff/Librarian"><i class="fa-solid fa-pen-to-square"></i></div>';
+                                            } elseif ($ebRole === 'employee') {
+                                                $ebIcon = '<div style="background:#f0fdf4;color:#16a34a;border:1px solid #bbf7d0;width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;margin:0 auto" title="e-Borrow: Standard User"><i class="fa-solid fa-user"></i></div>';
+                                            }
+
+                                            // e-Campaign Matrix Mapping
+                                            $ecAccess = (int)($st['access_ecampaign'] ?? 0);
+                                            $ecRole = $st['ecampaign_role'] ?? 'none';
+                                            $ecIcon = '<i class="fa-solid fa-circle-xmark" style="color:#cbd5e1;font-size:14px"></i>';
+                                            if ($ecAccess) {
+                                                if ($ecRole === 'admin' || $ecRole === 'superadmin') {
+                                                    $ecIcon = '<div style="background:#f5f3ff;color:#7c3aed;border:1px solid #ddd6fe;width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;margin:0 auto" title="e-Campaign: Administrator"><i class="fa-solid fa-crown"></i></div>';
+                                                } else {
+                                                    $ecIcon = '<div style="background:#eff6ff;color:#2563eb;border:1px solid #bfdbfe;width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;margin:0 auto" title="e-Campaign: Editor"><i class="fa-solid fa-file-signature"></i></div>';
+                                                }
+                                            }
                                             ?>
-                                            <tr style="border-bottom:1px solid #f1f5f9" class="id-staff-row">
-                                                <td style="padding:14px 20px">
-                                                    <div style="font-weight:750;color:#0f172a">
-                                                        <?= htmlspecialchars($st['full_name']) ?>
-                                                    </div>
-                                                    <div style="font-size:11px;color:#94a3b8">
-                                                        @<?= htmlspecialchars($st['username']) ?> · <span
-                                                            style="font-weight:700"><?= htmlspecialchars($st['role']) ?></span>
-                                                    </div>
-                                                </td>
-                                                <td style="padding:14px 20px">
-                                                    <div style="display:flex;gap:4px">
-                                                        <span title="e-Borrow Status"
-                                                            style="font-size:9px;font-weight:800;padding:2px 6px;border-radius:5px;background:#fff7ed;color:#ea580c;border:1px solid #fed7aa">e-Borrow</span>
-                                                        <?php if ($st['access_ecampaign']): ?>
-                                                            <span title="e-Campaign Role"
-                                                                style="font-size:9px;font-weight:800;padding:2px 6px;border-radius:5px;background:#eff6ff;color:#2563eb;border:1px solid #bfdbfe">e-Camp
-                                                                (<?= $st['ecampaign_role'] ?>)</span>
-                                                        <?php endif; ?>
-                                                        <span
-                                                            style="font-size:9px;font-weight:800;padding:2px 6px;border-radius:5px;background:<?= $isActive ? '#f0fdf4;color:#16a34a;border:1px solid #bbf7d0' : '#fef2f2;color:#dc2626;border:1px solid #fecaca' ?>"><?= strtoupper($st['account_status']) ?></span>
+                                            <tr style="border-bottom:1px solid #f1f5f9" class="id-staff-row hover:bg-slate-50/50 transition-colors">
+                                                <td style="padding:16px 20px">
+                                                    <div style="display:flex;align-items:center;gap:12px">
+                                                        <div style="width:36px;height:36px;border-radius:10px;background:<?= $isActive ? 'linear-gradient(135deg,#3b82f6,#1d4ed8)' : '#f1f5f9' ?>;color:<?= $isActive ? '#fff' : '#94a3b8' ?>;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:14px">
+                                                            <?= mb_substr($st['full_name'], 0, 1) ?>
+                                                        </div>
+                                                        <div>
+                                                            <div style="font-weight:800;color:#1e293b;font-size:13.5px"><?= htmlspecialchars($st['full_name']) ?></div>
+                                                            <div style="font-size:11px;color:#64748b;font-weight:600">@<?= htmlspecialchars($st['username']) ?></div>
+                                                        </div>
                                                     </div>
                                                 </td>
-                                                <td style="padding:14px 20px;text-align:right">
-                                                    <div style="display:flex;gap:6px;justify-content:flex-end">
-                                                        <button onclick='openEditStaffModal(<?= json_encode($st) ?>)'
-                                                            style="width:32px;height:32px;border-radius:8px;border:1px solid #e2e8f0;background:#fff;color:#64748b;cursor:pointer"><i
-                                                                class="fa-solid fa-pen"></i></button>
-                                                        <form method="POST" style="display:inline"
-                                                            onsubmit="return confirm('ยืนยันการลบ Staff ท่านนี้?')">
+                                                <td style="padding:16px 20px;text-align:center"><?= $ebIcon ?></td>
+                                                <td style="padding:16px 20px;text-align:center"><?= $ecIcon ?></td>
+                                                <td style="padding:16px 20px;text-align:center">
+                                                    <span style="font-size:10px;font-weight:900;padding:4px 10px;border-radius:99px;background:<?= $isActive ? '#f0fdf4;color:#16a34a;border:1px solid #bbf7d0' : '#fef2f2;color:#dc2626;border:1px solid #fecaca' ?>"><?= strtoupper($st['account_status']) ?></span>
+                                                </td>
+                                                <td style="padding:16px 20px;text-align:right">
+                                                    <div style="display:flex;gap:8px;justify-content:flex-end">
+                                                        <button onclick='openEditStaffModal(<?= json_encode($st) ?>)' class="id-action-btn" style="width:34px;height:34px;border-radius:10px;border:1.5px solid #e2e8f0;background:#fff;color:#64748b;cursor:pointer;transition:all 0.2s"><i class="fa-solid fa-pen-to-square"></i></button>
+                                                        <form method="POST" style="display:inline" onsubmit="return confirm('ยืนยันการลบ Staff ท่านนี้?')">
                                                             <input type="hidden" name="action" value="delete_staff">
                                                             <input type="hidden" name="sf_id" value="<?= $st['id'] ?>">
                                                             <?php csrf_field(); ?>
-                                                            <button type="submit"
-                                                                style="width:32px;height:32px;border-radius:8px;border:1px solid #fee2e2;background:#fff;color:#ef4444;cursor:pointer"><i
-                                                                    class="fa-solid fa-trash"></i></button>
+                                                            <button type="submit" class="id-action-btn-danger" style="width:34px;height:34px;border-radius:10px;border:1.5px solid #fee2e2;background:#fff;color:#ef4444;cursor:pointer;transition:all 0.2s"><i class="fa-solid fa-trash-can"></i></button>
                                                         </form>
                                                     </div>
                                                 </td>
@@ -1292,6 +1310,25 @@ $adminListForSelect = $pdo->query("SELECT id, full_name, username FROM sys_admin
                                         <?php endforeach; ?>
                                     </tbody>
                                 </table>
+                            </div>
+                            <!-- Matrix Legend -->
+                            <div style="padding:16px 24px;background:#f8fafc;border-top:1px solid #f1f5f9;display:flex;flex-wrap:wrap;gap:20px;align-items:center">
+                                <div style="font-size:10px;font-weight:900;color:#94a3b8;text-transform:uppercase;letter-spacing:.1em">Matrix Legend:</div>
+                                <div style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:#475569">
+                                    <span style="color:#ea580c"><i class="fa-solid fa-shield-halved"></i></span> Administrator
+                                </div>
+                                <div style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:#475569">
+                                    <span style="color:#7c3aed"><i class="fa-solid fa-crown"></i></span> Super Admin
+                                </div>
+                                <div style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:#475569">
+                                    <span style="color:#2563eb"><i class="fa-solid fa-pen-to-square"></i></span> Editor/Librarian
+                                </div>
+                                <div style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:#475569">
+                                    <span style="color:#16a34a"><i class="fa-solid fa-user"></i></span> Standard
+                                </div>
+                                <div style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:#94a3b8">
+                                    <i class="fa-solid fa-circle-xmark"></i> No Access
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -2511,12 +2548,32 @@ $adminListForSelect = $pdo->query("SELECT id, full_name, username FROM sys_admin
             window.idPrevPage = function () { if (currentPage > 1) { currentPage--; loadUsers(); } };
             window.idNextPage = function () { currentPage++; loadUsers(); };
 
-            // Initialize
             if (isInitialLoad) {
                 isInitialLoad = false;
                 loadUsers();
             }
         })();
+
+        /**
+         * switchIdTab - Handles switching between Identity sub-panels
+         */
+        function switchIdTab(tabName, btn) {
+            // Update tabs
+            document.querySelectorAll('.id-tab').forEach(b => b.classList.remove('active'));
+            if (btn) btn.classList.add('active');
+
+            // Update panels
+            document.querySelectorAll('.id-panel').forEach(p => p.classList.remove('active'));
+            const targetPanel = document.getElementById('id-panel-' + tabName);
+            if (targetPanel) targetPanel.classList.add('active');
+
+            // Show/Hide relevant Add buttons (Superadmin only)
+            const addAdmin = document.getElementById('id-btn-add-admin');
+            const addStaff = document.getElementById('id-btn-add-staff');
+            if (addAdmin) addAdmin.style.display = (tabName === 'admins') ? 'block' : 'none';
+            if (addStaff) addStaff.style.display = (tabName === 'staff') ? 'block' : 'none';
+        }
+
         // Close modals on backdrop click
         ['idEditModal', 'idViewModal', 'admModal', 'sfModal'].forEach(function (id) {
             const el = document.getElementById(id);
