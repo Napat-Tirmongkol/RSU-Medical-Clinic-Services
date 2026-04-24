@@ -22,3 +22,7 @@ node_modules/
 
 # Staging Sandbox
 ux_staging/
+
+# Tailwind CLI binary (compile locally, do not commit)
+tailwindcss
+tailwindcss-*
