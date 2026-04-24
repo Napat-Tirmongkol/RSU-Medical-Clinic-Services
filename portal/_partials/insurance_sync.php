@@ -4,7 +4,6 @@
  */
 declare(strict_types=1);
 
-// Logic extracted from original insurance_sync.php
 $pdo = db();
 
 // KPI stats
@@ -70,9 +69,10 @@ $csrfToken = get_csrf_token();
                         <?= defined('SITE_SHOW_INSURANCE') && SITE_SHOW_INSURANCE ? 'CARD ACTIVE' : 'HIDDEN' ?>
                     </span>
                 </div>
-                <label class="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" id="insToggleVisibility" class="sr-only peer" <?= defined('SITE_SHOW_INSURANCE') && SITE_SHOW_INSURANCE ? 'checked' : '' ?> onchange="updateInsVisibility(this)">
-                    <div class="w-10 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                <label class="toggle">
+                    <input type="checkbox" id="insToggleVisibility" <?= defined('SITE_SHOW_INSURANCE') && SITE_SHOW_INSURANCE ? 'checked' : '' ?> onchange="updateInsVisibility(this)">
+                    <div class="toggle-track"></div>
+                    <div class="toggle-thumb"></div>
                 </label>
             </div>
             <a href="ajax_insurance_export.php?type=active" class="bg-emerald-600 text-white px-5 py-2.5 rounded-2xl text-xs font-black hover:opacity-90 transition-all flex items-center gap-2 shadow-lg shadow-emerald-600/20">
@@ -170,9 +170,7 @@ $csrfToken = get_csrf_token();
                     </button>
 
                     <!-- Dry Run Results Placeholder -->
-                    <div id="insDryResult" class="hidden space-y-6 pt-4">
-                        <!-- Summary and Tables will be injected here -->
-                    </div>
+                    <div id="insDryResult" class="hidden space-y-6 pt-4"></div>
                 </div>
             </div>
 
@@ -249,33 +247,73 @@ $csrfToken = get_csrf_token();
                         </button>
                     </div>
 
-                    <div id="insMembersResult" class="overflow-x-auto min-h-[300px]">
-                        <!-- Content loaded via AJAX -->
-                    </div>
+                    <div id="insMembersResult" class="overflow-x-auto min-h-[300px]"></div>
+                    <div id="insMembersPagination" class="p-4 flex justify-center gap-2"></div>
                 </div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Scripts for Insurance Sync (Moved from original file and refined for SPA) -->
+<!-- ─── Modals ─────────────────────────────────────────────────────────────── -->
+<!-- Detail Modal -->
+<div id="insDetailModal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-black/40 backdrop-blur-sm">
+    <div class="bg-white rounded-[2.5rem] w-full max-w-4xl mx-4 max-h-[85vh] flex flex-col shadow-2xl">
+        <div class="p-8 border-b border-slate-100 flex items-center justify-between">
+            <h3 class="text-xl font-black text-slate-900" id="insDetailTitle">รายละเอียด Sync</h3>
+            <button onclick="closeInsDetailModal()" class="w-10 h-10 bg-slate-50 text-slate-400 hover:text-slate-600 rounded-full flex items-center justify-center transition-colors">
+                <i class="fa-solid fa-xmark text-xl"></i>
+            </button>
+        </div>
+        <div id="insDetailBody" class="overflow-y-auto flex-1 p-8 text-sm text-slate-600 no-scrollbar">
+            <div class="text-center py-12"><i class="fa-solid fa-spinner fa-spin text-3xl text-blue-400"></i></div>
+        </div>
+    </div>
+</div>
+
+<!-- Override Modal -->
+<div id="insOverrideModal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-black/40 backdrop-blur-sm">
+    <div class="bg-white rounded-[2.5rem] w-full max-w-md mx-4 shadow-2xl p-10">
+        <h3 class="text-xl font-black text-slate-900 mb-6">แก้ไขสิทธิ์ด้วยมือ (Manual Override)</h3>
+        <input type="hidden" id="insOverrideId">
+        <div class="space-y-6">
+            <div>
+                <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">สมาชิก</label>
+                <div id="insOverrideName" class="text-lg font-black text-slate-800"></div>
+            </div>
+            <div>
+                <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">สถานะใหม่</label>
+                <select id="insOverrideStatus" class="w-full h-14 px-6 border border-slate-200 rounded-2xl text-sm font-bold focus:ring-4 focus:ring-blue-500/10 outline-none">
+                    <option value="Active">Active — มีสิทธิ์</option>
+                    <option value="Inactive">Inactive — หมดสิทธิ์</option>
+                </select>
+            </div>
+            <div>
+                <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">หมายเหตุ</label>
+                <input type="text" id="insOverrideNote" placeholder="ระบุเหตุผลในการแก้ไข..." class="w-full h-14 px-6 border border-slate-200 rounded-2xl text-sm font-bold focus:ring-4 focus:ring-blue-500/10 outline-none">
+            </div>
+            <div class="flex gap-4 pt-4">
+                <button onclick="submitInsOverride()" class="flex-1 h-14 bg-[#0052CC] text-white font-black rounded-2xl shadow-xl shadow-blue-200 active:scale-95 transition-all">บันทึก</button>
+                <button onclick="closeInsOverrideModal()" class="px-8 h-14 bg-slate-50 text-slate-500 font-black rounded-2xl active:scale-95 transition-all">ยกเลิก</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script>
 (function() {
     const CSRF = '<?= $csrfToken ?>';
     let dryRunData = null;
 
-    // --- Tab Switching ---
     window.switchInsTab = function(name, btn) {
         document.querySelectorAll('.ins-tab-btn').forEach(b => b.classList.remove('active'));
         document.querySelectorAll('.ins-tab-content').forEach(c => c.classList.remove('active'));
         document.getElementById('ins-tab-' + name).classList.add('active');
         btn.classList.add('active');
-        
         if (name === 'members') loadInsMembers(1);
     };
 
-    // --- File Handling ---
     window.handleInsFileChange = function(input) {
         const label = document.getElementById('insFileLabelP');
         const area = document.getElementById('insAreaP');
@@ -302,7 +340,6 @@ $csrfToken = get_csrf_token();
         }
     };
 
-    // --- Helper: Convert Excel to CSV Blob ---
     async function excelToCSV(file) {
         if (!/\.(xlsx|xls)$/i.test(file.name)) return file;
         return new Promise((resolve, reject) => {
@@ -321,39 +358,34 @@ $csrfToken = get_csrf_token();
         });
     }
 
-    // --- Dry Run ---
     window.doInsDryRun = async function() {
         const btn = document.getElementById('insBtnDryRun');
         const insFileRaw = document.getElementById('insFileP').files[0];
         const regFileRaw = document.getElementById('regFileP').files[0];
-
-        if (!insFileRaw) return;
+        if (!insFileRaw && !regFileRaw) return;
 
         btn.disabled = true;
         btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>กำลังตรวจสอบข้อมูล...';
 
         try {
-            const insFile = await excelToCSV(insFileRaw);
+            const insFile = insFileRaw ? await excelToCSV(insFileRaw) : null;
             const regFile = regFileRaw ? await excelToCSV(regFileRaw) : null;
 
             const fd = new FormData();
             fd.append('action', 'dryrun');
             fd.append('csrf_token', CSRF);
-            fd.append('insurance_file', insFile);
+            if (insFile) fd.append('insurance_file', insFile);
             if (regFile) fd.append('registry_file', regFile);
 
             const res = await fetch('ajax_insurance_sync.php', { method: 'POST', body: fd });
             const data = await res.json();
 
-            if (data.status !== 'ok') {
-                Swal.fire('ข้อผิดพลาด', data.message, 'error');
-                return;
-            }
+            if (data.status !== 'ok') throw new Error(data.message);
 
             dryRunData = data;
             renderInsDryResult(data);
         } catch (err) {
-            Swal.fire('Error', 'ไม่สามารถตรวจสอบข้อมูลได้: ' + err.message, 'error');
+            Swal.fire('ข้อผิดพลาด', err.message, 'error');
         } finally {
             btn.disabled = false;
             btn.innerHTML = '<i class="fa-solid fa-magnifying-glass mr-2"></i>เริ่มการตรวจสอบข้อมูล (Dry Run)';
@@ -363,7 +395,6 @@ $csrfToken = get_csrf_token();
     function renderInsDryResult(data) {
         const resultDiv = document.getElementById('insDryResult');
         resultDiv.classList.remove('hidden');
-        
         const totalInact = data.total_will_inactivate ?? data.total_inactivated;
         
         let html = `
@@ -376,7 +407,6 @@ $csrfToken = get_csrf_token();
                         <span class="ins-badge badge-inactive">Inactivate: ${totalInact}</span>
                     </div>
                 </div>
-
                 ${data.guard_triggered ? `
                     <div class="bg-rose-50 border border-rose-100 rounded-2xl p-6 mb-8 flex items-start gap-4">
                         <div class="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-rose-600 shrink-0 shadow-sm border border-rose-50">
@@ -388,13 +418,9 @@ $csrfToken = get_csrf_token();
                         </div>
                     </div>
                 ` : ''}
-
                 <div class="flex gap-4">
-                    <button onclick="execInsSync(${data.guard_triggered ? 'true' : 'false'})" 
-                        class="flex-1 h-16 ${data.guard_triggered ? 'bg-rose-600 shadow-rose-200' : 'bg-emerald-600 shadow-emerald-200'} text-white font-black rounded-2xl shadow-xl active:scale-95 transition-all flex items-center justify-center gap-3">
-                        <i class="fa-solid fa-check-double"></i> ${data.guard_triggered ? 'บังคับยืนยัน (Override Guard)' : 'ยืนยันและอัปเดตข้อมูล'}
-                    </button>
-                    <button onclick="document.getElementById('insDryResult').classList.add('hidden')" class="px-8 h-16 bg-white border border-slate-200 text-slate-400 font-black rounded-2xl active:scale-95 transition-all">ยกเลิก</button>
+                    <button onclick="execInsSync(${data.guard_triggered})" class="flex-1 h-16 ${data.guard_triggered ? 'bg-rose-600' : 'bg-emerald-600'} text-white font-black rounded-2xl shadow-xl active:scale-95 transition-all">ยืนยันและอัปเดตข้อมูล</button>
+                    <button onclick="document.getElementById('insDryResult').classList.add('hidden')" class="px-8 h-16 bg-white border border-slate-200 text-slate-400 font-black rounded-2xl">ยกเลิก</button>
                 </div>
             </div>
         `;
@@ -403,21 +429,7 @@ $csrfToken = get_csrf_token();
     }
 
     window.execInsSync = async function(force) {
-        if (!dryRunData) return;
-        
-        const confirm = await Swal.fire({
-            title: 'ยืนยันการ Sync?',
-            text: 'ข้อมูลในฐานข้อมูลจะถูกปรับปรุงทันที ไม่สามารถย้อนกลับได้',
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonColor: force ? '#dc2626' : '#10b981',
-            confirmButtonText: 'ยืนยันดำเนินการ'
-        });
-
-        if (!confirm.isConfirmed) return;
-
         Swal.fire({ title: 'กำลังประมวลผล...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
-
         const fd = new FormData();
         fd.append('action', 'execute');
         fd.append('csrf_token', CSRF);
@@ -432,9 +444,7 @@ $csrfToken = get_csrf_token();
             const result = await res.json();
             if (result.status === 'success') {
                 Swal.fire('สำเร็จ!', result.message, 'success').then(() => switchSection('insurance_sync'));
-            } else {
-                Swal.fire('ล้มเหลว', result.message, 'error');
-            }
+            } else { Swal.fire('ล้มเหลว', result.message, 'error'); }
         } catch (err) { Swal.fire('Error', 'Connection failed', 'error'); }
     };
 
@@ -442,7 +452,6 @@ $csrfToken = get_csrf_token();
         const container = document.getElementById('insMembersResult');
         const q = document.getElementById('insMemberSearch').value;
         const f = document.getElementById('insMemberFilter').value;
-        
         container.innerHTML = '<div class="flex items-center justify-center py-20"><i class="fa-solid fa-spinner fa-spin text-4xl text-blue-200"></i></div>';
 
         const fd = new FormData();
@@ -457,70 +466,92 @@ $csrfToken = get_csrf_token();
             const data = await res.json();
             if (data.status !== 'ok') throw new Error(data.message);
 
-            if (!data.members.length) {
-                container.innerHTML = '<div class="text-center py-20 text-slate-300 font-bold">ไม่พบข้อมูลสมาชิก</div>';
-                return;
-            }
-
             let html = `
                 <table class="w-full border-collapse">
-                    <thead>
-                        <tr class="bg-slate-50/80">
-                            <th class="text-left px-6 py-4">Member ID</th>
-                            <th class="text-left px-6 py-4">Name / Position</th>
-                            <th class="text-center px-6 py-4">Status</th>
-                            <th class="text-center px-6 py-4">Manual</th>
-                            <th class="text-right px-6 py-4">Last Updated</th>
-                            <th class="px-6 py-4"></th>
+                    <thead><tr class="bg-slate-50/80"><th class="text-left px-6 py-4">ID</th><th class="text-left px-6 py-4">Name</th><th class="text-center px-6 py-4">Status</th><th class="text-center px-6 py-4">Lock</th><th class="px-6 py-4"></th></tr></thead>
+                    <tbody>${data.members.map(m => `
+                        <tr class="hover:bg-slate-50 border-b border-slate-100">
+                            <td class="px-6 py-4 font-mono text-xs font-black text-slate-400">${m.member_id}</td>
+                            <td class="px-6 py-4"><div class="text-sm font-black text-slate-800">${m.full_name}</div></td>
+                            <td class="px-6 py-4 text-center"><span class="ins-badge badge-${m.insurance_status === 'Active' ? 'active' : 'inactive'}">${m.insurance_status}</span></td>
+                            <td class="px-6 py-4 text-center">${m.manually_overridden == 1 ? '<span class="ins-badge badge-manual">LOCKED</span>' : '—'}</td>
+                            <td class="px-6 py-4 text-right"><button onclick="openInsOverrideModal('${m.member_id}', '${m.full_name}', '${m.insurance_status}')" class="text-blue-600 font-black text-xs">EDIT</button></td>
                         </tr>
-                    </thead>
-                    <tbody>
-                        ${data.members.map(m => `
-                            <tr class="hover:bg-slate-50 border-b border-slate-100">
-                                <td class="px-6 py-4 font-mono text-xs font-black text-slate-400">${m.member_id}</td>
-                                <td class="px-6 py-4">
-                                    <div class="text-sm font-black text-slate-800">${m.full_name}</div>
-                                    <div class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">${m.position || '-'}</div>
-                                </td>
-                                <td class="px-6 py-4 text-center">
-                                    <span class="ins-badge badge-${m.insurance_status === 'Active' ? 'active' : 'inactive'}">${m.insurance_status}</span>
-                                </td>
-                                <td class="px-6 py-4 text-center">
-                                    ${m.manually_overridden == 1 ? '<span class="ins-badge badge-manual">LOCK</span>' : '<span class="text-slate-200 text-xs">—</span>'}
-                                </td>
-                                <td class="px-6 py-4 text-right text-xs font-bold text-slate-400">
-                                    ${m.updated_at ? m.updated_at.substring(0,16) : '-'}
-                                </td>
-                                <td class="px-6 py-4 text-right">
-                                    <button onclick="openInsOverrideModal('${m.member_id}', '${m.full_name.replace(/'/g, "\\'")}', '${m.insurance_status}')" class="text-blue-600 hover:underline text-xs font-black">EDIT</button>
-                                </td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
+                    `).join('')}</tbody>
                 </table>
             `;
             container.innerHTML = html;
+            
+            // Pagination
+            const totalPages = Math.ceil(data.total / data.per_page);
+            let phtml = '';
+            for (let i = 1; i <= totalPages; i++) {
+                if (i > 10) break; // simple limit
+                phtml += `<button onclick="loadInsMembers(${i})" class="w-10 h-10 rounded-xl font-black text-xs ${i === page ? 'bg-blue-600 text-white shadow-lg shadow-blue-200' : 'bg-white border border-slate-200 text-slate-400 hover:bg-slate-50'}">${i}</button>`;
+            }
+            document.getElementById('insMembersPagination').innerHTML = phtml;
         } catch (err) { container.innerHTML = '<p class="text-rose-500 font-bold p-8">Error: ' + err.message + '</p>'; }
     };
 
     window.updateInsVisibility = function(cb) {
         const fd = new FormData();
         fd.append('csrf_token', CSRF);
-        fd.append('action', 'update_visibility');
-        fd.append('visible', cb.checked ? '1' : '0');
-        
+        fd.append('action', 'set_visibility');
+        fd.append('active', cb.checked ? '1' : '0');
         fetch('ajax_insurance_sync.php', { method: 'POST', body: fd })
             .then(r => r.json())
             .then(data => {
                 const status = document.getElementById('insVisibilityStatus');
-                if (data.ok) {
+                if (data.status === 'success') {
                     status.textContent = cb.checked ? 'CARD ACTIVE' : 'HIDDEN';
                     status.className = `text-[10px] font-bold ${cb.checked ? 'text-blue-600' : 'text-gray-400'} leading-none`;
-                }
+                } else { Swal.fire('Error', data.message, 'error'); cb.checked = !cb.checked; }
             });
     };
 
-    function esc(s) { return s ? s.toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') : ''; }
+    window.viewInsSyncDetail = async function(syncId) {
+        document.getElementById('insDetailModal').classList.replace('hidden', 'flex');
+        document.getElementById('insDetailBody').innerHTML = '<div class="text-center py-12"><i class="fa-solid fa-spinner fa-spin text-3xl text-blue-400"></i></div>';
+        const fd = new FormData();
+        fd.append('action', 'get_sync_detail');
+        fd.append('csrf_token', CSRF);
+        fd.append('sync_id', syncId);
+        try {
+            const res = await fetch('ajax_insurance_sync.php', { method: 'POST', body: fd });
+            const data = await res.json();
+            if (data.status !== 'ok') throw new Error(data.message);
+            document.getElementById('insDetailBody').innerHTML = `<div class="space-y-4"><h4 class="font-black text-slate-800">History Rows for Sync #${syncId}</h4><div class="overflow-x-auto"><table class="w-full"><thead><tr class="text-left text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100"><th class="pb-2">ID</th><th class="pb-2">Name</th><th class="pb-2">Change</th></tr></thead><tbody>${data.rows.map(r => `<tr><td class="py-2 font-mono text-xs">${r.member_id}</td><td class="py-2 font-bold">${r.full_name}</td><td class="py-2"><span class="ins-badge badge-${r.new_status === 'Active' ? 'active' : 'inactive'}">${r.new_status}</span></td></tr>`).join('')}</tbody></table></div></div>`;
+        } catch (err) { document.getElementById('insDetailBody').innerHTML = '<p class="text-rose-500">' + err.message + '</p>'; }
+    };
+
+    window.closeInsDetailModal = () => document.getElementById('insDetailModal').classList.replace('flex', 'hidden');
+
+    window.openInsOverrideModal = (id, name, status) => {
+        document.getElementById('insOverrideId').value = id;
+        document.getElementById('insOverrideName').textContent = name;
+        document.getElementById('insOverrideStatus').value = status;
+        document.getElementById('insOverrideModal').classList.replace('hidden', 'flex');
+    };
+    window.closeInsOverrideModal = () => document.getElementById('insOverrideModal').classList.replace('flex', 'hidden');
+
+    window.submitInsOverride = async () => {
+        const id = document.getElementById('insOverrideId').value;
+        const status = document.getElementById('insOverrideStatus').value;
+        const note = document.getElementById('insOverrideNote').value;
+        const fd = new FormData();
+        fd.append('action', 'manual_override');
+        fd.append('csrf_token', CSRF);
+        fd.append('member_id', id);
+        fd.append('new_status', status);
+        fd.append('note', note);
+        try {
+            const res = await fetch('ajax_insurance_sync.php', { method: 'POST', body: fd });
+            const data = await res.json();
+            if (data.status === 'success') {
+                Swal.fire('สำเร็จ', 'อัปเดตสิทธิ์เรียบร้อย', 'success').then(() => { closeInsOverrideModal(); loadInsMembers(1); });
+            } else { Swal.fire('Error', data.message, 'error'); }
+        } catch (err) { Swal.fire('Error', 'Connection failed', 'error'); }
+    };
 
 })();
 </script>
