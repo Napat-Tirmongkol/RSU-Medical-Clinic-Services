@@ -199,8 +199,38 @@ try {
     }
 }
 
-require_once __DIR__ . '/../admin/includes/header.php';
 ?>
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Governance - Central HUB</title>
+    <link rel="stylesheet" href="../assets/css/tailwind.min.css">
+    <link rel="stylesheet" href="../assets/css/portal.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="../assets/css/rsufont.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        .premium-input { width: 100%; padding: 0.75rem 1rem; border-radius: 12px; border: 1.5px solid #e5e7eb; outline: none; font-weight: 600; font-size: 0.875rem; transition: all 0.2s; }
+        .premium-input:focus { border-color: #2563eb; box-shadow: 0 0 0 4px rgba(37,99,235,0.1); }
+        .premium-select { width: 100%; padding: 0.75rem 1rem; border-radius: 12px; border: 1.5px solid #e5e7eb; outline: none; font-weight: 600; font-size: 0.875rem; background: #fff; cursor: pointer; }
+        .premium-role-card { border: 1.5px solid #f1f5f9; background: #fff; border-radius: 20px; transition: all 0.2s; overflow: hidden; }
+        .premium-role-card.orange { border-color: #ffedd5; }
+        .premium-role-card.blue { border-color: #dbeafe; }
+        .role-icon { width: 40px; height: 40px; border-radius: 12px; background: #fff7ed; display: flex; items-center; justify-content: center; }
+        .role-icon.blue { background: #eff6ff; }
+        .premium-toggle { position: relative; display: inline-block; width: 44px; height: 24px; }
+        .toggle-slider { position: absolute; cursor: pointer; inset: 0; background-color: #e2e8f0; transition: .4s; border-radius: 24px; }
+        .toggle-slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        input:checked + .toggle-slider { background-color: #2563eb; }
+        input:checked + .toggle-slider:before { transform: translateX(20px); }
+    </style>
+</head>
+<body style="background:#f4f7f5; min-height:100vh;">
+    <?php include __DIR__ . '/_partials/header.php'; ?>
+    
+    <div class="p-5 md:p-10 animate-slide-up">
 
 <div class="max-w-6xl mx-auto px-4">
 <?php 
@@ -1130,5 +1160,6 @@ renderPageHeader("System Governance", "Hub บริหารจัดการ:
     .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #d1d5db; }
 </style>
 
+</div>
 <?php require_once __DIR__ . '/../admin/includes/footer.php'; ?>
 

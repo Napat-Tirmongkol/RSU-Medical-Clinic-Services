@@ -324,6 +324,35 @@ $announcements_list = [];
 $ann_saved = false;
 $ann_error = '';
 
+// ตรวจสอบและสร้างตารางถ้ายังไม่มี
+try {
+    $pdo->exec("CREATE TABLE IF NOT EXISTS sys_announcements (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        title VARCHAR(255) NOT NULL,
+        content TEXT NOT NULL,
+        image_url VARCHAR(500) DEFAULT NULL,
+        type ENUM('info', 'warning', 'success', 'urgent') DEFAULT 'info',
+        target_audience ENUM('all', 'student', 'staff', 'other') DEFAULT 'all',
+        priority TINYINT UNSIGNED DEFAULT 0,
+        is_active TINYINT(1) DEFAULT 1,
+        show_once TINYINT(1) DEFAULT 1,
+        start_date DATE DEFAULT NULL,
+        end_date DATE DEFAULT NULL,
+        read_count INT DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+
+    $pdo->exec("CREATE TABLE IF NOT EXISTS sys_announcement_reads (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        announcement_id INT NOT NULL,
+        user_id INT NOT NULL,
+        read_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY unq_ann_user (announcement_id, user_id),
+        FOREIGN KEY (announcement_id) REFERENCES sys_announcements(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+} catch (PDOException $e) { /* silent fail */ }
+
 // จัดการ POST actions สำหรับประกาศ
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ann_action'])) {
     validate_csrf_or_die();
@@ -655,7 +684,24 @@ try {
             if (icon) icon.style.transform = isCollapsed ? 'rotate(180deg)' : '';
             if (expanded) expanded.style.display = isCollapsed ? 'none' : 'flex';
             if (collapsed) collapsed.style.display = isCollapsed ? 'flex' : 'none';
+            localStorage.setItem('portal_sidebar_collapsed', isCollapsed ? '1' : '0');
         };
+
+        // Auto-apply sidebar state on load
+        window.addEventListener('DOMContentLoaded', function() {
+            if (localStorage.getItem('portal_sidebar_collapsed') === '1') {
+                var sidebar = document.getElementById('portal-sidebar');
+                if (sidebar) {
+                    sidebar.classList.add('collapsed');
+                    var icon = document.getElementById('sidebar-toggle-icon');
+                    if (icon) icon.style.transform = 'rotate(180deg)';
+                    var expanded = document.getElementById('psb-user-expanded');
+                    var collapsed = document.getElementById('psb-user-collapsed');
+                    if (expanded) expanded.style.display = 'none';
+                    if (collapsed) collapsed.style.display = 'flex';
+                }
+            }
+        });
 
         window.switchSection = function (sectionId, btn) {
             document.querySelectorAll('.portal-section').forEach(function (s) { s.style.display = 'none'; });
@@ -704,7 +750,7 @@ try {
         </div>
 
         <!-- Nav items -->
-        <div style="padding:10px;flex:1;overflow:hidden">
+        <div style="padding:10px;flex:1;overflow:hidden;display:flex;flex-direction:column;">
             <button class="psb-item psb-active" data-section="dashboard" onclick="switchSection('dashboard',this)">
                 <div class="psb-icon"><i class="fa-solid fa-chart-pie" style="color:#059669"></i></div>
                 <span class="psb-label" style="color:#059669;font-weight:900">Dashboard</span>
@@ -737,71 +783,26 @@ try {
                 <span class="psb-label" style="color:#059669;font-weight:900">ISO Governance</span>
             </button>
             <?php endif; ?>
+            <button class="psb-item" data-section="announcements" onclick="switchSection('announcements',this)">
+                <div class="psb-icon"><i class="fa-solid fa-bullhorn" style="color:#7c3aed"></i></div>
+                <span class="psb-label" style="color:#6d28d9;font-weight:900">ประกาศ</span>
+            </button>
+
+            <div style="flex:1"></div> <!-- Spacer to push settings to bottom -->
+
             <?php if ($adminRole === 'superadmin' || !empty($_SESSION['access_site_settings'])): ?>
             <button class="psb-item" data-section="settings" onclick="switchSection('settings',this)">
                 <div class="psb-icon"><i class="fa-solid fa-gear" style="color:#d97706"></i></div>
                 <span class="psb-label" style="color:#b45309;font-weight:900">Settings</span>
             </button>
             <?php endif; ?>
-            <button class="psb-item" data-section="announcements" onclick="switchSection('announcements',this)">
-                <div class="psb-icon"><i class="fa-solid fa-bullhorn" style="color:#7c3aed"></i></div>
-                <span class="psb-label" style="color:#6d28d9;font-weight:900">ประกาศ</span>
-            </button>
         </div>
     </nav>
 
     <div id="app-shell" style="flex:1;min-width:0;background:#f4f7f5;height:100vh;overflow:hidden;display:flex;flex-direction:column;">
 
         <!-- ══════════════════ HEADER ══════════════════ -->
-        <header class="portal-header au">
-            <div class="w-full px-5 sm:px-8 py-3 flex items-center justify-between gap-4" style="min-height:60px">
-
-                <!-- Left/Center: Global Search -->
-                <div style="flex: 1; display: flex; justify-content: flex-start;">
-                    <div class="relative group w-full max-w-[400px]">
-                        <input type="text" placeholder="ค้นหาเมนู หรือแคมเปญ"
-                            class="w-full pl-5 pr-10 py-2 bg-slate-50 border border-slate-200 rounded-xl text-[13px] font-bold text-slate-800 outline-none focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all font-prompt">
-                        <button
-                            class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-emerald-600 transition-colors flex items-center justify-center">
-                            <i class="fa-solid fa-magnifying-glass text-sm"></i>
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Right Action Icons -->
-                <div class="flex items-center gap-3 sm:gap-4">
-
-                    <!-- Dark Mode Toggle Button -->
-                    <button id="darkModeToggle" onclick="toggleDarkMode()" title="สลับโหมดมืด/สว่าง"
-                        class="w-9 h-9 flex items-center justify-center rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900 transition-colors shadow-sm dark-mode-btn">
-                        <i class="fa-solid fa-moon"></i>
-                    </button>
-
-                    <!-- Divider -->
-                    <div class="w-px h-6 bg-gray-200 hidden sm:block"></div>
-
-                    <!-- User Identity & Logout -->
-                    <div class="flex items-center gap-2 sm:gap-3">
-                        <div class="text-right hidden sm:block">
-                            <div
-                                class="text-[9px] font-extrabold uppercase tracking-widest text-slate-500 leading-none mb-1">
-                                Admin</div>
-                            <div class="text-[13px] font-black text-slate-900 leading-none">
-                                <?= htmlspecialchars($_SESSION['admin_username'] ?? 'Administrator') ?>
-                            </div>
-                        </div>
-                        <div class="w-9 h-9 rounded-xl flex flex-shrink-0 items-center justify-center shadow-md shadow-emerald-500/20 text-sm"
-                            style="background: linear-gradient(135deg, #2e9e63, #10b981); color:#fff;">
-                            <i class="fa-solid fa-user-shield"></i>
-                        </div>
-                        <a href="../admin/auth/logout.php" title="ออกจากระบบ"
-                            class="w-9 h-9 rounded-xl bg-rose-50 text-rose-600 flex flex-shrink-0 items-center justify-center hover:bg-rose-500 hover:text-white transition-colors border border-rose-100 ml-1">
-                            <i class="fa-solid fa-power-off text-xs"></i>
-                        </a>
-                    </div>
-                </div>
-            </div>
-        </header>
+        <?php include __DIR__ . '/_partials/header.php'; ?>
 
         <!-- ── Main Content ── -->
         <main id="portal-main" style="flex:1;overflow-y:auto;min-width:0;">

@@ -15,6 +15,8 @@ $pdo = db();
     <title>Support Chat - Central HUB</title>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="../assets/css/tailwind.min.css">
+    <link rel="stylesheet" href="../assets/css/portal.css">
     <style>
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -463,11 +465,13 @@ $pdo = db();
     </style>
 </head>
 <body>
-    <div class="page-wrapper">
+    <?php include __DIR__ . '/_partials/header.php'; ?>
+
+    <div class="page-wrapper" style="height: calc(100vh - 60px); padding: 20px 32px;">
         <!-- Header -->
-        <div class="page-header">
+        <div class="page-header" style="margin-bottom: 20px;">
             <div>
-                <h1>Live Support Chat</h1>
+                <h1 style="font-size: 24px;">Live Support Chat</h1>
                 <p class="subtitle">Real-time Patient Support Center</p>
             </div>
             <a href="index.php" class="btn-back">

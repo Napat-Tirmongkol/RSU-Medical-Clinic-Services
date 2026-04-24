@@ -8,7 +8,20 @@ header('Cache-Control: no-store, no-cache, must-revalidate');
 header('Pragma: no-cache');
 
 $pdo = db();
-
+?>
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Users Center - Central HUB</title>
+    <link rel="stylesheet" href="../assets/css/tailwind.min.css">
+    <link rel="stylesheet" href="../assets/css/portal.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="../assets/css/rsufont.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+</head>
+<?php
 // ==========================================
 // POST Handler — PRG pattern (redirect หลัง save ทันที)
 // ==========================================
@@ -81,9 +94,11 @@ try {
 }
 
 // portal/users.php ไม่แสดง admin sidebar ของ e-campaign
-$_GET['layout'] = 'none';
-require_once __DIR__ . '/../admin/includes/header.php';
 ?>
+<body style="background:#f4f7f5; min-height:100vh;">
+    <?php include __DIR__ . '/_partials/header.php'; ?>
+    
+    <div class="p-5 md:p-10 animate-slide-up">
 
 <style>
     /* ── Premium UI Elements ── */
