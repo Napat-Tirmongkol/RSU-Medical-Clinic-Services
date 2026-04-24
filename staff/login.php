@@ -25,6 +25,8 @@ $error = '';
 if (($_GET['error'] ?? '') === 'too_many_attempts') {
     $wait = max(1, (int)($_GET['wait'] ?? 300));
     $error = 'พยายามเข้าสู่ระบบหลายครั้งเกินไป กรุณารอ ' . ceil($wait / 60) . ' นาทีแล้วลองใหม่';
+} elseif (($_GET['error'] ?? '') === 'access_denied') {
+    $error = 'คุณไม่มีสิทธิ์เข้าถึงระบบนี้ กรุณาติดต่อผู้ดูแลระบบ';
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -39,7 +41,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
             $pdo  = db();
             $stmt = $pdo->prepare("
-                SELECT id, username, password_hash, full_name, account_status
+                SELECT id, username, password_hash, full_name, account_status, access_ecampaign
                 FROM sys_staff
                 WHERE username = :uname
                 LIMIT 1
@@ -50,6 +52,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($staff && password_verify($password, $staff['password_hash'])) {
                 if ($staff['account_status'] === 'disabled') {
                     $error = 'บัญชีนี้ถูกระงับการใช้งาน กรุณาติดต่อผู้ดูแลระบบ';
+                } elseif (empty($staff['access_ecampaign']) || (int)$staff['access_ecampaign'] === 0) {
+                    $error = 'คุณไม่มีสิทธิ์เข้าถึงระบบจุดลงทะเบียน (e-Campaign Staff)';
                 } else {
                     rate_limit_clear('staff_login');
                     session_regenerate_id(true);

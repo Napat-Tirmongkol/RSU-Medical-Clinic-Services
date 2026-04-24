@@ -1,11 +1,38 @@
 <?php
 // staff/scan.php — Campaign-specific QR scanner
 session_start();
-if (!isset($_SESSION['staff_logged_in']) || $_SESSION['staff_logged_in'] !== true) {
+
+// รับ session ทั้ง 2 แบบ:
+// 1. staff_logged_in  — login ผ่าน staff/login.php
+// 2. admin_logged_in + is_ecampaign_staff — login ผ่าน portal
+$viaStaffLogin  = !empty($_SESSION['staff_logged_in']) && $_SESSION['staff_logged_in'] === true;
+$viaPortalLogin = !empty($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true
+               && !empty($_SESSION['is_ecampaign_staff']);
+
+if (!$viaStaffLogin && !$viaPortalLogin) {
     header('Location: login.php?redirect=' . urlencode($_SERVER['REQUEST_URI']));
     exit;
 }
+
 require_once __DIR__ . '/../config.php';
+
+// [ISO 27001] ตรวจสอบสิทธิ์การเข้าถึงแบบ Real-time สำหรับ Staff
+try {
+    $p = db();
+    $staffId = $_SESSION['staff_id'] ?? ($_SESSION['admin_id'] ?? 0);
+    $uname   = $_SESSION['staff_username'] ?? ($_SESSION['admin_username'] ?? '');
+    
+    $check = $p->prepare("SELECT IFNULL(access_ecampaign, 0) as access FROM sys_staff WHERE (id = ? OR username = ?) AND account_status = 'active' LIMIT 1");
+    $check->execute([$staffId, $uname]);
+    $row = $check->fetch();
+    
+    if (!$row || (int)$row['access'] === 0) {
+        // ถูกถอนสิทธิ์ หรือไม่มีสิทธิ์เข้าถึง e-Campaign
+        session_destroy();
+        header('Location: login.php?error=access_denied');
+        exit;
+    }
+} catch (Exception $e) { /* fallback to current session */ }
 
 $pdo = db();
 

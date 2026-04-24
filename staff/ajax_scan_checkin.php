@@ -14,6 +14,21 @@ if (!$viaStaffLogin && !$viaPortalLogin) {
 
 require_once __DIR__ . '/../config.php';
 
+// [ISO 27001] ตรวจสอบสิทธิ์การเข้าถึงแบบ Real-time สำหรับ Staff
+try {
+    $p = db();
+    $staffId = $_SESSION['staff_id'] ?? ($_SESSION['admin_id'] ?? 0);
+    $uname   = $_SESSION['staff_username'] ?? ($_SESSION['admin_username'] ?? '');
+    
+    $check = $p->prepare("SELECT 1 FROM sys_staff WHERE (id = ? OR username = ?) AND access_ecampaign = 1 AND account_status = 'active' LIMIT 1");
+    $check->execute([$staffId, $uname]);
+    
+    if (!$check->fetch()) {
+        echo json_encode(['status' => 'error', 'message' => 'คุณไม่มีสิทธิ์เข้าถึงระบบ (Access Denied)']);
+        exit;
+    }
+} catch (Exception $e) { /* continue on db fail */ }
+
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     echo json_encode(['status' => 'error', 'message' => 'Invalid Request']);
     exit;
