@@ -251,13 +251,6 @@ if (!function_exists('renderPageHeader')) {
             <?php navLink('../admin/reports.php',          'fa-file-lines',       'รายงาน / สถิติ',        $cur); ?>
         </div>
 
-        <?php if (in_array($_SESSION['admin_role'] ?? '', ['admin', 'superadmin'], true)): ?>
-        <!-- Staff Management -->
-        <div class="nav-section-label">Staff</div>
-        <div class="space-y-0.5">
-            <?php navLink('../admin/manage_staff.php', 'fa-user-tie', 'จัดการเจ้าหน้าที่', $cur); ?>
-        </div>
-        <?php endif; ?>
 
 
 
