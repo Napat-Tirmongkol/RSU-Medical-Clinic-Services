@@ -2108,7 +2108,7 @@ try {
 
             <!-- ════════════ SECTION: AI ASSISTANT ════════════ -->
             <div id="section-ai_assistant" class="portal-section"
-                style="<?= $activeSection==='ai_assistant'?'':'display:none;' ?> background:#fff; overflow:hidden;">
+                style="<?= $activeSection==='ai_assistant'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); overflow:hidden;">
                 <?php include __DIR__ . '/_partials/ai_assistant.php'; ?>
             </div>
 

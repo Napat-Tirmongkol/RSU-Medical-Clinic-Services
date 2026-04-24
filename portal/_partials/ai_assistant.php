@@ -1,7 +1,7 @@
 <?php
 // portal/_partials/ai_assistant.php
 ?>
-<div class="h-full flex flex-col bg-white">
+<div class="ai-assistant-container flex flex-col bg-white">
     <div class="px-8 py-5 border-b border-gray-100 flex items-center justify-between bg-white/80 backdrop-blur-md sticky top-0 z-10">
         <div>
             <h2 class="text-xl font-black text-gray-900 flex items-center gap-2">
@@ -53,8 +53,11 @@
 
 <style>
 #section-ai_assistant {
-    height: 100vh;
     display: flex;
     flex-direction: column;
+}
+.ai-assistant-container {
+    height: 100%;
+    width: 100%;
 }
 </style>
