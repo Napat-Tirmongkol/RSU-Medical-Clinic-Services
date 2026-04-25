@@ -125,7 +125,26 @@ if ($action === 'upload') {
 
     ensure_insurance_table($pdo);
 
-    $rows      = $parsed['rows'];
+    // Normalize Thai/alternative column name aliases
+    $aliases = [
+        'วันเริ่มต้น'       => 'coverage_start',
+        'วันสิ้นสุด'        => 'coverage_end',
+        'วันสิ้นสุดคุ้มครอง' => 'coverage_end',
+        'ชื่อ'              => 'full_name',
+        'ชื่อ-นามสกุล'      => 'full_name',
+        'ประเภท'            => 'member_status',
+        'เลขบัตรประชาชน'    => 'citizen_id',
+        'เลขกรมธรรม์'       => 'policy_number',
+        'หมายเหตุ'          => 'remarks',
+    ];
+    $rows = array_map(function($row) use ($aliases) {
+        $out = [];
+        foreach ($row as $k => $v) {
+            $out[$aliases[$k] ?? $k] = $v;
+        }
+        return $out;
+    }, $parsed['rows']);
+
     $csvIdSet  = array_flip(array_column($rows, 'member_id'));
     $totalCsv  = count($rows);
 
