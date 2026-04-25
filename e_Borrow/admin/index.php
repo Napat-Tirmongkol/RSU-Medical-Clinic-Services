@@ -474,7 +474,7 @@ include('../includes/header.php');
                                                         class="fas fa-user-circle text-gray-400 mr-1"></i> <strong
                                                         class="text-gray-800"><?php echo htmlspecialchars($req['student_name'] ?? '-'); ?></strong></span>
                                                 <span class="text-gray-600"><i
-                                                        class="fas fa-calendar-alt text-gray-400 mr-1"></i> เลิกจ้าง: <strong
+                                                        class="fas fa-calendar-alt text-gray-400 mr-1"></i> กำหนดคืน: <strong
                                                         class="text-gray-800"><?php echo date('d/m/Y', strtotime($req['due_date'])); ?></strong></span>
                                             </div>
 
