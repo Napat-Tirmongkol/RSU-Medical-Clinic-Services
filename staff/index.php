@@ -108,43 +108,85 @@ document.addEventListener('DOMContentLoaded', function() {
     let isProcessing = false;
 
     // ฟังก์ชันเช็คอิน
-    function processQRCode(decodedText) {
-        if (isProcessing) return; 
+    function processQRCode(decodedText, isConfirmed = false) {
+        if (isProcessing && !isConfirmed) return; 
         isProcessing = true;
         
-        document.getElementById('scan-status').innerText = 'กำลังตรวจสอบข้อมูล...';
+        document.getElementById('scan-status').innerText = isConfirmed ? 'กำลังบันทึกเช็คอิน...' : 'กำลังตรวจสอบข้อมูล...';
         document.getElementById('scan-status').className = 'text-sm font-bold text-orange-500 animate-pulse';
 
         const formData = new FormData();
         formData.append('qr_data', decodedText);
         formData.append('csrf_token', '<?= get_csrf_token() ?>');
+        if (isConfirmed) formData.append('confirm', '1');
 
         fetch('ajax_scan_checkin.php', { method: 'POST', body: formData })
             .then(res => res.json())
             .then(data => {
                 let swalConfig = { allowOutsideClick: false, customClass: { title: 'font-prompt', popup: 'font-prompt rounded-3xl' }};
                 
-                if (data.status === 'success') {
-                    swalConfig.title = 'เช็คอินสำเร็จ!';
-                    swalConfig.html = `<div class="text-left bg-gray-50 p-4 rounded-xl mt-2 border border-gray-100"><p class="text-sm text-gray-500 mb-1">ผู้เข้าร่วม:</p><p class="font-bold text-lg text-gray-900 mb-3">${data.data.name}</p><p class="text-sm text-gray-500 mb-1">กิจกรรม:</p><p class="font-bold text-[#0052CC]">${data.data.campaign}</p></div>`;
-                    swalConfig.icon = 'success'; swalConfig.confirmButtonColor = '#0052CC'; swalConfig.confirmButtonText = 'สแกนคิวถัดไป';
-                } else if (data.status === 'warning') {
-                    swalConfig.title = 'แจ้งเตือน!'; swalConfig.text = data.message; swalConfig.icon = 'warning'; swalConfig.confirmButtonColor = '#f59e0b'; swalConfig.confirmButtonText = 'ตกลง';
-                } else {
-                    swalConfig.title = 'ข้อผิดพลาด!'; swalConfig.text = data.message; swalConfig.icon = 'error'; swalConfig.confirmButtonColor = '#ef4444'; swalConfig.confirmButtonText = 'ลองใหม่';
-                }
-                
-                Swal.fire(swalConfig).then(() => { 
+                if (data.status === 'preview') {
                     isProcessing = false;
-                    document.getElementById('scan-status').innerText = 'พร้อมสแกน...';
-                    document.getElementById('scan-status').className = 'text-sm font-bold text-green-500 animate-pulse';
-                    html5QrCode.resume(); // เริ่มสแกนต่อ
-                });
+                    Swal.fire({
+                        title: 'ยืนยันข้อมูลเช็คอิน',
+                        html: `<div class="text-left bg-blue-50 p-4 rounded-2xl mt-2 border border-blue-100">
+                                <p class="text-[10px] text-blue-400 font-bold uppercase mb-1">ผู้เข้าร่วม</p>
+                                <p class="font-bold text-lg text-gray-900 mb-3">${data.data.name}</p>
+                                <p class="text-[10px] text-blue-400 font-bold uppercase mb-1">กิจกรรม/แคมเปญ</p>
+                                <p class="font-bold text-[#0052CC] text-sm">${data.data.campaign}</p>
+                                <p class="text-xs text-gray-500 mt-2"><i class="fa-regular fa-clock mr-1"></i>${data.data.slot_label}</p>
+                               </div>`,
+                        icon: 'question',
+                        showCancelButton: true,
+                        confirmButtonColor: '#0052CC',
+                        cancelButtonColor: '#6b7280',
+                        confirmButtonText: 'ยืนยันเช็คอิน',
+                        cancelButtonText: 'ยกเลิก',
+                        reverseButtons: true
+                    }).then((result) => {
+                        if (result.isConfirmed) {
+                            processQRCode(decodedText, true);
+                        } else {
+                            document.getElementById('scan-status').innerText = 'พร้อมสแกน...';
+                            document.getElementById('scan-status').className = 'text-sm font-bold text-green-500 animate-pulse';
+                            html5QrCode.resume();
+                        }
+                    });
+                } else if (data.status === 'success') {
+                    isProcessing = false;
+                    swalConfig.title = 'เช็คอินสำเร็จ!';
+                    swalConfig.html = `<div class="text-left bg-green-50 p-4 rounded-xl mt-2 border border-green-100"><p class="text-sm text-green-600 mb-1">ผู้เข้าร่วม:</p><p class="font-bold text-lg text-gray-900 mb-3">${data.data.name}</p><p class="text-sm text-green-600 mb-1">กิจกรรม:</p><p class="font-bold text-[#0052CC]">${data.data.campaign}</p></div>`;
+                    swalConfig.icon = 'success'; swalConfig.confirmButtonColor = '#0052CC'; swalConfig.confirmButtonText = 'สแกนคิวถัดไป';
+                    
+                    Swal.fire(swalConfig).then(() => { 
+                        document.getElementById('scan-status').innerText = 'พร้อมสแกน...';
+                        document.getElementById('scan-status').className = 'text-sm font-bold text-green-500 animate-pulse';
+                        html5QrCode.resume();
+                    });
+                } else if (data.status === 'warning') {
+                    isProcessing = false;
+                    swalConfig.title = 'แจ้งเตือน!'; swalConfig.text = data.message; swalConfig.icon = 'warning'; swalConfig.confirmButtonColor = '#f59e0b'; swalConfig.confirmButtonText = 'ตกลง';
+                    Swal.fire(swalConfig).then(() => { 
+                        document.getElementById('scan-status').innerText = 'พร้อมสแกน...';
+                        document.getElementById('scan-status').className = 'text-sm font-bold text-green-500 animate-pulse';
+                        html5QrCode.resume();
+                    });
+                } else {
+                    isProcessing = false;
+                    swalConfig.title = 'ข้อผิดพลาด!'; swalConfig.text = data.message; swalConfig.icon = 'error'; swalConfig.confirmButtonColor = '#ef4444'; swalConfig.confirmButtonText = 'ลองใหม่';
+                    Swal.fire(swalConfig).then(() => { 
+                        document.getElementById('scan-status').innerText = 'พร้อมสแกน...';
+                        document.getElementById('scan-status').className = 'text-sm font-bold text-green-500 animate-pulse';
+                        html5QrCode.resume();
+                    });
+                }
             })
-            .catch(err => Swal.fire('Error', 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้', 'error').then(() => { 
+            .catch(err => {
                 isProcessing = false;
-                html5QrCode.resume();
-            }));
+                Swal.fire('Error', 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้', 'error').then(() => { 
+                    html5QrCode.resume();
+                });
+            });
     }
 
     // เริ่มเปิดกล้อง โดยบังคับใช้กล้องหลัง (environment)

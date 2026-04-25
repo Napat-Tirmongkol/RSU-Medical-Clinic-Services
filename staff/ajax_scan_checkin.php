@@ -119,7 +119,24 @@ try {
         exit;
     }
 
-    // ── บันทึกเวลาเช็คอิน ─────────────────────────────────────────────────
+    // ── ตรวจสอบว่าเป็นขั้นตอนยืนยัน (Confirm) หรือไม่ ────────────────────────
+    $isConfirm = (isset($_POST['confirm']) && $_POST['confirm'] === '1');
+
+    if (!$isConfirm) {
+        // ขั้นตอน Preview: ส่งข้อมูลกลับไปให้กดยืนยัน โดยยังไม่บันทึกเวลา
+        echo json_encode([
+            'status' => 'preview',
+            'data'   => [
+                'name'            => $booking['full_name'],
+                'student_id'      => $booking['student_personnel_id'] ?? '',
+                'campaign'        => $booking['campaign_title'],
+                'slot_label'      => (date('d/m/Y', strtotime($booking['slot_date'] ?? ''))) . (isset($booking['start_time']) ? ' ' . substr($booking['start_time'], 0, 5) . '–' . substr($booking['end_time'], 0, 5) . ' น.' : ''),
+            ],
+        ]);
+        exit;
+    }
+
+    // ── บันทึกเวลาเช็คอิน (เมื่อกดยืนยันแล้ว) ─────────────────────────────────
     $pdo->prepare("UPDATE camp_bookings SET attended_at = NOW() WHERE id = :id")
         ->execute([':id' => $appointmentId]);
 

@@ -74,6 +74,7 @@ $typeColor = ['vaccine' => '#0052CC', 'training' => '#6366f1', 'health_check' =>
     <link rel="stylesheet" href="../assets/css/tailwind.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
         * { font-family: 'Prompt', sans-serif; }
         body { background: #f0f4ff; min-height: 100vh; }
@@ -383,19 +384,52 @@ function stopCamera() {
 }
 
 // ── Process check-in ───────────────────────────────────────────────────────
-function processCheckin(qrData, isManual) {
-    if (isProcessing) return;
+function processCheckin(qrData, isManual, isConfirmed = false) {
+    if (isProcessing && !isConfirmed) return;
     isProcessing = true;
-    setStatus('กำลังตรวจสอบ...', 'orange');
+    setStatus(isConfirmed ? 'กำลังบันทึกเช็คอิน...' : 'กำลังตรวจสอบ...', 'orange');
 
     const fd = new FormData();
     fd.append('qr_data', qrData);
     fd.append('campaign_id', activeCampaignId);
     fd.append('csrf_token', csrfToken);
+    if (isConfirmed) fd.append('confirm', '1');
 
     fetch('ajax_scan_checkin.php', { method: 'POST', body: fd })
         .then(r => r.json())
         .then(data => {
+            if (data.status === 'preview') {
+                isProcessing = false;
+                Swal.fire({
+                    title: 'ยืนยันข้อมูลเช็คอิน',
+                    html: `<div class="text-left bg-blue-50 p-4 rounded-2xl mt-2 border border-blue-100">
+                            <p class="text-[10px] text-blue-400 font-bold uppercase mb-1">ผู้เข้าร่วม</p>
+                            <p class="font-bold text-lg text-gray-900 mb-3">${data.data.name}</p>
+                            <p class="text-[10px] text-blue-400 font-bold uppercase mb-1">กิจกรรม/แคมเปญ</p>
+                            <p class="font-bold text-[#0052CC] text-sm">${data.data.campaign}</p>
+                            <p class="text-xs text-gray-500 mt-2"><i class="fa-regular fa-clock mr-1"></i>${data.data.slot_label}</p>
+                           </div>`,
+                    icon: 'question',
+                    showCancelButton: true,
+                    confirmButtonColor: '#0052CC',
+                    cancelButtonColor: '#6b7280',
+                    confirmButtonText: 'ยืนยันเช็คอิน',
+                    cancelButtonText: 'ยกเลิก',
+                    reverseButtons: true,
+                    customClass: { title: 'font-prompt', popup: 'font-prompt rounded-3xl' }
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        processCheckin(qrData, isManual, true);
+                    } else {
+                        setStatus('พร้อมสแกน', 'green');
+                        if (!isManual && html5QrCode) {
+                            setTimeout(() => html5QrCode.resume(), 300);
+                        }
+                    }
+                });
+                return;
+            }
+
             isProcessing = false;
 
             if (data.status === 'success') {
