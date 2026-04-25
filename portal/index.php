@@ -87,11 +87,14 @@ try {
     $kpis['camps'] = (int) $pdo->query("SELECT COUNT(*) FROM camp_list WHERE status = 'active'")->fetchColumn();
 
     // Quota & booking rate (e-Campaign)
+    // ปรับปรุงใหม่: ให้ดึงจากแคมเปญทั้งหมดเพื่อให้เห็นภาพรวมระบบ (หรือเฉพาะที่ยังไม่ลบ)
     $quotaRow = $pdo->query("
-        SELECT COALESCE(SUM(c.total_capacity), 0) AS total_quota,
-               (SELECT COUNT(*) FROM camp_bookings WHERE status IN ('booked','confirmed')) AS used_quota
-        FROM camp_list c WHERE c.status = 'active'
+        SELECT 
+            COALESCE(SUM(total_capacity), 0) AS total_quota,
+            (SELECT COUNT(*) FROM camp_bookings WHERE status IN ('booked','confirmed')) AS used_quota
+        FROM camp_list
     ")->fetch(PDO::FETCH_ASSOC);
+    
     $kpis['total_quota'] = (int) ($quotaRow['total_quota'] ?? 0);
     $kpis['used_quota'] = (int) ($quotaRow['used_quota'] ?? 0);
     $kpis['booking_rate'] = $kpis['total_quota'] > 0
@@ -104,8 +107,8 @@ try {
     }
 
     // Activity logs count (optional module)
-    if ($pdo->query("SHOW TABLES LIKE 'activity_logs'")->rowCount() > 0) {
-        $kpis['logs'] = (int) $pdo->query("SELECT COUNT(*) FROM activity_logs")->fetchColumn();
+    if ($pdo->query("SHOW TABLES LIKE 'sys_activity_logs'")->rowCount() > 0) {
+        $kpis['logs'] = (int) $pdo->query("SELECT COUNT(*) FROM sys_activity_logs")->fetchColumn();
     }
 } catch (PDOException $e) {
     error_log("Portal Stats Fetch Error: " . $e->getMessage());
@@ -204,7 +207,7 @@ $projects = [
         'allowed_roles' => ['admin', 'superadmin', 'editor'],
         'badges' => ['Insurance', 'Sync'],
         'actions' => [
-            ['label' => 'Open Insurance Sync Hub', 'url' => 'insurance_sync.php', 'primary' => true],
+            ['label' => 'Open Insurance Sync Hub', 'url' => 'javascript:switchSection(\'insurance_sync\', document.querySelector(\'[data-section=insurance_sync]\'))', 'primary' => true],
         ]
     ],
 
@@ -212,6 +215,49 @@ $projects = [
      * ตัวอย่างการเพิ่มโปรเจกต์ในอนาคต:
      * เพียงแค่ก๊อปปี้บล็อกนี้แล้วเปลี่ยน URL/Icon ระบบจะวาดหน้า Layout ให้เองทันที
      */
+    [
+        'id' => 'privilege_inventory',
+        'title' => 'Privileged Access (ISO)',
+        'description' => 'ISO 27001 (A.5.18) - บันทึกและควบคุมสิทธิ์การเข้าถึงระดับสูง (Admin/Super Admin) พร้อมหลักฐานการอนุมัติ',
+        'icon' => 'fa-shield-halved',
+        'bg_color' => 'bg-emerald-50',
+        'icon_color' => 'text-emerald-600',
+        'border_color' => 'border-emerald-100',
+        'allowed_roles' => ['superadmin'],
+        'badges' => ['ISO 27001', 'Access Control'],
+        'actions' => [
+            ['label' => 'Open Inventory', 'url' => 'javascript:switchSection(\'privilege_inventory\', document.querySelector(\'[data-section=privilege_inventory]\'))', 'primary' => true],
+        ]
+    ],
+    [
+        'id' => 'line_messaging',
+        'title' => 'LINE Messaging API',
+        'description' => 'จัดการการแจ้งเตือนผ่าน LINE — ตั้งค่า Webhook URL, Channel Token และทดสอบการส่งข้อความ Push รายบุคคล',
+        'icon' => 'fa-brands fa-line',
+        'bg_color' => 'bg-green-50',
+        'icon_color' => 'text-green-500',
+        'border_color' => 'border-green-100',
+        'allowed_roles' => ['superadmin'],
+        'badges' => ['Notifications', 'Webhooks'],
+        'actions' => [
+            ['label' => 'Open Settings & Test', 'url' => 'javascript:switchSection(\'line_settings\', document.querySelector(\'[data-section=line_settings]\'))', 'primary' => true],
+        ]
+    ],
+    [
+        'id' => 'live_support_chat',
+        'title' => 'Live Support Chat',
+        'description' => 'ระบบแชทตอบกลับผู้ใช้งานแบบ Real-time — จัดการคำขอความช่วยเหลือและให้คำปรึกษาแก่ผู้ใช้งานผ่านหน้าเว็บ',
+        'icon' => 'fa-comments',
+        'bg_color' => 'bg-blue-50',
+        'icon_color' => 'text-blue-600',
+        'border_color' => 'border-blue-100',
+        'allowed_roles' => ['admin', 'superadmin', 'editor'],
+        'staff_visible' => true,
+        'badges' => ['Live Chat', 'Support'],
+        'actions' => [
+            ['label' => 'Open Chat Center', 'url' => 'support_chat.php', 'primary' => true],
+        ]
+    ],
     [
         'id' => 'future_app',
         'title' => 'Upcoming Project...',
@@ -235,6 +281,7 @@ $categoryMap = [
     'e_borrow' => 'core',
     'insurance_sync' => 'core',
     'system_logs' => 'tools',
+    'privilege_inventory' => 'tools',
     'admin_tool' => 'tools',
     'future_app' => 'dev',
 ];
@@ -254,6 +301,140 @@ try {
 } catch (PDOException $e) { /* silent */
 }
 
+/**
+ * (4) PRIVILEGE INVENTORY FETCH (ISO 27001)
+ */
+$privilegeInventory = [];
+if ($adminRole === 'superadmin') {
+    try {
+        $sql = "SELECT p.*, a.full_name as admin_full_name, a.username as admin_username 
+                FROM sys_admin_privilege_inventory p
+                LEFT JOIN sys_admins a ON p.user_id = a.id
+                ORDER BY p.assigned_at DESC";
+        $privilegeInventory = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) { /* silent */ }
+}
+
+/**
+ * (5) ADMIN LIST FOR DROPDOWNS
+ */
+$adminListForSelect = $pdo->query("SELECT id, full_name, username FROM sys_admins ORDER BY full_name ASC")->fetchAll(PDO::FETCH_ASSOC);
+
+/**
+ * (6) ANNOUNCEMENTS FETCH & ACTIONS
+ */
+$announcements_list = [];
+$ann_saved = false;
+$ann_error = '';
+
+// ตรวจสอบและสร้างตารางถ้ายังไม่มี
+try {
+    $pdo->exec("CREATE TABLE IF NOT EXISTS sys_announcements (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        title VARCHAR(255) NOT NULL,
+        content TEXT NOT NULL,
+        image_url VARCHAR(500) DEFAULT NULL,
+        type ENUM('info', 'warning', 'success', 'urgent') DEFAULT 'info',
+        target_audience ENUM('all', 'student', 'staff', 'other') DEFAULT 'all',
+        priority TINYINT UNSIGNED DEFAULT 0,
+        is_active TINYINT(1) DEFAULT 1,
+        show_once TINYINT(1) DEFAULT 1,
+        start_date DATE DEFAULT NULL,
+        end_date DATE DEFAULT NULL,
+        read_count INT DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+
+    $pdo->exec("CREATE TABLE IF NOT EXISTS sys_announcement_reads (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        announcement_id INT NOT NULL,
+        user_id INT NOT NULL,
+        read_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY unq_ann_user (announcement_id, user_id),
+        FOREIGN KEY (announcement_id) REFERENCES sys_announcements(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+} catch (PDOException $e) { /* silent fail */ }
+
+// จัดการ POST actions สำหรับประกาศ
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ann_action'])) {
+    validate_csrf_or_die();
+    $annAction = $_POST['ann_action'];
+
+    if ($annAction === 'create' || $annAction === 'edit') {
+        $annId        = (int)($_POST['ann_id'] ?? 0);
+        $annTitle     = trim($_POST['ann_title'] ?? '');
+        $annContent   = trim($_POST['ann_content'] ?? '');
+        $annType      = in_array($_POST['ann_type'] ?? '', ['info','warning','success','urgent']) ? $_POST['ann_type'] : 'info';
+        $annPriority  = max(0, min(255, (int)($_POST['ann_priority'] ?? 0)));
+        $annAudience  = in_array($_POST['ann_audience'] ?? '', ['all','student','staff','other']) ? $_POST['ann_audience'] : 'all';
+        $annActive    = isset($_POST['ann_active']) ? 1 : 0;
+        $annShowOnce  = isset($_POST['ann_show_once']) ? 1 : 0;
+        $annImageUrl  = trim($_POST['ann_image_url'] ?? '');
+        $annStart     = $_POST['ann_start'] ?? null;
+        $annEnd       = $_POST['ann_end'] ?? null;
+        $annStart     = $annStart ?: null;
+        $annEnd       = $annEnd ?: null;
+
+        if ($annTitle && $annContent) {
+            try {
+                if ($annAction === 'create') {
+                    $pdo->prepare("
+                        INSERT INTO sys_announcements
+                            (title, content, image_url, type, priority, target_audience, is_active, show_once, start_date, end_date, created_by)
+                        VALUES (?,?,?,?,?,?,?,?,?,?,?)
+                    ")->execute([$annTitle, $annContent, $annImageUrl ?: null, $annType, $annPriority, $annAudience, $annActive, $annShowOnce, $annStart, $annEnd, $_SESSION['admin_id'] ?? null]);
+                    log_activity('Announcement Created', "สร้างประกาศ: $annTitle");
+                } else {
+                    $pdo->prepare("
+                        UPDATE sys_announcements
+                        SET title=?, content=?, image_url=?, type=?, priority=?, target_audience=?, is_active=?, show_once=?, start_date=?, end_date=?
+                        WHERE id=?
+                    ")->execute([$annTitle, $annContent, $annImageUrl ?: null, $annType, $annPriority, $annAudience, $annActive, $annShowOnce, $annStart, $annEnd, $annId]);
+                    log_activity('Announcement Updated', "แก้ไขประกาศ: $annTitle");
+                }
+                $ann_saved = true;
+            } catch (PDOException $e) {
+                $ann_error = $e->getMessage();
+            }
+        } else {
+            $ann_error = 'กรุณากรอกหัวข้อและเนื้อหาให้ครบถ้วน';
+        }
+    } elseif ($annAction === 'delete') {
+        $delId = (int)($_POST['ann_id'] ?? 0);
+        if ($delId > 0) {
+            try {
+                $pdo->prepare("DELETE FROM sys_announcement_reads WHERE announcement_id = ?")->execute([$delId]);
+                $pdo->prepare("DELETE FROM sys_announcements WHERE id = ?")->execute([$delId]);
+                log_activity('Announcement Deleted', "ลบประกาศ ID: $delId");
+                $ann_saved = true;
+            } catch (PDOException $e) {
+                $ann_error = $e->getMessage();
+            }
+        }
+    } elseif ($annAction === 'toggle') {
+        $togId     = (int)($_POST['ann_id'] ?? 0);
+        $togActive = (int)($_POST['ann_active_val'] ?? 0);
+        if ($togId > 0) {
+            try {
+                $pdo->prepare("UPDATE sys_announcements SET is_active = ? WHERE id = ?")->execute([$togActive, $togId]);
+                $ann_saved = true;
+            } catch (PDOException $e) { /* silent */ }
+        }
+    }
+}
+
+try {
+    $announcements_list = $pdo->query("
+        SELECT a.*, 
+               (SELECT COUNT(*) FROM sys_announcement_reads r WHERE r.announcement_id = a.id) AS read_count
+        FROM sys_announcements a
+        ORDER BY a.priority DESC, a.created_at DESC
+    ")->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    $announcements_list = []; // ตารางยังไม่มี
+}
+
 ?>
 <!DOCTYPE html>
 <html lang="th">
@@ -262,7 +443,7 @@ try {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= htmlspecialchars(SITE_NAME) ?> - Central Intelligence HUB</title>
-    <link rel="icon" href="../favicon.ico">
+    <link rel="icon" href="<?= !empty(SITE_LOGO) ? '../' . SITE_LOGO : '../favicon.ico' ?>">
 
     <!-- UI Framework & Fonts -->
     <link
@@ -506,7 +687,24 @@ try {
             if (icon) icon.style.transform = isCollapsed ? 'rotate(180deg)' : '';
             if (expanded) expanded.style.display = isCollapsed ? 'none' : 'flex';
             if (collapsed) collapsed.style.display = isCollapsed ? 'flex' : 'none';
+            localStorage.setItem('portal_sidebar_collapsed', isCollapsed ? '1' : '0');
         };
+
+        // Auto-apply sidebar state on load
+        window.addEventListener('DOMContentLoaded', function() {
+            if (localStorage.getItem('portal_sidebar_collapsed') === '1') {
+                var sidebar = document.getElementById('portal-sidebar');
+                if (sidebar) {
+                    sidebar.classList.add('collapsed');
+                    var icon = document.getElementById('sidebar-toggle-icon');
+                    if (icon) icon.style.transform = 'rotate(180deg)';
+                    var expanded = document.getElementById('psb-user-expanded');
+                    var collapsed = document.getElementById('psb-user-collapsed');
+                    if (expanded) expanded.style.display = 'none';
+                    if (collapsed) collapsed.style.display = 'flex';
+                }
+            }
+        });
 
         window.switchSection = function (sectionId, btn) {
             document.querySelectorAll('.portal-section').forEach(function (s) { s.style.display = 'none'; });
@@ -555,7 +753,7 @@ try {
         </div>
 
         <!-- Nav items -->
-        <div style="padding:10px;flex:1;overflow:hidden">
+        <div style="padding:10px;flex:1;overflow:hidden;display:flex;flex-direction:column;">
             <button class="psb-item psb-active" data-section="dashboard" onclick="switchSection('dashboard',this)">
                 <div class="psb-icon"><i class="fa-solid fa-chart-pie" style="color:#059669"></i></div>
                 <span class="psb-label" style="color:#059669;font-weight:900">Dashboard</span>
@@ -568,6 +766,11 @@ try {
                 <div class="psb-icon"><i class="fa-solid fa-id-card-clip" style="color:#2563eb"></i></div>
                 <span class="psb-label" style="color:#1d4ed8;font-weight:900">Identity & Governance</span>
             </button>
+            <button class="psb-item" data-section="insurance_sync" onclick="switchSection('insurance_sync',this)">
+                <div class="psb-icon"><i class="fa-solid fa-shield-halved" style="color:#0ea5e9"></i></div>
+                <span class="psb-label" style="color:#0284c7;font-weight:900">Insurance Hub</span>
+            </button>
+            <?php if ($adminRole === 'superadmin' || !empty($_SESSION['access_system_logs'])): ?>
             <button class="psb-item" data-section="activity_logs" onclick="switchSection('activity_logs',this)">
                 <div class="psb-icon"><i class="fa-solid fa-file-lines" style="color:#64748b"></i></div>
                 <span class="psb-label" style="color:#475569;font-weight:900">Activity Logs</span>
@@ -576,65 +779,33 @@ try {
                 <div class="psb-icon"><i class="fa-solid fa-bug" style="color:#ef4444"></i></div>
                 <span class="psb-label" style="color:#dc2626;font-weight:900">Error Logs</span>
             </button>
+            <?php endif; ?>
+            <?php if ($adminRole === 'superadmin'): ?>
+            <button class="psb-item" data-section="privilege_inventory" onclick="switchSection('privilege_inventory',this)">
+                <div class="psb-icon"><i class="fa-solid fa-shield-halved" style="color:#10b981"></i></div>
+                <span class="psb-label" style="color:#059669;font-weight:900">ISO Governance</span>
+            </button>
+            <?php endif; ?>
+            <button class="psb-item" data-section="announcements" onclick="switchSection('announcements',this)">
+                <div class="psb-icon"><i class="fa-solid fa-bullhorn" style="color:#7c3aed"></i></div>
+                <span class="psb-label" style="color:#6d28d9;font-weight:900">ประกาศ</span>
+            </button>
+
+            <div style="flex:1"></div> <!-- Spacer to push settings to bottom -->
+
+            <?php if ($adminRole === 'superadmin' || !empty($_SESSION['access_site_settings'])): ?>
             <button class="psb-item" data-section="settings" onclick="switchSection('settings',this)">
                 <div class="psb-icon"><i class="fa-solid fa-gear" style="color:#d97706"></i></div>
                 <span class="psb-label" style="color:#b45309;font-weight:900">Settings</span>
             </button>
+            <?php endif; ?>
         </div>
     </nav>
 
     <div id="app-shell" style="flex:1;min-width:0;background:#f4f7f5;height:100vh;overflow:hidden;display:flex;flex-direction:column;">
 
         <!-- ══════════════════ HEADER ══════════════════ -->
-        <header class="portal-header au">
-            <div class="w-full px-5 sm:px-8 py-3 flex items-center justify-between gap-4" style="min-height:60px">
-
-                <!-- Left/Center: Global Search -->
-                <div style="flex: 1; display: flex; justify-content: flex-start;">
-                    <div class="relative group w-full max-w-[400px]">
-                        <input type="text" placeholder="ค้นหาเมนู หรือแคมเปญ"
-                            class="w-full pl-5 pr-10 py-2 bg-slate-50 border border-slate-200 rounded-xl text-[13px] font-bold text-slate-800 outline-none focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all font-prompt">
-                        <button
-                            class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-emerald-600 transition-colors flex items-center justify-center">
-                            <i class="fa-solid fa-magnifying-glass text-sm"></i>
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Right Action Icons -->
-                <div class="flex items-center gap-3 sm:gap-4">
-
-                    <!-- Dark Mode Toggle Button -->
-                    <button id="darkModeToggle" onclick="toggleDarkMode()" title="สลับโหมดมืด/สว่าง"
-                        class="w-9 h-9 flex items-center justify-center rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900 transition-colors shadow-sm dark-mode-btn">
-                        <i class="fa-solid fa-moon"></i>
-                    </button>
-
-                    <!-- Divider -->
-                    <div class="w-px h-6 bg-gray-200 hidden sm:block"></div>
-
-                    <!-- User Identity & Logout -->
-                    <div class="flex items-center gap-2 sm:gap-3">
-                        <div class="text-right hidden sm:block">
-                            <div
-                                class="text-[9px] font-extrabold uppercase tracking-widest text-slate-500 leading-none mb-1">
-                                Admin</div>
-                            <div class="text-[13px] font-black text-slate-900 leading-none">
-                                <?= htmlspecialchars($_SESSION['admin_username'] ?? 'Administrator') ?>
-                            </div>
-                        </div>
-                        <div class="w-9 h-9 rounded-xl flex flex-shrink-0 items-center justify-center shadow-md shadow-emerald-500/20 text-sm"
-                            style="background: linear-gradient(135deg, #2e9e63, #10b981); color:#fff;">
-                            <i class="fa-solid fa-user-shield"></i>
-                        </div>
-                        <a href="../admin/auth/logout.php" title="ออกจากระบบ"
-                            class="w-9 h-9 rounded-xl bg-rose-50 text-rose-600 flex flex-shrink-0 items-center justify-center hover:bg-rose-500 hover:text-white transition-colors border border-rose-100 ml-1">
-                            <i class="fa-solid fa-power-off text-xs"></i>
-                        </a>
-                    </div>
-                </div>
-            </div>
-        </header>
+        <?php include __DIR__ . '/_partials/header.php'; ?>
 
         <!-- ── Main Content ── -->
         <main id="portal-main" style="flex:1;overflow-y:auto;min-width:0;">
@@ -782,10 +953,28 @@ try {
                             <div id="project-container" class="grid grid-cols-1 sm:grid-cols-2 gap-5">
                                 <?php $cardIdx = 0;
                                 foreach ($projects as $proj):
-                                    // Staff เห็นเฉพาะ tile ที่ staff_visible = true
-                                    if ($isStaff && !($proj['staff_visible'] ?? false)) continue;
-                                    // Admin/Superadmin กรองตาม allowed_roles ปกติ
-                                    if (!$isStaff && !in_array($adminRole, $proj['allowed_roles'])) continue;
+                                    // Robust access control check
+                                    $hasAccess = false;
+                                    if ($adminRole === 'superadmin') {
+                                        $hasAccess = true;
+                                    } else {
+                                        // Check project-specific flags
+                                        if ($proj['id'] === 'e_borrow' && !empty($_SESSION['access_eborrow'])) $hasAccess = true;
+                                        elseif ($proj['id'] === 'e_campaign' && !empty($_SESSION['access_ecampaign'])) $hasAccess = true;
+                                        elseif ($proj['id'] === 'insurance_sync' && !empty($_SESSION['access_insurance'])) $hasAccess = true;
+                                        elseif ($proj['id'] === 'system_logs' && !empty($_SESSION['access_system_logs'])) $hasAccess = true;
+                                        elseif ($proj['id'] === 'line_messaging' && !empty($_SESSION['access_site_settings'])) $hasAccess = true;
+                                        elseif ($proj['id'] === 'privilege_inventory' && $adminRole === 'superadmin') $hasAccess = true;
+                                        elseif ($proj['id'] === 'identity_governance' && in_array($adminRole, ['admin', 'superadmin'])) $hasAccess = true;
+                                        
+                                        // Fallback to role-based or staff-visibility
+                                        if (!$hasAccess) {
+                                            if (in_array($adminRole, $proj['allowed_roles'])) $hasAccess = true;
+                                            if ($isStaff && ($proj['staff_visible'] ?? false)) $hasAccess = true;
+                                        }
+                                    }
+
+                                    if (!$hasAccess) continue;
                                     $cardDelay = round(0.1 + $cardIdx * 0.12, 2);
                                     $cardIdx++;
                                     $cat = $categoryMap[$proj['id']] ?? 'core';
@@ -922,11 +1111,218 @@ try {
                     </footer>
 
                 </div><!-- /section-dashboard inner -->
+
             </div><!-- /section-dashboard -->
 
+            <!-- ════════════ SECTION: ANNOUNCEMENTS ════════════ -->
+            <div id="section-announcements" class="portal-section" 
+                style="<?= $activeSection==='announcements'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); background:#f8fafc; overflow-y:auto;">
+                <div class="px-5 md:px-8 py-8">
+
+                    <?php if ($ann_saved): ?>
+                    <div style="display:flex;align-items:center;gap:10px;background:#f0fdf4;border:1.5px solid #bbf7d0;border-radius:14px;padding:12px 18px;margin-bottom:20px;font-size:13px;font-weight:700;color:#15803d">
+                        <i class="fa-solid fa-circle-check"></i> บันทึกข้อมูลสำเร็จ
+                    </div>
+                    <?php endif; ?>
+                    <?php if ($ann_error): ?>
+                    <div style="display:flex;align-items:center;gap:10px;background:#fff1f2;border:1.5px solid #fecaca;border-radius:14px;padding:12px 18px;margin-bottom:20px;font-size:13px;font-weight:700;color:#dc2626">
+                        <i class="fa-solid fa-circle-exclamation"></i> <?= htmlspecialchars($ann_error) ?>
+                    </div>
+                    <?php endif; ?>
+
+                    <!-- Header -->
+                    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:24px">
+                        <div>
+                            <div class="sec-title" style="margin-bottom:4px">📢 จัดการประกาศ</div>
+                            <p style="font-size:13px;color:#64748b">สร้างและแก้ไขประกาศที่จะปรากฏเป็น Popup ให้ผู้ใช้เห็นเมื่อเข้าหน้า Hub</p>
+                        </div>
+                        <button onclick="annOpenForm('create')"
+                            style="background:#7c3aed;color:#fff;padding:10px 20px;border-radius:12px;font-size:13px;font-weight:700;border:none;cursor:pointer;display:flex;align-items:center;gap:8px;box-shadow:0 4px 14px rgba(124,58,237,.3)">
+                            <i class="fa-solid fa-plus"></i> สร้างประกาศใหม่
+                        </button>
+                    </div>
+
+                    <!-- Announcement List -->
+                    <div style="display:flex;flex-direction:column;gap:14px;">
+                        <?php if (empty($announcements_list)): ?>
+                        <div style="text-align:center;padding:60px 20px;background:#fff;border-radius:24px;border:1.5px dashed #e2e8f0;color:#94a3b8">
+                            <i class="fa-solid fa-bullhorn" style="font-size:2.5rem;margin-bottom:12px;display:block;opacity:.3"></i>
+                            <p style="font-weight:700;font-size:14px">ยังไม่มีประกาศ</p>
+                            <p style="font-size:12px;margin-top:4px">กดปุ่ม "สร้างประกาศใหม่" เพื่อเพิ่มประกาศแรก</p>
+                        </div>
+                        <?php else: ?>
+                        <?php
+                            $typeStyles = [
+                                'info'    => ['bg'=>'#eff6ff','color'=>'#1d4ed8','icon'=>'fa-bullhorn',        'label'=>'ข้อมูลทั่วไป'],
+                                'warning' => ['bg'=>'#fffbeb','color'=>'#b45309','icon'=>'fa-triangle-exclamation','label'=>'แจ้งเตือน'],
+                                'success' => ['bg'=>'#f0fdf4','color'=>'#15803d','icon'=>'fa-circle-check',   'label'=>'ข่าวดี'],
+                                'urgent'  => ['bg'=>'#fff1f2','color'=>'#dc2626','icon'=>'fa-siren-on',       'label'=>'ด่วน!'],
+                            ];
+                        ?>
+                        <?php foreach ($announcements_list as $ann): ?>
+                        <?php $ts = $typeStyles[$ann['type']] ?? $typeStyles['info']; ?>
+                        <div style="background:#fff;border-radius:20px;border:1.5px solid #f1f5f9;padding:18px 22px;display:flex;align-items:center;gap:16px;box-shadow:0 2px 8px rgba(0,0,0,.04)">
+                            <!-- Icon -->
+                            <div style="width:44px;height:44px;border-radius:14px;background:<?= $ts['bg'] ?>;color:<?= $ts['color'] ?>;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                                <i class="fa-solid <?= $ts['icon'] ?> text-lg"></i>
+                            </div>
+                            <!-- Info -->
+                            <div style="flex:1;min-width:0">
+                                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:2px">
+                                    <span style="font-weight:800;font-size:14px;color:#0f172a"><?= htmlspecialchars($ann['title']) ?></span>
+                                    <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:99px;background:<?= $ts['bg'] ?>;color:<?= $ts['color'] ?>"><?= $ts['label'] ?></span>
+                                    <?php if ($ann['target_audience'] !== 'all'): ?>
+                                    <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:99px;background:#f1f5f9;color:#64748b"><?= htmlspecialchars($ann['target_audience']) ?></span>
+                                    <?php endif; ?>
+                                    <?php if (!$ann['is_active']): ?>
+                                    <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:99px;background:#fef2f2;color:#dc2626">ปิดอยู่</span>
+                                    <?php endif; ?>
+                                </div>
+                                <p style="font-size:12px;color:#64748b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:500px"><?= htmlspecialchars(mb_substr($ann['content'], 0, 100)) ?>...</p>
+                                <div style="display:flex;align-items:center;gap:12px;margin-top:4px;font-size:11px;color:#94a3b8;font-weight:600">
+                                    <span><i class="fa-solid fa-eye mr-1"></i><?= (int)$ann['read_count'] ?> คนอ่านแล้ว</span>
+                                    <?php if ($ann['end_date']): ?><span><i class="fa-regular fa-calendar-xmark mr-1"></i>หมดอายุ <?= date('d/m/Y', strtotime($ann['end_date'])) ?></span><?php endif; ?>
+                                    <?php if ($ann['image_url']): ?><span><i class="fa-solid fa-image mr-1"></i>มีรูปภาพ</span><?php endif; ?>
+                                </div>
+                            </div>
+                            <!-- Actions -->
+                            <div style="display:flex;gap:6px;flex-shrink:0">
+                                <!-- Toggle -->
+                                <form method="POST" style="display:inline">
+                                    <?php csrf_field(); ?>
+                                    <input type="hidden" name="ann_action" value="toggle">
+                                    <input type="hidden" name="ann_id" value="<?= $ann['id'] ?>">
+                                    <input type="hidden" name="ann_active_val" value="<?= $ann['is_active'] ? '0' : '1' ?>">
+                                    <button type="submit" title="<?= $ann['is_active'] ? 'ปิด' : 'เปิด' ?>ประกาศ"
+                                        style="width:34px;height:34px;border-radius:10px;border:1px solid #e2e8f0;background:#fff;cursor:pointer;color:<?= $ann['is_active'] ? '#22c55e' : '#94a3b8' ?>;display:flex;align-items:center;justify-content:center">
+                                        <i class="fa-solid <?= $ann['is_active'] ? 'fa-toggle-on' : 'fa-toggle-off' ?> text-lg"></i>
+                                    </button>
+                                </form>
+                                <!-- Edit -->
+                                <button onclick="annOpenForm('edit', <?= htmlspecialchars(json_encode($ann, JSON_UNESCAPED_UNICODE)) ?>)"
+                                    style="width:34px;height:34px;border-radius:10px;border:1px solid #e2e8f0;background:#fff;cursor:pointer;color:#6366f1;display:flex;align-items:center;justify-content:center">
+                                    <i class="fa-solid fa-pen-to-square text-sm"></i>
+                                </button>
+                                <!-- Delete -->
+                                <button onclick="annConfirmDelete(<?= $ann['id'] ?>, '<?= htmlspecialchars(addslashes($ann['title'])) ?>')"
+                                    style="width:34px;height:34px;border-radius:10px;border:1px solid #fee2e2;background:#fff1f2;cursor:pointer;color:#ef4444;display:flex;align-items:center;justify-content:center">
+                                    <i class="fa-solid fa-trash text-sm"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <?php endforeach; ?>
+                        <?php endif; ?>
+                    </div>
+
+                </div>
+            </div><!-- /section-announcements -->
+
+            <!-- Announcement Form Modal -->
+            <div id="ann-form-modal" style="display:none;position:fixed;inset:0;z-index:999;background:rgba(15,23,42,.6);backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:20px">
+                <div style="background:#fff;border-radius:28px;width:100%;max-width:560px;max-height:90vh;overflow-y:auto;box-shadow:0 30px 60px rgba(0,0,0,.2)">
+                    <div style="padding:24px 28px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:#fff;z-index:10">
+                        <div>
+                            <p style="font-size:11px;font-weight:800;color:#7c3aed;text-transform:uppercase;letter-spacing:.1em;margin-bottom:2px">ระบบประกาศ</p>
+                            <h3 id="ann-form-title" style="font-size:18px;font-weight:900;color:#0f172a">สร้างประกาศใหม่</h3>
+                        </div>
+                        <button onclick="annCloseForm()" style="width:36px;height:36px;border-radius:10px;border:none;background:#f1f5f9;color:#64748b;cursor:pointer;display:flex;align-items:center;justify-content:center">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    </div>
+                    <form method="POST" id="ann-form" style="padding:24px 28px;display:flex;flex-direction:column;gap:16px">
+                        <?php csrf_field(); ?>
+                        <input type="hidden" id="ann-form-action" name="ann_action" value="create">
+                        <input type="hidden" id="ann-form-id" name="ann_id" value="0">
+
+                        <div>
+                            <label style="font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px">หัวข้อประกาศ <span style="color:red">*</span></label>
+                            <input type="text" id="ann-f-title" name="ann_title" required class="premium-input" placeholder="เช่น แจ้งวันหยุดให้บริการ">
+                        </div>
+
+                        <div>
+                            <label style="font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px">เนื้อหา <span style="color:red">*</span></label>
+                            <textarea id="ann-f-content" name="ann_content" required rows="4" class="premium-input" style="resize:vertical" placeholder="รายละเอียดของประกาศ..."></textarea>
+                        </div>
+
+                        <div>
+                            <label style="font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px">URL รูปภาพประกอบ (ถ้ามี)</label>
+                            <input type="url" id="ann-f-image" name="ann_image_url" class="premium-input" placeholder="https://example.com/image.jpg">
+                            <p style="font-size:11px;color:#94a3b8;margin-top:4px">ใส่ URL ของรูปภาพ (JPG, PNG, WebP)</p>
+                        </div>
+
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+                            <div>
+                                <label style="font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px">ประเภท</label>
+                                <select id="ann-f-type" name="ann_type" class="premium-input">
+                                    <option value="info">📘 ข้อมูลทั่วไป</option>
+                                    <option value="warning">⚠️ แจ้งเตือน</option>
+                                    <option value="success">✅ ข่าวดี</option>
+                                    <option value="urgent">🚨 ด่วน!</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style="font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px">กลุ่มเป้าหมาย</label>
+                                <select id="ann-f-audience" name="ann_audience" class="premium-input">
+                                    <option value="all">ทุกคน</option>
+                                    <option value="student">นักศึกษา</option>
+                                    <option value="staff">บุคลากร</option>
+                                    <option value="other">บุคคลทั่วไป</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+                            <div>
+                                <label style="font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px">วันเริ่ม (ไม่บังคับ)</label>
+                                <input type="date" id="ann-f-start" name="ann_start" class="premium-input">
+                            </div>
+                            <div>
+                                <label style="font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px">วันหมดอายุ (ไม่บังคับ)</label>
+                                <input type="date" id="ann-f-end" name="ann_end" class="premium-input">
+                            </div>
+                        </div>
+
+                        <div>
+                            <label style="font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px">ลำดับความสำคัญ (0-255)</label>
+                            <input type="number" id="ann-f-priority" name="ann_priority" min="0" max="255" value="0" class="premium-input">
+                        </div>
+
+                        <div style="display:flex;gap:20px">
+                            <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;cursor:pointer">
+                                <input type="checkbox" id="ann-f-active" name="ann_active" value="1" checked style="width:16px;height:16px;accent-color:#7c3aed">
+                                เปิดใช้งานทันที
+                            </label>
+                            <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;cursor:pointer">
+                                <input type="checkbox" id="ann-f-show-once" name="ann_show_once" value="1" checked style="width:16px;height:16px;accent-color:#7c3aed">
+                                แสดงครั้งเดียวต่อ User
+                            </label>
+                        </div>
+
+                        <div style="display:flex;gap:10px;padding-top:8px;border-top:1px solid #f1f5f9">
+                            <button type="button" onclick="annCloseForm()"
+                                style="flex:none;padding:11px 20px;border-radius:12px;border:1.5px solid #e2e8f0;background:#fff;font-size:13px;font-weight:700;color:#64748b;cursor:pointer">
+                                ยกเลิก
+                            </button>
+                            <button type="submit"
+                                style="flex:1;padding:11px 20px;border-radius:12px;border:none;background:#7c3aed;color:#fff;font-size:13px;font-weight:800;cursor:pointer;box-shadow:0 4px 14px rgba(124,58,237,.3)">
+                                <i class="fa-solid fa-save mr-1.5"></i> บันทึกประกาศ
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div><!-- /ann-form-modal -->
+
+            <!-- Delete form (hidden) -->
+            <form id="ann-delete-form" method="POST" style="display:none">
+                <?php csrf_field(); ?>
+                <input type="hidden" name="ann_action" value="delete">
+                <input type="hidden" id="ann-delete-id" name="ann_id" value="">
+            </form>
+
             <!-- ════════════ SECTION: IDENTITY & GOVERNANCE ════════════ -->
-            <div id="section-identity" class="portal-section" style="display:none">
-                <div class="max-w-[1280px] mx-auto px-5 md:px-8 py-8">
+            <div id="section-identity" class="portal-section" 
+                style="<?= $activeSection==='identity'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); background:#f8fafc; overflow-y:auto;">
+                <div class="px-5 md:px-8 py-8">
 
                     <?php if ($idSaved): ?>
                         <div id="id-toast"
@@ -974,7 +1370,7 @@ try {
                     <div
                         style="display:flex;gap:6px;margin-bottom:20px;padding-bottom:2px;border-bottom:1px solid #f1f5f9">
                         <button class="id-tab active" data-tab="users" onclick="switchIdTab('users',this)">System Users
-                            (<?= count($idUsers) ?>)</button>
+                            (<?= number_format($totalIdUsers) ?>)</button>
                         <?php if ($adminRole === 'superadmin'): ?>
                             <button class="id-tab" data-tab="admins" onclick="switchIdTab('admins',this)">System Admins
                                 (<?= count($allAdmins) ?>)</button>
@@ -986,12 +1382,8 @@ try {
                     <!-- PANEL: Master Users -->
                     <div id="id-panel-users" class="id-panel active">
                         <?php
-                        $statsUserType = ['student' => 0, 'staff' => 0, 'other' => 0];
-                        foreach ($idUsers as $u) {
-                            $statKey = in_array($u['status'], ['student', 'staff']) ? $u['status'] : 'other';
-                            $statsUserType[$statKey]++;
-                        }
-                        $totalUsersCalc = count($idUsers);
+                        // Stats are pre-calculated in identity_queries.php via SQL
+                        $totalUsersCalc = $totalIdUsers;
                         $pctStudent = $totalUsersCalc > 0 ? round(($statsUserType['student'] / $totalUsersCalc) * 100) : 0;
                         $pctStaff = $totalUsersCalc > 0 ? round(($statsUserType['staff'] / $totalUsersCalc) * 100) : 0;
                         $pctOther = $totalUsersCalc > 0 ? (100 - $pctStudent - $pctStaff) : 0;
@@ -1041,7 +1433,7 @@ try {
                                     style="font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.14em;color:#374151">Master
                                     Records</span>
                                 <span
-                                    style="margin-left:auto;font-size:11px;font-weight:700;color:#94a3b8"><?= number_format(count($idUsers)) ?>
+                                    style="margin-left:auto;font-size:11px;font-weight:700;color:#94a3b8"><?= number_format($totalIdUsers) ?>
                                     รายการ</span>
                             </div>
                             <div style="overflow-x:auto" id="idTableWrap">
@@ -1063,70 +1455,12 @@ try {
                                         </tr>
                                     </thead>
                                     <tbody id="idUserTbody">
-                                        <?php foreach ($idUsers as $u):
-                                            $statusTH = match ($u['status']) { 'student' => 'นักศึกษา', 'staff' => 'บุคลากร', 'other' => $u['status_other'] ?: 'บุคคลทั่วไป', default => 'ไม่ระบุ'};
-                                            $initial = mb_substr($u['full_name'], 0, 1);
-                                            ?>
-                                            <tr style="border-bottom:1px solid #f1f5f9" class="id-user-row">
-                                                <td style="padding:14px 20px">
-                                                    <div style="display:flex;align-items:center;gap:12px">
-                                                        <div
-                                                            style="width:38px;height:38px;border-radius:11px;background:#f1f5f9;color:#64748b;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;flex-shrink:0">
-                                                            <?= htmlspecialchars($initial) ?>
-                                                        </div>
-                                                        <div>
-                                                            <div style="font-weight:750;color:#0f172a">
-                                                                <?= htmlspecialchars($u['full_name']) ?>
-                                                            </div>
-                                                            <div
-                                                                style="font-size:10px;color:#94a3b8;font-weight:700;margin-top:2px">
-                                                                #<?= htmlspecialchars($u['student_personnel_id'] ?? '—') ?>
-                                                                · <?= htmlspecialchars($statusTH) ?></div>
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                                <td style="padding:14px 20px">
-                                                    <div style="font-size:12px;color:#374151;font-weight:600">
-                                                        <?= htmlspecialchars($u['phone_number'] ?: '—') ?>
-                                                    </div>
-                                                    <div style="font-size:11px;color:#94a3b8;margin-top:2px">
-                                                        <?= htmlspecialchars($u['email'] ?? '—') ?>
-                                                    </div>
-                                                </td>
-                                                <td style="padding:14px 20px">
-                                                    <div style="font-size:12px;font-weight:700;color:#374151">
-                                                        <?= date('d M Y', strtotime($u['created_at'])) ?>
-                                                    </div>
-                                                    <div style="font-size:10px;color:#94a3b8;margin-top:1px">
-                                                        <?= date('H:i', strtotime($u['created_at'])) ?>
-                                                    </div>
-                                                </td>
-                                                <td style="padding:14px 20px;text-align:right">
-                                                    <div style="display:flex;gap:6px;justify-content:flex-end">
-                                                        <button
-                                                            onclick='idOpenView(<?= json_encode($u, JSON_HEX_APOS | JSON_HEX_TAG) ?>)'
-                                                            style="width:32px;height:32px;border-radius:8px;border:1px solid #e2e8f0;background:#fff;color:#64748b;cursor:pointer;transition:all .15s"
-                                                            title="ดูข้อมูล">
-                                                            <i class="fa-solid fa-eye" style="font-size:11px"></i>
-                                                        </button>
-                                                        <button
-                                                            onclick='idOpenEdit(<?= json_encode($u, JSON_HEX_APOS | JSON_HEX_TAG) ?>)'
-                                                            style="width:32px;height:32px;border-radius:8px;border:1px solid #e2e8f0;background:#fff;color:#64748b;cursor:pointer;transition:all .15s"
-                                                            title="แก้ไข">
-                                                            <i class="fa-solid fa-pen" style="font-size:11px"></i>
-                                                        </button>
-                                                        <a href="../admin/user_history.php?id=<?= $u['id'] ?>"
-                                                            style="width:32px;height:32px;border-radius:8px;border:1px solid #e2e8f0;background:#fff;color:#64748b;display:flex;align-items:center;justify-content:center;text-decoration:none;transition:all .15s"
-                                                            onmouseover="this.style.background='#fffbeb';this.style.color='#d97706'"
-                                                            onmouseout="this.style.background='#fff';this.style.color='#64748b'"
-                                                            title="ประวัติการใช้งาน">
-                                                            <i class="fa-solid fa-clock-rotate-left"
-                                                                style="font-size:11px"></i>
-                                                        </a>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        <?php endforeach; ?>
+                                        <!-- Dynamically loaded via AJAX -->
+                                        <tr>
+                                            <td colspan="4" style="padding:40px;text-align:center;color:#94a3b8">
+                                                <i class="fa-solid fa-spinner fa-spin mr-2"></i> กำลังโหลดข้อมูล...
+                                            </td>
+                                        </tr>
                                     </tbody>
                                 </table>
                             </div>
@@ -1170,51 +1504,65 @@ try {
                             <div style="overflow-x:auto">
                                 <table style="width:100%;border-collapse:collapse;font-size:13px" id="idAdminTable">
                                     <thead>
-                                        <tr style="background:#f8fafc;border-bottom:1px solid #f1f5f9">
-                                            <th
-                                                style="padding:12px 20px;text-align:left;font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.14em">
-                                                Admin Detail</th>
-                                            <th
-                                                style="padding:12px 20px;text-align:left;font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.14em">
-                                                Privileges</th>
-                                            <th
-                                                style="padding:12px 20px;text-align:right;font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.14em">
-                                                จัดการ</th>
+                                        <tr style="background:#f8fafc;border-bottom:1.5px solid #e2e8f0">
+                                            <th style="padding:16px 20px;text-align:left;font-size:10px;font-weight:900;color:#64748b;text-transform:uppercase;letter-spacing:.15em"><i class="fa-solid fa-user-shield mr-2"></i>Admin Detail</th>
+                                            <th style="padding:16px 20px;text-align:center;font-size:10px;font-weight:900;color:#64748b;text-transform:uppercase;letter-spacing:.15em;width:150px"><i class="fa-solid fa-key mr-2"></i>Access Level</th>
+                                            <th style="padding:16px 20px;text-align:right;font-size:10px;font-weight:900;color:#64748b;text-transform:uppercase;letter-spacing:.15em">Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody id="idAdminTbody">
-                                        <?php foreach ($allAdmins as $adm):
-                                            $roleClass = match ($adm['role']) { 'superadmin' => 'bg-purple-100 text-purple-700', 'editor' => 'bg-rose-100 text-rose-700', default => 'bg-blue-100 text-blue-700'};
-                                            ?>
-                                            <tr style="border-bottom:1px solid #f1f5f9" class="id-admin-row">
-                                                <td style="padding:14px 20px">
-                                                    <div style="font-weight:750;color:#0f172a">
-                                                        <?= htmlspecialchars($adm['full_name']) ?>
-                                                    </div>
-                                                    <div style="font-size:11px;color:#94a3b8">
-                                                        @<?= htmlspecialchars($adm['username']) ?> ·
-                                                        <?= htmlspecialchars($adm['email']) ?>
+                                        <?php foreach ($allAdmins as $adm): 
+                                            $role = $adm['role'] ?? 'admin';
+                                            $roleIcon = '<i class="fa-solid fa-user-shield"></i>';
+                                            $roleLabel = 'Standard Admin';
+                                            $roleColor = '#3b82f6';
+                                            $roleBg = '#eff6ff';
+                                            $roleBorder = '#bfdbfe';
+
+                                            if ($role === 'superadmin') {
+                                                $roleIcon = '<i class="fa-solid fa-crown"></i>';
+                                                $roleLabel = 'Super Administrator';
+                                                $roleColor = '#7c3aed';
+                                                $roleBg = '#f5f3ff';
+                                                $roleBorder = '#ddd6fe';
+                                            } elseif ($role === 'editor') {
+                                                $roleIcon = '<i class="fa-solid fa-pen-to-square"></i>';
+                                                $roleLabel = 'Content Editor';
+                                                $roleColor = '#e11d48';
+                                                $roleBg = '#fff1f2';
+                                                $roleBorder = '#fecdd3';
+                                            }
+                                        ?>
+                                            <tr style="border-bottom:1px solid #f1f5f9" class="id-admin-row hover:bg-slate-50/50 transition-colors">
+                                                <td style="padding:16px 20px">
+                                                    <div style="display:flex;align-items:center;gap:12px">
+                                                        <div style="width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg, <?= $roleColor ?>, <?= $roleColor ?>dd);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:14px;box-shadow:0 4px 10px -2px <?= $roleColor ?>66">
+                                                            <?= mb_substr($adm['full_name'], 0, 1) ?>
+                                                        </div>
+                                                        <div>
+                                                            <div style="font-weight:800;color:#1e293b;font-size:13.5px"><?= htmlspecialchars($adm['full_name']) ?></div>
+                                                            <div style="font-size:11px;color:#64748b;font-weight:600">@<?= htmlspecialchars($adm['username']) ?> · <?= htmlspecialchars($adm['email']) ?></div>
+                                                        </div>
                                                     </div>
                                                 </td>
-                                                <td style="padding:14px 20px">
-                                                    <span
-                                                        style="font-size:10px;font-weight:800;padding:3px 8px;border-radius:6px;text-transform:uppercase"
-                                                        class="<?= $roleClass ?>"><?= htmlspecialchars($adm['role']) ?></span>
+                                                <td style="padding:16px 20px;text-align:center">
+                                                    <div style="display:inline-flex;align-items:center;gap:8px;padding:4px 12px;border-radius:8px;background:<?= $roleBg ?>;color:<?= $roleColor ?>;border:1.5px solid <?= $roleBorder ?>;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:0.05em">
+                                                        <?= $roleIcon ?> <?= $roleLabel ?>
+                                                    </div>
                                                 </td>
-                                                <td style="padding:14px 20px;text-align:right">
-                                                    <div style="display:flex;gap:6px;justify-content:flex-end">
-                                                        <button onclick='openEditAdminModal(<?= json_encode($adm) ?>)'
-                                                            style="width:32px;height:32px;border-radius:8px;border:1px solid #e2e8f0;background:#fff;color:#64748b;cursor:pointer"><i
-                                                                class="fa-solid fa-pen"></i></button>
+                                                <td style="padding:16px 20px;text-align:right">
+                                                    <div style="display:flex;gap:8px;justify-content:flex-end">
+                                                        <button onclick='openEditAdminModal(<?= json_encode($adm) ?>)' 
+                                                            class="id-action-btn"
+                                                            style="width:34px;height:34px;border-radius:10px;border:1.5px solid #e2e8f0;background:#fff;color:#64748b;cursor:pointer;transition:all 0.2s"><i class="fa-solid fa-pen-to-square"></i></button>
                                                         <?php if ($adm['id'] != $_SESSION['admin_id']): ?>
-                                                            <form method="POST" style="display:inline"
-                                                                onsubmit="return confirm('ยืนยันการลบ Admin ท่านนี้?')">
+                                                            <form method="POST" style="display:inline" onsubmit="return confirm('ยืนยันการลบ Admin ท่านนี้?')">
                                                                 <input type="hidden" name="action" value="delete_admin">
                                                                 <input type="hidden" name="admin_id" value="<?= $adm['id'] ?>">
                                                                 <?php csrf_field(); ?>
-                                                                <button type="submit"
-                                                                    style="width:32px;height:32px;border-radius:8px;border:1px solid #fee2e2;background:#fff;color:#ef4444;cursor:pointer"><i
-                                                                        class="fa-solid fa-trash"></i></button>
+                                                                <button type="submit" 
+                                                                    class="id-action-btn-danger"
+                                                                    style="width:34px;height:34px;border-radius:10px;border:1.5px solid #fee2e2;background:#fff;color:#ef4444;cursor:pointer;transition:all 0.2s"><i class="fa-solid fa-trash-can"></i></button>
                                                             </form>
                                                         <?php endif; ?>
                                                     </div>
@@ -1227,72 +1575,119 @@ try {
                         </div>
                     </div>
 
-                    <!-- PANEL: Staff -->
+                    <!-- PANEL: Staff Matrix -->
                     <div id="id-panel-staff" class="id-panel">
                         <div style="background:#fff;border-radius:20px;border:1.5px solid #e2e8f0;overflow:hidden">
-                            <div
-                                style="padding:18px 24px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;gap:8px">
-                                <div style="width:4px;height:18px;background:#2563eb;border-radius:99px;flex-shrink:0">
+                            <div style="padding:18px 24px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;gap:8px">
+                                <div style="width:4px;height:18px;background:#2563eb;border-radius:99px;flex-shrink:0"></div>
+                                <span style="font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.14em;color:#374151">Staff Permission Matrix</span>
+                            </div>
+                            <!-- Matrix Legend -->
+                            <div style="padding:12px 24px;background:#f8fafc;border-bottom:1px solid #f1f5f9;display:flex;flex-wrap:wrap;gap:20px;align-items:center">
+                                <div style="font-size:10px;font-weight:900;color:#94a3b8;text-transform:uppercase;letter-spacing:.1em">Matrix Legend:</div>
+                                <div style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:#475569">
+                                    <span style="color:#ea580c"><i class="fa-solid fa-shield-halved"></i></span> Admin
                                 </div>
-                                <span
-                                    style="font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.14em;color:#374151">Staff
-                                    Roster (e-Borrow)</span>
+                                <div style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:#475569">
+                                    <span style="color:#7c3aed"><i class="fa-solid fa-crown"></i></span> Super
+                                </div>
+                                <div style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:#475569">
+                                    <span style="color:#2563eb"><i class="fa-solid fa-pen-to-square"></i></span> Editor
+                                </div>
+                                <div style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:#475569">
+                                    <span style="color:#16a34a"><i class="fa-solid fa-user"></i></span> Standard
+                                </div>
+                                <div style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:#94a3b8">
+                                    <i class="fa-solid fa-circle-xmark"></i> No Access
+                                </div>
+                                <div style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:#475569">
+                                    <i class="fa-solid fa-circle-check text-emerald-500"></i> Active Flag
+                                </div>
+                                <div style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:#475569">
+                                    <i class="fa-solid fa-circle-minus text-slate-200"></i> Disabled
+                                </div>
                             </div>
                             <div style="overflow-x:auto">
                                 <table style="width:100%;border-collapse:collapse;font-size:13px" id="idStaffTable">
                                     <thead>
-                                        <tr style="background:#f8fafc;border-bottom:1px solid #f1f5f9">
-                                            <th
-                                                style="padding:12px 20px;text-align:left;font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.14em">
-                                                Staff</th>
-                                            <th
-                                                style="padding:12px 20px;text-align:left;font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.14em">
-                                                System Access</th>
-                                            <th
-                                                style="padding:12px 20px;text-align:right;font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.14em">
-                                                จัดการ</th>
+                                        <tr style="background:#f8fafc;border-bottom:1.5px solid #e2e8f0">
+                                            <th style="padding:16px 20px;text-align:left;font-size:10px;font-weight:900;color:#64748b;text-transform:uppercase;letter-spacing:.15em"><i class="fa-solid fa-user-gear mr-2"></i>Staff Details</th>
+                                            <th style="padding:16px 20px;text-align:center;font-size:10px;font-weight:900;color:#64748b;text-transform:uppercase;letter-spacing:.15em;width:120px"><i class="fa-solid fa-box-archive mr-2"></i>e-Borrow</th>
+                                            <th style="padding:16px 20px;text-align:center;font-size:10px;font-weight:900;color:#64748b;text-transform:uppercase;letter-spacing:.15em;width:120px"><i class="fa-solid fa-bullhorn mr-2"></i>e-Campaign</th>
+                                            <th style="padding:16px 20px;text-align:center;font-size:10px;font-weight:900;color:#64748b;text-transform:uppercase;letter-spacing:.15em;width:80px" title="Insurance Sync"><i class="fa-solid fa-shield-heart"></i></th>
+                                            <th style="padding:16px 20px;text-align:center;font-size:10px;font-weight:900;color:#64748b;text-transform:uppercase;letter-spacing:.15em;width:80px" title="System Logs"><i class="fa-solid fa-list-ul"></i></th>
+                                            <th style="padding:16px 20px;text-align:center;font-size:10px;font-weight:900;color:#64748b;text-transform:uppercase;letter-spacing:.15em;width:80px" title="System Settings"><i class="fa-solid fa-sliders"></i></th>
+                                            <th style="padding:16px 20px;text-align:center;font-size:10px;font-weight:900;color:#64748b;text-transform:uppercase;letter-spacing:.15em;width:100px">Status</th>
+                                            <th style="padding:16px 20px;text-align:right;font-size:10px;font-weight:900;color:#64748b;text-transform:uppercase;letter-spacing:.15em">Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody id="idStaffTbody">
                                         <?php foreach ($allStaff as $st):
                                             $isActive = ($st['account_status'] ?? 'active') === 'active';
+                                            
+                                            // e-Borrow Matrix Mapping
+                                            $ebAccess = (int)($st['access_eborrow'] ?? 1);
+                                            $ebRole = $st['role'] ?? 'none';
+                                            $ebIcon = '<i class="fa-solid fa-circle-xmark" style="color:#cbd5e1;font-size:14px"></i>';
+                                            if ($ebAccess) {
+                                                if ($ebRole === 'admin') {
+                                                    $ebIcon = '<div style="background:#fff7ed;color:#ea580c;border:1px solid #fed7aa;width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;margin:0 auto" title="e-Borrow: Administrator"><i class="fa-solid fa-shield-halved"></i></div>';
+                                                } elseif ($ebRole === 'librarian' || $ebRole === 'technician' || $ebRole === 'supervisor') {
+                                                    $ebIcon = '<div style="background:#f0f9ff;color:#0369a1;border:1px solid #bae6fd;width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;margin:0 auto" title="e-Borrow: Staff/Librarian"><i class="fa-solid fa-pen-to-square"></i></div>';
+                                                } elseif ($ebRole === 'employee') {
+                                                    $ebIcon = '<div style="background:#f0fdf4;color:#16a34a;border:1px solid #bbf7d0;width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;margin:0 auto" title="e-Borrow: Standard User"><i class="fa-solid fa-user"></i></div>';
+                                                }
+                                            }
+
+                                            // e-Campaign Matrix Mapping
+                                            $ecAccess = (int)($st['access_ecampaign'] ?? 0);
+                                            $ecRole = $st['ecampaign_role'] ?? 'none';
+                                            $ecIcon = '<i class="fa-solid fa-circle-xmark" style="color:#cbd5e1;font-size:14px"></i>';
+                                            if ($ecAccess) {
+                                                if ($ecRole === 'admin' || $ecRole === 'superadmin') {
+                                                    $ecIcon = '<div style="background:#f5f3ff;color:#7c3aed;border:1px solid #ddd6fe;width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;margin:0 auto" title="e-Campaign: Administrator"><i class="fa-solid fa-crown"></i></div>';
+                                                } else {
+                                                    $ecIcon = '<div style="background:#eff6ff;color:#2563eb;border:1px solid #bfdbfe;width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;margin:0 auto" title="e-Campaign: Editor"><i class="fa-solid fa-file-signature"></i></div>';
+                                                }
+                                            }
+
+                                            // Portal Extensions
+                                            $insAccess = (int)($st['access_insurance'] ?? 0);
+                                            $logsAccess = (int)($st['access_system_logs'] ?? 0);
+                                            $settAccess = (int)($st['access_site_settings'] ?? 0);
+                                            
+                                            $insIcon = $insAccess ? '<i class="fa-solid fa-circle-check text-emerald-500"></i>' : '<i class="fa-solid fa-circle-minus text-slate-200"></i>';
+                                            $logsIcon = $logsAccess ? '<i class="fa-solid fa-circle-check text-emerald-500"></i>' : '<i class="fa-solid fa-circle-minus text-slate-200"></i>';
+                                            $settIcon = $settAccess ? '<i class="fa-solid fa-circle-check text-emerald-500"></i>' : '<i class="fa-solid fa-circle-minus text-slate-200"></i>';
                                             ?>
-                                            <tr style="border-bottom:1px solid #f1f5f9" class="id-staff-row">
-                                                <td style="padding:14px 20px">
-                                                    <div style="font-weight:750;color:#0f172a">
-                                                        <?= htmlspecialchars($st['full_name']) ?>
-                                                    </div>
-                                                    <div style="font-size:11px;color:#94a3b8">
-                                                        @<?= htmlspecialchars($st['username']) ?> · <span
-                                                            style="font-weight:700"><?= htmlspecialchars($st['role']) ?></span>
-                                                    </div>
-                                                </td>
-                                                <td style="padding:14px 20px">
-                                                    <div style="display:flex;gap:4px">
-                                                        <span title="e-Borrow Status"
-                                                            style="font-size:9px;font-weight:800;padding:2px 6px;border-radius:5px;background:#fff7ed;color:#ea580c;border:1px solid #fed7aa">e-Borrow</span>
-                                                        <?php if ($st['access_ecampaign']): ?>
-                                                            <span title="e-Campaign Role"
-                                                                style="font-size:9px;font-weight:800;padding:2px 6px;border-radius:5px;background:#eff6ff;color:#2563eb;border:1px solid #bfdbfe">e-Camp
-                                                                (<?= $st['ecampaign_role'] ?>)</span>
-                                                        <?php endif; ?>
-                                                        <span
-                                                            style="font-size:9px;font-weight:800;padding:2px 6px;border-radius:5px;background:<?= $isActive ? '#f0fdf4;color:#16a34a;border:1px solid #bbf7d0' : '#fef2f2;color:#dc2626;border:1px solid #fecaca' ?>"><?= strtoupper($st['account_status']) ?></span>
+                                            <tr style="border-bottom:1px solid #f1f5f9" class="id-staff-row hover:bg-slate-50/50 transition-colors">
+                                                <td style="padding:16px 20px">
+                                                    <div style="display:flex;align-items:center;gap:12px">
+                                                        <div style="width:36px;height:36px;border-radius:10px;background:<?= $isActive ? 'linear-gradient(135deg,#3b82f6,#1d4ed8)' : '#f1f5f9' ?>;color:<?= $isActive ? '#fff' : '#94a3b8' ?>;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:14px">
+                                                            <?= mb_substr($st['full_name'], 0, 1) ?>
+                                                        </div>
+                                                        <div>
+                                                            <div style="font-weight:800;color:#1e293b;font-size:13.5px"><?= htmlspecialchars($st['full_name']) ?></div>
+                                                            <div style="font-size:11px;color:#64748b;font-weight:600">@<?= htmlspecialchars($st['username']) ?></div>
+                                                        </div>
                                                     </div>
                                                 </td>
-                                                <td style="padding:14px 20px;text-align:right">
-                                                    <div style="display:flex;gap:6px;justify-content:flex-end">
-                                                        <button onclick='openEditStaffModal(<?= json_encode($st) ?>)'
-                                                            style="width:32px;height:32px;border-radius:8px;border:1px solid #e2e8f0;background:#fff;color:#64748b;cursor:pointer"><i
-                                                                class="fa-solid fa-pen"></i></button>
-                                                        <form method="POST" style="display:inline"
-                                                            onsubmit="return confirm('ยืนยันการลบ Staff ท่านนี้?')">
+                                                <td style="padding:16px 20px;text-align:center"><?= $ebIcon ?></td>
+                                                <td style="padding:16px 20px;text-align:center"><?= $ecIcon ?></td>
+                                                <td style="padding:16px 20px;text-align:center"><?= $insIcon ?></td>
+                                                <td style="padding:16px 20px;text-align:center"><?= $logsIcon ?></td>
+                                                <td style="padding:16px 20px;text-align:center"><?= $settIcon ?></td>
+                                                <td style="padding:16px 20px;text-align:center">
+                                                    <span style="font-size:10px;font-weight:900;padding:4px 10px;border-radius:99px;background:<?= $isActive ? '#f0fdf4;color:#16a34a;border:1px solid #bbf7d0' : '#fef2f2;color:#dc2626;border:1px solid #fecaca' ?>"><?= strtoupper($st['account_status']) ?></span>
+                                                </td>
+                                                <td style="padding:16px 20px;text-align:right">
+                                                    <div style="display:flex;gap:8px;justify-content:flex-end">
+                                                        <button onclick='openEditStaffModal(<?= json_encode($st) ?>)' class="id-action-btn" style="width:34px;height:34px;border-radius:10px;border:1.5px solid #e2e8f0;background:#fff;color:#64748b;cursor:pointer;transition:all 0.2s"><i class="fa-solid fa-pen-to-square"></i></button>
+                                                        <form method="POST" style="display:inline" onsubmit="return confirm('ยืนยันการลบ Staff ท่านนี้?')">
                                                             <input type="hidden" name="action" value="delete_staff">
                                                             <input type="hidden" name="sf_id" value="<?= $st['id'] ?>">
                                                             <?php csrf_field(); ?>
-                                                            <button type="submit"
-                                                                style="width:32px;height:32px;border-radius:8px;border:1px solid #fee2e2;background:#fff;color:#ef4444;cursor:pointer"><i
-                                                                    class="fa-solid fa-trash"></i></button>
+                                                            <button type="submit" class="id-action-btn-danger" style="width:34px;height:34px;border-radius:10px;border:1.5px solid #fee2e2;background:#fff;color:#ef4444;cursor:pointer;transition:all 0.2s"><i class="fa-solid fa-trash-can"></i></button>
                                                         </form>
                                                     </div>
                                                 </td>
@@ -1301,6 +1696,7 @@ try {
                                     </tbody>
                                 </table>
                             </div>
+
                         </div>
                     </div>
 
@@ -1455,228 +1851,455 @@ try {
             </div>
 
             <?php if ($adminRole === 'superadmin'): ?>
-                <!-- Admin Modal -->
-                <div id="admModal"
-                    style="display:none;position:fixed;inset:0;z-index:200;background:rgba(15,23,42,.55);backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:20px">
-                    <div
-                        style="background:#fff;border-radius:24px;width:100%;max-width:480px;overflow:hidden;box-shadow:0 25px 50px -12px rgba(0,0,0,.25)">
-                        <div
-                            style="padding:20px 24px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;justify-content:space-between">
-                            <span id="admModalTitle" style="font-size:16px;font-weight:900;color:#0f172a">จัดการ
-                                Admin</span>
-                            <button onclick="document.getElementById('admModal').style.display='none'"
-                                style="background:none;border:none;cursor:pointer;color:#94a3b8"><i
-                                    class="fa-solid fa-times"></i></button>
-                        </div>
-                        <form method="POST" style="padding:24px" id="admForm">
-                            <input type="hidden" name="action" id="admAction" value="add_admin">
-                            <input type="hidden" name="admin_id" id="admId">
-                            <?php csrf_field(); ?>
-                            <div style="display:flex;flex-direction:column;gap:16px">
-                                <div>
-                                    <label
-                                        style="display:block;font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;margin-bottom:6px">ชื่อ-นามสกุล</label>
-                                    <input type="text" name="full_name" id="admFullName" required class="premium-input">
+                <!-- UNIFIED IDENTITY GOVERNANCE MODAL (ISO 27001 COMPLIANT) -->
+                <div id="idGovModal" style="display:none;position:fixed;inset:0;z-index:300;background:rgba(15,23,42,.6);backdrop-filter:blur(8px);align-items:center;justify-content:center;padding:20px">
+                    <div style="background:#fff;border-radius:28px;width:100%;max-width:720px;overflow:hidden;box-shadow:0 25px 50px -12px rgba(0,0,0,.3);display:flex;flex-direction:column;max-height:90vh">
+                        <!-- Modal Header -->
+                        <div style="padding:24px 30px;background:linear-gradient(90deg,#f8fafc,#fff);border-bottom:1px solid #f1f5f9;display:flex;align-items:center;justify-content:space-between">
+                            <div style="display:flex;align-items:center;gap:15px">
+                                <div id="govModalIcon" style="width:45px;height:45px;border-radius:14px;background:#eff6ff;color:#2563eb;display:flex;align-items:center;justify-content:center;font-size:20px;box-shadow:0 4px 10px rgba(37,99,235,0.1)">
+                                    <i class="fa-solid fa-user-shield"></i>
                                 </div>
                                 <div>
-                                    <label
-                                        style="display:block;font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;margin-bottom:6px">ชื่อผู้ใช้
-                                        (Username)</label>
-                                    <input type="text" name="username" id="admUsername" required class="premium-input">
-                                </div>
-                                <div>
-                                    <label
-                                        style="display:block;font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;margin-bottom:6px">อีเมล</label>
-                                    <input type="email" name="email" id="admEmail" required class="premium-input">
-                                </div>
-                                <div>
-                                    <label
-                                        style="display:block;font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;margin-bottom:6px">รหัสผ่าน
-                                        <span id="pwdNotice"
-                                            style="font-weight:normal;color:#94a3b8;font-size:9px">(เว้นว่างหากไม่ต้องการเปลี่ยน)</span></label>
-                                    <input type="password" name="password" id="admPassword" class="premium-input">
-                                </div>
-                                <div>
-                                    <label
-                                        style="display:block;font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;margin-bottom:6px">ระดับสิทธิ์
-                                        (Role)</label>
-                                    <select name="role" id="admRole" class="premium-input">
-                                        <option value="admin">Admin</option>
-                                        <option value="editor">Editor</option>
-                                        <option value="superadmin">Superadmin</option>
-                                    </select>
-                                </div>
-                                <div style="display:flex;gap:10px;margin-top:8px">
-                                    <button type="button" onclick="document.getElementById('admModal').style.display='none'"
-                                        style="flex:1;padding:12px;border-radius:12px;background:#f1f5f9;color:#475569;font-weight:800;font-size:13px;border:none">ยกเลิก</button>
-                                    <button type="submit"
-                                        style="flex:1;padding:12px;border-radius:12px;background:#2e9e63;color:#fff;font-weight:800;font-size:13px;border:none">บันทึกข้อมูล</button>
+                                    <h3 id="govModalTitle" style="margin:0;font-size:18px;font-weight:900;color:#0f172a">จัดการสิทธิ์ผู้ใช้งานระบบ</h3>
+                                    <p style="margin:2px 0 0;font-size:12px;color:#64748b;font-weight:600">Identity & Access Governance Interface</p>
                                 </div>
                             </div>
-                        </form>
-                    </div>
-                </div>
-
-                <!-- Staff Modal (e-Borrow) -->
-                <div id="sfModal"
-                    style="display:none;position:fixed;inset:0;z-index:200;background:rgba(15,23,42,.55);backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:20px">
-                    <div
-                        style="background:#fff;border-radius:24px;width:100%;max-width:600px;overflow:hidden;box-shadow:0 25px 50px -12px rgba(0,0,0,.25)">
-                        <div
-                            style="padding:20px 24px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;justify-content:space-between">
-                            <span id="sfModalTitle" style="font-size:16px;font-weight:900;color:#0f172a">จัดการเจ้าหน้าที่
-                                e-Borrow</span>
-                            <button onclick="document.getElementById('sfModal').style.display='none'"
-                                style="background:none;border:none;cursor:pointer;color:#94a3b8"><i
-                                    class="fa-solid fa-times"></i></button>
+                            <button onclick="document.getElementById('idGovModal').style.display='none'" style="width:36px;height:36px;border-radius:10px;border:1.5px solid #e2e8f0;background:#fff;color:#94a3b8;cursor:pointer;transition:all 0.2s" onmouseover="this.style.color='#ef4444';this.style.borderColor='#fecaca'" onmouseout="this.style.color='#94a3b8';this.style.borderColor='#e2e8f0'">
+                                <i class="fa-solid fa-xmark"></i>
+                            </button>
                         </div>
-                        <form method="POST" style="padding:24px" id="sfForm">
-                            <input type="hidden" name="action" id="sfAction" value="add_staff">
-                            <input type="hidden" name="sf_id" id="sfId">
+
+                        <!-- Modal Body (Scrollable) -->
+                        <form method="POST" id="idGovForm" style="overflow-y:auto;padding:30px">
+                            <input type="hidden" name="action" id="govAction" value="save_identity_gov">
+                            <input type="hidden" name="target_id" id="govTargetId">
+                            <input type="hidden" name="target_type" id="govTargetType"> <!-- 'admin' or 'staff' -->
                             <?php csrf_field(); ?>
-                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
-                                <div style="display:flex;flex-direction:column;gap:14px">
-                                    <div
-                                        style="font-size:10px;font-weight:900;color:#94a3b8;text-transform:uppercase;letter-spacing:.1em">
-                                        General Info</div>
-                                    <div>
-                                        <label
-                                            style="display:block;font-size:11px;font-weight:800;color:#64748b;margin-bottom:6px">ชื่อ-นามสกุล</label>
-                                        <input type="text" name="sf_full_name" id="sfFullName" required
-                                            class="premium-input">
+
+                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:30px">
+                                <!-- Column 1: Core Identity -->
+                                <div style="display:flex;flex-direction:column;gap:20px">
+                                    <div style="font-size:11px;font-weight:900;color:#94a3b8;text-transform:uppercase;letter-spacing:.1em;display:flex;align-items:center;gap:8px">
+                                        <i class="fa-solid fa-id-card"></i> ข้อมูลพื้นฐานบัญชี
                                     </div>
+                                    
                                     <div>
-                                        <label
-                                            style="display:block;font-size:11px;font-weight:800;color:#64748b;margin-bottom:6px">Username</label>
-                                        <input type="text" name="sf_username" id="sfUsername" required
-                                            class="premium-input">
+                                        <label style="display:block;font-size:12px;font-weight:800;color:#475569;margin-bottom:6px">ชื่อ-นามสกุล <span style="color:#ef4444">*</span></label>
+                                        <input type="text" name="full_name" id="govFullName" required class="premium-input" style="width:100%">
                                     </div>
-                                    <div>
-                                        <label
-                                            style="display:block;font-size:11px;font-weight:800;color:#64748b;margin-bottom:6px">รหัสผ่าน</label>
-                                        <input type="password" name="sf_password" id="sfPassword" class="premium-input"
-                                            placeholder="••••••••">
+                                    
+                                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                                        <div>
+                                            <label style="display:block;font-size:12px;font-weight:800;color:#475569;margin-bottom:6px">Username</label>
+                                            <input type="text" name="username" id="govUsername" required class="premium-input" style="width:100%">
+                                        </div>
+                                        <div>
+                                            <label style="display:block;font-size:12px;font-weight:800;color:#475569;margin-bottom:6px">สถานะบัญชี</label>
+                                            <select name="status" id="govStatus" class="premium-input" style="width:100%;background-image:none">
+                                                <option value="active">Active</option>
+                                                <option value="suspended">Suspended</option>
+                                            </select>
+                                        </div>
                                     </div>
+
                                     <div>
-                                        <label
-                                            style="display:block;font-size:11px;font-weight:800;color:#64748b;margin-bottom:6px">สถานะบัญชี</label>
-                                        <select name="sf_status" id="sfStatus" class="premium-input"
-                                            style="background-image:none">
-                                            <option value="active">Active (เข้าใช้งานได้ปกติ)</option>
-                                            <option value="suspended">Suspended (ระงับการใช้งาน)</option>
-                                        </select>
+                                        <label style="display:block;font-size:12px;font-weight:800;color:#475569;margin-bottom:6px">อีเมล</label>
+                                        <input type="email" name="email" id="govEmail" class="premium-input" style="width:100%" placeholder="— ไม่มีข้อมูล —">
+                                    </div>
+
+                                    <div>
+                                        <label style="display:block;font-size:12px;font-weight:800;color:#475569;margin-bottom:6px">รหัสผ่าน <span style="font-weight:normal;color:#94a3b8;font-size:11px">(เว้นว่างหากไม่เปลี่ยน)</span></label>
+                                        <input type="password" name="password" id="govPassword" class="premium-input" style="width:100%" placeholder="••••••••">
                                     </div>
                                 </div>
-                                <div style="display:flex;flex-direction:column;gap:14px">
-                                    <div
-                                        style="font-size:10px;font-weight:900;color:#94a3b8;text-transform:uppercase;letter-spacing:.1em">
-                                        Permissions & Roles</div>
 
-                                    <div class="premium-role-card orange p-3">
-                                        <div class="flex items-center gap-3 mb-2">
-                                            <div class="role-icon" style="color:#f59e0b"><i
-                                                    class="fa-solid fa-box-archive"></i></div>
-                                            <div class="font-black text-xs">e-Borrow System</div>
+                                <!-- Column 2: System Roles -->
+                                <div style="display:flex;flex-direction:column;gap:20px">
+                                    <div style="font-size:11px;font-weight:900;color:#94a3b8;text-transform:uppercase;letter-spacing:.1em;display:flex;align-items:center;gap:8px">
+                                        <i class="fa-solid fa-shield-halved"></i> กำหนดสิทธิ์รายระบบ
+                                    </div>
+
+                                    <!-- e-Borrow Card -->
+                                    <div id="govEbCard" onclick="toggleGovAccess('govEbAccess', 'govEbRole', this)" class="premium-role-card orange p-4" style="border-radius:18px;border:1.5px solid #fed7aa;background:#fffaf5;cursor:pointer;transition:all 0.2s">
+                                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+                                            <div style="display:flex;align-items:center;gap:10px">
+                                                <div id="govEbIcon" style="width:32px;height:32px;background:#ffedd5;color:#ea580c;border-radius:8px;display:flex;align-items:center;justify-content:center"><i class="fa-solid fa-box-archive"></i></div>
+                                                <span style="font-weight:900;font-size:13px;color:#9a3412">e-Borrow & Inventory</span>
+                                            </div>
+                                            <input type="checkbox" id="govEbAccess" name="eb_access" value="1" checked style="width:18px;height:18px;cursor:pointer" onclick="event.stopPropagation(); syncGovUI('govEbAccess', 'govEbRole', 'govEbCard')">
                                         </div>
-                                        <label
-                                            style="display:block;font-size:11px;font-weight:800;color:#475569;margin-bottom:4px">สิทธิ์ในระบบยืม-คืน</label>
-                                        <select name="sf_role" id="sfRole" class="premium-input"
-                                            style="padding:8px 12px; font-size:12px">
+                                        <select name="eb_role" id="govEbRole" class="premium-input" style="width:100%;font-size:12px;border-color:#fed7aa" onclick="event.stopPropagation()">
                                             <option value="employee">Employee (เจ้าหน้าที่ทั่วไป)</option>
+                                            <option value="librarian">Librarian (บรรณารักษ์)</option>
                                             <option value="technician">Technician (ช่างเทคนิค)</option>
                                             <option value="supervisor">Supervisor (หัวหน้างาน)</option>
-                                            <option value="admin">e-Borrow Admin (ผู้ดูแลสูงสุด)</option>
+                                            <option value="admin">System Administrator (ผู้ดูแลสูงสุด)</option>
                                         </select>
                                     </div>
 
-                                    <div class="premium-role-card blue p-3">
-                                        <div class="flex items-center gap-3 mb-2">
-                                            <div class="role-icon" style="color:#2563eb"><i
-                                                    class="fa-solid fa-bullhorn"></i></div>
-                                            <div class="font-black text-xs">e-Campaign System</div>
+                                    <!-- e-Campaign Card -->
+                                    <div id="govEcCard" onclick="toggleGovAccess('govEcAccess', 'govEcRole', this)" class="premium-role-card blue p-4" style="border-radius:18px;border:1.5px solid #bfdbfe;background:#f0f7ff;cursor:pointer;transition:all 0.2s">
+                                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+                                            <div style="display:flex;align-items:center;gap:10px">
+                                                <div id="govEcIcon" style="width:32px;height:32px;background:#dbeafe;color:#2563eb;border-radius:8px;display:flex;align-items:center;justify-content:center"><i class="fa-solid fa-bullhorn"></i></div>
+                                                <span style="font-weight:900;font-size:13px;color:#1e40af">e-Campaign System</span>
+                                            </div>
+                                            <input type="checkbox" name="ec_access" id="govEcAccess" value="1" style="width:18px;height:18px;cursor:pointer" onclick="event.stopPropagation(); syncGovUI('govEcAccess', 'govEcRole', 'govEcCard')">
                                         </div>
-                                        <div class="flex items-center gap-2 mb-3">
-                                            <input type="checkbox" name="sf_access_ecampaign" id="sfAccessEc" value="1"
-                                                style="width:16px;height:16px">
-                                            <label for="sfAccessEc"
-                                                style="font-size:12px;font-weight:700;color:#1e40af;cursor:pointer">อนุญาตให้จัดการแคมเปญ</label>
-                                        </div>
-                                        <label
-                                            style="display:block;font-size:11px;font-weight:800;color:#1e40af;margin-bottom:4px">สิทธิ์ใน
-                                            e-Campaign</label>
-                                        <select name="sf_ecampaign_role" id="sfEcRole" class="premium-input"
-                                            style="padding:8px 12px; font-size:12px">
-                                            <option value="admin">Admin (จัดการได้ทุกอย่าง)</option>
-                                            <option value="editor">Editor (ดูและแก้ไขข้อมูล)</option>
+                                        <select name="ec_role" id="govEcRole" class="premium-input" style="width:100%;font-size:12px;border-color:#bfdbfe" onclick="event.stopPropagation()">
+                                            <option value="editor">Content Editor (จัดการกิจกรรม)</option>
+                                            <option value="admin">System Administrator (ผู้ดูแลสูงสุด)</option>
                                         </select>
+                                    </div>
+                                    
+                                    <!-- Portal Role Card (Only for Admins) -->
+                                    <div id="govAdminOnlyCard" style="display:none;background:#f5f3ff;border:1.5px solid #ddd6fe;border-radius:18px;padding:15px">
+                                        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+                                            <div style="width:30px;height:30px;background:#ede9fe;color:#7c3aed;border-radius:8px;display:flex;align-items:center;justify-content:center"><i class="fa-solid fa-crown"></i></div>
+                                            <span style="font-weight:900;font-size:13px;color:#5b21b6">Portal Management</span>
+                                        </div>
+                                        <select name="admin_role" id="govAdminRole" class="premium-input" style="width:100%;font-size:12px;border-color:#ddd6fe">
+                                            <option value="admin">Standard Admin</option>
+                                            <option value="editor">Standard Editor</option>
+                                            <option value="superadmin">Super Administrator (FULL CONTROL)</option>
+                                        </select>
+                                    </div>
+
+                                    <!-- Portal Extension Rights -->
+                                    <div style="display:flex;flex-direction:column;gap:12px">
+                                        <div style="font-size:11px;font-weight:900;color:#94a3b8;text-transform:uppercase;letter-spacing:.1em;display:flex;align-items:center;gap:8px">
+                                            <i class="fa-solid fa-puzzle-piece"></i> ส่วนขยาย (Extensions)
+                                        </div>
+                                        <div style="display:grid;grid-template-columns:1fr;gap:10px">
+                                            <!-- Insurance -->
+                                            <div onclick="document.getElementById('govInsAccess').click()" class="premium-role-card" style="border-radius:14px;border:1.5px solid #e2e8f0;background:#fff;cursor:pointer;padding:12px;transition:all 0.2s;display:flex;align-items:center;justify-content:space-between">
+                                                <div style="display:flex;align-items:center;gap:10px">
+                                                    <i class="fa-solid fa-shield-heart text-emerald-500"></i>
+                                                    <span style="font-weight:800;font-size:12px;color:#475569">Insurance Sync Hub</span>
+                                                </div>
+                                                <input type="checkbox" name="ins_access" id="govInsAccess" value="1" style="width:16px;height:16px" onclick="event.stopPropagation()">
+                                            </div>
+                                            <!-- Logs -->
+                                            <div onclick="document.getElementById('govLogsAccess').click()" class="premium-role-card" style="border-radius:14px;border:1.5px solid #e2e8f0;background:#fff;cursor:pointer;padding:12px;transition:all 0.2s;display:flex;align-items:center;justify-content:space-between">
+                                                <div style="display:flex;align-items:center;gap:10px">
+                                                    <i class="fa-solid fa-list-ul text-slate-500"></i>
+                                                    <span style="font-weight:800;font-size:12px;color:#475569">System Activity Logs</span>
+                                                </div>
+                                                <input type="checkbox" name="logs_access" id="govLogsAccess" value="1" style="width:16px;height:16px" onclick="event.stopPropagation()">
+                                            </div>
+                                            <!-- Settings -->
+                                            <div onclick="document.getElementById('govSettAccess').click()" class="premium-role-card" style="border-radius:14px;border:1.5px solid #e2e8f0;background:#fff;cursor:pointer;padding:12px;transition:all 0.2s;display:flex;align-items:center;justify-content:space-between">
+                                                <div style="display:flex;align-items:center;gap:10px">
+                                                    <i class="fa-solid fa-sliders text-slate-500"></i>
+                                                    <span style="font-weight:800;font-size:12px;color:#475569">Global Site Settings</span>
+                                                </div>
+                                                <input type="checkbox" name="sett_access" id="govSettAccess" value="1" style="width:16px;height:16px" onclick="event.stopPropagation()">
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                            <div style="display:flex;gap:10px;margin-top:24px">
-                                <button type="button" onclick="document.getElementById('sfModal').style.display='none'"
-                                    style="flex:1;padding:12px;border-radius:12px;background:#f1f5f9;color:#475569;font-weight:800;font-size:13px;border:none">ยกเลิก</button>
-                                <button type="submit"
-                                    style="flex:1;padding:12px;border-radius:12px;background:#2563eb;color:#fff;font-weight:800;font-size:13px;border:none">บันทึกข้อมูลเจ้าหน้าที่</button>
+
+                            <!-- Audit Justification -->
+                            <div style="margin-top:30px;padding-top:20px;border-top:1.5px dashed #e2e8f0">
+                                <label style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:900;color:#dc2626;margin-bottom:8px">
+                                    <i class="fa-solid fa-shield-check"></i> เหตุผลความจำเป็นในการปรับสิทธิ์ (Justification) <span style="color:#ef4444">*</span>
+                                </label>
+                                <textarea name="justification" id="govJustification" required class="premium-input" style="width:100%;height:70px;padding:12px;font-size:13px;border-color:#fecaca" placeholder="ตัวอย่าง: ได้รับมอบหมายให้ดูแลระบบ e-Borrow เพิ่มเติมตามคำสั่งคณะ..."></textarea>
+                                <p style="margin:6px 0 0;font-size:10px;color:#94a3b8;font-weight:700"><i class="fa-solid fa-info-circle"></i> ISO 27001 Requirement: ทุกการปรับเปลี่ยนสิทธิ์ต้องมีการระบุเหตุผลความจำเป็นทางธุรกิจ</p>
+                            </div>
+                        </form>
+
+                        <!-- Modal Footer -->
+                        <div style="padding:24px 30px;background:#f8fafc;border-top:1px solid #f1f5f9;display:flex;gap:12px">
+                            <button type="button" onclick="document.getElementById('idGovModal').style.display='none'" style="flex:1;padding:13px;border-radius:14px;border:1.5px solid #e2e8f0;background:#fff;color:#475569;font-weight:800;font-size:14px;cursor:pointer">ยกเลิก</button>
+                            <button type="button" onclick="confirmGovSubmit()" style="flex:2;padding:13px;border-radius:14px;border:none;background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;font-weight:900;font-size:14px;cursor:pointer;box-shadow:0 10px 20px -5px rgba(37,99,235,0.3);display:flex;align-items:center;justify-content:center;gap:8px">
+                                <i class="fa-solid fa-check-double"></i> ยืนยันการปรับปรุงสิทธิ์
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Add Privilege Modal -->
+                <div id="privModal" style="display:none;position:fixed;inset:0;z-index:500;background:rgba(15,23,42,.6);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:20px">
+                    <div style="background:#fff;border-radius:28px;width:100%;max-width:480px;box-shadow:0 25px 50px -12px rgba(0,0,0,0.25);overflow:hidden">
+                        <div style="padding:24px;background:#fcfdfd;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center">
+                            <h3 style="margin:0;font-size:18px;font-weight:900;color:#0f172a">🛡️ บันทึกการถือสิทธิ์ระดับสูง</h3>
+                            <button type="button" onclick="document.getElementById('privModal').style.display='none'" style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:20px"><i class="fa-solid fa-xmark"></i></button>
+                        </div>
+                        <form id="privForm" style="padding:24px" enctype="multipart/form-data">
+                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+                                <div>
+                                    <label style="display:block;font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;margin-bottom:6px">ผู้รับสิทธิ์ (Admin)</label>
+                                    <select name="user_id" class="premium-input" style="width:100%" required>
+                                        <option value="">-- เลือกเจ้าหน้าที่ --</option>
+                                        <?php foreach ($adminListForSelect as $adm): ?>
+                                            <option value="<?= $adm['id'] ?>"><?= htmlspecialchars($adm['full_name']) ?> (@<?= htmlspecialchars($adm['username']) ?>)</option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label style="display:block;font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;margin-bottom:6px">บทบาท/ระดับสิทธิ์</label>
+                                    <input type="text" name="role_assigned" class="premium-input" style="width:100%" required placeholder="เช่น Super Admin">
+                                </div>
+                            </div>
+                            <div style="margin-bottom:16px">
+                                <label style="display:block;font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;margin-bottom:6px">เหตุผลความจำเป็น (Justification)</label>
+                                <textarea name="justification" class="premium-input" style="width:100%;height:60px" required placeholder="ระบุเหตุผลในการให้สิทธิ์..."></textarea>
+                            </div>
+                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+                                <div>
+                                    <label style="display:block;font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;margin-bottom:6px">ผู้อนุมัติ (Approved By)</label>
+                                    <input type="text" name="approved_by" class="premium-input" style="width:100%" required placeholder="ชื่อผู้อนุมัติ">
+                                </div>
+                                <div>
+                                    <label style="display:block;font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;margin-bottom:6px">วันหมดอายุ (ถ้ามี)</label>
+                                    <input type="date" name="expiry_date" class="premium-input" style="width:100%">
+                                </div>
+                            </div>
+                            <div style="margin-bottom:24px">
+                                <label style="display:block;font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;margin-bottom:6px">หลักฐานการอนุมัติ (PDF/Image)</label>
+                                <input type="file" name="approval_doc" class="premium-input" style="width:100%" accept=".pdf,image/*">
+                            </div>
+                            <div style="display:flex;gap:12px">
+                                <button type="button" onclick="document.getElementById('privModal').style.display='none'" style="flex:1;padding:12px;border-radius:14px;background:#f1f5f9;color:#475569;font-weight:800;border:none;cursor:pointer">ยกเลิก</button>
+                                <button type="submit" id="btnSavePriv" style="flex:1;padding:12px;border-radius:14px;background:#2e9e63;color:#fff;font-weight:800;border:none;cursor:pointer;box-shadow:0 4px 12px rgba(46,158,99,.2)">บันทึกรายการ</button>
                             </div>
                         </form>
                     </div>
                 </div>
+                <script>
+                    function openAddPrivilegeModal() {
+                        document.getElementById('privModal').style.display = 'flex';
+                    }
+                    document.getElementById('privForm')?.addEventListener('submit', function(e) {
+                        e.preventDefault();
+                        const fd = new FormData(this);
+                        const btn = document.getElementById('btnSavePriv');
+                        btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> กำลังบันทึก...';
+                        
+                        fetch('ajax_privilege_inventory.php', { method: 'POST', body: fd })
+                        .then(r => r.json())
+                        .then(d => {
+                            if(d.status === 'success') {
+                                Swal.fire({ icon: 'success', title: 'สำเร็จ', text: d.message }).then(() => location.reload());
+                            } else {
+                                Swal.fire({ icon: 'error', title: 'ผิดพลาด', text: d.message });
+                                btn.disabled = false; btn.textContent = 'บันทึกรายการ';
+                            }
+                        })
+                        .catch(err => {
+                            Swal.fire({ icon: 'error', title: 'Error', text: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้' });
+                            btn.disabled = false; btn.textContent = 'บันทึกรายการ';
+                        });
+                    });
+                </script>
             <?php endif; ?>
 
-            <!-- 
+            <?php /*
                 DEVELOPER NOTE: HOW TO ADD NEW SECTIONS
                 To add a new page/section, follow this template to ensure layout stability:
                 <div id="section-NAME" class="portal-section" style="<?= $activeSection==='NAME'?'':'display:none;' ?> background:#f8fafc; overflow-y:auto;">
                     <?php include __DIR__ . '/_partials/NAME.php'; ?>
                 </div>
-            -->
+            */ ?>
 
-            <!-- ════════════ SECTION: SETTINGS ════════════ -->
             <div id="section-settings" class="portal-section"
-                style="<?= $activeSection==='settings'?'':'display:none;' ?> background:#f1f5f9; overflow-y:auto;">
-                <?php include __DIR__ . '/_partials/settings.php'; ?>
+                style="<?= $activeSection==='settings'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); background:#f1f5f9; overflow-y:auto;">
+                <?php 
+                if ($adminRole === 'superadmin' || !empty($_SESSION['access_site_settings'])) {
+                    include __DIR__ . '/_partials/settings.php'; 
+                } else {
+                    echo '<div style="padding:100px;text-align:center;font-weight:900;color:#dc2626"><i class="fa-solid fa-shield-slash mb-4" style="font-size:4rem;display:block"></i> ACCESS DENIED<br><span style="font-size:14px;color:#94a3b8;font-weight:600">You do not have permission to manage site settings.</span></div>';
+                }
+                ?>
             </div>
 
             <!-- ════════════ SECTION: AI ASSISTANT ════════════ -->
             <div id="section-ai_assistant" class="portal-section"
-                style="<?= $activeSection==='ai_assistant'?'':'display:none;' ?> background:#fff; overflow:hidden;">
+                style="<?= $activeSection==='ai_assistant'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); overflow:hidden;">
                 <?php include __DIR__ . '/_partials/ai_assistant.php'; ?>
+            </div>
+
+            <!-- ════════════ SECTION: INSURANCE SYNC HUB ════════════ -->
+            <div id="section-insurance_sync" class="portal-section"
+                style="<?= $activeSection==='insurance_sync'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); background:#f8fafc; overflow-y:auto;">
+                <?php 
+                if ($adminRole === 'superadmin' || !empty($_SESSION['access_insurance'])) {
+                    include __DIR__ . '/_partials/insurance_sync.php'; 
+                } else {
+                    echo '<div style="padding:100px;text-align:center;font-weight:900;color:#dc2626"><i class="fa-solid fa-shield-slash mb-4" style="font-size:4rem;display:block"></i> ACCESS DENIED</div>';
+                }
+                ?>
             </div>
 
             <!-- ════════════ SECTION: CLINIC DATA ════════════ -->
             <div id="section-clinic_data" class="portal-section"
-                style="<?= $activeSection==='clinic_data'?'':'display:none;' ?> background:#f8fafc; overflow-y:auto;">
+                style="<?= $activeSection==='clinic_data'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); background:#f8fafc; overflow-y:auto;">
                 <?php include __DIR__ . '/_partials/clinic_data.php'; ?>
             </div>
 
             <!-- ════════════ SECTION: ACTIVITY LOGS ════════════ -->
             <div id="section-activity_logs" class="portal-section"
-                style="<?= $activeSection==='activity_logs'?'':'display:none;' ?> background:#f8fafc; overflow-y:auto;">
-                <?php include __DIR__ . '/_partials/activity_logs.php'; ?>
+                style="<?= $activeSection==='activity_logs'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); background:#f8fafc; overflow-y:auto;">
+                <?php 
+                if ($adminRole === 'superadmin' || !empty($_SESSION['access_system_logs'])) {
+                    include __DIR__ . '/_partials/activity_logs.php'; 
+                } else {
+                    echo '<div style="padding:100px;text-align:center;font-weight:900;color:#dc2626"><i class="fa-solid fa-shield-slash mb-4" style="font-size:4rem;display:block"></i> ACCESS DENIED<br><span style="font-size:14px;color:#94a3b8;font-weight:600">You do not have permission to view activity logs.</span></div>';
+                }
+                ?>
             </div>
 
             <!-- ════════════ SECTION: ERROR LOGS ════════════ -->
             <div id="section-error_logs" class="portal-section"
-                style="<?= $activeSection==='error_logs'?'':'display:none;' ?> background:#f8fafc; overflow-y:auto;">
-                <?php include __DIR__ . '/_partials/error_logs.php'; ?>
+                style="<?= $activeSection==='error_logs'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); background:#f8fafc; overflow-y:auto;">
+                <?php 
+                if ($adminRole === 'superadmin' || !empty($_SESSION['access_system_logs'])) {
+                    include __DIR__ . '/_partials/error_logs.php'; 
+                } else {
+                    echo '<div style="padding:100px;text-align:center;font-weight:900;color:#dc2626"><i class="fa-solid fa-shield-slash mb-4" style="font-size:4rem;display:block"></i> ACCESS DENIED<br><span style="font-size:14px;color:#94a3b8;font-weight:600">You do not have permission to view system error logs.</span></div>';
+                }
+                ?>
             </div>
 
             <!-- ════════════ SECTION: EMAIL LOGS ════════════ -->
             <div id="section-email_logs" class="portal-section"
-                style="<?= $activeSection==='email_logs'?'':'display:none;' ?> background:#f8fafc; overflow-y:auto;">
-                <?php include __DIR__ . '/_partials/email_logs.php'; ?>
+                style="<?= $activeSection==='email_logs'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); background:#f8fafc; overflow-y:auto;">
+                <?php 
+                if ($adminRole === 'superadmin' || !empty($_SESSION['access_system_logs'])) {
+                    include __DIR__ . '/_partials/email_logs.php'; 
+                } else {
+                    echo '<div style="padding:100px;text-align:center;font-weight:900;color:#dc2626"><i class="fa-solid fa-shield-slash mb-4" style="font-size:4rem;display:block"></i> ACCESS DENIED</div>';
+                }
+                ?>
             </div>
 
             <!-- ════════════ SECTION: SMTP SETTINGS ════════════ -->
             <div id="section-smtp_settings" class="portal-section"
-                style="<?= $activeSection==='smtp_settings'?'':'display:none;' ?> background:#f8fafc; overflow-y:auto;">
-                <?php include __DIR__ . '/_partials/smtp_settings.php'; ?>
+                style="<?= $activeSection==='smtp_settings'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); background:#f8fafc; overflow-y:auto;">
+                <?php 
+                if ($adminRole === 'superadmin' || !empty($_SESSION['access_site_settings'])) {
+                    include __DIR__ . '/_partials/smtp_settings.php'; 
+                } else {
+                    echo '<div style="padding:100px;text-align:center;font-weight:900;color:#dc2626"><i class="fa-solid fa-shield-slash mb-4" style="font-size:4rem;display:block"></i> ACCESS DENIED</div>';
+                }
+                ?>
             </div>
 
             <!-- ════════════ SECTION: SENTRY TEST ════════════ -->
             <div id="section-sentry_test" class="portal-section"
                 style="<?= $activeSection==='sentry_test'?'':'display:none;' ?> background:#f8fafc; overflow-y:auto;">
                 <?php include __DIR__ . '/_partials/sentry_test.php'; ?>
+            </div>
+
+            <!-- ════════════ SECTION: LINE MESSAGING API ════════════ -->
+            <div id="section-line_settings" class="portal-section"
+                style="<?= $activeSection==='line_settings'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); background:#f8fafc; overflow-y:auto;">
+                <?php 
+                if ($adminRole === 'superadmin' || !empty($_SESSION['access_site_settings'])) {
+                    include __DIR__ . '/_partials/line_settings.php'; 
+                } else {
+                    echo '<div style="padding:100px;text-align:center;font-weight:900;color:#dc2626"><i class="fa-solid fa-shield-slash mb-4" style="font-size:4rem;display:block"></i> ACCESS DENIED</div>';
+                }
+                ?>
+            </div>
+
+            <!-- ════════════ SECTION: PRIVILEGE INVENTORY (ISO 27001) ════════════ -->
+            <div id="section-privilege_inventory" class="portal-section" 
+                style="<?= $activeSection==='privilege_inventory'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); background:#f8fafc; overflow-y:auto;">
+                <div class="px-5 md:px-8 py-8">
+                    <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:24px">
+                        <div>
+                            <div class="sec-title" style="margin-bottom:2px">🛡️ Privileged Access Inventory</div>
+                            <p style="font-size:13px;color:#64748b">ISO 27001:2022 Control A.5.18 - การจัดการสิทธิ์การเข้าถึงที่ได้รับสิทธิพิเศษ</p>
+                        </div>
+                        <div style="display:flex;gap:10px;align-items:center">
+                            <button onclick="openAddPrivilegeModal()"
+                                style="background:#2e9e63;color:#fff;padding:8px 16px;border-radius:11px;font-size:12px;font-weight:700;border:none;cursor:pointer;box-shadow:0 4px 12px rgba(46,158,99,.25)">
+                                <i class="fa-solid fa-plus mr-1"></i> บันทึกการให้สิทธิ์ใหม่
+                            </button>
+                        </div>
+                    </div>
+
+                    <div style="background:#fff;border-radius:20px;border:1.5px solid #e2e8f0;overflow:hidden">
+                        <div style="padding:18px 24px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;gap:8px;background:#fcfdfc">
+                            <i class="fa-solid fa-list-check text-emerald-600"></i>
+                            <span style="font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.14em;color:#374151">บันทึกประวัติการถือสิทธิ์ระดับสูง</span>
+                        </div>
+                        <div style="overflow-x:auto">
+                            <table style="width:100%;border-collapse:collapse;font-size:13px">
+                                <thead>
+                                    <tr style="background:#f8fafc;border-bottom:1px solid #f1f5f9">
+                                        <th style="padding:12px 20px;text-align:left;font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.14em">ผู้ได้รับสิทธิ์</th>
+                                        <th style="padding:12px 20px;text-align:left;font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.14em">ระดับสิทธิ์ / บทบาท</th>
+                                        <th style="padding:12px 20px;text-align:left;font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.14em">วันที่ได้รับ / หมดอายุ</th>
+                                        <th style="padding:12px 20px;text-align:left;font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.14em">ผู้อนุมัติ (Approved By)</th>
+                                        <th style="padding:12px 20px;text-align:center;font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.14em">สถานะ</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php if (empty($privilegeInventory)): ?>
+                                        <tr>
+                                            <td colspan="5" style="padding:40px;text-align:center;color:#94a3b8">
+                                                <i class="fa-solid fa-folder-open text-4xl mb-3 block opacity-20"></i>
+                                                <p class="font-bold">ยังไม่มีการบันทึกข้อมูลในระบบ Inventory</p>
+                                                <p class="text-[11px]">กรุณาคลิก "บันทึกการให้สิทธิ์ใหม่" เพื่อเริ่มจัดเก็บประภูมิตามมาตรฐาน ISO</p>
+                                            </td>
+                                        </tr>
+                                    <?php else: ?>
+                                        <?php foreach ($privilegeInventory as $row): 
+                                            $isExpired = $row['expiry_date'] && strtotime($row['expiry_date']) < time();
+                                            $statusColor = $row['status'] == 1 && !$isExpired ? '#16a34a' : '#dc2626';
+                                            $statusBg = $row['status'] == 1 && !$isExpired ? '#f0fdf4' : '#fef2f2';
+                                            $statusText = $row['status'] == 1 && !$isExpired ? 'Active' : ($isExpired ? 'Expired' : 'Revoked');
+                                        ?>
+                                        <tr style="border-bottom:1px solid #f1f5f9">
+                                            <td style="padding:14px 20px">
+                                                <div style="font-weight:750;color:#0f172a"><?= htmlspecialchars($row['admin_full_name'] ?? '—') ?></div>
+                                                <div style="font-size:11px;color:#64748b">@<?= htmlspecialchars($row['admin_username'] ?? 'unknown') ?></div>
+                                            </td>
+                                            <td style="padding:14px 20px">
+                                                <div style="font-size:12px;font-weight:800;color:#1e293b"><?= htmlspecialchars($row['role_assigned'] ?? '—') ?></div>
+                                                <div style="font-size:10px;color:#94a3b8;max-width:200px" class="truncate" title="<?= htmlspecialchars($row['justification'] ?? '') ?>">
+                                                    Reason: <?= htmlspecialchars($row['justification'] ?? '—') ?>
+                                                </div>
+                                            </td>
+                                            <td style="padding:14px 20px">
+                                                <div style="font-size:12px;font-weight:700;color:#334155"><?= date('d M Y', strtotime($row['assigned_at'])) ?></div>
+                                                <div style="font-size:10px;color:<?= $isExpired ? '#ef4444' : '#94a3b8' ?>">
+                                                    Exp: <?= $row['expiry_date'] ? date('d M Y', strtotime($row['expiry_date'])) : 'Permanent' ?>
+                                                </div>
+                                            </td>
+                                            <td style="padding:14px 20px">
+                                                <div style="font-size:12px;font-weight:700;color:#475569"><?= htmlspecialchars($row['approved_by'] ?? '—') ?></div>
+                                                <?php if ($row['document_path']): ?>
+                                                    <a href="<?= htmlspecialchars($row['document_path']) ?>" target="_blank" style="font-size:10px;color:#2563eb;text-decoration:none">
+                                                        <i class="fa-solid fa-file-pdf mr-1"></i> ดูเอกสารประกอบ
+                                                    </a>
+                                                <?php else: ?>
+                                                    <span style="font-size:10px;color:#cbd5e1;font-style:italic">No document</span>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td style="padding:14px 20px;text-align:center">
+                                                <span style="padding:3px 10px;border-radius:99px;font-size:10px;font-weight:800;background:<?= $statusBg ?>;color:<?= $statusColor ?>;border:1px solid <?= $statusColor ?>40">
+                                                    <?= $statusText ?>
+                                                </span>
+                                            </td>
+                                        </tr>
+                                        <?php endforeach; ?>
+                                    <?php endif; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div style="padding:15px 24px;background:#f8fafc;border-top:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center">
+                            <div style="font-size:11px;color:#94a3b8;font-weight:700">
+                                <i class="fa-solid fa-circle-info mr-1"></i> ข้อมูลนี้ถูกใช้เพื่อการ Audit มาตรฐานความปลอดภัยสารสนเทศ
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
         </main><!-- /portal-main -->
@@ -2103,49 +2726,153 @@ try {
         }
 
         function openAddAdminModal() {
-            document.getElementById('admAction').value = 'add_admin';
-            document.getElementById('admModalTitle').textContent = 'เพิ่ม System Admin';
-            document.getElementById('admForm').reset();
-            document.getElementById('admPassword').placeholder = '';
-            document.getElementById('pwdNotice').style.display = 'none';
-            document.getElementById('admModal').style.display = 'flex';
-        }
-
-        function openEditAdminModal(adm) {
-            document.getElementById('admAction').value = 'edit_admin';
-            document.getElementById('admModalTitle').textContent = 'แก้ไข System Admin';
-            document.getElementById('admId').value = adm.id;
-            document.getElementById('admFullName').value = adm.full_name;
-            document.getElementById('admUsername').value = adm.username;
-            document.getElementById('admEmail').value = adm.email;
-            document.getElementById('admRole').value = adm.role;
-            document.getElementById('admPassword').value = '';
-            document.getElementById('admPassword').placeholder = '••••••••';
-            document.getElementById('pwdNotice').style.display = 'inline';
-            document.getElementById('admModal').style.display = 'flex';
+            openGovModal('admin', 'add');
         }
 
         function openAddStaffModal() {
-            document.getElementById('sfAction').value = 'add_staff';
-            document.getElementById('sfModalTitle').textContent = 'เพิ่มเจ้าหน้าที่ (Staff)';
-            document.getElementById('sfForm').reset();
-            document.getElementById('sfPassword').required = true;
-            document.getElementById('sfModal').style.display = 'flex';
+            openGovModal('staff', 'add');
+        }
+
+        function openEditAdminModal(adm) {
+            openGovModal('admin', 'edit', adm);
         }
 
         function openEditStaffModal(st) {
-            document.getElementById('sfAction').value = 'edit_staff';
-            document.getElementById('sfModalTitle').textContent = 'แก้ไขข้อมูลเจ้าหน้าที่';
-            document.getElementById('sfId').value = st.id;
-            document.getElementById('sfFullName').value = st.full_name;
-            document.getElementById('sfUsername').value = st.username;
-            document.getElementById('sfRole').value = st.role;
-            document.getElementById('sfStatus').value = st.account_status;
-            document.getElementById('sfAccessEc').checked = parseInt(st.access_ecampaign) === 1;
-            document.getElementById('sfEcRole').value = st.ecampaign_role;
-            document.getElementById('sfPassword').value = '';
-            document.getElementById('sfPassword').required = false;
-            document.getElementById('sfModal').style.display = 'flex';
+            openGovModal('staff', 'edit', st);
+        }
+
+        /**
+         * Unified Governance Modal Handler
+         */
+        function openGovModal(type, mode, data = null) {
+            const m = document.getElementById('idGovModal');
+            const f = document.getElementById('idGovForm');
+            const title = document.getElementById('govModalTitle');
+            const icon = document.getElementById('govModalIcon');
+            
+            f.reset();
+            document.getElementById('govJustification').value = '';
+            document.getElementById('govTargetType').value = type;
+            document.getElementById('govTargetId').value = data ? data.id : '';
+            document.getElementById('govAction').value = (mode === 'add' ? 'add_identity_gov' : 'save_identity_gov');
+            
+            // Set visuals based on type
+            if (type === 'admin') {
+                title.textContent = (mode === 'add' ? 'เพิ่ม System Admin' : 'จัดการสิทธิ์ System Admin');
+                icon.style.background = '#f5f3ff';
+                icon.style.color = '#7c3aed';
+                icon.innerHTML = '<i class="fa-solid fa-crown"></i>';
+                document.getElementById('govAdminOnlyCard').style.display = 'block';
+                document.getElementById('govEbCard').style.opacity = '0.5'; // Adms might not need borrow roles
+                document.getElementById('govEcCard').style.opacity = '1';
+            } else {
+                title.textContent = (mode === 'add' ? 'เพิ่ม Staff Record' : 'จัดการสิทธิ์ Staff & Roles');
+                icon.style.background = '#eff6ff';
+                icon.style.color = '#2563eb';
+                icon.innerHTML = '<i class="fa-solid fa-id-card-clip"></i>';
+                document.getElementById('govAdminOnlyCard').style.display = 'none';
+                document.getElementById('govEbCard').style.opacity = '1';
+                document.getElementById('govEcCard').style.opacity = '1';
+            }
+
+            // Fill data if editing
+            if (data) {
+                document.getElementById('govFullName').value = data.full_name || '';
+                document.getElementById('govUsername').value = data.username || '';
+                document.getElementById('govEmail').value = data.email || '';
+                document.getElementById('govStatus').value = data.account_status || data.status || 'active';
+                
+                    if (type === 'admin') {
+                        document.getElementById('govAdminRole').value = data.role || 'admin';
+                    } else {
+                        document.getElementById('govEbAccess').checked = (data.access_eborrow === undefined) ? true : (parseInt(data.access_eborrow) === 1);
+                        document.getElementById('govEbRole').value = data.role || 'employee';
+                        document.getElementById('govEcAccess').checked = parseInt(data.access_ecampaign) === 1;
+                        document.getElementById('govEcRole').value = data.ecampaign_role || 'editor';
+                        
+                        document.getElementById('govInsAccess').checked = parseInt(data.access_insurance) === 1;
+                        document.getElementById('govLogsAccess').checked = parseInt(data.access_system_logs) === 1;
+                        document.getElementById('govSettAccess').checked = parseInt(data.access_site_settings) === 1;
+                    }
+                } else {
+                    // Reset Extension Checkboxes for new records
+                    document.getElementById('govInsAccess').checked = false;
+                    document.getElementById('govLogsAccess').checked = false;
+                    document.getElementById('govSettAccess').checked = false;
+                }
+            // Update UI States
+            syncGovUI('govEbAccess', 'govEbRole', 'govEbCard');
+            syncGovUI('govEcAccess', 'govEcRole', 'govEcCard');
+
+            m.style.display = 'flex';
+        }
+
+        /**
+         * Toggle helper for the whole card
+         */
+        function toggleGovAccess(checkId, selectId, cardEl) {
+            const cb = document.getElementById(checkId);
+            cb.checked = !cb.checked;
+            syncGovUI(checkId, selectId, cardEl.id);
+        }
+
+        /**
+         * Visual Sync for Roles
+         */
+        function syncGovUI(checkId, selectId, cardId) {
+            const cb = document.getElementById(checkId);
+            const sel = document.getElementById(selectId);
+            const card = document.getElementById(cardId);
+            
+            if (cb.checked) {
+                sel.disabled = false;
+                sel.style.opacity = '1';
+                card.style.filter = 'none';
+                card.style.background = (cardId === 'govEcCard' ? '#f0f7ff' : '#fffaf5');
+            } else {
+                sel.disabled = true;
+                sel.style.opacity = '0.5';
+                card.style.filter = 'grayscale(0.6)';
+                card.style.background = '#f8fafc';
+            }
+        }
+
+
+        function confirmGovSubmit() {
+            const reason = document.getElementById('govJustification').value.trim();
+            if (!reason) {
+                Swal.fire({
+                    title: 'ระบุเหตุผล',
+                    text: 'กรุณากรอกเหตุผลความจำเป็นในการปรับสิทธิ์ก่อนบันทึกครับ (ISO 27001 Requirement)',
+                    icon: 'warning',
+                    confirmButtonColor: '#ef4444'
+                });
+                return;
+            }
+
+            Swal.fire({
+                title: 'ยืนยันการบันทึกสิทธิ์?',
+                text: "การเปลี่ยนแปลงสิทธิ์จะถูกบันทึกเข้าสู่ Audit Log พร้อมเหตุผลที่คุณระบุ และจะมีผลต่อการเข้าถึงระบบทันที",
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonColor: '#2563eb',
+                cancelButtonColor: '#94a3b8',
+                confirmButtonText: 'ใช่, ยืนยันการบันทึก',
+                cancelButtonText: 'ยกเลิก',
+                reverseButtons: true
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    Swal.fire({
+                        title: 'กำลังบันทึกข้อมูล...',
+                        text: 'กรุณารอสักครู่ ระบบกำลังดำเนินการปรับปรุงสิทธิ์และบันทึก Audit Log',
+                        allowOutsideClick: false,
+                        didOpen: () => {
+                            Swal.showLoading();
+                        }
+                    });
+                    document.getElementById('idGovForm').submit();
+                }
+            });
         }
 
         function idOpenEdit(u) {
@@ -2186,53 +2913,151 @@ try {
             }).join('');
             document.getElementById('idViewModal').style.display = 'flex';
         }
-        /* ── Identity pagination ── */
+        /* ── Identity & Governance AJAX Pagination ── */
         (function () {
-            var allRows = [];
-            var filtered = [];
             var currentPage = 1;
             var pageSize = 25;
+            var searchQuery = '';
+            var isInitialLoad = true;
 
-            function init() {
-                var tableBody = document.getElementById('idUserTbody');
-                if (!tableBody) return;
-                allRows = Array.from(tableBody.querySelectorAll('.id-user-row'));
-                filtered = allRows.slice();
-                render();
+            function loadUsers() {
+                var tbody = document.getElementById('idUserTbody');
+                if (!tbody) return;
+
+                // Show loading state
+                tbody.style.opacity = '0.5';
+                
+                var url = 'ajax_identity_users.php?page=' + currentPage + '&pageSize=' + pageSize + '&search=' + encodeURIComponent(searchQuery);
+
+                fetch(url)
+                    .then(res => res.json())
+                    .then(res => {
+                        tbody.style.opacity = '1';
+                        if (res.status === 'success') {
+                            renderRows(res.data);
+                            renderPagination(res.pagination);
+                        } else {
+                            tbody.innerHTML = '<tr><td colspan="4" style="padding:40px;text-align:center;color:#ef4444">เกิดข้อผิดพลาด: ' + res.message + '</td></tr>';
+                        }
+                    })
+                    .catch(err => {
+                        tbody.style.opacity = '1';
+                        tbody.innerHTML = '<tr><td colspan="4" style="padding:40px;text-align:center;color:#ef4444">ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้</td></tr>';
+                    });
             }
 
-            function render() {
-                var total = filtered.length;
-                var totalPages = Math.max(1, Math.ceil(total / pageSize));
-                if (currentPage > totalPages) currentPage = totalPages;
-                var start = (currentPage - 1) * pageSize;
-                var end = start + pageSize;
+            function renderRows(users) {
+                var tbody = document.getElementById('idUserTbody');
+                if (!tbody) return;
 
-                allRows.forEach(function (r) { r.style.display = 'none'; });
-                filtered.slice(start, end).forEach(function (r) { r.style.display = ''; });
+                if (users.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="4" style="padding:60px;text-align:center;color:#94a3b8"><i class="fa-solid fa-ghost text-3xl mb-3 block"></i>ไม่พบข้อมูลผู้ใช้งาน</td></tr>';
+                    return;
+                }
 
-                var from = total === 0 ? 0 : start + 1;
-                var to = Math.min(end, total);
+                var statusMap = { student: 'นักศึกษา', staff: 'บุคลากร', other: 'บุคคลทั่วไป' };
+                
+                var html = users.map(function(u) {
+                    var statusTH = statusMap[u.status] || u.status_other || 'ไม่ระบุ';
+                    var initial = (u.full_name || '?').charAt(0);
+                    var dateObj = new Date(u.created_at.replace(' ', 'T'));
+                    var dateStr = dateObj.toLocaleDateString('th-TH', { day: '2-digit', month: 'short', year: 'numeric' });
+                    var timeStr = dateObj.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+
+                    return `
+                        <tr style="border-bottom:1px solid #f1f5f9" class="id-user-row animate-fade-in">
+                            <td style="padding:14px 20px">
+                                <div style="display:flex;align-items:center;gap:12px">
+                                    <div style="width:38px;height:38px;border-radius:11px;background:#f1f5f9;color:#64748b;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;flex-shrink:0">
+                                        ${initial}
+                                    </div>
+                                    <div>
+                                        <div style="font-weight:750;color:#0f172a">${u.full_name}</div>
+                                        <div style="font-size:10px;color:#94a3b8;font-weight:700;margin-top:2px">
+                                            #${u.student_personnel_id || '—'} · ${statusTH}
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td style="padding:14px 20px">
+                                <div style="font-size:12px;color:#374151;font-weight:600">${u.phone_number || '—'}</div>
+                                <div style="font-size:11px;color:#94a3b8;margin-top:2px">${u.email || '—'}</div>
+                            </td>
+                            <td style="padding:14px 20px">
+                                <div style="font-size:12px;font-weight:700;color:#374151">${dateStr}</div>
+                                <div style="font-size:10px;color:#94a3b8;margin-top:1px">${timeStr}</div>
+                            </td>
+                            <td style="padding:14px 20px;text-align:right">
+                                <div style="display:flex;gap:6px;justify-content:flex-end">
+                                    <button onclick='idOpenView(${JSON.stringify(u).replace(/'/g, "&apos;")})'
+                                        style="width:32px;height:32px;border-radius:8px;border:1px solid #e2e8f0;background:#fff;color:#64748b;cursor:pointer;transition:all .15s"
+                                        title="ดูข้อมูล">
+                                        <i class="fa-solid fa-eye" style="font-size:11px"></i>
+                                    </button>
+                                    <button onclick='idOpenEdit(${JSON.stringify(u).replace(/'/g, "&apos;")})'
+                                        style="width:32px;height:32px;border-radius:8px;border:1px solid #e2e8f0;background:#fff;color:#64748b;cursor:pointer;transition:all .15s"
+                                        title="แก้ไข">
+                                        <i class="fa-solid fa-pen" style="font-size:11px"></i>
+                                    </button>
+                                    <a href="../admin/user_history.php?id=${u.id}"
+                                        style="width:32px;height:32px;border-radius:8px;border:1px solid #e2e8f0;background:#fff;color:#64748b;display:flex;align-items:center;justify-content:center;text-decoration:none;transition:all .15s"
+                                        onmouseover="this.style.background='#fffbeb';this.style.color='#d97706'"
+                                        onmouseout="this.style.background='#fff';this.style.color='#64748b'"
+                                        title="ประวัติการใช้งาน">
+                                        <i class="fa-solid fa-clock-rotate-left" style="font-size:11px"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>`;
+                }).join('');
+                tbody.innerHTML = html;
+            }
+
+            function renderPagination(p) {
                 var info = document.getElementById('id-page-info');
-                if (info) info.textContent = total === 0 ? 'ไม่พบรายการ' : from + '–' + to + ' จาก ' + total.toLocaleString();
+                if (info) {
+                    var from = p.total === 0 ? 0 : (p.page - 1) * p.pageSize + 1;
+                    var to = Math.min(p.page * p.pageSize, p.total);
+                    info.textContent = p.total === 0 ? 'ไม่พบรายการ' : from + '–' + to + ' จาก ' + p.total.toLocaleString();
+                }
 
                 var prev = document.getElementById('id-page-prev');
                 var next = document.getElementById('id-page-next');
-                if (prev) { prev.disabled = currentPage <= 1; prev.style.opacity = currentPage <= 1 ? '.35' : '1'; }
-                if (next) { next.disabled = currentPage >= totalPages; next.style.opacity = currentPage >= totalPages ? '.35' : '1'; }
+                if (prev) {
+                    prev.disabled = p.page <= 1;
+                    prev.style.opacity = p.page <= 1 ? '.35' : '1';
+                }
+                if (next) {
+                    next.disabled = p.page >= p.totalPages;
+                    next.style.opacity = p.page >= p.totalPages ? '.35' : '1';
+                }
             }
 
-            window.idFilterUsers = function (val) {
-                val = val.toLowerCase().trim();
-                filtered = val ? allRows.filter(function (r) { return r.innerText.toLowerCase().includes(val); }) : allRows.slice();
-                currentPage = 1;
-                render();
+            window.idUniversalFilter = function (val) {
+                // If on users tab, use AJAX. Otherwise use client-side filter
+                const activeTab = document.querySelector('.id-tab.active');
+                if (activeTab && activeTab.dataset.tab === 'users') {
+                    searchQuery = val;
+                    currentPage = 1;
+                    clearTimeout(window._idSearchTimer);
+                    window._idSearchTimer = setTimeout(loadUsers, 400);
+                } else {
+                    // Original client-side filter for admins/staff
+                    val = val.toLowerCase().trim();
+                    const activePanel = document.querySelector('.id-panel.active');
+                    if (!activePanel) return;
+                    const rows = activePanel.querySelectorAll('tbody tr');
+                    rows.forEach(row => {
+                        if (row.cells.length < 2) return;
+                        row.style.display = row.innerText.toLowerCase().includes(val) ? '' : 'none';
+                    });
+                }
             };
 
             window.idSetPageSize = function (size) {
                 pageSize = size;
                 currentPage = 1;
-                render();
+                loadUsers();
                 document.querySelectorAll('.id-ps-btn').forEach(function (b) {
                     var active = parseInt(b.dataset.size) === size;
                     b.style.background = active ? '#2e9e63' : '#f8fafc';
@@ -2241,20 +3066,37 @@ try {
                 });
             };
 
-            window.idPrevPage = function () { if (currentPage > 1) { currentPage--; render(); } };
-            window.idNextPage = function () {
-                if (currentPage < Math.ceil(filtered.length / pageSize)) { currentPage++; render(); }
-            };
+            window.idPrevPage = function () { if (currentPage > 1) { currentPage--; loadUsers(); } };
+            window.idNextPage = function () { currentPage++; loadUsers(); };
 
-            // run after DOM is ready
-            if (document.readyState === 'loading') {
-                document.addEventListener('DOMContentLoaded', init);
-            } else {
-                init();
+            if (isInitialLoad) {
+                isInitialLoad = false;
+                loadUsers();
             }
         })();
+
+        /**
+         * switchIdTab - Handles switching between Identity sub-panels
+         */
+        function switchIdTab(tabName, btn) {
+            // Update tabs
+            document.querySelectorAll('.id-tab').forEach(b => b.classList.remove('active'));
+            if (btn) btn.classList.add('active');
+
+            // Update panels
+            document.querySelectorAll('.id-panel').forEach(p => p.classList.remove('active'));
+            const targetPanel = document.getElementById('id-panel-' + tabName);
+            if (targetPanel) targetPanel.classList.add('active');
+
+            // Show/Hide relevant Add buttons (Superadmin only)
+            const addAdmin = document.getElementById('id-btn-add-admin');
+            const addStaff = document.getElementById('id-btn-add-staff');
+            if (addAdmin) addAdmin.style.display = (tabName === 'admins') ? 'block' : 'none';
+            if (addStaff) addStaff.style.display = (tabName === 'staff') ? 'block' : 'none';
+        }
+
         // Close modals on backdrop click
-        ['idEditModal', 'idViewModal', 'admModal', 'sfModal'].forEach(function (id) {
+        ['idEditModal', 'idViewModal', 'idGovModal', 'privModal'].forEach(function (id) {
             const el = document.getElementById(id);
             if (el) {
                 el.addEventListener('click', function (e) {
@@ -2350,40 +3192,105 @@ try {
         function toggleMaintenance(input) {
             const project = input.dataset.project;
             const active = input.checked;
+            const actionText = active ? 'เปิดใช้งาน' : 'ปิดปรับปรุง';
+            const confirmText = active ? 'ใช่, เปิดระบบ' : 'ใช่, ปิดปรับปรุงระบบ';
+            const confirmColor = active ? '#10b981' : '#f43f5e';
 
-            // Optimistic UI update
-            updateMaintenanceUI(project, active);
+            // Reset input state immediately (we will set it after confirmation)
+            input.checked = !active;
 
-            const fd = new FormData();
-            fd.append('action', 'set');
-            fd.append('project', project);
-            fd.append('active', active ? '1' : '0');
-            fd.append('csrf_token', portal_CSRF);
+            Swal.fire({
+                title: `ยืนยันการ${actionText}ระบบ?`,
+                text: `คุณกำลังจะทำการ${actionText}โปรเจกต์ ${project} ยืนยันการดำเนินการหรือไม่?`,
+                icon: active ? 'info' : 'warning',
+                showCancelButton: true,
+                confirmButtonColor: confirmColor,
+                cancelButtonColor: '#94a3b8',
+                confirmButtonText: confirmText,
+                cancelButtonText: 'ยกเลิก',
+                reverseButtons: true
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    // Proceed with update
+                    input.checked = active;
+                    updateMaintenanceUI(project, active);
 
-            fetch('ajax_maintenance.php', { method: 'POST', body: fd })
-                .then(r => r.json())
-                .then(d => {
-                    if (d.ok) {
-                        showPortalToast(active ? `${project} เปิดใช้งานแล้ว` : `${project} ปิดปรับปรุงแล้ว`, active ? 'success' : 'error');
-                    } else {
-                        input.checked = !active;
-                        updateMaintenanceUI(project, !active);
-                        showPortalToast('ผิดพลาด: ' + (d.message || 'Unknown error'), 'error');
-                    }
-                })
-                .catch(() => {
-                    input.checked = !active;
-                    updateMaintenanceUI(project, !active);
-                    showPortalToast('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้', 'error');
-                });
+                    const fd = new FormData();
+                    fd.append('action', 'set');
+                    fd.append('project', project);
+                    fd.append('active', active ? '1' : '0');
+                    fd.append('csrf_token', portal_CSRF);
+
+                    fetch('ajax_maintenance.php', { method: 'POST', body: fd })
+                        .then(r => r.json())
+                        .then(d => {
+                            if (d.ok) {
+                                showPortalToast(active ? `${project} เปิดใช้งานแล้ว` : `${project} ปิดปรับปรุงแล้ว`, active ? 'success' : 'error');
+                            } else {
+                                input.checked = !active;
+                                updateMaintenanceUI(project, !active);
+                                Swal.fire('ผิดพลาด', d.message || 'Unknown error', 'error');
+                            }
+                        })
+                        .catch(() => {
+                            input.checked = !active;
+                            updateMaintenanceUI(project, !active);
+                            showPortalToast('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้', 'error');
+                        });
+                }
+            });
         }
 
-        // Start polling after page is fully loaded
-        window.addEventListener('load', () => {
-            setBadge('live'); // optimistic: page data is fresh on load
-            pollTimer = setInterval(poll, POLL_INTERVAL);
+        // ── ฟังก์ชัน Announcement Form ─────────────────────────────────────────
+        window.annOpenForm = function(mode, data) {
+            const modal = document.getElementById('ann-form-modal');
+            document.getElementById('ann-form-title').textContent = mode === 'create' ? 'สร้างประกาศใหม่' : 'แก้ไขประกาศ';
+            document.getElementById('ann-form-action').value      = mode;
+            document.getElementById('ann-form-id').value          = data ? data.id : 0;
+            document.getElementById('ann-f-title').value          = data ? (data.title    || '') : '';
+            document.getElementById('ann-f-content').value        = data ? (data.content  || '') : '';
+            document.getElementById('ann-f-image').value          = data ? (data.image_url|| '') : '';
+            document.getElementById('ann-f-type').value           = data ? (data.type || 'info') : 'info';
+            document.getElementById('ann-f-audience').value       = data ? (data.target_audience || 'all') : 'all';
+            document.getElementById('ann-f-start').value          = data ? (data.start_date || '') : '';
+            document.getElementById('ann-f-end').value            = data ? (data.end_date   || '') : '';
+            document.getElementById('ann-f-priority').value       = data ? (data.priority || 0) : 0;
+            document.getElementById('ann-f-active').checked       = data ? (parseInt(data.is_active) === 1) : true;
+            document.getElementById('ann-f-show-once').checked    = data ? (parseInt(data.show_once) === 1) : true;
+            modal.style.display = 'flex';
+        };
+
+        window.annCloseForm = function() {
+            document.getElementById('ann-form-modal').style.display = 'none';
+        };
+
+        window.annConfirmDelete = function(id, title) {
+            Swal.fire({
+                title: 'ลบประกาศ?',
+                html: `ต้องการลบประกาศ <b>"${title}"</b> ออกจากระบบ?<br><small style="color:#94a3b8">การลบจะไม่สามารถกู้คืนได้</small>`,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#ef4444',
+                cancelButtonColor: '#94a3b8',
+                confirmButtonText: 'ลบเลย',
+                cancelButtonText: 'ยกเลิก',
+            }).then(result => {
+                if (result.isConfirmed) {
+                    document.getElementById('ann-delete-id').value = id;
+                    document.getElementById('ann-delete-form').submit();
+                }
+            });
+        };
+
+        document.getElementById('ann-form-modal')?.addEventListener('click', function(e) {
+            if (e.target === this) window.annCloseForm();
         });
+
+        <?php if ($ann_saved): ?>
+        switchSection('announcements', document.querySelector('[data-section="announcements"]'));
+        <?php endif; ?>
+
     </script>
 </body>
 
-</html>
+</html>
