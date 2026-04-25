@@ -144,7 +144,7 @@ $isActive = in_array($campaign['status'], ['active', 'private']);
                 ขออภัย จำนวนที่นั่งเต็มแล้ว
             </div>
         <?php else: ?>
-            <a href="booking.php?campaign_id=<?= $campaign['id'] ?>" 
+            <a href="booking_date.php?campaign_id=<?= $campaign['id'] ?>" 
                class="block w-full rsu-bg-blue hover:bg-blue-700 text-white font-bold py-6 rounded-3xl shadow-xl shadow-blue-100 transition-all active:scale-95 text-lg">
                 <i class="fa-solid fa-calendar-check mr-2"></i>
                 จองคิวทันที
