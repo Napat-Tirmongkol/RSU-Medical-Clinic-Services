@@ -1,7 +1,6 @@
 <?php
 // admin/ajax/ajax_upload_error_logs.php — Manual error log upload
 declare(strict_types=1);
-session_start();
 require_once __DIR__ . '/../../config.php';
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/error_log_helper.php';

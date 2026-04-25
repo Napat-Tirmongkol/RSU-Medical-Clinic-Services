@@ -1,6 +1,5 @@
 <?php
 // admin/activity_logs.php (V2 Portal - System Activity Log)
-session_start();
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/includes/auth.php';
 

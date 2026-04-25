@@ -4,7 +4,6 @@
  * Central Hub Dashboard สำหรับการจัดการระบบที่รองรับการขยายโปรเจกต์ในอนาคต
  */
 declare(strict_types=1);
-session_start();
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/includes/auth.php'; // ตรวจสอบความปลอดภัย
 
