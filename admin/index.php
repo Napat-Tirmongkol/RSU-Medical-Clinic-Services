@@ -47,13 +47,13 @@ foreach ($heatmap_rows as $r) {
 }
 
 function hmapColor(int $cnt, int $max): string {
-    if ($cnt === 0) return '#ede3df';
+    if ($cnt === 0) return '#f8fafc'; // Empty (Slate 50)
     $ratio = $cnt / $max;
-    if ($ratio < 0.15) return '#f5cec4';
-    if ($ratio < 0.35) return '#e9977f';
-    if ($ratio < 0.60) return '#d9664e';
-    if ($ratio < 0.80) return '#c04030';
-    return '#8c2416';
+    if ($ratio < 0.15) return '#dcfce7'; // Green 100
+    if ($ratio < 0.35) return '#86efac'; // Green 300
+    if ($ratio < 0.60) return '#4ade80'; // Green 400
+    if ($ratio < 0.80) return '#22c55e'; // Green 500
+    return '#16a34a'; // Green 600
 }
 
 require_once __DIR__ . '/includes/header.php';
@@ -108,35 +108,35 @@ renderPageHeader($header_title, "สถิติการลงทะเบี�
     </div>
 
     <!-- STAT CARD 2: Bookings Today -->
-    <div class="group bg-white p-3 sm:p-5 rounded-[18px] sm:rounded-[22px] shadow-sm border border-gray-100 relative overflow-hidden transition-all duration-300 hover:shadow-xl hover:shadow-blue-500/10 hover:-translate-y-1 animate-slide-up delay-100">
-        <div class="absolute right-0 top-0 w-1.5 h-full bg-gradient-to-b from-blue-400 to-blue-600"></div>
+    <div class="group bg-white p-3 sm:p-5 rounded-[18px] sm:rounded-[22px] shadow-sm border border-gray-100 relative overflow-hidden transition-all duration-300 hover:shadow-emerald-500/10 hover:-translate-y-1 animate-slide-up delay-100">
+        <div class="absolute right-0 top-0 w-1.5 h-full bg-gradient-to-b from-emerald-400 to-[#2e9e63]"></div>
         <div class="flex justify-between items-start">
             <div class="min-w-0">
                 <p class="text-gray-500 text-[10px] sm:text-xs font-semibold mb-1 uppercase tracking-wide leading-tight">จองวันนี้</p>
                 <h3 id="stat-bookings-today" class="text-2xl sm:text-3xl lg:text-4xl font-black text-gray-800 transition-all duration-300"><?= number_format((float)$stats['bookings_today']) ?></h3>
             </div>
-            <div class="w-9 h-9 sm:w-12 sm:h-12 bg-blue-50 text-blue-500 rounded-xl sm:rounded-2xl flex items-center justify-center shadow-inner flex-shrink-0">
+            <div class="w-9 h-9 sm:w-12 sm:h-12 bg-emerald-50 text-emerald-600 rounded-xl sm:rounded-2xl flex items-center justify-center shadow-inner flex-shrink-0">
                 <i class="fa-solid fa-calendar-day text-base sm:text-xl"></i>
             </div>
         </div>
-        <div class="mt-2 sm:mt-3 flex items-center gap-1.5 text-[10px] sm:text-xs text-blue-600 font-semibold bg-blue-50 w-max px-2.5 py-1 rounded-full">
+        <div class="mt-2 sm:mt-3 flex items-center gap-1.5 text-[10px] sm:text-xs text-emerald-600 font-semibold bg-emerald-50 w-max px-2.5 py-1 rounded-full">
             <i class="fa-solid fa-clock"></i> วันนี้
         </div>
     </div>
 
     <!-- STAT CARD 3: New Users (7d) -->
-    <div class="group bg-white p-3 sm:p-5 rounded-[18px] sm:rounded-[22px] shadow-sm border border-gray-100 relative overflow-hidden transition-all duration-300 hover:shadow-xl hover:shadow-purple-500/10 hover:-translate-y-1 animate-slide-up delay-200">
-        <div class="absolute right-0 top-0 w-1.5 h-full bg-gradient-to-b from-purple-400 to-violet-600"></div>
+    <div class="group bg-white p-3 sm:p-5 rounded-[18px] sm:rounded-[22px] shadow-sm border border-gray-100 relative overflow-hidden transition-all duration-300 hover:shadow-teal-500/10 hover:-translate-y-1 animate-slide-up delay-200">
+        <div class="absolute right-0 top-0 w-1.5 h-full bg-gradient-to-b from-teal-400 to-teal-600"></div>
         <div class="flex justify-between items-start">
             <div class="min-w-0">
                 <p class="text-gray-500 text-[10px] sm:text-xs font-semibold mb-1 uppercase tracking-wide leading-tight">User ใหม่ 7 วัน</p>
                 <h3 id="stat-new-users" class="text-2xl sm:text-3xl lg:text-4xl font-black text-gray-800 transition-all duration-300"><?= number_format((float)$stats['new_users_7d']) ?></h3>
             </div>
-            <div class="w-9 h-9 sm:w-12 sm:h-12 bg-purple-50 text-purple-500 rounded-xl sm:rounded-2xl flex items-center justify-center shadow-inner flex-shrink-0">
+            <div class="w-9 h-9 sm:w-12 sm:h-12 bg-teal-50 text-teal-600 rounded-xl sm:rounded-2xl flex items-center justify-center shadow-inner flex-shrink-0">
                 <i class="fa-solid fa-user-plus text-base sm:text-xl"></i>
             </div>
         </div>
-        <div class="mt-2 sm:mt-3 flex items-center gap-1.5 text-[10px] sm:text-xs text-purple-600 font-semibold bg-purple-50 w-max px-2.5 py-1 rounded-full">
+        <div class="mt-2 sm:mt-3 flex items-center gap-1.5 text-[10px] sm:text-xs text-teal-600 font-semibold bg-teal-50 w-max px-2.5 py-1 rounded-full">
             <i class="fa-solid fa-arrow-trend-up"></i> 7 วันล่าสุด
         </div>
     </div>
@@ -314,7 +314,7 @@ renderPageHeader($header_title, "สถิติการลงทะเบี�
                 <div class="flex items-center gap-1.5 mt-4">
                     <div style="width:38px; flex-shrink:0;"></div>
                     <span class="text-[10px] text-gray-400 font-medium mr-0.5">Less</span>
-                    <?php foreach (['#ede3df','#f5cec4','#e9977f','#d9664e','#c04030','#8c2416'] as $lc): ?>
+                    <?php foreach (['#f8fafc','#dcfce7','#86efac','#4ade80','#22c55e','#16a34a'] as $lc): ?>
                     <div style="width:13px; height:13px; background:<?= $lc ?>; border-radius:3px; flex-shrink:0;"></div>
                     <?php endforeach; ?>
                     <span class="text-[10px] text-gray-400 font-medium ml-0.5">More</span>
