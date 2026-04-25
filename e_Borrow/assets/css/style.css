@@ -270,8 +270,10 @@ body.dark-mode .theme-toggle-btn {
 
 /* Modern Sticky Header */
 .header {
-    position: sticky;
+    position: fixed;
     top: 0;
+    left: 0;
+    width: 100%;
     z-index: 1000;
     display: flex;
     justify-content: space-between;

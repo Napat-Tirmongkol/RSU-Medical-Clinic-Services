@@ -55,8 +55,13 @@ $current_page = "return";
 // 5. เรียกใช้ Header
 include('../includes/header.php'); 
 ?>
+<style>
+    /* Ensure Prompt/Tailwind harmony */
+    * { font-family: 'Prompt', sans-serif; }
+    .font-black { font-weight: 900; }
+</style>
 
-<div class="p-4 sm:p-8 max-w-7xl mx-auto">
+<div class="p-4 sm:p-8 max-w-7xl mx-auto min-h-screen">
     <!-- Header Section -->
     <div class="mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 animate-slide-up">
         <div>
