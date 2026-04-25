@@ -84,6 +84,18 @@ require_once __DIR__ . '/../config.php';
             <p id="scan-status" class="text-sm font-bold text-[#0052CC] animate-pulse">กำลังรอกล้อง...</p>
         </div>
     </div>
+
+    <!-- ส่วนอัปโหลดรูปภาพ (Fallback) -->
+    <div class="mt-4 bg-white p-6 rounded-3xl shadow-lg border border-gray-100 text-center">
+        <p class="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-3">หรืออัปโหลดรูปภาพ QR Code</p>
+        <label for="qr-input-file" class="flex flex-col items-center justify-center border-2 border-dashed border-blue-50 rounded-2xl p-6 cursor-pointer hover:bg-blue-50 hover:border-blue-200 transition-all group">
+            <div class="w-12 h-12 bg-blue-50 rounded-full flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                <i class="fa-solid fa-image text-[#0052CC] text-xl"></i>
+            </div>
+            <span class="text-sm font-semibold text-gray-600">เลือกรูปภาพเพื่อสแกน</span>
+            <input type="file" id="qr-input-file" accept="image/*" class="hidden">
+        </label>
+    </div>
 </div>
 
 <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
@@ -150,6 +162,36 @@ document.addEventListener('DOMContentLoaded', function() {
         console.error("Camera error", err);
         document.getElementById('scan-status').innerText = 'ไม่สามารถเปิดกล้องได้';
         document.getElementById('scan-status').className = 'text-sm font-bold text-red-500';
+    });
+
+    // เพิ่มตัวดักจับการอัปโหลดไฟล์
+    const fileInput = document.getElementById('qr-input-file');
+    fileInput.addEventListener('change', e => {
+        if (e.target.files.length === 0) return;
+        const imageFile = e.target.files[0];
+        
+        document.getElementById('scan-status').innerText = 'กำลังประมวลผลรูปภาพ...';
+        document.getElementById('scan-status').className = 'text-sm font-bold text-orange-500 animate-pulse';
+
+        // ใช้ html5QrCode สแกนจากไฟล์
+        html5QrCode.scanFile(imageFile, true)
+            .then(decodedText => {
+                processQRCode(decodedText);
+                fileInput.value = ''; // clear input
+            })
+            .catch(err => {
+                console.error(err);
+                Swal.fire({
+                    title: 'ไม่พบ QR Code',
+                    text: 'ไม่สามารถอ่าน QR Code จากรูปภาพนี้ได้ กรุณาลองด้วยรูปภาพอื่น',
+                    icon: 'error',
+                    confirmButtonColor: '#0052CC',
+                    customClass: { title: 'font-prompt', popup: 'font-prompt rounded-3xl' }
+                });
+                document.getElementById('scan-status').innerText = 'พร้อมสแกน...';
+                document.getElementById('scan-status').className = 'text-sm font-bold text-green-500 animate-pulse';
+                fileInput.value = ''; // clear input
+            });
     });
 });
 </script>

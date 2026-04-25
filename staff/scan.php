@@ -259,6 +259,16 @@ $typeColor = ['vaccine' => '#0052CC', 'training' => '#6366f1', 'health_check' =>
                 </button>
             </div>
         </div>
+
+        <!-- QR Image Upload -->
+        <div class="border-t border-gray-100 px-4 py-3 bg-gray-50/50">
+            <p class="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-2">หรือสแกนจากรูปภาพ</p>
+            <label for="qr-file" class="flex items-center justify-center gap-2 bg-white border border-gray-200 rounded-xl px-4 py-2 text-sm font-bold text-gray-600 cursor-pointer hover:bg-blue-50 hover:border-blue-200 transition-all">
+                <i class="fa-solid fa-image text-[#0052CC]"></i>
+                <span>เลือกรูปภาพ QR</span>
+                <input type="file" id="qr-file" accept="image/*" class="hidden">
+            </label>
+        </div>
     </div>
 
     <!-- Recent Scans Log -->
@@ -510,6 +520,35 @@ function escHtml(s) {
 document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('manualId')?.addEventListener('keydown', e => {
         if (e.key === 'Enter') submitManual();
+    });
+
+    // QR File Upload handler
+    document.getElementById('qr-file')?.addEventListener('change', e => {
+        if (!activeCampaignId) {
+            showToast('warning', 'กรุณาเลือกแคมเปญก่อน');
+            e.target.value = '';
+            return;
+        }
+        if (e.target.files.length === 0) return;
+        const file = e.target.files[0];
+        
+        // Ensure html5QrCode is initialized
+        if (!html5QrCode) {
+            html5QrCode = new Html5Qrcode('qr-reader');
+        }
+        
+        setStatus('กำลังอ่านรูปภาพ...', 'orange');
+        html5QrCode.scanFile(file, true)
+            .then(decoded => {
+                processCheckin(decoded, false);
+                e.target.value = '';
+            })
+            .catch(err => {
+                console.error(err);
+                showToast('error', 'ไม่พบ QR Code ในรูปภาพนี้');
+                setStatus('พร้อมสแกน', 'green');
+                e.target.value = '';
+            });
     });
 });
 </script>
