@@ -505,14 +505,14 @@ include('../includes/header.php');
 
                                     <!-- CTA Actions -->
                                     <div
-                                        class="flex flex-row sm:flex-col items-stretch gap-2 flex-shrink-0 w-full sm:w-[130px] border-t sm:border-t-0 sm:border-l border-gray-100 pt-3 sm:pt-0 sm:pl-4">
+                                        class="flex flex-row sm:flex-col items-stretch gap-2 flex-shrink-0 w-full sm:w-[150px] border-t sm:border-t-0 sm:border-l border-gray-100 pt-3 sm:pt-0 sm:pl-4">
                                         <button
-                                            class="flex-1 bg-emerald-50 text-emerald-600 hover:bg-emerald-500 hover:text-white border border-emerald-100 hover:border-emerald-500 rounded-xl px-4 py-2 text-[13px] font-bold transition-all flex items-center justify-center gap-1.5 group/btn"
+                                            class="flex-1 bg-emerald-50 text-emerald-600 hover:bg-emerald-500 hover:text-white border border-emerald-100 hover:border-emerald-500 rounded-xl px-3 py-2.5 text-[13px] font-bold transition-all flex items-center justify-center gap-1.5 group/btn"
                                             onclick="openApproveSelectionModal(<?php echo $req['transaction_id']; ?>, <?php echo $req['item_id'] ?? 0; ?>, '<?php echo htmlspecialchars($req['equipment_name'], ENT_QUOTES); ?>')">
                                             <i class="fas fa-check group-hover/btn:scale-125 transition-transform"></i> อนุมัติ
                                         </button>
                                         <button
-                                            class="flex-1 bg-white border border-red-200 text-red-500 hover:bg-red-50 hover:border-red-300 rounded-xl px-4 py-2 text-[13px] font-bold transition-all flex items-center justify-center gap-1.5"
+                                            class="flex-1 bg-white border border-red-200 text-red-500 hover:bg-red-50 hover:border-red-300 rounded-xl px-3 py-2.5 text-[13px] font-bold transition-all flex items-center justify-center gap-1.5"
                                             onclick="openRejectPopup(<?php echo $req['transaction_id']; ?>)">
                                             <i class="fas fa-times"></i> ปฏิเสธ
                                         </button>
