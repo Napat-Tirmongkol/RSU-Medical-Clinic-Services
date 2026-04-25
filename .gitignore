@@ -2,6 +2,7 @@
 secrets.php
 config/db_connect.php
 e_borrow.sql
+.env
 
 
 # ซ่อนทั้งโฟลเดอร์ (ใส่เครื่องหมาย / ต่อท้าย)

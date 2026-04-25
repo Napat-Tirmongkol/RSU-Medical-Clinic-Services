@@ -120,23 +120,6 @@ try {
  */
 $projects = [
     [
-        'id' => 'identity_governance',
-        'title' => 'Identity & Governance',
-        'description' => 'ศูนย์กลางจัดการข้อมูลผู้ใช้งานและควบคุมสิทธิ์การเข้าถึงระบบสำหรับเจ้าหน้าที่และแอดมินระดับสูง',
-        'icon' => 'fa-id-card-clip',
-        'bg_color' => 'bg-amber-50',
-        'icon_color' => 'text-amber-500',
-        'border_color' => 'border-amber-100',
-        'allowed_roles' => ['admin', 'superadmin'],
-        'badges' => ['Central DB', 'Security Hub'],
-        'actions' => array_filter([
-            ['label' => 'Search Users', 'url' => 'users.php?layout=none', 'primary' => false],
-            $adminRole === 'superadmin'
-            ? ['label' => 'Manage Admins', 'url' => 'manage_admins.php?layout=none', 'primary' => true]
-            : null,
-        ])
-    ],
-    [
         'id' => 'e_campaign',
         'title' => 'e-Campaign',
         'description' => 'ระบบจัดการแคมเปญ งานอบรม งานสแกนและการลงทะเบียนเข้าร่วมกิจกรรมแบบ Real-time',
