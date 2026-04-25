@@ -87,11 +87,14 @@ try {
     $kpis['camps'] = (int) $pdo->query("SELECT COUNT(*) FROM camp_list WHERE status = 'active'")->fetchColumn();
 
     // Quota & booking rate (e-Campaign)
+    // ปรับปรุงใหม่: ให้ดึงจากแคมเปญทั้งหมดเพื่อให้เห็นภาพรวมระบบ (หรือเฉพาะที่ยังไม่ลบ)
     $quotaRow = $pdo->query("
-        SELECT COALESCE(SUM(c.total_capacity), 0) AS total_quota,
-               (SELECT COUNT(*) FROM camp_bookings WHERE status IN ('booked','confirmed')) AS used_quota
-        FROM camp_list c WHERE c.status = 'active'
+        SELECT 
+            COALESCE(SUM(total_capacity), 0) AS total_quota,
+            (SELECT COUNT(*) FROM camp_bookings WHERE status IN ('booked','confirmed')) AS used_quota
+        FROM camp_list
     ")->fetch(PDO::FETCH_ASSOC);
+    
     $kpis['total_quota'] = (int) ($quotaRow['total_quota'] ?? 0);
     $kpis['used_quota'] = (int) ($quotaRow['used_quota'] ?? 0);
     $kpis['booking_rate'] = $kpis['total_quota'] > 0
