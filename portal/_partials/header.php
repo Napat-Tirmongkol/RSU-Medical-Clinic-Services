@@ -5,7 +5,7 @@
         <!-- Left/Center: Global Search -->
         <div style="flex: 1; display: flex; justify-content: flex-start;">
             <div class="relative group w-full max-w-[400px]">
-                <input type="text" placeholder="ค้นหาเมนู หรือแคมเปญ"
+                <input type="text" id="global-search" placeholder="ค้นหาเมนู หรือแคมเปญ"
                     class="w-full pl-5 pr-10 py-2 bg-slate-50 border border-slate-200 rounded-xl text-[13px] font-bold text-slate-800 outline-none focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all font-prompt">
                 <button
                     class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-emerald-600 transition-colors flex items-center justify-center">

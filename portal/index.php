@@ -2368,6 +2368,31 @@ try {
                 this.style.transition = 'transform .4s ease, box-shadow .25s, border-color .25s';
             });
         });
+
+        /* ── 4. Global Search Filtering ───────────────────────── */
+        const globalSearch = document.getElementById('global-search');
+        const projCards = document.querySelectorAll('.proj-card');
+        const projEmpty = document.getElementById('proj-empty');
+
+        if (globalSearch) {
+            globalSearch.addEventListener('input', function() {
+                const val = this.value.toLowerCase().trim();
+                let matchCount = 0;
+
+                projCards.forEach(card => {
+                    const name = card.dataset.name || '';
+                    const keywords = card.dataset.keywords || '';
+                    const isMatch = name.includes(val) || keywords.includes(val);
+                    
+                    card.style.display = isMatch ? '' : 'none';
+                    if (isMatch) matchCount++;
+                });
+
+                if (projEmpty) {
+                    projEmpty.style.display = (matchCount === 0 && val !== '') ? 'block' : 'none';
+                }
+            });
+        }
     </script>
 
     <?php if ($adminRole === 'superadmin'): ?>
