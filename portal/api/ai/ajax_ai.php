@@ -1,5 +1,5 @@
 <?php
-// portal/services/ai/ajax_ai.php
+// portal/api/ai/ajax_ai.php — AI Service Endpoint
 declare(strict_types=1);
 
 require_once __DIR__ . '/../../../config.php';
