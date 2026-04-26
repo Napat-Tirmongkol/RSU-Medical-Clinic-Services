@@ -2,6 +2,7 @@
 // config.php — จุดเข้าหลักข���งระบบทุกไฟล์ (canonical entry point)
 // โหลด: DB connection, CSRF, Error Logger และ helper functions
 require_once __DIR__ . '/config/db_connect.php';
+require_once __DIR__ . '/config/tenant.php';   // กำหนด CLINIC_ID constant
 require_once __DIR__ . '/includes/csrf.php';
 require_once __DIR__ . '/includes/error_logger.php';
 require_once __DIR__ . '/config/sentry.php'; // โหลดหลัง error_logger — Sentry wraps handler chain
@@ -23,34 +24,54 @@ defined('FINE_RATE_PER_DAY') || define('FINE_RATE_PER_DAY', 10); // ค่าป
 defined('APP_VERSION') || define('APP_VERSION', '2.2.0'); // เวอร์ชันหลัก
 defined('APP_BUILD')   || define('APP_BUILD',   '20260423.01'); // วันที่และลำดับการอัปเดต
 
-// ── Site Settings (Persistent Storage) ────────────────────────────────────────
+
+// ── Site Settings (Persistent Storage, per Clinic) ───────────────────────────
 $__siteSettingsFile = __DIR__ . '/config/site_settings.json';
 $__siteSettings = file_exists($__siteSettingsFile) ? json_decode(file_get_contents($__siteSettingsFile), true) : [];
 if (!is_array($__siteSettings)) $__siteSettings = [];
 
-// พยายามโหลดจาก Database เพื่อกันค่าหายเวลา Git Pull
+// โหลดจาก Database แบบ two-tier:
+//   1. global  (clinic_id = 0) → ค่า default ที่ใช้ถ้า clinic ไม่ได้ตั้งค่าเอง
+//   2. per-clinic (clinic_id = CLINIC_ID) → override global
+// DB ทับ JSON เพราะ DB คือค่าที่ user ตั้งจริงและไม่โดน Git pull ทับ
 try {
     $__pdo = db();
-    // สร้างตารางเก็บตั้งค่าหากยังไม่มี
+
+    // สร้างตารางหากยังไม่มี (รองรับทั้ง schema เดิมและใหม่)
     $__pdo->exec("CREATE TABLE IF NOT EXISTS sys_site_settings (
-        setting_key   VARCHAR(100) PRIMARY KEY,
+        setting_key   VARCHAR(100)  NOT NULL,
+        clinic_id     INT UNSIGNED  NOT NULL DEFAULT 0 COMMENT '0 = global default, >0 = per-clinic',
         setting_value TEXT,
-        updated_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        updated_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (setting_key, clinic_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
-    $__dbSettingsStmt = $__pdo->query("SELECT setting_key, setting_value FROM sys_site_settings");
-    $__dbSettings = $__dbSettingsStmt->fetchAll(PDO::FETCH_KEY_PAIR);
-    
-    // รวมค่า (DB ทับ JSON เพราะ DB คือค่าที่ User ตั้งค่าจริงๆ และไม่โดน Git ทับ)
+    // โหลด global settings (clinic_id = 0) ก่อน
+    $__dbStmt = $__pdo->prepare(
+        "SELECT setting_key, setting_value FROM sys_site_settings WHERE clinic_id = 0"
+    );
+    $__dbStmt->execute();
+    $__dbSettings = $__dbStmt->fetchAll(PDO::FETCH_KEY_PAIR);
     $__siteSettings = array_merge($__siteSettings, $__dbSettings);
+
+    // โหลด per-clinic settings ทับ (ถ้า CLINIC_ID > 0 และไม่ใช่ 0)
+    if (defined('CLINIC_ID') && CLINIC_ID > 0) {
+        $__clinicStmt = $__pdo->prepare(
+            "SELECT setting_key, setting_value FROM sys_site_settings WHERE clinic_id = ?"
+        );
+        $__clinicStmt->execute([CLINIC_ID]);
+        $__clinicSettings = $__clinicStmt->fetchAll(PDO::FETCH_KEY_PAIR);
+        $__siteSettings = array_merge($__siteSettings, $__clinicSettings);
+    }
 } catch (Exception $e) {
     // Fail silently if DB is not ready
 }
 
-defined('SITE_NAME') || define('SITE_NAME', $__siteSettings['site_name'] ?? 'e-Campaign V2');
-defined('SITE_LOGO') || define('SITE_LOGO', $__siteSettings['site_logo'] ?? ''); 
-defined('GEMINI_API_KEY') || define('GEMINI_API_KEY', $__siteSettings['gemini_api_key'] ?? '');
+defined('SITE_NAME')           || define('SITE_NAME',           $__siteSettings['site_name']      ?? 'e-Campaign V2');
+defined('SITE_LOGO')           || define('SITE_LOGO',           $__siteSettings['site_logo']      ?? '');
+defined('GEMINI_API_KEY')      || define('GEMINI_API_KEY',      $__siteSettings['gemini_api_key'] ?? '');
 defined('SITE_SHOW_INSURANCE') || define('SITE_SHOW_INSURANCE', ($__siteSettings['show_insurance'] ?? '1') == '1');
+
 
 
 /**
@@ -68,14 +89,16 @@ if (!function_exists('log_activity')) {
             if (!$activityTableReady) {
                 $pdo->exec("CREATE TABLE IF NOT EXISTS sys_activity_logs (
                     id          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                    clinic_id   INT UNSIGNED NOT NULL DEFAULT 1,
                     user_id     INT UNSIGNED NULL,
                     action      VARCHAR(100) NOT NULL,
                     description TEXT,
                     ip_address  VARCHAR(45),
                     user_agent  TEXT,
                     timestamp   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    INDEX idx_user (user_id),
-                    INDEX idx_action (action),
+                    INDEX idx_clinic    (clinic_id),
+                    INDEX idx_user      (user_id),
+                    INDEX idx_action    (action),
                     INDEX idx_timestamp (timestamp)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
                 $activityTableReady = true;
@@ -86,14 +109,16 @@ if (!function_exists('log_activity')) {
                 if ($user_id !== null) $user_id = (int)$user_id;
             }
 
+            $clinicId = defined('CLINIC_ID') ? CLINIC_ID : ($_SESSION['clinic_id'] ?? 1);
             $ip = $_SERVER['REMOTE_ADDR'] ?? '';
             $ua = $_SERVER['HTTP_USER_AGENT'] ?? '';
 
             $stmt = $pdo->prepare("
-                INSERT INTO sys_activity_logs (user_id, action, description, ip_address, user_agent) 
-                VALUES (:uid, :act, :desc, :ip, :ua)
+                INSERT INTO sys_activity_logs (clinic_id, user_id, action, description, ip_address, user_agent)
+                VALUES (:cid, :uid, :act, :desc, :ip, :ua)
             ");
             return $stmt->execute([
+                ':cid'  => $clinicId,
                 ':uid'  => $user_id,
                 ':act'  => mb_substr($action, 0, 100),
                 ':desc' => $description,
