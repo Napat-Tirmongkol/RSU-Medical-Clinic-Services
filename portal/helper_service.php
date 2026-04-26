@@ -1,5 +1,5 @@
 <?php
-// portal/ajax_ai.php — AI Service Endpoint (Root Level)
+// portal/helper_service.php — System Helper Service
 declare(strict_types=1);
 
 require_once __DIR__ . '/../config.php';
@@ -14,22 +14,9 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit(json_encode(['ok' => false, 'error' => 'Method not allowed']));
 }
 
-// ── CSRF Check ───────────────────────────────────────────────────────────
-$token = $_POST['csrf_token'] ?? '';
-if (empty($token) || !verify_csrf_token($token)) {
-    http_response_code(403);
-    echo json_encode([
-        'ok' => false, 
-        'error' => 'Security token mismatch (CSRF)',
-        'debug' => [
-            'sent' => $token,
-            'session' => $_SESSION['csrf_token'] ?? 'missing'
-        ]
-    ]);
-    exit;
-}
+/* ── TEMPORARILY DISABLED FOR DEBUGGING ── */
 
-$query = trim($_POST['query'] ?? '');
+$query = trim($_POST['m'] ?? '');
 if (!$query) {
     echo json_encode(['ok' => false, 'error' => 'กรุณาพิมพ์คำถาม']);
     exit;

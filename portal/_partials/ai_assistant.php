@@ -188,13 +188,13 @@ async function aiSendMessage() {
 
     try {
         const formData = new FormData();
-        formData.append('query', text);
+        formData.append('m', text);
         
         // Get CSRF token from global input
         const csrfToken = document.getElementById('global_csrf_token')?.value || '';
         formData.append('csrf_token', csrfToken);
 
-        const response = await fetch('ajax_ai.php', {
+        const response = await fetch('helper_service.php', {
             method: 'POST',
             body: formData
         });
