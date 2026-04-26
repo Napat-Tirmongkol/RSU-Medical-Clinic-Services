@@ -114,6 +114,21 @@ try {
 }
 
 /**
+ * (1.1) FETCH USER PINS
+ * ดึงรายการโปรเจกต์ที่ปักหมุดไว้จาก Database
+ */
+$userPins = [];
+try {
+    $userId = $_SESSION['admin_id'] ?? $_SESSION['user_id'] ?? 0;
+    $userType = isset($_SESSION['admin_id']) ? 'admin' : 'staff';
+    if ($userId) {
+        $stmt = $pdo->prepare("SELECT project_id FROM sys_portal_pins WHERE user_id = ? AND user_type = ?");
+        $stmt->execute([$userId, $userType]);
+        $userPins = $stmt->fetchAll(PDO::FETCH_COLUMN);
+    }
+} catch (PDOException $e) { /* Table might not exist yet */ }
+
+/**
  * (2) PROJECT CATALOG (SCALABLE STRUCTURE)
  * โครงสร้างอาเรย์สำหรับวนลูปโปรเจกต์ รองรับการเพิ่มโมดูลในอนาคตได้ทันที
  */
@@ -255,6 +270,17 @@ $projects = [
         ]
     ]
 ];
+
+// Sort projects: Pinned ones first
+if (!empty($userPins)) {
+    usort($projects, function($a, $b) use ($userPins) {
+        $aPinned = in_array($a['id'], $userPins);
+        $bPinned = in_array($b['id'], $userPins);
+        if ($aPinned && !$bPinned) return -1;
+        if (!$aPinned && $bPinned) return 1;
+        return 0;
+    });
+}
 
 // Category assignments for filter tabs
 $categoryMap = [
@@ -961,11 +987,17 @@ try {
                                     $cardIdx++;
                                     $cat = $categoryMap[$proj['id']] ?? 'core';
                                     $keywords = strtolower(implode(' ', $proj['badges']) . ' ' . $proj['title']);
+                                    $isPinned = in_array($proj['id'], $userPins);
                                     ?>
-                                    <div class="proj-card" data-category="<?= $cat ?>"
-                                        data-name="<?= htmlspecialchars(strtolower($proj['title'])) ?>"
-                                        data-keywords="<?= htmlspecialchars($keywords) ?>"
-                                        style="animation-delay:<?= $cardDelay ?>s">
+                                    <div class="proj-card" id="proj-<?= $proj['id'] ?>" data-category="<?= $cat ?>"
+                                         data-name="<?= htmlspecialchars(strtolower($proj['title'])) ?>"
+                                         data-keywords="<?= htmlspecialchars($keywords) ?>"
+                                         data-pinned="<?= $isPinned ? '1' : '0' ?>"
+                                         style="animation-delay:<?= $cardDelay ?>s">
+                                         
+                                         <button class="pin-btn <?= $isPinned ? 'active' : '' ?>" onclick="togglePin('<?= $proj['id'] ?>', this)" title="ปักหมุด">
+                                             <i class="fa-solid fa-thumbtack text-[10px]"></i>
+                                         </button>
 
                                         <div class="proj-card-header">
                                             <div
@@ -2393,6 +2425,54 @@ try {
                 }
             });
         }
+
+        /* ── 5. Project Pinning (Database Driven) ───────────── */
+        window.togglePin = function(projId, btn) {
+            btn.disabled = true;
+            const isPinned = btn.classList.contains('active');
+            
+            const fd = new FormData();
+            fd.append('project_id', projId);
+
+            fetch('ajax_pins.php?action=toggle', {
+                method: 'POST',
+                body: fd
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    if (data.action === 'added') {
+                        btn.classList.add('active');
+                        document.getElementById('proj-' + projId).dataset.pinned = '1';
+                    } else {
+                        btn.classList.remove('active');
+                        document.getElementById('proj-' + projId).dataset.pinned = '0';
+                    }
+                    applyProjectOrder();
+                }
+            })
+            .finally(() => {
+                btn.disabled = false;
+            });
+        };
+
+        function applyProjectOrder() {
+            const container = document.getElementById('project-container');
+            if (!container) return;
+            const cards = Array.from(container.querySelectorAll('.proj-card'));
+
+            cards.sort((a, b) => {
+                const aPinned = a.dataset.pinned === '1';
+                const bPinned = b.dataset.pinned === '1';
+                if (aPinned && !bPinned) return -1;
+                if (!aPinned && bPinned) return 1;
+                return 0;
+            });
+
+            cards.forEach(card => container.appendChild(card));
+        }
+
+        applyProjectOrder();
     </script>
 
     <?php if ($adminRole === 'superadmin'): ?>

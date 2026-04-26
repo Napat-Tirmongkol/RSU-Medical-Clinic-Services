@@ -560,3 +560,54 @@ body[data-theme='dark'] iframe {
     background: transparent !important;
 }
 body[data-theme='dark'] .kpi-stat { border-color: #334155 !important; }
+
+/* ── Pin Button ───────────────────────────────────────── */
+.pin-btn {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 10;
+    background: rgba(255,255,255,0.8);
+    border: 1px solid #e2e8f0;
+    color: #94a3b8;
+    transition: all .2s cubic-bezier(.4,0,.2,1);
+    opacity: 0;
+    transform: translateY(-5px);
+}
+.proj-card:hover .pin-btn {
+    opacity: 1;
+    transform: translateY(0);
+}
+.pin-btn:hover {
+    background: #fff;
+    color: #2e9e63;
+    border-color: #c7e8d5;
+    box-shadow: 0 4px 12px rgba(46,158,99,.15);
+}
+.pin-btn.active {
+    opacity: 1;
+    transform: translateY(0);
+    background: #e8f8f0;
+    color: #2e9e63;
+    border-color: #c7e8d5;
+}
+.pin-btn.active i { transform: rotate(45deg); }
+
+body[data-theme='dark'] .pin-btn {
+    background: rgba(30, 41, 59, 0.8);
+    border-color: #334155;
+    color: #64748b;
+}
+body[data-theme='dark'] .pin-btn:hover,
+body[data-theme='dark'] .pin-btn.active {
+    background: #0f172a;
+    color: #3bba7a;
+    border-color: #1e293b;
+}
