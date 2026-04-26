@@ -46,4 +46,18 @@ function check_admin_session(string $loginUrl, string $staffLoginUrl): void
         }
     }
     $_SESSION['_admin_last_activity'] = time();
+
+    // Tenant mismatch guard: session clinic ต้องตรงกับ CLINIC_ID ที่ resolve ได้จาก subdomain
+    // (superadmin ที่ไม่มี clinic_id ใน session จะ bypass ได้ — backward-compat)
+    if (
+        defined('CLINIC_ID') &&
+        isset($_SESSION['clinic_id']) &&
+        (int)$_SESSION['clinic_id'] !== CLINIC_ID
+    ) {
+        $isStaff = !empty($_SESSION['is_ecampaign_staff']);
+        session_unset();
+        session_destroy();
+        header('Location: ' . ($isStaff ? $staffLoginUrl : $loginUrl) . '?reason=clinic_mismatch');
+        exit;
+    }
 }

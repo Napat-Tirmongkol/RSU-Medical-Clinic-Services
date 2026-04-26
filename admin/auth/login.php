@@ -39,10 +39,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($admin && password_verify($password, $admin['password'])) {
             rate_limit_clear('admin_login');
             $_SESSION['admin_logged_in'] = true;
-            $_SESSION['admin_id'] = $admin['id'];
-            $_SESSION['admin_username'] = $admin['full_name'] ?: $admin['username'];
-            $_SESSION['admin_email'] = $admin['email'];
-            $_SESSION['admin_role'] = $admin['role'];
+            $_SESSION['clinic_id']       = CLINIC_ID;
+            $_SESSION['admin_id']        = $admin['id'];
+            $_SESSION['admin_username']  = $admin['full_name'] ?: $admin['username'];
+            $_SESSION['admin_email']     = $admin['email'];
+            $_SESSION['admin_role']      = $admin['role'];
             session_regenerate_id(true);
 
             // บันทึกกิจกรรม: เข้าสู่ระบบ

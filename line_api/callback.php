@@ -84,9 +84,9 @@ try {
     // Migration: เพิ่ม column picture_url ถ้ายังไม่มี
     try { $pdo->exec("ALTER TABLE sys_users ADD COLUMN IF NOT EXISTS picture_url TEXT"); } catch (PDOException $e) {}
 
-    // ตรวจสอบว่าผู้ใช้ใน LINE นี้มีอยู่ในฐานข้อมูลหรือไม่
-    $stmt = $pdo->prepare("SELECT id, full_name, line_user_id FROM sys_users WHERE line_user_id = :line_user_id LIMIT 1");
-    $stmt->execute([':line_user_id' => $line_user_id]);
+    // ตรวจสอบว่าผู้ใช้ใน LINE นี้มีอยู่ในฐานข้อมูลของ clinic นี้หรือไม่
+    $stmt = $pdo->prepare("SELECT id, full_name, line_user_id FROM sys_users WHERE line_user_id = :line_user_id AND clinic_id = :clinic_id LIMIT 1");
+    $stmt->execute([':line_user_id' => $line_user_id, ':clinic_id' => CLINIC_ID]);
     $user = $stmt->fetch();
 
     if ($user) {
@@ -97,16 +97,15 @@ try {
         }
 
         // ✅ พบ User เดิม — ตั้ง Session ร่วมที่รองรับทั้ง e-campaign และ e_Borrow
+        $_SESSION['clinic_id']         = CLINIC_ID;
         $_SESSION['line_user_id']      = $user['line_user_id'];
         $_SESSION['line_picture']      = $profile['pictureUrl'] ?? '';
 
         // Session สำหรับ e-campaign
-        $_SESSION['student_id']   = (int)$user['id'];
-        $_SESSION['student_full_name']    = $user['full_name'];
-
-        // Session สำหรับ e_Borrow (ใช้ชื่อ key เดิมที่ e_Borrow คาดหวัง)
         $_SESSION['student_id']        = (int)$user['id'];
         $_SESSION['student_full_name'] = $user['full_name'];
+
+        // Session สำหรับ e_Borrow (ใช้ชื่อ key เดิมที่ e_Borrow คาดหวัง)
         $_SESSION['student_line_id']   = $user['line_user_id'];
 
         session_regenerate_id(true); // ป้องกัน Session Fixation
@@ -131,6 +130,7 @@ try {
 
     } else {
         // ❌ ไม่พบ User — ผู้ใช้ใหม่ ให้กรอกข้อมูลส่วนตัวครั้งแรก
+        $_SESSION['clinic_id']         = CLINIC_ID;
         $_SESSION['line_user_id']      = $line_user_id;
         $_SESSION['line_picture_url']  = $linePicture;
         $_SESSION['pending_redirect']  = $redirectTarget;

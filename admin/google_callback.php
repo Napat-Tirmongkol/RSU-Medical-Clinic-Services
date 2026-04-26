@@ -76,10 +76,11 @@ $admin = $stmt->fetch();
 if ($admin) {
     // พบแอดมินในระบบ -> ล็อกอินสำเร็จ
     $_SESSION['admin_logged_in'] = true;
-    $_SESSION['admin_id'] = $admin['id'];
-    $_SESSION['admin_username'] = $admin['full_name'] ?: $name;
-    $_SESSION['admin_email'] = $email;
-    $_SESSION['admin_role'] = $admin['role'];
+    $_SESSION['clinic_id']       = CLINIC_ID;
+    $_SESSION['admin_id']        = $admin['id'];
+    $_SESSION['admin_username']  = $admin['full_name'] ?: $name;
+    $_SESSION['admin_email']     = $email;
+    $_SESSION['admin_role']      = $admin['role'];
 
     session_regenerate_id(true);
 

@@ -70,6 +70,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     session_regenerate_id(true);
 
                     $_SESSION['admin_logged_in']       = true;
+                    $_SESSION['clinic_id']             = CLINIC_ID;
                     $_SESSION['admin_id']              = (int)$staff['id'];
                     $_SESSION['admin_username']        = $staff['full_name'] ?: $staff['username'];
                     $_SESSION['admin_role']            = $ecRole;

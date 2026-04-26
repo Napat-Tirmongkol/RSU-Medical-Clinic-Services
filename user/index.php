@@ -10,8 +10,8 @@ $lineUserId = $_SESSION['line_user_id'] ?? '';
 if ($lineUserId !== '') {
     try {
         $pdo = db();
-        $stmt = $pdo->prepare("SELECT * FROM sys_users WHERE line_user_id = :line_id LIMIT 1");
-        $stmt->execute([':line_id' => $lineUserId]);
+        $stmt = $pdo->prepare("SELECT * FROM sys_users WHERE line_user_id = :line_id AND clinic_id = :clinic_id LIMIT 1");
+        $stmt->execute([':line_id' => $lineUserId, ':clinic_id' => CLINIC_ID]);
         $user = $stmt->fetch();
 
         if ($user) {

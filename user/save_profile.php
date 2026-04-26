@@ -77,13 +77,13 @@ try {
 
     $sidValue = ($status === 'other') ? null : $idNumber;
 
-    // 3. ตรวจสอบว่ามี Record อยู่แล้วหรือไม่
-    $stmtCheck = $pdo->prepare("SELECT id FROM sys_users WHERE line_user_id = :line_id LIMIT 1");
-    $stmtCheck->execute([':line_id' => $lineUserId]);
+    // 3. ตรวจสอบว่ามี Record อยู่แล้วหรือไม่ (scoped to clinic)
+    $stmtCheck = $pdo->prepare("SELECT id FROM sys_users WHERE line_user_id = :line_id AND clinic_id = :clinic_id LIMIT 1");
+    $stmtCheck->execute([':line_id' => $lineUserId, ':clinic_id' => CLINIC_ID]);
     $existingUser = $stmtCheck->fetch();
 
     if ($existingUser) {
-        // --- UPDATE ---
+        // --- UPDATE (clinic-scoped) ---
         $sql = "UPDATE sys_users
                 SET prefix = :prefix,
                     first_name = :first_name,
@@ -96,17 +96,18 @@ try {
                     email  = :email,
                     gender = :gender,
                     department = :dept
-                WHERE line_user_id = :line_id";
+                WHERE line_user_id = :line_id AND clinic_id = :clinic_id";
     } else {
-        // --- INSERT ---
+        // --- INSERT (with clinic_id) ---
         $sql = "INSERT INTO sys_users
-                    (line_user_id, prefix, first_name, last_name, full_name, student_personnel_id, citizen_id, phone_number, status, email, gender, department)
+                    (clinic_id, line_user_id, prefix, first_name, last_name, full_name, student_personnel_id, citizen_id, phone_number, status, email, gender, department)
                 VALUES
-                    (:line_id, :prefix, :first_name, :last_name, :name, :sid, :cid, :phone, :status, :email, :gender, :dept)";
+                    (:clinic_id, :line_id, :prefix, :first_name, :last_name, :name, :sid, :cid, :phone, :status, :email, :gender, :dept)";
     }
 
     $stmt = $pdo->prepare($sql);
     $stmt->execute([
+        ':clinic_id'  => CLINIC_ID,
         ':prefix'     => $prefix,
         ':first_name' => $firstName,
         ':last_name'  => $lastName,
@@ -126,9 +127,9 @@ try {
     $logDesc = $existingUser ? "ผู้ป่วยอัปเดตข้อมูลส่วนตัว '{$fullName}'" : "ผู้ป่วยลงทะเบียนเข้าใช้งานครั้งแรก '{$fullName}'";
     log_activity($logAction, $logDesc, (int)($existingUser['id'] ?? $pdo->lastInsertId()));
 
-    // 4. ดึง ID (PK) ของผู้ใช้เพื่อเก็บใส่ Session
-    $stmtGetId = $pdo->prepare("SELECT id FROM sys_users WHERE line_user_id = :line_id LIMIT 1");
-    $stmtGetId->execute([':line_id' => $lineUserId]);
+    // 4. ดึง ID (PK) ของผู้ใช้เพื่อเก็บใส่ Session (clinic-scoped)
+    $stmtGetId = $pdo->prepare("SELECT id FROM sys_users WHERE line_user_id = :line_id AND clinic_id = :clinic_id LIMIT 1");
+    $stmtGetId->execute([':line_id' => $lineUserId, ':clinic_id' => CLINIC_ID]);
     $user = $stmtGetId->fetch();
 
     if ($user) {
