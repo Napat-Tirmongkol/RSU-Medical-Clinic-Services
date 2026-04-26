@@ -34,7 +34,7 @@ if ($lineUserId === '') {
                 </div>
                 <h1 class="text-slate-900 font-bold text-2xl mb-4">กรุณาเข้าสู่ระบบด้วย LINE</h1>
                 <p class="text-slate-500 text-sm mb-8">เพื่อความปลอดภัยและใช้บริการนัดหมายแคมเปญพิเศษ</p>
-                <a href="https://healthycampus.rsu.ac.th/e-campaignv2/archive/line_api/line_login.php" 
+                <a href="https://healthycampus.rsu.ac.th/e-campaignv2/line_api/line_login.php" 
                    class="flex items-center justify-center gap-3 w-full py-5 bg-[#06C755] hover:bg-[#05b34c] text-white font-bold rounded-2xl shadow-lg transition-all active:scale-95">
                     <i class="fa-brands fa-line text-2xl"></i>
                     Login with LINE
