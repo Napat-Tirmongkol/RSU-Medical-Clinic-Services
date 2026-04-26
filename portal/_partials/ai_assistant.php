@@ -1,11 +1,29 @@
 <?php
 // portal/_partials/ai_assistant.php — Native AI Assistant UI
+$apiKeySet = defined('GEMINI_API_KEY') && !empty(GEMINI_API_KEY);
 ?>
 
 <!-- marked.js for Markdown rendering -->
 <script src="https://cdn.jsdelivr.net/npm/marked@12.0.0/marked.min.js"></script>
 
 <div class="ai-assistant-container flex flex-col h-full bg-slate-50/50">
+    
+    <?php if (!$apiKeySet): ?>
+    <!-- API KEY WARNING -->
+    <div class="m-6 p-6 bg-amber-50 border border-amber-200 rounded-3xl flex items-start gap-4 animate-in fade-in slide-in-from-top-4">
+        <div class="w-12 h-12 bg-amber-100 rounded-2xl flex items-center justify-center text-amber-600 text-xl flex-shrink-0">
+            <i class="fa-solid fa-key"></i>
+        </div>
+        <div>
+            <h3 class="text-base font-black text-amber-900 leading-tight">ยังไม่ได้ตั้งค่า API Key</h3>
+            <p class="text-sm text-amber-700 mt-1 font-medium">กรุณาไปที่หน้า <a href="javascript:switchSection('settings')" class="font-black underline decoration-2 underline-offset-2">Settings</a> เพื่อกรอก Gemini API Key ก่อนใช้งานครับ</p>
+            <div class="mt-4 flex gap-3">
+                <a href="https://aistudio.google.com/app/apikey" target="_blank" class="px-4 py-2 bg-amber-600 text-white rounded-xl text-xs font-black shadow-lg shadow-amber-200">รับ API Key ฟรี</a>
+                <button onclick="switchSection('settings')" class="px-4 py-2 bg-white border border-amber-200 text-amber-700 rounded-xl text-xs font-black">ไปที่หน้าตั้งค่า</button>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
     <!-- Header -->
     <div class="px-6 py-4 border-b border-slate-200 bg-white flex items-center justify-between sticky top-0 z-10">
         <div class="flex items-center gap-3">
@@ -61,12 +79,13 @@
         <div class="max-w-4xl mx-auto flex gap-3 items-end">
             <div class="flex-1 relative">
                 <textarea id="aiChatInput" rows="1" 
-                    placeholder="พิมพ์คำถามของคุณที่นี่..."
+                    placeholder="<?= $apiKeySet ? 'พิมพ์คำถามของคุณที่นี่...' : 'กรุณาตั้งค่า API Key ก่อนใช้งาน' ?>"
                     class="w-full pl-5 pr-12 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-[14px] font-medium text-slate-800 outline-none focus:bg-white focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 transition-all resize-none max-h-40"
                     onkeydown="if(event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); aiSendMessage(); }"
-                    oninput="this.style.height = ''; this.style.height = Math.min(this.scrollHeight, 160) + 'px'"></textarea>
+                    oninput="this.style.height = ''; this.style.height = Math.min(this.scrollHeight, 160) + 'px'"
+                    <?= !$apiKeySet ? 'disabled' : '' ?>></textarea>
             </div>
-            <button onclick="aiSendMessage()" id="aiSendBtn"
+            <button onclick="aiSendMessage()" id="aiSendBtn" <?= !$apiKeySet ? 'disabled' : '' ?>
                 class="w-12 h-12 bg-purple-600 hover:bg-purple-700 text-white rounded-2xl shadow-lg shadow-purple-200 transition-all flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed">
                 <i class="fa-solid fa-paper-plane"></i>
             </button>
