@@ -10,8 +10,8 @@ if ($lineUserId === '') {
 
 try {
     $pdo = db();
-    $stmtU = $pdo->prepare("SELECT id FROM sys_users WHERE line_user_id = :line_id LIMIT 1");
-    $stmtU->execute([':line_id' => $lineUserId]);
+    $stmtU = $pdo->prepare("SELECT id FROM sys_users WHERE line_user_id = :line_id AND clinic_id = :clinic_id LIMIT 1");
+    $stmtU->execute([':line_id' => $lineUserId, ':clinic_id' => clinic_id()]);
     $user = $stmtU->fetch();
     if (!$user) { header('Location: profile.php'); exit; }
     $studentId = (int)$user['id'];
@@ -37,8 +37,8 @@ $pdo = db();
 
 $campaign = null;
 try {
-    $stmtCamp = $pdo->prepare("SELECT id, title FROM camp_list WHERE id = :id AND status = 'active' AND (available_until IS NULL OR available_until >= CURDATE())");
-    $stmtCamp->execute([':id' => $campaignId]);
+    $stmtCamp = $pdo->prepare("SELECT id, title FROM camp_list WHERE id = :id AND clinic_id = :clinic_id AND status = 'active' AND (available_until IS NULL OR available_until >= CURDATE())");
+    $stmtCamp->execute([':id' => $campaignId, ':clinic_id' => clinic_id()]);
     $campaign = $stmtCamp->fetch(PDO::FETCH_ASSOC);
     if (!$campaign) {
         header('Location: hub.php');
@@ -57,11 +57,11 @@ try {
             t.id, t.start_time, t.end_time, t.max_capacity,
             (SELECT COUNT(*) FROM camp_bookings a WHERE a.slot_id = t.id AND a.status IN ('booked', 'confirmed')) as booked_count
         FROM camp_slots t
-        WHERE t.slot_date = :date AND t.campaign_id = :cid
+        WHERE t.slot_date = :date AND t.campaign_id = :cid AND t.clinic_id = :clinic_id
         ORDER BY t.start_time ASC
     ";
     $stmt = $pdo->prepare($sqlSlots);
-    $stmt->execute([':date' => $selectedDateStr, ':cid' => $campaignId]);
+    $stmt->execute([':date' => $selectedDateStr, ':cid' => $campaignId, ':clinic_id' => clinic_id()]);
     $timeSlots = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
     error_log("booking_time slots fetch error: " . $e->getMessage());

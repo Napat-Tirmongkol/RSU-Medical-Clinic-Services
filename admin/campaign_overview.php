@@ -9,7 +9,9 @@ $pdo = db();
 $campaignId = (int)($_GET['id'] ?? 0);
 
 // ดึงรายการแคมเปญทั้งหมดสำหรับ dropdown
-$allCampaigns = $pdo->query("SELECT id, title, status FROM camp_list ORDER BY created_at DESC")->fetchAll(PDO::FETCH_ASSOC);
+$stmt_all = $pdo->prepare("SELECT id, title, status FROM camp_list WHERE clinic_id = :clinic_id ORDER BY created_at DESC");
+$stmt_all->execute([':clinic_id' => clinic_id()]);
+$allCampaigns = $stmt_all->fetchAll(PDO::FETCH_ASSOC);
 
 $campaign = null;
 $stats = [];
@@ -25,9 +27,9 @@ if ($campaignId > 0) {
             (SELECT COUNT(*) FROM camp_bookings b WHERE b.campaign_id = c.id AND b.status IN ('booked','confirmed')) AS used_capacity,
             (SELECT COUNT(*) FROM camp_bookings b WHERE b.campaign_id = c.id) AS total_bookings,
             (SELECT COUNT(*) FROM camp_slots s WHERE s.campaign_id = c.id) AS total_slots
-        FROM camp_list c WHERE c.id = :id
+        FROM camp_list c WHERE c.id = :id AND c.clinic_id = :clinic_id
     ");
-    $stmt->execute([':id' => $campaignId]);
+    $stmt->execute([':id' => $campaignId, ':clinic_id' => clinic_id()]);
     $campaign = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if ($campaign) {
@@ -41,10 +43,10 @@ if ($campaignId > 0) {
         // สถิติแยกตามสถานะ
         $stmt2 = $pdo->prepare("
             SELECT status, COUNT(*) AS cnt
-            FROM camp_bookings WHERE campaign_id = :id
+            FROM camp_bookings WHERE campaign_id = :id AND clinic_id = :clinic_id
             GROUP BY status
         ");
-        $stmt2->execute([':id' => $campaignId]);
+        $stmt2->execute([':id' => $campaignId, ':clinic_id' => clinic_id()]);
         foreach ($stmt2->fetchAll(PDO::FETCH_ASSOC) as $row) {
             $statusBreakdown[$row['status']] = (int)$row['cnt'];
         }
@@ -53,11 +55,11 @@ if ($campaignId > 0) {
         $stmt3 = $pdo->prepare("
             SELECT DATE(created_at) AS day, COUNT(*) AS cnt
             FROM camp_bookings
-            WHERE campaign_id = :id AND created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+            WHERE campaign_id = :id AND clinic_id = :clinic_id AND created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
             GROUP BY DATE(created_at)
             ORDER BY day ASC
         ");
-        $stmt3->execute([':id' => $campaignId]);
+        $stmt3->execute([':id' => $campaignId, ':clinic_id' => clinic_id()]);
         $dailyTrend = $stmt3->fetchAll(PDO::FETCH_ASSOC);
 
         // การใช้งานรายรอบ (slot utilization)
@@ -66,12 +68,12 @@ if ($campaignId > 0) {
                 COUNT(CASE WHEN b.status IN ('booked','confirmed') THEN 1 END) AS booked_cnt
             FROM camp_slots s
             LEFT JOIN camp_bookings b ON b.slot_id = s.id
-            WHERE s.campaign_id = :id
+            WHERE s.campaign_id = :id AND s.clinic_id = :clinic_id
             GROUP BY s.id
             ORDER BY s.slot_date ASC, s.start_time ASC
             LIMIT 50
         ");
-        $stmt4->execute([':id' => $campaignId]);
+        $stmt4->execute([':id' => $campaignId, ':clinic_id' => clinic_id()]);
         $slotUtil = $stmt4->fetchAll(PDO::FETCH_ASSOC);
 
         // รายชื่อผู้จองล่าสุด
@@ -82,11 +84,11 @@ if ($campaignId > 0) {
             FROM camp_bookings b
             JOIN sys_users u ON b.student_id = u.id
             JOIN camp_slots s ON b.slot_id = s.id
-            WHERE b.campaign_id = :id
+            WHERE b.campaign_id = :id AND b.clinic_id = :clinic_id
             ORDER BY b.created_at DESC
             LIMIT 100
         ");
-        $stmt5->execute([':id' => $campaignId]);
+        $stmt5->execute([':id' => $campaignId, ':clinic_id' => clinic_id()]);
         $recentBookings = $stmt5->fetchAll(PDO::FETCH_ASSOC);
     }
 }

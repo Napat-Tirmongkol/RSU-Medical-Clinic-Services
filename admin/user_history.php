@@ -12,8 +12,8 @@ $pdo = db();
 
 // ดึงข้อมูล User
 try {
-    $stmtUser = $pdo->prepare("SELECT * FROM sys_users WHERE id = :id LIMIT 1");
-    $stmtUser->execute([':id' => $userId]);
+    $stmtUser = $pdo->prepare("SELECT * FROM sys_users WHERE id = :id AND clinic_id = :clinic_id LIMIT 1");
+    $stmtUser->execute([':id' => $userId, ':clinic_id' => clinic_id()]);
     $user = $stmtUser->fetch();
     if (!$user) {
         header('Location: users.php');
@@ -40,10 +40,11 @@ try {
         JOIN camp_slots t ON a.slot_id = t.id
         JOIN camp_list c       ON a.campaign_id = c.id
         WHERE a.student_id = :uid
+          AND a.clinic_id = :clinic_id
         ORDER BY a.created_at DESC
     ";
     $stmtBookings = $pdo->prepare($sql);
-    $stmtBookings->execute([':uid' => $userId]);
+    $stmtBookings->execute([':uid' => $userId, ':clinic_id' => clinic_id()]);
     $bookings = $stmtBookings->fetchAll();
 } catch (PDOException $e) {
     error_log("user_history error: " . $e->getMessage()); $history = [];

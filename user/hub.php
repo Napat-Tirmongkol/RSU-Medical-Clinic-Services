@@ -25,8 +25,8 @@ try {
     $pdo = db();
     $today = date('Y-m-d');
 
-    $stmt = $pdo->prepare("SELECT * FROM sys_users WHERE line_user_id = :line_id LIMIT 1");
-    $stmt->execute([':line_id' => $lineUserId]);
+    $stmt = $pdo->prepare("SELECT * FROM sys_users WHERE line_user_id = :line_id AND clinic_id = :clinic_id LIMIT 1");
+    $stmt->execute([':line_id' => $lineUserId, ':clinic_id' => clinic_id()]);
     $user = $stmt->fetch();
 
     if (!$user) {
@@ -44,12 +44,13 @@ try {
                (SELECT COUNT(*) FROM camp_bookings a WHERE a.campaign_id = c.id AND a.status IN ('booked', 'confirmed')) as used_seats
         FROM camp_list c
         WHERE c.status IN ('active', 'coming_soon', 'full')
+        AND c.clinic_id = :clinic_id
         AND (c.available_until IS NULL OR c.available_until >= :today)
-        ORDER BY 
+        ORDER BY
             CASE WHEN c.status = 'active' THEN 0 ELSE 1 END ASC,
             c.created_at DESC
     ");
-    $stmt->execute([':today' => $today]);
+    $stmt->execute([':today' => $today, ':clinic_id' => clinic_id()]);
     $camp_list = $stmt->fetchAll();
 
     // Bookings (all)
@@ -59,9 +60,10 @@ try {
         JOIN camp_list c ON b.campaign_id = c.id
         JOIN camp_slots s ON b.slot_id = s.id
         WHERE b.student_id = :sid
+        AND b.clinic_id = :clinic_id
         ORDER BY s.slot_date DESC, s.start_time DESC
     ");
-    $stmt->execute([':sid' => $user['id']]);
+    $stmt->execute([':sid' => $user['id'], ':clinic_id' => clinic_id()]);
     $booking_list = $stmt->fetchAll();
 
     // Next upcoming appointment (for appointment card)
@@ -73,8 +75,8 @@ try {
     }
 
     // Upcoming count
-    $stmt = $pdo->prepare("SELECT COUNT(*) FROM camp_bookings b JOIN camp_slots s ON b.slot_id = s.id WHERE b.student_id = :sid AND s.slot_date >= :today AND b.status != 'cancelled'");
-    $stmt->execute([':sid' => $user['id'], ':today' => $today]);
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM camp_bookings b JOIN camp_slots s ON b.slot_id = s.id WHERE b.student_id = :sid AND b.clinic_id = :clinic_id AND s.slot_date >= :today AND b.status != 'cancelled'");
+    $stmt->execute([':sid' => $user['id'], ':today' => $today, ':clinic_id' => clinic_id()]);
     $upcoming_count = (int) $stmt->fetchColumn();
 
     // Borrow count (optional)
@@ -93,8 +95,8 @@ try {
     $insurance = null;
     if (defined('SITE_SHOW_INSURANCE') && SITE_SHOW_INSURANCE && !empty($user['student_personnel_id'])) {
         try {
-            $insStmt = $pdo->prepare("SELECT * FROM insurance_members WHERE member_id = :mid LIMIT 1");
-            $insStmt->execute([':mid' => $user['student_personnel_id']]);
+            $insStmt = $pdo->prepare("SELECT * FROM insurance_members WHERE member_id = :mid AND clinic_id = :clinic_id LIMIT 1");
+            $insStmt->execute([':mid' => $user['student_personnel_id'], ':clinic_id' => clinic_id()]);
             $insurance = $insStmt->fetch(PDO::FETCH_ASSOC) ?: null;
         } catch (Exception $e) { /* table may not exist yet */ }
     }
@@ -110,6 +112,7 @@ if ($user) {
         $annStmt = $pdo->prepare("
             SELECT a.* FROM sys_announcements a
             WHERE a.is_active = 1
+            AND a.clinic_id = :clinic_id
             AND (
                 a.target_audience = 'all'
                 OR a.target_audience = :utype
@@ -124,10 +127,11 @@ if ($user) {
             LIMIT 5
         ");
         $annStmt->execute([
-            ':utype'  => $user['status'] ?? 'all',
-            ':today2' => $today,
-            ':today3' => $today,
-            ':uid'    => $user['id'],
+            ':utype'     => $user['status'] ?? 'all',
+            ':today2'    => $today,
+            ':today3'    => $today,
+            ':uid'       => $user['id'],
+            ':clinic_id' => clinic_id(),
         ]);
         $announcements = $annStmt->fetchAll();
     } catch (Exception $e) {

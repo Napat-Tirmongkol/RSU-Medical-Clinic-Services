@@ -13,8 +13,8 @@ if ($lineUserId === '') {
 
 try {
     $pdo = db();
-    $stmtU = $pdo->prepare("SELECT id, full_name, student_personnel_id FROM sys_users WHERE line_user_id = :line_id LIMIT 1");
-    $stmtU->execute([':line_id' => $lineUserId]);
+    $stmtU = $pdo->prepare("SELECT id, full_name, student_personnel_id FROM sys_users WHERE line_user_id = :line_id AND clinic_id = :clinic_id LIMIT 1");
+    $stmtU->execute([':line_id' => $lineUserId, ':clinic_id' => clinic_id()]);
     $user = $stmtU->fetch();
     if (!$user) { header('Location: index.php'); exit; }
     
@@ -27,12 +27,12 @@ $bookings = [];
 try {
   $pdo = db();
   $sql = "
-    SELECT 
-        a.id AS appointment_id, 
-        a.status, 
+    SELECT
+        a.id AS appointment_id,
+        a.status,
         a.attended_at,
-        t.slot_date, 
-        t.start_time, 
+        t.slot_date,
+        t.start_time,
         t.end_time,
         c.title AS campaign_title,
         c.description AS campaign_desc
@@ -40,9 +40,10 @@ try {
     JOIN camp_slots t ON a.slot_id = t.id
     JOIN camp_list c ON a.campaign_id = c.id
     WHERE a.student_id = :student_id
+    AND a.clinic_id = :clinic_id
   ";
   $stmt = $pdo->prepare($sql);
-  $stmt->execute([':student_id' => $studentId]);
+  $stmt->execute([':student_id' => $studentId, ':clinic_id' => clinic_id()]);
   $bookings = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
   error_log("my_bookings error: " . $e->getMessage()); $upcomingBookings = []; $historyBookings = [];

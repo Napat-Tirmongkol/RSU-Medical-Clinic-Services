@@ -18,11 +18,12 @@ try {
                (SELECT COUNT(*) FROM camp_bookings a WHERE a.campaign_id = c.id AND a.status IN ('booked', 'confirmed')) as used_seats
         FROM camp_list c
         WHERE c.status = 'active'
+        AND c.clinic_id = :clinic_id
         AND (c.available_until IS NULL OR c.available_until >= :today)
         ORDER BY c.created_at DESC
     ";
     $stmt = $pdo->prepare($sql);
-    $stmt->execute([':today' => $today]);
+    $stmt->execute([':today' => $today, ':clinic_id' => clinic_id()]);
     $camp_list = $stmt->fetchAll();
 } catch (PDOException $e) {
     error_log("booking_campaign DB error: " . $e->getMessage());

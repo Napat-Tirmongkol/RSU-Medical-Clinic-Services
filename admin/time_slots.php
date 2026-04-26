@@ -5,8 +5,12 @@ require_once __DIR__ . '/includes/auth.php';
 
 $pdo = db();
 
-$activeCampaigns = $pdo->query("SELECT id, title FROM camp_list WHERE status = 'active' ORDER BY title ASC")->fetchAll();
-$allCampaigns    = $pdo->query("SELECT id, title FROM camp_list ORDER BY title ASC")->fetchAll();
+$stmtAc = $pdo->prepare("SELECT id, title FROM camp_list WHERE status = 'active' AND clinic_id = ? ORDER BY title ASC");
+$stmtAc->execute([clinic_id()]);
+$activeCampaigns = $stmtAc->fetchAll();
+$stmtAllC = $pdo->prepare("SELECT id, title FROM camp_list WHERE clinic_id = ? ORDER BY title ASC");
+$stmtAllC->execute([clinic_id()]);
+$allCampaigns = $stmtAllC->fetchAll();
 
 $colors = [
     ['bg' => 'bg-emerald-50', 'border' => 'border-emerald-100', 'text' => 'text-emerald-700', 'badge' => 'text-emerald-500'],
@@ -57,7 +61,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // หารเฉลี่ยที่นั่งต่อรอบ
                 $base_capacity = floor($max / $valid_slots_count);
                 
-                $stmt = $pdo->prepare("INSERT INTO camp_slots (campaign_id, slot_date, start_time, end_time, max_capacity) VALUES (?, ?, ?, ?, ?)");
+                $stmt = $pdo->prepare("INSERT INTO camp_slots (campaign_id, slot_date, start_time, end_time, max_capacity, clinic_id) VALUES (?, ?, ?, ?, ?, ?)");
                 
                 foreach ($dates_array as $date) {
                     $date = trim($date);
@@ -71,8 +75,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             $et = $end_times[$i];
                             if ($st && $et) {
                                 // เช็คว่ามีรอบเวลานี้ในฐานข้อมูลแล้วหรือไม่ (ป้องกันการสร้างซ้ำ)
-                                $check_dup = $pdo->prepare("SELECT COUNT(*) FROM camp_slots WHERE campaign_id = ? AND slot_date = ? AND start_time = ?");
-                                $check_dup->execute([$campaign_id, $date, $st]);
+                                $check_dup = $pdo->prepare("SELECT COUNT(*) FROM camp_slots WHERE campaign_id = ? AND slot_date = ? AND start_time = ? AND clinic_id = ?");
+                                $check_dup->execute([$campaign_id, $date, $st, clinic_id()]);
                                 if ($check_dup->fetchColumn() > 0) {
                                     $skippedCount++;
                                     continue; // ข้ามไปหากมีรอบเวลานี้อยู่แล้ว
@@ -81,7 +85,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 $capacity_for_this_slot = $base_capacity + ($remainder > 0 ? 1 : 0);
                                 $remainder--;
                                 
-                                $stmt->execute([$campaign_id, $date, $st, $et, $capacity_for_this_slot]);
+                                $stmt->execute([$campaign_id, $date, $st, $et, $capacity_for_this_slot, clinic_id()]);
                                 $insertedCount++;
                             }
                         }
@@ -109,8 +113,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($id > 0 && $campaign_id > 0 && $start_time && $end_time && $max >= 0) {
             // เช็คว่าคนที่จองเกินโควต้าใหม่ไหม
-            $check = $pdo->prepare("SELECT COUNT(*) FROM camp_bookings WHERE slot_id = ? AND status IN ('booked', 'confirmed')");
-            $check->execute([$id]);
+            $check = $pdo->prepare("SELECT COUNT(*) FROM camp_bookings WHERE slot_id = ? AND status IN ('booked', 'confirmed') AND clinic_id = ?");
+            $check->execute([$id, clinic_id()]);
             $used = (int)$check->fetchColumn();
 
             if ($max < $used) {
@@ -118,8 +122,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 exit;
             }
 
-            $pdo->prepare("UPDATE camp_slots SET campaign_id = ?, start_time = ?, end_time = ?, max_capacity = ? WHERE id = ?")
-                ->execute([$campaign_id, $start_time, $end_time, $max, $id]);
+            $pdo->prepare("UPDATE camp_slots SET campaign_id = ?, start_time = ?, end_time = ?, max_capacity = ? WHERE id = ? AND clinic_id = ?")
+                ->execute([$campaign_id, $start_time, $end_time, $max, $id, clinic_id()]);
 
             log_activity('edit_slot', "แก้ไขรอบเวลา ID: {$id} เป็น {$start_time}-{$end_time} จุ {$max}");
 
@@ -269,13 +273,14 @@ $year = $_GET['year'] ?? date('Y');
 
 $stmt = $pdo->prepare("
     SELECT ts.*, c.title as campaign_title,
-           (SELECT COUNT(*) FROM camp_bookings a WHERE a.slot_id = ts.id AND a.status IN ('booked', 'confirmed')) as booked_count
-    FROM camp_slots ts 
-    JOIN camp_list c ON ts.campaign_id = c.id 
+           (SELECT COUNT(*) FROM camp_bookings a WHERE a.slot_id = ts.id AND a.status IN ('booked', 'confirmed') AND a.clinic_id = ?) as booked_count
+    FROM camp_slots ts
+    JOIN camp_list c ON ts.campaign_id = c.id
     WHERE MONTH(ts.slot_date) = ? AND YEAR(ts.slot_date) = ?
+      AND ts.clinic_id = ?
     ORDER BY ts.slot_date, ts.start_time
 ");
-$stmt->execute([$month, $year]);
+$stmt->execute([clinic_id(), $month, $year, clinic_id()]);
 $slots = $stmt->fetchAll();
 
 $calendarData = [];

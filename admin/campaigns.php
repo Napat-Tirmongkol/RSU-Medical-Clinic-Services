@@ -26,8 +26,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($action === 'add' && $title && $capacity >= 0) {
         try {
             $newToken = bin2hex(random_bytes(8)); // 16-char hex token
-            $sql = "INSERT INTO camp_list (title, type, description, total_capacity, available_until, status, is_auto_approve, share_token)
-                    VALUES (:title, :type, :description, :capacity, :until, :status, :auto_approve, :token)";
+            $sql = "INSERT INTO camp_list (title, type, description, total_capacity, available_until, status, is_auto_approve, share_token, clinic_id)
+                    VALUES (:title, :type, :description, :capacity, :until, :status, :auto_approve, :token, :clinic_id)";
             $stmt = $pdo->prepare($sql);
             $stmt->execute([
                 ':title' => $title,
@@ -37,7 +37,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ':until' => $availableUntil,
                 ':status' => $status,
                 ':auto_approve' => $isAutoApprove,
-                ':token' => $newToken
+                ':token' => $newToken,
+                ':clinic_id' => clinic_id()
             ]);
             $message = "สร้างแคมเปญเรียบร้อยแล้ว!";
             $messageType = "success";
@@ -53,16 +54,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $id = (int) ($_POST['campaign_id'] ?? 0);
         if ($id > 0 && $title && $capacity >= 0) {
             try {
-                $check = $pdo->prepare("SELECT COUNT(*) FROM camp_bookings WHERE campaign_id = :id AND status IN ('booked', 'confirmed')");
-                $check->execute([':id' => $id]);
+                $check = $pdo->prepare("SELECT COUNT(*) FROM camp_bookings WHERE campaign_id = :id AND status IN ('booked', 'confirmed') AND clinic_id = :clinic_id");
+                $check->execute([':id' => $id, ':clinic_id' => clinic_id()]);
                 $used = (int) $check->fetchColumn();
 
                 if ($capacity < $used) {
                     $message = "จำนวนโควต้ารวม ต้องไม่น้อยกว่าจำนวนผู้ที่ลงทะเบียนไปแล้ว ({$used} คน)";
                     $messageType = "error";
                 } else {
-                    $sql = "UPDATE camp_list SET title = :title, type = :type, description = :description, 
-                            total_capacity = :capacity, available_until = :until, status = :status, is_auto_approve = :auto_approve WHERE id = :id";
+                    $sql = "UPDATE camp_list SET title = :title, type = :type, description = :description,
+                            total_capacity = :capacity, available_until = :until, status = :status, is_auto_approve = :auto_approve WHERE id = :id AND clinic_id = :clinic_id";
                     $stmt = $pdo->prepare($sql);
                     $stmt->execute([
                         ':title' => $title,
@@ -72,7 +73,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         ':until' => $availableUntil,
                         ':status' => $status,
                         ':auto_approve' => $isAutoApprove,
-                        ':id' => $id
+                        ':id' => $id,
+                        ':clinic_id' => clinic_id()
                     ]);
                     $message = "อัปเดตข้อมูลแคมเปญสำเร็จ!";
                     $messageType = "success";
@@ -91,8 +93,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($id > 0) {
             try {
                 $newToken = bin2hex(random_bytes(8));
-                $pdo->prepare("UPDATE camp_list SET share_token = :token WHERE id = :id")
-                    ->execute([':token' => $newToken, ':id' => $id]);
+                $pdo->prepare("UPDATE camp_list SET share_token = :token WHERE id = :id AND clinic_id = :clinic_id")
+                    ->execute([':token' => $newToken, ':id' => $id, ':clinic_id' => clinic_id()]);
                 $message = "สร้าง URL แชร์เรียบร้อยแล้ว!";
                 $messageType = "success";
             } catch (Exception $e) {
@@ -107,17 +109,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $id = (int) ($_POST['campaign_id'] ?? 0);
         if ($id > 0) {
             try {
-                $check = $pdo->prepare("SELECT COUNT(*) FROM camp_bookings WHERE campaign_id = :id");
-                $check->execute([':id' => $id]);
+                $check = $pdo->prepare("SELECT COUNT(*) FROM camp_bookings WHERE campaign_id = :id AND clinic_id = :clinic_id");
+                $check->execute([':id' => $id, ':clinic_id' => clinic_id()]);
                 if ((int) $check->fetchColumn() > 0) {
                     $message = "ไม่สามารถลบได้ เนื่องจากมีประวัติลงทะเบียนในแคมเปญนี้แล้ว (แนะนำให้เปลี่ยนสถานะเป็นปิดชั่วคราวแทน)";
                     $messageType = "error";
                 } else {
                     // ลบรอบเวลาที่เกี่ยวข้องทั้งหมดก่อนลบแคมเปญ
-                    $pdo->prepare("DELETE FROM camp_slots WHERE campaign_id = :id")->execute([':id' => $id]);
+                    $pdo->prepare("DELETE FROM camp_slots WHERE campaign_id = :id AND clinic_id = :clinic_id")->execute([':id' => $id, ':clinic_id' => clinic_id()]);
 
-                    $stmt = $pdo->prepare("DELETE FROM camp_list WHERE id = :id");
-                    $stmt->execute([':id' => $id]);
+                    $stmt = $pdo->prepare("DELETE FROM camp_list WHERE id = :id AND clinic_id = :clinic_id");
+                    $stmt->execute([':id' => $id, ':clinic_id' => clinic_id()]);
                     $message = "ลบแคมเปญสำเร็จ!";
                     $messageType = "success";
                     log_activity('delete_campaign', "ลบแคมเปญ ID: {$id} (พร้อมลบรอบเวลาทั้งหมดที่เกี่ยวข้อง)");
@@ -140,6 +142,7 @@ try {
             c.*,
             (SELECT COUNT(*) FROM camp_bookings a WHERE a.campaign_id = c.id AND a.status IN ('booked', 'confirmed')) AS used_capacity
         FROM camp_list c
+        WHERE c.clinic_id = :clinic_id
         ORDER BY
             CASE
                 WHEN c.status = 'active' AND (c.available_until IS NULL OR c.available_until >= CURDATE()) THEN 0
@@ -147,7 +150,8 @@ try {
             END ASC,
             c.created_at DESC
     ";
-    $stmt = $pdo->query($sql);
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute([':clinic_id' => clinic_id()]);
     $camp_list = $stmt->fetchAll();
 } catch (PDOException $e) {
     $message = "ไม่พบตารางข้อมูล กรุณาตรวจสอบ Database";

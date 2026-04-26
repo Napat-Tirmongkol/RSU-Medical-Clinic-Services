@@ -75,6 +75,17 @@ defined('SITE_SHOW_INSURANCE') || define('SITE_SHOW_INSURANCE', ($__siteSettings
 
 
 /**
+ * คืนค่า clinic_id ของ request ปัจจุบัน
+ * ใช้แทน CLINIC_ID constant ใน prepared statements เพื่อความสะดวก
+ */
+if (!function_exists('clinic_id')) {
+    function clinic_id(): int
+    {
+        return defined('CLINIC_ID') ? CLINIC_ID : 1;
+    }
+}
+
+/**
  * ฟังก์ชันกลางสำหรับบันทึกกิจกรรมในระบบ (Activity Logging)
  */
 if (!function_exists('log_activity')) {

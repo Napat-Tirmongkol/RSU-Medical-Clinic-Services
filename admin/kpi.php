@@ -25,20 +25,25 @@ $sv = ['avg' => null, 'total' => 0, 'this_week' => 0, 'last_week' => 0,
 $sv_comments = []; $sv_total_rows = 0;
 
 try {
-    $r = $pdo->query("
+    $r_stmt = $pdo->prepare("
         SELECT ROUND(AVG(rating),1) AS avg_r, COUNT(*) AS total,
                SUM(created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)) AS this_week,
                SUM(created_at >= DATE_SUB(NOW(), INTERVAL 14 DAY)
                    AND created_at < DATE_SUB(NOW(), INTERVAL 7 DAY)) AS last_week
         FROM satisfaction_surveys
-    ")->fetch();
+        WHERE clinic_id = :clinic_id
+    ");
+    $r_stmt->execute([':clinic_id' => clinic_id()]);
+    $r = $r_stmt->fetch();
     if ($r && (int)$r['total'] > 0) {
         $sv['avg']       = round((float)$r['avg_r'], 1);
         $sv['total']     = (int)$r['total'];
         $sv['this_week'] = (int)$r['this_week'];
         $sv['last_week'] = (int)$r['last_week'];
     }
-    foreach ($pdo->query("SELECT rating, COUNT(*) cnt FROM satisfaction_surveys GROUP BY rating")->fetchAll() as $d) {
+    $dist_stmt = $pdo->prepare("SELECT rating, COUNT(*) cnt FROM satisfaction_surveys WHERE clinic_id = :clinic_id GROUP BY rating");
+    $dist_stmt->execute([':clinic_id' => clinic_id()]);
+    foreach ($dist_stmt->fetchAll() as $d) {
         $sv['dist'][(int)$d['rating']] = (int)$d['cnt'];
     }
 
@@ -46,10 +51,13 @@ try {
     $sv_page  = max(1, (int)($_GET['cp'] ?? 1));
     $sv_per   = 20;
     $sv_off   = ($sv_page - 1) * $sv_per;
-    $sv_total_rows = (int)$pdo->query("SELECT COUNT(*) FROM satisfaction_surveys WHERE TRIM(IFNULL(comment,'')) != ''")->fetchColumn();
+    $cnt_stmt = $pdo->prepare("SELECT COUNT(*) FROM satisfaction_surveys WHERE TRIM(IFNULL(comment,'')) != '' AND clinic_id = :clinic_id");
+    $cnt_stmt->execute([':clinic_id' => clinic_id()]);
+    $sv_total_rows = (int)$cnt_stmt->fetchColumn();
     $stmt = $pdo->prepare("SELECT rating, comment, created_at FROM satisfaction_surveys
-                           WHERE TRIM(IFNULL(comment,'')) != ''
+                           WHERE TRIM(IFNULL(comment,'')) != '' AND clinic_id = :clinic_id
                            ORDER BY created_at DESC LIMIT :lim OFFSET :off");
+    $stmt->bindValue(':clinic_id', clinic_id(), PDO::PARAM_INT);
     $stmt->bindValue(':lim', $sv_per, PDO::PARAM_INT);
     $stmt->bindValue(':off', $sv_off, PDO::PARAM_INT);
     $stmt->execute();

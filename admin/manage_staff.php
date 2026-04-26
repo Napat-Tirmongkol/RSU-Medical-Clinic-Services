@@ -40,16 +40,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error = 'Password ต้องมีอย่างน้อย 8 ตัวอักษร';
         } else {
             try {
-                $dup = $pdo->prepare("SELECT id FROM sys_staff WHERE username = ?");
-                $dup->execute([$username]);
+                $dup = $pdo->prepare("SELECT id FROM sys_staff WHERE username = ? AND clinic_id = ?");
+                $dup->execute([$username, clinic_id()]);
                 if ($dup->fetch()) {
                     $error = "Username '$username' มีในระบบแล้ว";
                 } else {
                     $hashed = password_hash($password, PASSWORD_DEFAULT);
                     $pdo->prepare("INSERT INTO sys_staff
-                        (username, password_hash, full_name, role, account_status, access_ecampaign, ecampaign_role)
-                        VALUES (?,?,?,?,?,?,?)")
-                        ->execute([$username, $hashed, $fullName, $role, $status, $accessEc, $ecRole]);
+                        (username, password_hash, full_name, role, account_status, access_ecampaign, ecampaign_role, clinic_id)
+                        VALUES (?,?,?,?,?,?,?,?)")
+                        ->execute([$username, $hashed, $fullName, $role, $status, $accessEc, $ecRole, clinic_id()]);
                     log_activity('staff_add', "เพิ่มเจ้าหน้าที่ใหม่: $fullName ($username) [e-Campaign: " . ($accessEc ? $ecRole : 'ไม่มีสิทธิ์') . "]");
                     $success = "เพิ่มเจ้าหน้าที่ '$fullName' เรียบร้อยแล้ว";
                 }
@@ -81,14 +81,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             try {
                 $pdo->prepare("UPDATE sys_staff
                     SET full_name=?, username=?, role=?, account_status=?, access_ecampaign=?, ecampaign_role=?
-                    WHERE id=?")
-                    ->execute([$fullName, $username, $role, $status, $accessEc, $ecRole, $staffId]);
+                    WHERE id=? AND clinic_id=?")
+                    ->execute([$fullName, $username, $role, $status, $accessEc, $ecRole, $staffId, clinic_id()]);
                 if (!empty($password)) {
                     if (strlen($password) < 8) {
                         $error = 'Password ต้องมีอย่างน้อย 8 ตัวอักษร';
                     } else {
-                        $pdo->prepare("UPDATE sys_staff SET password_hash=? WHERE id=?")
-                            ->execute([password_hash($password, PASSWORD_DEFAULT), $staffId]);
+                        $pdo->prepare("UPDATE sys_staff SET password_hash=? WHERE id=? AND clinic_id=?")
+                            ->execute([password_hash($password, PASSWORD_DEFAULT), $staffId, clinic_id()]);
                     }
                 }
                 if (!$error) {
@@ -107,10 +107,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // ป้องกันลบตัวเอง (ถ้าเป็น staff login)
         if ($staffId > 0 && !(isset($_SESSION['is_ecampaign_staff']) && (int)$_SESSION['admin_id'] === $staffId)) {
             try {
-                $row = $pdo->prepare("SELECT full_name FROM sys_staff WHERE id=?");
-                $row->execute([$staffId]);
+                $row = $pdo->prepare("SELECT full_name FROM sys_staff WHERE id=? AND clinic_id=?");
+                $row->execute([$staffId, clinic_id()]);
                 $name = $row->fetchColumn() ?: "ID $staffId";
-                $pdo->prepare("DELETE FROM sys_staff WHERE id=?")->execute([$staffId]);
+                $pdo->prepare("DELETE FROM sys_staff WHERE id=? AND clinic_id=?")->execute([$staffId, clinic_id()]);
                 log_activity('staff_delete', "ลบเจ้าหน้าที่: $name");
                 $success = "ลบเจ้าหน้าที่ '$name' เรียบร้อยแล้ว";
             } catch (PDOException $e) {
@@ -125,12 +125,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($action === 'toggle_status') {
         $staffId = (int)($_POST['staff_id'] ?? 0);
         if ($staffId > 0) {
-            $cur = $pdo->prepare("SELECT account_status FROM sys_staff WHERE id=?");
-            $cur->execute([$staffId]);
+            $cur = $pdo->prepare("SELECT account_status FROM sys_staff WHERE id=? AND clinic_id=?");
+            $cur->execute([$staffId, clinic_id()]);
             $curStatus = $cur->fetchColumn();
             $newStatus = ($curStatus === 'active') ? 'disabled' : 'active';
-            $pdo->prepare("UPDATE sys_staff SET account_status=? WHERE id=?")
-                ->execute([$newStatus, $staffId]);
+            $pdo->prepare("UPDATE sys_staff SET account_status=? WHERE id=? AND clinic_id=?")
+                ->execute([$newStatus, $staffId, clinic_id()]);
             log_activity('staff_toggle', "เปลี่ยนสถานะเจ้าหน้าที่ ID $staffId เป็น $newStatus");
             $success = 'อัปเดตสถานะเรียบร้อยแล้ว';
         }
@@ -139,13 +139,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 // ── ดึงข้อมูล Staff ทั้งหมด ──────────────────────────────────────────────────
 try {
-    $staffList = $pdo->query("
+    $stmtStaff = $pdo->prepare("
         SELECT id, username, full_name, role, account_status,
                IFNULL(access_ecampaign,0) AS access_ecampaign,
                IFNULL(ecampaign_role,'editor') AS ecampaign_role
         FROM sys_staff
+        WHERE clinic_id = :clinic_id
         ORDER BY account_status ASC, full_name ASC
-    ")->fetchAll(PDO::FETCH_ASSOC);
+    ");
+    $stmtStaff->execute([':clinic_id' => clinic_id()]);
+    $staffList = $stmtStaff->fetchAll(PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
     $staffList = [];
     $error = 'ไม่สามารถดึงข้อมูลเจ้าหน้าที่ได้: ' . $e->getMessage();

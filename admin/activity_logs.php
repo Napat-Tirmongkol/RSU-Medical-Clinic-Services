@@ -14,8 +14,8 @@ $limit = 25;
 $offset = ($page - 1) * $limit;
 $search = $_GET['search'] ?? '';
 
-$where = "WHERE 1=1";
-$params = [];
+$where = "WHERE l.clinic_id = ?";
+$params = [clinic_id()];
 if (!empty($search)) {
     $where .= " AND (l.action LIKE ? OR l.description LIKE ?)";
     $params[] = "%$search%";

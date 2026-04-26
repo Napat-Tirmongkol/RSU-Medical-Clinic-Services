@@ -27,10 +27,21 @@ $endDate = date('Y-m-t', strtotime($startDate));
 
 /** (2) KPI AGGREGATION (Insights) */
 try {
-    $total_pending = (int) $pdo->query("SELECT COUNT(*) FROM camp_bookings WHERE status = 'booked'")->fetchColumn();
-    $total_confirmed = (int) $pdo->query("SELECT COUNT(*) FROM camp_bookings WHERE status = 'confirmed'")->fetchColumn();
-    $total_cancelled = (int) $pdo->query("SELECT COUNT(*) FROM camp_bookings WHERE status IN ('cancelled', 'cancelled_by_admin')")->fetchColumn();
-    $total_today = (int) $pdo->query("SELECT COUNT(*) FROM camp_bookings b JOIN camp_slots s ON b.slot_id = s.id WHERE s.slot_date = CURDATE()")->fetchColumn();
+    $stmt_kpi = $pdo->prepare("SELECT COUNT(*) FROM camp_bookings WHERE status = 'booked' AND clinic_id = :clinic_id");
+    $stmt_kpi->execute([':clinic_id' => clinic_id()]);
+    $total_pending = (int) $stmt_kpi->fetchColumn();
+
+    $stmt_kpi = $pdo->prepare("SELECT COUNT(*) FROM camp_bookings WHERE status = 'confirmed' AND clinic_id = :clinic_id");
+    $stmt_kpi->execute([':clinic_id' => clinic_id()]);
+    $total_confirmed = (int) $stmt_kpi->fetchColumn();
+
+    $stmt_kpi = $pdo->prepare("SELECT COUNT(*) FROM camp_bookings WHERE status IN ('cancelled', 'cancelled_by_admin') AND clinic_id = :clinic_id");
+    $stmt_kpi->execute([':clinic_id' => clinic_id()]);
+    $total_cancelled = (int) $stmt_kpi->fetchColumn();
+
+    $stmt_kpi = $pdo->prepare("SELECT COUNT(*) FROM camp_bookings b JOIN camp_slots s ON b.slot_id = s.id WHERE s.slot_date = CURDATE() AND b.clinic_id = :clinic_id");
+    $stmt_kpi->execute([':clinic_id' => clinic_id()]);
+    $total_today = (int) $stmt_kpi->fetchColumn();
 } catch (PDOException $e) { /* fallback */
     $total_pending = $total_confirmed = $total_cancelled = $total_today = 0;
 }
@@ -47,16 +58,17 @@ try {
         JOIN sys_users u ON b.student_id = u.id
         JOIN camp_slots s ON b.slot_id = s.id
         JOIN camp_list c ON b.campaign_id = c.id
-        WHERE (
+        WHERE b.clinic_id = :clinic_id
+          AND (
             (s.slot_date >= :start AND s.slot_date <= :end AND b.status IN ('booked', 'confirmed'))
             OR b.status IN ('cancelled', 'cancelled_by_admin')
-        )
+          )
         ORDER BY
             CASE WHEN b.status = 'booked' THEN 0 ELSE 1 END,
             s.slot_date ASC, s.start_time ASC
     ";
     $stmt = $pdo->prepare($sql);
-    $stmt->execute([':start' => $startDate, ':end' => $endDate]);
+    $stmt->execute([':clinic_id' => clinic_id(), ':start' => $startDate, ':end' => $endDate]);
     $bookings = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
     die("Data Fetch Error: " . $e->getMessage());

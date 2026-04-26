@@ -9,15 +9,22 @@ try {
     $pdo = db();
     
     // 1. ดึงสถิติภาพรวม
-    $stmt = $pdo->query("
+    $stmt = $pdo->prepare("
         SELECT
             COUNT(*) as total_campaigns,
-            (SELECT COUNT(*) FROM camp_bookings WHERE status = 'booked') as pending_count,
-            (SELECT COUNT(*) FROM camp_bookings WHERE status = 'confirmed') as confirmed_count,
-            (SELECT COUNT(*) FROM camp_bookings WHERE created_at >= CURDATE()) as bookings_today,
-            (SELECT COUNT(*) FROM sys_users WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)) as new_users_7d
-        FROM camp_list WHERE status = 'active'
+            (SELECT COUNT(*) FROM camp_bookings WHERE status = 'booked' AND clinic_id = :cid1) as pending_count,
+            (SELECT COUNT(*) FROM camp_bookings WHERE status = 'confirmed' AND clinic_id = :cid2) as confirmed_count,
+            (SELECT COUNT(*) FROM camp_bookings WHERE created_at >= CURDATE() AND clinic_id = :cid3) as bookings_today,
+            (SELECT COUNT(*) FROM sys_users WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY) AND clinic_id = :cid4) as new_users_7d
+        FROM camp_list WHERE status = 'active' AND clinic_id = :cid5
     ");
+    $stmt->execute([
+        ':cid1' => clinic_id(),
+        ':cid2' => clinic_id(),
+        ':cid3' => clinic_id(),
+        ':cid4' => clinic_id(),
+        ':cid5' => clinic_id(),
+    ]);
     $stats = $stmt->fetch(PDO::FETCH_ASSOC) ?: [
         'total_campaigns' => 0,
         'pending_count' => 0,

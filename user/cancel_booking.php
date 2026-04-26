@@ -23,8 +23,8 @@ try {
     $pdo = db();
     
     // ดึงข้อมูลผู้ใช้เพื่อตรวจสอบว่าเป็นเจ้าของนัดหมายจริงหรือไม่
-    $stmtU = $pdo->prepare("SELECT student_personnel_id, id FROM sys_users WHERE line_user_id = :line_id LIMIT 1");
-    $stmtU->execute([':line_id' => $lineUserId]);
+    $stmtU = $pdo->prepare("SELECT student_personnel_id, id FROM sys_users WHERE line_user_id = :line_id AND clinic_id = :clinic_id LIMIT 1");
+    $stmtU->execute([':line_id' => $lineUserId, ':clinic_id' => clinic_id()]);
     $user = $stmtU->fetch(PDO::FETCH_ASSOC);
 
     if (!$user) {

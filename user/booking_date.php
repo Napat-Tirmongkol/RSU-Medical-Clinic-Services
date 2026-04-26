@@ -19,8 +19,8 @@ if ($campaignId <= 0) {
 try {
     $pdo = db();
     // Get user details
-    $stmtU = $pdo->prepare("SELECT id, student_personnel_id FROM sys_users WHERE line_user_id = :line_id LIMIT 1");
-    $stmtU->execute([':line_id' => $lineUserId]);
+    $stmtU = $pdo->prepare("SELECT id, student_personnel_id FROM sys_users WHERE line_user_id = :line_id AND clinic_id = :clinic_id LIMIT 1");
+    $stmtU->execute([':line_id' => $lineUserId, ':clinic_id' => clinic_id()]);
     $user = $stmtU->fetch();
     
     if (!$user) {
@@ -31,8 +31,8 @@ try {
     $studentId = (int)$user['id'];
     
     // Check existing booking (Fix: Use student_id instead of student_personnel_id)
-    $stmtCheck = $pdo->prepare("SELECT COUNT(*) FROM camp_bookings WHERE student_id = :sid AND campaign_id = :cid AND status IN ('confirmed', 'booked')");
-    $stmtCheck->execute([':sid' => $studentId, ':cid' => $campaignId]);
+    $stmtCheck = $pdo->prepare("SELECT COUNT(*) FROM camp_bookings WHERE student_id = :sid AND campaign_id = :cid AND clinic_id = :clinic_id AND status IN ('confirmed', 'booked')");
+    $stmtCheck->execute([':sid' => $studentId, ':cid' => $campaignId, ':clinic_id' => clinic_id()]);
     if ((int)$stmtCheck->fetchColumn() > 0) {
         header('Location: my_bookings.php?error=already_booked');
         exit;
@@ -55,14 +55,14 @@ try {
     $startDate = "$year-" . str_pad((string)$month, 2, '0', STR_PAD_LEFT) . "-01";
     $endDate   = date('Y-m-d', strtotime("$startDate +1 month"));
 
-    $sqlTotal = "SELECT DAY(slot_date) AS day_num, SUM(max_capacity) AS total FROM camp_slots WHERE slot_date >= :s AND slot_date < :e AND campaign_id = :cid GROUP BY DAY(slot_date)";
+    $sqlTotal = "SELECT DAY(slot_date) AS day_num, SUM(max_capacity) AS total FROM camp_slots WHERE slot_date >= :s AND slot_date < :e AND campaign_id = :cid AND clinic_id = :clinic_id GROUP BY DAY(slot_date)";
     $stmt = $pdo->prepare($sqlTotal);
-    $stmt->execute([':s' => $startDate, ':e' => $endDate, ':cid' => $campaignId]);
+    $stmt->execute([':s' => $startDate, ':e' => $endDate, ':cid' => $campaignId, ':clinic_id' => clinic_id()]);
     $totals = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
 
-    $sqlBooked = "SELECT DAY(ts.slot_date) AS day_num, COUNT(*) AS booked FROM camp_bookings ap JOIN camp_slots ts ON ts.id = ap.slot_id WHERE ts.slot_date >= :s AND ts.slot_date < :e AND ap.campaign_id = :cid AND ap.status IN ('confirmed', 'booked') GROUP BY DAY(ts.slot_date)";
+    $sqlBooked = "SELECT DAY(ts.slot_date) AS day_num, COUNT(*) AS booked FROM camp_bookings ap JOIN camp_slots ts ON ts.id = ap.slot_id WHERE ts.slot_date >= :s AND ts.slot_date < :e AND ap.campaign_id = :cid AND ap.clinic_id = :clinic_id AND ap.status IN ('confirmed', 'booked') GROUP BY DAY(ts.slot_date)";
     $stmt2 = $pdo->prepare($sqlBooked);
-    $stmt2->execute([':s' => $startDate, ':e' => $endDate, ':cid' => $campaignId]);
+    $stmt2->execute([':s' => $startDate, ':e' => $endDate, ':cid' => $campaignId, ':clinic_id' => clinic_id()]);
     $bookeds = $stmt2->fetchAll(PDO::FETCH_KEY_PAIR);
 
     for ($d = 1; $d <= 31; $d++) {
