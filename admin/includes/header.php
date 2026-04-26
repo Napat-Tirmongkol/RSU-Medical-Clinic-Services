@@ -319,7 +319,7 @@ function closeMobileSidebar(){
         $notifAjaxUrl = (substr($_curDir, -6) === '/admin')
             ? 'ajax/ajax_notifications.php'
             : '../admin/ajax/ajax_notifications.php';
-        $notifErrorUrl   = (substr($_curDir, -6) === '/admin') ? 'error_logs.php'   : '../admin/error_logs.php';
+        $notifErrorUrl   = '../portal/index.php?section=error_logs';
         $notifBookingUrl = (substr($_curDir, -6) === '/admin') ? 'bookings.php'      : '../admin/bookings.php';
         unset($_curDir);
         ?>
