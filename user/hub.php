@@ -952,7 +952,7 @@ document.getElementById('insDetailModal').addEventListener('click', function(e) 
             try {
                 const formData = new FormData();
                 formData.append('message', message);
-                const response = await fetch('ajax_chat.php?action=send', {
+                const response = await fetch('ajax/ajax_chat.php?action=send', {
                     method: 'POST',
                     body: formData
                 });
@@ -969,7 +969,7 @@ document.getElementById('insDetailModal').addEventListener('click', function(e) 
             if (isPolling) return;
             isPolling = true;
             try {
-                const response = await fetch(`ajax_chat.php?action=get&last_id=${lastChatId}`);
+                const response = await fetch(`ajax/ajax_chat.php?action=get&last_id=${lastChatId}`);
                 const text = await response.text();
                 let result;
                 try { result = JSON.parse(text); } catch(e) {
@@ -1488,7 +1488,7 @@ document.getElementById('insDetailModal').addEventListener('click', function(e) 
         fd.append('action', 'mark_read');
         fd.append('ann_id', ann.id);
 
-        fetch('../portal/ajax_announcements.php', { method: 'POST', body: fd })
+        fetch('../portal/ajax/ajax_announcements.php', { method: 'POST', body: fd })
             .then(r => r.json())
             .catch(() => ({ status: 'ok' })) // ถ้า fail ก็ปิดต่อไป
             .then(() => {

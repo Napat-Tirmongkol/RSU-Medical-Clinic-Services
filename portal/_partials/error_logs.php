@@ -560,7 +560,7 @@ async function handleStatusUpdate(e) {
         fd.append('status', status);
         fd.append('resolve_comment', comment);
 
-        const res = await fetch('ajax_error_logs.php', {
+        const res = await fetch('ajax/ajax_error_logs.php', {
             method: 'POST',
             body: fd
         });

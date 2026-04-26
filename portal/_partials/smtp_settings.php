@@ -174,7 +174,7 @@ $_smtp_fileWritable = file_exists($_smtp_secretsPath) ? is_writable($_smtp_secre
         const fd = new FormData();
         const d  = getFormData(); d.action = 'save';
         for (const [k, v] of Object.entries(d)) fd.append(k, v);
-        fetch('ajax_test_smtp.php', { method: 'POST', body: fd })
+        fetch('ajax/ajax_test_smtp.php', { method: 'POST', body: fd })
             .then(r => r.json())
             .then(data => {
                 const el = document.getElementById('smtpSaveStatus');
@@ -203,7 +203,7 @@ $_smtp_fileWritable = file_exists($_smtp_secretsPath) ? is_writable($_smtp_secre
         d.action   = type === 'basic' ? 'test' : 'test_template';
         if (type !== 'basic') d.template_type = type;
         for (const [k, v] of Object.entries(d)) fd.append(k, v);
-        fetch('ajax_test_smtp.php', { method: 'POST', body: fd })
+        fetch('ajax/ajax_test_smtp.php', { method: 'POST', body: fd })
             .then(r => r.json())
             .then(data => smtpShowResult(data.ok, data.ok ? data.message : (data.error || 'ส่งอีเมลไม่สำเร็จ')))
             .catch(() => smtpShowResult(false, 'ไม่สามารถเชื่อมต่อ server ได้'))

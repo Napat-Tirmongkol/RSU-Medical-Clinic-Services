@@ -13,7 +13,7 @@ if (empty($_SESSION['user_id'])) {
     exit;
 }
 
-require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../../config.php';
 validate_csrf_or_die();
 
 $announcementId = (int)($_POST['announcement_id'] ?? 0);

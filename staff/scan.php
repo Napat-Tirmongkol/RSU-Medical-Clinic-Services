@@ -403,7 +403,7 @@ function processCheckin(qrData, isManual, isConfirmed = false) {
     fd.append('csrf_token', csrfToken);
     if (isConfirmed) fd.append('confirm', '1');
 
-    fetch('ajax_scan_checkin.php', { method: 'POST', body: fd })
+    fetch('ajax/ajax_scan_checkin.php', { method: 'POST', body: fd })
         .then(r => r.json())
         .then(data => {
             if (data.status === 'preview') {

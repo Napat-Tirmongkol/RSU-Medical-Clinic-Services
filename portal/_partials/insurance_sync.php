@@ -239,7 +239,7 @@ $csrfToken = get_csrf_token();
             fd.append('csrf_token', CSRF);
             fd.append('insurance_file', file);
 
-            const res = await fetch('ajax_insurance_sync.php', { method: 'POST', body: fd });
+            const res = await fetch('ajax/ajax_insurance_sync.php', { method: 'POST', body: fd });
             const data = await res.json();
 
             resultDiv.classList.remove('hidden');
@@ -292,7 +292,7 @@ $csrfToken = get_csrf_token();
         fd.append('filter_status', document.getElementById('insFilterStatus').value);
 
         try {
-            const res  = await fetch('ajax_insurance_sync.php', { method: 'POST', body: fd });
+            const res  = await fetch('ajax/ajax_insurance_sync.php', { method: 'POST', body: fd });
             const data = await res.json();
             if (data.status !== 'ok') throw new Error(data.message);
 
@@ -411,7 +411,7 @@ $csrfToken = get_csrf_token();
         fd.append('remarks',          document.getElementById('imRemarks').value.trim());
 
         try {
-            const res  = await fetch('ajax_insurance_sync.php', { method: 'POST', body: fd });
+            const res  = await fetch('ajax/ajax_insurance_sync.php', { method: 'POST', body: fd });
             const data = await res.json();
             if (data.status === 'ok') {
                 closeInsMemberModal();
@@ -434,7 +434,7 @@ $csrfToken = get_csrf_token();
         fd.append('action', 'set_visibility');
         fd.append('csrf_token', CSRF);
         fd.append('active', cb.checked ? '1' : '0');
-        fetch('ajax_insurance_sync.php', { method: 'POST', body: fd })
+        fetch('ajax/ajax_insurance_sync.php', { method: 'POST', body: fd })
             .then(r => r.json())
             .then(data => {
                 const lbl = document.getElementById('insVisibilityLabel');

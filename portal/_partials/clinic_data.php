@@ -428,7 +428,7 @@ $_cd_qs = http_build_query(array_filter(['section' => 'clinic_data', 'cd_search'
 <script>
 (function () {
     const CSRF = '<?= htmlspecialchars(get_csrf_token()) ?>';
-    const ENDPOINT = 'ajax_clinic_data.php';
+    const ENDPOINT = 'ajax/ajax_clinic_data.php';
 
     // ── Tab Switcher ─────────────────────────────────────────────────────────
     window.switchClinicTab = function (tabId) {

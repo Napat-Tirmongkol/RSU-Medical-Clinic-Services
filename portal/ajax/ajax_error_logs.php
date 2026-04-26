@@ -5,8 +5,8 @@ declare(strict_types=1);
 if (session_status() === PHP_SESSION_NONE) {
 }
 
-require_once __DIR__ . '/../config.php';
-require_once __DIR__ . '/includes/auth.php';
+require_once __DIR__ . '/../../config.php';
+require_once __DIR__ . '/../includes/auth.php';
 
 header('Content-Type: application/json');
 

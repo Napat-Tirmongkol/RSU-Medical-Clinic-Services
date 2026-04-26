@@ -524,7 +524,7 @@ function toggleMaintenance(input) {
     fd.append('active',     active ? '1' : '0');
     fd.append('csrf_token', CSRF);
 
-    fetch('ajax_maintenance.php', { method: 'POST', body: fd })
+    fetch('ajax/ajax_maintenance.php', { method: 'POST', body: fd })
         .then(r => r.json())
         .then(d => {
             if (d.ok) {

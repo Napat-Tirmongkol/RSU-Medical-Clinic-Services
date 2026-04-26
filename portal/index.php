@@ -2124,7 +2124,7 @@ try {
                         const btn = document.getElementById('btnSavePriv');
                         btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> กำลังบันทึก...';
                         
-                        fetch('ajax_privilege_inventory.php', { method: 'POST', body: fd })
+                        fetch('ajax/ajax_privilege_inventory.php', { method: 'POST', body: fd })
                         .then(r => r.json())
                         .then(d => {
                             if(d.status === 'success') {
@@ -2460,7 +2460,7 @@ try {
             const fd = new FormData();
             fd.append('project_id', projId);
 
-            fetch('ajax_pins.php?action=toggle', {
+            fetch('ajax/ajax_pins.php?action=toggle', {
                 method: 'POST',
                 body: fd
             })
@@ -2705,7 +2705,7 @@ try {
 
         function poll() {
             setBadge('loading');
-            fetch('ajax_stats.php', { credentials: 'same-origin' })
+            fetch('ajax/ajax_stats.php', { credentials: 'same-origin' })
                 .then(r => r.ok ? r.json() : Promise.reject(r.status))
                 .then(d => {
                     if (!d.ok) { setBadge('offline'); return; }
@@ -3045,7 +3045,7 @@ try {
                 // Show loading state
                 tbody.style.opacity = '0.5';
                 
-                var url = 'ajax_identity_users.php?page=' + currentPage + '&pageSize=' + pageSize + '&search=' + encodeURIComponent(searchQuery);
+                var url = 'ajax/ajax_identity_users.php?page=' + currentPage + '&pageSize=' + pageSize + '&search=' + encodeURIComponent(searchQuery);
 
                 fetch(url)
                     .then(res => res.json())
@@ -3339,7 +3339,7 @@ try {
                     fd.append('active', active ? '1' : '0');
                     fd.append('csrf_token', portal_CSRF);
 
-                    fetch('ajax_maintenance.php', { method: 'POST', body: fd })
+                    fetch('ajax/ajax_maintenance.php', { method: 'POST', body: fd })
                         .then(r => r.json())
                         .then(d => {
                             if (d.ok) {

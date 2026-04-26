@@ -140,7 +140,7 @@ document.addEventListener('DOMContentLoaded', function() {
         formData.append('csrf_token', '<?= get_csrf_token() ?>');
         if (isConfirmed) formData.append('confirm', '1');
 
-        fetch('ajax_scan_checkin.php', { method: 'POST', body: formData })
+        fetch('ajax/ajax_scan_checkin.php', { method: 'POST', body: formData })
             .then(res => res.json())
             .then(data => {
                 let swalConfig = { allowOutsideClick: false, customClass: { title: 'font-prompt', popup: 'font-prompt rounded-3xl' }};

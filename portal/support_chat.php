@@ -617,7 +617,7 @@ $pdo = db();
 
         async function loadUsers() {
             try {
-                const res = await fetch('ajax_support_chat.php?action=list_users');
+                const res = await fetch('ajax/ajax_support_chat.php?action=list_users');
                 const text = await res.text();
                 let data;
                 try {
@@ -650,7 +650,7 @@ $pdo = db();
         async function loadMessages() {
             if (!currentUserId) return;
             try {
-                const res = await fetch(`ajax_support_chat.php?action=get_messages&user_id=${currentUserId}`);
+                const res = await fetch(`ajax/ajax_support_chat.php?action=get_messages&user_id=${currentUserId}`);
                 const text = await res.text();
                 let data;
                 try { data = JSON.parse(text); } catch(e) {
@@ -689,7 +689,7 @@ $pdo = db();
             formData.append('message', message);
 
             try {
-                const res = await fetch('ajax_support_chat.php?action=send_reply', {
+                const res = await fetch('ajax/ajax_support_chat.php?action=send_reply', {
                     method: 'POST',
                     body: formData
                 });

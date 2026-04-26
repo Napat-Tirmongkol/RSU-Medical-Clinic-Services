@@ -301,7 +301,7 @@ function saveConfig() {
     d.action = 'save';
     for (const [k, v] of Object.entries(d)) fd.append(k, v);
 
-    fetch('ajax_test_smtp.php', { method: 'POST', body: fd })
+    fetch('ajax/ajax_test_smtp.php', { method: 'POST', body: fd })
         .then(r => r.json())
         .then(data => {
             const el = document.getElementById('saveStatus');
@@ -335,7 +335,7 @@ function sendTest(type, btnEl) {
     if (type !== 'basic') d.template_type = type;
     for (const [k, v] of Object.entries(d)) fd.append(k, v);
 
-    fetch('ajax_test_smtp.php', { method: 'POST', body: fd })
+    fetch('ajax/ajax_test_smtp.php', { method: 'POST', body: fd })
         .then(r => r.json())
         .then(data => showTestResult(data.ok, data.ok ? data.message : (data.error || 'ส่งอีเมลไม่สำเร็จ')))
         .catch(() => showTestResult(false, 'ไม่สามารถเชื่อมต่อ server ได้'))

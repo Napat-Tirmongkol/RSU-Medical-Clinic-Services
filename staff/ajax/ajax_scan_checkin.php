@@ -12,7 +12,7 @@ if (!$viaStaffLogin && !$viaPortalLogin) {
     exit;
 }
 
-require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../../config.php';
 
 // [ISO 27001] ตรวจสอบสิทธิ์การเข้าถึงแบบ Real-time สำหรับ Staff
 try {

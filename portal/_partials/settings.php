@@ -94,7 +94,7 @@
                                 <i class="fa-solid fa-palette text-slate-300"></i>
                             </div>
                             <div class="p-8">
-                                <form id="siteSettingsForm" method="POST" action="ajax_site_settings.php" enctype="multipart/form-data" class="space-y-6">
+                                <form id="siteSettingsForm" method="POST" action="ajax/ajax_site_settings.php" enctype="multipart/form-data" class="space-y-6">
                                     <?php csrf_field(); ?>
                                     <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
                                         <!-- Site Name -->
@@ -327,7 +327,7 @@
                     fd.append('csrf_token', portal_CSRF);
                     
                     try {
-                        const res = await fetch('ajax_maintenance.php', { method: 'POST', body: fd });
+                        const res = await fetch('ajax/ajax_maintenance.php', { method: 'POST', body: fd });
                         const data = await res.json();
                         if (data.ok) {
                             showPortalToast(data.message, 'success');
@@ -348,7 +348,7 @@
                     fd.append('csrf_token', portal_CSRF);
                     
                     try {
-                        const res = await fetch('ajax_maintenance.php', { method: 'POST', body: fd });
+                        const res = await fetch('ajax/ajax_maintenance.php', { method: 'POST', body: fd });
                         const data = await res.json();
                         if (data.ok) {
                             showPortalToast(data.message, 'success');

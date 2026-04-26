@@ -6,8 +6,8 @@
 declare(strict_types=1);
 
 // Load configuration and authentication
-require_once __DIR__ . '/../config.php';
-require_once __DIR__ . '/includes/auth.php'; // Ensure security and starts session
+require_once __DIR__ . '/../../config.php';
+require_once __DIR__ . '/../includes/auth.php'; // Ensure security and starts session
 
 header('Content-Type: application/json');
 

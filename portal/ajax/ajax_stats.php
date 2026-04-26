@@ -11,7 +11,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     exit;
 }
 
-require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../../config.php';
 
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');

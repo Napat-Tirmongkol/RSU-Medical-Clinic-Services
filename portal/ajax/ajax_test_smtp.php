@@ -1,8 +1,8 @@
 <?php
 // portal/ajax_test_smtp.php — ทดสอบการส่งอีเมลผ่าน SMTP
 declare(strict_types=1);
-require_once __DIR__ . '/../config.php';
-require_once __DIR__ . '/includes/auth.php';
+require_once __DIR__ . '/../../config.php';
+require_once __DIR__ . '/../includes/auth.php';
 
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
@@ -29,7 +29,7 @@ if (($_SESSION['admin_role'] ?? '') !== 'superadmin') {
     http_response_code(403); exit(json_encode(['ok' => false, 'error' => 'Forbidden']));
 }
 
-require_once __DIR__ . '/../includes/mail_helper.php';
+require_once __DIR__ . '/../../includes/mail_helper.php';
 
 $action = $_POST['action'] ?? 'test';
 

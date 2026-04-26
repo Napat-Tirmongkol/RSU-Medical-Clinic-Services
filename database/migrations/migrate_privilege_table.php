@@ -1,6 +1,6 @@
 <?php
 /**
- * scratch/migrate_privilege_table.php
+ * dev/migrate_privilege_table.php
  * ขั้นตอนที่ 1: สร้างตาราง sys_admin_privilege_inventory และโฟลเดอร์จัดเก็บเอกสาร
  */
 require_once __DIR__ . '/../config.php';

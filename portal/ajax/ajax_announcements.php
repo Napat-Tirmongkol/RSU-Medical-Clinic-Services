@@ -1,7 +1,7 @@
 <?php
 // portal/ajax_announcements.php
 header('Content-Type: application/json');
-require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../../config.php';
 
 session_start();
 

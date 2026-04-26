@@ -187,7 +187,7 @@ function saveLineConfigP() {
     fd.append('LINE_MESSAGING_CHANNEL_ACCESS_TOKEN', document.getElementById('line_token_p').value);
     fd.append('LINE_MESSAGING_CHANNEL_SECRET', document.getElementById('line_secret_p').value);
 
-    fetch('ajax_test_line.php', { method: 'POST', body: fd })
+    fetch('ajax/ajax_test_line.php', { method: 'POST', body: fd })
         .then(r => r.json())
         .then(data => {
             const el = document.getElementById('saveStatusP');
@@ -220,7 +220,7 @@ function sendTestLineP() {
     fd.append('to_user_id', userId);
     fd.append('LINE_MESSAGING_CHANNEL_ACCESS_TOKEN', document.getElementById('line_token_p').value);
 
-    fetch('ajax_test_line.php', { method: 'POST', body: fd })
+    fetch('ajax/ajax_test_line.php', { method: 'POST', body: fd })
         .then(r => r.json())
         .then(data => {
             result.classList.remove('hidden');

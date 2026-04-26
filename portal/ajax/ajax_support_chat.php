@@ -2,7 +2,7 @@
 // portal/ajax_support_chat.php — Staff Chat Controller
 declare(strict_types=1);
 // NOTE: session_start() is handled by auth.php below
-require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../../config.php';
 
 header('Content-Type: application/json');
 header('Cache-Control: no-cache');
