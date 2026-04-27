@@ -44,3 +44,15 @@ define('LINE_MESSAGING_CHANNEL_SECRET', $secrets['LINE_MESSAGING_CHANNEL_SECRET'
 
 // 3. LIFF (LINE Front-end Framework)
 define('LINE_LIFF_ID', $secrets['LINE_LIFF_ID'] ?? '');
+
+// ============================================================
+// 4. LINE Login (NEW provider) — provider เดียวกับ Messaging API
+//    ใช้สำหรับ migrate UID จาก provider เดิมไปยัง provider ใหม่
+// ============================================================
+define('LINE_LOGIN_CHANNEL_ID_NEW', $secrets['LINE_LOGIN_CHANNEL_ID_NEW'] ?? '');
+define('LINE_LOGIN_CHANNEL_SECRET_NEW', $secrets['LINE_LOGIN_CHANNEL_SECRET_NEW'] ?? '');
+define('LINE_LIFF_ID_NEW', $secrets['LINE_LIFF_ID_NEW'] ?? '');
+define('LINE_LOGIN_CALLBACK_URL_NEW', $protocol . $host . $base_path . '/archive/line_api/migrate_callback.php');
+
+// Flag: ตรวจว่าเปิด migrate flow ได้ไหม (ต้องตั้ง credentials ใหม่ครบ)
+define('LINE_MIGRATE_ENABLED', LINE_LOGIN_CHANNEL_ID_NEW !== '' && LINE_LOGIN_CHANNEL_SECRET_NEW !== '');

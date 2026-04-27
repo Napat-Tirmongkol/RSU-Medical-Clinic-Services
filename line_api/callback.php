@@ -84,8 +84,18 @@ try {
     // Migration: เพิ่ม column picture_url ถ้ายังไม่มี
     try { $pdo->exec("ALTER TABLE sys_users ADD COLUMN IF NOT EXISTS picture_url TEXT"); } catch (PDOException $e) {}
 
+    // ── Migration helper: เผื่อมี column line_user_id_new ──────────
+    $hasNewUidColumn = false;
+    try {
+        $colCheck = $pdo->query("SHOW COLUMNS FROM sys_users LIKE 'line_user_id_new'")->fetch();
+        $hasNewUidColumn = (bool)$colCheck;
+    } catch (PDOException $e) { /* ignore */ }
+
     // ตรวจสอบว่าผู้ใช้ใน LINE นี้มีอยู่ในฐานข้อมูลหรือไม่
-    $stmt = $pdo->prepare("SELECT id, full_name, line_user_id FROM sys_users WHERE line_user_id = :line_user_id LIMIT 1");
+    $sqlSelect = $hasNewUidColumn
+        ? "SELECT id, full_name, line_user_id, line_user_id_new FROM sys_users WHERE line_user_id = :line_user_id LIMIT 1"
+        : "SELECT id, full_name, line_user_id FROM sys_users WHERE line_user_id = :line_user_id LIMIT 1";
+    $stmt = $pdo->prepare($sqlSelect);
     $stmt->execute([':line_user_id' => $line_user_id]);
     $user = $stmt->fetch();
 
@@ -117,16 +127,31 @@ try {
         // ตรวจสอบว่ามี invite_token ค้างอยู่หรือไม่ (มาจาก c.php?t=TOKEN)
         $inviteToken = $_SESSION['invite_token'] ?? '';
 
-        // Redirect ตามแอปที่ผู้ใช้มาจาก
+        // กำหนด final destination
         if ($redirectTarget === 'eborrow') {
-            header("Location: ../../e_Borrow/index.php");
+            $finalDest = '../../e_Borrow/index.php';
         } elseif ($inviteToken !== '') {
-            // มี invite token → ไปหน้า campaign นั้นโดยตรง ไม่ต้องผ่าน index
             unset($_SESSION['invite_token']);
-            header("Location: ../../user/c.php?t=" . urlencode($inviteToken));
+            $finalDest = '../../user/c.php?t=' . urlencode($inviteToken);
         } else {
-            header("Location: ../../user/hub.php");
+            $finalDest = '../../user/hub.php';
         }
+
+        // ── Migrate LINE Login Provider ──────────────────────────────
+        // ถ้าเปิด migrate flow ไว้ และ user ยังไม่มี new UID → เด้งไปหน้า migrate
+        $needsMigrate = defined('LINE_MIGRATE_ENABLED')
+            && LINE_MIGRATE_ENABLED
+            && $hasNewUidColumn
+            && empty($user['line_user_id_new']);
+
+        if ($needsMigrate) {
+            $_SESSION['migrate_old_uid']   = $user['line_user_id'];
+            $_SESSION['migrate_final_dest'] = $finalDest;
+            header('Location: migrate_login.php');
+            exit;
+        }
+
+        header("Location: {$finalDest}");
         exit;
 
     } else {

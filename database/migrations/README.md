@@ -20,6 +20,7 @@ php database/migrations/migrate_status_column.php
 | `migrate_privilege_table.php` | สร้างตาราง privilege inventory |
 | `fix_staff_schema.php` | แก้ schema ตาราง staff |
 | `setup_links.php` | ตั้งค่า symlinks |
+| `migrate_line_user_id_new.php` | เพิ่มคอลัมน์ line_user_id_new สำหรับ migrate LINE Login provider |
 
 ## หมายเหตุ
 - ไฟล์เหล่านี้รันครั้งเดียว (idempotent ด้วย `IF NOT EXISTS`)
