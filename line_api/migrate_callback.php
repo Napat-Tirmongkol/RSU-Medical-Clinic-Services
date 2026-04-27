@@ -4,17 +4,17 @@
 declare(strict_types=1);
 session_start();
 require_once __DIR__ . '/line_config.php';
-require_once __DIR__ . '/../../config.php';
+require_once __DIR__ . '/../config.php';
 
 /** ส่งผู้ใช้ไปหน้า error พร้อมเหตุผล */
 function migrate_redirect_error(string $reason): void {
-    header('Location: ../../user/migrate_error.php?reason=' . urlencode($reason));
+    header('Location: ' . LINE_APP_BASE_PATH . '/user/migrate_error.php?reason=' . urlencode($reason));
     exit;
 }
 
 /** ส่งผู้ใช้ไปยัง destination ที่ตั้งไว้ก่อน migrate (หรือ hub) */
 function migrate_redirect_final(): void {
-    $dest = $_SESSION['migrate_final_dest'] ?? '../../user/hub.php';
+    $dest = $_SESSION['migrate_final_dest'] ?? (LINE_APP_BASE_PATH . '/user/hub.php');
     unset($_SESSION['migrate_old_uid'], $_SESSION['migrate_final_dest'], $_SESSION['line_migrate_state']);
     header("Location: {$dest}");
     exit;
@@ -24,7 +24,7 @@ function migrate_redirect_final(): void {
 $oldUid = $_SESSION['migrate_old_uid'] ?? '';
 if ($oldUid === '') {
     // ไม่มี context เก่า — อาจเข้าหน้านี้ตรงๆ
-    header('Location: ../../user/index.php');
+    header('Location: ' . LINE_APP_BASE_PATH . '/user/index.php');
     exit;
 }
 
