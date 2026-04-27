@@ -1434,8 +1434,8 @@ try {
                         $pctOther = $totalUsersCalc > 0 ? (100 - $pctStudent - $pctStaff) : 0;
                         ?>
                         
-                        <!-- Statistics Bar -->
-                        <div style="background:#fff;border-radius:20px;padding:20px;margin-bottom:20px;border:1.5px solid #e2e8f0;box-shadow:0 4px 15px rgba(0,0,0,0.02)">
+	                        <!-- Statistics Bar -->
+	                        <div style="background:#fff;border-radius:20px;padding:20px;margin-bottom:20px;border:1.5px solid #e2e8f0;box-shadow:0 4px 15px rgba(0,0,0,0.02)">
                             <div style="font-size:12px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:15px;display:flex;align-items:center;gap:6px;">
                                 <i class="fa-solid fa-chart-pie" style="color:#2e9e63"></i> สัดส่วนประเภทผู้ใช้งาน
                             </div>
@@ -1465,10 +1465,49 @@ try {
                                     <div style="width:12px;height:12px;border-radius:4px;background:#8b5cf6;box-shadow:0 2px 4px rgba(139,92,246,0.3)"></div>
                                     <span style="color:#334155">บุคคลทั่วไป/อื่นๆ <span style="opacity:0.6;font-size:11px">(<?= $pctOther ?>%)</span></span>
                                 </div>
-                            </div>
-                        </div>
+	                            </div>
+	                        </div>
 
-                        <div style="background:#fff;border-radius:20px;border:1.5px solid #e2e8f0;overflow:hidden">
+                            <!-- LINE Provider Migration Progress -->
+                            <div style="background:#fff;border-radius:20px;padding:20px;margin-bottom:20px;border:1.5px solid #e2e8f0;box-shadow:0 4px 15px rgba(0,0,0,0.02)">
+                                <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px">
+                                    <div style="font-size:12px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:0.1em;display:flex;align-items:center;gap:6px;">
+                                        <i class="fa-brands fa-line" style="color:#06c755"></i> LINE Provider Migration
+                                    </div>
+                                    <div style="font-size:11px;font-weight:800;color:#0f172a;background:#f1f5f9;border:1px solid #e2e8f0;padding:5px 10px;border-radius:99px">
+                                        Coverage <?= (int)($lineMigration['coverage_pct'] ?? 0) ?>%
+                                    </div>
+                                </div>
+
+                                <?php if (!empty($lineMigration['column_ready'])): ?>
+                                    <div style="width:100%;height:12px;border-radius:99px;background:#f1f5f9;overflow:hidden;box-shadow:inset 0 1px 3px rgba(0,0,0,0.05);margin-bottom:14px">
+                                        <div style="width:<?= (int)$lineMigration['coverage_pct'] ?>%;height:100%;background:linear-gradient(90deg,#06c755,#34d399);transition:width .8s"></div>
+                                    </div>
+
+                                    <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px">
+                                        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;padding:12px">
+                                            <div style="font-size:11px;color:#64748b;font-weight:700">ผู้ใช้ที่มี LINE UID (เดิม)</div>
+                                            <div style="font-size:22px;font-weight:900;color:#0f172a;line-height:1.2"><?= number_format((int)$lineMigration['total_linked']) ?></div>
+                                        </div>
+                                        <div style="background:#ecfdf5;border:1px solid #bbf7d0;border-radius:14px;padding:12px">
+                                            <div style="font-size:11px;color:#065f46;font-weight:700">ย้ายแล้ว (มี UID ใหม่)</div>
+                                            <div style="font-size:22px;font-weight:900;color:#047857;line-height:1.2"><?= number_format((int)$lineMigration['migrated']) ?></div>
+                                        </div>
+                                        <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:14px;padding:12px">
+                                            <div style="font-size:11px;color:#92400e;font-weight:700">คงค้าง (ยังไม่ย้าย)</div>
+                                            <div style="font-size:22px;font-weight:900;color:#b45309;line-height:1.2"><?= number_format((int)$lineMigration['pending']) ?></div>
+                                        </div>
+                                    </div>
+                                <?php else: ?>
+                                    <div style="background:#fff7ed;border:1px solid #fdba74;border-radius:14px;padding:12px;font-size:12px;font-weight:700;color:#9a3412;display:flex;align-items:center;gap:8px">
+                                        <i class="fa-solid fa-triangle-exclamation"></i>
+                                        ยังไม่พบคอลัมน์ <code style="background:#fff;padding:2px 6px;border-radius:6px;border:1px solid #fed7aa">line_user_id_new</code> —
+                                        กรุณารัน migration ก่อนจึงจะแสดงสถิติการย้ายได้
+                                    </div>
+                                <?php endif; ?>
+                            </div>
+
+	                        <div style="background:#fff;border-radius:20px;border:1.5px solid #e2e8f0;overflow:hidden">
                             <div
                                 style="padding:18px 24px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;gap:8px">
                                 <div
@@ -3413,4 +3452,4 @@ try {
     </script>
 </body>
 
-</html>
+</html>

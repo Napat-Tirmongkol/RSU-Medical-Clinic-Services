@@ -25,6 +25,37 @@ $idActiveCount = (int) $pdo->query("
     WHERE id IN (SELECT student_id FROM camp_bookings WHERE student_id IS NOT NULL)
 ")->fetchColumn();
 
+// (0d) LINE PROVIDER MIGRATION STATS — for Identity dashboard
+$lineMigration = [
+    'column_ready' => false,
+    'total_linked' => 0,
+    'migrated' => 0,
+    'pending' => 0,
+    'coverage_pct' => 0,
+];
+try {
+    $hasNewUidCol = (bool) $pdo->query("SHOW COLUMNS FROM sys_users LIKE 'line_user_id_new'")->fetch();
+    $lineMigration['column_ready'] = $hasNewUidCol;
+
+    if ($hasNewUidCol) {
+        $row = $pdo->query("
+            SELECT
+                SUM(CASE WHEN line_user_id IS NOT NULL AND line_user_id <> '' THEN 1 ELSE 0 END) AS total_linked,
+                SUM(CASE WHEN line_user_id_new IS NOT NULL AND line_user_id_new <> '' THEN 1 ELSE 0 END) AS migrated
+            FROM sys_users
+        ")->fetch(PDO::FETCH_ASSOC) ?: [];
+
+        $lineMigration['total_linked'] = (int) ($row['total_linked'] ?? 0);
+        $lineMigration['migrated'] = (int) ($row['migrated'] ?? 0);
+        $lineMigration['pending'] = max(0, $lineMigration['total_linked'] - $lineMigration['migrated']);
+        $lineMigration['coverage_pct'] = $lineMigration['total_linked'] > 0
+            ? (int) round(($lineMigration['migrated'] / $lineMigration['total_linked']) * 100)
+            : 0;
+    }
+} catch (PDOException $e) {
+    // silent fallback (dashboard should remain usable)
+}
+
 // (0c) IDENTITY SECTION — ADMINS & STAFF QUERY (Superadmin Only)
 $allAdmins = [];
 $allStaff  = [];
