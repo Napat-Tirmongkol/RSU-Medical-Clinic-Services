@@ -10,7 +10,7 @@ require_once __DIR__ . '/line_config.php';
 // 1. ต้องเปิด migrate flow
 if (!defined('LINE_MIGRATE_ENABLED') || !LINE_MIGRATE_ENABLED) {
     // ถ้ายังไม่เปิด ก็ข้ามไปยัง destination เลย
-    $dest = $_SESSION['migrate_final_dest'] ?? '../../user/hub.php';
+    $dest = $_SESSION['migrate_final_dest'] ?? (LINE_APP_BASE_PATH . '/user/hub.php');
     unset($_SESSION['migrate_old_uid'], $_SESSION['migrate_final_dest']);
     header("Location: {$dest}");
     exit;
@@ -19,7 +19,7 @@ if (!defined('LINE_MIGRATE_ENABLED') || !LINE_MIGRATE_ENABLED) {
 // 2. ต้องผ่าน old callback มาก่อน (มี migrate_old_uid ใน session)
 if (empty($_SESSION['migrate_old_uid'])) {
     // ผู้ใช้เข้ามาตรงๆ โดยไม่ผ่าน flow ปกติ → ส่งกลับไป login ใหม่
-    header('Location: line_login.php');
+    header('Location: ' . LINE_APP_BASE_PATH . '/line_api/line_login.php');
     exit;
 }
 

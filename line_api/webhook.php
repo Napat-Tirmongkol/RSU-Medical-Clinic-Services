@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 // Webhook ไม่มี Session เพราะ LINE ยิงเข้ามาที่นี่แบบ Background
 // ควรจะ Include DB ถ้าต้องการบันทึกแชทหรือเช็คผู้ใช้
-require_once __DIR__ . '/../../config.php';
+require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/line_config.php';
 require_once __DIR__ . '/line_message_helper.php';
 

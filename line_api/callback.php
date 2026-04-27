@@ -5,7 +5,7 @@ session_start();
 
 // ดึงการตั้งค่า LINE และเชื่อมต่อ Database ของระบบหลัก
 require_once __DIR__ . '/line_config.php';
-require_once __DIR__ . '/../../config.php';
+require_once __DIR__ . '/../config.php';
 
 // ตรวจสอบว่า User จะไปหน้าไหนหลัง Login (e-campaign หรือ e_Borrow)
 $redirectTarget = $_SESSION['redirect_to'] ?? 'ecampaign';
@@ -129,12 +129,12 @@ try {
 
         // กำหนด final destination
         if ($redirectTarget === 'eborrow') {
-            $finalDest = '../../e_Borrow/index.php';
+            $finalDest = LINE_APP_BASE_PATH . '/e_Borrow/index.php';
         } elseif ($inviteToken !== '') {
             unset($_SESSION['invite_token']);
-            $finalDest = '../../user/c.php?t=' . urlencode($inviteToken);
+            $finalDest = LINE_APP_BASE_PATH . '/user/c.php?t=' . urlencode($inviteToken);
         } else {
-            $finalDest = '../../user/hub.php';
+            $finalDest = LINE_APP_BASE_PATH . '/user/hub.php';
         }
 
         // ── Migrate LINE Login Provider ──────────────────────────────
@@ -147,7 +147,7 @@ try {
         if ($needsMigrate) {
             $_SESSION['migrate_old_uid']   = $user['line_user_id'];
             $_SESSION['migrate_final_dest'] = $finalDest;
-            header('Location: migrate_login.php');
+            header('Location: ' . LINE_APP_BASE_PATH . '/line_api/migrate_login.php');
             exit;
         }
 
@@ -160,11 +160,10 @@ try {
         $_SESSION['line_picture_url']  = $linePicture;
         $_SESSION['pending_redirect']  = $redirectTarget;
 
-        header("Location: ../../user/profile.php");
+        header('Location: ' . LINE_APP_BASE_PATH . '/user/profile.php');
         exit;
     }
 
 } catch (PDOException $e) {
     error_log("LINE callback DB error: " . $e->getMessage()); http_response_code(500); exit("เกิดข้อผิดพลาด กรุณาลองใหม่");
 }
-
