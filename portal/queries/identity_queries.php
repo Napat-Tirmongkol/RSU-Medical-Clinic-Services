@@ -26,6 +26,54 @@ $idActiveCount = (int) $pdo->query("
 ")->fetchColumn();
 
 // (0c) IDENTITY SECTION — ADMINS & STAFF QUERY (Superadmin Only)
+$lineMigration = [
+    'has_old_column' => false,
+    'has_new_column' => false,
+    'old_uid_count' => 0,
+    'migrated_count' => 0,
+    'pending_count' => 0,
+    'covered_old_uid_count' => 0,
+    'coverage' => 0.0,
+];
+
+try {
+    $userColumns = $pdo->query("SHOW COLUMNS FROM sys_users")->fetchAll(PDO::FETCH_COLUMN);
+    $lineMigration['has_old_column'] = in_array('line_user_id', $userColumns, true);
+    $lineMigration['has_new_column'] = in_array('line_user_id_new', $userColumns, true);
+
+    if ($lineMigration['has_old_column']) {
+        if ($lineMigration['has_new_column']) {
+            $lineMigrationRow = $pdo->query("
+                SELECT
+                    SUM(CASE WHEN line_user_id IS NOT NULL AND line_user_id <> '' THEN 1 ELSE 0 END) AS old_uid_count,
+                    SUM(CASE WHEN line_user_id_new IS NOT NULL AND line_user_id_new <> '' THEN 1 ELSE 0 END) AS migrated_count,
+                    SUM(CASE WHEN line_user_id IS NOT NULL AND line_user_id <> '' AND line_user_id_new IS NOT NULL AND line_user_id_new <> '' THEN 1 ELSE 0 END) AS covered_old_uid_count,
+                    SUM(CASE WHEN line_user_id IS NOT NULL AND line_user_id <> '' AND (line_user_id_new IS NULL OR line_user_id_new = '') THEN 1 ELSE 0 END) AS pending_count
+                FROM sys_users
+            ")->fetch(PDO::FETCH_ASSOC);
+        } else {
+            $lineMigrationRow = $pdo->query("
+                SELECT
+                    SUM(CASE WHEN line_user_id IS NOT NULL AND line_user_id <> '' THEN 1 ELSE 0 END) AS old_uid_count,
+                    0 AS migrated_count,
+                    0 AS covered_old_uid_count,
+                    SUM(CASE WHEN line_user_id IS NOT NULL AND line_user_id <> '' THEN 1 ELSE 0 END) AS pending_count
+                FROM sys_users
+            ")->fetch(PDO::FETCH_ASSOC);
+        }
+
+        $lineMigration['old_uid_count'] = (int)($lineMigrationRow['old_uid_count'] ?? 0);
+        $lineMigration['migrated_count'] = (int)($lineMigrationRow['migrated_count'] ?? 0);
+        $lineMigration['pending_count'] = (int)($lineMigrationRow['pending_count'] ?? 0);
+        $lineMigration['covered_old_uid_count'] = (int)($lineMigrationRow['covered_old_uid_count'] ?? 0);
+        $lineMigration['coverage'] = $lineMigration['old_uid_count'] > 0
+            ? round(($lineMigration['covered_old_uid_count'] / $lineMigration['old_uid_count']) * 100, 1)
+            : 0.0;
+    }
+} catch (PDOException $e) {
+    // Leave zeroed fallback values; the identity dashboard should stay usable.
+}
+
 $allAdmins = [];
 $allStaff  = [];
 

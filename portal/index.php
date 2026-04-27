@@ -1432,6 +1432,7 @@ try {
                         $pctStudent = $totalUsersCalc > 0 ? round(($statsUserType['student'] / $totalUsersCalc) * 100) : 0;
                         $pctStaff = $totalUsersCalc > 0 ? round(($statsUserType['staff'] / $totalUsersCalc) * 100) : 0;
                         $pctOther = $totalUsersCalc > 0 ? (100 - $pctStudent - $pctStaff) : 0;
+                        $lineMigrationCoverage = max(0, min(100, (float)($lineMigration['coverage'] ?? 0)));
                         ?>
                         
                         <!-- Statistics Bar -->
@@ -1464,6 +1465,45 @@ try {
                                 <div style="display:flex;align-items:center;gap:8px">
                                     <div style="width:12px;height:12px;border-radius:4px;background:#8b5cf6;box-shadow:0 2px 4px rgba(139,92,246,0.3)"></div>
                                     <span style="color:#334155">บุคคลทั่วไป/อื่นๆ <span style="opacity:0.6;font-size:11px">(<?= $pctOther ?>%)</span></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- LINE Provider Migration -->
+                        <div style="background:#fff;border-radius:20px;padding:20px;margin-bottom:20px;border:1.5px solid #dbeafe;box-shadow:0 4px 15px rgba(0,0,0,0.02)">
+                            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:16px">
+                                <div>
+                                    <div style="font-size:12px;font-weight:900;color:#1e40af;text-transform:uppercase;letter-spacing:0.1em;display:flex;align-items:center;gap:7px;margin-bottom:5px">
+                                        <i class="fa-brands fa-line" style="color:#06c755"></i> LINE Provider Migration
+                                    </div>
+                                    <div style="font-size:12px;font-weight:700;color:#64748b">Coverage <?= number_format($lineMigrationCoverage, 1) ?>%</div>
+                                </div>
+                                <div style="font-size:24px;font-weight:900;color:#1e293b;line-height:1"><?= number_format($lineMigrationCoverage, 1) ?>%</div>
+                            </div>
+
+                            <?php if (empty($lineMigration['has_new_column'])): ?>
+                                <div style="display:flex;align-items:flex-start;gap:10px;background:#fffbeb;border:1.5px solid #fde68a;border-radius:12px;padding:12px 14px;margin-bottom:16px;color:#92400e;font-size:12px;font-weight:700;line-height:1.5">
+                                    <i class="fa-solid fa-triangle-exclamation" style="margin-top:2px"></i>
+                                    <span>ไม่พบคอลัมน์ <code style="font-family:ui-monospace,SFMono-Regular,Consolas,monospace;background:#fef3c7;padding:1px 5px;border-radius:5px">line_user_id_new</code> กรุณารัน migration ก่อน เพื่อเริ่มเก็บ UID จาก LINE Provider ใหม่</span>
+                                </div>
+                            <?php endif; ?>
+
+                            <div style="width:100%;height:14px;border-radius:99px;background:#e2e8f0;overflow:hidden;margin-bottom:16px;box-shadow:inset 0 2px 4px rgba(0,0,0,0.04)">
+                                <div style="width:<?= $lineMigrationCoverage ?>%;height:100%;background:linear-gradient(90deg,#06c755,#22c55e);transition:width 1s"></div>
+                            </div>
+
+                            <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px">
+                                <div style="border:1.5px solid #e2e8f0;border-radius:14px;padding:12px;background:#f8fafc;min-width:0">
+                                    <div style="font-size:10px;font-weight:900;color:#64748b;text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px">เดิม</div>
+                                    <div style="font-size:20px;font-weight:900;color:#1e293b;line-height:1.1"><?= number_format((int)($lineMigration['old_uid_count'] ?? 0)) ?></div>
+                                </div>
+                                <div style="border:1.5px solid #bbf7d0;border-radius:14px;padding:12px;background:#f0fdf4;min-width:0">
+                                    <div style="font-size:10px;font-weight:900;color:#15803d;text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px">ย้ายแล้ว</div>
+                                    <div style="font-size:20px;font-weight:900;color:#166534;line-height:1.1"><?= number_format((int)($lineMigration['migrated_count'] ?? 0)) ?></div>
+                                </div>
+                                <div style="border:1.5px solid #fed7aa;border-radius:14px;padding:12px;background:#fff7ed;min-width:0">
+                                    <div style="font-size:10px;font-weight:900;color:#c2410c;text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px">คงค้าง</div>
+                                    <div style="font-size:20px;font-weight:900;color:#9a3412;line-height:1.1"><?= number_format((int)($lineMigration['pending_count'] ?? 0)) ?></div>
                                 </div>
                             </div>
                         </div>
