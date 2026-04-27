@@ -24,6 +24,12 @@ return [
     'LINE_MESSAGING_CHANNEL_ACCESS_TOKEN' => '',
     'LINE_MESSAGING_CHANNEL_SECRET'       => '',
 
+    // --- LINE Login (NEW provider — same provider as Messaging API) ---
+    // ใช้สำหรับ migrate UID จาก provider เดิมไปยัง provider ใหม่
+    'LINE_LOGIN_CHANNEL_ID_NEW'           => '',
+    'LINE_LOGIN_CHANNEL_SECRET_NEW'       => '',
+    'LINE_LIFF_ID_NEW'                    => '',
+
     // --- Admin Panel (Google OAuth2) ---
     'GOOGLE_CLIENT_ID'                    => '',
     'GOOGLE_CLIENT_SECRET'                => '',
@@ -45,4 +51,9 @@ return [
 
     // --- Admin Alert ---
     'ADMIN_ALERT_EMAIL'                   => '', // อีเมลที่รับแจ้งเตือน Error Digest (ว่างเปล่า = ปิดการแจ้งเตือน)
+
+    // --- Migration Token (สำหรับรัน migration scripts ผ่าน browser ชั่วคราว) ---
+    // ตั้งค่าเป็น random string ยาวๆ ตอนต้องรัน แล้วเคลียร์เป็น '' หลังเสร็จ
+    // สร้าง token: bin2hex(random_bytes(32)) หรือ openssl rand -hex 32
+    'MIGRATION_TOKEN'                     => '',
 ];
