@@ -85,3 +85,32 @@ function _send_line_curl(string $url, array $data, string $accessToken): bool {
 function get_last_line_error(): string {
     return (string)($GLOBALS['LAST_LINE_ERROR'] ?? '');
 }
+
+/**
+ * ค้น user จาก LINE UID ระหว่างช่วง migrate provider
+ * เช็ค line_user_id_new ก่อน → ถ้าไม่เจอ fallback ไป line_user_id เดิม
+ *
+ * @param PDO    $pdo
+ * @param string $uid     UID ที่ได้จาก LINE (อาจเป็น new หรือ old)
+ * @param string $columns columns ที่ต้องการ (default: *)
+ * @return array|null     แถว user หรือ null ถ้าไม่เจอ
+ */
+function find_user_by_line_uid(PDO $pdo, string $uid, string $columns = '*'): ?array {
+    if ($uid === '') return null;
+
+    // 1. ลอง new UID ก่อน (เผื่อ user migrate แล้ว)
+    try {
+        $stmt = $pdo->prepare("SELECT {$columns} FROM sys_users WHERE line_user_id_new = :uid LIMIT 1");
+        $stmt->execute([':uid' => $uid]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($row) return $row;
+    } catch (PDOException $e) {
+        // column ยังไม่มี — ข้ามไป fallback
+    }
+
+    // 2. fallback ไป old UID
+    $stmt = $pdo->prepare("SELECT {$columns} FROM sys_users WHERE line_user_id = :uid LIMIT 1");
+    $stmt->execute([':uid' => $uid]);
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    return $row ?: null;
+}

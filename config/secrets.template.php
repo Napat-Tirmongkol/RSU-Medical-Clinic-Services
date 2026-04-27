@@ -24,6 +24,12 @@ return [
     'LINE_MESSAGING_CHANNEL_ACCESS_TOKEN' => '',
     'LINE_MESSAGING_CHANNEL_SECRET'       => '',
 
+    // --- LINE Login (NEW provider — same provider as Messaging API) ---
+    // ใช้สำหรับ migrate UID จาก provider เดิมไปยัง provider ใหม่
+    'LINE_LOGIN_CHANNEL_ID_NEW'           => '',
+    'LINE_LOGIN_CHANNEL_SECRET_NEW'       => '',
+    'LINE_LIFF_ID_NEW'                    => '',
+
     // --- Admin Panel (Google OAuth2) ---
     'GOOGLE_CLIENT_ID'                    => '',
     'GOOGLE_CLIENT_SECRET'                => '',
