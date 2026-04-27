@@ -51,4 +51,9 @@ return [
 
     // --- Admin Alert ---
     'ADMIN_ALERT_EMAIL'                   => '', // อีเมลที่รับแจ้งเตือน Error Digest (ว่างเปล่า = ปิดการแจ้งเตือน)
+
+    // --- Migration Token (สำหรับรัน migration scripts ผ่าน browser ชั่วคราว) ---
+    // ตั้งค่าเป็น random string ยาวๆ ตอนต้องรัน แล้วเคลียร์เป็น '' หลังเสร็จ
+    // สร้าง token: bin2hex(random_bytes(32)) หรือ openssl rand -hex 32
+    'MIGRATION_TOKEN'                     => '',
 ];
