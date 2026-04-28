@@ -8,8 +8,9 @@
 $secretsPath = __DIR__ . '/../../config/secrets.php';
 $secrets = file_exists($secretsPath) ? require $secretsPath : [];
 
-define('LINE_LOGIN_CHANNEL_ID', $secrets['EBORROW_LINE_LOGIN_ID'] ?? 'YOUR_EBORROW_ID');
-define('LINE_LOGIN_CHANNEL_SECRET', $secrets['EBORROW_LINE_LOGIN_SECRET'] ?? 'YOUR_EBORROW_SECRET');
+// เปลี่ยนมาใช้ channel 1657627999 (LINE_LOGIN_CHANNEL_ID_NEW) แทน channel เดิมของ e_Borrow
+define('LINE_LOGIN_CHANNEL_ID', $secrets['LINE_LOGIN_CHANNEL_ID_NEW'] ?? 'YOUR_CHANNEL_ID');
+define('LINE_LOGIN_CHANNEL_SECRET', $secrets['LINE_LOGIN_CHANNEL_SECRET_NEW'] ?? 'YOUR_CHANNEL_SECRET');
 define('LINE_MESSAGING_API_TOKEN', $secrets['EBORROW_LINE_MESSAGE_TOKEN'] ?? 'YOUR_EBORROW_TOKEN');
 
 // สร้าง callback URL จาก SCRIPT_NAME (web path จริง, ใช้งานได้ทั้ง Apache/IIS)
