@@ -244,7 +244,8 @@ if (!function_exists('renderPageHeader')) {
         <!-- Analytics -->
         <div class="nav-section-label">Analytics</div>
         <div class="space-y-0.5 mb-1">
-            <?php navLink('../admin/kpi.php', 'fa-gauge-high', 'KPI Dashboard', $cur); ?>
+            <?php navLink('../admin/kpi.php',        'fa-gauge-high',   'KPI Dashboard',   $cur); ?>
+            <?php navLink('../admin/line_stats.php', 'fa-comment-dots', 'LINE OA สถิติ',   $cur); ?>
         </div>
 
         <!-- Campaign Management -->
