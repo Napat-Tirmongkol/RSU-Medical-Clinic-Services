@@ -5,22 +5,34 @@
 require_once __DIR__ . '/../../config.php';
 check_maintenance('e_borrow');
 
-$timeout_duration = 1800; // 30 �ҷ�
+$timeout_duration = 1800; // 30 นาที
 
 if (isset($_SESSION['LAST_ACTIVITY_STUDENT'])) {
     if ((time() - $_SESSION['LAST_ACTIVITY_STUDENT']) > $timeout_duration) {
         session_unset();
         session_destroy();
-        header("Location: " . dirname($_SERVER['PHP_SELF']) . "/login.php?timeout=1");
+        header('Location: ../index.php?reason=timeout');
         exit;
     }
 }
 $_SESSION['LAST_ACTIVITY_STUDENT'] = time();
 
-// ��Ǩ�ͺ��� Session �ͧ e_Borrow ���������
-// Session 'student_id' �١ set �� line_api/callback.php ��ǡ�ҧ
+// SSO Bridge: ถ้ายังไม่มี student_id แต่มี line_user_id จาก main system → lookup อัตโนมัติ
+if (empty($_SESSION['student_id']) && !empty($_SESSION['line_user_id'])) {
+    try {
+        $pdo = db();
+        $s = $pdo->prepare("SELECT id, full_name FROM sys_users WHERE line_user_id = :line LIMIT 1");
+        $s->execute([':line' => $_SESSION['line_user_id']]);
+        $row = $s->fetch();
+        if ($row) {
+            $_SESSION['student_id']        = $row['id'];
+            $_SESSION['student_full_name'] = $row['full_name'];
+        }
+    } catch (Exception $e) { /* ไม่ block user */ }
+}
+
+// ยังไม่ login → ส่งกลับ main app login
 if (empty($_SESSION['student_id'])) {
-    // �ѧ����� Login -> ���˹�� Login �ͧ e_Borrow
-    header("Location: login.php");
+    header('Location: ../index.php');
     exit;
 }
