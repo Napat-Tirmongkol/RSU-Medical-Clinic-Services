@@ -809,7 +809,6 @@ try {
                 <div class="psb-icon"><i class="fa-solid fa-bullhorn" style="color:#7c3aed"></i></div>
                 <span class="psb-label" style="color:#6d28d9;font-weight:900">ประกาศ</span>
             </button>
-
             <div style="flex:1"></div> <!-- Spacer to push settings to bottom -->
 
             <?php if ($adminRole === 'superadmin' || !empty($_SESSION['access_site_settings'])): ?>
