@@ -1,20 +1,33 @@
 <?php
-// archive/e_Borrow/login.php
-// หน้าหลักสำหรับแสดงผล Login ของฝั่งนักศึกษา โดยเชื่อมต่อกับ LINE OAuth
+// e_Borrow/login.php — ระบบ login ของ e_Borrow ถูกยกเลิกแล้ว
+// ผู้ใช้เข้าระบบผ่าน main app (e-campaignv2/index.php) แล้วมาที่นี่ผ่าน hub
 declare(strict_types=1);
 session_start();
 require_once __DIR__ . '/../config.php';
 check_maintenance('e_borrow');
 
-// หาก Login อยู่แล้ว ให้ Redirect ไปหน้าหลักของ e_Borrow
+// SSO Bridge: ถ้ามี session จาก main system → lookup student_id อัตโนมัติ
+if (empty($_SESSION['student_id']) && !empty($_SESSION['line_user_id'])) {
+    try {
+        $pdo = db();
+        $s = $pdo->prepare("SELECT id FROM sys_users WHERE line_user_id = :line LIMIT 1");
+        $s->execute([':line' => $_SESSION['line_user_id']]);
+        $row = $s->fetch();
+        if ($row) {
+            $_SESSION['student_id'] = $row['id'];
+        }
+    } catch (Exception $e) { /* ignore */ }
+}
+
+// หาก Login อยู่แล้ว → ไปหน้าหลัก e_Borrow
 if (!empty($_SESSION['student_id'])) {
     header('Location: index.php');
     exit;
 }
 
-// ตรวจสอบเหตุผลการเด้ง (เช่น timeout, logged_out)
-$reason = $_GET['reason'] ?? ($_GET['timeout'] ?? '');
-$timeout = $reason === 'timeout' || isset($_GET['timeout']);
+// ไม่มี session ใดเลย → ส่งกลับ main app login
+header('Location: ../index.php');
+exit;
 
 // [NEW] ตรวจสอบความผิดพลาดจากการเข้าถึง (Access Control Enforcement)
 $errorCode = $_GET['error'] ?? '';
