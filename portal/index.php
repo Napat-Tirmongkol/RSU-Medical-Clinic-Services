@@ -809,6 +809,12 @@ try {
                 <div class="psb-icon"><i class="fa-solid fa-bullhorn" style="color:#7c3aed"></i></div>
                 <span class="psb-label" style="color:#6d28d9;font-weight:900">ประกาศ</span>
             </button>
+            <?php if ($adminRole === 'superadmin' || $isStaff || !empty($_SESSION['access_site_settings'])): ?>
+            <button class="psb-item" data-section="line_stats" onclick="switchSection('line_stats',this)">
+                <div class="psb-icon"><i class="fa-brands fa-line" style="color:#00b900"></i></div>
+                <span class="psb-label" style="color:#00a000;font-weight:900">LINE OA สถิติ</span>
+            </button>
+            <?php endif; ?>
 
             <div style="flex:1"></div> <!-- Spacer to push settings to bottom -->
 
@@ -2289,6 +2295,19 @@ try {
                     echo '<div style="padding:100px;text-align:center;font-weight:900;color:#dc2626"><i class="fa-solid fa-shield-slash mb-4" style="font-size:4rem;display:block"></i> ACCESS DENIED</div>';
                 }
                 ?>
+            </div>
+
+            <!-- ════════════ SECTION: LINE OA สถิติ ════════════ -->
+            <div id="section-line_stats" class="portal-section"
+                style="<?= $activeSection==='line_stats'?'':'display:none;' ?> width:100%; background:#f8fafc; overflow-y:auto;">
+                <?php if ($adminRole === 'superadmin' || $isStaff || !empty($_SESSION['access_site_settings'])): ?>
+                    <?php include __DIR__ . '/_partials/line_stats.php'; ?>
+                <?php else: ?>
+                    <div style="padding:100px;text-align:center;font-weight:900;color:#dc2626">
+                        <i class="fa-solid fa-shield-slash" style="font-size:4rem;display:block;margin-bottom:16px"></i>
+                        ACCESS DENIED
+                    </div>
+                <?php endif; ?>
             </div>
 
             <!-- ════════════ SECTION: PRIVILEGE INVENTORY (ISO 27001) ════════════ -->
