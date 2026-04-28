@@ -42,8 +42,17 @@ $host = $_SERVER['HTTP_HOST'] ?? 'healthycampus.rsu.ac.th';
 $scriptDir = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/line_api/index.php'));
 $scriptDir = rtrim($scriptDir, '/');
 
-// Expect script dir like "/e-campaignv2/line_api" or "/line_api"
-$base_path = preg_replace('#/line_api$#', '', $scriptDir);
+/**
+ * Normalize base path from caller directory.
+ * Supports callers from /line_api and sibling app folders that include this config
+ * (e.g. /e_Borrow/login.php) so callback URLs still point to /line_api/* under project root.
+ *
+ * Examples:
+ *   /e-campaignv2/line_api -> /e-campaignv2
+ *   /e-campaignv2/e_Borrow -> /e-campaignv2
+ *   /line_api              -> ''
+ */
+$base_path = preg_replace('#/(line_api|e_Borrow|user|admin|portal|staff)$#', '', $scriptDir);
 if ($base_path === false || $base_path === '/' || $base_path === '.') {
     $base_path = '';
 }
