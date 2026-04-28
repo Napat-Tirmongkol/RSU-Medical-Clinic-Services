@@ -12,11 +12,17 @@ define('LINE_LOGIN_CHANNEL_ID', $secrets['EBORROW_LINE_LOGIN_ID'] ?? 'YOUR_EBORR
 define('LINE_LOGIN_CHANNEL_SECRET', $secrets['EBORROW_LINE_LOGIN_SECRET'] ?? 'YOUR_EBORROW_SECRET');
 define('LINE_MESSAGING_API_TOKEN', $secrets['EBORROW_LINE_MESSAGE_TOKEN'] ?? 'YOUR_EBORROW_TOKEN');
 
-// 1. (���) ��˹� Base URL ���١��ͧ (���������ͧ�س)
-$base_url = "https://healthycampus.rsu.ac.th/e_Borrow_test";
+// สร้าง callback URL แบบ dynamic จาก DOCUMENT_ROOT และ __DIR__
+// __DIR__ = .../e_Borrow/includes → ขึ้นไป 1 ชั้น = .../e_Borrow
+$_eb_docroot  = rtrim(str_replace('\\', '/', $_SERVER['DOCUMENT_ROOT'] ?? ''), '/');
+$_eb_dir      = str_replace('\\', '/', realpath(__DIR__ . '/..') ?: dirname(__DIR__));
+$_eb_webpath  = str_replace($_eb_docroot, '', $_eb_dir);
+$_eb_protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+$_eb_host     = $_SERVER['HTTP_HOST'] ?? 'healthycampus.rsu.ac.th';
 
-// 2. (���) ���ҧ Path ���١��ͧ���� Base URL
-define('LINE_LOGIN_CALLBACK_URL', $base_url . '/callback.php');
-define('STAFF_LOGIN_URL', $base_url . '/admin/login.php');
+define('LINE_LOGIN_CALLBACK_URL', $_eb_protocol . '://' . $_eb_host . $_eb_webpath . '/callback.php');
+define('STAFF_LOGIN_URL',         $_eb_protocol . '://' . $_eb_host . $_eb_webpath . '/admin/login.php');
+
+unset($_eb_docroot, $_eb_dir, $_eb_webpath, $_eb_protocol, $_eb_host);
 
 ?>

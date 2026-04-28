@@ -36,7 +36,7 @@ $state = bin2hex(random_bytes(16));
 $_SESSION['line_login_state'] = $state;
 $_SESSION['redirect_to']      = 'eborrow';
 
-require_once __DIR__ . '/../line_api/line_config.php';
+require_once __DIR__ . '/includes/line_config.php';
 
 $authUrl = "https://access.line.me/oauth2/v2.1/authorize?" . http_build_query([
     'response_type' => 'code',
