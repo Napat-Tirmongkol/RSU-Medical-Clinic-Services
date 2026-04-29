@@ -267,6 +267,12 @@ if (!function_exists('renderPageHeader')) {
             <?php navLink('../admin/ai_assistant.php', 'fa-robot', 'AI Analyst', $cur); ?>
         </div>
 
+        <!-- System -->
+        <div class="nav-section-label">System</div>
+        <div class="space-y-0.5">
+            <?php navLink('../admin/activity_logs.php', 'fa-clipboard-list', 'บันทึกกิจกรรม', $cur); ?>
+        </div>
+
     </nav>
 
     <!-- Logout -->

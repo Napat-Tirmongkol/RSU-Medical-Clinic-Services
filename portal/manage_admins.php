@@ -413,6 +413,9 @@ $header_actions = '
                             <button onclick='openEditModal(<?= json_encode($adm) ?>)' class="w-10 h-10 flex items-center justify-center rounded-xl bg-white border border-gray-100 text-gray-400 hover:text-blue-600 hover:border-blue-100 hover:shadow-lg hover:shadow-blue-50 transition-all active:scale-90 shadow-sm" title="Edit Master">
                                 <i class="fa-solid fa-pen-nib text-sm"></i>
                             </button>
+                            <a href="index.php?section=activity_logs&al_user_id=<?= (int)$adm['id'] ?>&al_role=admin" class="w-10 h-10 flex items-center justify-center rounded-xl bg-white border border-gray-100 text-gray-400 hover:text-emerald-600 hover:border-emerald-100 hover:shadow-lg hover:shadow-emerald-50 transition-all active:scale-90 shadow-sm" title="ดูบันทึกกิจกรรม">
+                                <i class="fa-solid fa-clipboard-list text-sm"></i>
+                            </a>
                             <?php if ($adm['id'] != $_SESSION['admin_id']): ?>
                             <form method="POST" id="deleteAdminForm_<?= $adm['id'] ?>" style="display:inline;">
                                 <input type="hidden" name="action" value="delete">
@@ -542,6 +545,10 @@ $header_actions = '
                                 class="w-9 h-9 flex items-center justify-center rounded-xl bg-white border border-gray-100 text-gray-400 hover:text-blue-600 hover:border-blue-100 shadow-sm transition-all">
                                 <i class="fa-solid fa-pen-nib text-xs"></i>
                             </button>
+                            <a href="index.php?section=activity_logs&al_user_id=<?= (int)$st['id'] ?>&al_role=staff"
+                                class="w-9 h-9 flex items-center justify-center rounded-xl bg-white border border-gray-100 text-gray-400 hover:text-emerald-600 hover:border-emerald-100 shadow-sm transition-all" title="ดูบันทึกกิจกรรม">
+                                <i class="fa-solid fa-clipboard-list text-xs"></i>
+                            </a>
                             <form method="POST" id="deleteStaffForm_<?= (int)$st['id'] ?>" style="display:inline">
                                 <?php csrf_field(); ?>
                                 <input type="hidden" name="action" value="delete_staff">
