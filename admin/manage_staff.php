@@ -296,6 +296,12 @@ renderPageHeader('จัดการเจ้าหน้าที่', 'STAFF M
                                 title="แก้ไข">
                                 <i class="fa-solid fa-pen text-xs"></i>
                             </button>
+                            <!-- Activity Logs -->
+                            <a href="activity_logs.php?user_id=<?= (int)$s['id'] ?>&role=STAFF"
+                                class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 flex items-center justify-center transition-colors"
+                                title="ดูบันทึกกิจกรรม">
+                                <i class="fa-solid fa-clipboard-list text-xs"></i>
+                            </a>
                             <!-- Delete -->
                             <?php if (!$isSelf): ?>
                             <form method="POST" onsubmit="return confirm('ยืนยันลบเจ้าหน้าที่ \'<?= htmlspecialchars(addslashes($s['full_name'])) ?>\'?')">

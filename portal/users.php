@@ -329,6 +329,9 @@ try {
                                 <a href="../admin/user_history.php?id=<?= $user['id'] ?>" class="w-10 h-10 flex items-center justify-center rounded-xl bg-white border border-gray-100 text-gray-400 hover:text-amber-600 hover:border-amber-100 hover:shadow-lg hover:shadow-amber-50 transition-all active:scale-90 shadow-sm" title="Transaction Log">
                                     <i class="fa-solid fa-history text-xs"></i>
                                 </a>
+                                <a href="../admin/activity_logs.php?user_id=<?= $user['id'] ?>&role=USER" class="w-10 h-10 flex items-center justify-center rounded-xl bg-white border border-gray-100 text-gray-400 hover:text-emerald-600 hover:border-emerald-100 hover:shadow-lg hover:shadow-emerald-50 transition-all active:scale-90 shadow-sm" title="ดูบันทึกกิจกรรม">
+                                    <i class="fa-solid fa-clipboard-list text-xs"></i>
+                                </a>
                             </div>
                         </td>
                     </tr>
