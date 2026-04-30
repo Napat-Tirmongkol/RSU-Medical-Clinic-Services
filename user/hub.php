@@ -727,7 +727,7 @@ $greeting = ($hour >= 5 && $hour < 12) ? "สวัสดีตอนเช้�
                         </div>
 
                         <!-- Form code -->
-                        <p class="absolute bottom-3 right-5 text-[9px] font-black text-slate-400 tracking-widest z-10">F2/001</p>
+                        <p class="absolute bottom-3 right-5 text-[9px] font-black text-slate-400 tracking-widest z-10">INSURANCE CARD</p>
                     </div>
                     <?php endif; ?>
 
