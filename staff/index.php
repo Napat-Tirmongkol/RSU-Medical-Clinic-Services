@@ -56,6 +56,43 @@ require_once __DIR__ . '/../config.php';
         #reader__dashboard_section_csr span { display: none !important; }
         #reader button { background-color: #0052CC !important; color: white !important; border: none !important; padding: 8px 16px !important; border-radius: 8px !important; font-family: 'Prompt', sans-serif !important; margin-top: 10px !important; cursor: pointer; }
         #reader a { display: none !important; }
+        #btn-toggle-camera.camera-toggle-btn {
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            gap: 8px !important;
+            min-width: 132px !important;
+            height: 46px !important;
+            padding: 0 22px !important;
+            border: 2px solid rgba(255,255,255,.85) !important;
+            border-radius: 18px !important;
+            color: #fff !important;
+            font-size: 14px !important;
+            font-weight: 900 !important;
+            line-height: 1 !important;
+            box-shadow: 0 14px 34px rgba(15,23,42,.22) !important;
+            opacity: 1 !important;
+            filter: none !important;
+            transform: none;
+        }
+        #btn-toggle-camera.camera-toggle-btn:hover {
+            box-shadow: 0 16px 38px rgba(15,23,42,.28) !important;
+        }
+        #btn-toggle-camera.camera-toggle-btn:active {
+            transform: scale(.96);
+        }
+        #btn-toggle-camera.camera-toggle-on {
+            background: #dc2626 !important;
+        }
+        #btn-toggle-camera.camera-toggle-on:hover {
+            background: #b91c1c !important;
+        }
+        #btn-toggle-camera.camera-toggle-off {
+            background: #0f172a !important;
+        }
+        #btn-toggle-camera.camera-toggle-off:hover {
+            background: #1e293b !important;
+        }
     </style>
 </head>
 <body class="pb-24">
@@ -80,8 +117,8 @@ require_once __DIR__ . '/../config.php';
 <div class="max-w-md mx-auto p-5 mt-4">
     <!-- ปุ่มเปิด/ปิดกล้อง -->
     <div class="flex justify-center mb-6">
-        <button id="btn-toggle-camera" class="bg-emerald-600 text-white px-6 py-2.5 rounded-2xl font-bold text-sm shadow-lg hover:bg-emerald-700 active:scale-95 transition-all flex items-center gap-2">
-            <i class="fa-solid fa-camera"></i>
+        <button id="btn-toggle-camera" class="camera-toggle-btn camera-toggle-on">
+            <i class="fa-solid fa-video-slash"></i>
             <span id="toggle-text">ปิดกล้อง</span>
         </button>
     </div>
@@ -231,7 +268,8 @@ document.addEventListener('DOMContentLoaded', function() {
             );
             document.getElementById('scan-status').innerText = 'พร้อมสแกน...';
             document.getElementById('scan-status').className = 'text-sm font-bold text-green-500 animate-pulse';
-            toggleBtn.className = 'bg-emerald-600 text-white px-6 py-2.5 rounded-2xl font-bold text-sm shadow-lg hover:bg-emerald-700 active:scale-95 transition-all flex items-center gap-2';
+            toggleBtn.className = 'camera-toggle-btn camera-toggle-on';
+            toggleBtn.querySelector('i').className = 'fa-solid fa-video-slash';
             toggleText.innerText = 'ปิดกล้อง';
         } catch (err) {
             console.error("Camera error", err);
@@ -245,7 +283,8 @@ document.addEventListener('DOMContentLoaded', function() {
             await html5QrCode.stop();
             document.getElementById('scan-status').innerText = 'ปิดกล้องแล้ว';
             document.getElementById('scan-status').className = 'text-sm font-bold text-gray-400';
-            toggleBtn.className = 'bg-slate-700 text-white px-6 py-2.5 rounded-2xl font-bold text-sm shadow-lg hover:bg-slate-800 active:scale-95 transition-all flex items-center gap-2';
+            toggleBtn.className = 'camera-toggle-btn camera-toggle-off';
+            toggleBtn.querySelector('i').className = 'fa-solid fa-video';
             toggleText.innerText = 'เปิดกล้อง';
         }
     }
