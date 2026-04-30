@@ -15,7 +15,7 @@ $signature = $_SERVER['HTTP_X_LINE_SIGNATURE'] ?? '';
 // 2. โหลด Config
 $secrets = require __DIR__ . '/../config/secrets.php';
 $channelSecret = $secrets['LINE_MESSAGING_CHANNEL_SECRET'] ?? '';
-$accessToken   = $secrets['EBORROW_LINE_MESSAGE_TOKEN'] ?? $secrets['LINE_MESSAGING_CHANNEL_ACCESS_TOKEN'] ?? '';
+$accessToken   = $secrets['LINE_MESSAGING_CHANNEL_ACCESS_TOKEN'] ?? '';
 
 function line_mask_uid(?string $uid): string
 {
