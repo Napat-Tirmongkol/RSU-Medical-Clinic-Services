@@ -279,15 +279,20 @@ foreach ($data['events'] as $idx => $event) {
         'has_reply_token' => !empty($replyToken),
     ]);
 
-    if ($replyToken && $userId && is_insurance_request($event)) {
+    if ($userId && is_insurance_request($event)) {
         line_webhook_log('Insurance request detected', [
             'line_user_id' => line_mask_uid($userId),
             'trigger' => $messageText !== '' ? 'message' : 'postback',
+            'has_reply_token' => !empty($replyToken),
         ]);
-        $replyOk = send_line_reply($replyToken, build_insurance_reply(db(), $userId), $accessToken);
-        line_webhook_log('Insurance reply sent', [
+        $messages = build_insurance_reply(db(), $userId);
+        $replyOk = $replyToken
+            ? send_line_reply($replyToken, $messages, $accessToken)
+            : send_line_push($userId, $messages, $accessToken);
+        line_webhook_log($replyToken ? 'Insurance reply sent' : 'Insurance push sent', [
             'line_user_id' => line_mask_uid($userId),
             'ok' => $replyOk,
+            'method' => $replyToken ? 'reply' : 'push',
             'line_error' => $replyOk ? '' : get_last_line_error(),
         ], $replyOk ? 'info' : 'warning');
         continue;
