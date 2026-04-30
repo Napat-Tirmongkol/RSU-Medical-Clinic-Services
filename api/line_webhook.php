@@ -234,6 +234,51 @@ function build_insurance_flex_message(array $user, array $insurance): array
     ];
 }
 
+function build_insurance_inactive_flex(array $user, array $insurance): array
+{
+    $fullName = trim((string)($insurance['full_name'] ?? '')) ?: (string)($user['full_name'] ?? '-');
+    $memberId = trim((string)($insurance['member_id'] ?? '')) ?: (string)($user['student_personnel_id'] ?? '-');
+
+    return [
+        'type' => 'flex',
+        'altText' => 'สิทธิ์ประกันไม่พร้อมใช้งาน',
+        'contents' => [
+            'type' => 'bubble',
+            'size' => 'mega',
+            'body' => [
+                'type' => 'box',
+                'layout' => 'vertical',
+                'paddingAll' => '22px',
+                'backgroundColor' => '#FFF7ED',
+                'contents' => [
+                    ['type' => 'text', 'text' => 'INSURANCE STATUS', 'weight' => 'bold', 'size' => 'xs', 'color' => '#EA580C'],
+                    ['type' => 'text', 'text' => 'สิทธิ์ประกันไม่พร้อมใช้งาน', 'weight' => 'bold', 'size' => 'xl', 'color' => '#9A3412', 'margin' => 'md', 'wrap' => true],
+                    ['type' => 'text', 'text' => 'ข้อมูลประกันของคุณอยู่ในสถานะ Inactive กรุณาติดต่อห้องพยาบาลเพื่อตรวจสอบสิทธิ์', 'size' => 'sm', 'color' => '#78716C', 'margin' => 'md', 'wrap' => true],
+                    ['type' => 'separator', 'margin' => 'lg', 'color' => '#FED7AA'],
+                    insurance_flex_row('ชื่อ', $fullName),
+                    insurance_flex_row('รหัสสมาชิก', $memberId),
+                ],
+            ],
+            'footer' => [
+                'type' => 'box',
+                'layout' => 'vertical',
+                'contents' => [
+                    [
+                        'type' => 'button',
+                        'style' => 'secondary',
+                        'height' => 'sm',
+                        'action' => [
+                            'type' => 'uri',
+                            'label' => 'เปิด Medical Hub',
+                            'uri' => line_app_base_url() . '/user/hub.php',
+                        ],
+                    ],
+                ],
+            ],
+        ],
+    ];
+}
+
 function insurance_flex_row(string $label, string $value): array
 {
     return [
@@ -279,6 +324,15 @@ function build_insurance_reply(PDO $pdo, string $lineUserId): array
     if (!$insurance) {
         line_webhook_log('Insurance record not found', ['member_id' => $memberId, 'user_id' => $user['id'] ?? null], 'warning');
         return [reply_text_message('ไม่พบข้อมูลประกันของคุณ กรุณาติดต่อห้องพยาบาล')];
+    }
+
+    if (($insurance['insurance_status'] ?? '') !== 'Active') {
+        line_webhook_log('Insurance inactive notice built', [
+            'member_id' => $memberId,
+            'user_id' => $user['id'] ?? null,
+            'insurance_status' => $insurance['insurance_status'] ?? '',
+        ]);
+        return [build_insurance_inactive_flex($user, $insurance)];
     }
 
     line_webhook_log('Insurance flex message built', [
