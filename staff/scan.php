@@ -97,6 +97,41 @@ $typeColor = ['vaccine' => '#0052CC', 'training' => '#6366f1', 'health_check' =>
             margin-top: 10px !important; cursor: pointer !important;
         }
         #qr-reader a { display: none !important; }
+        .camera-toggle-btn {
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            gap: 6px !important;
+            min-width: 112px !important;
+            height: 42px !important;
+            padding: 0 18px !important;
+            border-radius: 14px !important;
+            border: 2px solid rgba(255,255,255,.7) !important;
+            font-size: 13px !important;
+            font-weight: 900 !important;
+            font-family: 'Prompt', sans-serif !important;
+            box-shadow: 0 12px 28px rgba(15,23,42,.18) !important;
+            transition: transform .15s ease, box-shadow .15s ease, background .15s ease !important;
+        }
+        .camera-toggle-btn:active {
+            transform: scale(.96) !important;
+        }
+        .camera-toggle-on {
+            background: #dc2626 !important;
+            color: #ffffff !important;
+        }
+        .camera-toggle-on:hover {
+            background: #b91c1c !important;
+            box-shadow: 0 14px 32px rgba(220,38,38,.26) !important;
+        }
+        .camera-toggle-off {
+            background: #0f172a !important;
+            color: #ffffff !important;
+        }
+        .camera-toggle-off:hover {
+            background: #1e293b !important;
+            box-shadow: 0 14px 32px rgba(15,23,42,.24) !important;
+        }
 
         /* pulse ring on scanner */
         .scanner-ring {
@@ -258,8 +293,8 @@ $typeColor = ['vaccine' => '#0052CC', 'training' => '#6366f1', 'health_check' =>
     <div class="bg-white rounded-3xl shadow-lg border border-gray-100 overflow-hidden mb-4">
         <div class="p-4">
             <div class="flex justify-end mb-3">
-                <button id="btnToggleCam" class="text-[10px] font-bold text-white bg-emerald-600 px-3 py-1.5 rounded-lg hover:bg-emerald-700 transition-colors">
-                    <i class="fa-solid fa-video mr-1"></i>ปิดกล้อง
+                <button id="btnToggleCam" class="camera-toggle-btn camera-toggle-on">
+                    <i class="fa-solid fa-video-slash"></i><span>ปิดกล้อง</span>
                 </button>
             </div>
             <div id="qr-reader" class="w-full rounded-2xl overflow-hidden scanner-ring"></div>
@@ -391,8 +426,8 @@ function startCamera() {
     ).then(() => {
         setStatus('พร้อมสแกน', 'green');
         const btn = document.getElementById('btnToggleCam');
-        btn.innerHTML = '<i class="fa-solid fa-video mr-1"></i>ปิดกล้อง';
-        btn.className = 'text-[10px] font-bold text-white bg-emerald-600 px-3 py-1.5 rounded-lg hover:bg-emerald-700 transition-colors';
+        btn.innerHTML = '<i class="fa-solid fa-video-slash"></i><span>ปิดกล้อง</span>';
+        btn.className = 'camera-toggle-btn camera-toggle-on';
     }).catch(err => {
         console.error(err);
         setStatus('ไม่สามารถเปิดกล้องได้ — ลองกรอก ID แทน', 'red');
@@ -596,8 +631,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const btn = document.getElementById('btnToggleCam');
         if (html5QrCode && html5QrCode.isScanning) {
             await html5QrCode.stop();
-            btn.innerHTML = '<i class="fa-solid fa-video-slash mr-1"></i>เปิดกล้อง';
-            btn.className = 'text-[10px] font-bold text-white bg-slate-700 px-3 py-1.5 rounded-lg hover:bg-slate-800 transition-colors';
+            btn.innerHTML = '<i class="fa-solid fa-video"></i><span>เปิดกล้อง</span>';
+            btn.className = 'camera-toggle-btn camera-toggle-off';
             setStatus('ปิดกล้องแล้ว', 'gray');
         } else {
             startCamera();
