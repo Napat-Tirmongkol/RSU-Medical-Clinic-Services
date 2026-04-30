@@ -17,6 +17,23 @@ $secrets = require __DIR__ . '/../config/secrets.php';
 $channelSecret = $secrets['LINE_MESSAGING_CHANNEL_SECRET'] ?? '';
 $accessToken   = $secrets['EBORROW_LINE_MESSAGE_TOKEN'] ?? $secrets['LINE_MESSAGING_CHANNEL_ACCESS_TOKEN'] ?? '';
 
+function line_mask_uid(?string $uid): string
+{
+    if (!$uid) return '';
+    if (strlen($uid) <= 12) return $uid;
+    return substr($uid, 0, 8) . '...' . substr($uid, -6);
+}
+
+function line_webhook_log(string $message, array $context = [], string $level = 'info'): void
+{
+    $contextJson = json_encode($context, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    error_log('[LINE Webhook] ' . $message . ($contextJson ? ' ' . $contextJson : ''));
+
+    if (function_exists('log_error_to_db')) {
+        log_error_to_db($message, $level, 'api/line_webhook.php', $contextJson ?: '');
+    }
+}
+
 function line_app_base_url(): string
 {
     $proto = (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']))
@@ -172,16 +189,19 @@ function insurance_flex_row(string $label, string $value): array
 function build_insurance_reply(PDO $pdo, string $lineUserId): array
 {
     if (defined('SITE_SHOW_INSURANCE') && !SITE_SHOW_INSURANCE) {
+        line_webhook_log('Insurance menu disabled', ['line_user_id' => line_mask_uid($lineUserId)]);
         return [reply_text_message('เมนูประกันอุบัติเหตุยังไม่เปิดให้ใช้งานในขณะนี้')];
     }
 
     $user = find_user_by_line_uid($pdo, $lineUserId, 'id, full_name, student_personnel_id, line_user_id, line_user_id_new');
     if (!$user) {
+        line_webhook_log('Insurance lookup user not found', ['line_user_id' => line_mask_uid($lineUserId)], 'warning');
         return [reply_text_message("ยังไม่พบการลงทะเบียน LINE ของคุณ\nกรุณา Login/ลงทะเบียนก่อนใช้งานเมนูประกันอุบัติเหตุ\n" . line_app_base_url() . '/line_api/line_login.php')];
     }
 
     $memberId = trim((string)($user['student_personnel_id'] ?? ''));
     if ($memberId === '') {
+        line_webhook_log('Insurance lookup missing member id', ['user_id' => $user['id'] ?? null, 'line_user_id' => line_mask_uid($lineUserId)], 'warning');
         return [reply_text_message('ไม่พบรหัสนักศึกษา/รหัสบุคลากรของคุณ กรุณาติดต่อห้องพยาบาล')];
     }
 
@@ -190,19 +210,38 @@ function build_insurance_reply(PDO $pdo, string $lineUserId): array
         $stmt->execute([':mid' => $memberId]);
         $insurance = $stmt->fetch(PDO::FETCH_ASSOC);
     } catch (Throwable $e) {
+        line_webhook_log('Insurance lookup query failed', ['member_id' => $memberId, 'error' => $e->getMessage()], 'error');
         error_log('LINE insurance lookup failed: ' . $e->getMessage());
         return [reply_text_message('ไม่สามารถตรวจสอบข้อมูลประกันได้ในขณะนี้ กรุณาลองใหม่อีกครั้ง')];
     }
 
     if (!$insurance) {
+        line_webhook_log('Insurance record not found', ['member_id' => $memberId, 'user_id' => $user['id'] ?? null], 'warning');
         return [reply_text_message('ไม่พบข้อมูลประกันของคุณ กรุณาติดต่อห้องพยาบาล')];
     }
+
+    line_webhook_log('Insurance flex message built', [
+        'member_id' => $memberId,
+        'user_id' => $user['id'] ?? null,
+        'insurance_status' => $insurance['insurance_status'] ?? '',
+        'has_policy_number' => trim((string)($insurance['policy_number'] ?? '')) !== '',
+    ]);
 
     return [build_insurance_flex_message($user, $insurance)];
 }
 
 // 3. ยืนยัน Signature (สำคัญมากเพื่อความปลอดภัย)
+line_webhook_log('Webhook request received', [
+    'payload_bytes' => strlen((string)$payload),
+    'has_signature' => $signature !== '',
+    'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? '',
+]);
+
 if (!verify_line_signature($payload, $signature, $channelSecret)) {
+    line_webhook_log('Invalid LINE signature', [
+        'payload_bytes' => strlen((string)$payload),
+        'has_channel_secret' => $channelSecret !== '',
+    ], 'warning');
     http_response_code(400);
     error_log("LINE Webhook: Invalid Signature");
     exit("Invalid Signature");
@@ -211,19 +250,46 @@ if (!verify_line_signature($payload, $signature, $channelSecret)) {
 // 4. แปลงข้อมูล
 $data = json_decode($payload, true);
 if (empty($data['events'])) {
+    line_webhook_log('Webhook request has no events', [
+        'json_valid' => json_last_error() === JSON_ERROR_NONE,
+        'json_error' => json_last_error_msg(),
+    ]);
     http_response_code(200);
     echo "OK (No events)";
     exit;
 }
 
+line_webhook_log('Webhook events decoded', ['event_count' => count($data['events'])]);
+
 // 5. วนลูปจัดการแต่ละ Event
-foreach ($data['events'] as $event) {
+foreach ($data['events'] as $idx => $event) {
     $type = $event['type'] ?? '';
     $replyToken = $event['replyToken'] ?? null;
     $userId = $event['source']['userId'] ?? null;
+    $messageText = (($event['message']['type'] ?? '') === 'text') ? (string)($event['message']['text'] ?? '') : '';
+    $postbackData = ($type === 'postback') ? (string)($event['postback']['data'] ?? '') : '';
+
+    line_webhook_log('Webhook event received', [
+        'index' => $idx,
+        'type' => $type,
+        'line_user_id' => line_mask_uid($userId),
+        'message_type' => $event['message']['type'] ?? '',
+        'message_text' => $messageText,
+        'postback_data' => $postbackData,
+        'has_reply_token' => !empty($replyToken),
+    ]);
 
     if ($replyToken && $userId && is_insurance_request($event)) {
-        send_line_reply($replyToken, build_insurance_reply(db(), $userId), $accessToken);
+        line_webhook_log('Insurance request detected', [
+            'line_user_id' => line_mask_uid($userId),
+            'trigger' => $messageText !== '' ? 'message' : 'postback',
+        ]);
+        $replyOk = send_line_reply($replyToken, build_insurance_reply(db(), $userId), $accessToken);
+        line_webhook_log('Insurance reply sent', [
+            'line_user_id' => line_mask_uid($userId),
+            'ok' => $replyOk,
+            'line_error' => $replyOk ? '' : get_last_line_error(),
+        ], $replyOk ? 'info' : 'warning');
         continue;
     }
 
