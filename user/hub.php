@@ -1584,10 +1584,6 @@ document.getElementById('insDetailModal').addEventListener('click', function(e) 
                             </tbody>
                         </table>
                     </div>
-                    <div class="border-t border-slate-100 px-5 py-4">
-                        <p id="vaccination-pagination-info-bottom" class="hidden"></p>
-                        <p class="text-[11px] font-semibold text-slate-400">แสดง 20 รายการต่อหน้า และค้นหาพร้อม pagination จากฐานข้อมูลโดยตรง</p>
-                    </div>
                 </div>
             </div>
         </div>
