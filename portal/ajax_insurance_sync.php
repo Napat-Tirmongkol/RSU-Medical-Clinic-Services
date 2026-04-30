@@ -231,10 +231,11 @@ if ($action === 'list_members') {
     $params = [];
 
     if ($search !== '') {
-        $where[]      = '(member_id LIKE :s OR full_name LIKE :s2 OR citizen_id LIKE :s3)';
+        $where[]      = '(member_id LIKE :s OR full_name LIKE :s2 OR citizen_id LIKE :s3 OR policy_number LIKE :s4)';
         $params[':s']  = "%{$search}%";
         $params[':s2'] = "%{$search}%";
         $params[':s3'] = "%{$search}%";
+        $params[':s4'] = "%{$search}%";
     }
     if ($fType !== '') {
         $where[]       = 'member_status = :ft';
@@ -253,7 +254,7 @@ if ($action === 'list_members') {
 
     $stmt = $pdo->prepare("
         SELECT member_id, full_name, member_status, insurance_status,
-               coverage_start, coverage_end, citizen_id
+               coverage_start, coverage_end, citizen_id, policy_number, remarks
         FROM insurance_members {$wSql}
         ORDER BY full_name ASC
         LIMIT {$perPage} OFFSET {$offset}
