@@ -13,8 +13,46 @@ if (empty($_SESSION['student_id']) && empty($_SESSION['line_user_id'])) {
     exit;
 }
 
-$appId = isset($_GET['id']) ? (string)$_GET['id'] : '';
-if ($appId === '') {
+$appId = isset($_GET['id']) ? (int) $_GET['id'] : 0;
+if ($appId <= 0) {
+    http_response_code(400);
+    exit;
+}
+
+$pdo = db();
+$currentUserId = (int) ($_SESSION['user_id'] ?? $_SESSION['student_id'] ?? 0);
+
+if ($currentUserId <= 0 && !empty($_SESSION['line_user_id'])) {
+    $stmt = $pdo->prepare("
+        SELECT id
+        FROM sys_users
+        WHERE line_user_id_new = :line_id OR line_user_id = :line_id
+        LIMIT 1
+    ");
+    $stmt->execute([':line_id' => $_SESSION['line_user_id']]);
+    $currentUserId = (int) ($stmt->fetchColumn() ?: 0);
+}
+
+if ($currentUserId <= 0) {
+    http_response_code(401);
+    exit;
+}
+
+$stmt = $pdo->prepare("
+    SELECT id
+    FROM camp_bookings
+    WHERE id = :booking_id
+      AND student_id = :user_id
+      AND status IN ('booked', 'confirmed')
+    LIMIT 1
+");
+$stmt->execute([
+    ':booking_id' => $appId,
+    ':user_id' => $currentUserId
+]);
+
+if (!$stmt->fetchColumn()) {
+    http_response_code(403);
     exit;
 }
 

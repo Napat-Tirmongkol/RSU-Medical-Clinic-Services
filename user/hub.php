@@ -282,11 +282,18 @@ $greeting = ($hour >= 5 && $hour < 12) ? "สวัสดีตอนเช้�
 
     <!-- Modal Functions (defined early to prevent ReferenceError on button clicks) -->
     <script>
-        function showQR() {
+        function showQR(bookingId = null, title = 'Identity QR Code', code = "<?= htmlspecialchars($user['student_personnel_id'] ?? '') ?>") {
             const modal = document.getElementById('qr-modal');
             const qrContainer = document.getElementById('qrcode');
+            const modalTitle = document.getElementById('qr-modal-title');
+            const modalCode = document.getElementById('qr-modal-code');
             modal.classList.remove('hidden'); modal.classList.add('flex');
-            if (typeof qr === 'undefined' || !qr) {
+            modalTitle.textContent = title || 'Booking QR Code';
+            modalCode.textContent = code || '';
+            if (bookingId) {
+                qr = null;
+                qrContainer.innerHTML = `<img src="api_qrcode.php?id=${encodeURIComponent(bookingId)}" alt="Booking QR Code" class="w-[180px] h-[180px] object-contain">`;
+            } else if (typeof qr === 'undefined' || !qr) {
                 qrContainer.innerHTML = '';
                 qr = new QRCode(qrContainer, { text: "<?= htmlspecialchars($user['student_personnel_id'] ?? '') ?>", width: 180, height: 180, colorDark: "#0f172a", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.H });
             }
@@ -722,8 +729,9 @@ $greeting = ($hour >= 5 && $hour < 12) ? "สวัสดีตอนเช้�
                                     continue;
                                 $status = getStatusStyle($b['status']);
                                 ?>
-                                <div
-                                    class="bg-slate-50/50 rounded-[2.2rem] p-6 border border-slate-100 relative group active:scale-[0.98] transition-all">
+                                <button type="button"
+                                    onclick="showQR('<?= (int) $b['id'] ?>', 'Campaign QR Code', 'BOOKING #<?= (int) $b['id'] ?>')"
+                                    class="w-full text-left bg-slate-50/50 rounded-[2.2rem] p-6 border border-slate-100 relative group active:scale-[0.98] transition-all hover:bg-white hover:shadow-xl focus:outline-none focus:ring-4 focus:ring-green-100">
                                     <div class="flex items-start justify-between mb-5">
                                         <div class="flex items-center gap-4">
                                             <div
@@ -770,7 +778,7 @@ $greeting = ($hour >= 5 && $hour < 12) ? "สวัสดีตอนเช้�
                                             </div>
                                         </div>
                                     </div>
-                                </div>
+                                </button>
                             <?php endforeach; ?>
                         <?php endif; ?>
                     </div>
@@ -1303,8 +1311,8 @@ document.getElementById('insDetailModal').addEventListener('click', function(e) 
                     class="flex justify-center bg-white p-5 rounded-[2rem] shadow-xl border border-slate-100 mx-auto">
                 </div>
             </div>
-            <h3 class="text-slate-900 font-black text-xl mb-1.5">Identity QR Code</h3>
-            <p class="text-[#2e9e63] font-mono font-black text-sm tracking-[0.2em] mb-8">
+            <h3 id="qr-modal-title" class="text-slate-900 font-black text-xl mb-1.5">Identity QR Code</h3>
+            <p id="qr-modal-code" class="text-[#2e9e63] font-mono font-black text-sm tracking-[0.2em] mb-8">
                 <?= $user['student_personnel_id'] ?>
             </p><button onclick="hideQR()"
                 class="w-full h-16 bg-slate-900 text-white font-black rounded-2xl active:scale-95 transition-all shadow-xl shadow-slate-200">ปิดหน้าต่าง</button>
