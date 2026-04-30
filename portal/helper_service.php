@@ -32,6 +32,10 @@ try {
     $pdo = db();
     $assistant = new DataAssistant($pdo);
     
+    if (($_SESSION['_gemini_model'] ?? '') === 'gemini-2.0-flash') {
+        unset($_SESSION['_gemini_model']);
+    }
+
     if (empty($_SESSION['_gemini_model'])) {
         $_SESSION['_gemini_model'] = GeminiService::autoPickModel($apiKey);
     }

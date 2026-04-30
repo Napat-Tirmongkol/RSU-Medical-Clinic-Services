@@ -63,7 +63,9 @@ if (($_POST['mode'] ?? '') === 'suggestions') {
         . "ตอบเป็น JSON array ภาษาไทยเท่านั้น ห้ามมีข้อความอื่น:\n"
         . "[\"คำถาม 1\",\"คำถาม 2\",\"คำถาม 3\",\"คำถาม 4\",\"คำถาม 5\"]";
 
-    $sugModel = $_SESSION['_gemini_model'] ?? 'gemini-2.0-flash';
+$sugModel = (($_SESSION['_gemini_model'] ?? '') === 'gemini-2.0-flash')
+    ? 'gemini-2.5-flash'
+    : ($_SESSION['_gemini_model'] ?? 'gemini-2.5-flash');
     $sugUrl   = "https://generativelanguage.googleapis.com/v1beta/models/{$sugModel}:generateContent?key={$apiKey}";
     $sugBody  = json_encode([
         'contents'         => [['role' => 'user', 'parts' => [['text' => $sugPrompt]]]],
@@ -360,7 +362,11 @@ $toolDeclarations = [[
 // ── Auto-discover best available Gemini model ─────────────────────────────────
 function gemini_pick_model(string $apiKey): string {
     if (!empty($_SESSION['_gemini_model'])) {
-        return $_SESSION['_gemini_model'];
+        if ($_SESSION['_gemini_model'] === 'gemini-2.0-flash') {
+            unset($_SESSION['_gemini_model']);
+        } else {
+            return $_SESSION['_gemini_model'];
+        }
     }
     $ch = curl_init("https://generativelanguage.googleapis.com/v1beta/models?key={$apiKey}&pageSize=100");
     curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 10, CURLOPT_SSL_VERIFYPEER => true]);
@@ -374,7 +380,7 @@ function gemini_pick_model(string $apiKey): string {
         if (preg_match('/embed|vision|aqa|imagen/i', $name)) continue;
         $candidates[] = $name;
     }
-    if (empty($candidates)) return 'gemini-2.0-flash';
+    if (empty($candidates)) return 'gemini-2.5-flash';
     $scored = [];
     foreach ($candidates as $c) {
         $score = 0;
