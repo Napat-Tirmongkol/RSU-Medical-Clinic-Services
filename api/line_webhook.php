@@ -78,6 +78,67 @@ function reply_text_message(string $text): array
     return ['type' => 'text', 'text' => $text];
 }
 
+function build_registration_required_flex(): array
+{
+    return [
+        'type' => 'flex',
+        'altText' => 'กรุณาลงทะเบียนก่อนใช้งาน',
+        'contents' => [
+            'type' => 'bubble',
+            'size' => 'mega',
+            'body' => [
+                'type' => 'box',
+                'layout' => 'vertical',
+                'paddingAll' => '22px',
+                'contents' => [
+                    [
+                        'type' => 'text',
+                        'text' => 'RSU Medical Hub',
+                        'weight' => 'bold',
+                        'size' => 'xs',
+                        'color' => '#2563EB',
+                    ],
+                    [
+                        'type' => 'text',
+                        'text' => 'กรุณาลงทะเบียนก่อนใช้งาน',
+                        'weight' => 'bold',
+                        'size' => 'xl',
+                        'color' => '#0F172A',
+                        'margin' => 'md',
+                        'wrap' => true,
+                    ],
+                    [
+                        'type' => 'text',
+                        'text' => 'ระบบยังไม่พบข้อมูล LINE ของคุณ กรุณา Login/ลงทะเบียนเพื่อผูกบัญชีกับรหัสนักศึกษาหรือรหัสบุคลากร แล้วจึงใช้งานเมนูประกันอุบัติเหตุ',
+                        'size' => 'sm',
+                        'color' => '#64748B',
+                        'margin' => 'md',
+                        'wrap' => true,
+                    ],
+                ],
+            ],
+            'footer' => [
+                'type' => 'box',
+                'layout' => 'vertical',
+                'spacing' => 'sm',
+                'contents' => [
+                    [
+                        'type' => 'button',
+                        'style' => 'primary',
+                        'color' => '#2563EB',
+                        'height' => 'sm',
+                        'action' => [
+                            'type' => 'uri',
+                            'label' => 'Login / ลงทะเบียน',
+                            'uri' => line_app_base_url() . '/line_api/line_login.php',
+                        ],
+                    ],
+                ],
+            ],
+        ],
+    ];
+}
+
 function build_insurance_flex_message(array $user, array $insurance): array
 {
     $fullName = trim((string)($insurance['full_name'] ?? '')) ?: (string)($user['full_name'] ?? '-');
@@ -196,7 +257,7 @@ function build_insurance_reply(PDO $pdo, string $lineUserId): array
     $user = find_user_by_line_uid($pdo, $lineUserId, 'id, full_name, student_personnel_id, line_user_id, line_user_id_new');
     if (!$user) {
         line_webhook_log('Insurance lookup user not found', ['line_user_id' => line_mask_uid($lineUserId)], 'warning');
-        return [reply_text_message("ยังไม่พบการลงทะเบียน LINE ของคุณ\nกรุณา Login/ลงทะเบียนก่อนใช้งานเมนูประกันอุบัติเหตุ\n" . line_app_base_url() . '/line_api/line_login.php')];
+        return [build_registration_required_flex()];
     }
 
     $memberId = trim((string)($user['student_personnel_id'] ?? ''));
