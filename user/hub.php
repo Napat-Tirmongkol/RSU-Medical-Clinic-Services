@@ -169,6 +169,14 @@ function formatThaiDate($date)
     return $days[date('w', $ts)] . ", " . date('j', $ts) . " " . $months[date('n', $ts)] . " " . (date('Y', $ts) + 543);
 }
 
+function maskCitizenId(?string $citizenId): string
+{
+    $digits = preg_replace('/\D+/', '', (string)$citizenId);
+    if ($digits === '') return '—';
+    if (strlen($digits) <= 5) return str_repeat('*', strlen($digits));
+    return substr($digits, 0, 3) . str_repeat('*', max(0, strlen($digits) - 5)) . substr($digits, -2);
+}
+
 function campIcon($type)
 {
     return match ($type) {
@@ -671,8 +679,8 @@ $greeting = ($hour >= 5 && $hour < 12) ? "สวัสดีตอนเช้�
                         <div class="relative z-10 grid grid-cols-[92px_1fr] gap-3 text-sm">
                             <span class="text-slate-400 font-bold">ชื่อ</span>
                             <span class="text-slate-800 font-black truncate"><?= htmlspecialchars($user['full_name']) ?></span>
-                            <span class="text-slate-400 font-bold">รหัสสมาชิก</span>
-                            <span class="text-slate-800 font-black tracking-wide"><?= htmlspecialchars((string)($insurance['member_id'] ?? $user['student_personnel_id'] ?? '—')) ?></span>
+                            <span class="text-slate-400 font-bold">เลขบัตรประชาชน</span>
+                            <span class="text-slate-800 font-black tracking-wide"><?= htmlspecialchars(maskCitizenId($insurance['citizen_id'] ?? '')) ?></span>
                         </div>
                     </div>
                     <?php else: ?>

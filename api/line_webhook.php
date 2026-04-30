@@ -73,6 +73,14 @@ function format_line_date(?string $date): string
     return $ts ? date('d/m/Y', $ts) : $date;
 }
 
+function mask_citizen_id(?string $citizenId): string
+{
+    $digits = preg_replace('/\D+/', '', (string)$citizenId);
+    if ($digits === '') return '-';
+    if (strlen($digits) <= 5) return str_repeat('*', strlen($digits));
+    return substr($digits, 0, 3) . str_repeat('*', max(0, strlen($digits) - 5)) . substr($digits, -2);
+}
+
 function reply_text_message(string $text): array
 {
     return ['type' => 'text', 'text' => $text];
@@ -143,7 +151,7 @@ function build_insurance_flex_message(array $user, array $insurance): array
 {
     $fullName = trim((string)($insurance['full_name'] ?? '')) ?: (string)($user['full_name'] ?? '-');
     $policyNo = trim((string)($insurance['policy_number'] ?? '')) ?: '-';
-    $memberId = trim((string)($insurance['member_id'] ?? '')) ?: (string)($user['student_personnel_id'] ?? '-');
+    $maskedCitizenId = mask_citizen_id($insurance['citizen_id'] ?? '');
     $status = (string)($insurance['insurance_status'] ?? 'Inactive');
     $isActive = $status === 'Active';
     $coverageStart = format_line_date($insurance['coverage_start'] ?? null);
@@ -198,7 +206,7 @@ function build_insurance_flex_message(array $user, array $insurance): array
                     ['type' => 'separator', 'margin' => 'lg', 'color' => '#FBCFE8'],
                     insurance_flex_row('เลขที่กรมธรรม์', $policyNo),
                     insurance_flex_row('ผู้เอาประกันภัย', $fullName),
-                    insurance_flex_row('รหัสสมาชิก', $memberId),
+                    insurance_flex_row('เลขบัตรประชาชน', $maskedCitizenId),
                     insurance_flex_row('วันเริ่มคุ้มครอง', $coverageStart),
                     insurance_flex_row('วันสิ้นสุดคุ้มครอง', $coverageEnd),
                     [
@@ -237,7 +245,7 @@ function build_insurance_flex_message(array $user, array $insurance): array
 function build_insurance_inactive_flex(array $user, array $insurance): array
 {
     $fullName = trim((string)($insurance['full_name'] ?? '')) ?: (string)($user['full_name'] ?? '-');
-    $memberId = trim((string)($insurance['member_id'] ?? '')) ?: (string)($user['student_personnel_id'] ?? '-');
+    $maskedCitizenId = mask_citizen_id($insurance['citizen_id'] ?? '');
 
     return [
         'type' => 'flex',
@@ -256,7 +264,7 @@ function build_insurance_inactive_flex(array $user, array $insurance): array
                     ['type' => 'text', 'text' => 'ข้อมูลประกันของคุณอยู่ในสถานะ Inactive กรุณาติดต่อห้องพยาบาลเพื่อตรวจสอบสิทธิ์', 'size' => 'sm', 'color' => '#78716C', 'margin' => 'md', 'wrap' => true],
                     ['type' => 'separator', 'margin' => 'lg', 'color' => '#FED7AA'],
                     insurance_flex_row('ชื่อ', $fullName),
-                    insurance_flex_row('รหัสสมาชิก', $memberId),
+                    insurance_flex_row('เลขบัตรประชาชน', $maskedCitizenId),
                 ],
             ],
             'footer' => [
