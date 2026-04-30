@@ -163,9 +163,18 @@ document.addEventListener('DOMContentLoaded', function() {
     // ใช้ Html5Qrcode เพื่อบังคับเลนส์กล้องหลังหลัก
     const html5QrCode = new Html5Qrcode("reader");
     let isProcessing = false;
+    let manualSubmitLocked = false;
+    let lastManualValue = '';
+    let lastManualAt = 0;
 
     // ฟังก์ชันเช็คอิน
-    function processQRCode(decodedText, isConfirmed = false) {
+    function resumeCameraIfNeeded(source) {
+        if (source === 'manual') return;
+        if (html5QrCode.getState() === 3) html5QrCode.resume();
+        else if (html5QrCode.getState() === 1) startCamera();
+    }
+
+    function processQRCode(decodedText, isConfirmed = false, source = 'camera') {
         if (isProcessing && !isConfirmed) return; 
         isProcessing = true;
         
@@ -202,12 +211,11 @@ document.addEventListener('DOMContentLoaded', function() {
                         reverseButtons: true
                     }).then((result) => {
                         if (result.isConfirmed) {
-                            processQRCode(decodedText, true);
+                            processQRCode(decodedText, true, source);
                         } else {
                             document.getElementById('scan-status').innerText = 'พร้อมสแกน...';
                             document.getElementById('scan-status').className = 'text-sm font-bold text-green-500 animate-pulse';
-                            if (html5QrCode.getState() === 3) html5QrCode.resume();
-                            else if (html5QrCode.getState() === 1) startCamera();
+                            resumeCameraIfNeeded(source);
                         }
                     });
                 } else if (data.status === 'success') {
@@ -219,8 +227,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     Swal.fire(swalConfig).then(() => { 
                         document.getElementById('scan-status').innerText = 'พร้อมสแกน...';
                         document.getElementById('scan-status').className = 'text-sm font-bold text-green-500 animate-pulse';
-                        if (html5QrCode.getState() === 3) html5QrCode.resume();
-                        else if (html5QrCode.getState() === 1) startCamera();
+                        resumeCameraIfNeeded(source);
                     });
                 } else if (data.status === 'warning') {
                     isProcessing = false;
@@ -228,8 +235,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     Swal.fire(swalConfig).then(() => { 
                         document.getElementById('scan-status').innerText = 'พร้อมสแกน...';
                         document.getElementById('scan-status').className = 'text-sm font-bold text-green-500 animate-pulse';
-                        if (html5QrCode.getState() === 3) html5QrCode.resume();
-                        else if (html5QrCode.getState() === 1) startCamera();
+                        resumeCameraIfNeeded(source);
                     });
                 } else {
                     isProcessing = false;
@@ -237,17 +243,25 @@ document.addEventListener('DOMContentLoaded', function() {
                     Swal.fire(swalConfig).then(() => { 
                         document.getElementById('scan-status').innerText = 'พร้อมสแกน...';
                         document.getElementById('scan-status').className = 'text-sm font-bold text-green-500 animate-pulse';
-                        if (html5QrCode.getState() === 3) html5QrCode.resume();
-                        else if (html5QrCode.getState() === 1) startCamera();
+                        resumeCameraIfNeeded(source);
                     });
                 }
             })
             .catch(err => {
                 isProcessing = false;
                 Swal.fire('Error', 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้', 'error').then(() => { 
-                    if (html5QrCode.getState() === 3) html5QrCode.resume();
-                    else if (html5QrCode.getState() === 1) startCamera();
+                    resumeCameraIfNeeded(source);
                 });
+            })
+            .finally(() => {
+                if (source === 'manual') {
+                    manualSubmitLocked = false;
+                    const btn = document.getElementById('btn-submit-manual');
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.classList.remove('opacity-60', 'cursor-not-allowed');
+                    }
+                }
             });
     }
 
@@ -346,16 +360,37 @@ document.addEventListener('DOMContentLoaded', function() {
     const manualInput = document.getElementById('manual-input-id');
     const btnSubmitManual = document.getElementById('btn-submit-manual');
 
-    function handleManualSubmit() {
+    async function handleManualSubmit(e) {
+        if (e) e.preventDefault();
+        if (manualSubmitLocked || isProcessing) return;
+
         const val = manualInput.value.trim();
-        if (val) {
-            processQRCode(val);
-            manualInput.value = '';
+        if (!val) return;
+
+        const now = Date.now();
+        if (val === lastManualValue && now - lastManualAt < 1500) {
+            return;
         }
+
+        manualSubmitLocked = true;
+        lastManualValue = val;
+        lastManualAt = now;
+        btnSubmitManual.disabled = true;
+        btnSubmitManual.classList.add('opacity-60', 'cursor-not-allowed');
+
+        if (html5QrCode.isScanning) {
+            await stopCamera();
+        }
+
+        processQRCode(val, false, 'manual');
+        manualInput.value = '';
     }
 
     manualInput.addEventListener('keydown', e => {
-        if (e.key === 'Enter') handleManualSubmit();
+        if (e.key === 'Enter') {
+            if (e.repeat || e.isComposing) return;
+            handleManualSubmit(e);
+        }
     });
     btnSubmitManual.addEventListener('click', handleManualSubmit);
 });
