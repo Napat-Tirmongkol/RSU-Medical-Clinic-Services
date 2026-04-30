@@ -40,18 +40,27 @@ $pdo = db();
 try {
     $campaigns = $pdo->query("
         SELECT
-            c.id, c.title, c.type, c.total_capacity,
-            COUNT(DISTINCT b.id)                                        AS total_booked,
-            SUM(b.attended_at IS NOT NULL)                              AS attended,
-            SUM(b.status = 'confirmed' AND b.attended_at IS NULL)      AS waiting,
+            c.id, c.title, c.type, c.status, c.total_capacity,
+            COUNT(DISTINCT b.id) AS total_booked,
+            COUNT(DISTINCT CASE WHEN b.attended_at IS NOT NULL THEN b.id END) AS attended,
+            COUNT(DISTINCT CASE WHEN b.status = 'confirmed' AND b.attended_at IS NULL THEN b.id END) AS waiting,
             MIN(CASE WHEN s.slot_date >= CURDATE() THEN s.slot_date END) AS next_slot_date
         FROM camp_list c
         LEFT JOIN camp_bookings b ON b.campaign_id = c.id
             AND b.status IN ('confirmed','booked')
         LEFT JOIN camp_slots s ON s.campaign_id = c.id
         WHERE c.status = 'active'
+           OR EXISTS (
+                SELECT 1
+                FROM camp_slots today_slots
+                WHERE today_slots.campaign_id = c.id
+                  AND today_slots.slot_date = CURDATE()
+           )
         GROUP BY c.id
-        ORDER BY next_slot_date ASC, c.id DESC
+        ORDER BY
+            CASE WHEN c.status = 'active' THEN 0 ELSE 1 END ASC,
+            next_slot_date ASC,
+            c.id DESC
     ")->fetchAll(PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
     $campaigns = [];
@@ -163,6 +172,7 @@ $typeColor = ['vaccine' => '#0052CC', 'training' => '#6366f1', 'health_check' =>
             $label   = $typeLabel[$c['type']] ?? $c['type'];
             $pct     = $c['total_booked'] > 0 ? round(($c['attended'] / max($c['total_booked'],1)) * 100) : 0;
             $nextDay = $c['next_slot_date'] ? date('d M', strtotime($c['next_slot_date'])) : '—';
+            $isScanOnly = ($c['status'] ?? '') !== 'active';
         ?>
         <button onclick="selectCampaign(<?= $c['id'] ?>, <?= htmlspecialchars(json_encode($c['title'])) ?>)"
             class="w-full text-left bg-white rounded-2xl p-4 border border-gray-100 shadow-sm
@@ -181,6 +191,11 @@ $typeColor = ['vaccine' => '#0052CC', 'training' => '#6366f1', 'health_check' =>
                         <span class="text-[10px] text-gray-400">
                             <i class="fa-regular fa-calendar mr-0.5"></i><?= $nextDay ?>
                         </span>
+                        <?php if ($isScanOnly): ?>
+                        <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-50 text-orange-600 border border-orange-100">
+                            ปิดรับสมัคร · สแกนได้
+                        </span>
+                        <?php endif; ?>
                     </div>
                     <!-- Progress bar -->
                     <div class="mt-2.5">
