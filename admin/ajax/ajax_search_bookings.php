@@ -1,22 +1,5 @@
 <?php
 declare(strict_types=1);
-
-// Catch ALL PHP errors and return as JSON (debug helper)
-set_error_handler(function(int $errno, string $errstr, string $errfile, int $errline): bool {
-    header('Content-Type: application/json; charset=utf-8');
-    http_response_code(500);
-    echo json_encode(['success' => false, 'debug_error' => "$errstr in $errfile:$errline"]);
-    exit;
-});
-register_shutdown_function(function() {
-    $e = error_get_last();
-    if ($e && in_array($e['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR])) {
-        header('Content-Type: application/json; charset=utf-8');
-        http_response_code(500);
-        echo json_encode(['success' => false, 'debug_fatal' => "{$e['message']} in {$e['file']}:{$e['line']}"]);
-    }
-});
-
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/booking_row.php';
 
@@ -42,13 +25,15 @@ $offset     = ($page - 1) * $perPage;
 if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateFrom)) $dateFrom = date('Y-m-01');
 if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateTo))   $dateTo   = date('Y-m-t');
 
-// Base where (always applied)
 $where  = "s.slot_date BETWEEN :start AND :end AND b.status IN ('booked','confirmed','completed','cancelled','cancelled_by_admin')";
 $params = [':start' => $dateFrom, ':end' => $dateTo];
 
 if ($q !== '') {
-    $where .= " AND (u.full_name LIKE :q OR u.student_personnel_id LIKE :q OR c.title LIKE :q)";
-    $params[':q'] = '%' . $q . '%';
+    // Native prepared statements (EMULATE_PREPARES=false) forbid duplicate named params —
+    // use :q1/:q2/:q3 instead of :q three times
+    $where .= " AND (u.full_name LIKE :q1 OR u.student_personnel_id LIKE :q2 OR c.title LIKE :q3)";
+    $like = '%' . $q . '%';
+    $params[':q1'] = $params[':q2'] = $params[':q3'] = $like;
 }
 
 if ($status === 'cancelled') {
@@ -67,11 +52,11 @@ try {
     $pdo = db();
 
     // KPI counts scoped to date+campaign only (not affected by search/status tab)
-    $kpiParams = [':start' => $dateFrom, ':end' => $dateTo];
-    $kpiWhere  = 's.slot_date BETWEEN :start AND :end';
+    $kpiParams = [':kstart' => $dateFrom, ':kend' => $dateTo];
+    $kpiWhere  = 's.slot_date BETWEEN :kstart AND :kend';
     if ($campaignId > 0) {
-        $kpiWhere .= ' AND b.campaign_id = :campaign_id';
-        $kpiParams[':campaign_id'] = $campaignId;
+        $kpiWhere .= ' AND b.campaign_id = :kcid';
+        $kpiParams[':kcid'] = $campaignId;
     }
     $kpiStmt = $pdo->prepare("
         SELECT
@@ -86,7 +71,6 @@ try {
     $kpiStmt->execute($kpiParams);
     $kpi = $kpiStmt->fetch(PDO::FETCH_ASSOC);
 
-    // Total count for current filters
     $cntStmt = $pdo->prepare("
         SELECT COUNT(*) FROM camp_bookings b
         JOIN sys_users u  ON b.student_id  = u.id
@@ -132,5 +116,5 @@ try {
 } catch (PDOException $e) {
     error_log('ajax_search_bookings: ' . $e->getMessage());
     http_response_code(500);
-    echo json_encode(['success' => false, 'message' => 'เกิดข้อผิดพลาดในระบบ', 'debug_pdo' => $e->getMessage()]);
+    echo json_encode(['success' => false, 'message' => 'เกิดข้อผิดพลาดในระบบ']);
 }

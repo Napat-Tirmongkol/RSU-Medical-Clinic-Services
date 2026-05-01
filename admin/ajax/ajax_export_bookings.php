@@ -22,8 +22,9 @@ $where  = "s.slot_date BETWEEN :start AND :end AND b.status IN ('booked','confir
 $params = [':start' => $dateFrom, ':end' => $dateTo];
 
 if ($q !== '') {
-    $where .= " AND (u.full_name LIKE :q OR u.student_personnel_id LIKE :q OR c.title LIKE :q)";
-    $params[':q'] = '%' . $q . '%';
+    $where .= " AND (u.full_name LIKE :q1 OR u.student_personnel_id LIKE :q2 OR c.title LIKE :q3)";
+    $like = '%' . $q . '%';
+    $params[':q1'] = $params[':q2'] = $params[':q3'] = $like;
 }
 
 if ($status === 'cancelled') {
