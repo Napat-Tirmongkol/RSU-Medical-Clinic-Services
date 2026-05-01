@@ -1,11 +1,37 @@
 <?php
 /**
- * portal/_partials/insurance_sync.php — Insurance Sync Hub (Simplified)
+ * portal/_partials/insurance_sync.php — Insurance Sync Hub
  */
 declare(strict_types=1);
 
 $pdo = db();
 $csrfToken = get_csrf_token();
+
+// KPI stats + last sync — loaded server-side to avoid FOUC
+$stats = ['total_active' => 0, 'total_inactive' => 0, 'staff' => 0, 'student' => 0, 'manual_override' => 0, 'total' => 0];
+$lastSync = null;
+try {
+    $r = $pdo->query("
+        SELECT
+            SUM(insurance_status = 'Active')    AS total_active,
+            SUM(insurance_status = 'Inactive')  AS total_inactive,
+            SUM(member_status = 'บุคลากร')       AS staff,
+            SUM(member_status = 'นักศึกษา')      AS student,
+            SUM(manually_overridden = 1)        AS manual_override,
+            COUNT(*)                            AS total
+        FROM insurance_members
+    ")->fetch(PDO::FETCH_ASSOC);
+    if ($r) $stats = array_map('intval', $r);
+
+    $lastSync = $pdo->query("
+        SELECT sync_id, MIN(changed_at) AS sync_time,
+               SUM(change_type = 'inserted')   AS cnt_new,
+               SUM(change_type = 'inactivated') AS cnt_removed,
+               COUNT(*) AS cnt_total
+        FROM insurance_member_history
+        GROUP BY sync_id ORDER BY sync_id DESC LIMIT 1
+    ")->fetch(PDO::FETCH_ASSOC) ?: null;
+} catch (PDOException $e) { /* table may not exist yet */ }
 ?>
 
 <style>
@@ -16,11 +42,12 @@ $csrfToken = get_csrf_token();
     .badge-inactive { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
     .badge-staff    { background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; }
     .badge-student  { background: #fef9c3; color: #ca8a04; border: 1px solid #fde68a; }
+    .ins-stat-card  { background:#fff; border:1px solid #f1f5f9; border-radius:20px; padding:20px 24px; display:flex; align-items:center; gap:16px; box-shadow:0 1px 3px rgba(0,0,0,.04); }
 </style>
 
 <div class="px-5 md:px-8 py-8 space-y-8">
 
-    <!-- Header -->
+    <!-- ── Header ── -->
     <div class="flex flex-wrap items-center justify-between gap-4">
         <div>
             <div class="sec-title" style="margin-bottom:4px">🛡️ Insurance Sync Hub</div>
@@ -44,32 +71,114 @@ $csrfToken = get_csrf_token();
         </div>
     </div>
 
-    <!-- Upload Section -->
-    <div class="bg-white rounded-[2rem] border border-slate-200 shadow-sm p-8">
-        <h2 class="text-base font-black text-slate-800 mb-6">อัปโหลดไฟล์รายชื่อผู้มีสิทธิ์</h2>
+    <!-- ── KPI Stat Cards ── -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div class="ins-stat-card">
+            <div class="w-11 h-11 rounded-2xl bg-emerald-50 text-emerald-500 flex items-center justify-center text-lg shrink-0">
+                <i class="fa-solid fa-shield-check"></i>
+            </div>
+            <div>
+                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">มีสิทธิ์ (Active)</p>
+                <p class="text-2xl font-black text-slate-800 leading-none"><?= number_format($stats['total_active']) ?></p>
+            </div>
+        </div>
+        <div class="ins-stat-card">
+            <div class="w-11 h-11 rounded-2xl bg-blue-50 text-blue-500 flex items-center justify-center text-lg shrink-0">
+                <i class="fa-solid fa-user-tie"></i>
+            </div>
+            <div>
+                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">บุคลากร</p>
+                <p class="text-2xl font-black text-slate-800 leading-none"><?= number_format($stats['staff']) ?></p>
+            </div>
+        </div>
+        <div class="ins-stat-card">
+            <div class="w-11 h-11 rounded-2xl bg-amber-50 text-amber-500 flex items-center justify-center text-lg shrink-0">
+                <i class="fa-solid fa-user-graduate"></i>
+            </div>
+            <div>
+                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">นักศึกษา</p>
+                <p class="text-2xl font-black text-slate-800 leading-none"><?= number_format($stats['student']) ?></p>
+            </div>
+        </div>
+        <div class="ins-stat-card">
+            <div class="w-11 h-11 rounded-2xl bg-rose-50 text-rose-400 flex items-center justify-center text-lg shrink-0">
+                <i class="fa-solid fa-pen-to-square"></i>
+            </div>
+            <div>
+                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Manual Override</p>
+                <p class="text-2xl font-black text-slate-800 leading-none"><?= number_format($stats['manual_override']) ?></p>
+            </div>
+        </div>
+    </div>
 
-        <div class="max-w-xl space-y-5">
-            <!-- Column hint -->
-            <div class="bg-blue-50 border border-blue-100 rounded-2xl p-4 text-xs font-bold text-blue-700 space-y-1">
-                <div class="font-black text-blue-800 mb-2">คอลัมในไฟล์ CSV / Excel</div>
-                <div>• <code class="bg-blue-100 px-1 rounded">member_id</code> — รหัสสมาชิก <span class="text-rose-500 font-black">(บังคับ)</span></div>
-                <div>• <code class="bg-blue-100 px-1 rounded">member_status</code> — <code>บุคลากร</code> หรือ <code>นักศึกษา</code></div>
-                <div>• <code class="bg-blue-100 px-1 rounded">full_name</code>, <code class="bg-blue-100 px-1 rounded">citizen_id</code>, <code class="bg-blue-100 px-1 rounded">coverage_start</code>, <code class="bg-blue-100 px-1 rounded">coverage_end</code> ฯลฯ</div>
+    <!-- ── Upload + History (2-col) ── -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+        <!-- Upload (5/12) -->
+        <div class="lg:col-span-5 bg-white rounded-[2rem] border border-slate-200 shadow-sm p-8 flex flex-col gap-6">
+            <h2 class="text-base font-black text-slate-800">อัปโหลดไฟล์รายชื่อผู้มีสิทธิ์</h2>
+
+            <!-- Step indicator -->
+            <div class="flex items-center gap-3">
+                <div class="flex items-center gap-2">
+                    <div id="stepDot1" class="w-7 h-7 rounded-full bg-[#0052CC] text-white text-[11px] font-black flex items-center justify-center">1</div>
+                    <span class="text-xs font-black text-slate-600">เลือกไฟล์</span>
+                </div>
+                <div class="flex-1 h-px bg-slate-200"></div>
+                <div class="flex items-center gap-2">
+                    <div id="stepDot2" class="w-7 h-7 rounded-full bg-slate-100 text-slate-400 text-[11px] font-black flex items-center justify-center transition-all">2</div>
+                    <span id="stepLabel2" class="text-xs font-black text-slate-400 transition-all">อัปโหลด</span>
+                </div>
             </div>
 
+            <!-- Column hint (collapsible) -->
+            <details class="group">
+                <summary class="cursor-pointer list-none flex items-center gap-2 text-xs font-black text-blue-600 select-none">
+                    <i class="fa-solid fa-circle-info"></i> ดูรูปแบบคอลัมในไฟล์
+                    <i class="fa-solid fa-chevron-down text-[9px] group-open:rotate-180 transition-transform ml-auto"></i>
+                </summary>
+                <div class="mt-3 bg-blue-50 border border-blue-100 rounded-2xl p-4 text-xs font-bold text-blue-700 space-y-1">
+                    <div class="font-black text-blue-800 mb-2">คอลัมในไฟล์ CSV / Excel</div>
+                    <div>• <code class="bg-blue-100 px-1 rounded">member_id</code> — รหัสสมาชิก <span class="text-rose-500 font-black">(บังคับ)</span></div>
+                    <div>• <code class="bg-blue-100 px-1 rounded">member_status</code> — <code>บุคลากร</code> หรือ <code>นักศึกษา</code></div>
+                    <div>• <code class="bg-blue-100 px-1 rounded">full_name</code>, <code class="bg-blue-100 px-1 rounded">citizen_id</code>, <code class="bg-blue-100 px-1 rounded">coverage_start</code>, <code class="bg-blue-100 px-1 rounded">coverage_end</code> ฯลฯ</div>
+                </div>
+            </details>
+
             <!-- Drop zone -->
-            <div class="ins-upload-area flex flex-col items-center justify-center py-12 px-6" id="insUploadArea"
+            <div class="ins-upload-area flex flex-col items-center justify-center py-10 px-6" id="insUploadArea"
                  onclick="document.getElementById('insFileInput').click()"
                  ondragover="event.preventDefault();this.classList.add('drag-over')"
                  ondragleave="this.classList.remove('drag-over')"
                  ondrop="handleInsDrop(event)">
-                <div class="w-16 h-16 bg-white rounded-3xl shadow-lg flex items-center justify-center text-blue-600 text-2xl mb-4 border border-blue-50">
+                <div class="w-14 h-14 bg-white rounded-3xl shadow-lg flex items-center justify-center text-blue-600 text-xl mb-3 border border-blue-50">
                     <i class="fa-solid fa-file-shield"></i>
                 </div>
                 <p class="text-sm font-black text-slate-700" id="insFileLabel">คลิกหรือลากไฟล์มาวางที่นี่</p>
                 <p class="text-[11px] text-slate-400 mt-1">.csv, .xlsx, .xls</p>
             </div>
             <input type="file" id="insFileInput" accept=".csv,.xlsx,.xls" class="hidden" onchange="onInsFileSelect(this)">
+
+            <!-- Last sync summary -->
+            <?php if ($lastSync): ?>
+            <div class="bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3 flex items-center gap-3">
+                <i class="fa-solid fa-clock-rotate-left text-slate-300 text-sm shrink-0"></i>
+                <div class="text-xs text-slate-500 font-bold">
+                    Sync ล่าสุด <span class="text-slate-700">#<?= $lastSync['sync_id'] ?></span>
+                    <span class="mx-1.5 text-slate-300">·</span>
+                    <?= htmlspecialchars($lastSync['sync_time'] ?? '', ENT_QUOTES, 'UTF-8') ?>
+                    <span class="mx-1.5 text-slate-300">·</span>
+                    <span class="text-emerald-600">+<?= (int)$lastSync['cnt_new'] ?></span>
+                    <span class="mx-1 text-slate-300">/</span>
+                    <span class="text-rose-500">-<?= (int)$lastSync['cnt_removed'] ?></span>
+                </div>
+            </div>
+            <?php else: ?>
+            <div class="bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3 flex items-center gap-3">
+                <i class="fa-solid fa-clock-rotate-left text-slate-200 text-sm shrink-0"></i>
+                <p class="text-xs text-slate-400 font-bold">ยังไม่มีประวัติการ sync</p>
+            </div>
+            <?php endif; ?>
 
             <button id="insBtnUpload" onclick="doInsUpload()" disabled
                 class="w-full h-14 bg-[#0052CC] text-white font-black rounded-2xl shadow-xl shadow-blue-200 active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-30 disabled:cursor-not-allowed">
@@ -78,24 +187,24 @@ $csrfToken = get_csrf_token();
 
             <div id="insUploadResult" class="hidden"></div>
         </div>
-    </div>
 
-    <!-- Sync History -->
-    <div class="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden">
-        <div class="px-8 py-6 border-b border-slate-100 flex flex-wrap items-center gap-3">
-            <div class="flex-1">
-                <h2 class="text-base font-black text-slate-800">ประวัติการอัปเดตประกัน</h2>
-                <p class="text-xs text-slate-400 font-bold mt-1">รายการเปลี่ยนแปลงจากการอัปโหลดล่าสุดและการ sync รายคน</p>
+        <!-- History (7/12) -->
+        <div class="lg:col-span-7 bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+            <div class="px-8 py-6 border-b border-slate-100 flex flex-wrap items-center gap-3 shrink-0">
+                <div class="flex-1">
+                    <h2 class="text-base font-black text-slate-800">ประวัติการ Sync</h2>
+                    <p class="text-xs text-slate-400 font-bold mt-1">สรุปผลแต่ละครั้งที่อัปโหลดไฟล์</p>
+                </div>
+                <button onclick="loadInsHistory(1)" class="h-9 px-4 bg-slate-50 border border-slate-200 text-slate-500 rounded-xl font-black text-xs active:scale-95 transition-all flex items-center gap-2">
+                    <i class="fa-solid fa-rotate"></i> รีเฟรช
+                </button>
             </div>
-            <button onclick="loadInsHistory(1)" class="h-10 px-4 bg-slate-50 border border-slate-200 text-slate-500 rounded-xl font-black text-xs active:scale-95 transition-all flex items-center gap-2">
-                <i class="fa-solid fa-rotate"></i> รีเฟรช
-            </button>
+            <div id="insHistoryResult" class="flex-1 min-h-[200px]"></div>
+            <div id="insHistoryPager" class="px-8 py-4 flex justify-center border-t border-slate-100 hidden shrink-0"></div>
         </div>
-        <div id="insHistoryResult" class="min-h-[140px]"></div>
-        <div id="insHistoryPager" class="px-8 py-4 flex justify-center border-t border-slate-100 hidden"></div>
     </div>
 
-    <!-- Member List -->
+    <!-- ── Member List (full width) ── -->
     <div class="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden">
         <div class="px-8 py-6 border-b border-slate-100 flex flex-wrap items-center gap-3">
             <h2 class="text-base font-black text-slate-800 flex-1">รายชื่อผู้ประกัน</h2>
@@ -114,7 +223,7 @@ $csrfToken = get_csrf_token();
                 <option value="Active">Active</option>
                 <option value="Inactive">Inactive</option>
             </select>
-            <button onclick="openInsMemberModal(null)" class="h-10 px-5 bg-[#0052CC] text-white rounded-xl font-black text-sm active:scale-95 transition-all flex items-center gap-2">
+            <button onclick="openInsMemberModal(null)" class="h-10 px-5 bg-slate-100 text-slate-600 rounded-xl font-black text-sm active:scale-95 transition-all flex items-center gap-2 hover:bg-slate-200">
                 <i class="fa-solid fa-plus text-xs"></i> เพิ่มสมาชิก
             </button>
         </div>
@@ -208,14 +317,29 @@ $csrfToken = get_csrf_token();
 (function () {
     const CSRF = '<?= $csrfToken ?>';
     let selectedFile = null;
+    let searchDebounce = null;
 
+    // ── Step indicator ──────────────────────────────────────────────────────────
+    function setStep(step) {
+        const dot2  = document.getElementById('stepDot2');
+        const lbl2  = document.getElementById('stepLabel2');
+        if (step >= 2) {
+            dot2.className  = 'w-7 h-7 rounded-full bg-[#0052CC] text-white text-[11px] font-black flex items-center justify-center transition-all';
+            lbl2.className  = 'text-xs font-black text-slate-700 transition-all';
+        } else {
+            dot2.className  = 'w-7 h-7 rounded-full bg-slate-100 text-slate-400 text-[11px] font-black flex items-center justify-center transition-all';
+            lbl2.className  = 'text-xs font-black text-slate-400 transition-all';
+        }
+    }
+
+    // ── File helpers ────────────────────────────────────────────────────────────
     async function excelToCSV(file) {
         if (!/\.(xlsx|xls)$/i.test(file.name)) return file;
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
             reader.onload = (e) => {
                 try {
-                    const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array', cellDates: true });
+                    const wb  = XLSX.read(new Uint8Array(e.target.result), { type: 'array', cellDates: true });
                     const csv = XLSX.utils.sheet_to_csv(wb.Sheets[wb.SheetNames[0]], { blankrows: false });
                     const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
                     resolve(new File([blob], file.name.replace(/\.(xlsx|xls)$/i, '.csv'), { type: 'text/csv' }));
@@ -230,31 +354,33 @@ $csrfToken = get_csrf_token();
         document.getElementById('insFileLabel').textContent = file.name;
         document.getElementById('insUploadArea').classList.add('border-blue-500', 'bg-blue-50');
         document.getElementById('insBtnUpload').disabled = false;
+        setStep(2);
     }
 
     window.onInsFileSelect = (input) => { if (input.files[0]) setFile(input.files[0]); };
-    window.handleInsDrop = (e) => {
+    window.handleInsDrop   = (e) => {
         e.preventDefault();
         document.getElementById('insUploadArea').classList.remove('drag-over');
         if (e.dataTransfer.files[0]) setFile(e.dataTransfer.files[0]);
     };
 
+    // ── Upload ──────────────────────────────────────────────────────────────────
     window.doInsUpload = async function () {
         if (!selectedFile) return;
-        const btn = document.getElementById('insBtnUpload');
+        const btn       = document.getElementById('insBtnUpload');
         const resultDiv = document.getElementById('insUploadResult');
-        btn.disabled = true;
-        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>กำลังประมวลผล...';
+        btn.disabled    = true;
+        btn.innerHTML   = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>กำลังประมวลผล...';
         resultDiv.classList.add('hidden');
 
         try {
             const file = await excelToCSV(selectedFile);
-            const fd = new FormData();
+            const fd   = new FormData();
             fd.append('action', 'upload');
             fd.append('csrf_token', CSRF);
             fd.append('insurance_file', file);
 
-            const res = await fetch('ajax_insurance_sync.php', { method: 'POST', body: fd });
+            const res  = await fetch('ajax_insurance_sync.php', { method: 'POST', body: fd });
             const data = await res.json();
 
             resultDiv.classList.remove('hidden');
@@ -265,21 +391,21 @@ $csrfToken = get_csrf_token();
                             <i class="fa-solid fa-check"></i>
                         </div>
                         <div>
-                            <div class="font-black text-emerald-800 text-sm mb-1">อัปเดตสำเร็จ</div>
-                            <div class="text-xs text-emerald-700 font-bold">
-                                ทั้งหมดในไฟล์: <strong>${data.total_csv}</strong> รายการ &nbsp;·&nbsp;
-                                เพิ่มใหม่: <strong>${data.total_new}</strong> &nbsp;·&nbsp;
-                                อัปเดต: <strong>${data.total_updated}</strong> &nbsp;·&nbsp;
-                                กันข้อมูลแก้เอง: <strong>${data.total_protected || 0}</strong> &nbsp;·&nbsp;
-                                ระงับสิทธิ์: <strong>${data.total_inactivated}</strong>
+                            <div class="font-black text-emerald-800 text-sm mb-1.5">อัปเดตสำเร็จ</div>
+                            <div class="flex flex-wrap gap-2 text-xs font-bold">
+                                <span class="px-2.5 py-1 bg-white border border-emerald-100 rounded-lg text-slate-600">ทั้งหมด <strong>${data.total_csv}</strong> รายการ</span>
+                                <span class="px-2.5 py-1 bg-emerald-100 rounded-lg text-emerald-700">+${data.total_new} ใหม่</span>
+                                <span class="px-2.5 py-1 bg-blue-100 rounded-lg text-blue-700">~${data.total_updated} อัปเดต</span>
+                                <span class="px-2.5 py-1 bg-rose-100 rounded-lg text-rose-600">-${data.total_inactivated} ระงับ</span>
+                                ${data.total_protected ? `<span class="px-2.5 py-1 bg-amber-100 rounded-lg text-amber-700">${data.total_protected} ป้องกัน</span>` : ''}
                             </div>
                         </div>
                     </div>`;
-                // Reset
                 selectedFile = null;
-                document.getElementById('insFileInput').value = '';
+                document.getElementById('insFileInput').value    = '';
                 document.getElementById('insFileLabel').textContent = 'คลิกหรือลากไฟล์มาวางที่นี่';
                 document.getElementById('insUploadArea').classList.remove('border-blue-500', 'bg-blue-50');
+                setStep(1);
                 loadInsMembers(1);
                 loadInsHistory(1);
             } else {
@@ -289,11 +415,12 @@ $csrfToken = get_csrf_token();
             resultDiv.classList.remove('hidden');
             resultDiv.innerHTML = `<div class="bg-rose-50 border border-rose-100 rounded-2xl p-5 text-sm font-bold text-rose-700">เกิดข้อผิดพลาด: ${err.message}</div>`;
         } finally {
-            btn.disabled = false;
+            btn.disabled  = false;
             btn.innerHTML = '<i class="fa-solid fa-cloud-arrow-up mr-2"></i>อัปโหลดและอัปเดตข้อมูล';
         }
     };
 
+    // ── Member List ─────────────────────────────────────────────────────────────
     window.loadInsMembers = async function (page) {
         const container = document.getElementById('insMembersResult');
         const pager     = document.getElementById('insMembersPager');
@@ -359,7 +486,6 @@ $csrfToken = get_csrf_token();
                     </table>
                 </div>`;
 
-            // Pagination
             const totalPages = Math.ceil(data.total / data.per_page);
             if (totalPages > 1 || data.total > 0) {
                 let ph = `<div class="flex items-center gap-2 flex-wrap justify-center">`;
@@ -367,7 +493,7 @@ $csrfToken = get_csrf_token();
                 if (page > 1)          ph += `<button onclick="loadInsMembers(1)" class="w-9 h-9 rounded-xl bg-white border border-slate-200 text-slate-400 hover:bg-slate-50 font-black text-xs">«</button>`;
                 if (page > 1)          ph += `<button onclick="loadInsMembers(${page-1})" class="w-9 h-9 rounded-xl bg-white border border-slate-200 text-slate-400 hover:bg-slate-50 font-black text-xs">‹</button>`;
                 for (let i = Math.max(1, page-2); i <= Math.min(totalPages, page+2); i++) {
-                    ph += `<button onclick="loadInsMembers(${i})" class="w-9 h-9 rounded-xl font-black text-xs ${i === page ? 'bg-blue-600 text-white shadow-lg shadow-blue-200' : 'bg-white border border-slate-200 text-slate-400 hover:bg-slate-50'}">${i}</button>`;
+                    ph += `<button onclick="loadInsMembers(${i})" class="w-9 h-9 rounded-xl font-black text-xs ${i === page ? 'bg-[#0052CC] text-white shadow-lg shadow-blue-200' : 'bg-white border border-slate-200 text-slate-400 hover:bg-slate-50'}">${i}</button>`;
                 }
                 if (page < totalPages) ph += `<button onclick="loadInsMembers(${page+1})" class="w-9 h-9 rounded-xl bg-white border border-slate-200 text-slate-400 hover:bg-slate-50 font-black text-xs">›</button>`;
                 if (page < totalPages) ph += `<button onclick="loadInsMembers(${totalPages})" class="w-9 h-9 rounded-xl bg-white border border-slate-200 text-slate-400 hover:bg-slate-50 font-black text-xs">»</button>`;
@@ -380,10 +506,13 @@ $csrfToken = get_csrf_token();
         }
     };
 
-    document.getElementById('insMemberSearch').addEventListener('keydown', e => {
-        if (e.key === 'Enter') loadInsMembers(1);
+    // Debounce search — real-time after 350ms
+    document.getElementById('insMemberSearch').addEventListener('input', () => {
+        clearTimeout(searchDebounce);
+        searchDebounce = setTimeout(() => loadInsMembers(1), 350);
     });
 
+    // ── History ─────────────────────────────────────────────────────────────────
     window.loadInsHistory = async function(page = 1) {
         const container = document.getElementById('insHistoryResult');
         const pager     = document.getElementById('insHistoryPager');
@@ -406,15 +535,6 @@ $csrfToken = get_csrf_token();
             }
 
             const fmt = (v) => Number(v || 0);
-            const chip = (n, bg, text, border, label) => n > 0
-                ? `<div class="flex flex-col items-center gap-1">
-                     <span class="text-lg font-black" style="color:${text}">${n > 0 ? '+' : ''}${n}</span>
-                     <span class="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full" style="background:${bg};color:${text};border:1px solid ${border}">${label}</span>
-                   </div>`
-                : `<div class="flex flex-col items-center gap-1 opacity-25">
-                     <span class="text-lg font-black text-slate-300">0</span>
-                     <span class="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-slate-50 text-slate-300 border border-slate-100">${label}</span>
-                   </div>`;
 
             container.innerHTML = `
                 <div class="overflow-x-auto">
@@ -435,24 +555,16 @@ $csrfToken = get_csrf_token();
                                 </td>
                                 <td class="px-6 py-5 text-xs font-bold text-slate-500 whitespace-nowrap">${h.sync_time || '-'}</td>
                                 <td class="px-6 py-5 text-center">
-                                    ${fmt(h.cnt_new) > 0
-                                        ? `<span class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-sm font-black bg-emerald-50 text-emerald-600 border border-emerald-100">+${fmt(h.cnt_new)} คน</span>`
-                                        : `<span class="text-slate-200 font-black text-sm">—</span>`}
+                                    ${fmt(h.cnt_new) > 0 ? `<span class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-sm font-black bg-emerald-50 text-emerald-600 border border-emerald-100">+${fmt(h.cnt_new)} คน</span>` : `<span class="text-slate-200 font-black text-sm">—</span>`}
                                 </td>
                                 <td class="px-6 py-5 text-center">
-                                    ${fmt(h.cnt_removed) > 0
-                                        ? `<span class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-sm font-black bg-rose-50 text-rose-500 border border-rose-100">-${fmt(h.cnt_removed)} คน</span>`
-                                        : `<span class="text-slate-200 font-black text-sm">—</span>`}
+                                    ${fmt(h.cnt_removed) > 0 ? `<span class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-sm font-black bg-rose-50 text-rose-500 border border-rose-100">-${fmt(h.cnt_removed)} คน</span>` : `<span class="text-slate-200 font-black text-sm">—</span>`}
                                 </td>
                                 <td class="px-6 py-5 text-center">
-                                    ${fmt(h.cnt_updated) > 0
-                                        ? `<span class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-sm font-black bg-blue-50 text-blue-600 border border-blue-100">${fmt(h.cnt_updated)} รายการ</span>`
-                                        : `<span class="text-slate-200 font-black text-sm">—</span>`}
+                                    ${fmt(h.cnt_updated) > 0 ? `<span class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-sm font-black bg-blue-50 text-blue-600 border border-blue-100">${fmt(h.cnt_updated)} รายการ</span>` : `<span class="text-slate-200 font-black text-sm">—</span>`}
                                 </td>
                                 <td class="px-6 py-5 text-center">
-                                    ${fmt(h.cnt_protected) > 0
-                                        ? `<span class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-sm font-black bg-amber-50 text-amber-600 border border-amber-100">${fmt(h.cnt_protected)} รายการ</span>`
-                                        : `<span class="text-slate-200 font-black text-sm">—</span>`}
+                                    ${fmt(h.cnt_protected) > 0 ? `<span class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-sm font-black bg-amber-50 text-amber-600 border border-amber-100">${fmt(h.cnt_protected)} รายการ</span>` : `<span class="text-slate-200 font-black text-sm">—</span>`}
                                 </td>
                                 <td class="px-6 py-5 text-center">
                                     <span class="text-sm font-black text-slate-600">${fmt(h.cnt_total).toLocaleString()}</span>
@@ -482,22 +594,22 @@ $csrfToken = get_csrf_token();
         }
     };
 
-    // ── Member Modal ────────────────────────────────────────────────────────────
+    // ── Member Modal ─────────────────────────────────────────────────────────────
     window.openInsMemberModal = function(member) {
         const isEdit = member !== null;
-        document.getElementById('insMemberModalTitle').textContent = isEdit ? 'แก้ไขข้อมูลสมาชิก' : 'เพิ่มสมาชิก';
-        document.getElementById('imIsEdit').value   = isEdit ? '1' : '0';
-        document.getElementById('imMemberId').value          = member?.member_id        ?? '';
-        document.getElementById('imMemberId').readOnly       = isEdit;
+        document.getElementById('insMemberModalTitle').textContent         = isEdit ? 'แก้ไขข้อมูลสมาชิก' : 'เพิ่มสมาชิก';
+        document.getElementById('imIsEdit').value                          = isEdit ? '1' : '0';
+        document.getElementById('imMemberId').value                        = member?.member_id        ?? '';
+        document.getElementById('imMemberId').readOnly                     = isEdit;
         document.getElementById('imMemberId').classList.toggle('opacity-50', isEdit);
-        document.getElementById('imFullName').value          = member?.full_name        ?? '';
-        document.getElementById('imMemberStatus').value      = member?.member_status    ?? '';
-        document.getElementById('imInsuranceStatus').value   = member?.insurance_status ?? 'Active';
-        document.getElementById('imCitizenId').value         = member?.citizen_id       ?? '';
-        document.getElementById('imPolicyNumber').value      = member?.policy_number    ?? '';
-        document.getElementById('imCoverageStart').value     = member?.coverage_start   ?? '';
-        document.getElementById('imCoverageEnd').value       = member?.coverage_end     ?? '';
-        document.getElementById('imRemarks').value           = member?.remarks          ?? '';
+        document.getElementById('imFullName').value                        = member?.full_name        ?? '';
+        document.getElementById('imMemberStatus').value                    = member?.member_status    ?? '';
+        document.getElementById('imInsuranceStatus').value                 = member?.insurance_status ?? 'Active';
+        document.getElementById('imCitizenId').value                       = member?.citizen_id       ?? '';
+        document.getElementById('imPolicyNumber').value                    = member?.policy_number    ?? '';
+        document.getElementById('imCoverageStart').value                   = member?.coverage_start   ?? '';
+        document.getElementById('imCoverageEnd').value                     = member?.coverage_end     ?? '';
+        document.getElementById('imRemarks').value                         = member?.remarks          ?? '';
         document.getElementById('imError').classList.add('hidden');
         document.getElementById('insMemberModal').classList.replace('hidden', 'flex');
     };
@@ -510,8 +622,7 @@ $csrfToken = get_csrf_token();
         const mid    = document.getElementById('imMemberId').value.trim();
         if (!mid) { errDiv.textContent = 'กรุณาระบุรหัสสมาชิก'; errDiv.classList.remove('hidden'); return; }
 
-        btn.disabled = true;
-        btn.textContent = 'กำลังบันทึก...';
+        btn.disabled = true; btn.textContent = 'กำลังบันทึก...';
         errDiv.classList.add('hidden');
 
         const fd = new FormData();
@@ -542,8 +653,7 @@ $csrfToken = get_csrf_token();
             errDiv.textContent = 'เกิดข้อผิดพลาด: ' + err.message;
             errDiv.classList.remove('hidden');
         } finally {
-            btn.disabled = false;
-            btn.textContent = 'บันทึก';
+            btn.disabled = false; btn.textContent = 'บันทึก';
         }
     };
 
@@ -557,12 +667,9 @@ $csrfToken = get_csrf_token();
             .then(data => {
                 const lbl = document.getElementById('insVisibilityLabel');
                 if (data.status === 'ok') {
-                    lbl.textContent  = cb.checked ? 'เปิดใช้งาน' : 'ปิดอยู่';
-                    lbl.className    = `text-[10px] font-bold leading-none ${cb.checked ? 'text-blue-600' : 'text-gray-400'}`;
-                } else {
-                    cb.checked = !cb.checked;
-                    alert(data.message);
-                }
+                    lbl.textContent = cb.checked ? 'เปิดใช้งาน' : 'ปิดอยู่';
+                    lbl.className   = `text-[10px] font-bold leading-none ${cb.checked ? 'text-blue-600' : 'text-gray-400'}`;
+                } else { cb.checked = !cb.checked; alert(data.message); }
             });
     };
 
