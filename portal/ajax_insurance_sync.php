@@ -332,17 +332,24 @@ if ($action === 'list_history') {
     $perPage = 20;
     $offset  = ($page - 1) * $perPage;
 
-    $countStmt = $pdo->query("SELECT COUNT(*) FROM insurance_member_history");
-    $total = (int)$countStmt->fetchColumn();
+    $total = (int)$pdo->query("SELECT COUNT(DISTINCT sync_id) FROM insurance_member_history")->fetchColumn();
 
     $stmt = $pdo->prepare("
-        SELECT h.id, h.member_id, h.sync_id, h.change_type, h.old_status, h.new_status,
-               h.snapshot, h.changed_at, m.full_name
-        FROM insurance_member_history h
-        LEFT JOIN insurance_members m ON m.member_id = h.member_id
-        ORDER BY h.changed_at DESC, h.id DESC
-        LIMIT {$perPage} OFFSET {$offset}
+        SELECT
+            sync_id,
+            MIN(changed_at)                          AS sync_time,
+            SUM(change_type = 'inserted')            AS cnt_new,
+            SUM(change_type = 'inactivated')         AS cnt_removed,
+            SUM(change_type = 'updated')             AS cnt_updated,
+            SUM(change_type = 'protected')           AS cnt_protected,
+            COUNT(*)                                 AS cnt_total
+        FROM insurance_member_history
+        GROUP BY sync_id
+        ORDER BY sync_id DESC
+        LIMIT :lim OFFSET :off
     ");
+    $stmt->bindValue(':lim', $perPage, PDO::PARAM_INT);
+    $stmt->bindValue(':off', $offset,  PDO::PARAM_INT);
     $stmt->execute();
 
     json_ok([
