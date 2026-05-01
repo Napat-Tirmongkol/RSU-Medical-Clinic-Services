@@ -112,10 +112,10 @@ try {
     </div>
 
     <!-- ── Upload + History (2-col) ── -->
-    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+    <div class="grid grid-cols-1 xl:grid-cols-12 gap-6">
 
         <!-- Upload (5/12) -->
-        <div class="lg:col-span-5 bg-white rounded-[2rem] border border-slate-200 shadow-sm p-8 flex flex-col gap-6">
+        <div class="xl:col-span-5 min-w-0 bg-white rounded-[2rem] border border-slate-200 shadow-sm p-8 flex flex-col gap-6">
             <h2 class="text-base font-black text-slate-800">อัปโหลดไฟล์รายชื่อผู้มีสิทธิ์</h2>
 
             <!-- Step indicator -->
@@ -189,7 +189,7 @@ try {
         </div>
 
         <!-- History (7/12) -->
-        <div class="lg:col-span-7 bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+        <div class="xl:col-span-7 min-w-0 bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col">
             <div class="px-8 py-6 border-b border-slate-100 flex flex-wrap items-center gap-3 shrink-0">
                 <div class="flex-1">
                     <h2 class="text-base font-black text-slate-800">ประวัติการ Sync</h2>
