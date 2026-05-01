@@ -724,7 +724,7 @@ $greeting = ($hour >= 5 && $hour < 12) ? "สวัสดีตอนเช้�
                                             </div>
                                             <div>
                                                 <h4 class="text-slate-900 font-black text-sm leading-tight mb-1.5">
-                                                    <?= htmlspecialchars($b['camp_name']) ?>
+                                                    <?= htmlspecialchars($b['camp_name'] ?? '') ?>
                                                 </h4>
                                                 <div class="flex items-center gap-2">
                                                     <span class="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
@@ -787,7 +787,7 @@ $greeting = ($hour >= 5 && $hour < 12) ? "สวัสดีตอนเช้�
                             </div>
                             <div class="pt-6 border-t border-white/10">
                                 <p class="text-white/30 text-[8px] font-black uppercase tracking-[0.2em] mb-1">Primary Holder</p>
-                                <p class="text-white text-[11px] font-black uppercase tracking-wider truncate"><?= htmlspecialchars($user['full_name']) ?></p>
+                                <p class="text-white text-[11px] font-black uppercase tracking-wider truncate"><?= htmlspecialchars($user['full_name'] ?? '') ?></p>
                             </div>
                         </div>
 
@@ -831,7 +831,7 @@ $greeting = ($hour >= 5 && $hour < 12) ? "สวัสดีตอนเช้�
                             <div>
                                 <p class="text-white/30 text-[8px] font-black uppercase tracking-[0.2em] mb-1.5">Primary Holder</p>
                                 <p class="text-white text-[11px] font-black uppercase tracking-wider truncate max-w-[180px]">
-                                    <?= htmlspecialchars($user['full_name']) ?>
+                                    <?= htmlspecialchars($user['full_name'] ?? '') ?>
                                 </p>
                             </div>
                             <div class="text-right">
@@ -1300,7 +1300,7 @@ document.getElementById('insDetailModal').addEventListener('click', function(e) 
                                 <?php endif; ?>
                             </div>
                             <h4 class="text-slate-900 font-black text-base mb-6 leading-snug">
-                                <?= htmlspecialchars($c['title']) ?>
+                                <?= htmlspecialchars($c['title'] ?? '') ?>
                             </h4>
                             <?php if ($isComing): ?>
                                 <button disabled class="w-full h-16 bg-purple-50 text-purple-400 font-black rounded-2xl cursor-not-allowed text-sm">COMING SOON</button>
