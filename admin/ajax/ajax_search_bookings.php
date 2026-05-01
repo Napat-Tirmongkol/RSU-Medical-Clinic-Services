@@ -1,5 +1,22 @@
 <?php
 declare(strict_types=1);
+
+// Catch ALL PHP errors and return as JSON (debug helper)
+set_error_handler(function(int $errno, string $errstr, string $errfile, int $errline): bool {
+    header('Content-Type: application/json; charset=utf-8');
+    http_response_code(500);
+    echo json_encode(['success' => false, 'debug_error' => "$errstr in $errfile:$errline"]);
+    exit;
+});
+register_shutdown_function(function() {
+    $e = error_get_last();
+    if ($e && in_array($e['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR])) {
+        header('Content-Type: application/json; charset=utf-8');
+        http_response_code(500);
+        echo json_encode(['success' => false, 'debug_fatal' => "{$e['message']} in {$e['file']}:{$e['line']}"]);
+    }
+});
+
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/booking_row.php';
 
@@ -115,5 +132,5 @@ try {
 } catch (PDOException $e) {
     error_log('ajax_search_bookings: ' . $e->getMessage());
     http_response_code(500);
-    echo json_encode(['success' => false, 'message' => 'เกิดข้อผิดพลาดในระบบ']);
+    echo json_encode(['success' => false, 'message' => 'เกิดข้อผิดพลาดในระบบ', 'debug_pdo' => $e->getMessage()]);
 }
