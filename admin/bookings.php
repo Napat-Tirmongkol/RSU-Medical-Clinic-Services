@@ -264,8 +264,8 @@ require_once __DIR__ . '/includes/header.php';
                                             title="Reject"><i class="fa-solid fa-xmark"></i></button>
                                     <?php elseif ($b['status'] === 'confirmed'): ?>
                                         <button onclick="checkinOne(<?= $b['booking_id'] ?>)"
-                                            class="w-9 h-9 bg-teal-600 text-white rounded-xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all shadow-md shadow-teal-200"
-                                            title="รับเข้าร่วมงาน"><i class="fa-solid fa-user-check"></i></button>
+                                            class="px-3 py-1.5 bg-teal-600 text-white rounded-xl text-[11px] font-black flex items-center gap-1.5 hover:brightness-110 active:scale-95 transition-all shadow-md shadow-teal-200 whitespace-nowrap">
+                                            <i class="fa-solid fa-user-check"></i> รับเข้าร่วม</button>
                                         <button onclick="rescheduleOne(<?= $b['booking_id'] ?>)"
                                             class="w-9 h-9 bg-orange-50 text-orange-600 border border-orange-100 rounded-xl flex items-center justify-center hover:bg-orange-500 hover:text-white hover:scale-110 active:scale-95 transition-all shadow-sm"
                                             title="แจ้งเลื่อนคิว"><i class="fa-solid fa-clock-rotate-left"></i></button>
@@ -644,7 +644,7 @@ require_once __DIR__ . '/includes/header.php';
         if (actionDiv) {
             if (newStatus === 'confirmed')
                 actionDiv.innerHTML = `
-                    <button onclick="checkinOne(${id})" class="w-9 h-9 bg-teal-600 text-white rounded-xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all shadow-md shadow-teal-200" title="รับเข้าร่วมงาน"><i class="fa-solid fa-user-check"></i></button>
+                    <button onclick="checkinOne(${id})" class="px-3 py-1.5 bg-teal-600 text-white rounded-xl text-[11px] font-black flex items-center gap-1.5 hover:brightness-110 active:scale-95 transition-all shadow-md shadow-teal-200 whitespace-nowrap"><i class="fa-solid fa-user-check"></i> รับเข้าร่วม</button>
                     <button onclick="rescheduleOne(${id})" class="w-9 h-9 bg-orange-50 text-orange-600 border border-orange-100 rounded-xl flex items-center justify-center hover:bg-orange-500 hover:text-white hover:scale-110 active:scale-95 transition-all shadow-sm" title="แจ้งเลื่อนคิว"><i class="fa-solid fa-clock-rotate-left"></i></button>`;
             else
                 actionDiv.innerHTML = `<button onclick='openDrawer(this.closest("tr").dataset.details)' class="text-gray-400 hover:text-blue-600 text-lg transition-colors"><i class="fa-solid fa-circle-info"></i></button>`;
