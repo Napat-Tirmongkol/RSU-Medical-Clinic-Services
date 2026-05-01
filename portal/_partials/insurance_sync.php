@@ -386,7 +386,7 @@ $csrfToken = get_csrf_token();
 
     window.loadInsHistory = async function(page = 1) {
         const container = document.getElementById('insHistoryResult');
-        const pager = document.getElementById('insHistoryPager');
+        const pager     = document.getElementById('insHistoryPager');
         container.innerHTML = '<div class="p-8 text-center text-slate-400 font-bold">กำลังโหลดประวัติ...</div>';
         pager.classList.add('hidden');
 
@@ -396,57 +396,80 @@ $csrfToken = get_csrf_token();
         fd.append('page', page);
 
         try {
-            const res = await fetch('ajax_insurance_sync.php', { method: 'POST', body: fd });
+            const res  = await fetch('ajax_insurance_sync.php', { method: 'POST', body: fd });
             const data = await res.json();
             if (data.status !== 'ok') throw new Error(data.message);
-
-            const statusClass = (type) => {
-                if (type === 'inserted') return 'background:#f0fdf4;color:#16a34a;border-color:#bbf7d0';
-                if (type === 'updated') return 'background:#eff6ff;color:#2563eb;border-color:#bfdbfe';
-                if (type === 'protected') return 'background:#fffbeb;color:#d97706;border-color:#fde68a';
-                if (type === 'inactivated') return 'background:#fef2f2;color:#dc2626;border-color:#fecaca';
-                return 'background:#f8fafc;color:#64748b;border-color:#e2e8f0';
-            };
 
             if (!data.history.length) {
                 container.innerHTML = '<div class="text-center py-12 text-slate-400 font-bold">ยังไม่มีประวัติการอัปเดต</div>';
                 return;
             }
 
+            const fmt = (v) => Number(v || 0);
+            const chip = (n, bg, text, border, label) => n > 0
+                ? `<div class="flex flex-col items-center gap-1">
+                     <span class="text-lg font-black" style="color:${text}">${n > 0 ? '+' : ''}${n}</span>
+                     <span class="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full" style="background:${bg};color:${text};border:1px solid ${border}">${label}</span>
+                   </div>`
+                : `<div class="flex flex-col items-center gap-1 opacity-25">
+                     <span class="text-lg font-black text-slate-300">0</span>
+                     <span class="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-slate-50 text-slate-300 border border-slate-100">${label}</span>
+                   </div>`;
+
             container.innerHTML = `
                 <div class="overflow-x-auto">
                     <table class="w-full border-collapse">
-                        <thead><tr class="bg-slate-50/80 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                            <th class="text-left px-6 py-4">เวลา</th>
+                        <thead><tr class="bg-slate-50/80 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">
                             <th class="text-left px-6 py-4">Sync</th>
-                            <th class="text-left px-6 py-4">รหัสสมาชิก</th>
-                            <th class="text-left px-6 py-4">ชื่อ</th>
-                            <th class="text-center px-6 py-4">การเปลี่ยนแปลง</th>
-                            <th class="text-center px-6 py-4">สถานะ</th>
+                            <th class="text-left px-6 py-4">เวลา</th>
+                            <th class="text-center px-6 py-4">เพิ่มใหม่</th>
+                            <th class="text-center px-6 py-4">ระงับสิทธิ์</th>
+                            <th class="text-center px-6 py-4">อัปเดต</th>
+                            <th class="text-center px-6 py-4">ป้องกัน</th>
+                            <th class="text-center px-6 py-4">รวม</th>
                         </tr></thead>
                         <tbody>${data.history.map(h => `
-                            <tr class="hover:bg-slate-50 border-b border-slate-100">
-                                <td class="px-6 py-4 text-xs font-bold text-slate-500 whitespace-nowrap">${h.changed_at || '-'}</td>
-                                <td class="px-6 py-4 text-xs font-black text-slate-400">#${h.sync_id}</td>
-                                <td class="px-6 py-4 font-mono text-xs font-black text-slate-500">${h.member_id}</td>
-                                <td class="px-6 py-4 text-sm font-bold text-slate-800">${h.full_name || '-'}</td>
-                                <td class="px-6 py-4 text-center">
-                                    <span class="ins-badge" style="${statusClass(h.change_type)}">${h.change_type}</span>
+                            <tr class="hover:bg-slate-50/60 border-b border-slate-100">
+                                <td class="px-6 py-5">
+                                    <span class="text-xs font-black text-slate-400 bg-slate-100 px-2.5 py-1 rounded-lg">#${h.sync_id}</span>
                                 </td>
-                                <td class="px-6 py-4 text-center text-xs font-bold text-slate-500">${h.old_status || '-'} → ${h.new_status || '-'}</td>
+                                <td class="px-6 py-5 text-xs font-bold text-slate-500 whitespace-nowrap">${h.sync_time || '-'}</td>
+                                <td class="px-6 py-5 text-center">
+                                    ${fmt(h.cnt_new) > 0
+                                        ? `<span class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-sm font-black bg-emerald-50 text-emerald-600 border border-emerald-100">+${fmt(h.cnt_new)} คน</span>`
+                                        : `<span class="text-slate-200 font-black text-sm">—</span>`}
+                                </td>
+                                <td class="px-6 py-5 text-center">
+                                    ${fmt(h.cnt_removed) > 0
+                                        ? `<span class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-sm font-black bg-rose-50 text-rose-500 border border-rose-100">-${fmt(h.cnt_removed)} คน</span>`
+                                        : `<span class="text-slate-200 font-black text-sm">—</span>`}
+                                </td>
+                                <td class="px-6 py-5 text-center">
+                                    ${fmt(h.cnt_updated) > 0
+                                        ? `<span class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-sm font-black bg-blue-50 text-blue-600 border border-blue-100">${fmt(h.cnt_updated)} รายการ</span>`
+                                        : `<span class="text-slate-200 font-black text-sm">—</span>`}
+                                </td>
+                                <td class="px-6 py-5 text-center">
+                                    ${fmt(h.cnt_protected) > 0
+                                        ? `<span class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-sm font-black bg-amber-50 text-amber-600 border border-amber-100">${fmt(h.cnt_protected)} รายการ</span>`
+                                        : `<span class="text-slate-200 font-black text-sm">—</span>`}
+                                </td>
+                                <td class="px-6 py-5 text-center">
+                                    <span class="text-sm font-black text-slate-600">${fmt(h.cnt_total).toLocaleString()}</span>
+                                </td>
                             </tr>
                         `).join('')}</tbody>
                     </table>
                 </div>`;
 
             const totalPages = Math.ceil(data.total / data.per_page);
-            if (totalPages > 1 || data.total > 0) {
+            if (totalPages > 1) {
                 let ph = `<div class="flex items-center gap-2 flex-wrap justify-center">`;
-                ph += `<span class="text-xs font-bold text-slate-400 mr-2">หน้า ${page} / ${totalPages} · รวม ${Number(data.total).toLocaleString()} รายการ</span>`;
-                if (page > 1) ph += `<button onclick="loadInsHistory(1)" class="w-9 h-9 rounded-xl bg-white border border-slate-200 text-slate-400 hover:bg-slate-50 font-black text-xs">«</button>`;
-                if (page > 1) ph += `<button onclick="loadInsHistory(${page-1})" class="w-9 h-9 rounded-xl bg-white border border-slate-200 text-slate-400 hover:bg-slate-50 font-black text-xs">‹</button>`;
+                ph += `<span class="text-xs font-bold text-slate-400 mr-2">หน้า ${page} / ${totalPages} · รวม ${data.total} ครั้ง</span>`;
+                if (page > 1)          ph += `<button onclick="loadInsHistory(1)" class="w-9 h-9 rounded-xl bg-white border border-slate-200 text-slate-400 hover:bg-slate-50 font-black text-xs">«</button>`;
+                if (page > 1)          ph += `<button onclick="loadInsHistory(${page-1})" class="w-9 h-9 rounded-xl bg-white border border-slate-200 text-slate-400 hover:bg-slate-50 font-black text-xs">‹</button>`;
                 for (let i = Math.max(1, page-2); i <= Math.min(totalPages, page+2); i++) {
-                    ph += `<button onclick="loadInsHistory(${i})" class="w-9 h-9 rounded-xl font-black text-xs ${i === page ? 'bg-blue-600 text-white shadow-lg shadow-blue-200' : 'bg-white border border-slate-200 text-slate-400 hover:bg-slate-50'}">${i}</button>`;
+                    ph += `<button onclick="loadInsHistory(${i})" class="w-9 h-9 rounded-xl font-black text-xs ${i === page ? 'bg-[#0052CC] text-white shadow-lg shadow-blue-200' : 'bg-white border border-slate-200 text-slate-400 hover:bg-slate-50'}">${i}</button>`;
                 }
                 if (page < totalPages) ph += `<button onclick="loadInsHistory(${page+1})" class="w-9 h-9 rounded-xl bg-white border border-slate-200 text-slate-400 hover:bg-slate-50 font-black text-xs">›</button>`;
                 if (page < totalPages) ph += `<button onclick="loadInsHistory(${totalPages})" class="w-9 h-9 rounded-xl bg-white border border-slate-200 text-slate-400 hover:bg-slate-50 font-black text-xs">»</button>`;
