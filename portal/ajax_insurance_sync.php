@@ -82,6 +82,12 @@ function ensure_insurance_table(PDO $pdo): void
             INDEX idx_change_type (change_type)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     ");
+
+    // If table was created with ENUM or narrow VARCHAR, migrate to VARCHAR(50)
+    $ct = $pdo->query("SHOW COLUMNS FROM insurance_member_history LIKE 'change_type'")->fetch(PDO::FETCH_ASSOC);
+    if ($ct && stripos($ct['Type'], 'varchar(50)') === false) {
+        $pdo->exec("ALTER TABLE insurance_member_history MODIFY COLUMN change_type VARCHAR(50) NOT NULL DEFAULT ''");
+    }
 }
 
 function insurance_snapshot(array $row): string
