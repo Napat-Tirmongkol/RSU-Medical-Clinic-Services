@@ -193,25 +193,28 @@ if ($action === 'upload') {
     $cntInactivated = 0;
     $cntProtected   = 0;
 
+    // Only update columns that actually exist in the CSV — prevents wiping existing data
+    $updatableCols = ['full_name', 'member_status', 'position', 'citizen_id',
+                      'date_of_birth', 'coverage_start', 'coverage_end', 'policy_number', 'remarks'];
+    $csvColumns    = !empty($rows) ? array_keys($rows[0]) : [];
+    $presentCols   = array_intersect($updatableCols, $csvColumns);
+
+    $updateParts   = ['insurance_status = IF(manually_overridden = 1, insurance_status, \'Active\')',
+                      'last_sync_id = :sync_id_update'];
+    foreach ($presentCols as $col) {
+        $updateParts[] = "{$col} = IF(manually_overridden = 1, {$col}, VALUES({$col}))";
+    }
+
     $upsert = $pdo->prepare("
         INSERT INTO insurance_members
-            (member_id, full_name, member_status, citizen_id, date_of_birth,
+            (member_id, full_name, member_status, position, citizen_id, date_of_birth,
              insurance_status, coverage_start, coverage_end, policy_number, remarks,
              last_sync_id, manually_overridden)
         VALUES
-            (:mid, :fn, :ms, :cid, :dob, 'Active', :cs, :ce, :pn, :rem,
+            (:mid, :fn, :ms, :pos, :cid, :dob, 'Active', :cs, :ce, :pn, :rem,
              :sync_id_insert, 0)
         ON DUPLICATE KEY UPDATE
-            full_name        = IF(manually_overridden = 1, full_name, VALUES(full_name)),
-            member_status    = IF(manually_overridden = 1, member_status, VALUES(member_status)),
-            citizen_id       = IF(manually_overridden = 1, citizen_id, VALUES(citizen_id)),
-            date_of_birth    = IF(manually_overridden = 1, date_of_birth, VALUES(date_of_birth)),
-            insurance_status = IF(manually_overridden = 1, insurance_status, 'Active'),
-            coverage_start   = IF(manually_overridden = 1, coverage_start, VALUES(coverage_start)),
-            coverage_end     = IF(manually_overridden = 1, coverage_end, VALUES(coverage_end)),
-            policy_number    = IF(manually_overridden = 1, policy_number, VALUES(policy_number)),
-            remarks          = IF(manually_overridden = 1, remarks, VALUES(remarks)),
-            last_sync_id     = :sync_id_update
+            " . implode(",\n            ", $updateParts) . "
     ");
 
     $pdo->beginTransaction();
@@ -242,6 +245,7 @@ if ($action === 'upload') {
                 ':mid' => $mid,
                 ':fn'  => $r['full_name']      ?? '',
                 ':ms'  => $r['member_status']  ?? '',
+                ':pos' => $r['position']       ?? '',
                 ':cid' => $r['citizen_id']     ?? '',
                 ':dob' => norm_date($r['date_of_birth'] ?? null),
                 ':cs'  => norm_date($r['coverage_start'] ?? null),
