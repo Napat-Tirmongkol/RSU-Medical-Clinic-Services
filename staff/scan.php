@@ -40,18 +40,27 @@ $pdo = db();
 try {
     $campaigns = $pdo->query("
         SELECT
-            c.id, c.title, c.type, c.total_capacity,
-            COUNT(DISTINCT b.id)                                        AS total_booked,
-            SUM(b.attended_at IS NOT NULL)                              AS attended,
-            SUM(b.status = 'confirmed' AND b.attended_at IS NULL)      AS waiting,
+            c.id, c.title, c.type, c.status, c.total_capacity,
+            COUNT(DISTINCT b.id) AS total_booked,
+            COUNT(DISTINCT CASE WHEN b.attended_at IS NOT NULL THEN b.id END) AS attended,
+            COUNT(DISTINCT CASE WHEN b.status = 'confirmed' AND b.attended_at IS NULL THEN b.id END) AS waiting,
             MIN(CASE WHEN s.slot_date >= CURDATE() THEN s.slot_date END) AS next_slot_date
         FROM camp_list c
         LEFT JOIN camp_bookings b ON b.campaign_id = c.id
             AND b.status IN ('confirmed','booked')
         LEFT JOIN camp_slots s ON s.campaign_id = c.id
         WHERE c.status = 'active'
+           OR EXISTS (
+                SELECT 1
+                FROM camp_slots today_slots
+                WHERE today_slots.campaign_id = c.id
+                  AND today_slots.slot_date = CURDATE()
+           )
         GROUP BY c.id
-        ORDER BY next_slot_date ASC, c.id DESC
+        ORDER BY
+            CASE WHEN c.status = 'active' THEN 0 ELSE 1 END ASC,
+            next_slot_date ASC,
+            c.id DESC
     ")->fetchAll(PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
     $campaigns = [];
@@ -88,6 +97,41 @@ $typeColor = ['vaccine' => '#0052CC', 'training' => '#6366f1', 'health_check' =>
             margin-top: 10px !important; cursor: pointer !important;
         }
         #qr-reader a { display: none !important; }
+        .camera-toggle-btn {
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            gap: 6px !important;
+            min-width: 112px !important;
+            height: 42px !important;
+            padding: 0 18px !important;
+            border-radius: 14px !important;
+            border: 2px solid rgba(255,255,255,.7) !important;
+            font-size: 13px !important;
+            font-weight: 900 !important;
+            font-family: 'Prompt', sans-serif !important;
+            box-shadow: 0 12px 28px rgba(15,23,42,.18) !important;
+            transition: transform .15s ease, box-shadow .15s ease, background .15s ease !important;
+        }
+        .camera-toggle-btn:active {
+            transform: scale(.96) !important;
+        }
+        .camera-toggle-on {
+            background: #dc2626 !important;
+            color: #ffffff !important;
+        }
+        .camera-toggle-on:hover {
+            background: #b91c1c !important;
+            box-shadow: 0 14px 32px rgba(220,38,38,.26) !important;
+        }
+        .camera-toggle-off {
+            background: #0f172a !important;
+            color: #ffffff !important;
+        }
+        .camera-toggle-off:hover {
+            background: #1e293b !important;
+            box-shadow: 0 14px 32px rgba(15,23,42,.24) !important;
+        }
 
         /* pulse ring on scanner */
         .scanner-ring {
@@ -163,6 +207,7 @@ $typeColor = ['vaccine' => '#0052CC', 'training' => '#6366f1', 'health_check' =>
             $label   = $typeLabel[$c['type']] ?? $c['type'];
             $pct     = $c['total_booked'] > 0 ? round(($c['attended'] / max($c['total_booked'],1)) * 100) : 0;
             $nextDay = $c['next_slot_date'] ? date('d M', strtotime($c['next_slot_date'])) : '—';
+            $isScanOnly = ($c['status'] ?? '') !== 'active';
         ?>
         <button onclick="selectCampaign(<?= $c['id'] ?>, <?= htmlspecialchars(json_encode($c['title'])) ?>)"
             class="w-full text-left bg-white rounded-2xl p-4 border border-gray-100 shadow-sm
@@ -181,6 +226,11 @@ $typeColor = ['vaccine' => '#0052CC', 'training' => '#6366f1', 'health_check' =>
                         <span class="text-[10px] text-gray-400">
                             <i class="fa-regular fa-calendar mr-0.5"></i><?= $nextDay ?>
                         </span>
+                        <?php if ($isScanOnly): ?>
+                        <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-50 text-orange-600 border border-orange-100">
+                            ปิดรับสมัคร · สแกนได้
+                        </span>
+                        <?php endif; ?>
                     </div>
                     <!-- Progress bar -->
                     <div class="mt-2.5">
@@ -243,8 +293,8 @@ $typeColor = ['vaccine' => '#0052CC', 'training' => '#6366f1', 'health_check' =>
     <div class="bg-white rounded-3xl shadow-lg border border-gray-100 overflow-hidden mb-4">
         <div class="p-4">
             <div class="flex justify-end mb-3">
-                <button id="btnToggleCam" class="text-[10px] font-bold text-white bg-emerald-600 px-3 py-1.5 rounded-lg hover:bg-emerald-700 transition-colors">
-                    <i class="fa-solid fa-video mr-1"></i>ปิดกล้อง
+                <button id="btnToggleCam" class="camera-toggle-btn camera-toggle-on">
+                    <i class="fa-solid fa-video-slash"></i><span>ปิดกล้อง</span>
                 </button>
             </div>
             <div id="qr-reader" class="w-full rounded-2xl overflow-hidden scanner-ring"></div>
@@ -376,8 +426,8 @@ function startCamera() {
     ).then(() => {
         setStatus('พร้อมสแกน', 'green');
         const btn = document.getElementById('btnToggleCam');
-        btn.innerHTML = '<i class="fa-solid fa-video mr-1"></i>ปิดกล้อง';
-        btn.className = 'text-[10px] font-bold text-white bg-emerald-600 px-3 py-1.5 rounded-lg hover:bg-emerald-700 transition-colors';
+        btn.innerHTML = '<i class="fa-solid fa-video-slash"></i><span>ปิดกล้อง</span>';
+        btn.className = 'camera-toggle-btn camera-toggle-on';
     }).catch(err => {
         console.error(err);
         setStatus('ไม่สามารถเปิดกล้องได้ — ลองกรอก ID แทน', 'red');
@@ -408,9 +458,13 @@ function processCheckin(qrData, isManual, isConfirmed = false) {
         .then(data => {
             if (data.status === 'preview') {
                 isProcessing = false;
+                const isEarly = Boolean(data.data.is_early);
+                const earlyNotice = isEarly
+                    ? `<div class="mb-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-700"><i class="fa-solid fa-triangle-exclamation mr-1"></i>${escHtml(data.data.warning || 'ยังไม่ถึงวันรับบริการ')}</div>`
+                    : '';
                 Swal.fire({
-                    title: 'ยืนยันข้อมูลเช็คอิน',
-                    html: `<div class="text-left bg-blue-50 p-4 rounded-2xl mt-2 border border-blue-100">
+                    title: isEarly ? 'ยืนยันให้เข้ารับการบริการ' : 'ยืนยันข้อมูลเช็คอิน',
+                    html: `${earlyNotice}<div class="text-left bg-blue-50 p-4 rounded-2xl mt-2 border border-blue-100">
                             <p class="text-[10px] text-blue-400 font-bold uppercase mb-1">ผู้เข้าร่วม</p>
                             <p class="font-bold text-lg text-gray-900 mb-3">${data.data.name}</p>
                             <p class="text-[10px] text-blue-400 font-bold uppercase mb-1">กิจกรรม/แคมเปญ</p>
@@ -421,7 +475,7 @@ function processCheckin(qrData, isManual, isConfirmed = false) {
                     showCancelButton: true,
                     confirmButtonColor: '#0052CC',
                     cancelButtonColor: '#6b7280',
-                    confirmButtonText: 'ยืนยันเช็คอิน',
+                    confirmButtonText: isEarly ? 'ยืนยันให้เข้ารับการบริการ' : 'ยืนยันเช็คอิน',
                     cancelButtonText: 'ยกเลิก',
                     reverseButtons: true,
                     customClass: { title: 'font-prompt', popup: 'font-prompt rounded-3xl' }
@@ -581,8 +635,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const btn = document.getElementById('btnToggleCam');
         if (html5QrCode && html5QrCode.isScanning) {
             await html5QrCode.stop();
-            btn.innerHTML = '<i class="fa-solid fa-video-slash mr-1"></i>เปิดกล้อง';
-            btn.className = 'text-[10px] font-bold text-white bg-slate-700 px-3 py-1.5 rounded-lg hover:bg-slate-800 transition-colors';
+            btn.innerHTML = '<i class="fa-solid fa-video"></i><span>เปิดกล้อง</span>';
+            btn.className = 'camera-toggle-btn camera-toggle-off';
             setStatus('ปิดกล้องแล้ว', 'gray');
         } else {
             startCamera();

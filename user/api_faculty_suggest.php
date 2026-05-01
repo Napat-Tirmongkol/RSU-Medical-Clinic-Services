@@ -84,7 +84,9 @@ $prompt = <<<PROMPT
 ตอบเป็น JSON เท่านั้น ห้ามมีข้อความอื่น
 PROMPT;
 
-$model = (isset($_SESSION['_gemini_model']) && is_string($_SESSION['_gemini_model'])) ? $_SESSION['_gemini_model'] : 'gemini-2.0-flash';
+$model = (isset($_SESSION['_gemini_model']) && is_string($_SESSION['_gemini_model']) && $_SESSION['_gemini_model'] !== 'gemini-2.0-flash')
+    ? $_SESSION['_gemini_model']
+    : 'gemini-2.5-flash';
 $url   = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$apiKey}";
 $body  = json_encode([
     'contents'         => [['role' => 'user', 'parts' => [['text' => $prompt]]]],

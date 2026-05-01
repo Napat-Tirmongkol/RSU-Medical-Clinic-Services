@@ -91,16 +91,25 @@ try {
     }
 
     // ── เช็คอินได้เฉพาะตรงวันนัดเท่านั้น ──────────────────────────────────
+    $isConfirm = (isset($_POST['confirm']) && $_POST['confirm'] === '1');
+
     if (!empty($booking['slot_date'])) {
         $tz      = new DateTimeZone('Asia/Bangkok');
         $today   = (new DateTimeImmutable('today', $tz))->format('Y-m-d');
         $slotDay = (new DateTimeImmutable($booking['slot_date'], $tz))->format('Y-m-d');
         $dateStr = date('d/m/Y', strtotime($booking['slot_date']));
 
-        if ($slotDay > $today) {
+        if ($slotDay > $today && !$isConfirm) {
             echo json_encode([
-                'status'  => 'error',
-                'message' => "ยังไม่ถึงวันรับบริการ — นัดหมายวันที่ {$dateStr}",
+                'status' => 'preview',
+                'data'   => [
+                    'name'       => $booking['full_name'],
+                    'student_id' => $booking['student_personnel_id'] ?? '',
+                    'campaign'   => $booking['campaign_title'],
+                    'slot_label' => $dateStr . (!empty($booking['start_time']) ? ' ' . substr($booking['start_time'], 0, 5) . '-' . substr($booking['end_time'], 0, 5) . ' น.' : ''),
+                    'is_early'   => true,
+                    'warning'    => "ยังไม่ถึงวันรับบริการ นัดหมายวันที่ {$dateStr}",
+                ],
             ]);
             exit;
         }
@@ -120,8 +129,6 @@ try {
     }
 
     // ── ตรวจสอบว่าเป็นขั้นตอนยืนยัน (Confirm) หรือไม่ ────────────────────────
-    $isConfirm = (isset($_POST['confirm']) && $_POST['confirm'] === '1');
-
     if (!$isConfirm) {
         // ขั้นตอน Preview: ส่งข้อมูลกลับไปให้กดยืนยัน โดยยังไม่บันทึกเวลา
         echo json_encode([

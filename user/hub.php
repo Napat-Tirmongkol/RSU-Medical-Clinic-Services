@@ -169,6 +169,14 @@ function formatThaiDate($date)
     return $days[date('w', $ts)] . ", " . date('j', $ts) . " " . $months[date('n', $ts)] . " " . (date('Y', $ts) + 543);
 }
 
+function maskCitizenId(?string $citizenId): string
+{
+    $digits = preg_replace('/\D+/', '', (string)$citizenId);
+    if ($digits === '') return '—';
+    if (strlen($digits) <= 5) return str_repeat('*', strlen($digits));
+    return substr($digits, 0, 3) . str_repeat('*', max(0, strlen($digits) - 5)) . substr($digits, -2);
+}
+
 function campIcon($type)
 {
     return match ($type) {
@@ -192,7 +200,7 @@ $greeting = ($hour >= 5 && $hour < 12) ? "สวัสดีตอนเช้�
     <meta name="viewport"
         content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>RSU Medical Hub</title>
-    <link rel="icon" type="image/x-icon" href="../favicon.ico">
+    <link rel="icon" href="<?= defined('SITE_LOGO') && SITE_LOGO !== '' ? '../' . htmlspecialchars(SITE_LOGO, ENT_QUOTES, 'UTF-8') : '../favicon.ico?v=' . APP_VERSION ?>">
     <script src="https://cdn.tailwindcss.com/3.4.1"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
@@ -274,11 +282,18 @@ $greeting = ($hour >= 5 && $hour < 12) ? "สวัสดีตอนเช้�
 
     <!-- Modal Functions (defined early to prevent ReferenceError on button clicks) -->
     <script>
-        function showQR() {
+        function showQR(bookingId = null, title = 'Identity QR Code', code = "<?= htmlspecialchars($user['student_personnel_id'] ?? '') ?>") {
             const modal = document.getElementById('qr-modal');
             const qrContainer = document.getElementById('qrcode');
+            const modalTitle = document.getElementById('qr-modal-title');
+            const modalCode = document.getElementById('qr-modal-code');
             modal.classList.remove('hidden'); modal.classList.add('flex');
-            if (typeof qr === 'undefined' || !qr) {
+            modalTitle.textContent = title || 'Booking QR Code';
+            modalCode.textContent = code || '';
+            if (bookingId) {
+                qr = null;
+                qrContainer.innerHTML = `<img src="api_qrcode.php?id=${encodeURIComponent(bookingId)}" alt="Booking QR Code" class="w-[180px] h-[180px] object-contain">`;
+            } else if (typeof qr === 'undefined' || !qr) {
                 qrContainer.innerHTML = '';
                 qr = new QRCode(qrContainer, { text: "<?= htmlspecialchars($user['student_personnel_id'] ?? '') ?>", width: 180, height: 180, colorDark: "#0f172a", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.H });
             }
@@ -714,8 +729,9 @@ $greeting = ($hour >= 5 && $hour < 12) ? "สวัสดีตอนเช้�
                                     continue;
                                 $status = getStatusStyle($b['status']);
                                 ?>
-                                <div
-                                    class="bg-slate-50/50 rounded-[2.2rem] p-6 border border-slate-100 relative group active:scale-[0.98] transition-all">
+                                <button type="button"
+                                    onclick="showQR('<?= (int) $b['id'] ?>', 'Campaign QR Code', 'BOOKING #<?= (int) $b['id'] ?>')"
+                                    class="w-full text-left bg-slate-50/50 rounded-[2.2rem] p-6 border border-slate-100 relative group active:scale-[0.98] transition-all hover:bg-white hover:shadow-xl focus:outline-none focus:ring-4 focus:ring-green-100">
                                     <div class="flex items-start justify-between mb-5">
                                         <div class="flex items-center gap-4">
                                             <div
@@ -762,7 +778,7 @@ $greeting = ($hour >= 5 && $hour < 12) ? "สวัสดีตอนเช้�
                                             </div>
                                         </div>
                                     </div>
-                                </div>
+                                </button>
                             <?php endforeach; ?>
                         <?php endif; ?>
                     </div>
@@ -797,56 +813,131 @@ $greeting = ($hour >= 5 && $hour < 12) ? "สวัสดีตอนเช้�
                         $coverEnd   = $insurance['coverage_end'] ?? null;
                         $coverStart = $insurance['coverage_start'] ?? null;
                         $policyNo   = $insurance['policy_number'] ?? '';
-                        $expireText = $coverEnd ? date('M Y', strtotime($coverEnd)) : 'N/A';
+
+                        // ฟอร์แมตวันที่ พ.ศ. (DD/MM/YY) — เช่น 13/06/62
+                        $thaiDate = function ($date) {
+                            if (!$date) return '—';
+                            $ts = strtotime($date);
+                            return date('d/m/', $ts) . substr((string)((int)date('Y', $ts) + 543), -2);
+                        };
+                        $coverStartText = $thaiDate($coverStart);
+                        $coverEndText   = $thaiDate($coverEnd);
+                        $medicalLimit   = '40,000'; // วงเงินค่ารักษาพยาบาลต่ออุบัติเหตุ (บาท)
                     ?>
-                    <!-- มีข้อมูลประกัน -->
-                    <div class="bg-slate-900 rounded-[3rem] p-8 shadow-2xl relative overflow-hidden premium-shadow">
-                        <div class="absolute -right-8 -bottom-8 w-40 h-40 bg-white/5 rounded-full blur-3xl"></div>
+                    <?php if (!$isActive): ?>
+                    <!-- Inactive insurance notice -->
+                    <div class="bg-white rounded-[2rem] p-6 shadow-xl relative overflow-hidden border border-orange-100">
+                        <div class="absolute -right-10 -top-10 w-40 h-40 bg-orange-100 rounded-full blur-3xl opacity-80"></div>
+                        <div class="absolute -left-8 -bottom-8 w-32 h-32 bg-rose-100 rounded-full blur-3xl opacity-60"></div>
 
-                        <div class="flex items-start justify-between mb-8">
+                        <div class="relative z-10 flex items-start justify-between gap-4 mb-6">
                             <div>
-                                <h4 class="text-white font-black text-sm tracking-tight">
-                                    <?= $memberType === 'นักศึกษา' ? 'Student Insurance' : ($memberType === 'บุคลากร' ? 'Staff Insurance' : 'Health Insurance') ?>
-                                </h4>
-                                <?php if ($memberType): ?>
-                                    <p class="text-white/30 text-[9px] font-black uppercase tracking-[0.2em] mt-1.5 leading-none">
-                                        <?= htmlspecialchars($memberType) ?>
-                                    </p>
-                                <?php endif; ?>
+                                <p class="text-orange-600 text-[10px] font-black uppercase tracking-[0.24em] mb-2">Insurance Status</p>
+                                <h3 class="text-slate-900 font-black text-xl leading-tight">สิทธิ์ประกันไม่พร้อมใช้งาน</h3>
                             </div>
-                            <!-- Status badge -->
-                            <span class="px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest <?= $isActive ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400' ?>">
-                                <?= $isActive ? 'Active' : 'Inactive' ?>
-                            </span>
+                            <span class="shrink-0 inline-flex px-3 py-1 rounded-full bg-orange-100 text-orange-700 text-[9px] font-black uppercase tracking-widest">Inactive</span>
                         </div>
 
-                        <?php if ($policyNo): ?>
-                        <div class="mb-6">
-                            <p class="text-white/30 text-[9px] font-black uppercase tracking-[0.2em] mb-1">Policy No.</p>
-                            <p class="text-white/70 text-xs font-black tracking-widest"><?= htmlspecialchars($policyNo) ?></p>
+                        <div class="relative z-10 rounded-2xl bg-orange-50 border border-orange-100 p-4 mb-5">
+                            <p class="text-orange-900 text-sm font-bold leading-relaxed">
+                                ข้อมูลประกันของคุณอยู่ในสถานะ Inactive กรุณาติดต่อห้องพยาบาลเพื่อตรวจสอบสิทธิ์
+                            </p>
                         </div>
-                        <?php endif; ?>
 
-                        <div class="flex items-end justify-between pt-6 border-t border-white/10 relative z-10">
-                            <div>
-                                <p class="text-white/30 text-[8px] font-black uppercase tracking-[0.2em] mb-1.5">Primary Holder</p>
-                                <p class="text-white text-[11px] font-black uppercase tracking-wider truncate max-w-[180px]">
-                                    <?= htmlspecialchars($user['full_name'] ?? '') ?>
-                                </p>
-                            </div>
-                            <div class="text-right">
-                                <p class="text-white/30 text-[8px] font-black uppercase tracking-[0.2em] mb-1.5">
-                                    <?= $coverEnd ? 'Expires' : 'Coverage' ?>
-                                </p>
-                                <p class="text-white text-[11px] font-black uppercase tracking-widest <?= !$isActive ? 'text-rose-400' : '' ?>">
-                                    <?= $expireText ?>
-                                </p>
-                            </div>
+                        <div class="relative z-10 grid grid-cols-[92px_1fr] gap-3 text-sm">
+                            <span class="text-slate-400 font-bold">ชื่อ</span>
+                            <span class="text-slate-800 font-black truncate"><?= htmlspecialchars($user['full_name'] ?? '') ?></span>
+                            <span class="text-slate-400 font-bold">เลขบัตรประชาชน</span>
+                            <span class="text-slate-800 font-black tracking-wide"><?= htmlspecialchars(maskCitizenId($insurance['citizen_id'] ?? '')) ?></span>
                         </div>
                     </div>
+                    <?php else: ?>
+                    <!-- การ์ดประกันอุบัติเหตุส่วนบุคคล -->
+                    <div class="bg-white rounded-[2rem] p-6 shadow-xl relative overflow-hidden border border-slate-100">
+                        <!-- Decorative blobs -->
+                        <div class="absolute -left-6 -top-3 w-24 h-24 bg-rose-300 rounded-full blur-2xl opacity-40"></div>
+                        <div class="absolute left-2 top-14 w-16 h-16 bg-emerald-300 rounded-full blur-2xl opacity-30"></div>
+                        <div class="absolute -right-10 -bottom-10 w-44 h-44 bg-rose-200 rounded-full blur-3xl opacity-50"></div>
+                        <div class="absolute -right-4 top-2 w-20 h-20 bg-pink-400 rounded-full blur-xl opacity-30"></div>
+
+                        <!-- Header -->
+                        <div class="flex items-start justify-between mb-5 relative z-10 gap-3">
+                            <h3 class="text-rose-600 font-black text-[15px] tracking-tight leading-tight">
+                                บัตรประกันอุบัติเหตุ<br>ส่วนบุคคล
+                            </h3>
+                            <div class="text-right shrink-0 flex flex-col items-end">
+                                <div class="inline-flex items-end gap-1.5">
+                                    <span class="block w-1.5 h-7 rounded-full bg-rose-500"></span>
+                                    <span class="text-rose-500 font-black text-[28px] leading-[0.85] tracking-tight lowercase">mtl</span>
+                                </div>
+                                <p class="text-rose-500 font-black text-[7px] uppercase tracking-[0.28em] mt-1">Muang Thai Life</p>
+                                <span class="inline-block mt-1 px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest <?= $isActive ? 'bg-emerald-500/15 text-emerald-600' : 'bg-rose-500/15 text-rose-600' ?>">
+                                    <?= $isActive ? 'Active' : 'Inactive' ?>
+                                </span>
+                            </div>
+                        </div>
+
+                        <!-- Body: label-value rows -->
+                        <div class="space-y-3.5 relative z-10 text-slate-800">
+
+                            <!-- Policy No. -->
+                            <div class="grid grid-cols-[110px_1fr] gap-2 items-center">
+                                <div>
+                                    <p class="text-[12px] font-bold leading-tight">เลขที่กรมธรรม์</p>
+                                    <p class="text-[10px] text-slate-500 leading-tight">(Policy No.)</p>
+                                </div>
+                                <p class="text-[13px] font-black tracking-wider truncate"><?= $policyNo !== '' ? htmlspecialchars($policyNo) : '—' ?></p>
+                            </div>
+
+                            <!-- Policyholder -->
+                            <div class="grid grid-cols-[110px_1fr] gap-2 items-center">
+                                <div>
+                                    <p class="text-[12px] font-bold leading-tight">ผู้เอาประกันภัย</p>
+                                    <p class="text-[10px] text-slate-500 leading-tight">(Policyholder)</p>
+                                </div>
+                                <p class="text-[13px] font-black truncate"><?= htmlspecialchars($user['full_name']) ?></p>
+                            </div>
+
+                            <!-- Coverage Period -->
+                            <div class="grid grid-cols-[110px_1fr] gap-2">
+                                <p class="text-[12px] font-bold leading-tight pt-0.5">ระยะเวลาประกันภัย</p>
+                                <div class="space-y-1.5">
+                                    <div class="grid grid-cols-[auto_1fr_auto] gap-2 items-center">
+                                        <span class="text-[11px] text-slate-700">วันที่เริ่มใช้</span>
+                                        <span class="text-[14px] font-black tracking-wider"><?= htmlspecialchars($coverStartText) ?></span>
+                                    </div>
+                                    <div class="grid grid-cols-[auto_1fr_auto] gap-2 items-center">
+                                        <span class="text-[11px] text-slate-700">วันที่สิ้นสุด</span>
+                                        <span class="text-[14px] font-black tracking-wider <?= !$isActive ? 'text-rose-500' : '' ?>"><?= htmlspecialchars($coverEndText) ?></span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Medical coverage limit -->
+                            <div class="grid grid-cols-[110px_1fr] gap-2 items-center pt-1">
+                                <span></span>
+                                <div class="flex items-baseline gap-2">
+                                    <p class="text-[12px] font-bold text-slate-800">วงเงินค่ารักษาพยาบาล</p>
+                                    <p class="text-[18px] font-black text-rose-600 tracking-tight"><?= $medicalLimit ?></p>
+                                    <span class="text-[11px] text-slate-500 font-bold">บาท</span>
+                                </div>
+                            </div>
+
+                            <?php if ($memberType): ?>
+                            <p class="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 pt-1">
+                                <?= htmlspecialchars($memberType) ?>
+                            </p>
+                            <?php endif; ?>
+                        </div>
+
+                        <!-- Form code -->
+                        <p class="absolute bottom-3 right-5 text-[9px] font-black text-slate-400 tracking-widest z-10">INSURANCE CARD</p>
+                    </div>
+                    <?php endif; ?>
                     <?php endif; ?>
 
                     <!-- Info Banner -->
+                    <?php if ($insurance !== null && ($insurance['insurance_status'] ?? '') === 'Active'): ?>
                     <div class="bg-[#2e9e63] rounded-[2.2rem] p-6 shadow-xl shadow-green-100 relative overflow-hidden group cursor-pointer"
                          onclick="document.getElementById('insDetailModal').classList.remove('hidden')">
                         <div class="absolute -right-4 -top-4 w-20 h-20 bg-white/10 rounded-full blur-xl group-hover:scale-150 transition-transform"></div>
@@ -861,6 +952,7 @@ $greeting = ($hour >= 5 && $hour < 12) ? "สวัสดีตอนเช้�
                             <i class="fa-solid fa-chevron-right text-white/50 text-xs shrink-0"></i>
                         </div>
                     </div>
+                    <?php endif; ?>
                 </div>
             <?php endif; ?>
 
@@ -921,7 +1013,7 @@ $greeting = ($hour >= 5 && $hour < 12) ? "สวัสดีตอนเช้�
                             </div>
                             <div class="flex justify-between text-xs font-bold border-b border-slate-50 pb-1.5">
                                 <span class="text-slate-600">ค่ารักษาพยาบาล (ต่ออุบัติเหตุ)</span>
-                                <span class="text-slate-900">จ่ายตามจริง สูงสุด 40,000 บาท</span>
+                                <span class="text-slate-900">จ่ายตามจริง สูงสุด <?= htmlspecialchars($medicalLimit) ?> บาท</span>
                             </div>
                             <div class="flex justify-between text-xs font-bold">
                                 <span class="text-slate-600">ภัยพิเศษ (จยย./ถูกทำร้าย/จลาจล)</span>
@@ -1219,8 +1311,8 @@ document.getElementById('insDetailModal').addEventListener('click', function(e) 
                     class="flex justify-center bg-white p-5 rounded-[2rem] shadow-xl border border-slate-100 mx-auto">
                 </div>
             </div>
-            <h3 class="text-slate-900 font-black text-xl mb-1.5">Identity QR Code</h3>
-            <p class="text-[#2e9e63] font-mono font-black text-sm tracking-[0.2em] mb-8">
+            <h3 id="qr-modal-title" class="text-slate-900 font-black text-xl mb-1.5">Identity QR Code</h3>
+            <p id="qr-modal-code" class="text-[#2e9e63] font-mono font-black text-sm tracking-[0.2em] mb-8">
                 <?= $user['student_personnel_id'] ?>
             </p><button onclick="hideQR()"
                 class="w-full h-16 bg-slate-900 text-white font-black rounded-2xl active:scale-95 transition-all shadow-xl shadow-slate-200">ปิดหน้าต่าง</button>
@@ -1499,10 +1591,6 @@ document.getElementById('insDetailModal').addEventListener('click', function(e) 
                                 </tr>
                             </tbody>
                         </table>
-                    </div>
-                    <div class="border-t border-slate-100 px-5 py-4">
-                        <p id="vaccination-pagination-info-bottom" class="hidden"></p>
-                        <p class="text-[11px] font-semibold text-slate-400">แสดง 20 รายการต่อหน้า และค้นหาพร้อม pagination จากฐานข้อมูลโดยตรง</p>
                     </div>
                 </div>
             </div>

@@ -43,15 +43,19 @@ if (empty($logs)) {
 // Basic analysis
 $analysis = analyze_error_logs($logs);
 
+$errorTypesJson = json_encode($analysis['error_types'], JSON_UNESCAPED_UNICODE);
+$failedRecipientsCount = count($analysis['failed_recipients']);
+$timelineJson = json_encode($analysis['timeline'], JSON_UNESCAPED_UNICODE);
+
 // Prepare Claude prompt
 $prompt = <<<PROMPT
 Analyze these error logs and identify root causes. Be concise and actionable.
 
 Error Summary:
 - Total Errors: {$analysis['total_errors']}
-- Error Types: {json_encode($analysis['error_types'], JSON_UNESCAPED_UNICODE)}
-- Failed Recipients: {count($analysis['failed_recipients'])} unique recipients
-- Timeline (daily): {json_encode($analysis['timeline'], JSON_UNESCAPED_UNICODE)}
+- Error Types: {$errorTypesJson}
+- Failed Recipients: {$failedRecipientsCount} unique recipients
+- Timeline (daily): {$timelineJson}
 
 Top Error Messages:
 PROMPT;
@@ -88,7 +92,9 @@ if (!$apiKey) {
 }
 
 // Call Gemini API
-$model = $_SESSION['_gemini_model'] ?? 'gemini-2.0-flash';
+$model = (isset($_SESSION['_gemini_model']) && $_SESSION['_gemini_model'] !== 'gemini-2.0-flash')
+    ? $_SESSION['_gemini_model']
+    : 'gemini-2.5-flash';
 $url = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$apiKey}";
 
 $body = json_encode([

@@ -11,18 +11,14 @@ try {
     $pdo = db();
 
     $errors_today = (int)$pdo->query(
-        "SELECT COUNT(*) FROM sys_error_logs WHERE DATE(created_at) = CURDATE() AND status != 'Resolved'"
-    )->fetchColumn();
-
-    $pending_bookings = (int)$pdo->query(
-        "SELECT COUNT(*) FROM camp_bookings WHERE status = 'booked'"
+        "SELECT COUNT(*) FROM sys_error_logs WHERE level = 'error' AND DATE(created_at) = CURDATE()"
     )->fetchColumn();
 
     echo json_encode([
         'status'          => 'success',
         'errors_today'    => $errors_today,
-        'pending_bookings'=> $pending_bookings,
-        'total'           => $errors_today + $pending_bookings,
+        'pending_bookings'=> 0,
+        'total'           => $errors_today,
     ]);
 
 } catch (PDOException $e) {

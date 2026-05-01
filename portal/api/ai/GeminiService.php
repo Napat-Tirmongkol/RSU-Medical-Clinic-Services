@@ -8,7 +8,7 @@ class GeminiService {
     private string $systemPrompt;
     private array $tools = [];
 
-    public function __construct(string $apiKey, string $model = 'gemini-2.0-flash') {
+    public function __construct(string $apiKey, string $model = 'gemini-2.5-flash') {
         $this->apiKey = $apiKey;
         $this->model = $model;
         $this->systemPrompt = "คุณคือ AI ผู้เชี่ยวชาญด้านการวิเคราะห์ข้อมูลประจำระบบ RSU Medical Clinic ตอบเป็นภาษาไทยด้วยความสุภาพและเป็นมืออาชีพ";
@@ -85,20 +85,33 @@ class GeminiService {
         curl_close($ch);
         
         $data = json_decode($res ?: '{}', true);
-        $best = 'gemini-1.5-flash'; // Fallback
+        $best = 'gemini-2.5-flash'; // Fallback
         
         $candidates = [];
         foreach ($data['models'] ?? [] as $m) {
             $name = str_replace('models/', '', $m['name']);
+            if (!in_array('generateContent', $m['supportedGenerationMethods'] ?? [], true)) {
+                continue;
+            }
             if (strpos($name, 'gemini') !== false && !preg_match('/vision|embed|aqa/i', $name)) {
                 $candidates[] = $name;
             }
         }
         
         if (!empty($candidates)) {
-            // Prefer 2.0 > 1.5, Flash > Pro for speed
+            // Prefer current Flash models for speed and availability.
             usort($candidates, function($a, $b) {
-                return strpos($b, '2.0') <=> strpos($a, '2.0') ?: strpos($b, 'flash') <=> strpos($a, 'flash');
+                $score = static function (string $name): int {
+                    $score = 0;
+                    if (preg_match('/gemini-(\d+)\.(\d+)/i', $name, $m)) {
+                        $score += (int)$m[1] * 100 + (int)$m[2] * 10;
+                    }
+                    if (stripos($name, 'flash') !== false) $score += 5;
+                    if (stripos($name, 'preview') !== false) $score -= 1;
+                    if (stripos($name, '-exp') !== false) $score -= 2;
+                    return $score;
+                };
+                return $score($b) <=> $score($a);
             });
             $best = $candidates[0];
         }

@@ -35,7 +35,7 @@ $skipUrl  = $_SESSION['migrate_final_dest'] ?? 'hub.php';
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>อัปเดตระบบไม่สำเร็จ - RSU Medical</title>
-    <link rel="icon" type="image/x-icon" href="../favicon.ico?v=<?= APP_VERSION ?>">
+    <link rel="icon" href="<?= defined('SITE_LOGO') && SITE_LOGO !== '' ? '../' . htmlspecialchars(SITE_LOGO, ENT_QUOTES, 'UTF-8') : '../favicon.ico?v=' . APP_VERSION ?>">
     <script src="https://cdn.tailwindcss.com/3.4.1"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css?v=<?= APP_VERSION ?>" rel="stylesheet">
     <style>

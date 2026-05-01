@@ -17,8 +17,354 @@ $secrets = require __DIR__ . '/../config/secrets.php';
 $channelSecret = $secrets['LINE_MESSAGING_CHANNEL_SECRET'] ?? '';
 $accessToken   = $secrets['LINE_MESSAGING_CHANNEL_ACCESS_TOKEN'] ?? '';
 
+function line_mask_uid(?string $uid): string
+{
+    if (!$uid) return '';
+    if (strlen($uid) <= 12) return $uid;
+    return substr($uid, 0, 8) . '...' . substr($uid, -6);
+}
+
+function line_webhook_log(string $message, array $context = [], string $level = 'info'): void
+{
+    $contextJson = json_encode($context, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    error_log('[LINE Webhook] ' . $message . ($contextJson ? ' ' . $contextJson : ''));
+
+    if (function_exists('log_error_to_db')) {
+        log_error_to_db($message, $level, 'api/line_webhook.php', $contextJson ?: '');
+    }
+}
+
+function line_app_base_url(): string
+{
+    $proto = (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']))
+        ? $_SERVER['HTTP_X_FORWARDED_PROTO']
+        : ((!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http');
+    $host = $_SERVER['HTTP_HOST'] ?? '';
+    $dir = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/api/line_webhook.php'));
+    $basePath = preg_replace('#/api$#', '', rtrim($dir, '/')) ?: '';
+    return rtrim($proto . '://' . $host . $basePath, '/');
+}
+
+function is_insurance_request(array $event): bool
+{
+    if (($event['type'] ?? '') === 'postback') {
+        $data = strtolower((string)($event['postback']['data'] ?? ''));
+        parse_str($data, $params);
+        return str_contains($data, 'insurance')
+            || str_contains($data, 'ประกัน')
+            || (($params['action'] ?? '') === 'insurance')
+            || (($params['menu'] ?? '') === 'insurance');
+    }
+
+    if (($event['type'] ?? '') === 'message' && (($event['message']['type'] ?? '') === 'text')) {
+        $text = mb_strtolower(trim((string)($event['message']['text'] ?? '')), 'UTF-8');
+        return str_contains($text, 'insurance')
+            || str_contains($text, 'ประกัน')
+            || str_contains($text, 'อุบัติเหตุ');
+    }
+
+    return false;
+}
+
+function format_line_date(?string $date): string
+{
+    if (!$date) return '-';
+    $ts = strtotime($date);
+    return $ts ? date('d/m/Y', $ts) : $date;
+}
+
+function mask_citizen_id(?string $citizenId): string
+{
+    $digits = preg_replace('/\D+/', '', (string)$citizenId);
+    if ($digits === '') return '-';
+    if (strlen($digits) <= 5) return str_repeat('*', strlen($digits));
+    return substr($digits, 0, 3) . str_repeat('*', max(0, strlen($digits) - 5)) . substr($digits, -2);
+}
+
+function reply_text_message(string $text): array
+{
+    return ['type' => 'text', 'text' => $text];
+}
+
+function build_registration_required_flex(): array
+{
+    return [
+        'type' => 'flex',
+        'altText' => 'กรุณาลงทะเบียนก่อนใช้งาน',
+        'contents' => [
+            'type' => 'bubble',
+            'size' => 'mega',
+            'body' => [
+                'type' => 'box',
+                'layout' => 'vertical',
+                'paddingAll' => '22px',
+                'contents' => [
+                    [
+                        'type' => 'text',
+                        'text' => 'RSU Medical Hub',
+                        'weight' => 'bold',
+                        'size' => 'xs',
+                        'color' => '#2563EB',
+                    ],
+                    [
+                        'type' => 'text',
+                        'text' => 'กรุณาลงทะเบียนก่อนใช้งาน',
+                        'weight' => 'bold',
+                        'size' => 'xl',
+                        'color' => '#0F172A',
+                        'margin' => 'md',
+                        'wrap' => true,
+                    ],
+                    [
+                        'type' => 'text',
+                        'text' => 'ระบบยังไม่พบข้อมูล LINE ของคุณ กรุณา Login/ลงทะเบียนเพื่อผูกบัญชีกับรหัสนักศึกษาหรือรหัสบุคลากร แล้วจึงใช้งานเมนูประกันอุบัติเหตุ',
+                        'size' => 'sm',
+                        'color' => '#64748B',
+                        'margin' => 'md',
+                        'wrap' => true,
+                    ],
+                ],
+            ],
+            'footer' => [
+                'type' => 'box',
+                'layout' => 'vertical',
+                'spacing' => 'sm',
+                'contents' => [
+                    [
+                        'type' => 'button',
+                        'style' => 'primary',
+                        'color' => '#2563EB',
+                        'height' => 'sm',
+                        'action' => [
+                            'type' => 'uri',
+                            'label' => 'Login / ลงทะเบียน',
+                            'uri' => line_app_base_url() . '/line_api/line_login.php',
+                        ],
+                    ],
+                ],
+            ],
+        ],
+    ];
+}
+
+function build_insurance_flex_message(array $user, array $insurance): array
+{
+    $fullName = trim((string)($insurance['full_name'] ?? '')) ?: (string)($user['full_name'] ?? '-');
+    $policyNo = trim((string)($insurance['policy_number'] ?? '')) ?: '-';
+    $maskedCitizenId = mask_citizen_id($insurance['citizen_id'] ?? '');
+    $status = (string)($insurance['insurance_status'] ?? 'Inactive');
+    $isActive = $status === 'Active';
+    $coverageStart = format_line_date($insurance['coverage_start'] ?? null);
+    $coverageEnd = format_line_date($insurance['coverage_end'] ?? null);
+    $medicalLimit = '40,000';
+    $baseUrl = line_app_base_url();
+
+    return [
+        'type' => 'flex',
+        'altText' => 'ข้อมูลประกันอุบัติเหตุของคุณ',
+        'contents' => [
+            'type' => 'bubble',
+            'size' => 'mega',
+            'body' => [
+                'type' => 'box',
+                'layout' => 'vertical',
+                'paddingAll' => '20px',
+                'backgroundColor' => '#FFF8FB',
+                'contents' => [
+                    [
+                        'type' => 'box',
+                        'layout' => 'horizontal',
+                        'contents' => [
+                            [
+                                'type' => 'box',
+                                'layout' => 'vertical',
+                                'contents' => [
+                                    ['type' => 'text', 'text' => 'บัตรประกันอุบัติเหตุ', 'weight' => 'bold', 'size' => 'lg', 'color' => '#E11D48'],
+                                    ['type' => 'text', 'text' => 'ส่วนบุคคล', 'weight' => 'bold', 'size' => 'md', 'color' => '#E11D48'],
+                                ],
+                                'flex' => 1,
+                            ],
+                            [
+                                'type' => 'box',
+                                'layout' => 'vertical',
+                                'contents' => [
+                                    ['type' => 'text', 'text' => 'mtl', 'weight' => 'bold', 'size' => 'xxl', 'color' => '#F43F5E', 'align' => 'end'],
+                                    ['type' => 'text', 'text' => 'MUANG THAI LIFE', 'weight' => 'bold', 'size' => 'xxs', 'color' => '#F43F5E', 'align' => 'end'],
+                                ],
+                            ],
+                        ],
+                    ],
+                    [
+                        'type' => 'text',
+                        'text' => $isActive ? 'ACTIVE' : 'INACTIVE',
+                        'size' => 'xxs',
+                        'weight' => 'bold',
+                        'color' => $isActive ? '#059669' : '#DC2626',
+                        'align' => 'end',
+                        'margin' => 'sm',
+                    ],
+                    ['type' => 'separator', 'margin' => 'lg', 'color' => '#FBCFE8'],
+                    insurance_flex_row('เลขที่กรมธรรม์', $policyNo),
+                    insurance_flex_row('ผู้เอาประกันภัย', $fullName),
+                    insurance_flex_row('เลขบัตรประชาชน', $maskedCitizenId),
+                    insurance_flex_row('วันเริ่มคุ้มครอง', $coverageStart),
+                    insurance_flex_row('วันสิ้นสุดคุ้มครอง', $coverageEnd),
+                    [
+                        'type' => 'box',
+                        'layout' => 'horizontal',
+                        'margin' => 'lg',
+                        'contents' => [
+                            ['type' => 'text', 'text' => 'วงเงินค่ารักษาพยาบาล', 'size' => 'sm', 'color' => '#475569', 'flex' => 2],
+                            ['type' => 'text', 'text' => $medicalLimit . ' บาท', 'size' => 'lg', 'weight' => 'bold', 'color' => '#E11D48', 'align' => 'end', 'flex' => 1],
+                        ],
+                    ],
+                ],
+            ],
+            'footer' => [
+                'type' => 'box',
+                'layout' => 'vertical',
+                'spacing' => 'sm',
+                'contents' => [
+                    [
+                        'type' => 'button',
+                        'style' => 'primary',
+                        'color' => '#0F766E',
+                        'height' => 'sm',
+                        'action' => [
+                            'type' => 'uri',
+                            'label' => 'เปิด Medical Hub',
+                            'uri' => $baseUrl . '/user/hub.php',
+                        ],
+                    ],
+                ],
+            ],
+        ],
+    ];
+}
+
+function build_insurance_inactive_flex(array $user, array $insurance): array
+{
+    $fullName = trim((string)($insurance['full_name'] ?? '')) ?: (string)($user['full_name'] ?? '-');
+    $maskedCitizenId = mask_citizen_id($insurance['citizen_id'] ?? '');
+
+    return [
+        'type' => 'flex',
+        'altText' => 'สิทธิ์ประกันไม่พร้อมใช้งาน',
+        'contents' => [
+            'type' => 'bubble',
+            'size' => 'mega',
+            'body' => [
+                'type' => 'box',
+                'layout' => 'vertical',
+                'paddingAll' => '22px',
+                'backgroundColor' => '#FFF7ED',
+                'contents' => [
+                    ['type' => 'text', 'text' => 'INSURANCE STATUS', 'weight' => 'bold', 'size' => 'xs', 'color' => '#EA580C'],
+                    ['type' => 'text', 'text' => 'สิทธิ์ประกันไม่พร้อมใช้งาน', 'weight' => 'bold', 'size' => 'xl', 'color' => '#9A3412', 'margin' => 'md', 'wrap' => true],
+                    ['type' => 'text', 'text' => 'ข้อมูลประกันของคุณอยู่ในสถานะ Inactive กรุณาติดต่อห้องพยาบาลเพื่อตรวจสอบสิทธิ์', 'size' => 'sm', 'color' => '#78716C', 'margin' => 'md', 'wrap' => true],
+                    ['type' => 'separator', 'margin' => 'lg', 'color' => '#FED7AA'],
+                    insurance_flex_row('ชื่อ', $fullName),
+                    insurance_flex_row('เลขบัตรประชาชน', $maskedCitizenId),
+                ],
+            ],
+            'footer' => [
+                'type' => 'box',
+                'layout' => 'vertical',
+                'contents' => [
+                    [
+                        'type' => 'button',
+                        'style' => 'secondary',
+                        'height' => 'sm',
+                        'action' => [
+                            'type' => 'uri',
+                            'label' => 'เปิด Medical Hub',
+                            'uri' => line_app_base_url() . '/user/hub.php',
+                        ],
+                    ],
+                ],
+            ],
+        ],
+    ];
+}
+
+function insurance_flex_row(string $label, string $value): array
+{
+    return [
+        'type' => 'box',
+        'layout' => 'horizontal',
+        'margin' => 'md',
+        'contents' => [
+            ['type' => 'text', 'text' => $label, 'size' => 'sm', 'color' => '#64748B', 'flex' => 2],
+            ['type' => 'text', 'text' => $value, 'size' => 'sm', 'weight' => 'bold', 'color' => '#0F172A', 'align' => 'end', 'wrap' => true, 'flex' => 3],
+        ],
+    ];
+}
+
+function build_insurance_reply(PDO $pdo, string $lineUserId): array
+{
+    if (defined('SITE_SHOW_INSURANCE') && !SITE_SHOW_INSURANCE) {
+        line_webhook_log('Insurance menu disabled', ['line_user_id' => line_mask_uid($lineUserId)]);
+        return [reply_text_message('เมนูประกันอุบัติเหตุยังไม่เปิดให้ใช้งานในขณะนี้')];
+    }
+
+    $user = find_user_by_line_uid($pdo, $lineUserId, 'id, full_name, student_personnel_id, line_user_id, line_user_id_new');
+    if (!$user) {
+        line_webhook_log('Insurance lookup user not found', ['line_user_id' => line_mask_uid($lineUserId)], 'warning');
+        return [build_registration_required_flex()];
+    }
+
+    $memberId = trim((string)($user['student_personnel_id'] ?? ''));
+    if ($memberId === '') {
+        line_webhook_log('Insurance lookup missing member id', ['user_id' => $user['id'] ?? null, 'line_user_id' => line_mask_uid($lineUserId)], 'warning');
+        return [reply_text_message('ไม่พบรหัสนักศึกษา/รหัสบุคลากรของคุณ กรุณาติดต่อห้องพยาบาล')];
+    }
+
+    try {
+        $stmt = $pdo->prepare("SELECT * FROM insurance_members WHERE member_id = :mid LIMIT 1");
+        $stmt->execute([':mid' => $memberId]);
+        $insurance = $stmt->fetch(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) {
+        line_webhook_log('Insurance lookup query failed', ['member_id' => $memberId, 'error' => $e->getMessage()], 'error');
+        error_log('LINE insurance lookup failed: ' . $e->getMessage());
+        return [reply_text_message('ไม่สามารถตรวจสอบข้อมูลประกันได้ในขณะนี้ กรุณาลองใหม่อีกครั้ง')];
+    }
+
+    if (!$insurance) {
+        line_webhook_log('Insurance record not found', ['member_id' => $memberId, 'user_id' => $user['id'] ?? null], 'warning');
+        return [reply_text_message('ไม่พบข้อมูลประกันของคุณ กรุณาติดต่อห้องพยาบาล')];
+    }
+
+    if (($insurance['insurance_status'] ?? '') !== 'Active') {
+        line_webhook_log('Insurance inactive notice built', [
+            'member_id' => $memberId,
+            'user_id' => $user['id'] ?? null,
+            'insurance_status' => $insurance['insurance_status'] ?? '',
+        ]);
+        return [build_insurance_inactive_flex($user, $insurance)];
+    }
+
+    line_webhook_log('Insurance flex message built', [
+        'member_id' => $memberId,
+        'user_id' => $user['id'] ?? null,
+        'insurance_status' => $insurance['insurance_status'] ?? '',
+        'has_policy_number' => trim((string)($insurance['policy_number'] ?? '')) !== '',
+    ]);
+
+    return [build_insurance_flex_message($user, $insurance)];
+}
+
 // 3. ยืนยัน Signature (สำคัญมากเพื่อความปลอดภัย)
+line_webhook_log('Webhook request received', [
+    'payload_bytes' => strlen((string)$payload),
+    'has_signature' => $signature !== '',
+    'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? '',
+]);
+
 if (!verify_line_signature($payload, $signature, $channelSecret)) {
+    line_webhook_log('Invalid LINE signature', [
+        'payload_bytes' => strlen((string)$payload),
+        'has_channel_secret' => $channelSecret !== '',
+    ], 'warning');
     http_response_code(400);
     error_log("LINE Webhook: Invalid Signature");
     exit("Invalid Signature");
@@ -27,16 +373,53 @@ if (!verify_line_signature($payload, $signature, $channelSecret)) {
 // 4. แปลงข้อมูล
 $data = json_decode($payload, true);
 if (empty($data['events'])) {
+    line_webhook_log('Webhook request has no events', [
+        'json_valid' => json_last_error() === JSON_ERROR_NONE,
+        'json_error' => json_last_error_msg(),
+    ]);
     http_response_code(200);
     echo "OK (No events)";
     exit;
 }
 
+line_webhook_log('Webhook events decoded', ['event_count' => count($data['events'])]);
+
 // 5. วนลูปจัดการแต่ละ Event
-foreach ($data['events'] as $event) {
+foreach ($data['events'] as $idx => $event) {
     $type = $event['type'] ?? '';
     $replyToken = $event['replyToken'] ?? null;
     $userId = $event['source']['userId'] ?? null;
+    $messageText = (($event['message']['type'] ?? '') === 'text') ? (string)($event['message']['text'] ?? '') : '';
+    $postbackData = ($type === 'postback') ? (string)($event['postback']['data'] ?? '') : '';
+
+    line_webhook_log('Webhook event received', [
+        'index' => $idx,
+        'type' => $type,
+        'line_user_id' => line_mask_uid($userId),
+        'message_type' => $event['message']['type'] ?? '',
+        'message_text' => $messageText,
+        'postback_data' => $postbackData,
+        'has_reply_token' => !empty($replyToken),
+    ]);
+
+    if ($userId && is_insurance_request($event)) {
+        line_webhook_log('Insurance request detected', [
+            'line_user_id' => line_mask_uid($userId),
+            'trigger' => $messageText !== '' ? 'message' : 'postback',
+            'has_reply_token' => !empty($replyToken),
+        ]);
+        $messages = build_insurance_reply(db(), $userId);
+        $replyOk = $replyToken
+            ? send_line_reply($replyToken, $messages, $accessToken)
+            : send_line_push($userId, $messages, $accessToken);
+        line_webhook_log($replyToken ? 'Insurance reply sent' : 'Insurance push sent', [
+            'line_user_id' => line_mask_uid($userId),
+            'ok' => $replyOk,
+            'method' => $replyToken ? 'reply' : 'push',
+            'line_error' => $replyOk ? '' : get_last_line_error(),
+        ], $replyOk ? 'info' : 'warning');
+        continue;
+    }
 
     switch ($type) {
         case 'follow':
@@ -50,6 +433,10 @@ foreach ($data['events'] as $event) {
                 ];
                 send_line_reply($replyToken, $messages, $accessToken);
             }
+            break;
+
+        case 'postback':
+            // Unsupported postback actions are acknowledged silently.
             break;
 
         case 'message':
