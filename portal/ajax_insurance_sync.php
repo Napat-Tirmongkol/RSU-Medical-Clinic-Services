@@ -66,6 +66,27 @@ function ensure_insurance_table(PDO $pdo): void
     if (!in_array('position', $columns, true)) {
         $pdo->exec("ALTER TABLE insurance_members ADD COLUMN position VARCHAR(100) NOT NULL DEFAULT '' AFTER member_status");
     }
+
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS insurance_member_history (
+            id          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            member_id   VARCHAR(20)  NOT NULL,
+            sync_id     INT UNSIGNED NOT NULL,
+            change_type VARCHAR(30)  NOT NULL,
+            old_status  VARCHAR(50)  NULL,
+            new_status  VARCHAR(50)  NULL,
+            snapshot    LONGTEXT     NULL,
+            changed_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_sync_id (sync_id),
+            INDEX idx_member_id (member_id),
+            INDEX idx_change_type (change_type)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ");
+}
+
+function insurance_snapshot(array $row): string
+{
+    return json_encode($row, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -153,8 +174,18 @@ if ($action === 'upload') {
     $csvIdSet  = array_flip(array_column($rows, 'member_id'));
     $totalCsv  = count($rows);
 
-    // Load existing IDs
-    $existing = $pdo->query("SELECT member_id FROM insurance_members")->fetchAll(PDO::FETCH_COLUMN);
+    // Load existing members for diff/history
+    $existingRows = $pdo->query("
+        SELECT member_id, full_name, member_status, citizen_id, date_of_birth,
+               insurance_status, coverage_start, coverage_end, policy_number, remarks,
+               last_sync_id, manually_overridden
+        FROM insurance_members
+    ")->fetchAll(PDO::FETCH_ASSOC);
+    $existing = array_column($existingRows, 'member_id');
+    $existingById = [];
+    foreach ($existingRows as $existingRow) {
+        $existingById[$existingRow['member_id']] = $existingRow;
+    }
     $existSet = array_flip($existing);
 
     $cntNew         = 0;
@@ -165,9 +196,11 @@ if ($action === 'upload') {
     $upsert = $pdo->prepare("
         INSERT INTO insurance_members
             (member_id, full_name, member_status, citizen_id, date_of_birth,
-             insurance_status, coverage_start, coverage_end, policy_number, remarks, manually_overridden)
+             insurance_status, coverage_start, coverage_end, policy_number, remarks,
+             last_sync_id, manually_overridden)
         VALUES
-            (:mid, :fn, :ms, :cid, :dob, 'Active', :cs, :ce, :pn, :rem, 0)
+            (:mid, :fn, :ms, :cid, :dob, 'Active', :cs, :ce, :pn, :rem,
+             :sync_id_insert, 0)
         ON DUPLICATE KEY UPDATE
             full_name        = IF(manually_overridden = 1, full_name, VALUES(full_name)),
             member_status    = IF(manually_overridden = 1, member_status, VALUES(member_status)),
@@ -177,11 +210,22 @@ if ($action === 'upload') {
             coverage_start   = IF(manually_overridden = 1, coverage_start, VALUES(coverage_start)),
             coverage_end     = IF(manually_overridden = 1, coverage_end, VALUES(coverage_end)),
             policy_number    = IF(manually_overridden = 1, policy_number, VALUES(policy_number)),
-            remarks          = IF(manually_overridden = 1, remarks, VALUES(remarks))
+            remarks          = IF(manually_overridden = 1, remarks, VALUES(remarks)),
+            last_sync_id     = :sync_id_update
     ");
 
     $pdo->beginTransaction();
     try {
+        $syncId = (int)$pdo->query("SELECT COALESCE(MAX(sync_id), 0) + 1 FROM insurance_member_history")->fetchColumn();
+        if ($syncId <= 0) $syncId = 1;
+
+        $history = $pdo->prepare("
+            INSERT INTO insurance_member_history
+                (member_id, sync_id, change_type, old_status, new_status, snapshot)
+            VALUES
+                (:member_id, :sync_id, :change_type, :old_status, :new_status, :snapshot)
+        ");
+
         $protectedStmt = $pdo->prepare("
             SELECT manually_overridden
             FROM insurance_members
@@ -192,6 +236,7 @@ if ($action === 'upload') {
             $mid = $r['member_id'];
             $protectedStmt->execute([':mid' => $mid]);
             $isProtected = ((int)($protectedStmt->fetchColumn() ?: 0) === 1);
+            $oldStatus = $existingById[$mid]['insurance_status'] ?? 'new';
 
             $upsert->execute([
                 ':mid' => $mid,
@@ -203,26 +248,59 @@ if ($action === 'upload') {
                 ':ce'  => norm_date($r['coverage_end']   ?? null),
                 ':pn'  => $r['policy_number']  ?? '',
                 ':rem' => $r['remarks']        ?? '',
+                ':sync_id_insert' => $syncId,
+                ':sync_id_update' => $syncId,
             ]);
+
             if (isset($existSet[$mid])) {
-                if ($isProtected) $cntProtected++;
-                else $cntUpdated++;
+                if ($isProtected) {
+                    $cntProtected++;
+                    $changeType = 'protected';
+                    $newStatus = $oldStatus;
+                } else {
+                    $cntUpdated++;
+                    $changeType = 'updated';
+                    $newStatus = 'Active';
+                }
             } else {
                 $cntNew++;
+                $changeType = 'inserted';
+                $newStatus = 'Active';
             }
+
+            $history->execute([
+                ':member_id' => $mid,
+                ':sync_id' => $syncId,
+                ':change_type' => $changeType,
+                ':old_status' => (string)$oldStatus,
+                ':new_status' => (string)$newStatus,
+                ':snapshot' => insurance_snapshot($r),
+            ]);
         }
 
         // Inactivate members not in file
         $inactivate = $pdo->prepare("
-            UPDATE insurance_members SET insurance_status = 'Inactive'
+            UPDATE insurance_members
+            SET insurance_status = 'Inactive',
+                last_sync_id = :sync_id
             WHERE member_id = :mid
               AND insurance_status = 'Active'
               AND manually_overridden = 0
         ");
         foreach ($existing as $mid) {
             if (!isset($csvIdSet[$mid])) {
-                $inactivate->execute([':mid' => $mid]);
-                if ($inactivate->rowCount() > 0) $cntInactivated++;
+                $inactivate->execute([':mid' => $mid, ':sync_id' => $syncId]);
+                if ($inactivate->rowCount() > 0) {
+                    $cntInactivated++;
+                    $history->execute([
+                        ':member_id' => $mid,
+                        ':sync_id' => $syncId,
+                        ':change_type' => 'inactivated',
+                        ':old_status' => (string)($existingById[$mid]['insurance_status'] ?? 'Active'),
+                        ':new_status' => 'Inactive',
+                        ':snapshot' => insurance_snapshot($existingById[$mid] ?? ['member_id' => $mid]),
+                    ]);
+                }
             }
         }
 
@@ -240,6 +318,38 @@ if ($action === 'upload') {
         'total_updated'     => $cntUpdated,
         'total_protected'   => $cntProtected,
         'total_inactivated' => $cntInactivated,
+        'sync_id'           => $syncId,
+    ]);
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ACTION: list_history — recent upload/update history from insurance_member_history
+// ══════════════════════════════════════════════════════════════════════════════
+if ($action === 'list_history') {
+    ensure_insurance_table($pdo);
+
+    $page    = max(1, (int)($_POST['page'] ?? 1));
+    $perPage = 20;
+    $offset  = ($page - 1) * $perPage;
+
+    $countStmt = $pdo->query("SELECT COUNT(*) FROM insurance_member_history");
+    $total = (int)$countStmt->fetchColumn();
+
+    $stmt = $pdo->prepare("
+        SELECT h.id, h.member_id, h.sync_id, h.change_type, h.old_status, h.new_status,
+               h.snapshot, h.changed_at, m.full_name
+        FROM insurance_member_history h
+        LEFT JOIN insurance_members m ON m.member_id = h.member_id
+        ORDER BY h.changed_at DESC, h.id DESC
+        LIMIT {$perPage} OFFSET {$offset}
+    ");
+    $stmt->execute();
+
+    json_ok([
+        'total'    => $total,
+        'page'     => $page,
+        'per_page' => $perPage,
+        'history'  => $stmt->fetchAll(PDO::FETCH_ASSOC),
     ]);
 }
 

@@ -80,6 +80,21 @@ $csrfToken = get_csrf_token();
         </div>
     </div>
 
+    <!-- Sync History -->
+    <div class="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden">
+        <div class="px-8 py-6 border-b border-slate-100 flex flex-wrap items-center gap-3">
+            <div class="flex-1">
+                <h2 class="text-base font-black text-slate-800">ประวัติการอัปเดตประกัน</h2>
+                <p class="text-xs text-slate-400 font-bold mt-1">รายการเปลี่ยนแปลงจากการอัปโหลดล่าสุดและการ sync รายคน</p>
+            </div>
+            <button onclick="loadInsHistory(1)" class="h-10 px-4 bg-slate-50 border border-slate-200 text-slate-500 rounded-xl font-black text-xs active:scale-95 transition-all flex items-center gap-2">
+                <i class="fa-solid fa-rotate"></i> รีเฟรช
+            </button>
+        </div>
+        <div id="insHistoryResult" class="min-h-[140px]"></div>
+        <div id="insHistoryPager" class="px-8 py-4 flex justify-center border-t border-slate-100 hidden"></div>
+    </div>
+
     <!-- Member List -->
     <div class="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden">
         <div class="px-8 py-6 border-b border-slate-100 flex flex-wrap items-center gap-3">
@@ -266,6 +281,7 @@ $csrfToken = get_csrf_token();
                 document.getElementById('insFileLabel').textContent = 'คลิกหรือลากไฟล์มาวางที่นี่';
                 document.getElementById('insUploadArea').classList.remove('border-blue-500', 'bg-blue-50');
                 loadInsMembers(1);
+                loadInsHistory(1);
             } else {
                 resultDiv.innerHTML = `<div class="bg-rose-50 border border-rose-100 rounded-2xl p-5 text-sm font-bold text-rose-700">${data.message}</div>`;
             }
@@ -368,6 +384,81 @@ $csrfToken = get_csrf_token();
         if (e.key === 'Enter') loadInsMembers(1);
     });
 
+    window.loadInsHistory = async function(page = 1) {
+        const container = document.getElementById('insHistoryResult');
+        const pager = document.getElementById('insHistoryPager');
+        container.innerHTML = '<div class="p-8 text-center text-slate-400 font-bold">กำลังโหลดประวัติ...</div>';
+        pager.classList.add('hidden');
+
+        const fd = new FormData();
+        fd.append('action', 'list_history');
+        fd.append('csrf_token', CSRF);
+        fd.append('page', page);
+
+        try {
+            const res = await fetch('ajax_insurance_sync.php', { method: 'POST', body: fd });
+            const data = await res.json();
+            if (data.status !== 'ok') throw new Error(data.message);
+
+            const statusClass = (type) => {
+                if (type === 'inserted') return 'background:#f0fdf4;color:#16a34a;border-color:#bbf7d0';
+                if (type === 'updated') return 'background:#eff6ff;color:#2563eb;border-color:#bfdbfe';
+                if (type === 'protected') return 'background:#fffbeb;color:#d97706;border-color:#fde68a';
+                if (type === 'inactivated') return 'background:#fef2f2;color:#dc2626;border-color:#fecaca';
+                return 'background:#f8fafc;color:#64748b;border-color:#e2e8f0';
+            };
+
+            if (!data.history.length) {
+                container.innerHTML = '<div class="text-center py-12 text-slate-400 font-bold">ยังไม่มีประวัติการอัปเดต</div>';
+                return;
+            }
+
+            container.innerHTML = `
+                <div class="overflow-x-auto">
+                    <table class="w-full border-collapse">
+                        <thead><tr class="bg-slate-50/80 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                            <th class="text-left px-6 py-4">เวลา</th>
+                            <th class="text-left px-6 py-4">Sync</th>
+                            <th class="text-left px-6 py-4">รหัสสมาชิก</th>
+                            <th class="text-left px-6 py-4">ชื่อ</th>
+                            <th class="text-center px-6 py-4">การเปลี่ยนแปลง</th>
+                            <th class="text-center px-6 py-4">สถานะ</th>
+                        </tr></thead>
+                        <tbody>${data.history.map(h => `
+                            <tr class="hover:bg-slate-50 border-b border-slate-100">
+                                <td class="px-6 py-4 text-xs font-bold text-slate-500 whitespace-nowrap">${h.changed_at || '-'}</td>
+                                <td class="px-6 py-4 text-xs font-black text-slate-400">#${h.sync_id}</td>
+                                <td class="px-6 py-4 font-mono text-xs font-black text-slate-500">${h.member_id}</td>
+                                <td class="px-6 py-4 text-sm font-bold text-slate-800">${h.full_name || '-'}</td>
+                                <td class="px-6 py-4 text-center">
+                                    <span class="ins-badge" style="${statusClass(h.change_type)}">${h.change_type}</span>
+                                </td>
+                                <td class="px-6 py-4 text-center text-xs font-bold text-slate-500">${h.old_status || '-'} → ${h.new_status || '-'}</td>
+                            </tr>
+                        `).join('')}</tbody>
+                    </table>
+                </div>`;
+
+            const totalPages = Math.ceil(data.total / data.per_page);
+            if (totalPages > 1 || data.total > 0) {
+                let ph = `<div class="flex items-center gap-2 flex-wrap justify-center">`;
+                ph += `<span class="text-xs font-bold text-slate-400 mr-2">หน้า ${page} / ${totalPages} · รวม ${Number(data.total).toLocaleString()} รายการ</span>`;
+                if (page > 1) ph += `<button onclick="loadInsHistory(1)" class="w-9 h-9 rounded-xl bg-white border border-slate-200 text-slate-400 hover:bg-slate-50 font-black text-xs">«</button>`;
+                if (page > 1) ph += `<button onclick="loadInsHistory(${page-1})" class="w-9 h-9 rounded-xl bg-white border border-slate-200 text-slate-400 hover:bg-slate-50 font-black text-xs">‹</button>`;
+                for (let i = Math.max(1, page-2); i <= Math.min(totalPages, page+2); i++) {
+                    ph += `<button onclick="loadInsHistory(${i})" class="w-9 h-9 rounded-xl font-black text-xs ${i === page ? 'bg-blue-600 text-white shadow-lg shadow-blue-200' : 'bg-white border border-slate-200 text-slate-400 hover:bg-slate-50'}">${i}</button>`;
+                }
+                if (page < totalPages) ph += `<button onclick="loadInsHistory(${page+1})" class="w-9 h-9 rounded-xl bg-white border border-slate-200 text-slate-400 hover:bg-slate-50 font-black text-xs">›</button>`;
+                if (page < totalPages) ph += `<button onclick="loadInsHistory(${totalPages})" class="w-9 h-9 rounded-xl bg-white border border-slate-200 text-slate-400 hover:bg-slate-50 font-black text-xs">»</button>`;
+                ph += '</div>';
+                pager.innerHTML = ph;
+                pager.classList.remove('hidden');
+            }
+        } catch (err) {
+            container.innerHTML = `<p class="text-rose-500 font-bold p-8">Error: ${err.message}</p>`;
+        }
+    };
+
     // ── Member Modal ────────────────────────────────────────────────────────────
     window.openInsMemberModal = function(member) {
         const isEdit = member !== null;
@@ -452,6 +543,7 @@ $csrfToken = get_csrf_token();
             });
     };
 
+    loadInsHistory(1);
     loadInsMembers(1);
 })();
 </script>
