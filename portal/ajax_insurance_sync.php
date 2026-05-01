@@ -36,6 +36,11 @@ $pdo    = db();
 // ── Table bootstrap ───────────────────────────────────────────────────────────
 function ensure_insurance_table(PDO $pdo): void
 {
+    static $done = false;
+    if ($done) return;
+    $done = true;
+    if (!empty($_SESSION['ins_table_v2'])) return;
+
     $pdo->exec("
         CREATE TABLE IF NOT EXISTS insurance_members (
             member_id        VARCHAR(20)              NOT NULL,
@@ -88,6 +93,8 @@ function ensure_insurance_table(PDO $pdo): void
     if ($ct && stripos($ct['Type'], 'varchar(50)') === false) {
         $pdo->exec("ALTER TABLE insurance_member_history MODIFY COLUMN change_type VARCHAR(50) NOT NULL DEFAULT ''");
     }
+
+    $_SESSION['ins_table_v2'] = true;
 }
 
 function insurance_snapshot(array $row): string
@@ -387,11 +394,21 @@ if ($action === 'get_sync_detail') {
 if ($action === 'list_history') {
     ensure_insurance_table($pdo);
 
-    $page    = max(1, (int)($_POST['page'] ?? 1));
-    $perPage = 20;
-    $offset  = ($page - 1) * $perPage;
+    $page      = max(1, (int)($_POST['page'] ?? 1));
+    $perPage   = 20;
+    $offset    = ($page - 1) * $perPage;
+    $dateFrom  = trim($_POST['date_from'] ?? '');
+    $dateTo    = trim($_POST['date_to']   ?? '');
 
-    $total = (int)$pdo->query("SELECT COUNT(DISTINCT sync_id) FROM insurance_member_history")->fetchColumn();
+    $where  = [];
+    $params = [];
+    if ($dateFrom) { $where[] = 'changed_at >= :df'; $params[':df'] = $dateFrom . ' 00:00:00'; }
+    if ($dateTo)   { $where[] = 'changed_at <= :dt'; $params[':dt'] = $dateTo   . ' 23:59:59'; }
+    $wSql = $where ? 'WHERE ' . implode(' AND ', $where) : '';
+
+    $countStmt = $pdo->prepare("SELECT COUNT(DISTINCT sync_id) FROM insurance_member_history {$wSql}");
+    $countStmt->execute($params);
+    $total = (int)$countStmt->fetchColumn();
 
     $stmt = $pdo->prepare("
         SELECT
@@ -402,11 +419,12 @@ if ($action === 'list_history') {
             SUM(change_type = 'updated')             AS cnt_updated,
             SUM(change_type = 'protected')           AS cnt_protected,
             COUNT(*)                                 AS cnt_total
-        FROM insurance_member_history
+        FROM insurance_member_history {$wSql}
         GROUP BY sync_id
         ORDER BY sync_id DESC
         LIMIT :lim OFFSET :off
     ");
+    foreach ($params as $k => $v) $stmt->bindValue($k, $v);
     $stmt->bindValue(':lim', $perPage, PDO::PARAM_INT);
     $stmt->bindValue(':off', $offset,  PDO::PARAM_INT);
     $stmt->execute();
@@ -514,6 +532,39 @@ if ($action === 'rollback_sync') {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
+// ACTION: analyze_upload — dry-run: compare CSV member_ids with DB (no commit)
+// ══════════════════════════════════════════════════════════════════════════════
+if ($action === 'analyze_upload') {
+    $memberIds = json_decode($_POST['member_ids'] ?? '[]', true);
+    if (!is_array($memberIds) || empty($memberIds)) json_err('ไม่พบข้อมูล member_id');
+
+    ensure_insurance_table($pdo);
+
+    $memberIds = array_values(array_unique(array_filter(array_map('strval', $memberIds))));
+    $csvSet    = array_flip($memberIds);
+    $totalCsv  = count($memberIds);
+
+    $activeRows = $pdo->query("SELECT member_id FROM insurance_members WHERE insurance_status = 'Active'")->fetchAll(PDO::FETCH_COLUMN);
+    $activeSet  = array_flip($activeRows);
+
+    $cntNew = $cntExisting = $cntWouldInactivate = 0;
+    foreach ($memberIds as $mid) {
+        if (isset($activeSet[$mid])) $cntExisting++;
+        else $cntNew++;
+    }
+    foreach ($activeRows as $mid) {
+        if (!isset($csvSet[$mid])) $cntWouldInactivate++;
+    }
+
+    json_ok([
+        'total_csv'             => $totalCsv,
+        'cnt_new'               => $cntNew,
+        'cnt_existing'          => $cntExisting,
+        'cnt_would_inactivate'  => $cntWouldInactivate,
+    ]);
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
 // ACTION: list_members — paginated member list
 // ══════════════════════════════════════════════════════════════════════════════
 if ($action === 'list_members') {
@@ -540,7 +591,9 @@ if ($action === 'list_members') {
         $where[]       = 'member_status = :ft';
         $params[':ft'] = $fType;
     }
-    if (in_array($fStatus, ['Active', 'Inactive'], true)) {
+    if ($fStatus === 'expiring') {
+        $where[] = "insurance_status = 'Active' AND coverage_end BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 30 DAY)";
+    } elseif (in_array($fStatus, ['Active', 'Inactive'], true)) {
         $where[]       = 'insurance_status = :fs';
         $params[':fs'] = $fStatus;
     }
