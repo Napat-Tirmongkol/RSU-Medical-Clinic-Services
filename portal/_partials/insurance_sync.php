@@ -137,90 +137,47 @@ try {
                     <i class="fa-solid fa-circle-info"></i> ดูรูปแบบคอลัมในไฟล์
                     <i class="fa-solid fa-chevron-down text-[9px] group-open:rotate-180 transition-transform ml-auto"></i>
                 </summary>
-                <div class="mt-3 bg-slate-50 border border-slate-200 rounded-2xl overflow-hidden text-xs">
+                <div class="mt-3 space-y-3">
 
-                    <!-- Required -->
-                    <div class="px-4 py-2.5 bg-rose-50 border-b border-rose-100 flex items-center gap-2">
-                        <span class="w-2 h-2 rounded-full bg-rose-400 shrink-0"></span>
-                        <span class="font-black text-rose-700 uppercase tracking-widest text-[10px]">บังคับมี</span>
-                    </div>
-                    <div class="divide-y divide-slate-100">
-                        <div class="px-4 py-2.5 flex items-start gap-3">
-                            <code class="bg-white border border-slate-200 px-2 py-0.5 rounded-lg font-black text-slate-700 shrink-0">member_id</code>
-                            <div class="text-slate-500 font-bold leading-relaxed">รหัสสมาชิก / รหัสนักศึกษา / รหัสบุคลากร<br><span class="text-slate-400">เช่น <code class="bg-slate-100 px-1 rounded">1100703392881</code></span></div>
+                    <!-- Standard column list -->
+                    <div class="bg-slate-50 border border-slate-200 rounded-2xl overflow-hidden text-xs">
+                        <div class="px-4 py-2.5 bg-slate-100 border-b border-slate-200 flex items-center justify-between">
+                            <span class="font-black text-slate-600 uppercase tracking-widest text-[10px]">ชื่อคอลัมมาตรฐาน</span>
+                            <span class="text-[10px] font-bold text-slate-400">รองรับ .csv · .xlsx · .xls</span>
                         </div>
-                    </div>
-
-                    <!-- Optional -->
-                    <div class="px-4 py-2.5 bg-slate-100 border-y border-slate-200 flex items-center gap-2 mt-1">
-                        <span class="w-2 h-2 rounded-full bg-slate-400 shrink-0"></span>
-                        <span class="font-black text-slate-500 uppercase tracking-widest text-[10px]">ไม่บังคับ — ชื่อคอลัมได้หลายแบบ</span>
-                    </div>
-                    <div class="divide-y divide-slate-100">
-                        <div class="px-4 py-2.5 flex items-start gap-3">
-                            <div class="shrink-0 space-y-1">
-                                <code class="block bg-white border border-slate-200 px-2 py-0.5 rounded-lg font-black text-slate-700">full_name</code>
-                                <code class="block bg-white border border-slate-200 px-2 py-0.5 rounded-lg font-black text-slate-400">ชื่อ-นามสกุล</code>
-                                <code class="block bg-white border border-slate-200 px-2 py-0.5 rounded-lg font-black text-slate-400">ชื่อ</code>
+                        <div class="divide-y divide-slate-100">
+                            <?php
+                            $colGuide = [
+                                ['member_id',      true,  'รหัสบุคลากร / รหัสนักศึกษา',    '2901035'],
+                                ['full_name',      false, 'ชื่อ-นามสกุล',                   'นางสาวสุกัลยา วงศ์ชมบุญ'],
+                                ['citizen_id',     false, 'เลขบัตรประชาชน 13 หลัก',          '3130100300638'],
+                                ['member_status',  false, 'บุคลากร หรือ นักศึกษา',           'บุคลากร'],
+                                ['position',       false, 'ตำแหน่ง / สาขาวิชา',              'ผู้ช่วยคณบดี'],
+                                ['policy_number',  false, 'เลขกรมธรรม์',                    '25400709'],
+                                ['coverage_start', false, 'วันเริ่มคุ้มครอง  dd/mm/yyyy หรือ yyyy-mm-dd', '01/06/2025'],
+                                ['coverage_end',   false, 'วันสิ้นสุดคุ้มครอง',              '31/05/2026'],
+                            ];
+                            foreach ($colGuide as [$col, $req, $desc, $example]): ?>
+                            <div class="px-4 py-2 flex items-center gap-3">
+                                <code class="bg-white border border-slate-200 px-2 py-0.5 rounded-lg font-black text-slate-700 shrink-0 w-[140px]"><?= $col ?></code>
+                                <?php if ($req): ?>
+                                    <span class="text-[9px] font-black text-rose-500 bg-rose-50 border border-rose-100 px-1.5 py-0.5 rounded shrink-0">บังคับ</span>
+                                <?php else: ?>
+                                    <span class="text-[9px] font-black text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded shrink-0">ไม่บังคับ</span>
+                                <?php endif; ?>
+                                <span class="text-slate-500 font-bold min-w-0"><?= $desc ?></span>
+                                <code class="text-slate-400 ml-auto shrink-0 bg-slate-100 px-1.5 py-0.5 rounded"><?= htmlspecialchars($example) ?></code>
                             </div>
-                            <div class="text-slate-500 font-bold leading-relaxed pt-0.5">ชื่อ-นามสกุล<br><span class="text-slate-400">เช่น <code class="bg-slate-100 px-1 rounded">นางสาว สมใจ ดีมาก</code></span></div>
-                        </div>
-                        <div class="px-4 py-2.5 flex items-start gap-3">
-                            <div class="shrink-0 space-y-1">
-                                <code class="block bg-white border border-slate-200 px-2 py-0.5 rounded-lg font-black text-slate-700">member_status</code>
-                                <code class="block bg-white border border-slate-200 px-2 py-0.5 rounded-lg font-black text-slate-400">ประเภท</code>
-                            </div>
-                            <div class="text-slate-500 font-bold leading-relaxed pt-0.5">ประเภทสมาชิก<br><span class="text-slate-400">ค่าที่รับ: <code class="bg-slate-100 px-1 rounded">บุคลากร</code> หรือ <code class="bg-slate-100 px-1 rounded">นักศึกษา</code></span></div>
-                        </div>
-                        <div class="px-4 py-2.5 flex items-start gap-3">
-                            <div class="shrink-0 space-y-1">
-                                <code class="block bg-white border border-slate-200 px-2 py-0.5 rounded-lg font-black text-slate-700">citizen_id</code>
-                                <code class="block bg-white border border-slate-200 px-2 py-0.5 rounded-lg font-black text-slate-400">เลขบัตรประชาชน</code>
-                            </div>
-                            <div class="text-slate-500 font-bold leading-relaxed pt-0.5">เลขประจำตัวประชาชน 13 หลัก<br><span class="text-slate-400">เช่น <code class="bg-slate-100 px-1 rounded">1100703392881</code></span></div>
-                        </div>
-                        <div class="px-4 py-2.5 flex items-start gap-3">
-                            <div class="shrink-0 space-y-1">
-                                <code class="block bg-white border border-slate-200 px-2 py-0.5 rounded-lg font-black text-slate-700">coverage_start</code>
-                                <code class="block bg-white border border-slate-200 px-2 py-0.5 rounded-lg font-black text-slate-400">วันเริ่มต้น</code>
-                            </div>
-                            <div class="text-slate-500 font-bold leading-relaxed pt-0.5">วันเริ่มต้นคุ้มครอง<br><span class="text-slate-400">รูปแบบ: <code class="bg-slate-100 px-1 rounded">2025-06-01</code> หรือ <code class="bg-slate-100 px-1 rounded">01/06/2025</code></span></div>
-                        </div>
-                        <div class="px-4 py-2.5 flex items-start gap-3">
-                            <div class="shrink-0 space-y-1">
-                                <code class="block bg-white border border-slate-200 px-2 py-0.5 rounded-lg font-black text-slate-700">coverage_end</code>
-                                <code class="block bg-white border border-slate-200 px-2 py-0.5 rounded-lg font-black text-slate-400">วันสิ้นสุด</code>
-                                <code class="block bg-white border border-slate-200 px-2 py-0.5 rounded-lg font-black text-slate-400">วันสิ้นสุดคุ้มครอง</code>
-                            </div>
-                            <div class="text-slate-500 font-bold leading-relaxed pt-0.5">วันสิ้นสุดคุ้มครอง<br><span class="text-slate-400">รูปแบบ: <code class="bg-slate-100 px-1 rounded">2026-05-31</code> หรือ <code class="bg-slate-100 px-1 rounded">31/05/2026</code></span></div>
-                        </div>
-                        <div class="px-4 py-2.5 flex items-start gap-3">
-                            <div class="shrink-0 space-y-1">
-                                <code class="block bg-white border border-slate-200 px-2 py-0.5 rounded-lg font-black text-slate-700">policy_number</code>
-                                <code class="block bg-white border border-slate-200 px-2 py-0.5 rounded-lg font-black text-slate-400">เลขกรมธรรม์</code>
-                            </div>
-                            <div class="text-slate-500 font-bold leading-relaxed pt-0.5">เลขกรมธรรม์ประกัน<br><span class="text-slate-400">เช่น <code class="bg-slate-100 px-1 rounded">25400823</code></span></div>
-                        </div>
-                        <div class="px-4 py-2.5 flex items-start gap-3">
-                            <div class="shrink-0 space-y-1">
-                                <code class="block bg-white border border-slate-200 px-2 py-0.5 rounded-lg font-black text-slate-700">position</code>
-                            </div>
-                            <div class="text-slate-500 font-bold leading-relaxed pt-0.5">ตำแหน่ง / สาขาวิชา (ถ้ามี)<br><span class="text-slate-400">เช่น <code class="bg-slate-100 px-1 rounded">วิทยาศาสตร์การกีฬา</code></span></div>
-                        </div>
-                        <div class="px-4 py-2.5 flex items-start gap-3">
-                            <div class="shrink-0 space-y-1">
-                                <code class="block bg-white border border-slate-200 px-2 py-0.5 rounded-lg font-black text-slate-700">remarks</code>
-                                <code class="block bg-white border border-slate-200 px-2 py-0.5 rounded-lg font-black text-slate-400">หมายเหตุ</code>
-                            </div>
-                            <div class="text-slate-500 font-bold leading-relaxed pt-0.5">หมายเหตุเพิ่มเติม</div>
+                            <?php endforeach; ?>
                         </div>
                     </div>
 
-                    <!-- Note -->
-                    <div class="px-4 py-3 bg-amber-50 border-t border-amber-100 flex items-start gap-2">
+                    <!-- Warning note -->
+                    <div class="bg-amber-50 border border-amber-100 rounded-2xl px-4 py-3 flex items-start gap-2">
                         <i class="fa-solid fa-triangle-exclamation text-amber-500 text-[11px] mt-0.5 shrink-0"></i>
                         <p class="text-[11px] font-bold text-amber-700 leading-relaxed">
-                            สมาชิกที่ <strong>ไม่อยู่ในไฟล์</strong> จะถูกเปลี่ยนสถานะเป็น Inactive อัตโนมัติ · ไฟล์รองรับ .csv, .xlsx, .xls · Encoding UTF-8 หรือ TIS-620
+                            สมาชิกที่ <strong>ไม่อยู่ในไฟล์</strong> จะถูกเปลี่ยนเป็น Inactive อัตโนมัติ ·
+                            คอลัมที่ไม่ส่งมาจะ<strong>ไม่เขียนทับ</strong>ข้อมูลเดิม
                         </p>
                     </div>
                 </div>

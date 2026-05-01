@@ -194,8 +194,9 @@ if ($action === 'upload') {
     $cntProtected   = 0;
 
     // Only update columns that actually exist in the CSV — prevents wiping existing data
-    $updatableCols = ['full_name', 'member_status', 'position', 'citizen_id',
-                      'date_of_birth', 'coverage_start', 'coverage_end', 'policy_number', 'remarks'];
+    // Standard set matches the official upload format
+    $updatableCols = ['full_name', 'citizen_id', 'member_status', 'position',
+                      'policy_number', 'coverage_start', 'coverage_end'];
     $csvColumns    = !empty($rows) ? array_keys($rows[0]) : [];
     $presentCols   = array_intersect($updatableCols, $csvColumns);
 
