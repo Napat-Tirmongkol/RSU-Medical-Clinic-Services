@@ -18,6 +18,7 @@ try {
             SUM(member_status = 'บุคลากร')       AS staff,
             SUM(member_status = 'นักศึกษา')      AS student,
             SUM(manually_overridden = 1)        AS manual_override,
+            SUM(insurance_status = 'Active' AND coverage_end BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 30 DAY)) AS expiring_soon,
             COUNT(*)                            AS total
         FROM insurance_members
     ")->fetch(PDO::FETCH_ASSOC);
@@ -53,6 +54,12 @@ try {
             <div class="sec-title" style="margin-bottom:4px">🛡️ Insurance Sync Hub</div>
             <p style="font-size:13px;color:#64748b">จัดการข้อมูลสิทธิ์ประกันสุขภาพของบุคลากรและนักศึกษา</p>
         </div>
+        <!-- User Preview -->
+        <button onclick="document.getElementById('insUserPreviewModal').classList.replace('hidden','flex')"
+            class="h-10 px-4 bg-white border border-slate-200 text-slate-500 rounded-2xl font-black text-xs shadow-sm hover:bg-slate-50 active:scale-95 transition-all flex items-center gap-2">
+            <i class="fa-solid fa-eye text-blue-400"></i> ดูตัวอย่าง User
+        </button>
+
         <!-- Visibility Toggle -->
         <div class="flex items-center gap-3 bg-white px-4 py-2.5 rounded-2xl border border-slate-200 shadow-sm">
             <div class="flex flex-col text-right">
@@ -72,7 +79,7 @@ try {
     </div>
 
     <!-- ── KPI Stat Cards ── -->
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+    <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
         <div class="ins-stat-card">
             <div class="w-11 h-11 rounded-2xl bg-emerald-50 text-emerald-500 flex items-center justify-center text-lg shrink-0">
                 <i class="fa-solid fa-shield-check"></i>
@@ -107,6 +114,15 @@ try {
             <div>
                 <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Manual Override</p>
                 <p class="text-2xl font-black text-slate-800 leading-none"><?= number_format($stats['manual_override']) ?></p>
+            </div>
+        </div>
+        <div class="ins-stat-card <?= ($stats['expiring_soon'] ?? 0) > 0 ? 'border-amber-200 bg-amber-50/50' : '' ?>" style="cursor:pointer" onclick="document.getElementById('insFilterStatus').value='expiring';loadInsMembers(1)">
+            <div class="w-11 h-11 rounded-2xl <?= ($stats['expiring_soon'] ?? 0) > 0 ? 'bg-amber-100 text-amber-500' : 'bg-slate-50 text-slate-300' ?> flex items-center justify-center text-lg shrink-0">
+                <i class="fa-solid fa-clock"></i>
+            </div>
+            <div>
+                <p class="text-[10px] font-black <?= ($stats['expiring_soon'] ?? 0) > 0 ? 'text-amber-500' : 'text-slate-400' ?> uppercase tracking-widest leading-none mb-1">ใกล้หมดอายุ ≤30 วัน</p>
+                <p class="text-2xl font-black <?= ($stats['expiring_soon'] ?? 0) > 0 ? 'text-amber-600' : 'text-slate-800' ?> leading-none"><?= number_format($stats['expiring_soon'] ?? 0) ?></p>
             </div>
         </div>
     </div>
@@ -223,6 +239,9 @@ try {
             </div>
             <input type="file" id="insFileInput" accept=".csv,.xlsx,.xls" class="hidden" onchange="onInsFileSelect(this)">
 
+            <!-- Upload preview (shown after file selected) -->
+            <div id="insUploadPreview" class="hidden"></div>
+
             <!-- Last sync summary -->
             <?php if ($lastSync): ?>
             <div class="bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3 flex items-center gap-3">
@@ -259,6 +278,13 @@ try {
                     <h2 class="text-base font-black text-slate-800">ประวัติการ Sync</h2>
                     <p class="text-xs text-slate-400 font-bold mt-1">สรุปผลแต่ละครั้งที่อัปโหลดไฟล์</p>
                 </div>
+                <div class="flex items-center gap-2">
+                    <input type="date" id="insHistoryFrom" onchange="loadInsHistory(1)"
+                        class="h-9 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold focus:ring-4 focus:ring-blue-500/10 outline-none text-slate-500">
+                    <span class="text-slate-300 font-bold text-xs">—</span>
+                    <input type="date" id="insHistoryTo" onchange="loadInsHistory(1)"
+                        class="h-9 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold focus:ring-4 focus:ring-blue-500/10 outline-none text-slate-500">
+                </div>
                 <button onclick="loadInsHistory(1)" class="h-9 px-4 bg-slate-50 border border-slate-200 text-slate-500 rounded-xl font-black text-xs active:scale-95 transition-all flex items-center gap-2">
                     <i class="fa-solid fa-rotate"></i> รีเฟรช
                 </button>
@@ -286,6 +312,7 @@ try {
                 <option value="">ทุกสถานะ</option>
                 <option value="Active">Active</option>
                 <option value="Inactive">Inactive</option>
+                <option value="expiring">⏰ ใกล้หมดอายุ (≤30 วัน)</option>
             </select>
             <button onclick="openInsMemberModal(null)" class="h-10 px-5 bg-slate-100 text-slate-600 rounded-xl font-black text-sm active:scale-95 transition-all flex items-center gap-2 hover:bg-slate-200">
                 <i class="fa-solid fa-plus text-xs"></i> เพิ่มสมาชิก
@@ -440,12 +467,60 @@ try {
         });
     }
 
+    async function analyzeFile(file) {
+        const previewDiv = document.getElementById('insUploadPreview');
+        previewDiv.innerHTML = '<div class="text-xs font-bold text-slate-400 flex items-center gap-2"><i class="fa-solid fa-spinner fa-spin"></i> กำลังวิเคราะห์ไฟล์...</div>';
+        previewDiv.classList.remove('hidden');
+
+        try {
+            // Extract member_ids client-side using XLSX.js
+            let memberIds = [];
+            const ab = await file.arrayBuffer();
+            const wb = XLSX.read(new Uint8Array(ab), { type: 'array' });
+            const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: '' });
+            const headers = (rows[0] ?? []).map(h => String(h).toLowerCase().trim());
+            const midIdx  = headers.indexOf('member_id');
+            if (midIdx >= 0) {
+                memberIds = rows.slice(1).map(r => String(r[midIdx] ?? '').trim()).filter(Boolean);
+            }
+
+            if (!memberIds.length) {
+                previewDiv.innerHTML = '<div class="text-xs font-bold text-rose-500"><i class="fa-solid fa-triangle-exclamation mr-1"></i>ไม่พบคอลัม member_id ในไฟล์</div>';
+                return;
+            }
+
+            const fd = new FormData();
+            fd.append('action', 'analyze_upload');
+            fd.append('csrf_token', CSRF);
+            fd.append('member_ids', JSON.stringify([...new Set(memberIds)]));
+            const res  = await fetch('ajax_insurance_sync.php', { method: 'POST', body: fd });
+            const data = await res.json();
+            if (data.status !== 'ok') throw new Error(data.message);
+
+            const mode = document.querySelector('input[name="insUploadMode"]:checked')?.value ?? 'full_sync';
+            previewDiv.innerHTML = `
+                <div class="bg-blue-50 border border-blue-100 rounded-2xl px-4 py-3">
+                    <div class="text-[10px] font-black text-blue-700 uppercase tracking-widest mb-2">ผลวิเคราะห์ไฟล์ · ${data.total_csv.toLocaleString()} รายการ</div>
+                    <div class="flex flex-wrap gap-2 text-xs font-bold">
+                        <span class="px-2.5 py-1 bg-emerald-100 text-emerald-700 rounded-lg">+${data.cnt_new} คนใหม่</span>
+                        <span class="px-2.5 py-1 bg-blue-100 text-blue-700 rounded-lg">~${data.cnt_existing} อัปเดต</span>
+                        ${mode === 'full_sync' && data.cnt_would_inactivate > 0
+                            ? `<span class="px-2.5 py-1 bg-rose-100 text-rose-600 rounded-lg">-${data.cnt_would_inactivate} จะถูก Inactive</span>`
+                            : mode === 'append' ? '<span class="px-2.5 py-1 bg-slate-100 text-slate-500 rounded-lg">Append mode — ไม่ Inactive ใคร</span>' : ''}
+                    </div>
+                </div>`;
+        } catch (err) {
+            previewDiv.innerHTML = `<div class="text-xs font-bold text-slate-400">วิเคราะห์ไม่สำเร็จ: ${err.message}</div>`;
+        }
+    }
+
     function setFile(file) {
         selectedFile = file;
         document.getElementById('insFileLabel').textContent = file.name;
         document.getElementById('insUploadArea').classList.add('border-blue-500', 'bg-blue-50');
         document.getElementById('insBtnUpload').disabled = false;
         setStep(2);
+        analyzeFile(file);
     }
 
     window.onInsFileSelect = (input) => { if (input.files[0]) setFile(input.files[0]); };
@@ -543,7 +618,19 @@ try {
                 if (s === 'นักศึกษา') return '<span class="ins-badge badge-student">นักศึกษา</span>';
                 return s ? `<span class="ins-badge" style="background:#f8fafc;color:#475569;border:1px solid #e2e8f0">${s}</span>` : '—';
             };
-            const dateRange = (s, e) => (s || e) ? [s, e].filter(Boolean).join(' – ') : '—';
+            const today = new Date(); today.setHours(0,0,0,0);
+            const in30  = new Date(today); in30.setDate(today.getDate() + 30);
+            const expiryInfo = (ce) => {
+                if (!ce) return { row: '', badge: '' };
+                const d = new Date(ce);
+                if (d < today)  return { row: 'bg-red-50/40',    badge: '<span class="ml-1.5 text-[9px] font-black text-red-500 bg-red-50 border border-red-100 px-1.5 py-0.5 rounded">หมดแล้ว</span>' };
+                if (d <= in30)  return { row: 'bg-amber-50/40',  badge: '<span class="ml-1.5 text-[9px] font-black text-amber-600 bg-amber-50 border border-amber-100 px-1.5 py-0.5 rounded">ใกล้หมด</span>' };
+                return { row: '', badge: '' };
+            };
+            const dateRange = (s, e) => {
+                const { badge } = expiryInfo(e);
+                return (s || e) ? `${[s,e].filter(Boolean).join(' – ')}${badge}` : '—';
+            };
 
             container.innerHTML = `
                 <div class="overflow-x-auto">
@@ -556,8 +643,10 @@ try {
                             <th class="text-center px-6 py-4">ระยะเวลาคุ้มครอง</th>
                             <th class="w-14"></th>
                         </tr></thead>
-                        <tbody>${data.members.map(m => `
-                            <tr class="hover:bg-slate-50 border-b border-slate-100">
+                        <tbody>${data.members.map(m => {
+                            const { row } = expiryInfo(m.coverage_end);
+                            return `
+                            <tr class="hover:bg-slate-50 border-b border-slate-100 ${row}">
                                 <td class="px-6 py-4 font-mono text-xs font-black text-slate-400">${m.member_id}</td>
                                 <td class="px-6 py-4 text-sm font-bold text-slate-800">
                                     <div>${m.full_name || '—'}</div>
@@ -574,8 +663,8 @@ try {
                                         <i class="fa-solid fa-pen-to-square"></i>
                                     </button>
                                 </td>
-                            </tr>
-                        `).join('')}</tbody>
+                            </tr>`;
+                        }).join('')}</tbody>
                     </table>
                 </div>`;
 
@@ -616,6 +705,8 @@ try {
         fd.append('action', 'list_history');
         fd.append('csrf_token', CSRF);
         fd.append('page', page);
+        fd.append('date_from', document.getElementById('insHistoryFrom')?.value ?? '');
+        fd.append('date_to',   document.getElementById('insHistoryTo')?.value   ?? '');
 
         try {
             const res  = await fetch('ajax_insurance_sync.php', { method: 'POST', body: fd });
@@ -923,6 +1014,62 @@ try {
     loadInsMembers(1);
 })();
 </script>
+
+<!-- ── User Preview Modal ────────────────────────────────────────────────────── -->
+<div id="insUserPreviewModal" class="fixed inset-0 z-[125] hidden items-center justify-center bg-black/40 backdrop-blur-sm">
+    <div class="bg-white rounded-[2rem] w-full max-w-sm mx-4 shadow-2xl">
+        <div class="px-8 pt-7 pb-5 border-b border-slate-100 flex items-center justify-between">
+            <div>
+                <h3 class="text-base font-black text-slate-900">ตัวอย่างที่ User เห็น</h3>
+                <p class="text-xs text-slate-400 font-bold mt-0.5">การ์ดนี้แสดงใน Portal ของผู้ใช้</p>
+            </div>
+            <button onclick="document.getElementById('insUserPreviewModal').classList.replace('flex','hidden')"
+                class="w-9 h-9 bg-slate-50 text-slate-400 hover:text-slate-600 rounded-full flex items-center justify-center transition-colors">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+        <div class="p-8">
+            <!-- Mock insurance card -->
+            <div class="bg-gradient-to-br from-[#0052CC] to-[#0747A6] rounded-[1.5rem] p-6 text-white shadow-2xl shadow-blue-300">
+                <div class="flex items-center justify-between mb-5">
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid fa-shield-check text-blue-200 text-lg"></i>
+                        <span class="text-xs font-black text-blue-100 uppercase tracking-widest">ประกันสุขภาพ RSU</span>
+                    </div>
+                    <span class="text-[10px] font-black bg-emerald-400/30 text-emerald-200 border border-emerald-400/30 px-2.5 py-1 rounded-full">Active</span>
+                </div>
+                <div class="mb-4">
+                    <p class="text-xs text-blue-200 font-bold mb-1">ชื่อ-นามสกุล</p>
+                    <p class="text-lg font-black">นายสมชาย ใจดี</p>
+                </div>
+                <div class="grid grid-cols-2 gap-3 text-xs">
+                    <div>
+                        <p class="text-blue-200 font-bold mb-0.5">รหัสสมาชิก</p>
+                        <p class="font-black">1000001</p>
+                    </div>
+                    <div>
+                        <p class="text-blue-200 font-bold mb-0.5">ประเภท</p>
+                        <p class="font-black">บุคลากร</p>
+                    </div>
+                    <div>
+                        <p class="text-blue-200 font-bold mb-0.5">เริ่มคุ้มครอง</p>
+                        <p class="font-black">01/06/2025</p>
+                    </div>
+                    <div>
+                        <p class="text-blue-200 font-bold mb-0.5">สิ้นสุดคุ้มครอง</p>
+                        <p class="font-black">31/05/2026</p>
+                    </div>
+                </div>
+                <div class="mt-4 pt-4 border-t border-blue-400/30 text-[10px] text-blue-200 font-bold">
+                    เลขกรมธรรม์ 25400001 · RSU Medical Clinic
+                </div>
+            </div>
+            <p class="text-[11px] text-slate-400 font-bold text-center mt-4">
+                การ์ดนี้จะแสดงเฉพาะเมื่อ toggle "แสดงการ์ดให้ User" เปิดอยู่
+            </p>
+        </div>
+    </div>
+</div>
 
 <!-- ── Sync Detail Modal ─────────────────────────────────────────────────────── -->
 <div id="sdModal" class="fixed inset-0 z-[125] hidden items-center justify-center bg-black/40 backdrop-blur-sm">
