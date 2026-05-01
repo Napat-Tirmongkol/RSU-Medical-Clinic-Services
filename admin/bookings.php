@@ -29,10 +29,11 @@ $endDate = date('Y-m-t', strtotime($startDate));
 try {
     $total_pending = (int) $pdo->query("SELECT COUNT(*) FROM camp_bookings WHERE status = 'booked'")->fetchColumn();
     $total_confirmed = (int) $pdo->query("SELECT COUNT(*) FROM camp_bookings WHERE status = 'confirmed'")->fetchColumn();
+    $total_completed = (int) $pdo->query("SELECT COUNT(*) FROM camp_bookings WHERE status = 'completed'")->fetchColumn();
     $total_cancelled = (int) $pdo->query("SELECT COUNT(*) FROM camp_bookings WHERE status IN ('cancelled', 'cancelled_by_admin')")->fetchColumn();
     $total_today = (int) $pdo->query("SELECT COUNT(*) FROM camp_bookings b JOIN camp_slots s ON b.slot_id = s.id WHERE s.slot_date = CURDATE()")->fetchColumn();
 } catch (PDOException $e) { /* fallback */
-    $total_pending = $total_confirmed = $total_cancelled = $total_today = 0;
+    $total_pending = $total_confirmed = $total_completed = $total_cancelled = $total_today = 0;
 }
 
 /** (3) DATA FETCHING (Universal Pending + Current Month) */
@@ -48,7 +49,7 @@ try {
         JOIN camp_slots s ON b.slot_id = s.id
         JOIN camp_list c ON b.campaign_id = c.id
         WHERE (
-            (s.slot_date >= :start AND s.slot_date <= :end AND b.status IN ('booked', 'confirmed'))
+            (s.slot_date >= :start AND s.slot_date <= :end AND b.status IN ('booked', 'confirmed', 'completed'))
             OR b.status IN ('cancelled', 'cancelled_by_admin')
         )
         ORDER BY
@@ -136,6 +137,13 @@ require_once __DIR__ . '/includes/header.php';
                 <h5 class="text-[10px] text-emerald-600 font-black uppercase tracking-widest">Active Bookings</h5>
                 <p class="text-2xl font-black text-gray-900">' . number_format((float) $total_confirmed) . '</p>
             </div>
+        </div>
+        <div class="bg-white border border-gray-100 p-4 px-6 rounded-[24px] shadow-sm flex items-center gap-4">
+            <div class="w-12 h-12 bg-teal-50 text-teal-500 rounded-full flex items-center justify-center text-xl shadow-inner"><i class="fa-solid fa-user-check"></i></div>
+            <div>
+                <h5 class="text-[10px] text-teal-600 font-black uppercase tracking-widest">เข้าร่วมแล้ว</h5>
+                <p class="text-2xl font-black text-gray-900">' . number_format((float) $total_completed) . '</p>
+            </div>
         </div>';
 
     renderPageHeader("Booking Management Center", "ศูนย์บริหารจัดการคิวการจองแบบองค์รวม", $header_actions);
@@ -155,6 +163,10 @@ require_once __DIR__ . '/includes/header.php';
                 class="status-tab px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest text-gray-400 hover:text-gray-900 transition-all flex items-center gap-2">Confirmed
                 <span
                     class="px-2 py-0.5 bg-emerald-100 text-emerald-600 rounded-lg text-[10px]"><?= $total_confirmed ?></span></button>
+            <button onclick="filterByStatus('completed')"
+                class="status-tab px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest text-gray-400 hover:text-gray-900 transition-all flex items-center gap-2">เข้าร่วมแล้ว
+                <span
+                    class="px-2 py-0.5 bg-teal-100 text-teal-600 rounded-lg text-[10px]"><?= $total_completed ?></span></button>
             <button onclick="filterByStatus('cancelled')"
                 class="status-tab px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest text-gray-400 hover:text-gray-900 transition-all flex items-center gap-2">Cancelled
                 <span
@@ -221,6 +233,9 @@ require_once __DIR__ . '/includes/header.php';
                                 <?php elseif ($b['status'] === 'confirmed'): ?>
                                     <span
                                         class="px-4 py-1.5 bg-emerald-50 text-emerald-600 text-[10px] font-black uppercase rounded-full border border-emerald-100 tracking-widest">Confirmed</span>
+                                <?php elseif ($b['status'] === 'completed'): ?>
+                                    <span
+                                        class="px-4 py-1.5 bg-teal-50 text-teal-600 text-[10px] font-black uppercase rounded-full border border-teal-100 tracking-widest">เข้าร่วมแล้ว</span>
                                 <?php else: ?>
                                     <span
                                         class="px-4 py-1.5 bg-gray-50 text-gray-400 text-[10px] font-black uppercase rounded-full tracking-widest"><?= $b['status'] ?></span>
@@ -237,6 +252,9 @@ require_once __DIR__ . '/includes/header.php';
                                             class="w-9 h-9 bg-white border border-gray-100 text-red-500 rounded-xl flex items-center justify-center hover:bg-red-50 hover:text-red-600 hover:scale-110 active:scale-95 transition-all"
                                             title="Reject"><i class="fa-solid fa-xmark"></i></button>
                                     <?php elseif ($b['status'] === 'confirmed'): ?>
+                                        <button onclick="checkinOne(<?= $b['booking_id'] ?>)"
+                                            class="w-9 h-9 bg-teal-600 text-white rounded-xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all shadow-md shadow-teal-200"
+                                            title="รับเข้าร่วมงาน"><i class="fa-solid fa-user-check"></i></button>
                                         <button onclick="rescheduleOne(<?= $b['booking_id'] ?>)"
                                             class="w-9 h-9 bg-orange-50 text-orange-600 border border-orange-100 rounded-xl flex items-center justify-center hover:bg-orange-500 hover:text-white hover:scale-110 active:scale-95 transition-all shadow-sm"
                                             title="แจ้งเลื่อนคิว"><i class="fa-solid fa-clock-rotate-left"></i></button>
@@ -385,8 +403,8 @@ require_once __DIR__ . '/includes/header.php';
             `;
         } else if (data.status === 'confirmed') {
             footer.innerHTML = `
-                <button onclick="rescheduleOne(${data.booking_id})" class="flex-1 bg-orange-500 text-white py-5 rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-orange-200">เลื่อนคิว (Reschedule)</button>
-                <button onclick="closeDrawer()" class="flex-1 bg-gray-900 text-white py-5 rounded-2xl font-black uppercase tracking-widest text-xs">Close</button>
+                <button onclick="checkinOne(${data.booking_id})" class="flex-1 bg-teal-600 text-white py-5 rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-teal-200"><i class="fa-solid fa-user-check mr-2"></i>รับเข้าร่วมงาน</button>
+                <button onclick="rescheduleOne(${data.booking_id})" class="flex-1 bg-orange-500 text-white py-5 rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-orange-200">เลื่อนคิว</button>
             `;
         } else {
             footer.innerHTML = `<button onclick="closeDrawer()" class="w-full bg-gray-900 text-white py-5 rounded-2xl font-black uppercase tracking-widest text-xs">Close Profile</button>`;
@@ -546,6 +564,24 @@ require_once __DIR__ . '/includes/header.php';
         });
     }
 
+    function checkinOne(id) {
+        Swal.fire({
+            title: 'รับเข้าร่วมงาน?',
+            text: 'ยืนยันว่าผู้ใช้คนนี้เข้าร่วมกิจกรรมแล้ว สถานะจะเปลี่ยนเป็น "เข้าร่วมแล้ว"',
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: '#0d9488',
+            confirmButtonText: '<i class="fa-solid fa-user-check mr-2"></i>ยืนยันรับเข้าร่วม',
+            cancelButtonText: 'ยกเลิก',
+            customClass: { title: 'font-prompt', htmlContainer: 'font-prompt', confirmButton: 'font-prompt', cancelButton: 'font-prompt' }
+        }).then((result) => {
+            if (result.isConfirmed) {
+                closeDrawer();
+                performApiCall('ajax/ajax_checkin_booking.php', id, 'รับเข้าร่วมงานสำเร็จ!', 'success', 'completed');
+            }
+        });
+    }
+
     function rescheduleOne(id) {
         Swal.fire({
             title: 'ยืนยันการเลื่อนคิว?',
@@ -589,12 +625,16 @@ require_once __DIR__ . '/includes/header.php';
         if (statusTd) {
             if (newStatus === 'confirmed')
                 statusTd.innerHTML = '<span class="px-4 py-1.5 bg-emerald-50 text-emerald-600 text-[10px] font-black uppercase rounded-full border border-emerald-100 tracking-widest">Confirmed</span>';
+            else if (newStatus === 'completed')
+                statusTd.innerHTML = '<span class="px-4 py-1.5 bg-teal-50 text-teal-600 text-[10px] font-black uppercase rounded-full border border-teal-100 tracking-widest">เข้าร่วมแล้ว</span>';
             else
                 statusTd.innerHTML = `<span class="px-4 py-1.5 bg-gray-50 text-gray-400 text-[10px] font-black uppercase rounded-full tracking-widest">${newStatus}</span>`;
         }
         if (actionDiv) {
             if (newStatus === 'confirmed')
-                actionDiv.innerHTML = `<button onclick="rescheduleOne(${id})" class="w-9 h-9 bg-orange-50 text-orange-600 border border-orange-100 rounded-xl flex items-center justify-center hover:bg-orange-500 hover:text-white hover:scale-110 active:scale-95 transition-all shadow-sm" title="แจ้งเลื่อนคิว"><i class="fa-solid fa-clock-rotate-left"></i></button>`;
+                actionDiv.innerHTML = `
+                    <button onclick="checkinOne(${id})" class="w-9 h-9 bg-teal-600 text-white rounded-xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all shadow-md shadow-teal-200" title="รับเข้าร่วมงาน"><i class="fa-solid fa-user-check"></i></button>
+                    <button onclick="rescheduleOne(${id})" class="w-9 h-9 bg-orange-50 text-orange-600 border border-orange-100 rounded-xl flex items-center justify-center hover:bg-orange-500 hover:text-white hover:scale-110 active:scale-95 transition-all shadow-sm" title="แจ้งเลื่อนคิว"><i class="fa-solid fa-clock-rotate-left"></i></button>`;
             else
                 actionDiv.innerHTML = `<button onclick='openDrawer(this.closest("tr").dataset.details)' class="text-gray-400 hover:text-blue-600 text-lg transition-colors"><i class="fa-solid fa-circle-info"></i></button>`;
         }
