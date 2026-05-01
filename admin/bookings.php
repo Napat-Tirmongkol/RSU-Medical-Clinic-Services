@@ -266,7 +266,8 @@ require_once __DIR__ . '/includes/header.php';
         <button onclick="bulkApprove()"
             class="bg-blue-600 text-white px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl shadow-blue-200 hover:brightness-110 transition-all active:scale-95">Approve All</button>
         <button onclick="bulkCheckin()"
-            class="bg-teal-600 text-white px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl shadow-teal-200 hover:brightness-110 transition-all active:scale-95">
+            style="background-color:#0d9488;color:#fff;box-shadow:0 20px 25px -5px rgba(13,148,136,.3)"
+            class="px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest hover:brightness-110 transition-all active:scale-95">
             <i class="fa-solid fa-user-check mr-1"></i>Check-in All</button>
         <button onclick="bulkCancel()"
             class="bg-white border border-gray-100 text-red-500 px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-red-50 transition-all active:scale-95">Cancel</button>
