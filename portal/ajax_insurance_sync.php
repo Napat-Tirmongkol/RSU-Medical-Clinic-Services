@@ -279,13 +279,19 @@ if ($action === 'upload') {
                 $newStatus = 'Active';
             }
 
+            // For 'updated': snapshot = old DB row (needed for rollback restore)
+            // For 'inserted': snapshot = CSV row (to know what was added)
+            // For 'protected': snapshot = existing DB row
+            $snapshotData = ($changeType === 'updated' || $changeType === 'protected')
+                ? ($existingById[$mid] ?? ['member_id' => $mid])
+                : $r;
             $history->execute([
                 ':member_id' => $mid,
                 ':sync_id' => $syncId,
                 ':change_type' => $changeType,
                 ':old_status' => (string)$oldStatus,
                 ':new_status' => (string)$newStatus,
-                ':snapshot' => insurance_snapshot($r),
+                ':snapshot' => insurance_snapshot($snapshotData),
             ]);
         }
 
@@ -368,6 +374,100 @@ if ($action === 'list_history') {
         'page'     => $page,
         'per_page' => $perPage,
         'history'  => $stmt->fetchAll(PDO::FETCH_ASSOC),
+    ]);
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ACTION: rollback_sync — reverse all changes made by a specific sync
+// ══════════════════════════════════════════════════════════════════════════════
+if ($action === 'rollback_sync') {
+    $syncId = (int)($_POST['sync_id'] ?? 0);
+    if ($syncId <= 0) json_err('sync_id ไม่ถูกต้อง');
+
+    ensure_insurance_table($pdo);
+
+    $records = $pdo->prepare("
+        SELECT member_id, change_type, old_status, snapshot
+        FROM insurance_member_history
+        WHERE sync_id = :sync_id
+    ");
+    $records->execute([':sync_id' => $syncId]);
+    $items = $records->fetchAll(PDO::FETCH_ASSOC);
+
+    if (empty($items)) json_err("ไม่พบประวัติ Sync #{$syncId}");
+
+    $cntDeleted  = 0;
+    $cntRestored = 0;
+    $cntReverted = 0;
+
+    $pdo->beginTransaction();
+    try {
+        $stmtDelete   = $pdo->prepare("DELETE FROM insurance_members WHERE member_id = :mid");
+        $stmtActivate = $pdo->prepare("UPDATE insurance_members SET insurance_status = 'Active', manually_overridden = 0 WHERE member_id = :mid");
+        $stmtRestore  = $pdo->prepare("
+            UPDATE insurance_members SET
+                full_name        = :fn,
+                member_status    = :ms,
+                position         = :pos,
+                citizen_id       = :cid,
+                insurance_status = :ins,
+                coverage_start   = :cs,
+                coverage_end     = :ce,
+                policy_number    = :pn,
+                manually_overridden = :mo
+            WHERE member_id = :mid
+        ");
+
+        foreach ($items as $item) {
+            $mid = $item['member_id'];
+            switch ($item['change_type']) {
+                case 'inserted':
+                    $stmtDelete->execute([':mid' => $mid]);
+                    if ($stmtDelete->rowCount() > 0) $cntDeleted++;
+                    break;
+
+                case 'inactivated':
+                    $stmtActivate->execute([':mid' => $mid]);
+                    if ($stmtActivate->rowCount() > 0) $cntRestored++;
+                    break;
+
+                case 'updated':
+                    $old = json_decode($item['snapshot'] ?? '{}', true);
+                    if ($old && !empty($old['member_id'])) {
+                        $stmtRestore->execute([
+                            ':mid' => $mid,
+                            ':fn'  => $old['full_name']          ?? '',
+                            ':ms'  => $old['member_status']      ?? '',
+                            ':pos' => $old['position']           ?? '',
+                            ':cid' => $old['citizen_id']         ?? '',
+                            ':ins' => $old['insurance_status']   ?? 'Active',
+                            ':cs'  => $old['coverage_start']     ?: null,
+                            ':ce'  => $old['coverage_end']       ?: null,
+                            ':pn'  => $old['policy_number']      ?? '',
+                            ':mo'  => (int)($old['manually_overridden'] ?? 0),
+                        ]);
+                        if ($stmtRestore->rowCount() > 0) $cntReverted++;
+                    }
+                    break;
+            }
+        }
+
+        $pdo->prepare("DELETE FROM insurance_member_history WHERE sync_id = :sync_id")
+            ->execute([':sync_id' => $syncId]);
+
+        $pdo->commit();
+    } catch (Exception $e) {
+        $pdo->rollBack();
+        json_err('ย้อนกลับไม่สำเร็จ: ' . $e->getMessage());
+    }
+
+    log_activity('insurance_rollback', "ย้อน sync #{$syncId}: deleted={$cntDeleted}, restored={$cntRestored}, reverted={$cntReverted}");
+
+    json_ok([
+        'sync_id'      => $syncId,
+        'cnt_deleted'  => $cntDeleted,
+        'cnt_restored' => $cntRestored,
+        'cnt_reverted' => $cntReverted,
     ]);
 }
 

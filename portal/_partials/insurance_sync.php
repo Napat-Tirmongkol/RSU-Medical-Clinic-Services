@@ -585,6 +585,7 @@ try {
                             <th class="text-center px-6 py-4">อัปเดต</th>
                             <th class="text-center px-6 py-4">ป้องกัน</th>
                             <th class="text-center px-6 py-4">รวม</th>
+                            <th class="w-14"></th>
                         </tr></thead>
                         <tbody>${data.history.map(h => `
                             <tr class="hover:bg-slate-50/60 border-b border-slate-100">
@@ -606,6 +607,13 @@ try {
                                 </td>
                                 <td class="px-6 py-5 text-center">
                                     <span class="text-sm font-black text-slate-600">${fmt(h.cnt_total).toLocaleString()}</span>
+                                </td>
+                                <td class="px-4 py-5 text-right">
+                                    <button onclick="openRollbackModal(${h.sync_id}, ${fmt(h.cnt_new)}, ${fmt(h.cnt_removed)}, ${fmt(h.cnt_updated)})"
+                                        class="w-8 h-8 rounded-xl bg-slate-50 border border-slate-200 text-slate-400 hover:bg-rose-50 hover:text-rose-500 hover:border-rose-200 flex items-center justify-center transition-all text-xs"
+                                        title="ย้อนกลับ Sync นี้">
+                                        <i class="fa-solid fa-rotate-left"></i>
+                                    </button>
                                 </td>
                             </tr>
                         `).join('')}</tbody>
@@ -711,7 +719,106 @@ try {
             });
     };
 
+    // ── Rollback ─────────────────────────────────────────────────────────────────
+    window.openRollbackModal = function(syncId, cntNew, cntRemoved, cntUpdated) {
+        document.getElementById('rbSyncId').textContent  = '#' + syncId;
+        document.getElementById('rbCntNew').textContent  = cntNew;
+        document.getElementById('rbCntRemoved').textContent = cntRemoved;
+        document.getElementById('rbCntUpdated').textContent = cntUpdated;
+        document.getElementById('rbConfirmBtn').onclick  = () => doRollback(syncId);
+        document.getElementById('rbResultDiv').classList.add('hidden');
+        document.getElementById('rbModal').classList.replace('hidden', 'flex');
+    };
+
+    window.closeRollbackModal = () => document.getElementById('rbModal').classList.replace('flex', 'hidden');
+
+    async function doRollback(syncId) {
+        const btn = document.getElementById('rbConfirmBtn');
+        const resultDiv = document.getElementById('rbResultDiv');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1.5"></i>กำลังย้อนกลับ...';
+        resultDiv.classList.add('hidden');
+
+        const fd = new FormData();
+        fd.append('action', 'rollback_sync');
+        fd.append('csrf_token', CSRF);
+        fd.append('sync_id', syncId);
+
+        try {
+            const res  = await fetch('ajax_insurance_sync.php', { method: 'POST', body: fd });
+            const data = await res.json();
+
+            resultDiv.classList.remove('hidden');
+            if (data.status === 'ok') {
+                resultDiv.innerHTML = `
+                    <div class="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 text-sm font-bold text-emerald-700">
+                        <div class="font-black mb-1">ย้อนกลับ Sync #${syncId} สำเร็จ</div>
+                        <div class="flex flex-wrap gap-2 text-xs mt-2">
+                            <span class="px-2.5 py-1 bg-white border border-emerald-100 rounded-lg">ลบใหม่ <strong>${data.cnt_deleted}</strong> คน</span>
+                            <span class="px-2.5 py-1 bg-white border border-emerald-100 rounded-lg">คืนสิทธิ์ <strong>${data.cnt_restored}</strong> คน</span>
+                            <span class="px-2.5 py-1 bg-white border border-emerald-100 rounded-lg">คืนข้อมูล <strong>${data.cnt_reverted}</strong> รายการ</span>
+                        </div>
+                    </div>`;
+                loadInsHistory(1);
+                loadInsMembers(1);
+                setTimeout(closeRollbackModal, 2500);
+            } else {
+                resultDiv.innerHTML = `<div class="bg-rose-50 border border-rose-100 rounded-2xl p-4 text-sm font-bold text-rose-700">${data.message}</div>`;
+            }
+        } catch (err) {
+            resultDiv.classList.remove('hidden');
+            resultDiv.innerHTML = `<div class="bg-rose-50 border border-rose-100 rounded-2xl p-4 text-sm font-bold text-rose-700">เกิดข้อผิดพลาด: ${err.message}</div>`;
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-rotate-left mr-1.5"></i>ยืนยันย้อนกลับ';
+        }
+    }
+
     loadInsHistory(1);
     loadInsMembers(1);
 })();
 </script>
+
+<!-- ── Rollback Confirm Modal ────────────────────────────────────────────────── -->
+<div id="rbModal" class="fixed inset-0 z-[130] hidden items-center justify-center bg-black/40 backdrop-blur-sm">
+    <div class="bg-white rounded-[2rem] w-full max-w-md mx-4 shadow-2xl">
+        <div class="px-8 pt-7 pb-5 border-b border-slate-100 flex items-center justify-between">
+            <div>
+                <h3 class="text-base font-black text-slate-900">ย้อนกลับ Sync <span id="rbSyncId" class="text-rose-500"></span></h3>
+                <p class="text-xs text-slate-400 font-bold mt-0.5">การดำเนินการนี้ไม่สามารถยกเลิกได้</p>
+            </div>
+            <button onclick="closeRollbackModal()" class="w-9 h-9 bg-slate-50 text-slate-400 hover:text-slate-600 rounded-full flex items-center justify-center transition-colors">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+        <div class="px-8 py-6 space-y-4">
+            <div class="bg-rose-50 border border-rose-100 rounded-2xl p-4 text-xs font-bold text-rose-700 space-y-2">
+                <div class="font-black text-rose-800 mb-2 flex items-center gap-2">
+                    <i class="fa-solid fa-triangle-exclamation"></i> ระบบจะดำเนินการดังนี้
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="w-5 h-5 rounded-lg bg-rose-100 flex items-center justify-center shrink-0"><i class="fa-solid fa-trash text-[9px]"></i></span>
+                    ลบสมาชิกใหม่ที่เพิ่งเพิ่ม <strong id="rbCntNew"></strong> คน
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="w-5 h-5 rounded-lg bg-rose-100 flex items-center justify-center shrink-0"><i class="fa-solid fa-rotate-left text-[9px]"></i></span>
+                    คืนสิทธิ์สมาชิกที่ถูกระงับ <strong id="rbCntRemoved"></strong> คน
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="w-5 h-5 rounded-lg bg-rose-100 flex items-center justify-center shrink-0"><i class="fa-solid fa-clock-rotate-left text-[9px]"></i></span>
+                    คืนข้อมูลเดิมของสมาชิกที่ถูกอัปเดต <strong id="rbCntUpdated"></strong> รายการ
+                </div>
+            </div>
+            <div id="rbResultDiv" class="hidden"></div>
+        </div>
+        <div class="px-8 pb-7 flex gap-3">
+            <button id="rbConfirmBtn"
+                class="flex-1 h-12 bg-rose-500 text-white font-black rounded-xl shadow-lg shadow-rose-200 active:scale-95 transition-all text-sm flex items-center justify-center gap-2">
+                <i class="fa-solid fa-rotate-left"></i> ยืนยันย้อนกลับ
+            </button>
+            <button onclick="closeRollbackModal()" class="px-6 h-12 bg-slate-50 text-slate-500 font-black rounded-xl text-sm active:scale-95 transition-all">
+                ยกเลิก
+            </button>
+        </div>
+    </div>
+</div>
