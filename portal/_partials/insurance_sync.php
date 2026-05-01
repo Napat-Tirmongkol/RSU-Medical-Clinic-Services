@@ -664,11 +664,18 @@ try {
                                     <span class="text-sm font-black text-slate-600">${fmt(h.cnt_total).toLocaleString()}</span>
                                 </td>
                                 <td class="px-4 py-5 text-right">
-                                    <button onclick="openRollbackModal(${h.sync_id}, ${fmt(h.cnt_new)}, ${fmt(h.cnt_removed)}, ${fmt(h.cnt_updated)})"
-                                        class="w-8 h-8 rounded-xl bg-slate-50 border border-slate-200 text-slate-400 hover:bg-rose-50 hover:text-rose-500 hover:border-rose-200 flex items-center justify-center transition-all text-xs"
-                                        title="ย้อนกลับ Sync นี้">
-                                        <i class="fa-solid fa-rotate-left"></i>
-                                    </button>
+                                    <div class="flex items-center justify-end gap-1.5">
+                                        <button onclick="openSyncDetail(${h.sync_id})"
+                                            class="w-8 h-8 rounded-xl bg-slate-50 border border-slate-200 text-slate-400 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 flex items-center justify-center transition-all text-xs"
+                                            title="ดูรายชื่อที่เปลี่ยนแปลง">
+                                            <i class="fa-solid fa-list-ul"></i>
+                                        </button>
+                                        <button onclick="openRollbackModal(${h.sync_id}, ${fmt(h.cnt_new)}, ${fmt(h.cnt_removed)}, ${fmt(h.cnt_updated)})"
+                                            class="w-8 h-8 rounded-xl bg-slate-50 border border-slate-200 text-slate-400 hover:bg-rose-50 hover:text-rose-500 hover:border-rose-200 flex items-center justify-center transition-all text-xs"
+                                            title="ย้อนกลับ Sync นี้">
+                                            <i class="fa-solid fa-rotate-left"></i>
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                         `).join('')}</tbody>
@@ -774,6 +781,89 @@ try {
             });
     };
 
+    // ── Sync Detail (drill-down) ─────────────────────────────────────────────────
+    window.openSyncDetail = function(syncId) {
+        document.getElementById('sdSyncId').textContent = '#' + syncId;
+        document.getElementById('sdBody').innerHTML = '<div class="flex items-center justify-center py-16"><i class="fa-solid fa-spinner fa-spin text-3xl text-blue-200"></i></div>';
+        document.getElementById('sdPager').innerHTML = '';
+        document.getElementById('sdModal').classList.replace('hidden', 'flex');
+        loadSyncDetail(syncId, 1);
+    };
+
+    window.closeSyncDetail = () => document.getElementById('sdModal').classList.replace('flex', 'hidden');
+
+    async function loadSyncDetail(syncId, page) {
+        const body  = document.getElementById('sdBody');
+        const pager = document.getElementById('sdPager');
+
+        const fd = new FormData();
+        fd.append('action', 'get_sync_detail');
+        fd.append('csrf_token', CSRF);
+        fd.append('sync_id', syncId);
+        fd.append('page', page);
+
+        try {
+            const res  = await fetch('ajax_insurance_sync.php', { method: 'POST', body: fd });
+            const data = await res.json();
+            if (data.status !== 'ok') throw new Error(data.message);
+
+            if (!data.rows.length) {
+                body.innerHTML = '<div class="text-center py-12 text-slate-400 font-bold">ไม่พบข้อมูล</div>';
+                return;
+            }
+
+            const typeBadge = (ct) => {
+                const map = {
+                    inserted:   ['bg-emerald-50 text-emerald-600 border-emerald-100', 'เพิ่มใหม่'],
+                    updated:    ['bg-blue-50 text-blue-600 border-blue-100',           'อัปเดต'],
+                    inactivated:['bg-rose-50 text-rose-500 border-rose-100',           'ระงับสิทธิ์'],
+                    protected:  ['bg-amber-50 text-amber-600 border-amber-100',        'ป้องกัน'],
+                };
+                const [cls, label] = map[ct] || ['bg-slate-50 text-slate-400 border-slate-100', ct];
+                return `<span class="inline-flex px-2.5 py-1 rounded-lg text-[10px] font-black border ${cls}">${label}</span>`;
+            };
+
+            body.innerHTML = `
+                <table class="w-full border-collapse text-xs">
+                    <thead><tr class="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">
+                        <th class="text-left px-5 py-3">รหัส</th>
+                        <th class="text-left px-5 py-3">ชื่อ-นามสกุล</th>
+                        <th class="text-left px-5 py-3">ประเภท</th>
+                        <th class="text-center px-5 py-3">การเปลี่ยนแปลง</th>
+                        <th class="text-center px-5 py-3">สถานะ</th>
+                    </tr></thead>
+                    <tbody>${data.rows.map(r => `
+                        <tr class="border-b border-slate-100 hover:bg-slate-50/60">
+                            <td class="px-5 py-3 font-mono font-black text-slate-400">${r.member_id}</td>
+                            <td class="px-5 py-3 font-bold text-slate-700">${r.full_name || '<span class="text-slate-300">—</span>'}</td>
+                            <td class="px-5 py-3 text-slate-500 font-bold">${r.member_status || '—'}</td>
+                            <td class="px-5 py-3 text-center">${typeBadge(r.change_type)}</td>
+                            <td class="px-5 py-3 text-center text-slate-400 font-bold">
+                                ${r.old_status !== r.new_status
+                                    ? `<span class="line-through text-slate-300">${r.old_status}</span> → <span class="text-slate-600">${r.new_status}</span>`
+                                    : `<span>${r.new_status}</span>`}
+                            </td>
+                        </tr>
+                    `).join('')}</tbody>
+                </table>`;
+
+            const totalPages = Math.ceil(data.total / data.per_page);
+            if (totalPages > 1) {
+                let ph = `<div class="flex items-center gap-1.5 flex-wrap justify-center pt-4 border-t border-slate-100">`;
+                ph += `<span class="text-xs font-bold text-slate-400 mr-2">หน้า ${page}/${totalPages} · ${Number(data.total).toLocaleString()} รายการ</span>`;
+                if (page > 1) ph += `<button onclick="loadSyncDetail(${syncId},${page-1})" class="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-400 hover:bg-slate-50 font-black text-xs">‹</button>`;
+                for (let i = Math.max(1, page-2); i <= Math.min(totalPages, page+2); i++) {
+                    ph += `<button onclick="loadSyncDetail(${syncId},${i})" class="w-8 h-8 rounded-lg font-black text-xs ${i===page ? 'bg-[#0052CC] text-white shadow-md shadow-blue-200' : 'bg-white border border-slate-200 text-slate-400 hover:bg-slate-50'}">${i}</button>`;
+                }
+                if (page < totalPages) ph += `<button onclick="loadSyncDetail(${syncId},${page+1})" class="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-400 hover:bg-slate-50 font-black text-xs">›</button>`;
+                ph += '</div>';
+                pager.innerHTML = ph;
+            }
+        } catch (err) {
+            body.innerHTML = `<p class="text-rose-500 font-bold p-6">Error: ${err.message}</p>`;
+        }
+    }
+
     // ── Rollback ─────────────────────────────────────────────────────────────────
     window.openRollbackModal = function(syncId, cntNew, cntRemoved, cntUpdated) {
         document.getElementById('rbSyncId').textContent  = '#' + syncId;
@@ -833,6 +923,23 @@ try {
     loadInsMembers(1);
 })();
 </script>
+
+<!-- ── Sync Detail Modal ─────────────────────────────────────────────────────── -->
+<div id="sdModal" class="fixed inset-0 z-[125] hidden items-center justify-center bg-black/40 backdrop-blur-sm">
+    <div class="bg-white rounded-[2rem] w-full max-w-2xl mx-4 shadow-2xl flex flex-col max-h-[85vh]">
+        <div class="px-8 pt-7 pb-5 border-b border-slate-100 flex items-center justify-between shrink-0">
+            <div>
+                <h3 class="text-base font-black text-slate-900">รายชื่อที่เปลี่ยนแปลง · Sync <span id="sdSyncId" class="text-[#0052CC]"></span></h3>
+                <p class="text-xs text-slate-400 font-bold mt-0.5">สมาชิกทั้งหมดที่ถูกเพิ่ม / อัปเดต / ระงับในการ sync นี้</p>
+            </div>
+            <button onclick="closeSyncDetail()" class="w-9 h-9 bg-slate-50 text-slate-400 hover:text-slate-600 rounded-full flex items-center justify-center transition-colors shrink-0">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+        <div id="sdBody" class="flex-1 overflow-y-auto"></div>
+        <div id="sdPager" class="px-6 pb-5 shrink-0"></div>
+    </div>
+</div>
 
 <!-- ── Rollback Confirm Modal ────────────────────────────────────────────────── -->
 <div id="rbModal" class="fixed inset-0 z-[130] hidden items-center justify-center bg-black/40 backdrop-blur-sm">
