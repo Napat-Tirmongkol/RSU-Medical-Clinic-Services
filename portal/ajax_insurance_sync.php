@@ -55,6 +55,17 @@ function ensure_insurance_table(PDO $pdo): void
             INDEX idx_insurance_status (insurance_status)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     ");
+
+    $columns = $pdo->query("SHOW COLUMNS FROM insurance_members")->fetchAll(PDO::FETCH_COLUMN);
+    if (!in_array('last_sync_id', $columns, true)) {
+        $pdo->exec("ALTER TABLE insurance_members ADD COLUMN last_sync_id INT UNSIGNED NULL AFTER remarks");
+    }
+    if (!in_array('manually_overridden', $columns, true)) {
+        $pdo->exec("ALTER TABLE insurance_members ADD COLUMN manually_overridden TINYINT(1) NOT NULL DEFAULT 0 AFTER last_sync_id");
+    }
+    if (!in_array('position', $columns, true)) {
+        $pdo->exec("ALTER TABLE insurance_members ADD COLUMN position VARCHAR(100) NOT NULL DEFAULT '' AFTER member_status");
+    }
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -149,29 +160,39 @@ if ($action === 'upload') {
     $cntNew         = 0;
     $cntUpdated     = 0;
     $cntInactivated = 0;
+    $cntProtected   = 0;
 
     $upsert = $pdo->prepare("
         INSERT INTO insurance_members
             (member_id, full_name, member_status, citizen_id, date_of_birth,
-             insurance_status, coverage_start, coverage_end, policy_number, remarks)
+             insurance_status, coverage_start, coverage_end, policy_number, remarks, manually_overridden)
         VALUES
-            (:mid, :fn, :ms, :cid, :dob, 'Active', :cs, :ce, :pn, :rem)
+            (:mid, :fn, :ms, :cid, :dob, 'Active', :cs, :ce, :pn, :rem, 0)
         ON DUPLICATE KEY UPDATE
-            full_name        = VALUES(full_name),
-            member_status    = VALUES(member_status),
-            citizen_id       = VALUES(citizen_id),
-            date_of_birth    = VALUES(date_of_birth),
-            insurance_status = 'Active',
-            coverage_start   = VALUES(coverage_start),
-            coverage_end     = VALUES(coverage_end),
-            policy_number    = VALUES(policy_number),
-            remarks          = VALUES(remarks)
+            full_name        = IF(manually_overridden = 1, full_name, VALUES(full_name)),
+            member_status    = IF(manually_overridden = 1, member_status, VALUES(member_status)),
+            citizen_id       = IF(manually_overridden = 1, citizen_id, VALUES(citizen_id)),
+            date_of_birth    = IF(manually_overridden = 1, date_of_birth, VALUES(date_of_birth)),
+            insurance_status = IF(manually_overridden = 1, insurance_status, 'Active'),
+            coverage_start   = IF(manually_overridden = 1, coverage_start, VALUES(coverage_start)),
+            coverage_end     = IF(manually_overridden = 1, coverage_end, VALUES(coverage_end)),
+            policy_number    = IF(manually_overridden = 1, policy_number, VALUES(policy_number)),
+            remarks          = IF(manually_overridden = 1, remarks, VALUES(remarks))
     ");
 
     $pdo->beginTransaction();
     try {
+        $protectedStmt = $pdo->prepare("
+            SELECT manually_overridden
+            FROM insurance_members
+            WHERE member_id = :mid
+            LIMIT 1
+        ");
         foreach ($rows as $r) {
             $mid = $r['member_id'];
+            $protectedStmt->execute([':mid' => $mid]);
+            $isProtected = ((int)($protectedStmt->fetchColumn() ?: 0) === 1);
+
             $upsert->execute([
                 ':mid' => $mid,
                 ':fn'  => $r['full_name']      ?? '',
@@ -183,13 +204,20 @@ if ($action === 'upload') {
                 ':pn'  => $r['policy_number']  ?? '',
                 ':rem' => $r['remarks']        ?? '',
             ]);
-            if (isset($existSet[$mid])) $cntUpdated++; else $cntNew++;
+            if (isset($existSet[$mid])) {
+                if ($isProtected) $cntProtected++;
+                else $cntUpdated++;
+            } else {
+                $cntNew++;
+            }
         }
 
         // Inactivate members not in file
         $inactivate = $pdo->prepare("
             UPDATE insurance_members SET insurance_status = 'Inactive'
-            WHERE member_id = :mid AND insurance_status = 'Active'
+            WHERE member_id = :mid
+              AND insurance_status = 'Active'
+              AND manually_overridden = 0
         ");
         foreach ($existing as $mid) {
             if (!isset($csvIdSet[$mid])) {
@@ -204,12 +232,13 @@ if ($action === 'upload') {
         json_err('เกิดข้อผิดพลาด: ' . $e->getMessage());
     }
 
-    log_activity('insurance_upload', "total={$totalCsv}, new={$cntNew}, updated={$cntUpdated}, inactivated={$cntInactivated}");
+    log_activity('insurance_upload', "total={$totalCsv}, new={$cntNew}, updated={$cntUpdated}, protected={$cntProtected}, inactivated={$cntInactivated}");
 
     json_ok([
         'total_csv'         => $totalCsv,
         'total_new'         => $cntNew,
         'total_updated'     => $cntUpdated,
+        'total_protected'   => $cntProtected,
         'total_inactivated' => $cntInactivated,
     ]);
 }
@@ -254,7 +283,8 @@ if ($action === 'list_members') {
 
     $stmt = $pdo->prepare("
         SELECT member_id, full_name, member_status, insurance_status,
-               coverage_start, coverage_end, citizen_id, policy_number, remarks
+               coverage_start, coverage_end, citizen_id, policy_number, remarks,
+               manually_overridden
         FROM insurance_members {$wSql}
         ORDER BY full_name ASC
         LIMIT {$perPage} OFFSET {$offset}
@@ -305,7 +335,8 @@ if ($action === 'save_member') {
                 policy_number    = :pn,
                 coverage_start   = :cs,
                 coverage_end     = :ce,
-                remarks          = :rem
+                remarks          = :rem,
+                manually_overridden = 1
             WHERE member_id = :mid
         ")->execute([':fn'=>$fn,':ms'=>$ms,':ins'=>$ins,':cid'=>$cid,':pn'=>$pn,':cs'=>$cs,':ce'=>$ce,':rem'=>$rem,':mid'=>$mid]);
 
@@ -320,9 +351,9 @@ if ($action === 'save_member') {
         $pdo->prepare("
             INSERT INTO insurance_members
                 (member_id, full_name, member_status, insurance_status, citizen_id,
-                 policy_number, coverage_start, coverage_end, remarks)
+                 policy_number, coverage_start, coverage_end, remarks, manually_overridden)
             VALUES
-                (:mid, :fn, :ms, :ins, :cid, :pn, :cs, :ce, :rem)
+                (:mid, :fn, :ms, :ins, :cid, :pn, :cs, :ce, :rem, 1)
         ")->execute([':mid'=>$mid,':fn'=>$fn,':ms'=>$ms,':ins'=>$ins,':cid'=>$cid,':pn'=>$pn,':cs'=>$cs,':ce'=>$ce,':rem'=>$rem]);
 
         log_activity('insurance_add', "เพิ่มสมาชิก member_id={$mid}");

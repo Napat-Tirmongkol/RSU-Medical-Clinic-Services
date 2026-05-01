@@ -255,6 +255,7 @@ $csrfToken = get_csrf_token();
                                 ทั้งหมดในไฟล์: <strong>${data.total_csv}</strong> รายการ &nbsp;·&nbsp;
                                 เพิ่มใหม่: <strong>${data.total_new}</strong> &nbsp;·&nbsp;
                                 อัปเดต: <strong>${data.total_updated}</strong> &nbsp;·&nbsp;
+                                กันข้อมูลแก้เอง: <strong>${data.total_protected || 0}</strong> &nbsp;·&nbsp;
                                 ระงับสิทธิ์: <strong>${data.total_inactivated}</strong>
                             </div>
                         </div>
@@ -322,7 +323,10 @@ $csrfToken = get_csrf_token();
                         <tbody>${data.members.map(m => `
                             <tr class="hover:bg-slate-50 border-b border-slate-100">
                                 <td class="px-6 py-4 font-mono text-xs font-black text-slate-400">${m.member_id}</td>
-                                <td class="px-6 py-4 text-sm font-bold text-slate-800">${m.full_name || '—'}</td>
+                                <td class="px-6 py-4 text-sm font-bold text-slate-800">
+                                    <div>${m.full_name || '—'}</div>
+                                    ${Number(m.manually_overridden || 0) === 1 ? '<div class="mt-1 text-[9px] font-black uppercase tracking-widest text-amber-600">Manual override</div>' : ''}
+                                </td>
                                 <td class="px-6 py-4 text-center">${typeBadge(m.member_status)}</td>
                                 <td class="px-6 py-4 text-center">
                                     <span class="ins-badge badge-${m.insurance_status === 'Active' ? 'active' : 'inactive'}">${m.insurance_status}</span>
