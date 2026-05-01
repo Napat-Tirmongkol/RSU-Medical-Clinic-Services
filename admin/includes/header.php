@@ -102,7 +102,7 @@ if (!function_exists('renderPageHeader')) {
             box-shadow: 0 2px 8px rgba(46,158,99,.07);
             padding: 12px 20px;
             display: flex; align-items: center; justify-content: space-between;
-            position: sticky; top: 0; z-index: 20;
+            position: sticky; top: 0; z-index: 110;
         }
 
         /* ── Content area ──────────────────────────────────────── */
