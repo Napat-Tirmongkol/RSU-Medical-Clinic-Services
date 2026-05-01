@@ -183,6 +183,32 @@ try {
                 </div>
             </details>
 
+            <!-- Upload mode selector -->
+            <div class="grid grid-cols-2 gap-2">
+                <label class="upload-mode-card cursor-pointer" data-mode="full_sync">
+                    <input type="radio" name="insUploadMode" value="full_sync" class="sr-only" checked>
+                    <div class="border-2 border-[#0052CC] bg-blue-50 rounded-2xl p-3 flex flex-col gap-1 transition-all">
+                        <div class="flex items-center gap-2">
+                            <i class="fa-solid fa-arrows-rotate text-[#0052CC] text-xs"></i>
+                            <span class="text-xs font-black text-[#0052CC]">Full Sync</span>
+                            <span class="ml-auto w-4 h-4 rounded-full bg-[#0052CC] flex items-center justify-center mode-dot"><i class="fa-solid fa-check text-white text-[8px]"></i></span>
+                        </div>
+                        <p class="text-[10px] font-bold text-slate-500 leading-relaxed">อัปเดตทั้งหมด — คนที่ไม่อยู่ในไฟล์จะถูก Inactive</p>
+                    </div>
+                </label>
+                <label class="upload-mode-card cursor-pointer" data-mode="append">
+                    <input type="radio" name="insUploadMode" value="append" class="sr-only">
+                    <div class="border-2 border-slate-200 bg-white rounded-2xl p-3 flex flex-col gap-1 transition-all">
+                        <div class="flex items-center gap-2">
+                            <i class="fa-solid fa-user-plus text-slate-400 text-xs mode-icon"></i>
+                            <span class="text-xs font-black text-slate-500 mode-label">เพิ่ม/อัปเดต</span>
+                            <span class="ml-auto w-4 h-4 rounded-full bg-slate-100 flex items-center justify-center mode-dot"></span>
+                        </div>
+                        <p class="text-[10px] font-bold text-slate-500 leading-relaxed">เพิ่มคนใหม่ + อัปเดตคนเดิม ไม่แตะคนที่ไม่อยู่ในไฟล์</p>
+                    </div>
+                </label>
+            </div>
+
             <!-- Drop zone -->
             <div class="ins-upload-area flex flex-col items-center justify-center py-10 px-6" id="insUploadArea"
                  onclick="document.getElementById('insFileInput').click()"
@@ -357,6 +383,33 @@ try {
     let selectedFile = null;
     let searchDebounce = null;
 
+    // ── Upload mode cards ───────────────────────────────────────────────────────
+    document.querySelectorAll('.upload-mode-card').forEach(card => {
+        card.addEventListener('click', () => {
+            const mode = card.dataset.mode;
+            document.querySelectorAll('.upload-mode-card').forEach(c => {
+                const isActive = c.dataset.mode === mode;
+                const inner = c.querySelector('div');
+                const dot   = c.querySelector('.mode-dot');
+                const icon  = c.querySelector('.mode-icon');
+                const lbl   = c.querySelector('.mode-label');
+                if (isActive) {
+                    inner.className = 'border-2 border-[#0052CC] bg-blue-50 rounded-2xl p-3 flex flex-col gap-1 transition-all';
+                    dot.className   = 'ml-auto w-4 h-4 rounded-full bg-[#0052CC] flex items-center justify-center mode-dot';
+                    dot.innerHTML   = '<i class="fa-solid fa-check text-white text-[8px]"></i>';
+                    if (icon) icon.className = icon.className.replace('text-slate-400', 'text-[#0052CC]') + ' mode-icon';
+                    if (lbl)  lbl.className  = lbl.className.replace('text-slate-500', 'text-[#0052CC]');
+                } else {
+                    inner.className = 'border-2 border-slate-200 bg-white rounded-2xl p-3 flex flex-col gap-1 transition-all';
+                    dot.className   = 'ml-auto w-4 h-4 rounded-full bg-slate-100 flex items-center justify-center mode-dot';
+                    dot.innerHTML   = '';
+                    if (icon) { icon.className = icon.className.replace('text-[#0052CC]', 'text-slate-400'); }
+                    if (lbl)  { lbl.className  = lbl.className.replace('text-[#0052CC]', 'text-slate-500'); }
+                }
+            });
+        });
+    });
+
     // ── Step indicator ──────────────────────────────────────────────────────────
     function setStep(step) {
         const dot2  = document.getElementById('stepDot2');
@@ -413,9 +466,11 @@ try {
 
         try {
             const file = await excelToCSV(selectedFile);
+            const mode = document.querySelector('input[name="insUploadMode"]:checked')?.value ?? 'full_sync';
             const fd   = new FormData();
             fd.append('action', 'upload');
             fd.append('csrf_token', CSRF);
+            fd.append('upload_mode', mode);
             fd.append('insurance_file', file);
 
             const res  = await fetch('ajax_insurance_sync.php', { method: 'POST', body: fd });
