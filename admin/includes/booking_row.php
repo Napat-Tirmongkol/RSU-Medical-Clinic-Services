@@ -57,7 +57,7 @@ if (!function_exists('render_booking_rows')) {
                     title="Reject"><i class="fa-solid fa-xmark"></i></button>
             <?php elseif ($b['status'] === 'confirmed'): ?>
                 <button onclick="checkinOne(<?= $b['booking_id'] ?>)"
-                    class="px-3 py-1.5 bg-teal-600 text-white rounded-xl text-[11px] font-black flex items-center gap-1.5 hover:brightness-110 active:scale-95 transition-all shadow-md shadow-teal-200 whitespace-nowrap">
+                    class="px-3 py-1.5 bg-[#0052CC] text-white rounded-xl text-[11px] font-black flex items-center gap-1.5 hover:brightness-110 active:scale-95 transition-all shadow-md shadow-blue-200 whitespace-nowrap">
                     <i class="fa-solid fa-user-check"></i> รับเข้าร่วม</button>
                 <button onclick="rescheduleOne(<?= $b['booking_id'] ?>)"
                     class="w-9 h-9 bg-orange-50 text-orange-600 border border-orange-100 rounded-xl flex items-center justify-center hover:bg-orange-500 hover:text-white hover:scale-110 active:scale-95 transition-all shadow-sm"
