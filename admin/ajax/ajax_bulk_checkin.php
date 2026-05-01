@@ -37,6 +37,6 @@ try {
     ]);
 
 } catch (PDOException $e) {
-    error_log('ajax_bulk_checkin: ' . $e->getMessage());
+    log_error_to_db('PDOException: ' . $e->getMessage(), 'error', 'ajax_bulk_checkin.php', $e->getTraceAsString());
     echo json_encode(['status' => 'error', 'message' => 'เกิดข้อผิดพลาดในระบบ']);
 }
