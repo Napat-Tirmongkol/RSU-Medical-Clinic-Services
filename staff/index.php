@@ -193,9 +193,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 if (data.status === 'preview') {
                     isProcessing = false;
+                    const isEarly = Boolean(data.data.is_early);
+                    const earlyNotice = isEarly
+                        ? `<div class="mb-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-700"><i class="fa-solid fa-triangle-exclamation mr-1"></i>${data.data.warning || 'ยังไม่ถึงวันรับบริการ'}</div>`
+                        : '';
                     Swal.fire({
-                        title: 'ยืนยันข้อมูลเช็คอิน',
-                        html: `<div class="text-left bg-blue-50 p-4 rounded-2xl mt-2 border border-blue-100">
+                        title: isEarly ? 'ยืนยันให้เข้ารับการบริการ' : 'ยืนยันข้อมูลเช็คอิน',
+                        html: `${earlyNotice}<div class="text-left bg-blue-50 p-4 rounded-2xl mt-2 border border-blue-100">
                                 <p class="text-[10px] text-blue-400 font-bold uppercase mb-1">ผู้เข้าร่วม</p>
                                 <p class="font-bold text-lg text-gray-900 mb-3">${data.data.name}</p>
                                 <p class="text-[10px] text-blue-400 font-bold uppercase mb-1">กิจกรรม/แคมเปญ</p>
@@ -206,7 +210,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         showCancelButton: true,
                         confirmButtonColor: '#0052CC',
                         cancelButtonColor: '#6b7280',
-                        confirmButtonText: 'ยืนยันเช็คอิน',
+                        confirmButtonText: isEarly ? 'ยืนยันให้เข้ารับการบริการ' : 'ยืนยันเช็คอิน',
                         cancelButtonText: 'ยกเลิก',
                         reverseButtons: true
                     }).then((result) => {
