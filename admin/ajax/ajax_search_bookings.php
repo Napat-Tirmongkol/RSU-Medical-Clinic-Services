@@ -114,7 +114,7 @@ try {
     ]);
 
 } catch (PDOException $e) {
-    error_log('ajax_search_bookings: ' . $e->getMessage());
+    log_error_to_db('PDOException: ' . $e->getMessage(), 'error', 'ajax_search_bookings.php', $e->getTraceAsString());
     http_response_code(500);
     echo json_encode(['success' => false, 'message' => 'เกิดข้อผิดพลาดในระบบ']);
 }

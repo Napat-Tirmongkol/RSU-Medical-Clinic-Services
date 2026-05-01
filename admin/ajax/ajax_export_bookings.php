@@ -58,8 +58,9 @@ try {
     $stmt->execute();
     $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
+    log_error_to_db('PDOException: ' . $e->getMessage(), 'error', 'ajax_export_bookings.php', $e->getTraceAsString());
     http_response_code(500);
-    exit('Error: ' . $e->getMessage());
+    exit('เกิดข้อผิดพลาดในระบบ');
 }
 
 $statusLabel = [
