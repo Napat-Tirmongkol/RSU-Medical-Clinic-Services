@@ -149,6 +149,8 @@ if ($action === 'upload') {
         json_err('กรุณาเลือกไฟล์ก่อนอัปโหลด');
     }
 
+    $uploadMode = ($_POST['upload_mode'] ?? 'full_sync') === 'append' ? 'append' : 'full_sync';
+
     $raw    = file_get_contents($_FILES['insurance_file']['tmp_name']);
     $parsed = parse_csv(decode_csv($raw));
     if (isset($parsed['error'])) {
@@ -295,28 +297,30 @@ if ($action === 'upload') {
             ]);
         }
 
-        // Inactivate members not in file
-        $inactivate = $pdo->prepare("
-            UPDATE insurance_members
-            SET insurance_status = 'Inactive',
-                last_sync_id = :sync_id
-            WHERE member_id = :mid
-              AND insurance_status = 'Active'
-              AND manually_overridden = 0
-        ");
-        foreach ($existing as $mid) {
-            if (!isset($csvIdSet[$mid])) {
-                $inactivate->execute([':mid' => $mid, ':sync_id' => $syncId]);
-                if ($inactivate->rowCount() > 0) {
-                    $cntInactivated++;
-                    $history->execute([
-                        ':member_id' => $mid,
-                        ':sync_id' => $syncId,
-                        ':change_type' => 'inactivated',
-                        ':old_status' => (string)($existingById[$mid]['insurance_status'] ?? 'Active'),
-                        ':new_status' => 'Inactive',
-                        ':snapshot' => insurance_snapshot($existingById[$mid] ?? ['member_id' => $mid]),
-                    ]);
+        // Inactivate members not in file — skipped in append mode
+        if ($uploadMode === 'full_sync') {
+            $inactivate = $pdo->prepare("
+                UPDATE insurance_members
+                SET insurance_status = 'Inactive',
+                    last_sync_id = :sync_id
+                WHERE member_id = :mid
+                  AND insurance_status = 'Active'
+                  AND manually_overridden = 0
+            ");
+            foreach ($existing as $mid) {
+                if (!isset($csvIdSet[$mid])) {
+                    $inactivate->execute([':mid' => $mid, ':sync_id' => $syncId]);
+                    if ($inactivate->rowCount() > 0) {
+                        $cntInactivated++;
+                        $history->execute([
+                            ':member_id' => $mid,
+                            ':sync_id' => $syncId,
+                            ':change_type' => 'inactivated',
+                            ':old_status' => (string)($existingById[$mid]['insurance_status'] ?? 'Active'),
+                            ':new_status' => 'Inactive',
+                            ':snapshot' => insurance_snapshot($existingById[$mid] ?? ['member_id' => $mid]),
+                        ]);
+                    }
                 }
             }
         }
@@ -327,7 +331,7 @@ if ($action === 'upload') {
         json_err('เกิดข้อผิดพลาด: ' . $e->getMessage());
     }
 
-    log_activity('insurance_upload', "total={$totalCsv}, new={$cntNew}, updated={$cntUpdated}, protected={$cntProtected}, inactivated={$cntInactivated}");
+    log_activity('insurance_upload', "mode={$uploadMode}, total={$totalCsv}, new={$cntNew}, updated={$cntUpdated}, protected={$cntProtected}, inactivated={$cntInactivated}");
 
     json_ok([
         'total_csv'         => $totalCsv,
