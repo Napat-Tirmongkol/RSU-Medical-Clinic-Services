@@ -25,38 +25,49 @@ $thaiMonths = [1 => 'มกราคม', 2 => 'กุมภาพันธ์',
 $startDate = sprintf('%04d-%02d-01', $year, $month);
 $endDate = date('Y-m-t', strtotime($startDate));
 
-/** (2) KPI AGGREGATION (Insights) */
+/** (2) KPI + DATA — รวม round-trips ให้เหลือ 2 queries */
 try {
-    $total_pending = (int) $pdo->query("SELECT COUNT(*) FROM camp_bookings WHERE status = 'booked'")->fetchColumn();
-    $total_confirmed = (int) $pdo->query("SELECT COUNT(*) FROM camp_bookings WHERE status = 'confirmed'")->fetchColumn();
-    $total_completed = (int) $pdo->query("SELECT COUNT(*) FROM camp_bookings WHERE status = 'completed'")->fetchColumn();
-    $total_cancelled = (int) $pdo->query("SELECT COUNT(*) FROM camp_bookings WHERE status IN ('cancelled', 'cancelled_by_admin')")->fetchColumn();
-    $total_today = (int) $pdo->query("SELECT COUNT(*) FROM camp_bookings b JOIN camp_slots s ON b.slot_id = s.id WHERE s.slot_date = CURDATE()")->fetchColumn();
-} catch (PDOException $e) { /* fallback */
+    // KPI: conditional aggregation แทน 5 queries แยก
+    $kpi = $pdo->query("
+        SELECT
+            SUM(status = 'booked')                               AS total_pending,
+            SUM(status = 'confirmed')                            AS total_confirmed,
+            SUM(status = 'completed')                            AS total_completed,
+            SUM(status IN ('cancelled','cancelled_by_admin'))    AS total_cancelled
+        FROM camp_bookings b
+        JOIN camp_slots s ON b.slot_id = s.id
+    ")->fetch(PDO::FETCH_ASSOC);
+    $total_pending   = (int)($kpi['total_pending']   ?? 0);
+    $total_confirmed = (int)($kpi['total_confirmed'] ?? 0);
+    $total_completed = (int)($kpi['total_completed'] ?? 0);
+    $total_cancelled = (int)($kpi['total_cancelled'] ?? 0);
+    $total_today     = (int)$pdo->query("
+        SELECT COUNT(*) FROM camp_bookings b
+        JOIN camp_slots s ON b.slot_id = s.id
+        WHERE s.slot_date = CURDATE()
+    ")->fetchColumn();
+} catch (PDOException $e) {
     $total_pending = $total_confirmed = $total_completed = $total_cancelled = $total_today = 0;
 }
 
-/** (3) DATA FETCHING (Universal Pending + Current Month) */
+/** (3) DATA FETCHING — กรองด้วย slot_date เพื่อให้ index ทำงานได้ */
 try {
-    $sql = "
+    $stmt = $pdo->prepare("
         SELECT
             b.id AS booking_id, b.status, b.created_at, b.campaign_id,
             u.full_name, u.student_personnel_id, u.phone_number,
             s.slot_date, s.start_time, s.end_time,
             c.title AS campaign_title
         FROM camp_bookings b
-        JOIN sys_users u ON b.student_id = u.id
-        JOIN camp_slots s ON b.slot_id = s.id
-        JOIN camp_list c ON b.campaign_id = c.id
-        WHERE (
-            (s.slot_date >= :start AND s.slot_date <= :end AND b.status IN ('booked', 'confirmed', 'completed'))
-            OR b.status IN ('cancelled', 'cancelled_by_admin')
-        )
+        JOIN sys_users u  ON b.student_id  = u.id
+        JOIN camp_slots s ON b.slot_id     = s.id
+        JOIN camp_list c  ON b.campaign_id = c.id
+        WHERE s.slot_date BETWEEN :start AND :end
+          AND b.status IN ('booked','confirmed','completed','cancelled','cancelled_by_admin')
         ORDER BY
             CASE WHEN b.status = 'booked' THEN 0 ELSE 1 END,
             s.slot_date ASC, s.start_time ASC
-    ";
-    $stmt = $pdo->prepare($sql);
+    ");
     $stmt->execute([':start' => $startDate, ':end' => $endDate]);
     $bookings = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
