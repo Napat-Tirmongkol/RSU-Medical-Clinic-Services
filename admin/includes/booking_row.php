@@ -47,7 +47,7 @@ if (!function_exists('render_booking_rows')) {
         <?php endif; ?>
     </td>
     <td class="p-6 text-center">
-        <div class="flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div class="flex items-center justify-center gap-2">
             <?php if ($b['status'] === 'booked'): ?>
                 <button onclick="approveOne(<?= $b['booking_id'] ?>)"
                     class="w-9 h-9 bg-blue-600 text-white rounded-xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all shadow-md shadow-blue-200"
