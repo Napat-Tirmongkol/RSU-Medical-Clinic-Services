@@ -238,17 +238,11 @@ if ($action === 'upload') {
                 (:member_id, :sync_id, :change_type, :old_status, :new_status, :snapshot)
         ");
 
-        $protectedStmt = $pdo->prepare("
-            SELECT manually_overridden
-            FROM insurance_members
-            WHERE member_id = :mid
-            LIMIT 1
-        ");
         foreach ($rows as $r) {
-            $mid = $r['member_id'];
-            $protectedStmt->execute([':mid' => $mid]);
-            $isProtected = ((int)($protectedStmt->fetchColumn() ?: 0) === 1);
-            $oldStatus = $existingById[$mid]['insurance_status'] ?? 'new';
+            $mid         = $r['member_id'];
+            $existing_   = $existingById[$mid] ?? null;
+            $isProtected = $existing_ !== null && (int)($existing_['manually_overridden'] ?? 0) === 1;
+            $oldStatus   = $existing_['insurance_status'] ?? 'new';
 
             $upsert->execute([
                 ':mid' => $mid,
@@ -340,6 +334,50 @@ if ($action === 'upload') {
         'total_protected'   => $cntProtected,
         'total_inactivated' => $cntInactivated,
         'sync_id'           => $syncId,
+    ]);
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ACTION: get_sync_detail — member-level breakdown for a specific sync
+// ══════════════════════════════════════════════════════════════════════════════
+if ($action === 'get_sync_detail') {
+    $syncId  = (int)($_POST['sync_id'] ?? 0);
+    $page    = max(1, (int)($_POST['page'] ?? 1));
+    $perPage = 20;
+    $offset  = ($page - 1) * $perPage;
+    if ($syncId <= 0) json_err('sync_id ไม่ถูกต้อง');
+
+    ensure_insurance_table($pdo);
+
+    $total = (int)$pdo->prepare("SELECT COUNT(*) FROM insurance_member_history WHERE sync_id = :sid")
+        ->execute([':sid' => $syncId]) ? $pdo->query("SELECT COUNT(*) FROM insurance_member_history WHERE sync_id = {$syncId}")->fetchColumn() : 0;
+
+    $countStmt = $pdo->prepare("SELECT COUNT(*) FROM insurance_member_history WHERE sync_id = :sid");
+    $countStmt->execute([':sid' => $syncId]);
+    $total = (int)$countStmt->fetchColumn();
+
+    $stmt = $pdo->prepare("
+        SELECT h.member_id, h.change_type, h.old_status, h.new_status,
+               COALESCE(m.full_name, '') AS full_name,
+               COALESCE(m.member_status, '') AS member_status,
+               COALESCE(m.position, '') AS position
+        FROM insurance_member_history h
+        LEFT JOIN insurance_members m ON m.member_id = h.member_id
+        WHERE h.sync_id = :sid
+        ORDER BY FIELD(h.change_type,'inserted','updated','inactivated','protected'), h.member_id
+        LIMIT :lim OFFSET :off
+    ");
+    $stmt->bindValue(':sid', $syncId, PDO::PARAM_INT);
+    $stmt->bindValue(':lim', $perPage, PDO::PARAM_INT);
+    $stmt->bindValue(':off', $offset,  PDO::PARAM_INT);
+    $stmt->execute();
+
+    json_ok([
+        'sync_id'  => $syncId,
+        'total'    => $total,
+        'page'     => $page,
+        'per_page' => $perPage,
+        'rows'     => $stmt->fetchAll(PDO::FETCH_ASSOC),
     ]);
 }
 
