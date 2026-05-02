@@ -133,6 +133,9 @@ try {
         } elseif ($inviteToken !== '') {
             unset($_SESSION['invite_token']);
             $finalDest = LINE_APP_BASE_PATH . '/user/c.php?t=' . urlencode($inviteToken);
+        } elseif (!empty($_SESSION['checkin_return'])) {
+            $finalDest = $_SESSION['checkin_return'];
+            unset($_SESSION['checkin_return']);
         } else {
             $finalDest = LINE_APP_BASE_PATH . '/user/hub.php';
         }

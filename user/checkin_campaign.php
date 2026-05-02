@@ -263,7 +263,7 @@ function fmt_date_c(string $d): string {
         <span class="font-bold text-gray-700"><?= htmlspecialchars($campaign['title']) ?></span>
       </div>
       <?php endif; ?>
-      <a href="index.php?return=<?= urlencode($return_url) ?>"
+      <a href="line_login.php"
          class="flex items-center justify-center gap-2 w-full py-3 rounded-2xl font-black text-sm text-white transition-all"
          style="background:#06c755">
         <i class="fa-brands fa-line text-lg"></i> เข้าสู่ระบบด้วย LINE
