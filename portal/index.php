@@ -789,6 +789,12 @@ try {
                 <div class="psb-icon"><i class="fa-solid fa-shield-halved" style="color:#0ea5e9"></i></div>
                 <span class="psb-label" style="color:#0284c7;font-weight:900">Insurance Hub</span>
             </button>
+            <?php if ($adminRole === 'superadmin'): ?>
+            <button class="psb-item" data-section="manage_insurance_partners" onclick="switchSection('manage_insurance_partners',this)">
+                <div class="psb-icon"><i class="fa-solid fa-handshake" style="color:#10b981"></i></div>
+                <span class="psb-label" style="color:#059669;font-weight:900">Insurance Partners</span>
+            </button>
+            <?php endif; ?>
             <?php if ($adminRole === 'superadmin' || !empty($_SESSION['access_system_logs'])): ?>
             <button class="psb-item" data-section="activity_logs" onclick="switchSection('activity_logs',this)">
                 <div class="psb-icon"><i class="fa-solid fa-file-lines" style="color:#64748b"></i></div>
@@ -2222,6 +2228,18 @@ try {
             <div id="section-clinic_data" class="portal-section"
                 style="<?= $activeSection==='clinic_data'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); background:#f8fafc; overflow-y:auto;">
                 <?php include __DIR__ . '/_partials/clinic_data.php'; ?>
+            </div>
+
+            <!-- ════════════ SECTION: MANAGE INSURANCE PARTNERS ════════════ -->
+            <div id="section-manage_insurance_partners" class="portal-section"
+                style="<?= $activeSection==='manage_insurance_partners'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); background:#f8fafc; overflow-y:auto;">
+                <?php
+                if ($adminRole === 'superadmin') {
+                    include __DIR__ . '/_partials/manage_insurance_partners.php';
+                } else {
+                    echo '<div style="padding:100px;text-align:center;font-weight:900;color:#dc2626"><i class="fa-solid fa-shield-slash mb-4" style="font-size:4rem;display:block"></i> ACCESS DENIED<br><span style="font-size:14px;color:#94a3b8;font-weight:600">Superadmin only.</span></div>';
+                }
+                ?>
             </div>
 
             <!-- ════════════ SECTION: ACTIVITY LOGS ════════════ -->
