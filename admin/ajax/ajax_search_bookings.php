@@ -16,14 +16,14 @@ validate_csrf_or_die();
 $q          = trim($_POST['q'] ?? '');
 $status     = $_POST['status'] ?? 'all';
 $campaignId = (int)($_POST['campaign_id'] ?? 0);
-$dateFrom   = $_POST['date_from'] ?? date('Y-m-01');
-$dateTo     = $_POST['date_to']   ?? date('Y-m-t');
+$dateFrom   = $_POST['date_from'] ?? date('Y-m-d', strtotime('-3 months'));
+$dateTo     = $_POST['date_to']   ?? date('Y-m-d', strtotime('+3 months'));
 $page       = max(1, (int)($_POST['page'] ?? 1));
 $perPage    = 20;
 $offset     = ($page - 1) * $perPage;
 
-if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateFrom)) $dateFrom = date('Y-m-01');
-if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateTo))   $dateTo   = date('Y-m-t');
+if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateFrom)) $dateFrom = date('Y-m-d', strtotime('-3 months'));
+if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateTo))   $dateTo   = date('Y-m-d', strtotime('+3 months'));
 
 $where  = "s.slot_date BETWEEN :start AND :end AND b.status IN ('booked','confirmed','completed','cancelled','cancelled_by_admin')";
 $params = [':start' => $dateFrom, ':end' => $dateTo];

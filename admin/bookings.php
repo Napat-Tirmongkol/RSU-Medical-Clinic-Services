@@ -9,11 +9,11 @@ require_once __DIR__ . '/includes/auth.php';
 
 $pdo = db();
 
-// ── Date range (default: current month) ──────────────────────────────────────
-$dateFrom = $_GET['date_from'] ?? date('Y-m-01');
-$dateTo   = $_GET['date_to']   ?? date('Y-m-t');
-if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateFrom)) $dateFrom = date('Y-m-01');
-if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateTo))   $dateTo   = date('Y-m-t');
+// ── Date range (default: 3 months back → 3 months forward) ───────────────────
+$dateFrom = $_GET['date_from'] ?? date('Y-m-d', strtotime('-3 months'));
+$dateTo   = $_GET['date_to']   ?? date('Y-m-d', strtotime('+3 months'));
+if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateFrom)) $dateFrom = date('Y-m-d', strtotime('-3 months'));
+if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateTo))   $dateTo   = date('Y-m-d', strtotime('+3 months'));
 
 $campaignId = isset($_GET['campaign_id']) ? (int)$_GET['campaign_id'] : 0;
 $page       = max(1, (int)($_GET['page'] ?? 1));
@@ -345,7 +345,12 @@ function doSearch(updateKpi = false) {
     })
     .then(r => r.json())
     .then(data => {
-        if (!data.success) return;
+        if (!data.success) {
+            document.getElementById('bookingTbody').innerHTML =
+                '<tr><td colspan="6" class="p-12 text-center text-red-400 text-sm"><i class="fa-solid fa-triangle-exclamation mr-2"></i>' +
+                (data.message || 'เกิดข้อผิดพลาดในการดึงข้อมูล') + '</td></tr>';
+            return;
+        }
         document.getElementById('bookingTbody').innerHTML =
             data.html || '<tr><td colspan="6" class="p-16 text-center text-gray-400 text-sm">ไม่พบรายการ</td></tr>';
 
