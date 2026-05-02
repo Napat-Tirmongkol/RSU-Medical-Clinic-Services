@@ -9,8 +9,20 @@ require_once __DIR__ . '/../includes/ajax_helpers.php';
 
 $adminRole = $_SESSION['admin_role'] ?? '';
 $isStaff   = !empty($_SESSION['is_ecampaign_staff']);
+$hasRegistry = !empty($_SESSION['access_registry']);
+$hasInsurance = !empty($_SESSION['access_insurance']) || $adminRole === 'superadmin';
+
+// Registry users can only call upload-related actions (member_id list maintenance only)
+$registryAllowedActions = ['upload', 'analyze_upload'];
+$requestedAction = $_POST['action'] ?? $_GET['action'] ?? '';
+
 if (($isStaff && $adminRole === '') || !in_array($adminRole, ['admin', 'superadmin', 'editor'], true)) {
     json_err('ไม่มีสิทธิ์เข้าถึงระบบนี้', 403);
+}
+if (!$hasInsurance) {
+    if (!$hasRegistry || !in_array($requestedAction, $registryAllowedActions, true)) {
+        json_err('ไม่มีสิทธิ์เข้าถึงระบบนี้', 403);
+    }
 }
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {

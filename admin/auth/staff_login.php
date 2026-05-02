@@ -46,7 +46,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                        IFNULL(access_eborrow, 0) AS access_eborrow,
                        IFNULL(access_insurance, 0) AS access_insurance,
                        IFNULL(access_system_logs, 0) AS access_system_logs,
-                       IFNULL(access_site_settings, 0) AS access_site_settings
+                       IFNULL(access_site_settings, 0) AS access_site_settings,
+                       IFNULL(access_registry, 0) AS access_registry
                 FROM sys_staff
                 WHERE username = :uname
                 LIMIT 1
@@ -58,7 +59,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 if ($staff['account_status'] === 'disabled') {
                     $error = 'บัญชีนี้ถูกระงับการใช้งาน กรุณาติดต่อผู้ดูแลระบบ';
-                } elseif (!(int)$staff['access_ecampaign'] && !(int)$staff['access_eborrow'] && !(int)$staff['access_insurance']) {
+                } elseif (!(int)$staff['access_ecampaign'] && !(int)$staff['access_eborrow'] && !(int)$staff['access_insurance'] && !(int)$staff['access_registry']) {
                     $error = 'บัญชีนี้ยังไม่ได้รับสิทธิ์เข้าใช้งานระบบใดๆ กรุณาติดต่อผู้ดูแลระบบ';
                 } else {
                     // Whitelist ecampaign_role ป้องกัน privilege escalation
@@ -81,6 +82,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $_SESSION['access_insurance']      = (int)$staff['access_insurance'];
                     $_SESSION['access_system_logs']    = (int)$staff['access_system_logs'];
                     $_SESSION['access_site_settings']  = (int)$staff['access_site_settings'];
+                    $_SESSION['access_registry']       = (int)$staff['access_registry'];
 
                     $_SESSION['_admin_last_activity']  = time();
 

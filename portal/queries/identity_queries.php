@@ -92,7 +92,10 @@ if ($adminRole === 'superadmin') {
         if (!in_array('access_site_settings', $cols)) {
             $pdo->exec("ALTER TABLE sys_staff ADD COLUMN access_site_settings TINYINT(1) DEFAULT 0");
         }
-        
+        if (!in_array('access_registry', $cols)) {
+            $pdo->exec("ALTER TABLE sys_staff ADD COLUMN access_registry TINYINT(1) DEFAULT 0");
+        }
+
         $allStaff = $pdo->query("
             SELECT id, username, full_name, email, role, account_status, linked_line_user_id,
                    IFNULL(access_eborrow, 1) AS access_eborrow,
@@ -100,7 +103,8 @@ if ($adminRole === 'superadmin') {
                    IFNULL(ecampaign_role, 'admin') AS ecampaign_role,
                    IFNULL(access_insurance, 0) AS access_insurance,
                    IFNULL(access_system_logs, 0) AS access_system_logs,
-                   IFNULL(access_site_settings, 0) AS access_site_settings
+                   IFNULL(access_site_settings, 0) AS access_site_settings,
+                   IFNULL(access_registry, 0) AS access_registry
             FROM sys_staff ORDER BY role ASC, full_name ASC
         ")->fetchAll(PDO::FETCH_ASSOC);
     } catch (PDOException $e) {

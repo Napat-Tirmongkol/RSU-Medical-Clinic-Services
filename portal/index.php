@@ -11,7 +11,18 @@ $pdo = db();
 $adminRole = $_SESSION['admin_role'] ?? 'admin';
 $isStaff   = !empty($_SESSION['is_ecampaign_staff']);
 
+// Registry-only mode: staff with only access_registry (no other access_* flag)
+// → lock UI to registry_upload section, hide everything else
+$registryOnly = !empty($_SESSION['access_registry'])
+    && empty($_SESSION['access_insurance'])
+    && empty($_SESSION['access_ecampaign'])
+    && empty($_SESSION['access_eborrow'])
+    && empty($_SESSION['access_system_logs'])
+    && empty($_SESSION['access_site_settings'])
+    && $adminRole !== 'superadmin';
+
 $activeSection = $_GET['section'] ?? 'dashboard';
+if ($registryOnly) $activeSection = 'registry_upload';
 
 // ── 1. Action Handlers (POST & Export) ──────────────────────────────────────
 require_once __DIR__ . '/actions/portal_handlers.php';
@@ -773,7 +784,8 @@ try {
 
         <!-- Nav items -->
         <div style="padding:10px;flex:1;overflow:hidden;display:flex;flex-direction:column;">
-            <button class="psb-item psb-active" data-section="dashboard" onclick="switchSection('dashboard',this)">
+            <?php if (!$registryOnly): ?>
+            <button class="psb-item <?= $activeSection==='dashboard'?'psb-active':'' ?>" data-section="dashboard" onclick="switchSection('dashboard',this)">
                 <div class="psb-icon"><i class="fa-solid fa-chart-pie" style="color:#059669"></i></div>
                 <span class="psb-label" style="color:#059669;font-weight:900">Dashboard</span>
             </button>
@@ -789,6 +801,14 @@ try {
                 <div class="psb-icon"><i class="fa-solid fa-shield-halved" style="color:#0ea5e9"></i></div>
                 <span class="psb-label" style="color:#0284c7;font-weight:900">Insurance Hub</span>
             </button>
+            <?php endif; ?>
+            <?php if ($adminRole === 'superadmin' || !empty($_SESSION['access_registry'])): ?>
+            <button class="psb-item <?= $activeSection==='registry_upload'?'psb-active':'' ?>" data-section="registry_upload" onclick="switchSection('registry_upload',this)">
+                <div class="psb-icon"><i class="fa-solid fa-id-card-clip" style="color:#06b6d4"></i></div>
+                <span class="psb-label" style="color:#0891b2;font-weight:900">อัพโหลดรายชื่อ (ทะเบียน)</span>
+            </button>
+            <?php endif; ?>
+            <?php if (!$registryOnly): ?>
             <?php if ($adminRole === 'superadmin'): ?>
             <button class="psb-item" data-section="manage_insurance_partners" onclick="switchSection('manage_insurance_partners',this)">
                 <div class="psb-icon"><i class="fa-solid fa-handshake" style="color:#10b981"></i></div>
@@ -815,9 +835,10 @@ try {
                 <div class="psb-icon"><i class="fa-solid fa-bullhorn" style="color:#7c3aed"></i></div>
                 <span class="psb-label" style="color:#6d28d9;font-weight:900">ประกาศ</span>
             </button>
+            <?php endif; ?>
             <div style="flex:1"></div> <!-- Spacer to push settings to bottom -->
 
-            <?php if ($adminRole === 'superadmin' || !empty($_SESSION['access_site_settings'])): ?>
+            <?php if (!$registryOnly && ($adminRole === 'superadmin' || !empty($_SESSION['access_site_settings']))): ?>
             <button class="psb-item" data-section="settings" onclick="switchSection('settings',this)">
                 <div class="psb-icon"><i class="fa-solid fa-gear" style="color:#d97706"></i></div>
                 <span class="psb-label" style="color:#b45309;font-weight:900">Settings</span>
@@ -2070,6 +2091,14 @@ try {
                                                 </div>
                                                 <input type="checkbox" name="ins_access" id="govInsAccess" value="1" style="width:16px;height:16px" onclick="event.stopPropagation()">
                                             </div>
+                                            <!-- Registry (ฝ่ายทะเบียน — upload only) -->
+                                            <div onclick="document.getElementById('govRegAccess').click()" class="premium-role-card" style="border-radius:14px;border:1.5px solid #e2e8f0;background:#fff;cursor:pointer;padding:12px;transition:all 0.2s;display:flex;align-items:center;justify-content:space-between">
+                                                <div style="display:flex;align-items:center;gap:10px">
+                                                    <i class="fa-solid fa-id-card-clip text-cyan-500"></i>
+                                                    <span style="font-weight:800;font-size:12px;color:#475569">Registry Upload (ฝ่ายทะเบียน)</span>
+                                                </div>
+                                                <input type="checkbox" name="reg_access" id="govRegAccess" value="1" style="width:16px;height:16px" onclick="event.stopPropagation()">
+                                            </div>
                                             <!-- Logs -->
                                             <div onclick="document.getElementById('govLogsAccess').click()" class="premium-role-card" style="border-radius:14px;border:1.5px solid #e2e8f0;background:#fff;cursor:pointer;padding:12px;transition:all 0.2s;display:flex;align-items:center;justify-content:space-between">
                                                 <div style="display:flex;align-items:center;gap:10px">
@@ -2238,6 +2267,18 @@ try {
                     include __DIR__ . '/_partials/manage_insurance_partners.php';
                 } else {
                     echo '<div style="padding:100px;text-align:center;font-weight:900;color:#dc2626"><i class="fa-solid fa-shield-slash mb-4" style="font-size:4rem;display:block"></i> ACCESS DENIED<br><span style="font-size:14px;color:#94a3b8;font-weight:600">Superadmin only.</span></div>';
+                }
+                ?>
+            </div>
+
+            <!-- ════════════ SECTION: REGISTRY UPLOAD (ฝ่ายทะเบียน) ════════════ -->
+            <div id="section-registry_upload" class="portal-section"
+                style="<?= $activeSection==='registry_upload'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); background:#f8fafc; overflow-y:auto;">
+                <?php
+                if ($adminRole === 'superadmin' || !empty($_SESSION['access_registry']) || !empty($_SESSION['access_insurance'])) {
+                    include __DIR__ . '/_partials/registry_upload.php';
+                } else {
+                    echo '<div style="padding:100px;text-align:center;font-weight:900;color:#dc2626"><i class="fa-solid fa-shield-slash mb-4" style="font-size:4rem;display:block"></i> ACCESS DENIED<br><span style="font-size:14px;color:#94a3b8;font-weight:600">ต้องมีสิทธิ์ access_registry หรือ access_insurance</span></div>';
                 }
                 ?>
             </div>
@@ -2968,12 +3009,14 @@ try {
                         document.getElementById('govInsAccess').checked = parseInt(data.access_insurance) === 1;
                         document.getElementById('govLogsAccess').checked = parseInt(data.access_system_logs) === 1;
                         document.getElementById('govSettAccess').checked = parseInt(data.access_site_settings) === 1;
+                        document.getElementById('govRegAccess').checked = parseInt(data.access_registry) === 1;
                     }
                 } else {
                     // Reset Extension Checkboxes for new records
                     document.getElementById('govInsAccess').checked = false;
                     document.getElementById('govLogsAccess').checked = false;
                     document.getElementById('govSettAccess').checked = false;
+                    document.getElementById('govRegAccess').checked = false;
                 }
             // Update UI States
             syncGovUI('govEbAccess', 'govEbRole', 'govEbCard');
