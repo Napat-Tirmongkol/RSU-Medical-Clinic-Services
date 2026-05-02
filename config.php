@@ -1,6 +1,7 @@
 <?php
 // config.php — จุดเข้าหลักข���งระบบทุกไฟล์ (canonical entry point)
 // โหลด: DB connection, CSRF, Error Logger และ helper functions
+date_default_timezone_set('Asia/Bangkok');
 require_once __DIR__ . '/config/db_connect.php';
 require_once __DIR__ . '/includes/csrf.php';
 require_once __DIR__ . '/includes/error_logger.php';
