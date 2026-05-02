@@ -7,6 +7,7 @@ require_once __DIR__ . '/../config.php';
 $pdo        = db();
 $campaignId = (int)($_GET['campaign'] ?? 0);
 $token      = trim($_GET['token'] ?? '');
+$isPost     = $_SERVER['REQUEST_METHOD'] === 'POST';
 
 function base_url_c(): string {
     $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
@@ -46,8 +47,7 @@ if ($lineUserId !== '') {
     } catch (PDOException) {}
 }
 
-// ── Attempt check-in ─────────────────────────────────────────────────────────
-// States: success | already | no_booking | qr_disabled | invalid | not_logged_in
+// ── States: confirm | success | already | no_booking | qr_disabled | invalid | not_logged_in
 $result  = null;
 $booking = null;
 $slot    = null;
@@ -60,7 +60,7 @@ if (!$token_ok || !$campaign) {
     $result = 'not_logged_in';
 } else {
     try {
-        // Find today's slot booking for this user in this campaign
+        // Find today's slot booking (or earliest future slot for early arrivals)
         $st = $pdo->prepare("
             SELECT b.id, b.attended_at, b.status,
                    s.slot_date, s.start_time, s.end_time
@@ -76,8 +76,6 @@ if (!$token_ok || !$campaign) {
         $row = $st->fetch(PDO::FETCH_ASSOC);
 
         if (!$row) {
-            // Fallback: check if user has any future slot in this campaign
-            // (early arrival: slot is in the future but they're here today)
             $st2 = $pdo->prepare("
                 SELECT b.id, b.attended_at, b.status,
                        s.slot_date, s.start_time, s.end_time
@@ -96,17 +94,27 @@ if (!$token_ok || !$campaign) {
 
         if (!$row) {
             $result = 'no_booking';
-        } else {
-            $slot = $row;
-            if (!empty($row['attended_at'])) {
-                $result = 'already';
+        } elseif (!empty($row['attended_at'])) {
+            $slot    = $row;
+            $booking = $row;
+            $result  = 'already';
+        } elseif ($isPost) {
+            // POST = user confirmed → mark attended
+            $bookingId = (int)($_POST['booking_id'] ?? 0);
+            if ($bookingId !== (int)$row['id']) {
+                $result = 'invalid';
             } else {
                 $pdo->prepare("UPDATE camp_bookings SET attended_at = NOW() WHERE id = ?")
-                    ->execute([$row['id']]);
-                $result = 'success';
-                $slot['attended_at'] = date('Y-m-d H:i:s');
+                    ->execute([$bookingId]);
+                $row['attended_at'] = date('Y-m-d H:i:s');
+                $slot    = $row;
+                $booking = $row;
+                $result  = 'success';
             }
-            $booking = $slot;
+        } else {
+            // GET = show confirmation screen
+            $slot   = $row;
+            $result = 'confirm';
         }
     } catch (PDOException) {
         $result = 'invalid';
@@ -155,7 +163,72 @@ function fmt_date_c(string $d): string {
 
   <div class="bg-white rounded-3xl shadow-xl overflow-hidden border border-emerald-50">
 
-    <?php if ($result === 'success'): ?>
+    <?php if ($result === 'confirm'): ?>
+    <!-- ✅ CONFIRM STEP -->
+    <div class="p-8 text-center">
+      <div class="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-emerald-100">
+        <i class="fa-solid fa-user-check text-4xl text-emerald-500"></i>
+      </div>
+      <h2 class="text-2xl font-black text-gray-900 mb-1">ยืนยันเช็คอิน</h2>
+      <p class="text-sm text-gray-500 mb-5">กรุณาตรวจสอบข้อมูลก่อนยืนยัน</p>
+
+      <div class="bg-gray-50 rounded-2xl p-4 text-left space-y-2 mb-6 border border-gray-100">
+        <div class="flex items-center gap-3">
+          <div class="w-8 h-8 bg-emerald-100 rounded-xl flex items-center justify-center flex-shrink-0">
+            <i class="fa-solid fa-user text-emerald-600 text-xs"></i>
+          </div>
+          <div>
+            <p class="text-[10px] text-gray-400 font-bold uppercase tracking-wider">ชื่อ</p>
+            <p class="font-black text-gray-800 text-sm"><?= htmlspecialchars($user['full_name']) ?></p>
+          </div>
+        </div>
+        <?php if (!empty($user['student_personnel_id'])): ?>
+        <div class="flex items-center gap-3">
+          <div class="w-8 h-8 bg-gray-100 rounded-xl flex items-center justify-center flex-shrink-0">
+            <i class="fa-solid fa-id-card text-gray-500 text-xs"></i>
+          </div>
+          <div>
+            <p class="text-[10px] text-gray-400 font-bold uppercase tracking-wider">รหัส</p>
+            <p class="font-bold text-gray-700 text-sm"><?= htmlspecialchars($user['student_personnel_id']) ?></p>
+          </div>
+        </div>
+        <?php endif; ?>
+        <div class="flex items-center gap-3">
+          <div class="w-8 h-8 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0">
+            <i class="fa-solid fa-calendar text-blue-600 text-xs"></i>
+          </div>
+          <div>
+            <p class="text-[10px] text-gray-400 font-bold uppercase tracking-wider">กิจกรรม</p>
+            <p class="font-bold text-gray-700 text-sm"><?= htmlspecialchars($campaign['title']) ?></p>
+          </div>
+        </div>
+        <div class="flex items-center gap-3">
+          <div class="w-8 h-8 bg-amber-100 rounded-xl flex items-center justify-center flex-shrink-0">
+            <i class="fa-solid fa-clock text-amber-600 text-xs"></i>
+          </div>
+          <div>
+            <p class="text-[10px] text-gray-400 font-bold uppercase tracking-wider">รอบเวลา</p>
+            <p class="font-bold text-gray-700 text-sm">
+              <?= fmt_date_c($slot['slot_date']) ?>
+              · <?= substr($slot['start_time'],0,5) ?>–<?= substr($slot['end_time'],0,5) ?>
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <form method="POST" action="checkin_campaign.php?campaign=<?= $campaignId ?>&token=<?= urlencode($token) ?>">
+        <?= csrf_field() ?>
+        <input type="hidden" name="booking_id" value="<?= (int)$slot['id'] ?>">
+        <button type="submit"
+                class="w-full py-3.5 rounded-2xl font-black text-sm text-white transition-all active:scale-95"
+                style="background:linear-gradient(135deg,#2e9e63,#4ade80)">
+          <i class="fa-solid fa-circle-check mr-2"></i> ยืนยันเช็คอิน
+        </button>
+      </form>
+    </div>
+
+    <?php elseif ($result === 'success'): ?>
+    <!-- 🎉 SUCCESS -->
     <div class="p-8 text-center">
       <div class="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-emerald-100">
         <i class="fa-solid fa-circle-check text-4xl text-emerald-500"></i>

@@ -1,5 +1,5 @@
 <?php
-// user/checkin.php — QR Self Check-in Landing Page
+// user/checkin.php — QR Self Check-in Landing Page (per-slot)
 declare(strict_types=1);
 session_start();
 require_once __DIR__ . '/../config.php';
@@ -7,8 +7,8 @@ require_once __DIR__ . '/../config.php';
 $pdo    = db();
 $slotId = (int)($_GET['slot'] ?? 0);
 $token  = trim($_GET['token'] ?? '');
+$isPost = $_SERVER['REQUEST_METHOD'] === 'POST';
 
-// ── Helper: build base URL ────────────────────────────────────────────────────
 function base_url(): string {
     $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
     $host   = $_SERVER['HTTP_HOST'] ?? 'localhost';
@@ -41,7 +41,6 @@ if ($token_ok) {
 // ── Get current user (LINE session) ──────────────────────────────────────────
 $lineUserId = $_SESSION['line_user_id'] ?? '';
 $user       = null;
-$booking    = null;
 
 if ($lineUserId !== '') {
     try {
@@ -56,8 +55,9 @@ if ($lineUserId !== '') {
     } catch (PDOException) {}
 }
 
-// ── Attempt check-in ─────────────────────────────────────────────────────────
-$result = null; // 'success' | 'already' | 'no_booking' | 'qr_disabled' | 'invalid' | 'not_logged_in'
+// ── States: confirm | success | already | no_booking | qr_disabled | invalid | not_logged_in
+$result  = null;
+$booking = null;
 
 if (!$token_ok || !$slot) {
     $result = 'invalid';
@@ -81,11 +81,20 @@ if (!$token_ok || !$slot) {
             $result = 'no_booking';
         } elseif (!empty($booking['attended_at'])) {
             $result = 'already';
+        } elseif ($isPost) {
+            // POST = user confirmed → mark attended
+            $bookingId = (int)($_POST['booking_id'] ?? 0);
+            if ($bookingId !== (int)$booking['id']) {
+                $result = 'invalid';
+            } else {
+                $pdo->prepare("UPDATE camp_bookings SET attended_at = NOW() WHERE id = ?")
+                    ->execute([$bookingId]);
+                $booking['attended_at'] = date('Y-m-d H:i:s');
+                $result = 'success';
+            }
         } else {
-            $pdo->prepare("UPDATE camp_bookings SET attended_at = NOW() WHERE id = ?")
-                ->execute([$booking['id']]);
-            $result = 'success';
-            $booking['attended_at'] = date('Y-m-d H:i:s');
+            // GET = show confirmation screen
+            $result = 'confirm';
         }
     } catch (PDOException) {
         $result = 'invalid';
@@ -98,7 +107,6 @@ if ($result === 'not_logged_in') {
     $_SESSION['checkin_return'] = $return_url;
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
 function fmt_date(string $d): string {
     $months = ['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
     $parts  = explode('-', $d);
@@ -119,15 +127,12 @@ function fmt_date(string $d): string {
   body { background: linear-gradient(135deg,#e8f5f0 0%,#f0faf4 50%,#e8f5ec 100%); min-height: 100vh; }
   @keyframes popIn { from{opacity:0;transform:scale(.88) translateY(24px)} to{opacity:1;transform:scale(1) translateY(0)} }
   .pop-in { animation: popIn .45s cubic-bezier(.16,1,.3,1) both; }
-  @keyframes spin { to { transform: rotate(360deg); } }
-  .icon-spin { animation: spin 1s linear infinite; }
 </style>
 </head>
 <body class="flex items-center justify-center min-h-screen p-4">
 
 <div class="w-full max-w-sm pop-in">
 
-  <!-- Logo / Brand -->
   <div class="text-center mb-6">
     <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl shadow-lg mb-3"
          style="background:linear-gradient(135deg,#2e9e63,#4ade80)">
@@ -136,11 +141,74 @@ function fmt_date(string $d): string {
     <p class="text-xs font-black uppercase tracking-widest text-emerald-700 opacity-70">RSU Medical Clinic</p>
   </div>
 
-  <!-- Card -->
   <div class="bg-white rounded-3xl shadow-xl overflow-hidden border border-emerald-50">
 
-    <?php if ($result === 'success'): ?>
-    <!-- ✅ SUCCESS -->
+    <?php if ($result === 'confirm'): ?>
+    <!-- ✅ CONFIRM STEP -->
+    <div class="p-8 text-center">
+      <div class="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-emerald-100">
+        <i class="fa-solid fa-user-check text-4xl text-emerald-500"></i>
+      </div>
+      <h2 class="text-2xl font-black text-gray-900 mb-1">ยืนยันเช็คอิน</h2>
+      <p class="text-sm text-gray-500 mb-5">กรุณาตรวจสอบข้อมูลก่อนยืนยัน</p>
+
+      <div class="bg-gray-50 rounded-2xl p-4 text-left space-y-2 mb-6 border border-gray-100">
+        <div class="flex items-center gap-3">
+          <div class="w-8 h-8 bg-emerald-100 rounded-xl flex items-center justify-center flex-shrink-0">
+            <i class="fa-solid fa-user text-emerald-600 text-xs"></i>
+          </div>
+          <div>
+            <p class="text-[10px] text-gray-400 font-bold uppercase tracking-wider">ชื่อ</p>
+            <p class="font-black text-gray-800 text-sm"><?= htmlspecialchars($user['full_name']) ?></p>
+          </div>
+        </div>
+        <?php if (!empty($user['student_personnel_id'])): ?>
+        <div class="flex items-center gap-3">
+          <div class="w-8 h-8 bg-gray-100 rounded-xl flex items-center justify-center flex-shrink-0">
+            <i class="fa-solid fa-id-card text-gray-500 text-xs"></i>
+          </div>
+          <div>
+            <p class="text-[10px] text-gray-400 font-bold uppercase tracking-wider">รหัส</p>
+            <p class="font-bold text-gray-700 text-sm"><?= htmlspecialchars($user['student_personnel_id']) ?></p>
+          </div>
+        </div>
+        <?php endif; ?>
+        <div class="flex items-center gap-3">
+          <div class="w-8 h-8 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0">
+            <i class="fa-solid fa-calendar text-blue-600 text-xs"></i>
+          </div>
+          <div>
+            <p class="text-[10px] text-gray-400 font-bold uppercase tracking-wider">กิจกรรม</p>
+            <p class="font-bold text-gray-700 text-sm"><?= htmlspecialchars($slot['campaign_title']) ?></p>
+          </div>
+        </div>
+        <div class="flex items-center gap-3">
+          <div class="w-8 h-8 bg-amber-100 rounded-xl flex items-center justify-center flex-shrink-0">
+            <i class="fa-solid fa-clock text-amber-600 text-xs"></i>
+          </div>
+          <div>
+            <p class="text-[10px] text-gray-400 font-bold uppercase tracking-wider">รอบเวลา</p>
+            <p class="font-bold text-gray-700 text-sm">
+              <?= fmt_date($slot['slot_date']) ?>
+              · <?= substr($slot['start_time'],0,5) ?>–<?= substr($slot['end_time'],0,5) ?>
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <form method="POST" action="checkin.php?slot=<?= $slotId ?>&token=<?= urlencode($token) ?>">
+        <?= csrf_field() ?>
+        <input type="hidden" name="booking_id" value="<?= (int)$booking['id'] ?>">
+        <button type="submit"
+                class="w-full py-3.5 rounded-2xl font-black text-sm text-white transition-all active:scale-95"
+                style="background:linear-gradient(135deg,#2e9e63,#4ade80)">
+          <i class="fa-solid fa-circle-check mr-2"></i> ยืนยันเช็คอิน
+        </button>
+      </form>
+    </div>
+
+    <?php elseif ($result === 'success'): ?>
+    <!-- 🎉 SUCCESS -->
     <div class="p-8 text-center">
       <div class="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-emerald-100">
         <i class="fa-solid fa-circle-check text-4xl text-emerald-500"></i>
@@ -198,14 +266,12 @@ function fmt_date(string $d): string {
     </div>
 
     <?php elseif ($result === 'already'): ?>
-    <!-- ⏰ ALREADY CHECKED IN -->
     <div class="p-8 text-center">
       <div class="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-blue-100">
         <i class="fa-solid fa-clock-rotate-left text-4xl text-blue-500"></i>
       </div>
       <h2 class="text-2xl font-black text-gray-900 mb-1">เช็คอินแล้ว</h2>
       <p class="text-sm text-gray-500 mb-5">คุณเช็คอินกิจกรรมนี้ไปแล้ว</p>
-
       <div class="bg-blue-50 rounded-2xl p-4 border border-blue-100 mb-6 text-sm text-blue-800 font-bold">
         <i class="fa-solid fa-circle-info mr-2"></i>
         เวลาเช็คอินเดิม: <?= date('d/m/Y H:i น.', strtotime($booking['attended_at'])) ?>
@@ -218,7 +284,6 @@ function fmt_date(string $d): string {
     </div>
 
     <?php elseif ($result === 'no_booking'): ?>
-    <!-- ❌ NO BOOKING -->
     <div class="p-8 text-center">
       <div class="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-red-100">
         <i class="fa-solid fa-user-xmark text-4xl text-red-500"></i>
@@ -242,7 +307,6 @@ function fmt_date(string $d): string {
     </div>
 
     <?php elseif ($result === 'not_logged_in'): ?>
-    <!-- 🔐 NOT LOGGED IN -->
     <div class="p-8 text-center">
       <div class="w-20 h-20 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-amber-100">
         <i class="fa-brands fa-line text-4xl text-green-500"></i>
@@ -263,7 +327,6 @@ function fmt_date(string $d): string {
     </div>
 
     <?php elseif ($result === 'qr_disabled'): ?>
-    <!-- 🚫 QR DISABLED -->
     <div class="p-8 text-center">
       <div class="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-gray-200">
         <i class="fa-solid fa-qrcode text-4xl text-gray-400"></i>
@@ -273,7 +336,6 @@ function fmt_date(string $d): string {
     </div>
 
     <?php else: ?>
-    <!-- ⚠️ INVALID -->
     <div class="p-8 text-center">
       <div class="w-20 h-20 bg-orange-50 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-orange-100">
         <i class="fa-solid fa-triangle-exclamation text-4xl text-orange-400"></i>
@@ -283,7 +345,7 @@ function fmt_date(string $d): string {
     </div>
     <?php endif; ?>
 
-  </div><!-- /card -->
+  </div>
 
   <p class="text-center text-xs text-gray-400 mt-5">RSU Medical Clinic · ระบบเช็คอินอัตโนมัติ</p>
 </div>
