@@ -808,6 +808,12 @@ try {
                 <span class="psb-label" style="color:#0891b2;font-weight:900">อัพโหลดรายชื่อ (ทะเบียน)</span>
             </button>
             <?php endif; ?>
+            <?php if ($adminRole === 'superadmin' || !empty($_SESSION['access_insurance']) || !empty($_SESSION['access_registry'])): ?>
+            <button class="psb-item <?= $activeSection==='batch_status'?'psb-active':'' ?>" data-section="batch_status" onclick="switchSection('batch_status',this)">
+                <div class="psb-icon"><i class="fa-solid fa-list-check" style="color:#0891b2"></i></div>
+                <span class="psb-label" style="color:#0e7490;font-weight:900">สถานะเอกสาร</span>
+            </button>
+            <?php endif; ?>
             <?php if (!$registryOnly): ?>
             <?php if ($adminRole === 'superadmin'): ?>
             <button class="psb-item" data-section="manage_insurance_partners" onclick="switchSection('manage_insurance_partners',this)">
@@ -2279,6 +2285,18 @@ try {
                     include __DIR__ . '/_partials/registry_upload.php';
                 } else {
                     echo '<div style="padding:100px;text-align:center;font-weight:900;color:#dc2626"><i class="fa-solid fa-shield-slash mb-4" style="font-size:4rem;display:block"></i> ACCESS DENIED<br><span style="font-size:14px;color:#94a3b8;font-weight:600">ต้องมีสิทธิ์ access_registry หรือ access_insurance</span></div>';
+                }
+                ?>
+            </div>
+
+            <!-- ════════════ SECTION: BATCH STATUS (Workflow Tracker) ════════════ -->
+            <div id="section-batch_status" class="portal-section"
+                style="<?= $activeSection==='batch_status'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); background:#f8fafc; overflow-y:auto;">
+                <?php
+                if ($adminRole === 'superadmin' || !empty($_SESSION['access_insurance']) || !empty($_SESSION['access_registry'])) {
+                    include __DIR__ . '/_partials/batch_status.php';
+                } else {
+                    echo '<div style="padding:100px;text-align:center;font-weight:900;color:#dc2626"><i class="fa-solid fa-shield-slash mb-4" style="font-size:4rem;display:block"></i> ACCESS DENIED</div>';
                 }
                 ?>
             </div>

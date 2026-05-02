@@ -14,6 +14,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/includes/auth_guard.php';
 require_ins_partner_login();
+require_once __DIR__ . '/../portal/includes/insurance_batch.php';
 
 $partner = current_ins_partner();
 $companyCode = $partner['company_code'];
@@ -170,6 +171,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         }
 
                         $pdo->commit();
+
+                        // Update batch counts + emit events for each affected batch
+                        try {
+                            $affectedBatches = $pdo->prepare("
+                                SELECT DISTINCT b.id, b.status
+                                FROM insurance_batch b
+                                JOIN insurance_member_history h ON h.sync_id = b.sync_id
+                                WHERE b.insurance_company = :cc
+                                  AND h.member_id IN (
+                                      SELECT DISTINCT member_id
+                                      FROM insurance_member_history
+                                      WHERE sync_id = :psid AND change_type = 'policy_assigned'
+                                  )
+                            ");
+                            $affectedBatches->execute([':cc' => $companyCode, ':psid' => $syncId]);
+                            foreach ($affectedBatches->fetchAll(PDO::FETCH_ASSOC) as $abr) {
+                                ins_batch_log_event(
+                                    $pdo, (int)$abr['id'], 'policy_imported',
+                                    $abr['status'], $abr['status'],
+                                    'partner', (int)$partner['id'], $partner['username'],
+                                    "imported_policies_count={$cntUpdated} (this upload)"
+                                );
+                                // Mark first/last policy time + auto-promote via recalc
+                                $pdo->prepare("
+                                    UPDATE insurance_batch
+                                    SET first_policy_returned_at = COALESCE(first_policy_returned_at, NOW()),
+                                        last_policy_returned_at = NOW()
+                                    WHERE id = :id
+                                ")->execute([':id' => (int)$abr['id']]);
+                                ins_batch_recalc($pdo, (int)$abr['id']);
+                            }
+                        } catch (Exception $e) {
+                            error_log('batch update after policy import: ' . $e->getMessage());
+                        }
 
                         $detail = [
                             "อัปเดตเรียบร้อย {$cntUpdated} ราย",

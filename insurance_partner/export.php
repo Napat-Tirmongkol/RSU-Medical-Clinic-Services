@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/includes/auth_guard.php';
 require_ins_partner_login();
+require_once __DIR__ . '/../portal/includes/insurance_batch.php';
 
 $partner = current_ins_partner();
 $companyCode = $partner['company_code'];
@@ -16,23 +17,64 @@ $pdo = db();
 // ── Mode: download CSV ────────────────────────────────────────────────────────
 if (($_GET['download'] ?? '') === 'csv') {
     $onlyMissing = !empty($_GET['only_missing_policy']);
+    $batchId = (int)($_GET['batch_id'] ?? 0);
 
-    $where = "insurance_company = :cc AND insurance_status = 'Active'";
-    $params = [':cc' => $companyCode];
-    if ($onlyMissing) {
-        $where .= " AND (policy_number IS NULL OR policy_number = '')";
+    // Batch-scoped download (preferred): verify batch exists, belongs to company,
+    // and has been approved by clinic
+    $batch = null;
+    if ($batchId > 0) {
+        $bStmt = $pdo->prepare("SELECT * FROM insurance_batch WHERE id = :id AND insurance_company = :cc");
+        $bStmt->execute([':id' => $batchId, ':cc' => $companyCode]);
+        $batch = $bStmt->fetch(PDO::FETCH_ASSOC);
+        if (!$batch) {
+            http_response_code(404);
+            exit('ไม่พบเอกสาร batch นี้ หรือไม่ใช่ของบริษัทคุณ');
+        }
+        if (!in_array($batch['status'], ['approved', 'downloaded', 'in_progress', 'partial'], true)) {
+            http_response_code(403);
+            exit('เอกสารนี้ยังไม่ได้รับการอนุมัติจาก RSU Medical Clinic (สถานะ: ' . htmlspecialchars($batch['status']) . ')');
+        }
     }
 
-    $stmt = $pdo->prepare("
-        SELECT member_id, full_name, member_status, position, citizen_id, date_of_birth,
-               insurance_status, coverage_start, coverage_end, policy_number, remarks, updated_at
-        FROM insurance_members
-        WHERE $where
-        ORDER BY full_name ASC
-    ");
+    if ($batch) {
+        // Members in this specific batch
+        $where = "m.insurance_company = :cc
+                  AND m.member_id IN (
+                      SELECT DISTINCT member_id FROM insurance_member_history WHERE sync_id = :sid
+                  )";
+        $params = [':cc' => $companyCode, ':sid' => (int)$batch['sync_id']];
+        if ($onlyMissing) {
+            $where .= " AND (m.policy_number IS NULL OR m.policy_number = '')";
+        }
+        $sql = "
+            SELECT m.member_id, m.full_name, m.member_status, m.position, m.citizen_id, m.date_of_birth,
+                   m.insurance_status, m.coverage_start, m.coverage_end, m.policy_number, m.remarks, m.updated_at
+            FROM insurance_members m
+            WHERE $where
+            ORDER BY m.full_name ASC
+        ";
+    } else {
+        // Legacy: full company export (no batch scope)
+        $where = "insurance_company = :cc AND insurance_status = 'Active'";
+        $params = [':cc' => $companyCode];
+        if ($onlyMissing) {
+            $where .= " AND (policy_number IS NULL OR policy_number = '')";
+        }
+        $sql = "
+            SELECT member_id, full_name, member_status, position, citizen_id, date_of_birth,
+                   insurance_status, coverage_start, coverage_end, policy_number, remarks, updated_at
+            FROM insurance_members
+            WHERE $where
+            ORDER BY full_name ASC
+        ";
+    }
+
+    $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
 
-    $filename = 'rsu_active_' . $companyCode . '_' . date('Ymd_His') . '.csv';
+    $filename = $batch
+        ? ($batch['batch_code'] . '_' . date('Ymd_His') . '.csv')
+        : ('rsu_active_' . $companyCode . '_' . date('Ymd_His') . '.csv');
 
     header('Content-Type: text/csv; charset=utf-8');
     header('Content-Disposition: attachment; filename="' . $filename . '"');
@@ -62,7 +104,29 @@ if (($_GET['download'] ?? '') === 'csv') {
         $count++;
     }
 
-    ins_partner_log('export_csv', "company={$companyCode}, rows={$count}, only_missing=" . ($onlyMissing ? '1' : '0'));
+    ins_partner_log('export_csv',
+        "company={$companyCode}, rows={$count}, only_missing=" . ($onlyMissing ? '1' : '0')
+        . ($batch ? ", batch={$batch['batch_code']}" : ''));
+
+    // Mark batch as downloaded + emit event
+    if ($batch) {
+        $now = date('Y-m-d H:i:s');
+        $newStatus = in_array($batch['status'], ['approved'], true) ? 'downloaded' : $batch['status'];
+        $pdo->prepare("
+            UPDATE insurance_batch
+            SET status = :st,
+                first_downloaded_at = COALESCE(first_downloaded_at, :now),
+                last_downloaded_at = :now,
+                download_count = download_count + 1
+            WHERE id = :id
+        ")->execute([':st' => $newStatus, ':now' => $now, ':id' => (int)$batch['id']]);
+        ins_batch_log_event(
+            $pdo, (int)$batch['id'], 'downloaded',
+            $batch['status'], $newStatus,
+            'partner', (int)$partner['id'], $partner['username'],
+            "rows={$count}, only_missing=" . ($onlyMissing ? '1' : '0')
+        );
+    }
     exit;
 }
 

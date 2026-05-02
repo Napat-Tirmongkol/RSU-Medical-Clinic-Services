@@ -173,6 +173,9 @@ function ins_partner_layout_start(string $pageTitle, string $activePage): void
             <a href="index.php" class="<?= $activePage === 'dashboard' ? 'active' : '' ?>">
                 <i class="fa-solid fa-gauge-high"></i> Dashboard
             </a>
+            <a href="batches.php" class="<?= $activePage === 'batches' ? 'active' : '' ?>">
+                <i class="fa-solid fa-list-check"></i> สถานะเอกสาร
+            </a>
             <a href="export.php" class="<?= $activePage === 'export' ? 'active' : '' ?>">
                 <i class="fa-solid fa-file-arrow-down"></i> ดาวน์โหลดรายชื่อ
             </a>

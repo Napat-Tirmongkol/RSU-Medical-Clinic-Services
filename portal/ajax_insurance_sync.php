@@ -346,6 +346,52 @@ if ($action === 'upload') {
 
     log_activity('insurance_upload', "mode={$uploadMode}, total={$totalCsv}, new={$cntNew}, updated={$cntUpdated}, protected={$cntProtected}, inactivated={$cntInactivated}");
 
+    // ── Create batch tracking row + initial event ─────────────────────────────
+    $batchId = null;
+    try {
+        require_once __DIR__ . '/includes/insurance_batch.php';
+
+        // Detect source_type from session — registry user vs clinic staff
+        $sourceType = !empty($_SESSION['access_registry']) && empty($_SESSION['access_insurance'])
+            ? 'registry'
+            : 'clinic_manual';
+        $sourceType .= '_' . $uploadMode;
+
+        $batchCode = ins_batch_generate_code($pdo);
+        $insBatch = $pdo->prepare("
+            INSERT INTO insurance_batch
+                (sync_id, batch_code, upload_mode, source_type, insurance_company,
+                 status, total_members, members_inserted, members_updated, members_inactivated,
+                 uploaded_by, uploaded_by_name, uploaded_at)
+            VALUES
+                (:sid, :bc, :um, :st, 'MTI',
+                 'pending_review', :tm, :mi, :mu, :minact,
+                 :ub, :ubn, NOW())
+        ");
+        $insBatch->execute([
+            ':sid'    => $syncId,
+            ':bc'     => $batchCode,
+            ':um'     => $uploadMode,
+            ':st'     => $sourceType,
+            ':tm'     => $totalCsv,
+            ':mi'     => $cntNew,
+            ':mu'     => $cntUpdated,
+            ':minact' => $cntInactivated,
+            ':ub'     => (int)($_SESSION['admin_id'] ?? 0) ?: null,
+            ':ubn'    => $_SESSION['admin_username'] ?? null,
+        ]);
+        $batchId = (int)$pdo->lastInsertId();
+
+        ins_batch_log_event(
+            $pdo, $batchId, 'uploaded', null, 'pending_review',
+            'staff', (int)($_SESSION['admin_id'] ?? 0) ?: null,
+            $_SESSION['admin_username'] ?? null,
+            "mode={$uploadMode}, total={$totalCsv}, new={$cntNew}, updated={$cntUpdated}, inactivated={$cntInactivated}"
+        );
+    } catch (Exception $e) {
+        error_log('insurance_batch create: ' . $e->getMessage());
+    }
+
     json_ok([
         'total_csv'         => $totalCsv,
         'total_new'         => $cntNew,
@@ -353,6 +399,7 @@ if ($action === 'upload') {
         'total_protected'   => $cntProtected,
         'total_inactivated' => $cntInactivated,
         'sync_id'           => $syncId,
+        'batch_id'          => $batchId,
     ]);
 }
 

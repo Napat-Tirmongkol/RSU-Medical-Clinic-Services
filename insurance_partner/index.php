@@ -40,6 +40,19 @@ $recent = $pdo->prepare("
 $recent->execute([':uid' => $partner['id']]);
 $recentRows = $recent->fetchAll(PDO::FETCH_ASSOC);
 
+// Batch counts (เห็นเฉพาะที่ approved+)
+$batchCnt = $pdo->prepare("
+    SELECT
+        SUM(status = 'approved')                               AS pending_download,
+        SUM(status IN ('downloaded','in_progress','partial'))  AS in_progress,
+        SUM(status = 'completed')                              AS completed
+    FROM insurance_batch
+    WHERE insurance_company = :cc
+      AND status IN ('approved','downloaded','in_progress','partial','completed')
+");
+$batchCnt->execute([':cc' => $companyCode]);
+$bc = $batchCnt->fetch(PDO::FETCH_ASSOC) ?: [];
+
 ins_partner_layout_start('Dashboard', 'dashboard');
 ?>
 
@@ -70,16 +83,40 @@ ins_partner_layout_start('Dashboard', 'dashboard');
 </div>
 
 <div class="ipp-card">
-    <h3><i class="fa-solid fa-bolt mr-1"></i> การดำเนินการ</h3>
+    <h3><i class="fa-solid fa-list-check mr-1"></i> เอกสาร (Batch)</h3>
+    <div class="ipp-stat-grid" style="margin-bottom:.75rem;">
+        <div class="ipp-stat" style="border-left-color:#10b981;">
+            <div class="label">รออัพโหลดเลขกรมธรรม์</div>
+            <div class="value" style="color:#059669;"><?= number_format((int)($bc['pending_download'] ?? 0)) ?></div>
+        </div>
+        <div class="ipp-stat" style="border-left-color:#a855f7;">
+            <div class="label">กำลังดำเนินการ</div>
+            <div class="value" style="color:#7c3aed;"><?= number_format((int)($bc['in_progress'] ?? 0)) ?></div>
+        </div>
+        <div class="ipp-stat" style="border-left-color:#06b6d4;">
+            <div class="label">เสร็จสิ้นแล้ว</div>
+            <div class="value" style="color:#0891b2;"><?= number_format((int)($bc['completed'] ?? 0)) ?></div>
+        </div>
+    </div>
+    <a href="batches.php" class="ipp-btn">
+        <i class="fa-solid fa-list-check"></i> ดูสถานะเอกสารทั้งหมด
+    </a>
+</div>
+
+<div class="ipp-card">
+    <h3><i class="fa-solid fa-bolt mr-1"></i> การดำเนินการด่วน</h3>
     <div style="display:flex; gap:.75rem; flex-wrap:wrap;">
-        <a href="export.php" class="ipp-btn">
-            <i class="fa-solid fa-file-arrow-down"></i> ดาวน์โหลดรายชื่อ Active (CSV)
+        <a href="batches.php" class="ipp-btn">
+            <i class="fa-solid fa-file-arrow-down"></i> ดาวน์โหลดตามเอกสาร (แนะนำ)
+        </a>
+        <a href="export.php" class="ipp-btn secondary">
+            <i class="fa-solid fa-file-arrow-down"></i> ดาวน์โหลดรายชื่อ Active ทั้งหมด
         </a>
         <a href="import_policy.php" class="ipp-btn secondary">
-            <i class="fa-solid fa-file-arrow-up"></i> อัปโหลดเลขกรมธรรม์กลับ
+            <i class="fa-solid fa-file-arrow-up"></i> อัปโหลดเลขกรมธรรม์
         </a>
         <a href="history.php" class="ipp-btn secondary">
-            <i class="fa-solid fa-clock-rotate-left"></i> ดูประวัติการดำเนินการ
+            <i class="fa-solid fa-clock-rotate-left"></i> ประวัติ
         </a>
     </div>
 </div>
