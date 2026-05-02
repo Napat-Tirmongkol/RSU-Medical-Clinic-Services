@@ -99,17 +99,21 @@ if (!$token_ok || !$campaign) {
             $booking = $row;
             $result  = 'already';
         } elseif ($isPost) {
-            // POST = user confirmed → mark attended
-            $bookingId = (int)($_POST['booking_id'] ?? 0);
-            if ($bookingId !== (int)$row['id']) {
+            // POST = user confirmed → validate CSRF + mark attended
+            if (!verify_csrf_token($_POST['csrf_token'] ?? '')) {
                 $result = 'invalid';
             } else {
-                $pdo->prepare("UPDATE camp_bookings SET attended_at = NOW(), status = 'completed' WHERE id = ?")
-                    ->execute([$bookingId]);
-                $row['attended_at'] = date('Y-m-d H:i:s');
-                $slot    = $row;
-                $booking = $row;
-                $result  = 'success';
+                $bookingId = (int)($_POST['booking_id'] ?? 0);
+                if ($bookingId !== (int)$row['id']) {
+                    $result = 'invalid';
+                } else {
+                    $pdo->prepare("UPDATE camp_bookings SET attended_at = NOW(), status = 'completed' WHERE id = ?")
+                        ->execute([$bookingId]);
+                    $row['attended_at'] = date('Y-m-d H:i:s');
+                    $slot    = $row;
+                    $booking = $row;
+                    $result  = 'success';
+                }
             }
         } else {
             // GET = show confirmation screen

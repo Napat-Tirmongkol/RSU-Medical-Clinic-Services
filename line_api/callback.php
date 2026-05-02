@@ -134,8 +134,11 @@ try {
             unset($_SESSION['invite_token']);
             $finalDest = LINE_APP_BASE_PATH . '/user/c.php?t=' . urlencode($inviteToken);
         } elseif (!empty($_SESSION['checkin_return'])) {
-            $finalDest = $_SESSION['checkin_return'];
+            $dest = $_SESSION['checkin_return'];
             unset($_SESSION['checkin_return']);
+            // Guard against open redirect: only allow URLs on the same host
+            $allowedPrefix = rtrim(LINE_APP_BASE_PATH, '/');
+            $finalDest = str_starts_with($dest, $allowedPrefix . '/') ? $dest : $allowedPrefix . '/user/hub.php';
         } else {
             $finalDest = LINE_APP_BASE_PATH . '/user/hub.php';
         }
