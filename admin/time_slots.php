@@ -5,8 +5,24 @@ require_once __DIR__ . '/includes/auth.php';
 
 $pdo = db();
 
-$activeCampaigns = $pdo->query("SELECT id, title FROM camp_list WHERE status = 'active' ORDER BY title ASC")->fetchAll();
-$allCampaigns    = $pdo->query("SELECT id, title FROM camp_list ORDER BY title ASC")->fetchAll();
+// สร้าง column qr_enabled ถ้ายังไม่มี
+try { $pdo->exec("ALTER TABLE camp_list ADD COLUMN qr_enabled TINYINT(1) NOT NULL DEFAULT 0"); } catch (PDOException) {}
+
+$activeCampaigns = $pdo->query("SELECT id, title, qr_enabled FROM camp_list WHERE status = 'active' ORDER BY title ASC")->fetchAll();
+$allCampaigns    = $pdo->query("SELECT id, title, qr_enabled FROM camp_list ORDER BY title ASC")->fetchAll();
+
+// map campaign_id → qr_enabled
+$qrEnabledMap = [];
+foreach ($allCampaigns as $ac) { $qrEnabledMap[(int)$ac['id']] = (int)$ac['qr_enabled']; }
+
+// helper: สร้าง check-in URL ต่อ slot
+function slot_checkin_url(int $slot_id): string {
+    $token  = hash_hmac('sha256', "qr:slot:{$slot_id}", QR_SLOT_SECRET);
+    $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+    $host   = $_SERVER['HTTP_HOST'] ?? 'localhost';
+    $base   = rtrim(dirname(dirname($_SERVER['SCRIPT_NAME'] ?? '')), '/');
+    return $scheme . '://' . $host . $base . '/user/checkin.php?slot=' . $slot_id . '&token=' . $token;
+}
 
 $colors = [
     ['bg' => 'bg-emerald-50', 'border' => 'border-emerald-100', 'text' => 'text-emerald-700', 'badge' => 'text-emerald-500'],
@@ -583,6 +599,10 @@ renderPageHeader("Campaign Time Slots", "กำหนดช่วงเวลา
                                 <?= htmlspecialchars($s['campaign_title']) ?>
                             </div>
                             <div class="slot-actions">
+                                <button onclick="showQrModal(<?= $s['id'] ?>,<?= $s['campaign_id'] ?>)"
+                                    class="slot-act-btn" style="background:#dcfce7;color:#16a34a" title="QR Check-in">
+                                    <i class="fa-solid fa-qrcode"></i>
+                                </button>
                                 <button onclick="openEditSlotModal(<?= $s['id'] ?>,<?= $cId ?>,'<?= substr($s['start_time'],0,5) ?>','<?= substr($s['end_time'],0,5) ?>',<?= $max ?>)"
                                     class="slot-act-btn" style="background:#fef3c7;color:#d97706" title="แก้ไข">
                                     <i class="fa-solid fa-pen"></i>
@@ -651,6 +671,10 @@ renderPageHeader("Campaign Time Slots", "กำหนดช่วงเวลา
                     </td>
                     <td class="text-center">
                         <div class="flex items-center justify-center gap-2">
+                            <button onclick="showQrModal(<?= $s['id'] ?>,<?= $s['campaign_id'] ?>)"
+                                class="w-8 h-8 rounded-xl text-emerald-600 bg-emerald-50 border border-emerald-100 hover:bg-emerald-500 hover:text-white transition-all shadow-sm" title="QR Check-in">
+                                <i class="fa-solid fa-qrcode text-xs"></i>
+                            </button>
                             <button onclick="openEditSlotModal(<?= $s['id'] ?>,<?= $s['campaign_id'] ?>,'<?= substr($s['start_time'],0,5) ?>','<?= substr($s['end_time'],0,5) ?>',<?= $max ?>)"
                                 class="w-8 h-8 rounded-xl text-amber-500 bg-amber-50 border border-amber-100 hover:bg-amber-500 hover:text-white transition-all shadow-sm" title="แก้ไข">
                                 <i class="fa-solid fa-pen text-xs"></i>
@@ -1851,6 +1875,147 @@ function dailyDeleteSlot(id, date) {
         });
     });
 }
+
+// ══════════════════════════════════════════════════════════
+// QR CHECK-IN SYSTEM
+// ══════════════════════════════════════════════════════════
+const QR_ENABLED_MAP = <?= json_encode($qrEnabledMap) ?>;
+const CSRF_QR = '<?= get_csrf_token() ?>';
+
+function showQrModal(slotId, campaignId) {
+    const qrEnabled = !!QR_ENABLED_MAP[campaignId];
+    document.getElementById('qrImg').src = `../user/api_slot_qr.php?slot=${slotId}`;
+    document.getElementById('qrCampaignId').value = campaignId;
+    setQrToggleUI(document.getElementById('qrToggleBtn'), qrEnabled);
+
+    // โหลด check-in URL
+    const copyInput = document.getElementById('qrCopyUrl');
+    copyInput.value = 'กำลังโหลด...';
+    fetch(`ajax/ajax_get_slot_checkin_url.php?slot=${slotId}`)
+        .then(r => r.json())
+        .then(d => { copyInput.value = d.url || ''; })
+        .catch(() => { copyInput.value = ''; });
+
+    document.getElementById('qrModal').classList.remove('hidden');
+}
+
+function setQrToggleUI(btn, enabled) {
+    if (enabled) {
+        btn.innerHTML = '<i class="fa-solid fa-toggle-on text-lg"></i> QR เปิดใช้งาน';
+        btn.style.cssText = 'background:#dcfce7;color:#16a34a;border-color:#bbf7d0';
+    } else {
+        btn.innerHTML = '<i class="fa-solid fa-toggle-off text-lg"></i> QR ปิดอยู่';
+        btn.style.cssText = 'background:#f3f4f6;color:#6b7280;border-color:#e5e7eb';
+    }
+}
+
+function toggleCampaignQr() {
+    const campaignId = parseInt(document.getElementById('qrCampaignId').value);
+    const btn = document.getElementById('qrToggleBtn');
+    fetch('ajax/ajax_toggle_campaign_qr.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `campaign_id=${campaignId}&csrf_token=${CSRF_QR}`,
+    })
+    .then(r => r.json())
+    .then(d => {
+        if (d.status === 'success') {
+            QR_ENABLED_MAP[campaignId] = d.qr_enabled;
+            setQrToggleUI(btn, !!d.qr_enabled);
+            Swal.fire({ icon: d.qr_enabled ? 'success' : 'info',
+                title: d.message, timer: 1600, showConfirmButton: false,
+                customClass: { popup: 'font-prompt rounded-2xl' } });
+        } else {
+            Swal.fire({ icon: 'error', title: d.message || 'เกิดข้อผิดพลาด',
+                customClass: { popup: 'font-prompt rounded-2xl' } });
+        }
+    });
+}
+
+function copyCheckinUrl() {
+    const val = document.getElementById('qrCopyUrl').value;
+    if (!val || val === 'กำลังโหลด...') return;
+    navigator.clipboard.writeText(val).then(() => {
+        const btn = document.getElementById('qrCopyBtn');
+        const orig = btn.innerHTML;
+        btn.innerHTML = '<i class="fa-solid fa-check" style="color:#16a34a"></i>';
+        setTimeout(() => { btn.innerHTML = orig; }, 1500);
+    });
+}
+
+function printQr() {
+    const imgSrc = document.getElementById('qrImg').src;
+    const w = window.open('', '_blank', 'width=400,height=520');
+    w.document.write(`<!DOCTYPE html><html><body style="text-align:center;padding:24px;font-family:sans-serif">
+        <h2 style="margin-bottom:6px;font-size:20px">QR Check-in</h2>
+        <p style="color:#666;font-size:13px;margin-bottom:16px">สแกนเพื่อเช็คอินกิจกรรม</p>
+        <img src="${imgSrc}" style="width:280px;height:280px;display:block;margin:0 auto">
+        <p style="margin-top:16px;font-size:11px;color:#aaa">RSU Medical Clinic</p>
+        <script>window.onload=()=>{ window.focus(); window.print(); }<\/script>
+    </body></html>`);
+    w.document.close();
+}
 </script>
+
+<!-- ── QR Modal ──────────────────────────────────────────────────── -->
+<div id="qrModal"
+     class="hidden fixed inset-0 flex items-center justify-center"
+     style="background:rgba(0,0,0,.5);backdrop-filter:blur(4px);z-index:900"
+     onclick="if(event.target===this)this.classList.add('hidden')">
+  <div class="bg-white rounded-3xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden"
+       onclick="event.stopPropagation()">
+
+    <!-- Header -->
+    <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between"
+         style="background:linear-gradient(135deg,#e8f8f0,#f0fdf4)">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl flex items-center justify-center"
+             style="background:linear-gradient(135deg,#2e9e63,#4ade80)">
+          <i class="fa-solid fa-qrcode text-white text-sm"></i>
+        </div>
+        <span class="font-black text-gray-800">QR Check-in</span>
+      </div>
+      <button onclick="document.getElementById('qrModal').classList.add('hidden')"
+              class="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center hover:bg-gray-200 transition-colors text-gray-500">
+        <i class="fa-solid fa-xmark text-xs"></i>
+      </button>
+    </div>
+
+    <!-- Body -->
+    <div class="p-6 flex flex-col items-center gap-4">
+
+      <!-- QR Image -->
+      <div class="p-3 bg-white rounded-2xl shadow-inner border border-gray-100">
+        <img id="qrImg" src="" alt="QR Code" class="w-52 h-52 object-contain"
+             onerror="this.alt='โหลด QR ไม่ได้'">
+      </div>
+
+      <!-- Toggle QR -->
+      <input type="hidden" id="qrCampaignId" value="0">
+      <button id="qrToggleBtn" onclick="toggleCampaignQr()"
+              class="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl font-bold text-sm border transition-all">
+      </button>
+
+      <!-- Copy URL -->
+      <div class="w-full flex items-center gap-2">
+        <input id="qrCopyUrl" type="text" readonly
+               class="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-500 font-mono"
+               placeholder="กำลังโหลด URL...">
+        <button id="qrCopyBtn" onclick="copyCheckinUrl()"
+                class="w-9 h-9 bg-gray-100 rounded-xl flex items-center justify-center hover:bg-gray-200 transition-colors text-gray-600 flex-shrink-0"
+                title="คัดลอก URL">
+          <i class="fa-solid fa-copy text-xs"></i>
+        </button>
+      </div>
+
+      <!-- Print -->
+      <button onclick="printQr()"
+              class="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl font-bold text-sm bg-gray-50 border border-gray-200 text-gray-600 hover:bg-gray-100 transition-colors">
+        <i class="fa-solid fa-print"></i> พิมพ์ QR Code
+      </button>
+
+    </div>
+  </div>
+</div>
 
 <?php require_once __DIR__ . '/includes/footer.php'; ?>

@@ -13,6 +13,11 @@ foreach (['PUSHER_KEY', 'PUSHER_CLUSTER'] as $key) {
     if (isset($__secrets[$key]) && !defined($key)) define($key, $__secrets[$key]);
 }
 
+// ── QR Check-in Secret ────────────────────────────────────────────────────────
+defined('QR_SLOT_SECRET') || define('QR_SLOT_SECRET',
+    $__secrets['QR_SLOT_SECRET'] ?? hash('sha256', 'rsu-clinic-slot-qr-v1')
+);
+
 // ── Log Retention Settings ────────────────────────────────────────────────────
 defined('ERROR_LOG_RETENTION_DAYS')    || define('ERROR_LOG_RETENTION_DAYS',    30);  // วัน
 defined('ACTIVITY_LOG_RETENTION_DAYS') || define('ACTIVITY_LOG_RETENTION_DAYS', 90);  // วัน
