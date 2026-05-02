@@ -481,6 +481,9 @@ function openDrawer(dataStr) {
         : data.status === 'confirmed' ? `
             <button onclick="checkinOne(${data.booking_id})" class="flex-1 bg-[#0052CC] text-white py-5 rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-blue-200"><i class="fa-solid fa-user-check mr-2"></i>รับเข้าร่วมงาน</button>
             <button onclick="rescheduleOne(${data.booking_id})" class="flex-1 bg-orange-500 text-white py-5 rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-orange-200">เลื่อนคิว</button>`
+        : data.status === 'completed' ? `
+            <button onclick="cancelAttendanceOne(${data.booking_id})" class="flex-1 bg-rose-500 text-white py-5 rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-rose-200"><i class="fa-solid fa-rotate-left mr-2"></i>ยกเลิกการเข้าร่วม</button>
+            <button onclick="closeDrawer()" class="flex-none px-6 bg-white border border-gray-200 text-gray-500 py-5 rounded-2xl font-black uppercase tracking-widest text-xs">ปิด</button>`
         : `<button onclick="closeDrawer()" class="w-full bg-gray-900 text-white py-5 rounded-2xl font-black uppercase tracking-widest text-xs">Close Profile</button>`;
 
     drawer.classList.remove('hidden');
@@ -556,6 +559,38 @@ function rescheduleOne(id) {
         confirmButtonColor:'#f97316', confirmButtonText:'ยืนยันแจ้งเลื่อน', cancelButtonText:'ยกเลิก',
         customClass:{title:'font-prompt',confirmButton:'font-prompt',cancelButton:'font-prompt'}
     }).then(r => r.isConfirmed && performApiCall('ajax/ajax_force_cancel.php', id, 'แจ้งเลื่อนคิวสำเร็จ!', 'success', 'cancelled_by_admin'));
+}
+
+function cancelAttendanceOne(id) {
+    Swal.fire({
+        title: 'ยกเลิกการเข้าร่วม?',
+        text: 'ผู้ใช้จะกลับไปอยู่ในคิวเดิมที่เคยจอง',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#e11d48',
+        confirmButtonText: 'ยืนยันยกเลิก',
+        cancelButtonText: 'ไม่ยกเลิก',
+        customClass: { title:'font-prompt', confirmButton:'font-prompt', cancelButton:'font-prompt' }
+    }).then(r => {
+        if (!r.isConfirmed) return;
+        closeDrawer();
+        fetch('ajax/ajax_cancel_attendance.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: `booking_id=${id}&csrf_token=${CSRF}`
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'success') {
+                updateRowStatus(id, data.new_status);
+                doSearch(true);
+                Swal.fire({ title:'ยกเลิกสำเร็จ', text:'ผู้ใช้กลับไปอยู่ในคิวเดิมแล้ว', icon:'success', timer:2000, showConfirmButton:false,
+                    customClass:{title:'font-prompt',popup:'font-prompt rounded-2xl'} });
+            } else {
+                Swal.fire('เกิดข้อผิดพลาด', data.message || 'ไม่สามารถยกเลิกได้', 'error');
+            }
+        });
+    });
 }
 
 function bulkApprove() {

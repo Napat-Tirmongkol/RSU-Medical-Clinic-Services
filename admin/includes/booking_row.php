@@ -64,6 +64,13 @@ if (!function_exists('render_booking_rows')) {
                     title="แจ้งเลื่อนคิว"><i class="fa-solid fa-clock-rotate-left"></i></button>
                 <button onclick='openDrawer(this.closest("tr").dataset.details)'
                     class="text-gray-400 hover:text-blue-600 text-lg transition-colors ml-1"><i class="fa-solid fa-circle-info"></i></button>
+            <?php elseif ($b['status'] === 'completed'): ?>
+                <button onclick="cancelAttendanceOne(<?= $b['booking_id'] ?>)"
+                    class="px-3 py-1.5 bg-rose-50 text-rose-600 border border-rose-100 rounded-xl text-[11px] font-black flex items-center gap-1.5 hover:bg-rose-500 hover:text-white hover:border-rose-500 active:scale-95 transition-all whitespace-nowrap"
+                    title="ยกเลิกการเข้าร่วม">
+                    <i class="fa-solid fa-rotate-left"></i> ยกเลิกเข้าร่วม</button>
+                <button onclick='openDrawer(this.closest("tr").dataset.details)'
+                    class="text-gray-400 hover:text-blue-600 text-lg transition-colors"><i class="fa-solid fa-circle-info"></i></button>
             <?php else: ?>
                 <button onclick='openDrawer(this.closest("tr").dataset.details)'
                     class="text-gray-400 hover:text-blue-600 text-lg transition-colors"><i class="fa-solid fa-circle-info"></i></button>

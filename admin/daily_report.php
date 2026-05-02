@@ -300,7 +300,10 @@ $date_display = $date_th . ' ' . $months_th[(int)date('n', strtotime($date))] . 
     </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
+const CSRF_DR = '<?= get_csrf_token() ?>';
+
 (function () {
     /* ── State ─────────────────────────────────────────────────────── */
     const S = {
@@ -531,6 +534,7 @@ $date_display = $date_th . ' ' . $months_th[(int)date('n', strtotime($date))] . 
                     <th class="px-5 py-3">รอบเวลา</th>
                     <th class="px-5 py-3">เวลาเช็คอิน</th>
                     <th class="px-5 py-3">สถานะ</th>
+                    <th class="px-5 py-3">จัดการ</th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-gray-100">`;
@@ -551,6 +555,13 @@ $date_display = $date_th . ' ' . $months_th[(int)date('n', strtotime($date))] . 
                 : '<span class="text-gray-300">—</span>';
             const dim = r.visit_type === 'cancelled' ? 'opacity-50' : '';
 
+            const canCancelAttend = r.attended_at && r.visit_type !== 'cancelled';
+            const cancelBtn = canCancelAttend
+                ? `<button onclick="cancelAttendanceReport(${r.id})"
+                      class="px-3 py-1.5 bg-rose-50 text-rose-600 border border-rose-100 rounded-xl text-[11px] font-black flex items-center gap-1.5 hover:bg-rose-500 hover:text-white hover:border-rose-500 active:scale-95 transition-all whitespace-nowrap">
+                      <i class="fa-solid fa-rotate-left"></i> ยกเลิก</button>`
+                : '<span class="text-gray-300 text-xs">—</span>';
+
             html += `<tr class="hover:bg-gray-50 transition-colors ${dim}">
                 <td class="px-5 py-3">
                     <div class="font-bold text-gray-900">${escHtml(r.full_name)}</div>
@@ -562,6 +573,7 @@ $date_display = $date_th . ' ' . $months_th[(int)date('n', strtotime($date))] . 
                 <td class="px-5 py-3 text-gray-600">${timeDisp}</td>
                 <td class="px-5 py-3 font-semibold text-emerald-700">${checkin}</td>
                 <td class="px-5 py-3">${visitBadge(r.visit_type)}</td>
+                <td class="px-5 py-3">${cancelBtn}</td>
             </tr>`;
         });
 
@@ -716,6 +728,40 @@ $date_display = $date_th . ' ' . $months_th[(int)date('n', strtotime($date))] . 
             type: S.type,
         });
         location.href = 'daily_report.php?' + p.toString();
+    };
+
+    /* ── Cancel attendance ─────────────────────────────────────────── */
+    window.cancelAttendanceReport = function (bookingId) {
+        Swal.fire({
+            title: 'ยกเลิกการเข้าร่วม?',
+            text: 'ผู้ใช้จะกลับไปอยู่ในคิวเดิมที่เคยจอง',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#e11d48',
+            confirmButtonText: 'ยืนยันยกเลิก',
+            cancelButtonText: 'ไม่ยกเลิก',
+            customClass: { title:'font-prompt', confirmButton:'font-prompt', cancelButton:'font-prompt' }
+        }).then(r => {
+            if (!r.isConfirmed) return;
+            fetch('ajax/ajax_cancel_attendance.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `booking_id=${bookingId}&csrf_token=${CSRF_DR}`
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    Swal.fire({ title:'ยกเลิกสำเร็จ', text:'ผู้ใช้กลับไปอยู่ในคิวเดิมแล้ว', icon:'success',
+                        timer:2000, showConfirmButton:false,
+                        customClass:{title:'font-prompt',popup:'font-prompt rounded-2xl'} });
+                    loadStats();
+                    loadSlots();
+                    loadList(S.page);
+                } else {
+                    Swal.fire('เกิดข้อผิดพลาด', data.message || 'ไม่สามารถยกเลิกได้', 'error');
+                }
+            });
+        });
     };
 
     /* ── Init ──────────────────────────────────────────────────────── */
