@@ -38,6 +38,12 @@ if ($q !== '') {
 
 if ($status === 'cancelled') {
     $where .= " AND b.status IN ('cancelled','cancelled_by_admin')";
+} elseif ($status === 'completed') {
+    // รวม QR check-in (attended_at set แต่ status อาจยังเป็น confirmed) + staff check-in (status = completed)
+    $where .= " AND (b.status = 'completed' OR (b.attended_at IS NOT NULL AND b.status NOT IN ('cancelled','cancelled_by_admin')))";
+} elseif ($status === 'confirmed') {
+    // confirmed ที่ยังไม่ได้เช็คอิน
+    $where .= " AND b.status = 'confirmed' AND b.attended_at IS NULL";
 } elseif ($status !== 'all') {
     $where .= " AND b.status = :status";
     $params[':status'] = $status;
@@ -60,10 +66,10 @@ try {
     }
     $kpiStmt = $pdo->prepare("
         SELECT
-            SUM(b.status = 'booked')                               AS pending,
-            SUM(b.status = 'confirmed')                            AS confirmed,
-            SUM(b.status = 'completed')                            AS completed,
-            SUM(b.status IN ('cancelled','cancelled_by_admin'))    AS cancelled
+            SUM(b.status = 'booked')                                                                             AS pending,
+            SUM(b.status = 'confirmed' AND b.attended_at IS NULL)                                               AS confirmed,
+            SUM(b.status = 'completed' OR (b.attended_at IS NOT NULL AND b.status NOT IN ('cancelled','cancelled_by_admin'))) AS completed,
+            SUM(b.status IN ('cancelled','cancelled_by_admin'))                                                  AS cancelled
         FROM camp_bookings b
         JOIN camp_slots s ON b.slot_id = s.id
         WHERE $kpiWhere

@@ -104,7 +104,7 @@ if (!$token_ok || !$campaign) {
             if ($bookingId !== (int)$row['id']) {
                 $result = 'invalid';
             } else {
-                $pdo->prepare("UPDATE camp_bookings SET attended_at = NOW() WHERE id = ?")
+                $pdo->prepare("UPDATE camp_bookings SET attended_at = NOW(), status = 'completed' WHERE id = ?")
                     ->execute([$bookingId]);
                 $row['attended_at'] = date('Y-m-d H:i:s');
                 $slot    = $row;
