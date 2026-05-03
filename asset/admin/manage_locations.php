@@ -144,11 +144,20 @@ include __DIR__ . '/../includes/header.php';
                                         onclick='editLocation(<?= json_encode($r, JSON_UNESCAPED_UNICODE) ?>)'>
                                     <i class="fas fa-edit"></i>
                                 </button>
-                                <form method="post" class="inline">
+                                <form method="post" class="inline"
+                                      onsubmit="return assetLocToggleConfirm(event, this, <?= (int)$r['is_active'] ?>, '<?= htmlspecialchars(addslashes($r['name']), ENT_QUOTES) ?>')">
                                     <?php csrf_field(); ?>
                                     <input type="hidden" name="action" value="toggle">
                                     <input type="hidden" name="id" value="<?= (int)$r['id'] ?>">
-                                    <button class="btn-asset btn-asset-ghost" title="สลับสถานะ"><i class="fas fa-power-off"></i></button>
+                                    <?php if ((int)$r['is_active'] === 1): ?>
+                                        <button class="btn-asset btn-asset-ghost" title="ซ่อนจุดนี้ออกจาก dropdown">
+                                            <i class="fas fa-eye-slash"></i>
+                                        </button>
+                                    <?php else: ?>
+                                        <button class="btn-asset btn-asset-secondary" title="เปิดใช้งานอีกครั้ง">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                    <?php endif; ?>
                                 </form>
                                 <form method="post" onsubmit="return confirm('ลบจุดใช้งานนี้?')" class="inline">
                                     <?php csrf_field(); ?>
@@ -169,6 +178,29 @@ include __DIR__ . '/../includes/header.php';
 </div>
 
 <script>
+window.assetLocToggleConfirm = function (e, form, isActive, name) {
+    // เปิดใช้งานอีกครั้ง — ไม่ต้อง confirm
+    if (Number(isActive) === 0) return true;
+    // กำลังจะปิดใช้งาน — ขอ confirm
+    e.preventDefault();
+    Swal.fire({
+        title: 'ซ่อนจุดใช้งานนี้?',
+        html: `<div class="text-sm text-slate-600 leading-relaxed">
+                  จุด <strong class="text-slate-800">"${name}"</strong> จะหายจาก dropdown ตอนเลือกจุดในฟอร์มครุภัณฑ์<br>
+                  <span class="text-emerald-700">ครุภัณฑ์เก่าที่อยู่ในจุดนี้ยังอยู่ครบ</span> และเปิดกลับได้ภายหลัง
+               </div>`,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'ซ่อนจุดนี้',
+        cancelButtonText: 'ยกเลิก',
+        confirmButtonColor: '#b45309',
+        cancelButtonColor: '#94a3b8',
+        reverseButtons: true,
+        focusCancel: true,
+    }).then((res) => { if (res.isConfirmed) form.submit(); });
+    return false;
+};
+
 function editLocation(l) {
     Swal.fire({
         title: 'แก้ไขจุดใช้งาน',
