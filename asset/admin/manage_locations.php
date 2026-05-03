@@ -80,7 +80,7 @@ include __DIR__ . '/../includes/header.php';
 ?>
 
 <div class="flex items-center justify-between mb-4">
-    <h2 class="text-xl font-extrabold text-slate-800"><i class="fas fa-location-dot text-indigo-500"></i> จุดใช้งาน</h2>
+    <h2 class="asset-sec-title">จุดใช้งาน</h2>
 </div>
 
 <?php if ($msg): ?><div class="mb-3 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm"><?= htmlspecialchars($msg) ?></div><?php endif; ?>
@@ -88,7 +88,7 @@ include __DIR__ . '/../includes/header.php';
 
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
     <div class="asset-card p-5 lg:col-span-1">
-        <h3 class="font-bold text-slate-700 mb-3"><i class="fas fa-plus-circle text-indigo-500"></i> เพิ่มจุดใช้งานใหม่</h3>
+        <h3 class="font-bold text-slate-700 mb-3"><i class="fas fa-plus-circle text-[#2e9e63]"></i> เพิ่มจุดใช้งานใหม่</h3>
         <form method="post" class="space-y-3">
             <?php csrf_field(); ?>
             <input type="hidden" name="action" value="create">

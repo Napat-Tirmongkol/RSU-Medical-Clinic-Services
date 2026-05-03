@@ -87,8 +87,8 @@ include __DIR__ . '/../includes/header.php';
 
 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
     <div>
-        <h2 class="text-xl font-extrabold text-slate-800"><i class="fas fa-boxes-stacked text-indigo-500"></i> รายการครุภัณฑ์</h2>
-        <p class="text-sm text-slate-500">ทะเบียนครุภัณฑ์สำนักงานทั้งหมด</p>
+        <h2 class="asset-sec-title">รายการครุภัณฑ์</h2>
+        <p class="text-sm text-slate-500 mt-1 ml-[14px]">ทะเบียนครุภัณฑ์สำนักงานทั้งหมด</p>
     </div>
     <?php if ($canManage): ?>
         <a href="asset_form.php" class="btn-asset btn-asset-primary">
@@ -143,7 +143,7 @@ include __DIR__ . '/../includes/header.php';
     </div>
     <?php if ($search || $filterStat || $filterLoc || $filterCat): ?>
         <div class="mt-3">
-            <a href="manage_assets.php" class="text-xs text-slate-500 hover:text-indigo-600">
+            <a href="manage_assets.php" class="text-xs text-slate-500 hover:text-[#2e9e63]">
                 <i class="fas fa-times-circle"></i> ล้างตัวกรอง
             </a>
         </div>
@@ -182,7 +182,7 @@ include __DIR__ . '/../includes/header.php';
                             <?php endif; ?>
                         </td>
                         <td data-label="รหัส / S/N">
-                            <div class="font-mono text-xs text-indigo-600 font-bold"><?= htmlspecialchars($r['asset_code']) ?></div>
+                            <div class="font-mono text-xs text-[#2e9e63] font-bold"><?= htmlspecialchars($r['asset_code']) ?></div>
                             <?php if (!empty($r['rsu_asset_code'])): ?>
                                 <div class="text-[11px] text-slate-500">มรส: <?= htmlspecialchars($r['rsu_asset_code']) ?></div>
                             <?php endif; ?>

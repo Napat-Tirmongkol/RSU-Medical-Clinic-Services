@@ -45,33 +45,33 @@ include __DIR__ . '/includes/header.php';
     </div>
 <?php endif; ?>
 
-<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-    <?php
-    $cards = [
-        ['label' => 'รายการทั้งหมด', 'value' => (int)($stats['total'] ?? 0),       'icon' => 'fa-boxes-stacked', 'color' => 'from-indigo-500 to-purple-600'],
-        ['label' => 'จำนวนรวม',     'value' => (int)($stats['total_qty'] ?? 0),   'icon' => 'fa-cubes',         'color' => 'from-sky-500 to-blue-600'],
-        ['label' => 'กำลังซ่อม',    'value' => (int)($stats['cnt_repair'] ?? 0),  'icon' => 'fa-screwdriver-wrench','color' => 'from-amber-500 to-orange-600'],
-        ['label' => 'จำหน่าย/สูญหาย','value' => (int)(($stats['cnt_disposed'] ?? 0) + ($stats['cnt_lost'] ?? 0)), 'icon' => 'fa-circle-xmark', 'color' => 'from-rose-500 to-red-600'],
-    ];
-    foreach ($cards as $c): ?>
-        <div class="asset-card p-4">
-            <div class="flex items-center gap-3">
-                <div class="w-11 h-11 rounded-xl bg-gradient-to-br <?= $c['color'] ?> text-white flex items-center justify-center shadow">
-                    <i class="fas <?= $c['icon'] ?>"></i>
+<div class="asset-anim d1 mb-6">
+    <div class="asset-kpi-strip">
+        <?php
+        $cards = [
+            ['label' => 'รายการทั้งหมด', 'value' => (int)($stats['total'] ?? 0),                                                       'icon' => 'fa-boxes-stacked',     'bg' => '#f0faf4', 'color' => '#2e9e63'],
+            ['label' => 'จำนวนรวม',      'value' => (int)($stats['total_qty'] ?? 0),                                                   'icon' => 'fa-cubes',             'bg' => '#eff6ff', 'color' => '#2563eb'],
+            ['label' => 'กำลังซ่อม',     'value' => (int)($stats['cnt_repair'] ?? 0),                                                  'icon' => 'fa-screwdriver-wrench','bg' => '#fffbeb', 'color' => '#d97706'],
+            ['label' => 'จำหน่าย/สูญหาย','value' => (int)(($stats['cnt_disposed'] ?? 0) + ($stats['cnt_lost'] ?? 0)),                  'icon' => 'fa-circle-xmark',      'bg' => '#fef2f2', 'color' => '#dc2626'],
+        ];
+        foreach ($cards as $c): ?>
+            <div class="asset-kpi-stat">
+                <div class="asset-kpi-icon" style="background: <?= $c['bg'] ?>; color: <?= $c['color'] ?>;">
+                    <i class="fa-solid <?= $c['icon'] ?>"></i>
                 </div>
-                <div>
-                    <div class="text-xs text-slate-500 font-semibold"><?= htmlspecialchars($c['label']) ?></div>
-                    <div class="text-2xl font-extrabold text-slate-800"><?= number_format($c['value']) ?></div>
+                <div class="min-w-0">
+                    <div class="asset-kpi-num"><?= number_format($c['value']) ?></div>
+                    <div class="asset-kpi-label"><?= htmlspecialchars($c['label']) ?></div>
                 </div>
             </div>
-        </div>
-    <?php endforeach; ?>
+        <?php endforeach; ?>
+    </div>
 </div>
 
-<div class="asset-card p-5">
+<div class="asset-card p-5 asset-anim d2">
     <div class="flex items-center justify-between mb-4">
-        <h2 class="text-lg font-extrabold text-slate-800"><i class="fas fa-clock-rotate-left text-indigo-500"></i> รายการล่าสุด</h2>
-        <a href="admin/manage_assets.php" class="text-sm font-bold text-indigo-600 hover:text-indigo-700">ดูทั้งหมด <i class="fas fa-arrow-right text-xs"></i></a>
+        <h2 class="asset-sec-title">รายการล่าสุด</h2>
+        <a href="admin/manage_assets.php" class="text-sm font-bold text-[#2e9e63] hover:text-[#258052]">ดูทั้งหมด <i class="fa-solid fa-arrow-right text-xs"></i></a>
     </div>
     <?php if (empty($recent)): ?>
         <p class="text-center text-slate-400 py-8 text-sm">ยังไม่มีข้อมูลครุภัณฑ์</p>
@@ -84,7 +84,7 @@ include __DIR__ . '/includes/header.php';
             <?php foreach ($recent as $r):
                 $st = asset_status_label($r['status']); ?>
                 <tr>
-                    <td data-label="รหัส" class="font-mono text-xs text-slate-600"><?= htmlspecialchars($r['asset_code']) ?></td>
+                    <td data-label="รหัส" class="font-mono text-xs text-[#2e9e63] font-bold"><?= htmlspecialchars($r['asset_code']) ?></td>
                     <td data-label="ชื่อ"><strong><?= htmlspecialchars($r['name']) ?></strong></td>
                     <td data-label="จุดใช้งาน"><?= htmlspecialchars($r['location_name'] ?? '-') ?></td>
                     <td data-label="สถานะ"><span class="badge-status <?= $st['class'] ?>"><?= $st['label'] ?></span></td>

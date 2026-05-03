@@ -11,11 +11,11 @@ if (!function_exists('asset_status_label')) {
     /** label + สีของสถานะ → ['label','class'] */
     function asset_status_label(string $status): array {
         return match ($status) {
-            'in_use'   => ['label' => 'ใช้งาน',  'class' => 'bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200'],
-            'repair'   => ['label' => 'ซ่อม',    'class' => 'bg-amber-100 text-amber-700 ring-1 ring-amber-200'],
-            'reserve'  => ['label' => 'สำรอง',   'class' => 'bg-sky-100 text-sky-700 ring-1 ring-sky-200'],
-            'disposed' => ['label' => 'จำหน่าย', 'class' => 'bg-slate-200 text-slate-600 ring-1 ring-slate-300'],
-            'lost'     => ['label' => 'สูญหาย',  'class' => 'bg-rose-100 text-rose-700 ring-1 ring-rose-200'],
+            'in_use'   => ['label' => 'ใช้งาน',  'class' => 'bg-[#f0faf4] text-[#2e7d52] border border-[#c7e8d5]'],
+            'repair'   => ['label' => 'ซ่อม',    'class' => 'bg-amber-50 text-amber-700 border border-amber-200'],
+            'reserve'  => ['label' => 'สำรอง',   'class' => 'bg-sky-50 text-sky-700 border border-sky-200'],
+            'disposed' => ['label' => 'จำหน่าย', 'class' => 'bg-slate-100 text-slate-600 border border-slate-200'],
+            'lost'     => ['label' => 'สูญหาย',  'class' => 'bg-rose-50 text-rose-700 border border-rose-200'],
             default    => ['label' => $status,   'class' => 'bg-slate-100 text-slate-600'],
         };
     }
@@ -92,24 +92,17 @@ if (!function_exists('asset_pagination_html')) {
         };
 
         $btn = function (string $href, string $label, bool $disabled = false, bool $active = false) {
-            $base = 'inline-flex items-center justify-center min-w-[36px] h-9 px-3 text-sm font-semibold rounded-lg border transition';
-            if ($active) {
-                $cls = 'bg-indigo-600 text-white border-indigo-600 shadow-sm';
-            } elseif ($disabled) {
-                $cls = 'bg-slate-50 text-slate-300 border-slate-200 cursor-not-allowed pointer-events-none';
-            } else {
-                $cls = 'bg-white text-slate-700 border-slate-200 hover:border-indigo-400 hover:text-indigo-600';
-            }
-            return '<a href="' . htmlspecialchars($href) . '" class="' . $base . ' ' . $cls . '">' . $label . '</a>';
+            $cls = $active ? 'active' : ($disabled ? 'disabled' : '');
+            return '<a href="' . htmlspecialchars($href) . '" class="' . $cls . '">' . $label . '</a>';
         };
 
         $start = max(1, $page - 2);
         $end   = min($totalPages, $page + 2);
 
-        $html  = '<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mt-4">';
-        $html .= '<div class="text-sm text-slate-600">หน้า <strong>' . $page . '</strong> / ' . $totalPages
+        $html  = '<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mt-5 pt-4 border-t border-[#f0faf4]">';
+        $html .= '<div class="text-sm text-slate-600">หน้า <strong class="text-[#2e9e63]">' . $page . '</strong> / ' . $totalPages
               . ' · รวม <strong>' . number_format($totalItems) . '</strong> รายการ</div>';
-        $html .= '<div class="flex flex-wrap items-center gap-1">';
+        $html .= '<div class="asset-pagination flex flex-wrap items-center gap-1">';
         $html .= $btn($build(1),          '«', $page <= 1);
         $html .= $btn($build($page - 1),  '‹', $page <= 1);
         if ($start > 1) {

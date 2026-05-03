@@ -39,7 +39,7 @@ include __DIR__ . '/../includes/header.php';
 
 <div class="flex items-center justify-between mb-4">
     <div>
-        <div class="text-xs font-mono text-indigo-600 font-bold"><?= htmlspecialchars($a['asset_code']) ?></div>
+        <div class="text-xs font-mono text-[#2e9e63] font-bold"><?= htmlspecialchars($a['asset_code']) ?></div>
         <h2 class="text-xl font-extrabold text-slate-800"><?= htmlspecialchars($a['name']) ?></h2>
     </div>
     <div class="flex items-center gap-2">
@@ -71,7 +71,7 @@ include __DIR__ . '/../includes/header.php';
     </div>
 
     <div class="asset-card p-5 lg:col-span-2">
-        <h3 class="font-bold text-slate-700 mb-3"><i class="fas fa-circle-info text-indigo-500"></i> ข้อมูลทั่วไป</h3>
+        <h3 class="font-bold text-slate-700 mb-3"><i class="fas fa-circle-info text-[#2e9e63]"></i> ข้อมูลทั่วไป</h3>
         <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
             <?php
             $pairs = [
@@ -104,7 +104,7 @@ include __DIR__ . '/../includes/header.php';
 </div>
 
 <div class="asset-card p-5 mt-4">
-    <h3 class="font-bold text-slate-700 mb-3"><i class="fas fa-clock-rotate-left text-indigo-500"></i> ประวัติการเปลี่ยนแปลง</h3>
+    <h3 class="font-bold text-slate-700 mb-3"><i class="fas fa-clock-rotate-left text-[#2e9e63]"></i> ประวัติการเปลี่ยนแปลง</h3>
     <?php if (empty($movements)): ?>
         <p class="text-center text-slate-400 py-6 text-sm">ยังไม่มีประวัติ</p>
     <?php else: ?>
@@ -119,7 +119,7 @@ include __DIR__ . '/../includes/header.php';
                 ?>
                     <tr>
                         <td data-label="วันที่" class="text-xs text-slate-500"><?= date('d/m/Y H:i', strtotime($m['moved_at'])) ?></td>
-                        <td data-label="การกระทำ"><span class="badge-status bg-indigo-100 text-indigo-700 ring-1 ring-indigo-200"><?= htmlspecialchars($actLabel) ?></span></td>
+                        <td data-label="การกระทำ"><span class="badge-status bg-[#e8f8f0] text-[#258052] ring-1 ring-[#c7e8d5]"><?= htmlspecialchars($actLabel) ?></span></td>
                         <td data-label="สถานะ" class="text-sm">
                             <?= htmlspecialchars($m['from_status'] ?? '-') ?> → <strong><?= htmlspecialchars($m['to_status'] ?? '-') ?></strong>
                         </td>

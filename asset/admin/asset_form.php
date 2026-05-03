@@ -115,11 +115,11 @@ include __DIR__ . '/../includes/header.php';
 <div class="flex items-center justify-between mb-4">
     <div>
         <h2 class="text-xl font-extrabold text-slate-800">
-            <i class="fas <?= $mode === 'edit' ? 'fa-pen-to-square' : 'fa-plus-circle' ?> text-indigo-500"></i>
+            <i class="fas <?= $mode === 'edit' ? 'fa-pen-to-square' : 'fa-plus-circle' ?> text-[#2e9e63]"></i>
             <?= htmlspecialchars($page_title) ?>
         </h2>
         <?php if ($mode === 'edit'): ?>
-            <p class="text-sm text-slate-500">รหัส: <span class="font-mono text-indigo-600 font-bold"><?= htmlspecialchars($asset['asset_code']) ?></span></p>
+            <p class="text-sm text-slate-500">รหัส: <span class="font-mono text-[#2e9e63] font-bold"><?= htmlspecialchars($asset['asset_code']) ?></span></p>
         <?php endif; ?>
     </div>
     <a href="manage_assets.php" class="btn-asset btn-asset-ghost">
