@@ -189,6 +189,21 @@ $projects = [
         ]
     ],
     [
+        'id' => 'asset_management',
+        'title' => 'ครุภัณฑ์สำนักงาน',
+        'description' => 'ทะเบียนครุภัณฑ์สำนักงาน — บันทึก ติดตาม และจัดการทรัพย์สินของหน่วยงาน พร้อมประวัติการเปลี่ยนแปลงและจุดใช้งาน',
+        'icon' => 'fa-boxes-stacked',
+        'bg_color' => 'bg-green-50',
+        'icon_color' => 'text-green-600',
+        'border_color' => 'border-green-100',
+        'allowed_roles' => ['admin', 'superadmin', 'editor'],
+        'staff_visible' => true,
+        'badges' => ['Asset Register', 'Inventory'],
+        'actions' => [
+            ['label' => 'เปิดระบบครุภัณฑ์', 'url' => '../asset/index.php', 'primary' => true],
+        ]
+    ],
+    [
         'id' => 'system_logs',
         'title' => 'System Logs',
         'description' => 'ติดตาม Error Log และ Activity Log ของระบบแบบ Real-time เพื่อตรวจสอบและแก้ไขปัญหาได้ทันที',
@@ -298,6 +313,7 @@ $categoryMap = [
     'identity_governance' => 'core',
     'e_campaign' => 'core',
     'e_borrow' => 'core',
+    'asset_management' => 'core',
     'insurance_sync' => 'core',
     'system_logs' => 'tools',
     'privilege_inventory' => 'tools',
