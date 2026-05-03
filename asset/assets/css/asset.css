@@ -27,7 +27,23 @@ body {
     -webkit-backdrop-filter: blur(12px);
     border-bottom: 1.5px solid rgba(199, 232, 213, 0.6);
     box-shadow: 0 2px 12px rgba(46, 158, 99, 0.05);
-    position: sticky; top: 0; z-index: 40;
+}
+
+/* ── Sidebar mobile slide-in ──────────────────────────────── */
+@media (max-width: 767px) {
+    #portal-sidebar {
+        position: fixed;
+        top: 0; left: 0;
+        height: 100vh;
+        z-index: 60;
+        transform: translateX(-100%);
+        transition: transform .28s cubic-bezier(.4,0,.2,1);
+        display: flex !important;
+    }
+    #portal-sidebar.mobile-open {
+        transform: translateX(0);
+        box-shadow: 8px 0 32px rgba(0,0,0,.15);
+    }
 }
 
 .asset-brand-icon {
