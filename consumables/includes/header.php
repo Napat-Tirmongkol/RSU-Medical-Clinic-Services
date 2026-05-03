@@ -31,6 +31,14 @@ $navGroups = [
         ],
     ],
     [
+        'label' => 'ปฏิบัติการ',
+        'items' => [
+            ['key' => 'stock_take', 'href' => 'admin/stock_take.php',          'icon' => 'fa-clipboard-check', 'color' => '#0891b2', 'label' => 'ตรวจนับ',       'roles' => ['admin','editor','employee']],
+            ['key' => 'import',     'href' => 'admin/import_consumables.php',  'icon' => 'fa-file-import',     'color' => '#2563eb', 'label' => 'นำเข้า Excel',   'roles' => ['admin','editor']],
+            ['key' => 'barcode',    'href' => 'admin/print_barcode.php',       'icon' => 'fa-barcode',         'color' => '#0f172a', 'label' => 'พิมพ์บาร์โค้ด',  'roles' => ['admin','editor']],
+        ],
+    ],
+    [
         'label' => 'รายงาน',
         'items' => [
             ['key' => 'reports', 'href' => 'admin/reports.php', 'icon' => 'fa-chart-line', 'color' => '#7c3aed', 'label' => 'รายงาน', 'roles' => ['admin','editor']],
@@ -48,7 +56,13 @@ $navGroups = [
     <title><?= htmlspecialchars($page_title) ?> | วัสดุสิ้นเปลือง</title>
 
     <link rel="icon" href="data:,">
+    <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#2e9e63">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="วัสดุ">
+    <link rel="apple-touch-icon" href="../asset/assets/icons/icon-192.png">
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=Prompt:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="stylesheet" href="../assets/css/tailwind.min.css">

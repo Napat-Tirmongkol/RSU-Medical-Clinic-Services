@@ -7,6 +7,12 @@
     </footer>
 </div>
 
+<!-- PWA install prompt button -->
+<button id="csm-install-btn" class="install-prompt" type="button" aria-label="ติดตั้งเป็นแอป">
+    <i class="fa-solid fa-download"></i>
+    <span>ติดตั้งเป็นแอป</span>
+</button>
+
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
 // ── Sidebar toggle (desktop) ──────────────────────────────────────────────
@@ -43,6 +49,40 @@ window.addEventListener('resize', csmUpdateMobileLayout);
 csmUpdateMobileLayout();
 
 // ── Confirm delete helper ─────────────────────────────────────────────────
+// ── PWA: Service Worker + Install prompt ──────────────────────────────────
+(function () {
+    if (!('serviceWorker' in navigator)) return;
+    window.addEventListener('load', () => {
+        const m = window.location.pathname.match(/^(.*\/consumables\/)/);
+        if (!m) return;
+        const scopePath = m[1];
+        navigator.serviceWorker.register(scopePath + 'sw.js', { scope: scopePath })
+            .catch(err => console.warn('[csm] SW register failed:', err));
+    });
+
+    let deferredPrompt = null;
+    const btn = document.getElementById('csm-install-btn');
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        if (btn) btn.classList.add('show');
+    });
+    if (btn) {
+        btn.addEventListener('click', async () => {
+            if (!deferredPrompt) return;
+            btn.classList.remove('show');
+            deferredPrompt.prompt();
+            await deferredPrompt.userChoice;
+            deferredPrompt = null;
+        });
+    }
+    window.addEventListener('appinstalled', () => {
+        if (btn) btn.classList.remove('show');
+        deferredPrompt = null;
+    });
+})();
+
 window.csmConfirmDelete = function (url, name) {
     Swal.fire({
         title: 'ยืนยันการลบ',

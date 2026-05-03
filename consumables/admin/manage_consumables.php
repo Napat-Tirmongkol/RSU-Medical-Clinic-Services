@@ -100,6 +100,9 @@ include __DIR__ . '/../includes/header.php';
             <i class="fas fa-hand-holding"></i> เบิกออก
         </a>
         <?php if ($canManage): ?>
+            <a href="admin/import_consumables.php" class="btn-asset btn-asset-secondary">
+                <i class="fas fa-file-import"></i> Import
+            </a>
             <a href="admin/consumable_form.php" class="btn-asset btn-asset-primary">
                 <i class="fas fa-plus"></i> เพิ่มวัสดุ
             </a>
