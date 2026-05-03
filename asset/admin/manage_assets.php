@@ -91,9 +91,14 @@ include __DIR__ . '/../includes/header.php';
         <p class="text-sm text-slate-500 mt-1 ml-[14px]">ทะเบียนครุภัณฑ์สำนักงานทั้งหมด</p>
     </div>
     <?php if ($canManage): ?>
-        <a href="asset_form.php" class="btn-asset btn-asset-primary">
-            <i class="fas fa-plus"></i> เพิ่มครุภัณฑ์
-        </a>
+        <div class="flex items-center gap-2">
+            <a href="import_assets.php" class="btn-asset btn-asset-secondary">
+                <i class="fas fa-file-import"></i> Import Excel
+            </a>
+            <a href="asset_form.php" class="btn-asset btn-asset-primary">
+                <i class="fas fa-plus"></i> เพิ่มครุภัณฑ์
+            </a>
+        </div>
     <?php endif; ?>
 </div>
 

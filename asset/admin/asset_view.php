@@ -48,6 +48,9 @@ include __DIR__ . '/../includes/header.php';
             <i class="fas fa-arrow-right-arrow-left"></i> เปลี่ยนสถานะ
         </button>
         <?php if ($canManage): ?>
+            <a href="print_barcode.php?id=<?= (int)$a['id'] ?>&print=1" target="_blank" class="btn-asset btn-asset-secondary">
+                <i class="fas fa-barcode"></i> พิมพ์บาร์โค้ด
+            </a>
             <a href="asset_form.php?id=<?= (int)$a['id'] ?>" class="btn-asset btn-asset-primary">
                 <i class="fas fa-edit"></i> แก้ไข
             </a>
