@@ -30,6 +30,12 @@ $navGroups = [
             ['key' => 'transactions', 'href' => 'admin/transactions.php',  'icon' => 'fa-clock-rotate-left',  'color' => '#0891b2', 'label' => 'ประวัติ',     'roles' => ['admin','editor','employee']],
         ],
     ],
+    [
+        'label' => 'รายงาน',
+        'items' => [
+            ['key' => 'reports', 'href' => 'admin/reports.php', 'icon' => 'fa-chart-line', 'color' => '#7c3aed', 'label' => 'รายงาน', 'roles' => ['admin','editor']],
+        ],
+    ],
 ];
 ?>
 <!DOCTYPE html>
