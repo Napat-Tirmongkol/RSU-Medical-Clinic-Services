@@ -92,10 +92,10 @@ include __DIR__ . '/../includes/header.php';
     </div>
     <?php if ($canManage): ?>
         <div class="flex items-center gap-2">
-            <a href="import_assets.php" class="btn-asset btn-asset-secondary">
+            <a href="admin/import_assets.php" class="btn-asset btn-asset-secondary">
                 <i class="fas fa-file-import"></i> Import Excel
             </a>
-            <a href="asset_form.php" class="btn-asset btn-asset-primary">
+            <a href="admin/asset_form.php" class="btn-asset btn-asset-primary">
                 <i class="fas fa-plus"></i> เพิ่มครุภัณฑ์
             </a>
         </div>
@@ -148,7 +148,7 @@ include __DIR__ . '/../includes/header.php';
     </div>
     <?php if ($search || $filterStat || $filterLoc || $filterCat): ?>
         <div class="mt-3">
-            <a href="manage_assets.php" class="text-xs text-slate-500 hover:text-[#2e9e63]">
+            <a href="admin/manage_assets.php" class="text-xs text-slate-500 hover:text-[#2e9e63]">
                 <i class="fas fa-times-circle"></i> ล้างตัวกรอง
             </a>
         </div>
@@ -181,7 +181,7 @@ include __DIR__ . '/../includes/header.php';
                     <tr>
                         <td data-label="รูป">
                             <?php if (!empty($r['image'])): ?>
-                                <img src="../<?= htmlspecialchars($r['image']) ?>" alt="" class="asset-thumb">
+                                <img src="<?= htmlspecialchars($r['image']) ?>" alt="" class="asset-thumb">
                             <?php else: ?>
                                 <div class="asset-thumb flex items-center justify-center text-slate-300"><i class="fas fa-image"></i></div>
                             <?php endif; ?>
@@ -213,7 +213,7 @@ include __DIR__ . '/../includes/header.php';
                         </td>
                         <td data-label="จัดการ">
                             <div class="flex items-center gap-1 justify-center flex-wrap">
-                                <a href="asset_view.php?id=<?= (int)$r['id'] ?>" class="btn-asset btn-asset-ghost" title="ดูรายละเอียด">
+                                <a href="admin/asset_view.php?id=<?= (int)$r['id'] ?>" class="btn-asset btn-asset-ghost" title="ดูรายละเอียด">
                                     <i class="fas fa-eye"></i>
                                 </a>
                                 <button type="button" class="btn-asset btn-asset-secondary" title="เปลี่ยนสถานะ"
@@ -221,11 +221,11 @@ include __DIR__ . '/../includes/header.php';
                                     <i class="fas fa-arrow-right-arrow-left"></i>
                                 </button>
                                 <?php if ($canManage): ?>
-                                    <a href="asset_form.php?id=<?= (int)$r['id'] ?>" class="btn-asset btn-asset-secondary" title="แก้ไข">
+                                    <a href="admin/asset_form.php?id=<?= (int)$r['id'] ?>" class="btn-asset btn-asset-secondary" title="แก้ไข">
                                         <i class="fas fa-edit"></i>
                                     </a>
                                     <button type="button" class="btn-asset btn-asset-danger" title="ลบ"
-                                            onclick="assetConfirmDelete('../ajax/delete_asset.php?id=<?= (int)$r['id'] ?>', '<?= htmlspecialchars(addslashes($r['name'])) ?>')">
+                                            onclick="assetConfirmDelete('ajax/delete_asset.php?id=<?= (int)$r['id'] ?>', '<?= htmlspecialchars(addslashes($r['name'])) ?>')">
                                         <i class="fas fa-trash"></i>
                                     </button>
                                 <?php endif; ?>

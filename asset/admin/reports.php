@@ -176,7 +176,7 @@ include __DIR__ . '/../includes/header.php';
             <button type="submit" class="btn-asset btn-asset-primary">
                 <i class="fas fa-filter"></i> ค้นหา
             </button>
-            <a href="reports.php" class="btn-asset btn-asset-ghost">ล้าง</a>
+            <a href="admin/reports.php" class="btn-asset btn-asset-ghost">ล้าง</a>
         </div>
     </div>
 </form>

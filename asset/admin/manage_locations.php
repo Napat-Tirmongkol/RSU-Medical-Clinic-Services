@@ -197,7 +197,7 @@ function editLocation(l) {
         fd.append('name', res.value.name);
         fd.append('building', res.value.building);
         fd.append('floor', res.value.floor);
-        fetch('manage_locations.php', { method: 'POST', body: fd })
+        fetch('admin/manage_locations.php', { method: 'POST', body: fd })
             .then(() => window.location.reload());
     });
 }

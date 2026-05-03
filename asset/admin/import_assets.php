@@ -312,7 +312,7 @@ include __DIR__ . '/../includes/header.php';
         <h2 class="asset-sec-title">นำเข้าครุภัณฑ์จาก Excel</h2>
         <p class="text-sm text-slate-500 mt-1 ml-[14px]">รองรับ .xlsx / .xls / .csv ขนาดไม่เกิน 10 MB</p>
     </div>
-    <a href="manage_assets.php" class="btn-asset btn-asset-ghost"><i class="fas fa-arrow-left"></i> กลับ</a>
+    <a href="admin/manage_assets.php" class="btn-asset btn-asset-ghost"><i class="fas fa-arrow-left"></i> กลับ</a>
 </div>
 
 <?php if ($message): ?>
@@ -481,10 +481,10 @@ include __DIR__ . '/../includes/header.php';
             </div>
         <?php endif; ?>
         <div class="mt-5 flex justify-center gap-2">
-            <a href="manage_assets.php" class="btn-asset btn-asset-primary">
+            <a href="admin/manage_assets.php" class="btn-asset btn-asset-primary">
                 <i class="fas fa-list"></i> ดูทะเบียนครุภัณฑ์
             </a>
-            <a href="import_assets.php" class="btn-asset btn-asset-ghost">
+            <a href="admin/import_assets.php" class="btn-asset btn-asset-ghost">
                 <i class="fas fa-rotate-left"></i> นำเข้าอีกไฟล์
             </a>
         </div>

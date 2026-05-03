@@ -50,15 +50,15 @@ include __DIR__ . '/../includes/header.php';
         <h2 class="text-xl font-extrabold text-slate-800"><?= htmlspecialchars($a['name']) ?></h2>
     </div>
     <div class="flex items-center gap-2">
-        <a href="manage_assets.php" class="btn-asset btn-asset-ghost"><i class="fas fa-arrow-left"></i> กลับ</a>
+        <a href="admin/manage_assets.php" class="btn-asset btn-asset-ghost"><i class="fas fa-arrow-left"></i> กลับ</a>
         <button type="button" class="btn-asset btn-asset-secondary" onclick="assetQuickStatus(<?= (int)$a['id'] ?>, '<?= htmlspecialchars($a['status']) ?>')">
             <i class="fas fa-arrow-right-arrow-left"></i> เปลี่ยนสถานะ
         </button>
         <?php if ($canManage): ?>
-            <a href="print_barcode.php?id=<?= (int)$a['id'] ?>&print=1" target="_blank" class="btn-asset btn-asset-secondary">
+            <a href="admin/print_barcode.php?id=<?= (int)$a['id'] ?>&print=1" target="_blank" class="btn-asset btn-asset-secondary">
                 <i class="fas fa-barcode"></i> พิมพ์บาร์โค้ด
             </a>
-            <a href="asset_form.php?id=<?= (int)$a['id'] ?>" class="btn-asset btn-asset-primary">
+            <a href="admin/asset_form.php?id=<?= (int)$a['id'] ?>" class="btn-asset btn-asset-primary">
                 <i class="fas fa-edit"></i> แก้ไข
             </a>
         <?php endif; ?>
@@ -68,7 +68,7 @@ include __DIR__ . '/../includes/header.php';
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
     <div class="asset-card p-5 lg:col-span-1">
         <?php if (!empty($a['image'])): ?>
-            <img src="../<?= htmlspecialchars($a['image']) ?>" alt="" class="w-full aspect-square object-cover rounded-xl border border-slate-200">
+            <img src="<?= htmlspecialchars($a['image']) ?>" alt="" class="w-full aspect-square object-cover rounded-xl border border-slate-200">
         <?php else: ?>
             <div class="w-full aspect-square rounded-xl bg-slate-100 flex items-center justify-center text-slate-300">
                 <i class="fas fa-image text-5xl"></i>
@@ -135,12 +135,12 @@ include __DIR__ . '/../includes/header.php';
             <div class="flex items-center gap-3 p-3 rounded-xl border border-slate-200 hover:border-[#c7e8d5] transition" data-att-id="<?= (int)$att['id'] ?>">
                 <i class="fas <?= $iconCls ?> text-2xl"></i>
                 <div class="flex-1 min-w-0">
-                    <a href="../<?= htmlspecialchars($att['file_path']) ?>" target="_blank" class="font-bold text-slate-800 hover:text-[#2e9e63] truncate block">
+                    <a href="<?= htmlspecialchars($att['file_path']) ?>" target="_blank" class="font-bold text-slate-800 hover:text-[#2e9e63] truncate block">
                         <?= htmlspecialchars($att['file_name']) ?>
                     </a>
                     <div class="text-[11px] text-slate-500"><?= date('d/m/Y H:i', strtotime($att['uploaded_at'])) ?></div>
                 </div>
-                <a href="../<?= htmlspecialchars($att['file_path']) ?>" target="_blank" class="btn-asset btn-asset-ghost"><i class="fas fa-download"></i></a>
+                <a href="<?= htmlspecialchars($att['file_path']) ?>" target="_blank" class="btn-asset btn-asset-ghost"><i class="fas fa-download"></i></a>
                 <?php if ($canManage): ?>
                     <button type="button" class="btn-asset btn-asset-danger" onclick="attDelete(<?= (int)$att['id'] ?>)"><i class="fas fa-trash"></i></button>
                 <?php endif; ?>
@@ -194,7 +194,7 @@ document.getElementById('att-upload-input')?.addEventListener('change', function
     fd.append('asset_id', ATT_ASSET_ID);
     fd.append('file', file);
     Swal.fire({ title: 'กำลังอัปโหลด...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
-    fetch('../ajax/upload_attachment.php', { method: 'POST', body: fd })
+    fetch('ajax/upload_attachment.php', { method: 'POST', body: fd })
         .then(r => r.json())
         .then(data => {
             if (data.ok) {
@@ -215,7 +215,7 @@ window.attDelete = function (id) {
         const fd = new FormData();
         fd.append('csrf_token', window.ASSET_CSRF);
         fd.append('id', id);
-        fetch('../ajax/delete_attachment.php', { method: 'POST', body: fd })
+        fetch('ajax/delete_attachment.php', { method: 'POST', body: fd })
             .then(r => r.json())
             .then(data => {
                 if (data.ok) {

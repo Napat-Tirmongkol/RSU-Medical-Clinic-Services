@@ -100,7 +100,7 @@ include __DIR__ . '/../includes/header.php';
             <?php if (!$take['scope_location_name'] && !$take['scope_category_name']): ?>ครอบคลุมทั้งหมด<?php endif; ?>
         </p>
     </div>
-    <a href="stock_take.php" class="btn-asset btn-asset-ghost"><i class="fas fa-arrow-left"></i> กลับ</a>
+    <a href="admin/stock_take.php" class="btn-asset btn-asset-ghost"><i class="fas fa-arrow-left"></i> กลับ</a>
 </div>
 
 <?php if ($readonly): ?>
@@ -202,7 +202,7 @@ include __DIR__ . '/../includes/header.php';
                 <tr>
                     <td data-label="">
                         <?php if (!empty($it['image'])): ?>
-                            <img src="../<?= htmlspecialchars($it['image']) ?>" class="asset-thumb">
+                            <img src="<?= htmlspecialchars($it['image']) ?>" class="asset-thumb">
                         <?php else: ?>
                             <div class="asset-thumb flex items-center justify-center"><i class="fas fa-image"></i></div>
                         <?php endif; ?>
@@ -263,7 +263,7 @@ window.stCheck = function (itemId, status) {
     fd.append('csrf_token', window.ASSET_CSRF);
     fd.append('item_id', itemId);
     fd.append('status', status);
-    fetch('../ajax/stock_take_check.php', { method: 'POST', body: fd })
+    fetch('ajax/stock_take_check.php', { method: 'POST', body: fd })
         .then(r => r.json())
         .then(data => {
             if (data.ok) window.location.reload();
@@ -315,7 +315,7 @@ window.stCheckAdvanced = function (item) {
         fd.append('status', res.value.status);
         fd.append('found_location_id', res.value.loc || '');
         fd.append('note', res.value.note);
-        fetch('../ajax/stock_take_check.php', { method: 'POST', body: fd })
+        fetch('ajax/stock_take_check.php', { method: 'POST', body: fd })
             .then(r => r.json())
             .then(data => {
                 if (data.ok) window.location.reload();

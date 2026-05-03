@@ -130,7 +130,7 @@ include __DIR__ . '/../includes/header.php';
         <h2 class="asset-sec-title">พิมพ์บาร์โค้ดป้ายครุภัณฑ์</h2>
         <p class="text-sm text-slate-500 mt-1 ml-[14px]">เลือกครุภัณฑ์ตาม ID หรือกรองตามจุด/หมวด แล้วพิมพ์ป้ายติดเครื่อง</p>
     </div>
-    <a href="manage_assets.php" class="btn-asset btn-asset-ghost"><i class="fas fa-arrow-left"></i> กลับ</a>
+    <a href="admin/manage_assets.php" class="btn-asset btn-asset-ghost"><i class="fas fa-arrow-left"></i> กลับ</a>
 </div>
 
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">

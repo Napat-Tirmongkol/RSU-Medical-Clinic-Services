@@ -180,7 +180,7 @@ function editCategory(c) {
         fd.append('code', res.value.code);
         fd.append('name', res.value.name);
         fd.append('description', res.value.description);
-        fetch('manage_categories.php', { method: 'POST', body: fd })
+        fetch('admin/manage_categories.php', { method: 'POST', body: fd })
             .then(() => window.location.reload());
     });
 }

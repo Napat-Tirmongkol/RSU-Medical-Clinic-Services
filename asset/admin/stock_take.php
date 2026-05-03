@@ -233,7 +233,7 @@ include __DIR__ . '/../includes/header.php';
                         </td>
                         <td data-label="จัดการ">
                             <div class="flex items-center justify-center gap-1 flex-wrap">
-                                <a href="stock_take_view.php?id=<?= (int)$r['id'] ?>" class="btn-asset btn-asset-secondary" title="เปิด">
+                                <a href="admin/stock_take_view.php?id=<?= (int)$r['id'] ?>" class="btn-asset btn-asset-secondary" title="เปิด">
                                     <i class="fas fa-eye"></i>
                                 </a>
                                 <?php if ($canManage && $r['status'] === 'in_progress'): ?>

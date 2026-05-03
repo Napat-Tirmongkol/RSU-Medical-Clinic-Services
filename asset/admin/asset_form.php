@@ -127,7 +127,7 @@ include __DIR__ . '/../includes/header.php';
             <p class="text-sm text-slate-500">รหัส: <span class="font-mono text-[#2e9e63] font-bold"><?= htmlspecialchars($asset['asset_code']) ?></span></p>
         <?php endif; ?>
     </div>
-    <a href="manage_assets.php" class="btn-asset btn-asset-ghost">
+    <a href="admin/manage_assets.php" class="btn-asset btn-asset-ghost">
         <i class="fas fa-arrow-left"></i> กลับ
     </a>
 </div>
@@ -233,7 +233,7 @@ include __DIR__ . '/../includes/header.php';
             <label class="asset-label">รูปภาพสินค้า (jpg/png/webp ≤ 5MB)</label>
             <div class="flex items-center gap-4">
                 <?php if (!empty($asset['image'])): ?>
-                    <img src="../<?= htmlspecialchars($asset['image']) ?>" alt="" class="w-24 h-24 object-cover rounded-xl border border-slate-200">
+                    <img src="<?= htmlspecialchars($asset['image']) ?>" alt="" class="w-24 h-24 object-cover rounded-xl border border-slate-200">
                 <?php endif; ?>
                 <input type="file" name="image" accept="image/*" class="asset-input flex-1">
             </div>
@@ -241,7 +241,7 @@ include __DIR__ . '/../includes/header.php';
     </div>
 
     <div class="flex justify-end gap-2 pt-4 border-t border-slate-100">
-        <a href="manage_assets.php" class="btn-asset btn-asset-ghost">ยกเลิก</a>
+        <a href="admin/manage_assets.php" class="btn-asset btn-asset-ghost">ยกเลิก</a>
         <button type="submit" class="btn-asset btn-asset-primary">
             <i class="fas fa-save"></i> บันทึก
         </button>
