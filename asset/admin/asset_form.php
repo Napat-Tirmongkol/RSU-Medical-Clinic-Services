@@ -152,7 +152,7 @@ include __DIR__ . '/../includes/header.php';
         </div>
         <div class="md:col-span-3">
             <label class="asset-label">จำนวน</label>
-            <input type="number" min="1" name="quantity" value="<?= (int)($asset['quantity'] ?? 1) ?>" class="asset-input">
+            <input type="number" min="1" inputmode="numeric" pattern="[0-9]*" name="quantity" value="<?= (int)($asset['quantity'] ?? 1) ?>" class="asset-input">
         </div>
 
         <div class="md:col-span-4">
@@ -235,7 +235,7 @@ include __DIR__ . '/../includes/header.php';
                 <?php if (!empty($asset['image'])): ?>
                     <img src="<?= htmlspecialchars($asset['image']) ?>" alt="" class="w-24 h-24 object-cover rounded-xl border border-slate-200">
                 <?php endif; ?>
-                <input type="file" name="image" accept="image/*" class="asset-input flex-1">
+                <input type="file" name="image" accept="image/*" capture="environment" class="asset-input flex-1">
             </div>
         </div>
     </div>

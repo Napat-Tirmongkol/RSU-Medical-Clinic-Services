@@ -7,6 +7,19 @@
     </footer>
 </div>
 
+<!-- Mobile scan FAB (hidden on desktop via CSS, shown by /asset/admin/scan.php route) -->
+<?php if (($current_page ?? '') !== 'scan'): ?>
+    <a href="admin/scan.php" class="scan-fab" aria-label="สแกน QR ครุภัณฑ์" title="สแกน QR">
+        <i class="fa-solid fa-qrcode"></i>
+    </a>
+<?php endif; ?>
+
+<!-- PWA install prompt button (hidden by default, shown when browser fires beforeinstallprompt) -->
+<button id="asset-install-btn" class="install-prompt" type="button" aria-label="ติดตั้งเป็นแอป">
+    <i class="fa-solid fa-download"></i>
+    <span>ติดตั้งเป็นแอป</span>
+</button>
+
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script src="assets/js/asset.js?v=1.0"></script>
 
@@ -43,6 +56,60 @@ function assetUpdateMobileLayout() {
 }
 window.addEventListener('resize', assetUpdateMobileLayout);
 assetUpdateMobileLayout();
+
+// ── PWA: Service Worker + Install prompt ───────────────────────────────────
+(function () {
+    if (!('serviceWorker' in navigator)) return;
+
+    // Register on load (so it doesn't compete with critical rendering)
+    window.addEventListener('load', () => {
+        const swPath = (window.location.pathname.split('/asset/')[0] || '') + '/asset/sw.js';
+        navigator.serviceWorker.register(swPath, { scope: '/asset/' })
+            .then(reg => {
+                // Listen for new versions
+                reg.addEventListener('updatefound', () => {
+                    const nw = reg.installing;
+                    if (!nw) return;
+                    nw.addEventListener('statechange', () => {
+                        if (nw.state === 'installed' && navigator.serviceWorker.controller) {
+                            // New version waiting — could prompt user
+                            console.info('[asset] New version installed; refresh to activate');
+                        }
+                    });
+                });
+            })
+            .catch(err => console.warn('[asset] SW register failed:', err));
+    });
+
+    // Install prompt (Chrome/Edge/Android)
+    let deferredPrompt = null;
+    const btn = document.getElementById('asset-install-btn');
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        if (btn) btn.classList.add('show');
+    });
+
+    if (btn) {
+        btn.addEventListener('click', async () => {
+            if (!deferredPrompt) return;
+            btn.classList.remove('show');
+            deferredPrompt.prompt();
+            const choice = await deferredPrompt.userChoice;
+            deferredPrompt = null;
+            if (choice.outcome === 'accepted') {
+                console.info('[asset] User installed PWA');
+            }
+        });
+    }
+
+    // Hide install button if already installed
+    window.addEventListener('appinstalled', () => {
+        if (btn) btn.classList.remove('show');
+        deferredPrompt = null;
+    });
+})();
 </script>
 </body>
 </html>
