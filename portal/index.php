@@ -90,6 +90,8 @@ $kpis = [
     'total_quota' => 0,
     'used_quota' => 0,
     'booking_rate' => 0,
+    'bookings_today' => 0,
+    'errors_today'   => 0,
 ];
 
 try {
@@ -99,17 +101,31 @@ try {
     // Quota & booking rate (e-Campaign)
     // ปรับปรุงใหม่: ให้ดึงจากแคมเปญทั้งหมดเพื่อให้เห็นภาพรวมระบบ (หรือเฉพาะที่ยังไม่ลบ)
     $quotaRow = $pdo->query("
-        SELECT 
+        SELECT
             COALESCE(SUM(total_capacity), 0) AS total_quota,
             (SELECT COUNT(*) FROM camp_bookings WHERE status IN ('booked','confirmed')) AS used_quota
         FROM camp_list
     ")->fetch(PDO::FETCH_ASSOC);
-    
+
     $kpis['total_quota'] = (int) ($quotaRow['total_quota'] ?? 0);
     $kpis['used_quota'] = (int) ($quotaRow['used_quota'] ?? 0);
     $kpis['booking_rate'] = $kpis['total_quota'] > 0
         ? (int) round($kpis['used_quota'] / $kpis['total_quota'] * 100)
         : 0;
+
+    // "งานวันนี้" — actionable signals สำหรับ admin daily user
+    try {
+        $kpis['bookings_today'] = (int) $pdo->query(
+            "SELECT COUNT(*) FROM camp_bookings WHERE created_at >= NOW() - INTERVAL 24 HOUR"
+        )->fetchColumn();
+    } catch (PDOException $e) { /* ignore */ }
+    try {
+        if ($pdo->query("SHOW TABLES LIKE 'sys_error_logs'")->rowCount() > 0) {
+            $kpis['errors_today'] = (int) $pdo->query(
+                "SELECT COUNT(*) FROM sys_error_logs WHERE created_at >= NOW() - INTERVAL 24 HOUR"
+            )->fetchColumn();
+        }
+    } catch (PDOException $e) { /* ignore */ }
 
     // Equipment borrows (optional module)
     if ($pdo->query("SHOW TABLES LIKE 'borrow_records'")->rowCount() > 0) {
@@ -913,88 +929,81 @@ try {
             <div id="section-dashboard" class="portal-section" style="<?= $activeSection==='dashboard'?'':'display:none;' ?>">
                 <div class="max-w-[1280px] mx-auto px-5 md:px-8 py-8 space-y-8">
 
-                    <!-- KPI COMPACT STRIP -->
-                    <?php $borrowUrgent = $kpis['borrows'] > 0; ?>
+                    <!-- ── PRIORITY PANEL: งานวันนี้ ──────────────────────────────── -->
+                    <?php
+                    $borrowUrgent = $kpis['borrows'] > 0;
+                    $today_items = [];
+                    if ($kpis['bookings_today'] > 0) {
+                        $today_items[] = [
+                            'label' => 'การจองใหม่ใน 24 ชม.',
+                            'value' => $kpis['bookings_today'],
+                            'icon'  => 'fa-bullhorn',
+                            'tone'  => 'info',
+                            'href'  => '../admin/bookings.php',
+                        ];
+                    }
+                    if ($borrowUrgent) {
+                        $today_items[] = [
+                            'label' => 'อุปกรณ์รออนุมัติ',
+                            'value' => $kpis['borrows'],
+                            'icon'  => 'fa-box-open',
+                            'tone'  => 'warning',
+                            'href'  => '../e_Borrow/admin/index.php',
+                        ];
+                    }
+                    if ($kpis['errors_today'] > 0) {
+                        $today_items[] = [
+                            'label' => 'Error ใหม่ใน 24 ชม.',
+                            'value' => $kpis['errors_today'],
+                            'icon'  => 'fa-bug',
+                            'tone'  => 'danger',
+                            'href'  => 'javascript:switchSection(\'error_logs\')',
+                        ];
+                    }
+                    ?>
                     <section class="au d1">
-                        <div class="kpi-strip">
-
-                            <!-- Users -->
-                            <div class="kpi-stat">
-                                <div class="kpi-stat-icon" style="background:#f0fdf4;color:#2e9e63">
-                                    <i class="fa-solid fa-users"></i>
-                                </div>
+                        <div class="priority-panel">
+                            <div class="priority-panel-head">
                                 <div>
-                                    <div class="kpi-stat-num" id="kpi-users" data-counter="<?= $kpis['users'] ?>">0
+                                    <div class="eyebrow">งานวันนี้ · <?= date('j M Y') ?></div>
+                                    <h2 class="display-h2">สวัสดี<?= !empty($_SESSION['admin_username']) ? ' ' . htmlspecialchars(explode(' ', $_SESSION['admin_username'])[0]) : '' ?></h2>
+                                </div>
+                                <div class="kpi-mini-row">
+                                    <div class="kpi-mini">
+                                        <div class="kpi-mini-num" id="kpi-users" data-counter="<?= $kpis['users'] ?>"><?= number_format($kpis['users']) ?></div>
+                                        <div class="kpi-mini-label">บุคลากรและนักศึกษา</div>
                                     </div>
-                                    <div class="kpi-stat-label">บุคลากรและนักศึกษา</div>
-                                </div>
-                            </div>
-
-                            <!-- Campaigns -->
-                            <div class="kpi-stat">
-                                <div class="kpi-stat-icon" style="background:#f0fdf4;color:#2e9e63">
-                                    <i class="fa-solid fa-bullhorn"></i>
-                                </div>
-                                <div>
-                                    <div style="display:flex;align-items:baseline;gap:7px">
-                                        <span class="kpi-stat-num" id="kpi-camps"
-                                            data-counter="<?= $kpis['camps'] ?>">0</span>
-                                        <span
-                                            style="font-size:10px;font-weight:800;color:#2e9e63;background:#f0fdf4;padding:1px 7px;border-radius:99px;border:1px solid #c7e8d5">Active</span>
-                                    </div>
-                                    <div class="kpi-stat-label">โควต้า <strong
-                                            style="color:#0f172a;font-weight:900"><?= number_format($kpis['total_quota']) ?></strong>
-                                        ที่นั่ง</div>
-                                </div>
-                            </div>
-
-                            <!-- Borrows -->
-                            <div class="kpi-stat">
-                                <div class="kpi-stat-icon"
-                                    style="background:<?= $borrowUrgent ? '#fff1f2' : '#f8fafc' ?>;color:<?= $borrowUrgent ? '#ef4444' : '#94a3b8' ?>">
-                                    <i class="fa-solid fa-box-open"></i>
-                                </div>
-                                <div>
-                                    <div style="display:flex;align-items:center;gap:7px">
-                                        <span class="kpi-stat-num" id="kpi-borrows"
-                                            data-counter="<?= $kpis['borrows'] ?>">0</span>
-                                        <?php if ($borrowUrgent): ?>
-                                            <span
-                                                style="font-size:9px;font-weight:900;color:#fff;background:#ef4444;padding:2px 6px;border-radius:5px;letter-spacing:.04em">URGENT</span>
-                                        <?php endif; ?>
-                                    </div>
-                                    <div class="kpi-stat-label" style="color:<?= $borrowUrgent ? '#ef4444' : '' ?>">
-                                        <?= $borrowUrgent ? 'รอการตรวจสอบ' : 'ไม่มีรายการค้าง' ?>
+                                    <div class="kpi-mini">
+                                        <div class="kpi-mini-num">
+                                            <span id="kpi-used"><?= number_format($kpis['used_quota']) ?></span>
+                                            <span class="kpi-mini-num--sub">/ <?= number_format($kpis['total_quota']) ?></span>
+                                        </div>
+                                        <div class="kpi-mini-label">ใช้ไปแล้ว · <?= number_format($kpis['camps']) ?> แคมเปญ active</div>
                                     </div>
                                 </div>
                             </div>
-
-                            <!-- Booking Rate -->
-                            <div class="kpi-stat" style="flex:1.3">
-                                <div class="kpi-stat-icon" style="background:#f5f3ff;color:#7c3aed">
-                                    <i class="fa-solid fa-chart-pie"></i>
-                                </div>
-                                <div style="flex:1;min-width:0">
-                                    <div style="display:flex;align-items:baseline;gap:2px">
-                                        <span class="kpi-stat-num" id="kpi-rate"><?= $kpis['booking_rate'] ?></span>
-                                        <span style="font-size:12px;font-weight:700;color:#94a3b8">%</span>
+                            <?php if (empty($today_items)): ?>
+                                <div class="priority-empty">
+                                    <i class="fa-solid fa-circle-check"></i>
+                                    <div>
+                                        <strong>ไม่มีงานค้าง</strong>
+                                        <p>ทุกอย่างเรียบร้อยใน 24 ชั่วโมงที่ผ่านมา</p>
                                     </div>
-                                    <div style="margin-top:6px">
-                                        <div
-                                            style="width:100%;background:#f1f5f9;border-radius:99px;height:3px;overflow:hidden">
-                                            <div id="kpi-rate-bar"
-                                                style="height:3px;border-radius:99px;width:<?= $kpis['booking_rate'] ?>%;background:#7c3aed;transition:width .7s ease">
+                                </div>
+                            <?php else: ?>
+                                <div class="priority-grid">
+                                    <?php foreach ($today_items as $it): ?>
+                                        <a href="<?= htmlspecialchars($it['href']) ?>" class="priority-item priority-item--<?= $it['tone'] ?>">
+                                            <div class="priority-item-icon"><i class="fa-solid <?= $it['icon'] ?>"></i></div>
+                                            <div class="priority-item-body">
+                                                <div class="priority-item-num"><?= number_format($it['value']) ?></div>
+                                                <div class="priority-item-label"><?= htmlspecialchars($it['label']) ?></div>
                                             </div>
-                                        </div>
-                                        <div class="kpi-stat-label" style="margin-top:3px">
-                                            <span id="kpi-used"><?= number_format($kpis['used_quota']) ?></span> / <span
-                                                id="kpi-total-quota"><?= number_format($kpis['total_quota']) ?></span>
-                                            ที่นั่ง
-                                        </div>
-                                    </div>
+                                            <i class="fa-solid fa-arrow-right priority-item-arrow"></i>
+                                        </a>
+                                    <?php endforeach; ?>
                                 </div>
-                            </div>
-
+                            <?php endif; ?>
                         </div>
                     </section>
 
@@ -1139,68 +1148,72 @@ try {
                         <!-- SIDEBAR (4/12) -->
                         <aside class="lg:col-span-4 flex flex-col gap-5 au d3">
 
-                            <!-- Activity Feed -->
+                            <!-- Activity Feed (flat list, color-coded by event) -->
                             <div>
                                 <div class="sec-title mb-4">
-                                    Recent Activity
-                                    <span class="ml-auto live-badge">LIVE</span>
-                                </div>
-                                <div class="feed-card" id="activity-feed">
-                                    <?php if ($recentActivity): ?>
-                                        <?php foreach ($recentActivity as $log): ?>
-                                            <div class="feed-item">
-                                                <div class="feed-dot">
-                                                    <i class="fa-solid fa-bolt text-[11px]"></i>
-                                                </div>
-                                                <div class="min-w-0 flex-1">
-                                                    <div class="flex items-center justify-between gap-2 mb-0.5">
-                                                        <span class="text-[10px] font-black uppercase tracking-wider truncate"
-                                                            style="color:#2e9e63"><?= htmlspecialchars($log['action']) ?></span>
-                                                        <span
-                                                            class="text-[9px] text-gray-400 whitespace-nowrap"><?= date('d M H:i', strtotime($log['created_at'])) ?></span>
-                                                    </div>
-                                                    <p class="text-[12px] font-bold text-gray-800 leading-snug truncate">
-                                                        <?= htmlspecialchars($log['admin_name'] ?? 'System') ?>
-                                                    </p>
-                                                    <p class="text-[11px] text-gray-400 leading-snug mt-0.5 line-clamp-1">
-                                                        <?= htmlspecialchars($log['description']) ?>
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        <?php endforeach; ?>
-                                    <?php else: ?>
-                                        <div class="py-12 text-center text-gray-300">
-                                            <i class="fa-solid fa-ghost text-3xl mb-2 block"></i>
-                                            <p class="text-[11px] font-bold uppercase tracking-widest">No activity yet</p>
-                                        </div>
+                                    ความเคลื่อนไหวล่าสุด
+                                    <?php if (!empty($recentActivity)): ?>
+                                        <span class="ml-auto eyebrow"><?= count($recentActivity) ?> รายการ</span>
                                     <?php endif; ?>
-                                    <a href="javascript:switchSection('activity_logs', document.querySelector('[data-section=activity_logs]'))"
-                                        class="flex items-center justify-center gap-1.5 py-3 text-[10px] font-black uppercase tracking-wider transition-colors border-t border-gray-50 hover:bg-green-50"
-                                        style="color:#2e9e63">
-                                        View all logs <i class="fa-solid fa-chevron-right text-[9px]"></i>
-                                    </a>
                                 </div>
+                                <ul class="activity-list" id="activity-feed">
+                                    <?php
+                                    if ($recentActivity):
+                                        // map action keyword → tone (color)
+                                        $eventTone = function (string $action): array {
+                                            $a = strtolower($action);
+                                            if (str_contains($a, 'error') || str_contains($a, 'fail')) return ['tone' => 'danger',  'icon' => 'fa-circle-exclamation'];
+                                            if (str_contains($a, 'login'))                              return ['tone' => 'info',    'icon' => 'fa-right-to-bracket'];
+                                            if (str_contains($a, 'logout'))                             return ['tone' => 'neutral', 'icon' => 'fa-right-from-bracket'];
+                                            if (str_contains($a, 'register') || str_contains($a, 'create')) return ['tone' => 'success', 'icon' => 'fa-user-plus'];
+                                            if (str_contains($a, 'migrate'))                            return ['tone' => 'accent',  'icon' => 'fa-arrows-rotate'];
+                                            if (str_contains($a, 'delete') || str_contains($a, 'remove')) return ['tone' => 'danger', 'icon' => 'fa-trash-can'];
+                                            if (str_contains($a, 'update') || str_contains($a, 'edit'))   return ['tone' => 'info',   'icon' => 'fa-pen'];
+                                            return ['tone' => 'neutral', 'icon' => 'fa-circle-dot'];
+                                        };
+                                        foreach ($recentActivity as $log):
+                                            $et = $eventTone($log['action']);
+                                            $userName = trim((string)($log['admin_name'] ?? ''));
+                                            if ($userName === '') $userName = 'ระบบ';
+                                    ?>
+                                        <li class="activity-row activity-row--<?= $et['tone'] ?>">
+                                            <div class="activity-dot"><i class="fa-solid <?= $et['icon'] ?>"></i></div>
+                                            <div class="activity-body">
+                                                <div class="activity-line">
+                                                    <strong class="activity-user"><?= htmlspecialchars($userName) ?></strong>
+                                                    <span class="activity-tag"><?= htmlspecialchars(strtolower($log['action'])) ?></span>
+                                                </div>
+                                                <?php if (!empty($log['description'])): ?>
+                                                    <p class="activity-desc"><?= htmlspecialchars($log['description']) ?></p>
+                                                <?php endif; ?>
+                                            </div>
+                                            <time class="activity-time" datetime="<?= htmlspecialchars($log['created_at']) ?>"
+                                                  title="<?= date('d/m/Y H:i', strtotime($log['created_at'])) ?>">
+                                                <?= date('H:i', strtotime($log['created_at'])) ?>
+                                            </time>
+                                        </li>
+                                    <?php endforeach; else: ?>
+                                        <li class="activity-empty">
+                                            <i class="fa-solid fa-circle-check"></i>
+                                            ไม่มีความเคลื่อนไหวใน 24 ชั่วโมงที่ผ่านมา
+                                        </li>
+                                    <?php endif; ?>
+                                </ul>
+                                <a href="javascript:switchSection('activity_logs', document.querySelector('[data-section=activity_logs]'))"
+                                    class="activity-view-all">
+                                    ดูทั้งหมด <i class="fa-solid fa-arrow-right text-[10px]"></i>
+                                </a>
                             </div>
 
-                            <!-- Quick Shortcuts -->
-                            <div class="shortcut-card au d4">
-                                <div class="text-xs font-black uppercase tracking-widest opacity-70 mb-1">Quick Access
-                                </div>
-                                <div class="font-black text-lg mb-4">System Shortcuts</div>
-                                <div class="space-y-2">
-                                    <a href="users.php" class="shortcut-link">
-                                        <i class="fa-solid fa-users"></i> Users Center
-                                    </a>
-                                    <a href="../admin/campaigns.php" class="shortcut-link">
-                                        <i class="fa-solid fa-bullhorn"></i> Campaign Manager
-                                    </a>
-                                    <a href="javascript:switchSection('error_logs', document.querySelector('[data-section=error_logs]'))"
-                                        class="shortcut-link">
-                                        <i class="fa-solid fa-bug"></i> Error Logs
-                                    </a>
-                                </div>
-                                <i
-                                    class="fa-solid fa-screwdriver-wrench absolute -bottom-6 -right-6 text-[6rem] opacity-5 rotate-12 pointer-events-none"></i>
+                            <!-- Quick Shortcuts (flat) -->
+                            <div class="quick-list au d4">
+                                <div class="sec-title mb-3">ทางลัด</div>
+                                <ul class="quick-items">
+                                    <li><a href="users.php"><i class="fa-solid fa-users"></i> Users Center<i class="fa-solid fa-arrow-right ml-auto"></i></a></li>
+                                    <li><a href="../admin/campaigns.php"><i class="fa-solid fa-bullhorn"></i> Campaign Manager<i class="fa-solid fa-arrow-right ml-auto"></i></a></li>
+                                    <li><a href="../asset/index.php"><i class="fa-solid fa-boxes-stacked"></i> ครุภัณฑ์สำนักงาน<i class="fa-solid fa-arrow-right ml-auto"></i></a></li>
+                                    <li><a href="javascript:switchSection('error_logs', document.querySelector('[data-section=error_logs]'))"><i class="fa-solid fa-bug"></i> Error Logs<i class="fa-solid fa-arrow-right ml-auto"></i></a></li>
+                                </ul>
                             </div>
 
                         </aside>
