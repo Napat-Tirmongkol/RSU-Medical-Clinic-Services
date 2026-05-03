@@ -80,16 +80,21 @@ try {
             $listStmt->execute($params);
             $rows = $listStmt->fetchAll(PDO::FETCH_ASSOC);
 
-            // Recalc cached counts on the fly for visible rows (cheap)
-            foreach ($rows as &$r) {
-                ins_batch_recalc($pdo, (int)$r['id']);
+            // Recalc only batches in transitional states where counts can change.
+            // Terminal states (completed, cancelled, rejected) and pre-approval
+            // states (uploaded, pending_review) are skipped to avoid N+1 cost.
+            $activeStates = ['approved', 'downloaded', 'in_progress', 'partial'];
+            $recalcIds = [];
+            foreach ($rows as $r) {
+                if (in_array($r['status'], $activeStates, true)) {
+                    $recalcIds[] = (int)$r['id'];
+                }
             }
-            unset($r);
-
-            // Re-fetch after recalc to get fresh status
-            if ($rows) {
-                $ids = array_column($rows, 'id');
-                $in  = implode(',', array_map('intval', $ids));
+            if ($recalcIds) {
+                foreach ($recalcIds as $rid) {
+                    ins_batch_recalc($pdo, $rid);
+                }
+                $in = implode(',', array_map('intval', array_column($rows, 'id')));
                 $rows = $pdo->query("
                     SELECT b.*, c.company_name
                     FROM insurance_batch b

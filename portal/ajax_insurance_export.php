@@ -69,6 +69,19 @@ if ($type === 'active') {
     $stmt->execute([':sid' => $syncId]);
     $filename = "insurance_newcomers_sync{$syncId}_" . date('Ymd') . '.csv';
 
+} elseif ($type === 'inactivated' && $syncId > 0) {
+    // Members inactivated in a specific sync — partner uses this to off-board policies
+    $stmt = $pdo->prepare("
+        SELECT m.member_id, m.full_name, m.member_status, m.position, m.citizen_id, m.date_of_birth,
+               m.insurance_status, m.coverage_start, m.coverage_end, m.policy_number, m.remarks, m.updated_at
+        FROM insurance_member_history h
+        JOIN insurance_members m ON h.member_id = m.member_id
+        WHERE h.sync_id = :sid AND h.change_type = 'inactivated'
+        ORDER BY m.full_name ASC
+    ");
+    $stmt->execute([':sid' => $syncId]);
+    $filename = "insurance_inactivated_sync{$syncId}_" . date('Ymd') . '.csv';
+
 } else {
     http_response_code(400);
     exit('ประเภทการส่งออกไม่ถูกต้อง');

@@ -357,7 +357,6 @@ if ($action === 'upload') {
             : 'clinic_manual';
         $sourceType .= '_' . $uploadMode;
 
-        $batchCode = ins_batch_generate_code($pdo);
         $insBatch = $pdo->prepare("
             INSERT INTO insurance_batch
                 (sync_id, batch_code, upload_mode, source_type, insurance_company,
@@ -368,18 +367,30 @@ if ($action === 'upload') {
                  'pending_review', :tm, :mi, :mu, :minact,
                  :ub, :ubn, NOW())
         ");
-        $insBatch->execute([
-            ':sid'    => $syncId,
-            ':bc'     => $batchCode,
-            ':um'     => $uploadMode,
-            ':st'     => $sourceType,
-            ':tm'     => $totalCsv,
-            ':mi'     => $cntNew,
-            ':mu'     => $cntUpdated,
-            ':minact' => $cntInactivated,
-            ':ub'     => (int)($_SESSION['admin_id'] ?? 0) ?: null,
-            ':ubn'    => $_SESSION['admin_username'] ?? null,
-        ]);
+        // Retry on UNIQUE batch_code collision (concurrent uploads on same day)
+        $batchCode = null;
+        for ($attempt = 0; $attempt < 5; $attempt++) {
+            $batchCode = ins_batch_generate_code($pdo);
+            try {
+                $insBatch->execute([
+                    ':sid'    => $syncId,
+                    ':bc'     => $batchCode,
+                    ':um'     => $uploadMode,
+                    ':st'     => $sourceType,
+                    ':tm'     => $totalCsv,
+                    ':mi'     => $cntNew,
+                    ':mu'     => $cntUpdated,
+                    ':minact' => $cntInactivated,
+                    ':ub'     => (int)($_SESSION['admin_id'] ?? 0) ?: null,
+                    ':ubn'    => $_SESSION['admin_username'] ?? null,
+                ]);
+                break;
+            } catch (PDOException $e) {
+                if ($e->getCode() !== '23000') throw $e;
+                if ($attempt === 4) throw $e;
+                usleep(random_int(10000, 50000));
+            }
+        }
         $batchId = (int)$pdo->lastInsertId();
 
         ins_batch_log_event(
