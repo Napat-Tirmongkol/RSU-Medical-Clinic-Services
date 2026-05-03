@@ -798,73 +798,105 @@ try {
             </button>
         </div>
 
-        <!-- Nav items -->
-        <div style="padding:10px;flex:1;overflow:hidden;display:flex;flex-direction:column;">
+        <!-- Nav items (grouped) -->
+        <div style="padding:10px;flex:1;overflow-y:auto;display:flex;flex-direction:column;">
+            <?php
+            // Pre-compute role flags for cleaner conditionals
+            $isSuper        = ($adminRole === 'superadmin');
+            $hasRegistry    = $isSuper || !empty($_SESSION['access_registry']);
+            $hasInsurance   = $isSuper || !empty($_SESSION['access_insurance']) || !empty($_SESSION['access_registry']);
+            $hasSysLogs     = $isSuper || !empty($_SESSION['access_system_logs']);
+            $hasSiteSet     = $isSuper || !empty($_SESSION['access_site_settings']);
+            ?>
+
+            <?php /* ── OVERVIEW ───────────────────────────────────────────── */ ?>
             <?php if (!$registryOnly): ?>
-            <button class="psb-item <?= $activeSection==='dashboard'?'psb-active':'' ?>" data-section="dashboard" onclick="switchSection('dashboard',this)">
-                <div class="psb-icon"><i class="fa-solid fa-chart-pie" style="color:#059669"></i></div>
-                <span class="psb-label" style="color:#059669;font-weight:900">Dashboard</span>
-            </button>
-            <button class="psb-item" data-section="ai_assistant" onclick="switchSection('ai_assistant',this)">
-                <div class="psb-icon"><i class="fa-solid fa-wand-magic-sparkles" style="color:#8b5cf6"></i></div>
-                <span class="psb-label" style="color:#7c3aed;font-weight:900">AI Assistant</span>
-            </button>
-            <button class="psb-item" data-section="identity" onclick="switchSection('identity',this)">
-                <div class="psb-icon"><i class="fa-solid fa-id-card-clip" style="color:#2563eb"></i></div>
-                <span class="psb-label" style="color:#1d4ed8;font-weight:900">Identity & Governance</span>
-            </button>
-            <button class="psb-item" data-section="insurance_sync" onclick="switchSection('insurance_sync',this)">
-                <div class="psb-icon"><i class="fa-solid fa-shield-halved" style="color:#0ea5e9"></i></div>
-                <span class="psb-label" style="color:#0284c7;font-weight:900">Insurance Hub</span>
-            </button>
+                <div class="psb-section-label" style="margin-top:4px">OVERVIEW</div>
+                <button class="psb-item <?= $activeSection==='dashboard'?'psb-active':'' ?>" data-section="dashboard" onclick="switchSection('dashboard',this)">
+                    <div class="psb-icon"><i class="fa-solid fa-chart-pie" style="color:#059669"></i></div>
+                    <span class="psb-label" style="color:#059669;font-weight:900">Dashboard</span>
+                </button>
+                <button class="psb-item" data-section="ai_assistant" onclick="switchSection('ai_assistant',this)">
+                    <div class="psb-icon"><i class="fa-solid fa-wand-magic-sparkles" style="color:#8b5cf6"></i></div>
+                    <span class="psb-label" style="color:#7c3aed;font-weight:900">AI Assistant</span>
+                </button>
             <?php endif; ?>
-            <?php if ($adminRole === 'superadmin' || !empty($_SESSION['access_registry'])): ?>
-            <button class="psb-item <?= $activeSection==='registry_upload'?'psb-active':'' ?>" data-section="registry_upload" onclick="switchSection('registry_upload',this)">
-                <div class="psb-icon"><i class="fa-solid fa-id-card-clip" style="color:#06b6d4"></i></div>
-                <span class="psb-label" style="color:#0891b2;font-weight:900">อัพโหลดรายชื่อ (ทะเบียน)</span>
-            </button>
-            <?php endif; ?>
-            <?php if ($adminRole === 'superadmin' || !empty($_SESSION['access_insurance']) || !empty($_SESSION['access_registry'])): ?>
-            <button class="psb-item <?= $activeSection==='batch_status'?'psb-active':'' ?>" data-section="batch_status" onclick="switchSection('batch_status',this)">
-                <div class="psb-icon"><i class="fa-solid fa-list-check" style="color:#0891b2"></i></div>
-                <span class="psb-label" style="color:#0e7490;font-weight:900">สถานะเอกสาร</span>
-            </button>
-            <?php endif; ?>
+
+            <?php /* ── สิทธิ์ & ความปลอดภัย ──────────────────────────────── */ ?>
             <?php if (!$registryOnly): ?>
-            <?php if ($adminRole === 'superadmin'): ?>
-            <button class="psb-item" data-section="manage_insurance_partners" onclick="switchSection('manage_insurance_partners',this)">
-                <div class="psb-icon"><i class="fa-solid fa-handshake" style="color:#10b981"></i></div>
-                <span class="psb-label" style="color:#059669;font-weight:900">Insurance Partners</span>
-            </button>
+                <div class="psb-section-label">สิทธิ์ &amp; ความปลอดภัย</div>
+                <button class="psb-item" data-section="identity" onclick="switchSection('identity',this)">
+                    <div class="psb-icon"><i class="fa-solid fa-id-card-clip" style="color:#2563eb"></i></div>
+                    <span class="psb-label" style="color:#1d4ed8;font-weight:900">Identity &amp; Governance</span>
+                </button>
+                <?php if ($isSuper): ?>
+                    <button class="psb-item" data-section="privilege_inventory" onclick="switchSection('privilege_inventory',this)">
+                        <div class="psb-icon"><i class="fa-solid fa-shield-halved" style="color:#10b981"></i></div>
+                        <span class="psb-label" style="color:#059669;font-weight:900">ISO Governance</span>
+                    </button>
+                <?php endif; ?>
             <?php endif; ?>
-            <?php if ($adminRole === 'superadmin' || !empty($_SESSION['access_system_logs'])): ?>
-            <button class="psb-item" data-section="activity_logs" onclick="switchSection('activity_logs',this)">
-                <div class="psb-icon"><i class="fa-solid fa-file-lines" style="color:#64748b"></i></div>
-                <span class="psb-label" style="color:#475569;font-weight:900">Activity Logs</span>
-            </button>
-            <button class="psb-item" data-section="error_logs" onclick="switchSection('error_logs',this)">
-                <div class="psb-icon"><i class="fa-solid fa-bug" style="color:#ef4444"></i></div>
-                <span class="psb-label" style="color:#dc2626;font-weight:900">Error Logs</span>
-            </button>
+
+            <?php /* ── ประกันสุขภาพ ─────────────────────────────────────── */ ?>
+            <?php if (!$registryOnly || $hasRegistry || $hasInsurance): ?>
+                <div class="psb-section-label">ประกันสุขภาพ</div>
+                <?php if (!$registryOnly): ?>
+                    <button class="psb-item" data-section="insurance_sync" onclick="switchSection('insurance_sync',this)">
+                        <div class="psb-icon"><i class="fa-solid fa-shield-halved" style="color:#0ea5e9"></i></div>
+                        <span class="psb-label" style="color:#0284c7;font-weight:900">Insurance Hub</span>
+                    </button>
+                <?php endif; ?>
+                <?php if ($hasRegistry): ?>
+                    <button class="psb-item <?= $activeSection==='registry_upload'?'psb-active':'' ?>" data-section="registry_upload" onclick="switchSection('registry_upload',this)">
+                        <div class="psb-icon"><i class="fa-solid fa-id-card-clip" style="color:#06b6d4"></i></div>
+                        <span class="psb-label" style="color:#0891b2;font-weight:900">อัพโหลดรายชื่อ (ทะเบียน)</span>
+                    </button>
+                <?php endif; ?>
+                <?php if ($hasInsurance): ?>
+                    <button class="psb-item <?= $activeSection==='batch_status'?'psb-active':'' ?>" data-section="batch_status" onclick="switchSection('batch_status',this)">
+                        <div class="psb-icon"><i class="fa-solid fa-list-check" style="color:#0891b2"></i></div>
+                        <span class="psb-label" style="color:#0e7490;font-weight:900">สถานะเอกสาร</span>
+                    </button>
+                <?php endif; ?>
+                <?php if (!$registryOnly && $isSuper): ?>
+                    <button class="psb-item" data-section="manage_insurance_partners" onclick="switchSection('manage_insurance_partners',this)">
+                        <div class="psb-icon"><i class="fa-solid fa-handshake" style="color:#10b981"></i></div>
+                        <span class="psb-label" style="color:#059669;font-weight:900">Insurance Partners</span>
+                    </button>
+                <?php endif; ?>
             <?php endif; ?>
-            <?php if ($adminRole === 'superadmin'): ?>
-            <button class="psb-item" data-section="privilege_inventory" onclick="switchSection('privilege_inventory',this)">
-                <div class="psb-icon"><i class="fa-solid fa-shield-halved" style="color:#10b981"></i></div>
-                <span class="psb-label" style="color:#059669;font-weight:900">ISO Governance</span>
-            </button>
+
+            <?php /* ── สื่อสาร ──────────────────────────────────────────── */ ?>
+            <?php if (!$registryOnly): ?>
+                <div class="psb-section-label">สื่อสาร</div>
+                <button class="psb-item" data-section="announcements" onclick="switchSection('announcements',this)">
+                    <div class="psb-icon"><i class="fa-solid fa-bullhorn" style="color:#7c3aed"></i></div>
+                    <span class="psb-label" style="color:#6d28d9;font-weight:900">ประกาศ</span>
+                </button>
             <?php endif; ?>
-            <button class="psb-item" data-section="announcements" onclick="switchSection('announcements',this)">
-                <div class="psb-icon"><i class="fa-solid fa-bullhorn" style="color:#7c3aed"></i></div>
-                <span class="psb-label" style="color:#6d28d9;font-weight:900">ประกาศ</span>
-            </button>
+
+            <?php /* ── ติดตามระบบ ──────────────────────────────────────── */ ?>
+            <?php if (!$registryOnly && $hasSysLogs): ?>
+                <div class="psb-section-label">ติดตามระบบ</div>
+                <button class="psb-item" data-section="activity_logs" onclick="switchSection('activity_logs',this)">
+                    <div class="psb-icon"><i class="fa-solid fa-file-lines" style="color:#64748b"></i></div>
+                    <span class="psb-label" style="color:#475569;font-weight:900">Activity Logs</span>
+                </button>
+                <button class="psb-item" data-section="error_logs" onclick="switchSection('error_logs',this)">
+                    <div class="psb-icon"><i class="fa-solid fa-bug" style="color:#ef4444"></i></div>
+                    <span class="psb-label" style="color:#dc2626;font-weight:900">Error Logs</span>
+                </button>
             <?php endif; ?>
+
             <div style="flex:1"></div> <!-- Spacer to push settings to bottom -->
 
-            <?php if (!$registryOnly && ($adminRole === 'superadmin' || !empty($_SESSION['access_site_settings']))): ?>
-            <button class="psb-item" data-section="settings" onclick="switchSection('settings',this)">
-                <div class="psb-icon"><i class="fa-solid fa-gear" style="color:#d97706"></i></div>
-                <span class="psb-label" style="color:#b45309;font-weight:900">Settings</span>
-            </button>
+            <?php /* ── ตั้งค่า (ล่างสุด) ─────────────────────────────────── */ ?>
+            <?php if (!$registryOnly && $hasSiteSet): ?>
+                <div class="psb-section-label">ตั้งค่า</div>
+                <button class="psb-item" data-section="settings" onclick="switchSection('settings',this)">
+                    <div class="psb-icon"><i class="fa-solid fa-gear" style="color:#d97706"></i></div>
+                    <span class="psb-label" style="color:#b45309;font-weight:900">Settings</span>
+                </button>
             <?php endif; ?>
         </div>
     </nav>
