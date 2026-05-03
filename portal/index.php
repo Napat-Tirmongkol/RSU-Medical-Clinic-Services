@@ -220,6 +220,21 @@ $projects = [
         ]
     ],
     [
+        'id' => 'consumables',
+        'title' => 'วัสดุสิ้นเปลือง',
+        'description' => 'จัดการสต็อกวัสดุสิ้นเปลือง — รับเข้า เบิกออก ตามหน่วยงาน/คณะ พร้อมแจ้งเตือนเมื่อใกล้หมด เหมาะสำหรับเวชภัณฑ์ ถุงยาง หน้ากาก ฯลฯ',
+        'icon' => 'fa-box-open',
+        'bg_color' => 'bg-emerald-50',
+        'icon_color' => 'text-emerald-600',
+        'border_color' => 'border-emerald-100',
+        'allowed_roles' => ['admin', 'superadmin', 'editor'],
+        'staff_visible' => true,
+        'badges' => ['Stock', 'Issue/Receive'],
+        'actions' => [
+            ['label' => 'เปิดระบบวัสดุ', 'url' => '../consumables/index.php', 'primary' => true],
+        ]
+    ],
+    [
         'id' => 'system_logs',
         'title' => 'System Logs',
         'description' => 'ติดตาม Error Log และ Activity Log ของระบบแบบ Real-time เพื่อตรวจสอบและแก้ไขปัญหาได้ทันที',
@@ -330,6 +345,7 @@ $categoryMap = [
     'e_campaign' => 'core',
     'e_borrow' => 'core',
     'asset_management' => 'core',
+    'consumables' => 'core',
     'insurance_sync' => 'core',
     'system_logs' => 'tools',
     'privilege_inventory' => 'tools',
@@ -1220,6 +1236,7 @@ try {
                                     <li><a href="users.php"><i class="fa-solid fa-users"></i> Users Center<i class="fa-solid fa-arrow-right ml-auto"></i></a></li>
                                     <li><a href="../admin/campaigns.php"><i class="fa-solid fa-bullhorn"></i> Campaign Manager<i class="fa-solid fa-arrow-right ml-auto"></i></a></li>
                                     <li><a href="../asset/index.php"><i class="fa-solid fa-boxes-stacked"></i> ครุภัณฑ์สำนักงาน<i class="fa-solid fa-arrow-right ml-auto"></i></a></li>
+                                    <li><a href="../consumables/index.php"><i class="fa-solid fa-box-open"></i> วัสดุสิ้นเปลือง<i class="fa-solid fa-arrow-right ml-auto"></i></a></li>
                                     <li><a href="javascript:switchSection('error_logs', document.querySelector('[data-section=error_logs]'))"><i class="fa-solid fa-bug"></i> Error Logs<i class="fa-solid fa-arrow-right ml-auto"></i></a></li>
                                 </ul>
                             </div>
