@@ -64,13 +64,22 @@ if (!function_exists('ins_batch_stage_index')) {
 
 /**
  * Generate human-readable batch code: BATCH-YYYYMMDD-NNN
+ *
+ * Uses MAX(suffix) instead of COUNT(*) so deleted batches don't cause collisions.
+ * Caller MUST handle UNIQUE constraint violation (SQLSTATE 23000) by retrying —
+ * concurrent uploads on the same day can still race between SELECT and INSERT.
  */
 if (!function_exists('ins_batch_generate_code')) {
     function ins_batch_generate_code(PDO $pdo): string
     {
-        $today = date('Ymd');
-        $stmt = $pdo->prepare("SELECT COUNT(*) FROM insurance_batch WHERE batch_code LIKE :p");
-        $stmt->execute([':p' => "BATCH-{$today}-%"]);
+        $today  = date('Ymd');
+        $prefix = "BATCH-{$today}-";
+        $stmt = $pdo->prepare("
+            SELECT COALESCE(MAX(CAST(SUBSTRING(batch_code, :len) AS UNSIGNED)), 0)
+            FROM insurance_batch
+            WHERE batch_code LIKE :p
+        ");
+        $stmt->execute([':len' => strlen($prefix) + 1, ':p' => $prefix . '%']);
         $n = ((int)$stmt->fetchColumn()) + 1;
         return sprintf('BATCH-%s-%03d', $today, $n);
     }
