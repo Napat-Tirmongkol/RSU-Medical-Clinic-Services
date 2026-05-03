@@ -237,7 +237,8 @@ include __DIR__ . '/../includes/header.php';
                                     <i class="fas fa-eye"></i>
                                 </a>
                                 <?php if ($canManage && $r['status'] === 'in_progress'): ?>
-                                    <form method="post" onsubmit="return confirm('ปิดรอบตรวจนับนี้?')" class="inline">
+                                    <form method="post" class="inline"
+                                          onsubmit="return assetCloseRoundConfirm(event, this, '<?= htmlspecialchars(addslashes($r['name']), ENT_QUOTES) ?>', <?= (int)$r['total_items'] - (int)$r['found_items'] - (int)$r['missing_items'] ?>)">
                                         <?php csrf_field(); ?>
                                         <input type="hidden" name="action" value="close">
                                         <input type="hidden" name="id" value="<?= (int)$r['id'] ?>">
@@ -255,5 +256,27 @@ include __DIR__ . '/../includes/header.php';
         <?= asset_pagination_html($page, $totalPages ?? 1, $total ?? 0, []) ?>
     </div>
 </div>
+
+<script>
+window.assetCloseRoundConfirm = function (e, form, name, pendingCount) {
+    e.preventDefault();
+    const html = pendingCount > 0
+        ? `<div class="text-sm text-slate-600 leading-relaxed">รอบ <strong>"${name}"</strong> ยังมี <strong class="text-amber-600">${pendingCount} รายการที่ยังไม่ตรวจ</strong><br>การปิดรอบจะทำให้แก้ไขผลตรวจไม่ได้อีก</div>`
+        : `<div class="text-sm text-slate-600">รอบ <strong>"${name}"</strong> จะถูกปิด<br>หลังปิดแล้วจะแก้ไขผลตรวจไม่ได้อีก</div>`;
+    Swal.fire({
+        title: 'ปิดรอบตรวจนับ?',
+        html: html,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'ปิดรอบ',
+        cancelButtonText: 'ยกเลิก',
+        confirmButtonColor: '#b45309',
+        cancelButtonColor: '#94a3b8',
+        reverseButtons: true,
+        focusCancel: true,
+    }).then((res) => { if (res.isConfirmed) form.submit(); });
+    return false;
+};
+</script>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>

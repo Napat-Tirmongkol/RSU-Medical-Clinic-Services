@@ -159,7 +159,8 @@ include __DIR__ . '/../includes/header.php';
                                         </button>
                                     <?php endif; ?>
                                 </form>
-                                <form method="post" onsubmit="return confirm('ลบจุดใช้งานนี้?')" class="inline">
+                                <form method="post" class="inline"
+                                      onsubmit="return assetLocDeleteConfirm(event, this, '<?= htmlspecialchars(addslashes($r['name']), ENT_QUOTES) ?>', <?= (int)$r['asset_count'] ?>)">
                                     <?php csrf_field(); ?>
                                     <input type="hidden" name="action" value="delete">
                                     <input type="hidden" name="id" value="<?= (int)$r['id'] ?>">
@@ -178,6 +179,33 @@ include __DIR__ . '/../includes/header.php';
 </div>
 
 <script>
+window.assetLocDeleteConfirm = function (e, form, name, assetCount) {
+    e.preventDefault();
+    if (assetCount > 0) {
+        Swal.fire({
+            title: 'ลบไม่ได้',
+            html: `<div class="text-sm text-slate-600">จุด <strong>"${name}"</strong> ยังมีครุภัณฑ์อยู่ <strong class="text-rose-600">${assetCount} รายการ</strong><br>กรุณาย้ายครุภัณฑ์ออกก่อน หรือใช้ปุ่ม <i class="fas fa-eye-slash"></i> ซ่อนแทน</div>`,
+            icon: 'info',
+            confirmButtonText: 'เข้าใจแล้ว',
+            confirmButtonColor: '#475569',
+        });
+        return false;
+    }
+    Swal.fire({
+        title: 'ลบจุดใช้งานนี้?',
+        html: `<div class="text-sm text-slate-600"><strong>"${name}"</strong> จะถูกลบถาวร<br>การกระทำนี้ย้อนกลับไม่ได้</div>`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'ลบ',
+        cancelButtonText: 'ยกเลิก',
+        confirmButtonColor: '#dc2626',
+        cancelButtonColor: '#94a3b8',
+        reverseButtons: true,
+        focusCancel: true,
+    }).then((res) => { if (res.isConfirmed) form.submit(); });
+    return false;
+};
+
 window.assetLocToggleConfirm = function (e, form, isActive, name) {
     // เปิดใช้งานอีกครั้ง — ไม่ต้อง confirm
     if (Number(isActive) === 0) return true;

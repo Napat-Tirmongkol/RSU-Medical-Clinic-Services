@@ -133,7 +133,8 @@ include __DIR__ . '/../includes/header.php';
                                         onclick='editCategory(<?= json_encode($r, JSON_UNESCAPED_UNICODE) ?>)'>
                                     <i class="fas fa-edit"></i>
                                 </button>
-                                <form method="post" onsubmit="return confirm('ลบหมวดหมู่นี้?')" class="inline">
+                                <form method="post" class="inline"
+                                      onsubmit="return assetCatDeleteConfirm(event, this, '<?= htmlspecialchars(addslashes($r['name']), ENT_QUOTES) ?>', <?= (int)$r['asset_count'] ?>)">
                                     <?php csrf_field(); ?>
                                     <input type="hidden" name="action" value="delete">
                                     <input type="hidden" name="id" value="<?= (int)$r['id'] ?>">
@@ -152,6 +153,33 @@ include __DIR__ . '/../includes/header.php';
 </div>
 
 <script>
+window.assetCatDeleteConfirm = function (e, form, name, assetCount) {
+    e.preventDefault();
+    if (assetCount > 0) {
+        Swal.fire({
+            title: 'ลบไม่ได้',
+            html: `<div class="text-sm text-slate-600">หมวดหมู่ <strong>"${name}"</strong> มีครุภัณฑ์อยู่ <strong class="text-rose-600">${assetCount} รายการ</strong><br>กรุณาย้ายครุภัณฑ์ไปหมวดอื่นก่อนลบ</div>`,
+            icon: 'info',
+            confirmButtonText: 'เข้าใจแล้ว',
+            confirmButtonColor: '#475569',
+        });
+        return false;
+    }
+    Swal.fire({
+        title: 'ลบหมวดหมู่นี้?',
+        html: `<div class="text-sm text-slate-600"><strong>"${name}"</strong> จะถูกลบถาวร<br>การกระทำนี้ย้อนกลับไม่ได้</div>`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'ลบ',
+        cancelButtonText: 'ยกเลิก',
+        confirmButtonColor: '#dc2626',
+        cancelButtonColor: '#94a3b8',
+        reverseButtons: true,
+        focusCancel: true,
+    }).then((res) => { if (res.isConfirmed) form.submit(); });
+    return false;
+};
+
 function editCategory(c) {
     Swal.fire({
         title: 'แก้ไขหมวดหมู่',
