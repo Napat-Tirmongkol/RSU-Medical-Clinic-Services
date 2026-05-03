@@ -4,8 +4,8 @@
     "description": "ระบบทะเบียนครุภัณฑ์สำนักงาน - บันทึก ตรวจนับ และพิมพ์บาร์โค้ด",
     "lang": "th",
     "dir": "ltr",
-    "start_url": "/asset/",
-    "scope": "/asset/",
+    "start_url": "./",
+    "scope": "./",
     "display": "standalone",
     "orientation": "portrait-primary",
     "background_color": "#f4f7f5",
@@ -34,13 +34,13 @@
         {
             "name": "สแกน QR",
             "short_name": "สแกน",
-            "url": "/asset/admin/scan.php",
+            "url": "./admin/scan.php",
             "icons": [{ "src": "assets/icons/shortcut-scan.png", "sizes": "96x96" }]
         },
         {
             "name": "เพิ่มครุภัณฑ์",
             "short_name": "เพิ่ม",
-            "url": "/asset/admin/asset_form.php",
+            "url": "./admin/asset_form.php",
             "icons": [{ "src": "assets/icons/shortcut-add.png", "sizes": "96x96" }]
         }
     ],
