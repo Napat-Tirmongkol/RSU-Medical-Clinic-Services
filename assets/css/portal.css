@@ -895,3 +895,261 @@ body[data-theme='dark'] .pin-btn.active {
 .sec-title::before {
     background: linear-gradient(180deg, var(--c-primary), var(--c-primary-500));
 }
+
+/* ════════════════════════════════════════════════════════════
+   COMMAND PALETTE (⌘K) — added by /overdrive
+   ════════════════════════════════════════════════════════════ */
+
+.cmdk-overlay {
+    position: fixed; inset: 0;
+    background: rgba(15, 23, 42, 0.45);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    z-index: 1000;
+    display: flex; align-items: flex-start; justify-content: center;
+    padding-top: clamp(60px, 12vh, 140px);
+    opacity: 0;
+    transition: opacity .18s ease;
+}
+.cmdk-overlay.is-open { opacity: 1; }
+.cmdk-overlay[hidden] { display: none !important; }
+
+.cmdk-panel {
+    width: min(560px, calc(100vw - 32px));
+    max-height: 70vh;
+    background: var(--c-surface);
+    border-radius: var(--r-lg);
+    box-shadow: 0 20px 60px rgba(15, 23, 42, .25);
+    border: 1px solid var(--c-border);
+    display: flex; flex-direction: column;
+    overflow: hidden;
+    transform: translateY(-8px);
+    transition: transform .2s cubic-bezier(.16,1,.3,1);
+}
+.cmdk-panel--small { max-height: 60vh; }
+.cmdk-overlay.is-open .cmdk-panel { transform: translateY(0); }
+
+.cmdk-search-wrap {
+    display: flex; align-items: center; gap: 12px;
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--c-border-2);
+}
+.cmdk-search-icon { color: var(--c-ink-4); font-size: 14px; }
+.cmdk-input {
+    flex: 1; border: none; outline: none;
+    font-size: var(--t-h3); font-weight: 500;
+    color: var(--c-ink-1);
+    background: transparent;
+    font-family: inherit;
+}
+.cmdk-input::placeholder { color: var(--c-ink-4); font-weight: 400; }
+.cmdk-esc {
+    font-size: 10px; font-weight: 700;
+    padding: 3px 8px; border-radius: var(--r-sm);
+    background: var(--c-surface-2); color: var(--c-ink-3);
+    border: 1px solid var(--c-border);
+    font-family: inherit;
+}
+
+.cmdk-list {
+    list-style: none; margin: 0; padding: 6px;
+    overflow-y: auto; flex: 1;
+}
+.cmdk-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 12px;
+    border-radius: var(--r-sm);
+    cursor: pointer;
+    transition: background .12s ease;
+}
+.cmdk-item:hover, .cmdk-item.is-active { background: var(--c-primary-tint); }
+.cmdk-item-icon {
+    width: 32px; height: 32px;
+    border-radius: var(--r-sm);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; flex-shrink: 0;
+    background: var(--c-tone-neutral-bg); color: var(--c-tone-neutral);
+}
+.cmdk-item--info    .cmdk-item-icon { background: var(--c-tone-info-bg);    color: var(--c-tone-info); }
+.cmdk-item--success .cmdk-item-icon { background: var(--c-tone-success-bg); color: var(--c-tone-success); }
+.cmdk-item--warning .cmdk-item-icon { background: var(--c-tone-warning-bg); color: var(--c-tone-warning); }
+.cmdk-item--danger  .cmdk-item-icon { background: var(--c-tone-danger-bg);  color: var(--c-tone-danger); }
+.cmdk-item--accent  .cmdk-item-icon { background: var(--c-tone-accent-bg);  color: var(--c-tone-accent); }
+.cmdk-item-body { flex: 1; min-width: 0; }
+.cmdk-item-label {
+    font-size: var(--t-body); font-weight: 600; color: var(--c-ink-1);
+    line-height: 1.3;
+}
+.cmdk-item-desc {
+    font-size: 12px; color: var(--c-ink-3);
+    margin-top: 2px; line-height: 1.3;
+}
+.cmdk-item-kbd, .kbd-help-list kbd, .cmdk-help-hint kbd {
+    font-size: 10.5px; font-weight: 700;
+    padding: 2px 7px; border-radius: 6px;
+    background: var(--c-surface-2); color: var(--c-ink-2);
+    border: 1px solid var(--c-border);
+    font-family: 'SF Mono', 'Menlo', monospace;
+    box-shadow: 0 1px 0 var(--c-border);
+}
+.cmdk-empty {
+    padding: 24px; text-align: center;
+    color: var(--c-ink-4); font-size: var(--t-meta);
+}
+.cmdk-foot {
+    display: flex; gap: 16px; align-items: center;
+    padding: 10px 16px;
+    border-top: 1px solid var(--c-border-2);
+    font-size: 11px; color: var(--c-ink-4);
+    background: var(--c-surface-2);
+}
+.cmdk-foot kbd {
+    font-size: 10px; padding: 1px 5px; border-radius: 4px;
+    background: var(--c-surface); border: 1px solid var(--c-border);
+    margin-right: 3px;
+    font-family: inherit; color: var(--c-ink-2);
+}
+.cmdk-help-hint { color: var(--c-ink-3); }
+
+/* Help modal */
+.cmdk-help-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 18px;
+    border-bottom: 1px solid var(--c-border-2);
+}
+.cmdk-close {
+    width: 30px; height: 30px;
+    border-radius: var(--r-sm);
+    background: var(--c-surface-2); border: 1px solid var(--c-border);
+    color: var(--c-ink-3); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background .12s ease, color .12s ease;
+}
+.cmdk-close:hover { background: var(--c-tone-danger-bg); color: var(--c-tone-danger); }
+.kbd-help-list {
+    margin: 0; padding: 8px 18px 18px;
+    display: grid; grid-template-columns: 1fr; gap: 6px;
+    overflow-y: auto;
+}
+.kbd-help-list > div {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 0;
+    font-size: var(--t-meta);
+    border-bottom: 1px dashed var(--c-border-2);
+}
+.kbd-help-list > div:last-child { border-bottom: none; }
+.kbd-help-list span { color: var(--c-ink-2); margin-left: auto; }
+
+/* ── Search trigger button (replaces inline search) ────── */
+.cmdk-trigger {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 7px 12px;
+    background: var(--c-surface);
+    border: 1px solid var(--c-border);
+    border-radius: var(--r-md);
+    cursor: pointer;
+    font-size: 12px; font-weight: 500;
+    color: var(--c-ink-3);
+    font-family: inherit;
+    transition: border-color .12s ease, color .12s ease;
+}
+.cmdk-trigger:hover { border-color: var(--c-primary-border); color: var(--c-primary); }
+.cmdk-trigger-icon { font-size: 11px; color: var(--c-ink-4); }
+.cmdk-trigger > span { white-space: nowrap; }
+.cmdk-trigger > kbd {
+    font-size: 10px; padding: 2px 6px; border-radius: 4px;
+    background: var(--c-surface-2); color: var(--c-ink-3);
+    border: 1px solid var(--c-border);
+    margin-left: 4px;
+    font-family: inherit; font-weight: 700;
+}
+.proj-search-inline {
+    padding: 7px 12px;
+    border: 1px solid var(--c-border);
+    border-radius: var(--r-md);
+    font-size: 12px; outline: none;
+    width: 120px; max-width: 30vw;
+    font-family: inherit; color: var(--c-ink-2);
+    background: var(--c-surface);
+    transition: border-color .15s, box-shadow .15s;
+}
+.proj-search-inline:focus {
+    border-color: var(--c-primary);
+    box-shadow: 0 0 0 3px rgba(20, 83, 45, .12);
+}
+
+/* ════════════════════════════════════════════════════════════
+   /audit — A11Y (focus visible, contrast, aria states)
+   ════════════════════════════════════════════════════════════ */
+*:focus { outline: none; }
+*:focus-visible {
+    outline: 2px solid var(--c-primary);
+    outline-offset: 2px;
+    border-radius: var(--r-sm);
+}
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+    outline-offset: 2px;
+}
+/* Sidebar active state — add visual marker beyond color (for color-blind) */
+.psb-item.psb-active::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 50%;
+    width: 3px; height: 60%;
+    transform: translateY(-50%);
+    background: var(--c-primary);
+    border-radius: 0 99px 99px 0;
+}
+.psb-item { position: relative; }
+
+/* Skip-to-content link (visually hidden until focus) */
+.skip-to-content {
+    position: absolute; left: -9999px; top: 12px;
+    padding: 8px 14px;
+    background: var(--c-primary); color: #fff;
+    border-radius: var(--r-sm);
+    font-weight: 700; font-size: var(--t-meta);
+    z-index: 999;
+    text-decoration: none;
+}
+.skip-to-content:focus { left: 12px; }
+
+/* ════════════════════════════════════════════════════════════
+   /polish — micro details
+   ════════════════════════════════════════════════════════════ */
+
+/* Tighten KPI strip if it lingers anywhere else */
+.kpi-strip { box-shadow: var(--shadow-1); border-radius: var(--r-lg); }
+
+/* Activity feed live indicator (now reflects real "LIVE" semantics) */
+.live-badge {
+    position: relative; padding-left: 14px;
+}
+.live-badge::before {
+    content: ''; position: absolute; left: 4px; top: 50%;
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--c-tone-success);
+    transform: translateY(-50%);
+    animation: livePulse 1.6s infinite;
+}
+@keyframes livePulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(21, 128, 61, .5); }
+    50%      { box-shadow: 0 0 0 5px rgba(21, 128, 61, 0); }
+}
+
+/* Reduce motion */
+@media (prefers-reduced-motion: reduce) {
+    .cmdk-overlay, .cmdk-panel, .priority-item, .activity-row, .quick-items a {
+        transition: none !important; animation: none !important;
+    }
+    .live-badge::before { animation: none; }
+}
+
+/* Mobile: priority panel stacks gracefully */
+@media (max-width: 639px) {
+    .priority-panel-head { flex-direction: column; gap: 16px; }
+    .kpi-mini-row { gap: 20px; }
+    .priority-grid { grid-template-columns: 1fr; }
+    .cmdk-foot { font-size: 10px; gap: 10px; flex-wrap: wrap; }
+    .cmdk-trigger > span { display: none; }
+}

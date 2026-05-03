@@ -772,13 +772,19 @@ try {
             document.querySelectorAll('.portal-section').forEach(function (s) { s.style.display = 'none'; });
             var target = document.getElementById('section-' + sectionId);
             if (target) target.style.display = '';
-            document.querySelectorAll('.psb-item').forEach(function (b) { b.classList.remove('psb-active'); });
-            
+            document.querySelectorAll('.psb-item').forEach(function (b) {
+                b.classList.remove('psb-active');
+                b.removeAttribute('aria-current');
+            });
+
             // If btn not provided, try to find it in sidebar
             if (!btn) {
                 btn = document.querySelector('.psb-item[data-section="' + sectionId + '"]');
             }
-            if (btn) btn.classList.add('psb-active');
+            if (btn) {
+                btn.classList.add('psb-active');
+                btn.setAttribute('aria-current', 'page');
+            }
             
             var url = new URL(window.location.href);
             url.searchParams.set('section', sectionId);
@@ -789,6 +795,8 @@ try {
 </head>
 
 <body class="font-sans text-gray-800 bg-[#f4f7f5]" style="height:100vh;overflow:hidden;display:flex;flex-direction:row">
+
+    <a href="#portal-main" class="skip-to-content">ข้ามไปยังเนื้อหาหลัก</a>
 
     <!-- ── Collapsible Sidebar ── -->
     <nav id="portal-sidebar">
@@ -1020,15 +1028,14 @@ try {
                                     <div class="sec-title">Systems</div>
 
                                     <div style="display:flex;align-items:center;gap:10px">
-                                        <!-- Search -->
-                                        <div style="position:relative">
-                                            <i class="fa-solid fa-magnifying-glass"
-                                                style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:11px;pointer-events:none"></i>
-                                            <input type="text" id="search-project" placeholder="ค้นหาระบบ..."
-                                                style="padding:7px 12px 7px 30px;border:1.5px solid #d0ead9;border-radius:12px;font-size:12px;outline:none;width:180px;font-family:inherit;color:#374151;background:#fff;transition:border-color .2s,box-shadow .2s"
-                                                onfocus="this.style.borderColor='#2e9e63';this.style.boxShadow='0 0 0 3px rgba(46,158,99,.1)'"
-                                                onblur="this.style.borderColor='#d0ead9';this.style.boxShadow='none'">
-                                        </div>
+                                        <!-- Search + Command Palette trigger -->
+                                        <button onclick="window.cmdkOpen && window.cmdkOpen()" type="button" class="cmdk-trigger" title="กด ⌘K เพื่อเปิด">
+                                            <i class="fa-solid fa-magnifying-glass cmdk-trigger-icon"></i>
+                                            <span>ค้นหาระบบ / คำสั่ง</span>
+                                            <kbd>⌘K</kbd>
+                                        </button>
+                                        <input type="text" id="search-project" placeholder="กรอง..."
+                                            class="proj-search-inline" aria-label="กรองรายการระบบในหน้านี้">
                                         <!-- View toggle -->
                                         <div
                                             style="display:flex;background:#f1f5f9;border-radius:10px;padding:3px;gap:2px">
@@ -1156,7 +1163,7 @@ try {
                                         <span class="ml-auto eyebrow"><?= count($recentActivity) ?> รายการ</span>
                                     <?php endif; ?>
                                 </div>
-                                <ul class="activity-list" id="activity-feed">
+                                <ul class="activity-list" id="activity-feed" role="log" aria-live="polite" aria-label="ความเคลื่อนไหวล่าสุด">
                                     <?php
                                     if ($recentActivity):
                                         // map action keyword → tone (color)
@@ -3590,6 +3597,260 @@ try {
         <?php endif; ?>
 
     </script>
+
+    <!-- ════════════════════════════════════════════════════════════
+         COMMAND PALETTE (⌘K) — added by /overdrive
+         ════════════════════════════════════════════════════════════ -->
+    <div id="cmdk-overlay" class="cmdk-overlay" role="dialog" aria-modal="true" aria-labelledby="cmdk-title" hidden>
+        <div class="cmdk-panel" role="document">
+            <div class="cmdk-search-wrap">
+                <i class="fa-solid fa-magnifying-glass cmdk-search-icon" aria-hidden="true"></i>
+                <input type="text" id="cmdk-input" class="cmdk-input"
+                       placeholder="พิมพ์เพื่อค้นหาคำสั่ง / ระบบ / หน้า…"
+                       aria-label="ค้นหาคำสั่ง"
+                       autocomplete="off" spellcheck="false">
+                <kbd class="cmdk-esc" aria-hidden="true">ESC</kbd>
+            </div>
+            <ul id="cmdk-list" class="cmdk-list" role="listbox" aria-label="ผลการค้นหา"></ul>
+            <div class="cmdk-foot">
+                <span><kbd>↑</kbd><kbd>↓</kbd> เลื่อน</span>
+                <span><kbd>↵</kbd> เลือก</span>
+                <span><kbd>ESC</kbd> ปิด</span>
+                <span class="ml-auto cmdk-help-hint">กด <kbd>?</kbd> ดูคีย์ลัด</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Keyboard shortcuts help modal -->
+    <div id="kbd-help-overlay" class="cmdk-overlay" role="dialog" aria-modal="true" aria-labelledby="kbd-help-title" hidden>
+        <div class="cmdk-panel cmdk-panel--small">
+            <div class="cmdk-help-head">
+                <h2 id="kbd-help-title" class="font-bold text-slate-800 text-base">คีย์ลัด</h2>
+                <button class="cmdk-close" onclick="kbdHelpClose()" aria-label="ปิด">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <dl class="kbd-help-list">
+                <div><kbd>⌘</kbd>+<kbd>K</kbd> <span>เปิด Command Palette</span></div>
+                <div><kbd>g</kbd> <kbd>d</kbd> <span>ไปหน้า Dashboard</span></div>
+                <div><kbd>g</kbd> <kbd>i</kbd> <span>ไป Identity & Governance</span></div>
+                <div><kbd>g</kbd> <kbd>a</kbd> <span>ไปประกาศ</span></div>
+                <div><kbd>g</kbd> <kbd>e</kbd> <span>ไป Error Logs</span></div>
+                <div><kbd>g</kbd> <kbd>s</kbd> <span>ไป Settings</span></div>
+                <div><kbd>g</kbd> <kbd>r</kbd> <span>ไปครุภัณฑ์สำนักงาน</span></div>
+                <div><kbd>/</kbd> <span>โฟกัสช่องค้นหา</span></div>
+                <div><kbd>?</kbd> <span>เปิดคีย์ลัด (หน้านี้)</span></div>
+                <div><kbd>ESC</kbd> <span>ปิด modal / palette</span></div>
+            </dl>
+        </div>
+    </div>
+
+    <script>
+    (function () {
+        // ── Command catalog ──────────────────────────────────────────────
+        // type: 'section' = call switchSection, 'url' = navigate
+        const ALL_COMMANDS = [
+            { id: 'dashboard',     label: 'Dashboard',           desc: 'ภาพรวม + งานวันนี้', shortcut: 'g d', icon: 'fa-chart-pie',          tone: 'success', type: 'section', target: 'dashboard' },
+            { id: 'ai_assistant',  label: 'AI Assistant',        desc: 'ผู้ช่วย AI',         icon: 'fa-wand-magic-sparkles', tone: 'accent', type: 'section', target: 'ai_assistant' },
+            { id: 'identity',      label: 'Identity & Governance', desc: 'จัดการสิทธิ์ผู้ใช้', shortcut: 'g i', icon: 'fa-id-card-clip',  tone: 'info',    type: 'section', target: 'identity' },
+            { id: 'insurance_sync', label: 'Insurance Hub',      desc: 'ระบบสิทธิ์ประกัน',   icon: 'fa-shield-halved',      tone: 'info',    type: 'section', target: 'insurance_sync' },
+            { id: 'registry_upload', label: 'อัพโหลดรายชื่อ',    desc: 'ทะเบียน',            icon: 'fa-id-card-clip',      tone: 'info',    type: 'section', target: 'registry_upload' },
+            { id: 'batch_status',  label: 'สถานะเอกสาร',         desc: 'Insurance Batch',    icon: 'fa-list-check',         tone: 'info',    type: 'section', target: 'batch_status' },
+            { id: 'manage_insurance_partners', label: 'Insurance Partners', desc: 'จัดการพาร์ทเนอร์', icon: 'fa-handshake', tone: 'success', type: 'section', target: 'manage_insurance_partners' },
+            { id: 'announcements', label: 'ประกาศ',              desc: 'จัดการประกาศ Hub',  shortcut: 'g a', icon: 'fa-bullhorn',           tone: 'accent',  type: 'section', target: 'announcements' },
+            { id: 'activity_logs', label: 'Activity Logs',       desc: 'บันทึกกิจกรรมระบบ',  icon: 'fa-file-lines',         tone: 'neutral', type: 'section', target: 'activity_logs' },
+            { id: 'error_logs',    label: 'Error Logs',          desc: 'บันทึกข้อผิดพลาด',  shortcut: 'g e', icon: 'fa-bug',                tone: 'danger',  type: 'section', target: 'error_logs' },
+            { id: 'privilege_inventory', label: 'ISO Governance', desc: 'Privileged Access', icon: 'fa-shield-halved',      tone: 'success', type: 'section', target: 'privilege_inventory' },
+            { id: 'settings',      label: 'Settings',            desc: 'ตั้งค่าระบบ',        shortcut: 'g s', icon: 'fa-gear',               tone: 'warning', type: 'section', target: 'settings' },
+
+            { id: 'open_asset',    label: 'ครุภัณฑ์สำนักงาน',   desc: 'ทะเบียนทรัพย์สิน',  shortcut: 'g r', icon: 'fa-boxes-stacked',     tone: 'success', type: 'url',     target: '../asset/index.php' },
+            { id: 'open_campaign', label: 'Campaign Manager',    desc: 'จัดการแคมเปญ',      icon: 'fa-bullhorn',           tone: 'info',    type: 'url',     target: '../admin/campaigns.php' },
+            { id: 'open_eborrow',  label: 'e-Borrow & Inventory', desc: 'ระบบยืม-คืนอุปกรณ์', icon: 'fa-toolbox',         tone: 'neutral', type: 'url',     target: '../e_Borrow/admin/index.php' },
+            { id: 'open_users',    label: 'Users Center',        desc: 'รายชื่อผู้ใช้',     icon: 'fa-users',              tone: 'info',    type: 'url',     target: 'users.php' },
+            { id: 'open_support',  label: 'Live Support Chat',   desc: 'แชทตอบกลับผู้ใช้',  icon: 'fa-comments',           tone: 'info',    type: 'url',     target: 'support_chat.php' },
+        ];
+
+        // Filter to commands that exist for this user
+        // (sidebar links only render for sections the user can access)
+        const accessibleSections = new Set(
+            Array.from(document.querySelectorAll('[data-section]')).map(el => el.dataset.section)
+        );
+        const COMMANDS = ALL_COMMANDS.filter(c =>
+            c.type === 'url' || accessibleSections.has(c.target)
+        );
+
+        // ── State ────────────────────────────────────────────────────────
+        const overlay = document.getElementById('cmdk-overlay');
+        const input   = document.getElementById('cmdk-input');
+        const list    = document.getElementById('cmdk-list');
+        const helpOverlay = document.getElementById('kbd-help-overlay');
+        let activeIdx = 0;
+        let filtered  = COMMANDS;
+        let leaderKey = null;       // pending 'g'
+        let leaderTimer = null;
+
+        // ── Filtering ────────────────────────────────────────────────────
+        function fuzzyMatch(query, text) {
+            query = query.toLowerCase().trim();
+            text  = text.toLowerCase();
+            if (!query) return true;
+            // Substring or all-chars-in-order
+            if (text.includes(query)) return true;
+            let qi = 0;
+            for (let i = 0; i < text.length && qi < query.length; i++) {
+                if (text[i] === query[qi]) qi++;
+            }
+            return qi === query.length;
+        }
+
+        function filter(query) {
+            filtered = COMMANDS.filter(c =>
+                fuzzyMatch(query, c.label + ' ' + (c.desc || '') + ' ' + (c.shortcut || ''))
+            );
+            activeIdx = 0;
+            render();
+        }
+
+        // ── Render ───────────────────────────────────────────────────────
+        function render() {
+            if (!filtered.length) {
+                list.innerHTML = '<li class="cmdk-empty">ไม่พบคำสั่งที่ตรง</li>';
+                return;
+            }
+            list.innerHTML = filtered.map((c, i) => `
+                <li class="cmdk-item cmdk-item--${c.tone || 'neutral'} ${i === activeIdx ? 'is-active' : ''}"
+                    role="option" aria-selected="${i === activeIdx}" data-idx="${i}">
+                    <div class="cmdk-item-icon"><i class="fa-solid ${c.icon}"></i></div>
+                    <div class="cmdk-item-body">
+                        <div class="cmdk-item-label">${c.label}</div>
+                        ${c.desc ? `<div class="cmdk-item-desc">${c.desc}</div>` : ''}
+                    </div>
+                    ${c.shortcut ? `<kbd class="cmdk-item-kbd">${c.shortcut}</kbd>` : ''}
+                </li>
+            `).join('');
+        }
+
+        // ── Open / Close ────────────────────────────────────────────────
+        function open() {
+            overlay.hidden = false;
+            requestAnimationFrame(() => overlay.classList.add('is-open'));
+            input.value = '';
+            filter('');
+            input.focus();
+        }
+        function close() {
+            overlay.classList.remove('is-open');
+            setTimeout(() => { overlay.hidden = true; }, 180);
+        }
+        window.cmdkOpen = open;
+
+        // Help modal
+        function helpOpen() {
+            helpOverlay.hidden = false;
+            requestAnimationFrame(() => helpOverlay.classList.add('is-open'));
+        }
+        window.kbdHelpClose = function () {
+            helpOverlay.classList.remove('is-open');
+            setTimeout(() => { helpOverlay.hidden = true; }, 180);
+        };
+
+        // ── Execute ──────────────────────────────────────────────────────
+        function execute(cmd) {
+            close();
+            if (!cmd) return;
+            if (cmd.type === 'section') {
+                if (typeof switchSection === 'function') {
+                    const btn = document.querySelector(`[data-section="${cmd.target}"]`);
+                    switchSection(cmd.target, btn);
+                }
+            } else if (cmd.type === 'url') {
+                window.location.href = cmd.target;
+            }
+        }
+
+        // ── Events ───────────────────────────────────────────────────────
+        input.addEventListener('input', e => filter(e.target.value));
+        input.addEventListener('keydown', e => {
+            if (e.key === 'ArrowDown') { e.preventDefault(); activeIdx = (activeIdx + 1) % filtered.length; render(); }
+            else if (e.key === 'ArrowUp') { e.preventDefault(); activeIdx = (activeIdx - 1 + filtered.length) % filtered.length; render(); }
+            else if (e.key === 'Enter')  { e.preventDefault(); execute(filtered[activeIdx]); }
+        });
+        list.addEventListener('click', e => {
+            const li = e.target.closest('.cmdk-item');
+            if (li) execute(filtered[parseInt(li.dataset.idx, 10)]);
+        });
+        overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+        helpOverlay.addEventListener('click', e => { if (e.target === helpOverlay) window.kbdHelpClose(); });
+
+        // ── Global keyboard ─────────────────────────────────────────────
+        function isTypingTarget(el) {
+            if (!el) return false;
+            const tag = el.tagName;
+            return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el.isContentEditable;
+        }
+
+        document.addEventListener('keydown', e => {
+            // ⌘K / Ctrl+K — open palette
+            if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+                e.preventDefault();
+                if (overlay.hidden) open(); else close();
+                return;
+            }
+            // ESC — close any open modal
+            if (e.key === 'Escape') {
+                if (!overlay.hidden) { e.preventDefault(); close(); }
+                else if (!helpOverlay.hidden) { e.preventDefault(); window.kbdHelpClose(); }
+                return;
+            }
+            // Don't trigger leader / help while typing
+            if (isTypingTarget(e.target)) return;
+
+            // ? — open shortcut help (use shift+/ which produces "?")
+            if (e.key === '?') { e.preventDefault(); helpOpen(); return; }
+
+            // / — focus project search
+            if (e.key === '/') {
+                e.preventDefault();
+                const proj = document.getElementById('search-project');
+                if (proj) proj.focus();
+                return;
+            }
+
+            // Sequence shortcut (g + letter)
+            if (e.key === 'g' && !e.metaKey && !e.ctrlKey && !e.altKey) {
+                leaderKey = 'g';
+                clearTimeout(leaderTimer);
+                leaderTimer = setTimeout(() => { leaderKey = null; }, 900);
+                return;
+            }
+            if (leaderKey === 'g') {
+                const map = {
+                    d: 'dashboard',
+                    i: 'identity',
+                    a: 'announcements',
+                    e: 'error_logs',
+                    s: 'settings',
+                };
+                const sec = map[e.key];
+                if (sec) {
+                    e.preventDefault();
+                    leaderKey = null;
+                    if (typeof switchSection === 'function') {
+                        const btn = document.querySelector(`[data-section="${sec}"]`);
+                        if (btn) switchSection(sec, btn);
+                    }
+                    return;
+                }
+                if (e.key === 'r') {
+                    e.preventDefault(); leaderKey = null;
+                    window.location.href = '../asset/index.php'; return;
+                }
+                leaderKey = null;
+            }
+        });
+    })();
+    </script>
+
 </body>
 
 </html>
