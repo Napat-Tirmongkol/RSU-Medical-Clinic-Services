@@ -69,6 +69,7 @@ $initials = mb_substr(trim(preg_replace('/\s+/u', ' ', $full_name)), 0, 1, 'UTF-
             $tabs = [
                 ['key' => 'index',      'href' => 'index.php',                  'icon' => 'fa-chart-pie',     'label' => 'ภาพรวม',     'roles' => ['admin','editor','employee']],
                 ['key' => 'assets',     'href' => 'admin/manage_assets.php',    'icon' => 'fa-boxes-stacked', 'label' => 'ครุภัณฑ์',     'roles' => ['admin','editor','employee']],
+                ['key' => 'stock_take', 'href' => 'admin/stock_take.php',       'icon' => 'fa-clipboard-check','label' => 'ตรวจนับ',     'roles' => ['admin','editor','employee']],
                 ['key' => 'reports',    'href' => 'admin/reports.php',          'icon' => 'fa-chart-line',    'label' => 'รายงาน',      'roles' => ['admin','editor']],
                 ['key' => 'barcode',    'href' => 'admin/print_barcode.php',    'icon' => 'fa-barcode',       'label' => 'พิมพ์บาร์โค้ด','roles' => ['admin','editor']],
                 ['key' => 'categories', 'href' => 'admin/manage_categories.php','icon' => 'fa-tags',          'label' => 'หมวดหมู่',     'roles' => ['admin','editor']],

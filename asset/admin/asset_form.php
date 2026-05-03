@@ -51,6 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'vendor'         => trim((string)($_POST['vendor'] ?? '')) ?: null,
             'category_id'    => (int)($_POST['category_id'] ?? 0) ?: null,
             'location_id'    => (int)($_POST['location_id'] ?? 0) ?: null,
+            'custodian_id'   => (int)($_POST['custodian_id'] ?? 0) ?: null,
             'status'         => array_key_exists($_POST['status'] ?? '', asset_status_options())
                                     ? $_POST['status'] : 'in_use',
             'note'           => trim((string)($_POST['note'] ?? '')) ?: null,
@@ -106,6 +107,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $categories = $pdo->query("SELECT id, name FROM asset_categories ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
 $locations  = $pdo->query("SELECT id, name FROM asset_locations  WHERE is_active=1 ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
+$custodians = [];
+try {
+    $custodians = $pdo->query("SELECT id, full_name FROM sys_staff WHERE account_status='active' ORDER BY full_name")->fetchAll(PDO::FETCH_ASSOC);
+} catch (Throwable $e) { /* table may not exist on test envs */ }
 
 $page_title   = $mode === 'edit' ? 'แก้ไขครุภัณฑ์' : 'เพิ่มครุภัณฑ์';
 $current_page = 'assets';
@@ -203,6 +208,18 @@ include __DIR__ . '/../includes/header.php';
             <select name="status" class="asset-input">
                 <?php foreach (asset_status_options() as $k => $label): ?>
                     <option value="<?= $k ?>" <?= ($asset['status'] ?? '') === $k ? 'selected' : '' ?>><?= $label ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+
+        <div class="md:col-span-6">
+            <label class="asset-label">ผู้รับผิดชอบ (Custodian)</label>
+            <select name="custodian_id" class="asset-input">
+                <option value="0">— ไม่ระบุ —</option>
+                <?php foreach ($custodians as $u): ?>
+                    <option value="<?= $u['id'] ?>" <?= (int)($asset['custodian_id'] ?? 0) === (int)$u['id'] ? 'selected' : '' ?>>
+                        <?= htmlspecialchars($u['full_name']) ?>
+                    </option>
                 <?php endforeach; ?>
             </select>
         </div>
