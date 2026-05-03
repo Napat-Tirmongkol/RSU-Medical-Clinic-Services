@@ -63,12 +63,27 @@ $navGroups = [
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="วัสดุ">
     <link rel="apple-touch-icon" href="../asset/assets/icons/icon-192.png">
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=Prompt:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
     <link rel="stylesheet" href="../assets/css/tailwind.min.css">
     <link rel="stylesheet" href="../assets/css/portal.css">
     <!-- ใช้ stylesheet ของโมดูลครุภัณฑ์ร่วมกัน เพื่อความสอดคล้องของดีไซน์ -->
     <link rel="stylesheet" href="../asset/assets/css/asset.css?v=2.1">
+    <style>
+        /* Protect Font Awesome icon glyphs from portal.css body{font-family:!important} cascade */
+        .fa-solid::before,.fa-regular::before,.fa-light::before,.fa-brands::before,
+        .fas::before,.far::before,.fab::before,.fa::before {
+            font-family: "Font Awesome 6 Free" !important;
+            font-weight: 900 !important;
+            -moz-osx-font-smoothing: grayscale;
+            -webkit-font-smoothing: antialiased;
+        }
+        .fa-brands::before,.fab::before {
+            font-family: "Font Awesome 6 Brands" !important;
+            font-weight: 400 !important;
+        }
+    </style>
     <script>
         (function () {
             try {
