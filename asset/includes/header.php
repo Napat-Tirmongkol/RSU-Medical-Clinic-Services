@@ -8,14 +8,34 @@ $full_name  = $_SESSION['full_name'] ?? 'ผู้ใช้';
 $initials   = mb_substr(trim(preg_replace('/\s+/u', ' ', $full_name)), 0, 1, 'UTF-8');
 $current    = $current_page ?? '';
 
-$navItems = [
-    ['key' => 'index',      'href' => 'index.php',                    'icon' => 'fa-chart-pie',      'color' => '#059669', 'label' => 'ภาพรวม',      'roles' => ['admin','editor','employee']],
-    ['key' => 'assets',     'href' => 'admin/manage_assets.php',      'icon' => 'fa-boxes-stacked',  'color' => '#2e9e63', 'label' => 'ครุภัณฑ์',      'roles' => ['admin','editor','employee']],
-    ['key' => 'stock_take', 'href' => 'admin/stock_take.php',         'icon' => 'fa-clipboard-check','color' => '#0891b2', 'label' => 'ตรวจนับ',      'roles' => ['admin','editor','employee']],
-    ['key' => 'reports',    'href' => 'admin/reports.php',            'icon' => 'fa-chart-line',     'color' => '#7c3aed', 'label' => 'รายงาน',       'roles' => ['admin','editor']],
-    ['key' => 'barcode',    'href' => 'admin/print_barcode.php',      'icon' => 'fa-barcode',        'color' => '#0f172a', 'label' => 'พิมพ์บาร์โค้ด','roles' => ['admin','editor']],
-    ['key' => 'categories', 'href' => 'admin/manage_categories.php',  'icon' => 'fa-tags',           'color' => '#d97706', 'label' => 'หมวดหมู่',     'roles' => ['admin','editor']],
-    ['key' => 'locations',  'href' => 'admin/manage_locations.php',   'icon' => 'fa-location-dot',   'color' => '#dc2626', 'label' => 'จุดใช้งาน',    'roles' => ['admin','editor']],
+$navGroups = [
+    [
+        'label' => 'OVERVIEW',
+        'items' => [
+            ['key' => 'index', 'href' => 'index.php', 'icon' => 'fa-chart-pie', 'color' => '#059669', 'label' => 'ภาพรวม', 'roles' => ['admin','editor','employee']],
+        ],
+    ],
+    [
+        'label' => 'ทะเบียน',
+        'items' => [
+            ['key' => 'assets',     'href' => 'admin/manage_assets.php',     'icon' => 'fa-boxes-stacked', 'color' => '#2e9e63', 'label' => 'ครุภัณฑ์',  'roles' => ['admin','editor','employee']],
+            ['key' => 'categories', 'href' => 'admin/manage_categories.php', 'icon' => 'fa-tags',          'color' => '#d97706', 'label' => 'หมวดหมู่',  'roles' => ['admin','editor']],
+            ['key' => 'locations',  'href' => 'admin/manage_locations.php',  'icon' => 'fa-location-dot',  'color' => '#dc2626', 'label' => 'จุดใช้งาน', 'roles' => ['admin','editor']],
+        ],
+    ],
+    [
+        'label' => 'ปฏิบัติการ',
+        'items' => [
+            ['key' => 'stock_take', 'href' => 'admin/stock_take.php',    'icon' => 'fa-clipboard-check', 'color' => '#0891b2', 'label' => 'ตรวจนับ',      'roles' => ['admin','editor','employee']],
+            ['key' => 'barcode',    'href' => 'admin/print_barcode.php', 'icon' => 'fa-barcode',         'color' => '#0f172a', 'label' => 'พิมพ์บาร์โค้ด','roles' => ['admin','editor']],
+        ],
+    ],
+    [
+        'label' => 'รายงาน',
+        'items' => [
+            ['key' => 'reports', 'href' => 'admin/reports.php', 'icon' => 'fa-chart-line', 'color' => '#7c3aed', 'label' => 'รายงาน', 'roles' => ['admin','editor']],
+        ],
+    ],
 ];
 ?>
 <!DOCTYPE html>
@@ -64,21 +84,30 @@ $navItems = [
     </div>
 
     <div style="padding:10px;flex:1;overflow-y:auto;display:flex;flex-direction:column;">
-        <?php foreach ($navItems as $item):
-            if (!in_array($user_role, $item['roles'], true)) continue;
-            $active = ($current === $item['key']);
+        <?php foreach ($navGroups as $gIdx => $group):
+            // กรองเฉพาะ items ที่ user role เห็นได้
+            $visibleItems = array_filter($group['items'], fn($it) => in_array($user_role, $it['roles'], true));
+            if (empty($visibleItems)) continue;
         ?>
-            <a href="<?= htmlspecialchars($item['href']) ?>" class="psb-item <?= $active ? 'psb-active' : '' ?>" style="text-decoration:none">
-                <div class="psb-icon"><i class="fa-solid <?= $item['icon'] ?>" style="color: <?= $item['color'] ?>"></i></div>
-                <span class="psb-label" style="color: <?= $item['color'] ?>; font-weight:900"><?= htmlspecialchars($item['label']) ?></span>
-            </a>
+            <div class="psb-section-label" <?= $gIdx === 0 ? 'style="margin-top:4px"' : '' ?>>
+                <?= htmlspecialchars($group['label']) ?>
+            </div>
+            <?php foreach ($visibleItems as $item):
+                $active = ($current === $item['key']);
+            ?>
+                <a href="<?= htmlspecialchars($item['href']) ?>" class="psb-item <?= $active ? 'psb-active' : '' ?>" style="text-decoration:none">
+                    <div class="psb-icon"><i class="fa-solid <?= $item['icon'] ?>" style="color: <?= $item['color'] ?>"></i></div>
+                    <span class="psb-label" style="color: <?= $item['color'] ?>; font-weight:900"><?= htmlspecialchars($item['label']) ?></span>
+                </a>
+            <?php endforeach; ?>
         <?php endforeach; ?>
 
         <div style="flex:1"></div>
 
+        <div class="psb-section-label">ทั่วไป</div>
         <a href="../portal/index.php" class="psb-item" style="text-decoration:none" title="กลับ Portal">
             <div class="psb-icon"><i class="fa-solid fa-house" style="color:#475569"></i></div>
-            <span class="psb-label" style="color:#475569;font-weight:900">Portal</span>
+            <span class="psb-label" style="color:#475569;font-weight:900">กลับ Portal</span>
         </a>
     </div>
 </nav>
