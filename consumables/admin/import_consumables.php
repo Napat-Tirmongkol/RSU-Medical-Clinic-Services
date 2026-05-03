@@ -50,7 +50,9 @@ if (($_GET['template'] ?? '') === '1') {
     $sh = $sp->getActiveSheet();
     $sh->setTitle('วัสดุสิ้นเปลือง');
     $headers = ['ชื่อวัสดุ','ยี่ห้อ','หมวดหมู่','จุดจัดเก็บ','หน่วยใหญ่','หน่วยย่อย','จำนวนต่อหน่วยใหญ่','จุดสั่งซื้อ','ยอดเริ่มต้น','หมายเหตุ'];
-    foreach ($headers as $i => $h) $sh->setCellValueByColumnAndRow($i + 1, 1, $h);
+    foreach ($headers as $i => $h) {
+        $sh->setCellValue([$i + 1, 1], $h);
+    }
     $sh->getStyle('A1:J1')->applyFromArray([
         'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
         'fill' => ['fillType' => 'solid', 'startColor' => ['rgb' => '2E9E63']],
@@ -61,12 +63,16 @@ if (($_GET['template'] ?? '') === '1') {
         ['หน้ากากอนามัย', '3M', 'เวชภัณฑ์ทางการแพทย์', 'ห้องยา', 'แพ็ค', 'ชิ้น', 50, 100, 500, ''],
     ];
     foreach ($sample as $i => $row) {
-        foreach ($row as $j => $v) $sh->setCellValueByColumnAndRow($j + 1, $i + 2, $v);
+        foreach ($row as $j => $v) {
+            $sh->setCellValue([$j + 1, $i + 2], $v);
+        }
     }
     foreach (range('A', 'J') as $c) $sh->getColumnDimension($c)->setAutoSize(true);
 
+    while (ob_get_level() > 0) ob_end_clean();
     header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     header('Content-Disposition: attachment; filename="consumables_template.xlsx"');
+    header('Cache-Control: max-age=0');
     (new XlsxWriter($sp))->save('php://output');
     exit;
 }

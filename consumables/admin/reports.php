@@ -187,6 +187,7 @@ if (($_GET['export'] ?? '') === 'xlsx') {
 
     $spreadsheet->setActiveSheetIndex(0);
     $filename = 'consumables_report_' . date('Ymd_His') . '.xlsx';
+    while (ob_get_level() > 0) ob_end_clean();
     header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     header('Content-Disposition: attachment; filename="' . $filename . '"');
     header('Cache-Control: max-age=0');
