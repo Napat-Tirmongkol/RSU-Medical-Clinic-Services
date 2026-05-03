@@ -795,6 +795,7 @@ try {
 </head>
 
 <body class="font-sans text-gray-800 bg-[#f4f7f5]" style="height:100vh;overflow:hidden;display:flex;flex-direction:row">
+<script>if(localStorage.getItem('ecampaign_theme')==='dark')document.body.setAttribute('data-theme','dark');</script>
 
     <a href="#portal-main" class="skip-to-content">ข้ามไปยังเนื้อหาหลัก</a>
 
@@ -2542,28 +2543,28 @@ try {
         }
 
         function applyTheme(theme) {
+            const btn = document.getElementById('darkModeToggle');
             if (theme === 'dark') {
                 document.body.setAttribute('data-theme', 'dark');
-                document.getElementById('darkModeToggle').innerHTML = '<i class="fa-solid fa-sun text-amber-500"></i>';
+                if (btn) btn.innerHTML = '<i class="fa-solid fa-sun text-amber-500"></i>';
                 localStorage.setItem('ecampaign_theme', 'dark');
             } else {
                 document.body.removeAttribute('data-theme');
-                document.getElementById('darkModeToggle').innerHTML = '<i class="fa-solid fa-moon"></i>';
+                if (btn) btn.innerHTML = '<i class="fa-solid fa-moon"></i>';
                 localStorage.setItem('ecampaign_theme', 'light');
             }
-            
-            // Send message to all iframes to update their theme
             document.querySelectorAll('iframe').forEach(iframe => {
-                if(iframe.contentWindow) {
-                    iframe.contentWindow.postMessage({ type: 'THEME_CHANGE', theme: theme }, '*');
-                }
+                try { iframe.contentWindow.postMessage({ type: 'THEME_CHANGE', theme }, '*'); } catch(e) {}
             });
         }
 
-        // Apply theme on load
-        if (localStorage.getItem('ecampaign_theme') === 'dark') {
-            applyTheme('dark');
-        }
+        // Sync toggle icon with the theme already applied by the early inline script
+        document.addEventListener('DOMContentLoaded', () => {
+            if (localStorage.getItem('ecampaign_theme') === 'dark') {
+                const btn = document.getElementById('darkModeToggle');
+                if (btn) btn.innerHTML = '<i class="fa-solid fa-sun text-amber-500"></i>';
+            }
+        });
     </script>
 
     <script>
