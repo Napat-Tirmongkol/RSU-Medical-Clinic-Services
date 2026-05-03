@@ -248,7 +248,7 @@ $stages = ins_batch_stepper_stages();
 
     window.bsLoadStats = async function() {
         const r = await fetch('ajax_insurance_batches.php?action=stats').then(r => r.json());
-        if (!r.ok && !r.success) return;
+        if (r.status !== 'ok') return;
         const counts = (r.data && r.data.by_status) || r.by_status || {};
         document.querySelectorAll('.bs-stat').forEach(el => {
             const st = el.dataset.status;
@@ -263,7 +263,7 @@ $stages = ins_batch_stepper_stages();
         const st = document.getElementById('bsStatusFilter').value;
         const url = `ajax_insurance_batches.php?action=list&page=${page}&q=${encodeURIComponent(q)}&status=${encodeURIComponent(st)}`;
         const r = await fetch(url).then(r => r.json());
-        if (!r.ok && !r.success) { alert(r.error || r.message || 'load error'); return; }
+        if (r.status !== 'ok') { alert(r.message || 'load error'); return; }
         const payload = r.data || r;
 
         const tb = document.getElementById('bsTbody');
@@ -314,8 +314,8 @@ $stages = ins_batch_stepper_stages();
         document.getElementById('bsDrawerBody').innerHTML = '<div style="text-align:center; padding:3rem; color:#94a3b8;"><i class="fa-solid fa-spinner fa-spin fa-2x"></i></div>';
 
         const r = await fetch(`ajax_insurance_batches.php?action=detail&id=${id}`).then(r => r.json());
-        if (!r.ok && !r.success) {
-            document.getElementById('bsDrawerBody').innerHTML = `<div style="color:#dc2626;">${esc(r.error || 'load error')}</div>`;
+        if (r.status !== 'ok') {
+            document.getElementById('bsDrawerBody').innerHTML = `<div style="color:#dc2626;">${esc(r.message || 'load error')}</div>`;
             return;
         }
         const d = r.data || r;
@@ -435,7 +435,7 @@ $stages = ins_batch_stepper_stages();
 
     window.bsLoadMembers = async function(batchId, page) {
         const r = await fetch(`ajax_insurance_batches.php?action=members&id=${batchId}&page=${page}`).then(r => r.json());
-        if (!r.ok && !r.success) { document.getElementById('bsMemberList').innerHTML = `<div style="color:#dc2626;">${esc(r.error)}</div>`; return; }
+        if (r.status !== 'ok') { document.getElementById('bsMemberList').innerHTML = `<div style="color:#dc2626;">${esc(r.message)}</div>`; return; }
         const p = (r.data || r).pagination;
         const rows = (r.data || r).data || [];
         if (!rows.length) {
@@ -472,7 +472,7 @@ $stages = ins_batch_stepper_stages();
         fd.append('note', note);
         fd.append('csrf_token', CSRF);
         const r = await fetch('ajax_insurance_batches.php', { method: 'POST', body: fd }).then(r => r.json());
-        if (!r.ok && !r.success) { alert(r.error || r.message); return; }
+        if (r.status !== 'ok') { alert(r.message); return; }
         bsCloseDrawer(); bsLoad(currentPage);
     };
     window.bsReject = async function(id) {
@@ -484,7 +484,7 @@ $stages = ins_batch_stepper_stages();
         fd.append('note', note.trim());
         fd.append('csrf_token', CSRF);
         const r = await fetch('ajax_insurance_batches.php', { method: 'POST', body: fd }).then(r => r.json());
-        if (!r.ok && !r.success) { alert(r.error || r.message); return; }
+        if (r.status !== 'ok') { alert(r.message); return; }
         bsCloseDrawer(); bsLoad(currentPage);
     };
     window.bsCloseDrawer = function(e) {
