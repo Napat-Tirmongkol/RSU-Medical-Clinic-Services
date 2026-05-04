@@ -87,12 +87,23 @@ try {
     switch ("$entity:$action") {
         // ── Clinic Profile ────────────────────────────────────────────────
         case 'profile:save':
+            // VALUES(col) so each named placeholder appears only once —
+            // PDO with EMULATE_PREPARES=false rejects reused names.
             $stmt = $pdo->prepare("INSERT INTO sys_clinic_profile
                 (id, name_th, name_en, address_th, address_en, phone, email, line_id, facebook, license_no, operating_hours, notes)
                 VALUES (1, :nt, :ne, :at, :ae, :ph, :em, :lid, :fb, :lic, :oh, :no)
                 ON DUPLICATE KEY UPDATE
-                    name_th=:nt, name_en=:ne, address_th=:at, address_en=:ae, phone=:ph,
-                    email=:em, line_id=:lid, facebook=:fb, license_no=:lic, operating_hours=:oh, notes=:no");
+                    name_th = VALUES(name_th),
+                    name_en = VALUES(name_en),
+                    address_th = VALUES(address_th),
+                    address_en = VALUES(address_en),
+                    phone = VALUES(phone),
+                    email = VALUES(email),
+                    line_id = VALUES(line_id),
+                    facebook = VALUES(facebook),
+                    license_no = VALUES(license_no),
+                    operating_hours = VALUES(operating_hours),
+                    notes = VALUES(notes)");
             $stmt->execute([
                 ':nt'  => trim((string)($_POST['name_th'] ?? '')),
                 ':ne'  => trim((string)($_POST['name_en'] ?? '')),
