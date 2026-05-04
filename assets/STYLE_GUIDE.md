@@ -111,20 +111,29 @@ respects the `content` purge so the file stays small.
 
 ## 4 — Module status (Phase 4 migration tracking)
 
-| Module                  | CDN → compiled | Tokens used | Bottom nav |
-|-------------------------|----------------|-------------|------------|
-| `user/hub.php`          | ⏳ pending     | ⏳ pending  | inline     |
-| `user/profile.php`      | ⏳ pending     | ⏳ pending  | shared ✅  |
-| `user/my_bookings.php`  | ⏳             | ⏳          | inline     |
-| `e_Borrow/` (user)      | ⏳             | ⏳          | shared ✅  |
-| `e_Borrow/admin`        | uses style.css | n/a         | n/a        |
-| `consumables/`          | TBD            | TBD         | TBD        |
-| `asset/`                | TBD            | TBD         | TBD        |
-| `insurance_partner/`    | TBD            | TBD         | TBD        |
-| `admin/`, `staff/`      | own theme      | n/a         | n/a        |
+| Module                  | CDN → compiled | Tokens available | Bottom nav |
+|-------------------------|----------------|------------------|------------|
+| `user/hub.php`          | ✅             | ✅                | inline     |
+| `user/profile.php`      | ✅             | ✅                | shared ✅  |
+| `user/my_bookings.php`  | ✅             | ✅                | inline     |
+| `user/booking_*.php`    | ✅             | ✅                | inline     |
+| `user/success.php`, `c.php`, `migrate_error.php` | ✅ | ✅ | n/a |
+| `e_Borrow/` (user)      | ✅             | ✅                | shared ✅  |
+| `e_Borrow/admin`        | uses own theme | n/a               | n/a        |
+| `consumables/`          | already ✅     | ✅ (auto-upgraded)| n/a        |
+| `asset/`                | already ✅     | ✅ (auto-upgraded)| n/a        |
+| `insurance_partner/`    | already ✅     | ✅ (auto-upgraded)| n/a        |
+| `admin/`, `staff/`      | own theme      | n/a               | n/a        |
 
-Tick a box when a module is migrated. Phases 1-2 only deliver the
-tokens + build; Phase 4 is the actual page-by-page migration.
+All user-facing modules now load the compiled stylesheet. The internal
+modules (`consumables/`, `asset/`, `insurance_partner/`) were already
+linking to `assets/css/tailwind.min.css`, but the file was empty before
+Phase 1-2 — they auto-upgraded the moment the build pipeline started
+producing real output.
+
+Remaining work for Phase 4 is opt-in: page-by-page refactor of long
+utility chains into `ds-*` component classes for readability. Not
+required, since direct utility usage works just as well.
 
 ---
 
