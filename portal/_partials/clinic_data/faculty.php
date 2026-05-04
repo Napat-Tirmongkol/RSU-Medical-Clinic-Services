@@ -1,6 +1,6 @@
 <?php
 // portal/_partials/clinic_data.php — included by portal/index.php
-// ข้อมูลคลีนิค: คณะ / หน่วยงาน (CRUD + นำเข้าจากไฟล์)
+// ข้อมูลคลินิก: คณะ / หน่วยงาน (CRUD + นำเข้าจากไฟล์)
 
 $pdo = db();
 
@@ -78,9 +78,9 @@ $_cd_qs = http_build_query(array_filter(['section' => 'clinic_data', 'cd_view' =
                 <div class="w-10 h-10 bg-teal-50 text-teal-600 rounded-xl flex items-center justify-center shadow-sm">
                     <i class="fa-solid fa-hospital"></i>
                 </div>
-                ข้อมูลคลีนิค
+                ข้อมูลคลินิก
             </h2>
-            <p class="text-slate-500 text-sm font-medium mt-1">ตั้งค่าโครงสร้างพื้นฐานและข้อมูลบุคลากรของคลีนิค</p>
+            <p class="text-slate-500 text-sm font-medium mt-1">ตั้งค่าโครงสร้างพื้นฐานและข้อมูลบุคลากรของคลินิก</p>
         </div>
     </div>
 
