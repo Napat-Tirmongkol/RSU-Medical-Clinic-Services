@@ -1,0 +1,48 @@
+{
+    "name": "ครุภัณฑ์สำนักงาน · RSU Medical Clinic",
+    "short_name": "ครุภัณฑ์",
+    "description": "ระบบทะเบียนครุภัณฑ์สำนักงาน - บันทึก ตรวจนับ และพิมพ์บาร์โค้ด",
+    "lang": "th",
+    "dir": "ltr",
+    "start_url": "./",
+    "scope": "./",
+    "display": "standalone",
+    "orientation": "portrait-primary",
+    "background_color": "#f4f7f5",
+    "theme_color": "#2e9e63",
+    "icons": [
+        {
+            "src": "assets/icons/icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any"
+        },
+        {
+            "src": "assets/icons/icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any"
+        },
+        {
+            "src": "assets/icons/icon-maskable.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "maskable"
+        }
+    ],
+    "shortcuts": [
+        {
+            "name": "สแกน QR",
+            "short_name": "สแกน",
+            "url": "./admin/scan.php",
+            "icons": [{ "src": "assets/icons/shortcut-scan.png", "sizes": "96x96" }]
+        },
+        {
+            "name": "เพิ่มครุภัณฑ์",
+            "short_name": "เพิ่ม",
+            "url": "./admin/asset_form.php",
+            "icons": [{ "src": "assets/icons/shortcut-add.png", "sizes": "96x96" }]
+        }
+    ],
+    "categories": ["business", "productivity", "utilities"]
+}

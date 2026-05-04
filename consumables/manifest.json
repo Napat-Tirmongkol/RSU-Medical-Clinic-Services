@@ -1,0 +1,46 @@
+{
+    "name": "วัสดุสิ้นเปลือง · RSU Medical Clinic",
+    "short_name": "วัสดุ",
+    "description": "ระบบจัดการสต็อกวัสดุสิ้นเปลือง — รับเข้า เบิกออก ตามหน่วยงาน",
+    "lang": "th",
+    "dir": "ltr",
+    "start_url": "./",
+    "scope": "./",
+    "display": "standalone",
+    "orientation": "portrait-primary",
+    "background_color": "#f4f7f5",
+    "theme_color": "#2e9e63",
+    "icons": [
+        {
+            "src": "../asset/assets/icons/icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any"
+        },
+        {
+            "src": "../asset/assets/icons/icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any"
+        },
+        {
+            "src": "../asset/assets/icons/icon-maskable.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "maskable"
+        }
+    ],
+    "shortcuts": [
+        {
+            "name": "เบิกออก",
+            "short_name": "เบิก",
+            "url": "./admin/issue_form.php"
+        },
+        {
+            "name": "รับเข้า",
+            "short_name": "รับ",
+            "url": "./admin/receive_form.php"
+        }
+    ],
+    "categories": ["business", "productivity", "utilities"]
+}

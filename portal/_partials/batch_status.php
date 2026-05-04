@@ -301,6 +301,11 @@ $stages = ins_batch_stepper_stages();
         }
 
         const p = payload.pagination;
+        if (!p) {
+            // Backend returned no pagination block — skip pagination render to avoid TypeError
+            bsLoadStats();
+            return;
+        }
         document.getElementById('bsTotalInfo').textContent =
             `หน้า ${p.page} / ${p.total_pages} · รวม ${p.total.toLocaleString()} เอกสาร`;
         renderPagination('bsPagination', p, bsLoad);

@@ -90,6 +90,8 @@ $kpis = [
     'total_quota' => 0,
     'used_quota' => 0,
     'booking_rate' => 0,
+    'bookings_today' => 0,
+    'errors_today'   => 0,
 ];
 
 try {
@@ -99,17 +101,31 @@ try {
     // Quota & booking rate (e-Campaign)
     // ปรับปรุงใหม่: ให้ดึงจากแคมเปญทั้งหมดเพื่อให้เห็นภาพรวมระบบ (หรือเฉพาะที่ยังไม่ลบ)
     $quotaRow = $pdo->query("
-        SELECT 
+        SELECT
             COALESCE(SUM(total_capacity), 0) AS total_quota,
             (SELECT COUNT(*) FROM camp_bookings WHERE status IN ('booked','confirmed')) AS used_quota
         FROM camp_list
     ")->fetch(PDO::FETCH_ASSOC);
-    
+
     $kpis['total_quota'] = (int) ($quotaRow['total_quota'] ?? 0);
     $kpis['used_quota'] = (int) ($quotaRow['used_quota'] ?? 0);
     $kpis['booking_rate'] = $kpis['total_quota'] > 0
         ? (int) round($kpis['used_quota'] / $kpis['total_quota'] * 100)
         : 0;
+
+    // "งานวันนี้" — actionable signals สำหรับ admin daily user
+    try {
+        $kpis['bookings_today'] = (int) $pdo->query(
+            "SELECT COUNT(*) FROM camp_bookings WHERE created_at >= NOW() - INTERVAL 24 HOUR"
+        )->fetchColumn();
+    } catch (PDOException $e) { /* ignore */ }
+    try {
+        if ($pdo->query("SHOW TABLES LIKE 'sys_error_logs'")->rowCount() > 0) {
+            $kpis['errors_today'] = (int) $pdo->query(
+                "SELECT COUNT(*) FROM sys_error_logs WHERE created_at >= NOW() - INTERVAL 24 HOUR"
+            )->fetchColumn();
+        }
+    } catch (PDOException $e) { /* ignore */ }
 
     // Equipment borrows (optional module)
     if ($pdo->query("SHOW TABLES LIKE 'borrow_records'")->rowCount() > 0) {
@@ -186,6 +202,36 @@ $projects = [
         'badges' => ['Inventory', 'Asset Tracking'],
         'actions' => [
             ['label' => 'Open System', 'url' => '../e_Borrow/admin/index.php', 'primary' => true],
+        ]
+    ],
+    [
+        'id' => 'asset_management',
+        'title' => 'ครุภัณฑ์สำนักงาน',
+        'description' => 'ทะเบียนครุภัณฑ์สำนักงาน — บันทึก ติดตาม และจัดการทรัพย์สินของหน่วยงาน พร้อมประวัติการเปลี่ยนแปลงและจุดใช้งาน',
+        'icon' => 'fa-boxes-stacked',
+        'bg_color' => 'bg-green-50',
+        'icon_color' => 'text-green-600',
+        'border_color' => 'border-green-100',
+        'allowed_roles' => ['admin', 'superadmin', 'editor'],
+        'staff_visible' => true,
+        'badges' => ['Asset Register', 'Inventory'],
+        'actions' => [
+            ['label' => 'เปิดระบบครุภัณฑ์', 'url' => '../asset/index.php', 'primary' => true],
+        ]
+    ],
+    [
+        'id' => 'consumables',
+        'title' => 'วัสดุสิ้นเปลือง',
+        'description' => 'จัดการสต็อกวัสดุสิ้นเปลือง — รับเข้า เบิกออก ตามหน่วยงาน/คณะ พร้อมแจ้งเตือนเมื่อใกล้หมด เหมาะสำหรับเวชภัณฑ์ ถุงยาง หน้ากาก ฯลฯ',
+        'icon' => 'fa-box-open',
+        'bg_color' => 'bg-emerald-50',
+        'icon_color' => 'text-emerald-600',
+        'border_color' => 'border-emerald-100',
+        'allowed_roles' => ['admin', 'superadmin', 'editor'],
+        'staff_visible' => true,
+        'badges' => ['Stock', 'Issue/Receive'],
+        'actions' => [
+            ['label' => 'เปิดระบบวัสดุ', 'url' => '../consumables/index.php', 'primary' => true],
         ]
     ],
     [
@@ -298,6 +344,8 @@ $categoryMap = [
     'identity_governance' => 'core',
     'e_campaign' => 'core',
     'e_borrow' => 'core',
+    'asset_management' => 'core',
+    'consumables' => 'core',
     'insurance_sync' => 'core',
     'system_logs' => 'tools',
     'privilege_inventory' => 'tools',
@@ -740,13 +788,19 @@ try {
             document.querySelectorAll('.portal-section').forEach(function (s) { s.style.display = 'none'; });
             var target = document.getElementById('section-' + sectionId);
             if (target) target.style.display = '';
-            document.querySelectorAll('.psb-item').forEach(function (b) { b.classList.remove('psb-active'); });
-            
+            document.querySelectorAll('.psb-item').forEach(function (b) {
+                b.classList.remove('psb-active');
+                b.removeAttribute('aria-current');
+            });
+
             // If btn not provided, try to find it in sidebar
             if (!btn) {
                 btn = document.querySelector('.psb-item[data-section="' + sectionId + '"]');
             }
-            if (btn) btn.classList.add('psb-active');
+            if (btn) {
+                btn.classList.add('psb-active');
+                btn.setAttribute('aria-current', 'page');
+            }
             
             var url = new URL(window.location.href);
             url.searchParams.set('section', sectionId);
@@ -757,6 +811,9 @@ try {
 </head>
 
 <body class="font-sans text-gray-800 bg-[#f4f7f5]" style="height:100vh;overflow:hidden;display:flex;flex-direction:row">
+<script>if(localStorage.getItem('ecampaign_theme')==='dark')document.body.setAttribute('data-theme','dark');</script>
+
+    <a href="#portal-main" class="skip-to-content">ข้ามไปยังเนื้อหาหลัก</a>
 
     <!-- ── Collapsible Sidebar ── -->
     <nav id="portal-sidebar">
@@ -782,73 +839,105 @@ try {
             </button>
         </div>
 
-        <!-- Nav items -->
-        <div style="padding:10px;flex:1;overflow:hidden;display:flex;flex-direction:column;">
+        <!-- Nav items (grouped) -->
+        <div style="padding:10px;flex:1;overflow-y:auto;display:flex;flex-direction:column;">
+            <?php
+            // Pre-compute role flags for cleaner conditionals
+            $isSuper        = ($adminRole === 'superadmin');
+            $hasRegistry    = $isSuper || !empty($_SESSION['access_registry']);
+            $hasInsurance   = $isSuper || !empty($_SESSION['access_insurance']) || !empty($_SESSION['access_registry']);
+            $hasSysLogs     = $isSuper || !empty($_SESSION['access_system_logs']);
+            $hasSiteSet     = $isSuper || !empty($_SESSION['access_site_settings']);
+            ?>
+
+            <?php /* ── OVERVIEW ───────────────────────────────────────────── */ ?>
             <?php if (!$registryOnly): ?>
-            <button class="psb-item <?= $activeSection==='dashboard'?'psb-active':'' ?>" data-section="dashboard" onclick="switchSection('dashboard',this)">
-                <div class="psb-icon"><i class="fa-solid fa-chart-pie" style="color:#059669"></i></div>
-                <span class="psb-label" style="color:#059669;font-weight:900">Dashboard</span>
-            </button>
-            <button class="psb-item" data-section="ai_assistant" onclick="switchSection('ai_assistant',this)">
-                <div class="psb-icon"><i class="fa-solid fa-wand-magic-sparkles" style="color:#8b5cf6"></i></div>
-                <span class="psb-label" style="color:#7c3aed;font-weight:900">AI Assistant</span>
-            </button>
-            <button class="psb-item" data-section="identity" onclick="switchSection('identity',this)">
-                <div class="psb-icon"><i class="fa-solid fa-id-card-clip" style="color:#2563eb"></i></div>
-                <span class="psb-label" style="color:#1d4ed8;font-weight:900">Identity & Governance</span>
-            </button>
-            <button class="psb-item" data-section="insurance_sync" onclick="switchSection('insurance_sync',this)">
-                <div class="psb-icon"><i class="fa-solid fa-shield-halved" style="color:#0ea5e9"></i></div>
-                <span class="psb-label" style="color:#0284c7;font-weight:900">Insurance Hub</span>
-            </button>
+                <div class="psb-section-label" style="margin-top:4px">OVERVIEW</div>
+                <button class="psb-item <?= $activeSection==='dashboard'?'psb-active':'' ?>" data-section="dashboard" onclick="switchSection('dashboard',this)">
+                    <div class="psb-icon"><i class="fa-solid fa-chart-pie" style="color:#059669"></i></div>
+                    <span class="psb-label" style="color:#059669;font-weight:900">Dashboard</span>
+                </button>
+                <button class="psb-item" data-section="ai_assistant" onclick="switchSection('ai_assistant',this)">
+                    <div class="psb-icon"><i class="fa-solid fa-wand-magic-sparkles" style="color:#8b5cf6"></i></div>
+                    <span class="psb-label" style="color:#7c3aed;font-weight:900">AI Assistant</span>
+                </button>
             <?php endif; ?>
-            <?php if ($adminRole === 'superadmin' || !empty($_SESSION['access_registry'])): ?>
-            <button class="psb-item <?= $activeSection==='registry_upload'?'psb-active':'' ?>" data-section="registry_upload" onclick="switchSection('registry_upload',this)">
-                <div class="psb-icon"><i class="fa-solid fa-id-card-clip" style="color:#06b6d4"></i></div>
-                <span class="psb-label" style="color:#0891b2;font-weight:900">อัพโหลดรายชื่อ (ทะเบียน)</span>
-            </button>
-            <?php endif; ?>
-            <?php if ($adminRole === 'superadmin' || !empty($_SESSION['access_insurance']) || !empty($_SESSION['access_registry'])): ?>
-            <button class="psb-item <?= $activeSection==='batch_status'?'psb-active':'' ?>" data-section="batch_status" onclick="switchSection('batch_status',this)">
-                <div class="psb-icon"><i class="fa-solid fa-list-check" style="color:#0891b2"></i></div>
-                <span class="psb-label" style="color:#0e7490;font-weight:900">สถานะเอกสาร</span>
-            </button>
-            <?php endif; ?>
+
+            <?php /* ── สิทธิ์ & ความปลอดภัย ──────────────────────────────── */ ?>
             <?php if (!$registryOnly): ?>
-            <?php if ($adminRole === 'superadmin'): ?>
-            <button class="psb-item" data-section="manage_insurance_partners" onclick="switchSection('manage_insurance_partners',this)">
-                <div class="psb-icon"><i class="fa-solid fa-handshake" style="color:#10b981"></i></div>
-                <span class="psb-label" style="color:#059669;font-weight:900">Insurance Partners</span>
-            </button>
+                <div class="psb-section-label">สิทธิ์ &amp; ความปลอดภัย</div>
+                <button class="psb-item" data-section="identity" onclick="switchSection('identity',this)">
+                    <div class="psb-icon"><i class="fa-solid fa-id-card-clip" style="color:#2563eb"></i></div>
+                    <span class="psb-label" style="color:#1d4ed8;font-weight:900">Identity &amp; Governance</span>
+                </button>
+                <?php if ($isSuper): ?>
+                    <button class="psb-item" data-section="privilege_inventory" onclick="switchSection('privilege_inventory',this)">
+                        <div class="psb-icon"><i class="fa-solid fa-shield-halved" style="color:#10b981"></i></div>
+                        <span class="psb-label" style="color:#059669;font-weight:900">ISO Governance</span>
+                    </button>
+                <?php endif; ?>
             <?php endif; ?>
-            <?php if ($adminRole === 'superadmin' || !empty($_SESSION['access_system_logs'])): ?>
-            <button class="psb-item" data-section="activity_logs" onclick="switchSection('activity_logs',this)">
-                <div class="psb-icon"><i class="fa-solid fa-file-lines" style="color:#64748b"></i></div>
-                <span class="psb-label" style="color:#475569;font-weight:900">Activity Logs</span>
-            </button>
-            <button class="psb-item" data-section="error_logs" onclick="switchSection('error_logs',this)">
-                <div class="psb-icon"><i class="fa-solid fa-bug" style="color:#ef4444"></i></div>
-                <span class="psb-label" style="color:#dc2626;font-weight:900">Error Logs</span>
-            </button>
+
+            <?php /* ── ประกันสุขภาพ ─────────────────────────────────────── */ ?>
+            <?php if (!$registryOnly || $hasRegistry || $hasInsurance): ?>
+                <div class="psb-section-label">ประกันสุขภาพ</div>
+                <?php if (!$registryOnly): ?>
+                    <button class="psb-item" data-section="insurance_sync" onclick="switchSection('insurance_sync',this)">
+                        <div class="psb-icon"><i class="fa-solid fa-shield-halved" style="color:#0ea5e9"></i></div>
+                        <span class="psb-label" style="color:#0284c7;font-weight:900">Insurance Hub</span>
+                    </button>
+                <?php endif; ?>
+                <?php if ($hasRegistry): ?>
+                    <button class="psb-item <?= $activeSection==='registry_upload'?'psb-active':'' ?>" data-section="registry_upload" onclick="switchSection('registry_upload',this)">
+                        <div class="psb-icon"><i class="fa-solid fa-id-card-clip" style="color:#06b6d4"></i></div>
+                        <span class="psb-label" style="color:#0891b2;font-weight:900">อัพโหลดรายชื่อ (ทะเบียน)</span>
+                    </button>
+                <?php endif; ?>
+                <?php if ($hasInsurance): ?>
+                    <button class="psb-item <?= $activeSection==='batch_status'?'psb-active':'' ?>" data-section="batch_status" onclick="switchSection('batch_status',this)">
+                        <div class="psb-icon"><i class="fa-solid fa-list-check" style="color:#0891b2"></i></div>
+                        <span class="psb-label" style="color:#0e7490;font-weight:900">สถานะเอกสาร</span>
+                    </button>
+                <?php endif; ?>
+                <?php if (!$registryOnly && $isSuper): ?>
+                    <button class="psb-item" data-section="manage_insurance_partners" onclick="switchSection('manage_insurance_partners',this)">
+                        <div class="psb-icon"><i class="fa-solid fa-handshake" style="color:#10b981"></i></div>
+                        <span class="psb-label" style="color:#059669;font-weight:900">Insurance Partners</span>
+                    </button>
+                <?php endif; ?>
             <?php endif; ?>
-            <?php if ($adminRole === 'superadmin'): ?>
-            <button class="psb-item" data-section="privilege_inventory" onclick="switchSection('privilege_inventory',this)">
-                <div class="psb-icon"><i class="fa-solid fa-shield-halved" style="color:#10b981"></i></div>
-                <span class="psb-label" style="color:#059669;font-weight:900">ISO Governance</span>
-            </button>
+
+            <?php /* ── สื่อสาร ──────────────────────────────────────────── */ ?>
+            <?php if (!$registryOnly): ?>
+                <div class="psb-section-label">สื่อสาร</div>
+                <button class="psb-item" data-section="announcements" onclick="switchSection('announcements',this)">
+                    <div class="psb-icon"><i class="fa-solid fa-bullhorn" style="color:#7c3aed"></i></div>
+                    <span class="psb-label" style="color:#6d28d9;font-weight:900">ประกาศ</span>
+                </button>
             <?php endif; ?>
-            <button class="psb-item" data-section="announcements" onclick="switchSection('announcements',this)">
-                <div class="psb-icon"><i class="fa-solid fa-bullhorn" style="color:#7c3aed"></i></div>
-                <span class="psb-label" style="color:#6d28d9;font-weight:900">ประกาศ</span>
-            </button>
+
+            <?php /* ── ติดตามระบบ ──────────────────────────────────────── */ ?>
+            <?php if (!$registryOnly && $hasSysLogs): ?>
+                <div class="psb-section-label">ติดตามระบบ</div>
+                <button class="psb-item" data-section="activity_logs" onclick="switchSection('activity_logs',this)">
+                    <div class="psb-icon"><i class="fa-solid fa-file-lines" style="color:#64748b"></i></div>
+                    <span class="psb-label" style="color:#475569;font-weight:900">Activity Logs</span>
+                </button>
+                <button class="psb-item" data-section="error_logs" onclick="switchSection('error_logs',this)">
+                    <div class="psb-icon"><i class="fa-solid fa-bug" style="color:#ef4444"></i></div>
+                    <span class="psb-label" style="color:#dc2626;font-weight:900">Error Logs</span>
+                </button>
             <?php endif; ?>
+
             <div style="flex:1"></div> <!-- Spacer to push settings to bottom -->
 
-            <?php if (!$registryOnly && ($adminRole === 'superadmin' || !empty($_SESSION['access_site_settings']))): ?>
-            <button class="psb-item" data-section="settings" onclick="switchSection('settings',this)">
-                <div class="psb-icon"><i class="fa-solid fa-gear" style="color:#d97706"></i></div>
-                <span class="psb-label" style="color:#b45309;font-weight:900">Settings</span>
-            </button>
+            <?php /* ── ตั้งค่า (ล่างสุด) ─────────────────────────────────── */ ?>
+            <?php if (!$registryOnly && $hasSiteSet): ?>
+                <div class="psb-section-label">ตั้งค่า</div>
+                <button class="psb-item" data-section="settings" onclick="switchSection('settings',this)">
+                    <div class="psb-icon"><i class="fa-solid fa-gear" style="color:#d97706"></i></div>
+                    <span class="psb-label" style="color:#b45309;font-weight:900">Settings</span>
+                </button>
             <?php endif; ?>
         </div>
     </nav>
@@ -865,88 +954,81 @@ try {
             <div id="section-dashboard" class="portal-section" style="<?= $activeSection==='dashboard'?'':'display:none;' ?>">
                 <div class="max-w-[1280px] mx-auto px-5 md:px-8 py-8 space-y-8">
 
-                    <!-- KPI COMPACT STRIP -->
-                    <?php $borrowUrgent = $kpis['borrows'] > 0; ?>
+                    <!-- ── PRIORITY PANEL: งานวันนี้ ──────────────────────────────── -->
+                    <?php
+                    $borrowUrgent = $kpis['borrows'] > 0;
+                    $today_items = [];
+                    if ($kpis['bookings_today'] > 0) {
+                        $today_items[] = [
+                            'label' => 'การจองใหม่ใน 24 ชม.',
+                            'value' => $kpis['bookings_today'],
+                            'icon'  => 'fa-bullhorn',
+                            'tone'  => 'info',
+                            'href'  => '../admin/bookings.php',
+                        ];
+                    }
+                    if ($borrowUrgent) {
+                        $today_items[] = [
+                            'label' => 'อุปกรณ์รออนุมัติ',
+                            'value' => $kpis['borrows'],
+                            'icon'  => 'fa-box-open',
+                            'tone'  => 'warning',
+                            'href'  => '../e_Borrow/admin/index.php',
+                        ];
+                    }
+                    if ($kpis['errors_today'] > 0) {
+                        $today_items[] = [
+                            'label' => 'Error ใหม่ใน 24 ชม.',
+                            'value' => $kpis['errors_today'],
+                            'icon'  => 'fa-bug',
+                            'tone'  => 'danger',
+                            'href'  => 'javascript:switchSection(\'error_logs\')',
+                        ];
+                    }
+                    ?>
                     <section class="au d1">
-                        <div class="kpi-strip">
-
-                            <!-- Users -->
-                            <div class="kpi-stat">
-                                <div class="kpi-stat-icon" style="background:#f0fdf4;color:#2e9e63">
-                                    <i class="fa-solid fa-users"></i>
-                                </div>
+                        <div class="priority-panel">
+                            <div class="priority-panel-head">
                                 <div>
-                                    <div class="kpi-stat-num" id="kpi-users" data-counter="<?= $kpis['users'] ?>">0
+                                    <div class="eyebrow">งานวันนี้ · <?= date('j M Y') ?></div>
+                                    <h2 class="display-h2">สวัสดี<?= !empty($_SESSION['admin_username']) ? ' ' . htmlspecialchars(explode(' ', $_SESSION['admin_username'])[0]) : '' ?></h2>
+                                </div>
+                                <div class="kpi-mini-row">
+                                    <div class="kpi-mini">
+                                        <div class="kpi-mini-num" id="kpi-users" data-counter="<?= $kpis['users'] ?>"><?= number_format($kpis['users']) ?></div>
+                                        <div class="kpi-mini-label">บุคลากรและนักศึกษา</div>
                                     </div>
-                                    <div class="kpi-stat-label">บุคลากรและนักศึกษา</div>
-                                </div>
-                            </div>
-
-                            <!-- Campaigns -->
-                            <div class="kpi-stat">
-                                <div class="kpi-stat-icon" style="background:#f0fdf4;color:#2e9e63">
-                                    <i class="fa-solid fa-bullhorn"></i>
-                                </div>
-                                <div>
-                                    <div style="display:flex;align-items:baseline;gap:7px">
-                                        <span class="kpi-stat-num" id="kpi-camps"
-                                            data-counter="<?= $kpis['camps'] ?>">0</span>
-                                        <span
-                                            style="font-size:10px;font-weight:800;color:#2e9e63;background:#f0fdf4;padding:1px 7px;border-radius:99px;border:1px solid #c7e8d5">Active</span>
-                                    </div>
-                                    <div class="kpi-stat-label">โควต้า <strong
-                                            style="color:#0f172a;font-weight:900"><?= number_format($kpis['total_quota']) ?></strong>
-                                        ที่นั่ง</div>
-                                </div>
-                            </div>
-
-                            <!-- Borrows -->
-                            <div class="kpi-stat">
-                                <div class="kpi-stat-icon"
-                                    style="background:<?= $borrowUrgent ? '#fff1f2' : '#f8fafc' ?>;color:<?= $borrowUrgent ? '#ef4444' : '#94a3b8' ?>">
-                                    <i class="fa-solid fa-box-open"></i>
-                                </div>
-                                <div>
-                                    <div style="display:flex;align-items:center;gap:7px">
-                                        <span class="kpi-stat-num" id="kpi-borrows"
-                                            data-counter="<?= $kpis['borrows'] ?>">0</span>
-                                        <?php if ($borrowUrgent): ?>
-                                            <span
-                                                style="font-size:9px;font-weight:900;color:#fff;background:#ef4444;padding:2px 6px;border-radius:5px;letter-spacing:.04em">URGENT</span>
-                                        <?php endif; ?>
-                                    </div>
-                                    <div class="kpi-stat-label" style="color:<?= $borrowUrgent ? '#ef4444' : '' ?>">
-                                        <?= $borrowUrgent ? 'รอการตรวจสอบ' : 'ไม่มีรายการค้าง' ?>
+                                    <div class="kpi-mini">
+                                        <div class="kpi-mini-num">
+                                            <span id="kpi-used"><?= number_format($kpis['used_quota']) ?></span>
+                                            <span class="kpi-mini-num--sub">/ <?= number_format($kpis['total_quota']) ?></span>
+                                        </div>
+                                        <div class="kpi-mini-label">ใช้ไปแล้ว · <?= number_format($kpis['camps']) ?> แคมเปญ active</div>
                                     </div>
                                 </div>
                             </div>
-
-                            <!-- Booking Rate -->
-                            <div class="kpi-stat" style="flex:1.3">
-                                <div class="kpi-stat-icon" style="background:#f5f3ff;color:#7c3aed">
-                                    <i class="fa-solid fa-chart-pie"></i>
-                                </div>
-                                <div style="flex:1;min-width:0">
-                                    <div style="display:flex;align-items:baseline;gap:2px">
-                                        <span class="kpi-stat-num" id="kpi-rate"><?= $kpis['booking_rate'] ?></span>
-                                        <span style="font-size:12px;font-weight:700;color:#94a3b8">%</span>
+                            <?php if (empty($today_items)): ?>
+                                <div class="priority-empty">
+                                    <i class="fa-solid fa-circle-check"></i>
+                                    <div>
+                                        <strong>ไม่มีงานค้าง</strong>
+                                        <p>ทุกอย่างเรียบร้อยใน 24 ชั่วโมงที่ผ่านมา</p>
                                     </div>
-                                    <div style="margin-top:6px">
-                                        <div
-                                            style="width:100%;background:#f1f5f9;border-radius:99px;height:3px;overflow:hidden">
-                                            <div id="kpi-rate-bar"
-                                                style="height:3px;border-radius:99px;width:<?= $kpis['booking_rate'] ?>%;background:#7c3aed;transition:width .7s ease">
+                                </div>
+                            <?php else: ?>
+                                <div class="priority-grid">
+                                    <?php foreach ($today_items as $it): ?>
+                                        <a href="<?= htmlspecialchars($it['href']) ?>" class="priority-item priority-item--<?= $it['tone'] ?>">
+                                            <div class="priority-item-icon"><i class="fa-solid <?= $it['icon'] ?>"></i></div>
+                                            <div class="priority-item-body">
+                                                <div class="priority-item-num"><?= number_format($it['value']) ?></div>
+                                                <div class="priority-item-label"><?= htmlspecialchars($it['label']) ?></div>
                                             </div>
-                                        </div>
-                                        <div class="kpi-stat-label" style="margin-top:3px">
-                                            <span id="kpi-used"><?= number_format($kpis['used_quota']) ?></span> / <span
-                                                id="kpi-total-quota"><?= number_format($kpis['total_quota']) ?></span>
-                                            ที่นั่ง
-                                        </div>
-                                    </div>
+                                            <i class="fa-solid fa-arrow-right priority-item-arrow"></i>
+                                        </a>
+                                    <?php endforeach; ?>
                                 </div>
-                            </div>
-
+                            <?php endif; ?>
                         </div>
                     </section>
 
@@ -963,15 +1045,14 @@ try {
                                     <div class="sec-title">Systems</div>
 
                                     <div style="display:flex;align-items:center;gap:10px">
-                                        <!-- Search -->
-                                        <div style="position:relative">
-                                            <i class="fa-solid fa-magnifying-glass"
-                                                style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:11px;pointer-events:none"></i>
-                                            <input type="text" id="search-project" placeholder="ค้นหาระบบ..."
-                                                style="padding:7px 12px 7px 30px;border:1.5px solid #d0ead9;border-radius:12px;font-size:12px;outline:none;width:180px;font-family:inherit;color:#374151;background:#fff;transition:border-color .2s,box-shadow .2s"
-                                                onfocus="this.style.borderColor='#2e9e63';this.style.boxShadow='0 0 0 3px rgba(46,158,99,.1)'"
-                                                onblur="this.style.borderColor='#d0ead9';this.style.boxShadow='none'">
-                                        </div>
+                                        <!-- Search + Command Palette trigger -->
+                                        <button onclick="window.cmdkOpen && window.cmdkOpen()" type="button" class="cmdk-trigger" title="กด ⌘K เพื่อเปิด">
+                                            <i class="fa-solid fa-magnifying-glass cmdk-trigger-icon"></i>
+                                            <span>ค้นหาระบบ / คำสั่ง</span>
+                                            <kbd>⌘K</kbd>
+                                        </button>
+                                        <input type="text" id="search-project" placeholder="กรอง..."
+                                            class="proj-search-inline" aria-label="กรองรายการระบบในหน้านี้">
                                         <!-- View toggle -->
                                         <div
                                             style="display:flex;background:#f1f5f9;border-radius:10px;padding:3px;gap:2px">
@@ -1091,68 +1172,73 @@ try {
                         <!-- SIDEBAR (4/12) -->
                         <aside class="lg:col-span-4 flex flex-col gap-5 au d3">
 
-                            <!-- Activity Feed -->
+                            <!-- Activity Feed (flat list, color-coded by event) -->
                             <div>
                                 <div class="sec-title mb-4">
-                                    Recent Activity
-                                    <span class="ml-auto live-badge">LIVE</span>
-                                </div>
-                                <div class="feed-card" id="activity-feed">
-                                    <?php if ($recentActivity): ?>
-                                        <?php foreach ($recentActivity as $log): ?>
-                                            <div class="feed-item">
-                                                <div class="feed-dot">
-                                                    <i class="fa-solid fa-bolt text-[11px]"></i>
-                                                </div>
-                                                <div class="min-w-0 flex-1">
-                                                    <div class="flex items-center justify-between gap-2 mb-0.5">
-                                                        <span class="text-[10px] font-black uppercase tracking-wider truncate"
-                                                            style="color:#2e9e63"><?= htmlspecialchars($log['action']) ?></span>
-                                                        <span
-                                                            class="text-[9px] text-gray-400 whitespace-nowrap"><?= date('d M H:i', strtotime($log['created_at'])) ?></span>
-                                                    </div>
-                                                    <p class="text-[12px] font-bold text-gray-800 leading-snug truncate">
-                                                        <?= htmlspecialchars($log['admin_name'] ?? 'System') ?>
-                                                    </p>
-                                                    <p class="text-[11px] text-gray-400 leading-snug mt-0.5 line-clamp-1">
-                                                        <?= htmlspecialchars($log['description']) ?>
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        <?php endforeach; ?>
-                                    <?php else: ?>
-                                        <div class="py-12 text-center text-gray-300">
-                                            <i class="fa-solid fa-ghost text-3xl mb-2 block"></i>
-                                            <p class="text-[11px] font-bold uppercase tracking-widest">No activity yet</p>
-                                        </div>
+                                    ความเคลื่อนไหวล่าสุด
+                                    <?php if (!empty($recentActivity)): ?>
+                                        <span class="ml-auto eyebrow"><?= count($recentActivity) ?> รายการ</span>
                                     <?php endif; ?>
-                                    <a href="javascript:switchSection('activity_logs', document.querySelector('[data-section=activity_logs]'))"
-                                        class="flex items-center justify-center gap-1.5 py-3 text-[10px] font-black uppercase tracking-wider transition-colors border-t border-gray-50 hover:bg-green-50"
-                                        style="color:#2e9e63">
-                                        View all logs <i class="fa-solid fa-chevron-right text-[9px]"></i>
-                                    </a>
                                 </div>
+                                <ul class="activity-list" id="activity-feed" role="log" aria-live="polite" aria-label="ความเคลื่อนไหวล่าสุด">
+                                    <?php
+                                    if ($recentActivity):
+                                        // map action keyword → tone (color)
+                                        $eventTone = function (string $action): array {
+                                            $a = strtolower($action);
+                                            if (str_contains($a, 'error') || str_contains($a, 'fail')) return ['tone' => 'danger',  'icon' => 'fa-circle-exclamation'];
+                                            if (str_contains($a, 'login'))                              return ['tone' => 'info',    'icon' => 'fa-right-to-bracket'];
+                                            if (str_contains($a, 'logout'))                             return ['tone' => 'neutral', 'icon' => 'fa-right-from-bracket'];
+                                            if (str_contains($a, 'register') || str_contains($a, 'create')) return ['tone' => 'success', 'icon' => 'fa-user-plus'];
+                                            if (str_contains($a, 'migrate'))                            return ['tone' => 'accent',  'icon' => 'fa-arrows-rotate'];
+                                            if (str_contains($a, 'delete') || str_contains($a, 'remove')) return ['tone' => 'danger', 'icon' => 'fa-trash-can'];
+                                            if (str_contains($a, 'update') || str_contains($a, 'edit'))   return ['tone' => 'info',   'icon' => 'fa-pen'];
+                                            return ['tone' => 'neutral', 'icon' => 'fa-circle-dot'];
+                                        };
+                                        foreach ($recentActivity as $log):
+                                            $et = $eventTone($log['action']);
+                                            $userName = trim((string)($log['admin_name'] ?? ''));
+                                            if ($userName === '') $userName = 'ระบบ';
+                                    ?>
+                                        <li class="activity-row activity-row--<?= $et['tone'] ?>">
+                                            <div class="activity-dot"><i class="fa-solid <?= $et['icon'] ?>"></i></div>
+                                            <div class="activity-body">
+                                                <div class="activity-line">
+                                                    <strong class="activity-user"><?= htmlspecialchars($userName) ?></strong>
+                                                    <span class="activity-tag"><?= htmlspecialchars(strtolower($log['action'])) ?></span>
+                                                </div>
+                                                <?php if (!empty($log['description'])): ?>
+                                                    <p class="activity-desc"><?= htmlspecialchars($log['description']) ?></p>
+                                                <?php endif; ?>
+                                            </div>
+                                            <time class="activity-time" datetime="<?= htmlspecialchars($log['created_at']) ?>"
+                                                  title="<?= date('d/m/Y H:i', strtotime($log['created_at'])) ?>">
+                                                <?= date('H:i', strtotime($log['created_at'])) ?>
+                                            </time>
+                                        </li>
+                                    <?php endforeach; else: ?>
+                                        <li class="activity-empty">
+                                            <i class="fa-solid fa-circle-check"></i>
+                                            ไม่มีความเคลื่อนไหวใน 24 ชั่วโมงที่ผ่านมา
+                                        </li>
+                                    <?php endif; ?>
+                                </ul>
+                                <a href="javascript:switchSection('activity_logs', document.querySelector('[data-section=activity_logs]'))"
+                                    class="activity-view-all">
+                                    ดูทั้งหมด <i class="fa-solid fa-arrow-right text-[10px]"></i>
+                                </a>
                             </div>
 
-                            <!-- Quick Shortcuts -->
-                            <div class="shortcut-card au d4">
-                                <div class="text-xs font-black uppercase tracking-widest opacity-70 mb-1">Quick Access
-                                </div>
-                                <div class="font-black text-lg mb-4">System Shortcuts</div>
-                                <div class="space-y-2">
-                                    <a href="users.php" class="shortcut-link">
-                                        <i class="fa-solid fa-users"></i> Users Center
-                                    </a>
-                                    <a href="../admin/campaigns.php" class="shortcut-link">
-                                        <i class="fa-solid fa-bullhorn"></i> Campaign Manager
-                                    </a>
-                                    <a href="javascript:switchSection('error_logs', document.querySelector('[data-section=error_logs]'))"
-                                        class="shortcut-link">
-                                        <i class="fa-solid fa-bug"></i> Error Logs
-                                    </a>
-                                </div>
-                                <i
-                                    class="fa-solid fa-screwdriver-wrench absolute -bottom-6 -right-6 text-[6rem] opacity-5 rotate-12 pointer-events-none"></i>
+                            <!-- Quick Shortcuts (flat) -->
+                            <div class="quick-list au d4">
+                                <div class="sec-title mb-3">ทางลัด</div>
+                                <ul class="quick-items">
+                                    <li><a href="users.php"><i class="fa-solid fa-users"></i> Users Center<i class="fa-solid fa-arrow-right ml-auto"></i></a></li>
+                                    <li><a href="../admin/campaigns.php"><i class="fa-solid fa-bullhorn"></i> Campaign Manager<i class="fa-solid fa-arrow-right ml-auto"></i></a></li>
+                                    <li><a href="../asset/index.php"><i class="fa-solid fa-boxes-stacked"></i> ครุภัณฑ์สำนักงาน<i class="fa-solid fa-arrow-right ml-auto"></i></a></li>
+                                    <li><a href="../consumables/index.php"><i class="fa-solid fa-box-open"></i> วัสดุสิ้นเปลือง<i class="fa-solid fa-arrow-right ml-auto"></i></a></li>
+                                    <li><a href="javascript:switchSection('error_logs', document.querySelector('[data-section=error_logs]'))"><i class="fa-solid fa-bug"></i> Error Logs<i class="fa-solid fa-arrow-right ml-auto"></i></a></li>
+                                </ul>
                             </div>
 
                         </aside>
@@ -2474,28 +2560,28 @@ try {
         }
 
         function applyTheme(theme) {
+            const btn = document.getElementById('darkModeToggle');
             if (theme === 'dark') {
                 document.body.setAttribute('data-theme', 'dark');
-                document.getElementById('darkModeToggle').innerHTML = '<i class="fa-solid fa-sun text-amber-500"></i>';
+                if (btn) btn.innerHTML = '<i class="fa-solid fa-sun text-amber-500"></i>';
                 localStorage.setItem('ecampaign_theme', 'dark');
             } else {
                 document.body.removeAttribute('data-theme');
-                document.getElementById('darkModeToggle').innerHTML = '<i class="fa-solid fa-moon"></i>';
+                if (btn) btn.innerHTML = '<i class="fa-solid fa-moon"></i>';
                 localStorage.setItem('ecampaign_theme', 'light');
             }
-            
-            // Send message to all iframes to update their theme
             document.querySelectorAll('iframe').forEach(iframe => {
-                if(iframe.contentWindow) {
-                    iframe.contentWindow.postMessage({ type: 'THEME_CHANGE', theme: theme }, '*');
-                }
+                try { iframe.contentWindow.postMessage({ type: 'THEME_CHANGE', theme }, '*'); } catch(e) {}
             });
         }
 
-        // Apply theme on load
-        if (localStorage.getItem('ecampaign_theme') === 'dark') {
-            applyTheme('dark');
-        }
+        // Sync toggle icon with the theme already applied by the early inline script
+        document.addEventListener('DOMContentLoaded', () => {
+            if (localStorage.getItem('ecampaign_theme') === 'dark') {
+                const btn = document.getElementById('darkModeToggle');
+                if (btn) btn.innerHTML = '<i class="fa-solid fa-sun text-amber-500"></i>';
+            }
+        });
     </script>
 
     <script>
@@ -3529,6 +3615,260 @@ try {
         <?php endif; ?>
 
     </script>
+
+    <!-- ════════════════════════════════════════════════════════════
+         COMMAND PALETTE (⌘K) — added by /overdrive
+         ════════════════════════════════════════════════════════════ -->
+    <div id="cmdk-overlay" class="cmdk-overlay" role="dialog" aria-modal="true" aria-labelledby="cmdk-title" hidden>
+        <div class="cmdk-panel" role="document">
+            <div class="cmdk-search-wrap">
+                <i class="fa-solid fa-magnifying-glass cmdk-search-icon" aria-hidden="true"></i>
+                <input type="text" id="cmdk-input" class="cmdk-input"
+                       placeholder="พิมพ์เพื่อค้นหาคำสั่ง / ระบบ / หน้า…"
+                       aria-label="ค้นหาคำสั่ง"
+                       autocomplete="off" spellcheck="false">
+                <kbd class="cmdk-esc" aria-hidden="true">ESC</kbd>
+            </div>
+            <ul id="cmdk-list" class="cmdk-list" role="listbox" aria-label="ผลการค้นหา"></ul>
+            <div class="cmdk-foot">
+                <span><kbd>↑</kbd><kbd>↓</kbd> เลื่อน</span>
+                <span><kbd>↵</kbd> เลือก</span>
+                <span><kbd>ESC</kbd> ปิด</span>
+                <span class="ml-auto cmdk-help-hint">กด <kbd>?</kbd> ดูคีย์ลัด</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Keyboard shortcuts help modal -->
+    <div id="kbd-help-overlay" class="cmdk-overlay" role="dialog" aria-modal="true" aria-labelledby="kbd-help-title" hidden>
+        <div class="cmdk-panel cmdk-panel--small">
+            <div class="cmdk-help-head">
+                <h2 id="kbd-help-title" class="font-bold text-slate-800 text-base">คีย์ลัด</h2>
+                <button class="cmdk-close" onclick="kbdHelpClose()" aria-label="ปิด">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <dl class="kbd-help-list">
+                <div><kbd>⌘</kbd>+<kbd>K</kbd> <span>เปิด Command Palette</span></div>
+                <div><kbd>g</kbd> <kbd>d</kbd> <span>ไปหน้า Dashboard</span></div>
+                <div><kbd>g</kbd> <kbd>i</kbd> <span>ไป Identity & Governance</span></div>
+                <div><kbd>g</kbd> <kbd>a</kbd> <span>ไปประกาศ</span></div>
+                <div><kbd>g</kbd> <kbd>e</kbd> <span>ไป Error Logs</span></div>
+                <div><kbd>g</kbd> <kbd>s</kbd> <span>ไป Settings</span></div>
+                <div><kbd>g</kbd> <kbd>r</kbd> <span>ไปครุภัณฑ์สำนักงาน</span></div>
+                <div><kbd>/</kbd> <span>โฟกัสช่องค้นหา</span></div>
+                <div><kbd>?</kbd> <span>เปิดคีย์ลัด (หน้านี้)</span></div>
+                <div><kbd>ESC</kbd> <span>ปิด modal / palette</span></div>
+            </dl>
+        </div>
+    </div>
+
+    <script>
+    (function () {
+        // ── Command catalog ──────────────────────────────────────────────
+        // type: 'section' = call switchSection, 'url' = navigate
+        const ALL_COMMANDS = [
+            { id: 'dashboard',     label: 'Dashboard',           desc: 'ภาพรวม + งานวันนี้', shortcut: 'g d', icon: 'fa-chart-pie',          tone: 'success', type: 'section', target: 'dashboard' },
+            { id: 'ai_assistant',  label: 'AI Assistant',        desc: 'ผู้ช่วย AI',         icon: 'fa-wand-magic-sparkles', tone: 'accent', type: 'section', target: 'ai_assistant' },
+            { id: 'identity',      label: 'Identity & Governance', desc: 'จัดการสิทธิ์ผู้ใช้', shortcut: 'g i', icon: 'fa-id-card-clip',  tone: 'info',    type: 'section', target: 'identity' },
+            { id: 'insurance_sync', label: 'Insurance Hub',      desc: 'ระบบสิทธิ์ประกัน',   icon: 'fa-shield-halved',      tone: 'info',    type: 'section', target: 'insurance_sync' },
+            { id: 'registry_upload', label: 'อัพโหลดรายชื่อ',    desc: 'ทะเบียน',            icon: 'fa-id-card-clip',      tone: 'info',    type: 'section', target: 'registry_upload' },
+            { id: 'batch_status',  label: 'สถานะเอกสาร',         desc: 'Insurance Batch',    icon: 'fa-list-check',         tone: 'info',    type: 'section', target: 'batch_status' },
+            { id: 'manage_insurance_partners', label: 'Insurance Partners', desc: 'จัดการพาร์ทเนอร์', icon: 'fa-handshake', tone: 'success', type: 'section', target: 'manage_insurance_partners' },
+            { id: 'announcements', label: 'ประกาศ',              desc: 'จัดการประกาศ Hub',  shortcut: 'g a', icon: 'fa-bullhorn',           tone: 'accent',  type: 'section', target: 'announcements' },
+            { id: 'activity_logs', label: 'Activity Logs',       desc: 'บันทึกกิจกรรมระบบ',  icon: 'fa-file-lines',         tone: 'neutral', type: 'section', target: 'activity_logs' },
+            { id: 'error_logs',    label: 'Error Logs',          desc: 'บันทึกข้อผิดพลาด',  shortcut: 'g e', icon: 'fa-bug',                tone: 'danger',  type: 'section', target: 'error_logs' },
+            { id: 'privilege_inventory', label: 'ISO Governance', desc: 'Privileged Access', icon: 'fa-shield-halved',      tone: 'success', type: 'section', target: 'privilege_inventory' },
+            { id: 'settings',      label: 'Settings',            desc: 'ตั้งค่าระบบ',        shortcut: 'g s', icon: 'fa-gear',               tone: 'warning', type: 'section', target: 'settings' },
+
+            { id: 'open_asset',    label: 'ครุภัณฑ์สำนักงาน',   desc: 'ทะเบียนทรัพย์สิน',  shortcut: 'g r', icon: 'fa-boxes-stacked',     tone: 'success', type: 'url',     target: '../asset/index.php' },
+            { id: 'open_campaign', label: 'Campaign Manager',    desc: 'จัดการแคมเปญ',      icon: 'fa-bullhorn',           tone: 'info',    type: 'url',     target: '../admin/campaigns.php' },
+            { id: 'open_eborrow',  label: 'e-Borrow & Inventory', desc: 'ระบบยืม-คืนอุปกรณ์', icon: 'fa-toolbox',         tone: 'neutral', type: 'url',     target: '../e_Borrow/admin/index.php' },
+            { id: 'open_users',    label: 'Users Center',        desc: 'รายชื่อผู้ใช้',     icon: 'fa-users',              tone: 'info',    type: 'url',     target: 'users.php' },
+            { id: 'open_support',  label: 'Live Support Chat',   desc: 'แชทตอบกลับผู้ใช้',  icon: 'fa-comments',           tone: 'info',    type: 'url',     target: 'support_chat.php' },
+        ];
+
+        // Filter to commands that exist for this user
+        // (sidebar links only render for sections the user can access)
+        const accessibleSections = new Set(
+            Array.from(document.querySelectorAll('[data-section]')).map(el => el.dataset.section)
+        );
+        const COMMANDS = ALL_COMMANDS.filter(c =>
+            c.type === 'url' || accessibleSections.has(c.target)
+        );
+
+        // ── State ────────────────────────────────────────────────────────
+        const overlay = document.getElementById('cmdk-overlay');
+        const input   = document.getElementById('cmdk-input');
+        const list    = document.getElementById('cmdk-list');
+        const helpOverlay = document.getElementById('kbd-help-overlay');
+        let activeIdx = 0;
+        let filtered  = COMMANDS;
+        let leaderKey = null;       // pending 'g'
+        let leaderTimer = null;
+
+        // ── Filtering ────────────────────────────────────────────────────
+        function fuzzyMatch(query, text) {
+            query = query.toLowerCase().trim();
+            text  = text.toLowerCase();
+            if (!query) return true;
+            // Substring or all-chars-in-order
+            if (text.includes(query)) return true;
+            let qi = 0;
+            for (let i = 0; i < text.length && qi < query.length; i++) {
+                if (text[i] === query[qi]) qi++;
+            }
+            return qi === query.length;
+        }
+
+        function filter(query) {
+            filtered = COMMANDS.filter(c =>
+                fuzzyMatch(query, c.label + ' ' + (c.desc || '') + ' ' + (c.shortcut || ''))
+            );
+            activeIdx = 0;
+            render();
+        }
+
+        // ── Render ───────────────────────────────────────────────────────
+        function render() {
+            if (!filtered.length) {
+                list.innerHTML = '<li class="cmdk-empty">ไม่พบคำสั่งที่ตรง</li>';
+                return;
+            }
+            list.innerHTML = filtered.map((c, i) => `
+                <li class="cmdk-item cmdk-item--${c.tone || 'neutral'} ${i === activeIdx ? 'is-active' : ''}"
+                    role="option" aria-selected="${i === activeIdx}" data-idx="${i}">
+                    <div class="cmdk-item-icon"><i class="fa-solid ${c.icon}"></i></div>
+                    <div class="cmdk-item-body">
+                        <div class="cmdk-item-label">${c.label}</div>
+                        ${c.desc ? `<div class="cmdk-item-desc">${c.desc}</div>` : ''}
+                    </div>
+                    ${c.shortcut ? `<kbd class="cmdk-item-kbd">${c.shortcut}</kbd>` : ''}
+                </li>
+            `).join('');
+        }
+
+        // ── Open / Close ────────────────────────────────────────────────
+        function open() {
+            overlay.hidden = false;
+            requestAnimationFrame(() => overlay.classList.add('is-open'));
+            input.value = '';
+            filter('');
+            input.focus();
+        }
+        function close() {
+            overlay.classList.remove('is-open');
+            setTimeout(() => { overlay.hidden = true; }, 180);
+        }
+        window.cmdkOpen = open;
+
+        // Help modal
+        function helpOpen() {
+            helpOverlay.hidden = false;
+            requestAnimationFrame(() => helpOverlay.classList.add('is-open'));
+        }
+        window.kbdHelpClose = function () {
+            helpOverlay.classList.remove('is-open');
+            setTimeout(() => { helpOverlay.hidden = true; }, 180);
+        };
+
+        // ── Execute ──────────────────────────────────────────────────────
+        function execute(cmd) {
+            close();
+            if (!cmd) return;
+            if (cmd.type === 'section') {
+                if (typeof switchSection === 'function') {
+                    const btn = document.querySelector(`[data-section="${cmd.target}"]`);
+                    switchSection(cmd.target, btn);
+                }
+            } else if (cmd.type === 'url') {
+                window.location.href = cmd.target;
+            }
+        }
+
+        // ── Events ───────────────────────────────────────────────────────
+        input.addEventListener('input', e => filter(e.target.value));
+        input.addEventListener('keydown', e => {
+            if (e.key === 'ArrowDown') { e.preventDefault(); activeIdx = (activeIdx + 1) % filtered.length; render(); }
+            else if (e.key === 'ArrowUp') { e.preventDefault(); activeIdx = (activeIdx - 1 + filtered.length) % filtered.length; render(); }
+            else if (e.key === 'Enter')  { e.preventDefault(); execute(filtered[activeIdx]); }
+        });
+        list.addEventListener('click', e => {
+            const li = e.target.closest('.cmdk-item');
+            if (li) execute(filtered[parseInt(li.dataset.idx, 10)]);
+        });
+        overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+        helpOverlay.addEventListener('click', e => { if (e.target === helpOverlay) window.kbdHelpClose(); });
+
+        // ── Global keyboard ─────────────────────────────────────────────
+        function isTypingTarget(el) {
+            if (!el) return false;
+            const tag = el.tagName;
+            return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el.isContentEditable;
+        }
+
+        document.addEventListener('keydown', e => {
+            // ⌘K / Ctrl+K — open palette
+            if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+                e.preventDefault();
+                if (overlay.hidden) open(); else close();
+                return;
+            }
+            // ESC — close any open modal
+            if (e.key === 'Escape') {
+                if (!overlay.hidden) { e.preventDefault(); close(); }
+                else if (!helpOverlay.hidden) { e.preventDefault(); window.kbdHelpClose(); }
+                return;
+            }
+            // Don't trigger leader / help while typing
+            if (isTypingTarget(e.target)) return;
+
+            // ? — open shortcut help (use shift+/ which produces "?")
+            if (e.key === '?') { e.preventDefault(); helpOpen(); return; }
+
+            // / — focus project search
+            if (e.key === '/') {
+                e.preventDefault();
+                const proj = document.getElementById('search-project');
+                if (proj) proj.focus();
+                return;
+            }
+
+            // Sequence shortcut (g + letter)
+            if (e.key === 'g' && !e.metaKey && !e.ctrlKey && !e.altKey) {
+                leaderKey = 'g';
+                clearTimeout(leaderTimer);
+                leaderTimer = setTimeout(() => { leaderKey = null; }, 900);
+                return;
+            }
+            if (leaderKey === 'g') {
+                const map = {
+                    d: 'dashboard',
+                    i: 'identity',
+                    a: 'announcements',
+                    e: 'error_logs',
+                    s: 'settings',
+                };
+                const sec = map[e.key];
+                if (sec) {
+                    e.preventDefault();
+                    leaderKey = null;
+                    if (typeof switchSection === 'function') {
+                        const btn = document.querySelector(`[data-section="${sec}"]`);
+                        if (btn) switchSection(sec, btn);
+                    }
+                    return;
+                }
+                if (e.key === 'r') {
+                    e.preventDefault(); leaderKey = null;
+                    window.location.href = '../asset/index.php'; return;
+                }
+                leaderKey = null;
+            }
+        });
+    })();
+    </script>
+
 </body>
 
 </html>

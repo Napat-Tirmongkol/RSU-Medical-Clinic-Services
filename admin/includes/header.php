@@ -186,16 +186,20 @@ if (!function_exists('renderPageHeader')) {
                 } else {
                     document.body.removeAttribute('data-theme');
                 }
-            }
-        });
-        document.addEventListener('DOMContentLoaded', () => {
-            if (localStorage.getItem('ecampaign_theme') === 'dark') {
-                document.body.setAttribute('data-theme', 'dark');
+                var btn = document.getElementById('adminDarkToggle');
+                if (btn) btn.innerHTML = e.data.theme === 'dark'
+                    ? '<i class="fa-solid fa-sun text-amber-400"></i>'
+                    : '<i class="fa-solid fa-moon"></i>';
             }
         });
     </script>
 </head>
 <body style="display:flex; min-height:100vh; background:#e2f4ea;">
+<script>
+    (function(){
+        if(localStorage.getItem('ecampaign_theme')==='dark') document.body.setAttribute('data-theme','dark');
+    })();
+</script>
 
 <?php if (!$layout_none): ?>
 <!-- ── Sidebar ──────────────────────────────────────────────────────────── -->
@@ -300,6 +304,21 @@ function closeMobileSidebar(){
     if(bd)bd.classList.remove('show');
     document.body.style.overflow='';
 }
+function adminToggleDark(){
+    var isDark=document.body.getAttribute('data-theme')==='dark';
+    var theme=isDark?'light':'dark';
+    if(theme==='dark'){
+        document.body.setAttribute('data-theme','dark');
+        localStorage.setItem('ecampaign_theme','dark');
+    } else {
+        document.body.removeAttribute('data-theme');
+        localStorage.setItem('ecampaign_theme','light');
+    }
+    var btn=document.getElementById('adminDarkToggle');
+    if(btn) btn.innerHTML=theme==='dark'
+        ?'<i class="fa-solid fa-sun text-amber-400"></i>'
+        :'<i class="fa-solid fa-moon"></i>';
+}
 </script>
 <?php endif; ?>
 
@@ -337,6 +356,13 @@ function closeMobileSidebar(){
                 <i class="fa-solid fa-user-tie mr-1"></i>Staff
             </span>
             <?php endif; ?>
+
+            <!-- Dark Mode Toggle -->
+            <button id="adminDarkToggle" onclick="adminToggleDark()" title="สลับโหมดมืด/สว่าง"
+                class="w-9 h-9 flex items-center justify-center rounded-xl border transition-all hover:shadow-sm focus:outline-none dark-mode-btn"
+                style="background:#f0faf4;color:#2e9e63;border-color:#c7e8d5;">
+                <i class="fa-solid fa-moon"></i>
+            </button>
 
             <!-- Notification Bell -->
             <div class="relative" id="notif-wrapper">
@@ -480,6 +506,14 @@ function closeMobileSidebar(){
 
         fetchNotifications();
         setInterval(fetchNotifications, 30000);
+    })();
+    </script>
+    <script>
+    // Sync dark mode toggle icon on load
+    (function(){
+        var btn=document.getElementById('adminDarkToggle');
+        if(btn && localStorage.getItem('ecampaign_theme')==='dark')
+            btn.innerHTML='<i class="fa-solid fa-sun text-amber-400"></i>';
     })();
     </script>
     <?php endif; ?>
