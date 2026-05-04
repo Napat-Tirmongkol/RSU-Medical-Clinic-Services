@@ -1222,6 +1222,33 @@ $heroThemes = [
                                 class="text-emerald-200 text-[9px] font-black uppercase tracking-[0.15em]">Verified</span>
                         </div>
                     </div>
+
+                    <?php if (defined('SITE_SHOW_INSURANCE') && SITE_SHOW_INSURANCE && $insurance !== null):
+                        $insActive = ($insurance['insurance_status'] ?? '') === 'Active';
+                        $coverEnd  = $insurance['coverage_end'] ?? '';
+                        $coverEndShort = $coverEnd
+                            ? date('d/m/', strtotime($coverEnd)) . substr((string)((int)date('Y', strtotime($coverEnd)) + 543), -2)
+                            : '—';
+                    ?>
+                    <button type="button"
+                        onclick="event.stopPropagation(); document.getElementById('insDetailModal').classList.remove('hidden');"
+                        class="relative mt-4 w-full flex items-center gap-3 rounded-2xl <?= $insActive ? 'bg-white/10 border-white/20' : 'bg-amber-400/15 border-amber-300/30' ?> backdrop-blur-md border px-4 py-3 text-left active:scale-[0.98] transition-all">
+                        <div class="w-9 h-9 rounded-xl bg-white/15 border border-white/20 flex items-center justify-center text-white shrink-0">
+                            <i class="fa-solid fa-shield-heart text-sm"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <p class="text-white/70 text-[9px] font-black uppercase tracking-[0.22em]">ประกันอุบัติเหตุ</p>
+                            <p class="text-white text-[12px] font-black mt-0.5 truncate">
+                                <?php if ($insActive): ?>
+                                    Active · ฿40,000 · ครบ <?= htmlspecialchars($coverEndShort) ?>
+                                <?php else: ?>
+                                    Inactive · ติดต่อเจ้าหน้าที่
+                                <?php endif; ?>
+                            </p>
+                        </div>
+                        <i class="fa-solid fa-chevron-right text-white/60 text-xs shrink-0"></i>
+                    </button>
+                    <?php endif; ?>
                 </div>
             </div>
 
@@ -1568,177 +1595,6 @@ $heroThemes = [
                     </div>
                 </div>
             </div>
-
-            <!-- ── Insurance Card ── -->
-            <?php if (defined('SITE_SHOW_INSURANCE') && SITE_SHOW_INSURANCE): ?>
-                <div class="space-y-4">
-                    <p class="text-slate-500 text-[10px] font-black uppercase tracking-[0.3em] px-1">Medical Coverage</p>
-
-                    <?php if ($insurance === null): ?>
-                        <!-- ไม่พบข้อมูลประกันในระบบ -->
-                        <div class="bg-slate-900 rounded-[3rem] p-8 shadow-2xl relative overflow-hidden premium-shadow">
-                            <div class="absolute -right-8 -bottom-8 w-40 h-40 bg-white/5 rounded-full blur-3xl"></div>
-                            <div class="flex flex-col items-center justify-center py-6 text-center gap-3">
-                                <div class="w-14 h-14 rounded-2xl bg-white/10 flex items-center justify-center text-white/30 text-2xl">
-                                    <i class="fa-solid fa-shield-xmark"></i>
-                                </div>
-                                <p class="text-white/50 text-xs font-black uppercase tracking-widest">ไม่พบข้อมูลประกันในระบบ</p>
-                                <p class="text-white/25 text-[10px] font-bold">กรุณาติดต่อเจ้าหน้าที่</p>
-                            </div>
-                            <div class="pt-6 border-t border-white/10">
-                                <p class="text-white/30 text-[8px] font-black uppercase tracking-[0.2em] mb-1">Primary Holder</p>
-                                <p class="text-white text-[11px] font-black uppercase tracking-wider truncate"><?= htmlspecialchars($user['full_name'] ?? '') ?></p>
-                            </div>
-                        </div>
-
-                    <?php else:
-                        $isActive   = ($insurance['insurance_status'] ?? '') === 'Active';
-                        $memberType = $insurance['member_status'] ?? '';
-                        $coverEnd   = $insurance['coverage_end'] ?? null;
-                        $coverStart = $insurance['coverage_start'] ?? null;
-                        $policyNo   = $insurance['policy_number'] ?? '';
-
-                        // ฟอร์แมตวันที่ พ.ศ. (DD/MM/YY) — เช่น 13/06/62
-                        $thaiDate = function ($date) {
-                            if (!$date) return '—';
-                            $ts = strtotime($date);
-                            return date('d/m/', $ts) . substr((string)((int)date('Y', $ts) + 543), -2);
-                        };
-                        $coverStartText = $thaiDate($coverStart);
-                        $coverEndText   = $thaiDate($coverEnd);
-                        $medicalLimit   = '40,000'; // วงเงินค่ารักษาพยาบาลต่ออุบัติเหตุ (บาท)
-                    ?>
-                    <?php if (!$isActive): ?>
-                    <!-- Inactive insurance notice -->
-                    <div class="bg-white rounded-[2rem] p-6 shadow-xl relative overflow-hidden border border-orange-100">
-                        <div class="absolute -right-10 -top-10 w-40 h-40 bg-orange-100 rounded-full blur-3xl opacity-80"></div>
-                        <div class="absolute -left-8 -bottom-8 w-32 h-32 bg-rose-100 rounded-full blur-3xl opacity-60"></div>
-
-                        <div class="relative z-10 flex items-start justify-between gap-4 mb-6">
-                            <div>
-                                <p class="text-orange-600 text-[10px] font-black uppercase tracking-[0.24em] mb-2">Insurance Status</p>
-                                <h3 class="text-slate-900 font-black text-xl leading-tight">สิทธิ์ประกันไม่พร้อมใช้งาน</h3>
-                            </div>
-                            <span class="shrink-0 inline-flex px-3 py-1 rounded-full bg-orange-100 text-orange-700 text-[9px] font-black uppercase tracking-widest">Inactive</span>
-                        </div>
-
-                        <div class="relative z-10 rounded-2xl bg-orange-50 border border-orange-100 p-4 mb-5">
-                            <p class="text-orange-900 text-sm font-bold leading-relaxed">
-                                ข้อมูลประกันของคุณอยู่ในสถานะ Inactive กรุณาติดต่อห้องพยาบาลเพื่อตรวจสอบสิทธิ์
-                            </p>
-                        </div>
-
-                        <div class="relative z-10 grid grid-cols-[92px_1fr] gap-3 text-sm">
-                            <span class="text-slate-400 font-bold">ชื่อ</span>
-                            <span class="text-slate-800 font-black truncate"><?= htmlspecialchars($user['full_name'] ?? '') ?></span>
-                            <span class="text-slate-400 font-bold">เลขบัตรประชาชน</span>
-                            <span class="text-slate-800 font-black tracking-wide"><?= htmlspecialchars(maskCitizenId($insurance['citizen_id'] ?? '')) ?></span>
-                        </div>
-                    </div>
-                    <?php else: ?>
-                    <!-- การ์ดประกันอุบัติเหตุส่วนบุคคล -->
-                    <div class="bg-white rounded-[2rem] p-6 shadow-xl relative overflow-hidden border border-slate-100">
-                        <!-- Decorative blobs -->
-                        <div class="absolute -left-6 -top-3 w-24 h-24 bg-rose-300 rounded-full blur-2xl opacity-40"></div>
-                        <div class="absolute left-2 top-14 w-16 h-16 bg-emerald-300 rounded-full blur-2xl opacity-30"></div>
-                        <div class="absolute -right-10 -bottom-10 w-44 h-44 bg-rose-200 rounded-full blur-3xl opacity-50"></div>
-                        <div class="absolute -right-4 top-2 w-20 h-20 bg-pink-400 rounded-full blur-xl opacity-30"></div>
-
-                        <!-- Header -->
-                        <div class="flex items-start justify-between mb-5 relative z-10 gap-3">
-                            <h3 class="text-rose-600 font-black text-[15px] tracking-tight leading-tight">
-                                บัตรประกันอุบัติเหตุ<br>ส่วนบุคคล
-                            </h3>
-                            <div class="text-right shrink-0 flex flex-col items-end">
-                                <div class="inline-flex items-end gap-1.5">
-                                    <span class="block w-1.5 h-7 rounded-full bg-rose-500"></span>
-                                    <span class="text-rose-500 font-black text-[28px] leading-[0.85] tracking-tight lowercase">mtl</span>
-                                </div>
-                                <p class="text-rose-500 font-black text-[7px] uppercase tracking-[0.28em] mt-1">Muang Thai Life</p>
-                                <span class="inline-block mt-1 px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest <?= $isActive ? 'bg-emerald-500/15 text-emerald-600' : 'bg-rose-500/15 text-rose-600' ?>">
-                                    <?= $isActive ? 'Active' : 'Inactive' ?>
-                                </span>
-                            </div>
-                        </div>
-
-                        <!-- Body: label-value rows -->
-                        <div class="space-y-3.5 relative z-10 text-slate-800">
-
-                            <!-- Policy No. -->
-                            <div class="grid grid-cols-[110px_1fr] gap-2 items-center">
-                                <div>
-                                    <p class="text-[12px] font-bold leading-tight">เลขที่กรมธรรม์</p>
-                                    <p class="text-[10px] text-slate-500 leading-tight">(Policy No.)</p>
-                                </div>
-                                <p class="text-[13px] font-black tracking-wider truncate"><?= $policyNo !== '' ? htmlspecialchars($policyNo) : '—' ?></p>
-                            </div>
-
-                            <!-- Policyholder -->
-                            <div class="grid grid-cols-[110px_1fr] gap-2 items-center">
-                                <div>
-                                    <p class="text-[12px] font-bold leading-tight">ผู้เอาประกันภัย</p>
-                                    <p class="text-[10px] text-slate-500 leading-tight">(Policyholder)</p>
-                                </div>
-                                <p class="text-[13px] font-black truncate"><?= htmlspecialchars($user['full_name'] ?? '') ?></p>
-                            </div>
-
-                            <!-- Coverage Period -->
-                            <div class="grid grid-cols-[110px_1fr] gap-2">
-                                <p class="text-[12px] font-bold leading-tight pt-0.5">ระยะเวลาประกันภัย</p>
-                                <div class="space-y-1.5">
-                                    <div class="grid grid-cols-[auto_1fr_auto] gap-2 items-center">
-                                        <span class="text-[11px] text-slate-700">วันที่เริ่มใช้</span>
-                                        <span class="text-[14px] font-black tracking-wider"><?= htmlspecialchars($coverStartText) ?></span>
-                                    </div>
-                                    <div class="grid grid-cols-[auto_1fr_auto] gap-2 items-center">
-                                        <span class="text-[11px] text-slate-700">วันที่สิ้นสุด</span>
-                                        <span class="text-[14px] font-black tracking-wider <?= !$isActive ? 'text-rose-500' : '' ?>"><?= htmlspecialchars($coverEndText) ?></span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Medical coverage limit -->
-                            <div class="grid grid-cols-[110px_1fr] gap-2 items-center pt-1">
-                                <span></span>
-                                <div class="flex items-baseline gap-2">
-                                    <p class="text-[12px] font-bold text-slate-800">วงเงินค่ารักษาพยาบาล</p>
-                                    <p class="text-[18px] font-black text-rose-600 tracking-tight"><?= $medicalLimit ?></p>
-                                    <span class="text-[11px] text-slate-500 font-bold">บาท</span>
-                                </div>
-                            </div>
-
-                            <?php if ($memberType): ?>
-                            <p class="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 pt-1">
-                                <?= htmlspecialchars($memberType) ?>
-                            </p>
-                            <?php endif; ?>
-                        </div>
-
-                        <!-- Form code -->
-                        <p class="absolute bottom-3 right-5 text-[9px] font-black text-slate-400 tracking-widest z-10">INSURANCE CARD</p>
-                    </div>
-                    <?php endif; ?>
-                    <?php endif; ?>
-
-                    <!-- Info Banner -->
-                    <?php if ($insurance !== null && ($insurance['insurance_status'] ?? '') === 'Active'): ?>
-                    <div class="bg-[#2e9e63] rounded-[2.2rem] p-6 shadow-xl shadow-green-100 relative overflow-hidden group cursor-pointer"
-                         onclick="document.getElementById('insDetailModal').classList.remove('hidden')">
-                        <div class="absolute -right-4 -top-4 w-20 h-20 bg-white/10 rounded-full blur-xl group-hover:scale-150 transition-transform"></div>
-                        <div class="flex items-center gap-4 relative z-10">
-                            <div class="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center text-white shrink-0">
-                                <i class="fa-solid fa-shield-heart"></i>
-                            </div>
-                            <div class="flex-1">
-                                <h5 class="text-white font-black text-xs uppercase tracking-widest">ความคุ้มครองและวิธีใช้สิทธิ์</h5>
-                                <p class="text-white/70 text-[11px] mt-0.5">กดเพื่อดูรายละเอียดประกันและช่องทางติดต่อ</p>
-                            </div>
-                            <i class="fa-solid fa-chevron-right text-white/50 text-xs shrink-0"></i>
-                        </div>
-                    </div>
-                    <?php endif; ?>
-                </div>
-            <?php endif; ?>
 
 <!-- ── Insurance Detail Modal ──────────────────────────────────────────────── -->
 <div id="insDetailModal" class="fixed inset-0 z-[200] hidden bg-black/50 backdrop-blur-sm overflow-y-auto">
