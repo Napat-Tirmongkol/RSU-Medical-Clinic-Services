@@ -1216,19 +1216,20 @@ $heroThemes = [
                     </div>
 
                     <div class="relative flex items-center justify-between pt-6 border-t border-white/10">
-                        <div class="flex items-center gap-3 text-white">
-                            <i class="fa-solid fa-graduation-cap text-emerald-200 text-sm"></i>
-                            <p class="text-emerald-50 text-[11px] font-bold tracking-wide truncate max-w-[200px]">
-                                <?php
-                                $dept = !empty($user['department']) ? $user['department'] : 'วิทยาลัยนวัตกรรมดิจิทัลเทคโนโลยี';
-                                $status_label = [
-                                    'student' => 'นักศึกษา',
-                                    'staff' => 'บุคลากร',
-                                    'other' => 'บุคคลทั่วไป'
-                                ][$user['status'] ?? 'other'] ?? 'ทั่วไป';
-                                echo $dept . ' · ' . $status_label;
-                                ?>
-                            </p>
+                        <div class="flex items-start gap-3 text-white min-w-0">
+                            <i class="fa-solid fa-graduation-cap text-emerald-200 text-sm mt-0.5 shrink-0"></i>
+                            <?php
+                            $dept = !empty($user['department']) ? $user['department'] : 'วิทยาลัยนวัตกรรมดิจิทัลเทคโนโลยี';
+                            $status_label = [
+                                'student' => 'นักศึกษา',
+                                'staff'   => 'บุคลากร',
+                                'other'   => 'บุคคลทั่วไป',
+                            ][$user['status'] ?? 'other'] ?? 'ทั่วไป';
+                            ?>
+                            <div class="min-w-0 leading-tight">
+                                <p class="text-emerald-50 text-[11px] font-bold tracking-wide truncate max-w-[200px]"><?= htmlspecialchars($dept) ?></p>
+                                <p class="text-emerald-200/80 text-[10px] font-black uppercase tracking-[0.18em] mt-0.5"><?= htmlspecialchars($status_label) ?></p>
+                            </div>
                         </div>
                         <div
                             class="bg-emerald-400/20 border border-emerald-400/30 rounded-full px-4 py-1.5 backdrop-blur-md flex items-center gap-2">
