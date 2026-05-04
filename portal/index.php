@@ -811,7 +811,7 @@ try {
             
             var url = new URL(window.location.href);
             url.searchParams.set('section', sectionId);
-            ['page','el_search','el_level','el_date','el_source','al_q','eml_q','eml_type','eml_status','cd_search'].forEach(function(k){ url.searchParams.delete(k); });
+            ['page','el_search','el_level','el_date','el_source','al_q','eml_q','eml_type','eml_status','cd_search','cd_view','s','p'].forEach(function(k){ url.searchParams.delete(k); });
             history.pushState({section: sectionId}, '', url.toString());
         };
     </script>
