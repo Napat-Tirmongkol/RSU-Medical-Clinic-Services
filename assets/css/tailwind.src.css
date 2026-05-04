@@ -1,3 +1,73 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* ──────────────────────────────────────────────────────────────────────
+   Base layer — fonts and global resets
+   ────────────────────────────────────────────────────────────────────── */
+@layer base {
+    @font-face {
+        font-family: 'RSU';
+        src: url('../fonts/RSU_Regular.ttf') format('truetype');
+        font-weight: 400;
+        font-display: swap;
+    }
+    @font-face {
+        font-family: 'RSU';
+        src: url('../fonts/RSU_BOLD.ttf') format('truetype');
+        font-weight: 700;
+        font-display: swap;
+    }
+    @font-face {
+        font-family: 'RSU';
+        src: url('../fonts/RSU_light.ttf') format('truetype');
+        font-weight: 300;
+        font-display: swap;
+    }
+
+    body {
+        @apply font-sans bg-canvas text-slate-900;
+        -webkit-tap-highlight-color: transparent;
+    }
+}
+
+/* ──────────────────────────────────────────────────────────────────────
+   Component layer — shared primitives across modules
+   Use these instead of repeating long utility chains.
+   ────────────────────────────────────────────────────────────────────── */
+@layer components {
+    /* Card surfaces */
+    .ds-card        { @apply bg-white rounded-card border border-slate-100 shadow-card; }
+    .ds-card-lg     { @apply bg-white rounded-card-lg border border-slate-100 shadow-card-lg; }
+    .ds-card-soft   { @apply bg-white rounded-2xl border border-slate-100 shadow-sm; }
+
+    /* Buttons */
+    .ds-btn         { @apply inline-flex items-center justify-center gap-2 h-12 px-5 rounded-2xl font-black text-sm transition-all active:scale-95; }
+    .ds-btn-primary { @apply ds-btn bg-brand-500 text-white shadow-glow-brand hover:bg-brand-600; }
+    .ds-btn-ghost   { @apply ds-btn bg-white border border-slate-200 text-slate-500 hover:border-brand-500 hover:text-brand-500; }
+    .ds-btn-danger  { @apply ds-btn bg-rose-50 text-rose-600 border border-rose-100; }
+    .ds-btn-info    { @apply ds-btn bg-info-500 text-white shadow-glow-info hover:bg-info-600; }
+
+    /* Inputs */
+    .ds-input       { @apply w-full h-14 px-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none font-bold text-slate-700 transition-all focus:ring-4 focus:ring-brand-50 focus:border-brand-500; }
+
+    /* Pills / badges */
+    .ds-pill        { @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-pill border text-[10px] font-black; }
+    .ds-pill-brand  { @apply ds-pill bg-brand-50 text-brand-700 border-brand-100; }
+    .ds-pill-amber  { @apply ds-pill bg-amber-50 text-amber-700 border-amber-100; }
+    .ds-pill-rose   { @apply ds-pill bg-rose-50 text-rose-700 border-rose-100; }
+    .ds-pill-slate  { @apply ds-pill bg-slate-100 text-slate-600 border-slate-200; }
+
+    /* Glass header (used by hub + module shells) */
+    .ds-glass-header {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        @apply sticky top-0 z-[60] border-b border-slate-100 shadow-sm shadow-slate-50;
+    }
+
+    /* Section eyebrow label */
+    .ds-eyebrow {
+        @apply text-[10px] font-black uppercase tracking-[0.22em] text-slate-400;
+    }
+}

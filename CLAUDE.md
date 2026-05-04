@@ -9,3 +9,11 @@
 - Pagination ต้องทำงานร่วมกับ search/filter ได้เสมอ
 - ใช้ `LIMIT` + `OFFSET` ใน SQL query
 - แสดง "หน้า X / Y · รวม N รายการ" เหนือ/ใต้ pagination controls
+
+### Design System
+- ใช้ tokens และ component classes จาก `assets/STYLE_GUIDE.md` เสมอ
+- **ห้ามเขียน CSS ใหม่ใน user-facing modules** — ถ้า `<style>` ยาวเกิน ~10 บรรทัด ให้เพิ่ม component ใน `assets/css/tailwind.src.css` แทน
+- **ห้ามใส่ค่าสี hex ดิบในมาร์กอัป** — ใช้ token (`bg-brand-500`, `text-rose-600`, ฯลฯ)
+- หลังแก้ `tailwind.src.css` หรือ `tailwind.config.js` ต้องรัน `npm run build:css` แล้ว commit ไฟล์ output (`assets/css/tailwind.min.css`) ด้วย
+- Bottom nav ของ user เป็น shared include — ใช้ `includes/user_bottom_nav.php` ทุกครั้ง อย่า copy markup
+- หน้า reference: `user/profile.php`
