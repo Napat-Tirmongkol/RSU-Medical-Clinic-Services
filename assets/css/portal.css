@@ -148,6 +148,10 @@ body {
 }
 
 /* ── Project cards (refined, less visual weight than priority panel) ─── */
+#project-container {
+    align-items: stretch;          /* explicit grid stretch — equal row heights */
+    grid-auto-rows: 1fr;           /* every implicit row gets the same fraction */
+}
 .proj-card {
     background: var(--c-surface);
     border: 1px solid var(--c-border);
@@ -155,6 +159,7 @@ body {
     padding: 20px;
     display: flex; flex-direction: column;
     height: 100%;
+    align-self: stretch;           /* override any align-self override on the cell */
     transition: box-shadow .2s, transform .2s, border-color .2s;
     position: relative; overflow: hidden;
 }
