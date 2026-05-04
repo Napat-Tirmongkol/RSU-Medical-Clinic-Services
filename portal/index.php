@@ -86,6 +86,7 @@ $kpis = [
     'users' => 0,
     'camps' => 0,
     'borrows' => 0,
+    'borrows_overdue' => 0,
     'logs' => 0,
     'total_quota' => 0,
     'used_quota' => 0,
@@ -130,6 +131,12 @@ try {
     // Equipment borrows (optional module)
     if ($pdo->query("SHOW TABLES LIKE 'borrow_records'")->rowCount() > 0) {
         $kpis['borrows'] = (int) $pdo->query("SELECT COUNT(*) FROM borrow_records WHERE approval_status = 'pending'")->fetchColumn();
+        $kpis['borrows_overdue'] = (int) $pdo->query(
+            "SELECT COUNT(*) FROM borrow_records
+             WHERE status = 'borrowed'
+               AND approval_status IN ('approved','staff_added')
+               AND due_date < CURDATE()"
+        )->fetchColumn();
     }
 
     // Activity logs count (optional module)
@@ -974,6 +981,15 @@ try {
                             'icon'  => 'fa-box-open',
                             'tone'  => 'warning',
                             'href'  => '../e_Borrow/admin/index.php',
+                        ];
+                    }
+                    if ($kpis['borrows_overdue'] > 0) {
+                        $today_items[] = [
+                            'label' => 'เลยกำหนดคืน',
+                            'value' => $kpis['borrows_overdue'],
+                            'icon'  => 'fa-clock-rotate-left',
+                            'tone'  => 'danger',
+                            'href'  => '../e_Borrow/admin/return_dashboard.php',
                         ];
                     }
                     if ($kpis['errors_today'] > 0) {
