@@ -393,32 +393,11 @@ $heroThemes = [
     <link rel="icon" href="<?= defined('SITE_LOGO') && SITE_LOGO !== '' ? '../' . htmlspecialchars(SITE_LOGO, ENT_QUOTES, 'UTF-8') : '../favicon.ico?v=' . APP_VERSION ?>">
     <link rel="stylesheet" href="../assets/css/tailwind.min.css?v=<?= APP_VERSION ?>">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="../assets/css/rsufont.css?v=<?= APP_VERSION ?>">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://js.pusher.com/8.0.1/pusher.min.js"></script>
     <style>
-        @font-face {
-            font-family: 'RSU';
-            src: url('../assets/fonts/RSU_Regular.ttf') format('truetype');
-            font-weight: normal;
-            font-style: normal;
-        }
-
-        @font-face {
-            font-family: 'RSU';
-            src: url('../assets/fonts/RSU_BOLD.ttf') format('truetype');
-            font-weight: bold;
-            font-style: normal;
-        }
-
-        @font-face {
-            font-family: 'RSU';
-            src: url('../assets/fonts/RSU_light.ttf') format('truetype');
-            font-weight: 300;
-            font-style: normal;
-        }
-
         body {
-            font-family: 'RSU', sans-serif;
             -webkit-tap-highlight-color: transparent;
             background-color: #F8FAFF;
         }
