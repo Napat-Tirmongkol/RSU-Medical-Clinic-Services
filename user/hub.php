@@ -424,6 +424,215 @@ $greeting = ($hour >= 5 && $hour < 12) ? "สวัสดีตอนเช้�
             m.classList.add('flex');
         }
         function hideBorrow() { document.getElementById('borrow-modal').classList.add('hidden'); }
+
+        // ── Borrow Flow (multi-step) ─────────────────────────────────────
+        const bfState = { step: 1, data: null, selected: null, loaded: false };
+
+        function showBorrowFlow() {
+            const m = document.getElementById('borrow-flow-modal');
+            m.classList.remove('hidden');
+            m.classList.add('flex');
+            bfState.step = 1;
+            bfState.selected = null;
+            bfRenderStep();
+            if (!bfState.loaded) bfLoadData();
+        }
+        function hideBorrowFlow() {
+            document.getElementById('borrow-flow-modal').classList.add('hidden');
+            document.getElementById('borrow-flow-modal').classList.remove('flex');
+        }
+
+        function bfShowError(msg) {
+            const e = document.getElementById('bf-error');
+            document.getElementById('bf-error-text').textContent = msg;
+            e.classList.remove('hidden');
+            setTimeout(() => e.classList.add('hidden'), 4000);
+        }
+
+        async function bfLoadData() {
+            document.getElementById('bf-loading').classList.remove('hidden');
+            document.getElementById('bf-step-1').classList.add('hidden');
+            try {
+                const res = await fetch('ajax_borrow_data.php');
+                const json = await res.json();
+                if (!json.ok) throw new Error(json.error || 'load failed');
+                bfState.data = json;
+                bfState.loaded = true;
+                bfRenderCategories(json.categories || []);
+                bfRenderStaff(json.staff || []);
+                document.getElementById('bf-step-1').classList.remove('hidden');
+            } catch (err) {
+                bfShowError('ไม่สามารถโหลดข้อมูลได้ กรุณาลองใหม่');
+            } finally {
+                document.getElementById('bf-loading').classList.add('hidden');
+            }
+        }
+
+        function escHtml(s) {
+            return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
+        }
+
+        function bfRenderCategories(cats) {
+            const grid = document.getElementById('bf-cat-grid');
+            if (!cats.length) {
+                grid.innerHTML = '';
+                document.getElementById('bf-cat-empty').classList.remove('hidden');
+                return;
+            }
+            document.getElementById('bf-cat-empty').classList.add('hidden');
+            grid.innerHTML = cats.map(c => `
+                <button type="button" data-name="${escHtml(c.name).toLowerCase()}"
+                    onclick="bfSelectCategory(${c.id})"
+                    class="bf-cat-card bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden flex flex-col text-left active:scale-95 transition-all">
+                    <div class="aspect-[4/3] bg-slate-50 relative flex items-center justify-center overflow-hidden">
+                        ${c.image_url
+                            ? `<img src="../e_Borrow/${escHtml(c.image_url)}" alt="" class="w-full h-full object-cover" onerror="this.outerHTML='<i class=\\'fa-solid fa-image text-slate-300 text-2xl\\'></i>'">`
+                            : `<i class="fa-solid fa-camera text-slate-300 text-2xl"></i>`
+                        }
+                        <span class="absolute top-2 right-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/90 text-[#2e9e63] text-[10px] font-black shadow-sm">
+                            <i class="fa-solid fa-check-circle text-[8px]"></i> ว่าง ${parseInt(c.available_quantity, 10)}
+                        </span>
+                    </div>
+                    <div class="p-3 flex-1">
+                        <p class="text-[13px] font-black text-slate-900 leading-tight line-clamp-2">${escHtml(c.name)}</p>
+                        <p class="mt-1 text-[11px] font-bold text-slate-400 line-clamp-2">${escHtml(c.description || '')}</p>
+                    </div>
+                </button>
+            `).join('');
+        }
+
+        function bfRenderStaff(staff) {
+            const sel = document.getElementById('bf-staff');
+            if (!staff.length) {
+                sel.innerHTML = '<option value="">— ไม่มีเจ้าหน้าที่ —</option>';
+                return;
+            }
+            sel.innerHTML = '<option value="">— กรุณาเลือก —</option>'
+                + staff.map(s => `<option value="${s.id}">${escHtml(s.full_name)}</option>`).join('');
+        }
+
+        function bfSelectCategory(id) {
+            const cat = (bfState.data?.categories || []).find(c => parseInt(c.id, 10) === parseInt(id, 10));
+            if (!cat) return;
+            bfState.selected = cat;
+            // Populate selected card
+            document.getElementById('bf-selected-name').textContent = cat.name;
+            document.getElementById('bf-selected-stock').textContent = `ว่าง ${parseInt(cat.available_quantity, 10)} ชิ้น · ${cat.description || ''}`;
+            const thumb = document.getElementById('bf-selected-thumb');
+            if (cat.image_url) {
+                thumb.innerHTML = `<img src="../e_Borrow/${escHtml(cat.image_url)}" alt="" class="w-full h-full object-cover">`;
+            } else {
+                thumb.innerHTML = '<i class="fa-solid fa-stethoscope"></i>';
+            }
+            bfState.step = 2;
+            bfRenderStep();
+        }
+
+        function bfRenderStep() {
+            const step = bfState.step;
+            document.getElementById('bf-step-num').textContent = step;
+            ['bf-step-1','bf-step-2','bf-step-3'].forEach((id, i) => {
+                document.getElementById(id).classList.toggle('hidden', (i + 1) !== step);
+                document.getElementById(`bf-bar-${i+1}`).classList.toggle('bg-[#2e9e63]', (i + 1) <= step);
+                document.getElementById(`bf-bar-${i+1}`).classList.toggle('bg-slate-200', (i + 1) > step);
+            });
+            const titles = {
+                1: ['เลือกอุปกรณ์', 'เลือกประเภทอุปกรณ์ที่ต้องการยืม'],
+                2: ['กรอกข้อมูลคำขอ', 'ระบุเหตุผล วันคืน และเจ้าหน้าที่ผู้อนุมัติ'],
+                3: ['ตรวจสอบและยืนยัน', 'กรุณาตรวจข้อมูลให้ถูกต้องก่อนส่งคำขอ'],
+            };
+            document.getElementById('bf-title').textContent = titles[step][0];
+            document.getElementById('bf-subtitle').textContent = titles[step][1];
+
+            // Footer buttons
+            document.getElementById('bf-back-btn').classList.toggle('hidden', step === 1);
+            document.getElementById('bf-next-btn').classList.toggle('hidden', step !== 2);
+            document.getElementById('bf-submit-btn').classList.toggle('hidden', step !== 3);
+        }
+
+        function bfBack() {
+            if (bfState.step > 1) {
+                bfState.step--;
+                bfRenderStep();
+            }
+        }
+
+        function bfNext() {
+            // Validate step 2
+            const reason = document.getElementById('bf-reason').value.trim();
+            const due    = document.getElementById('bf-due').value;
+            const staff  = document.getElementById('bf-staff').value;
+            if (!reason) return bfShowError('กรุณาระบุเหตุผลการยืม');
+            if (!due)    return bfShowError('กรุณาเลือกวันที่กำหนดคืน');
+            if (!staff)  return bfShowError('กรุณาเลือกเจ้าหน้าที่ผู้อนุมัติ');
+            const file = document.getElementById('bf-file').files[0];
+            if (file && file.size > 5 * 1024 * 1024) return bfShowError('ไฟล์ใหญ่เกิน 5MB');
+
+            // Populate confirmation
+            document.getElementById('bf-sum-name').textContent = bfState.selected?.name || '-';
+            document.getElementById('bf-sum-due').textContent = new Date(due).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
+            const staffOpt = document.getElementById('bf-staff').options[document.getElementById('bf-staff').selectedIndex];
+            document.getElementById('bf-sum-staff').textContent = staffOpt?.textContent || '-';
+            document.getElementById('bf-sum-reason').textContent = reason;
+            const fileRow = document.getElementById('bf-sum-file-row');
+            if (file) {
+                document.getElementById('bf-sum-file').textContent = file.name;
+                fileRow.classList.remove('hidden');
+                fileRow.classList.add('flex');
+            } else {
+                fileRow.classList.add('hidden');
+                fileRow.classList.remove('flex');
+            }
+            bfState.step = 3;
+            bfRenderStep();
+        }
+
+        async function bfSubmit() {
+            const btn = document.getElementById('bf-submit-btn');
+            btn.disabled = true;
+            const originalHtml = btn.innerHTML;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i>กำลังส่ง...';
+
+            const fd = new FormData();
+            fd.append('type_id', bfState.selected.id);
+            fd.append('reason_for_borrowing', document.getElementById('bf-reason').value.trim());
+            fd.append('lending_staff_id', document.getElementById('bf-staff').value);
+            fd.append('due_date', document.getElementById('bf-due').value);
+            const file = document.getElementById('bf-file').files[0];
+            if (file) fd.append('attachment', file);
+
+            try {
+                const res = await fetch('../e_Borrow/process/request_borrow_process.php', {
+                    method: 'POST',
+                    body: fd,
+                });
+                const json = await res.json();
+                if (json.status !== 'success') throw new Error(json.message || 'ส่งคำขอไม่สำเร็จ');
+                hideBorrowFlow();
+                // Reload page to refresh borrow stats + active list in hub
+                window.location.reload();
+            } catch (err) {
+                bfShowError(err.message || 'เกิดข้อผิดพลาด');
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+            }
+        }
+
+        // Search filter on step 1
+        document.addEventListener('DOMContentLoaded', () => {
+            const search = document.getElementById('bf-search');
+            if (!search) return;
+            search.addEventListener('input', () => {
+                const q = search.value.trim().toLowerCase();
+                let found = 0;
+                document.querySelectorAll('.bf-cat-card').forEach(card => {
+                    const match = (card.dataset.name || '').includes(q);
+                    card.style.display = match ? 'flex' : 'none';
+                    if (match) found++;
+                });
+                document.getElementById('bf-cat-empty').classList.toggle('hidden', found > 0);
+            });
+        });
         let vaccinationPage = 1;
         let vaccinationQuery = '';
         let vaccinationStatus = '';
@@ -1980,13 +2189,164 @@ document.getElementById('insDetailModal').addEventListener('click', function(e) 
 
                 <!-- Action buttons -->
                 <div class="grid grid-cols-2 gap-3">
-                    <a href="../e_Borrow/borrow.php" class="flex h-14 items-center justify-center gap-2 rounded-2xl bg-[#2e9e63] text-white font-black text-sm shadow-[0_10px_25px_rgba(46,158,99,0.25)] active:scale-95 transition-all">
+                    <button type="button" onclick="showBorrowFlow()" class="flex h-14 items-center justify-center gap-2 rounded-2xl bg-[#2e9e63] text-white font-black text-sm shadow-[0_10px_25px_rgba(46,158,99,0.25)] active:scale-95 transition-all">
                         <i class="fa-solid fa-plus"></i> ยืมอุปกรณ์
-                    </a>
+                    </button>
                     <a href="../e_Borrow/history.php" class="flex h-14 items-center justify-center gap-2 rounded-2xl bg-white border border-slate-200 text-slate-600 font-black text-sm active:scale-95 transition-all">
                         <i class="fa-solid fa-clock-rotate-left"></i> ประวัติทั้งหมด
                     </a>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Borrow Flow Modal (multi-step) ── -->
+    <div id="borrow-flow-modal" class="fixed inset-0 z-[120] hidden flex items-end sm:items-center justify-center p-0 sm:p-6">
+        <div class="absolute inset-0 bg-slate-900/55 backdrop-blur-sm" onclick="hideBorrowFlow()"></div>
+        <div class="relative bg-[#f8fafc] w-full max-w-[680px] rounded-t-[2rem] sm:rounded-[1.5rem] border border-slate-200 shadow-2xl animate-in slide-in-from-bottom duration-300 flex flex-col max-h-[92vh] overflow-hidden text-left">
+
+            <div class="flex items-start justify-between gap-5 border-b border-slate-200 bg-white px-6 py-5 sm:px-8">
+                <div class="min-w-0">
+                    <div class="mb-2 flex items-center gap-3">
+                        <span class="h-6 w-1 rounded-full bg-[#2e9e63]"></span>
+                        <p class="text-[10px] font-black uppercase tracking-[0.22em] text-slate-400">
+                            ขั้นตอน <span id="bf-step-num">1</span>/3
+                        </p>
+                    </div>
+                    <h3 id="bf-title" class="text-xl font-black tracking-tight text-slate-900">เลือกอุปกรณ์</h3>
+                    <p id="bf-subtitle" class="mt-1 text-xs font-semibold text-slate-500">เลือกประเภทอุปกรณ์ที่ต้องการยืม</p>
+                </div>
+                <button onclick="hideBorrowFlow()" class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-400 transition-all active:scale-95 hover:text-slate-700">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <!-- Progress -->
+            <div class="px-6 sm:px-8 py-3 bg-white border-b border-slate-100">
+                <div class="flex items-center gap-2">
+                    <div id="bf-bar-1" class="h-1.5 flex-1 rounded-full bg-[#2e9e63] transition-colors"></div>
+                    <div id="bf-bar-2" class="h-1.5 flex-1 rounded-full bg-slate-200 transition-colors"></div>
+                    <div id="bf-bar-3" class="h-1.5 flex-1 rounded-full bg-slate-200 transition-colors"></div>
+                </div>
+            </div>
+
+            <!-- Body -->
+            <div class="flex-1 overflow-auto bg-[#f8fafc] p-4 sm:p-6">
+
+                <!-- Loading -->
+                <div id="bf-loading" class="hidden py-16 text-center">
+                    <div class="inline-block w-10 h-10 border-4 border-emerald-200 border-t-[#2e9e63] rounded-full animate-spin mb-3"></div>
+                    <p class="text-sm font-bold text-slate-500">กำลังโหลดข้อมูล...</p>
+                </div>
+
+                <!-- Error -->
+                <div id="bf-error" class="hidden rounded-2xl bg-rose-50 border border-rose-100 text-rose-700 px-4 py-3 text-sm font-bold mb-3 flex items-start gap-2">
+                    <i class="fa-solid fa-circle-exclamation mt-0.5"></i>
+                    <span id="bf-error-text" class="flex-1"></span>
+                </div>
+
+                <!-- Step 1: Browse categories -->
+                <div id="bf-step-1">
+                    <div class="bg-white rounded-2xl border border-slate-100 shadow-sm flex items-center gap-3 px-5 h-12 mb-4">
+                        <i class="fa-solid fa-magnifying-glass text-slate-400"></i>
+                        <input type="text" id="bf-search" placeholder="ค้นหาชื่ออุปกรณ์..."
+                            class="flex-1 bg-transparent border-0 outline-none text-sm font-bold text-slate-700 placeholder:text-slate-300">
+                    </div>
+                    <div id="bf-cat-grid" class="grid grid-cols-2 gap-3"></div>
+                    <div id="bf-cat-empty" class="hidden bg-white rounded-2xl p-8 border border-slate-100 shadow-sm text-center">
+                        <i class="fa-solid fa-box-open text-slate-300 text-2xl mb-2"></i>
+                        <p class="text-sm font-bold text-slate-400">ไม่พบอุปกรณ์ที่ตรงกับการค้นหา</p>
+                    </div>
+                </div>
+
+                <!-- Step 2: Form -->
+                <div id="bf-step-2" class="hidden space-y-4">
+                    <div id="bf-selected-card" class="bg-white rounded-2xl border border-emerald-100 shadow-sm p-4 flex items-center gap-3">
+                        <div id="bf-selected-thumb" class="w-14 h-14 rounded-xl bg-emerald-50 flex items-center justify-center shrink-0 overflow-hidden text-[#2e9e63]">
+                            <i class="fa-solid fa-stethoscope"></i>
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <p class="text-[10px] font-black uppercase tracking-widest text-[#2e9e63]">เลือกแล้ว</p>
+                            <p id="bf-selected-name" class="text-sm font-black text-slate-900 truncate">-</p>
+                            <p id="bf-selected-stock" class="text-[11px] font-bold text-slate-400">-</p>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 space-y-4">
+                        <div>
+                            <label class="text-sm font-bold text-slate-700 block mb-1.5">เหตุผลการยืม <span class="text-rose-500">*</span></label>
+                            <textarea id="bf-reason" rows="3" placeholder="ระบุเหตุผลและการใช้งาน..."
+                                class="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl outline-none font-bold text-slate-700 resize-none focus:ring-4 focus:ring-emerald-50 focus:border-[#2e9e63]"></textarea>
+                        </div>
+                        <div>
+                            <label class="text-sm font-bold text-slate-700 block mb-1.5">วันที่กำหนดคืน <span class="text-rose-500">*</span></label>
+                            <input type="date" id="bf-due" min="<?= date('Y-m-d', strtotime('+1 day')) ?>"
+                                class="w-full h-12 px-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none font-bold text-slate-700 focus:ring-4 focus:ring-emerald-50 focus:border-[#2e9e63]">
+                        </div>
+                        <div>
+                            <label class="text-sm font-bold text-slate-700 block mb-1.5">เจ้าหน้าที่ผู้อนุมัติ <span class="text-rose-500">*</span></label>
+                            <select id="bf-staff"
+                                class="w-full h-12 px-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none font-bold text-slate-700 focus:ring-4 focus:ring-emerald-50 focus:border-[#2e9e63]"></select>
+                        </div>
+                        <div>
+                            <label class="text-sm font-bold text-slate-700 block mb-1.5">
+                                <i class="fa-solid fa-paperclip text-slate-400 mr-1"></i>เอกสารแนบ <span class="text-slate-400 text-xs font-bold">(ถ้ามี)</span>
+                            </label>
+                            <input type="file" id="bf-file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                                class="w-full text-xs font-bold text-slate-500 file:h-10 file:px-4 file:rounded-xl file:border-0 file:bg-emerald-50 file:text-[#2e9e63] file:font-black file:text-xs file:cursor-pointer">
+                            <p class="mt-1 text-[10px] font-bold text-slate-400">PDF, Word, รูปภาพ — ไม่เกิน 5MB</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 3: Confirm -->
+                <div id="bf-step-3" class="hidden space-y-4">
+                    <div class="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+                        <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3">สรุปคำขอ</p>
+                        <dl class="space-y-3 text-sm">
+                            <div class="flex gap-3">
+                                <dt class="w-24 shrink-0 text-slate-400 font-bold">อุปกรณ์</dt>
+                                <dd id="bf-sum-name" class="flex-1 font-black text-slate-900">-</dd>
+                            </div>
+                            <div class="flex gap-3">
+                                <dt class="w-24 shrink-0 text-slate-400 font-bold">วันที่คืน</dt>
+                                <dd id="bf-sum-due" class="flex-1 font-black text-slate-900">-</dd>
+                            </div>
+                            <div class="flex gap-3">
+                                <dt class="w-24 shrink-0 text-slate-400 font-bold">เจ้าหน้าที่</dt>
+                                <dd id="bf-sum-staff" class="flex-1 font-black text-slate-900">-</dd>
+                            </div>
+                            <div class="flex gap-3">
+                                <dt class="w-24 shrink-0 text-slate-400 font-bold">เหตุผล</dt>
+                                <dd id="bf-sum-reason" class="flex-1 font-bold text-slate-700 whitespace-pre-wrap break-words">-</dd>
+                            </div>
+                            <div id="bf-sum-file-row" class="hidden flex gap-3">
+                                <dt class="w-24 shrink-0 text-slate-400 font-bold">ไฟล์แนบ</dt>
+                                <dd id="bf-sum-file" class="flex-1 font-bold text-slate-700 truncate">-</dd>
+                            </div>
+                        </dl>
+                    </div>
+                    <div class="rounded-2xl bg-amber-50 border border-amber-100 px-4 py-3 text-[12px] font-bold text-amber-700 flex items-start gap-2">
+                        <i class="fa-solid fa-circle-info mt-0.5"></i>
+                        <span>คำขอจะถูกส่งให้เจ้าหน้าที่อนุมัติ คุณจะได้รับการแจ้งเตือนเมื่อสถานะเปลี่ยน</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer actions -->
+            <div class="border-t border-slate-200 bg-white px-6 py-4 sm:px-8 flex gap-3">
+                <button id="bf-back-btn" type="button" onclick="bfBack()"
+                    class="hidden flex-1 h-12 rounded-2xl bg-slate-100 text-slate-500 font-black text-sm active:scale-95 transition-all">
+                    <i class="fa-solid fa-chevron-left mr-1"></i>ย้อนกลับ
+                </button>
+                <button id="bf-next-btn" type="button" onclick="bfNext()"
+                    class="hidden flex-1 h-12 rounded-2xl bg-[#2e9e63] text-white font-black text-sm shadow-[0_10px_20px_rgba(46,158,99,0.25)] active:scale-95 transition-all">
+                    ถัดไป<i class="fa-solid fa-chevron-right ml-1"></i>
+                </button>
+                <button id="bf-submit-btn" type="button" onclick="bfSubmit()"
+                    class="hidden flex-1 h-12 rounded-2xl bg-[#2e9e63] text-white font-black text-sm shadow-[0_10px_20px_rgba(46,158,99,0.25)] active:scale-95 transition-all">
+                    <i class="fa-solid fa-paper-plane mr-1"></i>ส่งคำขอ
+                </button>
             </div>
         </div>
     </div>
