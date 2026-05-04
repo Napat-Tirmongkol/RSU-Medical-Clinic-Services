@@ -154,6 +154,7 @@ body {
     border-radius: var(--r-lg);
     padding: 20px;
     display: flex; flex-direction: column;
+    height: 100%;
     transition: box-shadow .2s, transform .2s, border-color .2s;
     position: relative; overflow: hidden;
 }
