@@ -22,6 +22,9 @@ $borrow_count = 0;
 $borrow_pending_count = 0;
 $borrow_overdue_count = 0;
 $borrow_total_fine = 0.0;
+
+// e-Borrow maintenance flag — drives UI gating in hub modal/menu/stat tile
+$borrow_online = !is_under_maintenance('e_borrow');
 $borrow_active = [];
 $next_appt = null;
 
@@ -515,7 +518,17 @@ $heroThemes = [
         function hideChat() { document.getElementById('chat-modal').classList.add('hidden'); }
         function showUpcoming(name) { document.getElementById('upcoming-name').innerText = name; document.getElementById('upcoming-modal').classList.remove('hidden'); document.getElementById('upcoming-modal').classList.add('flex'); }
         function hideUpcoming() { document.getElementById('upcoming-modal').classList.add('hidden'); }
+
+        // e-Borrow maintenance gate — true = system online (set from PHP)
+        const BORROW_ONLINE = <?= $borrow_online ? 'true' : 'false' ?>;
+        function borrowMaintenanceBlocked() {
+            if (BORROW_ONLINE) return false;
+            showUpcoming('ระบบ e-Borrow ปิดปรับปรุงชั่วคราว');
+            return true;
+        }
+
         function showBorrow() {
+            if (borrowMaintenanceBlocked()) return;
             const m = document.getElementById('borrow-modal');
             m.classList.remove('hidden');
             m.classList.add('flex');
@@ -526,6 +539,7 @@ $heroThemes = [
         const bfState = { step: 1, data: null, selected: null, loaded: false };
 
         function showBorrowFlow() {
+            if (borrowMaintenanceBlocked()) return;
             const m = document.getElementById('borrow-flow-modal');
             m.classList.remove('hidden');
             m.classList.add('flex');
@@ -779,6 +793,7 @@ $heroThemes = [
         let bhLoading = false;
 
         function showBorrowHistory() {
+            if (borrowMaintenanceBlocked()) return;
             const m = document.getElementById('borrow-history-modal');
             m.classList.remove('hidden');
             m.classList.add('flex');
@@ -1450,12 +1465,14 @@ $heroThemes = [
                         </button>
 
                         <button onclick="showBorrowFlow()"
-                            class="relative flex flex-col items-start p-5 rounded-2xl bg-amber-50 border border-amber-100 active:scale-95 transition-all text-left group">
-                            <?php if ($borrow_count > 0): ?>
+                            class="relative flex flex-col items-start p-5 rounded-2xl <?= $borrow_online ? 'bg-amber-50 border border-amber-100' : 'bg-slate-100 border border-slate-200 opacity-60' ?> active:scale-95 transition-all text-left group">
+                            <?php if (!$borrow_online): ?>
+                                <span class="absolute top-3 right-3 px-1.5 py-0.5 rounded-full bg-rose-100 text-rose-700 text-[8px] font-black uppercase tracking-widest border border-rose-200">ปิดปรับปรุง</span>
+                            <?php elseif ($borrow_count > 0): ?>
                                 <span class="absolute top-3 right-3 w-5 h-5 bg-amber-500 text-white text-[9px] font-black rounded-full flex items-center justify-center border-2 border-white shadow"><?= $borrow_count ?></span>
                             <?php endif; ?>
                             <div class="w-10 h-10 rounded-2xl bg-white flex items-center justify-center mb-3 shadow-sm border border-amber-50">
-                                <i class="fa-solid fa-box-archive text-amber-500 text-sm"></i>
+                                <i class="fa-solid fa-box-archive <?= $borrow_online ? 'text-amber-500' : 'text-slate-400' ?> text-sm"></i>
                             </div>
                             <p class="text-[13px] font-black leading-tight text-slate-800">ยืมอุปกรณ์<br>e-Borrow</p>
                         </button>

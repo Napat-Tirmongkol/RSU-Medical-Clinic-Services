@@ -7,6 +7,12 @@ require_once __DIR__ . '/../config.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
+if (is_under_maintenance('e_borrow')) {
+    http_response_code(503);
+    echo json_encode(['ok' => false, 'error' => 'maintenance', 'message' => 'ระบบ e-Borrow ปิดปรับปรุงชั่วคราว']);
+    exit;
+}
+
 $lineUserId = $_SESSION['line_user_id'] ?? '';
 if ($lineUserId === '') {
     http_response_code(401);

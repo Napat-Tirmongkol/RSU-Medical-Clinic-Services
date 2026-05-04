@@ -141,6 +141,24 @@ if (!function_exists('check_user_profile')) {
 /**
  * ตรวจสอบสถานะการปิดปรับปรุงระบบ (Maintenance Mode)
  */
+/**
+ * Returns TRUE if the given project is currently in maintenance mode AND
+ * the current request is not exempt (admin / whitelisted line/student id).
+ * Use this from AJAX endpoints that need a JSON response on block.
+ */
+if (!function_exists('is_under_maintenance')) {
+    function is_under_maintenance(string $project_key): bool {
+        if (isset($_SESSION['admin_id'])) return false;
+        $mFile = __DIR__ . '/config/maintenance.json';
+        if (!file_exists($mFile)) return false;
+        $mData = json_decode((string) file_get_contents($mFile), true) ?: [];
+        $whitelist = $mData['whitelist'] ?? [];
+        if (!empty($_SESSION['line_user_id']) && in_array($_SESSION['line_user_id'], $whitelist, true)) return false;
+        if (!empty($_SESSION['student_id'])  && in_array($_SESSION['student_id'],  $whitelist, true)) return false;
+        return ($mData[$project_key] ?? true) === false;
+    }
+}
+
 if (!function_exists('check_maintenance')) {
     function check_maintenance(string $project_key): void {
         // ถ้าเป็น Admin ให้เข้าได้ปกติเสมอ

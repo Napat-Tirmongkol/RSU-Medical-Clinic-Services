@@ -5,8 +5,15 @@
 @session_start();
 require_once('../includes/check_student_session_ajax.php');
 require_once(__DIR__ . '/../includes/db_connect.php');
+require_once(__DIR__ . '/../../config.php');
 
 header('Content-Type: application/json');
+
+if (is_under_maintenance('e_borrow')) {
+    http_response_code(503);
+    echo json_encode(['status' => 'error', 'error' => 'maintenance', 'message' => 'ระบบ e-Borrow ปิดปรับปรุงชั่วคราว']);
+    exit;
+}
 $response = ['status' => 'error', 'message' => 'Invalid request'];
 
 // 2. ดึง ID นักศึกษาจาก Session

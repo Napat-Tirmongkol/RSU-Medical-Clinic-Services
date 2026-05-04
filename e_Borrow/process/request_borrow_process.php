@@ -12,6 +12,15 @@ require_once __DIR__ . '/../includes/check_student_session_ajax.php';
 // 2. เชื่อมต่อฐานข้อมูล (พาธ 3 ชั้นจาก /process/ ถึง root)
 require_once __DIR__ . '/../includes/db_connect.php';
 
+// 2.1 Maintenance gate — block submits when e_borrow is toggled OFF.
+require_once __DIR__ . '/../../config.php';
+if (is_under_maintenance('e_borrow')) {
+    http_response_code(503);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['status' => 'error', 'error' => 'maintenance', 'message' => 'ระบบ e-Borrow ปิดปรับปรุงชั่วคราว']);
+    exit;
+}
+
 // ตั้งค่า Header เป็น JSON และ UTF-8
 header('Content-Type: application/json; charset=utf-8');
 
