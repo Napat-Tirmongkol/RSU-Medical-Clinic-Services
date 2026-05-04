@@ -727,6 +727,9 @@ $heroThemes = [
             if (hash === '#borrow-flow') showBorrowFlow();
             else if (hash === '#borrow-history') showBorrowHistory();
             else if (hash === '#borrow') showBorrow();
+            else if (hash === '#camps') showCampaigns();
+            else if (hash === '#records') document.getElementById('records-section')?.scrollIntoView({behavior:'smooth'});
+            else if (hash === '#services') document.getElementById('services-section')?.scrollIntoView({behavior:'smooth'});
         });
 
         // ── Borrow History modal ─────────────────────────────────────────

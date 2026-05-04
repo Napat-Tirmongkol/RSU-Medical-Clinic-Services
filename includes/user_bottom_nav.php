@@ -1,6 +1,6 @@
 <?php
 // includes/user_bottom_nav.php — shared bottom nav for user-facing pages
-// Set $__navActive = 'home' | 'booking' | 'health' | 'account' before including
+// Set $__navActive = 'home' | 'records' | 'services' | 'account' before including
 // Set $__navBase = '' (default, same dir) or '../user/' (when used from another module)
 $__navActive = $__navActive ?? '';
 $__navBase   = $__navBase ?? '';
@@ -17,18 +17,18 @@ if (!function_exists('_navClass')) {
         <i class="fa-solid fa-house-chimney text-xl"></i>
         <span class="text-[8px] font-black uppercase tracking-[0.1em]">Home</span>
     </button>
-    <button onclick="window.location.href='<?= $__navBase ?>my_bookings.php'" class="<?= _navClass('booking', $__navActive) ?>">
-        <i class="fa-solid fa-calendar-day text-xl"></i>
-        <span class="text-[8px] font-black uppercase tracking-[0.1em]">Booking</span>
+    <button onclick="window.location.href='<?= $__navBase ?>hub.php#records'" class="<?= _navClass('records', $__navActive) ?>">
+        <i class="fa-solid fa-folder-open text-xl"></i>
+        <span class="text-[8px] font-black uppercase tracking-[0.1em]">Records</span>
     </button>
     <div class="relative -mt-14">
         <button onclick="window.location.href='<?= $__navBase ?>hub.php#camps'" class="w-16 h-16 bg-[#2e9e63] rounded-[1.8rem] rotate-45 flex items-center justify-center text-white shadow-[0_15px_30px_rgba(46,158,99,0.4)] border-[6px] border-[#F8FAFF] active:scale-90 transition-all group">
             <i class="fa-solid fa-plus text-2xl -rotate-45 group-hover:scale-125 transition-transform"></i>
         </button>
     </div>
-    <button onclick="window.location.href='<?= $__navBase ?>hub.php#health'" class="<?= _navClass('health', $__navActive) ?>">
-        <i class="fa-solid fa-heart-pulse text-xl"></i>
-        <span class="text-[8px] font-black uppercase tracking-[0.1em]">Health</span>
+    <button onclick="window.location.href='<?= $__navBase ?>hub.php#services'" class="<?= _navClass('services', $__navActive) ?>">
+        <i class="fa-solid fa-grip text-xl"></i>
+        <span class="text-[8px] font-black uppercase tracking-[0.1em]">Services</span>
     </button>
     <button onclick="window.location.href='<?= $__navBase ?>profile.php'" class="<?= _navClass('account', $__navActive) ?>">
         <i class="fa-solid fa-user-ninja text-xl"></i>
