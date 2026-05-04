@@ -1,5 +1,5 @@
 <?php
-// user/profile.php — Basic Form with Premium Shell
+// user/profile.php — Sectioned profile with view/edit modes, medical fields, avatar
 declare(strict_types=1);
 session_start();
 require_once __DIR__ . '/../config.php';
@@ -19,28 +19,60 @@ $userData = [
     'prefix' => '', 'first_name' => '', 'last_name' => '', 'full_name' => '',
     'id_number' => '', 'citizen_id' => '', 'phone' => '', 'status' => '',
     'email' => '', 'gender' => '', 'department' => '',
+    'picture_url' => '',
+    'blood_type' => '', 'height_cm' => '', 'weight_kg' => '',
+    'allergies' => '', 'chronic_conditions' => '',
+    'emergency_contact_name' => '', 'emergency_contact_phone' => '',
+    'emergency_contact_relation' => '',
+    'updated_at' => '',
 ];
 
 try {
     $pdo = db();
+
+    // Self-healing migration for new columns
+    $newCols = [
+        'blood_type'                 => "VARCHAR(8) NOT NULL DEFAULT ''",
+        'height_cm'                  => "DECIMAL(5,2) NULL DEFAULT NULL",
+        'weight_kg'                  => "DECIMAL(5,2) NULL DEFAULT NULL",
+        'allergies'                  => "VARCHAR(500) NOT NULL DEFAULT ''",
+        'chronic_conditions'         => "VARCHAR(500) NOT NULL DEFAULT ''",
+        'emergency_contact_name'     => "VARCHAR(120) NOT NULL DEFAULT ''",
+        'emergency_contact_phone'    => "VARCHAR(20)  NOT NULL DEFAULT ''",
+        'emergency_contact_relation' => "VARCHAR(50)  NOT NULL DEFAULT ''",
+    ];
+    foreach ($newCols as $col => $def) {
+        try { $pdo->exec("ALTER TABLE sys_users ADD COLUMN IF NOT EXISTS {$col} {$def}"); } catch (PDOException) {}
+    }
+
     $stmt = $pdo->prepare("SELECT * FROM sys_users WHERE line_user_id = :line_id LIMIT 1");
     $stmt->execute([':line_id' => $lineUserId]);
     $user = $stmt->fetch();
 
     if ($user) {
-        $userData = [
-            'prefix' => $user['prefix'] ?? '',
-            'first_name' => $user['first_name'] ?? '',
-            'last_name' => $user['last_name'] ?? '',
-            'full_name' => $user['full_name'] ?? '',
-            'id_number' => $user['student_personnel_id'] ?? '',
-            'citizen_id' => $user['citizen_id'] ?? '',
-            'phone' => $user['phone_number'] ?? '',
-            'status' => $user['status'] ?? '',
-            'email' => $user['email'] ?? '',
-            'gender' => $user['gender'] ?? '',
-            'department' => $user['department'] ?? '',
-        ];
+        $userData = array_merge($userData, [
+            'prefix'         => $user['prefix'] ?? '',
+            'first_name'     => $user['first_name'] ?? '',
+            'last_name'      => $user['last_name'] ?? '',
+            'full_name'      => $user['full_name'] ?? '',
+            'id_number'      => $user['student_personnel_id'] ?? '',
+            'citizen_id'     => $user['citizen_id'] ?? '',
+            'phone'          => $user['phone_number'] ?? '',
+            'status'         => $user['status'] ?? '',
+            'email'          => $user['email'] ?? '',
+            'gender'         => $user['gender'] ?? '',
+            'department'     => $user['department'] ?? '',
+            'picture_url'    => $user['picture_url'] ?? '',
+            'blood_type'     => $user['blood_type'] ?? '',
+            'height_cm'      => $user['height_cm'] ?? '',
+            'weight_kg'      => $user['weight_kg'] ?? '',
+            'allergies'      => $user['allergies'] ?? '',
+            'chronic_conditions' => $user['chronic_conditions'] ?? '',
+            'emergency_contact_name'     => $user['emergency_contact_name'] ?? '',
+            'emergency_contact_phone'    => $user['emergency_contact_phone'] ?? '',
+            'emergency_contact_relation' => $user['emergency_contact_relation'] ?? '',
+            'updated_at'     => $user['updated_at'] ?? '',
+        ]);
     }
 } catch (PDOException $e) { error_log($e->getMessage()); }
 
@@ -51,29 +83,59 @@ if ($userData['full_name'] !== '' && $userData['first_name'] === '' && $userData
 }
 
 $isEditing = !empty($userData['full_name']);
-$redirectBack = $_GET['redirect_back'] ?? 'hub.php';
 $citizenIdValue = $userData['citizen_id'];
 $isPassport = ($citizenIdValue !== '' && (!ctype_digit($citizenIdValue) || strlen($citizenIdValue) > 13));
+
+// ── redirect_back: whitelist internal *.php only (XSS / open-redirect guard) ──
+$rawRedirect = (string) ($_GET['redirect_back'] ?? 'hub.php');
+$redirectBack = preg_match('/^[a-zA-Z0-9_\-\.]+\.php(\?[^\s]*)?$/', $rawRedirect) ? $rawRedirect : 'hub.php';
+
+// ── Mode: view (default if profile exists) / edit ──
+$mode = ($_GET['mode'] ?? '') === 'edit' || !$isEditing ? 'edit' : 'view';
+$saved = isset($_GET['saved']);
+$err   = (string) ($_GET['error'] ?? '');
 
 // Faculty list
 $_facultyList = [];
 try {
     $_pdo2 = db();
     $stmt_fac = $_pdo2->query("SELECT name_th FROM sys_faculties ORDER BY name_th");
-    if ($stmt_fac) {
-        $_facultyList = $stmt_fac->fetchAll(PDO::FETCH_ASSOC);
-    }
-} catch (Exception $e) {
-    error_log("Faculty query failed: " . $e->getMessage());
+    if ($stmt_fac) $_facultyList = $stmt_fac->fetchAll(PDO::FETCH_ASSOC);
+} catch (Exception $e) { error_log("Faculty query failed: " . $e->getMessage()); }
+
+// ── Profile completeness ──
+$weighted = [
+    'first_name' => 8, 'last_name' => 8, 'prefix' => 4, 'gender' => 4,
+    'status' => 6, 'citizen_id' => 8, 'phone' => 8, 'department' => 6,
+    'email' => 8,
+    'blood_type' => 8, 'allergies' => 6, 'chronic_conditions' => 6,
+    'height_cm' => 4, 'weight_kg' => 4,
+    'emergency_contact_name' => 6, 'emergency_contact_phone' => 6,
+];
+$totalW = array_sum($weighted); $gotW = 0;
+foreach ($weighted as $k => $w) {
+    $v = $userData[$k] ?? '';
+    if ($v !== '' && $v !== null && $v !== '0' && $v !== 0) $gotW += $w;
 }
+$completeness = (int) round(($gotW / $totalW) * 100);
+
+$avatarUrl = $userData['picture_url'] !== ''
+    ? $userData['picture_url']
+    : 'https://ui-avatars.com/api/?background=2e9e63&color=fff&name=' . urlencode($userData['full_name'] ?: 'User');
+
+$bloodOptions = ['', 'A', 'B', 'AB', 'O', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+$disabled = $mode === 'view' ? 'disabled' : '';
+$readonlyAttr = $mode === 'view' ? 'readonly' : '';
+
+function vh(?string $s): string { return htmlspecialchars((string) $s, ENT_QUOTES, 'UTF-8'); }
 ?>
 <!DOCTYPE html>
-<html lang="th">
+<html lang="<?= current_lang() ?>">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title><?= __('profile.heading_edit') ?> - RSU Medical</title>
-    <link rel="icon" href="<?= defined('SITE_LOGO') && SITE_LOGO !== '' ? '../' . htmlspecialchars(SITE_LOGO, ENT_QUOTES, 'UTF-8') : '../favicon.ico?v=' . APP_VERSION ?>">
+    <link rel="icon" href="<?= defined('SITE_LOGO') && SITE_LOGO !== '' ? '../' . vh(SITE_LOGO) : '../favicon.ico?v=' . APP_VERSION ?>">
     <script src="https://cdn.tailwindcss.com/3.4.1"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css?v=<?= APP_VERSION ?>" rel="stylesheet">
     <style>
@@ -81,35 +143,111 @@ try {
         @font-face { font-family: 'RSU'; src: url('../assets/fonts/RSU_BOLD.ttf') format('truetype'); font-weight: bold; }
         body { font-family: 'RSU', sans-serif; background-color: #F8FAFF; -webkit-tap-highlight-color: transparent; }
         .glass-header { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }
-        .nav-item-active { color: #2e9e63; }
-        .nav-item-inactive { color: #94a3b8; }
         .safe-area-bottom { padding-bottom: env(safe-area-inset-bottom); }
+        .field-input:disabled, .field-input[readonly] { background:#f8fafc; color:#475569; }
+        .toast { animation: slideDown .3s cubic-bezier(.16,1,.3,1); }
+        @keyframes slideDown { from { transform: translate(-50%, -120%); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
+        .pdpa-box { transition: border-color .2s; }
     </style>
 </head>
 <body class="text-slate-900 pb-32">
 
+    <?php if ($saved): ?>
+    <div id="toast-saved" class="toast fixed top-5 left-1/2 z-[120] -translate-x-1/2 rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-black text-white shadow-xl shadow-emerald-200">
+        <i class="fa-solid fa-circle-check mr-2"></i><?= __('profile.toast_saved') ?>
+    </div>
+    <script>setTimeout(() => document.getElementById('toast-saved')?.remove(), 2800);</script>
+    <?php endif; ?>
+
+    <?php if ($err !== ''): ?>
+    <?php
+        $errMap = [
+            'invalid_email' => __('profile.toast_error_email'),
+            'invalid_phone' => __('profile.toast_error_phone'),
+            'invalid_citizen' => __('profile.toast_error_citizen'),
+            'no_prefix' => __('profile.lbl_prefix'),
+            'no_status'  => __('profile.lbl_user_type'),
+            'no_gender'  => __('profile.lbl_gender'),
+            'empty'      => __('profile.toast_error_phone'),
+            'empty_student' => __('profile.lbl_id'),
+        ];
+        $errMsg = $errMap[$err] ?? $err;
+    ?>
+    <div id="toast-err" class="toast fixed top-5 left-1/2 z-[120] -translate-x-1/2 rounded-2xl bg-rose-600 px-5 py-3 text-sm font-black text-white shadow-xl shadow-rose-200">
+        <i class="fa-solid fa-circle-exclamation mr-2"></i><?= vh($errMsg) ?>
+    </div>
+    <script>setTimeout(() => document.getElementById('toast-err')?.remove(), 4000);</script>
+    <?php endif; ?>
+
     <div class="max-w-md mx-auto relative min-h-screen">
-        
-        <!-- ── Clean White Header ── -->
+
+        <!-- ── Header ── -->
         <header class="glass-header sticky top-0 z-[60] px-6 py-5 flex items-center justify-between border-b border-slate-100 shadow-sm shadow-slate-50">
-            <button onclick="window.location.href='<?= $redirectBack ?>'" class="w-11 h-11 flex items-center justify-center bg-slate-50 rounded-2xl text-slate-400 active:scale-90 transition-all">
+            <button onclick="window.location.href='<?= vh($redirectBack) ?>'" class="w-11 h-11 flex items-center justify-center bg-slate-50 rounded-2xl text-slate-400 active:scale-90 transition-all">
                 <i class="fa-solid fa-chevron-left"></i>
             </button>
-            <h1 class="text-lg font-black text-slate-900 tracking-tight"><?= __('profile.heading_edit') ?></h1>
-            <a href="logout.php" class="w-11 h-11 flex items-center justify-center bg-red-50 text-red-500 rounded-2xl active:scale-90 transition-all shadow-sm">
-                <i class="fa-solid fa-power-off"></i>
-            </a>
+            <h1 class="text-lg font-black text-slate-900 tracking-tight"><?= __($mode === 'view' ? 'profile.heading' : 'profile.heading_edit') ?></h1>
+            <div class="flex items-center gap-2">
+                <a href="<?= vh(lang_switch_url()) ?>" class="h-11 px-3 flex items-center justify-center bg-slate-50 rounded-2xl text-slate-500 text-[11px] font-black active:scale-90 transition-all">
+                    <?= current_lang() === 'th' ? 'EN' : 'TH' ?>
+                </a>
+                <button type="button" onclick="confirmLogout()" class="w-11 h-11 flex items-center justify-center bg-red-50 text-red-500 rounded-2xl active:scale-90 transition-all shadow-sm">
+                    <i class="fa-solid fa-power-off"></i>
+                </button>
+            </div>
         </header>
 
         <main class="px-6 pt-8 pb-12">
-            
-            <form id="profileForm" action="save_profile.php" method="POST" class="space-y-6">
-                <?php csrf_field(); ?>
-                <input type="hidden" name="redirect_back" value="<?= htmlspecialchars($redirectBack) ?>">
 
-                <!-- Basic Form Content (Original Structure) -->
-                <div class="bg-white rounded-[2.5rem] p-8 border border-slate-50 shadow-sm space-y-6">
-                    
+            <!-- ── Avatar + Completeness Card ── -->
+            <div class="bg-white rounded-[2.5rem] p-6 border border-slate-50 shadow-sm mb-6">
+                <div class="flex items-center gap-4">
+                    <img src="<?= vh($avatarUrl) ?>" alt="avatar"
+                         class="w-20 h-20 rounded-3xl object-cover border-2 border-emerald-100 shadow-sm bg-slate-100"
+                         onerror="this.src='https://ui-avatars.com/api/?background=2e9e63&color=fff&name=<?= urlencode($userData['full_name'] ?: 'U') ?>'">
+                    <div class="flex-1 min-w-0">
+                        <p class="text-[11px] font-black uppercase tracking-widest text-slate-400">
+                            <?= vh($userData['prefix']) ?>
+                        </p>
+                        <h2 class="truncate text-lg font-black text-slate-900"><?= vh($userData['full_name'] ?: '—') ?></h2>
+                        <p class="text-xs font-bold text-slate-500 truncate"><?= vh($userData['email'] ?: ($userData['phone'] ?: '—')) ?></p>
+                    </div>
+                </div>
+
+                <div class="mt-5">
+                    <div class="flex items-end justify-between mb-1.5">
+                        <p class="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400"><?= __('profile.completeness') ?></p>
+                        <p class="text-sm font-black <?= $completeness >= 100 ? 'text-emerald-600' : 'text-slate-700' ?>"><?= $completeness ?>%</p>
+                    </div>
+                    <div class="h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                        <div class="h-full rounded-full bg-gradient-to-r from-emerald-400 to-emerald-600 transition-all" style="width: <?= $completeness ?>%"></div>
+                    </div>
+                    <p class="mt-2 text-[11px] font-bold text-slate-400">
+                        <?= $completeness >= 100 ? __('profile.completeness_done') : __('profile.completeness_more') ?>
+                    </p>
+                </div>
+
+                <?php if ($mode === 'view'): ?>
+                <div class="mt-5 flex gap-3">
+                    <a href="?mode=edit" class="flex-1 h-12 flex items-center justify-center bg-[#2e9e63] text-white rounded-2xl font-black text-sm active:scale-95 transition-all">
+                        <i class="fa-solid fa-pen mr-2"></i><?= __('profile.btn_edit') ?>
+                    </a>
+                </div>
+                <p class="mt-3 text-center text-[11px] font-bold text-slate-400"><?= __('profile.view_mode_hint') ?></p>
+                <?php endif; ?>
+            </div>
+
+            <form id="profileForm" action="save_profile.php" method="POST" class="space-y-6" novalidate>
+                <?php csrf_field(); ?>
+                <input type="hidden" name="redirect_back" value="<?= vh($redirectBack) ?>">
+
+                <!-- ── Section: Basic Info ── -->
+                <div class="bg-white rounded-[2.5rem] p-7 border border-slate-50 shadow-sm space-y-5">
+                    <div class="flex items-center gap-2">
+                        <span class="h-5 w-1 rounded-full bg-[#2e9e63]"></span>
+                        <h3 class="text-sm font-black uppercase tracking-widest text-slate-700"><?= __('profile.section_basic') ?></h3>
+                    </div>
+
                     <!-- Prefix -->
                     <div class="space-y-1.5">
                         <label for="name_title" class="text-sm font-bold text-slate-700"><?= __('profile.lbl_prefix') ?> <span class="text-red-500">*</span></label>
@@ -119,8 +257,8 @@ try {
                         $_selectVal = $_isCustomPrefix ? 'other' : $userData['prefix'];
                         $_customVal = $_isCustomPrefix ? $userData['prefix'] : '';
                         ?>
-                        <select name="name_title" id="name_title" onchange="toggleCustomTitle()" required
-                            class="w-full h-14 px-4 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-4 focus:ring-green-50 outline-none transition-all font-bold text-slate-700">
+                        <select name="name_title" id="name_title" onchange="toggleCustomTitle()" required <?= $disabled ?>
+                            class="field-input w-full h-14 px-4 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-4 focus:ring-green-50 outline-none transition-all font-bold text-slate-700">
                             <option value="" disabled <?= $_selectVal === '' ? 'selected' : '' ?>><?= __('profile.select_placeholder') ?></option>
                             <option value="นาย" <?= $_selectVal === 'นาย' ? 'selected' : '' ?>>นาย</option>
                             <option value="นาง" <?= $_selectVal === 'นาง' ? 'selected' : '' ?>>นาง</option>
@@ -134,9 +272,9 @@ try {
                             <option value="other" <?= $_selectVal === 'other' ? 'selected' : '' ?>>อื่นๆ...</option>
                         </select>
                         <div id="custom_title_container" class="<?= $_isCustomPrefix ? '' : 'hidden' ?> mt-3">
-                            <input type="text" id="custom_title" name="custom_title" value="<?= htmlspecialchars($_customVal) ?>" 
-                                placeholder="ระบุเอง..." 
-                                class="w-full h-12 px-5 bg-white border border-slate-200 rounded-2xl outline-none font-bold">
+                            <input type="text" id="custom_title" name="custom_title" value="<?= vh($_customVal) ?>"
+                                <?= $disabled ?> placeholder="ระบุเอง..."
+                                class="field-input w-full h-12 px-5 bg-white border border-slate-200 rounded-2xl outline-none font-bold">
                         </div>
                     </div>
 
@@ -144,13 +282,13 @@ try {
                     <div class="grid grid-cols-2 gap-4">
                         <div class="space-y-1.5">
                             <label class="text-sm font-bold text-slate-700"><?= __('profile.lbl_first_name') ?> <span class="text-red-500">*</span></label>
-                            <input type="text" name="first_name" required value="<?= htmlspecialchars($userData['first_name']) ?>"
-                                class="w-full h-14 px-4 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-4 focus:ring-green-50 outline-none font-bold">
+                            <input type="text" name="first_name" required value="<?= vh($userData['first_name']) ?>" <?= $readonlyAttr ?>
+                                class="field-input w-full h-14 px-4 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-4 focus:ring-green-50 outline-none font-bold">
                         </div>
                         <div class="space-y-1.5">
                             <label class="text-sm font-bold text-slate-700"><?= __('profile.lbl_last_name') ?> <span class="text-red-500">*</span></label>
-                            <input type="text" name="last_name" required value="<?= htmlspecialchars($userData['last_name']) ?>"
-                                class="w-full h-14 px-4 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-4 focus:ring-green-50 outline-none font-bold">
+                            <input type="text" name="last_name" required value="<?= vh($userData['last_name']) ?>" <?= $readonlyAttr ?>
+                                class="field-input w-full h-14 px-4 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-4 focus:ring-green-50 outline-none font-bold">
                         </div>
                     </div>
 
@@ -159,65 +297,86 @@ try {
                         <label class="text-sm font-bold text-slate-700"><?= __('profile.lbl_gender') ?> <span class="text-red-500">*</span></label>
                         <div class="flex gap-3">
                             <?php foreach(['male' => 'ชาย', 'female' => 'หญิง', 'other' => 'อื่นๆ'] as $v => $l): ?>
-                            <label class="flex-1 cursor-pointer">
-                                <input type="radio" name="gender" value="<?= $v ?>" required class="peer hidden" <?= $userData['gender'] === $v ? 'checked' : '' ?>>
+                            <label class="flex-1 cursor-pointer <?= $disabled ? 'pointer-events-none opacity-90' : '' ?>">
+                                <input type="radio" name="gender" value="<?= $v ?>" required class="peer hidden" <?= $userData['gender'] === $v ? 'checked' : '' ?> <?= $disabled ?>>
                                 <div class="py-4 text-center rounded-2xl border border-slate-100 bg-slate-50 font-bold text-sm text-slate-400 peer-checked:bg-[#2e9e63] peer-checked:text-white peer-checked:border-[#2e9e63] transition-all"><?= $l ?></div>
                             </label>
                             <?php endforeach; ?>
                         </div>
                     </div>
+                </div>
 
-                    <div class="h-px bg-slate-50 my-2"></div>
+                <!-- ── Section: Identification ── -->
+                <div class="bg-white rounded-[2.5rem] p-7 border border-slate-50 shadow-sm space-y-5">
+                    <div class="flex items-center gap-2">
+                        <span class="h-5 w-1 rounded-full bg-[#2e9e63]"></span>
+                        <h3 class="text-sm font-black uppercase tracking-widest text-slate-700"><?= __('profile.section_id') ?></h3>
+                    </div>
 
                     <!-- User Type -->
                     <div class="space-y-1.5">
                         <label class="text-sm font-bold text-slate-700"><?= __('profile.lbl_user_type') ?> <span class="text-red-500">*</span></label>
                         <div class="grid grid-cols-3 gap-3">
                             <?php foreach(['student' => 'นักศึกษา', 'staff' => 'บุคลากร', 'other' => 'ทั่วไป'] as $v => $l): ?>
-                            <label class="cursor-pointer">
-                                <input type="radio" name="status" value="<?= $v ?>" required class="peer hidden" <?= $userData['status'] === $v ? 'checked' : '' ?>>
+                            <label class="cursor-pointer <?= $disabled ? 'pointer-events-none opacity-90' : '' ?>">
+                                <input type="radio" name="status" value="<?= $v ?>" required class="peer hidden" <?= $userData['status'] === $v ? 'checked' : '' ?> <?= $disabled ?>>
                                 <div class="py-4 text-center rounded-2xl border border-slate-100 bg-slate-50 font-bold text-[11px] text-slate-400 peer-checked:bg-emerald-500 peer-checked:text-white peer-checked:border-emerald-500 transition-all"><?= $l ?></div>
                             </label>
                             <?php endforeach; ?>
                         </div>
                     </div>
 
-                    <!-- ID Card Section -->
+                    <!-- Citizen ID with show/hide -->
                     <div id="id_section" class="space-y-5">
                         <div class="space-y-1.5">
                             <label class="text-sm font-bold text-slate-700"><?= __('profile.lbl_citizen_id') ?> <span class="text-red-500">*</span></label>
                             <div class="flex gap-2 mb-3">
-                                <label class="flex-1 cursor-pointer">
-                                    <input type="radio" name="id_type" value="citizen" class="peer hidden" <?= !$isPassport ? 'checked' : '' ?>>
+                                <label class="flex-1 cursor-pointer <?= $disabled ? 'pointer-events-none' : '' ?>">
+                                    <input type="radio" name="id_type" value="citizen" class="peer hidden" <?= !$isPassport ? 'checked' : '' ?> <?= $disabled ?>>
                                     <div class="py-2.5 text-center border border-slate-100 bg-slate-50 rounded-xl peer-checked:bg-green-50 peer-checked:border-green-200 peer-checked:text-[#2e9e63] font-bold text-[10px] transition-all"><?= __('profile.lbl_identity_th') ?></div>
                                 </label>
-                                <label class="flex-1 cursor-pointer">
-                                    <input type="radio" name="id_type" value="passport" class="peer hidden" <?= $isPassport ? 'checked' : '' ?>>
+                                <label class="flex-1 cursor-pointer <?= $disabled ? 'pointer-events-none' : '' ?>">
+                                    <input type="radio" name="id_type" value="passport" class="peer hidden" <?= $isPassport ? 'checked' : '' ?> <?= $disabled ?>>
                                     <div class="py-2.5 text-center border border-slate-100 bg-slate-50 rounded-xl peer-checked:bg-green-50 peer-checked:border-green-200 peer-checked:text-[#2e9e63] font-bold text-[10px] transition-all">Passport</div>
                                 </label>
                             </div>
-                            <input type="text" id="citizen_id" name="citizen_id" required value="<?= htmlspecialchars($userData['citizen_id']) ?>"
-                                class="w-full h-14 px-4 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-4 focus:ring-green-50 outline-none font-bold" 
-                                placeholder="<?= __('profile.lbl_citizen_id') ?>">
+                            <div class="relative">
+                                <input type="password" id="citizen_id" name="citizen_id" required value="<?= vh($userData['citizen_id']) ?>" <?= $readonlyAttr ?> autocomplete="off"
+                                    class="field-input w-full h-14 pl-4 pr-14 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-4 focus:ring-green-50 outline-none font-bold tracking-widest"
+                                    placeholder="<?= __('profile.lbl_citizen_id') ?>">
+                                <button type="button" id="cid-toggle" onclick="toggleCidVisibility()"
+                                    class="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-xl bg-white border border-slate-200 text-slate-400 active:scale-95 transition-all">
+                                    <i id="cid-icon" class="fa-solid fa-eye"></i>
+                                </button>
+                            </div>
+                            <p id="citizen-error" class="hidden text-[11px] font-bold text-rose-500"><i class="fa-solid fa-circle-exclamation mr-1"></i><?= __('profile.toast_error_citizen') ?></p>
                         </div>
 
                         <div id="student_id_container" class="space-y-1.5">
                             <label for="id_number" class="text-sm font-bold text-slate-700"><?= __('profile.lbl_id') ?> <span class="text-red-500">*</span></label>
-                            <input type="text" id="id_number" name="id_number" value="<?= htmlspecialchars($userData['id_number']) ?>"
-                                class="w-full h-14 px-4 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-4 focus:ring-green-50 outline-none font-bold"
+                            <input type="text" id="id_number" name="id_number" value="<?= vh($userData['id_number']) ?>" <?= $readonlyAttr ?>
+                                class="field-input w-full h-14 px-4 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-4 focus:ring-green-50 outline-none font-bold"
                                 placeholder="<?= __('profile.id_placeholder') ?>">
                         </div>
+                    </div>
+                </div>
+
+                <!-- ── Section: Contact Info ── -->
+                <div class="bg-white rounded-[2.5rem] p-7 border border-slate-50 shadow-sm space-y-5">
+                    <div class="flex items-center gap-2">
+                        <span class="h-5 w-1 rounded-full bg-[#2e9e63]"></span>
+                        <h3 class="text-sm font-black uppercase tracking-widest text-slate-700"><?= __('profile.section_contact') ?></h3>
                     </div>
 
                     <!-- Department -->
                     <div class="space-y-1.5">
                         <label for="department" class="text-sm font-bold text-slate-700">คณะ / หน่วยงาน <span class="text-red-500">*</span></label>
                         <div class="relative">
-                            <input type="text" id="department" name="department" list="faculty-datalist" value="<?= htmlspecialchars($userData['department']) ?>"
-                                class="w-full h-14 px-4 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-4 focus:ring-green-50 outline-none font-bold"
+                            <input type="text" id="department" name="department" list="faculty-datalist" value="<?= vh($userData['department']) ?>" <?= $readonlyAttr ?>
+                                class="field-input w-full h-14 px-4 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-4 focus:ring-green-50 outline-none font-bold"
                                 placeholder="<?= __('profile.dept_placeholder') ?>">
                             <datalist id="faculty-datalist">
-                                <?php foreach ($_facultyList as $_f) echo "<option value='".htmlspecialchars($_f['name_th'])."'>"; ?>
+                                <?php foreach ($_facultyList as $_f) echo "<option value='".vh($_f['name_th'])."'>"; ?>
                             </datalist>
                         </div>
                         <div id="dept-ai-hint" class="hidden items-center gap-2 text-[12px] text-teal-700 font-bold mt-2 bg-teal-50/50 p-3 rounded-xl border border-teal-100/50">
@@ -230,103 +389,170 @@ try {
                         </div>
                     </div>
 
+                    <!-- Phone -->
                     <div class="space-y-1.5">
                         <label class="text-sm font-bold text-slate-700"><?= __('profile.lbl_phone') ?> <span class="text-red-500">*</span></label>
-                        <input type="tel" name="phone_number" required value="<?= htmlspecialchars($userData['phone']) ?>"
-                            class="w-full h-14 px-4 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-4 focus:ring-green-50 outline-none font-bold">
+                        <input type="tel" id="phone_number" name="phone_number" required value="<?= vh($userData['phone']) ?>" <?= $readonlyAttr ?>
+                            inputmode="numeric" maxlength="10"
+                            class="field-input w-full h-14 px-4 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-4 focus:ring-green-50 outline-none font-bold">
+                        <p id="phone-error" class="hidden text-[11px] font-bold text-rose-500"><i class="fa-solid fa-circle-exclamation mr-1"></i><?= __('profile.toast_error_phone') ?></p>
+                    </div>
+
+                    <!-- Email -->
+                    <div class="space-y-1.5">
+                        <label class="text-sm font-bold text-slate-700"><?= __('profile.lbl_email') ?> <?= __('profile.optional') ?></label>
+                        <input type="email" id="email" name="email" value="<?= vh($userData['email']) ?>" <?= $readonlyAttr ?>
+                            class="field-input w-full h-14 px-4 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-4 focus:ring-green-50 outline-none font-bold">
+                        <p id="email-error" class="hidden text-[11px] font-bold text-rose-500"><i class="fa-solid fa-circle-exclamation mr-1"></i><?= __('profile.toast_error_email') ?></p>
+                        <p class="text-[11px] text-amber-600 font-bold mt-2 px-1"><i class="fa-solid fa-circle-info mr-1"></i> <?= __('profile.email_note') ?></p>
+                    </div>
+                </div>
+
+                <!-- ── Section: Health Info ── -->
+                <div class="bg-white rounded-[2.5rem] p-7 border border-slate-50 shadow-sm space-y-5">
+                    <div class="flex items-center gap-2">
+                        <span class="h-5 w-1 rounded-full bg-rose-500"></span>
+                        <h3 class="text-sm font-black uppercase tracking-widest text-slate-700"><?= __('profile.section_health') ?></h3>
+                    </div>
+                    <p class="text-[11px] font-bold text-slate-400 -mt-3"><i class="fa-solid fa-shield-heart mr-1 text-rose-400"></i><?= __('profile.section_health_desc') ?></p>
+
+                    <!-- Blood type -->
+                    <div class="space-y-1.5">
+                        <label class="text-sm font-bold text-slate-700"><?= __('profile.lbl_blood_type') ?></label>
+                        <select name="blood_type" <?= $disabled ?>
+                            class="field-input w-full h-14 px-4 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-4 focus:ring-rose-50 outline-none font-bold text-slate-700">
+                            <?php foreach ($bloodOptions as $bo): ?>
+                                <option value="<?= vh($bo) ?>" <?= $userData['blood_type'] === $bo ? 'selected' : '' ?>><?= $bo === '' ? '— ' . __('profile.select_placeholder') . ' —' : vh($bo) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+
+                    <!-- Height / Weight -->
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="space-y-1.5">
+                            <label class="text-sm font-bold text-slate-700"><?= __('profile.lbl_height') ?></label>
+                            <input type="number" name="height_cm" min="50" max="250" step="0.1" value="<?= vh((string) $userData['height_cm']) ?>" <?= $readonlyAttr ?>
+                                class="field-input w-full h-14 px-4 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-4 focus:ring-rose-50 outline-none font-bold">
+                        </div>
+                        <div class="space-y-1.5">
+                            <label class="text-sm font-bold text-slate-700"><?= __('profile.lbl_weight') ?></label>
+                            <input type="number" name="weight_kg" min="10" max="300" step="0.1" value="<?= vh((string) $userData['weight_kg']) ?>" <?= $readonlyAttr ?>
+                                class="field-input w-full h-14 px-4 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-4 focus:ring-rose-50 outline-none font-bold">
+                        </div>
+                    </div>
+
+                    <!-- Allergies -->
+                    <div class="space-y-1.5">
+                        <label class="text-sm font-bold text-slate-700"><?= __('profile.lbl_allergies') ?></label>
+                        <textarea name="allergies" rows="2" <?= $readonlyAttr ?> placeholder="<?= __('profile.placeholder_allergies') ?>"
+                            class="field-input w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-4 focus:ring-rose-50 outline-none font-bold resize-none"><?= vh($userData['allergies']) ?></textarea>
+                    </div>
+
+                    <!-- Chronic conditions -->
+                    <div class="space-y-1.5">
+                        <label class="text-sm font-bold text-slate-700"><?= __('profile.lbl_chronic') ?></label>
+                        <textarea name="chronic_conditions" rows="2" <?= $readonlyAttr ?> placeholder="<?= __('profile.placeholder_chronic') ?>"
+                            class="field-input w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-4 focus:ring-rose-50 outline-none font-bold resize-none"><?= vh($userData['chronic_conditions']) ?></textarea>
+                    </div>
+                </div>
+
+                <!-- ── Section: Emergency Contact ── -->
+                <div class="bg-white rounded-[2.5rem] p-7 border border-slate-50 shadow-sm space-y-5">
+                    <div class="flex items-center gap-2">
+                        <span class="h-5 w-1 rounded-full bg-amber-500"></span>
+                        <h3 class="text-sm font-black uppercase tracking-widest text-slate-700"><?= __('profile.section_emergency') ?></h3>
                     </div>
 
                     <div class="space-y-1.5">
-                        <label class="text-sm font-bold text-slate-700"><?= __('profile.lbl_email') ?> (Optional)</label>
-                        <input type="email" id="email" name="email" value="<?= htmlspecialchars($userData['email']) ?>"
-                            class="w-full h-14 px-4 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-4 focus:ring-green-50 outline-none font-bold">
-                        <p class="text-[11px] text-amber-600 font-bold mt-2 px-1"><i class="fa-solid fa-circle-info mr-1"></i> <?= __('profile.msg_email_benefit') ?></p>
+                        <label class="text-sm font-bold text-slate-700"><?= __('profile.lbl_emergency_name') ?></label>
+                        <input type="text" name="emergency_contact_name" value="<?= vh($userData['emergency_contact_name']) ?>" <?= $readonlyAttr ?>
+                            placeholder="<?= __('profile.placeholder_emergency_name') ?>"
+                            class="field-input w-full h-14 px-4 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-4 focus:ring-amber-50 outline-none font-bold">
                     </div>
 
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="space-y-1.5">
+                            <label class="text-sm font-bold text-slate-700"><?= __('profile.lbl_emergency_phone') ?></label>
+                            <input type="tel" id="emergency_phone" name="emergency_contact_phone" value="<?= vh($userData['emergency_contact_phone']) ?>" <?= $readonlyAttr ?>
+                                inputmode="numeric" maxlength="10"
+                                class="field-input w-full h-14 px-4 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-4 focus:ring-amber-50 outline-none font-bold">
+                        </div>
+                        <div class="space-y-1.5">
+                            <label class="text-sm font-bold text-slate-700"><?= __('profile.lbl_emergency_relation') ?></label>
+                            <input type="text" name="emergency_contact_relation" value="<?= vh($userData['emergency_contact_relation']) ?>" <?= $readonlyAttr ?>
+                                placeholder="<?= __('profile.placeholder_relation') ?>"
+                                class="field-input w-full h-14 px-4 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-4 focus:ring-amber-50 outline-none font-bold">
+                        </div>
+                    </div>
                 </div>
 
-                <!-- PDPA Content -->
-                <div class="bg-white rounded-[2.5rem] p-8 border border-slate-50 shadow-sm space-y-6">
+                <!-- ── PDPA ── -->
+                <div class="bg-white rounded-[2.5rem] p-7 border border-slate-50 shadow-sm space-y-5">
                     <h3 class="text-sm font-black text-slate-900 uppercase tracking-widest"><?= __('profile.pdpa_title') ?></h3>
-                    <div class="bg-slate-50 p-6 rounded-3xl text-[12px] text-slate-500 leading-relaxed max-h-64 overflow-y-auto custom-scrollbar border border-slate-100 space-y-4">
+                    <div id="pdpa-box" class="pdpa-box bg-slate-50 p-6 rounded-3xl text-[12px] text-slate-500 leading-relaxed max-h-64 overflow-y-auto custom-scrollbar border border-slate-100 space-y-4">
                         <div class="text-slate-900 font-black mb-2"><?= __('profile.pdpa_welcome') ?></div>
                         <p><?= __('profile.pdpa_intro') ?></p>
-                        
                         <div class="space-y-3">
+                            <?php foreach ([1,2,3,4] as $i): ?>
                             <div>
-                                <div class="font-black text-slate-700"><?= __('profile.pdpa_item1_title') ?></div>
-                                <p><?= __('profile.pdpa_item1_desc') ?></p>
+                                <div class="font-black text-slate-700"><?= __("profile.pdpa_item{$i}_title") ?></div>
+                                <p><?= __("profile.pdpa_item{$i}_desc") ?></p>
                             </div>
-                            <div>
-                                <div class="font-black text-slate-700"><?= __('profile.pdpa_item2_title') ?></div>
-                                <p><?= __('profile.pdpa_item2_desc') ?></p>
-                            </div>
-                            <div>
-                                <div class="font-black text-slate-700"><?= __('profile.pdpa_item3_title') ?></div>
-                                <p><?= __('profile.pdpa_item3_desc') ?></p>
-                            </div>
-                            <div>
-                                <div class="font-black text-slate-700"><?= __('profile.pdpa_item4_title') ?></div>
-                                <p><?= __('profile.pdpa_item4_desc') ?></p>
-                            </div>
+                            <?php endforeach; ?>
                         </div>
-
                         <div class="pt-2">
                             <div class="font-black text-slate-700 underline underline-offset-4 decoration-slate-200 mb-1"><?= __('profile.pdpa_retention_title') ?></div>
                             <p><?= __('profile.pdpa_retention_desc') ?></p>
                         </div>
-
                         <div class="pt-1">
                             <div class="font-black text-slate-700 underline underline-offset-4 decoration-slate-200 mb-1"><?= __('profile.pdpa_rights_title') ?></div>
                             <p><?= __('profile.pdpa_rights_desc') ?></p>
                         </div>
                     </div>
-                    <label class="flex items-center gap-4 p-5 bg-white rounded-3xl border border-slate-100 cursor-pointer active:scale-95 transition-all">
-                        <input type="checkbox" name="agreed" value="1" required <?= $isEditing ? 'checked' : '' ?> class="w-6 h-6 rounded-lg text-[#2e9e63] focus:ring-[#2e9e63]">
+                    <p id="pdpa-scroll-hint" class="<?= $isEditing ? 'hidden' : '' ?> text-[11px] font-bold text-amber-600 -mt-2"><i class="fa-solid fa-arrow-down mr-1"></i><?= __('profile.pdpa_scroll_hint') ?></p>
+                    <label id="pdpa-agree-wrap" class="flex items-center gap-4 p-5 bg-white rounded-3xl border border-slate-100 cursor-pointer active:scale-95 transition-all <?= !$isEditing ? 'opacity-50 pointer-events-none' : '' ?>">
+                        <input type="checkbox" id="pdpa-agree" name="agreed" value="1" required <?= $isEditing ? 'checked' : '' ?> <?= $disabled ?> class="w-6 h-6 rounded-lg text-[#2e9e63] focus:ring-[#2e9e63]">
                         <span class="text-xs text-slate-600 font-bold"><?= __('profile.lbl_agree') ?></span>
                     </label>
                 </div>
 
+                <?php if ($mode === 'edit'): ?>
                 <div class="flex gap-4">
-                    <button type="button" onclick="window.history.back()" class="flex-1 h-16 bg-white border border-slate-200 text-slate-400 font-black rounded-2xl"><?= __('profile.back_btn') ?></button>
+                    <a href="<?= $isEditing ? '?mode=view' : 'hub.php' ?>" class="flex-1 h-16 flex items-center justify-center bg-white border border-slate-200 text-slate-400 font-black rounded-2xl"><?= __('profile.btn_cancel') ?></a>
                     <button type="submit" class="flex-[2] h-16 bg-slate-900 text-white font-black rounded-2xl shadow-xl shadow-slate-200"><?= __('profile.save_btn') ?></button>
                 </div>
+                <?php endif; ?>
 
             </form>
+
             <footer class="pt-10 pb-20 text-center opacity-30">
                 <p class="text-slate-400 text-[10px] font-black uppercase tracking-[0.3em]">© 2568 RSU Medical Services</p>
                 <p class="text-slate-400 text-[8px] font-black uppercase tracking-[0.2em] mt-2">v<?= APP_VERSION ?> · build <?= APP_BUILD ?></p>
             </footer>
         </main>
 
-        <!-- ── Premium Bottom Navigation ── -->
-        <nav class="fixed bottom-0 left-0 right-0 z-[70] bg-white/90 backdrop-blur-2xl border-t border-slate-50 px-8 py-4 pb-10 flex justify-between items-center max-w-md mx-auto shadow-[0_-20px_40px_rgba(0,0,0,0.04)]">
-            <button onclick="window.location.href='hub.php'" class="flex flex-col items-center gap-1.5 text-slate-300 transition-all hover:text-slate-500">
-                <i class="fa-solid fa-house-chimney text-xl"></i>
-                <span class="text-[8px] font-black uppercase tracking-[0.1em]">Home</span>
-            </button>
-            <button onclick="window.location.href='my_bookings.php'" class="flex flex-col items-center gap-1.5 text-slate-300 transition-all hover:text-slate-500">
-                <i class="fa-solid fa-calendar-day text-xl"></i>
-                <span class="text-[8px] font-black uppercase tracking-[0.1em]">Booking</span>
-            </button>
-            <div class="relative -mt-14">
-                <button onclick="window.location.href='hub.php#camps'" class="w-16 h-16 bg-[#2e9e63] rounded-[1.8rem] rotate-45 flex items-center justify-center text-white shadow-[0_15px_30px_rgba(46,158,99,0.4)] border-[6px] border-[#F8FAFF] active:scale-90 transition-all group">
-                    <i class="fa-solid fa-plus text-2xl -rotate-45 group-hover:scale-125 transition-transform"></i>
-                </button>
-            </div>
-            <button onclick="window.location.href='hub.php#health'" class="flex flex-col items-center gap-1.5 text-slate-300 transition-all hover:text-slate-500">
-                <i class="fa-solid fa-heart-pulse text-xl"></i>
-                <span class="text-[8px] font-black uppercase tracking-[0.1em]">Health</span>
-            </button>
-            <button onclick="window.location.href='profile.php'" class="flex flex-col items-center gap-1.5 text-[#2e9e63] transition-all scale-110">
-                <i class="fa-solid fa-user-ninja text-xl"></i>
-                <span class="text-[8px] font-black uppercase tracking-[0.1em]">Account</span>
-            </button>
-        </nav>
+        <?php $__navActive = 'account'; require __DIR__ . '/../includes/user_bottom_nav.php'; ?>
+    </div>
 
+    <!-- ── Logout confirm modal ── -->
+    <div id="logout-modal" class="hidden fixed inset-0 z-[120] items-center justify-center p-6">
+        <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onclick="hideLogoutModal()"></div>
+        <div class="relative bg-white w-full max-w-[320px] rounded-[2rem] p-8 text-center shadow-2xl">
+            <div class="w-16 h-16 mx-auto mb-4 rounded-2xl bg-rose-50 text-rose-500 flex items-center justify-center text-2xl">
+                <i class="fa-solid fa-power-off"></i>
+            </div>
+            <p class="text-base font-black text-slate-900 mb-6"><?= __('profile.logout_confirm') ?></p>
+            <div class="flex gap-3">
+                <button type="button" onclick="hideLogoutModal()" class="flex-1 h-12 bg-slate-100 text-slate-500 font-black rounded-2xl"><?= __('profile.btn_cancel') ?></button>
+                <a href="logout.php" class="flex-1 h-12 flex items-center justify-center bg-rose-500 text-white font-black rounded-2xl">Logout</a>
+            </div>
+        </div>
     </div>
 
     <script>
+        const MODE = <?= json_encode($mode) ?>;
+        const IS_EDITING = <?= json_encode($isEditing) ?>;
+
         function toggleCustomTitle() {
             const sel = document.getElementById('name_title');
             const container = document.getElementById('custom_title_container');
@@ -335,20 +561,58 @@ try {
             else { container.classList.add('hidden'); input.value = ''; }
         }
 
+        function confirmLogout() {
+            const m = document.getElementById('logout-modal');
+            m.classList.remove('hidden');
+            m.classList.add('flex');
+        }
+        function hideLogoutModal() {
+            const m = document.getElementById('logout-modal');
+            m.classList.add('hidden');
+            m.classList.remove('flex');
+        }
+
+        function toggleCidVisibility() {
+            const inp = document.getElementById('citizen_id');
+            const ic = document.getElementById('cid-icon');
+            if (inp.type === 'password') { inp.type = 'text'; ic.className = 'fa-solid fa-eye-slash'; }
+            else { inp.type = 'password'; ic.className = 'fa-solid fa-eye'; }
+        }
+
+        // ── Thai citizen ID checksum (13 digits) ──
+        function isValidThaiCID(s) {
+            if (!/^\d{13}$/.test(s)) return false;
+            let sum = 0;
+            for (let i = 0; i < 12; i++) sum += parseInt(s[i], 10) * (13 - i);
+            const check = (11 - (sum % 11)) % 10;
+            return check === parseInt(s[12], 10);
+        }
+        function isValidThaiPhone(s) { return /^0\d{9}$/.test(s); }
+
         document.addEventListener('DOMContentLoaded', function () {
             // ID Type
             const idTypeInputs = document.querySelectorAll('input[name="id_type"]');
             const citizenIdInput = document.getElementById('citizen_id');
+            const citizenError = document.getElementById('citizen-error');
             function applyIdType(type) {
                 if (type === 'passport') {
                     citizenIdInput.setAttribute('placeholder', 'Passport Number');
                     citizenIdInput.removeAttribute('maxlength');
                 } else {
-                    citizenIdInput.setAttribute('placeholder', '<?= __('profile.lbl_citizen_id') ?>');
+                    citizenIdInput.setAttribute('placeholder', '<?= addslashes(__('profile.lbl_citizen_id')) ?>');
                     citizenIdInput.setAttribute('maxlength', '13');
                 }
+                citizenError.classList.add('hidden');
             }
             idTypeInputs.forEach(i => i.addEventListener('change', e => applyIdType(e.target.value)));
+
+            citizenIdInput.addEventListener('blur', () => {
+                const type = document.querySelector('input[name="id_type"]:checked')?.value;
+                const v = citizenIdInput.value.trim();
+                if (type === 'citizen' && v && !isValidThaiCID(v)) {
+                    citizenError.classList.remove('hidden');
+                } else { citizenError.classList.add('hidden'); }
+            });
 
             // Status Toggle
             const statusInputs = document.querySelectorAll('input[name="status"]');
@@ -361,6 +625,69 @@ try {
             statusInputs.forEach(i => i.addEventListener('change', toggleStatusFields));
             toggleStatusFields();
 
+            // Phone validation
+            const phone = document.getElementById('phone_number');
+            const phoneErr = document.getElementById('phone-error');
+            phone?.addEventListener('blur', () => {
+                if (phone.value.trim() && !isValidThaiPhone(phone.value.trim())) phoneErr.classList.remove('hidden');
+                else phoneErr.classList.add('hidden');
+            });
+            phone?.addEventListener('input', () => phone.value = phone.value.replace(/\D/g, '').slice(0, 10));
+
+            // Emergency phone digit-only
+            const epPhone = document.getElementById('emergency_phone');
+            epPhone?.addEventListener('input', () => epPhone.value = epPhone.value.replace(/\D/g, '').slice(0, 10));
+
+            // Email validation
+            const email = document.getElementById('email');
+            const emailErr = document.getElementById('email-error');
+            email?.addEventListener('blur', () => {
+                const v = email.value.trim();
+                if (v && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) emailErr.classList.remove('hidden');
+                else emailErr.classList.add('hidden');
+            });
+
+            // Submit guard
+            document.getElementById('profileForm')?.addEventListener('submit', (e) => {
+                if (MODE === 'view') { e.preventDefault(); return; }
+                const type = document.querySelector('input[name="id_type"]:checked')?.value;
+                const cid = citizenIdInput.value.trim();
+                if (type === 'citizen' && cid && !isValidThaiCID(cid)) {
+                    e.preventDefault();
+                    citizenError.classList.remove('hidden');
+                    citizenIdInput.focus();
+                    return;
+                }
+                if (phone && phone.value.trim() && !isValidThaiPhone(phone.value.trim())) {
+                    e.preventDefault();
+                    phoneErr.classList.remove('hidden');
+                    phone.focus();
+                    return;
+                }
+                if (email && email.value.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value.trim())) {
+                    e.preventDefault();
+                    emailErr.classList.remove('hidden');
+                    email.focus();
+                    return;
+                }
+            });
+
+            // PDPA scroll-to-enable (only for first-time users)
+            const pdpaBox = document.getElementById('pdpa-box');
+            const pdpaAgree = document.getElementById('pdpa-agree');
+            const pdpaWrap = document.getElementById('pdpa-agree-wrap');
+            const pdpaHint = document.getElementById('pdpa-scroll-hint');
+            if (pdpaBox && !IS_EDITING) {
+                const onScroll = () => {
+                    if (pdpaBox.scrollTop + pdpaBox.clientHeight >= pdpaBox.scrollHeight - 10) {
+                        pdpaWrap?.classList.remove('opacity-50', 'pointer-events-none');
+                        pdpaHint?.classList.add('hidden');
+                        pdpaBox.removeEventListener('scroll', onScroll);
+                    }
+                };
+                pdpaBox.addEventListener('scroll', onScroll);
+            }
+
             // AI Dept
             const deptInput = document.getElementById('department');
             const deptHint = document.getElementById('dept-ai-hint');
@@ -368,10 +695,9 @@ try {
             const deptAccept = document.getElementById('dept-ai-accept');
             const deptDismiss = document.getElementById('dept-ai-dismiss');
             let _deptSuggested = null;
-
-            deptInput.addEventListener('blur', async function() {
+            deptInput?.addEventListener('blur', async function() {
                 const val = this.value.trim();
-                if (!val) return;
+                if (!val || MODE === 'view') return;
                 try {
                     const fd = new FormData(); fd.append('input', val);
                     const res = await fetch('api_faculty_suggest.php', { method: 'POST', body: fd });
@@ -383,9 +709,9 @@ try {
                     }
                 } catch(e) {}
             });
-            deptInput.addEventListener('input', () => deptHint.classList.add('hidden'));
-            deptAccept.addEventListener('click', () => { if(_deptSuggested) deptInput.value = _deptSuggested; deptHint.classList.add('hidden'); });
-            deptDismiss.addEventListener('click', () => deptHint.classList.add('hidden'));
+            deptInput?.addEventListener('input', () => deptHint?.classList.add('hidden'));
+            deptAccept?.addEventListener('click', () => { if(_deptSuggested) deptInput.value = _deptSuggested; deptHint.classList.add('hidden'); });
+            deptDismiss?.addEventListener('click', () => deptHint.classList.add('hidden'));
         });
     </script>
 </body>
