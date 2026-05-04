@@ -3453,13 +3453,24 @@ try {
         });
 
         // Auto-switch section from URL ?section=...
+        // PHP already rendered the correct section server-side, so on initial
+        // load we just need to highlight the sidebar button — NOT call
+        // switchSection (which strips cd_view/s/p and would break sub-view
+        // pagination on refresh).
         (function () {
             var params = new URLSearchParams(window.location.search);
             var sec = params.get('section');
             var tab = params.get('tab');
             if (sec) {
                 var btn = document.querySelector('.psb-item[data-section="' + sec + '"]');
-                if (btn) window.switchSection(sec, btn);
+                if (btn) {
+                    document.querySelectorAll('.psb-item').forEach(function (b) {
+                        b.classList.remove('psb-active');
+                        b.removeAttribute('aria-current');
+                    });
+                    btn.classList.add('psb-active');
+                    btn.setAttribute('aria-current', 'page');
+                }
             }
             if (sec === 'identity' && tab) {
                 var tabBtn = document.querySelector('.id-tab[data-tab="' + tab + '"]');

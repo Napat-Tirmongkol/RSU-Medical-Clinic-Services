@@ -63,8 +63,9 @@ foreach ($_cd_rows as $r) {
     if (!empty($r['name_en'])) $_cd_withEn++;
 }
 
-// Build base querystring for pagination links
-$_cd_qs = http_build_query(array_filter(['section' => 'clinic_data', 'cd_search' => $_cd_search]));
+// Build base querystring for pagination links — must keep cd_view=faculty
+// so the router renders this sub-view (not the landing card grid).
+$_cd_qs = http_build_query(array_filter(['section' => 'clinic_data', 'cd_view' => 'faculty', 'cd_search' => $_cd_search]));
 ?>
 <div class="p-6">
     <a href="?section=clinic_data" class="inline-flex items-center gap-2 text-xs font-black text-slate-500 hover:text-emerald-600 mb-4">
