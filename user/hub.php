@@ -313,6 +313,74 @@ $thaiDate = formatThaiDate($today);
 $userInitials = getInitials($user['full_name']);
 $hour = (int) date('H');
 $greeting = ($hour >= 5 && $hour < 12) ? "สวัสดีตอนเช้า" : (($hour >= 12 && $hour < 17) ? "สวัสดีตอนบ่าย" : (($hour >= 17 && $hour < 21) ? "สวัสดีตอนเย็น" : "สวัสดีตอนค่ำ"));
+
+// ── Smart Hero card (priority-driven "today" focus) ──────────────────────
+$smartHero = null;
+if ($next_appt) {
+    $daysUntil = (int) ((strtotime($next_appt['slot_date']) - strtotime($today)) / 86400);
+    $smartHero = [
+        'kind'       => 'appointment',
+        'eyebrow'    => 'นัดหมายถัดไป',
+        'title'      => $next_appt['camp_name'],
+        'detail'     => formatThaiDate($next_appt['slot_date']) . ' · ' . substr((string)$next_appt['start_time'], 0, 5) . ' น.',
+        'days_until' => $daysUntil,
+        'icon'       => 'fa-calendar-check',
+        'theme'      => 'brand',
+        'action'     => "window.location.href='my_bookings.php'",
+        'cta_label'  => 'ดูรายละเอียด',
+    ];
+} elseif (!empty($borrow_overdue_count)) {
+    $smartHero = [
+        'kind'      => 'overdue',
+        'eyebrow'   => 'เกินกำหนดคืน',
+        'title'     => "อุปกรณ์ {$borrow_overdue_count} รายการเลยกำหนดคืน",
+        'detail'    => 'ติดต่อเจ้าหน้าที่เพื่อคืนของและชำระค่าปรับ',
+        'icon'      => 'fa-triangle-exclamation',
+        'theme'     => 'rose',
+        'action'    => 'showBorrow()',
+        'cta_label' => 'จัดการตอนนี้',
+    ];
+} elseif (!empty($healthOverview['vaccine_next_due'])) {
+    $vd = $healthOverview['vaccine_next_due'];
+    $smartHero = [
+        'kind'      => 'vaccine',
+        'eyebrow'   => 'วัคซีนครบกำหนด',
+        'title'     => $vd['vaccine_name'],
+        'detail'    => 'ครบกำหนด ' . formatThaiDate($vd['next_due_date']),
+        'icon'      => 'fa-syringe',
+        'theme'     => 'amber',
+        'action'    => 'showCampaigns()',
+        'cta_label' => 'จองนัด',
+    ];
+} elseif (!empty($borrow_pending_count)) {
+    $smartHero = [
+        'kind'      => 'pending',
+        'eyebrow'   => 'คำขอรออนุมัติ',
+        'title'     => "{$borrow_pending_count} รายการรอเจ้าหน้าที่อนุมัติ",
+        'detail'    => 'แตะดูสถานะคำขอ',
+        'icon'      => 'fa-hourglass-half',
+        'theme'     => 'amber',
+        'action'    => 'showBorrow()',
+        'cta_label' => 'ดูคำขอ',
+    ];
+} else {
+    $smartHero = [
+        'kind'      => 'empty',
+        'eyebrow'   => 'วันนี้ของคุณ',
+        'title'     => 'ไม่มีรายการเร่งด่วน',
+        'detail'    => 'ดูแลสุขภาพของคุณ — ตรวจสุขภาพประจำปีหรือฉีดวัคซีนตามกำหนด',
+        'icon'      => 'fa-heart-pulse',
+        'theme'     => 'brand',
+        'action'    => 'showCampaigns()',
+        'cta_label' => 'ดูแคมเปญ',
+    ];
+}
+
+$heroThemes = [
+    'brand' => ['bg' => 'from-emerald-500 to-emerald-600', 'shadow' => 'shadow-[0_15px_40px_rgba(46,158,99,0.25)]', 'btn' => 'bg-white text-[#1f7a4d]'],
+    'amber' => ['bg' => 'from-amber-500 to-orange-500',    'shadow' => 'shadow-[0_15px_40px_rgba(245,158,11,0.25)]', 'btn' => 'bg-white text-amber-700'],
+    'rose'  => ['bg' => 'from-rose-500 to-rose-600',       'shadow' => 'shadow-[0_15px_40px_rgba(225,29,72,0.25)]',  'btn' => 'bg-white text-rose-600'],
+];
 ?>
 <!DOCTYPE html>
 <html lang="th">
@@ -1125,128 +1193,255 @@ $greeting = ($hour >= 5 && $hour < 12) ? "สวัสดีตอนเช้�
                 </div>
             </div>
 
-            <!-- ── Health Stats ── -->
-            <div class="grid grid-cols-2 gap-4">
-                <button onclick="showUpcoming('ประวัติการเข้าพบ')"
-                    class="bg-white rounded-[2.5rem] p-6 border border-slate-100 shadow-[0_15px_30px_rgba(0,0,0,0.03)] flex flex-col items-center text-center active:scale-95 transition-all group">
-                    <div
-                        class="w-12 h-12 bg-green-50 rounded-2xl flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-                        <i class="fa-solid fa-calendar-check text-green-600 text-lg"></i>
-                    </div>
-                    <p class="font-black text-xl text-slate-900 mb-0.5"><?= count($booking_list) ?></p>
-                    <p class="text-slate-400 text-[10px] font-bold uppercase tracking-widest">การเข้าใช้บริการ</p>
-                </button>
-                <button onclick="showBorrow()"
-                    class="bg-white rounded-[2.5rem] p-6 border border-slate-100 shadow-[0_15px_30px_rgba(0,0,0,0.03)] flex flex-col items-center text-center active:scale-95 transition-all group relative">
-                    <?php if ($borrow_total_fine > 0): ?>
-                        <span class="absolute top-3 right-3 px-2 py-0.5 bg-rose-500 text-white text-[9px] font-black rounded-full shadow-sm">฿<?= number_format($borrow_total_fine, 0) ?></span>
-                    <?php endif; ?>
-                    <div
-                        class="w-12 h-12 bg-orange-50 rounded-2xl flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-                        <i class="fa-solid fa-boxes-stacked text-orange-600 text-lg"></i>
-                    </div>
-                    <p class="font-black text-xl text-slate-900 mb-0.5"><?= $borrow_count ?></p>
-                    <p class="text-slate-400 text-[10px] font-bold uppercase tracking-widest">รายการยืมของ</p>
-                </button>
-            </div>
-
-            <!-- ── Quick Services Menu ── -->
-            <div class="space-y-4">
+            <!-- ── Group A: วันนี้ของคุณ (Smart Hero + Quick Stats) ── -->
+            <section id="today-section" aria-label="วันนี้ของคุณ" class="space-y-4">
                 <div class="flex items-center justify-between px-1">
-                    <h3 class="text-slate-900 font-black text-sm uppercase tracking-widest">Main Menu</h3>
-                    <button onclick="showUpcoming('เมนูทั้งหมด')"
-                        class="text-green-600 text-[10px] font-black uppercase tracking-widest bg-green-50 px-3 py-1.5 rounded-full">All
-                        Services</button>
+                    <h3 class="text-slate-900 font-black text-sm uppercase tracking-widest">วันนี้ของคุณ</h3>
+                    <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Today</p>
                 </div>
 
-                <div
-                    class="bg-white rounded-[3rem] border border-slate-100 shadow-[0_20px_50px_rgba(0,0,0,0.04)] p-6 pt-8">
-                    <div class="grid grid-cols-2 gap-4 mb-8">
-                        <button onclick="showCampaigns()"
-                            class="relative flex flex-col items-start p-6 rounded-[2.2rem] bg-[#2e9e63] shadow-[0_15px_30px_rgba(46,158,99,0.25)] active:scale-95 transition-all text-white overflow-hidden text-left group">
-                            <div
-                                class="absolute -right-4 -top-4 w-16 h-16 bg-white/10 rounded-full blur-xl group-hover:scale-150 transition-transform">
+                <?php $heroT = $heroThemes[$smartHero['theme']] ?? $heroThemes['brand']; ?>
+                <button type="button" onclick="<?= htmlspecialchars($smartHero['action'], ENT_QUOTES) ?>"
+                    class="relative w-full text-left bg-gradient-to-br <?= $heroT['bg'] ?> rounded-[2.5rem] p-6 text-white <?= $heroT['shadow'] ?> overflow-hidden active:scale-[0.98] transition-all">
+                    <div class="absolute -right-8 -top-8 w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
+                    <div class="absolute -left-12 -bottom-12 w-48 h-48 bg-white/5 rounded-full blur-3xl"></div>
+                    <div class="relative z-10">
+                        <div class="flex items-center gap-2 mb-3">
+                            <span class="text-white/70 text-[10px] font-black uppercase tracking-[0.22em]"><?= htmlspecialchars($smartHero['eyebrow']) ?></span>
+                        </div>
+                        <div class="flex items-start gap-4">
+                            <div class="w-12 h-12 rounded-2xl bg-white/15 backdrop-blur-md border border-white/20 flex items-center justify-center text-white text-lg shrink-0">
+                                <i class="fa-solid <?= $smartHero['icon'] ?>"></i>
                             </div>
-                            <div
-                                class="w-11 h-11 rounded-2xl bg-white/20 flex items-center justify-center mb-4 border border-white/20">
-                                <i class="fa-solid fa-calendar-plus text-white text-base"></i>
+                            <div class="min-w-0 flex-1">
+                                <h4 class="text-white text-lg font-black leading-tight tracking-tight truncate"><?= htmlspecialchars($smartHero['title']) ?></h4>
+                                <p class="mt-1 text-white/80 text-[12px] font-bold leading-snug"><?= htmlspecialchars($smartHero['detail']) ?></p>
+                                <?php if (isset($smartHero['days_until'])): ?>
+                                    <p class="mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 backdrop-blur-sm text-[11px] font-black">
+                                        <i class="fa-regular fa-clock text-[9px]"></i>
+                                        <?= $smartHero['days_until'] === 0 ? 'วันนี้' : ($smartHero['days_until'] === 1 ? 'พรุ่งนี้' : 'อีก ' . (int)$smartHero['days_until'] . ' วัน') ?>
+                                    </p>
+                                <?php endif; ?>
                             </div>
-                            <p class="text-[13px] font-black leading-tight tracking-wide">จองคิว /<br>แคมเปญ</p>
+                        </div>
+                        <div class="mt-5 flex items-center justify-end">
+                            <span class="inline-flex items-center gap-2 <?= $heroT['btn'] ?> font-black text-[12px] px-4 py-2 rounded-2xl shadow-sm">
+                                <?= htmlspecialchars($smartHero['cta_label']) ?> <i class="fa-solid fa-arrow-right text-[10px]"></i>
+                            </span>
+                        </div>
+                    </div>
+                </button>
+
+                <!-- Quick stats: 3 compact tiles -->
+                <div class="grid grid-cols-3 gap-3">
+                    <button onclick="document.getElementById('records-section').scrollIntoView({behavior:'smooth'})"
+                        class="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm text-center active:scale-95 transition-all">
+                        <div class="w-9 h-9 mx-auto mb-2 rounded-xl bg-emerald-50 text-[#2e9e63] flex items-center justify-center">
+                            <i class="fa-solid fa-calendar-check text-sm"></i>
+                        </div>
+                        <p class="text-lg font-black text-slate-900"><?= $upcoming_count ?></p>
+                        <p class="text-[9px] font-black uppercase tracking-widest text-slate-400">นัดหมาย</p>
+                    </button>
+                    <button onclick="showVaccinationHistory()"
+                        class="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm text-center active:scale-95 transition-all">
+                        <div class="w-9 h-9 mx-auto mb-2 rounded-xl bg-emerald-50 text-[#2e9e63] flex items-center justify-center">
+                            <i class="fa-solid fa-syringe text-sm"></i>
+                        </div>
+                        <p class="text-lg font-black text-slate-900"><?= (int) ($healthOverview['vaccine_total'] ?? 0) ?></p>
+                        <p class="text-[9px] font-black uppercase tracking-widest text-slate-400">วัคซีน</p>
+                    </button>
+                    <button onclick="showBorrow()"
+                        class="relative bg-white rounded-2xl p-4 border border-slate-100 shadow-sm text-center active:scale-95 transition-all">
+                        <?php if ($borrow_total_fine > 0): ?>
+                            <span class="absolute top-2 right-2 px-1.5 py-0.5 bg-rose-500 text-white text-[8px] font-black rounded-full shadow-sm">฿<?= number_format($borrow_total_fine, 0) ?></span>
+                        <?php endif; ?>
+                        <div class="w-9 h-9 mx-auto mb-2 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+                            <i class="fa-solid fa-box-archive text-sm"></i>
+                        </div>
+                        <p class="text-lg font-black text-slate-900"><?= $borrow_count ?></p>
+                        <p class="text-[9px] font-black uppercase tracking-widest text-slate-400">ยืมอยู่</p>
+                    </button>
+                </div>
+            </section>
+
+            <!-- ── Group B: สุขภาพของฉัน (Records) ── -->
+            <section id="records-section" aria-label="สุขภาพของฉัน" class="space-y-4">
+                <div class="flex items-center justify-between px-1">
+                    <h3 class="text-slate-900 font-black text-sm uppercase tracking-widest">สุขภาพของฉัน</h3>
+                    <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Records</p>
+                </div>
+
+                <div class="bg-white rounded-[2rem] border border-slate-100 shadow-sm p-5">
+                    <div class="grid grid-cols-2 gap-3">
+                        <!-- Vaccination — ACTIVE -->
+                        <button onclick="showVaccinationHistory()"
+                            class="text-left p-4 rounded-2xl bg-emerald-50/60 border border-emerald-100 active:scale-95 transition-all">
+                            <div class="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-[#2e9e63] shadow-sm mb-3">
+                                <i class="fa-solid fa-syringe"></i>
+                            </div>
+                            <p class="text-[13px] font-black text-slate-900 leading-tight">ประวัติวัคซีน</p>
+                            <p class="mt-0.5 text-[10px] font-bold text-slate-500"><?= (int)($healthOverview['vaccine_total'] ?? 0) ?> รายการ</p>
                         </button>
 
-                        <button onclick="showBorrow()"
-                            class="relative flex flex-col items-start p-6 rounded-[2.2rem] bg-amber-50 border border-amber-100 shadow-sm active:scale-95 transition-all text-amber-600 group text-left">
-                            <?php if ($borrow_count > 0): ?>
-                                <span class="absolute top-4 right-4 w-6 h-6 bg-amber-500 text-white text-[10px] font-black rounded-full flex items-center justify-center border-2 border-white shadow-lg"><?= $borrow_count ?></span>
-                            <?php endif; ?>
-                            <div
-                                class="w-11 h-11 rounded-2xl bg-white flex items-center justify-center mb-4 shadow-sm border border-amber-50 group-hover:scale-110 transition-transform">
-                                <i class="fa-solid fa-box-archive text-amber-500 text-base"></i>
-                            </div>
-                            <p class="text-[13px] font-black leading-tight tracking-wide text-slate-800">
-                                ยืม-คืน<br>e-Borrow</p>
-                        </button>
-
+                        <!-- Visit history — ACTIVE -->
                         <a href="my_bookings.php"
-                            class="relative flex flex-col items-start p-6 rounded-[2.2rem] bg-indigo-50 border border-indigo-100 shadow-sm active:scale-95 transition-all text-indigo-600 group">
-                            <?php if ($upcoming_count > 0): ?>
-                                <span
-                                    class="absolute top-4 right-4 w-6 h-6 bg-red-500 text-white text-[10px] font-black rounded-full flex items-center justify-center border-2 border-white shadow-lg animate-bounce"><?= $upcoming_count ?></span>
-                            <?php endif; ?>
-                            <div
-                                class="w-11 h-11 rounded-2xl bg-white flex items-center justify-center mb-4 shadow-sm border border-indigo-50 group-hover:scale-110 transition-transform">
-                                <i class="fa-solid fa-clipboard-list text-indigo-500 text-base"></i>
+                            class="block text-left p-4 rounded-2xl bg-indigo-50/60 border border-indigo-100 active:scale-95 transition-all">
+                            <div class="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-indigo-500 shadow-sm mb-3">
+                                <i class="fa-solid fa-clipboard-list"></i>
                             </div>
-                            <p class="text-[13px] font-black leading-tight tracking-wide text-slate-800">
-                                ประวัติ<br>การรักษา</p>
+                            <p class="text-[13px] font-black text-slate-900 leading-tight">ประวัติการเข้าพบ</p>
+                            <p class="mt-0.5 text-[10px] font-bold text-slate-500"><?= count($booking_list) ?> ครั้ง</p>
                         </a>
+
+                        <!-- Health checks — ACTIVE (existing in Health Overview modal) -->
+                        <button onclick="showVaccinationHistory()"
+                            class="text-left p-4 rounded-2xl bg-green-50/60 border border-green-100 active:scale-95 transition-all">
+                            <div class="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-green-600 shadow-sm mb-3">
+                                <i class="fa-solid fa-stethoscope"></i>
+                            </div>
+                            <p class="text-[13px] font-black text-slate-900 leading-tight">ตรวจสุขภาพ</p>
+                            <p class="mt-0.5 text-[10px] font-bold text-slate-500"><?= (int)($healthOverview['healthcheck_total'] ?? 0) ?> ครั้ง</p>
+                        </button>
+
+                        <!-- Prescriptions — COMING SOON -->
+                        <button onclick="showUpcoming('ใบสั่งยา / ยาที่ใช้อยู่')"
+                            class="relative text-left p-4 rounded-2xl bg-slate-50 border border-slate-100 active:scale-95 transition-all opacity-90">
+                            <span class="absolute top-2 right-2 px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[8px] font-black uppercase tracking-widest">Soon</span>
+                            <div class="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-rose-400 shadow-sm mb-3">
+                                <i class="fa-solid fa-pills"></i>
+                            </div>
+                            <p class="text-[13px] font-black text-slate-700 leading-tight">ใบสั่งยา</p>
+                            <p class="mt-0.5 text-[10px] font-bold text-slate-400">เร็วๆ นี้</p>
+                        </button>
+
+                        <!-- Lab results — COMING SOON -->
+                        <button onclick="showUpcoming('ผลตรวจห้องแล็บ')"
+                            class="relative text-left p-4 rounded-2xl bg-slate-50 border border-slate-100 active:scale-95 transition-all opacity-90">
+                            <span class="absolute top-2 right-2 px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[8px] font-black uppercase tracking-widest">Soon</span>
+                            <div class="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-purple-500 shadow-sm mb-3">
+                                <i class="fa-solid fa-flask"></i>
+                            </div>
+                            <p class="text-[13px] font-black text-slate-700 leading-tight">ผลตรวจแล็บ</p>
+                            <p class="mt-0.5 text-[10px] font-bold text-slate-400">เร็วๆ นี้</p>
+                        </button>
+
+                        <!-- Vital signs — COMING SOON -->
+                        <button onclick="showUpcoming('สัญญาณชีพและกราฟสุขภาพ')"
+                            class="relative text-left p-4 rounded-2xl bg-slate-50 border border-slate-100 active:scale-95 transition-all opacity-90">
+                            <span class="absolute top-2 right-2 px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[8px] font-black uppercase tracking-widest">Soon</span>
+                            <div class="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-cyan-500 shadow-sm mb-3">
+                                <i class="fa-solid fa-chart-line"></i>
+                            </div>
+                            <p class="text-[13px] font-black text-slate-700 leading-tight">สัญญาณชีพ</p>
+                            <p class="mt-0.5 text-[10px] font-bold text-slate-400">เร็วๆ นี้</p>
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ── Group C: บริการ (Services) ── -->
+            <section id="services-section" aria-label="บริการ" class="space-y-4">
+                <div class="flex items-center justify-between px-1">
+                    <h3 class="text-slate-900 font-black text-sm uppercase tracking-widest">บริการ</h3>
+                    <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Services</p>
+                </div>
+
+                <div class="bg-white rounded-[2rem] border border-slate-100 shadow-sm p-5 space-y-5">
+                    <!-- Primary services -->
+                    <div class="grid grid-cols-2 gap-3">
+                        <button onclick="showCampaigns()"
+                            class="relative flex flex-col items-start p-5 rounded-2xl bg-[#2e9e63] shadow-[0_10px_25px_rgba(46,158,99,0.25)] active:scale-95 transition-all text-white overflow-hidden text-left group">
+                            <div class="absolute -right-4 -top-4 w-16 h-16 bg-white/10 rounded-full blur-xl group-hover:scale-150 transition-transform"></div>
+                            <div class="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center mb-3 border border-white/20">
+                                <i class="fa-solid fa-calendar-plus text-white text-sm"></i>
+                            </div>
+                            <p class="text-[13px] font-black leading-tight">จองคิว /<br>แคมเปญ</p>
+                        </button>
+
+                        <button onclick="showBorrowFlow()"
+                            class="relative flex flex-col items-start p-5 rounded-2xl bg-amber-50 border border-amber-100 active:scale-95 transition-all text-left group">
+                            <?php if ($borrow_count > 0): ?>
+                                <span class="absolute top-3 right-3 w-5 h-5 bg-amber-500 text-white text-[9px] font-black rounded-full flex items-center justify-center border-2 border-white shadow"><?= $borrow_count ?></span>
+                            <?php endif; ?>
+                            <div class="w-10 h-10 rounded-2xl bg-white flex items-center justify-center mb-3 shadow-sm border border-amber-50">
+                                <i class="fa-solid fa-box-archive text-amber-500 text-sm"></i>
+                            </div>
+                            <p class="text-[13px] font-black leading-tight text-slate-800">ยืมอุปกรณ์<br>e-Borrow</p>
+                        </button>
+
+                        <button onclick="showUpcoming('ขอเอกสาร / ใบรับรองแพทย์')"
+                            class="relative flex flex-col items-start p-5 rounded-2xl bg-slate-50 border border-slate-100 active:scale-95 transition-all text-left opacity-90">
+                            <span class="absolute top-3 right-3 px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[8px] font-black uppercase tracking-widest">Soon</span>
+                            <div class="w-10 h-10 rounded-2xl bg-white flex items-center justify-center mb-3 shadow-sm border border-slate-100 text-blue-500">
+                                <i class="fa-solid fa-file-medical text-sm"></i>
+                            </div>
+                            <p class="text-[13px] font-black leading-tight text-slate-700">ขอเอกสาร<br>ใบรับรอง</p>
+                        </button>
+
+                        <button onclick="showUpcoming('ปรึกษาแพทย์ออนไลน์ (Telemedicine)')"
+                            class="relative flex flex-col items-start p-5 rounded-2xl bg-slate-50 border border-slate-100 active:scale-95 transition-all text-left opacity-90">
+                            <span class="absolute top-3 right-3 px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[8px] font-black uppercase tracking-widest">Soon</span>
+                            <div class="w-10 h-10 rounded-2xl bg-white flex items-center justify-center mb-3 shadow-sm border border-slate-100 text-emerald-500">
+                                <i class="fa-solid fa-video text-sm"></i>
+                            </div>
+                            <p class="text-[13px] font-black leading-tight text-slate-700">ปรึกษาแพทย์<br>ออนไลน์</p>
+                        </button>
+
+                        <button onclick="showUpcoming('เคลมประกัน / ตรวจสอบสิทธิ์')"
+                            class="relative flex flex-col items-start p-5 rounded-2xl bg-slate-50 border border-slate-100 active:scale-95 transition-all text-left opacity-90">
+                            <span class="absolute top-3 right-3 px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[8px] font-black uppercase tracking-widest">Soon</span>
+                            <div class="w-10 h-10 rounded-2xl bg-white flex items-center justify-center mb-3 shadow-sm border border-slate-100 text-indigo-500">
+                                <i class="fa-solid fa-shield-heart text-sm"></i>
+                            </div>
+                            <p class="text-[13px] font-black leading-tight text-slate-700">เคลม<br>ประกัน</p>
+                        </button>
+
+                        <button onclick="showUpcoming('ชำระค่าบริการ')"
+                            class="relative flex flex-col items-start p-5 rounded-2xl bg-slate-50 border border-slate-100 active:scale-95 transition-all text-left opacity-90">
+                            <span class="absolute top-3 right-3 px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[8px] font-black uppercase tracking-widest">Soon</span>
+                            <div class="w-10 h-10 rounded-2xl bg-white flex items-center justify-center mb-3 shadow-sm border border-slate-100 text-rose-500">
+                                <i class="fa-solid fa-credit-card text-sm"></i>
+                            </div>
+                            <p class="text-[13px] font-black leading-tight text-slate-700">ชำระเงิน<br>ใบเสร็จ</p>
+                        </button>
                     </div>
 
-                    <div class="pt-6 border-t border-slate-50">
-                        <p class="text-slate-400 text-[9px] font-black uppercase tracking-[0.3em] mb-5 text-center">
-                            External Services</p>
+                    <!-- Quick contacts -->
+                    <div class="pt-5 border-t border-slate-50">
+                        <p class="text-slate-400 text-[9px] font-black uppercase tracking-[0.3em] mb-4 text-center">ติดต่อด่วน</p>
                         <div class="grid grid-cols-4 gap-4">
                             <a href="https://lin.ee/C3CJ2A9" target="_blank"
                                 class="flex flex-col items-center gap-2 active:scale-90 transition-all">
-                                <div
-                                    class="w-12 h-12 bg-purple-50 rounded-2xl flex items-center justify-center text-purple-600 shadow-sm hover:shadow-purple-100 transition-all">
+                                <div class="w-12 h-12 bg-purple-50 rounded-2xl flex items-center justify-center text-purple-600 shadow-sm">
                                     <i class="fa-solid fa-comment-dots text-lg"></i>
                                 </div>
-                                <span
-                                    class="text-slate-500 text-[8px] font-black text-center leading-tight uppercase tracking-widest">Counseling</span>
+                                <span class="text-slate-500 text-[8px] font-black text-center leading-tight uppercase tracking-widest">Counseling</span>
                             </a>
                             <a href="https://line.me/R/ti/p/@115vbibe?oat_content=url&ts=12222134" target="_blank"
                                 class="flex flex-col items-center gap-2 active:scale-90 transition-all">
-                                <div
-                                    class="w-12 h-12 bg-cyan-50 rounded-2xl flex items-center justify-center text-cyan-600 shadow-sm hover:shadow-cyan-100 transition-all">
+                                <div class="w-12 h-12 bg-cyan-50 rounded-2xl flex items-center justify-center text-cyan-600 shadow-sm">
                                     <i class="fa-solid fa-heart-pulse text-lg"></i>
                                 </div>
-                                <span
-                                    class="text-slate-500 text-[8px] font-black text-center leading-tight uppercase tracking-widest">NCD
-                                    Clinic</span>
+                                <span class="text-slate-500 text-[8px] font-black text-center leading-tight uppercase tracking-widest">NCD<br>Clinic</span>
                             </a>
                             <button onclick="showContact()"
                                 class="flex flex-col items-center gap-2 active:scale-90 transition-all">
-                                <div
-                                    class="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600 shadow-sm hover:shadow-emerald-100 transition-all">
+                                <div class="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600 shadow-sm">
                                     <i class="fa-solid fa-phone-flip text-base"></i>
                                 </div>
-                                <span
-                                    class="text-slate-500 text-[8px] font-black text-center leading-tight uppercase tracking-widest">Contact</span>
+                                <span class="text-slate-500 text-[8px] font-black text-center leading-tight uppercase tracking-widest">Contact</span>
                             </button>
                             <button onclick="showChat()"
                                 class="flex flex-col items-center gap-2 active:scale-90 transition-all">
-                                <div
-                                    class="w-12 h-12 bg-orange-50 rounded-2xl flex items-center justify-center text-orange-600 shadow-sm hover:shadow-orange-100 transition-all">
+                                <div class="w-12 h-12 bg-orange-50 rounded-2xl flex items-center justify-center text-orange-600 shadow-sm">
                                     <i class="fa-solid fa-circle-question text-lg"></i>
                                 </div>
-                                <span
-                                    class="text-slate-500 text-[8px] font-black text-center leading-tight uppercase tracking-widest">Help</span>
+                                <span class="text-slate-500 text-[8px] font-black text-center leading-tight uppercase tracking-widest">Help</span>
                             </button>
                         </div>
                     </div>
                 </div>
-            </div>
+            </section>
 
             <!-- ── Active Appointments ── -->
             <div class="space-y-4">
@@ -1679,15 +1874,15 @@ document.getElementById('insDetailModal').addEventListener('click', function(e) 
         <!-- ── Premium Bottom Navigation ── -->
         <nav
             class="fixed bottom-0 left-0 right-0 z-[70] bg-white/90 backdrop-blur-2xl border-t border-slate-50 px-8 py-4 pb-10 flex justify-between items-center max-w-md mx-auto shadow-[0_-20px_40px_rgba(0,0,0,0.04)]">
-            <button onclick="location.reload()"
+            <button onclick="window.scrollTo({top:0,behavior:'smooth'})"
                 class="flex flex-col items-center gap-1.5 text-green-600 transition-all scale-110">
                 <i class="fa-solid fa-house-chimney text-xl"></i>
                 <span class="text-[8px] font-black uppercase tracking-[0.1em]">Home</span>
             </button>
-            <button onclick="window.location.href='my_bookings.php'"
+            <button onclick="document.getElementById('records-section').scrollIntoView({behavior:'smooth'})"
                 class="flex flex-col items-center gap-1.5 text-slate-300 transition-all hover:text-slate-500">
-                <i class="fa-solid fa-calendar-day text-xl"></i>
-                <span class="text-[8px] font-black uppercase tracking-[0.1em]">Booking</span>
+                <i class="fa-solid fa-folder-open text-xl"></i>
+                <span class="text-[8px] font-black uppercase tracking-[0.1em]">Records</span>
             </button>
             <div class="relative -mt-14">
                 <button onclick="showCampaigns()"
@@ -1695,10 +1890,10 @@ document.getElementById('insDetailModal').addEventListener('click', function(e) 
                     <i class="fa-solid fa-plus text-2xl -rotate-45 group-hover:scale-125 transition-transform"></i>
                 </button>
             </div>
-            <button onclick="showVaccinationHistory()"
+            <button onclick="document.getElementById('services-section').scrollIntoView({behavior:'smooth'})"
                 class="flex flex-col items-center gap-1.5 text-slate-300 transition-all hover:text-slate-500">
-                <i class="fa-solid fa-heart-pulse text-xl"></i>
-                <span class="text-[8px] font-black uppercase tracking-[0.1em]">Health</span>
+                <i class="fa-solid fa-grip text-xl"></i>
+                <span class="text-[8px] font-black uppercase tracking-[0.1em]">Services</span>
             </button>
             <button onclick="window.location.href='profile.php'"
                 class="flex flex-col items-center gap-1.5 text-slate-300 transition-all hover:text-slate-500">
