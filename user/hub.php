@@ -19,6 +19,10 @@ $camp_list = [];
 $booking_list = [];
 $upcoming_count = 0;
 $borrow_count = 0;
+$borrow_pending_count = 0;
+$borrow_overdue_count = 0;
+$borrow_total_fine = 0.0;
+$borrow_active = [];
 $next_appt = null;
 
 try {
@@ -99,6 +103,18 @@ try {
         $borrow_count = count($borrow_active);
     } catch (Exception $e) {
         $borrow_count = 0;
+    }
+    // Derived alert counters used by notification bell
+    $borrow_pending_count = 0;
+    $borrow_overdue_count = 0;
+    foreach ($borrow_active as $b) {
+        if (($b['approval_status'] ?? '') === 'pending') {
+            $borrow_pending_count++;
+        } elseif (($b['approval_status'] ?? '') === 'approved'
+                  && !empty($b['due_date'])
+                  && $b['due_date'] < $today) {
+            $borrow_overdue_count++;
+        }
     }
     try {
         $stmt = $pdo->prepare("
@@ -634,6 +650,17 @@ $greeting = ($hour >= 5 && $hour < 12) ? "สวัสดีตอนเช้�
             });
         });
 
+        // ── Open borrow modals via URL hash (for redirects from e_Borrow) ─
+        document.addEventListener('DOMContentLoaded', () => {
+            const hash = (window.location.hash || '').toLowerCase();
+            if (!hash) return;
+            // Strip hash from URL so refresh doesn't re-trigger
+            history.replaceState(null, '', window.location.pathname + window.location.search);
+            if (hash === '#borrow-flow') showBorrowFlow();
+            else if (hash === '#borrow-history') showBorrowHistory();
+            else if (hash === '#borrow') showBorrow();
+        });
+
         // ── Borrow History modal ─────────────────────────────────────────
         let bhPage = 1;
         let bhLoading = false;
@@ -1014,12 +1041,13 @@ $greeting = ($hour >= 5 && $hour < 12) ? "สวัสดีตอนเช้�
                     class="w-10 h-10 flex items-center justify-center text-slate-600 hover:text-green-600 transition-colors">
                     <i class="fa-solid fa-qrcode text-lg"></i>
                 </button>
+                <?php $notif_total = $upcoming_count + $borrow_pending_count + $borrow_overdue_count; ?>
                 <button onclick="showNotifications()"
                     class="w-10 h-10 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors relative">
                     <i class="fa-solid fa-bell text-lg"></i>
-                    <?php if ($upcoming_count > 0): ?>
+                    <?php if ($notif_total > 0): ?>
                         <span
-                            class="absolute top-1.5 right-1.5 w-4 h-4 bg-red-500 text-white text-[9px] font-black rounded-full border-2 border-white flex items-center justify-center"><?= $upcoming_count ?></span>
+                            class="absolute top-1.5 right-1.5 min-w-4 h-4 px-1 <?= $borrow_overdue_count > 0 ? 'bg-rose-500' : 'bg-red-500' ?> text-white text-[9px] font-black rounded-full border-2 border-white flex items-center justify-center"><?= $notif_total ?></span>
                     <?php endif; ?>
                 </button>
             </div>
@@ -1838,26 +1866,74 @@ document.getElementById('insDetailModal').addEventListener('click', function(e) 
             <div class="w-12 h-1.5 bg-slate-100 rounded-full mx-auto mt-5 mb-3 flex-shrink-0"></div>
             <div class="px-8 py-5 border-b border-slate-50 flex items-center justify-between">
                 <h3 class="text-slate-900 font-black text-lg tracking-tight">Notifications</h3><span
-                    class="bg-blue-50 text-[#2e9e63] text-[10px] font-black px-3 py-1.5 rounded-full uppercase tracking-widest"><?= $upcoming_count ?>
+                    class="bg-blue-50 text-[#2e9e63] text-[10px] font-black px-3 py-1.5 rounded-full uppercase tracking-widest"><?= $notif_total ?>
                     NEW</span>
             </div>
             <div class="flex-1 overflow-y-auto custom-scrollbar divide-y divide-slate-50">
+
+                <?php if ($borrow_overdue_count > 0): ?>
+                <button type="button" onclick="hideNotifications(); showBorrow();" class="w-full text-left flex gap-5 p-6 bg-rose-50/40 relative active:bg-rose-50 transition-all">
+                    <div class="absolute left-0 top-0 bottom-0 w-1.5 bg-rose-500"></div>
+                    <div class="w-12 h-12 rounded-2xl bg-rose-100 flex items-center justify-center shrink-0 border border-rose-200/50 shadow-sm">
+                        <i class="fa-solid fa-triangle-exclamation text-rose-600 text-base"></i>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex justify-between items-start mb-1.5">
+                            <p class="text-slate-900 font-black text-sm">อุปกรณ์เกินกำหนดคืน</p>
+                            <span class="text-rose-500 text-[9px] font-black uppercase tracking-widest">URGENT</span>
+                        </div>
+                        <p class="text-slate-500 text-[11px] font-medium leading-relaxed">
+                            มีอุปกรณ์ <?= $borrow_overdue_count ?> รายการที่เลยกำหนดคืนแล้ว — แตะเพื่อดูรายละเอียด
+                        </p>
+                    </div>
+                </button>
+                <?php endif; ?>
+
+                <?php if ($borrow_pending_count > 0): ?>
+                <button type="button" onclick="hideNotifications(); showBorrow();" class="w-full text-left flex gap-5 p-6 bg-amber-50/40 relative active:bg-amber-50 transition-all">
+                    <div class="absolute left-0 top-0 bottom-0 w-1.5 bg-amber-500"></div>
+                    <div class="w-12 h-12 rounded-2xl bg-amber-100 flex items-center justify-center shrink-0 border border-amber-200/50 shadow-sm">
+                        <i class="fa-solid fa-hourglass-half text-amber-600 text-base"></i>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex justify-between items-start mb-1.5">
+                            <p class="text-slate-900 font-black text-sm">คำขอยืมรออนุมัติ</p>
+                            <span class="text-amber-500 text-[9px] font-black uppercase tracking-widest">PENDING</span>
+                        </div>
+                        <p class="text-slate-500 text-[11px] font-medium leading-relaxed">
+                            คุณมีคำขอยืม <?= $borrow_pending_count ?> รายการรอเจ้าหน้าที่อนุมัติ
+                        </p>
+                    </div>
+                </button>
+                <?php endif; ?>
+
+                <?php if ($upcoming_count > 0): ?>
                 <div class="flex gap-5 p-6 bg-blue-50/30 relative">
                     <div class="absolute left-0 top-0 bottom-0 w-1.5 bg-[#2e9e63]"></div>
-                    <div
-                        class="w-12 h-12 rounded-2xl bg-blue-100 flex items-center justify-center shrink-0 border border-blue-200/50 shadow-sm">
+                    <div class="w-12 h-12 rounded-2xl bg-blue-100 flex items-center justify-center shrink-0 border border-blue-200/50 shadow-sm">
                         <i class="fa-solid fa-calendar-check text-[#2e9e63] text-base"></i>
                     </div>
                     <div class="flex-1 min-w-0 text-left">
                         <div class="flex justify-between items-start mb-1.5">
-                            <p class="text-slate-900 font-black text-sm">System Alert</p><span
-                                class="text-slate-400 text-[9px] font-bold">RECENT</span>
+                            <p class="text-slate-900 font-black text-sm">นัดหมายสุขภาพ</p>
+                            <span class="text-slate-400 text-[9px] font-bold">UPCOMING</span>
                         </div>
                         <p class="text-slate-500 text-[11px] font-medium leading-relaxed">
                             คุณมีนัดหมายสุขภาพที่กำลังจะถึงจำนวน <?= $upcoming_count ?> รายการ กรุณาตรวจสอบเวลาอีกครั้ง
                         </p>
                     </div>
                 </div>
+                <?php endif; ?>
+
+                <?php if ($notif_total === 0): ?>
+                <div class="p-12 text-center">
+                    <div class="w-14 h-14 mx-auto mb-3 rounded-2xl bg-slate-50 text-slate-400 flex items-center justify-center text-xl">
+                        <i class="fa-solid fa-bell-slash"></i>
+                    </div>
+                    <p class="text-sm font-black text-slate-700">ไม่มีการแจ้งเตือนใหม่</p>
+                    <p class="mt-1 text-[11px] font-bold text-slate-400">รายการแจ้งเตือนจะแสดงที่นี่</p>
+                </div>
+                <?php endif; ?>
             </div>
             <div class="p-8 border-t border-slate-50 bg-slate-50/50"><button onclick="hideNotifications()"
                     class="w-full h-16 bg-white text-slate-900 font-black rounded-[1.5rem] border border-slate-200 active:scale-95 transition-all shadow-sm">ปิดหน้าต่าง</button>
