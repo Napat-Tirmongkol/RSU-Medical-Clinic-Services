@@ -365,12 +365,19 @@ $whitelistText      = implode("\n", $whitelistArr);
     (function () {
         const VALID = ['system', 'config', 'integrations', 'logs'];
 
-        function switchSettingsTab(name) {
+        // Paint DOM only (no URL mutation) — safe to call on any page load.
+        function paintSettingsTab(name) {
             if (!VALID.includes(name)) name = 'system';
             document.querySelectorAll('.stg-pane').forEach(p => p.hidden = (p.dataset.pane !== name));
             document.querySelectorAll('.stg-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
+        }
 
-            // Update URL without reload
+        // User-driven tab switch — paint AND update URL.
+        // Only safe to call when the settings section is the active one,
+        // otherwise it would clobber another section's URL state.
+        function switchSettingsTab(name) {
+            if (!VALID.includes(name)) name = 'system';
+            paintSettingsTab(name);
             const params = new URLSearchParams(location.search);
             params.set('section', 'settings');
             params.set('tab', name);
@@ -381,8 +388,19 @@ $whitelistText      = implode("\n", $whitelistArr);
             document.querySelectorAll('.stg-tab').forEach(btn => {
                 btn.addEventListener('click', () => switchSettingsTab(btn.dataset.tab));
             });
-            const initial = new URLSearchParams(location.search).get('tab') || 'system';
-            switchSettingsTab(initial);
+            // Only auto-switch (which mutates URL) when settings is the
+            // currently active section. Otherwise just paint the default
+            // tab so the markup is in a sensible state if the user navigates
+            // here later, but leave the URL untouched — it belongs to
+            // whichever section the user is currently viewing (e.g.
+            // ?section=clinic_data&cd_page=3).
+            const sp = new URLSearchParams(location.search);
+            const initial = sp.get('tab') || 'system';
+            if (sp.get('section') === 'settings') {
+                switchSettingsTab(initial);
+            } else {
+                paintSettingsTab(initial);
+            }
         });
 
         // Expose for external deep-linking
