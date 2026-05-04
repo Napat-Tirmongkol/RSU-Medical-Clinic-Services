@@ -36,11 +36,6 @@ $user_role = $_SESSION['role'] ?? 'employee';
     </a>
     <?php endif; ?>
 
-    <!-- เมนูจัดการโปรไฟล์ (แสดงเป็น Pop-up Card) -->
-    <a href="javascript:void(0)" onclick="openProfileCard()">
-        <i class="fas fa-user-circle"></i>
-        <span>โปรไฟล์</span>
-    </a>
 </nav>
 
 <!-- Scripts -->
