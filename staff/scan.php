@@ -81,11 +81,11 @@ $typeColor = ['vaccine' => '#0052CC', 'training' => '#6366f1', 'health_check' =>
     <title>Campaign Scanner — Staff</title>
     <link rel="icon" href="data:,">
     <link rel="stylesheet" href="../assets/css/tailwind.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
-        * { font-family: 'Prompt', sans-serif; }
+        * { font-family: 'Sarabun', sans-serif; }
         body { background: #f0f4ff; min-height: 100vh; }
 
         /* scanner lib overrides */
@@ -93,7 +93,7 @@ $typeColor = ['vaccine' => '#0052CC', 'training' => '#6366f1', 'health_check' =>
         #qr-reader button {
             background: #0052CC !important; color: #fff !important;
             border: none !important; padding: 8px 18px !important;
-            border-radius: 10px !important; font-family: 'Prompt', sans-serif !important;
+            border-radius: 10px !important; font-family: 'Sarabun', sans-serif !important;
             margin-top: 10px !important; cursor: pointer !important;
         }
         #qr-reader a { display: none !important; }
@@ -109,7 +109,7 @@ $typeColor = ['vaccine' => '#0052CC', 'training' => '#6366f1', 'health_check' =>
             border: 2px solid rgba(255,255,255,.7) !important;
             font-size: 13px !important;
             font-weight: 900 !important;
-            font-family: 'Prompt', sans-serif !important;
+            font-family: 'Sarabun', sans-serif !important;
             box-shadow: 0 12px 28px rgba(15,23,42,.18) !important;
             transition: transform .15s ease, box-shadow .15s ease, background .15s ease !important;
         }

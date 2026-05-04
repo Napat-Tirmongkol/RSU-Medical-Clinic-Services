@@ -43,7 +43,7 @@ if ($isUserFolder) {
             box-sizing: border-box;
             margin: 0;
             padding: 0;
-            font-family: 'rsufont', sans-serif !important;
+            font-family: 'Sarabun', sans-serif !important;
           }
 
           body {
@@ -262,19 +262,19 @@ function render_header(string $title = 'E-Vax'): void
       }
 
       @font-face {
-        font-family: 'rsufont';
+        font-family: 'Sarabun';
         src: url('../assets/fonts/RSU_BOLD.ttf') format('truetype');
         font-weight: bold;
       }
 
       @font-face {
-        font-family: 'rsufont';
+        font-family: 'Sarabun';
         src: url('../assets/fonts/RSU_REGULAR.ttf') format('truetype');
         font-weight: normal;
       }
 
       * {
-        font-family: 'rsufont', 'Prompt', sans-serif;
+        font-family: 'Sarabun', sans-serif;
       }
     </style>
   </head>

@@ -63,7 +63,7 @@ if (!$user) {
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="stylesheet" href="../assets/css/rsufont.css">
     <style>
-        * { font-family: 'rsufont', 'Prompt', sans-serif; box-sizing: border-box; }
+        * { font-family: 'Sarabun', sans-serif; box-sizing: border-box; }
         .profile-container { width: 100%; max-width: 600px; background: #ffffff; border-radius: 28px; box-shadow: 0 20px 40px -10px rgba(0,0,0,0.05); padding: 2.5rem; border: 1px solid #eef2f6; }
         .input-field { width: 100%; padding: 0.8rem 1.2rem; border: 1.5px solid #e2e8f0; border-radius: 14px; margin-top: 0.4rem; transition: all 0.2s; font-size: 1rem; font-weight: 600; color: #1e293b; background: #f8fafc; }
         .input-field:focus { border-color: #10b981; outline: none; box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.1); background: #fff; }

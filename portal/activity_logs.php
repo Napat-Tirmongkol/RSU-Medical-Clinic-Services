@@ -60,7 +60,7 @@ try {
     <link rel="stylesheet" href="../assets/css/rsufont.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 </head>
-<body style="background:#f4f7f5;min-height:100vh;font-family:'rsufont',sans-serif;color:#0f172a;<?= isset($_GET['embed']) ? 'padding:0' : 'padding:24px 28px' ?>">
+<body style="background:#f4f7f5;min-height:100vh;font-family:'Sarabun', sans-serif;color:#0f172a;<?= isset($_GET['embed']) ? 'padding:0' : 'padding:24px 28px' ?>">
 
 <div style="max-width:1200px;margin:0 auto">
 
@@ -89,9 +89,9 @@ try {
                 <i class="fa-solid fa-magnifying-glass" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:11px"></i>
                 <input type="text" name="search" value="<?= htmlspecialchars($search) ?>"
                     placeholder="ค้นหากิจกรรม..."
-                    style="padding:8px 14px 8px 30px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:13px;font-weight:500;font-family:'Prompt',sans-serif;outline:none;width:220px;background:#fff;color:#0f172a">
+                    style="padding:8px 14px 8px 30px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:13px;font-weight:500;font-family:'Sarabun',sans-serif;outline:none;width:220px;background:#fff;color:#0f172a">
             </div>
-            <button type="submit" style="background:#2e9e63;color:#fff;border:none;padding:8px 16px;border-radius:10px;font-size:12px;font-weight:700;font-family:'Prompt',sans-serif;cursor:pointer;letter-spacing:.03em">ค้นหา</button>
+            <button type="submit" style="background:#2e9e63;color:#fff;border:none;padding:8px 16px;border-radius:10px;font-size:12px;font-weight:700;font-family:'Sarabun',sans-serif;cursor:pointer;letter-spacing:.03em">ค้นหา</button>
             <?php if ($search): ?>
                 <a href="activity_logs.php<?= isset($_GET['embed']) ? '?embed=1' : '' ?>" style="background:#f1f5f9;color:#64748b;padding:8px 10px;border-radius:10px;font-size:12px;font-weight:700;text-decoration:none;display:flex;align-items:center"><i class="fa-solid fa-times"></i></a>
             <?php endif; ?>

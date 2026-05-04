@@ -254,7 +254,7 @@ function statusIcon(string $s): string {
     <link rel="stylesheet" href="../assets/css/rsufont.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 </head>
-<body style="background:#f4f7f5;min-height:100vh;font-family:'rsufont',sans-serif;color:#0f172a;<?= isset($_GET['embed']) ? 'padding:0' : 'padding:24px 28px' ?>">
+<body style="background:#f4f7f5;min-height:100vh;font-family:'Sarabun', sans-serif;color:#0f172a;<?= isset($_GET['embed']) ? 'padding:0' : 'padding:24px 28px' ?>">
 
 <div style="max-width:1200px;margin:0 auto">
 
@@ -278,7 +278,7 @@ function statusIcon(string $s): string {
         <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
             <a href="?export=csv&<?= http_build_query($_GET) ?>" style="display:inline-flex;align-items:center;gap:6px;padding:7px 14px;background:#fff;border:1.5px solid #e2e8f0;border-radius:10px;color:#475569;font-size:12px;font-weight:700;text-decoration:none"><i class="fa-solid fa-file-csv" style="color:#2e9e63"></i> CSV</a>
             <a href="?export=json&<?= http_build_query($_GET) ?>" style="display:inline-flex;align-items:center;gap:6px;padding:7px 14px;background:#fff;border:1.5px solid #e2e8f0;border-radius:10px;color:#475569;font-size:12px;font-weight:700;text-decoration:none"><i class="fa-solid fa-file-code" style="color:#3b82f6"></i> JSON</a>
-            <button onclick="document.getElementById('clearModal').style.display='flex'" style="display:inline-flex;align-items:center;gap:6px;padding:7px 14px;background:#fff1f2;border:1.5px solid #fecaca;border-radius:10px;color:#be123c;font-size:12px;font-weight:700;cursor:pointer;font-family:'Prompt',sans-serif"><i class="fa-solid fa-trash"></i> ล้าง Log</button>
+            <button onclick="document.getElementById('clearModal').style.display='flex'" style="display:inline-flex;align-items:center;gap:6px;padding:7px 14px;background:#fff1f2;border:1.5px solid #fecaca;border-radius:10px;color:#be123c;font-size:12px;font-weight:700;cursor:pointer;font-family:'Sarabun', sans-serif"><i class="fa-solid fa-trash"></i> ล้าง Log</button>
         </div>
     </div>
 
@@ -346,13 +346,13 @@ function statusIcon(string $s): string {
                 <div style="position:relative">
                     <i class="fa-solid fa-envelope" style="position:absolute;left:9px;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:10px"></i>
                     <input type="email" name="alert_email" value="<?= htmlspecialchars($currentAlertEmail) ?>" placeholder="admin@example.com"
-                        style="width:100%;padding:8px 12px 8px 28px;border:1.5px solid #e2e8f0;border-radius:9px;font-size:13px;font-weight:500;font-family:'rsufont',sans-serif;outline:none;background:#f8fafc;color:#0f172a;box-sizing:border-box">
+                        style="width:100%;padding:8px 12px 8px 28px;border:1.5px solid #e2e8f0;border-radius:9px;font-size:13px;font-weight:500;font-family:'Sarabun', sans-serif;outline:none;background:#f8fafc;color:#0f172a;box-sizing:border-box">
                 </div>
                 <?php if (isset($setting_error)): ?>
                     <div style="font-size:11px;color:#dc2626;margin-top:4px;font-weight:600"><?= htmlspecialchars($setting_error) ?></div>
                 <?php endif; ?>
             </div>
-            <button type="submit" style="background:#3b82f6;color:#fff;border:none;padding:8px 18px;border-radius:9px;font-size:12px;font-weight:700;font-family:'rsufont',sans-serif;cursor:pointer;white-space:nowrap">
+            <button type="submit" style="background:#3b82f6;color:#fff;border:none;padding:8px 18px;border-radius:9px;font-size:12px;font-weight:700;font-family:'Sarabun', sans-serif;cursor:pointer;white-space:nowrap">
                 <i class="fa-solid fa-floppy-disk" style="margin-right:5px"></i>บันทึก
             </button>
             <?php if ($currentAlertEmail): ?>
@@ -377,12 +377,12 @@ function statusIcon(string $s): string {
                 <label style="display:block;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.14em;color:#94a3b8;margin-bottom:5px">ค้นหาข้อความ</label>
                 <div style="position:relative">
                     <i class="fa-solid fa-magnifying-glass" style="position:absolute;left:9px;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:10px"></i>
-                    <input type="text" name="search" value="<?= htmlspecialchars($search) ?>" style="width:100%;padding:8px 12px 8px 28px;border:1.5px solid #e2e8f0;border-radius:9px;font-size:13px;font-weight:500;font-family:'Prompt',sans-serif;outline:none;background:#f8fafc;color:#0f172a">
+                    <input type="text" name="search" value="<?= htmlspecialchars($search) ?>" style="width:100%;padding:8px 12px 8px 28px;border:1.5px solid #e2e8f0;border-radius:9px;font-size:13px;font-weight:500;font-family:'Sarabun', sans-serif;outline:none;background:#f8fafc;color:#0f172a">
                 </div>
             </div>
             <div>
                 <label style="display:block;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.14em;color:#94a3b8;margin-bottom:5px">ระดับ</label>
-                <select name="level" style="padding:8px 12px;border:1.5px solid #e2e8f0;border-radius:9px;font-size:13px;font-weight:600;font-family:'Prompt',sans-serif;outline:none;background:#f8fafc;color:#374151">
+                <select name="level" style="padding:8px 12px;border:1.5px solid #e2e8f0;border-radius:9px;font-size:13px;font-weight:600;font-family:'Sarabun', sans-serif;outline:none;background:#f8fafc;color:#374151">
                     <option value="">ทั้งหมด</option>
                     <option value="error" <?= $filterLevel === 'error' ? 'selected' : '' ?>>🔴 Error</option>
                     <option value="warning" <?= $filterLevel === 'warning' ? 'selected' : '' ?>>🟡 Warning</option>
@@ -391,7 +391,7 @@ function statusIcon(string $s): string {
             </div>
             <div>
                 <label style="display:block;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.14em;color:#94a3b8;margin-bottom:5px">ประเภท</label>
-                <select name="source" style="padding:8px 12px;border:1.5px solid #e2e8f0;border-radius:9px;font-size:13px;font-weight:600;font-family:'Prompt',sans-serif;outline:none;background:#f8fafc;color:#374151">
+                <select name="source" style="padding:8px 12px;border:1.5px solid #e2e8f0;border-radius:9px;font-size:13px;font-weight:600;font-family:'Sarabun', sans-serif;outline:none;background:#f8fafc;color:#374151">
                     <option value="">ทั้งหมด</option>
                     <option value="php" <?= $filterSource === 'php' ? 'selected' : '' ?>>Backend (PHP)</option>
                     <option value="js" <?= $filterSource === 'js' ? 'selected' : '' ?>>Frontend (JS)</option>
@@ -399,18 +399,18 @@ function statusIcon(string $s): string {
             </div>
             <div>
                 <label style="display:block;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.14em;color:#94a3b8;margin-bottom:5px">วันที่</label>
-                <input type="date" name="date" value="<?= htmlspecialchars($filterDate) ?>" style="padding:8px 12px;border:1.5px solid #e2e8f0;border-radius:9px;font-size:13px;font-weight:600;font-family:'Prompt',sans-serif;outline:none;background:#f8fafc;color:#374151">
+                <input type="date" name="date" value="<?= htmlspecialchars($filterDate) ?>" style="padding:8px 12px;border:1.5px solid #e2e8f0;border-radius:9px;font-size:13px;font-weight:600;font-family:'Sarabun', sans-serif;outline:none;background:#f8fafc;color:#374151">
             </div>
             <div>
                 <label style="display:block;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.14em;color:#94a3b8;margin-bottom:5px">สถานะ</label>
-                <select name="status" style="padding:8px 12px;border:1.5px solid #e2e8f0;border-radius:9px;font-size:13px;font-weight:600;font-family:'Prompt',sans-serif;outline:none;background:#f8fafc;color:#374151">
+                <select name="status" style="padding:8px 12px;border:1.5px solid #e2e8f0;border-radius:9px;font-size:13px;font-weight:600;font-family:'Sarabun', sans-serif;outline:none;background:#f8fafc;color:#374151">
                     <option value="">ทั้งหมด</option>
                     <option value="New"      <?= $filterStatus === 'New' ? 'selected' : '' ?>>New</option>
                     <option value="Active"   <?= $filterStatus === 'Active' ? 'selected' : '' ?>>Active</option>
                     <option value="Resolved" <?= $filterStatus === 'Resolved' ? 'selected' : '' ?>>Resolved</option>
                 </select>
             </div>
-            <button type="submit" style="background:#2e9e63;color:#fff;border:none;padding:8px 18px;border-radius:9px;font-size:12px;font-weight:700;font-family:'Prompt',sans-serif;cursor:pointer;letter-spacing:.03em;align-self:flex-end">กรอง</button>
+            <button type="submit" style="background:#2e9e63;color:#fff;border:none;padding:8px 18px;border-radius:9px;font-size:12px;font-weight:700;font-family:'Sarabun', sans-serif;cursor:pointer;letter-spacing:.03em;align-self:flex-end">กรอง</button>
             <?php if ($search || $filterLevel || $filterStatus || $filterDate || $filterSource): ?>
                 <a href="error_logs.php<?= isset($_GET['embed']) ? '?embed=1' : '' ?>" style="background:#f1f5f9;color:#64748b;padding:8px 14px;border-radius:9px;font-size:12px;font-weight:700;text-decoration:none;display:flex;align-items:center;align-self:flex-end">ล้างค่า</a>
             <?php endif; ?>
@@ -526,7 +526,7 @@ function statusIcon(string $s): string {
         <form method="POST" style="padding:20px">
             <p style="font-size:13px;font-weight:500;color:#475569;margin:0 0 16px">คุณต้องการลบข้อมูล Error Logs ประเภทใด? ข้อมูลที่ถูกลบไปแล้วไม่สามารถกู้คืนได้</p>
             <label style="display:block;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.14em;color:#94a3b8;margin-bottom:5px">เลือกระดับที่จะลบ</label>
-            <select name="clear_level" style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:9px;font-size:13px;font-weight:600;font-family:'Prompt',sans-serif;outline:none;background:#f8fafc;color:#374151;margin-bottom:16px">
+            <select name="clear_level" style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:9px;font-size:13px;font-weight:600;font-family:'Sarabun', sans-serif;outline:none;background:#f8fafc;color:#374151;margin-bottom:16px">
                 <option value="all">ลบทั้งหมด (All Levels)</option>
                 <option value="error">เฉพาะระดับ Error</option>
                 <option value="warning">เฉพาะระดับ Warning</option>
@@ -534,8 +534,8 @@ function statusIcon(string $s): string {
             </select>
             <input type="hidden" name="action" value="clear">
             <div style="display:flex;gap:8px">
-                <button type="button" onclick="document.getElementById('clearModal').style.display='none'" style="flex:1;padding:9px;border-radius:9px;border:1.5px solid #e2e8f0;background:#fff;color:#475569;font-size:13px;font-weight:700;font-family:'Prompt',sans-serif;cursor:pointer">ยกเลิก</button>
-                <button type="submit" style="flex:1;padding:9px;border-radius:9px;border:none;background:#be123c;color:#fff;font-size:13px;font-weight:700;font-family:'Prompt',sans-serif;cursor:pointer">ยืนยันการลบ</button>
+                <button type="button" onclick="document.getElementById('clearModal').style.display='none'" style="flex:1;padding:9px;border-radius:9px;border:1.5px solid #e2e8f0;background:#fff;color:#475569;font-size:13px;font-weight:700;font-family:'Sarabun', sans-serif;cursor:pointer">ยกเลิก</button>
+                <button type="submit" style="flex:1;padding:9px;border-radius:9px;border:none;background:#be123c;color:#fff;font-size:13px;font-weight:700;font-family:'Sarabun', sans-serif;cursor:pointer">ยืนยันการลบ</button>
             </div>
         </form>
     </div>
@@ -575,12 +575,12 @@ function statusIcon(string $s): string {
 
             <div id="comment_field" style="display:none;margin-bottom:20px">
                 <label style="display:block;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.14em;color:#94a3b8;margin-bottom:5px">บันทึกการแก้ไข (Comment)</label>
-                <textarea name="resolve_comment" id="modal_comment" placeholder="ระบุรายละเอียดการแก้ไขปัญหา..." style="width:100%;padding:12px 14px;border:1.5px solid #e2e8f0;border-radius:12px;font-size:13px;font-family:'Prompt',sans-serif;outline:none;background:#f8fafc;color:#0f172a;height:90px;resize:none;box-sizing:border-box;font-weight:500"></textarea>
+                <textarea name="resolve_comment" id="modal_comment" placeholder="ระบุรายละเอียดการแก้ไขปัญหา..." style="width:100%;padding:12px 14px;border:1.5px solid #e2e8f0;border-radius:12px;font-size:13px;font-family:'Sarabun', sans-serif;outline:none;background:#f8fafc;color:#0f172a;height:90px;resize:none;box-sizing:border-box;font-weight:500"></textarea>
             </div>
 
             <div style="display:flex;gap:8px">
-                <button type="button" onclick="closeStatusModal()" style="flex:1;padding:12px;border-radius:12px;border:1.5px solid #e2e8f0;background:#fff;color:#475569;font-size:12px;font-weight:800;text-transform:uppercase;font-family:'Prompt',sans-serif;cursor:pointer">ยกเลิก</button>
-                <button type="submit" id="statusSubmitBtn" style="flex:1;padding:12px;border-radius:12px;border:none;background:#0f172a;color:#fff;font-size:12px;font-weight:800;text-transform:uppercase;font-family:'Prompt',sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px shadow-lg shadow-gray-100">
+                <button type="button" onclick="closeStatusModal()" style="flex:1;padding:12px;border-radius:12px;border:1.5px solid #e2e8f0;background:#fff;color:#475569;font-size:12px;font-weight:800;text-transform:uppercase;font-family:'Sarabun', sans-serif;cursor:pointer">ยกเลิก</button>
+                <button type="submit" id="statusSubmitBtn" style="flex:1;padding:12px;border-radius:12px;border:none;background:#0f172a;color:#fff;font-size:12px;font-weight:800;text-transform:uppercase;font-family:'Sarabun', sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px shadow-lg shadow-gray-100">
                     <span id="submitBtnText">บันทึก</span>
                     <i id="submitBtnIcon" class="fa-solid fa-check"></i>
                 </button>

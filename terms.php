@@ -10,10 +10,10 @@ require_once __DIR__ . '/config.php';
     <title>ข้อกำหนดการใช้งาน (Terms of Use) - <?= SITE_NAME ?></title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { font-family: 'Prompt', sans-serif; background-color: #f8fafc; color: #1e293b; line-height: 1.8; }
+        body { font-family: 'Sarabun', sans-serif; background-color: #f8fafc; color: #1e293b; line-height: 1.8; }
         .content-card { background: white; border-radius: 24px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05); }
         h1, h2, h3 { color: #0f172a; font-weight: 700; }
         .section-title { border-left: 4px solid #10b981; padding-left: 1rem; margin-bottom: 1rem; }

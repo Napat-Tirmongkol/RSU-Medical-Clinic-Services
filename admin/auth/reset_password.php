@@ -49,7 +49,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $user) {
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="stylesheet" href="../../assets/css/rsufont.css">
     <style>
-        * { font-family: 'rsufont', 'Prompt', sans-serif; box-sizing: border-box; }
+        * { font-family: 'Sarabun', sans-serif; box-sizing: border-box; }
         body {
             min-height: 100vh;
             background: <?= ($type === 'staff') ? '#eef2ff' : '#e8f5ee' ?>;

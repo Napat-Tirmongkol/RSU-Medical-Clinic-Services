@@ -70,11 +70,11 @@ ins_partner_layout_start('ประวัติการดำเนินกา
         <div style="flex:1; min-width:200px;">
             <label style="font-size:.75rem; font-weight:700; color:#064e3b;">ค้นหา</label>
             <input type="text" name="q" value="<?= htmlspecialchars($search) ?>" placeholder="ค้นหาในรายละเอียด..."
-                style="width:100%; padding:.55rem .75rem; border:1.5px solid #d1fae5; border-radius:.55rem; font-size:.85rem; font-family:Prompt,sans-serif;">
+                style="width:100%; padding:.55rem .75rem; border:1.5px solid #d1fae5; border-radius:.55rem; font-size:.85rem; font-family:Sarabun,sans-serif;">
         </div>
         <div style="min-width:180px;">
             <label style="font-size:.75rem; font-weight:700; color:#064e3b;">การกระทำ</label>
-            <select name="action" style="width:100%; padding:.55rem .75rem; border:1.5px solid #d1fae5; border-radius:.55rem; font-size:.85rem; font-family:Prompt,sans-serif;">
+            <select name="action" style="width:100%; padding:.55rem .75rem; border:1.5px solid #d1fae5; border-radius:.55rem; font-size:.85rem; font-family:Sarabun,sans-serif;">
                 <option value="">ทั้งหมด</option>
                 <?php foreach ($availableActions as $a): ?>
                 <option value="<?= htmlspecialchars($a) ?>" <?= $a === $action ? 'selected' : '' ?>><?= htmlspecialchars($a) ?></option>

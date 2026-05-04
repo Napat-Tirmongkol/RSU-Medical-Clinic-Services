@@ -68,7 +68,7 @@ $authUrl = "https://access.line.me/oauth2/v2.1/authorize?" . http_build_query([
     <link rel="icon" type="image/png" href="assets/img/logo.png" sizes="any">
     <link rel="stylesheet" href="assets/css/style.css?v=2.2">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet">
 
     <script>
         (function() {

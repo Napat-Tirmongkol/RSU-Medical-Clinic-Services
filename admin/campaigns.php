@@ -412,7 +412,7 @@ require_once __DIR__ . '/includes/header.php';
         background: #f8fafc;
         border: 1.5px solid #e2e8f0;
         border-radius: 14px;
-        font-family: 'Prompt', sans-serif;
+        font-family: 'Sarabun', sans-serif;
         color: #1e293b;
         font-size: .9rem;
         transition: border-color .15s, background .15s, box-shadow .15s;

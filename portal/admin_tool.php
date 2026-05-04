@@ -75,12 +75,12 @@ foreach ($projects as $p) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Tool — RSU Medical Clinic Portal</title>
-    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="stylesheet" href="../assets/css/tailwind.min.css">
     <link rel="stylesheet" href="../assets/css/portal.css">
     <style>
-        * { font-family: 'Prompt', sans-serif; }
+        * { font-family: 'Sarabun', sans-serif; }
 
         /* ── Toggle Switch ─────────────────────────────────────────────────── */
         .toggle-wrap { display:flex; align-items:center; gap:10px; flex-shrink:0; }

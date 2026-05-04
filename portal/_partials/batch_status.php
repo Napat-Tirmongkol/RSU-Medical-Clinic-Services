@@ -52,9 +52,9 @@ $stages = ins_batch_stepper_stages();
     <div style="background:#fff; border-radius:1rem; box-shadow:0 4px 14px rgba(0,0,0,.05); padding:1.25rem;">
         <div style="display:flex; gap:.5rem; flex-wrap:wrap; align-items:center; margin-bottom:1rem;">
             <input type="text" id="bsSearch" placeholder="ค้นหา batch_code, ผู้อัพโหลด..."
-                   style="flex:1; min-width:200px; padding:.55rem .8rem; border:1.5px solid #e2e8f0; border-radius:.5rem; font-family:Prompt,sans-serif; font-size:.85rem;">
+                   style="flex:1; min-width:200px; padding:.55rem .8rem; border:1.5px solid #e2e8f0; border-radius:.5rem; font-family:Sarabun,sans-serif; font-size:.85rem;">
             <select id="bsStatusFilter"
-                    style="padding:.55rem .8rem; border:1.5px solid #e2e8f0; border-radius:.5rem; font-family:Prompt,sans-serif; font-size:.85rem;">
+                    style="padding:.55rem .8rem; border:1.5px solid #e2e8f0; border-radius:.5rem; font-family:Sarabun,sans-serif; font-size:.85rem;">
                 <option value="">-- ทุกสถานะ --</option>
                 <?php foreach ($labels as $st => [$label]): ?>
                 <option value="<?= htmlspecialchars($st) ?>"><?= htmlspecialchars($label) ?></option>
@@ -139,7 +139,7 @@ $stages = ins_batch_stepper_stages();
     display:inline-flex; align-items:center; gap:.4rem;
     padding:.5rem .95rem; border-radius:.5rem; border:none;
     font-weight:700; font-size:.8rem; cursor:pointer;
-    font-family: 'Prompt', sans-serif;
+    font-family: 'Sarabun', sans-serif;
     transition: opacity .15s;
 }
 .bs-btn-primary { background:#06b6d4; color:#fff; }
@@ -158,7 +158,7 @@ $stages = ins_batch_stepper_stages();
     background:#fff; color:#475569;
     cursor:pointer; font-weight:700; font-size:.78rem;
     display:inline-flex; align-items:center; justify-content:center;
-    font-family: 'Prompt', sans-serif;
+    font-family: 'Sarabun', sans-serif;
 }
 .bs-page-btn:hover:not(.disabled):not(.active) { background:#f0f9ff; border-color:#06b6d4; color:#0891b2; }
 .bs-page-btn.active { background:#06b6d4; color:#fff; border-color:#06b6d4; }

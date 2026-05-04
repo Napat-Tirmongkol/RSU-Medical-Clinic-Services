@@ -181,10 +181,10 @@ if (!function_exists('check_maintenance')) {
                     <meta charset="UTF-8">
                     <meta name="viewport" content="width=device-width, initial-scale=1.0">
                     <title>ปิดปรับปรุงระบบ - System Maintenance</title>
-                    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;700&display=swap" rel="stylesheet">
+                    <link href="https://fonts.googleapis.com/css2?family=Sarabun:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet">
                     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
                     <style>
-                        body { font-family: 'Prompt', sans-serif; background: #f4f7fa; color: #334155; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; text-align: center; padding: 20px; }
+                        body { font-family: 'Sarabun', sans-serif; background: #f4f7fa; color: #334155; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; text-align: center; padding: 20px; }
                         .card { background: white; padding: 40px; border-radius: 30px; shadow: 0 10px 30px rgba(0,0,0,0.05); max-width: 500px; width: 100%; box-shadow: 0 20px 40px rgba(0,0,0,0.05); }
                         .icon { font-size: 60px; color: #f59e0b; margin-bottom: 20px; }
                         h1 { font-size: 24px; font-weight: 700; margin: 0 0 10px; color: #1e293b; }

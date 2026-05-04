@@ -17,9 +17,9 @@ if (!$isEmbed) {
 } else {
     // เมื่อ Embed ให้โหลด FontAwesome และ Font ที่จำเป็นด้วย
     echo '<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">';
-    echo '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700;800;900&display=swap">';
+    echo '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sarabun:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&display=swap">';
     $themeVal = (isset($_GET['theme']) && $_GET['theme'] === 'dark') ? 'dark' : 'light';
-    echo '<style>body { font-family: "Prompt", sans-serif; }</style>';
+    echo '<style>body { font-family: 'Sarabun', sans-serif; }</style>';
     echo "<script>document.documentElement.setAttribute('data-theme', '{$themeVal}');</script>";
 }
 ?>
@@ -178,7 +178,7 @@ if (!$isEmbed) {
     border-radius: 14px;
     padding: 10px 14px;
     font-size: .875rem;
-    font-family: 'Prompt', sans-serif;
+    font-family: 'Sarabun', sans-serif;
     outline: none;
     max-height: 120px;
     line-height: 1.5;

@@ -33,7 +33,7 @@ if (!function_exists('renderPageHeader')) {
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="stylesheet" href="../assets/css/rsufont.css">
     <style>
-        * { font-family: 'rsufont', 'Prompt', sans-serif; }
+        * { font-family: 'Sarabun', sans-serif; }
 
         /* ── Sidebar ───────────────────────────────────────────── */
         .admin-sidebar {

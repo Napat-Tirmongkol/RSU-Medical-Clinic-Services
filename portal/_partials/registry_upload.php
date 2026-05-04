@@ -136,7 +136,7 @@ declare(strict_types=1);
     cursor: pointer;
     text-align: left;
     transition: all .15s;
-    font-family: 'Prompt', sans-serif;
+    font-family: 'Sarabun', sans-serif;
 }
 .reg-mode-card:hover { border-color: #06b6d4; box-shadow: 0 6px 18px rgba(6,182,212,.1); }
 .reg-mode-card.active { border-color: #06b6d4; background: #ecfeff; box-shadow: 0 6px 18px rgba(6,182,212,.18); }
@@ -155,7 +155,7 @@ declare(strict_types=1);
     padding: .7rem 1.4rem; border-radius: .65rem;
     font-weight: 700; font-size: .9rem;
     cursor: pointer; border: none;
-    font-family: 'Prompt', sans-serif;
+    font-family: 'Sarabun', sans-serif;
     transition: opacity .15s, background .15s;
 }
 .reg-btn-primary { background: #0891b2; color: #fff; }

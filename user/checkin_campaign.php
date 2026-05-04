@@ -147,7 +147,7 @@ function fmt_date_c(string $d): string {
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <link rel="stylesheet" href="../assets/css/rsufont.css">
 <style>
-  * { font-family: 'rsufont','Prompt',sans-serif; }
+  * { font-family: 'Sarabun', sans-serif; }
   body { background: linear-gradient(135deg,#e8f5f0 0%,#f0faf4 50%,#e8f5ec 100%); min-height: 100vh; }
   @keyframes popIn { from{opacity:0;transform:scale(.88) translateY(24px)} to{opacity:1;transform:scale(1) translateY(0)} }
   .pop-in { animation: popIn .45s cubic-bezier(.16,1,.3,1) both; }

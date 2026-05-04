@@ -41,9 +41,9 @@ declare(strict_types=1);
         <div style="background:#fff; border-radius:.85rem; box-shadow:0 4px 14px rgba(0,0,0,.05); padding:1.25rem; margin-bottom:1rem;">
             <div style="display:flex; gap:.5rem; flex-wrap:wrap; align-items:center; margin-bottom:1rem;">
                 <input type="text" id="iptUserSearch" placeholder="ค้นหา username, ชื่อ, อีเมล..."
-                       style="flex:1; min-width:200px; padding:.55rem .8rem; border:1.5px solid #e2e8f0; border-radius:.5rem; font-family:Prompt,sans-serif; font-size:.85rem;">
+                       style="flex:1; min-width:200px; padding:.55rem .8rem; border:1.5px solid #e2e8f0; border-radius:.5rem; font-family:Sarabun,sans-serif; font-size:.85rem;">
                 <select id="iptUserCompanyFilter"
-                        style="padding:.55rem .8rem; border:1.5px solid #e2e8f0; border-radius:.5rem; font-family:Prompt,sans-serif; font-size:.85rem;">
+                        style="padding:.55rem .8rem; border:1.5px solid #e2e8f0; border-radius:.5rem; font-family:Sarabun,sans-serif; font-size:.85rem;">
                     <option value="">-- ทุกบริษัท --</option>
                 </select>
                 <button onclick="iptLoadUsers(1)" class="ipt-btn-primary">
@@ -108,7 +108,7 @@ declare(strict_types=1);
         <div style="background:#fff; border-radius:.85rem; box-shadow:0 4px 14px rgba(0,0,0,.05); padding:1.25rem;">
             <div style="display:flex; gap:.5rem; flex-wrap:wrap; margin-bottom:1rem;">
                 <select id="iptActCompanyFilter"
-                        style="padding:.55rem .8rem; border:1.5px solid #e2e8f0; border-radius:.5rem; font-family:Prompt,sans-serif; font-size:.85rem;">
+                        style="padding:.55rem .8rem; border:1.5px solid #e2e8f0; border-radius:.5rem; font-family:Sarabun,sans-serif; font-size:.85rem;">
                     <option value="">-- ทุกบริษัท --</option>
                 </select>
                 <button onclick="iptLoadActivity(1)" class="ipt-btn-primary">
@@ -222,7 +222,7 @@ declare(strict_types=1);
     background: transparent; border: none; padding: .75rem 1.25rem;
     font-weight: 700; font-size: .9rem; color: #64748b;
     cursor: pointer; border-bottom: 3px solid transparent;
-    margin-bottom: -2px; font-family: 'Prompt', sans-serif;
+    margin-bottom: -2px; font-family: 'Sarabun', sans-serif;
     transition: color .15s, border-color .15s;
 }
 .ipt-tab:hover { color: #059669; }
@@ -238,7 +238,7 @@ declare(strict_types=1);
     display:inline-flex; align-items:center; gap:.4rem;
     padding:.55rem 1rem; border-radius:.5rem; border:none;
     font-weight:700; font-size:.82rem; cursor:pointer;
-    font-family: 'Prompt', sans-serif;
+    font-family: 'Sarabun', sans-serif;
     transition: opacity .15s;
 }
 .ipt-btn-primary { background:#059669; color:#fff; }
@@ -262,7 +262,7 @@ declare(strict_types=1);
     background:#fff; color:#475569;
     cursor:pointer; font-weight:700; font-size:.78rem;
     display:inline-flex; align-items:center; justify-content:center;
-    font-family: 'Prompt', sans-serif;
+    font-family: 'Sarabun', sans-serif;
 }
 .ipt-page-btn:hover:not(.disabled):not(.active) { background:#f0fdf4; border-color:#10b981; color:#059669; }
 .ipt-page-btn.active { background:#059669; color:#fff; border-color:#059669; }
@@ -273,7 +273,7 @@ declare(strict_types=1);
 .ipt-form-row input, .ipt-form-row select {
     padding:.55rem .75rem; border:1.5px solid #e2e8f0;
     border-radius:.45rem; font-size:.85rem;
-    font-family: 'Prompt', sans-serif;
+    font-family: 'Sarabun', sans-serif;
 }
 .ipt-form-row input:focus, .ipt-form-row select:focus {
     outline:none; border-color:#10b981;

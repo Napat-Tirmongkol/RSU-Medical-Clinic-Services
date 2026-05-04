@@ -1,38 +1,23 @@
-@font-face {
-    font-family: 'rsufont';
-    src: url('../fonts/RSU_Regular.ttf') format('truetype');
-    font-weight: normal;
-    font-style: normal;
-    font-display: swap;
-}
-@font-face {
-    font-family: 'rsufont';
-    src: url('../fonts/RSU_BOLD.ttf') format('truetype');
-    font-weight: bold;
-    font-style: normal;
-    font-display: swap;
-}
-@font-face {
-    font-family: 'rsufont';
-    src: url('../fonts/RSU_light.ttf') format('truetype');
-    font-weight: 300;
-    font-style: normal;
-    font-display: swap;
-}
+@import url('https://fonts.googleapis.com/css2?family=Sarabun:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&display=swap');
 
 :root {
-    --rsu-font: 'rsufont', 'Prompt', sans-serif;
+    --rsu-font: 'Sarabun', sans-serif;
 }
 
 html {
-    font-size: 18px; /* Standard is 16px, so we increase it to 18px */
+    font-size: 16px;
 }
 
 * {
     font-family: var(--rsu-font) !important;
 }
 
-/* Fix for icons which should not use RSU font */
+/* Fix for icons which should not use Sarabun */
 .fa, .fas, .far, .fal, .fad, .fab, .fa-solid, .fa-regular, .fa-light, .fa-thin, .fa-duotone, .fa-brands {
     font-family: 'Font Awesome 6 Free', 'Font Awesome 6 Brands' !important;
+}
+
+/* Fix for monospace code blocks */
+code, pre, kbd, samp {
+    font-family: ui-monospace, 'SFMono-Regular', Consolas, monospace !important;
 }

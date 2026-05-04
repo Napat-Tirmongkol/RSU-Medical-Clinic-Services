@@ -28,7 +28,7 @@ function ins_partner_layout_start(string $pageTitle, string $activePage): void
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="stylesheet" href="../assets/css/rsufont.css">
     <style>
-        * { font-family: 'rsufont', 'Prompt', sans-serif; box-sizing: border-box; }
+        * { font-family: 'Sarabun', sans-serif; box-sizing: border-box; }
         body { margin: 0; background: #f0fdf4; color: #064e3b; min-height: 100vh; }
 
         .ipp-shell { display: flex; min-height: 100vh; }
@@ -70,7 +70,7 @@ function ins_partner_layout_start(string $pageTitle, string $activePage): void
             border: none; border-radius: .5rem; cursor: pointer;
             font-weight: 700; font-size: .75rem;
             text-decoration: none; text-align: center;
-            font-family: 'Prompt', sans-serif;
+            font-family: 'Sarabun', sans-serif;
         }
         .ipp-logout-btn:hover { background: rgba(220,38,38,1); }
 
@@ -98,7 +98,7 @@ function ins_partner_layout_start(string $pageTitle, string $activePage): void
             font-weight: 700; font-size: .85rem;
             text-decoration: none; cursor: pointer; border: none;
             transition: background .15s;
-            font-family: 'Prompt', sans-serif;
+            font-family: 'Sarabun', sans-serif;
         }
         .ipp-btn:hover { background: #047857; }
         .ipp-btn.secondary { background: #fff; color: #047857; border: 1.5px solid #d1fae5; }
@@ -130,7 +130,7 @@ function ins_partner_layout_start(string $pageTitle, string $activePage): void
             cursor: pointer; font-weight: 700; font-size: .8rem;
             display: inline-flex; align-items: center; justify-content: center;
             text-decoration: none;
-            font-family: 'Prompt', sans-serif;
+            font-family: 'Sarabun', sans-serif;
         }
         .ipp-page-btn:hover:not(.disabled):not(.active) { background: #ecfdf5; border-color: #10b981; }
         .ipp-page-btn.active { background: #059669; color: #fff; border-color: #059669; }
@@ -146,7 +146,7 @@ function ins_partner_layout_start(string $pageTitle, string $activePage): void
         .ipp-form-row input[type=file], .ipp-form-row input[type=text] {
             padding: .65rem .8rem; border: 1.5px solid #d1fae5;
             border-radius: .55rem; font-size: .85rem;
-            font-family: 'Prompt', sans-serif;
+            font-family: 'Sarabun', sans-serif;
         }
 
         @media (max-width: 768px) {

@@ -49,12 +49,12 @@ require_once __DIR__ . '/../config.php';
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Staff Scanner</title>
     <link rel="stylesheet" href="../assets/css/tailwind.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style> 
-        body { font-family: 'Prompt', sans-serif; background-color: #f4f7fa; }
+        body { font-family: 'Sarabun', sans-serif; background-color: #f4f7fa; }
         #reader__dashboard_section_csr span { display: none !important; }
-        #reader button { background-color: #0052CC !important; color: white !important; border: none !important; padding: 8px 16px !important; border-radius: 8px !important; font-family: 'Prompt', sans-serif !important; margin-top: 10px !important; cursor: pointer; }
+        #reader button { background-color: #0052CC !important; color: white !important; border: none !important; padding: 8px 16px !important; border-radius: 8px !important; font-family: 'Sarabun', sans-serif !important; margin-top: 10px !important; cursor: pointer; }
         #reader a { display: none !important; }
         #btn-toggle-camera.camera-toggle-btn {
             display: inline-flex !important;

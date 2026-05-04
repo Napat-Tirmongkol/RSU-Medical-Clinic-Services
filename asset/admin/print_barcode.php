@@ -58,10 +58,10 @@ if ($autoPrint && !empty($assets)):
 <head>
     <meta charset="UTF-8">
     <title>พิมพ์บาร์โค้ด · <?= $showCount ?> รายการ</title>
-    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
     <style>
-        body { font-family: 'Prompt', sans-serif; margin: 0; padding: 8mm; background: #fff; color: #000; }
+        body { font-family: 'Sarabun', sans-serif; margin: 0; padding: 8mm; background: #fff; color: #000; }
         .barcode-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 4mm; }
         .barcode-cell {
             border: 1px dashed #999;

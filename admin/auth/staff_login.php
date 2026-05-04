@@ -111,7 +111,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="stylesheet" href="../../assets/css/rsufont.css">
     <style>
-        * { font-family: 'rsufont', 'Prompt', sans-serif; box-sizing: border-box; }
+        * { font-family: 'Sarabun', sans-serif; box-sizing: border-box; }
 
         body {
             min-height: 100vh;
@@ -269,7 +269,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             font-size: .875rem; outline: none;
             transition: border-color .2s, box-shadow .2s;
             background: #fafafa;
-            font-family: 'Prompt', sans-serif; color: #111;
+            font-family: 'Sarabun', sans-serif; color: #111;
         }
         .input-wrap input::placeholder { color: #9ca3af; }
         .input-wrap input:focus {
@@ -296,7 +296,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             transition: background .2s, transform .1s, box-shadow .2s;
             box-shadow: 0 4px 14px rgba(79,70,229,.35);
             margin-bottom: 1.1rem;
-            font-family: 'Prompt', sans-serif;
+            font-family: 'Sarabun', sans-serif;
         }
         .btn-login:hover { background: #4338ca; box-shadow: 0 6px 20px rgba(79,70,229,.4); }
         .btn-login:active { transform: scale(.98); }

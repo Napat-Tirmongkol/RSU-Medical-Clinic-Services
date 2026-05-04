@@ -1038,7 +1038,7 @@ $header_actions = '
 
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.all.min.js"></script>
 <style>
-    .swal-font { font-family: 'Prompt', sans-serif !important; }
+    .swal-font { font-family: 'Sarabun', sans-serif !important; }
 
     /* ── Premium Staff Modal Styles ────────────────────────── */
     #staffModalBox {

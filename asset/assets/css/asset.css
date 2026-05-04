@@ -15,7 +15,7 @@
 }
 
 body {
-    font-family: 'rsufont', 'Prompt', sans-serif !important;
+    font-family: 'Sarabun', sans-serif !important;
     background: var(--asset-bg) !important;
     color: var(--asset-text);
 }

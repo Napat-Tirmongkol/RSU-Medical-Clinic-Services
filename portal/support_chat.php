@@ -13,7 +13,7 @@ $pdo = db();
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Support Chat - Central HUB</title>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="stylesheet" href="../assets/css/tailwind.min.css">
     <link rel="stylesheet" href="../assets/css/portal.css">
@@ -32,7 +32,7 @@ $pdo = db();
         }
 
         body {
-            font-family: 'RSU', 'Outfit', sans-serif;
+            font-family: 'Sarabun', sans-serif;
             background-color: #F0F4FF;
             height: 100vh;
             overflow: hidden;

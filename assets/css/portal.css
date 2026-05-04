@@ -1,5 +1,4 @@
 @import url('rsufont.css');
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&display=swap');
 
 /* ── Design Tokens (clinical refined) ─────────────────── */
 :root {
@@ -52,8 +51,7 @@
 body {
     background: var(--c-bg);
     min-height: 100vh;
-    font-family: 'Inter', 'IBM Plex Sans Thai', 'rsufont', 'Prompt', sans-serif !important;
-    font-feature-settings: 'cv11', 'ss01';
+    font-family: 'Sarabun', sans-serif !important;
     color: var(--c-ink-2);
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;

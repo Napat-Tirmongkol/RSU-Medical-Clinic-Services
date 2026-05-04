@@ -385,7 +385,7 @@ foreach ($slotUtil as $sl) {
 <!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 <script>
-Chart.defaults.font.family = "'Prompt', sans-serif";
+Chart.defaults.font.family = "'Sarabun', sans-serif";
 Chart.defaults.color = '#6b7280';
 
 <?php if (!empty($donutData)): ?>
