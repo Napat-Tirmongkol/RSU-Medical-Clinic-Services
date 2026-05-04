@@ -175,6 +175,13 @@ $titles     = ['นพ.','พญ.','ทพ.','ทญ.','ภก.','ภญ.','พ�
 </div>
 
 <script>
+function cdReload(view) {
+    const url = new URL(window.location.origin + window.location.pathname + window.location.search);
+    url.searchParams.set('section', 'clinic_data');
+    url.searchParams.set('cd_view', view);
+    window.location.assign(url.toString());
+}
+
 async function msPost(action, data) {
     const fd = new FormData();
     fd.append('entity', 'staff');
@@ -189,7 +196,7 @@ async function msAdd(e) {
     const fd = new FormData(e.target);
     const data = Object.fromEntries(fd.entries());
     const res = await msPost('add', data);
-    if (res.ok) { showPortalToast(res.message, 'success'); setTimeout(() => window.location.href = window.location.href, 600); }
+    if (res.ok) { showPortalToast(res.message, 'success'); setTimeout(() => cdReload('staff'), 600); }
     else Swal.fire('Error', res.message || 'เพิ่มไม่สำเร็จ', 'error');
 }
 async function msDelete(id, name) {
@@ -201,7 +208,7 @@ async function msDelete(id, name) {
 }
 async function msToggle(id, btn) {
     const res = await msPost('toggle', {id});
-    if (res.ok) window.location.href = window.location.href;
+    if (res.ok) cdReload('staff');
     else Swal.fire('Error', res.message, 'error');
 }
 </script>

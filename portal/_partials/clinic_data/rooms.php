@@ -157,6 +157,13 @@ $typeColors = ['exam'=>'emerald','vaccination'=>'blue','lab'=>'purple','consult'
 </div>
 
 <script>
+function cdReload(view) {
+    const url = new URL(window.location.origin + window.location.pathname + window.location.search);
+    url.searchParams.set('section', 'clinic_data');
+    url.searchParams.set('cd_view', view);
+    window.location.assign(url.toString());
+}
+
 async function rmPost(action, data) {
     const fd = new FormData();
     fd.append('entity','rooms'); fd.append('action',action); fd.append('csrf_token', portal_CSRF);
@@ -168,7 +175,7 @@ async function rmAdd(e) {
     e.preventDefault();
     const fd = new FormData(e.target);
     const res = await rmPost('add', Object.fromEntries(fd.entries()));
-    if (res.ok) { showPortalToast(res.message, 'success'); setTimeout(()=>window.location.href = window.location.href,600); }
+    if (res.ok) { showPortalToast(res.message, 'success'); setTimeout(()=>cdReload('rooms'),600); }
     else Swal.fire('Error', res.message, 'error');
 }
 async function rmDelete(id, name) {
@@ -180,6 +187,6 @@ async function rmDelete(id, name) {
 }
 async function rmToggle(id) {
     const res = await rmPost('toggle', {id});
-    if (res.ok) window.location.href = window.location.href;
+    if (res.ok) cdReload('rooms');
 }
 </script>

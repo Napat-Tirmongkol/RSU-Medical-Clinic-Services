@@ -135,6 +135,16 @@ foreach ($regular as $r) {
 </div>
 
 <script>
+// Reload while explicitly preserving section + cd_view (sidebar nav can
+// strip cd_view via pushState, leaving plain location.reload() landing
+// on the card-grid landing instead of staying on this sub-view).
+function cdReload(view) {
+    const url = new URL(window.location.origin + window.location.pathname + window.location.search);
+    url.searchParams.set('section', 'clinic_data');
+    url.searchParams.set('cd_view', view);
+    window.location.assign(url.toString());
+}
+
 async function hrPost(action, data) {
     const fd = new FormData();
     fd.append('entity','hours'); fd.append('action',action); fd.append('csrf_token', portal_CSRF);
@@ -146,14 +156,14 @@ async function hrAdd(e, type) {
     e.preventDefault();
     const fd = new FormData(e.target);
     const res = await hrPost('add', Object.fromEntries(fd.entries()));
-    if (res.ok) { showPortalToast(res.message, 'success'); setTimeout(()=>window.location.href = window.location.href,500); }
+    if (res.ok) { showPortalToast(res.message, 'success'); setTimeout(()=>cdReload('hours'),500); }
     else Swal.fire('Error', res.message, 'error');
 }
 async function hrDelete(id) {
     const c = await Swal.fire({title:'ลบรายการนี้?', icon:'warning', showCancelButton:true, confirmButtonColor:'#e11d48'});
     if (!c.isConfirmed) return;
     const res = await hrPost('delete', {id});
-    if (res.ok) window.location.href = window.location.href;
+    if (res.ok) cdReload('hours');
     else Swal.fire('Error', res.message, 'error');
 }
 </script>
