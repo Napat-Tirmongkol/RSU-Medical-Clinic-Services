@@ -4,273 +4,180 @@ declare(strict_types=1);
 @session_start();
 include('includes/check_student_session.php');
 
-// ใช้ DB กลาง (Correct path to Root)
 require_once __DIR__ . '/includes/db_connect.php';
 
 $student_id = (int)$_SESSION['student_id'];
 
-// ดึงประวัติเฉพาะรายการที่คืนแล้ว, รออนุมัติ, หรือถูกปฏิเสธ/ยกเลิก
+// Pagination per CLAUDE.md (20/page default)
+$perPage = 20;
+$page    = max(1, (int) ($_GET['page'] ?? 1));
+$offset  = ($page - 1) * $perPage;
+$total   = 0;
+$history = [];
+$history_error = '';
+
 try {
     $pdo = db();
-    $sql_history = "SELECT t.id, t.borrow_date, t.due_date, t.return_date, 
+
+    $countSql = "SELECT COUNT(*)
+                 FROM borrow_records t
+                 WHERE t.borrower_student_id = ?
+                   AND (t.status IN ('returned','cancelled') OR t.approval_status IN ('pending','rejected'))";
+    $cs = $pdo->prepare($countSql);
+    $cs->execute([$student_id]);
+    $total = (int) $cs->fetchColumn();
+
+    $sql_history = "SELECT t.id, t.borrow_date, t.due_date, t.return_date,
                            t.status, t.approval_status,
                            et.name as type_name, et.image_url,
                            ei.name as eq_name
                     FROM borrow_records t
                     JOIN borrow_categories et ON t.type_id = et.id
                     LEFT JOIN borrow_items ei ON t.item_id = ei.id
-                    WHERE t.borrower_student_id = ? 
-                      AND (t.status IN ('returned', 'cancelled') OR t.approval_status IN ('pending', 'rejected'))
-                    ORDER BY t.borrow_date DESC, t.id DESC";
-    
+                    WHERE t.borrower_student_id = ?
+                      AND (t.status IN ('returned','cancelled') OR t.approval_status IN ('pending','rejected'))
+                    ORDER BY t.borrow_date DESC, t.id DESC
+                    LIMIT $perPage OFFSET $offset";
     $stmt_history = $pdo->prepare($sql_history);
     $stmt_history->execute([$student_id]);
     $history = $stmt_history->fetchAll();
 } catch (PDOException $e) {
-    $history = [];
     $history_error = "เกิดข้อผิดพลาด: " . $e->getMessage();
 }
 
-$page_title  = "ประวัติคำขอ";
+$totalPages = max(1, (int) ceil($total / $perPage));
+
+$page_title  = 'ประวัติคำขอ';
 $active_page = 'history';
 include('includes/student_header.php');
 ?>
 
-<style>
-/* ===== PAGE WRAPPER ===== */
-.page-wrap { padding: 0 0 80px; }
+<?php if ($history_error !== ''): ?>
+<div class="rounded-2xl bg-rose-50 border border-rose-100 text-rose-700 px-4 py-3 text-sm font-bold mb-4 flex items-center gap-2">
+    <i class="fa-solid fa-circle-exclamation"></i><?= htmlspecialchars($history_error) ?>
+</div>
+<?php endif; ?>
 
-/* ===== TOP HEADER ===== */
-.history-header {
-    background: linear-gradient(135deg, #0052CC 0%, #0070f3 100%);
-    padding: 30px 20px 45px;
-    text-align: center;
-    position: relative;
-    border-bottom-left-radius: 24px;
-    border-bottom-right-radius: 24px;
-    box-shadow: 0 4px 12px rgba(11,102,35,.15);
-}
-.history-header::before {
-    content: ''; position: absolute; inset: 0;
-    background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.04'%3E%3Ccircle cx='30' cy='30' r='28'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
-    pointer-events: none; border-bottom-left-radius: 24px; border-bottom-right-radius: 24px;
-}
-.history-header h2 { color: #fff; font-size: 1.3rem; font-weight: 700; margin: 0 0 4px; position: relative; z-index: 1;}
-.history-header p  { color: rgba(255,255,255,.8); font-size: .85rem; margin: 0; position: relative; z-index: 1;}
-
-/* ===== SECTION BODY ===== */
-.section-body { padding: 20px 16px 0; margin-top: -20px; position: relative; z-index: 10; }
-
-/* ===== HISTORY CARDS ===== */
-.hist-card {
-    background: #fff;
-    border-radius: 16px;
-    padding: 16px;
-    margin-bottom: 12px;
-    box-shadow: 0 4px 12px rgba(0,0,0,.04);
-    border: 1px solid rgba(0,0,0,.03);
-    display: flex; gap: 14px; align-items: flex-start;
-    transition: transform .15s, box-shadow .15s;
-}
-.hist-card:active { transform: scale(.98); }
-
-/* Thumb */
-.hist-thumb {
-    width: 60px; height: 60px; border-radius: 14px;
-    background: #f1f5f9;
-    display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0; overflow: hidden;
-    color: #cbd5e1; font-size: 1.6rem;
-}
-.hist-thumb img { width: 100%; height: 100%; object-fit: cover; }
-
-/* Content */
-.hist-content { flex: 1; min-width: 0; }
-.hist-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 4px; gap: 8px;}
-.hist-title {
-    font-size: .95rem; font-weight: 700; color: #1e293b; margin: 0;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.hist-item { font-size: .75rem; color: #64748b; margin: 0 0 6px; }
-
-/* Dates */
-.hist-dates {
-    display: flex; flex-direction: column; gap: 3px;
-    padding: 8px; background: #f8fafc; border-radius: 8px;
-    margin-bottom: 10px;
-}
-.date-row { display: flex; justify-content: space-between; font-size: .72rem; }
-.date-row span { color: #64748b; }
-.date-row strong { color: #475569; font-weight: 600; }
-
-/* Status Badge & Actions */
-.hist-footer { display: flex; justify-content: space-between; align-items: center; }
-
-.status-badge {
-    display: inline-flex; align-items: center; gap: 6px;
-    padding: 6px 12px; border-radius: 20px;
-    font-size: .75rem; font-weight: 700;
-}
-.status-badge i { font-size: .8rem; }
-
-/* สีของ Status */
-.status-returned { background: #dcfce7; color: #16a34a; }
-.status-pending  { background: #fef9c3; color: #ca8a04; }
-.status-rejected { background: #f1f5f9; color: #64748b; }
-.status-cancelled { background: #fee2e2; color: #dc2626; }
-
-.btn-cancel {
-    background: transparent; color: #dc2626;
-    border: 1px solid #fecaca; border-radius: 8px;
-    padding: 5px 12px; font-size: .75rem; font-weight: 600;
-    cursor: pointer; transition: all .2s;
-}
-.btn-cancel:hover { background: #fee2e2; }
-
-/* Empty state */
-.empty-state {
-    text-align: center; padding: 40px 20px;
-    background: #fff; border-radius: 18px;
-    box-shadow: 0 4px 12px rgba(0,0,0,.04);
-}
-.empty-state i { font-size: 3rem; color: #cbd5e1; margin-bottom: 12px; }
-.empty-state p { color: #64748b; font-size: .9rem; margin: 0 0 16px; }
-.btn-primary-sm {
-    display: inline-block; padding: 8px 16px;
-    background: #0052CC; color: #fff; border-radius: 10px;
-    text-decoration: none; font-size: .85rem; font-weight: 600;
-}
-
-/* ===== DARK MODE OVERRIDES ===== */
-body.dark-mode .hist-card { background: #162040; border-color: rgba(255,255,255,.05); box-shadow: 0 4px 12px rgba(0,0,0,.2); }
-body.dark-mode .hist-thumb { background: #0f1a35; color: #334155; }
-body.dark-mode .hist-title { color: #e2e8f0; }
-body.dark-mode .hist-item { color: #94a3b8; }
-body.dark-mode .hist-dates { background: rgba(255,255,255,.03); }
-body.dark-mode .date-row span { color: #94a3b8; }
-body.dark-mode .date-row strong { color: #cbd5e1; }
-
-body.dark-mode .status-returned { background: rgba(22,163,74,.2); color: #60a5fa; }
-body.dark-mode .status-pending  { background: rgba(202,138,4,.2); color: #facc15; }
-body.dark-mode .status-rejected { background: rgba(100,116,139,.2); color: #94a3b8; }
-body.dark-mode .status-cancelled{ background: rgba(220,38,38,.2); color: #f87171; }
-
-body.dark-mode .btn-cancel { border-color: rgba(220,38,38,.4); color: #f87171; }
-body.dark-mode .btn-cancel:hover { background: rgba(220,38,38,.15); }
-body.dark-mode .empty-state { background: #162040; }
-</style>
-
-<div class="page-wrap">
-    
-    <div class="history-header">
-        <h2><i class="fas fa-history" style="margin-right:8px;"></i>ประวัติคำขอ</h2>
-        <p>รายการที่คุณเคยส่งคำขอยืม ปฏิเสธ และคืนแล้ว</p>
+<?php if (empty($history)): ?>
+<div class="bg-white rounded-[2rem] p-10 border border-slate-100 shadow-sm text-center">
+    <div class="w-16 h-16 mx-auto mb-3 rounded-2xl bg-slate-50 text-slate-400 flex items-center justify-center text-2xl">
+        <i class="fa-solid fa-clipboard-list"></i>
     </div>
+    <p class="text-sm font-black text-slate-900 mb-1">ยังไม่มีประวัติการทำรายการ</p>
+    <a href="borrow.php" class="inline-flex items-center gap-2 mt-4 h-12 px-6 rounded-2xl bg-[#2e9e63] text-white font-black text-sm shadow-[0_10px_20px_rgba(46,158,99,0.25)] active:scale-95 transition-all">
+        <i class="fa-solid fa-plus"></i> ไปยืมอุปกรณ์
+    </a>
+</div>
+<?php else: ?>
 
-    <div class="section-body">
-        <?php if (!empty($history_error)): ?>
-            <div style="background:#fee2e2; color:#991b1b; padding:12px; border-radius:12px; margin-bottom:16px; font-size:.85rem; font-weight:600;">
-                <?= htmlspecialchars($history_error) ?>
-            </div>
-        <?php endif; ?>
-
-        <?php if (empty($history)): ?>
-            <div class="empty-state">
-                <i class="fas fa-clipboard-list"></i>
-                <p>คุณยังไม่มีประวัติการทำรายการ</p>
-                <a href="borrow.php" class="btn-primary-sm">ไปยืมอุปกรณ์กันเลย</a>
-            </div>
-        <?php else: ?>
-            <?php foreach ($history as $row): 
-                
-                // กำหนดสถานะ UI
-                $status       = $row['status'];
-                $app_status   = $row['approval_status'];
-                
-                $badgeClass = '';
-                $badgeText  = '';
-                $badgeIcon  = '';
-                $isPending  = false;
-
-                if ($status === 'returned') {
-                    $badgeClass = 'status-returned';
-                    $badgeText  = 'คืนแล้ว';
-                    $badgeIcon  = 'fa-check-circle';
-                } elseif ($app_status === 'pending') {
-                    $badgeClass = 'status-pending';
-                    $badgeText  = 'รอดำเนินการ';
-                    $badgeIcon  = 'fa-hourglass-half';
-                    $isPending  = true;
-                } elseif ($app_status === 'rejected') {
-                    $badgeClass = 'status-rejected';
-                    $badgeText  = 'ถูกปฏิเสธ/ยกเลิก';
-                    $badgeIcon  = 'fa-ban';
-                } elseif ($status === 'cancelled') {
-                    $badgeClass = 'status-cancelled';
-                    $badgeText  = 'ยกเลิกแล้ว';
-                    $badgeIcon  = 'fa-times-circle';
-                } else {
-                    $badgeClass = 'status-rejected';
-                    $badgeText  = 'ไม่ทราบสถานะ';
-                    $badgeIcon  = 'fa-question-circle';
-                }
-
-                // สลับชื่อ (เน้น item ถ้ามี ไม่งั้นใช้ type)
-                $displayName = !empty($row['eq_name']) ? $row['eq_name'] : $row['type_name'];
-                $displayType = !empty($row['eq_name']) ? $row['type_name'] : 'ประเภทอุปกรณ์';
-            ?>
-                
-            <div class="hist-card">
-                <div class="hist-thumb">
-                    <?php if (!empty($row['image_url'])): ?>
-                        <img src="<?= htmlspecialchars($row['image_url']) ?>" alt="img" onerror="this.style.display='none';">
-                    <?php else: ?>
-                        <i class="fas fa-stethoscope"></i>
-                    <?php endif; ?>
-                </div>
-
-                <div class="hist-content">
-                    <div class="hist-header">
-                        <div style="min-width:0;">
-                            <h3 class="hist-title" title="<?= htmlspecialchars($displayName) ?>"><?= htmlspecialchars($displayName) ?></h3>
-                            <p class="hist-item"><?= htmlspecialchars($displayType) ?></p>
-                        </div>
-                    </div>
-
-                    <div class="hist-dates">
-                        <div class="date-row">
-                            <span>วันที่ส่งคำขอ</span>
-                            <strong><?= date('d/m/Y H:i', strtotime($row['borrow_date'])) ?></strong>
-                        </div>
-                        <?php if ($status === 'returned' && $row['return_date']): ?>
-                            <div class="date-row">
-                                <span>วันที่คืน</span>
-                                <strong style="color:#16a34a;"><?= date('d/m/Y H:i', strtotime($row['return_date'])) ?></strong>
-                            </div>
-                        <?php endif; ?>
-                    </div>
-
-                    <div class="hist-footer">
-                        <div class="status-badge <?= $badgeClass ?>">
-                            <i class="fas <?= $badgeIcon ?>"></i> <?= $badgeText ?>
-                        </div>
-
-                        <?php if ($isPending): ?>
-                            <button type="button" class="btn-cancel" onclick="confirmCancelRequest(<?= $row['id'] ?>)">
-                                ยกเลิก
-                            </button>
-                        <?php endif; ?>
-                    </div>
-                </div>
-            </div>
-
-            <?php endforeach; ?>
-        <?php endif; ?>
-    </div>
+<div class="flex items-center justify-between mb-3 px-1">
+    <p class="text-[11px] font-black text-slate-500">หน้า <?= $page ?> / <?= $totalPages ?> · รวม <?= number_format($total) ?> รายการ</p>
 </div>
 
-<script src="//cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-<script src="assets/js/student_app.js"></script>
+<div class="space-y-3">
+<?php foreach ($history as $row):
+    $status     = $row['status'];
+    $app_status = $row['approval_status'];
+
+    $badgeClass = 'bg-slate-100 text-slate-600 border-slate-200';
+    $accent     = 'bg-slate-300';
+    $badgeText  = 'ไม่ทราบสถานะ';
+    $badgeIcon  = 'fa-question-circle';
+    $isPending  = false;
+
+    if ($status === 'returned') {
+        $badgeClass = 'bg-emerald-50 text-emerald-700 border-emerald-100';
+        $accent     = 'bg-emerald-500';
+        $badgeText  = 'คืนแล้ว';
+        $badgeIcon  = 'fa-circle-check';
+    } elseif ($app_status === 'pending') {
+        $badgeClass = 'bg-amber-50 text-amber-700 border-amber-100';
+        $accent     = 'bg-amber-400';
+        $badgeText  = 'รอดำเนินการ';
+        $badgeIcon  = 'fa-hourglass-half';
+        $isPending  = true;
+    } elseif ($app_status === 'rejected') {
+        $badgeClass = 'bg-slate-100 text-slate-600 border-slate-200';
+        $accent     = 'bg-slate-400';
+        $badgeText  = 'ถูกปฏิเสธ';
+        $badgeIcon  = 'fa-ban';
+    } elseif ($status === 'cancelled') {
+        $badgeClass = 'bg-rose-50 text-rose-700 border-rose-100';
+        $accent     = 'bg-rose-500';
+        $badgeText  = 'ยกเลิกแล้ว';
+        $badgeIcon  = 'fa-circle-xmark';
+    }
+
+    $displayName = !empty($row['eq_name']) ? $row['eq_name'] : $row['type_name'];
+    $displayType = !empty($row['eq_name']) ? $row['type_name'] : 'ประเภทอุปกรณ์';
+?>
+<div class="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden flex">
+    <div class="w-1 <?= $accent ?> shrink-0"></div>
+    <div class="p-4 flex-1 min-w-0">
+        <div class="flex items-start gap-3 mb-3">
+            <div class="w-12 h-12 rounded-xl bg-slate-50 flex items-center justify-center shrink-0 overflow-hidden">
+                <?php if (!empty($row['image_url'])): ?>
+                    <img src="<?= htmlspecialchars($row['image_url']) ?>" alt="" class="w-full h-full object-cover" onerror="this.outerHTML='<i class=\'fa-solid fa-stethoscope text-slate-300\'></i>'">
+                <?php else: ?>
+                    <i class="fa-solid fa-stethoscope text-slate-300"></i>
+                <?php endif; ?>
+            </div>
+            <div class="min-w-0 flex-1">
+                <p class="text-sm font-black text-slate-900 truncate" title="<?= htmlspecialchars($displayName) ?>"><?= htmlspecialchars($displayName) ?></p>
+                <p class="text-[11px] font-bold text-slate-400"><?= htmlspecialchars($displayType) ?></p>
+            </div>
+        </div>
+
+        <div class="bg-slate-50 rounded-xl px-3 py-2 mb-3 space-y-1">
+            <div class="flex justify-between text-[11px]">
+                <span class="text-slate-400 font-bold">ส่งคำขอ</span>
+                <strong class="text-slate-700 font-black"><?= date('d/m/Y H:i', strtotime($row['borrow_date'])) ?></strong>
+            </div>
+            <?php if ($status === 'returned' && $row['return_date']): ?>
+            <div class="flex justify-between text-[11px]">
+                <span class="text-slate-400 font-bold">คืนเมื่อ</span>
+                <strong class="text-emerald-600 font-black"><?= date('d/m/Y H:i', strtotime($row['return_date'])) ?></strong>
+            </div>
+            <?php endif; ?>
+        </div>
+
+        <div class="flex items-center justify-between">
+            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-[10px] font-black <?= $badgeClass ?>">
+                <i class="fa-solid <?= $badgeIcon ?> text-[9px]"></i><?= $badgeText ?>
+            </span>
+            <?php if ($isPending): ?>
+            <button type="button" onclick="confirmCancelRequest(<?= (int)$row['id'] ?>)"
+                class="px-3 py-1.5 rounded-xl bg-rose-50 text-rose-600 text-[11px] font-black border border-rose-100 active:scale-95 transition-all">
+                ยกเลิก
+            </button>
+            <?php endif; ?>
+        </div>
+    </div>
+</div>
+<?php endforeach; ?>
+</div>
+
+<?php if ($totalPages > 1): ?>
+<div class="flex flex-wrap justify-center gap-2 mt-5">
+    <?php
+    $btn = function (string $label, int $target, bool $disabled = false, bool $active = false) use ($page) {
+        $base = 'min-w-9 h-9 px-3 rounded-xl text-xs font-black flex items-center justify-center transition-all';
+        if ($active) return "<span class='{$base} bg-[#2e9e63] text-white'>{$label}</span>";
+        if ($disabled) return "<span class='{$base} bg-white border border-slate-200 text-slate-300 opacity-50 cursor-not-allowed'>{$label}</span>";
+        return "<a href='?page={$target}' class='{$base} bg-white border border-slate-200 text-slate-500 hover:border-[#2e9e63] hover:text-[#2e9e63]'>{$label}</a>";
+    };
+    echo $btn('&laquo;', 1, $page === 1);
+    echo $btn('&lsaquo;', max(1, $page - 1), $page === 1);
+    for ($i = max(1, $page - 2); $i <= min($totalPages, $page + 2); $i++) {
+        echo $btn((string) $i, $i, false, $i === $page);
+    }
+    echo $btn('&rsaquo;', min($totalPages, $page + 1), $page === $totalPages);
+    echo $btn('&raquo;', $totalPages, $page === $totalPages);
+    ?>
+</div>
+<?php endif; ?>
+
+<?php endif; ?>
 
 <script>
 function confirmCancelRequest(transactionId) {
@@ -280,7 +187,7 @@ function confirmCancelRequest(transactionId) {
         icon: 'warning',
         showCancelButton: true,
         confirmButtonColor: '#dc2626',
-        cancelButtonColor: '#6b7280',
+        cancelButtonColor: '#94a3b8',
         confirmButtonText: 'ยืนยัน ยกเลิก',
         cancelButtonText: 'ไม่ยกเลิก',
     }).then((result) => {
