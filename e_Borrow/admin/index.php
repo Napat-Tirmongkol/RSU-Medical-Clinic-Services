@@ -453,68 +453,64 @@ include('../includes/header.php');
                             </div>
                         <?php else: ?>
                             <?php foreach ($pending_requests as $req): ?>
-                                <div
-                                    class="group flex flex-col md:flex-row md:items-center justify-between p-4 rounded-2xl bg-white border border-gray-100 shadow-sm hover:border-amber-200 hover:shadow-md transition-all gap-3">
-
-                                    <div class="flex items-start gap-3 flex-1 w-full min-w-0">
-                                        <div
-                                            class="w-11 h-11 rounded-xl bg-amber-50 text-amber-500 flex items-center justify-center flex-shrink-0">
-                                            <i class="fas fa-hourglass-half"></i>
+                                <div class="rounded-2xl bg-white border border-gray-100 shadow-sm hover:border-amber-200 hover:shadow-md transition-all p-3 sm:p-4">
+                                    <!-- Title row: icon + name (always full width) -->
+                                    <div class="flex items-center gap-3 min-w-0">
+                                        <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-500 flex items-center justify-center flex-shrink-0">
+                                            <i class="fas fa-hourglass-half text-sm"></i>
                                         </div>
-                                        <div class="min-w-0 flex-1">
-                                            <h4 lang="th" style="word-break:keep-all;overflow-wrap:anywhere"
-                                                class="font-black text-gray-900 text-[15px] leading-tight">
-                                                <?php echo htmlspecialchars($req['equipment_name']); ?>
-                                            </h4>
-                                            <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5 text-[12px]">
-                                                <span class="text-gray-500 inline-flex items-center gap-1 min-w-0">
-                                                    <i class="fas fa-user-circle text-gray-400 shrink-0"></i>
-                                                    <strong lang="th" style="word-break:keep-all"
-                                                        class="text-gray-700 font-bold truncate"><?php echo htmlspecialchars($req['student_name'] ?? '-'); ?></strong>
-                                                </span>
-                                                <span class="text-gray-500 inline-flex items-center gap-1 whitespace-nowrap">
-                                                    <i class="fas fa-calendar-alt text-gray-400"></i>
-                                                    <strong class="text-gray-700 font-bold"><?php echo date('d/m/Y', strtotime($req['due_date'])); ?></strong>
-                                                </span>
-                                            </div>
-
-                                            <!-- Subactions -->
-                                            <div class="mt-2 flex flex-wrap gap-2 text-[11px]">
-                                                <button type="button"
-                                                    class="font-bold text-blue-600 hover:text-blue-700 inline-flex items-center gap-1 active:scale-95 transition-all"
-                                                    onclick="openDetailModal(this)"
-                                                    data-item="<?php echo htmlspecialchars($req['equipment_name']); ?>"
-                                                    data-serial="<?php echo htmlspecialchars($req['serial_number'] ?? '-'); ?>"
-                                                    data-requester="<?php echo htmlspecialchars($req['student_name'] ?? '-'); ?>"
-                                                    data-borrow="<?php echo date('d/m/Y', strtotime($req['borrow_date'])); ?>"
-                                                    data-due="<?php echo date('d/m/Y', strtotime($req['due_date'])); ?>"
-                                                    data-reason="<?php echo htmlspecialchars($req['reason_for_borrowing']); ?>"
-                                                    data-attachment="<?php echo htmlspecialchars($req['attachment_url'] ?? ''); ?>">
-                                                    <i class="fas fa-search-plus"></i>รายละเอียด
-                                                </button>
-                                                <?php if (!empty($req['attachment_url'])): ?>
-                                                    <a href="<?php echo htmlspecialchars($req['attachment_url']); ?>"
-                                                        target="_blank"
-                                                        class="font-bold text-emerald-600 hover:text-emerald-700 inline-flex items-center gap-1 active:scale-95 transition-all">
-                                                        <i class="fas fa-paperclip"></i>แฟ้มแนบ
-                                                    </a>
-                                                <?php endif; ?>
-                                            </div>
-                                        </div>
+                                        <h4 title="<?php echo htmlspecialchars($req['equipment_name']); ?>"
+                                            class="font-black text-gray-900 text-[14px] leading-tight truncate flex-1 min-w-0">
+                                            <?php echo htmlspecialchars($req['equipment_name']); ?>
+                                        </h4>
                                     </div>
 
-                                    <!-- CTA Actions: stack vertical < md, horizontal at md+ -->
-                                    <div
-                                        class="flex flex-row md:flex-col items-stretch gap-2 flex-shrink-0 w-full md:w-auto md:min-w-[112px] border-t md:border-t-0 border-gray-100 pt-3 md:pt-0 md:pl-4 md:border-l">
+                                    <!-- Meta row -->
+                                    <div class="mt-2 grid grid-cols-1 gap-1 text-[12px] min-w-0">
+                                        <span class="text-gray-500 inline-flex items-center gap-1.5 min-w-0">
+                                            <i class="fas fa-user-circle text-gray-400 shrink-0"></i>
+                                            <strong title="<?php echo htmlspecialchars($req['student_name'] ?? '-'); ?>"
+                                                class="text-gray-700 font-bold truncate min-w-0"><?php echo htmlspecialchars($req['student_name'] ?? '-'); ?></strong>
+                                        </span>
+                                        <span class="text-gray-500 inline-flex items-center gap-1.5 whitespace-nowrap">
+                                            <i class="fas fa-calendar-alt text-gray-400 shrink-0"></i>
+                                            <span>กำหนดคืน <strong class="text-gray-700 font-bold"><?php echo date('d/m/Y', strtotime($req['due_date'])); ?></strong></span>
+                                        </span>
+                                    </div>
+
+                                    <!-- Subaction links -->
+                                    <div class="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px]">
+                                        <button type="button"
+                                            class="whitespace-nowrap font-bold text-blue-600 hover:text-blue-700 inline-flex items-center gap-1 active:scale-95 transition-all"
+                                            onclick="openDetailModal(this)"
+                                            data-item="<?php echo htmlspecialchars($req['equipment_name']); ?>"
+                                            data-serial="<?php echo htmlspecialchars($req['serial_number'] ?? '-'); ?>"
+                                            data-requester="<?php echo htmlspecialchars($req['student_name'] ?? '-'); ?>"
+                                            data-borrow="<?php echo date('d/m/Y', strtotime($req['borrow_date'])); ?>"
+                                            data-due="<?php echo date('d/m/Y', strtotime($req['due_date'])); ?>"
+                                            data-reason="<?php echo htmlspecialchars($req['reason_for_borrowing']); ?>"
+                                            data-attachment="<?php echo htmlspecialchars($req['attachment_url'] ?? ''); ?>">
+                                            <i class="fas fa-search-plus"></i>รายละเอียด
+                                        </button>
+                                        <?php if (!empty($req['attachment_url'])): ?>
+                                            <a href="<?php echo htmlspecialchars($req['attachment_url']); ?>" target="_blank"
+                                                class="whitespace-nowrap font-bold text-emerald-600 hover:text-emerald-700 inline-flex items-center gap-1 active:scale-95 transition-all">
+                                                <i class="fas fa-paperclip"></i>แฟ้มแนบ
+                                            </a>
+                                        <?php endif; ?>
+                                    </div>
+
+                                    <!-- CTA actions: always horizontal full-width at the bottom -->
+                                    <div class="mt-3 pt-3 border-t border-gray-100 grid grid-cols-2 gap-2">
                                         <button
-                                            class="flex-1 md:flex-none bg-emerald-500 text-white hover:bg-emerald-600 rounded-xl px-4 py-2.5 text-[13px] font-black shadow-sm shadow-emerald-500/20 transition-all flex items-center justify-center gap-1.5 active:scale-95"
+                                            class="bg-emerald-500 text-white hover:bg-emerald-600 rounded-xl px-3 py-2.5 text-[13px] font-black shadow-sm shadow-emerald-500/20 transition-all flex items-center justify-center gap-1.5 active:scale-95"
                                             onclick="openApproveSelectionModal(<?php echo $req['transaction_id']; ?>, <?php echo $req['item_id'] ?? 0; ?>, '<?php echo htmlspecialchars($req['equipment_name'], ENT_QUOTES); ?>')">
-                                            <i class="fas fa-check"></i>อนุมัติ
+                                            <i class="fas fa-check"></i><span>อนุมัติ</span>
                                         </button>
                                         <button
-                                            class="flex-1 md:flex-none bg-white border border-gray-200 text-gray-500 hover:border-rose-300 hover:text-rose-500 rounded-xl px-4 py-2.5 text-[13px] font-bold transition-all flex items-center justify-center gap-1.5 active:scale-95"
+                                            class="bg-white border border-gray-200 text-gray-500 hover:border-rose-300 hover:text-rose-500 rounded-xl px-3 py-2.5 text-[13px] font-bold transition-all flex items-center justify-center gap-1.5 active:scale-95"
                                             onclick="openRejectPopup(<?php echo $req['transaction_id']; ?>)">
-                                            <i class="fas fa-times"></i>ปฏิเสธ
+                                            <i class="fas fa-times"></i><span>ปฏิเสธ</span>
                                         </button>
                                     </div>
                                 </div>
@@ -552,36 +548,36 @@ include('../includes/header.php');
                                 $days_overdue = max(0, (int) $item['days_overdue']);
                                 $fine = $days_overdue * (defined('FINE_RATE_PER_DAY') ? FINE_RATE_PER_DAY : 0);
                                 ?>
-                                <div
-                                    class="group flex flex-col md:flex-row md:items-center justify-between p-4 rounded-2xl bg-white border border-rose-100 hover:border-rose-200 hover:shadow-md transition-all gap-3">
-                                    <div class="flex items-start gap-3 flex-1 w-full min-w-0">
-                                        <div
-                                            class="w-11 h-11 rounded-xl bg-rose-50 text-rose-500 border border-rose-100 flex items-center justify-center flex-shrink-0">
-                                            <i class="fas fa-calendar-times"></i>
+                                <div class="rounded-2xl bg-white border border-rose-100 hover:border-rose-200 hover:shadow-md transition-all p-3 sm:p-4">
+                                    <!-- Title row -->
+                                    <div class="flex items-center gap-3 min-w-0">
+                                        <div class="w-10 h-10 rounded-xl bg-rose-50 text-rose-500 border border-rose-100 flex items-center justify-center flex-shrink-0">
+                                            <i class="fas fa-calendar-times text-sm"></i>
                                         </div>
-                                        <div class="min-w-0 flex-1">
-                                            <h4 lang="th" style="word-break:keep-all;overflow-wrap:anywhere"
-                                                class="font-black text-gray-900 text-[15px] leading-tight">
-                                                <?php echo htmlspecialchars($item['equipment_name']); ?>
-                                            </h4>
-                                            <p class="text-[12px] text-gray-500 mt-1 flex items-center gap-1 min-w-0">
-                                                <i class="fas fa-user-circle text-gray-400 shrink-0"></i>
-                                                <span lang="th" style="word-break:keep-all"
-                                                    class="text-gray-700 font-bold truncate"><?php echo htmlspecialchars($item['student_name'] ?? '-'); ?></span>
-                                            </p>
-                                            <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-[12px]">
-                                                <span class="text-gray-500 inline-flex items-center gap-1 whitespace-nowrap">
-                                                    <i class="fas fa-phone-alt text-gray-400"></i>
-                                                    <?php echo htmlspecialchars($item['phone_number'] ?? '-'); ?>
-                                                </span>
-                                                <span class="font-black text-rose-600 inline-flex items-center gap-1 whitespace-nowrap">
-                                                    <i class="fas fa-clock"></i>เลยกำหนด <?php echo $days_overdue; ?> วัน
-                                                </span>
-                                            </div>
-                                        </div>
+                                        <h4 title="<?php echo htmlspecialchars($item['equipment_name']); ?>"
+                                            class="font-black text-gray-900 text-[14px] leading-tight truncate flex-1 min-w-0">
+                                            <?php echo htmlspecialchars($item['equipment_name']); ?>
+                                        </h4>
                                     </div>
-                                    <div
-                                        class="flex-shrink-0 border-t md:border-t-0 md:border-l border-rose-100 pt-3 md:pt-0 md:pl-4 w-full md:w-auto md:min-w-[140px]">
+
+                                    <!-- Meta -->
+                                    <div class="mt-2 grid grid-cols-1 gap-1 text-[12px] min-w-0">
+                                        <span class="text-gray-500 inline-flex items-center gap-1.5 min-w-0">
+                                            <i class="fas fa-user-circle text-gray-400 shrink-0"></i>
+                                            <strong title="<?php echo htmlspecialchars($item['student_name'] ?? '-'); ?>"
+                                                class="text-gray-700 font-bold truncate min-w-0"><?php echo htmlspecialchars($item['student_name'] ?? '-'); ?></strong>
+                                        </span>
+                                        <span class="text-gray-500 inline-flex items-center gap-1.5 whitespace-nowrap">
+                                            <i class="fas fa-phone-alt text-gray-400 shrink-0"></i>
+                                            <?php echo htmlspecialchars($item['phone_number'] ?? '-'); ?>
+                                        </span>
+                                        <span class="font-black text-rose-600 inline-flex items-center gap-1.5 whitespace-nowrap">
+                                            <i class="fas fa-clock shrink-0"></i>เลยกำหนด <?php echo $days_overdue; ?> วัน
+                                        </span>
+                                    </div>
+
+                                    <!-- CTA: full-width at bottom -->
+                                    <div class="mt-3 pt-3 border-t border-rose-100">
                                         <button
                                             class="w-full bg-amber-500 hover:bg-amber-600 text-white rounded-xl px-3 py-2.5 text-[12px] font-black shadow-sm shadow-amber-500/20 transition-all flex items-center gap-1.5 justify-center active:scale-95"
                                             onclick="openFineAndReturnPopup(
@@ -590,7 +586,7 @@ include('../includes/header.php');
                                                 '<?php echo htmlspecialchars(addslashes($item['equipment_name'])); ?>',
                                                 <?php echo $days_overdue; ?>, <?php echo $fine; ?>, <?php echo $item['equipment_id']; ?>
                                             )">
-                                            <i class="fas fa-coins text-[10px]"></i>คืน / ชำระค่าปรับ
+                                            <i class="fas fa-coins text-[10px]"></i><span class="whitespace-nowrap">คืน / ชำระค่าปรับ</span>
                                         </button>
                                     </div>
                                 </div>
