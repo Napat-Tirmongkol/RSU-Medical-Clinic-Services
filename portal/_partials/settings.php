@@ -388,19 +388,14 @@ $whitelistText      = implode("\n", $whitelistArr);
             document.querySelectorAll('.stg-tab').forEach(btn => {
                 btn.addEventListener('click', () => switchSettingsTab(btn.dataset.tab));
             });
-            // Only auto-switch (which mutates URL) when settings is the
-            // currently active section. Otherwise just paint the default
-            // tab so the markup is in a sensible state if the user navigates
-            // here later, but leave the URL untouched — it belongs to
-            // whichever section the user is currently viewing (e.g.
-            // ?section=clinic_data&cd_page=3).
-            const sp = new URLSearchParams(location.search);
-            const initial = sp.get('tab') || 'system';
-            if (sp.get('section') === 'settings') {
-                switchSettingsTab(initial);
-            } else {
-                paintSettingsTab(initial);
-            }
+            // Init NEVER mutates URL — settings.php is included in the
+            // single-page portal even when another section is active,
+            // so any history mutation here would clobber the real URL
+            // (e.g. ?section=clinic_data&cd_page=3 → ?section=settings).
+            // Just paint the default tab; URL mutation only happens on
+            // an actual user click via switchSettingsTab().
+            const initial = new URLSearchParams(location.search).get('tab') || 'system';
+            paintSettingsTab(initial);
         });
 
         // Expose for external deep-linking
