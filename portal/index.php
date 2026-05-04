@@ -536,7 +536,7 @@ try {
         rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="stylesheet" href="../assets/css/tailwind.min.css">
-    <link rel="stylesheet" href="../assets/css/portal.css?v=<?= defined('APP_VERSION') ? APP_VERSION : time() ?>">
+    <link rel="stylesheet" href="../assets/css/portal.css?v=<?= @filemtime(__DIR__ . '/../assets/css/portal.css') ?: (defined('APP_BUILD') ? APP_BUILD : time()) ?>">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
         /* ── Toggle Switch (Maintenance Mode) ──────────────────────────────── */
