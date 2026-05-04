@@ -938,6 +938,15 @@ try {
 
             <div style="flex:1"></div> <!-- Spacer to push settings to bottom -->
 
+            <?php /* ── ข้อมูลหลัก (Master Data) ─────────────────────────── */ ?>
+            <?php if (!$registryOnly && $hasSiteSet): ?>
+                <div class="psb-section-label">ข้อมูลหลัก</div>
+                <button class="psb-item <?= $activeSection==='clinic_data'?'psb-active':'' ?>" data-section="clinic_data" onclick="switchSection('clinic_data',this)">
+                    <div class="psb-icon"><i class="fa-solid fa-hospital" style="color:#0d9488"></i></div>
+                    <span class="psb-label" style="color:#0f766e;font-weight:900">ข้อมูลคลินิก</span>
+                </button>
+            <?php endif; ?>
+
             <?php /* ── ตั้งค่า (ล่างสุด) ─────────────────────────────────── */ ?>
             <?php if (!$registryOnly && $hasSiteSet): ?>
                 <div class="psb-section-label">ตั้งค่า</div>
