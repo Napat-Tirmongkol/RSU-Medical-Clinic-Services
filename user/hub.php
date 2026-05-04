@@ -718,18 +718,47 @@ $heroThemes = [
             });
         });
 
-        // ── Open borrow modals via URL hash (for redirects from e_Borrow) ─
+        // ── Tab switcher (Today / Records / Services) ────────────────────
+        function switchTab(name) {
+            const valid = ['today', 'records', 'services'];
+            if (!valid.includes(name)) name = 'today';
+
+            document.querySelectorAll('[data-tab-pane]').forEach(pane => {
+                pane.classList.toggle('hidden', pane.dataset.tabPane !== name);
+            });
+
+            // Top tab bar styling
+            document.querySelectorAll('[data-tab-btn]').forEach(btn => {
+                const active = btn.dataset.tabBtn === name;
+                btn.classList.toggle('bg-[#2e9e63]', active);
+                btn.classList.toggle('text-white', active);
+                btn.classList.toggle('shadow-sm', active);
+                btn.classList.toggle('text-slate-400', !active);
+            });
+
+            // Bottom nav styling
+            document.querySelectorAll('[data-bottom-tab]').forEach(btn => {
+                const active = btn.dataset.bottomTab === name;
+                btn.classList.toggle('text-green-600', active);
+                btn.classList.toggle('scale-110', active);
+                btn.classList.toggle('text-slate-300', !active);
+            });
+
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        // ── Open borrow modals + tabs via URL hash (deep-link) ──────────
         document.addEventListener('DOMContentLoaded', () => {
+            switchTab('today'); // initial state
             const hash = (window.location.hash || '').toLowerCase();
             if (!hash) return;
-            // Strip hash from URL so refresh doesn't re-trigger
             history.replaceState(null, '', window.location.pathname + window.location.search);
             if (hash === '#borrow-flow') showBorrowFlow();
             else if (hash === '#borrow-history') showBorrowHistory();
             else if (hash === '#borrow') showBorrow();
             else if (hash === '#camps') showCampaigns();
-            else if (hash === '#records') document.getElementById('records-section')?.scrollIntoView({behavior:'smooth'});
-            else if (hash === '#services') document.getElementById('services-section')?.scrollIntoView({behavior:'smooth'});
+            else if (hash === '#records') switchTab('records');
+            else if (hash === '#services') switchTab('services');
         });
 
         // ── Borrow History modal ─────────────────────────────────────────
@@ -1196,8 +1225,24 @@ $heroThemes = [
                 </div>
             </div>
 
+            <!-- ── Tab Switcher (matches bottom nav) ── -->
+            <div class="bg-white rounded-2xl border border-slate-100 shadow-sm p-1.5 flex gap-1" role="tablist">
+                <button type="button" role="tab" data-tab-btn="today" onclick="switchTab('today')"
+                    class="tab-btn flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[12px] font-black transition-all">
+                    <i class="fa-solid fa-house-chimney text-[11px]"></i>วันนี้
+                </button>
+                <button type="button" role="tab" data-tab-btn="records" onclick="switchTab('records')"
+                    class="tab-btn flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[12px] font-black transition-all">
+                    <i class="fa-solid fa-folder-open text-[11px]"></i>สุขภาพ
+                </button>
+                <button type="button" role="tab" data-tab-btn="services" onclick="switchTab('services')"
+                    class="tab-btn flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[12px] font-black transition-all">
+                    <i class="fa-solid fa-grip text-[11px]"></i>บริการ
+                </button>
+            </div>
+
             <!-- ── Group A: วันนี้ของคุณ (Smart Hero + Quick Stats) ── -->
-            <section id="today-section" aria-label="วันนี้ของคุณ" class="space-y-4">
+            <section id="today-section" data-tab-pane="today" aria-label="วันนี้ของคุณ" class="tab-pane space-y-4">
                 <div class="flex items-center justify-between px-1">
                     <h3 class="text-slate-900 font-black text-sm uppercase tracking-widest">วันนี้ของคุณ</h3>
                     <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Today</p>
@@ -1268,7 +1313,7 @@ $heroThemes = [
             </section>
 
             <!-- ── Group B: สุขภาพของฉัน (Records) ── -->
-            <section id="records-section" aria-label="สุขภาพของฉัน" class="space-y-4">
+            <section id="records-section" data-tab-pane="records" aria-label="สุขภาพของฉัน" class="tab-pane hidden space-y-4">
                 <div class="flex items-center justify-between px-1">
                     <h3 class="text-slate-900 font-black text-sm uppercase tracking-widest">สุขภาพของฉัน</h3>
                     <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Records</p>
@@ -1343,7 +1388,7 @@ $heroThemes = [
             </section>
 
             <!-- ── Group C: บริการ (Services) ── -->
-            <section id="services-section" aria-label="บริการ" class="space-y-4">
+            <section id="services-section" data-tab-pane="services" aria-label="บริการ" class="tab-pane hidden space-y-4">
                 <div class="flex items-center justify-between px-1">
                     <h3 class="text-slate-900 font-black text-sm uppercase tracking-widest">บริการ</h3>
                     <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Services</p>
@@ -1877,13 +1922,13 @@ document.getElementById('insDetailModal').addEventListener('click', function(e) 
         <!-- ── Premium Bottom Navigation ── -->
         <nav
             class="fixed bottom-0 left-0 right-0 z-[70] bg-white/90 backdrop-blur-2xl border-t border-slate-50 px-8 py-4 pb-10 flex justify-between items-center max-w-md mx-auto shadow-[0_-20px_40px_rgba(0,0,0,0.04)]">
-            <button onclick="window.scrollTo({top:0,behavior:'smooth'})"
-                class="flex flex-col items-center gap-1.5 text-green-600 transition-all scale-110">
+            <button type="button" data-bottom-tab="today" onclick="switchTab('today')"
+                class="flex flex-col items-center gap-1.5 transition-all">
                 <i class="fa-solid fa-house-chimney text-xl"></i>
                 <span class="text-[8px] font-black uppercase tracking-[0.1em]">Home</span>
             </button>
-            <button onclick="document.getElementById('records-section').scrollIntoView({behavior:'smooth'})"
-                class="flex flex-col items-center gap-1.5 text-slate-300 transition-all hover:text-slate-500">
+            <button type="button" data-bottom-tab="records" onclick="switchTab('records')"
+                class="flex flex-col items-center gap-1.5 transition-all">
                 <i class="fa-solid fa-folder-open text-xl"></i>
                 <span class="text-[8px] font-black uppercase tracking-[0.1em]">Records</span>
             </button>
@@ -1893,8 +1938,8 @@ document.getElementById('insDetailModal').addEventListener('click', function(e) 
                     <i class="fa-solid fa-plus text-2xl -rotate-45 group-hover:scale-125 transition-transform"></i>
                 </button>
             </div>
-            <button onclick="document.getElementById('services-section').scrollIntoView({behavior:'smooth'})"
-                class="flex flex-col items-center gap-1.5 text-slate-300 transition-all hover:text-slate-500">
+            <button type="button" data-bottom-tab="services" onclick="switchTab('services')"
+                class="flex flex-col items-center gap-1.5 transition-all">
                 <i class="fa-solid fa-grip text-xl"></i>
                 <span class="text-[8px] font-black uppercase tracking-[0.1em]">Services</span>
             </button>
