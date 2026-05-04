@@ -406,18 +406,16 @@ include('../includes/header.php');
 
     function onScanSuccess(decodedText) {
         if (scanLock) return; scanLock = true; setTimeout(() => scanLock = false, 1500);
-        
-        if (decodedText.startsWith("MEDLOAN_STUDENT:")) {
-            // กรณีสแกนบัตรนักศึกษา
+
+        // MEMBER: = unified hub QR (member_id-based, works for students/staff/external)
+        // MEDLOAN_STUDENT: = legacy e_Borrow card format (still printed cards in circulation)
+        if (decodedText.startsWith("MEMBER:") || decodedText.startsWith("MEDLOAN_STUDENT:")) {
             const parts = decodedText.split(":");
-            let studentCode = parts[1];
-            let dbId = parts[2] || ''; 
-            
-            // ใส่ค่าลงในช่อง Input ให้เห็นด้วย
+            const studentCode = parts[1] || '';
+            const dbId        = parts[2] || '';
+
             document.getElementById('manual_student_code').value = studentCode;
-            
-            // เรียกฟังก์ชันค้นหาเดียวกับแบบ Manual
-            fetchStudent(studentCode, dbId); 
+            fetchStudent(studentCode, dbId);
         } else {
             // กรณีสแกนของ (EQ-...)
             const itemId = decodedText.replace("EQ-", "");

@@ -495,7 +495,10 @@ $heroThemes = [
                 qrContainer.innerHTML = `<img src="api_qrcode.php?id=${encodeURIComponent(bookingId)}" alt="Booking QR Code" class="w-[180px] h-[180px] object-contain">`;
             } else if (typeof qr === 'undefined' || !qr) {
                 qrContainer.innerHTML = '';
-                qr = new QRCode(qrContainer, { text: "<?= htmlspecialchars($user['member_id'] ?? '') ?>", width: 180, height: 180, colorDark: "#0f172a", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.H });
+                // QR payload format: MEMBER:{member_id}:{db_id}
+                // Scanner can resolve via member_id (preferred) or db_id (fallback).
+                const qrText = "MEMBER:<?= htmlspecialchars($user['member_id'] ?? '') ?>:<?= (int) ($user['id'] ?? 0) ?>";
+                qr = new QRCode(qrContainer, { text: qrText, width: 180, height: 180, colorDark: "#0f172a", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.H });
             }
         }
         function hideQR() { document.getElementById('qr-modal').classList.add('hidden'); }
