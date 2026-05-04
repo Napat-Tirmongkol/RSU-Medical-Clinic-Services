@@ -168,7 +168,7 @@ async function rmAdd(e) {
     e.preventDefault();
     const fd = new FormData(e.target);
     const res = await rmPost('add', Object.fromEntries(fd.entries()));
-    if (res.ok) { showPortalToast(res.message, 'success'); setTimeout(()=>location.reload(),600); }
+    if (res.ok) { showPortalToast(res.message, 'success'); setTimeout(()=>window.location.href = window.location.href,600); }
     else Swal.fire('Error', res.message, 'error');
 }
 async function rmDelete(id, name) {
@@ -180,6 +180,6 @@ async function rmDelete(id, name) {
 }
 async function rmToggle(id) {
     const res = await rmPost('toggle', {id});
-    if (res.ok) location.reload();
+    if (res.ok) window.location.href = window.location.href;
 }
 </script>

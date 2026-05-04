@@ -146,14 +146,14 @@ async function hrAdd(e, type) {
     e.preventDefault();
     const fd = new FormData(e.target);
     const res = await hrPost('add', Object.fromEntries(fd.entries()));
-    if (res.ok) { showPortalToast(res.message, 'success'); setTimeout(()=>location.reload(),500); }
+    if (res.ok) { showPortalToast(res.message, 'success'); setTimeout(()=>window.location.href = window.location.href,500); }
     else Swal.fire('Error', res.message, 'error');
 }
 async function hrDelete(id) {
     const c = await Swal.fire({title:'ลบรายการนี้?', icon:'warning', showCancelButton:true, confirmButtonColor:'#e11d48'});
     if (!c.isConfirmed) return;
     const res = await hrPost('delete', {id});
-    if (res.ok) location.reload();
+    if (res.ok) window.location.href = window.location.href;
     else Swal.fire('Error', res.message, 'error');
 }
 </script>

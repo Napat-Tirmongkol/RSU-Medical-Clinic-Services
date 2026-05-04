@@ -189,7 +189,7 @@ async function msAdd(e) {
     const fd = new FormData(e.target);
     const data = Object.fromEntries(fd.entries());
     const res = await msPost('add', data);
-    if (res.ok) { showPortalToast(res.message, 'success'); setTimeout(() => location.reload(), 600); }
+    if (res.ok) { showPortalToast(res.message, 'success'); setTimeout(() => window.location.href = window.location.href, 600); }
     else Swal.fire('Error', res.message || 'เพิ่มไม่สำเร็จ', 'error');
 }
 async function msDelete(id, name) {
@@ -201,7 +201,7 @@ async function msDelete(id, name) {
 }
 async function msToggle(id, btn) {
     const res = await msPost('toggle', {id});
-    if (res.ok) location.reload();
+    if (res.ok) window.location.href = window.location.href;
     else Swal.fire('Error', res.message, 'error');
 }
 </script>
