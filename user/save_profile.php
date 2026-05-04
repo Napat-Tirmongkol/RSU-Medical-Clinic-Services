@@ -96,6 +96,7 @@ try {
         'emergency_contact_name'     => "VARCHAR(120) NOT NULL DEFAULT ''",
         'emergency_contact_phone'    => "VARCHAR(20)  NOT NULL DEFAULT ''",
         'emergency_contact_relation' => "VARCHAR(50)  NOT NULL DEFAULT ''",
+        'member_id'                  => "VARCHAR(20) NOT NULL DEFAULT ''",
     ] as $col => $def) {
         try { $pdo->exec("ALTER TABLE sys_users ADD COLUMN IF NOT EXISTS {$col} {$def}"); } catch (PDOException) {}
     }
