@@ -12,7 +12,7 @@ $active_page = $active_page ?? '';
     <title><?= htmlspecialchars($page_title) ?> · MedLoan</title>
 
     <link rel="icon" type="image/png" href="assets/img/logo.png" sizes="any">
-    <script src="https://cdn.tailwindcss.com/3.4.1"></script>
+    <link rel="stylesheet" href="../assets/css/tailwind.min.css?v=<?= APP_VERSION ?>">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
 
     <style>
@@ -22,11 +22,7 @@ $active_page = $active_page ?? '';
         .glass-header { background: rgba(255,255,255,.95); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }
         body { opacity: 1; transition: opacity .25s ease-out, transform .25s ease-out; }
         body.page-transitioning { opacity: 0; transform: translateY(10px); }
-        /* Suppress Tailwind CDN production warning */
     </style>
-    <script>
-        (function() { const w = console.warn; console.warn = function(...a){ if (a[0]?.includes?.('cdn.tailwindcss.com')) return; w.apply(console, a); }; })();
-    </script>
 </head>
 <body class="page-transitioning text-slate-900 pb-32">
 <script>window.addEventListener('DOMContentLoaded', () => document.body.classList.remove('page-transitioning'));</script>
