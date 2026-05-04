@@ -1203,9 +1203,16 @@ $heroThemes = [
                             <h3 class="text-white text-2xl font-black tracking-tight leading-tight mb-1 truncate">
                                 <?= $user['full_name'] ?>
                             </h3>
+                            <?php if (!empty($user['student_personnel_id'])): ?>
                             <p class="text-emerald-100/60 text-[11px] font-black uppercase tracking-[0.1em]">ID:
-                                <?= !empty($user['student_personnel_id']) ? $user['student_personnel_id'] : ($user['member_id'] ?: 'N/A') ?>
+                                <?= htmlspecialchars($user['student_personnel_id']) ?>
                             </p>
+                            <?php endif; ?>
+                            <?php if (!empty($user['member_id'])): ?>
+                            <p class="text-emerald-100/60 text-[11px] font-black uppercase tracking-[0.1em]">
+                                <i class="fa-solid fa-id-badge text-[9px] mr-0.5"></i><?= htmlspecialchars($user['member_id']) ?>
+                            </p>
+                            <?php endif; ?>
                         </div>
                         <div
                             class="w-12 h-12 bg-white/15 backdrop-blur-xl rounded-2xl flex items-center justify-center border border-white/20 shadow-xl group-hover:translate-x-1 transition-transform">
