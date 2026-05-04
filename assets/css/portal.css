@@ -149,8 +149,11 @@ body {
 
 /* ── Project cards (refined, less visual weight than priority panel) ─── */
 #project-container {
-    align-items: stretch;          /* explicit grid stretch — equal row heights */
-    grid-auto-rows: 1fr;           /* every implicit row gets the same fraction */
+    align-items: stretch;          /* explicit — items in same row equal height */
+    /* NOTE: do NOT set grid-auto-rows: 1fr here. Without an explicit
+       container height it resolves to 0 and squashes rows 2+ that follow
+       a content-sized row 1. Default `auto` already sizes each row to
+       its tallest card and is what we want. */
 }
 .proj-card {
     background: var(--c-surface);
@@ -159,7 +162,7 @@ body {
     padding: 20px;
     display: flex; flex-direction: column;
     height: 100%;
-    align-self: stretch;           /* override any align-self override on the cell */
+    align-self: stretch;
     transition: box-shadow .2s, transform .2s, border-color .2s;
     position: relative; overflow: hidden;
 }
