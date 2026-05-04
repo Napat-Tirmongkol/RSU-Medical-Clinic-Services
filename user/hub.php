@@ -77,16 +77,40 @@ try {
     $stmt->execute([':sid' => $user['id'], ':today' => $today]);
     $upcoming_count = (int) $stmt->fetchColumn();
 
-    // Borrow count (optional)
+    // Borrow data (active items + pending fines)
+    $borrow_active = [];
+    $borrow_total_fine = 0.0;
     try {
         $stmt = $pdo->prepare("
-            SELECT COUNT(*) FROM borrow_records 
-            WHERE borrower_student_id = :sid AND status IN ('borrowed','approved')
+            SELECT t.id AS transaction_id, t.borrow_date, t.due_date,
+                   t.approval_status, t.status,
+                   ei.name AS equipment_name,
+                   et.image_url, et.name AS type_name
+            FROM borrow_records t
+            JOIN borrow_items ei ON t.item_id = ei.id
+            JOIN borrow_categories et ON t.type_id = et.id
+            WHERE t.borrower_student_id = :sid
+              AND t.status = 'borrowed'
+              AND t.approval_status IN ('approved','pending')
+            ORDER BY t.borrow_date DESC
         ");
-        $stmt->execute([':sid' => $user['student_personnel_id']]); // borrow_records uses personnel_id
-        $borrow_count = (int) $stmt->fetchColumn();
+        $stmt->execute([':sid' => $user['id']]);
+        $borrow_active = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        $borrow_count = count($borrow_active);
     } catch (Exception $e) {
         $borrow_count = 0;
+    }
+    try {
+        $stmt = $pdo->prepare("
+            SELECT COALESCE(SUM(f.amount), 0) AS total
+            FROM borrow_fines f
+            JOIN borrow_records t ON f.transaction_id = t.id
+            WHERE t.borrower_student_id = :sid AND f.status = 'pending'
+        ");
+        $stmt->execute([':sid' => $user['id']]);
+        $borrow_total_fine = (float) $stmt->fetchColumn();
+    } catch (Exception $e) {
+        $borrow_total_fine = 0.0;
     }
 
     // Insurance record (linked by student_personnel_id = member_id)
@@ -394,6 +418,12 @@ $greeting = ($hour >= 5 && $hour < 12) ? "สวัสดีตอนเช้�
         function hideChat() { document.getElementById('chat-modal').classList.add('hidden'); }
         function showUpcoming(name) { document.getElementById('upcoming-name').innerText = name; document.getElementById('upcoming-modal').classList.remove('hidden'); document.getElementById('upcoming-modal').classList.add('flex'); }
         function hideUpcoming() { document.getElementById('upcoming-modal').classList.add('hidden'); }
+        function showBorrow() {
+            const m = document.getElementById('borrow-modal');
+            m.classList.remove('hidden');
+            m.classList.add('flex');
+        }
+        function hideBorrow() { document.getElementById('borrow-modal').classList.add('hidden'); }
         let vaccinationPage = 1;
         let vaccinationQuery = '';
         let vaccinationStatus = '';
@@ -709,8 +739,11 @@ $greeting = ($hour >= 5 && $hour < 12) ? "สวัสดีตอนเช้�
                     <p class="font-black text-xl text-slate-900 mb-0.5"><?= count($booking_list) ?></p>
                     <p class="text-slate-400 text-[10px] font-bold uppercase tracking-widest">การเข้าใช้บริการ</p>
                 </button>
-                <button onclick="showUpcoming('รายการยืมอุปกรณ์')"
-                    class="bg-white rounded-[2.5rem] p-6 border border-slate-100 shadow-[0_15px_30px_rgba(0,0,0,0.03)] flex flex-col items-center text-center active:scale-95 transition-all group">
+                <button onclick="showBorrow()"
+                    class="bg-white rounded-[2.5rem] p-6 border border-slate-100 shadow-[0_15px_30px_rgba(0,0,0,0.03)] flex flex-col items-center text-center active:scale-95 transition-all group relative">
+                    <?php if ($borrow_total_fine > 0): ?>
+                        <span class="absolute top-3 right-3 px-2 py-0.5 bg-rose-500 text-white text-[9px] font-black rounded-full shadow-sm">฿<?= number_format($borrow_total_fine, 0) ?></span>
+                    <?php endif; ?>
                     <div
                         class="w-12 h-12 bg-orange-50 rounded-2xl flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
                         <i class="fa-solid fa-boxes-stacked text-orange-600 text-lg"></i>
@@ -744,15 +777,18 @@ $greeting = ($hour >= 5 && $hour < 12) ? "สวัสดีตอนเช้�
                             <p class="text-[13px] font-black leading-tight tracking-wide">จองคิว /<br>แคมเปญ</p>
                         </button>
 
-                        <a href="../e_Borrow/"
-                            class="relative flex flex-col items-start p-6 rounded-[2.2rem] bg-amber-50 border border-amber-100 shadow-sm active:scale-95 transition-all text-amber-600 group">
+                        <button onclick="showBorrow()"
+                            class="relative flex flex-col items-start p-6 rounded-[2.2rem] bg-amber-50 border border-amber-100 shadow-sm active:scale-95 transition-all text-amber-600 group text-left">
+                            <?php if ($borrow_count > 0): ?>
+                                <span class="absolute top-4 right-4 w-6 h-6 bg-amber-500 text-white text-[10px] font-black rounded-full flex items-center justify-center border-2 border-white shadow-lg"><?= $borrow_count ?></span>
+                            <?php endif; ?>
                             <div
                                 class="w-11 h-11 rounded-2xl bg-white flex items-center justify-center mb-4 shadow-sm border border-amber-50 group-hover:scale-110 transition-transform">
                                 <i class="fa-solid fa-box-archive text-amber-500 text-base"></i>
                             </div>
                             <p class="text-[13px] font-black leading-tight tracking-wide text-slate-800">
                                 ยืม-คืน<br>e-Borrow</p>
-                        </a>
+                        </button>
 
                         <a href="my_bookings.php"
                             class="relative flex flex-col items-start p-6 rounded-[2.2rem] bg-indigo-50 border border-indigo-100 shadow-sm active:scale-95 transition-all text-indigo-600 group">
@@ -1850,6 +1886,115 @@ document.getElementById('insDetailModal').addEventListener('click', function(e) 
                     </div>
                 </div>
             </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Borrow Modal ── -->
+    <div id="borrow-modal" class="fixed inset-0 z-[115] hidden flex items-end sm:items-center justify-center p-0 sm:p-6">
+        <div class="absolute inset-0 bg-slate-900/55 backdrop-blur-sm" onclick="hideBorrow()"></div>
+        <div class="relative bg-[#f8fafc] w-full max-w-[760px] rounded-t-[2rem] sm:rounded-[1.5rem] border border-slate-200 shadow-2xl animate-in slide-in-from-bottom duration-300 flex flex-col max-h-[92vh] overflow-hidden text-left">
+
+            <div class="flex items-start justify-between gap-5 border-b border-slate-200 bg-white px-6 py-5 sm:px-8">
+                <div class="min-w-0">
+                    <div class="mb-2 flex items-center gap-3">
+                        <span class="h-6 w-1 rounded-full bg-amber-500"></span>
+                        <p class="text-[10px] font-black uppercase tracking-[0.22em] text-slate-400">e-Borrow</p>
+                    </div>
+                    <h3 class="text-xl font-black tracking-tight text-slate-900">ยืม-คืนอุปกรณ์</h3>
+                    <p class="mt-1 text-xs font-semibold text-slate-500">รายการยืมที่ active และค่าปรับค้างชำระ</p>
+                </div>
+                <button onclick="hideBorrow()"
+                    class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-400 transition-all active:scale-95 hover:text-slate-700">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="flex-1 overflow-auto bg-[#f8fafc] p-4 sm:p-6 space-y-4">
+
+                <!-- Stats row -->
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="rounded-2xl border border-amber-100 bg-white p-4">
+                        <div class="mb-2 flex h-9 w-9 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
+                            <i class="fa-solid fa-box-archive text-sm"></i>
+                        </div>
+                        <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">กำลังยืม</p>
+                        <p class="mt-1 text-xl font-black text-slate-900"><?= $borrow_count ?></p>
+                        <p class="text-[10px] font-bold text-slate-400">รายการ</p>
+                    </div>
+                    <div class="rounded-2xl border <?= $borrow_total_fine > 0 ? 'border-rose-200 bg-rose-50' : 'border-slate-100 bg-white' ?> p-4">
+                        <div class="mb-2 flex h-9 w-9 items-center justify-center rounded-xl <?= $borrow_total_fine > 0 ? 'bg-rose-100 text-rose-700' : 'bg-slate-50 text-slate-400' ?>">
+                            <i class="fa-solid fa-coins text-sm"></i>
+                        </div>
+                        <p class="text-[10px] font-black uppercase tracking-widest <?= $borrow_total_fine > 0 ? 'text-rose-700' : 'text-slate-400' ?>">ค่าปรับค้างชำระ</p>
+                        <p class="mt-1 text-xl font-black <?= $borrow_total_fine > 0 ? 'text-rose-700' : 'text-slate-900' ?>">฿<?= number_format($borrow_total_fine, 2) ?></p>
+                    </div>
+                </div>
+
+                <!-- Active list -->
+                <div class="rounded-2xl border border-slate-200 bg-white">
+                    <div class="border-b border-slate-100 px-5 py-4">
+                        <p class="text-[11px] font-black uppercase tracking-widest text-slate-400">รายการที่ยืมอยู่</p>
+                    </div>
+                    <?php if (empty($borrow_active)): ?>
+                        <div class="px-5 py-10 text-center">
+                            <div class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 text-slate-400">
+                                <i class="fa-solid fa-box-open"></i>
+                            </div>
+                            <p class="text-sm font-black text-slate-700">ไม่มีรายการที่ยืมอยู่</p>
+                            <p class="mt-1 text-xs font-semibold text-slate-400">กดปุ่มด้านล่างเพื่อเริ่มยืมอุปกรณ์</p>
+                        </div>
+                    <?php else: foreach ($borrow_active as $b):
+                        $today = date('Y-m-d');
+                        $dueDate = $b['due_date'] ?? '';
+                        $isPending = ($b['approval_status'] ?? '') === 'pending';
+                        $isOverdue = $dueDate && $dueDate < $today;
+                        $daysLeft = $dueDate ? (int) ((strtotime($dueDate) - strtotime($today)) / 86400) : null;
+                        $img = $b['image_url'] ?? '';
+                        $imgSrc = $img !== '' ? '../e_Borrow/uploads/' . htmlspecialchars($img, ENT_QUOTES, 'UTF-8') : '';
+                    ?>
+                        <div class="flex items-center gap-4 border-t border-slate-100 px-5 py-4 first:border-0">
+                            <div class="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-amber-50 text-amber-600">
+                                <?php if ($imgSrc !== ''): ?>
+                                    <img src="<?= $imgSrc ?>" alt="" class="h-full w-full object-cover" onerror="this.outerHTML='<i class=\'fa-solid fa-box text-lg\'></i>'">
+                                <?php else: ?>
+                                    <i class="fa-solid fa-box text-lg"></i>
+                                <?php endif; ?>
+                            </div>
+                            <div class="min-w-0 flex-1">
+                                <p class="truncate text-sm font-black text-slate-900"><?= htmlspecialchars($b['equipment_name'] ?: $b['type_name'], ENT_QUOTES, 'UTF-8') ?></p>
+                                <p class="text-[11px] font-bold text-slate-500">
+                                    <?= $b['type_name'] ? htmlspecialchars($b['type_name'], ENT_QUOTES, 'UTF-8') . ' · ' : '' ?>
+                                    ยืม <?= htmlspecialchars(formatThaiDate(substr((string)$b['borrow_date'], 0, 10)), ENT_QUOTES, 'UTF-8') ?>
+                                </p>
+                                <?php if ($dueDate): ?>
+                                <p class="mt-0.5 text-[11px] font-bold <?= $isOverdue ? 'text-rose-600' : ($daysLeft !== null && $daysLeft <= 3 ? 'text-amber-600' : 'text-slate-500') ?>">
+                                    <i class="fa-solid fa-calendar-days mr-1"></i>
+                                    คืน <?= htmlspecialchars(formatThaiDate($dueDate), ENT_QUOTES, 'UTF-8') ?>
+                                    <?php if ($isOverdue): ?>
+                                        · เลยกำหนด <?= abs((int)$daysLeft) ?> วัน
+                                    <?php elseif ($daysLeft !== null && $daysLeft >= 0): ?>
+                                        · เหลือ <?= (int)$daysLeft ?> วัน
+                                    <?php endif; ?>
+                                </p>
+                                <?php endif; ?>
+                            </div>
+                            <span class="shrink-0 rounded-full px-3 py-1 text-[10px] font-black <?= $isPending ? 'bg-amber-50 text-amber-700 border border-amber-100' : 'bg-emerald-50 text-emerald-700 border border-emerald-100' ?>">
+                                <?= $isPending ? 'รออนุมัติ' : 'อนุมัติแล้ว' ?>
+                            </span>
+                        </div>
+                    <?php endforeach; endif; ?>
+                </div>
+
+                <!-- Action buttons -->
+                <div class="grid grid-cols-2 gap-3">
+                    <a href="../e_Borrow/borrow.php" class="flex h-14 items-center justify-center gap-2 rounded-2xl bg-[#2e9e63] text-white font-black text-sm shadow-[0_10px_25px_rgba(46,158,99,0.25)] active:scale-95 transition-all">
+                        <i class="fa-solid fa-plus"></i> ยืมอุปกรณ์
+                    </a>
+                    <a href="../e_Borrow/history.php" class="flex h-14 items-center justify-center gap-2 rounded-2xl bg-white border border-slate-200 text-slate-600 font-black text-sm active:scale-95 transition-all">
+                        <i class="fa-solid fa-clock-rotate-left"></i> ประวัติทั้งหมด
+                    </a>
+                </div>
             </div>
         </div>
     </div>
