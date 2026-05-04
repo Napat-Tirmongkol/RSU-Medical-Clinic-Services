@@ -29,6 +29,9 @@ try {
     $pdo = db();
     $today = date('Y-m-d');
 
+    // Self-healing migration: dedicated member_id column for QR / check-in
+    try { $pdo->exec("ALTER TABLE sys_users ADD COLUMN IF NOT EXISTS member_id VARCHAR(20) NOT NULL DEFAULT ''"); } catch (PDOException) {}
+
     $stmt = $pdo->prepare("SELECT * FROM sys_users WHERE line_user_id = :line_id LIMIT 1");
     $stmt->execute([':line_id' => $lineUserId]);
     $user = $stmt->fetch();
@@ -36,6 +39,29 @@ try {
     if (!$user) {
         header('Location: index.php');
         exit;
+    }
+
+    // Lazy backfill: assign a member_id to any user that doesn't have one yet
+    if (empty($user['member_id'])) {
+        for ($attempt = 0; $attempt < 5; $attempt++) {
+            $candidate = generateMemberId();
+            try {
+                $upd = $pdo->prepare("UPDATE sys_users SET member_id = :mid WHERE id = :id AND (member_id IS NULL OR member_id = '')");
+                $upd->execute([':mid' => $candidate, ':id' => $user['id']]);
+                if ($upd->rowCount() > 0) {
+                    $user['member_id'] = $candidate;
+                    break;
+                }
+                // rowCount==0 means another request raced us; refetch and stop
+                $rs = $pdo->prepare("SELECT member_id FROM sys_users WHERE id = :id");
+                $rs->execute([':id' => $user['id']]);
+                $user['member_id'] = (string) $rs->fetchColumn();
+                break;
+            } catch (PDOException $e) {
+                // Highly unlikely random collision — try again
+                continue;
+            }
+        }
     }
 
     // ── Store user ID in session for AJAX endpoints ──
@@ -258,6 +284,11 @@ if ($user) {
 }
 
 // Helpers
+function generateMemberId(): string
+{
+    return 'RSU-' . strtoupper(bin2hex(random_bytes(4)));
+}
+
 function getInitials($name)
 {
     $parts = explode(' ', trim($name));
@@ -451,7 +482,7 @@ $heroThemes = [
 
     <!-- Modal Functions (defined early to prevent ReferenceError on button clicks) -->
     <script>
-        function showQR(bookingId = null, title = 'Identity QR Code', code = "<?= htmlspecialchars($user['student_personnel_id'] ?? '') ?>") {
+        function showQR(bookingId = null, title = 'Identity QR Code', code = "<?= htmlspecialchars($user['member_id'] ?? '') ?>") {
             const modal = document.getElementById('qr-modal');
             const qrContainer = document.getElementById('qrcode');
             const modalTitle = document.getElementById('qr-modal-title');
@@ -464,7 +495,7 @@ $heroThemes = [
                 qrContainer.innerHTML = `<img src="api_qrcode.php?id=${encodeURIComponent(bookingId)}" alt="Booking QR Code" class="w-[180px] h-[180px] object-contain">`;
             } else if (typeof qr === 'undefined' || !qr) {
                 qrContainer.innerHTML = '';
-                qr = new QRCode(qrContainer, { text: "<?= htmlspecialchars($user['student_personnel_id'] ?? '') ?>", width: 180, height: 180, colorDark: "#0f172a", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.H });
+                qr = new QRCode(qrContainer, { text: "<?= htmlspecialchars($user['member_id'] ?? '') ?>", width: 180, height: 180, colorDark: "#0f172a", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.H });
             }
         }
         function hideQR() { document.getElementById('qr-modal').classList.add('hidden'); }
@@ -1170,7 +1201,7 @@ $heroThemes = [
                                 <?= $user['full_name'] ?>
                             </h3>
                             <p class="text-emerald-100/60 text-[11px] font-black uppercase tracking-[0.1em]">ID:
-                                <?= !empty($user['student_personnel_id']) ? $user['student_personnel_id'] : 'N/A' ?>
+                                <?= !empty($user['student_personnel_id']) ? $user['student_personnel_id'] : ($user['member_id'] ?: 'N/A') ?>
                             </p>
                         </div>
                         <div

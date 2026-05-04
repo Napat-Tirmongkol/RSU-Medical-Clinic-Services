@@ -24,6 +24,7 @@ $userData = [
     'allergies' => '', 'chronic_conditions' => '',
     'emergency_contact_name' => '', 'emergency_contact_phone' => '',
     'emergency_contact_relation' => '',
+    'member_id' => '',
     'updated_at' => '',
 ];
 
@@ -71,6 +72,7 @@ try {
             'emergency_contact_name'     => $user['emergency_contact_name'] ?? '',
             'emergency_contact_phone'    => $user['emergency_contact_phone'] ?? '',
             'emergency_contact_relation' => $user['emergency_contact_relation'] ?? '',
+            'member_id'      => $user['member_id'] ?? '',
             'updated_at'     => $user['updated_at'] ?? '',
         ]);
     }
@@ -221,6 +223,11 @@ function vh(?string $s): string { return htmlspecialchars((string) $s, ENT_QUOTE
                         </p>
                         <h2 class="truncate text-lg font-black text-slate-900"><?= vh($userData['full_name'] ?: '—') ?></h2>
                         <p class="text-xs font-bold text-slate-500 truncate"><?= vh($userData['email'] ?: ($userData['phone'] ?: '—')) ?></p>
+                        <?php if (!empty($userData['member_id'])): ?>
+                        <p class="mt-1 inline-flex items-center gap-1 text-[10px] font-black tracking-[0.15em] text-[#2e9e63]">
+                            <i class="fa-solid fa-id-badge text-[9px]"></i><?= vh($userData['member_id']) ?>
+                        </p>
+                        <?php endif; ?>
                     </div>
                 </div>
 
