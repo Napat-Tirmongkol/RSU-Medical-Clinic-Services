@@ -76,6 +76,16 @@ try {
     }
 } catch (PDOException $e) { error_log($e->getMessage()); }
 
+// ── Insurance lookup (read-only display) ────────────────────────────
+$insurance = null;
+if (defined('SITE_SHOW_INSURANCE') && SITE_SHOW_INSURANCE && !empty($userData['id_number'])) {
+    try {
+        $insStmt = db()->prepare("SELECT * FROM insurance_members WHERE member_id = :mid LIMIT 1");
+        $insStmt->execute([':mid' => $userData['id_number']]);
+        $insurance = $insStmt->fetch(PDO::FETCH_ASSOC) ?: null;
+    } catch (Exception $e) { /* table may not exist yet */ }
+}
+
 if ($userData['full_name'] !== '' && $userData['first_name'] === '' && $userData['last_name'] === '') {
     $parts = explode(' ', trim($userData['full_name']), 2);
     $userData['first_name'] = $parts[0] ?? '';
@@ -236,6 +246,94 @@ function vh(?string $s): string { return htmlspecialchars((string) $s, ENT_QUOTE
                 <p class="mt-3 text-center text-[11px] font-bold text-slate-400"><?= __('profile.view_mode_hint') ?></p>
                 <?php endif; ?>
             </div>
+
+            <?php if (defined('SITE_SHOW_INSURANCE') && SITE_SHOW_INSURANCE): ?>
+            <!-- ── Medical Coverage (read-only, full detail) ── -->
+            <div class="bg-white rounded-[2.5rem] p-6 border border-slate-50 shadow-sm mb-6">
+                <div class="flex items-center gap-2 mb-4">
+                    <span class="h-5 w-1 rounded-full bg-rose-500"></span>
+                    <h3 class="text-sm font-black uppercase tracking-widest text-slate-700">ความคุ้มครอง</h3>
+                    <span class="ml-auto text-[10px] font-black text-slate-400 uppercase tracking-widest">Medical Coverage</span>
+                </div>
+
+                <?php if ($insurance === null): ?>
+                    <div class="rounded-2xl bg-slate-50 border border-slate-100 p-5 flex flex-col items-center text-center gap-2">
+                        <div class="w-12 h-12 rounded-2xl bg-white border border-slate-100 text-slate-400 flex items-center justify-center text-xl">
+                            <i class="fa-solid fa-shield-xmark"></i>
+                        </div>
+                        <p class="text-sm font-black text-slate-700">ไม่พบข้อมูลประกัน</p>
+                        <p class="text-[11px] font-bold text-slate-400">กรุณาติดต่อเจ้าหน้าที่ห้องพยาบาล</p>
+                    </div>
+                <?php else:
+                    $insActive   = ($insurance['insurance_status'] ?? '') === 'Active';
+                    $coverEnd    = $insurance['coverage_end'] ?? null;
+                    $coverStart  = $insurance['coverage_start'] ?? null;
+                    $policyNo    = $insurance['policy_number'] ?? '';
+                    $memberType  = $insurance['member_status'] ?? '';
+                    $thaiShort   = function ($d) {
+                        if (!$d) return '—';
+                        $ts = strtotime($d);
+                        return date('d/m/', $ts) . substr((string)((int)date('Y', $ts) + 543), -2);
+                    };
+                ?>
+                    <?php if (!$insActive): ?>
+                        <div class="rounded-2xl bg-amber-50 border border-amber-100 p-5">
+                            <div class="flex items-center gap-3 mb-3">
+                                <div class="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center">
+                                    <i class="fa-solid fa-triangle-exclamation"></i>
+                                </div>
+                                <div>
+                                    <p class="text-[10px] font-black uppercase tracking-widest text-amber-700">Inactive</p>
+                                    <p class="text-sm font-black text-slate-900">สิทธิ์ประกันไม่พร้อมใช้งาน</p>
+                                </div>
+                            </div>
+                            <p class="text-[12px] font-bold text-amber-700 leading-relaxed">
+                                ข้อมูลประกันของคุณอยู่ในสถานะ Inactive กรุณาติดต่อห้องพยาบาลเพื่อตรวจสอบสิทธิ์
+                            </p>
+                        </div>
+                    <?php else: ?>
+                        <div class="rounded-2xl bg-gradient-to-br from-rose-50 to-rose-100/60 border border-rose-100 p-5">
+                            <div class="flex items-start justify-between mb-4">
+                                <div>
+                                    <p class="text-[10px] font-black uppercase tracking-widest text-rose-600">Personal Accident</p>
+                                    <h4 class="text-base font-black text-slate-900 leading-tight mt-0.5">บัตรประกันอุบัติเหตุ</h4>
+                                </div>
+                                <span class="inline-flex px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-black uppercase tracking-widest">Active</span>
+                            </div>
+
+                            <dl class="space-y-3 text-[13px]">
+                                <div class="grid grid-cols-[100px_1fr] gap-2">
+                                    <dt class="text-slate-500 font-bold">เลขที่กรมธรรม์</dt>
+                                    <dd class="text-slate-900 font-black tracking-wider truncate"><?= $policyNo !== '' ? vh($policyNo) : '—' ?></dd>
+                                </div>
+                                <div class="grid grid-cols-[100px_1fr] gap-2">
+                                    <dt class="text-slate-500 font-bold">ผู้เอาประกัน</dt>
+                                    <dd class="text-slate-900 font-black truncate"><?= vh($userData['full_name'] ?: '—') ?></dd>
+                                </div>
+                                <div class="grid grid-cols-[100px_1fr] gap-2">
+                                    <dt class="text-slate-500 font-bold">เริ่มคุ้มครอง</dt>
+                                    <dd class="text-slate-900 font-black tracking-wider"><?= vh($thaiShort($coverStart)) ?></dd>
+                                </div>
+                                <div class="grid grid-cols-[100px_1fr] gap-2">
+                                    <dt class="text-slate-500 font-bold">สิ้นสุด</dt>
+                                    <dd class="text-slate-900 font-black tracking-wider"><?= vh($thaiShort($coverEnd)) ?></dd>
+                                </div>
+                                <div class="grid grid-cols-[100px_1fr] gap-2 pt-2 border-t border-rose-100">
+                                    <dt class="text-slate-500 font-bold">วงเงินรักษา</dt>
+                                    <dd class="text-rose-600 font-black text-lg leading-none">฿40,000<span class="text-[11px] text-slate-500 font-bold ml-1">/ ครั้ง</span></dd>
+                                </div>
+                                <?php if ($memberType): ?>
+                                <div class="grid grid-cols-[100px_1fr] gap-2">
+                                    <dt class="text-slate-500 font-bold">ประเภท</dt>
+                                    <dd class="text-slate-700 font-bold uppercase tracking-wide"><?= vh($memberType) ?></dd>
+                                </div>
+                                <?php endif; ?>
+                            </dl>
+                        </div>
+                    <?php endif; ?>
+                <?php endif; ?>
+            </div>
+            <?php endif; ?>
 
             <form id="profileForm" action="save_profile.php" method="POST" class="space-y-6" novalidate>
                 <?php csrf_field(); ?>
