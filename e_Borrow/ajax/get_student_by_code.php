@@ -16,17 +16,33 @@ if (empty($student_code) && empty($db_id)) {
 }
 
 try {
+    $student = null;
+    $cols = "id, full_name, student_personnel_id, member_id, department, status";
+
+    // 1. Most accurate: PK lookup
     if (!empty($db_id)) {
-        // ค้นหาด้วย ID (แม่นยำสุด)
-        $stmt = $pdo->prepare("SELECT id, full_name, student_personnel_id, department, status FROM sys_users WHERE id = ? LIMIT 1");
+        $stmt = $pdo->prepare("SELECT {$cols} FROM sys_users WHERE id = ? LIMIT 1");
         $stmt->execute([$db_id]);
-    } else {
-        // Fallback ค้นหาด้วยรหัสนักศึกษา
-        $stmt = $pdo->prepare("SELECT id, full_name, student_personnel_id, department, status FROM sys_users WHERE student_personnel_id = ? LIMIT 1");
-        $stmt->execute([$student_code]);
+        $student = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
     }
-    
-    $student = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    // 2. Try member_id (universal — works for students/staff/external)
+    if (!$student && !empty($student_code)) {
+        try {
+            $stmt = $pdo->prepare("SELECT {$cols} FROM sys_users WHERE member_id = ? LIMIT 1");
+            $stmt->execute([$student_code]);
+            $student = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+        } catch (PDOException) {
+            // member_id column may not exist on legacy DBs — fall through
+        }
+    }
+
+    // 3. Legacy fallback: student_personnel_id (printed cards / old QRs)
+    if (!$student && !empty($student_code)) {
+        $stmt = $pdo->prepare("SELECT {$cols} FROM sys_users WHERE student_personnel_id = ? LIMIT 1");
+        $stmt->execute([$student_code]);
+        $student = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+    }
 
     if ($student) {
         echo json_encode(['status' => 'success', 'student' => $student]);
