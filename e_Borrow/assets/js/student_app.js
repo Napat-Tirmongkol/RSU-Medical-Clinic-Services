@@ -4,16 +4,17 @@
 // 1. โค้ดสำหรับ borrow.php (Live Search & Popup)
 // =========================================
 document.addEventListener('DOMContentLoaded', function() {
-    
+
     // (ตรวจสอบก่อนว่า element ของ borrow.php มีอยู่จริงหรือไม่)
     const searchInput = document.getElementById('liveSearchInput');
-    
-    // (ถ้าไม่เจอ element เหล่านี้ = ไม่ได้อยู่หน้า borrow.php ก็ให้หยุด)
-    if (searchInput) {
-        const resultsContainer = document.getElementById('search-results-container');
+    const resultsContainer = document.getElementById('search-results-container');
+
+    // (เฉพาะหน้า borrow.php รุ่นเก่าที่ยังมี search-results-container เท่านั้น
+    //  หน้ารุ่นใหม่ใช้ inline client-side filter ตรง equip-card[data-name] แทน)
+    if (searchInput && resultsContainer) {
         const gridContainer = document.getElementById('equipment-grid-container');
         const clearBtn = document.getElementById('clearSearchBtn');
-        let searchTimeout; 
+        let searchTimeout;
 
         searchInput.addEventListener('keyup', () => {
             clearTimeout(searchTimeout);
@@ -163,7 +164,7 @@ function openRequestPopup(typeId, typeName) {
                 showCancelButton: true,
                 confirmButtonText: 'ยืนยันส่งคำขอ',
                 cancelButtonText: 'ยกเลิก',
-                confirmButtonColor: 'var(--color-success, #16a34a)',
+                confirmButtonColor: '#2e9e63',
                 focusConfirm: false,
                 preConfirm: () => {
                     const form = document.getElementById('swalRequestForm');

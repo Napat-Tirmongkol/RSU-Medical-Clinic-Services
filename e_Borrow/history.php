@@ -179,23 +179,4 @@ include('includes/student_header.php');
 
 <?php endif; ?>
 
-<script>
-function confirmCancelRequest(transactionId) {
-    Swal.fire({
-        title: 'ยืนยันการยกเลิก?',
-        text: 'คำขอยืมอุปกรณ์นี้จะถูกยกเลิก',
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonColor: '#dc2626',
-        cancelButtonColor: '#94a3b8',
-        confirmButtonText: 'ยืนยัน ยกเลิก',
-        cancelButtonText: 'ไม่ยกเลิก',
-    }).then((result) => {
-        if (result.isConfirmed) {
-            window.location.href = `process/cancel_request.php?id=${transactionId}`;
-        }
-    });
-}
-</script>
-
 <?php include('includes/student_footer.php'); ?>
