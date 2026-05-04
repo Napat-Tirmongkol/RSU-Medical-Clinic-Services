@@ -29,7 +29,7 @@ foreach ($indexes as [$table, $name, $sql]) {
 <!DOCTYPE html>
 <html lang="th">
 <head><meta charset="UTF-8"><title>Add Booking Indexes</title>
-<script src="https://cdn.tailwindcss.com"></script></head>
+<link rel="stylesheet" href="../../assets/css/tailwind.min.css?v=<?= APP_VERSION ?>"></head>
 <body class="bg-gray-50 p-10">
 <div class="max-w-xl mx-auto bg-white rounded-2xl shadow p-8 space-y-4">
     <h1 class="text-xl font-bold text-gray-800">Booking Index Setup</h1>
