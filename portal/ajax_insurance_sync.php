@@ -589,14 +589,15 @@ if ($action === 'upload_combined') {
     if (isset($studentParse['error']))  json_err('ไฟล์นักศึกษา: ' . $studentParse['error']);
     if (isset($resignedParse['error'])) json_err('ไฟล์คนออก: '   . $resignedParse['error']);
 
-    $staffList = array_map(
-        fn($r) => $r + ['_source' => 'staff', 'member_status' => $r['member_status'] ?: 'บุคลากร'],
-        $staffParse['rows']
-    );
-    $studentList = array_map(
-        fn($r) => $r + ['_source' => 'student', 'member_status' => $r['member_status'] ?: 'นักศึกษา'],
-        $studentParse['rows']
-    );
+    $tagSource = function (string $src, string $defaultStatus) {
+        return function (array $r) use ($src, $defaultStatus): array {
+            $r['_source']       = $src;
+            $r['member_status'] = !empty($r['member_status']) ? $r['member_status'] : $defaultStatus;
+            return $r;
+        };
+    };
+    $staffList   = array_map($tagSource('staff',   'บุคลากร'),  $staffParse['rows']);
+    $studentList = array_map($tagSource('student', 'นักศึกษา'), $studentParse['rows']);
     $resignedList = $resignedParse['rows'];
 
     // Build leaver indexes (carry resign_date so we can persist it on inactivate)
