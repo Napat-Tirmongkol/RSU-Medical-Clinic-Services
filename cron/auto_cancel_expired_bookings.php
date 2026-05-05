@@ -38,6 +38,24 @@ $pdo = db();
 $log = [];
 $log[] = '[' . date('Y-m-d H:i:s') . '] Auto-Cancel Expired Bookings Job เริ่มทำงาน';
 
+// ── Auto-migrate: ขยาย ENUM ให้รองรับ 'expired' ──────────────────────────────
+// status เดิมเป็น ENUM ที่ยังไม่มี 'expired' — UPDATE จะถูก MySQL truncate
+// (SQLSTATE 01000, 1265 Data truncated) ถ้าไม่ขยายชนิดก่อน
+try {
+    $pdo->exec("ALTER TABLE camp_bookings
+        MODIFY COLUMN status ENUM('booked','confirmed','completed','cancelled','cancelled_by_admin','expired')
+        NOT NULL DEFAULT 'booked'");
+    $log[] = 'ขยาย ENUM status ให้รองรับ expired แล้ว';
+} catch (PDOException $e) {
+    // ถ้า ENUM ไม่ตรง spec ให้ fallback เป็น VARCHAR เพื่อไม่ให้ block job
+    try {
+        $pdo->exec("ALTER TABLE camp_bookings MODIFY COLUMN status VARCHAR(40) NOT NULL DEFAULT 'booked'");
+        $log[] = 'fallback: เปลี่ยน status เป็น VARCHAR(40)';
+    } catch (PDOException $e2) {
+        $log[] = 'WARN: ขยาย status ENUM ไม่สำเร็จ — ' . $e2->getMessage();
+    }
+}
+
 // ── Find candidates ──────────────────────────────────────────────────────────
 $stmt = $pdo->prepare("
     SELECT
