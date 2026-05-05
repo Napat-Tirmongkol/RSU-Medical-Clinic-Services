@@ -341,6 +341,59 @@ try {
             break;
         }
 
+        // ─────── Diagnostic — for debugging mismatch between stats and list ───────
+        case 'diag': {
+            $sessionInfo = [
+                'admin_role'       => $adminRole,
+                'admin_id'         => $adminId,
+                'admin_name'       => $adminName,
+                'isSuper'          => $isSuper,
+                'hasInsurance'     => $hasInsurance,
+                'hasRegistry'      => $hasRegistry,
+                'session_keys'     => array_keys($_SESSION),
+            ];
+
+            $allBatches = $pdo->query("
+                SELECT id, batch_code, status, uploaded_by, uploaded_by_name,
+                       insurance_company, sync_id, uploaded_at
+                FROM insurance_batch
+                ORDER BY id DESC LIMIT 20
+            ")->fetchAll(PDO::FETCH_ASSOC);
+
+            $rawCount = (int)$pdo->query("SELECT COUNT(*) FROM insurance_batch")->fetchColumn();
+            $byStatusRaw = $pdo->query("
+                SELECT status, COUNT(*) AS cnt FROM insurance_batch GROUP BY status
+            ")->fetchAll(PDO::FETCH_ASSOC);
+
+            [$scopeWhere, $scopeParams] = batch_scope_where($hasInsurance, $adminId);
+            $listSql = "SELECT b.*, c.company_name FROM insurance_batch b
+                        LEFT JOIN insurance_companies c ON c.company_code = b.insurance_company
+                        WHERE 1=1 AND b.status = 'pending_review' $scopeWhere
+                        ORDER BY b.id DESC LIMIT 20";
+            $listResult = $pdo->prepare($listSql);
+            $listResult->execute($scopeParams);
+            $listRows = $listResult->fetchAll(PDO::FETCH_ASSOC);
+
+            $companiesExists = false;
+            try {
+                $pdo->query("SELECT 1 FROM insurance_companies LIMIT 1");
+                $companiesExists = true;
+            } catch (Exception $e) { /* table missing */ }
+
+            json_ok([
+                'session'           => $sessionInfo,
+                'insurance_batch_total' => $rawCount,
+                'by_status_raw'     => $byStatusRaw,
+                'all_batches_sample'=> $allBatches,
+                'list_query'        => $listSql,
+                'list_params'       => $scopeParams,
+                'list_result_count' => count($listRows),
+                'list_rows'         => $listRows,
+                'insurance_companies_table_exists' => $companiesExists,
+            ]);
+            break;
+        }
+
         default:
             json_err('unknown action', 400);
     }
