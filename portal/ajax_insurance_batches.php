@@ -32,6 +32,21 @@ if (!$hasInsurance && !$hasRegistry) {
 $pdo    = db();
 $action = $_REQUEST['action'] ?? '';
 
+// Auto-create insurance_companies if not yet migrated (safe, idempotent)
+try {
+    $pdo->exec("CREATE TABLE IF NOT EXISTS insurance_companies (
+        company_code  VARCHAR(20)  NOT NULL PRIMARY KEY,
+        company_name  VARCHAR(200) NOT NULL DEFAULT '',
+        created_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    $hasMTI = $pdo->query("SELECT COUNT(*) FROM insurance_companies WHERE company_code = 'MTI'")->fetchColumn();
+    if (!$hasMTI) {
+        $pdo->exec("INSERT IGNORE INTO insurance_companies (company_code, company_name) VALUES ('MTI', 'เมืองไทยประกันภัย')");
+    }
+} catch (Exception $e) {
+    error_log('insurance_companies bootstrap: ' . $e->getMessage());
+}
+
 // Visibility scope: registry-only sees own batches; clinic/super sees all
 function batch_scope_where(bool $hasInsurance, int $adminId): array
 {

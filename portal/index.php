@@ -808,7 +808,12 @@ try {
                 btn.classList.add('psb-active');
                 btn.setAttribute('aria-current', 'page');
             }
-            
+
+            // Refresh batch_status data whenever the section becomes active
+            if (sectionId === 'batch_status' && typeof window.bsLoad === 'function') {
+                window.bsLoad(1);
+            }
+
             var url = new URL(window.location.href);
             url.searchParams.set('section', sectionId);
             ['page','el_search','el_level','el_date','el_source','al_q','eml_q','eml_type','eml_status','cd_search','cd_view','s','p'].forEach(function(k){ url.searchParams.delete(k); });
