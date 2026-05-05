@@ -87,6 +87,15 @@ declare(strict_types=1);
                 </label>
             </div>
 
+            <div style="display:flex; align-items:center; gap:.65rem; flex-wrap:wrap; justify-content:center; margin-bottom:1rem; font-size:.78rem; padding:.65rem .9rem; background:#f8fafc; border:1px dashed #cbd5e1; border-radius:.65rem;">
+                <span style="color:#475569; font-weight:800;"><i class="fa-solid fa-download mr-1" style="color:#64748b;"></i> ดาวน์โหลดเทมเพลต:</span>
+                <a href="#" onclick="cwDownloadTemplate('staff'); return false;" style="color:#d97706; font-weight:800; text-decoration:none;">บุคลากร</a>
+                <span style="color:#cbd5e1;">·</span>
+                <a href="#" onclick="cwDownloadTemplate('student'); return false;" style="color:#2563eb; font-weight:800; text-decoration:none;">นักศึกษา</a>
+                <span style="color:#cbd5e1;">·</span>
+                <a href="#" onclick="cwDownloadTemplate('resigned'); return false;" style="color:#dc2626; font-weight:800; text-decoration:none;">คนออก</a>
+            </div>
+
             <div style="background:#fef9c3; border:1px solid #fde68a; border-radius:.65rem; padding:.75rem 1rem; font-size:.78rem; color:#78350f; margin-bottom:1rem; line-height:1.55;">
                 <i class="fa-solid fa-info-circle mr-1"></i>
                 <strong>กฎการรวม:</strong>
@@ -261,6 +270,51 @@ declare(strict_types=1);
         return String(s ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
     }
     function fmt(n) { return (n ?? 0).toLocaleString(); }
+
+    // Download CSV template (UTF-8 BOM for Excel compat)
+    window.cwDownloadTemplate = function(kind) {
+        const today = new Date().toISOString().slice(0, 10);
+        const tpl = {
+            staff: {
+                name: 'staff_template.csv',
+                rows: [
+                    ['member_id', 'full_name', 'citizen_id', 'position'],
+                    ['1000001', 'นางสาวสมใจ ใจดี', '1234567890123', 'อาจารย์ประจำ'],
+                    ['1000002', 'นายสมชาย รักดี', '1234567890124', 'เจ้าหน้าที่'],
+                ],
+            },
+            student: {
+                name: 'student_template.csv',
+                rows: [
+                    ['member_id', 'full_name', 'citizen_id', 'position'],
+                    ['6512345', 'นายสมชาย รักเรียน', '1234567890125', 'คณะแพทยศาสตร์'],
+                    ['6512346', 'นางสาวสุดา ขยัน', '1234567890126', 'คณะพยาบาลศาสตร์'],
+                ],
+            },
+            resigned: {
+                name: 'resigned_template.csv',
+                rows: [
+                    ['member_id', 'citizen_id', 'full_name', 'resign_date'],
+                    ['1000099', '1234567890127', 'นายเก่า ลาออก', today],
+                    ['1000100', '', 'นางสาวออก จากงาน', today],
+                ],
+            },
+        };
+        const t = tpl[kind];
+        if (!t) return;
+        const csv = t.rows.map(r => r.map(c => {
+            const s = String(c ?? '');
+            return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+        }).join(',')).join('\r\n') + '\r\n';
+        const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = t.name;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+    };
 
     function cwSetStep(n) {
         for (let i = 1; i <= 3; i++) {
