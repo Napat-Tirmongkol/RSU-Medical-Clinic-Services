@@ -13,7 +13,7 @@ $hasRegistry = !empty($_SESSION['access_registry']);
 $hasInsurance = !empty($_SESSION['access_insurance']) || $adminRole === 'superadmin';
 
 // Registry users can only call upload-related actions (member_id list maintenance only)
-$registryAllowedActions = ['upload', 'analyze_upload'];
+$registryAllowedActions = ['upload', 'analyze_upload', 'upload_combined', 'ai_review'];
 $requestedAction = $_POST['action'] ?? $_GET['action'] ?? '';
 
 if (($isStaff && $adminRole === '') || !in_array($adminRole, ['admin', 'superadmin', 'editor'], true)) {
@@ -150,12 +150,58 @@ function parse_csv(string $text): array
     return empty($rows) ? ['error' => 'ไม่พบข้อมูลในไฟล์'] : ['rows' => $rows];
 }
 
-function norm_date(?string $d): ?string
+function norm_date(?string $d, string $prefer = 'dmy'): ?string
 {
     if (!$d) return null;
-    foreach (['d/m/Y', 'Y-m-d', 'd-m-Y', 'd/m/y'] as $fmt) {
-        $dt = DateTime::createFromFormat($fmt, $d);
-        if ($dt) return $dt->format('Y-m-d');
+    $d = trim($d);
+    if ($d === '') return null;
+
+    // Replace Thai month names with numeric form. Original Thai layout is
+    // "DD <month> YYYY" so we convert to "DD/MM/YYYY" and force d/m/Y order.
+    static $thaiMonths = [
+        'มกราคม' => '01', 'ม.ค.' => '01',
+        'กุมภาพันธ์' => '02', 'ก.พ.' => '02',
+        'มีนาคม' => '03', 'มี.ค.' => '03',
+        'เมษายน' => '04', 'เม.ย.' => '04',
+        'พฤษภาคม' => '05', 'พ.ค.' => '05',
+        'มิถุนายน' => '06', 'มิ.ย.' => '06',
+        'กรกฎาคม' => '07', 'กรกฏาคม' => '07', 'ก.ค.' => '07',
+        'สิงหาคม' => '08', 'ส.ค.' => '08',
+        'กันยายน' => '09', 'ก.ย.' => '09',
+        'ตุลาคม' => '10', 'ต.ค.' => '10',
+        'พฤศจิกายน' => '11', 'พ.ย.' => '11',
+        'ธันวาคม' => '12', 'ธ.ค.' => '12',
+    ];
+    $thaiReplaced = false;
+    foreach ($thaiMonths as $thai => $num) {
+        if (mb_strpos($d, $thai) !== false) {
+            $d = str_replace($thai, '/' . $num . '/', $d);
+            $d = preg_replace('/\s+/', '', $d);
+            $d = preg_replace('/\/+/', '/', $d);
+            $d = trim($d, '/');
+            $thaiReplaced = true;
+            break;
+        }
+    }
+
+    // $prefer = 'dmy' (default Thai/Euro) or 'mdy' (registry birthdate files).
+    // Strict-mode rejection (warning_count > 0) lets unambiguous dates fall
+    // through, so 31/12/2020 still resolves to 2020-12-31 either way.
+    $dmy = ['Y-m-d', 'j/n/Y', 'd/m/Y', 'n/j/Y', 'm/d/Y', 'd-m-Y', 'Y/m/d', 'd/m/y'];
+    $mdy = ['Y-m-d', 'n/j/Y', 'm/d/Y', 'j/n/Y', 'd/m/Y', 'd-m-Y', 'Y/m/d', 'd/m/y'];
+    $formats = $thaiReplaced ? ['j/n/Y', 'd/m/Y'] : ($prefer === 'mdy' ? $mdy : $dmy);
+
+    foreach ($formats as $fmt) {
+        $dt  = DateTime::createFromFormat($fmt, $d);
+        $err = DateTime::getLastErrors() ?: ['warning_count' => 0, 'error_count' => 0];
+        if ($dt && $err['warning_count'] === 0 && $err['error_count'] === 0) {
+            // Thai BE → CE (4/8/2505 → 1962-08-04)
+            $year = (int)$dt->format('Y');
+            if ($year >= 2400 && $year <= 2700) {
+                $dt->modify('-543 years');
+            }
+            return $dt->format('Y-m-d');
+        }
     }
     return null;
 }
@@ -269,7 +315,7 @@ if ($action === 'upload') {
                 ':ms'  => $r['member_status']  ?? '',
                 ':pos' => $r['position']       ?? '',
                 ':cid' => $r['citizen_id']     ?? '',
-                ':dob' => norm_date($r['date_of_birth'] ?? null),
+                ':dob' => norm_date($r['date_of_birth'] ?? null, 'mdy'),
                 ':cs'  => norm_date($r['coverage_start'] ?? null),
                 ':ce'  => norm_date($r['coverage_end']   ?? null),
                 ':pn'  => $r['policy_number']  ?? '',
@@ -411,6 +457,571 @@ if ($action === 'upload') {
         'total_inactivated' => $cntInactivated,
         'sync_id'           => $syncId,
         'batch_id'          => $batchId,
+    ]);
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ACTION: upload_combined — รวม 3 ไฟล์ (staff + student + resigned) เป็น batch เดียว
+//
+//   1. parse 3 ไฟล์ (อย่างน้อย staff หรือ student ต้องมี)
+//   2. dedupe staff ↔ student ด้วย citizen_id (fallback member_id) — บุคลากรชนะ
+//   3. ตัดแถวที่ตรงกับไฟล์คนออก (citizen_id หรือ member_id)
+//   4. mode=preview → ส่ง summary + sample
+//      mode=commit  → upsert + full_sync inactivate + create insurance_batch
+// ══════════════════════════════════════════════════════════════════════════════
+if ($action === 'upload_combined') {
+    $mode = ($_POST['mode'] ?? 'preview') === 'commit' ? 'commit' : 'preview';
+
+    $hasStaff    = !empty($_FILES['staff_file'])    && $_FILES['staff_file']['error']    === UPLOAD_ERR_OK;
+    $hasStudent  = !empty($_FILES['student_file'])  && $_FILES['student_file']['error']  === UPLOAD_ERR_OK;
+    $hasResigned = !empty($_FILES['resigned_file']) && $_FILES['resigned_file']['error'] === UPLOAD_ERR_OK;
+
+    if (!$hasStaff && !$hasStudent) {
+        json_err('ต้องมีไฟล์รายชื่อบุคลากรหรือนักศึกษาอย่างน้อย 1 ไฟล์');
+    }
+
+    $aliases = [
+        'วันเริ่มต้น'        => 'coverage_start',
+        'วันสิ้นสุด'         => 'coverage_end',
+        'วันสิ้นสุดคุ้มครอง' => 'coverage_end',
+        'วันเริ่มคุ้มครอง'   => 'coverage_start',
+        'ชื่อ-นามสกุล'       => 'full_name',
+        'ชื่อ-สกุล'          => 'full_name',
+        'ชื่อ นามสกุล'       => 'full_name',
+        'ชื่อพนักงาน'         => 'full_name',
+        'ชื่อ-นามสกุล (รวม)'  => 'full_name',
+        'ชื่อ'               => 'first_name',
+        'ชื่อจริง'           => 'first_name',
+        'นามสกุล'            => 'last_name',
+        'สกุล'               => 'last_name',
+        'คำนำ'               => 'name_prefix',
+        'คำนำหน้า'           => 'name_prefix',
+        'คำนำหน้าชื่อ'       => 'name_prefix',
+        'ประเภท'             => 'member_status',
+        'เลขบัตรประชาชน'     => 'citizen_id',
+        'รหัสบัตรประชาชน'    => 'citizen_id',
+        'เลขบัตร'            => 'citizen_id',
+        'หมายเลขประจำตัวประชาชน' => 'citizen_id',
+        'หมายเลขประจำตัว'    => 'citizen_id',
+        'เลขประจำตัวประชาชน' => 'citizen_id',
+        'id_card_no'         => 'citizen_id',
+        'birthday'           => 'date_of_birth',
+        'เลขกรมธรรม์'        => 'policy_number',
+        'หมายเหตุ'           => 'remarks',
+        'รหัส'               => 'member_id',
+        'รหัสบุคลากร'        => 'member_id',
+        'รหัสพนักงาน'        => 'member_id',
+        'รหัสนักศึกษา'       => 'member_id',
+        'ลำดับ'              => '_seq',
+        'ตำแหน่ง'            => 'position',
+        'สาขา'               => 'position',
+        'สาขาวิชา'           => 'position',
+        'คณะ'                => 'position',
+        'สังกัด'             => 'position',
+        'แผนก'               => 'position',
+        'หน่วยงาน'           => 'position',
+        'student_code'       => 'member_id',
+        'วันที่ออก'           => 'resign_date',
+        'วันออก'             => 'resign_date',
+        'วันลาออก'           => 'resign_date',
+        'วันที่ลาออก'         => 'resign_date',
+        'effective_date'     => 'resign_date',
+        'วันเดือนปีเกิด'      => 'date_of_birth',
+        'วันเดือนปี เกิด'     => 'date_of_birth',
+        'วันเกิด'            => 'date_of_birth',
+        'dob'                => 'date_of_birth',
+    ];
+
+    $applyAliases = function (array $row) use ($aliases): array {
+        $out = [];
+        foreach ($row as $k => $v) $out[$aliases[$k] ?? $k] = $v;
+        return $out;
+    };
+    $normCitizen = function (string $cid): string {
+        $cid = preg_replace('/\D/', '', $cid);
+        return strlen($cid) === 13 ? $cid : '';
+    };
+
+    $parseFlexible = function (string $tmp, bool $requireMemberId) use ($applyAliases, $normCitizen): array {
+        $raw   = file_get_contents($tmp);
+        $text  = decode_csv($raw);
+        $lines = preg_split('/\r\n|\r|\n/', trim($text));
+        if (count($lines) < 2) return ['error' => 'ไฟล์ต้องมีอย่างน้อย 1 แถวข้อมูล'];
+
+        $headerLine = ltrim(array_shift($lines), "\xEF\xBB\xBF");
+        $headers    = array_map(fn($h) => strtolower(trim($h)), str_getcsv($headerLine));
+
+        $rows = [];
+        foreach ($lines as $line) {
+            $line = trim($line);
+            if ($line === '') continue;
+            $cols = str_getcsv($line);
+            while (count($cols) < count($headers)) $cols[] = '';
+            $row = [];
+            foreach ($headers as $i => $h) $row[$h] = trim($cols[$i] ?? '');
+            $row = $applyAliases($row);
+            $row['member_id']  = (string)($row['member_id']  ?? '');
+            $row['citizen_id'] = $normCitizen((string)($row['citizen_id'] ?? ''));
+
+            // Compose full_name from prefix + first_name + last_name when not already provided
+            if (empty($row['full_name'])) {
+                $prefix = trim((string)($row['name_prefix'] ?? ''));
+                $first  = trim((string)($row['first_name']  ?? ''));
+                $last   = trim((string)($row['last_name']   ?? ''));
+                if ($first !== '' || $last !== '') {
+                    $row['full_name'] = trim($prefix . $first . ($last !== '' ? ' ' . $last : ''));
+                }
+            }
+
+            if ($requireMemberId && $row['member_id'] === '') continue;
+            if (!$requireMemberId && $row['member_id'] === '' && $row['citizen_id'] === '') continue;
+
+            $rows[] = $row;
+        }
+        return ['rows' => $rows];
+    };
+
+    $staffParse    = $hasStaff    ? $parseFlexible($_FILES['staff_file']['tmp_name'],    true)  : ['rows' => []];
+    $studentParse  = $hasStudent  ? $parseFlexible($_FILES['student_file']['tmp_name'],  true)  : ['rows' => []];
+    $resignedParse = $hasResigned ? $parseFlexible($_FILES['resigned_file']['tmp_name'], false) : ['rows' => []];
+
+    if (isset($staffParse['error']))    json_err('ไฟล์บุคลากร: ' . $staffParse['error']);
+    if (isset($studentParse['error']))  json_err('ไฟล์นักศึกษา: ' . $studentParse['error']);
+    if (isset($resignedParse['error'])) json_err('ไฟล์คนออก: '   . $resignedParse['error']);
+
+    $tagSource = function (string $src, string $defaultStatus) {
+        return function (array $r) use ($src, $defaultStatus): array {
+            $r['_source']       = $src;
+            $r['member_status'] = !empty($r['member_status']) ? $r['member_status'] : $defaultStatus;
+            return $r;
+        };
+    };
+    $staffList   = array_map($tagSource('staff',   'บุคลากร'),  $staffParse['rows']);
+    $studentList = array_map($tagSource('student', 'นักศึกษา'), $studentParse['rows']);
+    $resignedList = $resignedParse['rows'];
+
+    // Build leaver indexes (carry resign_date so we can persist it on inactivate)
+    $leaverByCid = [];
+    $leaverByMid = [];
+    foreach ($resignedList as $r) {
+        $info = [
+            'resign_date' => norm_date($r['resign_date'] ?? null),
+            'member_id'   => $r['member_id'],
+            'citizen_id'  => $r['citizen_id'],
+            'full_name'   => $r['full_name'] ?? '',
+        ];
+        if ($r['citizen_id']) $leaverByCid[$r['citizen_id']] = $info;
+        if ($r['member_id'])  $leaverByMid[$r['member_id']]  = $info;
+    }
+    $leaverInfoFor = function (string $cid, string $mid) use ($leaverByCid, $leaverByMid): ?array {
+        if ($cid !== '' && isset($leaverByCid[$cid])) {
+            return $leaverByCid[$cid] + ['_match' => 'citizen_id', '_match_value' => $cid];
+        }
+        if ($mid !== '' && isset($leaverByMid[$mid])) {
+            return $leaverByMid[$mid] + ['_match' => 'member_id', '_match_value' => $mid];
+        }
+        return null;
+    };
+
+    $keyFor = function (array $r): string {
+        return !empty($r['citizen_id']) ? ('C:' . $r['citizen_id']) : ('M:' . $r['member_id']);
+    };
+
+    $merged           = [];
+    $duplicates       = [];
+    $droppedLeavers   = [];
+    $droppedLeaverCnt = 0;
+    $countStaffIn     = 0;
+    $countStudentIn   = 0;
+
+    // Staff first (priority — บุคลากรชนะ)
+    foreach ($staffList as $r) {
+        $info = $leaverInfoFor($r['citizen_id'] ?? '', $r['member_id'] ?? '');
+        if ($info !== null) {
+            $droppedLeaverCnt++;
+            if (count($droppedLeavers) < 50) {
+                $droppedLeavers[] = $r + [
+                    '_dropped_from' => 'staff',
+                    '_resign_date'  => $info['resign_date'],
+                    '_match'        => $info['_match'],
+                    '_match_value'  => $info['_match_value'],
+                ];
+            }
+            continue;
+        }
+        $countStaffIn++;
+        $merged[$keyFor($r)] = $r;
+    }
+
+    foreach ($studentList as $r) {
+        $info = $leaverInfoFor($r['citizen_id'] ?? '', $r['member_id'] ?? '');
+        if ($info !== null) {
+            $droppedLeaverCnt++;
+            if (count($droppedLeavers) < 50) {
+                $droppedLeavers[] = $r + [
+                    '_dropped_from' => 'student',
+                    '_resign_date'  => $info['resign_date'],
+                    '_match'        => $info['_match'],
+                    '_match_value'  => $info['_match_value'],
+                ];
+            }
+            continue;
+        }
+        $key = $keyFor($r);
+        if (isset($merged[$key]) && $merged[$key]['_source'] === 'staff') {
+            $staffRow = $merged[$key];
+            $duplicates[] = [
+                'staff_member_id'   => $staffRow['member_id'],
+                'student_member_id' => $r['member_id'],
+                'citizen_id'        => $staffRow['citizen_id'] ?: $r['citizen_id'],
+                'full_name'         => $staffRow['full_name'] ?? ($r['full_name'] ?? ''),
+            ];
+            $note = "เรียนต่อ — รหัส นศ. {$r['member_id']}";
+            $oldRem = (string)($staffRow['remarks'] ?? '');
+            $merged[$key]['remarks'] = $oldRem === '' ? $note : ($oldRem . '; ' . $note);
+            continue;
+        }
+        $countStudentIn++;
+        $merged[$key] = $r;
+    }
+
+    $finalRows = array_values($merged);
+
+    // ── PREVIEW MODE ────────────────────────────────────────────────────────────
+    if ($mode === 'preview') {
+        json_ok([
+            'summary' => [
+                'staff_in_file'    => count($staffList),
+                'student_in_file'  => count($studentList),
+                'resigned_in_file' => count($resignedList),
+                'duplicates'       => count($duplicates),
+                'dropped_leavers'  => $droppedLeaverCnt,
+                'final_count'      => count($finalRows),
+                'staff_kept'       => $countStaffIn,
+                'student_kept'     => $countStudentIn,
+            ],
+            'duplicates_sample' => array_slice($duplicates, 0, 50),
+            'dropped_sample'    => $droppedLeavers,
+            'final_sample'      => array_slice($finalRows, 0, 50),
+        ]);
+    }
+
+    // ── COMMIT MODE ─────────────────────────────────────────────────────────────
+    ensure_insurance_table($pdo);
+
+    $existingRows = $pdo->query("
+        SELECT member_id, full_name, member_status, citizen_id, date_of_birth,
+               insurance_status, coverage_start, coverage_end, policy_number, remarks,
+               last_sync_id, manually_overridden
+        FROM insurance_members
+    ")->fetchAll(PDO::FETCH_ASSOC);
+    $existingById = [];
+    foreach ($existingRows as $existingRow) $existingById[$existingRow['member_id']] = $existingRow;
+    $existSet = array_flip(array_column($existingRows, 'member_id'));
+
+    $finalIdSet = [];
+    foreach ($finalRows as $r) $finalIdSet[$r['member_id']] = true;
+
+    $cntNew = $cntUpdated = $cntInactivated = $cntProtected = 0;
+
+    $upsert = $pdo->prepare("
+        INSERT INTO insurance_members
+            (member_id, full_name, member_status, position, citizen_id, date_of_birth,
+             insurance_status, coverage_start, coverage_end, policy_number, remarks,
+             last_sync_id, manually_overridden)
+        VALUES
+            (:mid, :fn, :ms, :pos, :cid, :dob, 'Active', :cs, :ce, :pn, :rem,
+             :sync_id_insert, 0)
+        ON DUPLICATE KEY UPDATE
+            insurance_status = IF(manually_overridden = 1, insurance_status, 'Active'),
+            last_sync_id     = :sync_id_update,
+            full_name        = IF(manually_overridden = 1, full_name,      VALUES(full_name)),
+            citizen_id       = IF(manually_overridden = 1, citizen_id,     VALUES(citizen_id)),
+            member_status    = IF(manually_overridden = 1, member_status,  VALUES(member_status)),
+            position         = IF(manually_overridden = 1, position,       VALUES(position)),
+            policy_number    = IF(manually_overridden = 1, policy_number,  VALUES(policy_number)),
+            coverage_start   = IF(manually_overridden = 1, coverage_start, VALUES(coverage_start)),
+            coverage_end     = IF(manually_overridden = 1, coverage_end,   VALUES(coverage_end)),
+            remarks          = IF(manually_overridden = 1, remarks,        VALUES(remarks))
+    ");
+
+    $pdo->beginTransaction();
+    try {
+        $syncId = (int)$pdo->query("SELECT COALESCE(MAX(sync_id), 0) + 1 FROM insurance_member_history")->fetchColumn();
+        if ($syncId <= 0) $syncId = 1;
+
+        $history = $pdo->prepare("
+            INSERT INTO insurance_member_history
+                (member_id, sync_id, change_type, old_status, new_status, snapshot)
+            VALUES
+                (:member_id, :sync_id, :change_type, :old_status, :new_status, :snapshot)
+        ");
+
+        foreach ($finalRows as $r) {
+            $mid         = $r['member_id'];
+            $existing_   = $existingById[$mid] ?? null;
+            $isProtected = $existing_ !== null && (int)($existing_['manually_overridden'] ?? 0) === 1;
+            $oldStatus   = $existing_['insurance_status'] ?? 'new';
+
+            $upsert->execute([
+                ':mid' => $mid,
+                ':fn'  => $r['full_name']      ?? '',
+                ':ms'  => $r['member_status']  ?? '',
+                ':pos' => $r['position']       ?? '',
+                ':cid' => $r['citizen_id']     ?? '',
+                ':dob' => norm_date($r['date_of_birth'] ?? null, 'mdy'),
+                ':cs'  => norm_date($r['coverage_start'] ?? null),
+                ':ce'  => norm_date($r['coverage_end']   ?? null),
+                ':pn'  => $r['policy_number']  ?? '',
+                ':rem' => $r['remarks']        ?? '',
+                ':sync_id_insert' => $syncId,
+                ':sync_id_update' => $syncId,
+            ]);
+
+            if (isset($existSet[$mid])) {
+                if ($isProtected) {
+                    $cntProtected++;
+                    $changeType = 'protected';
+                    $newStatus  = $oldStatus;
+                } else {
+                    $cntUpdated++;
+                    $changeType = 'updated';
+                    $newStatus  = 'Active';
+                }
+            } else {
+                $cntNew++;
+                $changeType = 'inserted';
+                $newStatus  = 'Active';
+            }
+
+            $snapshotData = ($changeType === 'updated' || $changeType === 'protected')
+                ? ($existingById[$mid] ?? ['member_id' => $mid])
+                : $r;
+            $history->execute([
+                ':member_id'   => $mid,
+                ':sync_id'     => $syncId,
+                ':change_type' => $changeType,
+                ':old_status'  => (string)$oldStatus,
+                ':new_status'  => (string)$newStatus,
+                ':snapshot'    => insurance_snapshot($snapshotData),
+            ]);
+        }
+
+        // Inactivate anyone in DB but not in finalRows (full_sync semantics)
+        $inactivate = $pdo->prepare("
+            UPDATE insurance_members
+            SET insurance_status = 'Inactive',
+                last_sync_id     = :sync_id
+            WHERE member_id = :mid
+              AND insurance_status = 'Active'
+              AND manually_overridden = 0
+        ");
+        // Update remarks + coverage_end for those matched in resigned file (only when not protected)
+        $applyResign = $pdo->prepare("
+            UPDATE insurance_members
+            SET remarks      = TRIM(BOTH '; ' FROM CONCAT(COALESCE(remarks,''), '; ', :note)),
+                coverage_end = COALESCE(:rd, coverage_end)
+            WHERE member_id = :mid AND manually_overridden = 0
+        ");
+
+        foreach (array_keys($existSet) as $mid) {
+            if (!isset($finalIdSet[$mid])) {
+                $inactivate->execute([':mid' => $mid, ':sync_id' => $syncId]);
+                if ($inactivate->rowCount() > 0) {
+                    $cntInactivated++;
+                    $existRow = $existingById[$mid] ?? ['member_id' => $mid];
+                    $info     = $leaverInfoFor((string)($existRow['citizen_id'] ?? ''), (string)$mid);
+                    $byLeaver = $info !== null;
+                    $changeType = $byLeaver ? 'inactivated_resigned' : 'inactivated';
+
+                    if ($byLeaver) {
+                        $resignDate = $info['resign_date'];
+                        $note = $resignDate ? "ออกเมื่อ {$resignDate}" : 'ออกจากงาน';
+                        $applyResign->execute([
+                            ':note' => $note,
+                            ':rd'   => $resignDate,
+                            ':mid'  => $mid,
+                        ]);
+                        $existRow['_resign_date'] = $resignDate;
+                    }
+
+                    $history->execute([
+                        ':member_id'   => $mid,
+                        ':sync_id'     => $syncId,
+                        ':change_type' => $changeType,
+                        ':old_status'  => (string)($existRow['insurance_status'] ?? 'Active'),
+                        ':new_status'  => 'Inactive',
+                        ':snapshot'    => insurance_snapshot($existRow),
+                    ]);
+                }
+            }
+        }
+
+        $pdo->commit();
+    } catch (Exception $e) {
+        $pdo->rollBack();
+        json_err('เกิดข้อผิดพลาด: ' . $e->getMessage());
+    }
+
+    log_activity('insurance_upload_combined',
+        "staff={$countStaffIn}, student={$countStudentIn}, dup=" . count($duplicates) .
+        ", drop_leaver={$droppedLeaverCnt}, final=" . count($finalRows) .
+        ", new={$cntNew}, updated={$cntUpdated}, inactivated={$cntInactivated}");
+
+    $batchId   = null;
+    $batchCode = null;
+    try {
+        require_once __DIR__ . '/includes/insurance_batch.php';
+        $sourceType = !empty($_SESSION['access_registry']) && empty($_SESSION['access_insurance'])
+            ? 'registry_combined' : 'clinic_combined';
+
+        $insBatch = $pdo->prepare("
+            INSERT INTO insurance_batch
+                (sync_id, batch_code, upload_mode, source_type, insurance_company,
+                 status, total_members, members_inserted, members_updated, members_inactivated,
+                 uploaded_by, uploaded_by_name, uploaded_at)
+            VALUES
+                (:sid, :bc, 'full_sync', :st, 'MTI',
+                 'pending_review', :tm, :mi, :mu, :minact,
+                 :ub, :ubn, NOW())
+        ");
+        for ($attempt = 0; $attempt < 5; $attempt++) {
+            $batchCode = ins_batch_generate_code($pdo);
+            try {
+                $insBatch->execute([
+                    ':sid'    => $syncId,
+                    ':bc'     => $batchCode,
+                    ':st'     => $sourceType,
+                    ':tm'     => count($finalRows),
+                    ':mi'     => $cntNew,
+                    ':mu'     => $cntUpdated,
+                    ':minact' => $cntInactivated,
+                    ':ub'     => (int)($_SESSION['admin_id'] ?? 0) ?: null,
+                    ':ubn'    => $_SESSION['admin_username'] ?? null,
+                ]);
+                break;
+            } catch (PDOException $e) {
+                if ($e->getCode() !== '23000') throw $e;
+                if ($attempt === 4) throw $e;
+                usleep(random_int(10000, 50000));
+            }
+        }
+        $batchId = (int)$pdo->lastInsertId();
+
+        ins_batch_log_event(
+            $pdo, $batchId, 'uploaded', null, 'pending_review',
+            'staff', (int)($_SESSION['admin_id'] ?? 0) ?: null,
+            $_SESSION['admin_username'] ?? null,
+            "combined: staff={$countStaffIn}, student={$countStudentIn}, dup=" . count($duplicates) .
+            ", leaver={$droppedLeaverCnt}, final=" . count($finalRows)
+        );
+    } catch (Exception $e) {
+        error_log('insurance_batch combined: ' . $e->getMessage());
+    }
+
+    json_ok([
+        'sync_id'    => $syncId,
+        'batch_id'   => $batchId,
+        'batch_code' => $batchCode,
+        'summary'    => [
+            'staff_in_file'    => count($staffList),
+            'student_in_file'  => count($studentList),
+            'resigned_in_file' => count($resignedList),
+            'duplicates'       => count($duplicates),
+            'dropped_leavers'  => $droppedLeaverCnt,
+            'final_count'      => count($finalRows),
+            'new'              => $cntNew,
+            'updated'          => $cntUpdated,
+            'inactivated'      => $cntInactivated,
+            'protected'        => $cntProtected,
+        ],
+    ]);
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ACTION: ai_review — Gemini-powered data quality review of preview payload
+//
+// PDPA-safe: client masks citizen_id (1XXXXXXXXXXX3) and names (initials)
+// before submitting. Server only forwards summary + masked sample to Gemini.
+// ══════════════════════════════════════════════════════════════════════════════
+if ($action === 'ai_review') {
+    if (!defined('GEMINI_API_KEY') || GEMINI_API_KEY === '') {
+        json_err('AI ยังไม่ได้ตั้งค่า — admin ต้องใส่ GEMINI_API_KEY ใน Site Settings');
+    }
+
+    $summary = $_POST['summary'] ?? '';
+    $sample  = $_POST['sample']  ?? '';
+    if (is_string($summary)) $summary = json_decode($summary, true);
+    if (is_string($sample))  $sample  = json_decode($sample, true);
+    if (!is_array($summary) || !is_array($sample)) json_err('ข้อมูลไม่ครบ');
+
+    // Defensive — strip any field that looks like full citizen_id (13 digits)
+    foreach ($sample as &$row) {
+        if (is_array($row)) {
+            foreach ($row as $k => $v) {
+                if (is_string($v) && preg_match('/^\d{13}$/', $v)) {
+                    $row[$k] = substr($v, 0, 1) . str_repeat('X', 11) . substr($v, -1);
+                }
+            }
+        }
+    }
+    unset($row);
+
+    $prompt = "คุณคือผู้ช่วยตรวจคุณภาพข้อมูลรายชื่อสำหรับส่งให้บริษัทประกันสุขภาพ\n";
+    $prompt .= "ของศูนย์การแพทย์มหาวิทยาลัยรังสิต\n";
+    $prompt .= "ข้อมูลถูก anonymize แล้ว (เลขบัตรเป็น 1XXXXXXXXXXX3, ชื่อเป็น initials)\n\n";
+    $prompt .= "=== สรุปสถิติ ===\n";
+    $prompt .= json_encode($summary, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT) . "\n\n";
+    $prompt .= "=== ตัวอย่างแถว (anonymized) ===\n";
+    $prompt .= json_encode($sample, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT) . "\n\n";
+    $prompt .= "วิเคราะห์เป็น bullet points ภาษาไทย ไม่เกิน 6 ข้อ ครอบคลุม:\n";
+    $prompt .= "1. คุณภาพข้อมูลโดยรวม (ดี/พอใช้/ต้องตรวจ)\n";
+    $prompt .= "2. ความผิดปกติของวันเกิด (อายุ <5 หรือ >80, ในอนาคต ฯลฯ) ระบุจำนวน\n";
+    $prompt .= "3. รายการที่ citizen_id ผิดรูป (ไม่ใช่ 13 หลัก/ว่าง) ระบุจำนวนและที่มา\n";
+    $prompt .= "4. ความสมดุลของ บุคลากร vs นักศึกษา ดูสมเหตุสมผลไหม\n";
+    $prompt .= "5. ข้อสังเกตอื่นที่ admin ควรตรวจก่อน commit\n";
+    $prompt .= "ตอบสั้นกระชับ ตรงประเด็น ใส่ emoji นำหน้าแต่ละข้อ (✅ คือดี, ⚠️ คือควรเช็ค, ❌ คือต้องแก้)";
+
+    $url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" . urlencode(GEMINI_API_KEY);
+    $payload = [
+        'contents'         => [['parts' => [['text' => $prompt]]]],
+        'generationConfig' => ['temperature' => 0.3, 'maxOutputTokens' => 800],
+    ];
+
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_POST           => true,
+        CURLOPT_POSTFIELDS     => json_encode($payload, JSON_UNESCAPED_UNICODE),
+        CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
+        CURLOPT_TIMEOUT        => 30,
+    ]);
+    $resp     = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlErr  = curl_error($ch);
+    curl_close($ch);
+
+    if ($resp === false) json_err('AI ติดต่อไม่ได้: ' . $curlErr);
+    if ($httpCode !== 200) {
+        $err = json_decode($resp, true)['error']['message'] ?? "HTTP $httpCode";
+        json_err('AI ตอบกลับผิดพลาด: ' . $err);
+    }
+
+    $data  = json_decode($resp, true);
+    $parts = $data['candidates'][0]['content']['parts'] ?? [];
+    $text  = '';
+    foreach ($parts as $part) {
+        if (!($part['thought'] ?? false) && isset($part['text'])) {
+            $text .= $part['text'];
+        }
+    }
+    if ($text === '') json_err('AI ตอบมาว่างเปล่า — ลองอีกครั้ง');
+
+    log_activity('insurance_ai_review', 'sample=' . count($sample) . ', tokens~' . (int)($data['usageMetadata']['totalTokenCount'] ?? 0));
+    json_ok([
+        'review' => $text,
+        'tokens' => (int)($data['usageMetadata']['totalTokenCount'] ?? 0),
+        'model'  => 'gemini-2.5-flash',
     ]);
 }
 
