@@ -307,6 +307,14 @@ function notify_booking_status(string $to, string $type, array $data): bool {
             $tplType    = 'reminder';
             break;
 
+        case 'expired':
+            $subject    = "การจองหมดอายุ: {$title}";
+            $emailTitle = 'การจองของคุณถูกยกเลิกอัตโนมัติ';
+            $message    = "{$greeting} เนื่องจากคุณไม่ได้เข้าเช็คอินในวันที่นัดหมายของกิจกรรม <strong>{$title}</strong> ระบบจึงยกเลิกการจองให้อัตโนมัติ หากต้องการเข้าร่วมกรุณาจองรอบเวลาใหม่";
+            $details['สถานะ'] = 'หมดอายุ — ไม่ได้เข้าเช็คอิน';
+            $tplType    = 'cancel';
+            break;
+
         default:
             return false;
     }

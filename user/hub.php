@@ -310,10 +310,11 @@ function getCampStyle($type): array
 function getStatusStyle($status): array
 {
     return match ($status) {
-        'confirmed', 'booked' => ['label' => 'ยืนยันแล้ว', 'class' => 'bg-emerald-50 text-emerald-600'],
-        'completed' => ['label' => 'สำเร็จแล้ว', 'class' => 'bg-green-50 text-green-600'],
-        'cancelled' => ['label' => 'ยกเลิกแล้ว', 'class' => 'bg-red-50 text-red-600'],
-        default => ['label' => 'รอดำเนินการ', 'class' => 'bg-gray-50 text-gray-600'],
+        'confirmed', 'booked'                  => ['label' => 'ยืนยันแล้ว',     'class' => 'bg-emerald-50 text-emerald-600'],
+        'completed'                            => ['label' => 'สำเร็จแล้ว',     'class' => 'bg-green-50 text-green-600'],
+        'cancelled', 'cancelled_by_admin'      => ['label' => 'ยกเลิกแล้ว',     'class' => 'bg-red-50 text-red-600'],
+        'expired'                              => ['label' => 'หมดอายุ',         'class' => 'bg-slate-100 text-slate-500'],
+        default                                => ['label' => 'รอดำเนินการ',     'class' => 'bg-gray-50 text-gray-600'],
     };
 }
 
