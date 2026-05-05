@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>404 — ไม่พบหน้าที่ต้องการ | RSU Medical Hub</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Sarabun', system-ui, -apple-system, sans-serif;
+            background: #f0f4f9;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1.5rem;
+            color: #0f172a;
+        }
+        .premium-gradient { background: linear-gradient(135deg, #2e9e63 0%, #10b981 100%); }
+        .wrap {
+            width: 100%;
+            max-width: 28rem;
+            text-align: center;
+            animation: fadeIn .7s ease-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(.95); }
+            to   { opacity: 1; transform: scale(1); }
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            border-radius: 3.5rem;
+            padding: 3rem;
+            box-shadow: 0 30px 80px rgba(0, 0, 0, 0.06);
+            position: relative;
+            overflow: hidden;
+        }
+        .deco-tl, .deco-br {
+            position: absolute;
+            width: 12rem;
+            height: 12rem;
+            border-radius: 50%;
+            filter: blur(48px);
+            opacity: .3;
+            pointer-events: none;
+        }
+        .deco-tl { right: -5rem; top: -5rem; background: #ecfdf5; }
+        .deco-br { left: -5rem;  bottom: -5rem; background: #d1fae5; }
+        .content { position: relative; z-index: 1; }
+        .pill {
+            display: inline-block;
+            padding: .375rem 1rem;
+            background: #f0fdf4;
+            color: #2e9e63;
+            border: 1px solid #dcfce7;
+            border-radius: 9999px;
+            font-size: .625rem;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: .2em;
+            margin-bottom: 1.5rem;
+        }
+        .big-num {
+            font-size: 8rem;
+            font-weight: 900;
+            color: #f1f5f9;
+            line-height: 1;
+            letter-spacing: -.05em;
+            user-select: none;
+            margin-bottom: 1rem;
+        }
+        .icon-circle {
+            width: 5rem;
+            height: 5rem;
+            border-radius: 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: -4rem auto 2rem;
+            color: #fff;
+            font-size: 1.75rem;
+            box-shadow: 0 10px 25px rgba(46, 158, 99, .25);
+            position: relative;
+            z-index: 2;
+        }
+        .icon-circle i { animation: pulse 2s ease-in-out infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .6; } }
+        h1 {
+            font-size: 1.875rem;
+            font-weight: 900;
+            margin-bottom: 1rem;
+            letter-spacing: -.025em;
+        }
+        .desc {
+            color: #94a3b8;
+            font-size: .875rem;
+            font-weight: 700;
+            line-height: 1.7;
+            margin-bottom: 2.5rem;
+            padding: 0 1rem;
+        }
+        .btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: .75rem;
+            width: 100%;
+            padding: 1.25rem;
+            font-weight: 900;
+            font-size: .8125rem;
+            border-radius: 1rem;
+            text-decoration: none;
+            text-transform: uppercase;
+            letter-spacing: .075em;
+            transition: transform .15s, box-shadow .15s;
+            border: none;
+            cursor: pointer;
+            font-family: inherit;
+        }
+        .btn:active { transform: scale(.97); }
+        .btn-primary {
+            color: #fff;
+            box-shadow: 0 10px 20px rgba(46, 158, 99, .15);
+            margin-bottom: 1rem;
+        }
+        .btn-secondary {
+            background: #fff;
+            color: #94a3b8;
+            border: 1px solid #f1f5f9;
+        }
+        .btn-secondary:hover { background: #f8fafc; }
+        .footer-line {
+            margin-top: 2.5rem;
+            padding-top: 2rem;
+            border-top: 1px solid #f1f5f9;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: .5rem;
+            color: #cbd5e1;
+            font-size: .625rem;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: .25em;
+        }
+        .footer-line .dot { color: #86efac; font-size: .5rem; }
+        .system-status {
+            margin-top: 2rem;
+            color: #cbd5e1;
+            font-size: .625rem;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: .3em;
+        }
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <div class="glass-card">
+            <div class="deco-tl"></div>
+            <div class="deco-br"></div>
+
+            <div class="content">
+                <div class="pill">Error 404</div>
+
+                <div class="big-num">404</div>
+
+                <div class="icon-circle premium-gradient">
+                    <i class="fa-solid fa-compass"></i>
+                </div>
+
+                <h1>ไม่พบหน้าที่ต้องการ</h1>
+                <p class="desc">
+                    ขออภัย ไม่พบหน้าที่คุณกำลังมองหา<br>
+                    อาจถูกย้าย ลบออก หรือ URL ไม่ถูกต้องครับ
+                </p>
+
+                <a href="javascript:history.back()" class="btn btn-primary premium-gradient">
+                    <i class="fa-solid fa-arrow-left"></i>
+                    กลับหน้าก่อนหน้า
+                </a>
+
+                <a href="/e-campaignv2/user/hub.php" class="btn btn-secondary">
+                    <i class="fa-solid fa-house"></i>
+                    ไปหน้าหลัก
+                </a>
+
+                <div class="footer-line">
+                    <i class="fa-solid fa-circle dot"></i>
+                    <span>RSU Medical Clinic Services</span>
+                </div>
+            </div>
+        </div>
+
+        <p class="system-status">System Health: Online</p>
+    </div>
+
+    <script>
+        // ── Log this 404 to the backend ──────────────────────────────────────
+        // The static error page can't talk to the DB directly, so we POST a
+        // report to ajax_log_404.php which writes into sys_error_logs.
+        (function () {
+            try {
+                var payload = JSON.stringify({
+                    url:      window.location.href,
+                    status:   404,
+                    referrer: document.referrer || '',
+                    message:  '404 (IIS error_docs): ' + window.location.pathname,
+                    context: {
+                        source: 'error_docs/not_found.html',
+                        user_agent: navigator.userAgent,
+                    },
+                });
+                var ENDPOINT = '/e-campaignv2/portal/ajax_log_404.php';
+                if (navigator.sendBeacon) {
+                    navigator.sendBeacon(ENDPOINT, new Blob([payload], { type: 'application/json' }));
+                } else {
+                    fetch(ENDPOINT, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: payload,
+                        keepalive: true,
+                    }).catch(function () { /* swallow */ });
+                }
+            } catch (_) { /* never break the error page because logging failed */ }
+        })();
+    </script>
+</body>
+</html>
