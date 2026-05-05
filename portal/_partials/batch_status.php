@@ -203,6 +203,9 @@ $stages = ins_batch_stepper_stages();
     display:flex; align-items:center; justify-content:center;
     font-size:.85rem; flex-shrink:0;
 }
+
+/* SweetAlert2 must sit above the detail drawer (z-index:9999) */
+.swal2-container { z-index: 100000 !important; }
 </style>
 
 <script>
