@@ -130,124 +130,35 @@ try {
     <!-- ── Upload + History (2-col) ── -->
     <div class="grid grid-cols-1 xl:grid-cols-12 gap-6">
 
-        <!-- Upload (5/12) -->
-        <div class="xl:col-span-5 min-w-0 bg-white rounded-[2rem] border border-slate-200 shadow-sm p-8 flex flex-col gap-6">
-            <h2 class="text-base font-black text-slate-800">อัปโหลดไฟล์รายชื่อผู้มีสิทธิ์</h2>
-
-            <!-- Step indicator -->
+        <!-- Upload CTA (5/12) — moved to "อัพโหลดรายชื่อ (ทะเบียน)" wizard -->
+        <div class="xl:col-span-5 min-w-0 bg-gradient-to-br from-cyan-50 to-blue-50 rounded-[2rem] border border-cyan-200 shadow-sm p-8 flex flex-col gap-5">
             <div class="flex items-center gap-3">
-                <div class="flex items-center gap-2">
-                    <div id="stepDot1" class="w-7 h-7 rounded-full bg-[#0052CC] text-white text-[11px] font-black flex items-center justify-center">1</div>
-                    <span class="text-xs font-black text-slate-600">เลือกไฟล์</span>
+                <div class="w-12 h-12 rounded-2xl bg-white shadow-sm flex items-center justify-center text-cyan-600 text-xl">
+                    <i class="fa-solid fa-layer-group"></i>
                 </div>
-                <div class="flex-1 h-px bg-slate-200"></div>
-                <div class="flex items-center gap-2">
-                    <div id="stepDot2" class="w-7 h-7 rounded-full bg-slate-100 text-slate-400 text-[11px] font-black flex items-center justify-center transition-all">2</div>
-                    <span id="stepLabel2" class="text-xs font-black text-slate-400 transition-all">อัปโหลด</span>
+                <div>
+                    <h2 class="text-base font-black text-slate-800">อัปโหลดรายชื่อ — รวม 3 ไฟล์</h2>
+                    <p class="text-xs text-slate-500 font-bold mt-0.5">บุคลากร · นักศึกษา · คนออก → รวม + Dedupe → ส่งประกัน</p>
                 </div>
             </div>
 
-            <!-- Column hint (collapsible) -->
-            <details class="group">
-                <summary class="cursor-pointer list-none flex items-center gap-2 text-xs font-black text-blue-600 select-none">
-                    <i class="fa-solid fa-circle-info"></i> ดูรูปแบบคอลัมในไฟล์
-                    <i class="fa-solid fa-chevron-down text-[9px] group-open:rotate-180 transition-transform ml-auto"></i>
-                </summary>
-                <div class="mt-3 space-y-3">
+            <ul class="text-xs text-slate-600 font-bold space-y-1.5 leading-relaxed">
+                <li class="flex items-start gap-2"><i class="fa-solid fa-check text-emerald-500 mt-0.5"></i> รวม 3 ไฟล์เป็น batch เดียว</li>
+                <li class="flex items-start gap-2"><i class="fa-solid fa-check text-emerald-500 mt-0.5"></i> Dedupe บุคลากรซ้อนนักศึกษา (citizen_id)</li>
+                <li class="flex items-start gap-2"><i class="fa-solid fa-check text-emerald-500 mt-0.5"></i> ตัดคนที่อยู่ในไฟล์คนออก ก่อนส่งประกัน</li>
+                <li class="flex items-start gap-2"><i class="fa-solid fa-eye text-blue-500 mt-0.5"></i> Preview ก่อน commit ทุกครั้ง</li>
+            </ul>
 
-                    <!-- Standard column list -->
-                    <div class="bg-slate-50 border border-slate-200 rounded-2xl overflow-hidden text-xs">
-                        <div class="px-4 py-2.5 bg-slate-100 border-b border-slate-200 flex items-center justify-between">
-                            <span class="font-black text-slate-600 uppercase tracking-widest text-[10px]">ชื่อคอลัมมาตรฐาน</span>
-                            <span class="text-[10px] font-bold text-slate-400">รองรับ .csv · .xlsx · .xls</span>
-                        </div>
-                        <div class="divide-y divide-slate-100">
-                            <?php
-                            $colGuide = [
-                                ['member_id',      true,  'รหัสบุคลากร / รหัสนักศึกษา',    '1000001'],
-                                ['full_name',      false, 'ชื่อ-นามสกุล',                   'นางสาวสมใจ ใจดี'],
-                                ['citizen_id',     false, 'เลขบัตรประชาชน 13 หลัก',          '1234567890123'],
-                                ['member_status',  false, 'บุคลากร หรือ นักศึกษา',           'บุคลากร'],
-                                ['position',       false, 'ตำแหน่ง / สาขาวิชา',              'อาจารย์ประจำ'],
-                                ['policy_number',  false, 'เลขกรมธรรม์',                    '25400001'],
-                                ['coverage_start', false, 'วันเริ่มคุ้มครอง  dd/mm/yyyy หรือ yyyy-mm-dd', '01/06/2025'],
-                                ['coverage_end',   false, 'วันสิ้นสุดคุ้มครอง',              '31/05/2026'],
-                            ];
-                            foreach ($colGuide as [$col, $req, $desc, $example]): ?>
-                            <div class="px-4 py-2 flex items-center gap-3">
-                                <code class="bg-white border border-slate-200 px-2 py-0.5 rounded-lg font-black text-slate-700 shrink-0 w-[140px]"><?= $col ?></code>
-                                <?php if ($req): ?>
-                                    <span class="text-[9px] font-black text-rose-500 bg-rose-50 border border-rose-100 px-1.5 py-0.5 rounded shrink-0">บังคับ</span>
-                                <?php else: ?>
-                                    <span class="text-[9px] font-black text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded shrink-0">ไม่บังคับ</span>
-                                <?php endif; ?>
-                                <span class="text-slate-500 font-bold min-w-0"><?= $desc ?></span>
-                                <code class="text-slate-400 ml-auto shrink-0 bg-slate-100 px-1.5 py-0.5 rounded"><?= htmlspecialchars($example) ?></code>
-                            </div>
-                            <?php endforeach; ?>
-                        </div>
-                    </div>
+            <button onclick="switchSection('registry_upload', document.querySelector('[data-section=registry_upload]'))"
+                class="w-full h-14 bg-[#0891b2] hover:bg-[#0e7490] text-white font-black rounded-2xl shadow-xl shadow-cyan-200 active:scale-95 transition-all flex items-center justify-center gap-3">
+                <i class="fa-solid fa-arrow-right-to-bracket"></i> ไปหน้าอัพโหลดรายชื่อ
+            </button>
 
-                    <!-- Warning note -->
-                    <div class="bg-amber-50 border border-amber-100 rounded-2xl px-4 py-3 flex items-start gap-2">
-                        <i class="fa-solid fa-triangle-exclamation text-amber-500 text-[11px] mt-0.5 shrink-0"></i>
-                        <p class="text-[11px] font-bold text-amber-700 leading-relaxed">
-                            สมาชิกที่ <strong>ไม่อยู่ในไฟล์</strong> จะถูกเปลี่ยนเป็น Inactive อัตโนมัติ ·
-                            คอลัมที่ไม่ส่งมาจะ<strong>ไม่เขียนทับ</strong>ข้อมูลเดิม
-                        </p>
-                    </div>
-                </div>
-            </details>
-
-            <!-- Upload mode selector -->
-            <div class="grid grid-cols-2 gap-2">
-                <label class="upload-mode-card cursor-pointer" data-mode="full_sync">
-                    <input type="radio" name="insUploadMode" value="full_sync" class="sr-only" checked>
-                    <div class="border-2 border-[#0052CC] bg-blue-50 rounded-2xl p-3 flex flex-col gap-1 transition-all">
-                        <div class="flex items-center gap-2">
-                            <i class="fa-solid fa-arrows-rotate text-[#0052CC] text-xs"></i>
-                            <span class="text-xs font-black text-[#0052CC]">Full Sync</span>
-                            <span class="ml-auto w-4 h-4 rounded-full bg-[#0052CC] flex items-center justify-center mode-dot"><i class="fa-solid fa-check text-white text-[8px]"></i></span>
-                        </div>
-                        <p class="text-[10px] font-bold text-slate-500 leading-relaxed">อัปเดตทั้งหมด — คนที่ไม่อยู่ในไฟล์จะถูก Inactive</p>
-                    </div>
-                </label>
-                <label class="upload-mode-card cursor-pointer" data-mode="append">
-                    <input type="radio" name="insUploadMode" value="append" class="sr-only">
-                    <div class="border-2 border-slate-200 bg-white rounded-2xl p-3 flex flex-col gap-1 transition-all">
-                        <div class="flex items-center gap-2">
-                            <i class="fa-solid fa-user-plus text-slate-400 text-xs mode-icon"></i>
-                            <span class="text-xs font-black text-slate-500 mode-label">เพิ่ม/อัปเดต</span>
-                            <span class="ml-auto w-4 h-4 rounded-full bg-slate-100 flex items-center justify-center mode-dot"></span>
-                        </div>
-                        <p class="text-[10px] font-bold text-slate-500 leading-relaxed">เพิ่มคนใหม่ + อัปเดตคนเดิม ไม่แตะคนที่ไม่อยู่ในไฟล์</p>
-                    </div>
-                </label>
-            </div>
-
-            <!-- Drop zone -->
-            <div class="ins-upload-area flex flex-col items-center justify-center py-10 px-6" id="insUploadArea"
-                 onclick="document.getElementById('insFileInput').click()"
-                 ondragover="event.preventDefault();this.classList.add('drag-over')"
-                 ondragleave="this.classList.remove('drag-over')"
-                 ondrop="handleInsDrop(event)">
-                <div class="w-14 h-14 bg-white rounded-3xl shadow-lg flex items-center justify-center text-blue-600 text-xl mb-3 border border-blue-50">
-                    <i class="fa-solid fa-file-shield"></i>
-                </div>
-                <p class="text-sm font-black text-slate-700" id="insFileLabel">คลิกหรือลากไฟล์มาวางที่นี่</p>
-                <p class="text-[11px] text-slate-400 mt-1">.csv, .xlsx, .xls</p>
-            </div>
-            <input type="file" id="insFileInput" accept=".csv,.xlsx,.xls" class="hidden" onchange="onInsFileSelect(this)">
-
-            <!-- Upload preview (shown after file selected) -->
-            <div id="insUploadPreview" class="hidden"></div>
-
-            <!-- Last sync summary -->
             <?php if ($lastSync): ?>
-            <div class="bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3 flex items-center gap-3">
-                <i class="fa-solid fa-clock-rotate-left text-slate-300 text-sm shrink-0"></i>
-                <div class="text-xs text-slate-500 font-bold">
-                    Sync ล่าสุด <span class="text-slate-700">#<?= $lastSync['sync_id'] ?></span>
+            <div class="bg-white/60 border border-slate-100 rounded-2xl px-4 py-3 flex items-center gap-3">
+                <i class="fa-solid fa-clock-rotate-left text-slate-400 text-sm shrink-0"></i>
+                <div class="text-xs text-slate-600 font-bold">
+                    Sync ล่าสุด <span class="text-slate-800">#<?= $lastSync['sync_id'] ?></span>
                     <span class="mx-1.5 text-slate-300">·</span>
                     <?= htmlspecialchars($lastSync['sync_time'] ?? '', ENT_QUOTES, 'UTF-8') ?>
                     <span class="mx-1.5 text-slate-300">·</span>
@@ -256,19 +167,15 @@ try {
                     <span class="text-rose-500">-<?= (int)$lastSync['cnt_removed'] ?></span>
                 </div>
             </div>
-            <?php else: ?>
-            <div class="bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3 flex items-center gap-3">
-                <i class="fa-solid fa-clock-rotate-left text-slate-200 text-sm shrink-0"></i>
-                <p class="text-xs text-slate-400 font-bold">ยังไม่มีประวัติการ sync</p>
-            </div>
             <?php endif; ?>
+        </div>
 
-            <button id="insBtnUpload" onclick="doInsUpload()" disabled
-                class="w-full h-14 bg-[#0052CC] text-white font-black rounded-2xl shadow-xl shadow-blue-200 active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-30 disabled:cursor-not-allowed">
-                <i class="fa-solid fa-cloud-arrow-up"></i> อัปโหลดและอัปเดตข้อมูล
-            </button>
 
-            <div id="insUploadResult" class="hidden"></div>
+        <?php /* Legacy upload UI removed — moved to /portal section=registry_upload (Combined Wizard). */ ?>
+        <div class="hidden" aria-hidden="true">
+            <div id="insUploadArea"></div><div id="insFileLabel"></div><div id="insUploadPreview"></div>
+            <div id="insUploadResult"></div><button id="insBtnUpload" disabled></button>
+            <input id="insFileInput" type="file">
         </div>
 
         <!-- History (7/12) -->
