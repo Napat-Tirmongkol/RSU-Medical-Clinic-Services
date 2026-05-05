@@ -193,6 +193,100 @@ try {
             echo json_encode(['ok' => true, 'message' => 'ลบแล้ว']);
             return;
 
+        // ── Doctor Schedule ──────────────────────────────────────────────
+        case 'schedule:list': {
+            // Auto-migrate
+            try {
+                $pdo->exec("CREATE TABLE IF NOT EXISTS sys_doctor_schedule (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    staff_id INT NOT NULL,
+                    type ENUM('regular','override','off') NOT NULL DEFAULT 'regular',
+                    weekday TINYINT NULL,
+                    specific_date DATE NULL,
+                    start_time TIME NULL,
+                    end_time TIME NULL,
+                    room_id INT NULL,
+                    service_type VARCHAR(100) NULL,
+                    notes VARCHAR(255) NULL,
+                    is_active TINYINT(1) NOT NULL DEFAULT 1,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    INDEX idx_staff (staff_id),
+                    INDEX idx_weekday (weekday),
+                    INDEX idx_date (specific_date)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+            } catch (PDOException) {}
+
+            $start = $_POST['start'] ?? date('Y-m-01');
+            $end   = $_POST['end']   ?? date('Y-m-t');
+
+            $stmt = $pdo->prepare("
+                SELECT s.*, ms.title AS doc_title, ms.full_name AS doc_name,
+                       cr.name AS room_name, cr.code AS room_code
+                FROM sys_doctor_schedule s
+                LEFT JOIN sys_medical_staff ms ON s.staff_id = ms.id
+                LEFT JOIN sys_clinic_rooms  cr ON s.room_id  = cr.id
+                WHERE s.is_active = 1
+            ");
+            $stmt->execute();
+            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            echo json_encode(['ok' => true, 'rows' => $rows]);
+            return;
+        }
+
+        case 'schedule:add': {
+            $type = $_POST['type'] ?? 'regular';
+            $stmt = $pdo->prepare("INSERT INTO sys_doctor_schedule
+                (staff_id, type, weekday, specific_date, start_time, end_time, room_id, service_type, notes)
+                VALUES (?,?,?,?,?,?,?,?,?)");
+            $stmt->execute([
+                (int)$_POST['staff_id'],
+                $type,
+                $type === 'regular' ? (int)$_POST['weekday'] : null,
+                $type !== 'regular' ? ($_POST['specific_date'] ?? null) : null,
+                $type === 'off' ? null : ($_POST['start_time'] ?? null),
+                $type === 'off' ? null : ($_POST['end_time']   ?? null),
+                !empty($_POST['room_id']) ? (int)$_POST['room_id'] : null,
+                trim((string)($_POST['service_type'] ?? '')) ?: null,
+                trim((string)($_POST['notes'] ?? '')) ?: null,
+            ]);
+            echo json_encode(['ok' => true, 'id' => (int)$pdo->lastInsertId(), 'message' => 'เพิ่ม shift แล้ว']);
+            return;
+        }
+
+        case 'schedule:update': {
+            // Used by drag-drop & modal edit. Updates time + optional fields.
+            $id = (int)$_POST['id'];
+            $stmt = $pdo->prepare("UPDATE sys_doctor_schedule SET
+                weekday       = COALESCE(:weekday, weekday),
+                specific_date = COALESCE(:date, specific_date),
+                start_time    = :st,
+                end_time      = :et,
+                staff_id      = COALESCE(:staff, staff_id),
+                room_id       = :room,
+                service_type  = :svc,
+                notes         = :notes
+                WHERE id = :id");
+            $stmt->execute([
+                ':weekday' => isset($_POST['weekday'])       ? (int)$_POST['weekday'] : null,
+                ':date'    => $_POST['specific_date']        ?? null,
+                ':st'      => $_POST['start_time']           ?? null,
+                ':et'      => $_POST['end_time']             ?? null,
+                ':staff'   => isset($_POST['staff_id'])      ? (int)$_POST['staff_id'] : null,
+                ':room'    => !empty($_POST['room_id'])      ? (int)$_POST['room_id']  : null,
+                ':svc'     => trim((string)($_POST['service_type'] ?? '')) ?: null,
+                ':notes'   => trim((string)($_POST['notes'] ?? '')) ?: null,
+                ':id'      => $id,
+            ]);
+            echo json_encode(['ok' => true, 'message' => 'อัปเดตแล้ว']);
+            return;
+        }
+
+        case 'schedule:delete':
+            $pdo->prepare("DELETE FROM sys_doctor_schedule WHERE id = ?")->execute([(int)$_POST['id']]);
+            echo json_encode(['ok' => true, 'message' => 'ลบแล้ว']);
+            return;
+
         default:
             echo json_encode(['ok' => false, 'message' => "Unknown action: $entity:$action"]);
             return;

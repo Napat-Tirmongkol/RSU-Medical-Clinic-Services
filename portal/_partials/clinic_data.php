@@ -1,10 +1,10 @@
 <?php
 // portal/_partials/clinic_data.php — router + card-grid landing
-// Sub-views: profile / faculty / staff / rooms / hours
+// Sub-views: profile / faculty / staff / rooms / hours / schedule
 // Each sub-view gets back to landing via ?section=clinic_data (no cd_view)
 
 $_view = $_GET['cd_view'] ?? '';
-$_validViews = ['profile','faculty','staff','rooms','hours'];
+$_validViews = ['profile','faculty','staff','rooms','hours','schedule'];
 
 if (in_array($_view, $_validViews, true)) {
     include __DIR__ . '/clinic_data/' . $_view . '.php';
@@ -105,6 +105,17 @@ $_cards = [
         'count'   => $_counts['hours'],
         'count_label' => 'รายการ',
         'updated' => null,
+    ],
+    [
+        'view'    => 'schedule',
+        'title'   => 'ตารางแพทย์ออกตรวจ',
+        'desc'    => 'จัดตารางเวรแพทย์ ห้องตรวจ และประเภทบริการ — drag-drop calendar',
+        'icon'    => 'fa-user-clock',
+        'tone'    => ['bg'=>'#ecfeff','fg'=>'#0e7490','border'=>'#a5f3fc'],
+        'used_by' => ['internal scheduling'],
+        'count'   => $_safeCount("SELECT COUNT(*) FROM sys_doctor_schedule WHERE is_active = 1"),
+        'count_label' => 'shift',
+        'updated' => $_safeMax("SELECT MAX(updated_at) FROM sys_doctor_schedule") ? $_relTime($_safeMax("SELECT MAX(updated_at) FROM sys_doctor_schedule")) : null,
     ],
     [
         'view'    => null, // external link — managed in separate section
