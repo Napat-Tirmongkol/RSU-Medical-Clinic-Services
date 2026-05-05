@@ -263,11 +263,10 @@ $stages = ins_batch_stepper_stages();
         const st = document.getElementById('bsStatusFilter').value;
         const url = `ajax_insurance_batches.php?action=list&page=${page}&q=${encodeURIComponent(q)}&status=${encodeURIComponent(st)}`;
         const r = await fetch(url).then(r => r.json());
-        if (r.status !== 'ok') { alert(r.message || 'load error'); return; }
-        const payload = r.data || r;
+        if (r.status !== 'ok') { Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: r.message || 'load error' }); return; }
 
         const tb = document.getElementById('bsTbody');
-        const rows = payload.data || [];
+        const rows = r.data || [];
         if (!rows.length) {
             tb.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:1.5rem; color:#94a3b8;">ไม่พบ batch</td></tr>';
         } else {
@@ -300,9 +299,8 @@ $stages = ins_batch_stepper_stages();
             `).join('');
         }
 
-        const p = payload.pagination;
+        const p = r.pagination;
         if (!p) {
-            // Backend returned no pagination block — skip pagination render to avoid TypeError
             bsLoadStats();
             return;
         }
@@ -441,8 +439,8 @@ $stages = ins_batch_stepper_stages();
     window.bsLoadMembers = async function(batchId, page) {
         const r = await fetch(`ajax_insurance_batches.php?action=members&id=${batchId}&page=${page}`).then(r => r.json());
         if (r.status !== 'ok') { document.getElementById('bsMemberList').innerHTML = `<div style="color:#dc2626;">${esc(r.message)}</div>`; return; }
-        const p = (r.data || r).pagination;
-        const rows = (r.data || r).data || [];
+        const p = r.pagination;
+        const rows = r.data || [];
         if (!rows.length) {
             document.getElementById('bsMemberList').innerHTML = '<div style="color:#94a3b8;">ไม่มีรายชื่อ</div>';
             return;
@@ -469,28 +467,53 @@ $stages = ins_batch_stepper_stages();
     };
 
     window.bsApprove = async function(id) {
-        const note = prompt('หมายเหตุการอนุมัติ (ไม่บังคับ):', '');
-        if (note === null) return;
+        const { isConfirmed, value: note } = await Swal.fire({
+            title: 'อนุมัติเอกสาร?',
+            input: 'text',
+            inputLabel: 'หมายเหตุการอนุมัติ (ไม่บังคับ)',
+            inputPlaceholder: 'ระบุหมายเหตุ...',
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonText: '<i class="fa-solid fa-check mr-1"></i> อนุมัติ',
+            cancelButtonText: 'ยกเลิก',
+            confirmButtonColor: '#10b981',
+            reverseButtons: true,
+        });
+        if (!isConfirmed) return;
         const fd = new FormData();
         fd.append('action', 'approve');
         fd.append('id', id);
-        fd.append('note', note);
+        fd.append('note', note || '');
         fd.append('csrf_token', CSRF);
         const r = await fetch('ajax_insurance_batches.php', { method: 'POST', body: fd }).then(r => r.json());
-        if (r.status !== 'ok') { alert(r.message); return; }
+        if (r.status !== 'ok') { Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: r.message }); return; }
         bsCloseDrawer(); bsLoad(currentPage);
+        Swal.fire({ icon: 'success', title: 'อนุมัติแล้ว', timer: 1500, showConfirmButton: false });
     };
     window.bsReject = async function(id) {
-        const note = prompt('เหตุผลการตีกลับ (จำเป็น):', '');
-        if (!note || !note.trim()) return;
+        const { isConfirmed, value: note } = await Swal.fire({
+            title: 'ตีกลับเอกสาร?',
+            input: 'text',
+            inputLabel: 'เหตุผลการตีกลับ (จำเป็น)',
+            inputPlaceholder: 'ระบุเหตุผล...',
+            inputValidator: v => (!v || !v.trim()) ? 'กรุณาระบุเหตุผล' : null,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: '<i class="fa-solid fa-xmark mr-1"></i> ตีกลับ',
+            cancelButtonText: 'ยกเลิก',
+            confirmButtonColor: '#ef4444',
+            reverseButtons: true,
+        });
+        if (!isConfirmed || !note || !note.trim()) return;
         const fd = new FormData();
         fd.append('action', 'reject');
         fd.append('id', id);
         fd.append('note', note.trim());
         fd.append('csrf_token', CSRF);
         const r = await fetch('ajax_insurance_batches.php', { method: 'POST', body: fd }).then(r => r.json());
-        if (r.status !== 'ok') { alert(r.message); return; }
+        if (r.status !== 'ok') { Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: r.message }); return; }
         bsCloseDrawer(); bsLoad(currentPage);
+        Swal.fire({ icon: 'success', title: 'ตีกลับแล้ว', timer: 1500, showConfirmButton: false });
     };
     window.bsCloseDrawer = function(e) {
         if (e && e.target.id !== 'bsDrawer') return;
