@@ -120,6 +120,76 @@ declare(strict_types=1);
         <div id="cwPreview" style="display:none; margin-top:1.25rem;"></div>
     </div>
 
+    <!-- ─────────────── Add single member (เข้าใหม่กลางเทอม) ─────────────── -->
+    <div style="background:#fff; border-radius:1rem; box-shadow:0 4px 14px rgba(0,0,0,.05); padding:1.5rem 1.75rem; margin-bottom:1.25rem;">
+        <div style="display:flex; align-items:center; gap:.75rem; margin-bottom:1.25rem;">
+            <i class="fa-solid fa-user-plus" style="font-size:1.4rem; color:#10b981;"></i>
+            <div>
+                <h3 style="margin:0; font-weight:800; color:#0f172a;">เพิ่มรายชื่อทีละคน</h3>
+                <p style="margin:.2rem 0 0 0; font-size:.78rem; color:#64748b;">
+                    สำหรับนักศึกษา/บุคลากรเข้าใหม่กลางเทอม — ระบบจะสร้าง batch ส่งให้คลินิกตรวจสอบเหมือนการอัพโหลดไฟล์
+                </p>
+            </div>
+        </div>
+
+        <form id="asForm" onsubmit="return false;">
+            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(get_csrf_token()) ?>">
+            <input type="hidden" name="action" value="add_single">
+
+            <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:.85rem;">
+                <div>
+                    <label class="as-label">ประเภท <span class="as-req">*</span></label>
+                    <select name="member_status" class="as-input" required>
+                        <option value="">-- เลือกประเภท --</option>
+                        <option value="นักศึกษา">นักศึกษา</option>
+                        <option value="บุคลากร">บุคลากร</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="as-label">รหัสนักศึกษา/บุคลากร <span class="as-req">*</span></label>
+                    <input type="text" name="member_id" class="as-input" required maxlength="20" placeholder="เช่น 6612345">
+                </div>
+                <div style="grid-column:1/-1;">
+                    <label class="as-label">ชื่อ-นามสกุล (พร้อมคำนำหน้า) <span class="as-req">*</span></label>
+                    <input type="text" name="full_name" class="as-input" required maxlength="255" placeholder="เช่น นายสมชาย ใจดี">
+                </div>
+                <div>
+                    <label class="as-label">เลขบัตรประชาชน (13 หลัก)</label>
+                    <input type="text" name="citizen_id" class="as-input" maxlength="17" placeholder="1-2345-67890-12-3">
+                </div>
+                <div>
+                    <label class="as-label">วันเกิด</label>
+                    <input type="date" name="date_of_birth" class="as-input">
+                </div>
+                <div>
+                    <label class="as-label">ตำแหน่ง / สังกัด / คณะ</label>
+                    <input type="text" name="position" class="as-input" maxlength="100" placeholder="เช่น คณะแพทยศาสตร์">
+                </div>
+                <div>
+                    <label class="as-label">วันเริ่มต้นคุ้มครอง</label>
+                    <input type="date" name="coverage_start" class="as-input">
+                </div>
+                <div>
+                    <label class="as-label">วันสิ้นสุดคุ้มครอง</label>
+                    <input type="date" name="coverage_end" class="as-input">
+                </div>
+                <div style="grid-column:1/-1;">
+                    <label class="as-label">หมายเหตุ</label>
+                    <textarea name="remarks" class="as-input" rows="2" placeholder="เช่น เข้าใหม่กลางเทอม 2/2568"></textarea>
+                </div>
+            </div>
+
+            <div style="display:flex; gap:.5rem; justify-content:flex-end; margin-top:1rem;">
+                <button type="button" onclick="asReset()" class="reg-btn-secondary">
+                    <i class="fa-solid fa-rotate-left"></i> ล้าง
+                </button>
+                <button type="button" onclick="asSubmit()" class="reg-btn-primary" style="background:#10b981;">
+                    <i class="fa-solid fa-user-plus"></i> เพิ่มรายชื่อ
+                </button>
+            </div>
+        </form>
+    </div>
+
     <!-- ─────────────── Advanced: legacy single-file ─────────────── -->
     <details style="background:#fff; border-radius:1rem; box-shadow:0 4px 14px rgba(0,0,0,.05); padding:1rem 1.5rem;">
         <summary style="cursor:pointer; font-weight:800; color:#475569; font-size:.9rem; list-style:none;">
@@ -273,6 +343,20 @@ declare(strict_types=1);
 .reg-alert-success { background:#ecfdf5; border:1px solid #86efac; color:#065f46; padding:.85rem 1rem; border-radius:.65rem; }
 .reg-alert-error { background:#fef2f2; border:1px solid #fca5a5; color:#991b1b; padding:.85rem 1rem; border-radius:.65rem; }
 .reg-alert-info { background:#eff6ff; border:1px solid #bfdbfe; color:#1e40af; padding:.85rem 1rem; border-radius:.65rem; }
+
+.as-label { display:block; font-size:.78rem; font-weight:700; color:#475569; margin-bottom:.3rem; }
+.as-req   { color:#ef4444; }
+.as-input {
+    width:100%; padding:.55rem .75rem;
+    border:1.5px solid #e2e8f0; border-radius:.5rem;
+    font-family:'Sarabun',sans-serif; font-size:.88rem;
+    background:#fff; color:#0f172a;
+    transition: border-color .15s, box-shadow .15s;
+}
+.as-input:focus {
+    outline:none; border-color:#10b981;
+    box-shadow:0 0 0 3px rgba(16,185,129,.15);
+}
 </style>
 
 <script>
@@ -719,5 +803,72 @@ declare(strict_types=1);
             }
         });
     });
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Add Single Member (เพิ่มรายชื่อทีละคน)
+    // ═══════════════════════════════════════════════════════════════════════════
+    window.asReset = function() {
+        const f = document.getElementById('asForm');
+        if (!f) return;
+        f.querySelectorAll('input[type=text], input[type=date], textarea').forEach(el => el.value = '');
+        f.querySelector('select[name=member_status]').value = '';
+    };
+
+    window.asSubmit = async function() {
+        const f = document.getElementById('asForm');
+        const memberId   = f.member_id.value.trim();
+        const fullName   = f.full_name.value.trim();
+        const memberType = f.member_status.value;
+        const citizenId  = (f.citizen_id.value || '').replace(/[\s\-]/g, '');
+
+        if (!memberType) { Swal.fire({ icon: 'warning', title: 'กรุณาเลือกประเภท' }); return; }
+        if (!memberId)   { Swal.fire({ icon: 'warning', title: 'กรุณากรอกรหัสนักศึกษา/บุคลากร' }); return; }
+        if (!fullName)   { Swal.fire({ icon: 'warning', title: 'กรุณากรอกชื่อ-นามสกุล' }); return; }
+        if (citizenId !== '' && !/^\d{13}$/.test(citizenId)) {
+            Swal.fire({ icon: 'warning', title: 'เลขบัตรประชาชนไม่ถูกต้อง', text: 'ต้องเป็นตัวเลข 13 หลัก' });
+            return;
+        }
+
+        const { isConfirmed } = await Swal.fire({
+            title: 'ยืนยันเพิ่มรายชื่อ?',
+            html: `<div style="text-align:left; font-size:.9rem;">
+                <div><b>ประเภท:</b> ${escHTML(memberType)}</div>
+                <div><b>รหัส:</b> ${escHTML(memberId)}</div>
+                <div><b>ชื่อ:</b> ${escHTML(fullName)}</div>
+                <div style="margin-top:.5rem; color:#64748b; font-size:.8rem;">
+                    ระบบจะสร้าง batch รายเดียว ส่งให้คลินิกตรวจสอบ
+                </div>
+            </div>`,
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonText: '<i class="fa-solid fa-check mr-1"></i> ยืนยัน',
+            cancelButtonText: 'ยกเลิก',
+            confirmButtonColor: '#10b981',
+            reverseButtons: true,
+        });
+        if (!isConfirmed) return;
+
+        Swal.fire({ title: 'กำลังบันทึก...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
+
+        const fd = new FormData(f);
+        try {
+            const r = await fetch('ajax_insurance_sync.php', { method: 'POST', body: fd }).then(r => r.json());
+            Swal.close();
+            if (r.status !== 'ok') {
+                Swal.fire({ icon: 'error', title: 'เพิ่มไม่สำเร็จ', text: r.message || 'เกิดข้อผิดพลาด' });
+                return;
+            }
+            await Swal.fire({
+                icon: 'success',
+                title: 'เพิ่มรายชื่อแล้ว',
+                html: `สร้าง batch <code>${escHTML(r.batch_code || '')}</code> ส่งให้คลินิกตรวจสอบ`,
+                timer: 2200,
+                showConfirmButton: false,
+            });
+            asReset();
+        } catch (e) {
+            Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: e.message || 'network error' });
+        }
+    };
 })();
 </script>

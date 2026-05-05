@@ -461,6 +461,155 @@ if ($action === 'upload') {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
+// ACTION: add_single — เพิ่มรายชื่อทีละคน (สำหรับนักศึกษา/บุคลากรเข้าใหม่กลางเทอม)
+//
+//   - Validate: member_id + full_name + member_status required
+//   - Reject duplicate member_id (ให้ใช้หน้าแก้ไขสำหรับ update)
+//   - Insert insurance_members + insurance_member_history (change_type='inserted')
+//   - Create insurance_batch (source_type='manual_single', status='pending_review')
+// ══════════════════════════════════════════════════════════════════════════════
+if ($action === 'add_single') {
+    $memberId     = trim((string)($_POST['member_id']     ?? ''));
+    $fullName     = trim((string)($_POST['full_name']     ?? ''));
+    $memberStatus = trim((string)($_POST['member_status'] ?? ''));
+    $citizenId    = preg_replace('/[\s\-]+/', '', (string)($_POST['citizen_id'] ?? ''));
+    $position     = trim((string)($_POST['position']      ?? ''));
+    $dob          = trim((string)($_POST['date_of_birth'] ?? ''));
+    $coverageStart= trim((string)($_POST['coverage_start']?? ''));
+    $coverageEnd  = trim((string)($_POST['coverage_end']  ?? ''));
+    $remarks      = trim((string)($_POST['remarks']       ?? ''));
+
+    if ($memberId === '')     json_err('กรุณากรอกรหัสนักศึกษา/บุคลากร');
+    if ($fullName === '')     json_err('กรุณากรอกชื่อ-นามสกุล');
+    if ($memberStatus === '') json_err('กรุณาเลือกประเภท (นักศึกษา/บุคลากร)');
+    if ($citizenId !== '' && !preg_match('/^\d{13}$/', $citizenId)) {
+        json_err('เลขบัตรประชาชนต้องเป็นตัวเลข 13 หลัก');
+    }
+
+    ensure_insurance_table($pdo);
+
+    // Reject duplicate member_id
+    $dupChk = $pdo->prepare("SELECT insurance_status FROM insurance_members WHERE member_id = :mid");
+    $dupChk->execute([':mid' => $memberId]);
+    $existing = $dupChk->fetch(PDO::FETCH_ASSOC);
+    if ($existing) {
+        json_err('รหัส ' . $memberId . ' มีในระบบแล้ว (สถานะ: ' . $existing['insurance_status'] . ') — กรุณาใช้หน้าแก้ไขรายชื่อแทน');
+    }
+
+    $dobNorm = norm_date($dob !== '' ? $dob : null, 'mdy');
+    $csNorm  = norm_date($coverageStart !== '' ? $coverageStart : null);
+    $ceNorm  = norm_date($coverageEnd !== '' ? $coverageEnd : null);
+
+    $batchId = null;
+    $syncId  = null;
+    $pdo->beginTransaction();
+    try {
+        $syncId = (int)$pdo->query("SELECT COALESCE(MAX(sync_id), 0) + 1 FROM insurance_member_history")->fetchColumn();
+        if ($syncId <= 0) $syncId = 1;
+
+        $pdo->prepare("
+            INSERT INTO insurance_members
+                (member_id, full_name, member_status, position, citizen_id, date_of_birth,
+                 insurance_status, coverage_start, coverage_end, policy_number, remarks,
+                 last_sync_id, manually_overridden)
+            VALUES
+                (:mid, :fn, :ms, :pos, :cid, :dob, 'Active', :cs, :ce, '', :rem, :sid, 0)
+        ")->execute([
+            ':mid' => $memberId,
+            ':fn'  => $fullName,
+            ':ms'  => $memberStatus,
+            ':pos' => $position,
+            ':cid' => $citizenId,
+            ':dob' => $dobNorm,
+            ':cs'  => $csNorm,
+            ':ce'  => $ceNorm,
+            ':rem' => $remarks,
+            ':sid' => $syncId,
+        ]);
+
+        $snapshotData = [
+            'member_id'      => $memberId,
+            'full_name'      => $fullName,
+            'member_status'  => $memberStatus,
+            'position'       => $position,
+            'citizen_id'     => $citizenId,
+            'date_of_birth'  => $dobNorm,
+            'coverage_start' => $csNorm,
+            'coverage_end'   => $ceNorm,
+            'remarks'        => $remarks,
+        ];
+        $pdo->prepare("
+            INSERT INTO insurance_member_history
+                (member_id, sync_id, change_type, old_status, new_status, snapshot)
+            VALUES
+                (:mid, :sid, 'inserted', 'new', 'Active', :snap)
+        ")->execute([
+            ':mid'  => $memberId,
+            ':sid'  => $syncId,
+            ':snap' => insurance_snapshot($snapshotData),
+        ]);
+
+        // Create batch row (source_type='manual_single')
+        require_once __DIR__ . '/includes/insurance_batch.php';
+        $insBatch = $pdo->prepare("
+            INSERT INTO insurance_batch
+                (sync_id, batch_code, upload_mode, source_type, insurance_company,
+                 status, total_members, members_inserted, members_updated, members_inactivated,
+                 uploaded_by, uploaded_by_name, uploaded_at, notes)
+            VALUES
+                (:sid, :bc, 'append', 'manual_single', 'MTI',
+                 'pending_review', 1, 1, 0, 0,
+                 :ub, :ubn, NOW(), :nt)
+        ");
+        $batchCode = null;
+        for ($attempt = 0; $attempt < 5; $attempt++) {
+            $batchCode = ins_batch_generate_code($pdo);
+            try {
+                $insBatch->execute([
+                    ':sid' => $syncId,
+                    ':bc'  => $batchCode,
+                    ':ub'  => (int)($_SESSION['admin_id'] ?? 0) ?: null,
+                    ':ubn' => $_SESSION['admin_username'] ?? null,
+                    ':nt'  => 'เพิ่มรายชื่อทีละคน: ' . $fullName . ' (' . $memberId . ')',
+                ]);
+                break;
+            } catch (PDOException $e) {
+                if ($e->getCode() !== '23000') throw $e;
+                if ($attempt === 4) throw $e;
+                usleep(random_int(10000, 50000));
+            }
+        }
+        $batchId = (int)$pdo->lastInsertId();
+
+        $pdo->commit();
+    } catch (Exception $e) {
+        $pdo->rollBack();
+        error_log('add_single: ' . $e->getMessage());
+        json_err('บันทึกไม่สำเร็จ: ' . $e->getMessage());
+    }
+
+    try {
+        ins_batch_log_event(
+            $pdo, $batchId, 'uploaded', null, 'pending_review',
+            'staff', (int)($_SESSION['admin_id'] ?? 0) ?: null,
+            $_SESSION['admin_username'] ?? null,
+            'manual_single: ' . $fullName . ' (' . $memberId . ')'
+        );
+    } catch (Exception $e) {
+        error_log('add_single log_event: ' . $e->getMessage());
+    }
+
+    log_activity('insurance_add_single', "member_id={$memberId}, name={$fullName}, batch_id={$batchId}");
+
+    json_ok([
+        'member_id' => $memberId,
+        'sync_id'   => $syncId,
+        'batch_id'  => $batchId,
+        'batch_code'=> $batchCode,
+    ]);
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
 // ACTION: upload_combined — รวม 3 ไฟล์ (staff + student + resigned) เป็น batch เดียว
 //
 //   1. parse 3 ไฟล์ (อย่างน้อย staff หรือ student ต้องมี)
