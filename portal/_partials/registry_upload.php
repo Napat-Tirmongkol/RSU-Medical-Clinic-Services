@@ -578,7 +578,17 @@ declare(strict_types=1);
     };
 
     window.cwCommit = async function() {
-        if (!confirm('ยืนยันบันทึกรายชื่อสุดท้ายเป็น batch ใหม่?')) return;
+        const { isConfirmed } = await Swal.fire({
+            title: 'ยืนยันบันทึก?',
+            text: 'บันทึกรายชื่อสุดท้ายเป็น batch ใหม่',
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonText: '<i class="fa-solid fa-check mr-1"></i> ยืนยัน',
+            cancelButtonText: 'ยกเลิก',
+            confirmButtonColor: '#0f766e',
+            reverseButtons: true,
+        });
+        if (!isConfirmed) return;
 
         const btn = document.getElementById('cwBtnCommit');
         btn.disabled = true;
