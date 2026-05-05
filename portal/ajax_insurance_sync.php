@@ -155,15 +155,51 @@ function norm_date(?string $d, string $prefer = 'dmy'): ?string
     if (!$d) return null;
     $d = trim($d);
     if ($d === '') return null;
-    // $prefer = 'dmy' (default Thai/Euro) or 'mdy' (registry birthdate files)
+
+    // Replace Thai month names with numeric form. Original Thai layout is
+    // "DD <month> YYYY" so we convert to "DD/MM/YYYY" and force d/m/Y order.
+    static $thaiMonths = [
+        'มกราคม' => '01', 'ม.ค.' => '01',
+        'กุมภาพันธ์' => '02', 'ก.พ.' => '02',
+        'มีนาคม' => '03', 'มี.ค.' => '03',
+        'เมษายน' => '04', 'เม.ย.' => '04',
+        'พฤษภาคม' => '05', 'พ.ค.' => '05',
+        'มิถุนายน' => '06', 'มิ.ย.' => '06',
+        'กรกฎาคม' => '07', 'กรกฏาคม' => '07', 'ก.ค.' => '07',
+        'สิงหาคม' => '08', 'ส.ค.' => '08',
+        'กันยายน' => '09', 'ก.ย.' => '09',
+        'ตุลาคม' => '10', 'ต.ค.' => '10',
+        'พฤศจิกายน' => '11', 'พ.ย.' => '11',
+        'ธันวาคม' => '12', 'ธ.ค.' => '12',
+    ];
+    $thaiReplaced = false;
+    foreach ($thaiMonths as $thai => $num) {
+        if (mb_strpos($d, $thai) !== false) {
+            $d = str_replace($thai, '/' . $num . '/', $d);
+            $d = preg_replace('/\s+/', '', $d);
+            $d = preg_replace('/\/+/', '/', $d);
+            $d = trim($d, '/');
+            $thaiReplaced = true;
+            break;
+        }
+    }
+
+    // $prefer = 'dmy' (default Thai/Euro) or 'mdy' (registry birthdate files).
     // Strict-mode rejection (warning_count > 0) lets unambiguous dates fall
     // through, so 31/12/2020 still resolves to 2020-12-31 either way.
     $dmy = ['Y-m-d', 'j/n/Y', 'd/m/Y', 'n/j/Y', 'm/d/Y', 'd-m-Y', 'Y/m/d', 'd/m/y'];
     $mdy = ['Y-m-d', 'n/j/Y', 'm/d/Y', 'j/n/Y', 'd/m/Y', 'd-m-Y', 'Y/m/d', 'd/m/y'];
-    foreach ($prefer === 'mdy' ? $mdy : $dmy as $fmt) {
+    $formats = $thaiReplaced ? ['j/n/Y', 'd/m/Y'] : ($prefer === 'mdy' ? $mdy : $dmy);
+
+    foreach ($formats as $fmt) {
         $dt  = DateTime::createFromFormat($fmt, $d);
         $err = DateTime::getLastErrors() ?: ['warning_count' => 0, 'error_count' => 0];
         if ($dt && $err['warning_count'] === 0 && $err['error_count'] === 0) {
+            // Thai BE → CE (4/8/2505 → 1962-08-04)
+            $year = (int)$dt->format('Y');
+            if ($year >= 2400 && $year <= 2700) {
+                $dt->modify('-543 years');
+            }
             return $dt->format('Y-m-d');
         }
     }
@@ -452,6 +488,8 @@ if ($action === 'upload_combined') {
         'ชื่อ-นามสกุล'       => 'full_name',
         'ชื่อ-สกุล'          => 'full_name',
         'ชื่อ นามสกุล'       => 'full_name',
+        'ชื่อพนักงาน'         => 'full_name',
+        'ชื่อ-นามสกุล (รวม)'  => 'full_name',
         'ชื่อ'               => 'first_name',
         'ชื่อจริง'           => 'first_name',
         'นามสกุล'            => 'last_name',
@@ -463,6 +501,11 @@ if ($action === 'upload_combined') {
         'เลขบัตรประชาชน'     => 'citizen_id',
         'รหัสบัตรประชาชน'    => 'citizen_id',
         'เลขบัตร'            => 'citizen_id',
+        'หมายเลขประจำตัวประชาชน' => 'citizen_id',
+        'หมายเลขประจำตัว'    => 'citizen_id',
+        'เลขประจำตัวประชาชน' => 'citizen_id',
+        'id_card_no'         => 'citizen_id',
+        'birthday'           => 'date_of_birth',
         'เลขกรมธรรม์'        => 'policy_number',
         'หมายเหตุ'           => 'remarks',
         'รหัส'               => 'member_id',
@@ -474,6 +517,10 @@ if ($action === 'upload_combined') {
         'สาขา'               => 'position',
         'สาขาวิชา'           => 'position',
         'คณะ'                => 'position',
+        'สังกัด'             => 'position',
+        'แผนก'               => 'position',
+        'หน่วยงาน'           => 'position',
+        'student_code'       => 'member_id',
         'วันที่ออก'           => 'resign_date',
         'วันออก'             => 'resign_date',
         'วันลาออก'           => 'resign_date',

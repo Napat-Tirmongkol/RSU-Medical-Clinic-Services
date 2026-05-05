@@ -172,29 +172,44 @@ declare(strict_types=1);
         </div>
     </details>
 
-    <!-- Format reference (still useful) -->
+    <!-- Format reference -->
     <div style="background:#fff; border-radius:1rem; box-shadow:0 4px 14px rgba(0,0,0,.05); padding:1.25rem 1.75rem; margin-top:1.25rem;">
-        <h3 style="margin:0 0 .5rem 0; font-weight:800; color:#0f172a; font-size:.95rem;">
-            <i class="fa-solid fa-circle-info mr-1" style="color:#06b6d4;"></i> รูปแบบไฟล์ CSV
+        <h3 style="margin:0 0 .85rem 0; font-weight:800; color:#0f172a; font-size:.95rem;">
+            <i class="fa-solid fa-circle-info mr-1" style="color:#06b6d4;"></i> รูปแบบไฟล์ CSV — รับชื่อคอลัมน์ภาษาไทยตรงๆ
         </h3>
-        <table style="width:100%; border-collapse:collapse; font-size:.82rem;">
+        <p style="font-size:.82rem; color:#475569; margin:0 0 .85rem 0; line-height:1.6;">
+            ระบบรู้จักคอลัมน์ตามไฟล์ทะเบียนปัจจุบัน — ไม่ต้องเปลี่ยนชื่อ header
+            <strong style="color:#0f172a;">ตัด section title (เช่น "มหาวิทยาลัยรังสิต รายชื่อบุคลากร...") ออกก่อน</strong>
+            ให้แถวแรกเป็น header จริงๆ
+        </p>
+        <table style="width:100%; border-collapse:collapse; font-size:.8rem;">
             <thead>
                 <tr style="background:#f0f9ff;">
-                    <th style="padding:.5rem .75rem; text-align:left; font-weight:700; color:#075985;">Column</th>
-                    <th style="padding:.5rem .75rem; text-align:left; font-weight:700; color:#075985;">staff/student</th>
-                    <th style="padding:.5rem .75rem; text-align:left; font-weight:700; color:#075985;">resigned</th>
-                    <th style="padding:.5rem .75rem; text-align:left; font-weight:700; color:#075985;">คำอธิบาย</th>
+                    <th style="padding:.5rem .75rem; text-align:left; font-weight:700; color:#075985;">ฟิลด์ในระบบ</th>
+                    <th style="padding:.5rem .75rem; text-align:left; font-weight:700; color:#075985;">ชื่อคอลัมน์ที่รับ</th>
+                    <th style="padding:.5rem .75rem; text-align:left; font-weight:700; color:#075985;">หมายเหตุ</th>
                 </tr>
             </thead>
             <tbody>
-                <tr><td style="padding:.5rem .75rem;"><code>member_id</code></td><td>✅</td><td>✅</td><td>รหัสนักศึกษา / รหัสพนักงาน — <strong>คีย์ fallback</strong> เมื่อไฟล์ไม่มี citizen_id</td></tr>
-                <tr><td style="padding:.5rem .75rem;"><code>citizen_id</code></td><td>—</td><td>—</td><td>เลขบัตร 13 หลัก — <strong>คีย์หลัก</strong>ในการ dedupe ระหว่างไฟล์</td></tr>
-                <tr><td style="padding:.5rem .75rem;"><code>full_name</code></td><td>✅</td><td>—</td><td>ชื่อ-สกุล</td></tr>
-                <tr><td style="padding:.5rem .75rem;"><code>resign_date</code></td><td>—</td><td>✅</td><td>วันที่ออกจากงาน — รับ <code>วันที่ออก</code>, <code>วันลาออก</code> หรือ YYYY-MM-DD / DD/MM/YYYY (จะถูกเขียนเป็น <code>coverage_end</code>)</td></tr>
-                <tr><td style="padding:.5rem .75rem;"><code>member_status</code></td><td>—</td><td>—</td><td>นักศึกษา / บุคลากร (ถ้าไม่มี ระบบกำหนดให้ตามไฟล์)</td></tr>
-                <tr><td style="padding:.5rem .75rem;"><code>position</code></td><td>—</td><td>—</td><td>ตำแหน่ง / คณะ</td></tr>
+                <tr><td style="padding:.5rem .75rem;"><code>member_id</code></td><td><code>รหัสนักศึกษา</code> / <code>รหัสบุคลากร</code> / <code>รหัสพนักงาน</code> / <code>รหัส</code> / <code>STUDENT_CODE</code></td><td><strong>บังคับ</strong> สำหรับ staff/student</td></tr>
+                <tr><td style="padding:.5rem .75rem;"><code>citizen_id</code></td><td><code>เลขบัตรประชาชน</code> / <code>หมายเลขประจำตัวประชาชน</code> / <code>เลขบัตร</code> / <code>ID_CARD_NO</code></td><td>13 หลัก รับรูปมี <code>-</code> คั่น เช่น <code>3-8206-00056-99-3</code></td></tr>
+                <tr><td style="padding:.5rem .75rem;"><code>full_name</code> หรือ<br>แยก 3 คอลัมน์</td><td><code>ชื่อพนักงาน</code> (รวม) <strong>หรือ</strong> <code>คำนำหน้า</code> + <code>ชื่อ</code> + <code>นามสกุล</code> / <code>สกุล</code></td><td>แยกหรือรวมก็ได้ — ระบบประกอบให้</td></tr>
+                <tr><td style="padding:.5rem .75rem;"><code>position</code></td><td><code>ตำแหน่ง</code> / <code>สังกัด</code> / <code>สาขา</code> / <code>คณะ</code> / <code>หน่วยงาน</code></td><td>ฟิลด์เดียวกันในระบบ</td></tr>
+                <tr><td style="padding:.5rem .75rem;"><code>date_of_birth</code></td><td><code>วันเดือนปีเกิด</code> / <code>วันเดือนปี เกิด</code> / <code>วันเกิด</code> / <code>BIRTHDAY</code></td><td>รองรับ ค.ศ. M/D/Y, พ.ศ. d/m/y, ชื่อเดือนไทย เช่น <code>8 มีนาคม 1977</code>, <code>4/8/2505</code></td></tr>
+                <tr><td style="padding:.5rem .75rem;"><code>resign_date</code></td><td><code>วันที่ออก</code> / <code>วันลาออก</code> (เฉพาะไฟล์คนออก)</td><td>จะเขียนเป็น <code>coverage_end</code> + แปะหมายเหตุ "ออกเมื่อ ..."</td></tr>
             </tbody>
         </table>
+
+        <div style="margin-top:1rem; background:#ecfdf5; border:1px solid #86efac; border-radius:.65rem; padding:.75rem 1rem; font-size:.8rem; color:#065f46; line-height:1.6;">
+            <strong><i class="fa-solid fa-circle-check mr-1"></i> ระบบรองรับอัตโนมัติ:</strong>
+            ปี พ.ศ. (≥2400 หาร 543) · ชื่อเดือนภาษาไทย (มกราคม...ธันวาคม + ม.ค...ธ.ค.) ·
+            เลขบัตรมี <code>-</code> หรือเว้นวรรค · ชื่อรวมในคอลัมน์เดียว
+        </div>
+        <div style="margin-top:.5rem; background:#fef2f2; border:1px solid #fca5a5; border-radius:.65rem; padding:.75rem 1rem; font-size:.8rem; color:#991b1b; line-height:1.6;">
+            <strong><i class="fa-solid fa-triangle-exclamation mr-1"></i> ระวัง — ข้อมูลที่ระบบกู้ไม่ได้:</strong>
+            เลขบัตรเป็น scientific notation (<code>3.1301E+12</code>) จาก Excel — แปลว่าหลักท้ายหายแล้ว
+            ต้อง re-export โดย format คอลัมน์เป็น <strong>Text</strong> ก่อน
+        </div>
     </div>
 </div>
 
@@ -278,17 +293,17 @@ declare(strict_types=1);
             staff: {
                 name: 'staff_template.csv',
                 rows: [
-                    ['member_id', 'full_name', 'citizen_id', 'position'],
-                    ['1000001', 'นางสาวสมใจ ใจดี', '1234567890123', 'อาจารย์ประจำ'],
-                    ['1000002', 'นายสมชาย รักดี', '1234567890124', 'เจ้าหน้าที่'],
+                    ['ลำดับ', 'รหัสพนักงาน', 'คำนำหน้า', 'ชื่อ', 'สกุล', 'ตำแหน่ง', 'สังกัด', 'หมายเลขประจำตัวประชาชน', 'วันเดือนปีเกิด'],
+                    ['1', 'RHZ001', 'นางสาว', 'จันจิรา', 'ตรีชัย', 'พนักงานศูนย์ความงาม', 'RSU Horizon', '3-8206-00056-99-3', '8 มีนาคม 1977'],
+                    ['2', '2901035', 'น.ส.', 'สุกัลยา', 'วงศ์ชมบุญ', 'ผู้ช่วยคณบดี', 'วิทยาลัยศิลปศาสตร์', '3130100300638', '4/8/2505'],
                 ],
             },
             student: {
                 name: 'student_template.csv',
                 rows: [
-                    ['member_id', 'full_name', 'citizen_id', 'position'],
-                    ['6512345', 'นายสมชาย รักเรียน', '1234567890125', 'คณะแพทยศาสตร์'],
-                    ['6512346', 'นางสาวสุดา ขยัน', '1234567890126', 'คณะพยาบาลศาสตร์'],
+                    ['ลำดับ', 'คำนำหน้า', 'ชื่อ', 'นามสกุล', 'เลขบัตรประชาชน', 'รหัสนักศึกษา', 'วันเดือนปี เกิด'],
+                    ['1', 'นาย', 'ภฤศธร', 'ภูวภิรมย์ขวัญ', '1100801395116', '6300327', '6/11/2001'],
+                    ['2', 'นางสาว', 'นภสร', 'รัตนพร', '1309902900548', '6302774', '9/17/2001'],
                 ],
             },
             resigned: {
