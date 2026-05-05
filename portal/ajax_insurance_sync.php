@@ -150,12 +150,22 @@ function parse_csv(string $text): array
     return empty($rows) ? ['error' => 'ไม่พบข้อมูลในไฟล์'] : ['rows' => $rows];
 }
 
-function norm_date(?string $d): ?string
+function norm_date(?string $d, string $prefer = 'dmy'): ?string
 {
     if (!$d) return null;
-    foreach (['d/m/Y', 'Y-m-d', 'd-m-Y', 'd/m/y'] as $fmt) {
-        $dt = DateTime::createFromFormat($fmt, $d);
-        if ($dt) return $dt->format('Y-m-d');
+    $d = trim($d);
+    if ($d === '') return null;
+    // $prefer = 'dmy' (default Thai/Euro) or 'mdy' (registry birthdate files)
+    // Strict-mode rejection (warning_count > 0) lets unambiguous dates fall
+    // through, so 31/12/2020 still resolves to 2020-12-31 either way.
+    $dmy = ['Y-m-d', 'j/n/Y', 'd/m/Y', 'n/j/Y', 'm/d/Y', 'd-m-Y', 'Y/m/d', 'd/m/y'];
+    $mdy = ['Y-m-d', 'n/j/Y', 'm/d/Y', 'j/n/Y', 'd/m/Y', 'd-m-Y', 'Y/m/d', 'd/m/y'];
+    foreach ($prefer === 'mdy' ? $mdy : $dmy as $fmt) {
+        $dt  = DateTime::createFromFormat($fmt, $d);
+        $err = DateTime::getLastErrors() ?: ['warning_count' => 0, 'error_count' => 0];
+        if ($dt && $err['warning_count'] === 0 && $err['error_count'] === 0) {
+            return $dt->format('Y-m-d');
+        }
     }
     return null;
 }
@@ -269,7 +279,7 @@ if ($action === 'upload') {
                 ':ms'  => $r['member_status']  ?? '',
                 ':pos' => $r['position']       ?? '',
                 ':cid' => $r['citizen_id']     ?? '',
-                ':dob' => norm_date($r['date_of_birth'] ?? null),
+                ':dob' => norm_date($r['date_of_birth'] ?? null, 'mdy'),
                 ':cs'  => norm_date($r['coverage_start'] ?? null),
                 ':ce'  => norm_date($r['coverage_end']   ?? null),
                 ':pn'  => $r['policy_number']  ?? '',
@@ -439,17 +449,27 @@ if ($action === 'upload_combined') {
         'วันสิ้นสุด'         => 'coverage_end',
         'วันสิ้นสุดคุ้มครอง' => 'coverage_end',
         'วันเริ่มคุ้มครอง'   => 'coverage_start',
-        'ชื่อ'               => 'full_name',
         'ชื่อ-นามสกุล'       => 'full_name',
+        'ชื่อ-สกุล'          => 'full_name',
+        'ชื่อ นามสกุล'       => 'full_name',
+        'ชื่อ'               => 'first_name',
+        'ชื่อจริง'           => 'first_name',
+        'นามสกุล'            => 'last_name',
+        'สกุล'               => 'last_name',
+        'คำนำ'               => 'name_prefix',
+        'คำนำหน้า'           => 'name_prefix',
+        'คำนำหน้าชื่อ'       => 'name_prefix',
         'ประเภท'             => 'member_status',
         'เลขบัตรประชาชน'     => 'citizen_id',
         'รหัสบัตรประชาชน'    => 'citizen_id',
+        'เลขบัตร'            => 'citizen_id',
         'เลขกรมธรรม์'        => 'policy_number',
         'หมายเหตุ'           => 'remarks',
         'รหัส'               => 'member_id',
         'รหัสบุคลากร'        => 'member_id',
         'รหัสพนักงาน'        => 'member_id',
         'รหัสนักศึกษา'       => 'member_id',
+        'ลำดับ'              => '_seq',
         'ตำแหน่ง'            => 'position',
         'สาขา'               => 'position',
         'สาขาวิชา'           => 'position',
@@ -459,6 +479,10 @@ if ($action === 'upload_combined') {
         'วันลาออก'           => 'resign_date',
         'วันที่ลาออก'         => 'resign_date',
         'effective_date'     => 'resign_date',
+        'วันเดือนปีเกิด'      => 'date_of_birth',
+        'วันเดือนปี เกิด'     => 'date_of_birth',
+        'วันเกิด'            => 'date_of_birth',
+        'dob'                => 'date_of_birth',
     ];
 
     $applyAliases = function (array $row) use ($aliases): array {
@@ -491,6 +515,16 @@ if ($action === 'upload_combined') {
             $row = $applyAliases($row);
             $row['member_id']  = (string)($row['member_id']  ?? '');
             $row['citizen_id'] = $normCitizen((string)($row['citizen_id'] ?? ''));
+
+            // Compose full_name from prefix + first_name + last_name when not already provided
+            if (empty($row['full_name'])) {
+                $prefix = trim((string)($row['name_prefix'] ?? ''));
+                $first  = trim((string)($row['first_name']  ?? ''));
+                $last   = trim((string)($row['last_name']   ?? ''));
+                if ($first !== '' || $last !== '') {
+                    $row['full_name'] = trim($prefix . $first . ($last !== '' ? ' ' . $last : ''));
+                }
+            }
 
             if ($requireMemberId && $row['member_id'] === '') continue;
             if (!$requireMemberId && $row['member_id'] === '' && $row['citizen_id'] === '') continue;
@@ -679,7 +713,7 @@ if ($action === 'upload_combined') {
                 ':ms'  => $r['member_status']  ?? '',
                 ':pos' => $r['position']       ?? '',
                 ':cid' => $r['citizen_id']     ?? '',
-                ':dob' => norm_date($r['date_of_birth'] ?? null),
+                ':dob' => norm_date($r['date_of_birth'] ?? null, 'mdy'),
                 ':cs'  => norm_date($r['coverage_start'] ?? null),
                 ':ce'  => norm_date($r['coverage_end']   ?? null),
                 ':pn'  => $r['policy_number']  ?? '',
