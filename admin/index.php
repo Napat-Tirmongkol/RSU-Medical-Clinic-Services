@@ -411,7 +411,15 @@ document.addEventListener('DOMContentLoaded', function() {
             })
             .catch(error => {
                 isFetching = false;
-                if (error.name === 'AbortError') return; // Ignore expected aborts
+                // Silently swallow transient errors that the poller will
+                // self-recover from on its next 5s tick:
+                //   - AbortError: previous request superseded
+                //   - TypeError 'Failed to fetch': network blip, tab
+                //     backgrounded, page navigating away, etc.
+                // Log only genuine HTTP errors (those throw with a status
+                // code message from the .then handler above).
+                if (error.name === 'AbortError') return;
+                if (error instanceof TypeError && /failed to fetch|network/i.test(error.message)) return;
                 console.error('Error fetching dashboard data:', error);
             });
     }
