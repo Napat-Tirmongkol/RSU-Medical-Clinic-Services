@@ -614,8 +614,12 @@ if ($action === 'upload_combined') {
         if ($r['member_id'])  $leaverByMid[$r['member_id']]  = $info;
     }
     $leaverInfoFor = function (string $cid, string $mid) use ($leaverByCid, $leaverByMid): ?array {
-        if ($cid !== '' && isset($leaverByCid[$cid])) return $leaverByCid[$cid];
-        if ($mid !== '' && isset($leaverByMid[$mid])) return $leaverByMid[$mid];
+        if ($cid !== '' && isset($leaverByCid[$cid])) {
+            return $leaverByCid[$cid] + ['_match' => 'citizen_id', '_match_value' => $cid];
+        }
+        if ($mid !== '' && isset($leaverByMid[$mid])) {
+            return $leaverByMid[$mid] + ['_match' => 'member_id', '_match_value' => $mid];
+        }
         return null;
     };
 
@@ -639,6 +643,8 @@ if ($action === 'upload_combined') {
                 $droppedLeavers[] = $r + [
                     '_dropped_from' => 'staff',
                     '_resign_date'  => $info['resign_date'],
+                    '_match'        => $info['_match'],
+                    '_match_value'  => $info['_match_value'],
                 ];
             }
             continue;
@@ -655,6 +661,8 @@ if ($action === 'upload_combined') {
                 $droppedLeavers[] = $r + [
                     '_dropped_from' => 'student',
                     '_resign_date'  => $info['resign_date'],
+                    '_match'        => $info['_match'],
+                    '_match_value'  => $info['_match_value'],
                 ];
             }
             continue;

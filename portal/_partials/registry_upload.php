@@ -434,18 +434,24 @@ declare(strict_types=1);
                 </div>
             </div>` : '';
 
+        const matchLabel = (m) => {
+            if (m === 'citizen_id') return '<span style="color:#0891b2; font-weight:700;">ตรงเลขบัตร</span>';
+            if (m === 'member_id')  return '<span style="color:#7c3aed; font-weight:700;">ตรงรหัส</span>';
+            return '—';
+        };
         const dropTable = drops.length ? `
             <div class="cw-table-wrap">
                 <div class="cw-table-head"><i class="fa-solid fa-user-slash mr-1" style="color:#dc2626;"></i> ถูกตัดทิ้งเพราะอยู่ในไฟล์คนออก (${drops.length}${drops.length === 50 ? '+' : ''} รายการแรก)</div>
                 <div class="cw-table-body">
                     <table class="cw-table">
-                        <thead><tr><th>มาจาก</th><th>รหัส</th><th>เลขบัตร</th><th>ชื่อ</th><th>วันที่ออก</th></tr></thead>
+                        <thead><tr><th>มาจาก</th><th>รหัส</th><th>เลขบัตร</th><th>ชื่อ</th><th>เหตุผล</th><th>วันที่ออก</th></tr></thead>
                         <tbody>${drops.map(d => `
                             <tr>
                                 <td>${d._dropped_from === 'staff' ? '<span style="color:#d97706;">บุคลากร</span>' : '<span style="color:#2563eb;">นักศึกษา</span>'}</td>
                                 <td><code>${escHTML(d.member_id)}</code></td>
                                 <td>${escHTML(d.citizen_id)}</td>
                                 <td>${escHTML(d.full_name)}</td>
+                                <td>${matchLabel(d._match)}<div style="font-size:.7rem; color:#94a3b8; font-weight:500;">${escHTML(d._match_value || '')}</div></td>
                                 <td>${escHTML(d._resign_date || '—')}</td>
                             </tr>`).join('')}
                         </tbody>
