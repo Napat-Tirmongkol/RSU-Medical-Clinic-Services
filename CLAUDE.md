@@ -10,6 +10,11 @@
 - ใช้ `LIMIT` + `OFFSET` ใน SQL query
 - แสดง "หน้า X / Y · รวม N รายการ" เหนือ/ใต้ pagination controls
 
+### Dialogs / Alerts
+- **ห้ามใช้ `alert()`, `confirm()`, `prompt()` ของ browser** — ใช้ **SweetAlert2** (`Swal.fire()`) ทุกครั้ง
+- SweetAlert2 โหลดอยู่แล้วที่ `portal/index.php` (CDN line ~540) — ใช้ได้ทันทีในทุก partial ของ portal
+- ใช้ `await Swal.fire({ ... })` ใน async function และ destructure `{ isConfirmed }` สำหรับ confirm dialog
+
 ### Design System
 - ใช้ tokens และ component classes จาก `assets/STYLE_GUIDE.md` เสมอ
 - **ห้ามเขียน CSS ใหม่ใน user-facing modules** — ถ้า `<style>` ยาวเกิน ~10 บรรทัด ให้เพิ่ม component ใน `assets/css/tailwind.src.css` แทน
