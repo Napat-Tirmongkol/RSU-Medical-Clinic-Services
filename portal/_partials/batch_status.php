@@ -108,9 +108,33 @@ $stages = ins_batch_stepper_stages();
     text-align:center; cursor:pointer;
     border:2px solid transparent;
     transition: border-color .15s, transform .1s;
+    position:relative;
 }
 .bs-stat:hover { border-color:#06b6d4; transform: translateY(-2px); }
-.bs-stat.active { border-color:#06b6d4; background:#ecfeff; }
+.bs-stat.active {
+    border-color:#06b6d4; background:#ecfeff;
+    animation: bsStatActive 1.6s ease-in-out infinite;
+}
+@keyframes bsStatActive {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(6,182,212,.45), 0 2px 8px rgba(0,0,0,.04); }
+    50%      { box-shadow: 0 0 0 8px rgba(6,182,212,0),  0 2px 8px rgba(0,0,0,.04); }
+}
+
+/* Attention-grabbing pulse for cards with pending action items */
+.bs-stat.has-pending {
+    animation: bsStatPending 2s ease-in-out infinite;
+}
+.bs-stat.has-pending [data-count] {
+    animation: bsCountBlink 1.2s ease-in-out infinite;
+}
+@keyframes bsStatPending {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(245,158,11,.5),  0 2px 8px rgba(0,0,0,.04); }
+    50%      { box-shadow: 0 0 0 10px rgba(245,158,11,0), 0 2px 8px rgba(0,0,0,.04); }
+}
+@keyframes bsCountBlink {
+    0%, 100% { color:#0f172a; transform: scale(1); }
+    50%      { color:#f59e0b; transform: scale(1.08); }
+}
 
 .bs-table { width:100%; border-collapse:collapse; font-size:.85rem; }
 .bs-table th, .bs-table td { padding:.7rem .75rem; text-align:left; border-bottom:1px solid #f1f5f9; vertical-align:middle; }
@@ -249,11 +273,14 @@ $stages = ins_batch_stepper_stages();
     window.bsLoadStats = async function() {
         const r = await fetch('ajax_insurance_batches.php?action=stats').then(r => r.json());
         if (r.status !== 'ok') return;
-        const counts = (r.data && r.data.by_status) || r.by_status || {};
+        const counts = r.by_status || (r.data && r.data.by_status) || {};
+        const ATTENTION = ['pending_review', 'rejected', 'partial'];
         document.querySelectorAll('.bs-stat').forEach(el => {
             const st = el.dataset.status;
+            const cnt = counts[st] || 0;
             const cntEl = el.querySelector('[data-count]');
-            cntEl.textContent = (counts[st] || 0).toLocaleString();
+            cntEl.textContent = cnt.toLocaleString();
+            el.classList.toggle('has-pending', ATTENTION.includes(st) && cnt > 0);
         });
     };
 
