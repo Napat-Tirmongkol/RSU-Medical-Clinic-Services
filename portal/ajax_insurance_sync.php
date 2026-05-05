@@ -1007,8 +1007,14 @@ if ($action === 'ai_review') {
         json_err('AI ตอบกลับผิดพลาด: ' . $err);
     }
 
-    $data = json_decode($resp, true);
-    $text = $data['candidates'][0]['content']['parts'][0]['text'] ?? '';
+    $data  = json_decode($resp, true);
+    $parts = $data['candidates'][0]['content']['parts'] ?? [];
+    $text  = '';
+    foreach ($parts as $part) {
+        if (!($part['thought'] ?? false) && isset($part['text'])) {
+            $text .= $part['text'];
+        }
+    }
     if ($text === '') json_err('AI ตอบมาว่างเปล่า — ลองอีกครั้ง');
 
     log_activity('insurance_ai_review', 'sample=' . count($sample) . ', tokens~' . (int)($data['usageMetadata']['totalTokenCount'] ?? 0));

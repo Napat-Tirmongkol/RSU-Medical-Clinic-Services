@@ -70,4 +70,15 @@
     .ds-eyebrow {
         @apply text-[10px] font-black uppercase tracking-[0.22em] text-slate-400;
     }
+
+    /* AI Review markdown output body */
+    .ai-review-body {
+        @apply text-[0.85rem] text-slate-800 leading-relaxed;
+        padding: 1rem 1.25rem;
+    }
+    .ai-review-body p      { @apply mb-2; }
+    .ai-review-body ul     { @apply list-disc pl-5 mb-2 space-y-1; }
+    .ai-review-body ol     { @apply list-decimal pl-5 mb-2 space-y-1; }
+    .ai-review-body li     { @apply leading-relaxed; }
+    .ai-review-body strong { @apply font-semibold; }
 }

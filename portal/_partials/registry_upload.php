@@ -13,6 +13,7 @@
  */
 declare(strict_types=1);
 ?>
+<script src="https://cdn.jsdelivr.net/npm/marked@12.0.0/marked.min.js"></script>
 <div style="padding:1.5rem 2rem; max-width:1200px; margin:0 auto;">
 
     <div style="margin-bottom:1.5rem;">
@@ -566,7 +567,7 @@ declare(strict_types=1);
                         <span><i class="fa-solid fa-robot mr-1"></i> AI Review (Gemini 2.5 Flash)</span>
                         <span style="font-size:.7rem; color:#a78bfa; font-weight:500;">PDPA-safe · masked sample${tokens}</span>
                     </div>
-                    <div style="padding:1rem 1.25rem; font-size:.85rem; color:#1f2937; white-space:pre-wrap; line-height:1.75;">${escHTML(data.review)}</div>
+                    <div class="ai-review-body">${marked.parse(data.review)}</div>
                 </div>`;
         } catch (e) {
             box.innerHTML = `<div class="reg-alert-error"><strong><i class="fa-solid fa-circle-exclamation mr-1"></i> ผิดพลาด:</strong> ${escHTML(e.message)}</div>`;
