@@ -538,6 +538,7 @@ try {
     <link rel="stylesheet" href="../assets/css/tailwind.min.css">
     <link rel="stylesheet" href="../assets/css/portal.css?v=<?= @filemtime(__DIR__ . '/../assets/css/portal.css') ?: (defined('APP_BUILD') ? APP_BUILD : time()) ?>">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="../assets/js/safe-fetch.js?v=<?= @filemtime(__DIR__ . '/../assets/js/safe-fetch.js') ?: (defined('APP_BUILD') ? APP_BUILD : time()) ?>"></script>
     <style>
         /* ── Toggle Switch (Maintenance Mode) ──────────────────────────────── */
         .toggle-wrap {
@@ -792,9 +793,28 @@ try {
         });
 
         window.switchSection = function (sectionId, btn) {
-            document.querySelectorAll('.portal-section').forEach(function (s) { s.style.display = 'none'; });
             var target = document.getElementById('section-' + sectionId);
-            if (target) target.style.display = '';
+            if (!target) {
+                // Section doesn't exist — log to backend and inform user
+                if (typeof safeFetch !== 'undefined' && safeFetch.reportError) {
+                    safeFetch.reportError(
+                        window.location.pathname + '?section=' + sectionId,
+                        404,
+                        'switchSection: unknown sectionId="' + sectionId + '"'
+                    );
+                }
+                if (typeof Swal !== 'undefined') {
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'ไม่พบหน้านี้',
+                        text: 'section "' + sectionId + '" ไม่มีในระบบ — อาจถูกย้ายหรือคุณไม่มีสิทธิ์เข้าถึง',
+                        confirmButtonColor: '#0f766e',
+                    });
+                }
+                return;
+            }
+            document.querySelectorAll('.portal-section').forEach(function (s) { s.style.display = 'none'; });
+            target.style.display = '';
             document.querySelectorAll('.psb-item').forEach(function (b) {
                 b.classList.remove('psb-active');
                 b.removeAttribute('aria-current');

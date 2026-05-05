@@ -852,8 +852,11 @@ declare(strict_types=1);
 
         const fd = new FormData(f);
         try {
-            const r = await fetch('ajax_insurance_sync.php', { method: 'POST', body: fd }).then(r => r.json());
+            const r = await (typeof safeFetch === 'function'
+                ? safeFetch('ajax_insurance_sync.php', { method: 'POST', body: fd })
+                : fetch('ajax_insurance_sync.php', { method: 'POST', body: fd }).then(r => r.json()));
             Swal.close();
+            if (!r) return; // safeFetch already alerted
             if (r.status !== 'ok') {
                 Swal.fire({ icon: 'error', title: 'เพิ่มไม่สำเร็จ', text: r.message || 'เกิดข้อผิดพลาด' });
                 return;

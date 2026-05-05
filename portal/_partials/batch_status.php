@@ -274,8 +274,10 @@ $stages = ins_batch_stepper_stages();
     }
 
     window.bsLoadStats = async function() {
-        const r = await fetch('ajax_insurance_batches.php?action=stats').then(r => r.json());
-        if (r.status !== 'ok') return;
+        const r = await (typeof safeFetch === 'function'
+            ? safeFetch('ajax_insurance_batches.php?action=stats', null, { silent: true })
+            : fetch('ajax_insurance_batches.php?action=stats').then(r => r.json()));
+        if (!r || r.status !== 'ok') return;
         const counts = r.by_status || (r.data && r.data.by_status) || {};
         const ATTENTION = ['pending_review', 'rejected', 'partial'];
         document.querySelectorAll('.bs-stat').forEach(el => {
@@ -292,7 +294,10 @@ $stages = ins_batch_stepper_stages();
         const q = document.getElementById('bsSearch').value;
         const st = document.getElementById('bsStatusFilter').value;
         const url = `ajax_insurance_batches.php?action=list&page=${page}&q=${encodeURIComponent(q)}&status=${encodeURIComponent(st)}`;
-        const r = await fetch(url).then(r => r.json());
+        const r = await (typeof safeFetch === 'function'
+            ? safeFetch(url)
+            : fetch(url).then(r => r.json()));
+        if (!r) return; // safeFetch already showed an alert
         if (r.status !== 'ok') { Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: r.message || 'load error' }); return; }
 
         const tb = document.getElementById('bsTbody');
@@ -346,7 +351,10 @@ $stages = ins_batch_stepper_stages();
         document.getElementById('bsDrawerTitle').textContent = 'กำลังโหลด...';
         document.getElementById('bsDrawerBody').innerHTML = '<div style="text-align:center; padding:3rem; color:#94a3b8;"><i class="fa-solid fa-spinner fa-spin fa-2x"></i></div>';
 
-        const r = await fetch(`ajax_insurance_batches.php?action=detail&id=${id}`).then(r => r.json());
+        const r = await (typeof safeFetch === 'function'
+            ? safeFetch(`ajax_insurance_batches.php?action=detail&id=${id}`)
+            : fetch(`ajax_insurance_batches.php?action=detail&id=${id}`).then(r => r.json()));
+        if (!r) { document.getElementById('bsDrawerBody').innerHTML = '<div style="color:#dc2626;">โหลดไม่สำเร็จ</div>'; return; }
         if (r.status !== 'ok') {
             document.getElementById('bsDrawerBody').innerHTML = `<div style="color:#dc2626;">${esc(r.message || 'load error')}</div>`;
             return;
@@ -467,7 +475,10 @@ $stages = ins_batch_stepper_stages();
     }
 
     window.bsLoadMembers = async function(batchId, page) {
-        const r = await fetch(`ajax_insurance_batches.php?action=members&id=${batchId}&page=${page}`).then(r => r.json());
+        const r = await (typeof safeFetch === 'function'
+            ? safeFetch(`ajax_insurance_batches.php?action=members&id=${batchId}&page=${page}`)
+            : fetch(`ajax_insurance_batches.php?action=members&id=${batchId}&page=${page}`).then(r => r.json()));
+        if (!r) { document.getElementById('bsMemberList').innerHTML = '<div style="color:#dc2626;">โหลดไม่สำเร็จ</div>'; return; }
         if (r.status !== 'ok') { document.getElementById('bsMemberList').innerHTML = `<div style="color:#dc2626;">${esc(r.message)}</div>`; return; }
         const p = r.pagination;
         const rows = r.data || [];
@@ -515,7 +526,10 @@ $stages = ins_batch_stepper_stages();
         fd.append('id', id);
         fd.append('note', note || '');
         fd.append('csrf_token', CSRF);
-        const r = await fetch('ajax_insurance_batches.php', { method: 'POST', body: fd }).then(r => r.json());
+        const r = await (typeof safeFetch === 'function'
+            ? safeFetch('ajax_insurance_batches.php', { method: 'POST', body: fd })
+            : fetch('ajax_insurance_batches.php', { method: 'POST', body: fd }).then(r => r.json()));
+        if (!r) return;
         if (r.status !== 'ok') { Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: r.message }); return; }
         bsCloseDrawer(); bsLoad(currentPage);
         Swal.fire({ icon: 'success', title: 'อนุมัติแล้ว', timer: 1500, showConfirmButton: false });
@@ -540,7 +554,10 @@ $stages = ins_batch_stepper_stages();
         fd.append('id', id);
         fd.append('note', note.trim());
         fd.append('csrf_token', CSRF);
-        const r = await fetch('ajax_insurance_batches.php', { method: 'POST', body: fd }).then(r => r.json());
+        const r = await (typeof safeFetch === 'function'
+            ? safeFetch('ajax_insurance_batches.php', { method: 'POST', body: fd })
+            : fetch('ajax_insurance_batches.php', { method: 'POST', body: fd }).then(r => r.json()));
+        if (!r) return;
         if (r.status !== 'ok') { Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: r.message }); return; }
         bsCloseDrawer(); bsLoad(currentPage);
         Swal.fire({ icon: 'success', title: 'ตีกลับแล้ว', timer: 1500, showConfirmButton: false });
