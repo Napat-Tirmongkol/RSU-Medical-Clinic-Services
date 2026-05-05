@@ -47,20 +47,21 @@ function line_app_base_url(): string
 
 function is_insurance_request(array $event): bool
 {
+    // Trigger phrase — single specific keyword to avoid false positives
+    // (e.g. user mentioning 'ประกันสังคม' or 'อุบัติเหตุ' in casual chat).
+    $TRIGGER = 'เช็คสิทธิประกัน';
+
     if (($event['type'] ?? '') === 'postback') {
-        $data = strtolower((string)($event['postback']['data'] ?? ''));
+        $data = (string)($event['postback']['data'] ?? '');
         parse_str($data, $params);
-        return str_contains($data, 'insurance')
-            || str_contains($data, 'ประกัน')
+        return str_contains($data, $TRIGGER)
             || (($params['action'] ?? '') === 'insurance')
             || (($params['menu'] ?? '') === 'insurance');
     }
 
     if (($event['type'] ?? '') === 'message' && (($event['message']['type'] ?? '') === 'text')) {
-        $text = mb_strtolower(trim((string)($event['message']['text'] ?? '')), 'UTF-8');
-        return str_contains($text, 'insurance')
-            || str_contains($text, 'ประกัน')
-            || str_contains($text, 'อุบัติเหตุ');
+        $text = trim((string)($event['message']['text'] ?? ''));
+        return str_contains($text, $TRIGGER);
     }
 
     return false;
