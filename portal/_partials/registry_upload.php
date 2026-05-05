@@ -178,9 +178,10 @@ declare(strict_types=1);
                 </tr>
             </thead>
             <tbody>
-                <tr><td style="padding:.5rem .75rem;"><code>member_id</code></td><td>✅</td><td>—</td><td>รหัสนักศึกษา / รหัสพนักงาน</td></tr>
-                <tr><td style="padding:.5rem .75rem;"><code>citizen_id</code></td><td>—</td><td>✅<span style="color:#94a3b8;"> หรือ member_id</span></td><td>เลขบัตร 13 หลัก (คีย์หลักในการ dedupe)</td></tr>
+                <tr><td style="padding:.5rem .75rem;"><code>member_id</code></td><td>✅</td><td>✅</td><td>รหัสนักศึกษา / รหัสพนักงาน — <strong>คีย์ fallback</strong> เมื่อไฟล์ไม่มี citizen_id</td></tr>
+                <tr><td style="padding:.5rem .75rem;"><code>citizen_id</code></td><td>—</td><td>—</td><td>เลขบัตร 13 หลัก — <strong>คีย์หลัก</strong>ในการ dedupe ระหว่างไฟล์</td></tr>
                 <tr><td style="padding:.5rem .75rem;"><code>full_name</code></td><td>✅</td><td>—</td><td>ชื่อ-สกุล</td></tr>
+                <tr><td style="padding:.5rem .75rem;"><code>resign_date</code></td><td>—</td><td>✅</td><td>วันที่ออกจากงาน — รับ <code>วันที่ออก</code>, <code>วันลาออก</code> หรือ YYYY-MM-DD / DD/MM/YYYY (จะถูกเขียนเป็น <code>coverage_end</code>)</td></tr>
                 <tr><td style="padding:.5rem .75rem;"><code>member_status</code></td><td>—</td><td>—</td><td>นักศึกษา / บุคลากร (ถ้าไม่มี ระบบกำหนดให้ตามไฟล์)</td></tr>
                 <tr><td style="padding:.5rem .75rem;"><code>position</code></td><td>—</td><td>—</td><td>ตำแหน่ง / คณะ</td></tr>
             </tbody>
@@ -370,13 +371,14 @@ declare(strict_types=1);
                 <div class="cw-table-head"><i class="fa-solid fa-user-slash mr-1" style="color:#dc2626;"></i> ถูกตัดทิ้งเพราะอยู่ในไฟล์คนออก (${drops.length}${drops.length === 50 ? '+' : ''} รายการแรก)</div>
                 <div class="cw-table-body">
                     <table class="cw-table">
-                        <thead><tr><th>มาจาก</th><th>รหัส</th><th>เลขบัตร</th><th>ชื่อ</th></tr></thead>
+                        <thead><tr><th>มาจาก</th><th>รหัส</th><th>เลขบัตร</th><th>ชื่อ</th><th>วันที่ออก</th></tr></thead>
                         <tbody>${drops.map(d => `
                             <tr>
                                 <td>${d._dropped_from === 'staff' ? '<span style="color:#d97706;">บุคลากร</span>' : '<span style="color:#2563eb;">นักศึกษา</span>'}</td>
                                 <td><code>${escHTML(d.member_id)}</code></td>
                                 <td>${escHTML(d.citizen_id)}</td>
                                 <td>${escHTML(d.full_name)}</td>
+                                <td>${escHTML(d._resign_date || '—')}</td>
                             </tr>`).join('')}
                         </tbody>
                     </table>

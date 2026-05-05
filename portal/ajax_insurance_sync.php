@@ -454,6 +454,11 @@ if ($action === 'upload_combined') {
         'สาขา'               => 'position',
         'สาขาวิชา'           => 'position',
         'คณะ'                => 'position',
+        'วันที่ออก'           => 'resign_date',
+        'วันออก'             => 'resign_date',
+        'วันลาออก'           => 'resign_date',
+        'วันที่ลาออก'         => 'resign_date',
+        'effective_date'     => 'resign_date',
     ];
 
     $applyAliases = function (array $row) use ($aliases): array {
@@ -513,13 +518,24 @@ if ($action === 'upload_combined') {
     );
     $resignedList = $resignedParse['rows'];
 
-    // Build leaver indexes
-    $leaverCidSet = [];
-    $leaverMidSet = [];
+    // Build leaver indexes (carry resign_date so we can persist it on inactivate)
+    $leaverByCid = [];
+    $leaverByMid = [];
     foreach ($resignedList as $r) {
-        if ($r['citizen_id']) $leaverCidSet[$r['citizen_id']] = true;
-        if ($r['member_id'])  $leaverMidSet[$r['member_id']]  = true;
+        $info = [
+            'resign_date' => norm_date($r['resign_date'] ?? null),
+            'member_id'   => $r['member_id'],
+            'citizen_id'  => $r['citizen_id'],
+            'full_name'   => $r['full_name'] ?? '',
+        ];
+        if ($r['citizen_id']) $leaverByCid[$r['citizen_id']] = $info;
+        if ($r['member_id'])  $leaverByMid[$r['member_id']]  = $info;
     }
+    $leaverInfoFor = function (string $cid, string $mid) use ($leaverByCid, $leaverByMid): ?array {
+        if ($cid !== '' && isset($leaverByCid[$cid])) return $leaverByCid[$cid];
+        if ($mid !== '' && isset($leaverByMid[$mid])) return $leaverByMid[$mid];
+        return null;
+    };
 
     $keyFor = function (array $r): string {
         return !empty($r['citizen_id']) ? ('C:' . $r['citizen_id']) : ('M:' . $r['member_id']);
@@ -534,10 +550,15 @@ if ($action === 'upload_combined') {
 
     // Staff first (priority — บุคลากรชนะ)
     foreach ($staffList as $r) {
-        if (($r['citizen_id'] && isset($leaverCidSet[$r['citizen_id']]))
-            || ($r['member_id'] && isset($leaverMidSet[$r['member_id']]))) {
+        $info = $leaverInfoFor($r['citizen_id'] ?? '', $r['member_id'] ?? '');
+        if ($info !== null) {
             $droppedLeaverCnt++;
-            if (count($droppedLeavers) < 50) $droppedLeavers[] = $r + ['_dropped_from' => 'staff'];
+            if (count($droppedLeavers) < 50) {
+                $droppedLeavers[] = $r + [
+                    '_dropped_from' => 'staff',
+                    '_resign_date'  => $info['resign_date'],
+                ];
+            }
             continue;
         }
         $countStaffIn++;
@@ -545,10 +566,15 @@ if ($action === 'upload_combined') {
     }
 
     foreach ($studentList as $r) {
-        if (($r['citizen_id'] && isset($leaverCidSet[$r['citizen_id']]))
-            || ($r['member_id'] && isset($leaverMidSet[$r['member_id']]))) {
+        $info = $leaverInfoFor($r['citizen_id'] ?? '', $r['member_id'] ?? '');
+        if ($info !== null) {
             $droppedLeaverCnt++;
-            if (count($droppedLeavers) < 50) $droppedLeavers[] = $r + ['_dropped_from' => 'student'];
+            if (count($droppedLeavers) < 50) {
+                $droppedLeavers[] = $r + [
+                    '_dropped_from' => 'student',
+                    '_resign_date'  => $info['resign_date'],
+                ];
+            }
             continue;
         }
         $key = $keyFor($r);
@@ -700,15 +726,35 @@ if ($action === 'upload_combined') {
               AND insurance_status = 'Active'
               AND manually_overridden = 0
         ");
+        // Update remarks + coverage_end for those matched in resigned file (only when not protected)
+        $applyResign = $pdo->prepare("
+            UPDATE insurance_members
+            SET remarks      = TRIM(BOTH '; ' FROM CONCAT(COALESCE(remarks,''), '; ', :note)),
+                coverage_end = COALESCE(:rd, coverage_end)
+            WHERE member_id = :mid AND manually_overridden = 0
+        ");
+
         foreach (array_keys($existSet) as $mid) {
             if (!isset($finalIdSet[$mid])) {
                 $inactivate->execute([':mid' => $mid, ':sync_id' => $syncId]);
                 if ($inactivate->rowCount() > 0) {
                     $cntInactivated++;
                     $existRow = $existingById[$mid] ?? ['member_id' => $mid];
-                    $byLeaver = ((!empty($existRow['citizen_id'])) && isset($leaverCidSet[$existRow['citizen_id']]))
-                              || isset($leaverMidSet[$mid]);
+                    $info     = $leaverInfoFor((string)($existRow['citizen_id'] ?? ''), (string)$mid);
+                    $byLeaver = $info !== null;
                     $changeType = $byLeaver ? 'inactivated_resigned' : 'inactivated';
+
+                    if ($byLeaver) {
+                        $resignDate = $info['resign_date'];
+                        $note = $resignDate ? "ออกเมื่อ {$resignDate}" : 'ออกจากงาน';
+                        $applyResign->execute([
+                            ':note' => $note,
+                            ':rd'   => $resignDate,
+                            ':mid'  => $mid,
+                        ]);
+                        $existRow['_resign_date'] = $resignDate;
+                    }
+
                     $history->execute([
                         ':member_id'   => $mid,
                         ':sync_id'     => $syncId,
