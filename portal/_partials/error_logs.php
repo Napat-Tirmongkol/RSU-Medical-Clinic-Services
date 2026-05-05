@@ -65,6 +65,12 @@ if ($_el_search !== '') {
 if (in_array($_el_level, ['error', 'warning', 'info'], true)) {
     $_el_where   .= ' AND level = ?';
     $_el_params[] = $_el_level;
+} elseif ($_el_level === 'all') {
+    // Explicit 'all' — include info too. No filter applied.
+} else {
+    // Default: hide noisy info-level logs (LINE webhook events, etc.)
+    // unless the user explicitly selects 'info' or 'all'.
+    $_el_where .= " AND level <> 'info'";
 }
 if (in_array($_el_status, ['New', 'Active', 'Resolved'], true)) {
     $_el_where   .= ' AND status = ?';
@@ -294,10 +300,11 @@ $_el_filterQs = http_build_query(array_filter([
             <div>
                 <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 block">Level</label>
                 <select name="el_level" class="py-2.5 px-3 border border-gray-200 rounded-xl text-sm outline-none bg-gray-50">
-                    <option value="">ทั้งหมด</option>
+                    <option value="">Error + Warning</option>
                     <option value="error"   <?= $_el_level==='error'   ? 'selected':'' ?>>Error</option>
                     <option value="warning" <?= $_el_level==='warning' ? 'selected':'' ?>>Warning</option>
                     <option value="info"    <?= $_el_level==='info'    ? 'selected':'' ?>>Info</option>
+                    <option value="all"     <?= $_el_level==='all'     ? 'selected':'' ?>>ทั้งหมด (รวม Info)</option>
                 </select>
             </div>
             <div>
