@@ -387,11 +387,10 @@ declare(strict_types=1);
         try {
             const res = await fetch('ajax_insurance_sync.php', { method: 'POST', body: fd });
             const data = await res.json();
-            if (!(data.ok || data.success)) {
-                throw new Error(data.error || data.message || 'วิเคราะห์ไม่สำเร็จ');
+            if (data.status !== 'ok') {
+                throw new Error(data.message || 'วิเคราะห์ไม่สำเร็จ');
             }
-            const payload = data.data || data;
-            cwRenderPreview(payload);
+            cwRenderPreview(data);
             cwSetStep(2);
         } catch (e) {
             cwAlertBox('<strong><i class="fa-solid fa-circle-exclamation mr-1"></i> ผิดพลาด:</strong> ' + escHTML(e.message), 'error');
@@ -502,16 +501,15 @@ declare(strict_types=1);
         try {
             const res = await fetch('ajax_insurance_sync.php', { method: 'POST', body: fd });
             const data = await res.json();
-            if (!(data.ok || data.success)) {
-                throw new Error(data.error || data.message || 'บันทึกไม่สำเร็จ');
+            if (data.status !== 'ok') {
+                throw new Error(data.message || 'บันทึกไม่สำเร็จ');
             }
-            const p = data.data || data;
-            const s = p.summary || {};
+            const s = data.summary || {};
             cwSetStep(3);
             cwAlertBox(`
                 <strong><i class="fa-solid fa-circle-check mr-1"></i> บันทึกสำเร็จ</strong>
                 <ul style="margin-top:.5rem; font-size:.85rem; line-height:1.6;">
-                    <li>Batch: <code>${escHTML(p.batch_code || '—')}</code> · sync_id #${p.sync_id}</li>
+                    <li>Batch: <code>${escHTML(data.batch_code || '—')}</code> · sync_id #${data.sync_id}</li>
                     <li>รายชื่อสุดท้าย: <strong>${fmt(s.final_count)}</strong> รายการ</li>
                     <li>เพิ่มใหม่ ${fmt(s.new)} · อัพเดท ${fmt(s.updated)} · Inactive ${fmt(s.inactivated)}${s.protected ? ' · Protected ' + fmt(s.protected) : ''}</li>
                     <li>ซ้ำที่ถูกรวม: ${fmt(s.duplicates)} · ตัดเพราะคนออก: ${fmt(s.dropped_leavers)}</li>
@@ -567,8 +565,8 @@ declare(strict_types=1);
             const res = await fetch('ajax_insurance_sync.php', { method: 'POST', body: fd });
             const data = await res.json();
 
-            if (data.ok || data.success) {
-                const summary = data.summary || data.data || data;
+            if (data.status === 'ok') {
+                const summary = data;
                 alertBox.className = 'reg-alert-success';
                 alertBox.innerHTML = `
                     <strong><i class="fa-solid fa-circle-check mr-1"></i> อัพโหลดสำเร็จ</strong>
@@ -580,7 +578,7 @@ declare(strict_types=1);
                     </ul>`;
             } else {
                 alertBox.className = 'reg-alert-error';
-                alertBox.innerHTML = `<strong><i class="fa-solid fa-circle-exclamation mr-1"></i> ผิดพลาด:</strong> ${data.error || data.message || 'ไม่ทราบสาเหตุ'}`;
+                alertBox.innerHTML = `<strong><i class="fa-solid fa-circle-exclamation mr-1"></i> ผิดพลาด:</strong> ${data.message || 'ไม่ทราบสาเหตุ'}`;
             }
         } catch (err) {
             alertBox.className = 'reg-alert-error';
