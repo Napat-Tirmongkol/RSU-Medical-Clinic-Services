@@ -13,7 +13,7 @@ $hasRegistry = !empty($_SESSION['access_registry']);
 $hasInsurance = !empty($_SESSION['access_insurance']) || $adminRole === 'superadmin';
 
 // Registry users can only call upload-related actions (member_id list maintenance only)
-$registryAllowedActions = ['upload', 'analyze_upload', 'upload_combined'];
+$registryAllowedActions = ['upload', 'analyze_upload', 'upload_combined', 'ai_review'];
 $requestedAction = $_POST['action'] ?? $_GET['action'] ?? '';
 
 if (($isStaff && $adminRole === '') || !in_array($adminRole, ['admin', 'superadmin', 'editor'], true)) {
@@ -935,6 +935,87 @@ if ($action === 'upload_combined') {
             'inactivated'      => $cntInactivated,
             'protected'        => $cntProtected,
         ],
+    ]);
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ACTION: ai_review — Gemini-powered data quality review of preview payload
+//
+// PDPA-safe: client masks citizen_id (1XXXXXXXXXXX3) and names (initials)
+// before submitting. Server only forwards summary + masked sample to Gemini.
+// ══════════════════════════════════════════════════════════════════════════════
+if ($action === 'ai_review') {
+    if (!defined('GEMINI_API_KEY') || GEMINI_API_KEY === '') {
+        json_err('AI ยังไม่ได้ตั้งค่า — admin ต้องใส่ GEMINI_API_KEY ใน Site Settings');
+    }
+
+    $summary = $_POST['summary'] ?? '';
+    $sample  = $_POST['sample']  ?? '';
+    if (is_string($summary)) $summary = json_decode($summary, true);
+    if (is_string($sample))  $sample  = json_decode($sample, true);
+    if (!is_array($summary) || !is_array($sample)) json_err('ข้อมูลไม่ครบ');
+
+    // Defensive — strip any field that looks like full citizen_id (13 digits)
+    foreach ($sample as &$row) {
+        if (is_array($row)) {
+            foreach ($row as $k => $v) {
+                if (is_string($v) && preg_match('/^\d{13}$/', $v)) {
+                    $row[$k] = substr($v, 0, 1) . str_repeat('X', 11) . substr($v, -1);
+                }
+            }
+        }
+    }
+    unset($row);
+
+    $prompt = "คุณคือผู้ช่วยตรวจคุณภาพข้อมูลรายชื่อสำหรับส่งให้บริษัทประกันสุขภาพ\n";
+    $prompt .= "ของศูนย์การแพทย์มหาวิทยาลัยรังสิต\n";
+    $prompt .= "ข้อมูลถูก anonymize แล้ว (เลขบัตรเป็น 1XXXXXXXXXXX3, ชื่อเป็น initials)\n\n";
+    $prompt .= "=== สรุปสถิติ ===\n";
+    $prompt .= json_encode($summary, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT) . "\n\n";
+    $prompt .= "=== ตัวอย่างแถว (anonymized) ===\n";
+    $prompt .= json_encode($sample, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT) . "\n\n";
+    $prompt .= "วิเคราะห์เป็น bullet points ภาษาไทย ไม่เกิน 6 ข้อ ครอบคลุม:\n";
+    $prompt .= "1. คุณภาพข้อมูลโดยรวม (ดี/พอใช้/ต้องตรวจ)\n";
+    $prompt .= "2. ความผิดปกติของวันเกิด (อายุ <5 หรือ >80, ในอนาคต ฯลฯ) ระบุจำนวน\n";
+    $prompt .= "3. รายการที่ citizen_id ผิดรูป (ไม่ใช่ 13 หลัก/ว่าง) ระบุจำนวนและที่มา\n";
+    $prompt .= "4. ความสมดุลของ บุคลากร vs นักศึกษา ดูสมเหตุสมผลไหม\n";
+    $prompt .= "5. ข้อสังเกตอื่นที่ admin ควรตรวจก่อน commit\n";
+    $prompt .= "ตอบสั้นกระชับ ตรงประเด็น ใส่ emoji นำหน้าแต่ละข้อ (✅ คือดี, ⚠️ คือควรเช็ค, ❌ คือต้องแก้)";
+
+    $url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" . urlencode(GEMINI_API_KEY);
+    $payload = [
+        'contents'         => [['parts' => [['text' => $prompt]]]],
+        'generationConfig' => ['temperature' => 0.3, 'maxOutputTokens' => 800],
+    ];
+
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_POST           => true,
+        CURLOPT_POSTFIELDS     => json_encode($payload, JSON_UNESCAPED_UNICODE),
+        CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
+        CURLOPT_TIMEOUT        => 30,
+    ]);
+    $resp     = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlErr  = curl_error($ch);
+    curl_close($ch);
+
+    if ($resp === false) json_err('AI ติดต่อไม่ได้: ' . $curlErr);
+    if ($httpCode !== 200) {
+        $err = json_decode($resp, true)['error']['message'] ?? "HTTP $httpCode";
+        json_err('AI ตอบกลับผิดพลาด: ' . $err);
+    }
+
+    $data = json_decode($resp, true);
+    $text = $data['candidates'][0]['content']['parts'][0]['text'] ?? '';
+    if ($text === '') json_err('AI ตอบมาว่างเปล่า — ลองอีกครั้ง');
+
+    log_activity('insurance_ai_review', 'sample=' . count($sample) . ', tokens~' . (int)($data['usageMetadata']['totalTokenCount'] ?? 0));
+    json_ok([
+        'review' => $text,
+        'tokens' => (int)($data['usageMetadata']['totalTokenCount'] ?? 0),
+        'model'  => 'gemini-2.5-flash',
     ]);
 }
 

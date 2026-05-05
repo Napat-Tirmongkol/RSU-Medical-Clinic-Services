@@ -401,6 +401,7 @@ declare(strict_types=1);
     };
 
     function cwRenderPreview(p) {
+        window._cwLastPreview = p;
         const s = p.summary || {};
         const dups = p.duplicates_sample || [];
         const drops = p.dropped_sample || [];
@@ -478,19 +479,102 @@ declare(strict_types=1);
                 </div>
             </div>` : '';
 
+        const aiResultBox = `<div id="cwAiResult" style="margin-top:.85rem;"></div>`;
+
         const actionBar = `
-            <div style="display:flex; gap:.5rem; justify-content:flex-end; margin-top:1.25rem;">
-                <button type="button" onclick="cwReset()" class="reg-btn-secondary">
-                    <i class="fa-solid fa-rotate-left"></i> เริ่มใหม่
+            <div style="display:flex; gap:.5rem; justify-content:space-between; align-items:center; flex-wrap:wrap; margin-top:1.25rem;">
+                <button type="button" id="cwBtnAiReview" onclick="cwAiReview()"
+                    style="display:inline-flex; align-items:center; gap:.5rem; padding:.7rem 1.2rem; border-radius:.65rem; font-weight:700; font-size:.85rem; cursor:pointer; border:1px solid #c4b5fd; background:#faf5ff; color:#6b21a8;">
+                    <i class="fa-solid fa-robot"></i> ขอ AI ช่วยตรวจ
+                    <span style="font-size:.7rem; color:#a78bfa; font-weight:500;">(Gemini · PDPA-safe)</span>
                 </button>
-                <button type="button" id="cwBtnCommit" class="reg-btn-primary" onclick="cwCommit()">
-                    <i class="fa-solid fa-check"></i> ยืนยันและบันทึก (${fmt(s.final_count)} รายการ)
-                </button>
+                <div style="display:flex; gap:.5rem;">
+                    <button type="button" onclick="cwReset()" class="reg-btn-secondary">
+                        <i class="fa-solid fa-rotate-left"></i> เริ่มใหม่
+                    </button>
+                    <button type="button" id="cwBtnCommit" class="reg-btn-primary" onclick="cwCommit()">
+                        <i class="fa-solid fa-check"></i> ยืนยันและบันทึก (${fmt(s.final_count)} รายการ)
+                    </button>
+                </div>
             </div>`;
 
-        document.getElementById('cwPreview').innerHTML = stats + dupTable + dropTable + finalTable + actionBar;
+        document.getElementById('cwPreview').innerHTML = stats + dupTable + dropTable + finalTable + aiResultBox + actionBar;
         document.getElementById('cwPreview').style.display = 'block';
     }
+
+    // ── PDPA-safe masking helpers ───────────────────────────────────────────────
+    function maskCid(cid) {
+        const s = String(cid || '').replace(/\D/g, '');
+        if (s.length !== 13) return '—';
+        return s[0] + 'X'.repeat(11) + s[12];
+    }
+    function nameInitials(name) {
+        const s = String(name || '').trim();
+        if (!s) return '—';
+        // Keep prefix as-is, abbreviate first/last names
+        const prefixes = ['น.ส.', 'นางสาว', 'นาย', 'นาง', 'ดร.', 'ผศ.', 'รศ.', 'ศ.', 'อ.', 'Mr.', 'Mrs.', 'Ms.', 'Miss'];
+        let work = s;
+        let prefix = '';
+        for (const p of prefixes) {
+            if (work.startsWith(p)) {
+                prefix = p;
+                work = work.slice(p.length).trim();
+                break;
+            }
+        }
+        const parts = work.split(/\s+/).filter(Boolean);
+        const abbr = parts.map(p => (p[0] || '') + '.').join(' ');
+        return (prefix + abbr).trim() || '—';
+    }
+
+    window.cwAiReview = async function() {
+        const btn = document.getElementById('cwBtnAiReview');
+        const box = document.getElementById('cwAiResult');
+        if (!window._cwLastPreview) { return; }
+
+        btn.disabled = true;
+        const origText = btn.innerHTML;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> AI กำลังวิเคราะห์...';
+        box.innerHTML = '';
+
+        const p = window._cwLastPreview;
+        const sample = (p.final_sample || []).slice(0, 15).map(r => ({
+            member_id:    r.member_id,
+            citizen_id:   maskCid(r.citizen_id),
+            name:         nameInitials(r.full_name),
+            member_status: r.member_status || '',
+            position:     r.position || '',
+            date_of_birth: r.date_of_birth || '',
+            remarks:      (r.remarks || '').slice(0, 80),
+        }));
+
+        const csrfToken = document.querySelector('#cwForm input[name="csrf_token"]')?.value || '';
+        const fd = new FormData();
+        fd.append('action', 'ai_review');
+        fd.append('csrf_token', csrfToken);
+        fd.append('summary', JSON.stringify(p.summary || {}));
+        fd.append('sample',  JSON.stringify(sample));
+
+        try {
+            const res = await fetch('ajax_insurance_sync.php', { method: 'POST', body: fd });
+            const data = await res.json();
+            if (data.status !== 'ok') throw new Error(data.message || 'AI ตอบไม่ได้');
+            const tokens = data.tokens ? ` · ${data.tokens.toLocaleString()} tokens` : '';
+            box.innerHTML = `
+                <div style="background:#faf5ff; border:1px solid #c4b5fd; border-radius:.85rem; overflow:hidden;">
+                    <div style="padding:.7rem 1rem; background:#ede9fe; color:#6b21a8; font-weight:800; font-size:.82rem; display:flex; align-items:center; justify-content:space-between;">
+                        <span><i class="fa-solid fa-robot mr-1"></i> AI Review (Gemini 2.5 Flash)</span>
+                        <span style="font-size:.7rem; color:#a78bfa; font-weight:500;">PDPA-safe · masked sample${tokens}</span>
+                    </div>
+                    <div style="padding:1rem 1.25rem; font-size:.85rem; color:#1f2937; white-space:pre-wrap; line-height:1.75;">${escHTML(data.review)}</div>
+                </div>`;
+        } catch (e) {
+            box.innerHTML = `<div class="reg-alert-error"><strong><i class="fa-solid fa-circle-exclamation mr-1"></i> ผิดพลาด:</strong> ${escHTML(e.message)}</div>`;
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = origText;
+        }
+    };
 
     window.cwCommit = async function() {
         if (!confirm('ยืนยันบันทึกรายชื่อสุดท้ายเป็น batch ใหม่?')) return;
