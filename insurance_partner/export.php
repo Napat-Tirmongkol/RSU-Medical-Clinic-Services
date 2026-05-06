@@ -115,11 +115,11 @@ if (($_GET['download'] ?? '') === 'csv') {
         $pdo->prepare("
             UPDATE insurance_batch
             SET status = :st,
-                first_downloaded_at = COALESCE(first_downloaded_at, :now),
-                last_downloaded_at = :now,
+                first_downloaded_at = COALESCE(first_downloaded_at, :now1),
+                last_downloaded_at = :now2,
                 download_count = download_count + 1
             WHERE id = :id
-        ")->execute([':st' => $newStatus, ':now' => $now, ':id' => (int)$batch['id']]);
+        ")->execute([':st' => $newStatus, ':now1' => $now, ':now2' => $now, ':id' => (int)$batch['id']]);
         ins_batch_log_event(
             $pdo, (int)$batch['id'], 'downloaded',
             $batch['status'], $newStatus,
