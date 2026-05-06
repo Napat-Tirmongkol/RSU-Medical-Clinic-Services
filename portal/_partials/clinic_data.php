@@ -4,7 +4,7 @@
 // Each sub-view gets back to landing via ?section=clinic_data (no cd_view)
 
 $_view = $_GET['cd_view'] ?? '';
-$_validViews = ['profile','faculty','staff','rooms','hours','schedule'];
+$_validViews = ['profile','faculty','staff','rooms','hours','schedule','calendar'];
 
 if (in_array($_view, $_validViews, true)) {
     include __DIR__ . '/clinic_data/' . $_view . '.php';
@@ -104,6 +104,17 @@ $_cards = [
         'used_by' => ['booking validation'],
         'count'   => $_counts['hours'],
         'count_label' => 'รายการ',
+        'updated' => null,
+    ],
+    [
+        'view'    => 'calendar',
+        'title'   => 'ปฏิทินคลินิก',
+        'desc'    => 'ภาพรวมรายเดือน — เวลาเปิด-ปิด, วันหยุด, แพทย์ออกตรวจ',
+        'icon'    => 'fa-calendar',
+        'tone'    => ['bg'=>'#ecfeff','fg'=>'#0e7490','border'=>'#a5f3fc'],
+        'used_by' => ['hours','schedule','holidays'],
+        'count'   => (int)date('t'),
+        'count_label' => 'วันในเดือนนี้',
         'updated' => null,
     ],
     [
