@@ -700,6 +700,35 @@ declare(strict_types=1);
                     <li>ซ้ำที่ถูกรวม: ${fmt(s.duplicates)} · ตัดเพราะคนออก: ${fmt(s.dropped_leavers)}</li>
                 </ul>`, 'success');
             btn.style.display = 'none';
+
+            Swal.fire({
+                icon: 'success',
+                title: 'บันทึกสำเร็จ',
+                html: `
+                    <div style="text-align:left; font-size:.9rem; line-height:1.7;">
+                        <div style="margin-bottom:.5rem;">
+                            <span style="color:#64748b;">Batch:</span>
+                            <code style="color:#0f766e; font-weight:700;">${escHTML(data.batch_code || '—')}</code>
+                            <span style="color:#94a3b8; font-size:.8rem;">· sync_id #${data.sync_id}</span>
+                        </div>
+                        <div style="background:#f0fdfa; border-radius:.5rem; padding:.75rem 1rem;">
+                            <div style="font-weight:700; color:#0f766e; margin-bottom:.35rem;">
+                                <i class="fa-solid fa-list-check mr-1"></i> รายชื่อสุดท้าย: ${fmt(s.final_count)} รายการ
+                            </div>
+                            <div style="font-size:.82rem; color:#475569;">
+                                เพิ่มใหม่ <strong>${fmt(s.new)}</strong> ·
+                                อัพเดท <strong>${fmt(s.updated)}</strong> ·
+                                Inactive <strong>${fmt(s.inactivated)}</strong>${s.protected ? ' · Protected <strong>' + fmt(s.protected) + '</strong>' : ''}
+                            </div>
+                            <div style="font-size:.78rem; color:#94a3b8; margin-top:.25rem;">
+                                ซ้ำที่ถูกรวม ${fmt(s.duplicates)} · ตัดเพราะคนออก ${fmt(s.dropped_leavers)}
+                            </div>
+                        </div>
+                    </div>
+                `,
+                confirmButtonText: '<i class="fa-solid fa-check mr-1"></i> รับทราบ',
+                confirmButtonColor: '#0f766e',
+            });
         } catch (e) {
             cwAlertBox('<strong><i class="fa-solid fa-circle-exclamation mr-1"></i> ผิดพลาด:</strong> ' + escHTML(e.message), 'error');
             btn.disabled = false;
