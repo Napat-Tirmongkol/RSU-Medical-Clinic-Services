@@ -1134,7 +1134,13 @@ if ($action === 'ai_review') {
     $url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" . urlencode(GEMINI_API_KEY);
     $payload = [
         'contents'         => [['parts' => [['text' => $prompt]]]],
-        'generationConfig' => ['temperature' => 0.3, 'maxOutputTokens' => 800],
+        'generationConfig' => [
+            'temperature'     => 0.3,
+            'maxOutputTokens' => 2048,
+            // Gemini 2.5 Flash นับ thinking tokens รวมใน maxOutputTokens
+            // งานนี้แค่สรุป bullet ไม่ต้อง deep reasoning → ปิด thinking
+            'thinkingConfig'  => ['thinkingBudget' => 0],
+        ],
     ];
 
     $ch = curl_init($url);
@@ -1156,9 +1162,11 @@ if ($action === 'ai_review') {
         json_err('AI ตอบกลับผิดพลาด: ' . $err);
     }
 
-    $data  = json_decode($resp, true);
-    $parts = $data['candidates'][0]['content']['parts'] ?? [];
-    $text  = '';
+    $data         = json_decode($resp, true);
+    $candidate    = $data['candidates'][0] ?? [];
+    $parts        = $candidate['content']['parts'] ?? [];
+    $finishReason = $candidate['finishReason'] ?? '';
+    $text         = '';
     foreach ($parts as $part) {
         if (!($part['thought'] ?? false) && isset($part['text'])) {
             $text .= $part['text'];
@@ -1166,11 +1174,18 @@ if ($action === 'ai_review') {
     }
     if ($text === '') json_err('AI ตอบมาว่างเปล่า — ลองอีกครั้ง');
 
-    log_activity('insurance_ai_review', 'sample=' . count($sample) . ', tokens~' . (int)($data['usageMetadata']['totalTokenCount'] ?? 0));
+    // เตือนถ้า output โดนตัด (เกิน maxOutputTokens)
+    $truncated = ($finishReason === 'MAX_TOKENS');
+    if ($truncated) {
+        $text .= "\n\n> ⚠️ *คำตอบอาจไม่สมบูรณ์ (เกิน token limit) — กดปุ่ม \"ขอ AI ช่วยตรวจ\" อีกครั้งหากต้องการ*";
+    }
+
+    log_activity('insurance_ai_review', 'sample=' . count($sample) . ', tokens~' . (int)($data['usageMetadata']['totalTokenCount'] ?? 0) . ($truncated ? ', TRUNCATED' : ''));
     json_ok([
-        'review' => $text,
-        'tokens' => (int)($data['usageMetadata']['totalTokenCount'] ?? 0),
-        'model'  => 'gemini-2.5-flash',
+        'review'    => $text,
+        'tokens'    => (int)($data['usageMetadata']['totalTokenCount'] ?? 0),
+        'model'     => 'gemini-2.5-flash',
+        'truncated' => $truncated,
     ]);
 }
 
