@@ -172,6 +172,42 @@ try {
     error_log("Hub DB error: " . $e->getMessage());
 }
 
+// ── Today's doctor shifts (for "แพทย์ออกตรวจวันนี้" widget) ───────────────
+$todayShifts = [];
+try {
+    $todayWd = (int)date('w');
+    $stmt = $pdo->prepare("
+        SELECT s.id, s.type, s.weekday, s.specific_date, s.start_time, s.end_time,
+               s.staff_id, s.service_type,
+               ms.title AS doc_title, ms.full_name AS doc_name,
+               cr.name AS room_name, cr.code AS room_code
+        FROM sys_doctor_schedule s
+        JOIN sys_medical_staff ms ON s.staff_id = ms.id
+        LEFT JOIN sys_clinic_rooms cr ON s.room_id = cr.id
+        WHERE s.is_active = 1 AND ms.is_active = 1
+          AND s.type <> 'off'
+          AND (
+              (s.specific_date = :today)
+              OR (s.specific_date IS NULL AND s.weekday = :wd AND s.type = 'regular')
+          )
+        ORDER BY s.start_time ASC
+    ");
+    $stmt->execute([':today' => $today, ':wd' => $todayWd]);
+    $rawShifts = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // Override (specific_date) wins over regular for same staff
+    $overrideStaff = [];
+    foreach ($rawShifts as $r) {
+        if (!empty($r['specific_date'])) $overrideStaff[(int)$r['staff_id']] = true;
+    }
+    foreach ($rawShifts as $r) {
+        if (!empty($r['specific_date']) || empty($overrideStaff[(int)$r['staff_id']])) {
+            $todayShifts[] = $r;
+        }
+    }
+    $todayShifts = array_slice($todayShifts, 0, 4);
+} catch (Exception) { /* table may not exist or other error — silently fall back to empty */ }
+
 // ── Health Overview Summary ────────────────────────────────────────────────
 $healthOverview = [
     'vaccine_total'      => 0,
@@ -1368,6 +1404,61 @@ $heroThemes = [
                         <p class="text-lg font-black text-slate-900"><?= $borrow_count ?></p>
                         <p class="text-[9px] font-black uppercase tracking-widest text-slate-400">ยืมอยู่</p>
                     </button>
+                </div>
+
+                <!-- Doctor schedule widget — แพทย์ออกตรวจวันนี้ -->
+                <div class="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
+                    <div class="flex items-center justify-between mb-3">
+                        <h4 class="text-sm font-black text-slate-900 flex items-center gap-2">
+                            <span class="w-7 h-7 rounded-lg bg-cyan-50 text-cyan-600 flex items-center justify-center">
+                                <i class="fa-solid fa-user-doctor text-xs"></i>
+                            </span>
+                            แพทย์ออกตรวจวันนี้
+                        </h4>
+                        <a href="clinic_schedule.php" class="text-[10px] font-black text-cyan-600 uppercase tracking-widest hover:text-cyan-700 active:scale-95 transition-all">
+                            ดูทั้งหมด <i class="fa-solid fa-arrow-right text-[8px] ml-0.5"></i>
+                        </a>
+                    </div>
+                    <?php if (empty($todayShifts)): ?>
+                        <div class="text-center py-5">
+                            <div class="w-10 h-10 mx-auto mb-2 rounded-full bg-slate-50 text-slate-300 flex items-center justify-center">
+                                <i class="fa-solid fa-calendar-xmark"></i>
+                            </div>
+                            <p class="text-xs font-bold text-slate-400">ไม่มีแพทย์ออกตรวจในวันนี้</p>
+                        </div>
+                    <?php else: ?>
+                        <div class="space-y-1.5">
+                            <?php
+                            $svcColorMap = [
+                                'ตรวจทั่วไป' => ['bg-sky-50','text-sky-600'],
+                                'วัคซีน'      => ['bg-emerald-50','text-emerald-600'],
+                                'ตรวจสุขภาพ' => ['bg-purple-50','text-purple-600'],
+                                'ปรึกษา'     => ['bg-amber-50','text-amber-600'],
+                                'ทันตกรรม'   => ['bg-pink-50','text-pink-600'],
+                            ];
+                            foreach ($todayShifts as $s):
+                                $svc = $s['service_type'] ?? '';
+                                $clr = $svcColorMap[$svc] ?? ['bg-cyan-50','text-cyan-600'];
+                                $docName = trim(($s['doc_title'] ?? '') . ' ' . ($s['doc_name'] ?? '-'));
+                            ?>
+                            <div class="flex items-center gap-3 p-2.5 rounded-xl bg-slate-50/60 border border-slate-100">
+                                <div class="w-9 h-9 rounded-lg <?= $clr[0] ?> <?= $clr[1] ?> flex items-center justify-center shrink-0">
+                                    <i class="fa-solid fa-user-doctor text-xs"></i>
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <p class="text-xs font-black text-slate-800 truncate"><?= htmlspecialchars($docName) ?></p>
+                                    <p class="text-[10px] font-bold text-slate-500 truncate">
+                                        <i class="fa-regular fa-clock text-[8px] mr-0.5"></i><?= substr($s['start_time'],0,5) ?>–<?= substr($s['end_time'],0,5) ?>
+                                        <?php if ($svc !== ''): ?> · <?= htmlspecialchars($svc) ?><?php endif; ?>
+                                    </p>
+                                </div>
+                                <?php if (!empty($s['room_code'])): ?>
+                                <span class="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-white border border-slate-200 text-slate-500 shrink-0"><?= htmlspecialchars($s['room_code']) ?></span>
+                                <?php endif; ?>
+                            </div>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php endif; ?>
                 </div>
             </section>
 
