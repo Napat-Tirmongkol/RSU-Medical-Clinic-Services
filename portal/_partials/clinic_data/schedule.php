@@ -93,10 +93,10 @@ $serviceTypes = ['ตรวจทั่วไป', 'วัคซีน', 'ตร
         <span class="inline-flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-slate-400"></span>ลา/หยุด</span>
     </div>
 
-    <div class="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-4">
+    <div class="grid grid-cols-1 md:grid-cols-[220px_1fr] gap-4">
 
         <!-- Doctor Palette (drag source) -->
-        <aside class="bg-white rounded-2xl border border-slate-200 shadow-sm p-3 lg:sticky lg:top-4 lg:self-start lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">
+        <aside class="bg-white rounded-2xl border border-slate-200 shadow-sm p-3 md:sticky md:top-4 md:self-start md:max-h-[calc(100vh-2rem)] md:overflow-y-auto">
             <div class="flex items-center justify-between mb-3 px-1">
                 <h4 class="text-[11px] font-black uppercase tracking-widest text-slate-500">
                     <i class="fa-solid fa-hand-pointer text-cyan-500 mr-1"></i> ลากแพทย์ลงปฏิทิน
