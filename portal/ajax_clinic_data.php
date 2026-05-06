@@ -291,7 +291,11 @@ if ($action === 'import') {
     $stmt = $pdo->prepare("
         INSERT INTO sys_faculties (code, name_th, name_en, type)
         VALUES (:code, :name_th, :name_en, :type)
-        ON DUPLICATE KEY UPDATE code = VALUES(code), name_en = VALUES(name_en), type = VALUES(type), updated_at = CURRENT_TIMESTAMP
+        ON DUPLICATE KEY UPDATE
+            code       = COALESCE(NULLIF(VALUES(code), ''), code),
+            name_en    = COALESCE(NULLIF(VALUES(name_en), ''), name_en),
+            type       = VALUES(type),
+            updated_at = CURRENT_TIMESTAMP
     ");
 
     $inserted = 0; $skipped = 0; $errors = [];
