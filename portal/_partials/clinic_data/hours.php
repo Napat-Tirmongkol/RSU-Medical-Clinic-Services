@@ -181,7 +181,7 @@ async function hrFetchThai() {
     const { value: year } = await Swal.fire({
         title: 'เลือกปีที่ต้องการดึงวันหยุด',
         html: `<select id="hr-fetch-year" class="swal2-select" style="width:80%; padding:.55rem .8rem; font-size:.9rem; border:1.5px solid #e2e8f0; border-radius:.5rem; font-family:Sarabun,sans-serif;">${yearOpts}</select>
-            <p style="font-size:.75rem; color:#64748b; margin-top:.65rem;">ใช้ข้อมูลจาก <a href="https://date.nager.at" target="_blank" style="color:#10b981; text-decoration:underline;">date.nager.at</a></p>`,
+            <p style="font-size:.75rem; color:#64748b; margin-top:.65rem;">ใช้ข้อมูลจาก <a href="https://www.myhora.com" target="_blank" style="color:#10b981; text-decoration:underline;">myhora.com</a> (วันหยุดราชการไทย รวมวันหยุดชดเชย)</p>`,
         showCancelButton: true,
         confirmButtonText: '<i class="fa-solid fa-magnifying-glass"></i> ค้นหา',
         cancelButtonText: 'ยกเลิก',
@@ -212,7 +212,7 @@ async function hrFetchThai() {
             <input type="checkbox" class="hr-thai-check" data-idx="${i}" ${r.exists?'disabled':'checked'} style="width:1rem; height:1rem; accent-color:#10b981;">
             <div style="flex:1; min-width:0; text-align:left;">
                 <div style="font-weight:700; color:#0f172a; font-size:.85rem;">${esc(r.name_th)}</div>
-                <div style="font-size:.72rem; color:#64748b;">${fmt(r.date)} · <span style="color:#94a3b8;">${esc(r.name_en)}</span></div>
+                <div style="font-size:.72rem; color:#64748b;">${fmt(r.date)}${r.name_en ? ' · <span style="color:#94a3b8;">' + esc(r.name_en) + '</span>' : ''}</div>
             </div>
             ${r.exists ? '<span style="font-size:.65rem; padding:.15rem .45rem; border-radius:9999px; background:#fef3c7; color:#92400e; font-weight:700;">นำเข้าแล้ว</span>' : ''}
         </label>

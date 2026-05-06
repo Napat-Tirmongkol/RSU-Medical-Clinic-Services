@@ -229,7 +229,8 @@ try {
             echo json_encode(['ok' => true, 'message' => 'ลบแล้ว']);
             return;
 
-        // ── Thai Public Holidays — ดึงจาก date.nager.at (free, no API key) ─
+        // ── Thai Public Holidays — ดึงจาก myhora.com (Thai-specific, ครบทั้ง
+        // วันหยุดราชการ + วันหยุดชดเชย, อัปเดตตามประกาศจริง)
         case 'hours:fetch_thai_holidays': {
             $year = (int)($_POST['year'] ?? date('Y'));
             if ($year < 2020 || $year > 2050) {
@@ -237,12 +238,14 @@ try {
                 return;
             }
 
-            $url = "https://date.nager.at/api/v3/PublicHolidays/{$year}/TH";
+            $url = 'https://www.myhora.com/calendar/ical/holiday.aspx?latest.json';
             $ch  = curl_init($url);
             curl_setopt_array($ch, [
                 CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_TIMEOUT        => 10,
-                CURLOPT_USERAGENT      => 'RSU-Clinic/1.0',
+                CURLOPT_TIMEOUT        => 15,
+                CURLOPT_FOLLOWLOCATION => true,
+                CURLOPT_USERAGENT      => 'Mozilla/5.0 (compatible; RSU-Clinic/1.0)',
+                CURLOPT_HTTPHEADER     => ['Accept: application/json'],
             ]);
             $resp = curl_exec($ch);
             $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -250,16 +253,69 @@ try {
             curl_close($ch);
 
             if ($resp === false || $code !== 200) {
-                echo json_encode(['ok' => false, 'message' => "เชื่อมต่อ API ไม่ได้ (HTTP $code) $err"]);
+                echo json_encode(['ok' => false, 'message' => "เชื่อมต่อ myhora.com ไม่ได้ (HTTP $code) $err"]);
                 return;
             }
-            $list = json_decode($resp, true);
-            if (!is_array($list)) {
-                echo json_encode(['ok' => false, 'message' => 'API ส่งข้อมูลผิดรูปแบบ']);
+            $data = json_decode($resp, true);
+            if (!is_array($data)) {
+                echo json_encode(['ok' => false, 'message' => 'API ส่งข้อมูลผิดรูปแบบ (parse ไม่ได้)']);
                 return;
             }
 
-            // เช็ควันที่มีในระบบแล้ว (ในปีนี้) เพื่อ mark "นำเข้าแล้ว"
+            // Flexible parser: รองรับทั้ง VCALENDAR nested และ flat array
+            $events = [];
+            if (isset($data['VCALENDAR']) && is_array($data['VCALENDAR'])) {
+                foreach ($data['VCALENDAR'] as $cal) {
+                    foreach ($cal['VEVENT'] ?? [] as $ev) $events[] = $ev;
+                }
+            } elseif (isset($data['VEVENT']) && is_array($data['VEVENT'])) {
+                $events = $data['VEVENT'];
+            } elseif (array_is_list($data)) {
+                $events = $data;
+            }
+
+            // Extract date (try DTSTART variants) + name (SUMMARY)
+            $extractDate = function (array $ev): ?string {
+                foreach ($ev as $k => $v) {
+                    if (stripos($k, 'DTSTART') === 0 && is_string($v)) {
+                        if (preg_match('/^(\d{4})(\d{2})(\d{2})/', $v, $m)) return "$m[1]-$m[2]-$m[3]";
+                        if (preg_match('/^(\d{4})-(\d{2})-(\d{2})/', $v, $m)) return "$m[1]-$m[2]-$m[3]";
+                    }
+                }
+                foreach (['date', 'Date'] as $k) {
+                    if (!empty($ev[$k]) && is_string($ev[$k])) {
+                        if (preg_match('/^(\d{4})-?(\d{2})-?(\d{2})/', $ev[$k], $m)) return "$m[1]-$m[2]-$m[3]";
+                    }
+                }
+                return null;
+            };
+            $extractName = function (array $ev): string {
+                foreach (['SUMMARY', 'summary', 'name', 'Name', 'title'] as $k) {
+                    if (!empty($ev[$k]) && is_string($ev[$k])) {
+                        return trim(str_replace(['\\,', '\\;', '\\n', '\\\\'], [',', ';', "\n", '\\'], $ev[$k]));
+                    }
+                }
+                return '';
+            };
+
+            $filtered = [];
+            foreach ($events as $ev) {
+                if (!is_array($ev)) continue;
+                $d = $extractDate($ev);
+                $n = $extractName($ev);
+                if (!$d || $n === '') continue;
+                if (substr($d, 0, 4) !== (string)$year) continue;
+                $filtered[$d] = ['date' => $d, 'name' => $n]; // dedupe by date
+            }
+            ksort($filtered);
+            $filtered = array_values($filtered);
+
+            if (empty($filtered)) {
+                echo json_encode(['ok' => false, 'message' => "ไม่พบวันหยุดสำหรับปี $year (อาจยังไม่มีข้อมูล)"]);
+                return;
+            }
+
+            // เช็ควันที่มีในระบบแล้ว
             $existing = [];
             $st = $pdo->prepare("SELECT specific_date FROM sys_clinic_hours
                 WHERE type IN ('holiday','special') AND specific_date BETWEEN :s AND :e");
@@ -267,17 +323,15 @@ try {
             foreach ($st->fetchAll(PDO::FETCH_COLUMN) as $d) $existing[$d] = true;
 
             $rows = [];
-            foreach ($list as $h) {
-                $d = $h['date'] ?? '';
-                if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $d)) continue;
+            foreach ($filtered as $e) {
                 $rows[] = [
-                    'date'    => $d,
-                    'name_th' => $h['localName'] ?? '',
-                    'name_en' => $h['name']      ?? '',
-                    'exists'  => isset($existing[$d]),
+                    'date'    => $e['date'],
+                    'name_th' => $e['name'],
+                    'name_en' => '',
+                    'exists'  => isset($existing[$e['date']]),
                 ];
             }
-            echo json_encode(['ok' => true, 'rows' => $rows, 'year' => $year]);
+            echo json_encode(['ok' => true, 'rows' => $rows, 'year' => $year, 'source' => 'myhora.com']);
             return;
         }
 
