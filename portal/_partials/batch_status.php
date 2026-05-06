@@ -461,6 +461,7 @@ $stages = ins_batch_stepper_stages();
             uploaded: 'cloud-arrow-up', approved: 'check', rejected: 'xmark',
             downloaded: 'paper-plane', policy_imported: 'shield-heart',
             completed: 'circle-check', note_added: 'comment', status_auto_change: 'rotate',
+            partner_returned: 'rotate-left',
         };
         return m[type] || 'circle-info';
     }
@@ -470,6 +471,7 @@ $stages = ins_batch_stepper_stages();
             downloaded: 'ดาวน์โหลดโดย Partner', policy_imported: 'นำเข้าเลขกรมธรรม์',
             completed: 'เสร็จสิ้นสมบูรณ์', note_added: 'เพิ่มหมายเหตุ',
             status_auto_change: 'เปลี่ยนสถานะอัตโนมัติ',
+            partner_returned: 'ตีเอกสารกลับ (โดย Partner)',
         };
         return m[type] || type;
     }

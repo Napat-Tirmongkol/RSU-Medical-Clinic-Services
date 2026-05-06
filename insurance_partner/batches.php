@@ -270,9 +270,27 @@ $stepperHtml = function (string $st) use ($stages): string {
         <a href="import_policy.php" class="ipp-btn secondary">
             <i class="fa-solid fa-cloud-arrow-up"></i> อัปโหลดเลขกรมธรรม์
         </a>
+        <?php if (in_array($detail['status'], ['approved', 'downloaded', 'in_progress', 'partial'], true)): ?>
+        <button class="ipp-btn danger" onclick="returnBatch(<?= (int)$detail['id'] ?>, '<?= htmlspecialchars($detail['batch_code'], ENT_QUOTES) ?>')">
+            <i class="fa-solid fa-rotate-left"></i> ตีเอกสารกลับ
+        </button>
+        <?php endif; ?>
     </div>
 
     <h3><i class="fa-solid fa-clock-rotate-left mr-1"></i> Timeline</h3>
+    <?php
+    $eventLabels = [
+        'uploaded'           => 'อัพโหลดเอกสาร',
+        'approved'           => 'อนุมัติเอกสาร',
+        'rejected'           => 'ตีกลับเอกสาร (โดยคลินิก)',
+        'downloaded'         => 'ดาวน์โหลดโดย Partner',
+        'policy_imported'    => 'นำเข้าเลขกรมธรรม์',
+        'partner_returned'   => 'ตีเอกสารกลับ (โดย Partner)',
+        'completed'          => 'เสร็จสิ้นสมบูรณ์',
+        'note_added'         => 'เพิ่มหมายเหตุ',
+        'status_auto_change' => 'เปลี่ยนสถานะอัตโนมัติ',
+    ];
+    ?>
     <?php if (!$detailEvents): ?>
         <p style="color:#94a3b8;">ยังไม่มีกิจกรรม</p>
     <?php else: ?>
@@ -284,7 +302,7 @@ $stepperHtml = function (string $st) use ($stages): string {
             </div>
             <div style="flex:1;">
                 <div style="font-weight:700; color:#064e3b; font-size:.85rem;">
-                    <?= htmlspecialchars($ev['event_type']) ?>
+                    <?= htmlspecialchars($eventLabels[$ev['event_type']] ?? $ev['event_type']) ?>
                     <?php if ($ev['from_status'] && $ev['to_status']): ?>
                     <span style="color:#94a3b8; font-weight:500;"><?= htmlspecialchars($ev['from_status']) ?> → <?= htmlspecialchars($ev['to_status']) ?></span>
                     <?php endif; ?>
@@ -343,6 +361,54 @@ $stepperHtml = function (string $st) use ($stages): string {
 <?php elseif ($detailId > 0): ?>
 <div class="ipp-alert error">ไม่พบเอกสารนี้ หรือยังไม่ได้รับการอนุมัติ</div>
 <?php endif; ?>
+
+<script>
+async function returnBatch(id, batchCode) {
+    const { isConfirmed, value: reason } = await Swal.fire({
+        title: 'ตีเอกสารกลับ?',
+        html: `<p style="font-size:.85rem;color:#6b7280;margin:.25rem 0 0 0;">เอกสาร <strong>${batchCode}</strong> จะถูกส่งคืนให้คลินิกตรวจสอบใหม่</p>`,
+        input: 'textarea',
+        inputLabel: 'เหตุผลการตีเอกสารกลับ (จำเป็น)',
+        inputPlaceholder: 'ระบุเหตุผล เช่น ข้อมูลไม่ถูกต้อง, รายชื่อขาด...',
+        inputAttributes: { rows: 3 },
+        inputValidator: v => (!v || !v.trim()) ? 'กรุณาระบุเหตุผล' : null,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: '<i class="fa-solid fa-rotate-left"></i> ตีเอกสารกลับ',
+        cancelButtonText: 'ยกเลิก',
+        confirmButtonColor: '#dc2626',
+        reverseButtons: true,
+    });
+    if (!isConfirmed || !reason || !reason.trim()) return;
+
+    const fd = new FormData();
+    fd.append('id', id);
+    fd.append('reason', reason.trim());
+
+    let result;
+    try {
+        const resp = await fetch('ajax_return_batch.php', { method: 'POST', body: fd });
+        result = await resp.json();
+    } catch (e) {
+        Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้' });
+        return;
+    }
+
+    if (result.status !== 'ok') {
+        Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: result.message });
+        return;
+    }
+
+    await Swal.fire({
+        icon: 'success',
+        title: 'ตีเอกสารกลับแล้ว',
+        text: 'เอกสารถูกส่งคืนให้คลินิกตรวจสอบใหม่',
+        timer: 2000,
+        showConfirmButton: false,
+    });
+    window.location.href = 'batches.php';
+}
+</script>
 
 <?php
 ins_partner_layout_end();

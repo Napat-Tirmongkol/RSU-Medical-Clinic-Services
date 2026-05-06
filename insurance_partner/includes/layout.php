@@ -27,6 +27,7 @@ function ins_partner_layout_start(string $pageTitle, string $activePage): void
     <link rel="stylesheet" href="../assets/css/tailwind.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="stylesheet" href="../assets/css/rsufont.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.all.min.js"></script>
     <style>
         * { font-family: 'Sarabun', sans-serif; box-sizing: border-box; }
         body { margin: 0; background: #f0fdf4; color: #064e3b; min-height: 100vh; }
