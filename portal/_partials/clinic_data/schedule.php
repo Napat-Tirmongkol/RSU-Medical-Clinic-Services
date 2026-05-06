@@ -93,10 +93,15 @@ $serviceTypes = ['ตรวจทั่วไป', 'วัคซีน', 'ตร
         <span class="inline-flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-slate-400"></span>ลา/หยุด</span>
     </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-[220px_1fr] gap-4">
+    <div class="grid grid-cols-1 md:grid-cols-[1fr_220px] gap-4">
+
+        <!-- Calendar -->
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 min-w-0 md:order-1">
+            <div id="ds-calendar"></div>
+        </div>
 
         <!-- Doctor Palette (drag source) -->
-        <aside class="bg-white rounded-2xl border border-slate-200 shadow-sm p-3 md:sticky md:top-4 md:self-start md:max-h-[calc(100vh-2rem)] md:overflow-y-auto">
+        <aside class="bg-white rounded-2xl border border-slate-200 shadow-sm p-3 md:order-2 md:sticky md:top-4 md:self-start md:max-h-[calc(100vh-2rem)] md:overflow-y-auto">
             <div class="flex items-center justify-between mb-3 px-1">
                 <h4 class="text-[11px] font-black uppercase tracking-widest text-slate-500">
                     <i class="fa-solid fa-hand-pointer text-cyan-500 mr-1"></i> ลากแพทย์ลงปฏิทิน
@@ -141,11 +146,6 @@ $serviceTypes = ['ตรวจทั่วไป', 'วัคซีน', 'ตร
                 <p>ระบบสร้าง shift 1 ชม. ที่เวลาที่วาง — แก้รายละเอียดเพิ่มเติมได้</p>
             </div>
         </aside>
-
-        <!-- Calendar -->
-        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 min-w-0">
-            <div id="ds-calendar"></div>
-        </div>
     </div>
 </div>
 
