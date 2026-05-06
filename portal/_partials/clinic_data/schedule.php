@@ -53,6 +53,43 @@ $serviceTypes = ['ตรวจทั่วไป', 'วัคซีน', 'ตร
     .fc-event.svc-ทันตกรรม    { background:#ec4899; border-color:#db2777; }
     .fc-event.svc-off         { background:#94a3b8; border-color:#64748b; opacity:.85; }
 
+    /* Layout: ปฏิทิน + palette ด้านขวา (ไม่พึ่ง Tailwind JIT) */
+    .ds-layout {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+    @media (min-width: 768px) {
+        .ds-layout { grid-template-columns: minmax(0, 1fr) 240px; }
+    }
+    @media (min-width: 1280px) {
+        .ds-layout { grid-template-columns: minmax(0, 1fr) 260px; }
+    }
+    .ds-palette {
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 1rem;
+        box-shadow: 0 1px 3px rgba(0,0,0,.05);
+        padding: .75rem;
+    }
+    @media (min-width: 768px) {
+        .ds-palette {
+            position: sticky;
+            top: 1rem;
+            align-self: start;
+            max-height: calc(100vh - 2rem);
+            overflow-y: auto;
+        }
+    }
+    .ds-cal-wrap {
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 1rem;
+        box-shadow: 0 1px 3px rgba(0,0,0,.05);
+        padding: 1rem;
+        min-width: 0;
+    }
+
     /* Doctor palette draggable cards */
     .ds-doc-card {
         cursor: grab; user-select: none;
@@ -93,15 +130,15 @@ $serviceTypes = ['ตรวจทั่วไป', 'วัคซีน', 'ตร
         <span class="inline-flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-slate-400"></span>ลา/หยุด</span>
     </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-[1fr_220px] gap-4">
+    <div class="ds-layout">
 
         <!-- Calendar -->
-        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 min-w-0 md:order-1">
+        <div class="ds-cal-wrap">
             <div id="ds-calendar"></div>
         </div>
 
         <!-- Doctor Palette (drag source) -->
-        <aside class="bg-white rounded-2xl border border-slate-200 shadow-sm p-3 md:order-2 md:sticky md:top-4 md:self-start md:max-h-[calc(100vh-2rem)] md:overflow-y-auto">
+        <aside class="ds-palette">
             <div class="flex items-center justify-between mb-3 px-1">
                 <h4 class="text-[11px] font-black uppercase tracking-widest text-slate-500">
                     <i class="fa-solid fa-hand-pointer text-cyan-500 mr-1"></i> ลากแพทย์ลงปฏิทิน
