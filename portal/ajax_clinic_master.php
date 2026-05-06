@@ -238,7 +238,7 @@ try {
                 return;
             }
 
-            $url = 'https://www.myhora.com/calendar/ical/holiday.aspx?latest.ics';
+            $url = 'https://myhora.com/calendar/ical/holiday.aspx?latest.ics';
             $ch  = curl_init($url);
             curl_setopt_array($ch, [
                 CURLOPT_RETURNTRANSFER => true,
