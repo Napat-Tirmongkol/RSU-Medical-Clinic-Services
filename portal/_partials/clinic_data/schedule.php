@@ -52,9 +52,19 @@ $serviceTypes = ['ตรวจทั่วไป', 'วัคซีน', 'ตร
     .fc-event.svc-ปรึกษา      { background:#f59e0b; border-color:#d97706; }
     .fc-event.svc-ทันตกรรม    { background:#ec4899; border-color:#db2777; }
     .fc-event.svc-off         { background:#94a3b8; border-color:#64748b; opacity:.85; }
+
+    /* Doctor palette draggable cards */
+    .ds-doc-card {
+        cursor: grab; user-select: none;
+        transition: transform .15s, box-shadow .15s, border-color .15s;
+    }
+    .ds-doc-card:hover { transform: translateY(-1px); box-shadow: 0 4px 10px rgba(14,116,144,.15); border-color: #06b6d4; }
+    .ds-doc-card:active { cursor: grabbing; transform: scale(.98); }
+    .ds-doc-card.fc-event { background: transparent; border: none; padding: 0; } /* override fc default */
+    .fc-highlight { background: #ecfeff !important; border: 2px dashed #06b6d4 !important; }
 </style>
 
-<div class="max-w-[1200px] mx-auto px-4 py-6">
+<div class="max-w-[1400px] mx-auto px-4 py-6">
     <a href="?section=clinic_data" class="inline-flex items-center gap-2 text-xs font-black text-slate-500 hover:text-emerald-600 mb-4">
         <i class="fa-solid fa-chevron-left text-[10px]"></i>กลับ
     </a>
@@ -83,8 +93,59 @@ $serviceTypes = ['ตรวจทั่วไป', 'วัคซีน', 'ตร
         <span class="inline-flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-slate-400"></span>ลา/หยุด</span>
     </div>
 
-    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
-        <div id="ds-calendar"></div>
+    <div class="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-4">
+
+        <!-- Doctor Palette (drag source) -->
+        <aside class="bg-white rounded-2xl border border-slate-200 shadow-sm p-3 lg:sticky lg:top-4 lg:self-start lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">
+            <div class="flex items-center justify-between mb-3 px-1">
+                <h4 class="text-[11px] font-black uppercase tracking-widest text-slate-500">
+                    <i class="fa-solid fa-hand-pointer text-cyan-500 mr-1"></i> ลากแพทย์ลงปฏิทิน
+                </h4>
+                <span class="text-[10px] font-bold text-slate-400"><?= count($staffList) ?> ท่าน</span>
+            </div>
+            <div class="mb-2.5">
+                <input type="text" id="ds-doc-search" placeholder="ค้นหาแพทย์..."
+                    class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:border-cyan-400">
+            </div>
+            <div id="ds-doc-list" class="space-y-1.5">
+                <?php if (empty($staffList)): ?>
+                <p class="text-xs text-slate-400 italic text-center py-6">ยังไม่มีบุคลากร — ไป<a href="?section=clinic_data&cd_view=staff" class="text-cyan-600 underline">เพิ่มบุคลากร</a></p>
+                <?php else: foreach ($staffList as $s):
+                    $roleColors = [
+                        'doctor'=>['bg'=>'#dbeafe','fg'=>'#1d4ed8','label'=>'แพทย์'],
+                        'nurse'=>['bg'=>'#fce7f3','fg'=>'#be185d','label'=>'พยาบาล'],
+                        'pharmacist'=>['bg'=>'#dcfce7','fg'=>'#15803d','label'=>'เภสัช'],
+                        'dentist'=>['bg'=>'#fef3c7','fg'=>'#a16207','label'=>'ทันตะ'],
+                        'other'=>['bg'=>'#e2e8f0','fg'=>'#475569','label'=>'อื่นๆ'],
+                    ];
+                    $rc = $roleColors[$s['role']] ?? $roleColors['other'];
+                ?>
+                <div class="ds-doc-card flex items-center gap-2 px-2.5 py-2 bg-white border border-slate-200 rounded-lg"
+                    data-staff-id="<?= (int)$s['id'] ?>"
+                    data-staff-name="<?= htmlspecialchars(trim($s['title'].' '.$s['full_name']), ENT_QUOTES) ?>"
+                    data-staff-search="<?= htmlspecialchars(mb_strtolower(trim($s['title'].' '.$s['full_name'])), ENT_QUOTES) ?>">
+                    <div class="w-7 h-7 rounded-md flex items-center justify-center text-[10px] font-black shrink-0" style="background:<?= $rc['bg'] ?>; color:<?= $rc['fg'] ?>;">
+                        <i class="fa-solid fa-user-doctor text-[10px]"></i>
+                    </div>
+                    <div class="min-w-0 flex-1">
+                        <div class="text-[12px] font-black text-slate-800 truncate leading-tight"><?= htmlspecialchars(trim($s['title'].' '.$s['full_name'])) ?></div>
+                        <div class="text-[9px] font-black uppercase tracking-wider" style="color:<?= $rc['fg'] ?>"><?= htmlspecialchars($rc['label']) ?></div>
+                    </div>
+                    <i class="fa-solid fa-grip-vertical text-slate-300 text-[10px]"></i>
+                </div>
+                <?php endforeach; endif; ?>
+            </div>
+
+            <div class="mt-3 pt-3 border-t border-slate-100 text-[10px] text-slate-400 leading-relaxed px-1">
+                <p class="mb-1"><i class="fa-solid fa-circle-info mr-1"></i>ลาก card ลง slot บนปฏิทิน</p>
+                <p>ระบบสร้าง shift 1 ชม. ที่เวลาที่วาง — แก้รายละเอียดเพิ่มเติมได้</p>
+            </div>
+        </aside>
+
+        <!-- Calendar -->
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 min-w-0">
+            <div id="ds-calendar"></div>
+        </div>
     </div>
 </div>
 
@@ -188,6 +249,18 @@ const STAFF_LIST = <?= json_encode($staffList, JSON_UNESCAPED_UNICODE) ?>;
 const ROOMS_LIST = <?= json_encode($roomsList, JSON_UNESCAPED_UNICODE) ?>;
 let dsCalendar = null;
 let dsRows = [];
+
+// ── Local time helpers (avoid toISOString() UTC shift in Asia/Bangkok) ──
+function dsPad2(n) { return String(n).padStart(2, '0'); }
+function dsLocalDate(d) {
+    return `${d.getFullYear()}-${dsPad2(d.getMonth()+1)}-${dsPad2(d.getDate())}`;
+}
+function dsLocalTime(d) {
+    return `${dsPad2(d.getHours())}:${dsPad2(d.getMinutes())}`;
+}
+function dsAddMin(d, mins) {
+    return new Date(d.getTime() + mins * 60000);
+}
 
 async function dsPost(action, data) {
     const fd = new FormData();
@@ -337,6 +410,36 @@ document.addEventListener('DOMContentLoaded', () => {
             // Clicking on empty slot opens add modal pre-filled with date+time
             dsOpenAdd({ date: info.dateStr.substring(0,10), time: info.dateStr.substring(11,16) || '09:00' });
         },
+        droppable: true, // Accept external drag from doctor palette
+        drop: async (info) => {
+            const el = info.draggedEl;
+            const staffId = el?.dataset?.staffId;
+            const staffName = el?.dataset?.staffName || 'แพทย์';
+            if (!staffId) return;
+
+            // ถ้า drop ใน month view (allDay) ใช้ default 09:00–10:00
+            // ถ้า week/day view ใช้เวลาที่วาง + 60 นาที
+            const start = info.date;
+            const isAllDay = info.allDay;
+            const startTime = isAllDay ? '09:00' : dsLocalTime(start);
+            const endTime   = isAllDay ? '10:00' : dsLocalTime(dsAddMin(start, 60));
+
+            const data = {
+                type: 'override',
+                specific_date: dsLocalDate(start),
+                start_time: startTime,
+                end_time:   endTime,
+                staff_id:   staffId,
+                service_type: 'ตรวจทั่วไป',
+            };
+            const res = await dsPost('add', data);
+            if (res.ok) {
+                showPortalToast(`เพิ่ม shift ${staffName} แล้ว`, 'success');
+                dsLoadAndRender();
+            } else {
+                Swal.fire('Error', res.message || 'เพิ่ม shift ไม่สำเร็จ', 'error');
+            }
+        },
         eventDrop: async (info) => {
             const row = dsRows.find(r => +r.id === +info.event.id);
             if (!row) return;
@@ -345,12 +448,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = { id: row.id };
             if (row.type === 'regular') {
                 data.weekday = newStart.getDay();
-                data.start_time = newStart.toTimeString().substring(0,5);
-                data.end_time   = newEnd.toTimeString().substring(0,5);
+                data.start_time = dsLocalTime(newStart);
+                data.end_time   = dsLocalTime(newEnd);
             } else {
-                data.specific_date = newStart.toISOString().substring(0,10);
-                data.start_time = newStart.toTimeString().substring(0,5);
-                data.end_time   = newEnd.toTimeString().substring(0,5);
+                data.specific_date = dsLocalDate(newStart);
+                data.start_time = dsLocalTime(newStart);
+                data.end_time   = dsLocalTime(newEnd);
             }
             // Carry over other fields
             data.staff_id = row.staff_id;
@@ -367,12 +470,12 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!row) return;
             const data = {
                 id: row.id,
-                start_time: info.event.start.toTimeString().substring(0,5),
-                end_time:   info.event.end.toTimeString().substring(0,5),
-                staff_id: row.staff_id,
+                start_time: dsLocalTime(info.event.start),
+                end_time:   dsLocalTime(info.event.end),
+                staff_id:   row.staff_id,
             };
             if (row.type === 'regular') data.weekday = row.weekday;
-            else data.specific_date = row.specific_date;
+            else data.specific_date = dsLocalDate(new Date(row.specific_date));
             data.room_id = row.room_id || '';
             data.service_type = row.service_type || '';
             data.notes = row.notes || '';
@@ -383,5 +486,32 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     dsCalendar.render();
     dsLoadAndRender();
+
+    // ── External draggable: doctor palette → calendar ──
+    const palette = document.getElementById('ds-doc-list');
+    if (palette && window.FullCalendar?.Draggable) {
+        new FullCalendar.Draggable(palette, {
+            itemSelector: '.ds-doc-card',
+            eventData: function (el) {
+                return {
+                    title: el.dataset.staffName || 'แพทย์',
+                    duration: '01:00',
+                    create: false, // เราจัดการสร้าง event ผ่าน drop handler เอง
+                };
+            },
+        });
+    }
+
+    // ── Doctor palette search filter ──
+    const search = document.getElementById('ds-doc-search');
+    if (search) {
+        search.addEventListener('input', () => {
+            const q = search.value.trim().toLowerCase();
+            document.querySelectorAll('.ds-doc-card').forEach(card => {
+                const name = (card.dataset.staffSearch || '').toLowerCase();
+                card.style.display = (q === '' || name.includes(q)) ? '' : 'none';
+            });
+        });
+    }
 });
 </script>
