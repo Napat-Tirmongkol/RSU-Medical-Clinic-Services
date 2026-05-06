@@ -164,7 +164,14 @@ try {
     $logDesc = $existingUser ? "ผู้ป่วยอัปเดตข้อมูลส่วนตัว '{$fullName}'" : "ผู้ป่วยลงทะเบียนเข้าใช้งานครั้งแรก '{$fullName}'";
     log_activity($logAction, $logDesc, (int)($existingUser['id'] ?? $pdo->lastInsertId()));
 
-    $stmtGetId = $pdo->prepare("SELECT id FROM sys_users WHERE line_user_id = :line_id LIMIT 1");
+    // Detect line_user_id_new column (may not exist in older DBs)
+    $hasNewUidColumn = false;
+    try {
+        $hasNewUidColumn = (bool) $pdo->query("SHOW COLUMNS FROM sys_users LIKE 'line_user_id_new'")->fetch();
+    } catch (PDOException) { /* ignore */ }
+
+    $selectCols = $hasNewUidColumn ? 'id, line_user_id_new' : 'id';
+    $stmtGetId = $pdo->prepare("SELECT {$selectCols} FROM sys_users WHERE line_user_id = :line_id LIMIT 1");
     $stmtGetId->execute([':line_id' => $lineUserId]);
     $user = $stmtGetId->fetch();
 
@@ -187,12 +194,40 @@ try {
 
     if ($safeRedirectBack !== '') {
         $sep = (strpos($safeRedirectBack, '?') !== false) ? '&' : '?';
-        header('Location: ' . $safeRedirectBack . $sep . 'saved=1', true, 303);
+        $finalDest = $safeRedirectBack . $sep . 'saved=1';
     } elseif ($inviteToken !== '') {
-        header('Location: c.php?t=' . urlencode($inviteToken), true, 303);
+        $finalDest = 'c.php?t=' . urlencode($inviteToken);
     } else {
-        header('Location: profile.php?saved=1', true, 303);
+        $finalDest = 'profile.php?saved=1';
     }
+
+    // ── Capture NEW provider UID (line_user_id_new) if missing ────────────
+    // Webhook events arrive with the Messaging API channel's UID, which lives
+    // in line_user_id_new. Without it, future bot lookups (e.g. insurance
+    // menu) cannot find this user. Route through migrate flow once.
+    $needsMigrate = $hasNewUidColumn && empty($user['line_user_id_new']);
+    if ($needsMigrate) {
+        $secretsPath = __DIR__ . '/../config/secrets.php';
+        $lineSecrets = file_exists($secretsPath) ? require $secretsPath : [];
+        $migrateEnabled = !empty($lineSecrets['LINE_LOGIN_CHANNEL_ID_NEW'])
+            && !empty($lineSecrets['LINE_LOGIN_CHANNEL_SECRET_NEW']);
+
+        if ($migrateEnabled) {
+            $scriptDir = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/user/save_profile.php'));
+            $basePath  = preg_replace('#/user$#', '', rtrim($scriptDir, '/')) ?: '';
+
+            $absDest = (str_starts_with($finalDest, '/') || preg_match('#^https?://#i', $finalDest))
+                ? $finalDest
+                : $basePath . '/user/' . $finalDest;
+
+            $_SESSION['migrate_old_uid']    = $lineUserId;
+            $_SESSION['migrate_final_dest'] = $absDest;
+            header('Location: ' . $basePath . '/line_api/migrate_login.php', true, 303);
+            exit;
+        }
+    }
+
+    header('Location: ' . $finalDest, true, 303);
     exit;
 
 } catch (Exception $e) {
