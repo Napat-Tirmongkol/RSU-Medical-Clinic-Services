@@ -65,17 +65,26 @@ if (!function_exists('renderPageHeader')) {
 
         /* ── Sidebar nav links ─────────────────────────────────── */
         .nav-link {
+            position: relative;
             display: flex; align-items: center; gap: 10px;
             padding: 10px 12px; border-radius: 12px;
             font-size: .875rem; font-weight: 500;
             color: #4b5563; text-decoration: none;
-            transition: background .18s, color .18s;
+            transition: background .18s, color .18s, transform .15s;
         }
         .nav-link:hover { background: #f0faf4; color: #1a5c38; }
+        .nav-link:hover .nav-icon { background: #d6f0e2; }
+        .nav-link:hover .nav-label { transform: translateX(2px); }
         .nav-link.active {
             background: #e8f8f0;
             color: #2e9e63;
             font-weight: 700;
+        }
+        .nav-link.active::before {
+            content: '';
+            position: absolute; left: -3px; top: 8px; bottom: 8px;
+            width: 3px; border-radius: 0 4px 4px 0;
+            background: #2e9e63;
         }
         .nav-link .nav-icon {
             width: 32px; height: 32px;
@@ -86,7 +95,24 @@ if (!function_exists('renderPageHeader')) {
             transition: background .18s;
         }
         .nav-link.active .nav-icon { background: #c7e8d5; color: #2e7d52; }
-        .nav-link:hover .nav-icon  { background: #d6f0e2; }
+        .nav-link .nav-label {
+            flex: 1; min-width: 0;
+            transition: transform .15s;
+        }
+        .nav-link .nav-badge {
+            display: inline-flex; align-items: center; justify-content: center;
+            min-width: 20px; height: 18px; padding: 0 6px;
+            background: #ef4444; color: #fff;
+            border-radius: 999px;
+            font-size: 10px; font-weight: 800;
+            box-shadow: 0 2px 4px rgba(239,68,68,.3);
+            flex-shrink: 0;
+        }
+        .nav-link.active .nav-badge {
+            background: #fff; color: #ef4444;
+            border: 1.5px solid #fecaca;
+            box-shadow: none;
+        }
 
         .nav-section-label {
             font-size: 10px; font-weight: 800;
@@ -230,12 +256,32 @@ if (!function_exists('renderPageHeader')) {
 
         <?php
         $cur = basename($_SERVER['PHP_SELF']);
-        function navLink($href, $icon, $label, $cur) {
-            $file = basename($href);
+
+        // Badge: นับ booking ที่ยังไม่ confirmed (status='booked') ของวันนี้+อนาคต
+        $pendingBookings = 0;
+        try {
+            if (function_exists('db')) {
+                $pdo = db();
+                $stmt = $pdo->prepare("
+                    SELECT COUNT(*) FROM camp_bookings b
+                    JOIN camp_slots s ON b.slot_id = s.id
+                    WHERE b.status = 'booked' AND s.slot_date >= CURDATE()
+                ");
+                $stmt->execute();
+                $pendingBookings = (int)$stmt->fetchColumn();
+            }
+        } catch (Throwable) {}
+
+        function navLink($href, $icon, $label, $cur, $badge = 0) {
+            $file   = basename($href);
             $active = $cur === $file ? 'active' : '';
+            $badgeHtml = $badge > 0
+                ? '<span class="nav-badge">' . ($badge > 99 ? '99+' : (int)$badge) . '</span>'
+                : '';
             echo "<a href=\"$href\" class=\"nav-link $active\">
                     <span class=\"nav-icon\"><i class=\"fa-solid $icon\"></i></span>
-                    $label
+                    <span class=\"nav-label\">$label</span>
+                    $badgeHtml
                   </a>";
         }
         ?>
@@ -245,37 +291,34 @@ if (!function_exists('renderPageHeader')) {
             <?php navLink('../admin/index.php', 'fa-chart-pie', 'Dashboard', $cur); ?>
         </div>
 
-        <!-- Analytics -->
-        <div class="nav-section-label">Analytics</div>
+        <!-- ภาพรวม -->
+        <div class="nav-section-label">ภาพรวม</div>
         <div class="space-y-0.5 mb-1">
-            <?php navLink('../admin/kpi.php',        'fa-gauge-high',   'KPI Dashboard',   $cur); ?>
-            <?php navLink('../admin/line_stats.php', 'fa-comment-dots', 'LINE OA สถิติ',   $cur); ?>
+            <?php navLink('../admin/kpi.php',              'fa-gauge-high',  'KPI',           $cur); ?>
+            <?php navLink('../admin/campaign_overview.php','fa-chart-bar',   'ภาพรวมแคมเปญ',  $cur); ?>
+            <?php navLink('../admin/line_stats.php',       'fa-comment-dots','LINE OA',        $cur); ?>
         </div>
 
-        <!-- Campaign Management -->
-        <div class="nav-section-label">Campaign</div>
-        <div class="space-y-0.5">
-            <?php navLink('../admin/campaigns.php',        'fa-layer-group',      'จัดการแคมเปญ',          $cur); ?>
-            <?php navLink('../admin/time_slots.php',       'fa-calendar-alt',     'จัดการรอบเวลา',         $cur); ?>
-            <?php navLink('../admin/campaign_overview.php','fa-chart-bar',        'ภาพรวมแคมเปญ',          $cur); ?>
-            <?php navLink('../admin/bookings.php',         'fa-clipboard-check',  'รายชื่อผู้เข้าร่วม',    $cur); ?>
-            <?php navLink('../admin/reports.php',          'fa-file-lines',       'รายงาน / สถิติ',        $cur); ?>
-            <?php navLink('../admin/daily_report.php',     'fa-calendar-day',     'รีพอตรายวัน',           $cur); ?>
+        <!-- แคมเปญ -->
+        <div class="nav-section-label">แคมเปญ</div>
+        <div class="space-y-0.5 mb-1">
+            <?php navLink('../admin/campaigns.php',  'fa-layer-group',     'แคมเปญ',     $cur); ?>
+            <?php navLink('../admin/time_slots.php', 'fa-calendar-alt',    'รอบเวลา',    $cur); ?>
+            <?php navLink('../admin/bookings.php',   'fa-clipboard-check', 'ผู้เข้าร่วม', $cur, $pendingBookings); ?>
         </div>
 
-
-
-
-        <!-- AI -->
-        <div class="nav-section-label">AI</div>
-        <div class="space-y-0.5">
-            <?php navLink('../admin/ai_assistant.php', 'fa-robot', 'AI Analyst', $cur); ?>
+        <!-- รายงาน -->
+        <div class="nav-section-label">รายงาน</div>
+        <div class="space-y-0.5 mb-1">
+            <?php navLink('../admin/reports.php',      'fa-file-lines',   'รายงานรวม',     $cur); ?>
+            <?php navLink('../admin/daily_report.php', 'fa-calendar-day', 'รายงานรายวัน',  $cur); ?>
         </div>
 
-        <!-- System -->
-        <div class="nav-section-label">System</div>
+        <!-- เครื่องมือ -->
+        <div class="nav-section-label">เครื่องมือ</div>
         <div class="space-y-0.5">
-            <?php navLink('../admin/activity_logs.php', 'fa-clipboard-list', 'บันทึกกิจกรรม', $cur); ?>
+            <?php navLink('../admin/ai_assistant.php',  'fa-robot',           'AI Analyst',     $cur); ?>
+            <?php navLink('../admin/activity_logs.php', 'fa-clipboard-list',  'บันทึกกิจกรรม',  $cur); ?>
         </div>
 
     </nav>
