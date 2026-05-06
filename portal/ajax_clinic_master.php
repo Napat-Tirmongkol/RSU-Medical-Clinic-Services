@@ -278,13 +278,40 @@ try {
                 }
             }
 
+            // 1st pass
             $data = json_decode($raw, true);
+
+            // 2nd pass: try fixing common myhora JSON quirks
             if (!is_array($data)) {
-                $snippet = mb_substr(trim($resp), 0, 200);
+                $cleaned = $raw;
+                // Strip /* ... */ block comments
+                $cleaned = preg_replace('!/\*.*?\*/!s', '', $cleaned);
+                // Strip // line comments (but not inside strings — best-effort)
+                $cleaned = preg_replace('!^\s*//.*$!m', '', $cleaned);
+                // Remove trailing commas before } or ]
+                $cleaned = preg_replace('/,\s*([}\]])/', '$1', $cleaned);
+                // Replace bare control chars 0x00-0x1F (except \t \n \r) inside strings
+                // — JSON spec disallows raw control chars, escape them
+                $cleaned = preg_replace_callback('/"((?:[^"\\\\]|\\\\.)*)"/s', function ($m) {
+                    return '"' . preg_replace_callback('/[\x00-\x08\x0B\x0C\x0E-\x1F]/', function ($c) {
+                        return sprintf('\\u%04x', ord($c[0]));
+                    }, $m[1]) . '"';
+                }, $cleaned);
+                $data = json_decode($cleaned, true);
+                if (is_array($data)) $raw = $cleaned;
+            }
+
+            if (!is_array($data)) {
+                $len    = strlen($resp);
+                $head   = mb_substr(trim($resp), 0, 150);
+                $tail   = mb_substr(trim($resp), -200);
                 echo json_encode([
                     'ok'      => false,
-                    'message' => 'API ส่งข้อมูลผิดรูปแบบ (parse ไม่ได้) — JSON error: '
-                                 . json_last_error_msg() . ' | snippet: ' . $snippet,
+                    'message' => "API ส่งข้อมูลผิดรูปแบบ (parse ไม่ได้) — JSON error: "
+                                 . json_last_error_msg()
+                                 . " | length: $len bytes"
+                                 . " | head: $head"
+                                 . " | tail: $tail",
                 ]);
                 return;
             }
