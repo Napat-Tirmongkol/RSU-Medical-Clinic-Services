@@ -94,7 +94,13 @@ foreach ($regular as $r) {
         <div class="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
             <div class="px-6 py-4 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
                 <h3 class="text-sm font-black text-slate-700 uppercase tracking-wider"><i class="fa-solid fa-calendar-xmark text-rose-500 mr-2"></i>วันหยุดพิเศษ</h3>
-                <span class="text-[10px] font-bold text-slate-400"><?= count($holidays) ?> รายการที่จะถึง</span>
+                <div class="flex items-center gap-3">
+                    <button onclick="hrFetchThai()" type="button"
+                        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-100 text-[11px] font-black hover:bg-emerald-100 transition-all">
+                        <i class="fa-solid fa-flag text-[10px]"></i> ดึงวันหยุดไทย
+                    </button>
+                    <span class="text-[10px] font-bold text-slate-400"><?= count($holidays) ?> รายการที่จะถึง</span>
+                </div>
             </div>
             <div class="p-5">
                 <form id="hr-add-hol" onsubmit="hrAdd(event,'holiday')" class="grid grid-cols-2 md:grid-cols-5 gap-2 mb-4 pb-4 border-b border-slate-100">
@@ -165,5 +171,99 @@ async function hrDelete(id) {
     const res = await hrPost('delete', {id});
     if (res.ok) cdReload('hours');
     else Swal.fire('Error', res.message, 'error');
+}
+
+async function hrFetchThai() {
+    const thisYear = new Date().getFullYear();
+    const yearOpts = [thisYear, thisYear+1, thisYear+2]
+        .map(y => `<option value="${y}">${y} (พ.ศ. ${y+543})</option>`).join('');
+
+    const { value: year } = await Swal.fire({
+        title: 'เลือกปีที่ต้องการดึงวันหยุด',
+        html: `<select id="hr-fetch-year" class="swal2-select" style="width:80%; padding:.55rem .8rem; font-size:.9rem; border:1.5px solid #e2e8f0; border-radius:.5rem; font-family:Sarabun,sans-serif;">${yearOpts}</select>
+            <p style="font-size:.75rem; color:#64748b; margin-top:.65rem;">ใช้ข้อมูลจาก <a href="https://date.nager.at" target="_blank" style="color:#10b981; text-decoration:underline;">date.nager.at</a></p>`,
+        showCancelButton: true,
+        confirmButtonText: '<i class="fa-solid fa-magnifying-glass"></i> ค้นหา',
+        cancelButtonText: 'ยกเลิก',
+        confirmButtonColor: '#10b981',
+        reverseButtons: true,
+        focusConfirm: false,
+        preConfirm: () => parseInt(document.getElementById('hr-fetch-year').value, 10),
+    });
+    if (!year) return;
+
+    Swal.fire({ title: 'กำลังดึงข้อมูล...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+    const res = await hrPost('fetch_thai_holidays', { year });
+    Swal.close();
+
+    if (!res.ok) { Swal.fire('Error', res.message || 'ดึงข้อมูลไม่สำเร็จ', 'error'); return; }
+    const rows = res.rows || [];
+    if (!rows.length) { Swal.fire('ไม่พบข้อมูล', `ไม่มีวันหยุดสำหรับปี ${year}`, 'info'); return; }
+
+    const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    const fmt = d => {
+        const dt = new Date(d + 'T00:00:00');
+        const days = ['อา.','จ.','อ.','พ.','พฤ.','ศ.','ส.'];
+        return `${dt.getDate()}/${dt.getMonth()+1}/${dt.getFullYear()} (${days[dt.getDay()]})`;
+    };
+
+    const listHtml = rows.map((r, i) => `
+        <label style="display:flex; align-items:center; gap:.6rem; padding:.55rem .6rem; border-bottom:1px solid #f1f5f9; cursor:${r.exists?'not-allowed':'pointer'}; opacity:${r.exists?0.5:1};">
+            <input type="checkbox" class="hr-thai-check" data-idx="${i}" ${r.exists?'disabled':'checked'} style="width:1rem; height:1rem; accent-color:#10b981;">
+            <div style="flex:1; min-width:0; text-align:left;">
+                <div style="font-weight:700; color:#0f172a; font-size:.85rem;">${esc(r.name_th)}</div>
+                <div style="font-size:.72rem; color:#64748b;">${fmt(r.date)} · <span style="color:#94a3b8;">${esc(r.name_en)}</span></div>
+            </div>
+            ${r.exists ? '<span style="font-size:.65rem; padding:.15rem .45rem; border-radius:9999px; background:#fef3c7; color:#92400e; font-weight:700;">นำเข้าแล้ว</span>' : ''}
+        </label>
+    `).join('');
+
+    const result = await Swal.fire({
+        title: `วันหยุดไทย ปี ${year} (${rows.length} รายการ)`,
+        html: `
+            <div style="display:flex; gap:.5rem; margin-bottom:.6rem; justify-content:flex-end;">
+                <button type="button" onclick="document.querySelectorAll('.hr-thai-check:not(:disabled)').forEach(c => c.checked = true)"
+                    style="font-size:.75rem; padding:.35rem .65rem; background:#ecfdf5; color:#047857; border:1px solid #a7f3d0; border-radius:.4rem; font-weight:700; cursor:pointer;">เลือกทั้งหมด</button>
+                <button type="button" onclick="document.querySelectorAll('.hr-thai-check:not(:disabled)').forEach(c => c.checked = false)"
+                    style="font-size:.75rem; padding:.35rem .65rem; background:#f1f5f9; color:#475569; border:1px solid #e2e8f0; border-radius:.4rem; font-weight:700; cursor:pointer;">ล้างเลือก</button>
+            </div>
+            <div style="max-height:50vh; overflow-y:auto; border:1px solid #e2e8f0; border-radius:.5rem;">${listHtml}</div>
+        `,
+        width: 600,
+        showCancelButton: true,
+        confirmButtonText: '<i class="fa-solid fa-download"></i> นำเข้าที่เลือก',
+        cancelButtonText: 'ยกเลิก',
+        confirmButtonColor: '#10b981',
+        reverseButtons: true,
+        focusConfirm: false,
+        preConfirm: () => {
+            const picks = [];
+            document.querySelectorAll('.hr-thai-check:checked:not(:disabled)').forEach(c => picks.push(parseInt(c.dataset.idx, 10)));
+            if (picks.length === 0) {
+                Swal.showValidationMessage('กรุณาเลือกอย่างน้อย 1 รายการ');
+                return false;
+            }
+            return picks;
+        },
+    });
+    if (!result.isConfirmed || !Array.isArray(result.value)) return;
+
+    const fd = new FormData();
+    fd.append('entity', 'hours');
+    fd.append('action', 'import_thai_holidays');
+    fd.append('csrf_token', portal_CSRF);
+    result.value.forEach(idx => {
+        fd.append('dates[]', rows[idx].date);
+        fd.append('names[]', rows[idx].name_th);
+    });
+
+    Swal.fire({ title: 'กำลังนำเข้า...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+    const r = await fetch('ajax_clinic_master.php', { method: 'POST', body: fd });
+    const data = await r.json();
+    Swal.close();
+
+    if (!data.ok) { Swal.fire('Error', data.message || 'นำเข้าไม่สำเร็จ', 'error'); return; }
+    await Swal.fire({ icon:'success', title:'นำเข้าสำเร็จ', text: data.message, timer: 2000, showConfirmButton: false });
+    cdReload('hours');
 }
 </script>

@@ -229,6 +229,95 @@ try {
             echo json_encode(['ok' => true, 'message' => 'ลบแล้ว']);
             return;
 
+        // ── Thai Public Holidays — ดึงจาก date.nager.at (free, no API key) ─
+        case 'hours:fetch_thai_holidays': {
+            $year = (int)($_POST['year'] ?? date('Y'));
+            if ($year < 2020 || $year > 2050) {
+                echo json_encode(['ok' => false, 'message' => 'ปีต้องอยู่ระหว่าง 2020–2050']);
+                return;
+            }
+
+            $url = "https://date.nager.at/api/v3/PublicHolidays/{$year}/TH";
+            $ch  = curl_init($url);
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT        => 10,
+                CURLOPT_USERAGENT      => 'RSU-Clinic/1.0',
+            ]);
+            $resp = curl_exec($ch);
+            $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $err  = curl_error($ch);
+            curl_close($ch);
+
+            if ($resp === false || $code !== 200) {
+                echo json_encode(['ok' => false, 'message' => "เชื่อมต่อ API ไม่ได้ (HTTP $code) $err"]);
+                return;
+            }
+            $list = json_decode($resp, true);
+            if (!is_array($list)) {
+                echo json_encode(['ok' => false, 'message' => 'API ส่งข้อมูลผิดรูปแบบ']);
+                return;
+            }
+
+            // เช็ควันที่มีในระบบแล้ว (ในปีนี้) เพื่อ mark "นำเข้าแล้ว"
+            $existing = [];
+            $st = $pdo->prepare("SELECT specific_date FROM sys_clinic_hours
+                WHERE type IN ('holiday','special') AND specific_date BETWEEN :s AND :e");
+            $st->execute([':s' => "$year-01-01", ':e' => "$year-12-31"]);
+            foreach ($st->fetchAll(PDO::FETCH_COLUMN) as $d) $existing[$d] = true;
+
+            $rows = [];
+            foreach ($list as $h) {
+                $d = $h['date'] ?? '';
+                if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $d)) continue;
+                $rows[] = [
+                    'date'    => $d,
+                    'name_th' => $h['localName'] ?? '',
+                    'name_en' => $h['name']      ?? '',
+                    'exists'  => isset($existing[$d]),
+                ];
+            }
+            echo json_encode(['ok' => true, 'rows' => $rows, 'year' => $year]);
+            return;
+        }
+
+        case 'hours:import_thai_holidays': {
+            $dates = $_POST['dates'] ?? [];
+            $names = $_POST['names'] ?? [];
+            if (!is_array($dates) || !is_array($names) || count($dates) !== count($names)) {
+                echo json_encode(['ok' => false, 'message' => 'ข้อมูลไม่ถูกต้อง']);
+                return;
+            }
+
+            $check = $pdo->prepare("SELECT 1 FROM sys_clinic_hours
+                WHERE type IN ('holiday','special') AND specific_date = :d LIMIT 1");
+            $insert = $pdo->prepare("INSERT INTO sys_clinic_hours (type, specific_date, is_closed, note)
+                VALUES ('holiday', :d, 1, :n)");
+
+            $imported = 0; $skipped = 0;
+            foreach ($dates as $i => $d) {
+                $name = trim((string)($names[$i] ?? ''));
+                if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)$d) || $name === '') {
+                    $skipped++; continue;
+                }
+                $check->execute([':d' => $d]);
+                if ($check->fetchColumn()) { $skipped++; continue; }
+                try {
+                    $insert->execute([':d' => $d, ':n' => $name]);
+                    $imported++;
+                } catch (PDOException) {
+                    $skipped++;
+                }
+            }
+            echo json_encode([
+                'ok'       => true,
+                'imported' => $imported,
+                'skipped'  => $skipped,
+                'message'  => "นำเข้า $imported รายการ" . ($skipped ? " (ข้าม $skipped รายการที่มีอยู่แล้ว)" : ''),
+            ]);
+            return;
+        }
+
         // ── Doctor Schedule ──────────────────────────────────────────────
         case 'schedule:list': {
             // Auto-migrate
