@@ -256,9 +256,36 @@ try {
                 echo json_encode(['ok' => false, 'message' => "เชื่อมต่อ myhora.com ไม่ได้ (HTTP $code) $err"]);
                 return;
             }
-            $data = json_decode($resp, true);
+
+            // Normalize raw response — strip BOM / JSONP / var-assign wrappers
+            $raw = ltrim($resp, "\xEF\xBB\xBF \t\r\n");
+
+            // ถ้าไม่ใช่ UTF-8 แปลงก่อน (myhora บางครั้งส่ง TIS-620 / Windows-874)
+            if (!mb_check_encoding($raw, 'UTF-8')) {
+                $converted = @mb_convert_encoding($raw, 'UTF-8', 'TIS-620,Windows-874,UTF-8');
+                if ($converted !== false) $raw = $converted;
+            }
+
+            // Strip JSONP wrapper: callbackName({...}) หรือ callbackName([...])
+            if (preg_match('/^[A-Za-z_$][A-Za-z0-9_$.]*\s*\((.+)\)\s*;?\s*$/s', $raw, $m)) {
+                $raw = $m[1];
+            }
+            // Strip JS variable assignment: var x = {...}; หรือ x = {...};
+            if (preg_match('/^(?:var\s+|let\s+|const\s+)?[A-Za-z_$][A-Za-z0-9_$]*\s*=\s*(.+?);?\s*$/s', $raw, $m)) {
+                $candidate = trim($m[1]);
+                if (str_starts_with($candidate, '{') || str_starts_with($candidate, '[')) {
+                    $raw = $candidate;
+                }
+            }
+
+            $data = json_decode($raw, true);
             if (!is_array($data)) {
-                echo json_encode(['ok' => false, 'message' => 'API ส่งข้อมูลผิดรูปแบบ (parse ไม่ได้)']);
+                $snippet = mb_substr(trim($resp), 0, 200);
+                echo json_encode([
+                    'ok'      => false,
+                    'message' => 'API ส่งข้อมูลผิดรูปแบบ (parse ไม่ได้) — JSON error: '
+                                 . json_last_error_msg() . ' | snippet: ' . $snippet,
+                ]);
                 return;
             }
 
