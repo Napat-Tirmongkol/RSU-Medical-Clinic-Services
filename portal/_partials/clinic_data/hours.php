@@ -78,11 +78,18 @@ foreach ($regular as $r) {
                         <?php if (empty($regularMap[$i])): ?>
                             <span class="text-xs font-bold text-slate-300 italic">ไม่ได้ตั้งค่า</span>
                         <?php else: foreach ($regularMap[$i] as $r): ?>
-                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-purple-50 text-purple-700 border border-purple-100 text-[11px] font-black">
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-purple-50 text-purple-700 border border-purple-100 text-[11px] font-black"
+                                data-id="<?= (int)$r['id'] ?>"
+                                data-type="regular"
+                                data-weekday="<?= (int)$r['weekday'] ?>"
+                                data-open="<?= htmlspecialchars(substr((string)$r['open_time'],0,5), ENT_QUOTES) ?>"
+                                data-close="<?= htmlspecialchars(substr((string)$r['close_time'],0,5), ENT_QUOTES) ?>"
+                                data-note="<?= htmlspecialchars((string)$r['note'], ENT_QUOTES) ?>">
                                 <i class="fa-solid fa-clock text-[8px]"></i>
                                 <?= substr($r['open_time'],0,5) ?>–<?= substr($r['close_time'],0,5) ?>
                                 <?php if ($r['note']): ?> · <?= htmlspecialchars($r['note']) ?><?php endif; ?>
-                                <button onclick="hrDelete(<?= (int)$r['id'] ?>)" class="text-rose-500 ml-1 hover:bg-rose-50 rounded px-1"><i class="fa-solid fa-xmark text-[8px]"></i></button>
+                                <button onclick="hrEdit(<?= (int)$r['id'] ?>)" class="text-purple-600 ml-1 hover:bg-purple-100 rounded px-1" title="แก้ไข"><i class="fa-solid fa-pen text-[8px]"></i></button>
+                                <button onclick="hrDelete(<?= (int)$r['id'] ?>)" class="text-rose-500 hover:bg-rose-50 rounded px-1" title="ลบ"><i class="fa-solid fa-xmark text-[8px]"></i></button>
                             </span>
                         <?php endforeach; endif; ?>
                     </div>
@@ -116,7 +123,14 @@ foreach ($regular as $r) {
                 <?php if (empty($holidays)): ?>
                     <p class="py-8 text-center text-xs font-bold text-slate-300 italic">ยังไม่มีวันหยุดที่จะถึง</p>
                 <?php else: foreach ($holidays as $h): ?>
-                    <div class="flex items-center justify-between py-2.5 border-b border-slate-50 last:border-0">
+                    <div class="flex items-center justify-between py-2.5 border-b border-slate-50 last:border-0"
+                        data-id="<?= (int)$h['id'] ?>"
+                        data-type="holiday"
+                        data-date="<?= htmlspecialchars((string)$h['specific_date'], ENT_QUOTES) ?>"
+                        data-open="<?= htmlspecialchars(substr((string)$h['open_time'],0,5), ENT_QUOTES) ?>"
+                        data-close="<?= htmlspecialchars(substr((string)$h['close_time'],0,5), ENT_QUOTES) ?>"
+                        data-is-closed="<?= (int)$h['is_closed'] ?>"
+                        data-note="<?= htmlspecialchars((string)$h['note'], ENT_QUOTES) ?>">
                         <div class="flex items-center gap-3 min-w-0">
                             <div class="w-9 h-9 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center text-xs font-black shrink-0">
                                 <?= date('d', strtotime($h['specific_date'])) ?>
@@ -132,7 +146,10 @@ foreach ($regular as $r) {
                                 </p>
                             </div>
                         </div>
-                        <button onclick="hrDelete(<?= (int)$h['id'] ?>)" class="text-rose-500 hover:bg-rose-50 px-2 py-1 rounded text-xs"><i class="fa-solid fa-trash"></i></button>
+                        <div class="flex items-center gap-1 shrink-0">
+                            <button onclick="hrEdit(<?= (int)$h['id'] ?>)" class="text-blue-500 hover:bg-blue-50 px-2 py-1 rounded text-xs" title="แก้ไข"><i class="fa-solid fa-pen"></i></button>
+                            <button onclick="hrDelete(<?= (int)$h['id'] ?>)" class="text-rose-500 hover:bg-rose-50 px-2 py-1 rounded text-xs" title="ลบ"><i class="fa-solid fa-trash"></i></button>
+                        </div>
                     </div>
                 <?php endforeach; endif; ?>
             </div>
@@ -171,6 +188,140 @@ async function hrDelete(id) {
     const res = await hrPost('delete', {id});
     if (res.ok) cdReload('hours');
     else Swal.fire('Error', res.message, 'error');
+}
+
+async function hrEdit(id) {
+    // หา element ที่มี data-id ตรงนี้ (ทั้ง regular badge และ holiday row)
+    const el = document.querySelector(`[data-id="${id}"][data-type]`);
+    if (!el) { Swal.fire('Error', 'ไม่พบรายการ', 'error'); return; }
+
+    const type = el.dataset.type; // 'regular' หรือ 'holiday'
+    const cur = {
+        weekday:    el.dataset.weekday || '0',
+        date:       el.dataset.date || '',
+        open:       el.dataset.open || '',
+        close:      el.dataset.close || '',
+        isClosed:   el.dataset.isClosed === '1',
+        note:       el.dataset.note || '',
+    };
+
+    const wdNames = ['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์'];
+    const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    const inputCls = 'w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 outline-none focus:border-purple-400';
+
+    let bodyHtml;
+    if (type === 'regular') {
+        const wdOpts = wdNames.map((n, i) => `<option value="${i}" ${parseInt(cur.weekday,10) === i ? 'selected' : ''}>${esc(n)}</option>`).join('');
+        bodyHtml = `
+            <div style="display:grid; gap:.6rem; text-align:left;">
+                <div>
+                    <label style="font-size:.7rem; font-weight:800; color:#64748b; text-transform:uppercase; letter-spacing:.05em;">วัน</label>
+                    <select id="hr-edit-weekday" class="${inputCls}">${wdOpts}</select>
+                </div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:.5rem;">
+                    <div>
+                        <label style="font-size:.7rem; font-weight:800; color:#64748b; text-transform:uppercase; letter-spacing:.05em;">เปิด</label>
+                        <input id="hr-edit-open" type="time" value="${esc(cur.open)}" class="${inputCls}">
+                    </div>
+                    <div>
+                        <label style="font-size:.7rem; font-weight:800; color:#64748b; text-transform:uppercase; letter-spacing:.05em;">ปิด</label>
+                        <input id="hr-edit-close" type="time" value="${esc(cur.close)}" class="${inputCls}">
+                    </div>
+                </div>
+                <div>
+                    <label style="font-size:.7rem; font-weight:800; color:#64748b; text-transform:uppercase; letter-spacing:.05em;">หมายเหตุ</label>
+                    <input id="hr-edit-note" type="text" value="${esc(cur.note)}" placeholder="เช่น พักเที่ยง, ช่วงเช้า" class="${inputCls}">
+                </div>
+            </div>
+        `;
+    } else {
+        // holiday / special
+        bodyHtml = `
+            <div style="display:grid; gap:.6rem; text-align:left;">
+                <div>
+                    <label style="font-size:.7rem; font-weight:800; color:#64748b; text-transform:uppercase; letter-spacing:.05em;">วันที่</label>
+                    <input id="hr-edit-date" type="date" value="${esc(cur.date)}" class="${inputCls}">
+                </div>
+                <div>
+                    <label style="font-size:.7rem; font-weight:800; color:#64748b; text-transform:uppercase; letter-spacing:.05em;">ชื่อวันหยุด *</label>
+                    <input id="hr-edit-note" type="text" value="${esc(cur.note)}" placeholder="เช่น สงกรานต์" class="${inputCls}">
+                </div>
+                <label style="display:flex; align-items:center; gap:.5rem; padding:.5rem; background:#fef2f2; border-radius:.5rem; cursor:pointer;">
+                    <input id="hr-edit-closed" type="checkbox" ${cur.isClosed ? 'checked' : ''} style="width:1rem; height:1rem; accent-color:#e11d48;">
+                    <span style="font-size:.85rem; font-weight:700; color:#991b1b;">ปิดทั้งวัน</span>
+                </label>
+                <div id="hr-edit-times" style="display:${cur.isClosed?'none':'grid'}; grid-template-columns:1fr 1fr; gap:.5rem;">
+                    <div>
+                        <label style="font-size:.7rem; font-weight:800; color:#64748b; text-transform:uppercase; letter-spacing:.05em;">เปิด</label>
+                        <input id="hr-edit-open" type="time" value="${esc(cur.open)}" class="${inputCls}">
+                    </div>
+                    <div>
+                        <label style="font-size:.7rem; font-weight:800; color:#64748b; text-transform:uppercase; letter-spacing:.05em;">ปิด</label>
+                        <input id="hr-edit-close" type="time" value="${esc(cur.close)}" class="${inputCls}">
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    const result = await Swal.fire({
+        title: type === 'regular' ? 'แก้ไขเวลาทำการประจำสัปดาห์' : 'แก้ไขวันหยุดพิเศษ',
+        html: bodyHtml,
+        width: 480,
+        showCancelButton: true,
+        confirmButtonText: '<i class="fa-solid fa-floppy-disk mr-1"></i> บันทึก',
+        cancelButtonText: 'ยกเลิก',
+        confirmButtonColor: type === 'regular' ? '#a855f7' : '#e11d48',
+        reverseButtons: true,
+        focusConfirm: false,
+        didOpen: () => {
+            // toggle time fields when "ปิดทั้งวัน" checkbox flips
+            const cb = document.getElementById('hr-edit-closed');
+            const wrap = document.getElementById('hr-edit-times');
+            if (cb && wrap) cb.addEventListener('change', () => wrap.style.display = cb.checked ? 'none' : 'grid');
+        },
+        preConfirm: () => {
+            const v = id => document.getElementById('hr-edit-' + id)?.value || '';
+            const note = v('note').trim();
+            if (type === 'holiday' && !note) {
+                Swal.showValidationMessage('กรุณาระบุชื่อวันหยุด');
+                return false;
+            }
+            if (type === 'holiday' && !v('date')) {
+                Swal.showValidationMessage('กรุณาเลือกวันที่');
+                return false;
+            }
+            const isClosedNow = type === 'holiday' && document.getElementById('hr-edit-closed')?.checked;
+            const out = { id, note };
+            if (type === 'regular') {
+                out.weekday    = v('weekday');
+                out.open_time  = v('open');
+                out.close_time = v('close');
+                out.is_closed  = '0';
+                if (!out.open_time || !out.close_time) {
+                    Swal.showValidationMessage('กรุณากรอกเวลาเปิด-ปิด');
+                    return false;
+                }
+            } else {
+                out.specific_date = v('date');
+                out.is_closed     = isClosedNow ? '1' : '0';
+                if (!isClosedNow) {
+                    out.open_time  = v('open');
+                    out.close_time = v('close');
+                }
+            }
+            return out;
+        },
+    });
+    if (!result.isConfirmed || !result.value) return;
+
+    const res = await hrPost('edit', result.value);
+    if (res.ok) {
+        showPortalToast(res.message || 'อัปเดตแล้ว', 'success');
+        setTimeout(() => cdReload('hours'), 500);
+    } else {
+        Swal.fire('Error', res.message || 'อัปเดตไม่สำเร็จ', 'error');
+    }
 }
 
 async function hrFetchThai() {

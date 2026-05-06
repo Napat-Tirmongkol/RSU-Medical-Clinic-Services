@@ -229,6 +229,43 @@ try {
             echo json_encode(['ok' => true, 'message' => 'ลบแล้ว']);
             return;
 
+        case 'hours:edit': {
+            $id = (int)($_POST['id'] ?? 0);
+            if ($id <= 0) {
+                echo json_encode(['ok' => false, 'message' => 'invalid id']);
+                return;
+            }
+            $cur = $pdo->prepare("SELECT type FROM sys_clinic_hours WHERE id = ?");
+            $cur->execute([$id]);
+            $row = $cur->fetch(PDO::FETCH_ASSOC);
+            if (!$row) {
+                echo json_encode(['ok' => false, 'message' => 'not found']);
+                return;
+            }
+            $type     = $row['type'];
+            $isClosed = (($_POST['is_closed'] ?? '0') === '1') ? 1 : 0;
+
+            $stmt = $pdo->prepare("UPDATE sys_clinic_hours SET
+                weekday       = :weekday,
+                specific_date = :date,
+                open_time     = :open_time,
+                close_time    = :close_time,
+                is_closed     = :is_closed,
+                note          = :note
+                WHERE id = :id");
+            $stmt->execute([
+                ':weekday'    => $type === 'regular' ? (int)($_POST['weekday'] ?? 0) : null,
+                ':date'       => $type !== 'regular' ? ($_POST['specific_date'] ?? null) : null,
+                ':open_time'  => $isClosed ? null : (trim((string)($_POST['open_time'] ?? '')) ?: null),
+                ':close_time' => $isClosed ? null : (trim((string)($_POST['close_time'] ?? '')) ?: null),
+                ':is_closed'  => $isClosed,
+                ':note'       => trim((string)($_POST['note'] ?? '')) ?: null,
+                ':id'         => $id,
+            ]);
+            echo json_encode(['ok' => true, 'message' => 'อัปเดตแล้ว']);
+            return;
+        }
+
         // ── Thai Public Holidays — ดึงจาก myhora.com (ICS format / RFC 5545)
         // วันหยุดราชการครบ + วันหยุดชดเชย, อัปเดตตามประกาศจริง
         case 'hours:fetch_thai_holidays': {
