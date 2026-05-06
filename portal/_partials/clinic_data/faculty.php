@@ -537,7 +537,7 @@ $_cd_qs = http_build_query(array_filter(['section' => 'clinic_data', 'cd_view' =
             return;
         }
         fileNm.textContent = f.name;
-        fileSz.textContent = (f.size / 1024).toFixed(1) + ' KB';
+        if (fileSz) fileSz.textContent = (f.size / 1024).toFixed(1) + ' KB';
         fileInfo.classList.remove('hidden');
         impBtnWrap.classList.remove('hidden');
         impRes.classList.add('hidden');
