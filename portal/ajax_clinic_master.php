@@ -136,6 +136,42 @@ try {
             echo json_encode(['ok' => true, 'id' => (int)$pdo->lastInsertId(), 'message' => 'เพิ่มบุคลากรแล้ว']);
             return;
 
+        case 'staff:edit':
+            $id = (int)($_POST['id'] ?? 0);
+            if ($id <= 0) {
+                echo json_encode(['ok' => false, 'message' => 'invalid id']);
+                return;
+            }
+            $fullName = trim((string)($_POST['full_name'] ?? ''));
+            if ($fullName === '') {
+                echo json_encode(['ok' => false, 'message' => 'กรุณากรอกชื่อ-นามสกุล']);
+                return;
+            }
+            $allowedRoles = ['doctor', 'nurse', 'pharmacist', 'dentist', 'other'];
+            $role = in_array($_POST['role'] ?? '', $allowedRoles, true) ? $_POST['role'] : 'doctor';
+
+            $stmt = $pdo->prepare("UPDATE sys_medical_staff
+                SET title       = :title,
+                    full_name   = :full_name,
+                    license_no  = :license_no,
+                    role        = :role,
+                    department  = :department,
+                    phone       = :phone,
+                    email       = :email
+                WHERE id = :id");
+            $stmt->execute([
+                ':title'      => trim((string)($_POST['title'] ?? '')),
+                ':full_name'  => $fullName,
+                ':license_no' => trim((string)($_POST['license_no'] ?? '')) ?: null,
+                ':role'       => $role,
+                ':department' => trim((string)($_POST['department'] ?? '')) ?: null,
+                ':phone'      => trim((string)($_POST['phone'] ?? '')) ?: null,
+                ':email'      => trim((string)($_POST['email'] ?? '')) ?: null,
+                ':id'         => $id,
+            ]);
+            echo json_encode(['ok' => true, 'message' => 'อัปเดตข้อมูลแล้ว']);
+            return;
+
         case 'staff:delete':
             $pdo->prepare("DELETE FROM sys_medical_staff WHERE id = ?")->execute([(int)$_POST['id']]);
             echo json_encode(['ok' => true, 'message' => 'ลบแล้ว']);
