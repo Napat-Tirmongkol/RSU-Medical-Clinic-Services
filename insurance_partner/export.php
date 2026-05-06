@@ -14,6 +14,57 @@ $partner = current_ins_partner();
 $companyCode = $partner['company_code'];
 $pdo = db();
 
+/**
+ * แยก full_name ภาษาไทย/อังกฤษ → [คำนำหน้า, ชื่อ, นามสกุล]
+ * จับ prefix ที่พบบ่อยก่อน (เรียงจากยาวไปสั้นเพื่อ longest-match)
+ */
+function ipp_parse_thai_name(string $fullName): array
+{
+    $fullName = trim(preg_replace('/\s+/u', ' ', $fullName) ?? '');
+    if ($fullName === '') return ['', '', ''];
+
+    $prefixes = [
+        // longest first
+        'ผู้ช่วยศาสตราจารย์ ดร.', 'รองศาสตราจารย์ ดร.', 'ศาสตราจารย์ ดร.',
+        'ผู้ช่วยศาสตราจารย์', 'รองศาสตราจารย์', 'ศาสตราจารย์',
+        'นายแพทย์', 'แพทย์หญิง',
+        'ผศ.ดร.', 'รศ.ดร.', 'ศ.ดร.',
+        'เด็กชาย', 'เด็กหญิง',
+        'นางสาว', 'น.ส.',
+        'ด.ช.', 'ด.ญ.',
+        'ผศ.', 'รศ.', 'ศ.', 'ดร.',
+        'นพ.', 'พญ.',
+        'นาย', 'นาง',
+        'MR.', 'MRS.', 'MS.', 'MISS', 'DR.',
+        'Mr.', 'Mrs.', 'Ms.', 'Miss', 'Dr.',
+    ];
+
+    $title = '';
+    $rest = $fullName;
+    foreach ($prefixes as $p) {
+        $plen = mb_strlen($p);
+        if (mb_substr($rest, 0, $plen) === $p) {
+            $title = $p;
+            $rest = trim(mb_substr($rest, $plen));
+            break;
+        }
+    }
+
+    $parts = preg_split('/\s+/u', $rest, 2, PREG_SPLIT_NO_EMPTY) ?: [];
+    return [$title, $parts[0] ?? '', $parts[1] ?? ''];
+}
+
+/**
+ * แปลงวันที่เป็น dd/mm/yyyy (ค.ศ.) — ถ้า invalid ส่งเป็นค่าว่าง
+ */
+function ipp_format_dob(?string $date): string
+{
+    if (!$date || $date === '0000-00-00' || str_starts_with($date, '0000-00-00')) return '';
+    $ts = strtotime($date);
+    if ($ts === false) return (string)$date;
+    return date('d/m/Y', $ts);
+}
+
 // ── Mode: download CSV ────────────────────────────────────────────────────────
 if (($_GET['download'] ?? '') === 'csv') {
     $onlyMissing = !empty($_GET['only_missing_policy']);
@@ -47,8 +98,7 @@ if (($_GET['download'] ?? '') === 'csv') {
             $where .= " AND (m.policy_number IS NULL OR m.policy_number = '')";
         }
         $sql = "
-            SELECT m.member_id, m.full_name, m.member_status, m.position, m.citizen_id, m.date_of_birth,
-                   m.insurance_status, m.coverage_start, m.coverage_end, m.policy_number, m.remarks, m.updated_at
+            SELECT m.member_id, m.full_name, m.citizen_id, m.date_of_birth
             FROM insurance_members m
             WHERE $where
             ORDER BY m.full_name ASC
@@ -61,8 +111,7 @@ if (($_GET['download'] ?? '') === 'csv') {
             $where .= " AND (policy_number IS NULL OR policy_number = '')";
         }
         $sql = "
-            SELECT member_id, full_name, member_status, position, citizen_id, date_of_birth,
-                   insurance_status, coverage_start, coverage_end, policy_number, remarks, updated_at
+            SELECT member_id, full_name, citizen_id, date_of_birth
             FROM insurance_members
             WHERE $where
             ORDER BY full_name ASC
@@ -82,11 +131,15 @@ if (($_GET['download'] ?? '') === 'csv') {
 
     echo "\xEF\xBB\xBF"; // UTF-8 BOM for Excel
 
+    // Insurance company template — strict 7 columns only
     $headers = [
-        'รหัสบุคลากร/นักศึกษา', 'ชื่อ-สกุล', 'สถานะสมาชิก', 'ตำแหน่ง',
-        'เลขบัตรประชาชน', 'วันเกิด',
-        'สถานะประกัน', 'วันเริ่มต้นสิทธิ์', 'วันสิ้นสุดสิทธิ์',
-        'เลขกรมธรรม์', 'หมายเหตุ', 'อัปเดตล่าสุด',
+        'ลำดับ',
+        'คำนำหน้า',
+        'ชื่อ',
+        'นามสกุล',
+        'เลขบัตรประชาชน',
+        'รหัสนักศึกษา',
+        'วันเดือนปี เกิด',
     ];
     $csvRow = function (array $cols): void {
         echo implode(',', array_map(fn($c) => '"' . str_replace('"', '""', (string)$c) . '"', $cols)) . "\r\n";
@@ -95,13 +148,17 @@ if (($_GET['download'] ?? '') === 'csv') {
 
     $count = 0;
     while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-        $csvRow([
-            $row['member_id'], $row['full_name'], $row['member_status'], $row['position'],
-            $row['citizen_id'], $row['date_of_birth'] ?? '',
-            $row['insurance_status'], $row['coverage_start'] ?? '', $row['coverage_end'] ?? '',
-            $row['policy_number'], $row['remarks'] ?? '', $row['updated_at'],
-        ]);
         $count++;
+        [$title, $firstName, $lastName] = ipp_parse_thai_name((string)($row['full_name'] ?? ''));
+        $csvRow([
+            $count,
+            $title,
+            $firstName,
+            $lastName,
+            $row['citizen_id'] ?? '',
+            $row['member_id'] ?? '',
+            ipp_format_dob($row['date_of_birth'] ?? null),
+        ]);
     }
 
     ins_partner_log('export_csv',
