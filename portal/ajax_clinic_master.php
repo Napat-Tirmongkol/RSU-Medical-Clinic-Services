@@ -229,8 +229,8 @@ try {
             echo json_encode(['ok' => true, 'message' => 'ลบแล้ว']);
             return;
 
-        // ── Thai Public Holidays — ดึงจาก myhora.com (Thai-specific, ครบทั้ง
-        // วันหยุดราชการ + วันหยุดชดเชย, อัปเดตตามประกาศจริง)
+        // ── Thai Public Holidays — ดึงจาก myhora.com (ICS format / RFC 5545)
+        // วันหยุดราชการครบ + วันหยุดชดเชย, อัปเดตตามประกาศจริง
         case 'hours:fetch_thai_holidays': {
             $year = (int)($_POST['year'] ?? date('Y'));
             if ($year < 2020 || $year > 2050) {
@@ -238,14 +238,14 @@ try {
                 return;
             }
 
-            $url = 'https://www.myhora.com/calendar/ical/holiday.aspx?latest.json';
+            $url = 'https://www.myhora.com/calendar/ical/holiday.aspx?latest.ics';
             $ch  = curl_init($url);
             curl_setopt_array($ch, [
                 CURLOPT_RETURNTRANSFER => true,
                 CURLOPT_TIMEOUT        => 15,
                 CURLOPT_FOLLOWLOCATION => true,
                 CURLOPT_USERAGENT      => 'Mozilla/5.0 (compatible; RSU-Clinic/1.0)',
-                CURLOPT_HTTPHEADER     => ['Accept: application/json'],
+                CURLOPT_HTTPHEADER     => ['Accept: text/calendar, text/plain, */*'],
             ]);
             $resp = curl_exec($ch);
             $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -257,115 +257,76 @@ try {
                 return;
             }
 
-            // Normalize raw response — strip BOM / JSONP / var-assign wrappers
-            $raw = ltrim($resp, "\xEF\xBB\xBF \t\r\n");
-
-            // ถ้าไม่ใช่ UTF-8 แปลงก่อน (myhora บางครั้งส่ง TIS-620 / Windows-874)
+            // Strip BOM + ensure UTF-8
+            $raw = ltrim($resp, "\xEF\xBB\xBF");
             if (!mb_check_encoding($raw, 'UTF-8')) {
                 $converted = @mb_convert_encoding($raw, 'UTF-8', 'TIS-620,Windows-874,UTF-8');
                 if ($converted !== false) $raw = $converted;
             }
 
-            // Strip JSONP wrapper: callbackName({...}) หรือ callbackName([...])
-            if (preg_match('/^[A-Za-z_$][A-Za-z0-9_$.]*\s*\((.+)\)\s*;?\s*$/s', $raw, $m)) {
-                $raw = $m[1];
-            }
-            // Strip JS variable assignment: var x = {...}; หรือ x = {...};
-            if (preg_match('/^(?:var\s+|let\s+|const\s+)?[A-Za-z_$][A-Za-z0-9_$]*\s*=\s*(.+?);?\s*$/s', $raw, $m)) {
-                $candidate = trim($m[1]);
-                if (str_starts_with($candidate, '{') || str_starts_with($candidate, '[')) {
-                    $raw = $candidate;
-                }
-            }
-
-            // 1st pass
-            $data = json_decode($raw, true);
-
-            // 2nd pass: try fixing common myhora JSON quirks
-            if (!is_array($data)) {
-                $cleaned = $raw;
-                // Strip /* ... */ block comments
-                $cleaned = preg_replace('!/\*.*?\*/!s', '', $cleaned);
-                // Strip // line comments (but not inside strings — best-effort)
-                $cleaned = preg_replace('!^\s*//.*$!m', '', $cleaned);
-                // Remove trailing commas before } or ]
-                $cleaned = preg_replace('/,\s*([}\]])/', '$1', $cleaned);
-                // Replace bare control chars 0x00-0x1F (except \t \n \r) inside strings
-                // — JSON spec disallows raw control chars, escape them
-                $cleaned = preg_replace_callback('/"((?:[^"\\\\]|\\\\.)*)"/s', function ($m) {
-                    return '"' . preg_replace_callback('/[\x00-\x08\x0B\x0C\x0E-\x1F]/', function ($c) {
-                        return sprintf('\\u%04x', ord($c[0]));
-                    }, $m[1]) . '"';
-                }, $cleaned);
-                $data = json_decode($cleaned, true);
-                if (is_array($data)) $raw = $cleaned;
-            }
-
-            if (!is_array($data)) {
-                $len    = strlen($resp);
-                $head   = mb_substr(trim($resp), 0, 150);
-                $tail   = mb_substr(trim($resp), -200);
-                echo json_encode([
-                    'ok'      => false,
-                    'message' => "API ส่งข้อมูลผิดรูปแบบ (parse ไม่ได้) — JSON error: "
-                                 . json_last_error_msg()
-                                 . " | length: $len bytes"
-                                 . " | head: $head"
-                                 . " | tail: $tail",
-                ]);
+            // Quick sanity check — should contain BEGIN:VCALENDAR
+            if (stripos($raw, 'BEGIN:VCALENDAR') === false) {
+                $head = mb_substr(trim($raw), 0, 200);
+                echo json_encode(['ok' => false, 'message' => "ไม่ใช่ไฟล์ ICS ที่ถูกต้อง — head: $head"]);
                 return;
             }
 
-            // Flexible parser: รองรับทั้ง VCALENDAR nested และ flat array
-            $events = [];
-            if (isset($data['VCALENDAR']) && is_array($data['VCALENDAR'])) {
-                foreach ($data['VCALENDAR'] as $cal) {
-                    foreach ($cal['VEVENT'] ?? [] as $ev) $events[] = $ev;
+            // ── ICS Parser ──────────────────────────────────────────────
+            // 1) Split into lines (handle CRLF, CR, LF)
+            $lines = preg_split('/\r\n|\r|\n/', $raw);
+
+            // 2) Unfold: RFC 5545 — lines starting with space/tab continue previous
+            $unfolded = [];
+            foreach ($lines as $line) {
+                if ($line === '') continue;
+                if ($line[0] === ' ' || $line[0] === "\t") {
+                    if (!empty($unfolded)) $unfolded[count($unfolded) - 1] .= substr($line, 1);
+                } else {
+                    $unfolded[] = $line;
                 }
-            } elseif (isset($data['VEVENT']) && is_array($data['VEVENT'])) {
-                $events = $data['VEVENT'];
-            } elseif (array_is_list($data)) {
-                $events = $data;
             }
 
-            // Extract date (try DTSTART variants) + name (SUMMARY)
-            $extractDate = function (array $ev): ?string {
-                foreach ($ev as $k => $v) {
-                    if (stripos($k, 'DTSTART') === 0 && is_string($v)) {
-                        if (preg_match('/^(\d{4})(\d{2})(\d{2})/', $v, $m)) return "$m[1]-$m[2]-$m[3]";
-                        if (preg_match('/^(\d{4})-(\d{2})-(\d{2})/', $v, $m)) return "$m[1]-$m[2]-$m[3]";
-                    }
-                }
-                foreach (['date', 'Date'] as $k) {
-                    if (!empty($ev[$k]) && is_string($ev[$k])) {
-                        if (preg_match('/^(\d{4})-?(\d{2})-?(\d{2})/', $ev[$k], $m)) return "$m[1]-$m[2]-$m[3]";
-                    }
-                }
-                return null;
-            };
-            $extractName = function (array $ev): string {
-                foreach (['SUMMARY', 'summary', 'name', 'Name', 'title'] as $k) {
-                    if (!empty($ev[$k]) && is_string($ev[$k])) {
-                        return trim(str_replace(['\\,', '\\;', '\\n', '\\\\'], [',', ';', "\n", '\\'], $ev[$k]));
-                    }
-                }
-                return '';
-            };
+            // 3) Walk events, extract DTSTART + SUMMARY
+            $unescape = fn(string $s) => str_replace(
+                ['\\\\', '\\,', '\\;', '\\n', '\\N'],
+                ['\\', ',', ';', "\n", "\n"],
+                $s
+            );
 
+            $events  = [];
+            $inEvent = false;
+            $cur     = [];
+            foreach ($unfolded as $line) {
+                if ($line === 'BEGIN:VEVENT') { $inEvent = true; $cur = []; continue; }
+                if ($line === 'END:VEVENT') {
+                    if (!empty($cur['date']) && !empty($cur['summary'])) $events[] = $cur;
+                    $inEvent = false; continue;
+                }
+                if (!$inEvent) continue;
+
+                // DTSTART (with optional params: DTSTART;VALUE=DATE:20250101)
+                if (preg_match('/^DTSTART(?:;[^:]*)?:(\d{4})-?(\d{2})-?(\d{2})/i', $line, $m)) {
+                    $cur['date'] = "$m[1]-$m[2]-$m[3]";
+                    continue;
+                }
+                // SUMMARY (with optional params: SUMMARY;LANGUAGE=th:...)
+                if (preg_match('/^SUMMARY(?:;[^:]*)?:(.*)$/i', $line, $m)) {
+                    $cur['summary'] = trim($unescape($m[1]));
+                    continue;
+                }
+            }
+
+            // Filter by year + dedupe by date
             $filtered = [];
-            foreach ($events as $ev) {
-                if (!is_array($ev)) continue;
-                $d = $extractDate($ev);
-                $n = $extractName($ev);
-                if (!$d || $n === '') continue;
-                if (substr($d, 0, 4) !== (string)$year) continue;
-                $filtered[$d] = ['date' => $d, 'name' => $n]; // dedupe by date
+            foreach ($events as $e) {
+                if (substr($e['date'], 0, 4) !== (string)$year) continue;
+                $filtered[$e['date']] = $e;
             }
             ksort($filtered);
             $filtered = array_values($filtered);
 
             if (empty($filtered)) {
-                echo json_encode(['ok' => false, 'message' => "ไม่พบวันหยุดสำหรับปี $year (อาจยังไม่มีข้อมูล)"]);
+                echo json_encode(['ok' => false, 'message' => "ไม่พบวันหยุดสำหรับปี $year — ลองปีอื่นดู"]);
                 return;
             }
 
@@ -380,12 +341,12 @@ try {
             foreach ($filtered as $e) {
                 $rows[] = [
                     'date'    => $e['date'],
-                    'name_th' => $e['name'],
+                    'name_th' => $e['summary'],
                     'name_en' => '',
                     'exists'  => isset($existing[$e['date']]),
                 ];
             }
-            echo json_encode(['ok' => true, 'rows' => $rows, 'year' => $year, 'source' => 'myhora.com']);
+            echo json_encode(['ok' => true, 'rows' => $rows, 'year' => $year, 'source' => 'myhora.com (ICS)']);
             return;
         }
 
