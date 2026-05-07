@@ -592,6 +592,57 @@ try {
             exit;
         }
 
+        // ════════════ CATEGORY: CRUD ════════════
+        case 'category:create':
+        case 'category:update': {
+            $kind = $_POST['kind'] ?? 'priority';
+            if (!in_array($kind, ['priority','confidentiality','custom'], true)) $kind = 'priority';
+            $code  = trim($_POST['code'] ?? '');
+            $name  = trim($_POST['name'] ?? '');
+            $color = trim($_POST['color'] ?? '') ?: null;
+            $sort  = (int)($_POST['sort_order'] ?? 0);
+            $active= (int)($_POST['is_active'] ?? 1) ? 1 : 0;
+
+            if ($code === '' || $name === '') throw new RuntimeException('กรอกรหัสและชื่อให้ครบ');
+
+            if ($action === 'create') {
+                $stmt = $pdo->prepare("INSERT INTO sys_doc_categories (kind, code, name, color, sort_order, is_active) VALUES (?, ?, ?, ?, ?, ?)");
+                $stmt->execute([$kind, $code, $name, $color, $sort, $active]);
+                $newId = (int)$pdo->lastInsertId();
+                echo json_encode(['ok' => true, 'id' => $newId, 'message' => 'เพิ่มหมวดแล้ว'], JSON_UNESCAPED_UNICODE);
+            } else {
+                $id = (int)($_POST['id'] ?? 0);
+                if ($id <= 0) throw new RuntimeException('ระบุ id ไม่ถูกต้อง');
+                $stmt = $pdo->prepare("UPDATE sys_doc_categories SET kind=?, code=?, name=?, color=?, sort_order=?, is_active=? WHERE id=?");
+                $stmt->execute([$kind, $code, $name, $color, $sort, $active, $id]);
+                echo json_encode(['ok' => true, 'message' => 'อัปเดตแล้ว'], JSON_UNESCAPED_UNICODE);
+            }
+            exit;
+        }
+
+        case 'category:toggle': {
+            $id = (int)($_POST['id'] ?? 0);
+            if ($id <= 0) throw new RuntimeException('ระบุ id ไม่ถูกต้อง');
+            $pdo->prepare("UPDATE sys_doc_categories SET is_active = 1 - is_active WHERE id = ?")->execute([$id]);
+            echo json_encode(['ok' => true, 'message' => 'อัปเดตสถานะแล้ว']);
+            exit;
+        }
+
+        case 'category:delete': {
+            $id = (int)($_POST['id'] ?? 0);
+            if ($id <= 0) throw new RuntimeException('ระบุ id ไม่ถูกต้อง');
+
+            // ห้ามลบถ้ามีเอกสารอ้างอิงอยู่
+            $used = $pdo->prepare("SELECT COUNT(*) FROM sys_doc_documents WHERE priority_id = ?");
+            $used->execute([$id]);
+            if ((int)$used->fetchColumn() > 0) {
+                throw new RuntimeException('หมวดนี้ถูกใช้งานในเอกสารอยู่ — ปิดสถานะแทนการลบ');
+            }
+            $pdo->prepare("DELETE FROM sys_doc_categories WHERE id = ?")->execute([$id]);
+            echo json_encode(['ok' => true, 'message' => 'ลบแล้ว']);
+            exit;
+        }
+
         // ════════════ ATTACHMENT: DELETE ════════════
         case 'attachment:delete': {
             $id = (int)($_POST['id'] ?? 0);

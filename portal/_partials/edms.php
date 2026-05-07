@@ -13,7 +13,7 @@
 declare(strict_types=1);
 
 $_view = $_GET['edms_view'] ?? '';
-$_validViews = ['list', 'detail', 'myinbox'];
+$_validViews = ['list', 'detail', 'myinbox', 'reports', 'categories'];
 
 if (in_array($_view, $_validViews, true)) {
     include __DIR__ . '/edms/' . $_view . '.php';
@@ -186,5 +186,32 @@ $tonePalette = [
                 </div>
             </a>
         <?php endforeach; ?>
+    </div>
+
+    <!-- Tools row -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <a href="?section=edms&edms_view=reports" class="group bg-white rounded-3xl border border-slate-200 shadow-sm p-4 flex items-center gap-3 hover:shadow-md hover:border-purple-200 transition-all">
+            <div class="w-10 h-10 bg-purple-50 text-purple-600 rounded-xl border border-purple-100 flex items-center justify-center">
+                <i class="fa-solid fa-chart-column"></i>
+            </div>
+            <div class="flex-1 min-w-0">
+                <p class="text-sm font-black text-slate-800">รายงานสถิติ</p>
+                <p class="text-[11px] font-bold text-slate-500">KPI · กราฟรายเดือน · Export Excel</p>
+            </div>
+            <i class="fa-solid fa-arrow-right text-slate-300 group-hover:text-purple-500 group-hover:translate-x-1 transition-all"></i>
+        </a>
+
+        <?php if (($_SESSION['admin_role'] ?? '') === 'superadmin' || !empty($_SESSION['access_edms'])): ?>
+            <a href="?section=edms&edms_view=categories" class="group bg-white rounded-3xl border border-slate-200 shadow-sm p-4 flex items-center gap-3 hover:shadow-md hover:border-amber-200 transition-all">
+                <div class="w-10 h-10 bg-amber-50 text-amber-600 rounded-xl border border-amber-100 flex items-center justify-center">
+                    <i class="fa-solid fa-tags"></i>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <p class="text-sm font-black text-slate-800">หมวดหมู่</p>
+                    <p class="text-[11px] font-bold text-slate-500">ความเร่งด่วน · ชั้นความลับ · หมวดทั่วไป</p>
+                </div>
+                <i class="fa-solid fa-arrow-right text-slate-300 group-hover:text-amber-500 group-hover:translate-x-1 transition-all"></i>
+            </a>
+        <?php endif; ?>
     </div>
 </div>

@@ -146,7 +146,7 @@ $confidentialityLabels = [
     </div>
 
     <!-- Header -->
-    <div class="mb-5 flex items-center gap-4">
+    <div class="mb-5 flex items-center gap-3 flex-wrap">
         <div class="w-12 h-12 <?= $tone['bg'] ?> rounded-2xl border <?= $tone['border'] ?> flex items-center justify-center <?= $tone['text'] ?> text-xl">
             <i class="fa-solid <?= $meta['icon'] ?>"></i>
         </div>
@@ -154,6 +154,17 @@ $confidentialityLabels = [
             <h2 class="text-2xl font-black text-slate-800"><?= htmlspecialchars($meta['title']) ?></h2>
             <p class="text-slate-500 text-sm font-medium">รวม <?= number_format($total) ?> รายการ</p>
         </div>
+        <?php
+        $exportQs = http_build_query([
+            'format'=>'list','type'=>$type,'s'=>$search,'status'=>$status,
+            'priority'=>$priority,'from'=>$from,'to'=>$to,
+        ]);
+        ?>
+        <a href="edms_export.php?<?= htmlspecialchars($exportQs) ?>"
+           class="bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-2.5 rounded-2xl text-sm font-black flex items-center gap-2 shadow-sm transition-colors"
+           title="Export CSV (ตามตัวกรองปัจจุบัน)">
+            <i class="fa-solid fa-file-csv"></i> Export
+        </a>
         <button onclick="edmsOpenCompose()" class="<?= $tone['btn'] ?> text-white px-4 py-2.5 rounded-2xl text-sm font-black flex items-center gap-2 shadow-sm transition-colors">
             <i class="fa-solid fa-plus"></i> สร้างใหม่
         </button>
