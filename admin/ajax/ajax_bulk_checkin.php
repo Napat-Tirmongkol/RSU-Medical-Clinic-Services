@@ -31,19 +31,10 @@ try {
           AND status = 'confirmed'
     ");
     $stmt->execute($ids);
-    $affected = $stmt->rowCount();
-
-    // Best-effort LINE flex reminders for each booking we just checked in
-    if ($affected > 0) {
-        require_once __DIR__ . '/../../includes/survey_helper.php';
-        foreach ($ids as $bid) {
-            @send_post_checkin_survey_reminder($pdo, (int)$bid);
-        }
-    }
 
     echo json_encode([
         'status'   => 'success',
-        'affected' => $affected,
+        'affected' => $stmt->rowCount(),
     ]);
 
 } catch (PDOException $e) {

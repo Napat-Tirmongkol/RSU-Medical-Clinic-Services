@@ -76,10 +76,6 @@ try {
         $adminId
     );
 
-    // Best-effort LINE flex reminder so the user knows to fill the survey
-    require_once __DIR__ . '/../../includes/survey_helper.php';
-    @send_post_checkin_survey_reminder($pdo, $bookingId);
-
     echo json_encode(['status' => 'success', 'message' => 'รับเข้าร่วมงานสำเร็จ']);
 
 } catch (PDOException $e) {
