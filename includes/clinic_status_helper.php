@@ -271,6 +271,153 @@ function clinic_format_thai_date(string $date): string
 }
 
 /**
+ * คำนวณสถานะคลินิก ณ "เวลาขณะนี้" จริง ๆ
+ * (ใช้กับคำถามที่หมายถึง "ตอนนี้/วันนี้" — เช่น "เปิดไหม", "เปิดกี่โมง")
+ *
+ * @return array{
+ *   is_open_now: bool,
+ *   state: 'open_now'|'before_open'|'after_close'|'closed_today',
+ *   today_open: ?string,
+ *   today_close: ?string,
+ *   minutes_until_close: ?int,
+ *   minutes_until_open: ?int,
+ *   next_open_date: ?string,
+ *   next_open_time: ?string,
+ *   next_open_label: ?string,
+ *   today_note: string
+ * }
+ */
+function get_clinic_current_status(PDO $pdo, ?DateTimeImmutable $now = null): array
+{
+    $tz  = new DateTimeZone(CLINIC_TZ_NAME);
+    $now = $now ?? new DateTimeImmutable('now', $tz);
+    $today      = $now->format('Y-m-d');
+    $todayHours = get_clinic_hours_for_date($pdo, $today);
+    $nowHm      = $now->format('H:i');
+
+    if (!$todayHours['closed'] && $todayHours['open_time'] && $todayHours['close_time']) {
+        if ($nowHm < $todayHours['open_time']) {
+            return [
+                'is_open_now' => false,
+                'state' => 'before_open',
+                'today_open'  => $todayHours['open_time'],
+                'today_close' => $todayHours['close_time'],
+                'minutes_until_close' => null,
+                'minutes_until_open'  => clinic_minutes_diff($nowHm, $todayHours['open_time']),
+                'next_open_date'  => $today,
+                'next_open_time'  => $todayHours['open_time'],
+                'next_open_label' => 'วันนี้',
+                'today_note'  => $todayHours['note'],
+            ];
+        }
+        if ($nowHm < $todayHours['close_time']) {
+            return [
+                'is_open_now' => true,
+                'state' => 'open_now',
+                'today_open'  => $todayHours['open_time'],
+                'today_close' => $todayHours['close_time'],
+                'minutes_until_close' => clinic_minutes_diff($nowHm, $todayHours['close_time']),
+                'minutes_until_open'  => null,
+                'next_open_date'  => null,
+                'next_open_time'  => null,
+                'next_open_label' => null,
+                'today_note'  => $todayHours['note'],
+            ];
+        }
+        // ผ่านเวลาปิดของวันนี้แล้ว
+        $next = find_next_clinic_opening($pdo, $now->modify('+1 day'));
+        return [
+            'is_open_now' => false,
+            'state' => 'after_close',
+            'today_open'  => $todayHours['open_time'],
+            'today_close' => $todayHours['close_time'],
+            'minutes_until_close' => null,
+            'minutes_until_open'  => null,
+            'next_open_date'  => $next['date'],
+            'next_open_time'  => $next['open_time'],
+            'next_open_label' => $next['label'],
+            'today_note'  => $todayHours['note'],
+        ];
+    }
+
+    // วันนี้คลินิกหยุดทั้งวัน
+    $next = find_next_clinic_opening($pdo, $now->modify('+1 day'));
+    return [
+        'is_open_now' => false,
+        'state' => 'closed_today',
+        'today_open'  => null,
+        'today_close' => null,
+        'minutes_until_close' => null,
+        'minutes_until_open'  => null,
+        'next_open_date'  => $next['date'],
+        'next_open_time'  => $next['open_time'],
+        'next_open_label' => $next['label'],
+        'today_note'  => $todayHours['note'],
+    ];
+}
+
+/**
+ * หาวันเปิดทำการถัดไป (เริ่มหาจาก $startFrom 00:00 — มองไปข้างหน้า max 14 วัน)
+ *
+ * @return array{date: ?string, open_time: ?string, label: ?string}
+ */
+function find_next_clinic_opening(PDO $pdo, DateTimeImmutable $startFrom, int $maxDays = 14): array
+{
+    $cur = $startFrom->setTime(0, 0);
+    for ($i = 0; $i < $maxDays; $i++) {
+        $date = $cur->format('Y-m-d');
+        $h    = get_clinic_hours_for_date($pdo, $date);
+        if (!$h['closed'] && $h['open_time']) {
+            return [
+                'date'      => $date,
+                'open_time' => $h['open_time'],
+                'label'     => clinic_relative_date_label($cur),
+            ];
+        }
+        $cur = $cur->modify('+1 day');
+    }
+    return ['date' => null, 'open_time' => null, 'label' => null];
+}
+
+/**
+ * คืน label สัมพัทธ์ของวันที่: "วันนี้" / "พรุ่งนี้" / "มะรืน" / "วันจันทร์ที่ 12 พ.ค."
+ */
+function clinic_relative_date_label(DateTimeImmutable $date): string
+{
+    $tz    = new DateTimeZone(CLINIC_TZ_NAME);
+    $today = new DateTimeImmutable('today', $tz);
+    $diff  = (int)$today->diff($date->setTime(0, 0))->format('%r%a');
+    if ($diff === 0) return 'วันนี้';
+    if ($diff === 1) return 'พรุ่งนี้';
+    if ($diff === 2) return 'มะรืน';
+    $wd = (int)$date->format('w');
+    return 'วัน' . CLINIC_WEEKDAY_TH_FULL[$wd] . 'ที่ ' . (int)$date->format('j') . ' '
+        . ['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'][(int)$date->format('n')];
+}
+
+/**
+ * ความต่างนาทีระหว่าง HH:MM สองค่า (b - a)
+ */
+function clinic_minutes_diff(string $a, string $b): int
+{
+    [$ah, $am] = array_pad(explode(':', $a), 2, '0');
+    [$bh, $bm] = array_pad(explode(':', $b), 2, '0');
+    return ((int)$bh * 60 + (int)$bm) - ((int)$ah * 60 + (int)$am);
+}
+
+/**
+ * แปลงนาทีเป็น "X ชม. Y นาที" / "Y นาที"
+ */
+function clinic_format_minutes(int $minutes): string
+{
+    if ($minutes < 0) $minutes = 0;
+    if ($minutes < 60) return $minutes . ' นาที';
+    $h = intdiv($minutes, 60);
+    $m = $minutes % 60;
+    return $m === 0 ? $h . ' ชม.' : $h . ' ชม. ' . $m . ' นาที';
+}
+
+/**
  * สร้าง URL ฐาน (https://host/path) สำหรับลิงก์ในข้อความ
  */
 function clinic_app_base_url(): string
@@ -289,7 +436,7 @@ function clinic_app_base_url(): string
  *
  * @return array<string,mixed>  Flex message payload
  */
-function build_clinic_status_flex(PDO $pdo, string $date, string $dateLabel): array
+function build_clinic_status_flex(PDO $pdo, string $date, string $dateLabel, bool $considerNow = false): array
 {
     $hours    = get_clinic_hours_for_date($pdo, $date);
     $doctors  = get_clinic_doctors_for_date($pdo, $date);
@@ -297,10 +444,49 @@ function build_clinic_status_flex(PDO $pdo, string $date, string $dateLabel): ar
     $thaiDate = clinic_format_thai_date($date);
     $baseUrl  = clinic_app_base_url();
 
-    $isOpen = !$hours['closed'];
-    $statusText  = $isOpen ? 'เปิดทำการ' : 'หยุดทำการ';
-    $statusColor = $isOpen ? '#059669' : '#DC2626';
-    $statusBg    = $isOpen ? '#ECFDF5' : '#FEF2F2';
+    $isOpenToday = !$hours['closed'];
+
+    // Real-time status — เฉพาะคำถามที่หมายถึง "ตอนนี้/วันนี้"
+    $now = $considerNow ? get_clinic_current_status($pdo) : null;
+
+    if ($now !== null) {
+        switch ($now['state']) {
+            case 'open_now':
+                $statusText  = 'เปิดอยู่ในขณะนี้';
+                $subText     = 'ปิด ' . $now['today_close'] . ' น. (อีก ' . clinic_format_minutes((int)$now['minutes_until_close']) . ')';
+                $statusColor = '#059669';
+                $statusBg    = '#ECFDF5';
+                break;
+            case 'before_open':
+                $statusText  = 'ยังไม่เปิดให้บริการ';
+                $subText     = 'จะเปิด ' . $now['today_open'] . ' น. (อีก ' . clinic_format_minutes((int)$now['minutes_until_open']) . ')';
+                $statusColor = '#D97706';
+                $statusBg    = '#FFFBEB';
+                break;
+            case 'after_close':
+                $statusText  = 'ขณะนี้นอกเวลาทำการ';
+                $subText     = $now['next_open_date']
+                    ? ('จะเปิด' . $now['next_open_label'] . ' เวลา ' . $now['next_open_time'] . ' น.')
+                    : 'โปรดตรวจสอบเวลาทำการอีกครั้ง';
+                $statusColor = '#DC2626';
+                $statusBg    = '#FEF2F2';
+                break;
+            case 'closed_today':
+            default:
+                $statusText  = 'วันนี้คลินิกหยุด';
+                $subText     = $now['next_open_date']
+                    ? ('จะเปิด' . $now['next_open_label'] . ' เวลา ' . $now['next_open_time'] . ' น.')
+                    : '';
+                $statusColor = '#DC2626';
+                $statusBg    = '#FEF2F2';
+                break;
+        }
+    } else {
+        $statusText  = $isOpenToday ? 'เปิดทำการ' : 'หยุดทำการ';
+        $subText     = '';
+        $statusColor = $isOpenToday ? '#059669' : '#DC2626';
+        $statusBg    = $isOpenToday ? '#ECFDF5' : '#FEF2F2';
+    }
 
     // ── header ──
     $headerContents = [
@@ -321,33 +507,38 @@ function build_clinic_status_flex(PDO $pdo, string $date, string $dateLabel): ar
             'wrap' => true,
         ],
         [
-            'type' => 'box',
-            'layout' => 'baseline',
+            'type' => 'text',
+            'text' => $statusText,
+            'weight' => 'bold',
+            'size' => 'xl',
+            'color' => $statusColor,
             'margin' => 'md',
-            'contents' => [
-                [
-                    'type' => 'text',
-                    'text' => $statusText,
-                    'weight' => 'bold',
-                    'size' => 'xl',
-                    'color' => $statusColor,
-                ],
-            ],
         ],
     ];
+    if ($subText !== '') {
+        $headerContents[] = [
+            'type' => 'text',
+            'text' => $subText,
+            'size' => 'sm',
+            'weight' => 'bold',
+            'color' => '#475569',
+            'margin' => 'sm',
+            'wrap' => true,
+        ];
+    }
 
     // ── body rows ──
     $rows = [];
-    if ($isOpen && $hours['open_time'] && $hours['close_time']) {
+    if ($isOpenToday && $hours['open_time'] && $hours['close_time']) {
         $rows[] = clinic_flex_row('เวลาทำการ', $hours['open_time'] . ' - ' . $hours['close_time'] . ' น.');
     }
     if ($hours['note'] !== '') {
         $rows[] = clinic_flex_row($hours['source'] === 'holiday' ? 'วันหยุด' : 'หมายเหตุ', $hours['note']);
-    } elseif ($hours['source'] === 'no_regular' && !$isOpen) {
+    } elseif ($hours['source'] === 'no_regular' && !$isOpenToday) {
         $rows[] = clinic_flex_row('หมายเหตุ', 'ไม่ได้กำหนดเวลาทำการของวันนี้');
     }
 
-    if ($isOpen) {
+    if ($isOpenToday) {
         $rows[] = clinic_flex_row(
             'แพทย์ออกตรวจ',
             count($doctors) > 0 ? (count($doctors) . ' ท่าน') : 'ยังไม่มีตารางแพทย์'
@@ -409,8 +600,8 @@ function build_clinic_status_flex(PDO $pdo, string $date, string $dateLabel): ar
 
     return [
         'type' => 'flex',
-        'altText' => $dateLabel . ' ห้องพยาบาล' . $statusText
-            . ($isOpen && $hours['open_time'] ? ' ' . $hours['open_time'] . '-' . $hours['close_time'] : ''),
+        'altText' => $dateLabel . ' ห้องพยาบาล: ' . $statusText
+            . ($subText !== '' ? ' · ' . $subText : ''),
         'contents' => [
             'type' => 'bubble',
             'size' => 'mega',
@@ -448,7 +639,7 @@ function build_clinic_status_flex(PDO $pdo, string $date, string $dateLabel): ar
 /**
  * สร้าง LINE Flex bubble แสดง "ตารางแพทย์ของวันที่ระบุ"
  */
-function build_clinic_doctors_flex(PDO $pdo, string $date, string $dateLabel): array
+function build_clinic_doctors_flex(PDO $pdo, string $date, string $dateLabel, bool $considerNow = false): array
 {
     $hours    = get_clinic_hours_for_date($pdo, $date);
     $doctors  = get_clinic_doctors_for_date($pdo, $date);
@@ -456,9 +647,15 @@ function build_clinic_doctors_flex(PDO $pdo, string $date, string $dateLabel): a
     $thaiDate = clinic_format_thai_date($date);
     $baseUrl  = clinic_app_base_url();
 
-    // ถ้าคลินิกหยุด ตอบ status flex แทน
+    // ถ้าคลินิกหยุด หรือถามวันนี้ตอนนอกเวลา → ตอบ status flex แทน (มี out-of-hours notice)
     if ($hours['closed']) {
-        return build_clinic_status_flex($pdo, $date, $dateLabel);
+        return build_clinic_status_flex($pdo, $date, $dateLabel, $considerNow);
+    }
+    if ($considerNow) {
+        $cur = get_clinic_current_status($pdo);
+        if (in_array($cur['state'], ['after_close', 'before_open'], true)) {
+            return build_clinic_status_flex($pdo, $date, $dateLabel, true);
+        }
     }
 
     $listContents = [];
@@ -621,9 +818,10 @@ function build_clinic_status_messages(PDO $pdo, array $intent): array
     $date  = (string)$intent['date'];
     $label = (string)$intent['date_label'];
     $type  = (string)$intent['type'];
+    $considerNow = ((int)($intent['offset'] ?? 0)) === 0;
 
     if ($type === 'doctors') {
-        return [build_clinic_doctors_flex($pdo, $date, $label)];
+        return [build_clinic_doctors_flex($pdo, $date, $label, $considerNow)];
     }
-    return [build_clinic_status_flex($pdo, $date, $label)];
+    return [build_clinic_status_flex($pdo, $date, $label, $considerNow)];
 }
