@@ -46,8 +46,16 @@ $backupFile = "{$backupDir}/{$dbName}_{$timestamp}.sql.gz";
 $logFile    = "{$logDir}/backup.log";
 $now        = date('Y-m-d H:i:s');
 
-@mkdir($backupDir, 0750, true);
-@mkdir($logDir,    0750, true);
+// สร้าง directory แล้วตรวจสอบว่าเขียนได้จริง
+foreach ([$backupDir, $logDir] as $_dir) {
+    if (!is_dir($_dir)) {
+        @mkdir($_dir, 0750, true);
+    }
+    if (!is_writable($_dir)) {
+        http_response_code(500);
+        exit("ERROR: ไม่สามารถเขียนไฟล์ได้ที่ {$_dir} — ตรวจสอบ permission ของ cron/backups/ และ cron/logs/");
+    }
+}
 
 // ── ฟังก์ชัน log ──────────────────────────────────────────────────────────────
 function log_msg(string $msg, string $logFile): void {
@@ -61,7 +69,10 @@ log_msg("{$now} Starting backup: {$dbName}", $logFile);
 // ── ลองใช้ mysqldump (วิธีที่ดีที่สุด) ───────────────────────────────────────
 $success = false;
 
-if (function_exists('exec') && !in_array('exec', array_map('trim', explode(',', ini_get('disable_functions'))))) {
+$disabledFunctions = array_map('trim', explode(',', ini_get('disable_functions')));
+$execAvailable = function_exists('exec') && !in_array('exec', $disabledFunctions);
+
+if ($execAvailable && $dbUser !== '' && $dbName !== '') {
     $cmd = sprintf(
         'mysqldump --host=%s --port=%d --user=%s --password=%s --single-transaction --routines --triggers --add-drop-table %s 2>&1 | gzip > %s',
         escapeshellarg($dbHost),
@@ -78,8 +89,11 @@ if (function_exists('exec') && !in_array('exec', array_map('trim', explode(',', 
         log_msg("{$now} SUCCESS via mysqldump: " . basename($backupFile) . " ({$size} KB)", $logFile);
         $success = true;
     } else {
-        log_msg("{$now} mysqldump failed (code {$returnCode}), falling back to PHP export", $logFile);
+        $errDetail = implode(' | ', array_filter($output));
+        log_msg("{$now} mysqldump failed (code {$returnCode}): {$errDetail} — falling back to PHP export", $logFile);
     }
+} else {
+    log_msg("{$now} exec() ไม่พร้อมใช้งาน — ใช้ PHP export แทน", $logFile);
 }
 
 // ── Fallback: Pure PHP export ด้วย PDO ────────────────────────────────────────
@@ -117,6 +131,9 @@ if (!$success) {
 
         // บีบอัดและเขียนไฟล์
         $gz = gzopen($backupFile, 'wb9');
+        if ($gz === false) {
+            throw new RuntimeException("gzopen ล้มเหลว: ไม่สามารถเขียนไฟล์ {$backupFile}");
+        }
         gzwrite($gz, $sql);
         gzclose($gz);
 
@@ -125,9 +142,10 @@ if (!$success) {
         $success = true;
 
     } catch (Throwable $e) {
-        log_msg("{$now} ERROR: " . $e->getMessage(), $logFile);
+        $errMsg = $e->getMessage();
+        log_msg("{$now} ERROR: {$errMsg}", $logFile);
         http_response_code(500);
-        exit('Backup failed');
+        exit("Backup failed: {$errMsg}");
     }
 }
 
