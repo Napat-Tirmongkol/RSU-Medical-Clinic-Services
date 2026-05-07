@@ -19,6 +19,7 @@ $registryOnly = !empty($_SESSION['access_registry'])
     && empty($_SESSION['access_eborrow'])
     && empty($_SESSION['access_system_logs'])
     && empty($_SESSION['access_site_settings'])
+    && empty($_SESSION['access_edms'])
     && $adminRole !== 'superadmin';
 
 $activeSection = $_GET['section'] ?? 'dashboard';
@@ -880,6 +881,7 @@ try {
             $hasInsurance   = $isSuper || !empty($_SESSION['access_insurance']) || !empty($_SESSION['access_registry']);
             $hasSysLogs     = $isSuper || !empty($_SESSION['access_system_logs']);
             $hasSiteSet     = $isSuper || !empty($_SESSION['access_site_settings']);
+            $hasEdms        = $isSuper || !empty($_SESSION['access_edms']);
             ?>
 
             <?php /* ── OVERVIEW ───────────────────────────────────────────── */ ?>
@@ -946,6 +948,12 @@ try {
                     <div class="psb-icon"><i class="fa-solid fa-bullhorn" style="color:#7c3aed"></i></div>
                     <span class="psb-label" style="color:#6d28d9;font-weight:900">ประกาศ</span>
                 </button>
+                <?php if ($hasEdms): ?>
+                    <button class="psb-item <?= $activeSection==='edms'?'psb-active':'' ?>" data-section="edms" onclick="switchSection('edms',this)">
+                        <div class="psb-icon"><i class="fa-solid fa-folder-open" style="color:#0ea5e9"></i></div>
+                        <span class="psb-label" style="color:#0284c7;font-weight:900">สารบรรณอิเล็กทรอนิกส์</span>
+                    </button>
+                <?php endif; ?>
             <?php endif; ?>
 
             <?php /* ── ติดตามระบบ ──────────────────────────────────────── */ ?>
@@ -2257,6 +2265,14 @@ try {
                                                 </div>
                                                 <input type="checkbox" name="sett_access" id="govSettAccess" value="1" style="width:16px;height:16px" onclick="event.stopPropagation()">
                                             </div>
+                                            <!-- EDMS (สารบรรณอิเล็กทรอนิกส์) -->
+                                            <div onclick="document.getElementById('govEdmsAccess').click()" class="premium-role-card" style="border-radius:14px;border:1.5px solid #e2e8f0;background:#fff;cursor:pointer;padding:12px;transition:all 0.2s;display:flex;align-items:center;justify-content:space-between">
+                                                <div style="display:flex;align-items:center;gap:10px">
+                                                    <i class="fa-solid fa-folder-open text-sky-500"></i>
+                                                    <span style="font-weight:800;font-size:12px;color:#475569">สารบรรณอิเล็กทรอนิกส์ (EDMS)</span>
+                                                </div>
+                                                <input type="checkbox" name="edms_access" id="govEdmsAccess" value="1" style="width:16px;height:16px" onclick="event.stopPropagation()">
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -2489,6 +2505,18 @@ try {
             <div id="section-sentry_test" class="portal-section"
                 style="<?= $activeSection==='sentry_test'?'':'display:none;' ?> background:#f8fafc; overflow-y:auto;">
                 <?php include __DIR__ . '/_partials/sentry_test.php'; ?>
+            </div>
+
+            <!-- ════════════ SECTION: EDMS (สารบรรณอิเล็กทรอนิกส์) ════════════ -->
+            <div id="section-edms" class="portal-section"
+                style="<?= $activeSection==='edms'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); background:#f8fafc; overflow-y:auto;">
+                <?php
+                if ($adminRole === 'superadmin' || !empty($_SESSION['access_edms'])) {
+                    include __DIR__ . '/_partials/edms.php';
+                } else {
+                    echo '<div style="padding:100px;text-align:center;font-weight:900;color:#dc2626"><i class="fa-solid fa-shield-slash mb-4" style="font-size:4rem;display:block"></i> ACCESS DENIED<br><span style="font-size:14px;color:#94a3b8;font-weight:600">ต้องมีสิทธิ์ access_edms</span></div>';
+                }
+                ?>
             </div>
 
             <!-- ════════════ SECTION: LINE MESSAGING API ════════════ -->
@@ -3164,6 +3192,7 @@ try {
                         document.getElementById('govLogsAccess').checked = parseInt(data.access_system_logs) === 1;
                         document.getElementById('govSettAccess').checked = parseInt(data.access_site_settings) === 1;
                         document.getElementById('govRegAccess').checked = parseInt(data.access_registry) === 1;
+                        document.getElementById('govEdmsAccess').checked = parseInt(data.access_edms) === 1;
                     }
                 } else {
                     // Reset Extension Checkboxes for new records
@@ -3171,6 +3200,7 @@ try {
                     document.getElementById('govLogsAccess').checked = false;
                     document.getElementById('govSettAccess').checked = false;
                     document.getElementById('govRegAccess').checked = false;
+                    document.getElementById('govEdmsAccess').checked = false;
                 }
             // Update UI States
             syncGovUI('govEbAccess', 'govEbRole', 'govEbCard');
