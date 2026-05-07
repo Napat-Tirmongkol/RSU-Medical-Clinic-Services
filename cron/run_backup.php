@@ -12,10 +12,6 @@
  */
 declare(strict_types=1);
 
-// แสดง error จริงในหน้า (สำหรับ debug ผ่าน cron-job.org)
-ini_set('display_errors', '1');
-error_reporting(E_ALL);
-
 // ── เพิ่ม time limit และ memory เผื่อ DB ใหญ่ ─────────────────────────────────
 set_time_limit(0);
 ini_set('memory_limit', '512M');
