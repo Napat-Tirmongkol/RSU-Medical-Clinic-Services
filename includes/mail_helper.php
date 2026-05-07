@@ -28,7 +28,7 @@ function smtp_send(string $to, string $subject, string $htmlBody, array $cfg): b
     $pass    = $cfg['SMTP_PASS']       ?? '';
     $from    = $cfg['SMTP_FROM_EMAIL'] ?? $user;
     $name    = $cfg['SMTP_FROM_NAME']  ?? 'RSU Medical Clinic';
-    $timeout = 15;
+    $timeout = 3;
 
     // เลือก transport
     $useSsl = ($port === 465);

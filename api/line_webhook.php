@@ -443,6 +443,12 @@ foreach ($data['events'] as $idx => $event) {
             line_webhook_log('Clinic FAQ disabled, falling through to default reply', [
                 'line_user_id' => line_mask_uid($userId),
             ]);
+        } elseif ((int)$faqSettings['only_when_closed'] && get_clinic_current_status($pdo)['is_open_now']) {
+            // only_when_closed = 1 และคลินิกเปิดอยู่ → ไม่ตอบ FAQ (ตกไป default reply)
+            line_webhook_log('Clinic FAQ skipped (clinic is open, only_when_closed=1)', [
+                'line_user_id' => line_mask_uid($userId),
+                'intent_type'  => $intent['type'],
+            ]);
         } else {
             // เช็ค rate limit ก่อนตอบ — ป้องกัน spam
             $allowed = $userId

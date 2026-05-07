@@ -17,9 +17,6 @@ declare(strict_types=1);
 // ── Secret Token ──────────────────────────────────────────────────────────────
 define('REMINDER_SECRET_TOKEN', 'rsu_purge_a8f3k2m9x');
 
-// ── หน่วงเวลาระหว่างแต่ละอีเมล (วินาที) ───────────────────────────────────────
-define('REMINDER_DELAY_SECONDS', 3);
-
 // ── ตรวจสอบ token ─────────────────────────────────────────────────────────────
 $token = $_GET['token'] ?? $_SERVER['HTTP_X_CRON_TOKEN'] ?? '';
 if (!hash_equals(REMINDER_SECRET_TOKEN, $token)) {
@@ -39,12 +36,29 @@ $log    = [];
 $log[]  = '[' . date('Y-m-d H:i:s') . '] Appointment Reminder Job เริ่มทำงาน';
 $log[]  = 'ส่งสำหรับวันที่: ' . date('Y-m-d', strtotime('+1 day'));
 
+// ── ตรวจ SMTP config ก่อน — ถ้าไม่ครบให้ exit เร็ว (ไม่รอ php mail() ที่อาจ hang) ──
+$_smtpCfg = (require $projectRoot . '/config/secrets.php') ?: [];
+if (empty($_smtpCfg['SMTP_HOST']) || empty($_smtpCfg['SMTP_USER']) || empty($_smtpCfg['SMTP_PASS'])) {
+    $log[] = 'SMTP ยังไม่ได้ตั้งค่า (SMTP_HOST / SMTP_USER / SMTP_PASS ใน secrets.php) — หยุดการทำงาน';
+    echo implode("\n", $log) . "\n";
+    exit;
+}
+
 // ── Auto-migrate: เพิ่มคอลัมน์ reminder_sent_at ถ้ายังไม่มี ───────────────────
-try {
-    $pdo->exec("ALTER TABLE camp_bookings ADD COLUMN reminder_sent_at DATETIME NULL DEFAULT NULL");
-    $log[] = 'สร้างคอลัมน์ reminder_sent_at เรียบร้อย';
-} catch (PDOException) {
-    // คอลัมน์มีอยู่แล้ว — ข้ามได้
+// ตรวจก่อนด้วย INFORMATION_SCHEMA แทนที่จะ ALTER แล้ว catch — เพราะ ALTER บน
+// table ใหญ่อาจใช้เวลานานมากแม้แค่ "column มีอยู่แล้ว" บาง MySQL version
+$colExists = $pdo->prepare("
+    SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'camp_bookings' AND COLUMN_NAME = 'reminder_sent_at'
+");
+$colExists->execute();
+if ((int)$colExists->fetchColumn() === 0) {
+    try {
+        $pdo->exec("ALTER TABLE camp_bookings ADD COLUMN reminder_sent_at DATETIME NULL DEFAULT NULL");
+        $log[] = 'สร้างคอลัมน์ reminder_sent_at เรียบร้อย';
+    } catch (PDOException $e) {
+        $log[] = 'WARN: ALTER TABLE ไม่สำเร็จ — ' . $e->getMessage();
+    }
 }
 
 // ── ดึงรายการที่ต้องส่งแจ้งเตือน ──────────────────────────────────────────────
@@ -89,8 +103,15 @@ $markStmt = $pdo->prepare("
     UPDATE camp_bookings SET reminder_sent_at = NOW() WHERE id = :id
 ");
 
-// ── ส่งอีเมลทีละรายการ + delay ───────────────────────────────────────────────
+// หยุดส่งก่อนถึง cron-job.org timeout (25 วินาที) — รอบถัดไปส่งต่อได้เพราะ reminder_sent_at
+$deadline = time() + 55; // ตั้ง request timeout ใน cron-job.org เป็น 60 วินาที
+
+// ── ส่งอีเมลทีละรายการ ────────────────────────────────────────────────────────
 foreach ($bookings as $i => $row) {
+    if (time() >= $deadline) {
+        $log[] = "⚠ หยุดชั่วคราว (ใกล้ถึง time limit) — cron รอบถัดไปจะส่งที่เหลือต่อ";
+        break;
+    }
     $bookingId = (int)$row['booking_id'];
     $email     = $row['email'];
     $name      = $row['full_name'] ?? '';
@@ -119,10 +140,7 @@ foreach ($bookings as $i => $row) {
         $log[] = "  ✗ #{$bookingId} {$name} <{$email}> — ส่งล้มเหลว";
     }
 
-    // หน่วงเวลาระหว่างแต่ละเมล (ยกเว้นรายการสุดท้าย)
-    if ($i < $total - 1) {
-        sleep(REMINDER_DELAY_SECONDS);
-    }
+
 }
 
 // ── สรุปผล ────────────────────────────────────────────────────────────────────

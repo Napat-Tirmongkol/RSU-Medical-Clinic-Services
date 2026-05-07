@@ -99,6 +99,15 @@ $serviceTypes = ['ตรวจทั่วไป', 'วัคซีน', 'ตร
     .ds-doc-card:active { cursor: grabbing; transform: scale(.98); }
     .ds-doc-card.fc-event { background: transparent; border: none; padding: 0; } /* override fc default */
     .fc-highlight { background: #ecfeff !important; border: 2px dashed #06b6d4 !important; }
+
+    .ds-btn-import { background: #7c3aed; color: #fff; }
+    .ds-btn-import:hover { background: #6d28d9; }
+
+    /* Import modal — fix uncompiled Tailwind arbitrary-value classes */
+    #ds-import-modal           { z-index: 300; }
+    #ds-import-modal-box       { max-height: 90vh; }
+    #ds-import-step3           { min-height: 0; }
+    #ds-import-confirm-btn     { flex: 2 2 0%; }
 </style>
 
 <div class="max-w-[1400px] mx-auto px-4 py-6">
@@ -117,7 +126,7 @@ $serviceTypes = ['ตรวจทั่วไป', 'วัคซีน', 'ตร
         <button onclick="dsOpenAdd()" class="px-4 py-2 bg-cyan-600 text-white rounded-xl text-sm font-black hover:bg-cyan-700 transition-all flex items-center gap-2 shadow-sm">
             <i class="fa-solid fa-plus"></i>เพิ่ม shift
         </button>
-        <button onclick="dsOpenImport()" class="px-4 py-2 bg-violet-600 text-white rounded-xl text-sm font-black hover:bg-violet-700 transition-all flex items-center gap-2 shadow-sm" title="นำเข้าตารางจากรูปภาพด้วย AI">
+        <button onclick="dsOpenImport()" class="ds-btn-import px-4 py-2 rounded-xl text-sm font-black transition-all flex items-center gap-2 shadow-sm" title="นำเข้าตารางจากรูปภาพด้วย AI">
             <i class="fa-solid fa-camera"></i>นำเข้าจากรูป
         </button>
     </div>
@@ -198,6 +207,7 @@ $serviceTypes = ['ตรวจทั่วไป', 'วัคซีน', 'ตร
         </div>
         <form id="ds-form" onsubmit="dsSave(event)" class="p-6 space-y-4">
             <input type="hidden" name="id" id="ds-id">
+            <input type="hidden" id="ds-clicked-date">
 
             <div>
                 <label class="text-[10px] font-black uppercase tracking-widest text-slate-500 block mb-1.5">ประเภท *</label>
@@ -218,6 +228,11 @@ $serviceTypes = ['ตรวจทั่วไป', 'วัคซีน', 'ตร
                         <option value="<?= $i ?>"><?= $n ?></option>
                     <?php endforeach; ?>
                 </select>
+                <div class="mt-2">
+                    <label class="text-[10px] font-black uppercase tracking-widest text-slate-500 block mb-1.5">สิ้นสุดซ้ำ <span class="font-medium normal-case text-slate-400">(ว่าง = ไม่มีกำหนด)</span></label>
+                    <input type="date" name="recur_end_date" id="ds-recur-end"
+                        class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 outline-none">
+                </div>
             </div>
 
             <div id="ds-field-date" class="hidden">
@@ -285,11 +300,11 @@ $serviceTypes = ['ตรวจทั่วไป', 'วัคซีน', 'ตร
 </div>
 
 <!-- Import from Photo Modal -->
-<div id="ds-import-modal" class="hidden fixed inset-0 z-[300] items-center justify-center bg-black/40 p-4">
-    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col">
+<div id="ds-import-modal" class="hidden fixed inset-0 items-center justify-center bg-black/40 p-4">
+    <div id="ds-import-modal-box" class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl flex flex-col">
         <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between shrink-0">
             <h3 class="font-black text-slate-800 flex items-center gap-2">
-                <i class="fa-solid fa-camera text-violet-500"></i> นำเข้าตารางจากรูป (AI)
+                <i class="fa-solid fa-camera text-purple-500"></i> นำเข้าตารางจากรูป (AI)
             </h3>
             <button onclick="dsCloseImport()" class="text-slate-400 hover:text-slate-700"><i class="fa-solid fa-xmark"></i></button>
         </div>
@@ -297,7 +312,7 @@ $serviceTypes = ['ตรวจทั่วไป', 'วัคซีน', 'ตร
         <!-- Step 1: Upload dropzone -->
         <div id="ds-import-step1" class="p-6">
             <div id="ds-import-dropzone"
-                class="border-2 border-dashed border-slate-300 rounded-2xl p-12 text-center cursor-pointer hover:border-violet-400 hover:bg-violet-50 transition-all">
+                class="border-2 border-dashed border-slate-300 rounded-2xl p-12 text-center cursor-pointer hover:border-purple-400 hover:bg-purple-50 transition-all">
                 <i class="fa-solid fa-camera-retro text-4xl text-slate-300 mb-4 block"></i>
                 <p class="text-slate-700 font-bold text-sm">คลิกหรือลากรูปภาพมาวางที่นี่</p>
                 <p class="text-slate-400 text-xs mt-1">รองรับ JPEG, PNG, WEBP · สูงสุด 10MB</p>
@@ -308,8 +323,8 @@ $serviceTypes = ['ตรวจทั่วไป', 'วัคซีน', 'ตร
         <!-- Step 2: Processing indicator -->
         <div id="ds-import-step2" class="hidden p-10 text-center">
             <div class="flex flex-col items-center gap-4">
-                <div class="w-16 h-16 rounded-full bg-violet-50 flex items-center justify-center">
-                    <i class="fa-solid fa-robot text-violet-500 text-2xl animate-pulse"></i>
+                <div class="w-16 h-16 rounded-full bg-purple-50 flex items-center justify-center">
+                    <i class="fa-solid fa-robot text-purple-500 text-2xl animate-pulse"></i>
                 </div>
                 <p class="font-bold text-slate-700">AI กำลังวิเคราะห์รูปภาพ...</p>
                 <p class="text-sm text-slate-400">อาจใช้เวลา 5–15 วินาที</p>
@@ -317,11 +332,11 @@ $serviceTypes = ['ตรวจทั่วไป', 'วัคซีน', 'ตร
         </div>
 
         <!-- Step 3: Preview parsed shifts -->
-        <div id="ds-import-step3" class="hidden flex-col flex-1 min-h-0">
+        <div id="ds-import-step3" class="hidden flex-col flex-1">
             <div class="px-4 pt-4 pb-2 flex gap-4 shrink-0">
                 <img id="ds-import-thumb" src="" alt="" class="w-28 h-auto rounded-xl border border-slate-200 object-contain shrink-0">
                 <div class="flex-1 min-w-0">
-                    <p class="text-sm font-bold text-slate-700">พบ <span id="ds-import-count" class="text-violet-600">0</span> shift จากรูปภาพ</p>
+                    <p class="text-sm font-bold text-slate-700">พบ <span id="ds-import-count" class="text-purple-600">0</span> shift จากรูปภาพ</p>
                     <p class="text-xs text-slate-400 mt-1">ตรวจสอบและปรับแก้ข้อมูลก่อนนำเข้า · แถวที่ยังไม่จับคู่แพทย์จะถูกข้ามไป</p>
                 </div>
             </div>
@@ -345,7 +360,7 @@ $serviceTypes = ['ตรวจทั่วไป', 'วัคซีน', 'ตร
             <div class="px-4 py-3 flex gap-2 border-t border-slate-100 shrink-0">
                 <button onclick="dsCloseImport()" class="flex-1 px-4 py-2.5 bg-slate-100 text-slate-600 rounded-xl text-sm font-black hover:bg-slate-200 transition-all">ยกเลิก</button>
                 <button onclick="dsImportConfirm()" id="ds-import-confirm-btn"
-                    class="flex-[2] px-4 py-2.5 bg-violet-600 text-white rounded-xl text-sm font-black hover:bg-violet-700 transition-all shadow-sm">
+                    class="ds-btn-import px-4 py-2.5 rounded-xl text-sm font-black transition-all shadow-sm">
                     <i class="fa-solid fa-file-import"></i> นำเข้า shift ทั้งหมด
                 </button>
             </div>
@@ -393,12 +408,14 @@ function rowToEvent(row) {
     };
 
     if (row.type === 'regular') {
-        return Object.assign(base, {
+        const ev = {
             daysOfWeek: [Number(row.weekday)],
             startTime: row.start_time,
             endTime:   row.end_time,
             startRecur: '2024-01-01',
-        });
+        };
+        if (row.recur_end_date) ev.endRecur = row.recur_end_date;
+        return Object.assign(base, ev);
     }
     if (row.type === 'off') {
         return Object.assign(base, {
@@ -431,16 +448,24 @@ function dsToggleType() {
     document.querySelector('[name=specific_date]').required = (t !== 'regular');
 }
 
+function dsDefaultRecurEnd() {
+    const d = new Date();
+    d.setMonth(d.getMonth() + 1);
+    return d.toISOString().substring(0, 10);
+}
+
 function dsOpenAdd(prefill = {}) {
     document.getElementById('ds-modal-title').textContent = 'เพิ่ม shift';
     document.getElementById('ds-id').value = '';
     document.getElementById('ds-delete-btn').classList.add('hidden');
     document.getElementById('ds-form').reset();
     document.querySelector('[name=type][value=regular]').checked = true;
+    document.getElementById('ds-recur-end').value = dsDefaultRecurEnd();
     if (prefill.weekday !== undefined) document.querySelector('[name=weekday]').value = prefill.weekday;
     if (prefill.date) {
         document.querySelector('[name=type][value=override]').checked = true;
         document.querySelector('[name=specific_date]').value = prefill.date;
+        document.getElementById('ds-recur-end').value = '';
     }
     if (prefill.time) document.querySelector('[name=start_time]').value = prefill.time;
     dsToggleType();
@@ -448,9 +473,10 @@ function dsOpenAdd(prefill = {}) {
     document.getElementById('ds-modal').classList.add('flex');
 }
 
-function dsOpenEdit(row) {
+function dsOpenEdit(row, clickedDate = null) {
     document.getElementById('ds-modal-title').textContent = 'แก้ shift #' + row.id;
     document.getElementById('ds-id').value = row.id;
+    document.getElementById('ds-clicked-date').value = (row.type === 'regular' && clickedDate) ? dsLocalDate(clickedDate) : '';
     document.getElementById('ds-delete-btn').classList.remove('hidden');
     document.querySelector(`[name=type][value=${row.type}]`).checked = true;
     document.querySelector('[name=weekday]').value = row.weekday ?? 0;
@@ -461,6 +487,7 @@ function dsOpenEdit(row) {
     document.querySelector('[name=room_id]').value = row.room_id ?? '';
     document.querySelector('[name=service_type]').value = row.service_type ?? '';
     document.querySelector('[name=notes]').value = row.notes ?? '';
+    document.getElementById('ds-recur-end').value = row.recur_end_date ?? '';
     dsToggleType();
     document.getElementById('ds-modal').classList.remove('hidden');
     document.getElementById('ds-modal').classList.add('flex');
@@ -489,6 +516,77 @@ async function dsSave(e) {
 async function dsDelete() {
     const id = document.getElementById('ds-id').value;
     if (!id) return;
+    const row = dsRows.find(r => +r.id === +id);
+    const clickedDate = document.getElementById('ds-clicked-date').value;
+
+    if (row && row.type === 'regular' && clickedDate) {
+        // Recurring delete dialog — 3 options like Google Calendar
+        const result = await Swal.fire({
+            title: 'ลบกิจกรรมที่เกิดซ้ำ',
+            input: 'radio',
+            inputOptions: {
+                'this':              'กิจกรรมนี้',
+                'this_and_following':'กิจกรรมนี้และกิจกรรมที่ตามมาทั้งหมด',
+                'all':              'กิจกรรมทั้งหมด',
+            },
+            inputValue: 'this',
+            showCancelButton: true,
+            confirmButtonText: 'ตกลง',
+            cancelButtonText: 'ยกเลิก',
+            confirmButtonColor: '#0ea5e9',
+            didOpen: () => {
+                // style radio options ให้ขึ้นบรรทัดใหม่แต่ละตัว
+                document.querySelectorAll('.swal2-radio label').forEach(el => {
+                    el.style.display = 'flex';
+                    el.style.alignItems = 'center';
+                    el.style.gap = '10px';
+                    el.style.padding = '6px 0';
+                    el.style.fontSize = '15px';
+                });
+            },
+        });
+        if (!result.isConfirmed) return;
+
+        if (result.value === 'this') {
+            // สร้าง 'off' override วันนั้น → ซ่อนแค่ occurrence เดียว
+            const res = await dsPost('add', {
+                type: 'off',
+                specific_date: clickedDate,
+                staff_id: row.staff_id,
+            });
+            if (res.ok) { showPortalToast('ข้ามกิจกรรมวันที่ ' + clickedDate + ' แล้ว', 'success'); dsCloseModal(); dsLoadAndRender(); }
+            else Swal.fire('Error', res.message || 'ไม่สำเร็จ', 'error');
+
+        } else if (result.value === 'this_and_following') {
+            // ตั้ง recur_end_date เป็นวันก่อนหน้า clickedDate
+            const prev = new Date(clickedDate);
+            prev.setDate(prev.getDate() - 1);
+            const endDate = dsLocalDate(prev);
+            const res = await dsPost('update', {
+                id,
+                type: 'regular',
+                weekday: row.weekday,
+                recur_end_date: endDate,
+                start_time: (row.start_time || '').substring(0, 5),
+                end_time:   (row.end_time   || '').substring(0, 5),
+                staff_id: row.staff_id,
+                room_id: row.room_id || '',
+                service_type: row.service_type || '',
+                notes: row.notes || '',
+            });
+            if (res.ok) { showPortalToast('ลบกิจกรรมที่ตามมาทั้งหมดแล้ว', 'success'); dsCloseModal(); dsLoadAndRender(); }
+            else Swal.fire('Error', res.message || 'ไม่สำเร็จ', 'error');
+
+        } else {
+            // ลบทั้งหมด
+            const res = await dsPost('delete', {id});
+            if (res.ok) { showPortalToast('ลบ shift ทั้งหมดแล้ว', 'success'); dsCloseModal(); dsLoadAndRender(); }
+            else Swal.fire('Error', res.message || 'ไม่สำเร็จ', 'error');
+        }
+        return;
+    }
+
+    // Non-recurring
     const c = await Swal.fire({title:'ลบ shift นี้?', icon:'warning', showCancelButton:true, confirmButtonColor:'#e11d48'});
     if (!c.isConfirmed) return;
     const res = await dsPost('delete', {id});
@@ -584,7 +682,7 @@ function dsRenderImportTable() {
                 <div class="mt-0.5">${badge}</div>
             </td>
             <td class="px-3 py-2">
-                <select class="ds-imp-sel w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:border-violet-400" data-idx="${idx}">
+                <select class="ds-imp-sel w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:border-purple-400" data-idx="${idx}">
                     <option value="">— ไม่ระบุ (ข้าม) —</option>
                     ${opts}
                 </select>
@@ -689,7 +787,7 @@ document.addEventListener('DOMContentLoaded', () => {
         selectable: true,
         eventClick: (info) => {
             const row = dsRows.find(r => +r.id === +info.event.id);
-            if (row) dsOpenEdit(row);
+            if (row) dsOpenEdit(row, info.event.start);
         },
         dateClick: (info) => {
             // Clicking on empty slot opens add modal pre-filled with date+time
@@ -800,14 +898,14 @@ document.addEventListener('DOMContentLoaded', () => {
         importDropzone.addEventListener('click', () => importFile && importFile.click());
         importDropzone.addEventListener('dragover', e => {
             e.preventDefault();
-            importDropzone.classList.add('border-violet-400', 'bg-violet-50');
+            importDropzone.classList.add('border-purple-400', 'bg-purple-50');
         });
         importDropzone.addEventListener('dragleave', () => {
-            importDropzone.classList.remove('border-violet-400', 'bg-violet-50');
+            importDropzone.classList.remove('border-purple-400', 'bg-purple-50');
         });
         importDropzone.addEventListener('drop', e => {
             e.preventDefault();
-            importDropzone.classList.remove('border-violet-400', 'bg-violet-50');
+            importDropzone.classList.remove('border-purple-400', 'bg-purple-50');
             const file = e.dataTransfer?.files?.[0];
             if (file) dsImportUpload(file);
         });

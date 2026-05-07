@@ -98,32 +98,63 @@ foreach ($regular as $r) {
         </div>
 
         <!-- Holidays / special dates -->
-        <div class="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-            <div class="px-6 py-4 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
+        <div class="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+            <div class="px-6 py-4 bg-slate-50 border-b border-slate-100 flex justify-between items-center shrink-0">
                 <h3 class="text-sm font-black text-slate-700 uppercase tracking-wider"><i class="fa-solid fa-calendar-xmark text-rose-500 mr-2"></i>วันหยุดพิเศษ</h3>
                 <div class="flex items-center gap-3">
                     <button onclick="hrFetchThai()" type="button"
-                        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-100 text-[11px] font-black hover:bg-emerald-100 transition-all">
-                        <i class="fa-solid fa-flag text-[10px]"></i> ดึงวันหยุดไทย
+                        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-100 text-xs font-black hover:bg-emerald-100 transition-all">
+                        <i class="fa-solid fa-flag"></i> ดึงวันหยุดไทย
                     </button>
-                    <span class="text-[10px] font-bold text-slate-400"><?= count($holidays) ?> รายการที่จะถึง</span>
                 </div>
             </div>
-            <div class="p-5">
-                <form id="hr-add-hol" onsubmit="hrAdd(event,'holiday')" class="grid grid-cols-2 md:grid-cols-5 gap-2 mb-4 pb-4 border-b border-slate-100">
-                    <input type="hidden" name="type" value="holiday">
-                    <input type="hidden" name="is_closed" value="1">
-                    <input type="date" name="specific_date" required min="<?= $today ?>" class="px-2 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-800 outline-none">
-                    <input type="text" name="note" placeholder="ชื่อวันหยุด เช่น สงกรานต์" required class="md:col-span-3 px-2 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-800 outline-none">
-                    <button type="submit" class="px-3 py-2 bg-rose-500 text-white rounded-lg text-xs font-black hover:bg-rose-600 flex items-center justify-center gap-1.5">
-                        <i class="fa-solid fa-plus"></i>เพิ่ม
-                    </button>
-                </form>
 
+            <!-- Drag-select calendar -->
+            <div class="p-4 border-b border-slate-100 shrink-0">
+                <!-- Month navigation -->
+                <div class="flex items-center justify-between mb-3">
+                    <button onclick="hrCalNav(-1)" class="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 font-black text-sm transition-all flex items-center justify-center">‹</button>
+                    <span id="hr-cal-title" class="text-sm font-black text-slate-700"></span>
+                    <button onclick="hrCalNav(1)"  class="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 font-black text-sm transition-all flex items-center justify-center">›</button>
+                </div>
+                <!-- Day-of-week header -->
+                <div id="hr-cal-dow" class="hr-cal-grid mb-1">
+                    <?php foreach (['อา','จ','อ','พ','พฤ','ศ','ส'] as $d): ?>
+                    <div class="text-center text-[10px] font-black text-slate-400 py-1"><?= $d ?></div>
+                    <?php endforeach; ?>
+                </div>
+                <!-- Day cells (rendered by JS) -->
+                <div id="hr-cal-grid" class="hr-cal-grid select-none"></div>
+
+                <!-- Legend -->
+                <div class="flex items-center gap-3 mt-2.5 text-[10px] font-bold text-slate-500">
+                    <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-rose-100 border border-rose-300 inline-block"></span>วันหยุดที่มีอยู่</span>
+                    <span class="flex items-center gap-1"><span class="hr-legend-sel w-3 h-3 rounded inline-block"></span>เลือกอยู่</span>
+                    <span id="hr-cal-sel-count" class="ml-auto font-black text-slate-600"></span>
+                </div>
+
+                <!-- Name + Add row -->
+                <div class="mt-3 flex gap-2">
+                    <input id="hr-cal-name" type="text" placeholder="ชื่อวันหยุด เช่น สงกรานต์"
+                        class="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:border-rose-400">
+                    <button onclick="hrCalAdd()" id="hr-cal-add-btn"
+                        class="hr-btn-add px-4 py-2 rounded-xl text-xs font-black transition-all shadow-sm flex items-center gap-1.5 shrink-0 disabled:opacity-40">
+                        <i class="fa-solid fa-plus"></i><span id="hr-cal-add-label">เพิ่ม</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Upcoming holidays list (scrollable) -->
+            <div class="overflow-y-auto" style="max-height:320px;">
                 <?php if (empty($holidays)): ?>
                     <p class="py-8 text-center text-xs font-bold text-slate-300 italic">ยังไม่มีวันหยุดที่จะถึง</p>
-                <?php else: foreach ($holidays as $h): ?>
-                    <div class="flex items-center justify-between py-2.5 border-b border-slate-50 last:border-0"
+                <?php else: ?>
+                    <div class="px-2 py-1.5 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+                        <span class="text-[10px] font-black text-slate-500 uppercase tracking-widest">วันหยุดที่จะถึง</span>
+                        <span class="text-[10px] font-bold text-slate-400"><?= count($holidays) ?> รายการ</span>
+                    </div>
+                <?php foreach ($holidays as $h): ?>
+                    <div class="flex items-center justify-between px-4 py-2.5 border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors"
                         data-id="<?= (int)$h['id'] ?>"
                         data-type="holiday"
                         data-date="<?= htmlspecialchars((string)$h['specific_date'], ENT_QUOTES) ?>"
@@ -137,12 +168,11 @@ foreach ($regular as $r) {
                             </div>
                             <div class="min-w-0">
                                 <p class="text-sm font-black text-slate-800 truncate"><?= htmlspecialchars($h['note'] ?: '—') ?></p>
-                                <p class="text-[10px] font-bold text-slate-400">
+                                <p class="text-xs font-bold text-slate-400">
                                     <?= date('d M Y', strtotime($h['specific_date'])) ?>
                                     <?php if (!$h['is_closed']): ?>
                                         · <?= substr($h['open_time'],0,5) ?>–<?= substr($h['close_time'],0,5) ?>
-                                    <?php else: ?> · ปิดทั้งวัน
-                                    <?php endif; ?>
+                                    <?php else: ?> · ปิดทั้งวัน<?php endif; ?>
                                 </p>
                             </div>
                         </div>
@@ -156,6 +186,28 @@ foreach ($regular as $r) {
         </div>
     </div>
 </div>
+
+<style>
+    .hr-cal-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:2px; }
+    .hr-cal-day {
+        aspect-ratio:1; display:flex; align-items:center; justify-content:center;
+        border-radius:.45rem; font-size:.72rem; font-weight:700; color:#475569;
+        cursor:pointer; transition:background .1s, color .1s; user-select:none;
+    }
+    .hr-cal-day:hover:not(.hr-cal-past):not(.hr-cal-empty)  { background:#f1f5f9; }
+    .hr-cal-empty   { cursor:default; }
+    .hr-cal-past    { opacity:.35; cursor:not-allowed; }
+    .hr-cal-today   { outline:2px solid #f59e0b; outline-offset:-2px; font-weight:900; color:#92400e; }
+    .hr-cal-holiday { background:#ffe4e6; color:#be123c; font-weight:900; }
+    .hr-cal-holiday:hover:not(.hr-cal-past) { background:#fecdd3; }
+    .hr-cal-selected             { background:#0ea5e9; color:#fff !important; font-weight:900; }
+    .hr-cal-selected.hr-cal-holiday { background:#7c3aed; color:#fff !important; }
+    .hr-cal-selected:hover:not(.hr-cal-past) { background:#0284c7; }
+    .hr-legend-sel  { background:#0ea5e9; }
+    .hr-btn-add     { background:#e11d48; color:#fff; }
+    .hr-btn-add:hover:not(:disabled) { background:#be123c; }
+    .hr-btn-add:disabled { pointer-events:none; }
+</style>
 
 <script>
 // Reload while explicitly preserving section + cd_view (sidebar nav can
@@ -324,6 +376,173 @@ async function hrEdit(id) {
     }
 }
 
+// ── Drag-select holiday calendar ─────────────────────────────────────────────
+const HR_EXISTING = new Set(<?= json_encode(array_column($holidays, 'specific_date')) ?>);
+const HR_MONTH_TH = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน',
+    'กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+
+let hrCalY   = new Date().getFullYear();
+let hrCalM   = new Date().getMonth();
+let hrCalSel = new Set();   // selected dates (YYYY-MM-DD)
+let hrCalDragging  = false;
+let hrCalDragMode  = 'select'; // 'select' | 'deselect'
+let hrCalDragAnchor = null;
+
+function hrCalPad(n) { return String(n).padStart(2,'0'); }
+function hrCalDateStr(y, m, d) { return `${y}-${hrCalPad(m+1)}-${hrCalPad(d)}`; }
+const hrToday = new Date().toISOString().slice(0,10);
+
+function hrCalRender() {
+    const title = document.getElementById('hr-cal-title');
+    const grid  = document.getElementById('hr-cal-grid');
+    if (!title || !grid) return;
+
+    title.textContent = HR_MONTH_TH[hrCalM] + ' ' + (hrCalY + 543);
+
+    const firstDow   = new Date(hrCalY, hrCalM, 1).getDay();
+    const daysInMonth = new Date(hrCalY, hrCalM + 1, 0).getDate();
+
+    grid.innerHTML = '';
+
+    for (let i = 0; i < firstDow; i++) {
+        const blank = document.createElement('div');
+        blank.className = 'hr-cal-day hr-cal-empty';
+        grid.appendChild(blank);
+    }
+
+    for (let d = 1; d <= daysInMonth; d++) {
+        const ds   = hrCalDateStr(hrCalY, hrCalM, d);
+        const cell = document.createElement('div');
+        cell.className  = 'hr-cal-day';
+        cell.dataset.date = ds;
+        cell.textContent = d;
+
+        if (ds < hrToday)         cell.classList.add('hr-cal-past');
+        if (ds === hrToday)       cell.classList.add('hr-cal-today');
+        if (HR_EXISTING.has(ds))  cell.classList.add('hr-cal-holiday');
+        if (hrCalSel.has(ds))     cell.classList.add('hr-cal-selected');
+
+        if (ds >= hrToday) {
+            cell.addEventListener('mousedown',  hrCalDown);
+            cell.addEventListener('mouseenter', hrCalEnter);
+            cell.addEventListener('touchstart', hrCalTouchStart, { passive: true });
+            cell.addEventListener('touchmove',  hrCalTouchMove,  { passive: true });
+        }
+        grid.appendChild(cell);
+    }
+
+    hrCalUpdateCount();
+}
+
+function hrCalApplyRange(a, b) {
+    const [from, to] = a <= b ? [a, b] : [b, a];
+    const cur = new Date(from + 'T00:00:00');
+    const end = new Date(to   + 'T00:00:00');
+    while (cur <= end) {
+        const ds = cur.toISOString().slice(0,10);
+        if (ds >= hrToday) {
+            hrCalDragMode === 'select' ? hrCalSel.add(ds) : hrCalSel.delete(ds);
+        }
+        cur.setDate(cur.getDate() + 1);
+    }
+    hrCalRender();
+}
+
+function hrCalDown(e) {
+    e.preventDefault();
+    hrCalDragging   = true;
+    hrCalDragAnchor = e.currentTarget.dataset.date;
+    hrCalDragMode   = hrCalSel.has(hrCalDragAnchor) ? 'deselect' : 'select';
+    hrCalApplyRange(hrCalDragAnchor, hrCalDragAnchor);
+}
+function hrCalEnter(e) {
+    if (!hrCalDragging) return;
+    hrCalApplyRange(hrCalDragAnchor, e.currentTarget.dataset.date);
+}
+
+// Touch support
+let hrTouchAnchorDate = null;
+function hrCalTouchStart(e) {
+    const ds = e.currentTarget.dataset.date;
+    hrCalDragging   = true;
+    hrCalDragAnchor = ds;
+    hrTouchAnchorDate = ds;
+    hrCalDragMode   = hrCalSel.has(ds) ? 'deselect' : 'select';
+    hrCalApplyRange(ds, ds);
+}
+function hrCalTouchMove(e) {
+    if (!hrCalDragging) return;
+    const touch = e.touches[0];
+    const el = document.elementFromPoint(touch.clientX, touch.clientY);
+    if (el?.dataset?.date) hrCalApplyRange(hrCalDragAnchor, el.dataset.date);
+}
+
+document.addEventListener('mouseup',   () => { hrCalDragging = false; });
+document.addEventListener('touchend',  () => { hrCalDragging = false; });
+
+function hrCalNav(dir) {
+    hrCalM += dir;
+    if (hrCalM > 11) { hrCalM = 0;  hrCalY++; }
+    if (hrCalM < 0)  { hrCalM = 11; hrCalY--; }
+    hrCalRender();
+}
+
+function hrCalUpdateCount() {
+    const n   = hrCalSel.size;
+    const cnt = document.getElementById('hr-cal-sel-count');
+    const btn = document.getElementById('hr-cal-add-btn');
+    const lbl = document.getElementById('hr-cal-add-label');
+    if (cnt) cnt.textContent = n > 0 ? `เลือก ${n} วัน` : '';
+    if (lbl) lbl.textContent = n > 1 ? `เพิ่ม ${n} วัน` : 'เพิ่ม';
+    if (btn) btn.disabled = n === 0;
+}
+
+async function hrCalAdd() {
+    const dates = [...hrCalSel].sort();
+    if (!dates.length) return;
+    const name = document.getElementById('hr-cal-name')?.value.trim();
+    if (!name) {
+        const input = document.getElementById('hr-cal-name');
+        if (input) { input.focus(); input.style.borderColor = '#e11d48'; setTimeout(() => input.style.borderColor = '', 1500); }
+        showPortalToast('กรุณาระบุชื่อวันหยุดก่อน', 'error');
+        return;
+    }
+
+    const fd = new FormData();
+    fd.append('entity', 'hours');
+    fd.append('action', 'add_bulk');
+    fd.append('csrf_token', portal_CSRF);
+    fd.append('note', name);
+    dates.forEach(d => fd.append('dates[]', d));
+
+    const btn = document.getElementById('hr-cal-add-btn');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>'; }
+
+    try {
+        const res  = await fetch('ajax_clinic_master.php', { method: 'POST', body: fd });
+        const data = await res.json();
+        if (data.ok) {
+            showPortalToast(data.message, 'success');
+            // Add to local existing set and clear selection
+            dates.forEach(d => HR_EXISTING.add(d));
+            hrCalSel.clear();
+            document.getElementById('hr-cal-name').value = '';
+            hrCalRender();
+            // Refresh the list section after short delay
+            setTimeout(() => cdReload('hours'), 800);
+        } else {
+            Swal.fire('Error', data.message || 'เพิ่มไม่สำเร็จ', 'error');
+        }
+    } finally {
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-plus"></i><span id="hr-cal-add-label">เพิ่ม</span>'; }
+        hrCalUpdateCount();
+    }
+}
+
+// Init calendar on load
+document.addEventListener('DOMContentLoaded', () => { hrCalRender(); hrCalUpdateCount(); });
+
+// ── Thai Public Holidays ──────────────────────────────────────────────────────
 async function hrFetchThai() {
     const thisYear = new Date().getFullYear();
     const yearOpts = [thisYear, thisYear+1, thisYear+2]
