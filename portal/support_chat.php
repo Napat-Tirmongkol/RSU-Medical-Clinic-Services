@@ -17,6 +17,7 @@ $pdo = db();
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="stylesheet" href="../assets/css/tailwind.min.css">
     <link rel="stylesheet" href="../assets/css/portal.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -422,28 +423,32 @@ $pdo = db();
         .chat-form {
             display: flex;
             gap: 14px;
-            align-items: center;
+            align-items: flex-end;
         }
-        .chat-form input {
+        .chat-form textarea {
             flex: 1;
-            height: 56px;
+            min-height: 56px;
+            max-height: 200px;
             background: #F8FAFC;
             border: 1.5px solid #E2E8F0;
             border-radius: 20px;
-            padding: 0 24px;
+            padding: 16px 24px;
             font-size: 14px;
             font-weight: 600;
             font-family: inherit;
             color: #334155;
             outline: none;
-            transition: all 0.2s;
+            transition: border-color .2s, background .2s, box-shadow .2s;
+            resize: none;
+            line-height: 1.5;
+            overflow-y: auto;
         }
-        .chat-form input:focus {
+        .chat-form textarea:focus {
             background: #fff;
             border-color: #93C5FD;
             box-shadow: 0 0 0 4px rgba(37,99,235,0.08);
         }
-        .chat-form input::placeholder { color: #CBD5E1; }
+        .chat-form textarea::placeholder { color: #CBD5E1; }
         .send-btn {
             width: 56px;
             height: 56px;
@@ -462,6 +467,40 @@ $pdo = db();
         }
         .send-btn:hover { transform: scale(1.05); box-shadow: 0 12px 32px rgba(37,99,235,0.4); }
         .send-btn:active { transform: scale(0.95); }
+
+        /* Quick reply chips above the input */
+        .quick-replies {
+            display: flex; flex-wrap: wrap; gap: 6px;
+            padding: 10px 28px 0; background: #fff;
+        }
+        .quick-replies-label {
+            font-size: 9px; font-weight: 900; color: #94A3B8;
+            text-transform: uppercase; letter-spacing: .14em;
+            display: inline-flex; align-items: center; gap: 4px;
+            margin-right: 4px;
+        }
+        .qr-chip {
+            padding: 5px 11px;
+            background: #F1F5F9;
+            color: #475569;
+            border: 1px solid #E2E8F0;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 700;
+            font-family: inherit;
+            cursor: pointer;
+            transition: background .15s, color .15s, border-color .15s, transform .1s;
+            white-space: nowrap;
+            max-width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .qr-chip:hover {
+            background: #DBEAFE;
+            color: #1D4ED8;
+            border-color: #BFDBFE;
+        }
+        .qr-chip:active { transform: scale(.96); }
     </style>
 </head>
 <body>
@@ -534,11 +573,16 @@ $pdo = db();
                     <!-- Messages -->
                     <div class="messages-container" id="messages-container"></div>
 
+                    <!-- Quick reply chips -->
+                    <div class="quick-replies" id="quick-replies">
+                        <span class="quick-replies-label"><i class="fa-solid fa-bolt"></i> ตอบด่วน</span>
+                    </div>
+
                     <!-- Input -->
                     <div class="chat-input-bar">
                         <form class="chat-form" id="chat-form" onsubmit="handleStaffSubmit(event)">
-                            <input type="text" id="chat-input" placeholder="พิมพ์ข้อความตอบกลับ...">
-                            <button type="submit" class="send-btn">
+                            <textarea id="chat-input" rows="1" placeholder="พิมพ์ข้อความตอบกลับ... (Enter ส่ง · Shift+Enter ขึ้นบรรทัดใหม่)"></textarea>
+                            <button type="submit" class="send-btn" title="ส่งข้อความ (Enter)">
                                 <i class="fa-solid fa-paper-plane"></i>
                             </button>
                         </form>
@@ -554,9 +598,24 @@ $pdo = db();
         let allUsers = [];
         // Cursor (highest message id already rendered) per conversation — drives since_id polling
         const lastMsgIdByUser = Object.create(null);
+        // Per-conversation drafts so switching tabs doesn't lose unsent text
+        const drafts = Object.create(null);
         // Sidebar pagination state
         let currentPage = 1, totalPages = 1, currentSearch = '';
         let searchDebounceTimer = null;
+        // Title flash bookkeeping
+        let prevTotalUnread = 0;
+        const BASE_TITLE = 'Support Chat - Central HUB';
+
+        // Quick-reply templates (chips). Edit list to taste — admin UI can be added later.
+        const QUICK_REPLIES = [
+            'สวัสดีครับ มีอะไรให้เราช่วยไหมครับ',
+            'ขอบคุณที่ติดต่อเข้ามา จะรีบดำเนินการให้ครับ',
+            'รบกวนรอสักครู่ กำลังตรวจสอบให้ครับ',
+            'ขออภัยในความไม่สะดวกครับ',
+            'รับทราบแล้วครับ',
+            'หากมีคำถามเพิ่มเติม สามารถสอบถามได้ตลอดครับ',
+        ];
 
         // ── Safe HTML escape helper ──
         function esc(str) {
@@ -649,6 +708,11 @@ $pdo = db();
         function selectUser(id) {
             const u = allUsers.find(x => x.id == id);
             if (!u) return;
+
+            // Save current draft before switching away
+            const input = document.getElementById('chat-input');
+            if (currentUserId !== null) drafts[currentUserId] = input.value;
+
             currentUserId = id;
             // Force a full reload of this conversation's history
             lastMsgIdByUser[id] = 0;
@@ -660,8 +724,66 @@ $pdo = db();
             const fallback = 'https://ui-avatars.com/api/?name=' + encodeURIComponent(u.full_name) + '&background=EFF6FF&color=2563EB&bold=true';
             imgEl.src = u.picture_url || fallback;
             imgEl.onerror = () => { imgEl.src = fallback; };
+
+            // Restore the draft for this conversation (if any)
+            input.value = drafts[id] || '';
+            autoGrowInput(input);
+            input.focus();
+
             renderUserList(allUsers);
             loadMessages();
+        }
+
+        function autoGrowInput(el) {
+            el.style.height = 'auto';
+            el.style.height = Math.min(el.scrollHeight, 200) + 'px';
+        }
+
+        function renderQuickReplies() {
+            const host = document.getElementById('quick-replies');
+            if (!host) return;
+            const labelHtml = '<span class="quick-replies-label"><i class="fa-solid fa-bolt"></i> ตอบด่วน</span>';
+            const chipsHtml = QUICK_REPLIES.map((text, i) =>
+                `<button type="button" class="qr-chip" data-idx="${i}" title="${esc(text)}">${esc(text.length > 28 ? text.slice(0, 28) + '…' : text)}</button>`
+            ).join('');
+            host.innerHTML = labelHtml + chipsHtml;
+            host.querySelectorAll('.qr-chip').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const idx = parseInt(btn.dataset.idx, 10);
+                    insertQuickReply(QUICK_REPLIES[idx] || '');
+                });
+            });
+        }
+
+        function insertQuickReply(text) {
+            if (!text) return;
+            const t = document.getElementById('chat-input');
+            const start = t.selectionStart ?? t.value.length;
+            const end   = t.selectionEnd   ?? t.value.length;
+            const before = t.value.slice(0, start);
+            const after  = t.value.slice(end);
+            const sep = before && !before.endsWith('\n') && !before.endsWith(' ') ? ' ' : '';
+            t.value = before + sep + text + after;
+            const pos = before.length + sep.length + text.length;
+            t.setSelectionRange(pos, pos);
+            autoGrowInput(t);
+            t.focus();
+            if (currentUserId !== null) drafts[currentUserId] = t.value;
+        }
+
+        function updateUnreadTitle() {
+            const total = allUsers.reduce((sum, u) => sum + (parseInt(u.unread_count, 10) || 0), 0);
+            document.title = total > 0 ? `(${total}) ${BASE_TITLE}` : BASE_TITLE;
+            // Browser notification — only fire on a new bump (avoid noise on every poll)
+            if (total > prevTotalUnread && 'Notification' in window && Notification.permission === 'granted') {
+                try {
+                    new Notification('ข้อความใหม่ในระบบ Support Chat', {
+                        body: `มีข้อความที่ยังไม่ได้ตอบทั้งหมด ${total} รายการ`,
+                        tag: 'support-chat-unread',
+                    });
+                } catch (e) { /* ignore */ }
+            }
+            prevTotalUnread = total;
         }
 
         async function loadUsers() {
@@ -693,6 +815,7 @@ $pdo = db();
                     } else {
                         renderUserList(allUsers);
                     }
+                    updateUnreadTitle();
                 } else {
                     console.warn('API error:', data.error);
                     document.getElementById('user-list-container').innerHTML =
@@ -764,6 +887,9 @@ $pdo = db();
             formData.append('message', message);
             formData.append('csrf_token', portal_CSRF);
 
+            // Optimistic clear so admin can keep typing; we'll restore on failure
+            input.disabled = true;
+
             try {
                 const res = await fetch('ajax_support_chat.php?action=send_reply', {
                     method: 'POST',
@@ -777,12 +903,43 @@ $pdo = db();
                 }
                 if (data.success) {
                     input.value = '';
+                    if (currentUserId !== null) drafts[currentUserId] = '';
+                    autoGrowInput(input);
                     loadMessages();
+                } else {
+                    Swal.fire({ icon: 'error', title: 'ส่งข้อความไม่สำเร็จ', text: data.error || 'กรุณาลองใหม่' });
                 }
-            } catch(e) {
-                console.error('sendReply error:', e);
+            } catch(err) {
+                console.error('sendReply error:', err);
+                Swal.fire({ icon: 'error', title: 'เครือข่ายขัดข้อง', text: 'ส่งข้อความไม่สำเร็จ — กรุณาลองใหม่' });
+            } finally {
+                input.disabled = false;
+                input.focus();
             }
         }
+
+        // Wire up the textarea: Enter sends, Shift+Enter newline, autogrow, draft on every keystroke
+        document.addEventListener('DOMContentLoaded', () => {
+            const input = document.getElementById('chat-input');
+            if (input) {
+                input.addEventListener('keydown', e => {
+                    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+                        e.preventDefault();
+                        document.getElementById('chat-form').requestSubmit();
+                    }
+                });
+                input.addEventListener('input', () => {
+                    autoGrowInput(input);
+                    if (currentUserId !== null) drafts[currentUserId] = input.value;
+                });
+            }
+            renderQuickReplies();
+
+            // Ask for browser notification permission once (silent if denied)
+            if ('Notification' in window && Notification.permission === 'default') {
+                try { Notification.requestPermission(); } catch (e) { /* ignore */ }
+            }
+        });
 
         // Initial Load
         loadUsers();
