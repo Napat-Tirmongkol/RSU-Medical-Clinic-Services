@@ -568,6 +568,100 @@ $pdo = db();
             color: #B45309; margin-bottom: 4px;
             letter-spacing: .04em; text-transform: uppercase;
         }
+
+        /* Customer profile drawer (right side) */
+        .profile-drawer {
+            width: 320px; flex-shrink: 0;
+            border-left: 1px solid #F1F5F9; background: #FAFBFF;
+            display: flex; flex-direction: column; overflow-y: auto;
+            transition: transform .25s ease;
+        }
+        .profile-drawer.collapsed { display: none; }
+        .profile-drawer-header {
+            padding: 18px 20px; border-bottom: 1px solid #F1F5F9;
+            display: flex; align-items: center; justify-content: space-between;
+            background: #fff;
+        }
+        .profile-drawer-title {
+            font-size: 11px; font-weight: 900; color: #475569;
+            letter-spacing: .14em; text-transform: uppercase;
+        }
+        .profile-card { padding: 20px; text-align: center; border-bottom: 1px solid #F1F5F9; }
+        .profile-card img {
+            width: 72px; height: 72px; border-radius: 50%; object-fit: cover;
+            border: 3px solid #fff; box-shadow: 0 8px 20px rgba(15,23,42,.08);
+            margin-bottom: 10px;
+        }
+        .profile-card-name { font-size: 15px; font-weight: 900; color: #0F172A; }
+        .profile-card-meta { font-size: 11px; font-weight: 700; color: #94A3B8; margin-top: 4px; }
+        .profile-stats {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+            padding: 16px 20px; border-bottom: 1px solid #F1F5F9;
+        }
+        .profile-stat {
+            background: #fff; border: 1px solid #E2E8F0; border-radius: 10px;
+            padding: 10px; text-align: center;
+        }
+        .profile-stat-value { font-size: 18px; font-weight: 900; color: #1D4ED8; }
+        .profile-stat-label { font-size: 9px; font-weight: 800; color: #94A3B8;
+            text-transform: uppercase; letter-spacing: .12em; margin-top: 2px; }
+        .profile-section { padding: 16px 20px; border-bottom: 1px solid #F1F5F9; }
+        .profile-section-title {
+            font-size: 10px; font-weight: 900; color: #64748B;
+            letter-spacing: .14em; text-transform: uppercase; margin-bottom: 10px;
+        }
+        .profile-row {
+            display: flex; gap: 8px; align-items: flex-start;
+            font-size: 12px; line-height: 1.5; color: #334155; margin-bottom: 6px;
+        }
+        .profile-row i { color: #94A3B8; width: 14px; text-align: center; margin-top: 2px; }
+        .profile-row span { font-weight: 700; word-break: break-all; }
+        .profile-row .muted { color: #CBD5E1; font-style: italic; font-weight: 600; }
+        .profile-booking {
+            background: #fff; border: 1px solid #E2E8F0; border-radius: 10px;
+            padding: 10px 12px; margin-bottom: 8px;
+        }
+        .profile-booking-title { font-size: 12px; font-weight: 800; color: #0F172A; }
+        .profile-booking-meta { font-size: 10px; font-weight: 700; color: #94A3B8; margin-top: 2px; }
+        .profile-booking-status {
+            display: inline-block; padding: 1px 7px; border-radius: 999px;
+            font-size: 9px; font-weight: 900; letter-spacing: .04em; margin-top: 4px;
+        }
+        .profile-booking-status.completed { background: #ECFDF5; color: #047857; border: 1px solid #BBF7D0; }
+        .profile-booking-status.confirmed { background: #EFF6FF; color: #1D4ED8; border: 1px solid #BFDBFE; }
+        .profile-booking-status.booked    { background: #F1F5F9; color: #475569; border: 1px solid #E2E8F0; }
+        .profile-booking-status.cancelled { background: #FEF2F2; color: #B91C1C; border: 1px solid #FECACA; }
+
+        /* Toggle button for drawer */
+        .icon-btn[data-toggle="profile"] {
+            background: #F1F5F9; color: #475569;
+        }
+        .icon-btn[data-toggle="profile"].active {
+            background: #DBEAFE; color: #1D4ED8;
+        }
+
+        /* ── Responsive ── */
+        @media (max-width: 1024px) {
+            .profile-drawer {
+                position: fixed; top: 0; right: 0; bottom: 0;
+                z-index: 90; width: min(360px, 90vw); transform: translateX(100%);
+                box-shadow: -20px 0 40px -10px rgba(15,23,42,.15);
+            }
+            .profile-drawer:not(.collapsed) { transform: translateX(0); }
+        }
+        @media (max-width: 768px) {
+            .chat-app { flex-direction: column; border-radius: 20px; }
+            .sidebar {
+                width: 100%; max-height: 38vh; min-height: 0;
+                border-right: none; border-bottom: 1px solid #F1F5F9;
+            }
+            .chat-window { min-height: 0; flex: 1; }
+            .chat-input-bar { padding: 14px 16px; }
+            .quick-replies { padding: 8px 16px 0; }
+            .chat-form { gap: 8px; }
+            .internal-toggle, .send-btn { width: 44px; height: 44px; border-radius: 14px; font-size: 14px; }
+            .chat-form textarea { min-height: 44px; padding: 10px 16px; }
+        }
     </style>
 </head>
 <body>
@@ -638,6 +732,9 @@ $pdo = db();
                             <button type="button" class="icon-btn" id="resolve-btn" onclick="setStatus('resolved')" title="ปิดเคส (Resolved)">
                                 <i class="fa-solid fa-check"></i>
                             </button>
+                            <button type="button" class="icon-btn" data-toggle="profile" id="profile-toggle" onclick="toggleProfileDrawer()" title="ข้อมูลผู้ใช้">
+                                <i class="fa-solid fa-id-card"></i>
+                            </button>
                         </div>
                     </div>
 
@@ -663,6 +760,19 @@ $pdo = db();
                     </div>
                 </div>
             </div>
+
+            <!-- Customer Profile Drawer -->
+            <aside class="profile-drawer collapsed" id="profile-drawer">
+                <div class="profile-drawer-header">
+                    <span class="profile-drawer-title"><i class="fa-solid fa-circle-info"></i> ข้อมูลผู้ใช้</span>
+                    <button type="button" class="icon-btn" onclick="toggleProfileDrawer()" title="ปิด">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+                <div id="profile-drawer-body" style="flex:1">
+                    <div class="loading-state" style="padding:40px;text-align:center;color:#CBD5E1"><div class="spinner"></div></div>
+                </div>
+            </aside>
         </div>
     </div>
 
@@ -684,6 +794,12 @@ $pdo = db();
         let internalMode = false;
         // Friendly Thai labels for status values
         const STATUS_LABELS = { open: 'เปิดอยู่', pending: 'รอลูกค้า', resolved: 'ปิดเคสแล้ว' };
+        // Cache profile responses so re-opening the drawer doesn't refetch every time
+        const profileCache = Object.create(null);
+        const BOOKING_STATUS_LABELS = {
+            booked: 'รออนุมัติ', confirmed: 'อนุมัติแล้ว', completed: 'เข้าร่วมแล้ว',
+            cancelled: 'ยกเลิก', cancelled_by_admin: 'ยกเลิกโดยแอดมิน', expired: 'หมดอายุ'
+        };
 
         // Quick-reply templates (chips). Edit list to taste — admin UI can be added later.
         const QUICK_REPLIES = [
@@ -816,6 +932,112 @@ $pdo = db();
             updateStatusPill(u.status || 'open');
             renderUserList(allUsers);
             loadMessages();
+
+            // Refresh profile drawer (only fetch if it's open or already cached)
+            const drawer = document.getElementById('profile-drawer');
+            if (!drawer.classList.contains('collapsed') || profileCache[id]) {
+                loadCustomerProfile(id);
+            }
+        }
+
+        function toggleProfileDrawer() {
+            const drawer = document.getElementById('profile-drawer');
+            const btn = document.getElementById('profile-toggle');
+            const open = drawer.classList.toggle('collapsed');
+            btn.classList.toggle('active', !open);
+            if (!open && currentUserId) loadCustomerProfile(currentUserId);
+        }
+
+        async function loadCustomerProfile(id) {
+            const body = document.getElementById('profile-drawer-body');
+            // Use cache while fetching to avoid a flash of empty
+            if (profileCache[id]) renderCustomerProfile(profileCache[id]);
+            try {
+                const res = await fetch(`ajax_support_chat.php?action=get_customer_profile&user_id=${id}`);
+                const data = await res.json();
+                if (data.success) {
+                    profileCache[id] = data;
+                    if (currentUserId == id) renderCustomerProfile(data);
+                } else if (!profileCache[id]) {
+                    body.innerHTML = `<div style="padding:24px;text-align:center;color:#94A3B8;font-size:12px;font-weight:700">ไม่สามารถโหลดข้อมูลได้</div>`;
+                }
+            } catch (err) {
+                if (!profileCache[id]) {
+                    body.innerHTML = `<div style="padding:24px;text-align:center;color:#EF4444;font-size:12px;font-weight:700">เครือข่ายขัดข้อง</div>`;
+                }
+            }
+        }
+
+        function renderCustomerProfile(data) {
+            const u = data.user || {};
+            const bookings = data.bookings || [];
+            const totals = data.totals || { total: 0, attended: 0 };
+            const fallback = 'https://ui-avatars.com/api/?name=' + encodeURIComponent(u.full_name || '?') + '&background=EFF6FF&color=2563EB&bold=true';
+            const avatar = u.picture_url || fallback;
+
+            const memberLine = u.member_id
+                ? `<div class="profile-card-meta"><i class="fa-solid fa-id-badge"></i> ${esc(u.member_id)}</div>`
+                : '';
+
+            const renderRow = (icon, value, fallbackText) => value
+                ? `<div class="profile-row"><i class="fa-solid ${icon}"></i><span>${esc(value)}</span></div>`
+                : `<div class="profile-row"><i class="fa-solid ${icon}"></i><span class="muted">${fallbackText}</span></div>`;
+
+            const fmtDate = d => {
+                if (!d) return '';
+                const dt = new Date(String(d).replace(' ', 'T'));
+                return Number.isNaN(dt.getTime()) ? d : dt.toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' });
+            };
+
+            const bookingsHtml = bookings.length === 0
+                ? `<div style="font-size:11px;color:#CBD5E1;font-style:italic;font-weight:600">ยังไม่มีการจอง</div>`
+                : bookings.slice(0, 3).map(b => {
+                    const status = String(b.status || '').toLowerCase();
+                    const cls = ['completed','confirmed','booked','cancelled'].includes(status) ? status : 'booked';
+                    const label = BOOKING_STATUS_LABELS[b.status] || b.status;
+                    const slotLine = b.slot_date
+                        ? `${fmtDate(b.slot_date)}${b.start_time ? ' · ' + String(b.start_time).slice(0,5) : ''}`
+                        : 'ไม่มีนัดเวลา';
+                    return `
+                        <div class="profile-booking">
+                            <div class="profile-booking-title">${esc(b.campaign_title || '—')}</div>
+                            <div class="profile-booking-meta">${esc(slotLine)}</div>
+                            <span class="profile-booking-status ${cls}">${esc(label)}</span>
+                        </div>
+                    `;
+                }).join('');
+
+            document.getElementById('profile-drawer-body').innerHTML = `
+                <div class="profile-card">
+                    <img src="${esc(avatar)}" alt="avatar" onerror="this.src='${esc(fallback)}'">
+                    <div class="profile-card-name">${esc(u.full_name || '—')}</div>
+                    ${memberLine}
+                </div>
+
+                <div class="profile-stats">
+                    <div class="profile-stat">
+                        <div class="profile-stat-value">${esc(String(totals.total))}</div>
+                        <div class="profile-stat-label">การจอง</div>
+                    </div>
+                    <div class="profile-stat">
+                        <div class="profile-stat-value">${esc(String(totals.attended))}</div>
+                        <div class="profile-stat-label">เข้าร่วม</div>
+                    </div>
+                </div>
+
+                <div class="profile-section">
+                    <div class="profile-section-title">ติดต่อ</div>
+                    ${renderRow('fa-phone',          u.phone_number, 'ไม่ระบุเบอร์โทร')}
+                    ${renderRow('fa-envelope',       u.email,        'ไม่ระบุอีเมล')}
+                    ${renderRow('fa-building-columns', u.department, 'ไม่ระบุคณะ/หน่วยงาน')}
+                    ${renderRow('fa-graduation-cap', u.student_personnel_id, 'ไม่ระบุรหัส')}
+                </div>
+
+                <div class="profile-section">
+                    <div class="profile-section-title">การจองล่าสุด</div>
+                    ${bookingsHtml}
+                </div>
+            `;
         }
 
         function updateStatusPill(status) {

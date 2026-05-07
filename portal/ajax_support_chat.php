@@ -165,6 +165,57 @@ try {
         exit;
     }
 
+    if ($action === 'get_customer_profile') {
+        $targetUserId = (int)($_GET['user_id'] ?? 0);
+        if (!$targetUserId) { echo json_encode(['success' => false, 'error' => 'Invalid user_id']); exit; }
+
+        $u = null;
+        try {
+            $st = $pdo->prepare("SELECT id, full_name, picture_url, member_id,
+                                        student_personnel_id, email, phone_number, department, created_at
+                FROM sys_users WHERE id = :id LIMIT 1");
+            $st->execute([':id' => $targetUserId]);
+            $u = $st->fetch(PDO::FETCH_ASSOC);
+        } catch (PDOException) {}
+        if (!$u) { echo json_encode(['success' => false, 'error' => 'Not found']); exit; }
+
+        $bookings = [];
+        try {
+            $st = $pdo->prepare("
+                SELECT a.id, a.status, a.attended_at, a.created_at AS booked_at,
+                       t.slot_date, t.start_time, t.end_time,
+                       c.title AS campaign_title
+                FROM camp_bookings a
+                LEFT JOIN camp_slots t ON a.slot_id = t.id
+                LEFT JOIN camp_list  c ON a.campaign_id = c.id
+                WHERE a.student_id = :uid
+                ORDER BY a.created_at DESC
+                LIMIT 5
+            ");
+            $st->execute([':uid' => $targetUserId]);
+            $bookings = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        } catch (PDOException) {}
+
+        $totals = ['total' => 0, 'attended' => 0];
+        try {
+            $st = $pdo->prepare("SELECT
+                    COUNT(*) AS total,
+                    SUM(attended_at IS NOT NULL) AS attended
+                FROM camp_bookings WHERE student_id = :uid");
+            $st->execute([':uid' => $targetUserId]);
+            $r = $st->fetch(PDO::FETCH_ASSOC);
+            $totals = ['total' => (int)($r['total'] ?? 0), 'attended' => (int)($r['attended'] ?? 0)];
+        } catch (PDOException) {}
+
+        echo json_encode([
+            'success'  => true,
+            'user'     => $u,
+            'bookings' => $bookings,
+            'totals'   => $totals,
+        ]);
+        exit;
+    }
+
     if ($action === 'set_status') {
         $targetUserId = (int)($_POST['user_id'] ?? 0);
         $status = (string)($_POST['status'] ?? '');
