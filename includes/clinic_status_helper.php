@@ -1083,11 +1083,20 @@ function build_clinic_test_flex(PDO $pdo, string $state, ?array $settingsOverrid
     $today = (new DateTimeImmutable('today', $tz))->format('Y-m-d');
     $forced = build_clinic_simulated_status($state);
 
-    // Override simulated open/close times with real DB hours so preview matches actual schedule
+    // Override simulated times with real DB hours so preview matches actual schedule
     $realHours = get_clinic_hours_for_date($pdo, $today);
     if (!$realHours['closed'] && $realHours['open_time'] && $realHours['close_time']) {
         $forced['today_open']  = $realHours['open_time'];
         $forced['today_close'] = $realHours['close_time'];
+
+        // Recalculate time remaining from real current time instead of hardcoded 150 min
+        $nowHm = (new DateTimeImmutable('now', $tz))->format('H:i');
+        if ($state === 'open_now' && $nowHm < $realHours['close_time']) {
+            $forced['minutes_until_close'] = clinic_minutes_diff($nowHm, $realHours['close_time']);
+        } elseif ($state === 'before_open' && $nowHm < $realHours['open_time']) {
+            $forced['minutes_until_open'] = clinic_minutes_diff($nowHm, $realHours['open_time']);
+            $forced['next_open_time']     = $realHours['open_time'];
+        }
     }
 
     return build_clinic_status_flex($pdo, $today, 'วันนี้', false, $forced, $settingsOverride);
