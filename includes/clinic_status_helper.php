@@ -386,6 +386,13 @@ function get_clinic_doctors_for_date(PDO $pdo, string $date): array
 {
     $weekday = (int)(new DateTimeImmutable($date, new DateTimeZone(CLINIC_TZ_NAME)))->format('w');
 
+    // Self-heal corrupted regular shifts that have specific_date = '' or '0000-00-00'
+    // (The migration in schedule:list only runs when an admin opens that page.)
+    try {
+        $pdo->exec("UPDATE sys_doctor_schedule SET specific_date = NULL
+            WHERE type = 'regular' AND (specific_date = '' OR specific_date = '0000-00-00')");
+    } catch (PDOException) {}
+
     try {
         $stmt = $pdo->prepare("
             SELECT s.id, s.staff_id, s.type, s.specific_date, s.weekday,
@@ -402,10 +409,9 @@ function get_clinic_doctors_for_date(PDO $pdo, string $date): array
               AND (
                   s.specific_date = :d
                   OR (
-                      (s.specific_date IS NULL OR s.specific_date = '')
-                      AND s.type = 'regular'
+                      s.type = 'regular'
                       AND s.weekday = :wd
-                      AND (s.recur_end_date IS NULL OR s.recur_end_date >= :d)
+                      AND (s.recur_end_date IS NULL OR s.recur_end_date = '0000-00-00' OR s.recur_end_date >= :d)
                   )
               )
         ");
