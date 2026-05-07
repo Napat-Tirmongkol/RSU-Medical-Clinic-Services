@@ -36,6 +36,14 @@ $log    = [];
 $log[]  = '[' . date('Y-m-d H:i:s') . '] Appointment Reminder Job เริ่มทำงาน';
 $log[]  = 'ส่งสำหรับวันที่: ' . date('Y-m-d', strtotime('+1 day'));
 
+// ── ตรวจ SMTP config ก่อน — ถ้าไม่ครบให้ exit เร็ว (ไม่รอ php mail() ที่อาจ hang) ──
+$_smtpCfg = (require $projectRoot . '/config/secrets.php') ?: [];
+if (empty($_smtpCfg['SMTP_HOST']) || empty($_smtpCfg['SMTP_USER']) || empty($_smtpCfg['SMTP_PASS'])) {
+    $log[] = 'SMTP ยังไม่ได้ตั้งค่า (SMTP_HOST / SMTP_USER / SMTP_PASS ใน secrets.php) — หยุดการทำงาน';
+    echo implode("\n", $log) . "\n";
+    exit;
+}
+
 // ── Auto-migrate: เพิ่มคอลัมน์ reminder_sent_at ถ้ายังไม่มี ───────────────────
 try {
     $pdo->exec("ALTER TABLE camp_bookings ADD COLUMN reminder_sent_at DATETIME NULL DEFAULT NULL");
