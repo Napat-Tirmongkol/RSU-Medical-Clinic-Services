@@ -119,6 +119,11 @@ $serviceTypes = ['ตรวจทั่วไป', 'วัคซีน', 'ตร
     .fc-event.ds-holiday-evt .fc-event-title,
     .fc-event.ds-holiday-evt .fc-event-time { color: #991b1b !important; }
     .fc-event.ds-holiday-evt .ds-holiday-icon { margin-right: 4px; }
+
+    /* Hide doctor shift events that fall on a holiday — holiday implies closure */
+    .fc-event.ds-hidden-on-holiday,
+    .fc-bg-event.ds-hidden-on-holiday,
+    .fc-daygrid-event.ds-hidden-on-holiday { display: none !important; }
 </style>
 
 <div class="max-w-[1400px] mx-auto px-4 py-6">
@@ -842,6 +847,13 @@ document.addEventListener('DOMContentLoaded', () => {
             if (info.event.extendedProps.__holiday) return; // holidays are read-only markers
             const row = dsRows.find(r => +r.id === +info.event.id);
             if (row) dsOpenEdit(row, info.event.start);
+        },
+        eventClassNames: (info) => {
+            // Hide any non-holiday event that falls on a holiday date
+            if (info.event.extendedProps.__holiday) return [];
+            const startDate = info.event.start ? dsLocalDate(info.event.start) : null;
+            if (startDate && DS_HOLIDAYS.has(startDate)) return ['ds-hidden-on-holiday'];
+            return [];
         },
         eventDidMount: (info) => {
             if (info.event.extendedProps.__holiday) {
