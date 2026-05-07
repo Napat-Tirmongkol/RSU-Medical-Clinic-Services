@@ -129,7 +129,7 @@ function callGeminiVision(string $apiKey, string $model, string $body): array {
     return ['raw' => $raw ?: '', 'httpCode' => $httpCode, 'curlErr' => $curlErr];
 }
 
-$models   = ['gemini-2.0-flash', 'gemini-1.5-flash'];
+$models   = ['gemini-2.5-flash', 'gemini-2.0-flash'];
 $raw      = '';
 $httpCode = 0;
 
