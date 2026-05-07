@@ -203,9 +203,9 @@ $exportQs = http_build_query(['from' => $from, 'to' => $to, 'format' => 'reports
             <p class="text-[10px] font-black uppercase tracking-widest text-rose-500">เกินกำหนด</p>
             <p class="text-2xl font-black text-rose-600 mt-1"><?= number_format($kpi['overdue']) ?></p>
         </div>
-        <div class="bg-white rounded-2xl border border-violet-200 p-4 shadow-sm">
-            <p class="text-[10px] font-black uppercase tracking-widest text-violet-500">เฉลี่ยปิด (วัน)</p>
-            <p class="text-2xl font-black text-violet-600 mt-1"><?= $kpi['avg_days'] !== null ? number_format($kpi['avg_days'], 1) : '-' ?></p>
+        <div class="bg-white rounded-2xl border border-purple-200 p-4 shadow-sm">
+            <p class="text-[10px] font-black uppercase tracking-widest text-purple-500">เฉลี่ยปิด (วัน)</p>
+            <p class="text-2xl font-black text-purple-600 mt-1"><?= $kpi['avg_days'] !== null ? number_format($kpi['avg_days'], 1) : '-' ?></p>
         </div>
     </div>
 
