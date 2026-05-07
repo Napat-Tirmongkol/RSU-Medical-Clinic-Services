@@ -648,10 +648,16 @@ try {
             $id = (int)($_POST['id'] ?? 0);
             if ($id <= 0) throw new RuntimeException('ระบุ id ไม่ถูกต้อง');
 
-            $sel = $pdo->prepare("SELECT doc_id, stored_path FROM sys_doc_attachments WHERE id = ? LIMIT 1");
+            $sel = $pdo->prepare("SELECT doc_id, stored_path, uploaded_by FROM sys_doc_attachments WHERE id = ? LIMIT 1");
             $sel->execute([$id]);
             $row = $sel->fetch(PDO::FETCH_ASSOC);
             if (!$row) throw new RuntimeException('ไม่พบไฟล์');
+
+            // Only the uploader or a superadmin may delete an attachment
+            $isSuperadmin = ($_SESSION['admin_role'] ?? '') === 'superadmin';
+            if (!$isSuperadmin && (int)$row['uploaded_by'] !== (int)$userId) {
+                throw new RuntimeException('คุณไม่มีสิทธิ์ลบไฟล์ของผู้อื่น');
+            }
 
             $pdo->prepare("DELETE FROM sys_doc_attachments WHERE id = ?")->execute([$id]);
 

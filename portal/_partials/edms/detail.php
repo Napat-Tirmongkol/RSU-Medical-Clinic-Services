@@ -45,7 +45,12 @@ try {
     $doc = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if ($doc) {
-        $att = $pdo->prepare("SELECT id, file_name, stored_path, mime_type, file_size, uploaded_at FROM sys_doc_attachments WHERE doc_id = ? ORDER BY id ASC");
+        $att = $pdo->prepare("SELECT a.id, a.file_name, a.stored_path, a.mime_type, a.file_size,
+                                     a.uploaded_at, a.uploaded_by,
+                                     s.full_name AS uploader_name
+            FROM sys_doc_attachments a
+            LEFT JOIN sys_staff s ON s.id = a.uploaded_by
+            WHERE a.doc_id = ? ORDER BY a.id ASC");
         $att->execute([$id]);
         $attachments = $att->fetchAll(PDO::FETCH_ASSOC);
 
@@ -401,10 +406,24 @@ $routingStatusLabels = [
     <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
         <!-- Attachments -->
         <div class="md:col-span-2 bg-white rounded-3xl border border-slate-200 shadow-sm p-5">
-            <h3 class="text-sm font-black text-slate-800 mb-3 flex items-center gap-2">
-                <i class="fa-solid fa-paperclip <?= $tone['text'] ?>"></i> ไฟล์แนบ
-                <span class="text-xs font-bold text-slate-400">(<?= count($attachments) ?>)</span>
-            </h3>
+            <div class="flex items-center justify-between gap-2 mb-3 flex-wrap">
+                <h3 class="text-sm font-black text-slate-800 flex items-center gap-2">
+                    <i class="fa-solid fa-paperclip <?= $tone['text'] ?>"></i> ไฟล์แนบ
+                    <span class="text-xs font-bold text-slate-400">(<?= count($attachments) ?>)</span>
+                </h3>
+                <div class="flex items-center gap-2">
+                    <input type="file" id="edmsAddFiles" multiple class="hidden"
+                        accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.doc,.docx,.xls,.xlsx,.txt">
+                    <button type="button" onclick="document.getElementById('edmsAddFiles').click()"
+                        class="bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1.5 rounded-xl text-xs font-black inline-flex items-center gap-1.5 shadow-sm transition-colors">
+                        <i class="fa-solid fa-cloud-arrow-up"></i> อัปโหลดไฟล์เพิ่ม
+                    </button>
+                </div>
+            </div>
+            <p class="text-[11px] text-slate-400 font-medium mb-3 leading-relaxed">
+                <i class="fa-solid fa-circle-info text-slate-300"></i>
+                ดาวน์โหลดต้นฉบับ → แก้ไข/เซ็นชื่อ/กรอก → อัปโหลดไฟล์ผลงานกลับมาที่นี่ก่อนกดส่งคืน/เสร็จ — ไฟล์จะอยู่รวมกับไฟล์ต้นฉบับและแสดงชื่อผู้อัปโหลด
+            </p>
             <?php if (empty($attachments)): ?>
                 <p class="text-center text-sm font-bold text-slate-400 py-6">— ยังไม่มีไฟล์แนบ —</p>
             <?php else: ?>
@@ -414,12 +433,17 @@ $routingStatusLabels = [
                         $isImage = in_array($ext, ['png','jpg','jpeg','gif','webp'], true);
                         $isPdf   = ($ext === 'pdf');
                         $iconClass = $isPdf ? 'fa-file-pdf text-rose-500' : ($isImage ? 'fa-file-image text-purple-500' : 'fa-file text-slate-400');
+                        $uploader = trim((string)($a['uploader_name'] ?? '')) ?: 'ระบบ';
                     ?>
                         <div class="flex items-center gap-3 px-3 py-2.5 bg-slate-50 hover:bg-slate-100 rounded-2xl border border-slate-100 transition-colors">
                             <i class="fa-solid <?= $iconClass ?> text-lg"></i>
                             <div class="flex-1 min-w-0">
                                 <p class="text-sm font-black text-slate-700 truncate"><?= htmlspecialchars($a['file_name']) ?></p>
-                                <p class="text-[10px] font-bold text-slate-400"><?= edms_format_bytes((int)$a['file_size']) ?> · <?= date('d/m/Y H:i', strtotime($a['uploaded_at'])) ?></p>
+                                <p class="text-[10px] font-bold text-slate-400 truncate">
+                                    <?= edms_format_bytes((int)$a['file_size']) ?>
+                                    · <?= date('d/m/Y H:i', strtotime($a['uploaded_at'])) ?>
+                                    · โดย <span class="text-slate-500"><?= htmlspecialchars($uploader) ?></span>
+                                </p>
                             </div>
                             <?php if ($isPdf || $isImage): ?>
                                 <button onclick="edmsViewer(<?= (int)$a['id'] ?>, '<?= htmlspecialchars(addslashes($a['file_name']), ENT_QUOTES) ?>', '<?= $isPdf ? 'pdf' : 'image' ?>')"
@@ -433,6 +457,13 @@ $routingStatusLabels = [
                                title="ดาวน์โหลด">
                                 <i class="fa-solid fa-download"></i>
                             </a>
+                            <?php if ((int)$a['uploaded_by'] === (int)($_SESSION['admin_id'] ?? 0) || ($_SESSION['admin_role'] ?? '') === 'superadmin'): ?>
+                            <button onclick="edmsDeleteAttachment(<?= (int)$a['id'] ?>, '<?= htmlspecialchars(addslashes($a['file_name']), ENT_QUOTES) ?>')"
+                                class="text-rose-400 hover:bg-rose-100 px-2.5 py-1 rounded-lg text-xs font-black"
+                                title="ลบไฟล์ (เฉพาะที่ฉันอัปโหลดเอง)">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
+                            <?php endif; ?>
                         </div>
                     <?php endforeach; ?>
                 </div>
@@ -629,6 +660,89 @@ window.edmsArchive = async function(id) {
         });
     }
 })();
+
+// ════════════ ATTACHMENT UPLOAD (เพิ่มไฟล์เพิ่มเติม) ════════════
+const EDMS_DETAIL_DOC_ID = <?= $id ?>;
+
+document.getElementById('edmsAddFiles')?.addEventListener('change', async e => {
+    const files = e.target.files;
+    if (!files || !files.length) return;
+
+    // Quick client-side guard — backend re-checks (limit per file = 20MB)
+    const tooBig = Array.from(files).filter(f => f.size > 20 * 1024 * 1024);
+    if (tooBig.length) {
+        Swal.fire({
+            icon: 'warning',
+            title: 'ไฟล์ใหญ่เกินไป',
+            text: `ไฟล์ต่อไปนี้เกิน 20MB: ${tooBig.map(f => f.name).join(', ')}`,
+        });
+        e.target.value = '';
+        return;
+    }
+
+    const fd = new FormData();
+    fd.append('entity', 'attachment');
+    fd.append('action', 'upload');
+    fd.append('doc_id', EDMS_DETAIL_DOC_ID);
+    fd.append('csrf_token', portal_CSRF);
+    for (const f of files) fd.append('files[]', f);
+
+    Swal.fire({
+        title: 'กำลังอัปโหลด...',
+        html: `กำลังส่ง ${files.length} ไฟล์`,
+        allowOutsideClick: false,
+        didOpen: () => Swal.showLoading(),
+    });
+
+    try {
+        const res = await (await fetch('ajax_edms.php', { method: 'POST', body: fd })).json();
+        if (res.ok) {
+            await Swal.fire({
+                icon: 'success',
+                title: res.message || 'อัปโหลดสำเร็จ',
+                timer: 1200,
+                showConfirmButton: false,
+            });
+            window.location.reload();
+        } else {
+            Swal.fire({ icon: 'error', title: 'อัปโหลดไม่สำเร็จ', text: res.message || '' });
+        }
+    } catch (err) {
+        Swal.fire({ icon: 'error', title: 'เครือข่ายขัดข้อง', text: 'อัปโหลดไม่สำเร็จ' });
+    } finally {
+        e.target.value = '';
+    }
+});
+
+window.edmsDeleteAttachment = async function(attId, fileName) {
+    const c = await Swal.fire({
+        title: 'ลบไฟล์นี้?',
+        text: fileName,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'ลบ',
+        cancelButtonText: 'ยกเลิก',
+        confirmButtonColor: '#e11d48',
+    });
+    if (!c.isConfirmed) return;
+
+    const fd = new FormData();
+    fd.append('entity', 'attachment');
+    fd.append('action', 'delete');
+    fd.append('id', attId);
+    fd.append('csrf_token', portal_CSRF);
+    try {
+        const res = await (await fetch('ajax_edms.php', { method: 'POST', body: fd })).json();
+        if (res.ok) {
+            await Swal.fire({ icon: 'success', title: 'ลบไฟล์แล้ว', timer: 800, showConfirmButton: false });
+            window.location.reload();
+        } else {
+            Swal.fire({ icon: 'error', title: 'ลบไม่สำเร็จ', text: res.message || '' });
+        }
+    } catch (err) {
+        Swal.fire({ icon: 'error', title: 'เครือข่ายขัดข้อง', text: '' });
+    }
+};
 
 // ════════════ ROUTING ACTIONS ════════════
 const EDMS_DOC_ID = <?= $id ?>;
