@@ -277,6 +277,11 @@ try {
                     </td>
                 </tr>
                 <?php else: ?>
+                    <?php
+                        // carries current search so back button on user_history.php returns to filtered list
+                        $backTarget = '../portal/users.php' . ($search !== '' ? '?search=' . urlencode($search) : '');
+                        $backTargetEncoded = urlencode($backTarget);
+                    ?>
                     <?php foreach ($users as $user): ?>
                     <tr class="hover:bg-blue-50/20 transition-all group/row cursor-default">
                         <td class="px-8 py-6">
@@ -326,7 +331,7 @@ try {
                                 <button onclick='openEditModal(<?= json_encode($user) ?>)' class="w-10 h-10 flex items-center justify-center rounded-xl bg-white border border-gray-100 text-gray-400 hover:text-indigo-600 hover:border-indigo-100 hover:shadow-lg hover:shadow-indigo-50 transition-all active:scale-90 shadow-sm" title="Edit Profile">
                                     <i class="fa-solid fa-user-edit text-xs"></i>
                                 </button>
-                                <a href="../admin/user_history.php?id=<?= $user['id'] ?>" class="w-10 h-10 flex items-center justify-center rounded-xl bg-white border border-gray-100 text-gray-400 hover:text-amber-600 hover:border-amber-100 hover:shadow-lg hover:shadow-amber-50 transition-all active:scale-90 shadow-sm" title="Transaction Log">
+                                <a href="../admin/user_history.php?id=<?= $user['id'] ?>&amp;redirect_back=<?= $backTargetEncoded ?>" class="w-10 h-10 flex items-center justify-center rounded-xl bg-white border border-gray-100 text-gray-400 hover:text-amber-600 hover:border-amber-100 hover:shadow-lg hover:shadow-amber-50 transition-all active:scale-90 shadow-sm" title="Transaction Log">
                                     <i class="fa-solid fa-history text-xs"></i>
                                 </a>
                                 <a href="index.php?section=activity_logs&al_user_id=<?= (int)$user['id'] ?>&al_role=user" class="w-10 h-10 flex items-center justify-center rounded-xl bg-white border border-gray-100 text-gray-400 hover:text-emerald-600 hover:border-emerald-100 hover:shadow-lg hover:shadow-emerald-50 transition-all active:scale-90 shadow-sm" title="ดูบันทึกกิจกรรม">
