@@ -224,6 +224,28 @@ try {
             echo json_encode(['ok' => true, 'message' => 'เพิ่มแล้ว']);
             return;
 
+        case 'hours:add_bulk': {
+            $dates = array_values(array_filter(array_map('trim', (array)($_POST['dates'] ?? []))));
+            $note  = trim((string)($_POST['note'] ?? '')) ?: null;
+            if (empty($dates)) {
+                echo json_encode(['ok' => false, 'message' => 'ไม่มีวันที่ที่เลือก']);
+                return;
+            }
+            $check  = $pdo->prepare("SELECT 1 FROM sys_clinic_hours WHERE type IN ('holiday','special') AND specific_date = :d LIMIT 1");
+            $insert = $pdo->prepare("INSERT INTO sys_clinic_hours (type, specific_date, is_closed, note) VALUES ('holiday', :d, 1, :n)");
+            $added = 0; $skipped = 0;
+            foreach ($dates as $date) {
+                if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) continue;
+                $check->execute([':d' => $date]);
+                if ($check->fetch()) { $skipped++; continue; }
+                $insert->execute([':d' => $date, ':n' => $note]);
+                $added++;
+            }
+            $msg = "เพิ่ม {$added} วัน" . ($skipped ? " (ข้าม {$skipped} วันที่มีอยู่แล้ว)" : '');
+            echo json_encode(['ok' => true, 'message' => $msg, 'added' => $added]);
+            return;
+        }
+
         case 'hours:delete':
             $pdo->prepare("DELETE FROM sys_clinic_hours WHERE id = ?")->execute([(int)$_POST['id']]);
             echo json_encode(['ok' => true, 'message' => 'ลบแล้ว']);
