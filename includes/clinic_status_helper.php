@@ -393,6 +393,13 @@ function get_clinic_doctors_for_date(PDO $pdo, string $date): array
             WHERE type = 'regular' AND (specific_date = '' OR specific_date = '0000-00-00')");
     } catch (PDOException) {}
 
+    // Ensure recur_end_date column exists — schedule:list runs the same ALTER on admin open,
+    // but the LINE webhook can hit older schemas where the column is missing, which would
+    // make the WHERE clause below fail with "Unknown column 's.recur_end_date'".
+    try {
+        $pdo->exec("ALTER TABLE sys_doctor_schedule ADD COLUMN recur_end_date DATE NULL DEFAULT NULL AFTER weekday");
+    } catch (PDOException) {} // already exists → ignore
+
     try {
         $stmt = $pdo->prepare("
             SELECT s.id, s.staff_id, s.type, s.specific_date, s.weekday,
@@ -417,7 +424,8 @@ function get_clinic_doctors_for_date(PDO $pdo, string $date): array
         ");
         $stmt->execute([':d' => $date, ':wd' => $weekday]);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
-    } catch (PDOException) {
+    } catch (PDOException $e) {
+        error_log('get_clinic_doctors_for_date query failed: ' . $e->getMessage());
         return [];
     }
 
