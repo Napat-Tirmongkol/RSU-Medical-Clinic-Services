@@ -20,7 +20,6 @@
 declare(strict_types=1);
 
 define('CRON_SECRET_TOKEN', 'rsu_purge_a8f3k2m9x');
-define('NOTIFY_DELAY_SECONDS', 2);
 
 $token = $_GET['token'] ?? $_SERVER['HTTP_X_CRON_TOKEN'] ?? '';
 if (!hash_equals(CRON_SECRET_TOKEN, $token)) {
@@ -106,7 +105,41 @@ $lineSent   = 0;
 $skipped    = 0;
 $failed     = 0;
 
-foreach ($rows as $i => $row) {
+// ── Step 1: Batch UPDATE ทั้งหมดก่อน (เร็ว ไม่มี delay) ──────────────────────
+$ids = array_column($rows, 'booking_id');
+$placeholders = implode(',', array_fill(0, count($ids), '?'));
+try {
+    $batchStmt = $pdo->prepare("
+        UPDATE camp_bookings
+        SET status = 'expired'
+        WHERE id IN ({$placeholders})
+          AND attended_at IS NULL
+          AND status IN ('booked', 'confirmed')
+    ");
+    $batchStmt->execute(array_values($ids));
+    $cancelled = $batchStmt->rowCount();
+    $skipped   = $total - $cancelled;
+    $log[] = "  ✓ Batch update: ยกเลิก {$cancelled} รายการ (ข้าม {$skipped} — เปลี่ยนสถานะระหว่างทาง)";
+} catch (PDOException $e) {
+    $log[] = "  ✗ Batch update error: " . $e->getMessage();
+    $failed = $total;
+}
+
+// ── Step 2: ส่ง notification เฉพาะรายการที่ถูกยกเลิกจริง ─────────────────────
+// ดึง ID ที่ถูก update จริง (re-query เพื่อความแน่ใจ)
+$notifyStmt = $pdo->prepare("
+    SELECT b.id AS booking_id, u.email, u.full_name, u.line_user_id,
+           s.slot_date, s.start_time, s.end_time, c.title AS campaign_title
+    FROM camp_bookings b
+    JOIN camp_slots s ON b.slot_id     = s.id
+    JOIN camp_list  c ON b.campaign_id = c.id
+    JOIN sys_users  u ON b.student_id  = u.id
+    WHERE b.id IN ({$placeholders}) AND b.status = 'expired'
+");
+$notifyStmt->execute(array_values($ids));
+$notifyRows = $notifyStmt->fetchAll(PDO::FETCH_ASSOC);
+
+foreach ($notifyRows as $row) {
     $bookingId = (int)$row['booking_id'];
     $email     = trim((string)($row['email'] ?? ''));
     $lineId    = trim((string)($row['line_user_id'] ?? ''));
@@ -115,22 +148,6 @@ foreach ($rows as $i => $row) {
     $date      = date('d/m/Y', strtotime($row['slot_date']));
     $timeRange = substr((string)$row['start_time'], 0, 5) . ' – ' . substr((string)$row['end_time'], 0, 5) . ' น.';
 
-    // 1. Cancel
-    try {
-        $updateStmt->execute([':id' => $bookingId]);
-        if ($updateStmt->rowCount() === 0) {
-            $skipped++;
-            $log[] = "  ↺ #{$bookingId} {$name} — ข้าม (เปลี่ยนสถานะระหว่างทาง)";
-            continue;
-        }
-        $cancelled++;
-    } catch (PDOException $e) {
-        $failed++;
-        $log[] = "  ✗ #{$bookingId} DB error: " . $e->getMessage();
-        continue;
-    }
-
-    // 2. Email notification (ถ้ามีอีเมล)
     if ($email !== '') {
         try {
             $ok = notify_booking_status($email, 'expired', [
@@ -145,7 +162,6 @@ foreach ($rows as $i => $row) {
         }
     }
 
-    // 3. LINE push notification (ถ้ามี LINE user id)
     if ($lineId !== '') {
         try {
             $ok = send_line_notification_simple($lineId, [
@@ -159,14 +175,9 @@ foreach ($rows as $i => $row) {
         }
     }
 
-    $log[] = "  ✓ #{$bookingId} {$name} — ยกเลิก + แจ้งเตือน"
-           . ($email ? ' [email]' : '')
-           . ($lineId ? ' [line]' : '');
-
-    // Throttle to avoid hitting mail / LINE rate limits
-    if ($i < $total - 1) {
-        sleep(NOTIFY_DELAY_SECONDS);
-    }
+    $log[] = "  ✓ #{$bookingId} {$name}"
+           . ($email  ? ' [email]' : '')
+           . ($lineId ? ' [line]'  : '');
 }
 
 // ── Summary ──────────────────────────────────────────────────────────────────
