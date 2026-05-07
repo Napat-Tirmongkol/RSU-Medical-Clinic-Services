@@ -108,7 +108,7 @@ $typeMap = [
 $tonePalette = [
     'sky'     => ['bg' => 'bg-sky-50',     'text' => 'text-sky-600',     'border' => 'border-sky-100',     'btn' => 'bg-sky-500 hover:bg-sky-600'],
     'emerald' => ['bg' => 'bg-emerald-50', 'text' => 'text-emerald-600', 'border' => 'border-emerald-100', 'btn' => 'bg-emerald-500 hover:bg-emerald-600'],
-    'violet'  => ['bg' => 'bg-violet-50',  'text' => 'text-violet-600',  'border' => 'border-violet-100',  'btn' => 'bg-violet-500 hover:bg-violet-600'],
+    'violet'  => ['bg' => 'bg-purple-50',  'text' => 'text-purple-600',  'border' => 'border-purple-100',  'btn' => 'bg-purple-500 hover:bg-purple-600'],
     'amber'   => ['bg' => 'bg-amber-50',   'text' => 'text-amber-600',   'border' => 'border-amber-100',   'btn' => 'bg-amber-500 hover:bg-amber-600'],
 ];
 
@@ -118,7 +118,7 @@ $tone = $tonePalette[$meta['tone']];
 $statusLabels = [
     'draft'       => ['label' => 'ฉบับร่าง',       'tone' => 'bg-slate-100 text-slate-600 border-slate-200'],
     'registered'  => ['label' => 'ลงทะเบียนแล้ว',  'tone' => 'bg-sky-50 text-sky-700 border-sky-200'],
-    'routing'     => ['label' => 'อยู่ระหว่างโอน', 'tone' => 'bg-violet-50 text-violet-700 border-violet-200'],
+    'routing'     => ['label' => 'อยู่ระหว่างโอน', 'tone' => 'bg-purple-50 text-purple-700 border-purple-200'],
     'in_progress' => ['label' => 'ดำเนินการ',      'tone' => 'bg-amber-50 text-amber-700 border-amber-200'],
     'completed'   => ['label' => 'เสร็จสิ้น',       'tone' => 'bg-emerald-50 text-emerald-700 border-emerald-200'],
     'archived'    => ['label' => 'เก็บแฟ้ม',       'tone' => 'bg-slate-50 text-slate-500 border-slate-200'],
@@ -223,7 +223,7 @@ $routingStatusLabels = [
             </div>
             <div class="flex items-center gap-2 shrink-0 flex-wrap justify-end">
                 <?php if (in_array($doc['status'], ['registered','routing','in_progress'], true)): ?>
-                    <button onclick="edmsOpenRouting()" title="โอน/มอบหมาย" class="bg-violet-500 hover:bg-violet-600 text-white px-3 py-2 rounded-xl text-xs font-black inline-flex items-center gap-1.5 shadow-sm transition-colors">
+                    <button onclick="edmsOpenRouting()" title="โอน/มอบหมาย" class="bg-purple-500 hover:bg-purple-600 text-white px-3 py-2 rounded-xl text-xs font-black inline-flex items-center gap-1.5 shadow-sm transition-colors">
                         <i class="fa-solid fa-share"></i> โอน/มอบหมาย
                     </button>
                 <?php endif; ?>
@@ -323,11 +323,11 @@ $routingStatusLabels = [
     <div class="bg-white rounded-3xl border border-slate-200 shadow-sm p-5 mb-5">
         <div class="flex items-center justify-between mb-4">
             <h3 class="text-sm font-black text-slate-800 flex items-center gap-2">
-                <i class="fa-solid fa-share-nodes text-violet-500"></i> เส้นทางการโอน
+                <i class="fa-solid fa-share-nodes text-purple-500"></i> เส้นทางการโอน
                 <span class="text-xs font-bold text-slate-400">(<?= count($routings) ?>)</span>
             </h3>
             <?php if (in_array($doc['status'], ['registered','routing','in_progress'], true)): ?>
-                <button onclick="edmsOpenRouting()" class="bg-violet-50 hover:bg-violet-100 text-violet-700 border border-violet-200 px-3 py-1.5 rounded-xl text-xs font-black inline-flex items-center gap-1.5 transition-colors">
+                <button onclick="edmsOpenRouting()" class="bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 px-3 py-1.5 rounded-xl text-xs font-black inline-flex items-center gap-1.5 transition-colors">
                     <i class="fa-solid fa-plus"></i> โอนต่อ
                 </button>
             <?php endif; ?>
@@ -413,7 +413,7 @@ $routingStatusLabels = [
                         $ext = strtolower(pathinfo($a['file_name'], PATHINFO_EXTENSION));
                         $isImage = in_array($ext, ['png','jpg','jpeg','gif','webp'], true);
                         $isPdf   = ($ext === 'pdf');
-                        $iconClass = $isPdf ? 'fa-file-pdf text-rose-500' : ($isImage ? 'fa-file-image text-violet-500' : 'fa-file text-slate-400');
+                        $iconClass = $isPdf ? 'fa-file-pdf text-rose-500' : ($isImage ? 'fa-file-image text-purple-500' : 'fa-file text-slate-400');
                     ?>
                         <div class="flex items-center gap-3 px-3 py-2.5 bg-slate-50 hover:bg-slate-100 rounded-2xl border border-slate-100 transition-colors">
                             <i class="fa-solid <?= $iconClass ?> text-lg"></i>
@@ -470,7 +470,7 @@ $routingStatusLabels = [
 <div id="edmsRoutingModal" class="fixed inset-0 bg-black/40 hidden items-center justify-center p-4">
     <div id="edmsRoutingBox" class="bg-white rounded-3xl shadow-2xl w-full max-w-xl flex flex-col overflow-hidden">
         <div class="px-6 py-4 border-b border-slate-100 flex items-center gap-3">
-            <div class="w-10 h-10 bg-violet-50 rounded-xl border border-violet-100 flex items-center justify-center text-violet-600">
+            <div class="w-10 h-10 bg-purple-50 rounded-xl border border-purple-100 flex items-center justify-center text-purple-600">
                 <i class="fa-solid fa-share-nodes"></i>
             </div>
             <div class="flex-1 min-w-0">
@@ -523,7 +523,7 @@ $routingStatusLabels = [
             </button>
             <div class="flex-1"></div>
             <button type="button" onclick="edmsSubmitRouting()"
-                class="bg-violet-500 hover:bg-violet-600 text-white px-4 py-2.5 rounded-xl text-sm font-black flex items-center gap-2 shadow-sm transition-colors">
+                class="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2.5 rounded-xl text-sm font-black flex items-center gap-2 shadow-sm transition-colors">
                 <i class="fa-solid fa-share"></i> โอนเอกสาร
             </button>
         </div>
@@ -570,7 +570,7 @@ window.edmsViewer = function(id, name, kind) {
         iframe.src = `edms_file.php?id=${id}&disposition=inline`;
         iframe.classList.remove('hidden');
     } else if (kind === 'image') {
-        icon.className = 'fa-solid fa-file-image text-violet-500 text-lg';
+        icon.className = 'fa-solid fa-file-image text-purple-500 text-lg';
         img.src = `edms_file.php?id=${id}&disposition=inline`;
         img.classList.remove('hidden');
     }

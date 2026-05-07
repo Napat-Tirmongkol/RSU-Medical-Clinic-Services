@@ -21,7 +21,7 @@ $validTypes = [
 $tonePalette = [
     'sky'     => ['bg' => 'bg-sky-50',     'text' => 'text-sky-600',     'border' => 'border-sky-100',     'btn' => 'bg-sky-500 hover:bg-sky-600'],
     'emerald' => ['bg' => 'bg-emerald-50', 'text' => 'text-emerald-600', 'border' => 'border-emerald-100', 'btn' => 'bg-emerald-500 hover:bg-emerald-600'],
-    'violet'  => ['bg' => 'bg-violet-50',  'text' => 'text-violet-600',  'border' => 'border-violet-100',  'btn' => 'bg-violet-500 hover:bg-violet-600'],
+    'violet'  => ['bg' => 'bg-purple-50',  'text' => 'text-purple-600',  'border' => 'border-purple-100',  'btn' => 'bg-purple-500 hover:bg-purple-600'],
     'amber'   => ['bg' => 'bg-amber-50',   'text' => 'text-amber-600',   'border' => 'border-amber-100',   'btn' => 'bg-amber-500 hover:bg-amber-600'],
 ];
 
@@ -101,7 +101,7 @@ try {
 $statusLabels = [
     'draft'       => ['label' => 'ฉบับร่าง',       'tone' => 'bg-slate-100 text-slate-600 border-slate-200'],
     'registered'  => ['label' => 'ลงทะเบียนแล้ว',  'tone' => 'bg-sky-50 text-sky-700 border-sky-200'],
-    'routing'     => ['label' => 'อยู่ระหว่างโอน', 'tone' => 'bg-violet-50 text-violet-700 border-violet-200'],
+    'routing'     => ['label' => 'อยู่ระหว่างโอน', 'tone' => 'bg-purple-50 text-purple-700 border-purple-200'],
     'in_progress' => ['label' => 'ดำเนินการ',      'tone' => 'bg-amber-50 text-amber-700 border-amber-200'],
     'completed'   => ['label' => 'เสร็จสิ้น',       'tone' => 'bg-emerald-50 text-emerald-700 border-emerald-200'],
     'archived'    => ['label' => 'เก็บแฟ้ม',       'tone' => 'bg-slate-50 text-slate-500 border-slate-200'],
