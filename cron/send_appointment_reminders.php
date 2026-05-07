@@ -104,7 +104,7 @@ $markStmt = $pdo->prepare("
 ");
 
 // หยุดส่งก่อนถึง cron-job.org timeout (25 วินาที) — รอบถัดไปส่งต่อได้เพราะ reminder_sent_at
-$deadline = time() + 25;
+$deadline = time() + 55; // ตั้ง request timeout ใน cron-job.org เป็น 60 วินาที
 
 // ── ส่งอีเมลทีละรายการ ────────────────────────────────────────────────────────
 foreach ($bookings as $i => $row) {
