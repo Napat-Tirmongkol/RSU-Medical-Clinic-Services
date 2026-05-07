@@ -9,6 +9,24 @@ if (!isset($secrets)) {
     $secrets = require __DIR__ . '/../../config/secrets.php';
 }
 
+// ชอบ line_user_id_new (new channel) มากกว่า line_user_id เดิม เพื่อให้ test push ตรง channel ปัจจุบัน
+$_prefillLineId = '';
+if (!empty($_SESSION['student_id'])) {
+    try {
+        $_pdoLine = db();
+        $_stmtLine = $_pdoLine->prepare("SELECT line_user_id, line_user_id_new FROM sys_users WHERE id = :id LIMIT 1");
+        $_stmtLine->execute([':id' => (int)$_SESSION['student_id']]);
+        $_rowLine = $_stmtLine->fetch(PDO::FETCH_ASSOC);
+        if ($_rowLine) {
+            $_prefillLineId = (string)($_rowLine['line_user_id_new'] ?: $_rowLine['line_user_id'] ?: '');
+        }
+    } catch (Throwable $e) {
+        $_prefillLineId = (string)($_SESSION['line_user_id'] ?? '');
+    }
+} else {
+    $_prefillLineId = (string)($_SESSION['line_user_id'] ?? '');
+}
+
 // ดึง Webhook URL อัตโนมัติ
 $protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http";
 $host = $_SERVER['HTTP_HOST'];
@@ -132,9 +150,9 @@ $webhookUrl = "$protocol://$host$uri";
                     <label class="line-label">LINE User ID ผู้รับ</label>
                     <input type="text" id="toUserIdP" class="line-input font-mono text-sm placeholder:text-slate-400"
                            placeholder="Uxxxxxxxxxxxxxxxx..."
-                           value="<?= htmlspecialchars($_SESSION['line_user_id'] ?? '') ?>">
+                           value="<?= htmlspecialchars($_prefillLineId) ?>">
                     <p class="text-[11px] text-slate-600 mt-2 font-medium leading-relaxed">
-                        <i class="fa-solid fa-circle-info text-blue-500"></i> ส่งข้อความ Push หาตัวเองเพื่อทดสอบความถูกต้องของ Token
+                        <i class="fa-solid fa-circle-info text-blue-500"></i> User ID ต้องเป็น ID จาก LINE OA (Messaging API) Channel นี้ ไม่ใช่ LINE Login Channel — ต้องเคย<strong>เพิ่ม OA เป็นเพื่อน</strong>ก่อน
                     </p>
                 </div>
 
@@ -315,7 +333,7 @@ $webhookUrl = "$protocol://$host$uri";
                         <input type="text" id="faqTestUserId" class="line-input font-mono"
                             style="padding:9px 14px;font-size:12px"
                             placeholder="Uxxxxxxxxxxxxxxxx"
-                            value="<?= htmlspecialchars($_SESSION['line_user_id'] ?? '') ?>">
+                            value="<?= htmlspecialchars($_prefillLineId) ?>">
                     </div>
                     <button type="button" onclick="faqTestSend()" id="faqTestBtn"
                         style="padding:11px 22px;background:#0c4a6e;color:#fff;border:none;border-radius:12px;font-weight:900;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:8px;white-space:nowrap;box-shadow:0 4px 12px rgba(12,74,110,.25)">
