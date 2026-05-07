@@ -632,7 +632,7 @@ function clinic_app_base_url(): string
  *
  * @return array<string,mixed>  Flex message payload
  */
-function build_clinic_status_flex(PDO $pdo, string $date, string $dateLabel, bool $considerNow = false): array
+function build_clinic_status_flex(PDO $pdo, string $date, string $dateLabel, bool $considerNow = false, ?array $forceStatus = null, ?array $settingsOverride = null): array
 {
     $hours    = get_clinic_hours_for_date($pdo, $date);
     $doctors  = get_clinic_doctors_for_date($pdo, $date);
@@ -643,10 +643,13 @@ function build_clinic_status_flex(PDO $pdo, string $date, string $dateLabel, boo
     $isOpenToday = !$hours['closed'];
 
     // Real-time status — เฉพาะคำถามที่หมายถึง "ตอนนี้/วันนี้"
-    $now = $considerNow ? get_clinic_current_status($pdo) : null;
+    // $forceStatus ใช้สำหรับ preview/test ใน admin settings
+    $now = $forceStatus ?? ($considerNow ? get_clinic_current_status($pdo) : null);
 
     if ($now !== null) {
-        $settings = get_clinic_faq_settings($pdo);
+        $settings = $settingsOverride
+            ? array_merge(get_clinic_faq_settings($pdo), $settingsOverride)
+            : get_clinic_faq_settings($pdo);
         $vars = [
             'open_time'   => (string)($now['today_open'] ?? ''),
             'close_time'  => (string)($now['today_close'] ?? ''),
@@ -1010,6 +1013,76 @@ function clinic_flex_row(string $label, string $value): array
             ],
         ],
     ];
+}
+
+/**
+ * สร้างค่า "current status" จำลองสำหรับ preview/test
+ * รองรับ 4 state: open_now, before_open, after_close, closed_today
+ *
+ * @return array<string,mixed>  รูปแบบเดียวกับ get_clinic_current_status()
+ */
+function build_clinic_simulated_status(string $state): array
+{
+    $base = [
+        'is_open_now' => false,
+        'state' => $state,
+        'today_open'  => null,
+        'today_close' => null,
+        'minutes_until_close' => null,
+        'minutes_until_open'  => null,
+        'next_open_date'  => null,
+        'next_open_time'  => null,
+        'next_open_label' => null,
+        'today_note'  => '',
+    ];
+    switch ($state) {
+        case 'open_now':
+            return array_merge($base, [
+                'is_open_now' => true,
+                'today_open'  => '08:00',
+                'today_close' => '17:00',
+                'minutes_until_close' => 150,   // อีก 2 ชม. 30 นาที
+            ]);
+        case 'before_open':
+            return array_merge($base, [
+                'today_open'  => '08:00',
+                'today_close' => '17:00',
+                'minutes_until_open' => 90,     // อีก 1 ชม. 30 นาที
+                'next_open_date'  => date('Y-m-d'),
+                'next_open_time'  => '08:00',
+                'next_open_label' => 'วันนี้',
+            ]);
+        case 'after_close':
+            return array_merge($base, [
+                'today_open'  => '08:00',
+                'today_close' => '17:00',
+                'next_open_date'  => date('Y-m-d', strtotime('+1 day')),
+                'next_open_time'  => '08:00',
+                'next_open_label' => 'พรุ่งนี้',
+            ]);
+        case 'closed_today':
+        default:
+            return array_merge($base, [
+                'state' => 'closed_today',
+                'next_open_date'  => date('Y-m-d', strtotime('+1 day')),
+                'next_open_time'  => '08:00',
+                'next_open_label' => 'พรุ่งนี้',
+                'today_note'  => 'วันหยุดราชการ',
+            ]);
+    }
+}
+
+/**
+ * สร้าง flex สำหรับ preview/test ตาม state ที่ระบุ (ไม่อิงเวลาจริง)
+ *
+ * @param array<string,string>|null $settingsOverride  ใส่เพื่อ preview ค่าฟอร์มที่ยังไม่ได้บันทึก
+ */
+function build_clinic_test_flex(PDO $pdo, string $state, ?array $settingsOverride = null): array
+{
+    $tz = new DateTimeZone(CLINIC_TZ_NAME);
+    $today = (new DateTimeImmutable('today', $tz))->format('Y-m-d');
+    $forced = build_clinic_simulated_status($state);
+    return build_clinic_status_flex($pdo, $today, 'วันนี้', false, $forced, $settingsOverride);
 }
 
 /**
