@@ -428,6 +428,11 @@ try {
         case 'schedule:list': {
             // Auto-migrate
             try {
+                // Fix rows corrupted by the old update bug: regular shifts with specific_date='' or '0000-00-00'
+                $pdo->exec("UPDATE sys_doctor_schedule SET specific_date = NULL
+                    WHERE type = 'regular' AND (specific_date = '' OR specific_date = '0000-00-00')");
+            } catch (PDOException) {}
+            try {
                 $pdo->exec("CREATE TABLE IF NOT EXISTS sys_doctor_schedule (
                     id INT AUTO_INCREMENT PRIMARY KEY,
                     staff_id INT NOT NULL,
@@ -486,29 +491,69 @@ try {
         }
 
         case 'schedule:update': {
-            // Used by drag-drop & modal edit. Updates time + optional fields.
-            $id = (int)$_POST['id'];
-            $stmt = $pdo->prepare("UPDATE sys_doctor_schedule SET
-                weekday       = COALESCE(:weekday, weekday),
-                specific_date = COALESCE(:date, specific_date),
-                start_time    = :st,
-                end_time      = :et,
-                staff_id      = COALESCE(:staff, staff_id),
-                room_id       = :room,
-                service_type  = :svc,
-                notes         = :notes
-                WHERE id = :id");
-            $stmt->execute([
-                ':weekday' => isset($_POST['weekday'])       ? (int)$_POST['weekday'] : null,
-                ':date'    => $_POST['specific_date']        ?? null,
-                ':st'      => $_POST['start_time']           ?? null,
-                ':et'      => $_POST['end_time']             ?? null,
-                ':staff'   => isset($_POST['staff_id'])      ? (int)$_POST['staff_id'] : null,
-                ':room'    => !empty($_POST['room_id'])      ? (int)$_POST['room_id']  : null,
-                ':svc'     => trim((string)($_POST['service_type'] ?? '')) ?: null,
-                ':notes'   => trim((string)($_POST['notes'] ?? '')) ?: null,
-                ':id'      => $id,
-            ]);
+            // Used by drag-drop/resize AND modal edit.
+            // When 'type' is present → full modal save; recompute weekday/specific_date from type.
+            // When 'type' is absent  → partial drag-drop update; preserve existing type fields via COALESCE.
+            $id   = (int)$_POST['id'];
+            $type = isset($_POST['type']) && $_POST['type'] !== '' ? $_POST['type'] : null;
+
+            if ($type !== null) {
+                // Full modal edit — derive nullable fields strictly from type to avoid '' overwriting NULL
+                $weekday      = ($type === 'regular') ? (int)$_POST['weekday'] : null;
+                $specificDate = ($type !== 'regular')
+                    ? (trim((string)($_POST['specific_date'] ?? '')) ?: null)
+                    : null;
+                $startTime = ($type === 'off') ? null : ($_POST['start_time'] ?? null);
+                $endTime   = ($type === 'off') ? null : ($_POST['end_time']   ?? null);
+                $staffId   = !empty($_POST['staff_id']) ? (int)$_POST['staff_id'] : null;
+
+                $stmt = $pdo->prepare("UPDATE sys_doctor_schedule SET
+                    type          = :type,
+                    weekday       = :weekday,
+                    specific_date = :date,
+                    start_time    = :st,
+                    end_time      = :et,
+                    staff_id      = COALESCE(:staff, staff_id),
+                    room_id       = :room,
+                    service_type  = :svc,
+                    notes         = :notes
+                    WHERE id = :id");
+                $stmt->execute([
+                    ':type'    => $type,
+                    ':weekday' => $weekday,
+                    ':date'    => $specificDate,
+                    ':st'      => $startTime,
+                    ':et'      => $endTime,
+                    ':staff'   => $staffId,
+                    ':room'    => !empty($_POST['room_id']) ? (int)$_POST['room_id'] : null,
+                    ':svc'     => trim((string)($_POST['service_type'] ?? '')) ?: null,
+                    ':notes'   => trim((string)($_POST['notes'] ?? '')) ?: null,
+                    ':id'      => $id,
+                ]);
+            } else {
+                // Partial update from drag-drop / resize — preserve type-related fields with COALESCE
+                $stmt = $pdo->prepare("UPDATE sys_doctor_schedule SET
+                    weekday       = COALESCE(:weekday, weekday),
+                    specific_date = COALESCE(:date, specific_date),
+                    start_time    = :st,
+                    end_time      = :et,
+                    staff_id      = COALESCE(:staff, staff_id),
+                    room_id       = :room,
+                    service_type  = :svc,
+                    notes         = :notes
+                    WHERE id = :id");
+                $stmt->execute([
+                    ':weekday' => isset($_POST['weekday']) && $_POST['weekday'] !== '' ? (int)$_POST['weekday'] : null,
+                    ':date'    => !empty($_POST['specific_date']) ? $_POST['specific_date'] : null,
+                    ':st'      => $_POST['start_time'] ?? null,
+                    ':et'      => $_POST['end_time']   ?? null,
+                    ':staff'   => isset($_POST['staff_id']) && (int)$_POST['staff_id'] > 0 ? (int)$_POST['staff_id'] : null,
+                    ':room'    => !empty($_POST['room_id']) ? (int)$_POST['room_id'] : null,
+                    ':svc'     => trim((string)($_POST['service_type'] ?? '')) ?: null,
+                    ':notes'   => trim((string)($_POST['notes'] ?? '')) ?: null,
+                    ':id'      => $id,
+                ]);
+            }
             echo json_encode(['ok' => true, 'message' => 'อัปเดตแล้ว']);
             return;
         }
