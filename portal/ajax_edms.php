@@ -684,11 +684,11 @@ try {
             if ((int)$row['is_current'] === 1) {
                 $rootId = $row['root_id'] !== null ? (int)$row['root_id'] : $id;
                 $prev = $pdo->prepare("SELECT id FROM sys_doc_attachments
-                    WHERE (id = :root OR root_id = :root)
-                      AND id <> :self
-                      AND version_no < :ver
+                    WHERE (id = ? OR root_id = ?)
+                      AND id <> ?
+                      AND version_no < ?
                     ORDER BY version_no DESC LIMIT 1");
-                $prev->execute([':root' => $rootId, ':self' => $id, ':ver' => (int)$row['version_no']]);
+                $prev->execute([$rootId, $rootId, $id, (int)$row['version_no']]);
                 $prevId = (int)($prev->fetchColumn() ?: 0);
                 if ($prevId > 0) {
                     $pdo->prepare("UPDATE sys_doc_attachments
@@ -747,16 +747,16 @@ try {
 
             // Compute next version_no across the entire chain
             $vstmt = $pdo->prepare("SELECT COALESCE(MAX(version_no), 0) FROM sys_doc_attachments
-                WHERE id = :root OR root_id = :root");
-            $vstmt->execute([':root' => $rootId]);
+                WHERE id = ? OR root_id = ?");
+            $vstmt->execute([$rootId, $rootId]);
             $nextVersion = (int)$vstmt->fetchColumn() + 1;
 
             // Mark all current rows in this chain as superseded (defensive: there
             // should be exactly one, but a race could leave more than one)
             $pdo->prepare("UPDATE sys_doc_attachments
                 SET is_current = 0, superseded_at = NOW()
-                WHERE (id = :root OR root_id = :root) AND is_current = 1")
-                ->execute([':root' => $rootId]);
+                WHERE (id = ? OR root_id = ?) AND is_current = 1")
+                ->execute([$rootId, $rootId]);
 
             $ins = $pdo->prepare("INSERT INTO sys_doc_attachments
                 (doc_id, root_id, version_no, is_current, role,
@@ -816,15 +816,15 @@ try {
                 if ($role === 'primary') {
                     $pdo->prepare("UPDATE sys_doc_attachments
                         SET role = 'supporting'
-                        WHERE doc_id = :d AND role = 'primary'
-                          AND COALESCE(root_id, id) <> :r")
-                        ->execute([':d' => $docId, ':r' => $rootId]);
+                        WHERE doc_id = ? AND role = 'primary'
+                          AND COALESCE(root_id, id) <> ?")
+                        ->execute([$docId, $rootId]);
                 }
                 // Set the chosen chain's role on every row in its chain
                 $pdo->prepare("UPDATE sys_doc_attachments
-                    SET role = :role
-                    WHERE id = :root OR root_id = :root")
-                    ->execute([':role' => $role, ':root' => $rootId]);
+                    SET role = ?
+                    WHERE id = ? OR root_id = ?")
+                    ->execute([$role, $rootId, $rootId]);
 
                 $pdo->commit();
             } catch (Throwable $e) {
@@ -861,10 +861,10 @@ try {
                        s.full_name AS uploader_name
                 FROM sys_doc_attachments a
                 LEFT JOIN sys_staff s ON s.id = a.uploaded_by
-                WHERE a.id = :root OR a.root_id = :root
+                WHERE a.id = ? OR a.root_id = ?
                 ORDER BY a.version_no DESC, a.id DESC
             ");
-            $stmt->execute([':root' => $rootId]);
+            $stmt->execute([$rootId, $rootId]);
             echo json_encode([
                 'ok' => true,
                 'root_id'  => $rootId,
