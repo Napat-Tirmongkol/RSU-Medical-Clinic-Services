@@ -76,25 +76,25 @@ $staffNamesStr = implode(', ', array_map(
 
 // ── Build Gemini Vision prompt ───────────────────────────────────────────────
 $prompt = <<<PROMPT
-วิเคราะห์ตารางเวรแพทย์จากภาพนี้ แล้วส่งกลับมาเป็น JSON array เท่านั้น ห้ามมีข้อความอื่น ห้ามมี markdown code fence
+Extract all doctor shifts from this medical clinic schedule image.
 
-รายชื่อแพทย์ที่มีในระบบ (ใช้จับคู่): {$staffNamesStr}
+Staff in the system (use for name matching): {$staffNamesStr}
 
-รูปแบบ JSON แต่ละ shift:
-{
-  "doctor_name": "ชื่อแพทย์ตามที่เห็นในรูป",
-  "date": "YYYY-MM-DD หรือ null ถ้าเป็นตารางรายสัปดาห์ (จันทร์–อาทิตย์)",
-  "weekday": ตัวเลข 0-6 (0=อาทิตย์,1=จันทร์,2=อังคาร,3=พุธ,4=พฤหัสบดี,5=ศุกร์,6=เสาร์) หรือ null ถ้าระบุวันที่ชัดเจน,
-  "start_time": "HH:MM (24h เช่น 08:00)",
-  "end_time": "HH:MM (24h เช่น 12:00)",
-  "service_type": "ประเภทงาน เช่น ตรวจทั่วไป หรือ ว่างเปล่าถ้าไม่ระบุ"
-}
+Return ONLY a JSON array. Each element must have these exact keys:
+- "doctor_name": string — name as shown in image
+- "date": string "YYYY-MM-DD" or null if weekly recurring schedule
+- "weekday": integer 0-6 (0=Sun,1=Mon,2=Tue,3=Wed,4=Thu,5=Fri,6=Sat) or null if specific date
+- "start_time": string "HH:MM" 24-hour format
+- "end_time": string "HH:MM" 24-hour format (estimate start+3h if not shown)
+- "service_type": string e.g. "ตรวจทั่วไป" or empty string if unknown
 
-กฎ:
-- ตารางรายสัปดาห์ → date=null, weekday=ตัวเลข
-- ตารางระบุวันที่ → weekday=null, date=YYYY-MM-DD
-- ถ้าไม่มีเวลาสิ้นสุด ให้ประมาณ end_time = start_time + 3 ชั่วโมง
-- ส่งกลับ JSON array เท่านั้น ตัวอย่าง: [{"doctor_name":"นพ.สมชาย","date":null,"weekday":1,"start_time":"09:00","end_time":"12:00","service_type":""}]
+Rules:
+- Weekly schedule (Mon–Sun columns) → set date=null, weekday=number
+- Date-specific schedule → set weekday=null, date="YYYY-MM-DD"
+- Output ONLY the JSON array, nothing else.
+
+Example output:
+[{"doctor_name":"นพ.สมชาย ใจดี","date":null,"weekday":1,"start_time":"09:00","end_time":"12:00","service_type":"ตรวจทั่วไป"}]
 PROMPT;
 
 $requestBody = json_encode([
@@ -105,7 +105,11 @@ $requestBody = json_encode([
             ['inlineData' => ['mimeType' => $mimeType, 'data' => $imageData]],
         ],
     ]],
-    'generationConfig' => ['temperature' => 0.1, 'maxOutputTokens' => 4096],
+    'generationConfig' => [
+        'temperature'      => 0.1,
+        'maxOutputTokens'  => 4096,
+        'responseMimeType' => 'application/json',
+    ],
 ]);
 
 // ── Call Gemini Vision API ───────────────────────────────────────────────────
@@ -159,18 +163,42 @@ if ($httpCode !== 200) {
 $geminiResp = json_decode($raw, true);
 $text       = $geminiResp['candidates'][0]['content']['parts'][0]['text'] ?? '';
 
-// Strip markdown code fences if present
+// Strip markdown code fences
 $text = preg_replace('/^```(?:json)?\s*/m', '', $text);
 $text = preg_replace('/```\s*$/m', '', $text);
 $text = trim($text);
 
-if (!preg_match('/\[[\s\S]*\]/u', $text, $match)) {
-    echo json_encode(['ok' => false, 'message' => 'AI ไม่สามารถอ่านตารางจากรูปภาพได้ (ไม่พบ JSON array)']);
-    exit;
+$shifts = null;
+
+// 1. Try direct JSON parse (responseMimeType=application/json should give clean JSON)
+$direct = json_decode($text, true);
+if (is_array($direct)) {
+    if (!empty($direct) && isset($direct[0])) {
+        $shifts = $direct; // Already a flat array of shifts
+    } else {
+        // Might be {"shifts":[...]} or {"data":[...]} wrapper
+        foreach ($direct as $v) {
+            if (is_array($v) && !empty($v) && isset($v[0]) && is_array($v[0])) {
+                $shifts = $v;
+                break;
+            }
+        }
+    }
 }
 
-$shifts = json_decode($match[0], true);
-if (!is_array($shifts) || empty($shifts)) {
+// 2. Fallback: extract first [...] block from text
+if (!$shifts) {
+    if (preg_match('/\[[\s\S]*\]/u', $text, $m)) {
+        $arr = json_decode($m[0], true);
+        if (is_array($arr) && !empty($arr)) $shifts = $arr;
+    }
+}
+
+if (!$shifts) {
+    echo json_encode(['ok' => false, 'message' => 'AI ไม่สามารถอ่านตารางจากรูปภาพได้ — กรุณาลองใช้รูปภาพที่ชัดเจนกว่านี้']);
+    exit;
+}
+if (empty($shifts)) {
     echo json_encode(['ok' => false, 'message' => 'ไม่พบข้อมูล shift ในรูปภาพ']);
     exit;
 }
