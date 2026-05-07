@@ -111,21 +111,39 @@ try {
 // ── 4) sys_doc_attachments ────────────────────────────────────────────────
 try {
     $pdo->exec("CREATE TABLE IF NOT EXISTS sys_doc_attachments (
-        id           INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-        doc_id       INT UNSIGNED NOT NULL,
-        file_name    VARCHAR(255) NOT NULL COMMENT 'ชื่อไฟล์ต้นฉบับ',
-        stored_path  VARCHAR(500) NOT NULL COMMENT 'path สัมพัทธ์ใต้ uploads/edms/',
-        mime_type    VARCHAR(100) NULL,
-        file_size    BIGINT UNSIGNED NOT NULL DEFAULT 0,
-        sha1_hash    CHAR(40) NULL COMMENT 'ตรวจซ้ำไฟล์',
-        uploaded_by  INT UNSIGNED NULL,
-        uploaded_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        id            INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        doc_id        INT UNSIGNED NOT NULL,
+        root_id       INT UNSIGNED NULL COMMENT 'NULL = v1 ของ chain, otherwise ชี้ไปที่ id ของ v1',
+        version_no    INT NOT NULL DEFAULT 1,
+        is_current    TINYINT(1) NOT NULL DEFAULT 1,
+        superseded_at DATETIME NULL,
+        file_name     VARCHAR(255) NOT NULL COMMENT 'ชื่อไฟล์ต้นฉบับ',
+        stored_path   VARCHAR(500) NOT NULL COMMENT 'path สัมพัทธ์ใต้ uploads/edms/',
+        mime_type     VARCHAR(100) NULL,
+        file_size     BIGINT UNSIGNED NOT NULL DEFAULT 0,
+        sha1_hash     CHAR(40) NULL COMMENT 'ตรวจซ้ำไฟล์',
+        uploaded_by   INT UNSIGNED NULL,
+        uploaded_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         INDEX idx_doc (doc_id),
+        INDEX idx_doc_current (doc_id, is_current),
+        INDEX idx_root_chain (root_id, version_no),
         INDEX idx_uploaded_at (uploaded_at)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
     $results[] = ['ok' => true, 'msg' => 'สร้างตาราง sys_doc_attachments'];
 } catch (PDOException $e) {
     $results[] = ['ok' => false, 'msg' => 'sys_doc_attachments: ' . $e->getMessage()];
+}
+
+// ── 4b) Versioning columns retrofit (idempotent — old deployments) ───────
+foreach ([
+    "ALTER TABLE sys_doc_attachments ADD COLUMN root_id INT UNSIGNED NULL AFTER doc_id",
+    "ALTER TABLE sys_doc_attachments ADD COLUMN version_no INT NOT NULL DEFAULT 1 AFTER root_id",
+    "ALTER TABLE sys_doc_attachments ADD COLUMN is_current TINYINT(1) NOT NULL DEFAULT 1 AFTER version_no",
+    "ALTER TABLE sys_doc_attachments ADD COLUMN superseded_at DATETIME NULL AFTER is_current",
+    "ALTER TABLE sys_doc_attachments ADD INDEX idx_doc_current (doc_id, is_current)",
+    "ALTER TABLE sys_doc_attachments ADD INDEX idx_root_chain (root_id, version_no)",
+] as $alter) {
+    try { $pdo->exec($alter); } catch (PDOException) {}
 }
 
 // ── 5) sys_doc_routings ───────────────────────────────────────────────────

@@ -43,6 +43,21 @@ $entity = $_POST['entity'] ?? '';
 $action = $_POST['action'] ?? '';
 $userId = (int)($_SESSION['admin_id'] ?? 0);
 
+// ── Runtime self-heal: versioning columns on sys_doc_attachments ─────────
+// (canonical schema lives in database/migrations/migrate_edms_module.php
+//  but rerunning that script in production is rare — these idempotent
+//  ALTERs let upload_version / list_versions land without manual ops)
+foreach ([
+    "ALTER TABLE sys_doc_attachments ADD COLUMN root_id INT UNSIGNED NULL AFTER doc_id",
+    "ALTER TABLE sys_doc_attachments ADD COLUMN version_no INT NOT NULL DEFAULT 1 AFTER root_id",
+    "ALTER TABLE sys_doc_attachments ADD COLUMN is_current TINYINT(1) NOT NULL DEFAULT 1 AFTER version_no",
+    "ALTER TABLE sys_doc_attachments ADD COLUMN superseded_at DATETIME NULL AFTER is_current",
+    "ALTER TABLE sys_doc_attachments ADD INDEX idx_doc_current (doc_id, is_current)",
+    "ALTER TABLE sys_doc_attachments ADD INDEX idx_root_chain (root_id, version_no)",
+] as $sql) {
+    try { $pdo->exec($sql); } catch (PDOException) {}
+}
+
 // ── Helpers ──────────────────────────────────────────────────────────────
 
 function edms_log(PDO $pdo, int $docId, ?int $userId, string $action, array $detail = []): void
@@ -648,7 +663,8 @@ try {
             $id = (int)($_POST['id'] ?? 0);
             if ($id <= 0) throw new RuntimeException('ระบุ id ไม่ถูกต้อง');
 
-            $sel = $pdo->prepare("SELECT doc_id, stored_path, uploaded_by FROM sys_doc_attachments WHERE id = ? LIMIT 1");
+            $sel = $pdo->prepare("SELECT doc_id, stored_path, uploaded_by, root_id, version_no, is_current
+                FROM sys_doc_attachments WHERE id = ? LIMIT 1");
             $sel->execute([$id]);
             $row = $sel->fetch(PDO::FETCH_ASSOC);
             if (!$row) throw new RuntimeException('ไม่พบไฟล์');
@@ -659,14 +675,144 @@ try {
                 throw new RuntimeException('คุณไม่มีสิทธิ์ลบไฟล์ของผู้อื่น');
             }
 
+            // If we're deleting the CURRENT version of a multi-version chain,
+            // promote the previous version (max(version_no) < this) so the chain
+            // doesn't end up with no current.
+            $promotedTo = null;
+            if ((int)$row['is_current'] === 1) {
+                $rootId = $row['root_id'] !== null ? (int)$row['root_id'] : $id;
+                $prev = $pdo->prepare("SELECT id FROM sys_doc_attachments
+                    WHERE (id = :root OR root_id = :root)
+                      AND id <> :self
+                      AND version_no < :ver
+                    ORDER BY version_no DESC LIMIT 1");
+                $prev->execute([':root' => $rootId, ':self' => $id, ':ver' => (int)$row['version_no']]);
+                $prevId = (int)($prev->fetchColumn() ?: 0);
+                if ($prevId > 0) {
+                    $pdo->prepare("UPDATE sys_doc_attachments
+                        SET is_current = 1, superseded_at = NULL WHERE id = ?")
+                        ->execute([$prevId]);
+                    $promotedTo = $prevId;
+                }
+            }
+
             $pdo->prepare("DELETE FROM sys_doc_attachments WHERE id = ?")->execute([$id]);
 
             $path = edms_uploads_dir() . '/' . $row['stored_path'];
             if (is_file($path)) @unlink($path);
 
-            edms_log($pdo, (int)$row['doc_id'], $userId, 'detach', ['attachment_id' => $id]);
+            edms_log($pdo, (int)$row['doc_id'], $userId, 'detach',
+                ['attachment_id' => $id, 'promoted_previous' => $promotedTo]);
 
-            echo json_encode(['ok' => true, 'message' => 'ลบไฟล์แนบแล้ว']);
+            echo json_encode([
+                'ok' => true,
+                'message' => $promotedTo
+                    ? 'ลบเวอร์ชันแล้ว — เวอร์ชันก่อนหน้าถูกเลื่อนเป็นปัจจุบัน'
+                    : 'ลบไฟล์แนบแล้ว',
+                'promoted_previous' => $promotedTo,
+            ]);
+            exit;
+        }
+
+        // ════════════ ATTACHMENT: UPLOAD NEW VERSION ════════════
+        // อัปโหลดไฟล์เป็นเวอร์ชันใหม่ของไฟล์ที่ระบุ — ตัวเก่าโดน supersede อัตโนมัติ
+        case 'attachment:upload_version': {
+            $parentId = (int)($_POST['parent_id'] ?? 0);
+            if ($parentId <= 0) throw new RuntimeException('ระบุ parent_id ไม่ถูกต้อง');
+
+            $sel = $pdo->prepare("SELECT doc_id, root_id, version_no, is_current
+                FROM sys_doc_attachments WHERE id = ? LIMIT 1");
+            $sel->execute([$parentId]);
+            $parent = $sel->fetch(PDO::FETCH_ASSOC);
+            if (!$parent) throw new RuntimeException('ไม่พบไฟล์ต้นฉบับที่จะ override');
+
+            $docId  = (int)$parent['doc_id'];
+            $rootId = $parent['root_id'] !== null ? (int)$parent['root_id'] : $parentId;
+
+            if (empty($_FILES['file']['name'])) throw new RuntimeException('ไม่พบไฟล์');
+            if ($_FILES['file']['error'] !== UPLOAD_ERR_OK) throw new RuntimeException('อัปโหลดไม่สำเร็จ');
+
+            $saved = edms_save_uploaded_file([
+                'name'     => $_FILES['file']['name'],
+                'type'     => $_FILES['file']['type'] ?? '',
+                'tmp_name' => $_FILES['file']['tmp_name'],
+                'error'    => $_FILES['file']['error'],
+                'size'     => $_FILES['file']['size'] ?? 0,
+            ], $docId);
+            if (!$saved) throw new RuntimeException('ไฟล์ขนาดเกิน 20MB หรือนามสกุลไม่รองรับ');
+
+            // Compute next version_no across the entire chain
+            $vstmt = $pdo->prepare("SELECT COALESCE(MAX(version_no), 0) FROM sys_doc_attachments
+                WHERE id = :root OR root_id = :root");
+            $vstmt->execute([':root' => $rootId]);
+            $nextVersion = (int)$vstmt->fetchColumn() + 1;
+
+            // Mark all current rows in this chain as superseded (defensive: there
+            // should be exactly one, but a race could leave more than one)
+            $pdo->prepare("UPDATE sys_doc_attachments
+                SET is_current = 0, superseded_at = NOW()
+                WHERE (id = :root OR root_id = :root) AND is_current = 1")
+                ->execute([':root' => $rootId]);
+
+            $ins = $pdo->prepare("INSERT INTO sys_doc_attachments
+                (doc_id, root_id, version_no, is_current,
+                 file_name, stored_path, mime_type, file_size, sha1_hash, uploaded_by)
+                VALUES (?, ?, ?, 1, ?, ?, ?, ?, ?, ?)");
+            $ins->execute([
+                $docId,
+                $rootId,
+                $nextVersion,
+                $saved['file_name'],
+                $saved['stored_path'],
+                $saved['mime_type'],
+                $saved['file_size'],
+                $saved['sha1_hash'],
+                $userId ?: null,
+            ]);
+            $newId = (int)$pdo->lastInsertId();
+
+            edms_log($pdo, $docId, $userId, 'attach_version',
+                ['root_id' => $rootId, 'version_no' => $nextVersion, 'new_id' => $newId]);
+
+            echo json_encode([
+                'ok'        => true,
+                'id'        => $newId,
+                'root_id'   => $rootId,
+                'version_no'=> $nextVersion,
+                'file_name' => $saved['file_name'],
+                'message'   => 'อัปโหลดเวอร์ชันใหม่ (v' . $nextVersion . ') แล้ว',
+            ], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        // ════════════ ATTACHMENT: LIST VERSIONS ════════════
+        // คืนค่าทุกเวอร์ชันใน chain เดียวกัน — เรียงเวอร์ชันล่าสุดก่อน
+        case 'attachment:list_versions': {
+            $id = (int)($_POST['id'] ?? 0);
+            if ($id <= 0) throw new RuntimeException('ระบุ id ไม่ถูกต้อง');
+
+            $sel = $pdo->prepare("SELECT id, root_id FROM sys_doc_attachments WHERE id = ? LIMIT 1");
+            $sel->execute([$id]);
+            $r = $sel->fetch(PDO::FETCH_ASSOC);
+            if (!$r) throw new RuntimeException('ไม่พบไฟล์');
+            $rootId = $r['root_id'] !== null ? (int)$r['root_id'] : (int)$r['id'];
+
+            $stmt = $pdo->prepare("
+                SELECT a.id, a.root_id, a.version_no, a.is_current, a.file_name,
+                       a.file_size, a.mime_type, a.uploaded_at, a.uploaded_by,
+                       a.superseded_at,
+                       s.full_name AS uploader_name
+                FROM sys_doc_attachments a
+                LEFT JOIN sys_staff s ON s.id = a.uploaded_by
+                WHERE a.id = :root OR a.root_id = :root
+                ORDER BY a.version_no DESC, a.id DESC
+            ");
+            $stmt->execute([':root' => $rootId]);
+            echo json_encode([
+                'ok' => true,
+                'root_id'  => $rootId,
+                'versions' => $stmt->fetchAll(PDO::FETCH_ASSOC),
+            ], JSON_UNESCAPED_UNICODE);
             exit;
         }
 

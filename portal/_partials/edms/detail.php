@@ -45,12 +45,18 @@ try {
     $doc = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if ($doc) {
+        // Show only the current version of each chain. version_no + total versions
+        // are computed so the row badge can read "v3" + "(3 เวอร์ชัน)".
         $att = $pdo->prepare("SELECT a.id, a.file_name, a.stored_path, a.mime_type, a.file_size,
-                                     a.uploaded_at, a.uploaded_by,
-                                     s.full_name AS uploader_name
+                                     a.uploaded_at, a.uploaded_by, a.root_id, a.version_no,
+                                     s.full_name AS uploader_name,
+                                     (SELECT COUNT(*) FROM sys_doc_attachments x
+                                      WHERE x.id = COALESCE(a.root_id, a.id)
+                                         OR x.root_id = COALESCE(a.root_id, a.id)) AS total_versions
             FROM sys_doc_attachments a
             LEFT JOIN sys_staff s ON s.id = a.uploaded_by
-            WHERE a.doc_id = ? ORDER BY a.id ASC");
+            WHERE a.doc_id = ? AND a.is_current = 1
+            ORDER BY a.id ASC");
         $att->execute([$id]);
         $attachments = $att->fetchAll(PDO::FETCH_ASSOC);
 
@@ -438,13 +444,31 @@ $routingStatusLabels = [
                         <div class="flex items-center gap-3 px-3 py-2.5 bg-slate-50 hover:bg-slate-100 rounded-2xl border border-slate-100 transition-colors">
                             <i class="fa-solid <?= $iconClass ?> text-lg"></i>
                             <div class="flex-1 min-w-0">
-                                <p class="text-sm font-black text-slate-700 truncate"><?= htmlspecialchars($a['file_name']) ?></p>
+                                <div class="flex items-center gap-1.5 flex-wrap">
+                                    <p class="text-sm font-black text-slate-700 truncate"><?= htmlspecialchars($a['file_name']) ?></p>
+                                    <?php $vNum = (int)$a['version_no']; $vTotal = (int)$a['total_versions']; ?>
+                                    <?php if ($vNum > 1 || $vTotal > 1): ?>
+                                        <span class="inline-flex items-center text-[9px] font-black px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 border border-amber-200" title="<?= $vTotal ?> เวอร์ชัน">v<?= $vNum ?></span>
+                                    <?php endif; ?>
+                                </div>
                                 <p class="text-[10px] font-bold text-slate-400 truncate">
                                     <?= edms_format_bytes((int)$a['file_size']) ?>
                                     · <?= date('d/m/Y H:i', strtotime($a['uploaded_at'])) ?>
                                     · โดย <span class="text-slate-500"><?= htmlspecialchars($uploader) ?></span>
                                 </p>
                             </div>
+                            <?php if ($vTotal > 1): ?>
+                                <button onclick="edmsShowVersions(<?= (int)$a['id'] ?>, '<?= htmlspecialchars(addslashes($a['file_name']), ENT_QUOTES) ?>')"
+                                    class="text-amber-600 hover:bg-amber-100 px-2.5 py-1 rounded-lg text-xs font-black"
+                                    title="ดูประวัติเวอร์ชัน (<?= $vTotal ?> เวอร์ชัน)">
+                                    <i class="fa-solid fa-clock-rotate-left"></i>
+                                </button>
+                            <?php endif; ?>
+                            <button onclick="edmsUploadVersion(<?= (int)$a['id'] ?>, '<?= htmlspecialchars(addslashes($a['file_name']), ENT_QUOTES) ?>')"
+                                class="text-purple-500 hover:bg-purple-100 px-2.5 py-1 rounded-lg text-xs font-black"
+                                title="อัปโหลดเวอร์ชันใหม่ (แทนไฟล์เดิม)">
+                                <i class="fa-solid fa-arrows-rotate"></i>
+                            </button>
                             <?php if ($isPdf || $isImage): ?>
                                 <button onclick="edmsViewer(<?= (int)$a['id'] ?>, '<?= htmlspecialchars(addslashes($a['file_name']), ENT_QUOTES) ?>', '<?= $isPdf ? 'pdf' : 'image' ?>')"
                                     class="text-sky-500 hover:bg-sky-100 px-2.5 py-1 rounded-lg text-xs font-black"
@@ -557,6 +581,26 @@ $routingStatusLabels = [
                 class="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2.5 rounded-xl text-sm font-black flex items-center gap-2 shadow-sm transition-colors">
                 <i class="fa-solid fa-share"></i> โอนเอกสาร
             </button>
+        </div>
+    </div>
+</div>
+
+<!-- Hidden picker dedicated to "upload new version of <attachment X>" -->
+<input type="file" id="edmsVersionFile" class="hidden"
+    accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.doc,.docx,.xls,.xlsx,.txt">
+
+<!-- ════════════ VERSION HISTORY MODAL ════════════ -->
+<div id="edmsVersionsModal" class="fixed inset-0 bg-black/60 hidden items-center justify-center p-4" style="z-index:310">
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-2xl flex flex-col overflow-hidden" style="max-height:88vh">
+        <div class="px-5 py-3 border-b border-slate-100 flex items-center gap-3 shrink-0">
+            <i class="fa-solid fa-clock-rotate-left text-amber-500 text-lg"></i>
+            <p id="edmsVersionsName" class="flex-1 min-w-0 text-sm font-black text-slate-700 truncate">—</p>
+            <button onclick="edmsCloseVersions()" class="text-slate-400 hover:text-rose-500 w-8 h-8 rounded-lg hover:bg-slate-50 flex items-center justify-center">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+        <div id="edmsVersionsBody" class="flex-1 overflow-y-auto p-5 space-y-2" style="min-height:0">
+            <p class="text-center text-sm text-slate-400 py-6">กำลังโหลด...</p>
         </div>
     </div>
 </div>
@@ -713,6 +757,139 @@ document.getElementById('edmsAddFiles')?.addEventListener('change', async e => {
         e.target.value = '';
     }
 });
+
+// ════════════ ATTACHMENT VERSIONING ════════════
+
+let edmsVersionParentId = null; // remembers which attachment we're versioning
+
+window.edmsUploadVersion = function(parentId, parentName) {
+    edmsVersionParentId = parentId;
+    const picker = document.getElementById('edmsVersionFile');
+    picker.value = '';
+    // Stash the friendly name so the success toast can mention it
+    picker.dataset.parentName = parentName || '';
+    picker.click();
+};
+
+document.getElementById('edmsVersionFile')?.addEventListener('change', async e => {
+    const file = e.target.files?.[0];
+    const parentId = edmsVersionParentId;
+    edmsVersionParentId = null;
+    if (!file || !parentId) return;
+
+    if (file.size > 20 * 1024 * 1024) {
+        Swal.fire({ icon: 'warning', title: 'ไฟล์ใหญ่เกิน 20MB' });
+        e.target.value = '';
+        return;
+    }
+
+    const fd = new FormData();
+    fd.append('entity', 'attachment');
+    fd.append('action', 'upload_version');
+    fd.append('parent_id', parentId);
+    fd.append('csrf_token', portal_CSRF);
+    fd.append('file', file);
+
+    Swal.fire({
+        title: 'กำลังอัปโหลดเวอร์ชันใหม่...',
+        allowOutsideClick: false,
+        didOpen: () => Swal.showLoading(),
+    });
+
+    try {
+        const res = await (await fetch('ajax_edms.php', { method: 'POST', body: fd })).json();
+        if (res.ok) {
+            await Swal.fire({
+                icon: 'success',
+                title: res.message || 'อัปโหลดเวอร์ชันใหม่แล้ว',
+                timer: 1200,
+                showConfirmButton: false,
+            });
+            window.location.reload();
+        } else {
+            Swal.fire({ icon: 'error', title: 'อัปโหลดไม่สำเร็จ', text: res.message || '' });
+        }
+    } catch (err) {
+        Swal.fire({ icon: 'error', title: 'เครือข่ายขัดข้อง', text: 'อัปโหลดไม่สำเร็จ' });
+    } finally {
+        e.target.value = '';
+    }
+});
+
+window.edmsShowVersions = async function(attId, attName) {
+    document.getElementById('edmsVersionsName').textContent = attName;
+    const body = document.getElementById('edmsVersionsBody');
+    body.innerHTML = '<p class="text-center text-sm text-slate-400 py-6">กำลังโหลด...</p>';
+    const m = document.getElementById('edmsVersionsModal');
+    m.classList.remove('hidden'); m.classList.add('flex');
+
+    const fd = new FormData();
+    fd.append('entity', 'attachment');
+    fd.append('action', 'list_versions');
+    fd.append('id', attId);
+    fd.append('csrf_token', portal_CSRF);
+
+    try {
+        const res = await (await fetch('ajax_edms.php', { method: 'POST', body: fd })).json();
+        if (!res.ok) {
+            body.innerHTML = `<p class="text-center text-sm text-rose-500 py-6">${escEdms(res.message || 'โหลดไม่สำเร็จ')}</p>`;
+            return;
+        }
+        if (!res.versions || res.versions.length === 0) {
+            body.innerHTML = '<p class="text-center text-sm text-slate-400 py-6">ไม่มีประวัติเวอร์ชัน</p>';
+            return;
+        }
+        body.innerHTML = res.versions.map(v => {
+            const isCur = parseInt(v.is_current, 10) === 1;
+            const ext = String(v.file_name).split('.').pop().toLowerCase();
+            const isPdf = ext === 'pdf';
+            const isImg = ['png','jpg','jpeg','gif','webp'].includes(ext);
+            const icon = isPdf ? 'fa-file-pdf text-rose-500'
+                       : isImg ? 'fa-file-image text-purple-500'
+                       : 'fa-file text-slate-400';
+            const sizeKb = (parseInt(v.file_size, 10) / 1024).toFixed(1) + ' KB';
+            const when = v.uploaded_at ? new Date(String(v.uploaded_at).replace(' ', 'T')).toLocaleString('th-TH') : '-';
+            const uploader = v.uploader_name || 'ระบบ';
+            const previewBtn = (isPdf || isImg)
+                ? `<button onclick="edmsViewer(${v.id}, ${JSON.stringify(v.file_name)}, '${isPdf ? 'pdf' : 'image'}')"
+                    class="text-sky-500 hover:bg-sky-100 px-2 py-1 rounded text-xs font-black" title="ดู"><i class="fa-solid fa-eye"></i></button>`
+                : '';
+            const supersededLine = (!isCur && v.superseded_at)
+                ? `<span class="text-slate-400">· แทนที่: ${escEdms(new Date(String(v.superseded_at).replace(' ', 'T')).toLocaleString('th-TH'))}</span>`
+                : '';
+            return `
+                <div class="flex items-center gap-3 px-3 py-2.5 ${isCur ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-100'} border rounded-2xl">
+                    <span class="inline-flex items-center text-[10px] font-black px-2 py-0.5 rounded ${isCur ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : 'bg-amber-100 text-amber-700 border border-amber-200'} shrink-0">v${v.version_no}${isCur ? ' · ปัจจุบัน' : ''}</span>
+                    <i class="fa-solid ${icon} text-lg"></i>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-black text-slate-700 truncate">${escEdms(v.file_name)}</p>
+                        <p class="text-[10px] font-bold text-slate-400 truncate">
+                            ${escEdms(sizeKb)} · ${escEdms(when)} · โดย ${escEdms(uploader)} ${supersededLine}
+                        </p>
+                    </div>
+                    ${previewBtn}
+                    <a href="edms_file.php?id=${v.id}&disposition=attachment"
+                       class="text-emerald-500 hover:bg-emerald-100 px-2 py-1 rounded text-xs font-black" title="ดาวน์โหลด"><i class="fa-solid fa-download"></i></a>
+                </div>
+            `;
+        }).join('');
+    } catch (err) {
+        body.innerHTML = '<p class="text-center text-sm text-rose-500 py-6">เครือข่ายขัดข้อง</p>';
+    }
+};
+
+window.edmsCloseVersions = function() {
+    const m = document.getElementById('edmsVersionsModal');
+    m.classList.add('hidden'); m.classList.remove('flex');
+};
+
+// Tiny HTML-escape helper used inside the version history renderer
+function escEdms(s) {
+    if (s == null) return '';
+    return String(s).replace(/[&<>"']/g, c => ({
+        '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+    })[c]);
+}
 
 window.edmsDeleteAttachment = async function(attId, fileName) {
     const c = await Swal.fire({
