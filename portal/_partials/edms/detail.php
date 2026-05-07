@@ -531,9 +531,9 @@ $routingStatusLabels = [
 </div>
 
 <!-- ════════════ ATTACHMENT VIEWER MODAL ════════════ -->
-<div id="edmsViewerModal" class="fixed inset-0 bg-black/60 hidden items-center justify-center p-4">
-    <div id="edmsViewerBox" class="bg-white rounded-3xl shadow-2xl w-full max-w-5xl flex flex-col overflow-hidden">
-        <div class="px-5 py-3 border-b border-slate-100 flex items-center gap-3">
+<div id="edmsViewerModal" class="fixed inset-0 bg-black/60 hidden items-center justify-center p-4" style="z-index:300">
+    <div id="edmsViewerBox" class="bg-white rounded-3xl shadow-2xl w-full max-w-7xl flex flex-col overflow-hidden" style="height:92vh;max-height:92vh">
+        <div class="px-5 py-3 border-b border-slate-100 flex items-center gap-3 shrink-0">
             <i id="edmsViewerIcon" class="fa-solid fa-file text-slate-400 text-lg"></i>
             <p id="edmsViewerName" class="flex-1 min-w-0 text-sm font-black text-slate-700 truncate">—</p>
             <a id="edmsViewerDownload" href="#" class="text-emerald-500 hover:bg-emerald-50 px-3 py-1.5 rounded-lg text-xs font-black inline-flex items-center gap-1.5">
@@ -543,9 +543,9 @@ $routingStatusLabels = [
                 <i class="fa-solid fa-xmark"></i>
             </button>
         </div>
-        <div id="edmsViewerFrame" class="flex-1 overflow-hidden bg-slate-100" style="height: 75vh;">
+        <div id="edmsViewerFrame" class="flex-1 overflow-auto bg-slate-100" style="min-height:0">
             <iframe id="edmsViewerIframe" class="hidden w-full h-full bg-white" frameborder="0"></iframe>
-            <img id="edmsViewerImg" class="hidden mx-auto max-h-full" alt="">
+            <img id="edmsViewerImg" class="hidden mx-auto max-w-full max-h-full object-contain" alt="">
         </div>
     </div>
 </div>
@@ -567,7 +567,9 @@ window.edmsViewer = function(id, name, kind) {
 
     if (kind === 'pdf') {
         icon.className = 'fa-solid fa-file-pdf text-rose-500 text-lg';
-        iframe.src = `edms_file.php?id=${id}&disposition=inline`;
+        // #toolbar=1 keeps the PDF toolbar; zoom=page-width fits page to iframe width by
+        // default so short / non-A4 pages don't render as a tiny strip in a sea of black.
+        iframe.src = `edms_file.php?id=${id}&disposition=inline#toolbar=1&zoom=page-width&view=FitH`;
         iframe.classList.remove('hidden');
     } else if (kind === 'image') {
         icon.className = 'fa-solid fa-file-image text-purple-500 text-lg';
