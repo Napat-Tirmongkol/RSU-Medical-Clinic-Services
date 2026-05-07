@@ -45,11 +45,20 @@ if (empty($_smtpCfg['SMTP_HOST']) || empty($_smtpCfg['SMTP_USER']) || empty($_sm
 }
 
 // ── Auto-migrate: เพิ่มคอลัมน์ reminder_sent_at ถ้ายังไม่มี ───────────────────
-try {
-    $pdo->exec("ALTER TABLE camp_bookings ADD COLUMN reminder_sent_at DATETIME NULL DEFAULT NULL");
-    $log[] = 'สร้างคอลัมน์ reminder_sent_at เรียบร้อย';
-} catch (PDOException) {
-    // คอลัมน์มีอยู่แล้ว — ข้ามได้
+// ตรวจก่อนด้วย INFORMATION_SCHEMA แทนที่จะ ALTER แล้ว catch — เพราะ ALTER บน
+// table ใหญ่อาจใช้เวลานานมากแม้แค่ "column มีอยู่แล้ว" บาง MySQL version
+$colExists = $pdo->prepare("
+    SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'camp_bookings' AND COLUMN_NAME = 'reminder_sent_at'
+");
+$colExists->execute();
+if ((int)$colExists->fetchColumn() === 0) {
+    try {
+        $pdo->exec("ALTER TABLE camp_bookings ADD COLUMN reminder_sent_at DATETIME NULL DEFAULT NULL");
+        $log[] = 'สร้างคอลัมน์ reminder_sent_at เรียบร้อย';
+    } catch (PDOException $e) {
+        $log[] = 'WARN: ALTER TABLE ไม่สำเร็จ — ' . $e->getMessage();
+    }
 }
 
 // ── ดึงรายการที่ต้องส่งแจ้งเตือน ──────────────────────────────────────────────
@@ -94,8 +103,15 @@ $markStmt = $pdo->prepare("
     UPDATE camp_bookings SET reminder_sent_at = NOW() WHERE id = :id
 ");
 
-// ── ส่งอีเมลทีละรายการ + delay ───────────────────────────────────────────────
+// หยุดส่งก่อนถึง cron-job.org timeout (25 วินาที) — รอบถัดไปส่งต่อได้เพราะ reminder_sent_at
+$deadline = time() + 25;
+
+// ── ส่งอีเมลทีละรายการ ────────────────────────────────────────────────────────
 foreach ($bookings as $i => $row) {
+    if (time() >= $deadline) {
+        $log[] = "⚠ หยุดชั่วคราว (ใกล้ถึง time limit) — cron รอบถัดไปจะส่งที่เหลือต่อ";
+        break;
+    }
     $bookingId = (int)$row['booking_id'];
     $email     = $row['email'];
     $name      = $row['full_name'] ?? '';
