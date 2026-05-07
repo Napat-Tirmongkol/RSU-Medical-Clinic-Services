@@ -491,12 +491,39 @@ try {
             ");
             $stmt->execute();
             $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            echo json_encode(['ok' => true, 'rows' => $rows]);
+
+            // Pull closed-day holidays so the UI can display them and block scheduling
+            $holidays = [];
+            try {
+                $hStmt = $pdo->query("SELECT specific_date, note, is_closed
+                    FROM sys_clinic_hours
+                    WHERE type IN ('holiday','special') AND is_closed = 1
+                    ORDER BY specific_date");
+                $holidays = $hStmt ? $hStmt->fetchAll(PDO::FETCH_ASSOC) : [];
+            } catch (PDOException) {}
+
+            echo json_encode(['ok' => true, 'rows' => $rows, 'holidays' => $holidays]);
             return;
         }
 
         case 'schedule:add': {
             $type = $_POST['type'] ?? 'regular';
+            // Block override shifts on closed-day holidays
+            if ($type === 'override') {
+                $sd = trim((string)($_POST['specific_date'] ?? ''));
+                if ($sd !== '') {
+                    $hCheck = $pdo->prepare("SELECT note FROM sys_clinic_hours
+                        WHERE type IN ('holiday','special') AND is_closed = 1 AND specific_date = :d LIMIT 1");
+                    $hCheck->execute([':d' => $sd]);
+                    if ($holRow = $hCheck->fetch(PDO::FETCH_ASSOC)) {
+                        echo json_encode([
+                            'ok' => false,
+                            'message' => 'ไม่สามารถลงตารางแพทย์ในวันหยุด: ' . ($holRow['note'] ?: 'วันหยุด'),
+                        ]);
+                        return;
+                    }
+                }
+            }
             $recurEnd = ($type === 'regular' && !empty($_POST['recur_end_date']))
                 ? trim((string)$_POST['recur_end_date']) : null;
             $stmt = $pdo->prepare("INSERT INTO sys_doctor_schedule
@@ -524,6 +551,31 @@ try {
             // When 'type' is absent  → partial drag-drop update; preserve existing type fields via COALESCE.
             $id   = (int)$_POST['id'];
             $type = isset($_POST['type']) && $_POST['type'] !== '' ? $_POST['type'] : null;
+
+            // Block override shifts on closed-day holidays (covers both modal save and drag-drop)
+            $effectiveDate = null;
+            if ($type === 'override') {
+                $effectiveDate = trim((string)($_POST['specific_date'] ?? '')) ?: null;
+            } elseif ($type === null && !empty($_POST['specific_date'])) {
+                // Partial drag-drop — only block if the existing row is an override
+                $row = $pdo->prepare("SELECT type FROM sys_doctor_schedule WHERE id = :id");
+                $row->execute([':id' => $id]);
+                if ($row->fetchColumn() === 'override') {
+                    $effectiveDate = $_POST['specific_date'];
+                }
+            }
+            if ($effectiveDate) {
+                $hCheck = $pdo->prepare("SELECT note FROM sys_clinic_hours
+                    WHERE type IN ('holiday','special') AND is_closed = 1 AND specific_date = :d LIMIT 1");
+                $hCheck->execute([':d' => $effectiveDate]);
+                if ($holRow = $hCheck->fetch(PDO::FETCH_ASSOC)) {
+                    echo json_encode([
+                        'ok' => false,
+                        'message' => 'ไม่สามารถลงตารางแพทย์ในวันหยุด: ' . ($holRow['note'] ?: 'วันหยุด'),
+                    ]);
+                    return;
+                }
+            }
 
             if ($type !== null) {
                 // Full modal edit — derive nullable fields strictly from type to avoid '' overwriting NULL

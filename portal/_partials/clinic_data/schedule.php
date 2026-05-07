@@ -108,6 +108,17 @@ $serviceTypes = ['ตรวจทั่วไป', 'วัคซีน', 'ตร
     #ds-import-modal-box       { max-height: 90vh; }
     #ds-import-step3           { min-height: 0; }
     #ds-import-confirm-btn     { flex: 2 2 0%; }
+
+    /* Holiday events — block scheduling, distinct rose tone */
+    .fc-event.ds-holiday-evt {
+        background: #fee2e2 !important;
+        border-color: #fca5a5 !important;
+        color: #991b1b !important;
+        font-weight: 800;
+    }
+    .fc-event.ds-holiday-evt .fc-event-title,
+    .fc-event.ds-holiday-evt .fc-event-time { color: #991b1b !important; }
+    .fc-event.ds-holiday-evt .ds-holiday-icon { margin-right: 4px; }
 </style>
 
 <div class="max-w-[1400px] mx-auto px-4 py-6">
@@ -140,6 +151,7 @@ $serviceTypes = ['ตรวจทั่วไป', 'วัคซีน', 'ตร
         <span class="inline-flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-amber-500"></span>ปรึกษา</span>
         <span class="inline-flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-pink-500"></span>ทันตกรรม</span>
         <span class="inline-flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-slate-400"></span>ลา/หยุด</span>
+        <span class="inline-flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-rose-200 border border-rose-300"></span>วันหยุดคลินิก</span>
     </div>
 
     <div class="ds-layout">
@@ -373,6 +385,18 @@ const STAFF_LIST = <?= json_encode($staffList, JSON_UNESCAPED_UNICODE) ?>;
 const ROOMS_LIST = <?= json_encode($roomsList, JSON_UNESCAPED_UNICODE) ?>;
 let dsCalendar = null;
 let dsRows = [];
+const DS_HOLIDAYS = new Map(); // 'YYYY-MM-DD' → note (for blocking + lookup)
+
+function dsHolidayBlock(dateStr, verb = 'ลงตารางแพทย์') {
+    if (!DS_HOLIDAYS.has(dateStr)) return false;
+    Swal.fire({
+        icon: 'warning',
+        title: 'วันหยุดคลินิก',
+        text: `ไม่สามารถ${verb}ในวันหยุด: ${DS_HOLIDAYS.get(dateStr)}`,
+        confirmButtonColor: '#0ea5e9',
+    });
+    return true;
+}
 
 // ── Local time helpers (avoid toISOString() UTC shift in Asia/Bangkok) ──
 function dsPad2(n) { return String(n).padStart(2, '0'); }
@@ -436,7 +460,35 @@ async function dsLoadAndRender() {
     const res = await dsPost('list', {});
     if (!res.ok) { Swal.fire('Error', res.message || 'โหลดไม่สำเร็จ', 'error'); return; }
     dsRows = res.rows;
+
+    DS_HOLIDAYS.clear();
+    (res.holidays || []).forEach(h => {
+        DS_HOLIDAYS.set(h.specific_date, h.note || 'วันหยุด');
+    });
+
     dsCalendar.removeAllEvents();
+
+    // Holiday events (background tint + visible label) — render before shifts
+    (res.holidays || []).forEach(h => {
+        dsCalendar.addEvent({
+            start: h.specific_date,
+            allDay: true,
+            display: 'background',
+            backgroundColor: '#fee2e2',
+            extendedProps: { __holiday: true },
+        });
+        dsCalendar.addEvent({
+            title: h.note || 'วันหยุด',
+            start: h.specific_date,
+            allDay: true,
+            classNames: ['ds-holiday-evt'],
+            editable: false,
+            startEditable: false,
+            durationEditable: false,
+            extendedProps: { __holiday: true },
+        });
+    });
+
     dsRows.forEach(r => dsCalendar.addEvent(rowToEvent(r)));
 }
 
@@ -502,6 +554,7 @@ async function dsSave(e) {
     e.preventDefault();
     const fd = new FormData(e.target);
     const data = Object.fromEntries(fd.entries());
+    if (data.type === 'override' && data.specific_date && dsHolidayBlock(data.specific_date)) return;
     const action = data.id ? 'update' : 'add';
     const res = await dsPost(action, data);
     if (res.ok) {
@@ -786,12 +839,26 @@ document.addEventListener('DOMContentLoaded', () => {
         editable: true,
         selectable: true,
         eventClick: (info) => {
+            if (info.event.extendedProps.__holiday) return; // holidays are read-only markers
             const row = dsRows.find(r => +r.id === +info.event.id);
             if (row) dsOpenEdit(row, info.event.start);
         },
+        eventDidMount: (info) => {
+            if (info.event.extendedProps.__holiday) {
+                info.el.title = 'วันหยุดคลินิก: ' + info.event.title;
+                const titleEl = info.el.querySelector('.fc-event-title');
+                if (titleEl && !titleEl.querySelector('.ds-holiday-icon')) {
+                    const ico = document.createElement('i');
+                    ico.className = 'fa-solid fa-calendar-xmark ds-holiday-icon';
+                    titleEl.prepend(ico);
+                }
+            }
+        },
         dateClick: (info) => {
+            const ds = info.dateStr.substring(0, 10);
+            if (dsHolidayBlock(ds)) return;
             // Clicking on empty slot opens add modal pre-filled with date+time
-            dsOpenAdd({ date: info.dateStr.substring(0,10), time: info.dateStr.substring(11,16) || '09:00' });
+            dsOpenAdd({ date: ds, time: info.dateStr.substring(11,16) || '09:00' });
         },
         droppable: true, // Accept external drag from doctor palette
         drop: async (info) => {
@@ -807,9 +874,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const startTime = isAllDay ? '09:00' : dsLocalTime(start);
             const endTime   = isAllDay ? '10:00' : dsLocalTime(dsAddMin(start, 60));
 
+            const dateStr = dsLocalDate(start);
+            if (dsHolidayBlock(dateStr)) return;
+
             const data = {
                 type: 'override',
-                specific_date: dsLocalDate(start),
+                specific_date: dateStr,
                 start_time: startTime,
                 end_time:   endTime,
                 staff_id:   staffId,
@@ -824,10 +894,18 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         },
         eventDrop: async (info) => {
+            if (info.event.extendedProps.__holiday) { info.revert(); return; }
             const row = dsRows.find(r => +r.id === +info.event.id);
             if (!row) return;
             const newStart = info.event.start;
             const newEnd   = info.event.end || new Date(newStart.getTime() + 60*60*1000);
+
+            // Block moving an override onto a holiday date
+            if (row.type === 'override') {
+                const newDateStr = dsLocalDate(newStart);
+                if (dsHolidayBlock(newDateStr, 'ย้าย shift')) { info.revert(); return; }
+            }
+
             const data = { id: row.id };
             if (row.type === 'regular') {
                 data.weekday = newStart.getDay();
