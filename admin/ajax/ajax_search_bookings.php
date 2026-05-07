@@ -40,7 +40,7 @@ if ($status === 'cancelled') {
     $where .= " AND b.status IN ('cancelled','cancelled_by_admin','expired')";
 } elseif ($status === 'completed') {
     // รวม QR check-in (attended_at set แต่ status อาจยังเป็น confirmed) + staff check-in (status = completed)
-    $where .= " AND (b.status = 'completed' OR (b.attended_at IS NOT NULL AND b.status NOT IN ('cancelled','cancelled_by_admin')))";
+    $where .= " AND (b.status = 'completed' OR (b.attended_at IS NOT NULL AND b.status NOT IN ('cancelled','cancelled_by_admin','expired')))";
 } elseif ($status === 'confirmed') {
     // confirmed ที่ยังไม่ได้เช็คอิน
     $where .= " AND b.status = 'confirmed' AND b.attended_at IS NULL";
