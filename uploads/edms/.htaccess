@@ -1,0 +1,8 @@
+# Block PHP/script execution under uploads/edms/
+<FilesMatch "\.(php|phtml|phar|pl|py|jsp|asp|sh|cgi)$">
+    Order Deny,Allow
+    Deny from all
+</FilesMatch>
+
+# Disable directory listing
+Options -Indexes
