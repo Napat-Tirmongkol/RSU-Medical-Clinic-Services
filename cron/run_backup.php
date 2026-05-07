@@ -12,6 +12,10 @@
  */
 declare(strict_types=1);
 
+// แสดง error จริงในหน้า (สำหรับ debug ผ่าน cron-job.org)
+ini_set('display_errors', '1');
+error_reporting(E_ALL);
+
 // ── เพิ่ม time limit และ memory เผื่อ DB ใหญ่ ─────────────────────────────────
 set_time_limit(0);
 ini_set('memory_limit', '512M');
@@ -39,23 +43,26 @@ $dbUser = $secrets['DB_USER'] ?? '';
 $dbPass = $secrets['DB_PASS'] ?? '';
 $dbName = $secrets['DB_NAME'] ?? '';
 
-$backupDir = __DIR__ . '/backups';
-$logDir    = __DIR__ . '/logs';
-$timestamp = date('Ymd_His');
+$now = date('Y-m-d H:i:s');
+
+// หา directory ที่เขียนได้: ลอง cron/backups/ ก่อน → fallback sys_get_temp_dir()
+function find_writable_dir(string $preferred): string {
+    if (!is_dir($preferred)) @mkdir($preferred, 0750, true);
+    if (is_writable($preferred)) return $preferred;
+    // fallback: ใช้ temp dir
+    $tmp = sys_get_temp_dir() . '/rsu_backup';
+    if (!is_dir($tmp)) @mkdir($tmp, 0750, true);
+    return $tmp;
+}
+
+$backupDir  = find_writable_dir(__DIR__ . '/backups');
+$logDir     = find_writable_dir(__DIR__ . '/logs');
+$timestamp  = date('Ymd_His');
 $backupFile = "{$backupDir}/{$dbName}_{$timestamp}.sql.gz";
 $logFile    = "{$logDir}/backup.log";
-$now        = date('Y-m-d H:i:s');
 
-// สร้าง directory แล้วตรวจสอบว่าเขียนได้จริง
-foreach ([$backupDir, $logDir] as $_dir) {
-    if (!is_dir($_dir)) {
-        @mkdir($_dir, 0750, true);
-    }
-    if (!is_writable($_dir)) {
-        http_response_code(500);
-        exit("ERROR: ไม่สามารถเขียนไฟล์ได้ที่ {$_dir} — ตรวจสอบ permission ของ cron/backups/ และ cron/logs/");
-    }
-}
+echo "INFO: backupDir = {$backupDir}\n";
+echo "INFO: logDir    = {$logDir}\n";
 
 // ── ฟังก์ชัน log ──────────────────────────────────────────────────────────────
 function log_msg(string $msg, string $logFile): void {
