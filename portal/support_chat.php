@@ -501,6 +501,73 @@ $pdo = db();
             border-color: #BFDBFE;
         }
         .qr-chip:active { transform: scale(.96); }
+
+        /* Status pill in chat header */
+        .status-pill {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 3px 10px; border-radius: 999px;
+            border: 1px solid #BBF7D0; background: #ECFDF5; color: #047857;
+            font-size: 11px; font-weight: 800; font-family: inherit;
+            cursor: pointer; transition: filter .15s, transform .1s;
+        }
+        .status-pill:hover { filter: brightness(.97); }
+        .status-pill:active { transform: scale(.97); }
+        .status-pill .status-dot {
+            width: 7px; height: 7px; border-radius: 50%; background: #10B981;
+        }
+        .status-pill[data-status="pending"] {
+            border-color: #FED7AA; background: #FFF7ED; color: #C2410C;
+        }
+        .status-pill[data-status="pending"] .status-dot { background: #F97316; }
+        .status-pill[data-status="resolved"] {
+            border-color: #E2E8F0; background: #F1F5F9; color: #475569;
+        }
+        .status-pill[data-status="resolved"] .status-dot { background: #94A3B8; }
+
+        /* Per-conversation status badge in sidebar */
+        .user-item-status {
+            display: inline-block; padding: 1px 7px; border-radius: 999px;
+            font-size: 9px; font-weight: 900; letter-spacing: .04em;
+            margin-top: 2px;
+        }
+        .user-item-status[data-status="pending"]  { background: #FFF7ED; color: #C2410C; border: 1px solid #FED7AA; }
+        .user-item-status[data-status="resolved"] { background: #F1F5F9; color: #64748B; border: 1px solid #E2E8F0; }
+
+        /* Internal-note toggle button (yellow lightbulb) */
+        .internal-toggle {
+            width: 56px; height: 56px;
+            background: #fff; border: 1.5px dashed #E2E8F0; border-radius: 18px;
+            color: #94A3B8; font-size: 16px; cursor: pointer; flex-shrink: 0;
+            display: flex; align-items: center; justify-content: center;
+            transition: background .15s, border-color .15s, color .15s;
+        }
+        .internal-toggle:hover { background: #FFFBEB; border-color: #FCD34D; color: #B45309; }
+        .internal-toggle.active {
+            background: #FEF3C7; border: 1.5px solid #F59E0B; border-style: solid; color: #B45309;
+        }
+        /* When internal mode is active, tint the textarea + send button */
+        .chat-form.internal-mode textarea {
+            background: #FFFBEB; border-color: #FCD34D;
+        }
+        .chat-form.internal-mode .send-btn {
+            background: linear-gradient(135deg, #F59E0B, #D97706);
+            box-shadow: 0 8px 24px rgba(245,158,11,0.35);
+        }
+
+        /* Internal-note bubble (yellow card, only visible to admin) */
+        .msg-bubble.msg-internal {
+            background: #FFFBEB !important;
+            border: 1px dashed #FCD34D !important;
+            color: #92400E !important;
+            align-self: center !important;
+            max-width: 90% !important;
+        }
+        .msg-bubble.msg-internal::before {
+            content: "หมายเหตุภายใน — ผู้ใช้มองไม่เห็น";
+            display: block; font-size: 9px; font-weight: 900;
+            color: #B45309; margin-bottom: 4px;
+            letter-spacing: .04em; text-transform: uppercase;
+        }
     </style>
 </head>
 <body>
@@ -558,15 +625,19 @@ $pdo = db();
                             </div>
                             <div>
                                 <div class="chat-header-name" id="active-user-name">...</div>
-                                <div class="chat-header-status">
-                                    <span style="width:7px;height:7px;background:#10B981;border-radius:50%;display:inline-block"></span>
-                                    Online Now
+                                <div class="chat-header-status" id="active-status-row">
+                                    <button type="button" class="status-pill" id="status-pill" onclick="openStatusMenu()" title="เปลี่ยนสถานะเคส">
+                                        <span class="status-dot"></span>
+                                        <span class="status-label">เปิดอยู่</span>
+                                        <i class="fa-solid fa-chevron-down" style="font-size:9px;opacity:.7"></i>
+                                    </button>
                                 </div>
                             </div>
                         </div>
                         <div class="chat-header-actions">
-                            <button class="icon-btn" title="โทร"><i class="fa-solid fa-phone"></i></button>
-                            <button class="icon-btn" title="เพิ่มเติม"><i class="fa-solid fa-ellipsis-vertical"></i></button>
+                            <button type="button" class="icon-btn" id="resolve-btn" onclick="setStatus('resolved')" title="ปิดเคส (Resolved)">
+                                <i class="fa-solid fa-check"></i>
+                            </button>
                         </div>
                     </div>
 
@@ -581,6 +652,9 @@ $pdo = db();
                     <!-- Input -->
                     <div class="chat-input-bar">
                         <form class="chat-form" id="chat-form" onsubmit="handleStaffSubmit(event)">
+                            <button type="button" class="internal-toggle" id="internal-toggle" onclick="toggleInternalMode()" title="สลับโหมดหมายเหตุภายใน — ผู้ใช้ไม่เห็นข้อความนี้">
+                                <i class="fa-solid fa-note-sticky"></i>
+                            </button>
                             <textarea id="chat-input" rows="1" placeholder="พิมพ์ข้อความตอบกลับ... (Enter ส่ง · Shift+Enter ขึ้นบรรทัดใหม่)"></textarea>
                             <button type="submit" class="send-btn" title="ส่งข้อความ (Enter)">
                                 <i class="fa-solid fa-paper-plane"></i>
@@ -606,6 +680,10 @@ $pdo = db();
         // Title flash bookkeeping
         let prevTotalUnread = 0;
         const BASE_TITLE = 'Support Chat - Central HUB';
+        // Track whether the next reply will be saved as an internal note
+        let internalMode = false;
+        // Friendly Thai labels for status values
+        const STATUS_LABELS = { open: 'เปิดอยู่', pending: 'รอลูกค้า', resolved: 'ปิดเคสแล้ว' };
 
         // Quick-reply templates (chips). Edit list to taste — admin UI can be added later.
         const QUICK_REPLIES = [
@@ -648,11 +726,16 @@ $pdo = db();
                 const avatarUrl = esc(u.picture_url || ('https://ui-avatars.com/api/?name=' + encodeURIComponent(u.full_name) + '&background=EFF6FF&color=2563EB&bold=true'));
                 const time = new Date(u.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
                 const fallbackAvatar = 'https://ui-avatars.com/api/?name=' + encodeURIComponent(u.full_name) + '&background=EFF6FF&color=2563EB&bold=true';
+                const status = u.status || 'open';
+                const statusBadge = (status !== 'open')
+                    ? `<span class="user-item-status" data-status="${esc(status)}">${esc(STATUS_LABELS[status] || status)}</span>`
+                    : '';
                 return '<div onclick="selectUser(' + u.id + ')" class="user-item' + (isActive ? ' active' : '') + '" data-uid="' + u.id + '">'
                     + '<img src="' + avatarUrl + '" alt="avatar" onerror="this.src=\'' + esc(fallbackAvatar) + '\'">'
                     + '<div class="user-item-info">'
                     + '<div class="user-item-name">' + esc(u.full_name) + '</div>'
                     + '<div class="user-item-preview">' + esc(u.last_message) + '</div>'
+                    + statusBadge
                     + '</div>'
                     + '<div class="user-item-meta">'
                     + '<span class="user-item-time">' + time + '</span>'
@@ -730,8 +813,69 @@ $pdo = db();
             autoGrowInput(input);
             input.focus();
 
+            updateStatusPill(u.status || 'open');
             renderUserList(allUsers);
             loadMessages();
+        }
+
+        function updateStatusPill(status) {
+            const pill = document.getElementById('status-pill');
+            if (!pill) return;
+            const safe = ['open','pending','resolved'].includes(status) ? status : 'open';
+            pill.dataset.status = safe;
+            pill.querySelector('.status-label').textContent = STATUS_LABELS[safe] || safe;
+        }
+
+        async function openStatusMenu() {
+            if (!currentUserId) return;
+            const cur = (allUsers.find(u => u.id == currentUserId) || {}).status || 'open';
+            const result = await Swal.fire({
+                title: 'เปลี่ยนสถานะเคส',
+                input: 'radio',
+                inputOptions: STATUS_LABELS,
+                inputValue: cur,
+                showCancelButton: true,
+                confirmButtonText: 'บันทึก',
+                cancelButtonText: 'ยกเลิก',
+                confirmButtonColor: '#2563EB',
+            });
+            if (result.isConfirmed && result.value && result.value !== cur) {
+                setStatus(result.value);
+            }
+        }
+
+        async function setStatus(status) {
+            if (!currentUserId || !['open','pending','resolved'].includes(status)) return;
+            const fd = new FormData();
+            fd.append('user_id', currentUserId);
+            fd.append('status', status);
+            fd.append('csrf_token', portal_CSRF);
+            try {
+                const res = await fetch('ajax_support_chat.php?action=set_status', { method: 'POST', body: fd });
+                const data = await res.json();
+                if (data.success) {
+                    // Reflect locally so the pill + sidebar update before next poll
+                    updateStatusPill(status);
+                    const u = allUsers.find(x => x.id == currentUserId);
+                    if (u) u.status = status;
+                    renderUserList(allUsers);
+                } else {
+                    Swal.fire({ icon: 'error', title: 'เปลี่ยนสถานะไม่สำเร็จ', text: data.error || 'กรุณาลองใหม่' });
+                }
+            } catch (err) {
+                Swal.fire({ icon: 'error', title: 'เครือข่ายขัดข้อง', text: 'เปลี่ยนสถานะไม่สำเร็จ' });
+            }
+        }
+
+        function toggleInternalMode() {
+            internalMode = !internalMode;
+            document.getElementById('chat-form').classList.toggle('internal-mode', internalMode);
+            document.getElementById('internal-toggle').classList.toggle('active', internalMode);
+            const input = document.getElementById('chat-input');
+            input.placeholder = internalMode
+                ? 'หมายเหตุภายใน (ผู้ใช้ไม่เห็น) — Enter บันทึก'
+                : 'พิมพ์ข้อความตอบกลับ... (Enter ส่ง · Shift+Enter ขึ้นบรรทัดใหม่)';
+            input.focus();
         }
 
         function autoGrowInput(el) {
@@ -844,11 +988,14 @@ $pdo = db();
 
                 const renderBubble = m => {
                     const isStaff = m.sender_type === 'staff';
+                    const isInternal = parseInt(m.is_internal, 10) === 1;
+                    const cls = isInternal ? 'msg-internal' : (isStaff ? 'msg-staff' : 'msg-user');
+                    const senderLabel = isInternal ? 'หมายเหตุ' : (isStaff ? 'คุณ' : 'ผู้ใช้งาน');
                     return `
-                        <div class="msg-bubble ${isStaff ? 'msg-staff' : 'msg-user'}">
+                        <div class="msg-bubble ${cls}">
                             <p>${esc(m.message)}</p>
                             <div class="msg-meta">
-                                <span>${isStaff ? 'คุณ' : 'ผู้ใช้งาน'}</span>
+                                <span>${senderLabel}</span>
                                 <span>${esc(m.time)}</span>
                             </div>
                         </div>
@@ -886,6 +1033,7 @@ $pdo = db();
             formData.append('user_id', currentUserId);
             formData.append('message', message);
             formData.append('csrf_token', portal_CSRF);
+            if (internalMode) formData.append('is_internal', '1');
 
             // Optimistic clear so admin can keep typing; we'll restore on failure
             input.disabled = true;

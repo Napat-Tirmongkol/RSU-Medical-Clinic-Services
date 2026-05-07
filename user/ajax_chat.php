@@ -71,11 +71,12 @@ try {
     
     if ($action === 'get') {
         $lastId = (int)($_GET['last_id'] ?? 0);
-        
+
+        // is_internal = 1 messages are operator notes — never expose to the user side
         $stmt = $pdo->prepare("
-            SELECT id, sender_type, message, created_at 
-            FROM sys_chat_messages 
-            WHERE user_id = :uid AND id > :last 
+            SELECT id, sender_type, message, created_at
+            FROM sys_chat_messages
+            WHERE user_id = :uid AND id > :last AND is_internal = 0
             ORDER BY id ASC
         ");
         $stmt->execute([':uid' => $userId, ':last' => $lastId]);

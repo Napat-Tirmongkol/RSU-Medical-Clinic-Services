@@ -29,4 +29,19 @@ function ensure_chat_schema(PDO $pdo): void
     // ALTER ADD INDEX is not idempotent on every MySQL — wrap each in try/catch
     try { $pdo->exec("ALTER TABLE sys_chat_messages ADD INDEX idx_user_pk (user_id, id)"); } catch (PDOException) {}
     try { $pdo->exec("ALTER TABLE sys_chat_messages ADD INDEX idx_unread (user_id, is_read, sender_type)"); } catch (PDOException) {}
+
+    // Internal-note flag — staff-only message that user-facing endpoint must filter out
+    try { $pdo->exec("ALTER TABLE sys_chat_messages ADD COLUMN is_internal TINYINT(1) NOT NULL DEFAULT 0 AFTER message"); } catch (PDOException) {}
+
+    // Per-conversation metadata (status workflow). One row per user_id (lazy-create on first set_status).
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS sys_chat_conversations (
+            user_id          INT UNSIGNED PRIMARY KEY,
+            status           ENUM('open','pending','resolved') NOT NULL DEFAULT 'open',
+            resolved_at      DATETIME NULL,
+            resolved_by      INT UNSIGNED NULL,
+            updated_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX idx_status (status)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    } catch (PDOException) {}
 }

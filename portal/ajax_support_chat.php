@@ -60,11 +60,13 @@ try {
                 u.picture_url,
                 m.message as last_message,
                 m.created_at,
-                COALESCE(unread.cnt, 0) as unread_count
+                COALESCE(unread.cnt, 0) as unread_count,
+                COALESCE(cv.status, 'open') as status
             FROM sys_users u
             JOIN (
                 SELECT user_id, MAX(id) as max_id
                 FROM sys_chat_messages
+                WHERE is_internal = 0
                 GROUP BY user_id
             ) latest ON u.id = latest.user_id
             JOIN sys_chat_messages m ON latest.max_id = m.id
@@ -74,6 +76,7 @@ try {
                 WHERE is_read = 0 AND sender_type = 'user'
                 GROUP BY user_id
             ) unread ON u.id = unread.user_id
+            LEFT JOIN sys_chat_conversations cv ON cv.user_id = u.id
             WHERE 1=1 $searchClause
             ORDER BY m.created_at DESC
             LIMIT $limit OFFSET $offset
@@ -110,7 +113,8 @@ try {
             ->execute([':uid' => $targetUserId]);
 
         $stmt = $pdo->prepare("
-            SELECT m.id, m.sender_type, m.user_id, m.staff_id, m.message, m.is_read, m.created_at,
+            SELECT m.id, m.sender_type, m.user_id, m.staff_id, m.message, m.is_read,
+                   m.is_internal, m.created_at,
                    a.full_name as staff_name
             FROM sys_chat_messages m
             LEFT JOIN sys_admins a ON m.staff_id = a.id
@@ -131,16 +135,61 @@ try {
     if ($action === 'send_reply') {
         $targetUserId = (int)($_POST['user_id'] ?? 0);
         $message = trim($_POST['message'] ?? '');
+        $isInternal = !empty($_POST['is_internal']) ? 1 : 0;
 
         if (!$targetUserId || empty($message)) {
             echo json_encode(['success' => false, 'error' => 'Invalid data']);
             exit;
         }
 
-        $stmt = $pdo->prepare("INSERT INTO sys_chat_messages (sender_type, user_id, staff_id, message) VALUES ('staff', :uid, :sid, :msg)");
-        $stmt->execute([':uid' => $targetUserId, ':sid' => $staffId, ':msg' => $message]);
+        $stmt = $pdo->prepare("INSERT INTO sys_chat_messages
+            (sender_type, user_id, staff_id, message, is_internal)
+            VALUES ('staff', :uid, :sid, :msg, :ii)");
+        $stmt->execute([
+            ':uid' => $targetUserId,
+            ':sid' => $staffId,
+            ':msg' => $message,
+            ':ii'  => $isInternal,
+        ]);
 
-        echo json_encode(['success' => true]);
+        // Re-open the conversation if a real (non-internal) reply lands and it was resolved
+        if (!$isInternal) {
+            $pdo->prepare("INSERT INTO sys_chat_conversations (user_id, status)
+                VALUES (:uid, 'open')
+                ON DUPLICATE KEY UPDATE
+                    status = IF(status = 'resolved', 'open', status)")
+                ->execute([':uid' => $targetUserId]);
+        }
+
+        echo json_encode(['success' => true, 'is_internal' => $isInternal]);
+        exit;
+    }
+
+    if ($action === 'set_status') {
+        $targetUserId = (int)($_POST['user_id'] ?? 0);
+        $status = (string)($_POST['status'] ?? '');
+        if (!$targetUserId || !in_array($status, ['open', 'pending', 'resolved'], true)) {
+            echo json_encode(['success' => false, 'error' => 'Invalid data']);
+            exit;
+        }
+        $resolvedAt = $status === 'resolved' ? date('Y-m-d H:i:s') : null;
+        $resolvedBy = $status === 'resolved' ? $staffId : null;
+
+        $pdo->prepare("INSERT INTO sys_chat_conversations
+            (user_id, status, resolved_at, resolved_by)
+            VALUES (:uid, :st, :ra, :rb)
+            ON DUPLICATE KEY UPDATE
+                status = VALUES(status),
+                resolved_at = VALUES(resolved_at),
+                resolved_by = VALUES(resolved_by)")
+            ->execute([
+                ':uid' => $targetUserId,
+                ':st'  => $status,
+                ':ra'  => $resolvedAt,
+                ':rb'  => $resolvedBy,
+            ]);
+
+        echo json_encode(['success' => true, 'status' => $status]);
         exit;
     }
 
