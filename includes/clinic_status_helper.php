@@ -393,7 +393,12 @@ function get_clinic_doctors_for_date(PDO $pdo, string $date): array
             WHERE s.is_active = 1 AND ms.is_active = 1
               AND (
                   s.specific_date = :d
-                  OR (s.specific_date IS NULL AND s.type = 'regular' AND s.weekday = :wd)
+                  OR (
+                      (s.specific_date IS NULL OR s.specific_date = '')
+                      AND s.type = 'regular'
+                      AND s.weekday = :wd
+                      AND (s.recur_end_date IS NULL OR s.recur_end_date >= :d)
+                  )
               )
         ");
         $stmt->execute([':d' => $date, ':wd' => $weekday]);

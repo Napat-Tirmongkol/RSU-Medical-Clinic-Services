@@ -12,7 +12,8 @@ require_once __DIR__ . '/../includes/line_helper.php';
 header('Content-Type: application/json; charset=utf-8');
 
 if (session_status() === PHP_SESSION_NONE) session_start();
-if (($_SESSION['admin_role'] ?? '') !== 'superadmin') {
+$_faqRole = $_SESSION['admin_role'] ?? '';
+if ($_faqRole !== 'superadmin' && $_faqRole !== 'admin') {
     http_response_code(403);
     echo json_encode(['ok' => false, 'error' => 'Permission denied']);
     exit;
@@ -39,7 +40,8 @@ try {
 
         case 'save': {
             $data = [
-                'enabled'                => isset($_POST['enabled']) ? (int)!!$_POST['enabled'] : 0,
+                'enabled'                => (int)!empty($_POST['enabled']) && $_POST['enabled'] !== '0' ? 1 : 0,
+                'only_when_closed'       => !empty($_POST['only_when_closed']) && $_POST['only_when_closed'] !== '0' ? 1 : 0,
                 'rate_limit_hours'       => (int)($_POST['rate_limit_hours'] ?? 24),
                 'msg_open_now_title'     => (string)($_POST['msg_open_now_title']     ?? ''),
                 'msg_open_now_sub'       => (string)($_POST['msg_open_now_sub']       ?? ''),
