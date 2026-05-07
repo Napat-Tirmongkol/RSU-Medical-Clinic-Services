@@ -8,6 +8,12 @@ if ($userId <= 0) {
     exit;
 }
 
+// ── redirect_back: whitelist internal portal paths only (XSS / open-redirect guard) ──
+$rawRedirect  = (string) ($_GET['redirect_back'] ?? '');
+$redirectBack = preg_match('#^\.\./portal/[a-zA-Z0-9_\-]+\.php(\?[a-zA-Z0-9=&_\-%.]*)?$#', $rawRedirect)
+    ? $rawRedirect
+    : '../portal/users.php';
+
 $pdo = db();
 
 // ดึงข้อมูล User
@@ -70,7 +76,7 @@ function statusBadge(array $b): string {
 
 <!-- ===== PAGE HEADER ===== -->
 <div class="mb-6">
-    <a href="../portal/users.php" class="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-[#0052CC] transition-colors mb-4 group">
+    <a href="<?= htmlspecialchars($redirectBack, ENT_QUOTES) ?>" class="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-[#0052CC] transition-colors mb-4 group">
         <i class="fa-solid fa-arrow-left text-xs group-hover:-translate-x-0.5 transition-transform"></i> กลับหน้ารายชื่อผู้ใช้
     </a>
 
@@ -96,7 +102,7 @@ function statusBadge(array $b): string {
         </div>
 
         <!-- Action -->
-        <a href="../portal/users.php" class="text-sm text-[#0052CC] hover:underline font-medium whitespace-nowrap">
+        <a href="<?= htmlspecialchars($redirectBack, ENT_QUOTES) ?>" class="text-sm text-[#0052CC] hover:underline font-medium whitespace-nowrap">
             <i class="fa-solid fa-pen-to-square mr-1"></i>แก้ไขข้อมูล
         </a>
     </div>

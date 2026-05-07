@@ -3419,7 +3419,7 @@ try {
                                         title="แก้ไข">
                                         <i class="fa-solid fa-pen" style="font-size:11px"></i>
                                     </button>
-                                    <a href="../admin/user_history.php?id=${u.id}"
+                                    <a href="../admin/user_history.php?id=${u.id}&redirect_back=${encodeURIComponent('../portal/index.php?section=identity')}"
                                         style="width:32px;height:32px;border-radius:8px;border:1px solid #e2e8f0;background:#fff;color:#64748b;display:flex;align-items:center;justify-content:center;text-decoration:none;transition:all .15s"
                                         onmouseover="this.style.background='#fffbeb';this.style.color='#d97706'"
                                         onmouseout="this.style.background='#fff';this.style.color='#64748b'"
