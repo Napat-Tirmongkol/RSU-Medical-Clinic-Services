@@ -44,6 +44,17 @@ try {
         exit;
     }
 
+    // Force any outstanding post-checkin survey before letting the user use the hub.
+    // (Allows ?survey=done|skipped to land on hub once after submission.)
+    if (!isset($_GET['survey'])) {
+        require_once __DIR__ . '/../includes/survey_helper.php';
+        $pendingSurvey = find_pending_survey_booking($pdo, (int)$user['id']);
+        if ($pendingSurvey) {
+            header('Location: post_checkin_survey.php?booking=' . (int)$pendingSurvey['id']);
+            exit;
+        }
+    }
+
     // Lazy backfill: assign a member_id to any user that doesn't have one yet
     if (empty($user['member_id'])) {
         for ($attempt = 0; $attempt < 5; $attempt++) {

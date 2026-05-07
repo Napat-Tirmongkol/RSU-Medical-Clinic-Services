@@ -109,10 +109,9 @@ if (!$token_ok || !$campaign) {
                 } else {
                     $pdo->prepare("UPDATE camp_bookings SET attended_at = NOW(), status = 'completed' WHERE id = ?")
                         ->execute([$bookingId]);
-                    $row['attended_at'] = date('Y-m-d H:i:s');
-                    $slot    = $row;
-                    $booking = $row;
-                    $result  = 'success';
+                    // Force the post-checkin survey before showing success
+                    header('Location: post_checkin_survey.php?booking=' . $bookingId);
+                    exit;
                 }
             }
         } else {
