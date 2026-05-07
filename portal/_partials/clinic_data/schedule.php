@@ -99,6 +99,9 @@ $serviceTypes = ['ตรวจทั่วไป', 'วัคซีน', 'ตร
     .ds-doc-card:active { cursor: grabbing; transform: scale(.98); }
     .ds-doc-card.fc-event { background: transparent; border: none; padding: 0; } /* override fc default */
     .fc-highlight { background: #ecfeff !important; border: 2px dashed #06b6d4 !important; }
+
+    .ds-btn-import { background: #7c3aed; color: #fff; }
+    .ds-btn-import:hover { background: #6d28d9; }
 </style>
 
 <div class="max-w-[1400px] mx-auto px-4 py-6">
@@ -117,7 +120,7 @@ $serviceTypes = ['ตรวจทั่วไป', 'วัคซีน', 'ตร
         <button onclick="dsOpenAdd()" class="px-4 py-2 bg-cyan-600 text-white rounded-xl text-sm font-black hover:bg-cyan-700 transition-all flex items-center gap-2 shadow-sm">
             <i class="fa-solid fa-plus"></i>เพิ่ม shift
         </button>
-        <button onclick="dsOpenImport()" class="px-4 py-2 bg-violet-600 text-white rounded-xl text-sm font-black hover:bg-violet-700 transition-all flex items-center gap-2 shadow-sm" title="นำเข้าตารางจากรูปภาพด้วย AI">
+        <button onclick="dsOpenImport()" class="ds-btn-import px-4 py-2 rounded-xl text-sm font-black transition-all flex items-center gap-2 shadow-sm" title="นำเข้าตารางจากรูปภาพด้วย AI">
             <i class="fa-solid fa-camera"></i>นำเข้าจากรูป
         </button>
     </div>
@@ -295,7 +298,7 @@ $serviceTypes = ['ตรวจทั่วไป', 'วัคซีน', 'ตร
     <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col">
         <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between shrink-0">
             <h3 class="font-black text-slate-800 flex items-center gap-2">
-                <i class="fa-solid fa-camera text-violet-500"></i> นำเข้าตารางจากรูป (AI)
+                <i class="fa-solid fa-camera text-purple-500"></i> นำเข้าตารางจากรูป (AI)
             </h3>
             <button onclick="dsCloseImport()" class="text-slate-400 hover:text-slate-700"><i class="fa-solid fa-xmark"></i></button>
         </div>
@@ -303,7 +306,7 @@ $serviceTypes = ['ตรวจทั่วไป', 'วัคซีน', 'ตร
         <!-- Step 1: Upload dropzone -->
         <div id="ds-import-step1" class="p-6">
             <div id="ds-import-dropzone"
-                class="border-2 border-dashed border-slate-300 rounded-2xl p-12 text-center cursor-pointer hover:border-violet-400 hover:bg-violet-50 transition-all">
+                class="border-2 border-dashed border-slate-300 rounded-2xl p-12 text-center cursor-pointer hover:border-purple-400 hover:bg-purple-50 transition-all">
                 <i class="fa-solid fa-camera-retro text-4xl text-slate-300 mb-4 block"></i>
                 <p class="text-slate-700 font-bold text-sm">คลิกหรือลากรูปภาพมาวางที่นี่</p>
                 <p class="text-slate-400 text-xs mt-1">รองรับ JPEG, PNG, WEBP · สูงสุด 10MB</p>
@@ -314,8 +317,8 @@ $serviceTypes = ['ตรวจทั่วไป', 'วัคซีน', 'ตร
         <!-- Step 2: Processing indicator -->
         <div id="ds-import-step2" class="hidden p-10 text-center">
             <div class="flex flex-col items-center gap-4">
-                <div class="w-16 h-16 rounded-full bg-violet-50 flex items-center justify-center">
-                    <i class="fa-solid fa-robot text-violet-500 text-2xl animate-pulse"></i>
+                <div class="w-16 h-16 rounded-full bg-purple-50 flex items-center justify-center">
+                    <i class="fa-solid fa-robot text-purple-500 text-2xl animate-pulse"></i>
                 </div>
                 <p class="font-bold text-slate-700">AI กำลังวิเคราะห์รูปภาพ...</p>
                 <p class="text-sm text-slate-400">อาจใช้เวลา 5–15 วินาที</p>
@@ -327,7 +330,7 @@ $serviceTypes = ['ตรวจทั่วไป', 'วัคซีน', 'ตร
             <div class="px-4 pt-4 pb-2 flex gap-4 shrink-0">
                 <img id="ds-import-thumb" src="" alt="" class="w-28 h-auto rounded-xl border border-slate-200 object-contain shrink-0">
                 <div class="flex-1 min-w-0">
-                    <p class="text-sm font-bold text-slate-700">พบ <span id="ds-import-count" class="text-violet-600">0</span> shift จากรูปภาพ</p>
+                    <p class="text-sm font-bold text-slate-700">พบ <span id="ds-import-count" class="text-purple-600">0</span> shift จากรูปภาพ</p>
                     <p class="text-xs text-slate-400 mt-1">ตรวจสอบและปรับแก้ข้อมูลก่อนนำเข้า · แถวที่ยังไม่จับคู่แพทย์จะถูกข้ามไป</p>
                 </div>
             </div>
@@ -351,7 +354,7 @@ $serviceTypes = ['ตรวจทั่วไป', 'วัคซีน', 'ตร
             <div class="px-4 py-3 flex gap-2 border-t border-slate-100 shrink-0">
                 <button onclick="dsCloseImport()" class="flex-1 px-4 py-2.5 bg-slate-100 text-slate-600 rounded-xl text-sm font-black hover:bg-slate-200 transition-all">ยกเลิก</button>
                 <button onclick="dsImportConfirm()" id="ds-import-confirm-btn"
-                    class="flex-[2] px-4 py-2.5 bg-violet-600 text-white rounded-xl text-sm font-black hover:bg-violet-700 transition-all shadow-sm">
+                    class="ds-btn-import flex-[2] px-4 py-2.5 rounded-xl text-sm font-black transition-all shadow-sm">
                     <i class="fa-solid fa-file-import"></i> นำเข้า shift ทั้งหมด
                 </button>
             </div>
@@ -673,7 +676,7 @@ function dsRenderImportTable() {
                 <div class="mt-0.5">${badge}</div>
             </td>
             <td class="px-3 py-2">
-                <select class="ds-imp-sel w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:border-violet-400" data-idx="${idx}">
+                <select class="ds-imp-sel w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:border-purple-400" data-idx="${idx}">
                     <option value="">— ไม่ระบุ (ข้าม) —</option>
                     ${opts}
                 </select>
@@ -889,14 +892,14 @@ document.addEventListener('DOMContentLoaded', () => {
         importDropzone.addEventListener('click', () => importFile && importFile.click());
         importDropzone.addEventListener('dragover', e => {
             e.preventDefault();
-            importDropzone.classList.add('border-violet-400', 'bg-violet-50');
+            importDropzone.classList.add('border-purple-400', 'bg-purple-50');
         });
         importDropzone.addEventListener('dragleave', () => {
-            importDropzone.classList.remove('border-violet-400', 'bg-violet-50');
+            importDropzone.classList.remove('border-purple-400', 'bg-purple-50');
         });
         importDropzone.addEventListener('drop', e => {
             e.preventDefault();
-            importDropzone.classList.remove('border-violet-400', 'bg-violet-50');
+            importDropzone.classList.remove('border-purple-400', 'bg-purple-50');
             const file = e.dataTransfer?.files?.[0];
             if (file) dsImportUpload(file);
         });
