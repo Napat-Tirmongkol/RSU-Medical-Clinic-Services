@@ -390,7 +390,11 @@ let hrCalDragAnchor = null;
 
 function hrCalPad(n) { return String(n).padStart(2,'0'); }
 function hrCalDateStr(y, m, d) { return `${y}-${hrCalPad(m+1)}-${hrCalPad(d)}`; }
-const hrToday = new Date().toISOString().slice(0,10);
+const hrToday = (() => {
+    // Use local date — toISOString() returns UTC and is off-by-one during early morning in Bangkok (+7)
+    const t = new Date();
+    return `${t.getFullYear()}-${hrCalPad(t.getMonth()+1)}-${hrCalPad(t.getDate())}`;
+})();
 
 function hrCalRender() {
     const title = document.getElementById('hr-cal-title');
@@ -439,7 +443,8 @@ function hrCalApplyRange(a, b) {
     const cur = new Date(from + 'T00:00:00');
     const end = new Date(to   + 'T00:00:00');
     while (cur <= end) {
-        const ds = cur.toISOString().slice(0,10);
+        // Use local date components — toISOString() shifts to UTC and breaks in non-UTC timezones (Bangkok = +7)
+        const ds = `${cur.getFullYear()}-${hrCalPad(cur.getMonth()+1)}-${hrCalPad(cur.getDate())}`;
         if (ds >= hrToday) {
             hrCalDragMode === 'select' ? hrCalSel.add(ds) : hrCalSel.delete(ds);
         }
