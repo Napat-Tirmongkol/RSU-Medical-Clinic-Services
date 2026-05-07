@@ -117,6 +117,9 @@ $serviceTypes = ['ตรวจทั่วไป', 'วัคซีน', 'ตร
         <button onclick="dsOpenAdd()" class="px-4 py-2 bg-cyan-600 text-white rounded-xl text-sm font-black hover:bg-cyan-700 transition-all flex items-center gap-2 shadow-sm">
             <i class="fa-solid fa-plus"></i>เพิ่ม shift
         </button>
+        <button onclick="dsOpenImport()" class="px-4 py-2 bg-violet-600 text-white rounded-xl text-sm font-black hover:bg-violet-700 transition-all flex items-center gap-2 shadow-sm" title="นำเข้าตารางจากรูปภาพด้วย AI">
+            <i class="fa-solid fa-camera"></i>นำเข้าจากรูป
+        </button>
     </div>
 
     <!-- Legend -->
@@ -284,6 +287,75 @@ $serviceTypes = ['ตรวจทั่วไป', 'วัคซีน', 'ตร
                 </button>
             </div>
         </form>
+    </div>
+</div>
+
+<!-- Import from Photo Modal -->
+<div id="ds-import-modal" class="hidden fixed inset-0 z-[300] items-center justify-center bg-black/40 p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col">
+        <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between shrink-0">
+            <h3 class="font-black text-slate-800 flex items-center gap-2">
+                <i class="fa-solid fa-camera text-violet-500"></i> นำเข้าตารางจากรูป (AI)
+            </h3>
+            <button onclick="dsCloseImport()" class="text-slate-400 hover:text-slate-700"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+
+        <!-- Step 1: Upload dropzone -->
+        <div id="ds-import-step1" class="p-6">
+            <div id="ds-import-dropzone"
+                class="border-2 border-dashed border-slate-300 rounded-2xl p-12 text-center cursor-pointer hover:border-violet-400 hover:bg-violet-50 transition-all">
+                <i class="fa-solid fa-camera-retro text-4xl text-slate-300 mb-4 block"></i>
+                <p class="text-slate-700 font-bold text-sm">คลิกหรือลากรูปภาพมาวางที่นี่</p>
+                <p class="text-slate-400 text-xs mt-1">รองรับ JPEG, PNG, WEBP · สูงสุด 10MB</p>
+            </div>
+            <input type="file" id="ds-import-file" accept="image/*" class="hidden">
+        </div>
+
+        <!-- Step 2: Processing indicator -->
+        <div id="ds-import-step2" class="hidden p-10 text-center">
+            <div class="flex flex-col items-center gap-4">
+                <div class="w-16 h-16 rounded-full bg-violet-50 flex items-center justify-center">
+                    <i class="fa-solid fa-robot text-violet-500 text-2xl animate-pulse"></i>
+                </div>
+                <p class="font-bold text-slate-700">AI กำลังวิเคราะห์รูปภาพ...</p>
+                <p class="text-sm text-slate-400">อาจใช้เวลา 5–15 วินาที</p>
+            </div>
+        </div>
+
+        <!-- Step 3: Preview parsed shifts -->
+        <div id="ds-import-step3" class="hidden flex-col flex-1 min-h-0">
+            <div class="px-4 pt-4 pb-2 flex gap-4 shrink-0">
+                <img id="ds-import-thumb" src="" alt="" class="w-28 h-auto rounded-xl border border-slate-200 object-contain shrink-0">
+                <div class="flex-1 min-w-0">
+                    <p class="text-sm font-bold text-slate-700">พบ <span id="ds-import-count" class="text-violet-600">0</span> shift จากรูปภาพ</p>
+                    <p class="text-xs text-slate-400 mt-1">ตรวจสอบและปรับแก้ข้อมูลก่อนนำเข้า · แถวที่ยังไม่จับคู่แพทย์จะถูกข้ามไป</p>
+                </div>
+            </div>
+
+            <div class="flex-1 overflow-y-auto px-4 pb-2">
+                <table class="w-full text-xs border-collapse">
+                    <thead class="sticky top-0 z-10">
+                        <tr class="bg-slate-50">
+                            <th class="px-3 py-2 text-left font-black text-slate-500 border-b border-slate-200">ชื่อในรูป</th>
+                            <th class="px-3 py-2 text-left font-black text-slate-500 border-b border-slate-200">แพทย์ในระบบ</th>
+                            <th class="px-3 py-2 text-left font-black text-slate-500 border-b border-slate-200">วัน/วันที่</th>
+                            <th class="px-3 py-2 text-left font-black text-slate-500 border-b border-slate-200">เวลา</th>
+                            <th class="px-3 py-2 text-left font-black text-slate-500 border-b border-slate-200">บริการ</th>
+                            <th class="px-3 py-2 border-b border-slate-200 w-8"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="ds-import-tbody"></tbody>
+                </table>
+            </div>
+
+            <div class="px-4 py-3 flex gap-2 border-t border-slate-100 shrink-0">
+                <button onclick="dsCloseImport()" class="flex-1 px-4 py-2.5 bg-slate-100 text-slate-600 rounded-xl text-sm font-black hover:bg-slate-200 transition-all">ยกเลิก</button>
+                <button onclick="dsImportConfirm()" id="ds-import-confirm-btn"
+                    class="flex-[2] px-4 py-2.5 bg-violet-600 text-white rounded-xl text-sm font-black hover:bg-violet-700 transition-all shadow-sm">
+                    <i class="fa-solid fa-file-import"></i> นำเข้า shift ทั้งหมด
+                </button>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -513,6 +585,182 @@ async function dsDelete() {
     else Swal.fire('Error', res.message, 'error');
 }
 
+// ── Import from Photo (Gemini Vision) ────────────────────────────────────────
+const DS_WEEKDAY_NAMES = ['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์'];
+let dsImportShifts = [];
+let dsImportStaffPool = [];
+
+function dsImportSetStep(step) {
+    document.getElementById('ds-import-step1').classList.toggle('hidden', step !== 1);
+    document.getElementById('ds-import-step2').classList.toggle('hidden', step !== 2);
+    const s3 = document.getElementById('ds-import-step3');
+    if (step === 3) { s3.classList.remove('hidden'); s3.classList.add('flex'); }
+    else            { s3.classList.add('hidden');    s3.classList.remove('flex'); }
+}
+
+function dsOpenImport() {
+    dsImportShifts = [];
+    dsImportStaffPool = [];
+    document.getElementById('ds-import-file').value = '';
+    document.getElementById('ds-import-thumb').src = '';
+    dsImportSetStep(1);
+    document.getElementById('ds-import-modal').classList.remove('hidden');
+    document.getElementById('ds-import-modal').classList.add('flex');
+}
+
+function dsCloseImport() {
+    document.getElementById('ds-import-modal').classList.add('hidden');
+    document.getElementById('ds-import-modal').classList.remove('flex');
+}
+
+async function dsImportUpload(file) {
+    if (!file) return;
+    // Show thumbnail preview
+    const reader = new FileReader();
+    reader.onload = e => { document.getElementById('ds-import-thumb').src = e.target.result; };
+    reader.readAsDataURL(file);
+
+    dsImportSetStep(2);
+
+    const fd = new FormData();
+    fd.append('image', file);
+    fd.append('csrf_token', portal_CSRF);
+
+    try {
+        const res  = await fetch('ajax_schedule_import.php', { method: 'POST', body: fd });
+        const data = await res.json();
+
+        if (!data.ok) {
+            Swal.fire('วิเคราะห์ไม่สำเร็จ', data.message || 'เกิดข้อผิดพลาด', 'error');
+            dsCloseImport();
+            return;
+        }
+
+        dsImportShifts   = data.shifts;
+        dsImportStaffPool = data.staff;
+        dsRenderImportTable();
+        document.getElementById('ds-import-count').textContent = dsImportShifts.length;
+        dsImportSetStep(3);
+
+    } catch (err) {
+        Swal.fire('Error', 'เกิดข้อผิดพลาด: ' + err.message, 'error');
+        dsCloseImport();
+    }
+}
+
+function dsRenderImportTable() {
+    const tbody = document.getElementById('ds-import-tbody');
+    tbody.innerHTML = '';
+
+    dsImportShifts.forEach((shift, idx) => {
+        const opts = dsImportStaffPool.map(s =>
+            `<option value="${s.id}"${shift.staff_id == s.id ? ' selected' : ''}>${s.name}</option>`
+        ).join('');
+
+        const dayLabel = shift.date
+            ? shift.date
+            : (shift.weekday !== null ? DS_WEEKDAY_NAMES[shift.weekday] ?? '?' : '?');
+
+        const badge = shift.match_status === 'matched'
+            ? '<span class="inline-block px-1.5 py-0.5 rounded text-[9px] font-black bg-emerald-50 text-emerald-700">จับคู่แล้ว</span>'
+            : '<span class="inline-block px-1.5 py-0.5 rounded text-[9px] font-black bg-amber-50 text-amber-700">ยังไม่จับคู่</span>';
+
+        const tr = document.createElement('tr');
+        tr.className = 'border-b border-slate-100 hover:bg-slate-50';
+        tr.innerHTML = `
+            <td class="px-3 py-2">
+                <div class="font-bold text-slate-700 leading-tight">${shift.doctor_name}</div>
+                <div class="mt-0.5">${badge}</div>
+            </td>
+            <td class="px-3 py-2">
+                <select class="ds-imp-sel w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:border-violet-400" data-idx="${idx}">
+                    <option value="">— ไม่ระบุ (ข้าม) —</option>
+                    ${opts}
+                </select>
+            </td>
+            <td class="px-3 py-2 font-bold text-slate-600 whitespace-nowrap">${dayLabel}</td>
+            <td class="px-3 py-2 font-bold text-slate-600 whitespace-nowrap">${shift.start_time}–${shift.end_time}</td>
+            <td class="px-3 py-2 text-slate-500 whitespace-nowrap">${shift.service_type || '—'}</td>
+            <td class="px-3 py-2 text-center">
+                <button type="button" onclick="dsImportRemoveRow(${idx})" class="text-slate-300 hover:text-rose-500 transition-colors p-1">
+                    <i class="fa-solid fa-xmark text-xs"></i>
+                </button>
+            </td>`;
+        tbody.appendChild(tr);
+    });
+
+    // Sync staff_id on dropdown change
+    tbody.querySelectorAll('.ds-imp-sel').forEach(sel => {
+        sel.addEventListener('change', () => {
+            const i = parseInt(sel.dataset.idx);
+            dsImportShifts[i].staff_id = sel.value ? parseInt(sel.value) : null;
+            dsImportShifts[i].match_status = sel.value ? 'matched' : 'unmatched';
+        });
+    });
+}
+
+function dsImportRemoveRow(idx) {
+    dsImportShifts.splice(idx, 1);
+    document.getElementById('ds-import-count').textContent = dsImportShifts.length;
+    dsRenderImportTable();
+}
+
+async function dsImportConfirm() {
+    const toImport = dsImportShifts.filter(s => s.staff_id);
+    const skipped  = dsImportShifts.length - toImport.length;
+
+    if (toImport.length === 0) {
+        Swal.fire('', 'กรุณาเลือกแพทย์ในระบบสำหรับแถวที่ต้องการนำเข้าก่อน', 'warning');
+        return;
+    }
+
+    const { isConfirmed } = await Swal.fire({
+        title: 'ยืนยันการนำเข้า',
+        text: skipped > 0
+            ? `นำเข้า ${toImport.length} shift (ข้าม ${skipped} แถวที่ไม่มีแพทย์)?`
+            : `นำเข้า ${toImport.length} shift ทั้งหมด?`,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'นำเข้า',
+        cancelButtonText: 'ยกเลิก',
+        confirmButtonColor: '#7c3aed',
+    });
+    if (!isConfirmed) return;
+
+    const btn = document.getElementById('ds-import-confirm-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> กำลังนำเข้า...';
+
+    let success = 0, failed = 0;
+    for (const shift of toImport) {
+        const data = {
+            staff_id:     shift.staff_id,
+            start_time:   shift.start_time,
+            end_time:     shift.end_time,
+            service_type: shift.service_type || '',
+        };
+        if (shift.date) {
+            data.type          = 'override';
+            data.specific_date = shift.date;
+        } else {
+            data.type    = 'regular';
+            data.weekday = shift.weekday ?? 1;
+        }
+        const res = await dsPost('add', data);
+        res.ok ? success++ : failed++;
+    }
+
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fa-solid fa-file-import"></i> นำเข้า shift ทั้งหมด';
+
+    dsCloseImport();
+    dsLoadAndRender();
+    showPortalToast(
+        failed > 0 ? `นำเข้าสำเร็จ ${success} รายการ · ล้มเหลว ${failed} รายการ` : `นำเข้าสำเร็จ ${success} รายการ`,
+        failed > 0 ? 'warning' : 'success'
+    );
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     const el = document.getElementById('ds-calendar');
     if (!el || !window.FullCalendar) return;
@@ -625,6 +873,32 @@ document.addEventListener('DOMContentLoaded', () => {
                     create: false, // เราจัดการสร้าง event ผ่าน drop handler เอง
                 };
             },
+        });
+    }
+
+    // ── Import modal: file input + drag-drop ──────────────────────────────────
+    const importFile     = document.getElementById('ds-import-file');
+    const importDropzone = document.getElementById('ds-import-dropzone');
+
+    if (importFile) {
+        importFile.addEventListener('change', () => {
+            if (importFile.files[0]) dsImportUpload(importFile.files[0]);
+        });
+    }
+    if (importDropzone) {
+        importDropzone.addEventListener('click', () => importFile && importFile.click());
+        importDropzone.addEventListener('dragover', e => {
+            e.preventDefault();
+            importDropzone.classList.add('border-violet-400', 'bg-violet-50');
+        });
+        importDropzone.addEventListener('dragleave', () => {
+            importDropzone.classList.remove('border-violet-400', 'bg-violet-50');
+        });
+        importDropzone.addEventListener('drop', e => {
+            e.preventDefault();
+            importDropzone.classList.remove('border-violet-400', 'bg-violet-50');
+            const file = e.dataTransfer?.files?.[0];
+            if (file) dsImportUpload(file);
         });
     }
 
