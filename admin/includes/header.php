@@ -317,7 +317,6 @@ if (!function_exists('renderPageHeader')) {
         <!-- เครื่องมือ -->
         <div class="nav-section-label">เครื่องมือ</div>
         <div class="space-y-0.5">
-            <?php navLink('../admin/ai_assistant.php',  'fa-robot',           'AI Analyst',     $cur); ?>
             <?php navLink('../admin/activity_logs.php', 'fa-clipboard-list',  'บันทึกกิจกรรม',  $cur); ?>
         </div>
 
