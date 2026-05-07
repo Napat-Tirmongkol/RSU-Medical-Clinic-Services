@@ -457,6 +457,141 @@ try {
             exit;
         }
 
+        // ════════════ DOCUMENT: COMPLETE ════════════
+        case 'document:complete': {
+            $id = (int)($_POST['id'] ?? 0);
+            if ($id <= 0) throw new RuntimeException('ระบุ id ไม่ถูกต้อง');
+
+            $pdo->prepare("UPDATE sys_doc_documents SET status = 'completed', updated_by = ? WHERE id = ?")
+                ->execute([$userId ?: null, $id]);
+
+            edms_log($pdo, $id, $userId, 'complete');
+            echo json_encode(['ok' => true, 'message' => 'ปิดเรื่องเรียบร้อย']);
+            exit;
+        }
+
+        // ════════════ ROUTING: FORWARD (โอน/มอบหมาย) ════════════
+        case 'routing:forward': {
+            $docId    = (int)($_POST['doc_id'] ?? 0);
+            $toUser   = (int)($_POST['to_user_id'] ?? 0) ?: null;
+            $toDept   = trim($_POST['to_dept'] ?? '') ?: null;
+            $rAction  = $_POST['r_action'] ?? 'forward';
+            $comment  = trim($_POST['comment'] ?? '') ?: null;
+            $dueDate  = edms_normalize_date($_POST['due_date'] ?? null);
+
+            if ($docId <= 0) throw new RuntimeException('ระบุ doc_id ไม่ถูกต้อง');
+            if (!$toUser && !$toDept) throw new RuntimeException('กรุณาเลือกผู้รับหรือฝ่ายปลายทาง');
+            if (!in_array($rAction, ['forward','assign','approve','sign','return','note','close'], true)) {
+                $rAction = 'forward';
+            }
+
+            $cur = $pdo->prepare("SELECT id, status FROM sys_doc_documents WHERE id = ?");
+            $cur->execute([$docId]);
+            $doc = $cur->fetch(PDO::FETCH_ASSOC);
+            if (!$doc) throw new RuntimeException('ไม่พบเอกสาร');
+            if (in_array($doc['status'], ['draft','archived','cancelled'], true)) {
+                throw new RuntimeException('ไม่สามารถโอนเอกสารในสถานะนี้ได้ — กรุณาลงทะเบียนก่อน');
+            }
+
+            $pdo->beginTransaction();
+            $pdo->prepare("
+                INSERT INTO sys_doc_routings (doc_id, from_user_id, to_user_id, to_dept, action, comment, due_date, status)
+                VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')
+            ")->execute([$docId, $userId ?: null, $toUser, $toDept, $rAction, $comment, $dueDate]);
+
+            $newRouteId = (int)$pdo->lastInsertId();
+
+            // เปลี่ยนสถานะเอกสารเป็น routing ถ้ายังเป็น registered
+            if ($doc['status'] === 'registered') {
+                $pdo->prepare("UPDATE sys_doc_documents SET status = 'routing', updated_by = ? WHERE id = ?")
+                    ->execute([$userId ?: null, $docId]);
+            }
+            $pdo->commit();
+
+            edms_log($pdo, $docId, $userId, 'route', [
+                'routing_id' => $newRouteId,
+                'action'     => $rAction,
+                'to_user_id' => $toUser,
+                'to_dept'    => $toDept,
+                'due_date'   => $dueDate,
+            ]);
+
+            echo json_encode(['ok' => true, 'message' => 'โอนเอกสารแล้ว', 'routing_id' => $newRouteId], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        // ════════════ ROUTING: ACKNOWLEDGE / COMPLETE / RETURN ════════════
+        case 'routing:acknowledge':
+        case 'routing:complete':
+        case 'routing:return': {
+            $routeId = (int)($_POST['routing_id'] ?? 0);
+            if ($routeId <= 0) throw new RuntimeException('ระบุ routing_id ไม่ถูกต้อง');
+            $comment = trim($_POST['comment'] ?? '') ?: null;
+
+            $sel = $pdo->prepare("SELECT * FROM sys_doc_routings WHERE id = ? LIMIT 1");
+            $sel->execute([$routeId]);
+            $route = $sel->fetch(PDO::FETCH_ASSOC);
+            if (!$route) throw new RuntimeException('ไม่พบรายการโอน');
+
+            // ตรวจว่าเป็นผู้รับหรือไม่ (เฉพาะ to_user_id ที่ทำได้ + superadmin override)
+            $isSuperUser = ($_SESSION['admin_role'] ?? '') === 'superadmin';
+            if (!$isSuperUser && $route['to_user_id'] !== null && (int)$route['to_user_id'] !== $userId) {
+                throw new RuntimeException('คุณไม่ใช่ผู้รับมอบหมายเอกสารนี้');
+            }
+            if (in_array($route['status'], ['done','returned'], true)) {
+                throw new RuntimeException('รายการนี้ถูกปิดไปแล้ว');
+            }
+
+            $newStatus = match($action) {
+                'acknowledge' => 'acknowledged',
+                'complete'    => 'done',
+                'return'      => 'returned',
+            };
+
+            $pdo->beginTransaction();
+            $pdo->prepare("UPDATE sys_doc_routings SET status = ?, completed_at = " . ($newStatus !== 'acknowledged' ? 'NOW()' : 'completed_at') . " WHERE id = ?")
+                ->execute([$newStatus, $routeId]);
+
+            // ถ้าตีกลับ → สร้าง routing ใหม่กลับไปยัง from_user
+            if ($newStatus === 'returned' && !empty($route['from_user_id'])) {
+                $pdo->prepare("
+                    INSERT INTO sys_doc_routings (doc_id, from_user_id, to_user_id, action, comment, status)
+                    VALUES (?, ?, ?, 'return', ?, 'pending')
+                ")->execute([
+                    $route['doc_id'],
+                    $userId ?: null,
+                    $route['from_user_id'],
+                    $comment ?: 'ตีกลับเพื่อแก้ไข',
+                ]);
+            }
+
+            // ถ้า routings ทั้งหมดของเอกสารนี้ปิดหมด (done/returned) และ doc status='routing' → ตั้ง in_progress
+            $cnt = $pdo->prepare("SELECT
+                    SUM(CASE WHEN status IN ('pending','acknowledged') THEN 1 ELSE 0 END) AS open_cnt,
+                    COUNT(*) AS total
+                FROM sys_doc_routings WHERE doc_id = ?");
+            $cnt->execute([$route['doc_id']]);
+            $rcnt = $cnt->fetch(PDO::FETCH_ASSOC);
+            if ((int)$rcnt['open_cnt'] === 0 && (int)$rcnt['total'] > 0) {
+                $pdo->prepare("UPDATE sys_doc_documents SET status = 'in_progress', updated_by = ? WHERE id = ? AND status = 'routing'")
+                    ->execute([$userId ?: null, $route['doc_id']]);
+            }
+            $pdo->commit();
+
+            edms_log($pdo, (int)$route['doc_id'], $userId, $newStatus === 'done' ? 'route_done' : ($newStatus === 'returned' ? 'route_return' : 'route_ack'), [
+                'routing_id' => $routeId,
+                'comment'    => $comment,
+            ]);
+
+            $msg = match($newStatus) {
+                'acknowledged' => 'รับทราบแล้ว',
+                'done'         => 'ดำเนินการเสร็จสิ้น',
+                'returned'     => 'ตีกลับแล้ว',
+            };
+            echo json_encode(['ok' => true, 'message' => $msg], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
         // ════════════ ATTACHMENT: DELETE ════════════
         case 'attachment:delete': {
             $id = (int)($_POST['id'] ?? 0);

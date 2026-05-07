@@ -882,6 +882,19 @@ try {
             $hasSysLogs     = $isSuper || !empty($_SESSION['access_system_logs']);
             $hasSiteSet     = $isSuper || !empty($_SESSION['access_site_settings']);
             $hasEdms        = $isSuper || !empty($_SESSION['access_edms']);
+
+            // EDMS pending count badge — count routings where current user is recipient and status is open
+            $edmsInboxBadge = 0;
+            if ($hasEdms) {
+                $_uid = (int)($_SESSION['admin_id'] ?? 0);
+                if ($_uid > 0) {
+                    try {
+                        $_st = $pdo->prepare("SELECT COUNT(*) FROM sys_doc_routings WHERE to_user_id = ? AND status IN ('pending','acknowledged')");
+                        $_st->execute([$_uid]);
+                        $edmsInboxBadge = (int)$_st->fetchColumn();
+                    } catch (PDOException) { /* table not yet migrated */ }
+                }
+            }
             ?>
 
             <?php /* ── OVERVIEW ───────────────────────────────────────────── */ ?>
@@ -949,9 +962,14 @@ try {
                     <span class="psb-label" style="color:#6d28d9;font-weight:900">ประกาศ</span>
                 </button>
                 <?php if ($hasEdms): ?>
-                    <button class="psb-item <?= $activeSection==='edms'?'psb-active':'' ?>" data-section="edms" onclick="switchSection('edms',this)">
+                    <button class="psb-item <?= $activeSection==='edms'?'psb-active':'' ?>" data-section="edms" onclick="switchSection('edms',this)" style="position:relative">
                         <div class="psb-icon"><i class="fa-solid fa-folder-open" style="color:#0ea5e9"></i></div>
                         <span class="psb-label" style="color:#0284c7;font-weight:900">สารบรรณอิเล็กทรอนิกส์</span>
+                        <?php if ($edmsInboxBadge > 0): ?>
+                            <span style="margin-left:auto;display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:20px;padding:0 6px;border-radius:99px;background:#f59e0b;color:#fff;font-size:10px;font-weight:900;box-shadow:0 1px 2px rgba(0,0,0,.1)" title="<?= $edmsInboxBadge ?> รายการรอดำเนินการ">
+                                <?= $edmsInboxBadge > 99 ? '99+' : $edmsInboxBadge ?>
+                            </span>
+                        <?php endif; ?>
                     </button>
                 <?php endif; ?>
             <?php endif; ?>

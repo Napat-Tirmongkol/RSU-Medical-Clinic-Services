@@ -13,7 +13,7 @@
 declare(strict_types=1);
 
 $_view = $_GET['edms_view'] ?? '';
-$_validViews = ['list', 'detail'];
+$_validViews = ['list', 'detail', 'myinbox'];
 
 if (in_array($_view, $_validViews, true)) {
     include __DIR__ . '/edms/' . $_view . '.php';
@@ -21,9 +21,12 @@ if (in_array($_view, $_validViews, true)) {
 }
 
 $pdo = db();
+$_currentUserId = (int)($_SESSION['admin_id'] ?? 0);
 
 // Quick stats (จะเริ่มมีค่าเมื่อสร้างเอกสาร) — ป้องกันถ้าตารางยังไม่มี
 $stats = ['incoming' => 0, 'outgoing' => 0, 'internal' => 0, 'circular' => 0, 'pending' => 0];
+$myInboxCount = 0;
+$myOverdueCount = 0;
 try {
     $row = $pdo->query("
         SELECT
@@ -40,6 +43,19 @@ try {
         $stats['internal'] = (int)($row['internal_'] ?? 0);
         $stats['circular'] = (int)($row['circular'] ?? 0);
         $stats['pending']  = (int)($row['pending'] ?? 0);
+    }
+
+    if ($_currentUserId > 0) {
+        $mi = $pdo->prepare("SELECT
+                SUM(CASE WHEN status IN ('pending','acknowledged') THEN 1 ELSE 0 END) AS open_cnt,
+                SUM(CASE WHEN status IN ('pending','acknowledged') AND due_date IS NOT NULL AND due_date < CURDATE() THEN 1 ELSE 0 END) AS overdue_cnt
+            FROM sys_doc_routings WHERE to_user_id = ?");
+        $mi->execute([$_currentUserId]);
+        $mr = $mi->fetch(PDO::FETCH_ASSOC);
+        if ($mr) {
+            $myInboxCount   = (int)($mr['open_cnt'] ?? 0);
+            $myOverdueCount = (int)($mr['overdue_cnt'] ?? 0);
+        }
     }
 } catch (PDOException $e) {
     // ตารางยังไม่ถูกสร้าง — ผู้ใช้ต้องรัน migration ก่อน
@@ -123,6 +139,29 @@ $tonePalette = [
             <p class="text-2xl font-black text-rose-600 mt-1"><?= number_format($stats['pending']) ?></p>
         </div>
     </div>
+
+    <!-- Inbox ของฉัน -->
+    <a href="?section=edms&edms_view=myinbox" class="group block bg-gradient-to-br from-amber-50 via-orange-50 to-rose-50 rounded-3xl border-2 border-amber-200 shadow-sm p-5 mb-6 flex items-center gap-4 hover:shadow-md hover:-translate-y-0.5 transition-all">
+        <div class="w-12 h-12 bg-amber-500 text-white rounded-2xl shadow-md flex items-center justify-center text-xl shrink-0">
+            <i class="fa-solid fa-bell"></i>
+        </div>
+        <div class="flex-1 min-w-0">
+            <p class="text-[10px] font-black uppercase tracking-widest text-amber-600">Inbox ของฉัน</p>
+            <p class="text-base font-black text-slate-800 mt-0.5">
+                <?php if ($myInboxCount > 0): ?>
+                    คุณมี <span class="text-amber-600"><?= number_format($myInboxCount) ?></span> เอกสารรอดำเนินการ
+                    <?php if ($myOverdueCount > 0): ?>
+                        <span class="ml-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 border border-rose-200 text-[10px] font-black">
+                            <i class="fa-solid fa-circle-exclamation text-[8px]"></i> เกินกำหนด <?= $myOverdueCount ?>
+                        </span>
+                    <?php endif; ?>
+                <?php else: ?>
+                    ไม่มีเอกสารรอดำเนินการในตอนนี้
+                <?php endif; ?>
+            </p>
+        </div>
+        <i class="fa-solid fa-arrow-right text-amber-500 group-hover:translate-x-1 transition-transform"></i>
+    </a>
 
     <!-- Type cards -->
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
