@@ -102,6 +102,12 @@ $serviceTypes = ['ตรวจทั่วไป', 'วัคซีน', 'ตร
 
     .ds-btn-import { background: #7c3aed; color: #fff; }
     .ds-btn-import:hover { background: #6d28d9; }
+
+    /* Import modal — fix uncompiled Tailwind arbitrary-value classes */
+    #ds-import-modal           { z-index: 300; }
+    #ds-import-modal-box       { max-height: 90vh; }
+    #ds-import-step3           { min-height: 0; }
+    #ds-import-confirm-btn     { flex: 2 2 0%; }
 </style>
 
 <div class="max-w-[1400px] mx-auto px-4 py-6">
@@ -294,8 +300,8 @@ $serviceTypes = ['ตรวจทั่วไป', 'วัคซีน', 'ตร
 </div>
 
 <!-- Import from Photo Modal -->
-<div id="ds-import-modal" class="hidden fixed inset-0 z-[300] items-center justify-center bg-black/40 p-4">
-    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col">
+<div id="ds-import-modal" class="hidden fixed inset-0 items-center justify-center bg-black/40 p-4">
+    <div id="ds-import-modal-box" class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl flex flex-col">
         <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between shrink-0">
             <h3 class="font-black text-slate-800 flex items-center gap-2">
                 <i class="fa-solid fa-camera text-purple-500"></i> นำเข้าตารางจากรูป (AI)
@@ -326,7 +332,7 @@ $serviceTypes = ['ตรวจทั่วไป', 'วัคซีน', 'ตร
         </div>
 
         <!-- Step 3: Preview parsed shifts -->
-        <div id="ds-import-step3" class="hidden flex-col flex-1 min-h-0">
+        <div id="ds-import-step3" class="hidden flex-col flex-1">
             <div class="px-4 pt-4 pb-2 flex gap-4 shrink-0">
                 <img id="ds-import-thumb" src="" alt="" class="w-28 h-auto rounded-xl border border-slate-200 object-contain shrink-0">
                 <div class="flex-1 min-w-0">
@@ -354,7 +360,7 @@ $serviceTypes = ['ตรวจทั่วไป', 'วัคซีน', 'ตร
             <div class="px-4 py-3 flex gap-2 border-t border-slate-100 shrink-0">
                 <button onclick="dsCloseImport()" class="flex-1 px-4 py-2.5 bg-slate-100 text-slate-600 rounded-xl text-sm font-black hover:bg-slate-200 transition-all">ยกเลิก</button>
                 <button onclick="dsImportConfirm()" id="ds-import-confirm-btn"
-                    class="ds-btn-import flex-[2] px-4 py-2.5 rounded-xl text-sm font-black transition-all shadow-sm">
+                    class="ds-btn-import px-4 py-2.5 rounded-xl text-sm font-black transition-all shadow-sm">
                     <i class="fa-solid fa-file-import"></i> นำเข้า shift ทั้งหมด
                 </button>
             </div>
