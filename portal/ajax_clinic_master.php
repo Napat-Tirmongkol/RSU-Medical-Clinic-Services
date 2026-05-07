@@ -433,6 +433,9 @@ try {
                     WHERE type = 'regular' AND (specific_date = '' OR specific_date = '0000-00-00')");
             } catch (PDOException) {}
             try {
+                $pdo->exec("ALTER TABLE sys_doctor_schedule ADD COLUMN recur_end_date DATE NULL DEFAULT NULL AFTER weekday");
+            } catch (PDOException) {}  // column already exists → ignore
+            try {
                 $pdo->exec("CREATE TABLE IF NOT EXISTS sys_doctor_schedule (
                     id INT AUTO_INCREMENT PRIMARY KEY,
                     staff_id INT NOT NULL,
@@ -472,13 +475,16 @@ try {
 
         case 'schedule:add': {
             $type = $_POST['type'] ?? 'regular';
+            $recurEnd = ($type === 'regular' && !empty($_POST['recur_end_date']))
+                ? trim((string)$_POST['recur_end_date']) : null;
             $stmt = $pdo->prepare("INSERT INTO sys_doctor_schedule
-                (staff_id, type, weekday, specific_date, start_time, end_time, room_id, service_type, notes)
-                VALUES (?,?,?,?,?,?,?,?,?)");
+                (staff_id, type, weekday, recur_end_date, specific_date, start_time, end_time, room_id, service_type, notes)
+                VALUES (?,?,?,?,?,?,?,?,?,?)");
             $stmt->execute([
                 (int)$_POST['staff_id'],
                 $type,
                 $type === 'regular' ? (int)$_POST['weekday'] : null,
+                $recurEnd,
                 $type !== 'regular' ? ($_POST['specific_date'] ?? null) : null,
                 $type === 'off' ? null : ($_POST['start_time'] ?? null),
                 $type === 'off' ? null : ($_POST['end_time']   ?? null),
@@ -500,6 +506,8 @@ try {
             if ($type !== null) {
                 // Full modal edit — derive nullable fields strictly from type to avoid '' overwriting NULL
                 $weekday      = ($type === 'regular') ? (int)$_POST['weekday'] : null;
+                $recurEnd     = ($type === 'regular' && !empty($_POST['recur_end_date']))
+                    ? trim((string)$_POST['recur_end_date']) : null;
                 $specificDate = ($type !== 'regular')
                     ? (trim((string)($_POST['specific_date'] ?? '')) ?: null)
                     : null;
@@ -508,27 +516,29 @@ try {
                 $staffId   = !empty($_POST['staff_id']) ? (int)$_POST['staff_id'] : null;
 
                 $stmt = $pdo->prepare("UPDATE sys_doctor_schedule SET
-                    type          = :type,
-                    weekday       = :weekday,
-                    specific_date = :date,
-                    start_time    = :st,
-                    end_time      = :et,
-                    staff_id      = COALESCE(:staff, staff_id),
-                    room_id       = :room,
-                    service_type  = :svc,
-                    notes         = :notes
+                    type           = :type,
+                    weekday        = :weekday,
+                    recur_end_date = :recur_end,
+                    specific_date  = :date,
+                    start_time     = :st,
+                    end_time       = :et,
+                    staff_id       = COALESCE(:staff, staff_id),
+                    room_id        = :room,
+                    service_type   = :svc,
+                    notes          = :notes
                     WHERE id = :id");
                 $stmt->execute([
-                    ':type'    => $type,
-                    ':weekday' => $weekday,
-                    ':date'    => $specificDate,
-                    ':st'      => $startTime,
-                    ':et'      => $endTime,
-                    ':staff'   => $staffId,
-                    ':room'    => !empty($_POST['room_id']) ? (int)$_POST['room_id'] : null,
-                    ':svc'     => trim((string)($_POST['service_type'] ?? '')) ?: null,
-                    ':notes'   => trim((string)($_POST['notes'] ?? '')) ?: null,
-                    ':id'      => $id,
+                    ':type'      => $type,
+                    ':weekday'   => $weekday,
+                    ':recur_end' => $recurEnd,
+                    ':date'      => $specificDate,
+                    ':st'        => $startTime,
+                    ':et'        => $endTime,
+                    ':staff'     => $staffId,
+                    ':room'      => !empty($_POST['room_id']) ? (int)$_POST['room_id'] : null,
+                    ':svc'       => trim((string)($_POST['service_type'] ?? '')) ?: null,
+                    ':notes'     => trim((string)($_POST['notes'] ?? '')) ?: null,
+                    ':id'        => $id,
                 ]);
             } else {
                 // Partial update from drag-drop / resize — preserve type-related fields with COALESCE

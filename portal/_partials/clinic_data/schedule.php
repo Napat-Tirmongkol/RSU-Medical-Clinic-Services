@@ -215,6 +215,11 @@ $serviceTypes = ['ตรวจทั่วไป', 'วัคซีน', 'ตร
                         <option value="<?= $i ?>"><?= $n ?></option>
                     <?php endforeach; ?>
                 </select>
+                <div class="mt-2">
+                    <label class="text-[10px] font-black uppercase tracking-widest text-slate-500 block mb-1.5">สิ้นสุดซ้ำ <span class="font-medium normal-case text-slate-400">(ว่าง = ไม่มีกำหนด)</span></label>
+                    <input type="date" name="recur_end_date" id="ds-recur-end"
+                        class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 outline-none">
+                </div>
             </div>
 
             <div id="ds-field-date" class="hidden">
@@ -321,12 +326,14 @@ function rowToEvent(row) {
     };
 
     if (row.type === 'regular') {
-        return Object.assign(base, {
+        const ev = {
             daysOfWeek: [Number(row.weekday)],
             startTime: row.start_time,
             endTime:   row.end_time,
             startRecur: '2024-01-01',
-        });
+        };
+        if (row.recur_end_date) ev.endRecur = row.recur_end_date;
+        return Object.assign(base, ev);
     }
     if (row.type === 'off') {
         return Object.assign(base, {
@@ -359,16 +366,24 @@ function dsToggleType() {
     document.querySelector('[name=specific_date]').required = (t !== 'regular');
 }
 
+function dsDefaultRecurEnd() {
+    const d = new Date();
+    d.setMonth(d.getMonth() + 1);
+    return d.toISOString().substring(0, 10);
+}
+
 function dsOpenAdd(prefill = {}) {
     document.getElementById('ds-modal-title').textContent = 'เพิ่ม shift';
     document.getElementById('ds-id').value = '';
     document.getElementById('ds-delete-btn').classList.add('hidden');
     document.getElementById('ds-form').reset();
     document.querySelector('[name=type][value=regular]').checked = true;
+    document.getElementById('ds-recur-end').value = dsDefaultRecurEnd();
     if (prefill.weekday !== undefined) document.querySelector('[name=weekday]').value = prefill.weekday;
     if (prefill.date) {
         document.querySelector('[name=type][value=override]').checked = true;
         document.querySelector('[name=specific_date]').value = prefill.date;
+        document.getElementById('ds-recur-end').value = '';
     }
     if (prefill.time) document.querySelector('[name=start_time]').value = prefill.time;
     dsToggleType();
@@ -389,6 +404,7 @@ function dsOpenEdit(row) {
     document.querySelector('[name=room_id]').value = row.room_id ?? '';
     document.querySelector('[name=service_type]').value = row.service_type ?? '';
     document.querySelector('[name=notes]').value = row.notes ?? '';
+    document.getElementById('ds-recur-end').value = row.recur_end_date ?? '';
     dsToggleType();
     document.getElementById('ds-modal').classList.remove('hidden');
     document.getElementById('ds-modal').classList.add('flex');
