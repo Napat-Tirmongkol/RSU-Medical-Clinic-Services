@@ -45,6 +45,37 @@ $webhookUrl = "$protocol://$host$uri";
     .line-input:focus { background:#fff; border-color:#06b6d4; box-shadow:0 0 0 3px rgba(6,182,212,.1); }
     .line-label { display:block; font-size:.75rem; font-weight:800; color:#4b5563; text-transform:uppercase; letter-spacing:.05em; margin-bottom:.5rem; }
     .line-card  { background:#fff; border-radius:1.5rem; border:1.5px solid #e5e7eb; padding:1.75rem; margin-bottom:1.25rem; }
+
+    /* Toggle switch — replaces native checkboxes for FAQ on/off settings */
+    .line-toggle {
+        --toggle-on: #0ea5e9;
+        position: relative; display: inline-block; flex-shrink: 0;
+        width: 44px; height: 24px;
+    }
+    .line-toggle input { position: absolute; opacity: 0; width: 0; height: 0; }
+    .line-toggle .line-toggle-slider {
+        position: absolute; inset: 0;
+        background: #cbd5e1; border-radius: 24px;
+        cursor: pointer;
+        transition: background .2s;
+    }
+    .line-toggle .line-toggle-slider::before {
+        content: ''; position: absolute;
+        height: 18px; width: 18px;
+        left: 3px; top: 3px;
+        background: #fff; border-radius: 50%;
+        box-shadow: 0 2px 6px rgba(15,23,42,.2);
+        transition: transform .22s cubic-bezier(.34,1.56,.64,1);
+    }
+    .line-toggle input:checked + .line-toggle-slider { background: var(--toggle-on); }
+    .line-toggle input:checked + .line-toggle-slider::before { transform: translateX(20px); }
+    .line-toggle input:focus-visible + .line-toggle-slider {
+        box-shadow: 0 0 0 3px rgba(14,165,233,.25);
+    }
+    .line-toggle.line-toggle--purple { --toggle-on: #7c3aed; }
+    .line-toggle.line-toggle--purple input:focus-visible + .line-toggle-slider {
+        box-shadow: 0 0 0 3px rgba(124,58,237,.25);
+    }
 </style>
 
 <div class="px-4 py-8">
@@ -208,17 +239,21 @@ $webhookUrl = "$protocol://$host$uri";
         <form id="faqForm" onsubmit="return false" style="display:grid;gap:18px">
             <!-- Master toggle + only_when_closed + rate limit -->
             <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;padding:14px;background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:14px">
-                <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
-                    <input type="checkbox" id="faq_enabled" name="enabled" value="1"
-                        style="width:18px;height:18px;accent-color:#0ea5e9;cursor:pointer">
+                <label style="display:flex;align-items:center;gap:12px;cursor:pointer">
+                    <span class="line-toggle">
+                        <input type="checkbox" id="faq_enabled" name="enabled" value="1">
+                        <span class="line-toggle-slider"></span>
+                    </span>
                     <div>
                         <div style="font-size:13px;font-weight:800;color:#0f172a">เปิดใช้งาน FAQ</div>
                         <div style="font-size:11px;color:#64748b;font-weight:500">ปิดเพื่อให้บอทไม่ตอบอัตโนมัติ</div>
                     </div>
                 </label>
-                <label style="display:flex;align-items:center;gap:10px;cursor:pointer;border-left:1.5px solid #e2e8f0;padding-left:14px">
-                    <input type="checkbox" id="faq_only_when_closed" name="only_when_closed" value="1"
-                        style="width:18px;height:18px;accent-color:#7c3aed;cursor:pointer">
+                <label style="display:flex;align-items:center;gap:12px;cursor:pointer;border-left:1.5px solid #e2e8f0;padding-left:14px">
+                    <span class="line-toggle line-toggle--purple">
+                        <input type="checkbox" id="faq_only_when_closed" name="only_when_closed" value="1">
+                        <span class="line-toggle-slider"></span>
+                    </span>
                     <div>
                         <div style="font-size:13px;font-weight:800;color:#0f172a">ตอบเฉพาะตอนปิด</div>
                         <div style="font-size:11px;color:#64748b;font-weight:500">คลินิกเปิดอยู่ → บอทไม่ตอบ FAQ</div>
