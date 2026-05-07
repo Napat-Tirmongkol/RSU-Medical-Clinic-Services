@@ -4,7 +4,7 @@ require_once __DIR__ . '/includes/auth.php';
 
 $userId = (int)($_GET['id'] ?? 0);
 if ($userId <= 0) {
-    header('Location: users.php');
+    header('Location: ../portal/users.php');
     exit;
 }
 
@@ -16,7 +16,7 @@ try {
     $stmtUser->execute([':id' => $userId]);
     $user = $stmtUser->fetch();
     if (!$user) {
-        header('Location: users.php');
+        header('Location: ../portal/users.php');
         exit;
     }
 } catch (PDOException $e) {
@@ -70,7 +70,7 @@ function statusBadge(array $b): string {
 
 <!-- ===== PAGE HEADER ===== -->
 <div class="mb-6">
-    <a href="users.php" class="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-[#0052CC] transition-colors mb-4 group">
+    <a href="../portal/users.php" class="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-[#0052CC] transition-colors mb-4 group">
         <i class="fa-solid fa-arrow-left text-xs group-hover:-translate-x-0.5 transition-transform"></i> กลับหน้ารายชื่อผู้ใช้
     </a>
 
@@ -96,7 +96,7 @@ function statusBadge(array $b): string {
         </div>
 
         <!-- Action -->
-        <a href="users.php" class="text-sm text-[#0052CC] hover:underline font-medium whitespace-nowrap">
+        <a href="../portal/users.php" class="text-sm text-[#0052CC] hover:underline font-medium whitespace-nowrap">
             <i class="fa-solid fa-pen-to-square mr-1"></i>แก้ไขข้อมูล
         </a>
     </div>
