@@ -156,8 +156,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ->execute([':id' => $bookingId]);
 
                 $pdo->commit();
-                header('Location: hub.php?survey=done');
-                exit;
+                $showThankYou = true; // fall through to render thank-you screen instead of redirecting
             } catch (PDOException $e) {
                 if ($pdo->inTransaction()) $pdo->rollBack();
                 error_log('post_checkin_survey save failed: ' . $e->getMessage());
@@ -203,11 +202,71 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     .pcs-submit-btn:hover    { background: #be185d; }
     .pcs-submit-btn:disabled { background: #cbd5e1; box-shadow: none; cursor: not-allowed; }
+
+    /* Thank-you screen */
+    .pcs-thanks-card {
+        background: #fff; border-radius: 28px; padding: 48px 28px;
+        box-shadow: 0 20px 50px -12px rgba(219, 39, 119, .25);
+        border: 1px solid #fce7f3;
+    }
+    .pcs-check-circle {
+        width: 96px; height: 96px; border-radius: 50%;
+        background: linear-gradient(135deg, #f472b6, #db2777);
+        display: flex; align-items: center; justify-content: center;
+        color: #fff; font-size: 48px;
+        margin: 0 auto 24px;
+        animation: pcs-pop .55s cubic-bezier(.34,1.56,.64,1) both;
+        box-shadow: 0 12px 28px -8px rgba(219, 39, 119, .55);
+    }
+    @keyframes pcs-pop {
+        0%   { transform: scale(0);   opacity: 0; }
+        60%  { transform: scale(1.12); opacity: 1; }
+        100% { transform: scale(1);   opacity: 1; }
+    }
+    .pcs-thanks-title { color: #831843; }
+    .pcs-redirect-link { color: #db2777; }
+    .pcs-redirect-link:hover { color: #be185d; }
 </style>
 </head>
 <body class="p-4">
 
 <div class="max-w-md mx-auto pt-6 pb-12">
+
+<?php if (!empty($showThankYou)): ?>
+
+    <!-- Thank-you screen — auto-redirect to hub.php after 4s -->
+    <div class="pcs-thanks-card text-center">
+        <div class="pcs-check-circle">
+            <i class="fa-solid fa-check"></i>
+        </div>
+        <h1 class="pcs-thanks-title text-2xl font-black mb-2">ขอบคุณที่ตอบแบบสอบถาม</h1>
+        <p class="text-sm text-slate-600 font-bold leading-relaxed mb-6">
+            ความเห็นของคุณถูกบันทึกเรียบร้อย<br>
+            ทีมงานจะนำไปปรับปรุงบริการให้ดียิ่งขึ้น 💗
+        </p>
+        <a href="hub.php?survey=done" class="pcs-submit-btn inline-flex items-center justify-center gap-2 w-full py-3.5 rounded-2xl text-base font-black no-underline">
+            <i class="fa-solid fa-house"></i>
+            กลับหน้าหลัก
+        </a>
+        <p class="text-[11px] text-slate-400 font-bold mt-4">
+            จะพากลับหน้าหลักอัตโนมัติใน <span id="pcs-countdown">4</span> วินาที
+        </p>
+    </div>
+
+    <script>
+        let pcsRemain = 4;
+        const pcsCountdownEl = document.getElementById('pcs-countdown');
+        const pcsTimer = setInterval(() => {
+            pcsRemain -= 1;
+            if (pcsCountdownEl) pcsCountdownEl.textContent = String(Math.max(0, pcsRemain));
+            if (pcsRemain <= 0) {
+                clearInterval(pcsTimer);
+                location.href = 'hub.php?survey=done';
+            }
+        }, 1000);
+    </script>
+
+<?php else: ?>
 
     <!-- Header -->
     <div class="text-center mb-6">
@@ -290,8 +349,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             คำตอบของคุณจะถูกใช้เพื่อปรับปรุงบริการเท่านั้น
         </p>
     </form>
+
+<?php endif; // showThankYou ?>
+
 </div>
 
+<?php if (empty($showThankYou)): ?>
 <script>
 let pcsSubmitting = false;
 
@@ -342,6 +405,7 @@ document.getElementById('pcs-form').addEventListener('submit', e => {
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> กำลังส่ง...';
 });
 </script>
+<?php endif; ?>
 
 </body>
 </html>
