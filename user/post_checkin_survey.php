@@ -181,9 +181,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     * { font-family: 'Sarabun', sans-serif; }
     body { background: linear-gradient(135deg, #fdf2f8 0%, #fff 50%, #fce7f3 100%); min-height: 100vh; }
     .pcs-star { width: 44px; height: 44px; cursor: pointer; transition: transform .15s, color .15s; color: #cbd5e1; }
-    .pcs-star:hover { color: #f59e0b; transform: scale(1.1); }
-    .pcs-star.selected { color: #f59e0b; }
-    .pcs-star.selected ~ .pcs-star { color: #cbd5e1; }
+    .pcs-star:hover { transform: scale(1.1); }
+    .pcs-star.selected,
+    .pcs-star.hover-fill { color: #f59e0b; }
     .pcs-choice {
         display: block; padding: 14px 16px; border: 2px solid #e2e8f0; border-radius: 14px;
         font-weight: 700; cursor: pointer; transition: all .15s; background: #fff;
@@ -293,6 +293,13 @@ document.querySelectorAll('[data-rating]').forEach(group => {
             input.value = String(v);
             stars.forEach(s => s.classList.toggle('selected', parseInt(s.dataset.star, 10) <= v));
         });
+        star.addEventListener('mouseenter', () => {
+            const v = parseInt(star.dataset.star, 10);
+            stars.forEach(s => s.classList.toggle('hover-fill', parseInt(s.dataset.star, 10) <= v));
+        });
+    });
+    group.addEventListener('mouseleave', () => {
+        stars.forEach(s => s.classList.remove('hover-fill'));
     });
 });
 
