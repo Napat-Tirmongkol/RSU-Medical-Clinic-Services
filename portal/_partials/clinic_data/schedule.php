@@ -450,7 +450,6 @@ function rowToEvent(row) {
         return Object.assign(base, {
             start: row.specific_date,
             allDay: true,
-            display: 'background',
             classNames: ['svc-off'],
         });
     }
