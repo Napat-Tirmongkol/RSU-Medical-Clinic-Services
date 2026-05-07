@@ -24,7 +24,14 @@ if (!$userId && !empty($_SESSION['line_user_id'])) {
 }
 
 if (!$userId) {
-    echo json_encode(['success' => false, 'error' => 'Unauthorized', 'debug' => 'No user_id in session']);
+    echo json_encode(['success' => false, 'error' => 'Unauthorized']);
+    exit;
+}
+
+// Reject mutating requests without a valid CSRF token (only fires on POST)
+if ($_SERVER['REQUEST_METHOD'] === 'POST'
+    && !verify_csrf_token($_POST['csrf_token'] ?? '')) {
+    echo json_encode(['success' => false, 'error' => 'Invalid CSRF token']);
     exit;
 }
 
@@ -97,5 +104,6 @@ try {
     }
 
 } catch (Exception $e) {
-    echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    error_log('user/ajax_chat error (' . ($action ?? '?') . '): ' . $e->getMessage());
+    echo json_encode(['success' => false, 'error' => 'เกิดข้อผิดพลาดในระบบ']);
 }

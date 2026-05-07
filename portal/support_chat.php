@@ -549,6 +549,7 @@ $pdo = db();
     </div>
 
     <script>
+        const portal_CSRF = <?= json_encode(get_csrf_token(), JSON_UNESCAPED_SLASHES) ?>;
         let currentUserId = null;
         let allUsers = [];
 
@@ -663,10 +664,10 @@ $pdo = db();
                         const isStaff = m.sender_type === 'staff';
                         return `
                             <div class="msg-bubble ${isStaff ? 'msg-staff' : 'msg-user'}">
-                                <p>${m.message}</p>
+                                <p>${esc(m.message)}</p>
                                 <div class="msg-meta">
                                     <span>${isStaff ? 'คุณ' : 'ผู้ใช้งาน'}</span>
-                                    <span>${m.time}</span>
+                                    <span>${esc(m.time)}</span>
                                 </div>
                             </div>
                         `;
@@ -687,6 +688,7 @@ $pdo = db();
             const formData = new FormData();
             formData.append('user_id', currentUserId);
             formData.append('message', message);
+            formData.append('csrf_token', portal_CSRF);
 
             try {
                 const res = await fetch('ajax_support_chat.php?action=send_reply', {

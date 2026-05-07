@@ -1967,19 +1967,20 @@ document.getElementById('insDetailModal').addEventListener('click', function(e) 
             const userBubble = `
                 <div class="flex flex-row-reverse items-start gap-3 max-w-[85%] ml-auto animate-in slide-in-from-right-2 duration-300">
                     <div class="space-y-1 text-right">
-                        <div class="bg-[#2e9e63] p-4 rounded-2xl rounded-tr-none shadow-lg shadow-green-100"><p class="text-white text-xs leading-relaxed text-left">${message}</p></div>
-                        <span class="text-[9px] text-white/40 font-black mr-1 uppercase">${time}</span>
+                        <div class="bg-[#2e9e63] p-4 rounded-2xl rounded-tr-none shadow-lg shadow-green-100"><p class="text-white text-xs leading-relaxed text-left">${escapeHtml(message)}</p></div>
+                        <span class="text-[9px] text-white/40 font-black mr-1 uppercase">${escapeHtml(time)}</span>
                     </div>
                 </div>
             `;
             chatContent.insertAdjacentHTML('beforeend', userBubble);
-            input.value = ''; 
+            input.value = '';
             chatContent.scrollTop = chatContent.scrollHeight;
 
             // 2. Send to Backend
             try {
                 const formData = new FormData();
                 formData.append('message', message);
+                formData.append('csrf_token', csrfToken);
                 const response = await fetch('ajax_chat.php?action=send', {
                     method: 'POST',
                     body: formData
@@ -2019,9 +2020,9 @@ document.getElementById('insDetailModal').addEventListener('click', function(e) 
                                     </div>
                                     <div class="space-y-2">
                                         <div class="bg-white p-5 rounded-[1.8rem] rounded-tl-none border border-slate-100 shadow-[0_10px_30px_rgba(0,0,0,0.02)]">
-                                            <p class="text-slate-700 text-[13px] leading-relaxed font-medium">${msg.message}</p>
+                                            <p class="text-slate-700 text-[13px] leading-relaxed font-medium">${escapeHtml(msg.message)}</p>
                                         </div>
-                                        <span class="text-[9px] text-slate-300 font-black ml-1 uppercase tracking-widest">${msg.time}</span>
+                                        <span class="text-[9px] text-slate-300 font-black ml-1 uppercase tracking-widest">${escapeHtml(msg.time)}</span>
                                     </div>
                                 </div>
                             `;
@@ -2032,8 +2033,8 @@ document.getElementById('insDetailModal').addEventListener('click', function(e) 
                             const userBubble = `
                                 <div class="flex flex-row-reverse items-start gap-3 max-w-[85%] ml-auto">
                                     <div class="space-y-1 text-right">
-                                        <div class="bg-[#2e9e63] p-4 rounded-2xl rounded-tr-none shadow-lg shadow-green-100"><p class="text-white text-xs leading-relaxed text-left">${msg.message}</p></div>
-                                        <span class="text-[9px] text-white/40 font-black mr-1 uppercase">${time}</span>
+                                        <div class="bg-[#2e9e63] p-4 rounded-2xl rounded-tr-none shadow-lg shadow-green-100"><p class="text-white text-xs leading-relaxed text-left">${escapeHtml(msg.message)}</p></div>
+                                        <span class="text-[9px] text-white/40 font-black mr-1 uppercase">${escapeHtml(time)}</span>
                                     </div>
                                 </div>
                             `;

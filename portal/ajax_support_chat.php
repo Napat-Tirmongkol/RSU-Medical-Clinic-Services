@@ -18,6 +18,13 @@ if (!$staffId || empty($_SESSION['admin_logged_in'])) {
     exit;
 }
 
+// Reject mutating requests without a valid CSRF token (only fires on POST)
+if ($_SERVER['REQUEST_METHOD'] === 'POST'
+    && !verify_csrf_token($_POST['csrf_token'] ?? '')) {
+    echo json_encode(['success' => false, 'error' => 'Invalid CSRF token']);
+    exit;
+}
+
 $action = $_GET['action'] ?? 'list_users';
 $pdo = db();
 
@@ -112,5 +119,6 @@ try {
     }
 
 } catch (Exception $e) {
-    echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    error_log('ajax_support_chat error (' . ($action ?? '?') . '): ' . $e->getMessage());
+    echo json_encode(['success' => false, 'error' => 'เกิดข้อผิดพลาดในระบบ']);
 }
