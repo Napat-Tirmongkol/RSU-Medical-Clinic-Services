@@ -40,6 +40,7 @@ try {
         case 'save': {
             $data = [
                 'enabled'                => isset($_POST['enabled']) ? (int)!!$_POST['enabled'] : 0,
+                'only_when_closed'       => isset($_POST['only_when_closed']) ? 1 : 0,
                 'rate_limit_hours'       => (int)($_POST['rate_limit_hours'] ?? 24),
                 'msg_open_now_title'     => (string)($_POST['msg_open_now_title']     ?? ''),
                 'msg_open_now_sub'       => (string)($_POST['msg_open_now_sub']       ?? ''),

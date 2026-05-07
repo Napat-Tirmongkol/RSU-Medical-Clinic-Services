@@ -206,8 +206,8 @@ $webhookUrl = "$protocol://$host$uri";
         </div>
 
         <form id="faqForm" onsubmit="return false" style="display:grid;gap:18px">
-            <!-- Master toggle + rate limit -->
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:14px;background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:14px">
+            <!-- Master toggle + only_when_closed + rate limit -->
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;padding:14px;background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:14px">
                 <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
                     <input type="checkbox" id="faq_enabled" name="enabled" value="1"
                         style="width:18px;height:18px;accent-color:#0ea5e9;cursor:pointer">
@@ -216,7 +216,15 @@ $webhookUrl = "$protocol://$host$uri";
                         <div style="font-size:11px;color:#64748b;font-weight:500">ปิดเพื่อให้บอทไม่ตอบอัตโนมัติ</div>
                     </div>
                 </label>
-                <div>
+                <label style="display:flex;align-items:center;gap:10px;cursor:pointer;border-left:1.5px solid #e2e8f0;padding-left:14px">
+                    <input type="checkbox" id="faq_only_when_closed" name="only_when_closed" value="1"
+                        style="width:18px;height:18px;accent-color:#7c3aed;cursor:pointer">
+                    <div>
+                        <div style="font-size:13px;font-weight:800;color:#0f172a">ตอบเฉพาะตอนปิด</div>
+                        <div style="font-size:11px;color:#64748b;font-weight:500">คลินิกเปิดอยู่ → บอทไม่ตอบ FAQ</div>
+                    </div>
+                </label>
+                <div style="border-left:1.5px solid #e2e8f0;padding-left:14px">
                     <label class="line-label" style="margin-bottom:6px">จำกัดการตอบ (ชั่วโมง / user / คำถาม)</label>
                     <div style="display:flex;align-items:center;gap:8px">
                         <input type="number" id="faq_rate_limit_hours" name="rate_limit_hours" min="0" max="720"
@@ -691,6 +699,7 @@ function sendTestLineP() {
 
     function applySettings(s) {
         document.getElementById('faq_enabled').checked = !!Number(s.enabled);
+        document.getElementById('faq_only_when_closed').checked = !!Number(s.only_when_closed);
         document.getElementById('faq_rate_limit_hours').value = Number(s.rate_limit_hours || 0);
         FAQ_KEYS.forEach(function (k) {
             var el = document.getElementById(k);
@@ -727,8 +736,9 @@ function sendTestLineP() {
         var fd = new FormData(document.getElementById('faqForm'));
         fd.append('csrf_token', '<?= get_csrf_token() ?>');
         fd.append('action', 'save');
-        // กล่อง enabled ที่ unchecked จะไม่ส่งใน FormData — บังคับให้ส่ง 0
+        // checkbox ที่ unchecked จะไม่ส่งใน FormData — บังคับให้ส่ง 0
         if (!document.getElementById('faq_enabled').checked) fd.set('enabled', '0');
+        if (!document.getElementById('faq_only_when_closed').checked) fd.set('only_when_closed', '0');
 
         var btn = document.getElementById('faqSaveBtn');
         btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> กำลังบันทึก...';
