@@ -195,6 +195,7 @@ $serviceTypes = ['ตรวจทั่วไป', 'วัคซีน', 'ตร
         </div>
         <form id="ds-form" onsubmit="dsSave(event)" class="p-6 space-y-4">
             <input type="hidden" name="id" id="ds-id">
+            <input type="hidden" id="ds-clicked-date">
 
             <div>
                 <label class="text-[10px] font-black uppercase tracking-widest text-slate-500 block mb-1.5">ประเภท *</label>
@@ -391,9 +392,10 @@ function dsOpenAdd(prefill = {}) {
     document.getElementById('ds-modal').classList.add('flex');
 }
 
-function dsOpenEdit(row) {
+function dsOpenEdit(row, clickedDate = null) {
     document.getElementById('ds-modal-title').textContent = 'แก้ shift #' + row.id;
     document.getElementById('ds-id').value = row.id;
+    document.getElementById('ds-clicked-date').value = (row.type === 'regular' && clickedDate) ? dsLocalDate(clickedDate) : '';
     document.getElementById('ds-delete-btn').classList.remove('hidden');
     document.querySelector(`[name=type][value=${row.type}]`).checked = true;
     document.querySelector('[name=weekday]').value = row.weekday ?? 0;
@@ -433,6 +435,77 @@ async function dsSave(e) {
 async function dsDelete() {
     const id = document.getElementById('ds-id').value;
     if (!id) return;
+    const row = dsRows.find(r => +r.id === +id);
+    const clickedDate = document.getElementById('ds-clicked-date').value;
+
+    if (row && row.type === 'regular' && clickedDate) {
+        // Recurring delete dialog — 3 options like Google Calendar
+        const result = await Swal.fire({
+            title: 'ลบกิจกรรมที่เกิดซ้ำ',
+            input: 'radio',
+            inputOptions: {
+                'this':              'กิจกรรมนี้',
+                'this_and_following':'กิจกรรมนี้และกิจกรรมที่ตามมาทั้งหมด',
+                'all':              'กิจกรรมทั้งหมด',
+            },
+            inputValue: 'this',
+            showCancelButton: true,
+            confirmButtonText: 'ตกลง',
+            cancelButtonText: 'ยกเลิก',
+            confirmButtonColor: '#0ea5e9',
+            didOpen: () => {
+                // style radio options ให้ขึ้นบรรทัดใหม่แต่ละตัว
+                document.querySelectorAll('.swal2-radio label').forEach(el => {
+                    el.style.display = 'flex';
+                    el.style.alignItems = 'center';
+                    el.style.gap = '10px';
+                    el.style.padding = '6px 0';
+                    el.style.fontSize = '15px';
+                });
+            },
+        });
+        if (!result.isConfirmed) return;
+
+        if (result.value === 'this') {
+            // สร้าง 'off' override วันนั้น → ซ่อนแค่ occurrence เดียว
+            const res = await dsPost('add', {
+                type: 'off',
+                specific_date: clickedDate,
+                staff_id: row.staff_id,
+            });
+            if (res.ok) { showPortalToast('ข้ามกิจกรรมวันที่ ' + clickedDate + ' แล้ว', 'success'); dsCloseModal(); dsLoadAndRender(); }
+            else Swal.fire('Error', res.message || 'ไม่สำเร็จ', 'error');
+
+        } else if (result.value === 'this_and_following') {
+            // ตั้ง recur_end_date เป็นวันก่อนหน้า clickedDate
+            const prev = new Date(clickedDate);
+            prev.setDate(prev.getDate() - 1);
+            const endDate = dsLocalDate(prev);
+            const res = await dsPost('update', {
+                id,
+                type: 'regular',
+                weekday: row.weekday,
+                recur_end_date: endDate,
+                start_time: (row.start_time || '').substring(0, 5),
+                end_time:   (row.end_time   || '').substring(0, 5),
+                staff_id: row.staff_id,
+                room_id: row.room_id || '',
+                service_type: row.service_type || '',
+                notes: row.notes || '',
+            });
+            if (res.ok) { showPortalToast('ลบกิจกรรมที่ตามมาทั้งหมดแล้ว', 'success'); dsCloseModal(); dsLoadAndRender(); }
+            else Swal.fire('Error', res.message || 'ไม่สำเร็จ', 'error');
+
+        } else {
+            // ลบทั้งหมด
+            const res = await dsPost('delete', {id});
+            if (res.ok) { showPortalToast('ลบ shift ทั้งหมดแล้ว', 'success'); dsCloseModal(); dsLoadAndRender(); }
+            else Swal.fire('Error', res.message || 'ไม่สำเร็จ', 'error');
+        }
+        return;
+    }
+
+    // Non-recurring
     const c = await Swal.fire({title:'ลบ shift นี้?', icon:'warning', showCancelButton:true, confirmButtonColor:'#e11d48'});
     if (!c.isConfirmed) return;
     const res = await dsPost('delete', {id});
@@ -457,7 +530,7 @@ document.addEventListener('DOMContentLoaded', () => {
         selectable: true,
         eventClick: (info) => {
             const row = dsRows.find(r => +r.id === +info.event.id);
-            if (row) dsOpenEdit(row);
+            if (row) dsOpenEdit(row, info.event.start);
         },
         dateClick: (info) => {
             // Clicking on empty slot opens add modal pre-filled with date+time
