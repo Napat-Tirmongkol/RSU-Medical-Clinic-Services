@@ -53,8 +53,10 @@ try {
         exit;
     }
 
+    // Stamp attended_at too so the post-checkin survey hub lock can detect this booking
     $upd = $pdo->prepare("
-        UPDATE camp_bookings SET status = 'completed'
+        UPDATE camp_bookings
+        SET status = 'completed', attended_at = COALESCE(attended_at, NOW())
         WHERE id = :id AND status = 'confirmed'
     ");
     $upd->execute([':id' => $bookingId]);
@@ -73,6 +75,10 @@ try {
         "รับเข้าร่วมงาน ID: {$bookingId} — {$booking['full_name']} — {$booking['campaign_title']}",
         $adminId
     );
+
+    // Best-effort LINE flex reminder so the user knows to fill the survey
+    require_once __DIR__ . '/../../includes/survey_helper.php';
+    @send_post_checkin_survey_reminder($pdo, $bookingId);
 
     echo json_encode(['status' => 'success', 'message' => 'รับเข้าร่วมงานสำเร็จ']);
 

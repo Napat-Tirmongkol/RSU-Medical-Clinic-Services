@@ -23,17 +23,27 @@ $ids = array_values(array_filter(array_map('intval', $ids)));
 try {
     $pdo          = db();
     $placeholders = implode(',', array_fill(0, count($ids), '?'));
+    // Stamp attended_at on bulk check-in too so the post-checkin survey can detect it
     $stmt         = $pdo->prepare("
         UPDATE camp_bookings
-        SET status = 'completed'
+        SET status = 'completed', attended_at = COALESCE(attended_at, NOW())
         WHERE id IN ($placeholders)
           AND status = 'confirmed'
     ");
     $stmt->execute($ids);
+    $affected = $stmt->rowCount();
+
+    // Best-effort LINE flex reminders for each booking we just checked in
+    if ($affected > 0) {
+        require_once __DIR__ . '/../../includes/survey_helper.php';
+        foreach ($ids as $bid) {
+            @send_post_checkin_survey_reminder($pdo, (int)$bid);
+        }
+    }
 
     echo json_encode([
         'status'   => 'success',
-        'affected' => $stmt->rowCount(),
+        'affected' => $affected,
     ]);
 
 } catch (PDOException $e) {

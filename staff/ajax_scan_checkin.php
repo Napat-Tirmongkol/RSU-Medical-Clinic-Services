@@ -147,6 +147,10 @@ try {
     $pdo->prepare("UPDATE camp_bookings SET attended_at = NOW() WHERE id = :id")
         ->execute([':id' => $appointmentId]);
 
+    // ── ส่ง LINE flex แจ้ง user ให้ทำแบบสอบถาม (best-effort, ไม่ block response) ──
+    require_once __DIR__ . '/../includes/survey_helper.php';
+    @send_post_checkin_survey_reminder($pdo, $appointmentId);
+
     // ── นับจำนวน attended ของแคมเปญนี้ (สำหรับ real-time counter) ────────
     $cntStmt = $pdo->prepare("
         SELECT COUNT(*) FROM camp_bookings
