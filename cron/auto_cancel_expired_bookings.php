@@ -29,7 +29,7 @@ if (!hash_equals(CRON_SECRET_TOKEN, $token)) {
 }
 
 $projectRoot = dirname(__DIR__);
-require_once $projectRoot . '/config.php';
+require_once $projectRoot . '/config/db_connect.php';
 require_once $projectRoot . '/includes/mail_helper.php';
 
 date_default_timezone_set('Asia/Bangkok');
@@ -178,15 +178,36 @@ $log[] = "ข้าม:   {$skipped}  (race condition)";
 $log[] = "ล้มเหลว: {$failed}";
 $log[] = '[' . date('Y-m-d H:i:s') . '] จบการทำงาน';
 
-// ── Activity Log ─────────────────────────────────────────────────────────────
+// ── Activity Log (insert ตรงโดยไม่โหลด config.php ทั้งไฟล์) ──────────────────
 if ($cancelled > 0) {
-    log_activity(
-        'auto_expire_bookings',
-        "Cron ยกเลิกอัตโนมัติ (ไม่มาตามนัด): {$cancelled} รายการ"
-        . " | Email: {$emailSent} | LINE: {$lineSent}"
-        . ($failed > 0 ? " | ล้มเหลว: {$failed}" : ''),
-        null
-    );
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS sys_activity_logs (
+            id          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            user_id     INT UNSIGNED NULL,
+            action      VARCHAR(100) NOT NULL,
+            description TEXT,
+            ip_address  VARCHAR(45),
+            user_agent  TEXT,
+            timestamp   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_action (action),
+            INDEX idx_timestamp (timestamp)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        $desc = "Cron ยกเลิกอัตโนมัติ (ไม่มาตามนัด): {$cancelled} รายการ"
+              . " | Email: {$emailSent} | LINE: {$lineSent}"
+              . ($failed > 0 ? " | ล้มเหลว: {$failed}" : '');
+
+        $pdo->prepare("INSERT INTO sys_activity_logs (user_id, action, description, ip_address, user_agent)
+                       VALUES (NULL, 'auto_expire_bookings', :desc, :ip, :ua)")
+            ->execute([
+                ':desc' => $desc,
+                ':ip'   => $_SERVER['REMOTE_ADDR'] ?? 'cron',
+                ':ua'   => $_SERVER['HTTP_USER_AGENT'] ?? 'cron/auto_cancel_expired_bookings',
+            ]);
+        $log[] = 'บันทึก Activity Log แล้ว';
+    } catch (PDOException $e) {
+        $log[] = 'WARN: บันทึก Activity Log ไม่สำเร็จ — ' . $e->getMessage();
+    }
 }
 
 echo implode("\n", $log) . "\n";
