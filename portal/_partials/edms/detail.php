@@ -49,6 +49,7 @@ try {
         // are computed so the row badge can read "v3" + "(3 เวอร์ชัน)".
         $att = $pdo->prepare("SELECT a.id, a.file_name, a.stored_path, a.mime_type, a.file_size,
                                      a.uploaded_at, a.uploaded_by, a.root_id, a.version_no,
+                                     COALESCE(a.role, 'supporting') AS role,
                                      s.full_name AS uploader_name,
                                      (SELECT COUNT(*) FROM sys_doc_attachments x
                                       WHERE x.id = COALESCE(a.root_id, a.id)
@@ -56,9 +57,11 @@ try {
             FROM sys_doc_attachments a
             LEFT JOIN sys_staff s ON s.id = a.uploaded_by
             WHERE a.doc_id = ? AND a.is_current = 1
-            ORDER BY a.id ASC");
+            ORDER BY (a.role = 'primary') DESC, a.id ASC");
         $att->execute([$id]);
         $attachments = $att->fetchAll(PDO::FETCH_ASSOC);
+        $primaryAttachments    = array_values(array_filter($attachments, fn($a) => ($a['role'] ?? '') === 'primary'));
+        $supportingAttachments = array_values(array_filter($attachments, fn($a) => ($a['role'] ?? '') !== 'primary'));
 
         $lg = $pdo->prepare("
             SELECT l.action, l.detail, l.created_at, s.full_name AS user_name
@@ -428,69 +431,113 @@ $routingStatusLabels = [
             </div>
             <p class="text-[11px] text-slate-400 font-medium mb-3 leading-relaxed">
                 <i class="fa-solid fa-circle-info text-slate-300"></i>
-                ดาวน์โหลดต้นฉบับ → แก้ไข/เซ็นชื่อ/กรอก → อัปโหลดไฟล์ผลงานกลับมาที่นี่ก่อนกดส่งคืน/เสร็จ — ไฟล์จะอยู่รวมกับไฟล์ต้นฉบับและแสดงชื่อผู้อัปโหลด
+                <strong>เอกสารหลัก</strong> = ไฟล์ที่ใช้แทนเอกสารฉบับนั้น (1 ตัวต่อเอกสาร) อัปโหลดเวอร์ชันใหม่เพื่อแทนที่ ·
+                <strong>ไฟล์ประกอบ</strong> = รูปถ่าย หลักฐาน เอกสารอ้างอิง ฯลฯ ใส่ได้หลายไฟล์
             </p>
+            <?php
+            // Shared row renderer so primary + supporting sections look identical
+            $renderAttachmentRow = function(array $a) {
+                $ext = strtolower(pathinfo($a['file_name'], PATHINFO_EXTENSION));
+                $isImage = in_array($ext, ['png','jpg','jpeg','gif','webp'], true);
+                $isPdf   = ($ext === 'pdf');
+                $iconClass = $isPdf ? 'fa-file-pdf text-rose-500' : ($isImage ? 'fa-file-image text-purple-500' : 'fa-file text-slate-400');
+                $uploader = trim((string)($a['uploader_name'] ?? '')) ?: 'ระบบ';
+                $vNum = (int)$a['version_no'];
+                $vTotal = (int)$a['total_versions'];
+                $isPrimary = ($a['role'] ?? '') === 'primary';
+                $rowBg = $isPrimary ? 'bg-amber-50/60 hover:bg-amber-50 border-amber-200' : 'bg-slate-50 hover:bg-slate-100 border-slate-100';
+                $canDelete = (int)$a['uploaded_by'] === (int)($_SESSION['admin_id'] ?? 0) || ($_SESSION['admin_role'] ?? '') === 'superadmin';
+                $jsName = htmlspecialchars(addslashes($a['file_name']), ENT_QUOTES);
+                ?>
+                <div class="flex items-center gap-3 px-3 py-2.5 <?= $rowBg ?> rounded-2xl border transition-colors">
+                    <i class="fa-solid <?= $iconClass ?> text-lg"></i>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-1.5 flex-wrap">
+                            <p class="text-sm font-black text-slate-700 truncate"><?= htmlspecialchars($a['file_name']) ?></p>
+                            <?php if ($vNum > 1 || $vTotal > 1): ?>
+                                <span class="inline-flex items-center text-[9px] font-black px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 border border-amber-200" title="<?= $vTotal ?> เวอร์ชัน">v<?= $vNum ?></span>
+                            <?php endif; ?>
+                        </div>
+                        <p class="text-[10px] font-bold text-slate-400 truncate">
+                            <?= edms_format_bytes((int)$a['file_size']) ?>
+                            · <?= date('d/m/Y H:i', strtotime($a['uploaded_at'])) ?>
+                            · โดย <span class="text-slate-500"><?= htmlspecialchars($uploader) ?></span>
+                        </p>
+                    </div>
+                    <button onclick="edmsToggleRole(<?= (int)$a['id'] ?>, '<?= $isPrimary ? 'supporting' : 'primary' ?>')"
+                        class="<?= $isPrimary ? 'text-amber-500 hover:bg-amber-100' : 'text-slate-300 hover:text-amber-500 hover:bg-amber-50' ?> px-2.5 py-1 rounded-lg text-xs font-black"
+                        title="<?= $isPrimary ? 'ปลดออกจากเอกสารหลัก' : 'ตั้งเป็นเอกสารหลัก (มีได้ 1 ตัวต่อเอกสาร)' ?>">
+                        <i class="fa-solid fa-star"></i>
+                    </button>
+                    <?php if ($vTotal > 1): ?>
+                        <button onclick="edmsShowVersions(<?= (int)$a['id'] ?>, '<?= $jsName ?>')"
+                            class="text-amber-600 hover:bg-amber-100 px-2.5 py-1 rounded-lg text-xs font-black"
+                            title="ดูประวัติเวอร์ชัน (<?= $vTotal ?> เวอร์ชัน)">
+                            <i class="fa-solid fa-clock-rotate-left"></i>
+                        </button>
+                    <?php endif; ?>
+                    <button onclick="edmsUploadVersion(<?= (int)$a['id'] ?>, '<?= $jsName ?>')"
+                        class="text-purple-500 hover:bg-purple-100 px-2.5 py-1 rounded-lg text-xs font-black"
+                        title="อัปโหลดเวอร์ชันใหม่ (แทนไฟล์เดิม)">
+                        <i class="fa-solid fa-arrows-rotate"></i>
+                    </button>
+                    <?php if ($isPdf || $isImage): ?>
+                        <button onclick="edmsViewer(<?= (int)$a['id'] ?>, '<?= $jsName ?>', '<?= $isPdf ? 'pdf' : 'image' ?>')"
+                            class="text-sky-500 hover:bg-sky-100 px-2.5 py-1 rounded-lg text-xs font-black"
+                            title="ดูในเบราว์เซอร์">
+                            <i class="fa-solid fa-eye"></i>
+                        </button>
+                    <?php endif; ?>
+                    <a href="edms_file.php?id=<?= (int)$a['id'] ?>&disposition=attachment"
+                       class="text-emerald-500 hover:bg-emerald-100 px-2.5 py-1 rounded-lg text-xs font-black"
+                       title="ดาวน์โหลด">
+                        <i class="fa-solid fa-download"></i>
+                    </a>
+                    <?php if ($canDelete): ?>
+                    <button onclick="edmsDeleteAttachment(<?= (int)$a['id'] ?>, '<?= $jsName ?>')"
+                        class="text-rose-400 hover:bg-rose-100 px-2.5 py-1 rounded-lg text-xs font-black"
+                        title="ลบไฟล์ (เฉพาะที่ฉันอัปโหลดเอง)">
+                        <i class="fa-solid fa-trash"></i>
+                    </button>
+                    <?php endif; ?>
+                </div>
+                <?php
+            };
+            ?>
+
             <?php if (empty($attachments)): ?>
                 <p class="text-center text-sm font-bold text-slate-400 py-6">— ยังไม่มีไฟล์แนบ —</p>
             <?php else: ?>
-                <div class="space-y-2">
-                    <?php foreach ($attachments as $a):
-                        $ext = strtolower(pathinfo($a['file_name'], PATHINFO_EXTENSION));
-                        $isImage = in_array($ext, ['png','jpg','jpeg','gif','webp'], true);
-                        $isPdf   = ($ext === 'pdf');
-                        $iconClass = $isPdf ? 'fa-file-pdf text-rose-500' : ($isImage ? 'fa-file-image text-purple-500' : 'fa-file text-slate-400');
-                        $uploader = trim((string)($a['uploader_name'] ?? '')) ?: 'ระบบ';
-                    ?>
-                        <div class="flex items-center gap-3 px-3 py-2.5 bg-slate-50 hover:bg-slate-100 rounded-2xl border border-slate-100 transition-colors">
-                            <i class="fa-solid <?= $iconClass ?> text-lg"></i>
-                            <div class="flex-1 min-w-0">
-                                <div class="flex items-center gap-1.5 flex-wrap">
-                                    <p class="text-sm font-black text-slate-700 truncate"><?= htmlspecialchars($a['file_name']) ?></p>
-                                    <?php $vNum = (int)$a['version_no']; $vTotal = (int)$a['total_versions']; ?>
-                                    <?php if ($vNum > 1 || $vTotal > 1): ?>
-                                        <span class="inline-flex items-center text-[9px] font-black px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 border border-amber-200" title="<?= $vTotal ?> เวอร์ชัน">v<?= $vNum ?></span>
-                                    <?php endif; ?>
-                                </div>
-                                <p class="text-[10px] font-bold text-slate-400 truncate">
-                                    <?= edms_format_bytes((int)$a['file_size']) ?>
-                                    · <?= date('d/m/Y H:i', strtotime($a['uploaded_at'])) ?>
-                                    · โดย <span class="text-slate-500"><?= htmlspecialchars($uploader) ?></span>
-                                </p>
-                            </div>
-                            <?php if ($vTotal > 1): ?>
-                                <button onclick="edmsShowVersions(<?= (int)$a['id'] ?>, '<?= htmlspecialchars(addslashes($a['file_name']), ENT_QUOTES) ?>')"
-                                    class="text-amber-600 hover:bg-amber-100 px-2.5 py-1 rounded-lg text-xs font-black"
-                                    title="ดูประวัติเวอร์ชัน (<?= $vTotal ?> เวอร์ชัน)">
-                                    <i class="fa-solid fa-clock-rotate-left"></i>
-                                </button>
-                            <?php endif; ?>
-                            <button onclick="edmsUploadVersion(<?= (int)$a['id'] ?>, '<?= htmlspecialchars(addslashes($a['file_name']), ENT_QUOTES) ?>')"
-                                class="text-purple-500 hover:bg-purple-100 px-2.5 py-1 rounded-lg text-xs font-black"
-                                title="อัปโหลดเวอร์ชันใหม่ (แทนไฟล์เดิม)">
-                                <i class="fa-solid fa-arrows-rotate"></i>
-                            </button>
-                            <?php if ($isPdf || $isImage): ?>
-                                <button onclick="edmsViewer(<?= (int)$a['id'] ?>, '<?= htmlspecialchars(addslashes($a['file_name']), ENT_QUOTES) ?>', '<?= $isPdf ? 'pdf' : 'image' ?>')"
-                                    class="text-sky-500 hover:bg-sky-100 px-2.5 py-1 rounded-lg text-xs font-black"
-                                    title="ดูในเบราว์เซอร์">
-                                    <i class="fa-solid fa-eye"></i>
-                                </button>
-                            <?php endif; ?>
-                            <a href="edms_file.php?id=<?= (int)$a['id'] ?>&disposition=attachment"
-                               class="text-emerald-500 hover:bg-emerald-100 px-2.5 py-1 rounded-lg text-xs font-black"
-                               title="ดาวน์โหลด">
-                                <i class="fa-solid fa-download"></i>
-                            </a>
-                            <?php if ((int)$a['uploaded_by'] === (int)($_SESSION['admin_id'] ?? 0) || ($_SESSION['admin_role'] ?? '') === 'superadmin'): ?>
-                            <button onclick="edmsDeleteAttachment(<?= (int)$a['id'] ?>, '<?= htmlspecialchars(addslashes($a['file_name']), ENT_QUOTES) ?>')"
-                                class="text-rose-400 hover:bg-rose-100 px-2.5 py-1 rounded-lg text-xs font-black"
-                                title="ลบไฟล์ (เฉพาะที่ฉันอัปโหลดเอง)">
-                                <i class="fa-solid fa-trash"></i>
-                            </button>
-                            <?php endif; ?>
+                <!-- Primary section -->
+                <div class="mb-4">
+                    <p class="text-[10px] font-black uppercase tracking-widest text-amber-700 mb-2 flex items-center gap-1.5">
+                        <i class="fa-solid fa-star text-[9px]"></i> เอกสารหลัก
+                        <span class="text-slate-300 font-bold normal-case tracking-normal">·
+                            <?= empty($primaryAttachments) ? 'ยังไม่ได้กำหนด' : '1 ไฟล์' ?></span>
+                    </p>
+                    <?php if (empty($primaryAttachments)): ?>
+                        <div class="text-[11px] font-bold text-slate-400 italic px-3 py-3 bg-amber-50/40 border border-dashed border-amber-200 rounded-2xl text-center">
+                            กดดาว <i class="fa-solid fa-star text-amber-400"></i> ที่ไฟล์ประกอบเพื่อเลือกเป็นเอกสารหลัก
                         </div>
-                    <?php endforeach; ?>
+                    <?php else: ?>
+                        <div class="space-y-2">
+                            <?php foreach ($primaryAttachments as $a) $renderAttachmentRow($a); ?>
+                        </div>
+                    <?php endif; ?>
                 </div>
+
+                <!-- Supporting section -->
+                <?php if (!empty($supportingAttachments)): ?>
+                <div>
+                    <p class="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2 flex items-center gap-1.5">
+                        <i class="fa-solid fa-paperclip text-[9px]"></i> ไฟล์ประกอบ
+                        <span class="text-slate-300 font-bold normal-case tracking-normal">· <?= count($supportingAttachments) ?> ไฟล์</span>
+                    </p>
+                    <div class="space-y-2">
+                        <?php foreach ($supportingAttachments as $a) $renderAttachmentRow($a); ?>
+                    </div>
+                </div>
+                <?php endif; ?>
             <?php endif; ?>
         </div>
 
@@ -881,6 +928,40 @@ window.edmsShowVersions = async function(attId, attName) {
 window.edmsCloseVersions = function() {
     const m = document.getElementById('edmsVersionsModal');
     m.classList.add('hidden'); m.classList.remove('flex');
+};
+
+window.edmsToggleRole = async function(attId, newRole) {
+    if (newRole === 'primary') {
+        const c = await Swal.fire({
+            title: 'ตั้งเป็นเอกสารหลัก?',
+            text: 'ถ้ามีเอกสารหลักอยู่แล้ว ตัวเดิมจะถูกย้ายไปเป็นไฟล์ประกอบ (ข้อมูล/เวอร์ชันยังอยู่ครบ)',
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonText: 'ตั้งเป็นหลัก',
+            cancelButtonText: 'ยกเลิก',
+            confirmButtonColor: '#f59e0b',
+        });
+        if (!c.isConfirmed) return;
+    }
+
+    const fd = new FormData();
+    fd.append('entity', 'attachment');
+    fd.append('action', 'set_role');
+    fd.append('id', attId);
+    fd.append('role', newRole);
+    fd.append('csrf_token', portal_CSRF);
+
+    try {
+        const res = await (await fetch('ajax_edms.php', { method: 'POST', body: fd })).json();
+        if (res.ok) {
+            await Swal.fire({ icon: 'success', title: res.message || 'อัปเดตแล้ว', timer: 900, showConfirmButton: false });
+            window.location.reload();
+        } else {
+            Swal.fire({ icon: 'error', title: 'ไม่สำเร็จ', text: res.message || '' });
+        }
+    } catch (err) {
+        Swal.fire({ icon: 'error', title: 'เครือข่ายขัดข้อง' });
+    }
 };
 
 // Tiny HTML-escape helper used inside the version history renderer

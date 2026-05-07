@@ -51,8 +51,10 @@ foreach ([
     "ALTER TABLE sys_doc_attachments ADD COLUMN root_id INT UNSIGNED NULL AFTER doc_id",
     "ALTER TABLE sys_doc_attachments ADD COLUMN version_no INT NOT NULL DEFAULT 1 AFTER root_id",
     "ALTER TABLE sys_doc_attachments ADD COLUMN is_current TINYINT(1) NOT NULL DEFAULT 1 AFTER version_no",
-    "ALTER TABLE sys_doc_attachments ADD COLUMN superseded_at DATETIME NULL AFTER is_current",
+    "ALTER TABLE sys_doc_attachments ADD COLUMN role ENUM('primary','supporting') NOT NULL DEFAULT 'supporting' AFTER is_current",
+    "ALTER TABLE sys_doc_attachments ADD COLUMN superseded_at DATETIME NULL AFTER role",
     "ALTER TABLE sys_doc_attachments ADD INDEX idx_doc_current (doc_id, is_current)",
+    "ALTER TABLE sys_doc_attachments ADD INDEX idx_doc_role (doc_id, role)",
     "ALTER TABLE sys_doc_attachments ADD INDEX idx_root_chain (root_id, version_no)",
 ] as $sql) {
     try { $pdo->exec($sql); } catch (PDOException) {}
@@ -720,7 +722,7 @@ try {
             $parentId = (int)($_POST['parent_id'] ?? 0);
             if ($parentId <= 0) throw new RuntimeException('ระบุ parent_id ไม่ถูกต้อง');
 
-            $sel = $pdo->prepare("SELECT doc_id, root_id, version_no, is_current
+            $sel = $pdo->prepare("SELECT doc_id, root_id, version_no, is_current, role
                 FROM sys_doc_attachments WHERE id = ? LIMIT 1");
             $sel->execute([$parentId]);
             $parent = $sel->fetch(PDO::FETCH_ASSOC);
@@ -728,6 +730,8 @@ try {
 
             $docId  = (int)$parent['doc_id'];
             $rootId = $parent['root_id'] !== null ? (int)$parent['root_id'] : $parentId;
+            $parentRole = in_array($parent['role'] ?? 'supporting', ['primary', 'supporting'], true)
+                ? $parent['role'] : 'supporting';
 
             if (empty($_FILES['file']['name'])) throw new RuntimeException('ไม่พบไฟล์');
             if ($_FILES['file']['error'] !== UPLOAD_ERR_OK) throw new RuntimeException('อัปโหลดไม่สำเร็จ');
@@ -755,13 +759,14 @@ try {
                 ->execute([':root' => $rootId]);
 
             $ins = $pdo->prepare("INSERT INTO sys_doc_attachments
-                (doc_id, root_id, version_no, is_current,
+                (doc_id, root_id, version_no, is_current, role,
                  file_name, stored_path, mime_type, file_size, sha1_hash, uploaded_by)
-                VALUES (?, ?, ?, 1, ?, ?, ?, ?, ?, ?)");
+                VALUES (?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?)");
             $ins->execute([
                 $docId,
                 $rootId,
                 $nextVersion,
+                $parentRole,
                 $saved['file_name'],
                 $saved['stored_path'],
                 $saved['mime_type'],
@@ -772,15 +777,67 @@ try {
             $newId = (int)$pdo->lastInsertId();
 
             edms_log($pdo, $docId, $userId, 'attach_version',
-                ['root_id' => $rootId, 'version_no' => $nextVersion, 'new_id' => $newId]);
+                ['root_id' => $rootId, 'version_no' => $nextVersion, 'new_id' => $newId, 'role' => $parentRole]);
 
             echo json_encode([
                 'ok'        => true,
                 'id'        => $newId,
                 'root_id'   => $rootId,
                 'version_no'=> $nextVersion,
+                'role'      => $parentRole,
                 'file_name' => $saved['file_name'],
                 'message'   => 'อัปโหลดเวอร์ชันใหม่ (v' . $nextVersion . ') แล้ว',
+            ], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        // ════════════ ATTACHMENT: SET ROLE (primary / supporting) ════════════
+        // Promote a chain to primary (demoting any existing primary in same doc)
+        // or unset primary back to supporting. Role is stored on every row of
+        // the chain so version queries and visual grouping stay consistent.
+        case 'attachment:set_role': {
+            $id   = (int)($_POST['id'] ?? 0);
+            $role = (string)($_POST['role'] ?? '');
+            if ($id <= 0) throw new RuntimeException('ระบุ id ไม่ถูกต้อง');
+            if (!in_array($role, ['primary', 'supporting'], true)) {
+                throw new RuntimeException('role ไม่ถูกต้อง');
+            }
+
+            $sel = $pdo->prepare("SELECT doc_id, root_id FROM sys_doc_attachments WHERE id = ? LIMIT 1");
+            $sel->execute([$id]);
+            $row = $sel->fetch(PDO::FETCH_ASSOC);
+            if (!$row) throw new RuntimeException('ไม่พบไฟล์');
+            $docId  = (int)$row['doc_id'];
+            $rootId = $row['root_id'] !== null ? (int)$row['root_id'] : $id;
+
+            $pdo->beginTransaction();
+            try {
+                // Demote any existing primary chain in this doc when promoting
+                if ($role === 'primary') {
+                    $pdo->prepare("UPDATE sys_doc_attachments
+                        SET role = 'supporting'
+                        WHERE doc_id = :d AND role = 'primary'
+                          AND COALESCE(root_id, id) <> :r")
+                        ->execute([':d' => $docId, ':r' => $rootId]);
+                }
+                // Set the chosen chain's role on every row in its chain
+                $pdo->prepare("UPDATE sys_doc_attachments
+                    SET role = :role
+                    WHERE id = :root OR root_id = :root")
+                    ->execute([':role' => $role, ':root' => $rootId]);
+
+                $pdo->commit();
+            } catch (Throwable $e) {
+                if ($pdo->inTransaction()) $pdo->rollBack();
+                throw $e;
+            }
+
+            edms_log($pdo, $docId, $userId, 'set_role', ['root_id' => $rootId, 'role' => $role]);
+
+            echo json_encode([
+                'ok'      => true,
+                'role'    => $role,
+                'message' => $role === 'primary' ? 'ตั้งเป็นเอกสารหลักแล้ว' : 'ปลดออกจากเอกสารหลักแล้ว',
             ], JSON_UNESCAPED_UNICODE);
             exit;
         }

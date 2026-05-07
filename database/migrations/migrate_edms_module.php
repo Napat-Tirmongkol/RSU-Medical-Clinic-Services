@@ -116,6 +116,8 @@ try {
         root_id       INT UNSIGNED NULL COMMENT 'NULL = v1 ของ chain, otherwise ชี้ไปที่ id ของ v1',
         version_no    INT NOT NULL DEFAULT 1,
         is_current    TINYINT(1) NOT NULL DEFAULT 1,
+        role          ENUM('primary','supporting') NOT NULL DEFAULT 'supporting'
+                          COMMENT 'primary = เอกสารหลัก (1 chain ต่อเอกสาร), supporting = ไฟล์ประกอบ',
         superseded_at DATETIME NULL,
         file_name     VARCHAR(255) NOT NULL COMMENT 'ชื่อไฟล์ต้นฉบับ',
         stored_path   VARCHAR(500) NOT NULL COMMENT 'path สัมพัทธ์ใต้ uploads/edms/',
@@ -126,6 +128,7 @@ try {
         uploaded_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         INDEX idx_doc (doc_id),
         INDEX idx_doc_current (doc_id, is_current),
+        INDEX idx_doc_role    (doc_id, role),
         INDEX idx_root_chain (root_id, version_no),
         INDEX idx_uploaded_at (uploaded_at)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
@@ -134,13 +137,15 @@ try {
     $results[] = ['ok' => false, 'msg' => 'sys_doc_attachments: ' . $e->getMessage()];
 }
 
-// ── 4b) Versioning columns retrofit (idempotent — old deployments) ───────
+// ── 4b) Versioning + role columns retrofit (idempotent — old deployments) ───────
 foreach ([
     "ALTER TABLE sys_doc_attachments ADD COLUMN root_id INT UNSIGNED NULL AFTER doc_id",
     "ALTER TABLE sys_doc_attachments ADD COLUMN version_no INT NOT NULL DEFAULT 1 AFTER root_id",
     "ALTER TABLE sys_doc_attachments ADD COLUMN is_current TINYINT(1) NOT NULL DEFAULT 1 AFTER version_no",
-    "ALTER TABLE sys_doc_attachments ADD COLUMN superseded_at DATETIME NULL AFTER is_current",
+    "ALTER TABLE sys_doc_attachments ADD COLUMN role ENUM('primary','supporting') NOT NULL DEFAULT 'supporting' AFTER is_current",
+    "ALTER TABLE sys_doc_attachments ADD COLUMN superseded_at DATETIME NULL AFTER role",
     "ALTER TABLE sys_doc_attachments ADD INDEX idx_doc_current (doc_id, is_current)",
+    "ALTER TABLE sys_doc_attachments ADD INDEX idx_doc_role (doc_id, role)",
     "ALTER TABLE sys_doc_attachments ADD INDEX idx_root_chain (root_id, version_no)",
 ] as $alter) {
     try { $pdo->exec($alter); } catch (PDOException) {}
