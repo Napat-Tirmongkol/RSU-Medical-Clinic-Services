@@ -3,12 +3,22 @@
  * portal/_partials/edms.php
  * ระบบสารบรรณอิเล็กทรอนิกส์ (Electronic Document Management System)
  *
- * Phase 1: Foundation only — แสดง landing page + cards 4 ประเภท
- * Phase 2 จะเพิ่ม inbox/outbox/internal/circular/compose/detail
+ * Router:
+ *   no edms_view → landing page (KPI + cards 4 ประเภท)
+ *   edms_view=list → รายการเอกสารตาม ?type= (รับ/ส่ง/ภายใน/เวียน)
+ *   edms_view=detail → รายละเอียดเอกสาร 1 ฉบับ ?id=
  *
  * เข้าถึงได้เมื่อ: superadmin หรือมี $_SESSION['access_edms'] = 1
  */
 declare(strict_types=1);
+
+$_view = $_GET['edms_view'] ?? '';
+$_validViews = ['list', 'detail'];
+
+if (in_array($_view, $_validViews, true)) {
+    include __DIR__ . '/edms/' . $_view . '.php';
+    return;
+}
 
 $pdo = db();
 
@@ -115,33 +125,27 @@ $tonePalette = [
     </div>
 
     <!-- Type cards -->
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
         <?php foreach ($cards as $card):
             $t = $tonePalette[$card['tone']];
+            $count = (int)$stats[$card['key']];
+            $href = '?section=edms&edms_view=list&type=' . urlencode($card['key']);
         ?>
-            <div class="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 flex items-start gap-4 hover:shadow-md transition-shadow">
+            <a href="<?= $href ?>" class="group bg-white rounded-3xl border border-slate-200 shadow-sm p-6 flex items-start gap-4 hover:shadow-md hover:-translate-y-0.5 hover:border-sky-200 transition-all">
                 <div class="w-12 h-12 <?= $t['bg'] ?> rounded-2xl border <?= $t['border'] ?> flex items-center justify-center <?= $t['text'] ?> text-xl shrink-0">
                     <i class="fa-solid <?= $card['icon'] ?>"></i>
                 </div>
                 <div class="flex-1 min-w-0">
-                    <h3 class="text-lg font-black text-slate-800"><?= htmlspecialchars($card['title']) ?></h3>
-                    <p class="text-sm text-slate-500 font-medium mt-0.5"><?= htmlspecialchars($card['desc']) ?></p>
-                    <p class="text-xs text-slate-400 mt-3 font-bold">เร็ว ๆ นี้ใน Phase 2</p>
+                    <div class="flex items-center justify-between gap-2 mb-1">
+                        <h3 class="text-lg font-black text-slate-800"><?= htmlspecialchars($card['title']) ?></h3>
+                        <span class="text-2xl font-black <?= $t['text'] ?> leading-none"><?= number_format($count) ?></span>
+                    </div>
+                    <p class="text-sm text-slate-500 font-medium"><?= htmlspecialchars($card['desc']) ?></p>
+                    <p class="text-xs font-black text-slate-400 mt-3 inline-flex items-center gap-1.5">
+                        เปิดรายการ <i class="fa-solid fa-arrow-right text-[10px] group-hover:translate-x-1 transition-transform"></i>
+                    </p>
                 </div>
-            </div>
+            </a>
         <?php endforeach; ?>
-    </div>
-
-    <!-- Phase 1 status notice -->
-    <div class="bg-amber-50 border border-amber-200 rounded-3xl p-5 flex items-start gap-3">
-        <i class="fa-solid fa-circle-info text-amber-600 text-lg mt-0.5"></i>
-        <div class="flex-1 text-sm">
-            <p class="font-black text-amber-800 mb-1">Phase 1 — Foundation Ready</p>
-            <p class="text-amber-700 font-medium leading-relaxed">
-                โครงสร้างฐานข้อมูล (sys_doc_*) และระบบสิทธิ์ <code class="px-1.5 py-0.5 bg-amber-100 rounded font-mono text-xs">access_edms</code> พร้อมใช้งานแล้ว<br>
-                <span class="text-xs text-amber-600 font-bold">ขั้นต่อไป (Phase 2):</span>
-                หน้ารายการ 4 ประเภท + Compose modal + ไฟล์แนบ + Detail viewer
-            </p>
-        </div>
     </div>
 </div>
