@@ -262,7 +262,7 @@ $webhookUrl = "$protocol://$host$uri";
             </div>
 
             <!-- Save button -->
-            <div style="display:flex;align-items:center;gap:12px;padding-top:6px">
+            <div style="display:flex;align-items:center;gap:12px;padding-top:6px;flex-wrap:wrap">
                 <button type="button" onclick="faqSave()" id="faqSaveBtn"
                     style="padding:11px 22px;background:#0ea5e9;color:#fff;border:none;border-radius:12px;font-weight:900;font-size:13px;cursor:pointer;box-shadow:0 4px 12px rgba(14,165,233,.3);display:flex;align-items:center;gap:8px">
                     <i class="fa-solid fa-floppy-disk"></i> บันทึกการตั้งค่า
@@ -274,6 +274,57 @@ $webhookUrl = "$protocol://$host$uri";
                 <span id="faqSaveStatus" style="display:none;font-size:12px;font-weight:800"></span>
             </div>
         </form>
+
+        <!-- ───── Test/Preview Panel ───── -->
+        <div style="margin-top:22px;padding:18px;background:linear-gradient(135deg,#f0f9ff,#ecfeff);border:1.5px solid #bae6fd;border-radius:16px">
+            <div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:14px;flex-wrap:wrap">
+                <div style="flex:1;min-width:220px">
+                    <h4 style="font-weight:900;color:#0c4a6e;font-size:13px;margin-bottom:4px">
+                        <i class="fa-solid fa-flask" style="color:#0ea5e9;margin-right:6px"></i>ทดสอบส่งให้ตัวเอง
+                    </h4>
+                    <p style="color:#475569;font-size:11px;font-weight:600;line-height:1.55">
+                        เลือก state แล้วกดส่ง — ระบบจะ push flex จริงไป LINE ของผู้รับเพื่อให้ดูข้อความที่ user จะเห็น
+                        (ใช้ค่าจากฟอร์มที่กำลังแก้ — ไม่ต้องบันทึกก่อน)
+                    </p>
+                </div>
+            </div>
+
+            <div style="display:grid;gap:12px">
+                <div>
+                    <label class="line-label" style="margin-bottom:6px">เลือก State</label>
+                    <div style="display:flex;flex-wrap:wrap;gap:8px">
+                        <?php foreach ([
+                            'open_now'     => ['label' => 'กำลังเปิด',     'color' => '#059669', 'bg' => '#ecfdf5', 'icon' => 'fa-circle-check'],
+                            'before_open'  => ['label' => 'ยังไม่ถึงเวลาเปิด', 'color' => '#d97706', 'bg' => '#fffbeb', 'icon' => 'fa-clock'],
+                            'after_close'  => ['label' => 'หลังเวลาปิด',   'color' => '#dc2626', 'bg' => '#fef2f2', 'icon' => 'fa-moon'],
+                            'closed_today' => ['label' => 'วันหยุด',       'color' => '#9333ea', 'bg' => '#faf5ff', 'icon' => 'fa-calendar-xmark'],
+                        ] as $key => $cfg): ?>
+                        <label style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border:1.5px solid #e2e8f0;background:<?= $cfg['bg'] ?>;border-radius:10px;cursor:pointer;font-size:12px;font-weight:800;color:<?= $cfg['color'] ?>;transition:all .15s">
+                            <input type="radio" name="faq_test_state" value="<?= $key ?>" <?= $key === 'open_now' ? 'checked' : '' ?>
+                                style="accent-color:<?= $cfg['color'] ?>">
+                            <i class="fa-solid <?= $cfg['icon'] ?>" style="font-size:11px"></i>
+                            <?= htmlspecialchars($cfg['label']) ?>
+                        </label>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+
+                <div style="display:grid;grid-template-columns:1fr auto;gap:10px;align-items:end">
+                    <div>
+                        <label class="line-label" style="margin-bottom:6px">LINE User ID ผู้รับ</label>
+                        <input type="text" id="faqTestUserId" class="line-input font-mono"
+                            style="padding:9px 14px;font-size:12px"
+                            placeholder="Uxxxxxxxxxxxxxxxx"
+                            value="<?= htmlspecialchars($_SESSION['line_user_id'] ?? '') ?>">
+                    </div>
+                    <button type="button" onclick="faqTestSend()" id="faqTestBtn"
+                        style="padding:11px 22px;background:#0c4a6e;color:#fff;border:none;border-radius:12px;font-weight:900;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:8px;white-space:nowrap;box-shadow:0 4px 12px rgba(12,74,110,.25)">
+                        <i class="fa-brands fa-line"></i> ส่งทดสอบ
+                    </button>
+                </div>
+                <div id="faqTestStatus" style="display:none;font-size:12px;font-weight:700;padding:8px 12px;border-radius:8px"></div>
+            </div>
+        </div>
     </div>
 
     <!-- ════════════════════════════════════════════════════ -->
@@ -713,6 +764,54 @@ function sendTestLineP() {
     document.getElementById('faq_enabled').addEventListener('change', function (e) {
         renderEnabledBadge(e.target.checked);
     });
+
+    // ── Test send (push flex จริงไป LINE) ─────────────────────────────
+    function showTestStatus(msg, kind) {
+        var el = document.getElementById('faqTestStatus');
+        if (!el) return;
+        el.style.display = '';
+        if (kind === 'ok') {
+            el.style.background = '#ecfdf5'; el.style.color = '#059669'; el.style.border = '1px solid #a7f3d0';
+            el.innerHTML = '<i class="fa-solid fa-circle-check"></i> ' + msg;
+        } else {
+            el.style.background = '#fef2f2'; el.style.color = '#dc2626'; el.style.border = '1px solid #fecaca';
+            el.innerHTML = '<i class="fa-solid fa-circle-exclamation"></i> ' + msg;
+        }
+    }
+
+    window.faqTestSend = function () {
+        var stateInput = document.querySelector('input[name="faq_test_state"]:checked');
+        var state = stateInput ? stateInput.value : 'open_now';
+        var toUserId = document.getElementById('faqTestUserId').value.trim();
+        if (!toUserId) { showTestStatus('กรุณาระบุ LINE User ID ผู้รับ', 'err'); return; }
+
+        // ส่งค่าฟอร์มปัจจุบันไปด้วย เพื่อ preview ค่าที่ยังไม่ได้บันทึก
+        var fd = new FormData();
+        fd.append('csrf_token', '<?= get_csrf_token() ?>');
+        fd.append('action', 'test_send');
+        fd.append('state', state);
+        fd.append('to_user_id', toUserId);
+        fd.append('use_form_values', '1');
+        FAQ_KEYS.forEach(function (k) {
+            var el = document.getElementById(k);
+            if (el && el.value) fd.append(k, el.value);
+        });
+
+        var btn = document.getElementById('faqTestBtn');
+        btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> กำลังส่ง...';
+        document.getElementById('faqTestStatus').style.display = 'none';
+
+        fetch('ajax_line_faq.php', { method: 'POST', body: fd })
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+                if (d.ok) showTestStatus(d.message, 'ok');
+                else      showTestStatus(d.error || d.message || 'ส่งไม่สำเร็จ', 'err');
+            })
+            .catch(function (e) { showTestStatus('Network error: ' + e.message, 'err'); })
+            .finally(function () {
+                btn.disabled = false; btn.innerHTML = '<i class="fa-brands fa-line"></i> ส่งทดสอบ';
+            });
+    };
 
     // โหลด settings เมื่อ partial นี้แสดง
     fetch('ajax_line_faq.php?action=get')
