@@ -650,7 +650,9 @@ function clinic_app_base_url(): string
         : ((!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http');
     $host = $_SERVER['HTTP_HOST'] ?? '';
     $dir  = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/api/line_webhook.php'));
-    $basePath = preg_replace('#/api$#', '', rtrim($dir, '/')) ?: '';
+    // Strip trailing /api (line_webhook) or /portal (ajax_line_faq preview) so the
+    // base URL is the app root regardless of which entry point built the flex.
+    $basePath = preg_replace('#/(api|portal)$#', '', rtrim($dir, '/')) ?: '';
     return rtrim($proto . '://' . $host . $basePath, '/');
 }
 
