@@ -103,46 +103,67 @@ if ($execAvailable && $dbUser !== '' && $dbName !== '') {
     log_msg("{$now} exec() ไม่พร้อมใช้งาน — ใช้ PHP export แทน", $logFile);
 }
 
-// ── Fallback: Pure PHP export ด้วย PDO ────────────────────────────────────────
+// ── Fallback: Pure PHP export ด้วย PDO (streaming — ไม่สร้าง string ใหญ่ใน memory) ──
 if (!$success) {
     try {
         $pdo = db();
+        // ใช้ unbuffered query เพื่อลด memory ในการดึงข้อมูล
+        $pdo->setAttribute(PDO::MYSQL_ATTR_USE_BUFFERED_QUERY, false);
+
         $tables = $pdo->query("SHOW TABLES")->fetchAll(PDO::FETCH_COLUMN);
 
-        $sql  = "-- RSU Medical Clinic DB Backup\n";
-        $sql .= "-- Generated: {$now}\n";
-        $sql .= "-- Database: {$dbName}\n\n";
-        $sql .= "SET FOREIGN_KEY_CHECKS=0;\n\n";
-
-        foreach ($tables as $table) {
-            // DROP + CREATE
-            $createStmt = $pdo->query("SHOW CREATE TABLE `{$table}`")->fetch(PDO::FETCH_NUM);
-            $sql .= "DROP TABLE IF EXISTS `{$table}`;\n";
-            $sql .= $createStmt[1] . ";\n\n";
-
-            // INSERT rows
-            $rows = $pdo->query("SELECT * FROM `{$table}`")->fetchAll(PDO::FETCH_ASSOC);
-            if ($rows) {
-                $cols = '`' . implode('`, `', array_keys($rows[0])) . '`';
-                $sql .= "INSERT INTO `{$table}` ({$cols}) VALUES\n";
-                $vals = [];
-                foreach ($rows as $row) {
-                    $escaped = array_map(fn($v) => $v === null ? 'NULL' : $pdo->quote((string)$v), $row);
-                    $vals[] = '(' . implode(', ', $escaped) . ')';
-                }
-                $sql .= implode(",\n", $vals) . ";\n\n";
-            }
-        }
-
-        $sql .= "SET FOREIGN_KEY_CHECKS=1;\n";
-
-        // บีบอัดและเขียนไฟล์
-        $gz = gzopen($backupFile, 'wb9');
+        $gz = gzopen($backupFile, 'wb6');   // compression 6 = balance speed/size
         if ($gz === false) {
             throw new RuntimeException("gzopen ล้มเหลว: ไม่สามารถเขียนไฟล์ {$backupFile}");
         }
-        gzwrite($gz, $sql);
+
+        gzwrite($gz, "-- RSU Medical Clinic DB Backup\n");
+        gzwrite($gz, "-- Generated: {$now}\n");
+        gzwrite($gz, "-- Database: {$dbName}\n\n");
+        gzwrite($gz, "SET FOREIGN_KEY_CHECKS=0;\n\n");
+
+        foreach ($tables as $table) {
+            // DROP + CREATE
+            $pdo->setAttribute(PDO::MYSQL_ATTR_USE_BUFFERED_QUERY, true);
+            $createStmt = $pdo->query("SHOW CREATE TABLE `{$table}`")->fetch(PDO::FETCH_NUM);
+            $pdo->setAttribute(PDO::MYSQL_ATTR_USE_BUFFERED_QUERY, false);
+
+            gzwrite($gz, "DROP TABLE IF EXISTS `{$table}`;\n");
+            gzwrite($gz, $createStmt[1] . ";\n\n");
+
+            // Stream rows ทีละ chunk (500 rows) — ไม่โหลดทั้ง table ขึ้น memory
+            $rowStmt = $pdo->query("SELECT * FROM `{$table}`");
+            $cols = null;
+            $chunkVals = [];
+            $chunkSize = 500;
+            $rowCount  = 0;
+
+            while ($row = $rowStmt->fetch(PDO::FETCH_ASSOC)) {
+                if ($cols === null) {
+                    $cols = '`' . implode('`, `', array_keys($row)) . '`';
+                }
+                $escaped     = array_map(fn($v) => $v === null ? 'NULL' : $pdo->quote((string)$v), $row);
+                $chunkVals[] = '(' . implode(', ', $escaped) . ')';
+                $rowCount++;
+
+                if (count($chunkVals) >= $chunkSize) {
+                    gzwrite($gz, "INSERT INTO `{$table}` ({$cols}) VALUES\n");
+                    gzwrite($gz, implode(",\n", $chunkVals) . ";\n");
+                    $chunkVals = [];
+                }
+            }
+            // flush rows ที่เหลือ
+            if ($chunkVals) {
+                gzwrite($gz, "INSERT INTO `{$table}` ({$cols}) VALUES\n");
+                gzwrite($gz, implode(",\n", $chunkVals) . ";\n");
+            }
+            if ($rowCount > 0) gzwrite($gz, "\n");
+        }
+
+        gzwrite($gz, "SET FOREIGN_KEY_CHECKS=1;\n");
         gzclose($gz);
+
+        $pdo->setAttribute(PDO::MYSQL_ATTR_USE_BUFFERED_QUERY, true); // restore
 
         $size = round(filesize($backupFile) / 1024, 1);
         log_msg("{$now} SUCCESS via PHP export: " . basename($backupFile) . " ({$size} KB)", $logFile);
