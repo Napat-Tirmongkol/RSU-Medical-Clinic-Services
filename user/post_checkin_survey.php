@@ -191,6 +191,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     .pcs-choice:hover { border-color: #f9a8d4; background: #fdf2f8; }
     .pcs-choice input { display: none; }
     .pcs-choice.selected { border-color: #db2777; background: #fce7f3; color: #831843; }
+
+    /* Pink theme — Tailwind pink-* classes aren't compiled in tailwind.min.css */
+    .pcs-icon-wrap   { background: #fce7f3; color: #db2777; }
+    .pcs-campaign    { color: #be185d; }
+    .pcs-q-num       { color: #db2777; }
+    .pcs-submit-btn  {
+        background: #db2777; color: #fff;
+        box-shadow: 0 10px 15px -3px rgba(251, 207, 232, .5), 0 4px 6px -4px rgba(251, 207, 232, .5);
+        transition: background .15s, transform .1s;
+    }
+    .pcs-submit-btn:hover    { background: #be185d; }
+    .pcs-submit-btn:disabled { background: #cbd5e1; box-shadow: none; cursor: not-allowed; }
 </style>
 </head>
 <body class="p-4">
@@ -199,11 +211,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <!-- Header -->
     <div class="text-center mb-6">
-        <div class="inline-flex w-16 h-16 mb-3 rounded-2xl bg-pink-100 text-pink-600 items-center justify-center text-3xl">
+        <div class="pcs-icon-wrap inline-flex w-16 h-16 mb-3 rounded-2xl items-center justify-center text-3xl">
             <i class="fa-solid fa-clipboard-list"></i>
         </div>
         <h1 class="text-2xl font-black text-slate-900">แบบสอบถามความพึงพอใจ</h1>
-        <p class="text-sm text-slate-500 font-bold mt-1">ขอบคุณที่เช็คอินเข้าร่วม<br><strong class="text-pink-700"><?= htmlspecialchars($booking['campaign_title'] ?? 'กิจกรรม') ?></strong></p>
+        <p class="text-sm text-slate-500 font-bold mt-1">ขอบคุณที่เช็คอินเข้าร่วม<br><strong class="pcs-campaign"><?= htmlspecialchars($booking['campaign_title'] ?? 'กิจกรรม') ?></strong></p>
         <div class="inline-flex items-center gap-1.5 mt-3 px-3 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-800 text-[11px] font-black">
             <i class="fa-solid fa-circle-exclamation text-[10px]"></i>
             กรุณาตอบทุกข้อก่อนปิดหน้านี้
@@ -233,7 +245,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ?>
         <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
             <p class="text-sm font-black text-slate-800 mb-3">
-                <span class="text-pink-600 mr-1"><?= $i + 1 ?>.</span>
+                <span class="pcs-q-num mr-1"><?= $i + 1 ?>.</span>
                 <?= htmlspecialchars($q['question_text']) ?>
                 <?php if ($req): ?><span class="text-rose-500">*</span><?php endif; ?>
             </p>
@@ -262,13 +274,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <?php else: // text ?>
                 <textarea name="q_<?= $qid ?>" rows="3" maxlength="1000"
                     placeholder="<?= $req ? 'กรุณาตอบ' : 'ตอบเพิ่มเติมได้ตามต้องการ' ?>"
-                    class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 outline-none focus:border-pink-400 resize-none"><?= htmlspecialchars((string)$prev) ?></textarea>
+                    class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 outline-none resize-none"><?= htmlspecialchars((string)$prev) ?></textarea>
             <?php endif; ?>
         </div>
         <?php endforeach; ?>
 
         <button type="submit" id="pcs-submit"
-            class="w-full py-4 bg-pink-600 text-white rounded-2xl text-base font-black hover:bg-pink-700 active:scale-[.98] transition-all shadow-lg shadow-pink-200 flex items-center justify-center gap-2">
+            class="pcs-submit-btn w-full py-4 rounded-2xl text-base font-black flex items-center justify-center gap-2">
             <i class="fa-solid fa-paper-plane"></i>
             ส่งแบบสอบถาม
         </button>
