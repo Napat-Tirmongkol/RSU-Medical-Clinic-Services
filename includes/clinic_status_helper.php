@@ -23,6 +23,202 @@ const CLINIC_TZ_NAME = 'Asia/Bangkok';
 const CLINIC_WEEKDAY_TH_FULL = ['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์'];
 const CLINIC_MONTH_TH_FULL   = ['','มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
 
+const CLINIC_FAQ_DEFAULTS = [
+    'enabled'                => 1,
+    'rate_limit_hours'       => 24,
+    'msg_open_now_title'     => 'เปิดอยู่ในขณะนี้',
+    'msg_open_now_sub'       => 'ปิด {close_time} น. (อีก {time_left})',
+    'msg_before_open_title'  => 'ยังไม่เปิดให้บริการ',
+    'msg_before_open_sub'    => 'จะเปิด {open_time} น. (อีก {time_left})',
+    'msg_after_close_title'  => 'ขณะนี้นอกเวลาทำการ',
+    'msg_after_close_sub'    => 'จะเปิด{next_label} เวลา {next_time} น.',
+    'msg_closed_today_title' => 'วันนี้คลินิกหยุด',
+    'msg_closed_today_sub'   => 'จะเปิด{next_label} เวลา {next_time} น.',
+];
+
+/**
+ * สร้างตาราง settings + log ของ FAQ ถ้ายังไม่มี (idempotent)
+ */
+function ensure_clinic_faq_tables(PDO $pdo): void
+{
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS sys_line_faq_settings (
+            id INT PRIMARY KEY DEFAULT 1,
+            enabled TINYINT(1) NOT NULL DEFAULT 1,
+            rate_limit_hours INT NOT NULL DEFAULT 24,
+            msg_open_now_title     VARCHAR(160) NOT NULL DEFAULT 'เปิดอยู่ในขณะนี้',
+            msg_open_now_sub       VARCHAR(255) NOT NULL DEFAULT 'ปิด {close_time} น. (อีก {time_left})',
+            msg_before_open_title  VARCHAR(160) NOT NULL DEFAULT 'ยังไม่เปิดให้บริการ',
+            msg_before_open_sub    VARCHAR(255) NOT NULL DEFAULT 'จะเปิด {open_time} น. (อีก {time_left})',
+            msg_after_close_title  VARCHAR(160) NOT NULL DEFAULT 'ขณะนี้นอกเวลาทำการ',
+            msg_after_close_sub    VARCHAR(255) NOT NULL DEFAULT 'จะเปิด{next_label} เวลา {next_time} น.',
+            msg_closed_today_title VARCHAR(160) NOT NULL DEFAULT 'วันนี้คลินิกหยุด',
+            msg_closed_today_sub   VARCHAR(255) NOT NULL DEFAULT 'จะเปิด{next_label} เวลา {next_time} น.',
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        $pdo->exec("CREATE TABLE IF NOT EXISTS sys_line_faq_log (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            line_user_id VARCHAR(80) NOT NULL,
+            intent_type  VARCHAR(20) NOT NULL,
+            replied_at   DATETIME    NOT NULL,
+            INDEX idx_user_intent_time (line_user_id, intent_type, replied_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    } catch (PDOException) {
+        // ใช้ default ใน memory ถ้า DB ไม่พร้อม
+    }
+}
+
+/**
+ * อ่าน settings ของ FAQ — ถ้ายังไม่มี row ใช้ default จาก CLINIC_FAQ_DEFAULTS
+ */
+function get_clinic_faq_settings(PDO $pdo): array
+{
+    ensure_clinic_faq_tables($pdo);
+    try {
+        $row = $pdo->query("SELECT * FROM sys_line_faq_settings WHERE id = 1 LIMIT 1")
+            ->fetch(PDO::FETCH_ASSOC);
+    } catch (PDOException) {
+        $row = null;
+    }
+    if (!$row) return CLINIC_FAQ_DEFAULTS;
+
+    $out = CLINIC_FAQ_DEFAULTS;
+    foreach ($out as $k => $_) {
+        if (isset($row[$k]) && $row[$k] !== '' && $row[$k] !== null) {
+            $out[$k] = $row[$k];
+        }
+    }
+    $out['enabled'] = (int)$out['enabled'];
+    $out['rate_limit_hours'] = (int)$out['rate_limit_hours'];
+    return $out;
+}
+
+/**
+ * บันทึก settings (singleton row id=1) — เฉพาะ key ใน CLINIC_FAQ_DEFAULTS
+ *
+ * @param array<string,mixed> $data
+ */
+function save_clinic_faq_settings(PDO $pdo, array $data): bool
+{
+    ensure_clinic_faq_tables($pdo);
+
+    $values = [];
+    foreach (CLINIC_FAQ_DEFAULTS as $k => $default) {
+        if (!array_key_exists($k, $data)) {
+            $values[$k] = $default;
+            continue;
+        }
+        if ($k === 'enabled') {
+            $values[$k] = !empty($data[$k]) ? 1 : 0;
+        } elseif ($k === 'rate_limit_hours') {
+            $values[$k] = max(0, min(720, (int)$data[$k]));   // 0..720 ชั่วโมง (30 วัน)
+        } else {
+            $v = trim((string)$data[$k]);
+            $values[$k] = $v !== '' ? mb_substr($v, 0, 255) : $default;
+        }
+    }
+
+    try {
+        $stmt = $pdo->prepare("
+            INSERT INTO sys_line_faq_settings
+                (id, enabled, rate_limit_hours,
+                 msg_open_now_title, msg_open_now_sub,
+                 msg_before_open_title, msg_before_open_sub,
+                 msg_after_close_title, msg_after_close_sub,
+                 msg_closed_today_title, msg_closed_today_sub)
+            VALUES
+                (1, :enabled, :rate_limit_hours,
+                 :msg_open_now_title, :msg_open_now_sub,
+                 :msg_before_open_title, :msg_before_open_sub,
+                 :msg_after_close_title, :msg_after_close_sub,
+                 :msg_closed_today_title, :msg_closed_today_sub)
+            ON DUPLICATE KEY UPDATE
+                enabled                = VALUES(enabled),
+                rate_limit_hours       = VALUES(rate_limit_hours),
+                msg_open_now_title     = VALUES(msg_open_now_title),
+                msg_open_now_sub       = VALUES(msg_open_now_sub),
+                msg_before_open_title  = VALUES(msg_before_open_title),
+                msg_before_open_sub    = VALUES(msg_before_open_sub),
+                msg_after_close_title  = VALUES(msg_after_close_title),
+                msg_after_close_sub    = VALUES(msg_after_close_sub),
+                msg_closed_today_title = VALUES(msg_closed_today_title),
+                msg_closed_today_sub   = VALUES(msg_closed_today_sub)
+        ");
+        $params = [];
+        foreach ($values as $k => $v) {
+            $params[':' . $k] = $v;
+        }
+        return $stmt->execute($params);
+    } catch (PDOException) {
+        return false;
+    }
+}
+
+/**
+ * เช็คว่า user คนนี้ยังตอบ FAQ ชนิดนี้ได้หรือไม่ (ภายใน N ชั่วโมงล่าสุด)
+ *
+ * @return bool true = อนุญาต, false = ติด rate limit
+ */
+function check_clinic_faq_rate_limit(PDO $pdo, string $lineUserId, string $intentType, int $windowHours): bool
+{
+    if ($lineUserId === '' || $windowHours <= 0) return true;
+    ensure_clinic_faq_tables($pdo);
+    try {
+        $stmt = $pdo->prepare("
+            SELECT 1 FROM sys_line_faq_log
+            WHERE line_user_id = :uid
+              AND intent_type  = :it
+              AND replied_at   >= (NOW() - INTERVAL :hh HOUR)
+            LIMIT 1
+        ");
+        $stmt->bindValue(':uid', $lineUserId);
+        $stmt->bindValue(':it',  $intentType);
+        $stmt->bindValue(':hh',  $windowHours, PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->fetchColumn() === false;   // ไม่มี row = ยังไม่ติด limit
+    } catch (PDOException) {
+        return true;   // fail-open: ถ้า DB error ให้ตอบไปก่อน
+    }
+}
+
+/**
+ * บันทึกว่า user ได้รับการตอบ FAQ ชนิดนี้แล้ว
+ */
+function log_clinic_faq_reply(PDO $pdo, string $lineUserId, string $intentType): void
+{
+    if ($lineUserId === '') return;
+    ensure_clinic_faq_tables($pdo);
+    try {
+        $stmt = $pdo->prepare("
+            INSERT INTO sys_line_faq_log (line_user_id, intent_type, replied_at)
+            VALUES (:uid, :it, NOW())
+        ");
+        $stmt->execute([':uid' => $lineUserId, ':it' => $intentType]);
+    } catch (PDOException) {}
+}
+
+/**
+ * ลบ log เก่ากว่า 30 วัน — เรียกเป็นครั้งคราวเพื่อกัน table โต
+ */
+function purge_clinic_faq_log(PDO $pdo, int $keepDays = 30): void
+{
+    try {
+        $pdo->prepare("DELETE FROM sys_line_faq_log WHERE replied_at < (NOW() - INTERVAL :d DAY)")
+            ->execute([':d' => max(1, $keepDays)]);
+    } catch (PDOException) {}
+}
+
+/**
+ * Substitute placeholders {key} ในเทมเพลต เช่น "ปิด {close_time} น."
+ */
+function clinic_render_template(string $template, array $vars): string
+{
+    return preg_replace_callback('/\{(\w+)\}/u', function ($m) use ($vars) {
+        return (string)($vars[$m[1]] ?? '');
+    }, $template) ?? $template;
+}
+
 /**
  * ตรวจว่าข้อความ user เป็นคำถามเกี่ยวกับสถานะคลินิกหรือไม่
  *
@@ -450,32 +646,40 @@ function build_clinic_status_flex(PDO $pdo, string $date, string $dateLabel, boo
     $now = $considerNow ? get_clinic_current_status($pdo) : null;
 
     if ($now !== null) {
+        $settings = get_clinic_faq_settings($pdo);
+        $vars = [
+            'open_time'   => (string)($now['today_open'] ?? ''),
+            'close_time'  => (string)($now['today_close'] ?? ''),
+            'time_left'   => clinic_format_minutes((int)($now['minutes_until_close'] ?? $now['minutes_until_open'] ?? 0)),
+            'next_label'  => (string)($now['next_open_label'] ?? ''),
+            'next_time'   => (string)($now['next_open_time'] ?? ''),
+        ];
         switch ($now['state']) {
             case 'open_now':
-                $statusText  = 'เปิดอยู่ในขณะนี้';
-                $subText     = 'ปิด ' . $now['today_close'] . ' น. (อีก ' . clinic_format_minutes((int)$now['minutes_until_close']) . ')';
+                $statusText  = clinic_render_template($settings['msg_open_now_title'], $vars);
+                $subText     = clinic_render_template($settings['msg_open_now_sub'],   $vars);
                 $statusColor = '#059669';
                 $statusBg    = '#ECFDF5';
                 break;
             case 'before_open':
-                $statusText  = 'ยังไม่เปิดให้บริการ';
-                $subText     = 'จะเปิด ' . $now['today_open'] . ' น. (อีก ' . clinic_format_minutes((int)$now['minutes_until_open']) . ')';
+                $statusText  = clinic_render_template($settings['msg_before_open_title'], $vars);
+                $subText     = clinic_render_template($settings['msg_before_open_sub'],   $vars);
                 $statusColor = '#D97706';
                 $statusBg    = '#FFFBEB';
                 break;
             case 'after_close':
-                $statusText  = 'ขณะนี้นอกเวลาทำการ';
+                $statusText  = clinic_render_template($settings['msg_after_close_title'], $vars);
                 $subText     = $now['next_open_date']
-                    ? ('จะเปิด' . $now['next_open_label'] . ' เวลา ' . $now['next_open_time'] . ' น.')
+                    ? clinic_render_template($settings['msg_after_close_sub'], $vars)
                     : 'โปรดตรวจสอบเวลาทำการอีกครั้ง';
                 $statusColor = '#DC2626';
                 $statusBg    = '#FEF2F2';
                 break;
             case 'closed_today':
             default:
-                $statusText  = 'วันนี้คลินิกหยุด';
+                $statusText  = clinic_render_template($settings['msg_closed_today_title'], $vars);
                 $subText     = $now['next_open_date']
-                    ? ('จะเปิด' . $now['next_open_label'] . ' เวลา ' . $now['next_open_time'] . ' น.')
+                    ? clinic_render_template($settings['msg_closed_today_sub'], $vars)
                     : '';
                 $statusColor = '#DC2626';
                 $statusBg    = '#FEF2F2';

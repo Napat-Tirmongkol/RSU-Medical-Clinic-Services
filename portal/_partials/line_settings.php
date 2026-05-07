@@ -158,6 +158,125 @@ $webhookUrl = "$protocol://$host$uri";
     </div>
 
     <!-- ════════════════════════════════════════════════════ -->
+    <!-- FAQ Auto-reply (เวลาเปิด/ปิด)                         -->
+    <!-- ════════════════════════════════════════════════════ -->
+    <div style="display:flex;align-items:center;gap:14px;margin:36px 0 18px">
+        <div style="flex:1;height:1.5px;background:#f1f5f9"></div>
+        <span style="font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.18em;color:#94a3b8;white-space:nowrap">
+            <i class="fa-solid fa-comments" style="color:#0ea5e9;margin-right:5px"></i>FAQ ตอบอัตโนมัติ — เวลาเปิด/ปิด
+        </span>
+        <div style="flex:1;height:1.5px;background:#f1f5f9"></div>
+    </div>
+
+    <div class="line-card shadow-sm" style="border-top:4px solid #0ea5e9">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:18px">
+            <div>
+                <h3 style="font-weight:900;color:#0f172a;font-size:15px;margin-bottom:4px">
+                    <i class="fa-solid fa-robot" style="color:#0ea5e9;margin-right:6px"></i>ตั้งค่าข้อความตอบอัตโนมัติ
+                </h3>
+                <p style="color:#64748b;font-size:12px;font-weight:500;line-height:1.5">
+                    บอทจะตอบอัตโนมัติเมื่อ user ถามคำถามเกี่ยวกับเวลาเปิด-ปิด เช่น "วันนี้คลินิกเปิดไหม", "เปิดกี่โมง", "ตารางแพทย์วันนี้"
+                </p>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px">
+                <span id="faq-status-badge" style="display:none;font-size:11px;font-weight:800;padding:6px 12px;border-radius:99px"></span>
+                <button type="button" onclick="faqLoadDefaults()"
+                    style="font-size:11px;font-weight:800;color:#64748b;background:#f1f5f9;border:none;border-radius:8px;padding:7px 12px;cursor:pointer">
+                    <i class="fa-solid fa-rotate-left"></i> รีเซ็ต
+                </button>
+            </div>
+        </div>
+
+        <form id="faqForm" onsubmit="return false" style="display:grid;gap:18px">
+            <!-- Master toggle + rate limit -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:14px;background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:14px">
+                <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
+                    <input type="checkbox" id="faq_enabled" name="enabled" value="1"
+                        style="width:18px;height:18px;accent-color:#0ea5e9;cursor:pointer">
+                    <div>
+                        <div style="font-size:13px;font-weight:800;color:#0f172a">เปิดใช้งาน FAQ</div>
+                        <div style="font-size:11px;color:#64748b;font-weight:500">ปิดเพื่อให้บอทไม่ตอบอัตโนมัติ</div>
+                    </div>
+                </label>
+                <div>
+                    <label class="line-label" style="margin-bottom:6px">จำกัดการตอบ (ชั่วโมง / user / คำถาม)</label>
+                    <div style="display:flex;align-items:center;gap:8px">
+                        <input type="number" id="faq_rate_limit_hours" name="rate_limit_hours" min="0" max="720"
+                            class="line-input" style="padding:8px 12px;font-size:13px;font-weight:700;width:90px">
+                        <span style="font-size:11px;color:#64748b;font-weight:600">ชั่วโมง<br>(0 = ไม่จำกัด, 24 = วันละครั้ง)</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Placeholder hint -->
+            <div style="background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:12px;padding:12px 14px">
+                <div style="font-size:11px;font-weight:800;color:#1e40af;margin-bottom:6px">
+                    <i class="fa-solid fa-circle-info"></i> ตัวแปรที่ใช้ใน Template ได้
+                </div>
+                <div style="display:flex;flex-wrap:wrap;gap:6px">
+                    <?php foreach ([
+                        '{open_time}' => 'เวลาเปิดวันนี้',
+                        '{close_time}' => 'เวลาปิดวันนี้',
+                        '{time_left}' => 'เวลาที่เหลือก่อนเปิด/ปิด',
+                        '{next_label}' => '"พรุ่งนี้" / "วันจันทร์ที่ 12 พ.ค."',
+                        '{next_time}' => 'เวลาเปิดวันถัดไป',
+                    ] as $ph => $desc): ?>
+                    <span title="<?= htmlspecialchars($desc) ?>"
+                        style="font-family:monospace;font-size:11px;font-weight:800;background:#fff;border:1px solid #93c5fd;color:#1e3a8a;padding:3px 8px;border-radius:6px;cursor:help">
+                        <?= htmlspecialchars($ph) ?>
+                    </span>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+
+            <!-- 4 message states -->
+            <?php
+            $states = [
+                ['key' => 'open_now',     'label' => 'กำลังเปิดทำการ', 'color' => '#059669', 'bg' => '#ecfdf5', 'icon' => 'fa-circle-check'],
+                ['key' => 'before_open',  'label' => 'ยังไม่ถึงเวลาเปิด', 'color' => '#d97706', 'bg' => '#fffbeb', 'icon' => 'fa-clock'],
+                ['key' => 'after_close',  'label' => 'หลังเวลาปิด',     'color' => '#dc2626', 'bg' => '#fef2f2', 'icon' => 'fa-moon'],
+                ['key' => 'closed_today', 'label' => 'วันหยุด',         'color' => '#9333ea', 'bg' => '#faf5ff', 'icon' => 'fa-calendar-xmark'],
+            ];
+            ?>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:14px">
+            <?php foreach ($states as $s): ?>
+                <div style="border:1.5px solid #e2e8f0;border-radius:14px;overflow:hidden">
+                    <div style="background:<?= $s['bg'] ?>;padding:10px 14px;display:flex;align-items:center;gap:8px;border-bottom:1px solid #e2e8f0">
+                        <i class="fa-solid <?= $s['icon'] ?>" style="color:<?= $s['color'] ?>;font-size:13px"></i>
+                        <span style="font-size:12px;font-weight:900;color:<?= $s['color'] ?>;text-transform:uppercase;letter-spacing:.05em"><?= htmlspecialchars($s['label']) ?></span>
+                    </div>
+                    <div style="padding:14px;display:grid;gap:10px">
+                        <div>
+                            <label class="line-label" style="margin-bottom:4px;font-size:10px">หัวข้อ (Title)</label>
+                            <input type="text" id="msg_<?= $s['key'] ?>_title" name="msg_<?= $s['key'] ?>_title"
+                                class="line-input" style="padding:8px 12px;font-size:13px" maxlength="160">
+                        </div>
+                        <div>
+                            <label class="line-label" style="margin-bottom:4px;font-size:10px">ข้อความรอง (Subtitle)</label>
+                            <input type="text" id="msg_<?= $s['key'] ?>_sub" name="msg_<?= $s['key'] ?>_sub"
+                                class="line-input" style="padding:8px 12px;font-size:13px" maxlength="255">
+                        </div>
+                    </div>
+                </div>
+            <?php endforeach; ?>
+            </div>
+
+            <!-- Save button -->
+            <div style="display:flex;align-items:center;gap:12px;padding-top:6px">
+                <button type="button" onclick="faqSave()" id="faqSaveBtn"
+                    style="padding:11px 22px;background:#0ea5e9;color:#fff;border:none;border-radius:12px;font-weight:900;font-size:13px;cursor:pointer;box-shadow:0 4px 12px rgba(14,165,233,.3);display:flex;align-items:center;gap:8px">
+                    <i class="fa-solid fa-floppy-disk"></i> บันทึกการตั้งค่า
+                </button>
+                <button type="button" onclick="faqPurgeLog()"
+                    style="padding:11px 16px;background:#f1f5f9;color:#475569;border:none;border-radius:12px;font-weight:800;font-size:12px;cursor:pointer">
+                    <i class="fa-solid fa-broom"></i> ลบ log เก่ากว่า 30 วัน
+                </button>
+                <span id="faqSaveStatus" style="display:none;font-size:12px;font-weight:800"></span>
+            </div>
+        </form>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════ -->
     <!-- สถิติการส่งข้อความ                                   -->
     <!-- ════════════════════════════════════════════════════ -->
     <div style="display:flex;align-items:center;gap:14px;margin:36px 0 24px">
@@ -489,5 +608,115 @@ function sendTestLineP() {
     } else {
         window.addEventListener('load', loadStats);
     }
+})();
+
+// ── FAQ Auto-reply Settings ─────────────────────────────────────────────────
+(function () {
+    'use strict';
+    var FAQ_KEYS = [
+        'msg_open_now_title','msg_open_now_sub',
+        'msg_before_open_title','msg_before_open_sub',
+        'msg_after_close_title','msg_after_close_sub',
+        'msg_closed_today_title','msg_closed_today_sub',
+    ];
+
+    function applySettings(s) {
+        document.getElementById('faq_enabled').checked = !!Number(s.enabled);
+        document.getElementById('faq_rate_limit_hours').value = Number(s.rate_limit_hours || 0);
+        FAQ_KEYS.forEach(function (k) {
+            var el = document.getElementById(k);
+            if (el) el.value = s[k] || '';
+        });
+        renderEnabledBadge(!!Number(s.enabled));
+    }
+
+    function renderEnabledBadge(on) {
+        var b = document.getElementById('faq-status-badge');
+        if (!b) return;
+        b.style.display = '';
+        if (on) {
+            b.style.background = '#ecfdf5';
+            b.style.color = '#059669';
+            b.innerHTML = '<i class="fa-solid fa-circle-check"></i> เปิดใช้งาน';
+        } else {
+            b.style.background = '#fef2f2';
+            b.style.color = '#dc2626';
+            b.innerHTML = '<i class="fa-solid fa-circle-xmark"></i> ปิดใช้งาน';
+        }
+    }
+
+    function showStatus(msg, kind) {
+        var el = document.getElementById('faqSaveStatus');
+        if (!el) return;
+        el.style.display = '';
+        el.style.color = kind === 'ok' ? '#059669' : '#dc2626';
+        el.innerHTML = (kind === 'ok' ? '<i class="fa-solid fa-circle-check"></i> ' : '<i class="fa-solid fa-circle-exclamation"></i> ') + msg;
+        setTimeout(function(){ el.style.display = 'none'; }, 3500);
+    }
+
+    window.faqSave = function () {
+        var fd = new FormData(document.getElementById('faqForm'));
+        fd.append('csrf_token', '<?= get_csrf_token() ?>');
+        fd.append('action', 'save');
+        // กล่อง enabled ที่ unchecked จะไม่ส่งใน FormData — บังคับให้ส่ง 0
+        if (!document.getElementById('faq_enabled').checked) fd.set('enabled', '0');
+
+        var btn = document.getElementById('faqSaveBtn');
+        btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> กำลังบันทึก...';
+
+        fetch('ajax_line_faq.php', { method: 'POST', body: fd })
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+                if (d.ok) { applySettings(d.settings); showStatus(d.message || 'บันทึกแล้ว', 'ok'); }
+                else      { showStatus(d.error || d.message || 'บันทึกไม่สำเร็จ', 'err'); }
+            })
+            .catch(function (e) { showStatus('Network error: ' + e.message, 'err'); })
+            .finally(function () { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> บันทึกการตั้งค่า'; });
+    };
+
+    window.faqLoadDefaults = function () {
+        Swal.fire({
+            title: 'รีเซ็ตเป็นค่าเริ่มต้น?',
+            text: 'ข้อความและการตั้งค่าทั้งหมดจะกลับไปเป็นค่า default',
+            icon: 'warning', showCancelButton: true, confirmButtonText: 'รีเซ็ต', cancelButtonText: 'ยกเลิก',
+            confirmButtonColor: '#0ea5e9'
+        }).then(function (r) {
+            if (!r.isConfirmed) return;
+            var fd = new FormData();
+            fd.append('csrf_token', '<?= get_csrf_token() ?>');
+            fd.append('action', 'reset');
+            fetch('ajax_line_faq.php', { method: 'POST', body: fd })
+                .then(function (r) { return r.json(); })
+                .then(function (d) {
+                    if (d.ok) { applySettings(d.settings); showStatus(d.message, 'ok'); }
+                    else      { showStatus(d.error || 'รีเซ็ตไม่สำเร็จ', 'err'); }
+                });
+        });
+    };
+
+    window.faqPurgeLog = function () {
+        Swal.fire({
+            title: 'ลบ log การตอบ FAQ ที่เก่ากว่า 30 วัน?',
+            icon: 'question', showCancelButton: true, confirmButtonText: 'ลบ', cancelButtonText: 'ยกเลิก',
+            confirmButtonColor: '#dc2626'
+        }).then(function (r) {
+            if (!r.isConfirmed) return;
+            var fd = new FormData();
+            fd.append('csrf_token', '<?= get_csrf_token() ?>');
+            fd.append('action', 'purge_log');
+            fetch('ajax_line_faq.php', { method: 'POST', body: fd })
+                .then(function (r) { return r.json(); })
+                .then(function (d) { showStatus(d.message || (d.ok ? 'OK' : 'failed'), d.ok ? 'ok' : 'err'); });
+        });
+    };
+
+    document.getElementById('faq_enabled').addEventListener('change', function (e) {
+        renderEnabledBadge(e.target.checked);
+    });
+
+    // โหลด settings เมื่อ partial นี้แสดง
+    fetch('ajax_line_faq.php?action=get')
+        .then(function (r) { return r.json(); })
+        .then(function (d) { if (d.ok) applySettings(d.settings); });
 })();
 </script>

@@ -426,29 +426,59 @@ foreach ($data['events'] as $idx => $event) {
     // ── คำถามพื้นฐาน: "วันนี้คลินิกเปิดไหม", "เปิดกี่โมง", "ตารางแพทย์วันนี้" ──
     if ($type === 'message' && $messageText !== ''
         && ($intent = detect_clinic_status_intent($messageText)) !== null) {
+        $pdo = db();
+        $faqSettings = get_clinic_faq_settings($pdo);
+
         line_webhook_log('Clinic status intent detected', [
             'line_user_id' => line_mask_uid($userId),
             'intent_type'  => $intent['type'],
             'date'         => $intent['date'],
             'offset'       => $intent['offset'],
+            'enabled'      => $faqSettings['enabled'],
             'has_reply_token' => !empty($replyToken),
         ]);
-        try {
-            $messages = build_clinic_status_messages(db(), $intent);
-        } catch (Throwable $e) {
-            line_webhook_log('Clinic status build failed', ['error' => $e->getMessage()], 'error');
-            $messages = [reply_text_message('ขออภัย ระบบไม่สามารถตรวจสอบเวลาทำการได้ในขณะนี้ กรุณาลองใหม่อีกครั้ง')];
+
+        // ถ้า admin ปิด FAQ ไว้ → ตกไป fallback ปกติ
+        if (!(int)$faqSettings['enabled']) {
+            line_webhook_log('Clinic FAQ disabled, falling through to default reply', [
+                'line_user_id' => line_mask_uid($userId),
+            ]);
+        } else {
+            // เช็ค rate limit ก่อนตอบ — ป้องกัน spam
+            $allowed = $userId
+                ? check_clinic_faq_rate_limit($pdo, (string)$userId, (string)$intent['type'], (int)$faqSettings['rate_limit_hours'])
+                : true;
+
+            if (!$allowed) {
+                line_webhook_log('Clinic FAQ rate limited (silent skip)', [
+                    'line_user_id'     => line_mask_uid($userId),
+                    'intent_type'      => $intent['type'],
+                    'rate_limit_hours' => $faqSettings['rate_limit_hours'],
+                ]);
+                continue;
+            }
+
+            try {
+                $messages = build_clinic_status_messages($pdo, $intent);
+            } catch (Throwable $e) {
+                line_webhook_log('Clinic status build failed', ['error' => $e->getMessage()], 'error');
+                $messages = [reply_text_message('ขออภัย ระบบไม่สามารถตรวจสอบเวลาทำการได้ในขณะนี้ กรุณาลองใหม่อีกครั้ง')];
+            }
+            $replyOk = $replyToken
+                ? send_line_reply($replyToken, $messages, $accessToken)
+                : ($userId ? send_line_push($userId, $messages, $accessToken) : false);
+
+            if ($replyOk && $userId) {
+                log_clinic_faq_reply($pdo, (string)$userId, (string)$intent['type']);
+            }
+            line_webhook_log($replyToken ? 'Clinic status reply sent' : 'Clinic status push sent', [
+                'line_user_id' => line_mask_uid($userId),
+                'ok'     => $replyOk,
+                'method' => $replyToken ? 'reply' : 'push',
+                'line_error' => $replyOk ? '' : get_last_line_error(),
+            ], $replyOk ? 'info' : 'warning');
+            continue;
         }
-        $replyOk = $replyToken
-            ? send_line_reply($replyToken, $messages, $accessToken)
-            : ($userId ? send_line_push($userId, $messages, $accessToken) : false);
-        line_webhook_log($replyToken ? 'Clinic status reply sent' : 'Clinic status push sent', [
-            'line_user_id' => line_mask_uid($userId),
-            'ok' => $replyOk,
-            'method' => $replyToken ? 'reply' : 'push',
-            'line_error' => $replyOk ? '' : get_last_line_error(),
-        ], $replyOk ? 'info' : 'warning');
-        continue;
     }
 
     switch ($type) {
