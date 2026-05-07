@@ -7,6 +7,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../includes/line_helper.php';
+require_once __DIR__ . '/../includes/clinic_status_helper.php';
 
 // 1. รับข้อมูลจาก LINE
 $payload   = file_get_contents('php://input');
@@ -414,6 +415,34 @@ foreach ($data['events'] as $idx => $event) {
             ? send_line_reply($replyToken, $messages, $accessToken)
             : send_line_push($userId, $messages, $accessToken);
         line_webhook_log($replyToken ? 'Insurance reply sent' : 'Insurance push sent', [
+            'line_user_id' => line_mask_uid($userId),
+            'ok' => $replyOk,
+            'method' => $replyToken ? 'reply' : 'push',
+            'line_error' => $replyOk ? '' : get_last_line_error(),
+        ], $replyOk ? 'info' : 'warning');
+        continue;
+    }
+
+    // ── คำถามพื้นฐาน: "วันนี้คลินิกเปิดไหม", "เปิดกี่โมง", "ตารางแพทย์วันนี้" ──
+    if ($type === 'message' && $messageText !== ''
+        && ($intent = detect_clinic_status_intent($messageText)) !== null) {
+        line_webhook_log('Clinic status intent detected', [
+            'line_user_id' => line_mask_uid($userId),
+            'intent_type'  => $intent['type'],
+            'date'         => $intent['date'],
+            'offset'       => $intent['offset'],
+            'has_reply_token' => !empty($replyToken),
+        ]);
+        try {
+            $messages = build_clinic_status_messages(db(), $intent);
+        } catch (Throwable $e) {
+            line_webhook_log('Clinic status build failed', ['error' => $e->getMessage()], 'error');
+            $messages = [reply_text_message('ขออภัย ระบบไม่สามารถตรวจสอบเวลาทำการได้ในขณะนี้ กรุณาลองใหม่อีกครั้ง')];
+        }
+        $replyOk = $replyToken
+            ? send_line_reply($replyToken, $messages, $accessToken)
+            : ($userId ? send_line_push($userId, $messages, $accessToken) : false);
+        line_webhook_log($replyToken ? 'Clinic status reply sent' : 'Clinic status push sent', [
             'line_user_id' => line_mask_uid($userId),
             'ok' => $replyOk,
             'method' => $replyToken ? 'reply' : 'push',
