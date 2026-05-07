@@ -42,6 +42,10 @@ if (!function_exists('render_booking_rows')) {
             <span class="px-4 py-1.5 bg-emerald-50 text-emerald-600 text-[10px] font-black uppercase rounded-full border border-emerald-100 tracking-widest">Confirmed</span>
         <?php elseif ($b['status'] === 'completed'): ?>
             <span class="px-4 py-1.5 bg-teal-50 text-teal-600 text-[10px] font-black uppercase rounded-full border border-teal-100 tracking-widest">เข้าร่วมแล้ว</span>
+        <?php elseif ($b['status'] === 'expired'): ?>
+            <span class="px-4 py-1.5 bg-slate-100 text-slate-500 text-[10px] font-black uppercase rounded-full border border-slate-200 tracking-widest" title="ไม่มาตามนัด — ถูกยกเลิกอัตโนมัติ">ไม่มาตามนัด</span>
+        <?php elseif (in_array($b['status'], ['cancelled','cancelled_by_admin'], true)): ?>
+            <span class="px-4 py-1.5 bg-red-50 text-red-500 text-[10px] font-black uppercase rounded-full border border-red-100 tracking-widest">ยกเลิกแล้ว</span>
         <?php else: ?>
             <span class="px-4 py-1.5 bg-gray-50 text-gray-400 text-[10px] font-black uppercase rounded-full tracking-widest"><?= htmlspecialchars($b['status'], ENT_QUOTES, 'UTF-8') ?></span>
         <?php endif; ?>

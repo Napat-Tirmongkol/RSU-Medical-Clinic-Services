@@ -33,7 +33,7 @@ try {
             SUM(b.status = 'booked')                               AS total_pending,
             SUM(b.status = 'confirmed')                            AS total_confirmed,
             SUM(b.status = 'completed')                            AS total_completed,
-            SUM(b.status IN ('cancelled','cancelled_by_admin'))    AS total_cancelled
+            SUM(b.status IN ('cancelled','cancelled_by_admin','expired')) AS total_cancelled
         FROM camp_bookings b
         JOIN camp_slots s ON b.slot_id = s.id
         WHERE $kpiWhere
@@ -61,7 +61,7 @@ try {
 }
 
 // ── Initial data (first page, no search term) ────────────────────────────────
-$dataWhere  = "s.slot_date BETWEEN :start AND :end AND b.status IN ('booked','confirmed','completed','cancelled','cancelled_by_admin')";
+$dataWhere  = "s.slot_date BETWEEN :start AND :end AND b.status IN ('booked','confirmed','completed','cancelled','cancelled_by_admin','expired')";
 $dataParams = [':start' => $dateFrom, ':end' => $dateTo];
 if ($campaignId > 0) {
     $dataWhere .= ' AND b.campaign_id = :cid';

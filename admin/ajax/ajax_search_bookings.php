@@ -25,7 +25,7 @@ $offset     = ($page - 1) * $perPage;
 if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateFrom)) $dateFrom = date('Y-m-d', strtotime('-3 months'));
 if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateTo))   $dateTo   = date('Y-m-d', strtotime('+3 months'));
 
-$where  = "s.slot_date BETWEEN :start AND :end AND b.status IN ('booked','confirmed','completed','cancelled','cancelled_by_admin')";
+$where  = "s.slot_date BETWEEN :start AND :end AND b.status IN ('booked','confirmed','completed','cancelled','cancelled_by_admin','expired')";
 $params = [':start' => $dateFrom, ':end' => $dateTo];
 
 if ($q !== '') {
@@ -37,10 +37,10 @@ if ($q !== '') {
 }
 
 if ($status === 'cancelled') {
-    $where .= " AND b.status IN ('cancelled','cancelled_by_admin')";
+    $where .= " AND b.status IN ('cancelled','cancelled_by_admin','expired')";
 } elseif ($status === 'completed') {
     // รวม QR check-in (attended_at set แต่ status อาจยังเป็น confirmed) + staff check-in (status = completed)
-    $where .= " AND (b.status = 'completed' OR (b.attended_at IS NOT NULL AND b.status NOT IN ('cancelled','cancelled_by_admin')))";
+    $where .= " AND (b.status = 'completed' OR (b.attended_at IS NOT NULL AND b.status NOT IN ('cancelled','cancelled_by_admin','expired')))";
 } elseif ($status === 'confirmed') {
     // confirmed ที่ยังไม่ได้เช็คอิน
     $where .= " AND b.status = 'confirmed' AND b.attended_at IS NULL";
@@ -68,8 +68,8 @@ try {
         SELECT
             SUM(b.status = 'booked')                                                                             AS pending,
             SUM(b.status = 'confirmed' AND b.attended_at IS NULL)                                               AS confirmed,
-            SUM(b.status = 'completed' OR (b.attended_at IS NOT NULL AND b.status NOT IN ('cancelled','cancelled_by_admin'))) AS completed,
-            SUM(b.status IN ('cancelled','cancelled_by_admin'))                                                  AS cancelled
+            SUM(b.status = 'completed' OR (b.attended_at IS NOT NULL AND b.status NOT IN ('cancelled','cancelled_by_admin','expired'))) AS completed,
+            SUM(b.status IN ('cancelled','cancelled_by_admin','expired'))                                        AS cancelled
         FROM camp_bookings b
         JOIN camp_slots s ON b.slot_id = s.id
         WHERE $kpiWhere
