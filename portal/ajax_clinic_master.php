@@ -5,6 +5,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/includes/auth.php';
+require_once __DIR__ . '/../includes/survey_helper.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -646,6 +647,105 @@ try {
             $pdo->prepare("DELETE FROM sys_doctor_schedule WHERE id = ?")->execute([(int)$_POST['id']]);
             echo json_encode(['ok' => true, 'message' => 'ลบแล้ว']);
             return;
+
+        // ── Survey Questions (configurable post-checkin survey) ────────────
+        case 'survey_q:list': {
+            ensure_survey_schema($pdo);
+            $type = trim((string)($_POST['survey_type'] ?? 'post_checkin'));
+            $stmt = $pdo->prepare("SELECT * FROM sys_survey_questions
+                WHERE survey_type = :t ORDER BY sort_order ASC, id ASC");
+            $stmt->execute([':t' => $type]);
+            echo json_encode(['ok' => true, 'rows' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
+            return;
+        }
+
+        case 'survey_q:add': {
+            ensure_survey_schema($pdo);
+            $type = trim((string)($_POST['survey_type'] ?? 'post_checkin'));
+            $text = trim((string)($_POST['question_text'] ?? ''));
+            $atype = $_POST['answer_type'] ?? 'rating';
+            if ($text === '') { echo json_encode(['ok'=>false,'message'=>'กรุณาใส่ข้อความคำถาม']); return; }
+            if (!in_array($atype, ['rating','text','single_choice'], true)) $atype = 'rating';
+
+            $optsJson = null;
+            if ($atype === 'single_choice') {
+                $opts = array_values(array_filter(array_map('trim', explode("\n", (string)($_POST['options'] ?? '')))));
+                if (count($opts) < 2) { echo json_encode(['ok'=>false,'message'=>'choice ต้องมีอย่างน้อย 2 ตัวเลือก (บรรทัดละ 1)']); return; }
+                $optsJson = json_encode($opts, JSON_UNESCAPED_UNICODE);
+            }
+
+            $maxOrder = (int)$pdo->query("SELECT COALESCE(MAX(sort_order),0) FROM sys_survey_questions")->fetchColumn();
+            $stmt = $pdo->prepare("INSERT INTO sys_survey_questions
+                (survey_type, question_text, answer_type, options_json, is_required, sort_order, is_active)
+                VALUES (:t, :q, :at, :o, :r, :so, 1)");
+            $stmt->execute([
+                ':t'  => $type,
+                ':q'  => mb_substr($text, 0, 255),
+                ':at' => $atype,
+                ':o'  => $optsJson,
+                ':r'  => !empty($_POST['is_required']) ? 1 : 0,
+                ':so' => $maxOrder + 1,
+            ]);
+            echo json_encode(['ok'=>true, 'id'=>(int)$pdo->lastInsertId(), 'message'=>'เพิ่มคำถามแล้ว']);
+            return;
+        }
+
+        case 'survey_q:update': {
+            ensure_survey_schema($pdo);
+            $id = (int)($_POST['id'] ?? 0);
+            if ($id <= 0) { echo json_encode(['ok'=>false,'message'=>'invalid id']); return; }
+            $text = trim((string)($_POST['question_text'] ?? ''));
+            $atype = $_POST['answer_type'] ?? 'rating';
+            if ($text === '') { echo json_encode(['ok'=>false,'message'=>'กรุณาใส่ข้อความคำถาม']); return; }
+            if (!in_array($atype, ['rating','text','single_choice'], true)) $atype = 'rating';
+
+            $optsJson = null;
+            if ($atype === 'single_choice') {
+                $opts = array_values(array_filter(array_map('trim', explode("\n", (string)($_POST['options'] ?? '')))));
+                if (count($opts) < 2) { echo json_encode(['ok'=>false,'message'=>'choice ต้องมีอย่างน้อย 2 ตัวเลือก']); return; }
+                $optsJson = json_encode($opts, JSON_UNESCAPED_UNICODE);
+            }
+
+            $stmt = $pdo->prepare("UPDATE sys_survey_questions SET
+                question_text = :q, answer_type = :at, options_json = :o, is_required = :r
+                WHERE id = :id");
+            $stmt->execute([
+                ':q'  => mb_substr($text, 0, 255),
+                ':at' => $atype,
+                ':o'  => $optsJson,
+                ':r'  => !empty($_POST['is_required']) ? 1 : 0,
+                ':id' => $id,
+            ]);
+            echo json_encode(['ok'=>true, 'message'=>'อัปเดตแล้ว']);
+            return;
+        }
+
+        case 'survey_q:toggle': {
+            $id = (int)($_POST['id'] ?? 0);
+            $pdo->prepare("UPDATE sys_survey_questions SET is_active = 1 - is_active WHERE id = :id")
+                ->execute([':id' => $id]);
+            echo json_encode(['ok'=>true, 'message'=>'สลับสถานะแล้ว']);
+            return;
+        }
+
+        case 'survey_q:delete': {
+            $id = (int)($_POST['id'] ?? 0);
+            $pdo->prepare("DELETE FROM sys_survey_questions WHERE id = :id")->execute([':id' => $id]);
+            echo json_encode(['ok'=>true, 'message'=>'ลบแล้ว']);
+            return;
+        }
+
+        case 'survey_q:reorder': {
+            $ids = $_POST['ids'] ?? '';
+            $idList = array_values(array_filter(array_map('intval', explode(',', (string)$ids))));
+            if (empty($idList)) { echo json_encode(['ok'=>false,'message'=>'no ids']); return; }
+            $stmt = $pdo->prepare("UPDATE sys_survey_questions SET sort_order = :so WHERE id = :id");
+            foreach ($idList as $i => $id) {
+                $stmt->execute([':so' => $i + 1, ':id' => $id]);
+            }
+            echo json_encode(['ok'=>true, 'message'=>'จัดลำดับใหม่แล้ว']);
+            return;
+        }
 
         default:
             echo json_encode(['ok' => false, 'message' => "Unknown action: $entity:$action"]);

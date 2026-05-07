@@ -4,7 +4,7 @@
 // Each sub-view gets back to landing via ?section=clinic_data (no cd_view)
 
 $_view = $_GET['cd_view'] ?? '';
-$_validViews = ['profile','faculty','staff','rooms','hours','schedule','calendar'];
+$_validViews = ['profile','faculty','staff','rooms','hours','schedule','calendar','survey'];
 
 if (in_array($_view, $_validViews, true)) {
     include __DIR__ . '/clinic_data/' . $_view . '.php';
@@ -127,6 +127,17 @@ $_cards = [
         'count'   => $_safeCount("SELECT COUNT(*) FROM sys_doctor_schedule WHERE is_active = 1"),
         'count_label' => 'shift',
         'updated' => $_safeMax("SELECT MAX(updated_at) FROM sys_doctor_schedule") ? $_relTime($_safeMax("SELECT MAX(updated_at) FROM sys_doctor_schedule")) : null,
+    ],
+    [
+        'view'    => 'survey',
+        'title'   => 'แบบสอบถามหลังเช็คอิน',
+        'desc'    => 'จัดการคำถามที่ผู้ใช้ต้องตอบหลังเช็คอินเข้าร่วมกิจกรรม — บังคับตอบทุกครั้ง',
+        'icon'    => 'fa-clipboard-question',
+        'tone'    => ['bg'=>'#fdf2f8','fg'=>'#be185d','border'=>'#fbcfe8'],
+        'used_by' => ['post-checkin','KPI'],
+        'count'   => $_safeCount("SELECT COUNT(*) FROM sys_survey_questions WHERE survey_type = 'post_checkin' AND is_active = 1"),
+        'count_label' => 'คำถาม active',
+        'updated' => $_safeMax("SELECT MAX(updated_at) FROM sys_survey_questions") ? $_relTime($_safeMax("SELECT MAX(updated_at) FROM sys_survey_questions")) : null,
     ],
     [
         'view'    => null, // external link — managed in separate section
