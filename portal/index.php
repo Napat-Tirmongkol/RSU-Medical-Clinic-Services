@@ -1006,6 +1006,15 @@ try {
                     <span class="psb-label" style="color:#b45309;font-weight:900">Settings</span>
                 </button>
             <?php endif; ?>
+
+            <?php /* ── บัญชีของฉัน (ทุก admin เห็น ไม่ขึ้นกับสิทธิ์ system settings) ── */ ?>
+            <?php if (!$registryOnly): ?>
+                <div class="psb-section-label">บัญชี</div>
+                <button class="psb-item <?= $activeSection==='account'?'psb-active':'' ?>" data-section="account" onclick="switchSection('account',this)">
+                    <div class="psb-icon"><i class="fa-solid fa-circle-user" style="color:#2e9e63"></i></div>
+                    <span class="psb-label" style="color:#1f7a4d;font-weight:900">บัญชีของฉัน</span>
+                </button>
+            <?php endif; ?>
         </div>
     </nav>
 
@@ -2402,13 +2411,19 @@ try {
 
             <div id="section-settings" class="portal-section"
                 style="<?= $activeSection==='settings'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); background:#f1f5f9; overflow-y:auto;">
-                <?php 
+                <?php
                 if ($adminRole === 'superadmin' || !empty($_SESSION['access_site_settings'])) {
-                    include __DIR__ . '/_partials/settings.php'; 
+                    include __DIR__ . '/_partials/settings.php';
                 } else {
                     echo '<div style="padding:100px;text-align:center;font-weight:900;color:#dc2626"><i class="fa-solid fa-shield-slash mb-4" style="font-size:4rem;display:block"></i> ACCESS DENIED<br><span style="font-size:14px;color:#94a3b8;font-weight:600">You do not have permission to manage site settings.</span></div>';
                 }
                 ?>
+            </div>
+
+            <!-- ════════════ SECTION: ACCOUNT (บัญชีของฉัน) ════════════ -->
+            <div id="section-account" class="portal-section"
+                style="<?= $activeSection==='account'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); background:#f1f5f9; overflow-y:auto;">
+                <?php include __DIR__ . '/_partials/account.php'; ?>
             </div>
 
             <!-- ════════════ SECTION: AI ASSISTANT ════════════ -->
