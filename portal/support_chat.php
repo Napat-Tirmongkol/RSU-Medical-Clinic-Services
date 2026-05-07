@@ -552,6 +552,11 @@ $pdo = db();
         const portal_CSRF = <?= json_encode(get_csrf_token(), JSON_UNESCAPED_SLASHES) ?>;
         let currentUserId = null;
         let allUsers = [];
+        // Cursor (highest message id already rendered) per conversation — drives since_id polling
+        const lastMsgIdByUser = Object.create(null);
+        // Sidebar pagination state
+        let currentPage = 1, totalPages = 1, currentSearch = '';
+        let searchDebounceTimer = null;
 
         // ── Safe HTML escape helper ──
         function esc(str) {
@@ -564,16 +569,19 @@ $pdo = db();
                 .replace(/'/g, '&#39;');
         }
 
+        // Search input now triggers server-side query (debounced 250ms)
         function filterUsers(query) {
-            const q = query.toLowerCase();
-            const filtered = allUsers.filter(u => u.full_name.toLowerCase().includes(q));
-            renderUserList(filtered);
+            currentSearch = String(query || '').trim();
+            currentPage = 1;
+            clearTimeout(searchDebounceTimer);
+            searchDebounceTimer = setTimeout(loadUsers, 250);
         }
 
         function renderUserList(users) {
             const container = document.getElementById('user-list-container');
             if (users.length === 0) {
                 container.innerHTML = '<div style="padding:40px;text-align:center;color:#CBD5E1;font-size:13px;font-weight:700">ยังไม่มีข้อความเข้ามา</div>';
+                renderPagination();
                 return;
             }
             container.innerHTML = users.map(u => {
@@ -599,12 +607,52 @@ $pdo = db();
                 const el = container.querySelector('[data-uid="' + u.id + '"]');
                 if (el) el._userData = u;
             });
+            renderPagination();
+        }
+
+        function renderPagination() {
+            let host = document.getElementById('user-list-pagination');
+            if (!host) {
+                host = document.createElement('div');
+                host.id = 'user-list-pagination';
+                host.style.cssText = 'padding:8px;display:flex;flex-wrap:wrap;justify-content:center;gap:4px;border-top:1px solid #E2E8F0;background:#F8FAFC';
+                document.getElementById('user-list-container').after(host);
+            }
+            if (totalPages <= 1) { host.innerHTML = ''; return; }
+            const btn = (label, target, opts = {}) => {
+                const disabled = !!opts.disabled;
+                const active = !!opts.active;
+                const bg  = active ? '#2563EB' : (disabled ? '#F1F5F9' : '#FFFFFF');
+                const fg  = active ? '#FFFFFF' : (disabled ? '#CBD5E1' : '#475569');
+                const cur = disabled ? 'default' : 'pointer';
+                return `<button type="button" data-page="${target}" ${disabled ? 'disabled' : ''}
+                    style="min-width:28px;height:28px;border:1px solid #E2E8F0;border-radius:6px;background:${bg};color:${fg};font-size:11px;font-weight:800;cursor:${cur};padding:0 6px">${label}</button>`;
+            };
+            const parts = [];
+            parts.push(btn('«', 1, { disabled: currentPage === 1 }));
+            parts.push(btn('‹', Math.max(1, currentPage - 1), { disabled: currentPage === 1 }));
+            for (let p = Math.max(1, currentPage - 2); p <= Math.min(totalPages, currentPage + 2); p++) {
+                parts.push(btn(String(p), p, { active: p === currentPage }));
+            }
+            parts.push(btn('›', Math.min(totalPages, currentPage + 1), { disabled: currentPage === totalPages }));
+            parts.push(btn('»', totalPages, { disabled: currentPage === totalPages }));
+            host.innerHTML = parts.join('') +
+                `<div style="flex-basis:100%;text-align:center;font-size:10px;font-weight:700;color:#94A3B8;margin-top:2px">หน้า ${currentPage} / ${totalPages}</div>`;
+            host.querySelectorAll('button[data-page]').forEach(b => {
+                b.addEventListener('click', () => {
+                    const p = parseInt(b.dataset.page, 10);
+                    if (!Number.isNaN(p) && p !== currentPage) { currentPage = p; loadUsers(); }
+                });
+            });
         }
 
         function selectUser(id) {
             const u = allUsers.find(x => x.id == id);
             if (!u) return;
             currentUserId = id;
+            // Force a full reload of this conversation's history
+            lastMsgIdByUser[id] = 0;
+            document.getElementById('messages-container').innerHTML = '';
             document.getElementById('chat-placeholder').style.display = 'none';
             document.getElementById('chat-active').classList.add('visible');
             document.getElementById('active-user-name').innerText = u.full_name;
@@ -618,7 +666,9 @@ $pdo = db();
 
         async function loadUsers() {
             try {
-                const res = await fetch('ajax_support_chat.php?action=list_users');
+                const params = new URLSearchParams({ action: 'list_users', page: String(currentPage) });
+                if (currentSearch !== '') params.set('q', currentSearch);
+                const res = await fetch('ajax_support_chat.php?' + params.toString());
                 const text = await res.text();
                 let data;
                 try {
@@ -634,46 +684,70 @@ $pdo = db();
                 }
                 if (data.success) {
                     allUsers = data.users;
-                    const query = document.getElementById('search-input').value;
-                    filterUsers(query);
+                    currentPage = data.page || 1;
+                    totalPages = data.pages || 1;
+                    if (allUsers.length === 0 && data.empty_message) {
+                        document.getElementById('user-list-container').innerHTML =
+                            `<div style="padding:40px;text-align:center;color:#CBD5E1;font-size:13px;font-weight:700">${esc(data.empty_message)}</div>`;
+                        renderPagination();
+                    } else {
+                        renderUserList(allUsers);
+                    }
                 } else {
                     console.warn('API error:', data.error);
                     document.getElementById('user-list-container').innerHTML =
-                        `<div style="padding:24px;text-align:center;color:#EF4444;font-size:12px;font-weight:700">${data.error}</div>`;
+                        `<div style="padding:24px;text-align:center;color:#EF4444;font-size:12px;font-weight:700">${esc(data.error)}</div>`;
                 }
             } catch(e) {
                 console.error('loadUsers network error:', e);
             }
         }
 
-
-
         async function loadMessages() {
             if (!currentUserId) return;
+            const sinceId = lastMsgIdByUser[currentUserId] || 0;
             try {
-                const res = await fetch(`ajax_support_chat.php?action=get_messages&user_id=${currentUserId}`);
+                const res = await fetch(`ajax_support_chat.php?action=get_messages&user_id=${currentUserId}&since_id=${sinceId}`);
                 const text = await res.text();
                 let data;
                 try { data = JSON.parse(text); } catch(e) {
                     console.error('loadMessages: non-JSON response:', text.substring(0, 150));
                     return;
                 }
-                if (data.success) {
-                    const container = document.getElementById('messages-container');
-                    container.innerHTML = data.messages.map(m => {
-                        const isStaff = m.sender_type === 'staff';
-                        return `
-                            <div class="msg-bubble ${isStaff ? 'msg-staff' : 'msg-user'}">
-                                <p>${esc(m.message)}</p>
-                                <div class="msg-meta">
-                                    <span>${isStaff ? 'คุณ' : 'ผู้ใช้งาน'}</span>
-                                    <span>${esc(m.time)}</span>
-                                </div>
+                if (!data.success) return;
+
+                const container = document.getElementById('messages-container');
+                if (!data.messages || data.messages.length === 0) return;
+
+                const renderBubble = m => {
+                    const isStaff = m.sender_type === 'staff';
+                    return `
+                        <div class="msg-bubble ${isStaff ? 'msg-staff' : 'msg-user'}">
+                            <p>${esc(m.message)}</p>
+                            <div class="msg-meta">
+                                <span>${isStaff ? 'คุณ' : 'ผู้ใช้งาน'}</span>
+                                <span>${esc(m.time)}</span>
                             </div>
-                        `;
-                    }).join('');
-                    container.scrollTop = container.scrollHeight;
+                        </div>
+                    `;
+                };
+
+                // Auto-scroll only if admin was already near the bottom
+                const wasAtBottom = (container.scrollHeight - container.scrollTop - container.clientHeight) < 80;
+
+                if (sinceId === 0) {
+                    container.innerHTML = data.messages.map(renderBubble).join('');
+                } else {
+                    container.insertAdjacentHTML('beforeend', data.messages.map(renderBubble).join(''));
                 }
+
+                // Update cursor — id ของข้อความล่าสุด
+                const lastId = data.messages[data.messages.length - 1].id;
+                if (lastId > (lastMsgIdByUser[currentUserId] || 0)) {
+                    lastMsgIdByUser[currentUserId] = lastId;
+                }
+
+                if (sinceId === 0 || wasAtBottom) container.scrollTop = container.scrollHeight;
             } catch(e) {
                 console.error('loadMessages error:', e);
             }

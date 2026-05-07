@@ -38,18 +38,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST'
 $action = $_GET['action'] ?? 'get';
 $pdo = db();
 
-// Auto-create table if not exists
-$pdo->exec("CREATE TABLE IF NOT EXISTS sys_chat_messages (
-    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    sender_type ENUM('user', 'staff') NOT NULL,
-    user_id INT UNSIGNED NOT NULL,
-    staff_id INT UNSIGNED NULL,
-    message TEXT NOT NULL,
-    is_read TINYINT(1) DEFAULT 0,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    INDEX idx_user (user_id),
-    INDEX idx_created (created_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+require_once __DIR__ . '/../includes/chat_helper.php';
+ensure_chat_schema($pdo);
 
 try {
     if ($action === 'send') {

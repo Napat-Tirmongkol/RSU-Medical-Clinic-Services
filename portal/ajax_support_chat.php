@@ -3,6 +3,7 @@
 declare(strict_types=1);
 // NOTE: session_start() is handled by auth.php below
 require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../includes/chat_helper.php';
 
 header('Content-Type: application/json');
 header('Cache-Control: no-cache');
@@ -27,27 +28,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST'
 
 $action = $_GET['action'] ?? 'list_users';
 $pdo = db();
-
-// Auto-create table if not exists
-$pdo->exec("CREATE TABLE IF NOT EXISTS sys_chat_messages (
-    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    sender_type ENUM('user', 'staff') NOT NULL,
-    user_id INT UNSIGNED NOT NULL,
-    staff_id INT UNSIGNED NULL,
-    message TEXT NOT NULL,
-    is_read TINYINT(1) DEFAULT 0,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    INDEX idx_user (user_id),
-    INDEX idx_created (created_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+ensure_chat_schema($pdo);
 
 try {
     if ($action === 'list_users') {
-        // แสดงเฉพาะผู้ใช้งานที่ส่งข้อความมาแล้ว
-        $stmt = $pdo->query("
-            SELECT 
-                u.id, 
-                u.full_name, 
+        // แสดงเฉพาะผู้ใช้งานที่ส่งข้อความมาแล้ว — paginate 20/page + optional search by name
+        $page  = max(1, (int)($_GET['page'] ?? 1));
+        $limit = 20;
+        $offset = ($page - 1) * $limit;
+
+        $q = trim((string)($_GET['q'] ?? ''));
+        $searchClause = '';
+        $params = [];
+        if ($q !== '') {
+            $searchClause = " AND u.full_name LIKE :q";
+            $params[':q'] = '%' . $q . '%';
+        }
+
+        $countSql = "SELECT COUNT(DISTINCT u.id)
+            FROM sys_users u
+            JOIN sys_chat_messages m ON m.user_id = u.id
+            WHERE 1=1 $searchClause";
+        $cs = $pdo->prepare($countSql);
+        $cs->execute($params);
+        $total = (int)$cs->fetchColumn();
+
+        $listSql = "
+            SELECT
+                u.id,
+                u.full_name,
                 u.picture_url,
                 m.message as last_message,
                 m.created_at,
@@ -65,15 +74,24 @@ try {
                 WHERE is_read = 0 AND sender_type = 'user'
                 GROUP BY user_id
             ) unread ON u.id = unread.user_id
+            WHERE 1=1 $searchClause
             ORDER BY m.created_at DESC
-        ");
+            LIMIT $limit OFFSET $offset
+        ";
+        $stmt = $pdo->prepare($listSql);
+        $stmt->execute($params);
         $users = $stmt->fetchAll();
 
-        if (empty($users)) {
-            echo json_encode(['success' => true, 'users' => [], 'empty_message' => 'ยังไม่มีผู้ใช้งานส่งข้อความเข้ามา']);
-        } else {
-            echo json_encode(['success' => true, 'users' => $users]);
-        }
+        echo json_encode([
+            'success' => true,
+            'users'   => $users,
+            'page'    => $page,
+            'pages'   => max(1, (int)ceil($total / $limit)),
+            'total'   => $total,
+            'empty_message' => empty($users)
+                ? ($q !== '' ? 'ไม่พบผู้ใช้งานที่ตรงกับคำค้น' : 'ยังไม่มีผู้ใช้งานส่งข้อความเข้ามา')
+                : null,
+        ]);
         exit;
     }
 
@@ -81,17 +99,25 @@ try {
         $targetUserId = (int)($_GET['user_id'] ?? 0);
         if (!$targetUserId) exit;
 
-        // Mark as read
-        $pdo->prepare("UPDATE sys_chat_messages SET is_read = 1 WHERE user_id = :uid AND sender_type = 'user'")->execute([':uid' => $targetUserId]);
+        // since_id cursor — initial load uses 0 (returns all), polls send last seen id
+        $sinceId = max(0, (int)($_GET['since_id'] ?? 0));
+
+        // Mark unread user-side messages in this conversation as read while admin is viewing.
+        // No-op (rowCount=0) once everything's already read.
+        $pdo->prepare("UPDATE sys_chat_messages
+            SET is_read = 1
+            WHERE user_id = :uid AND sender_type = 'user' AND is_read = 0")
+            ->execute([':uid' => $targetUserId]);
 
         $stmt = $pdo->prepare("
-            SELECT m.*, a.full_name as staff_name 
+            SELECT m.id, m.sender_type, m.user_id, m.staff_id, m.message, m.is_read, m.created_at,
+                   a.full_name as staff_name
             FROM sys_chat_messages m
             LEFT JOIN sys_admins a ON m.staff_id = a.id
-            WHERE m.user_id = :uid 
+            WHERE m.user_id = :uid AND m.id > :since
             ORDER BY m.id ASC
         ");
-        $stmt->execute([':uid' => $targetUserId]);
+        $stmt->execute([':uid' => $targetUserId, ':since' => $sinceId]);
         $messages = $stmt->fetchAll();
 
         foreach ($messages as &$m) {
