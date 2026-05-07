@@ -17,9 +17,6 @@ declare(strict_types=1);
 // ── Secret Token ──────────────────────────────────────────────────────────────
 define('REMINDER_SECRET_TOKEN', 'rsu_purge_a8f3k2m9x');
 
-// ── หน่วงเวลาระหว่างแต่ละอีเมล (วินาที) ───────────────────────────────────────
-define('REMINDER_DELAY_SECONDS', 3);
-
 // ── ตรวจสอบ token ─────────────────────────────────────────────────────────────
 $token = $_GET['token'] ?? $_SERVER['HTTP_X_CRON_TOKEN'] ?? '';
 if (!hash_equals(REMINDER_SECRET_TOKEN, $token)) {
@@ -119,10 +116,7 @@ foreach ($bookings as $i => $row) {
         $log[] = "  ✗ #{$bookingId} {$name} <{$email}> — ส่งล้มเหลว";
     }
 
-    // หน่วงเวลาระหว่างแต่ละเมล (ยกเว้นรายการสุดท้าย)
-    if ($i < $total - 1) {
-        sleep(REMINDER_DELAY_SECONDS);
-    }
+
 }
 
 // ── สรุปผล ────────────────────────────────────────────────────────────────────
