@@ -29,7 +29,7 @@ if (!hash_equals(CRON_SECRET_TOKEN, $token)) {
 }
 
 $projectRoot = dirname(__DIR__);
-require_once $projectRoot . '/config/db_connect.php';
+require_once $projectRoot . '/config.php';
 require_once $projectRoot . '/includes/mail_helper.php';
 
 date_default_timezone_set('Asia/Bangkok');
@@ -177,5 +177,16 @@ $log[] = "LINE:   {$lineSent}";
 $log[] = "ข้าม:   {$skipped}  (race condition)";
 $log[] = "ล้มเหลว: {$failed}";
 $log[] = '[' . date('Y-m-d H:i:s') . '] จบการทำงาน';
+
+// ── Activity Log ─────────────────────────────────────────────────────────────
+if ($cancelled > 0) {
+    log_activity(
+        'auto_expire_bookings',
+        "Cron ยกเลิกอัตโนมัติ (ไม่มาตามนัด): {$cancelled} รายการ"
+        . " | Email: {$emailSent} | LINE: {$lineSent}"
+        . ($failed > 0 ? " | ล้มเหลว: {$failed}" : ''),
+        null
+    );
+}
 
 echo implode("\n", $log) . "\n";
