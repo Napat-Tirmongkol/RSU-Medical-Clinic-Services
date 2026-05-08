@@ -269,6 +269,25 @@ $webhookUrl = "$protocol://$host$uri";
                 </div>
             </div>
 
+            <!-- Blocked keywords — webhook ไม่ตอบเมื่อข้อความมีคำเหล่านี้ -->
+            <div style="background:#fff7ed;border:1.5px solid #fed7aa;border-radius:12px;padding:14px 16px;margin-top:12px">
+                <label class="line-label" style="margin-bottom:6px;display:flex;align-items:center;gap:8px;color:#9a3412">
+                    <i class="fa-solid fa-ban"></i>
+                    Keywords ที่ webhook จะไม่ตอบ
+                </label>
+                <div style="font-size:11px;color:#9a3412;font-weight:600;margin-bottom:8px;line-height:1.5">
+                    ถ้าข้อความที่ user ส่งมีคำใดคำหนึ่งในรายการนี้ ระบบจะ <b>ไม่ตอบกลับเลย</b> (ทั้ง AI และ default reply)
+                    — เหมาะสำหรับคำที่ตั้ง <b>LINE OA built-in keyword auto-reply</b> ไว้แล้ว เพื่อกันตอบซ้ำ
+                </div>
+                <textarea id="faq_blocked_keywords" name="blocked_keywords" rows="3"
+                    placeholder="วัคซีน,&#10;HPV,&#10;ฉีด"
+                    class="line-input"
+                    style="padding:10px 12px;font-size:13px;font-family:monospace;width:100%;resize:vertical;min-height:80px"></textarea>
+                <div style="font-size:11px;color:#9a3412;font-weight:500;margin-top:6px">
+                    คั่นด้วย <code>,</code> หรือขึ้นบรรทัดใหม่ · match แบบ case-insensitive substring
+                </div>
+            </div>
+
             <!-- Placeholder hint -->
             <div style="background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:12px;padding:12px 14px">
                 <div style="font-size:11px;font-weight:800;color:#1e40af;margin-bottom:6px">
@@ -736,6 +755,7 @@ function sendTestLineP() {
         document.getElementById('faq_enabled').checked = !!Number(s.enabled);
         document.getElementById('faq_only_when_closed').checked = !!Number(s.only_when_closed);
         document.getElementById('faq_rate_limit_hours').value = Number(s.rate_limit_hours || 0);
+        document.getElementById('faq_blocked_keywords').value = String(s.blocked_keywords || '');
         FAQ_KEYS.forEach(function (k) {
             var el = document.getElementById(k);
             if (el) el.value = s[k] || '';
