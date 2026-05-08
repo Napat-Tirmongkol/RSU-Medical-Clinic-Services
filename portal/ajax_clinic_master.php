@@ -966,22 +966,31 @@ try {
         // ── Org Chart: Members ───────────────────────────────────────────
         case 'org_member:list': {
             $positionId = isset($_POST['position_id']) && $_POST['position_id'] !== '' ? (int)$_POST['position_id'] : null;
+            // Live-sync the displayed name from sys_staff when staff_id is set,
+            // so renaming an account also renames every linked org member.
+            // PDO::FETCH_ASSOC keeps the later same-named column, so the
+            // COALESCE'd alias overwrites m.full_name from `m.*` cleanly.
             if ($positionId === null && empty($_POST['all'])) {
-                // Return all members with position info
-                $rows = $pdo->query("SELECT m.*, p.title AS position_title, p.card_style
+                $rows = $pdo->query("SELECT m.*, p.title AS position_title, p.card_style,
+                        COALESCE(s.full_name, m.full_name) AS full_name
                     FROM sys_org_members m
                     LEFT JOIN sys_org_positions p ON p.id = m.position_id
+                    LEFT JOIN sys_staff s ON s.id = m.staff_id
                     WHERE m.is_active = 1
                     ORDER BY m.position_id ASC, m.display_order ASC, m.id ASC")->fetchAll(PDO::FETCH_ASSOC);
             } elseif ($positionId === null) {
-                $rows = $pdo->query("SELECT m.*, p.title AS position_title, p.card_style
+                $rows = $pdo->query("SELECT m.*, p.title AS position_title, p.card_style,
+                        COALESCE(s.full_name, m.full_name) AS full_name
                     FROM sys_org_members m
                     LEFT JOIN sys_org_positions p ON p.id = m.position_id
+                    LEFT JOIN sys_staff s ON s.id = m.staff_id
                     ORDER BY m.position_id ASC, m.display_order ASC")->fetchAll(PDO::FETCH_ASSOC);
             } else {
-                $st = $pdo->prepare("SELECT m.*, p.title AS position_title, p.card_style
+                $st = $pdo->prepare("SELECT m.*, p.title AS position_title, p.card_style,
+                        COALESCE(s.full_name, m.full_name) AS full_name
                     FROM sys_org_members m
                     LEFT JOIN sys_org_positions p ON p.id = m.position_id
+                    LEFT JOIN sys_staff s ON s.id = m.staff_id
                     WHERE m.position_id = ? AND m.is_active = 1
                     ORDER BY m.display_order ASC, m.id ASC");
                 $st->execute([$positionId]);
@@ -1107,7 +1116,12 @@ try {
             // refresh without a full page reload after edits.
             require_once __DIR__ . '/../includes/org_chart_renderer.php';
             $positions = $pdo->query("SELECT * FROM sys_org_positions WHERE is_active = 1 ORDER BY level ASC, sort_order ASC, id ASC")->fetchAll(PDO::FETCH_ASSOC);
-            $members   = $pdo->query("SELECT * FROM sys_org_members   WHERE is_active = 1 ORDER BY position_id ASC, display_order ASC, id ASC")->fetchAll(PDO::FETCH_ASSOC);
+            // Live-sync member names from sys_staff (see org_member:list comment).
+            $members   = $pdo->query("SELECT m.*, COALESCE(s.full_name, m.full_name) AS full_name
+                FROM sys_org_members m
+                LEFT JOIN sys_staff s ON s.id = m.staff_id
+                WHERE m.is_active = 1
+                ORDER BY m.position_id ASC, m.display_order ASC, m.id ASC")->fetchAll(PDO::FETCH_ASSOC);
             $built = ocrBuildChart($positions, $members, null);
             $html = $built['html'];
             if (empty($positions) || empty($members)) {

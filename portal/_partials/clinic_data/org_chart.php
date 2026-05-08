@@ -53,7 +53,13 @@ $unassignedMembers = (int)$pdo->query("SELECT COUNT(*) FROM sys_org_members WHER
 // way to inspect the result while editing).
 require_once __DIR__ . '/../../../includes/org_chart_renderer.php';
 $ocPreviewPositions = $pdo->query("SELECT * FROM sys_org_positions WHERE is_active = 1 ORDER BY level ASC, sort_order ASC, id ASC")->fetchAll(PDO::FETCH_ASSOC);
-$ocPreviewMembers   = $pdo->query("SELECT * FROM sys_org_members WHERE is_active = 1 ORDER BY position_id ASC, display_order ASC, id ASC")->fetchAll(PDO::FETCH_ASSOC);
+// Live-sync the rendered name from sys_staff for any linked member, so
+// renaming a Staff account renames their org-chart card automatically.
+$ocPreviewMembers   = $pdo->query("SELECT m.*, COALESCE(s.full_name, m.full_name) AS full_name
+    FROM sys_org_members m
+    LEFT JOIN sys_staff s ON s.id = m.staff_id
+    WHERE m.is_active = 1
+    ORDER BY m.position_id ASC, m.display_order ASC, m.id ASC")->fetchAll(PDO::FETCH_ASSOC);
 $ocPreview = ocrBuildChart($ocPreviewPositions, $ocPreviewMembers, null);
 ?>
 <div class="max-w-[1400px] mx-auto px-4 py-6">
@@ -300,6 +306,10 @@ $ocPreview = ocrBuildChart($ocPreviewPositions, $ocPreviewMembers, null);
                         <div>
                             <label>ชื่อ-สกุล <span class="text-rose-500">*</span></label>
                             <input type="text" name="full_name" id="oc-mem-name" required maxlength="255">
+                            <small id="oc-mem-name-hint" class="oc-name-hint" style="display:none;">
+                                <i class="fa-solid fa-link text-emerald-500"></i>
+                                ชื่อ sync มาจากบัญชี Staff อัตโนมัติ — ปลดลิงก์เพื่อแก้แยก
+                            </small>
                         </div>
                     </div>
                     <div class="oc-form-row">
@@ -422,6 +432,10 @@ $ocPreview = ocrBuildChart($ocPreviewPositions, $ocPreviewMembers, null);
 
 /* Member card linked badge */
 .oc-mem-linked-badge { display: inline-flex; align-items: center; gap: .25rem; padding: .1rem .4rem; border-radius: .35rem; background: #ecfdf5; color: #065f46; font-size: .65rem; font-weight: 800; border: 1px solid #a7f3d0; margin-left: .35rem; }
+
+/* Locked name field (when linked to a Staff account) */
+.oc-name-locked { background: #f1f5f9 !important; color: #475569 !important; cursor: not-allowed; }
+.oc-name-hint { display: inline-flex; align-items: center; gap: .3rem; font-size: .72rem; font-weight: 700; color: #047857; margin-top: .35rem; }
 
 /* View toggle tabs (Manage / Preview) */
 .oc-view-tabs { display: inline-flex; gap: .35rem; padding: .35rem; background: #f1f5f9; border-radius: .9rem; margin-bottom: 1.25rem; }
@@ -864,12 +878,28 @@ $ocPreview = ocrBuildChart($ocPreviewPositions, $ocPreviewMembers, null);
     // ── Staff picker (search-as-you-type) ────────────────────────────
     let ocStaffSearchTimer = null;
 
+    function ocSetNameLocked(locked) {
+        const input = document.getElementById('oc-mem-name');
+        const hint = document.getElementById('oc-mem-name-hint');
+        if (!input) return;
+        if (locked) {
+            input.setAttribute('readonly', '');
+            input.classList.add('oc-name-locked');
+            if (hint) hint.style.display = '';
+        } else {
+            input.removeAttribute('readonly');
+            input.classList.remove('oc-name-locked');
+            if (hint) hint.style.display = 'none';
+        }
+    }
+
     function ocClearStaffPicker() {
         document.getElementById('oc-mem-staff-id').value = '';
         document.getElementById('oc-mem-staff-linked').style.display = 'none';
         document.getElementById('oc-mem-staff-search-wrap').style.display = '';
         document.getElementById('oc-mem-staff-search').value = '';
         document.getElementById('oc-mem-staff-results').style.display = 'none';
+        ocSetNameLocked(false);
     }
 
     function ocShowLinkedStaff(staff) {
@@ -881,19 +911,23 @@ $ocPreview = ocrBuildChart($ocPreviewPositions, $ocPreviewMembers, null);
         document.getElementById('oc-mem-staff-linked').style.display = '';
         document.getElementById('oc-mem-staff-search-wrap').style.display = 'none';
         document.getElementById('oc-mem-staff-results').style.display = 'none';
+        // Mirror the live staff name into the form and lock the field —
+        // saving submits the same value and the chart always reads the
+        // join'd name anyway, so admins can't accidentally desync.
+        const nameEl = document.getElementById('oc-mem-name');
+        if (nameEl && staff.full_name) nameEl.value = staff.full_name;
+        ocSetNameLocked(true);
     }
 
     window.ocUnlinkStaff = function() {
         ocClearStaffPicker();
     };
 
-    window.ocPickStaff = function(staff, autoFill = true) {
+    window.ocPickStaff = function(staff) {
+        // ocShowLinkedStaff already mirrors staff.full_name into the form
+        // and locks it. sys_staff doesn't carry prefix / license_no /
+        // department, so those stay manual whether or not we auto-fill.
         ocShowLinkedStaff(staff);
-        if (!autoFill) return;
-        // Auto-fill full_name only if empty (sys_staff doesn't carry
-        // prefix / license / department — those stay manual)
-        const nameEl = document.getElementById('oc-mem-name');
-        if (nameEl && !nameEl.value && staff.full_name) nameEl.value = staff.full_name;
     };
 
     async function ocSearchStaff(q) {

@@ -61,7 +61,13 @@ $positions = [];
 $members   = [];
 try {
     $positions = $pdo->query("SELECT * FROM sys_org_positions WHERE is_active = 1 ORDER BY level ASC, sort_order ASC, id ASC")->fetchAll(PDO::FETCH_ASSOC);
-    $members   = $pdo->query("SELECT * FROM sys_org_members WHERE is_active = 1 ORDER BY position_id ASC, display_order ASC, id ASC")->fetchAll(PDO::FETCH_ASSOC);
+    // Live-sync member names from sys_staff so a linked staff renaming
+    // their account also updates how they appear on the chart.
+    $members   = $pdo->query("SELECT m.*, COALESCE(s.full_name, m.full_name) AS full_name
+        FROM sys_org_members m
+        LEFT JOIN sys_staff s ON s.id = m.staff_id
+        WHERE m.is_active = 1
+        ORDER BY m.position_id ASC, m.display_order ASC, m.id ASC")->fetchAll(PDO::FETCH_ASSOC);
 } catch (PDOException) {}
 
 // Build lookup tables
