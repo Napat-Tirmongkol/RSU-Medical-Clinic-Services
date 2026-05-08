@@ -24,6 +24,9 @@ $_qa_source   = (string)($_GET['qa_source']   ?? '');
 $_qa_category = (string)($_GET['qa_category'] ?? '');
 $_qa_status   = (string)($_GET['qa_status']   ?? '');
 $_qa_date     = (string)($_GET['qa_date']     ?? '');
+// 'all' (default — ซ่อน 'no') | 'show_all' (แสดง 'no' ด้วย) | 'no' (เห็นเฉพาะที่ AI ตัดสินว่าไม่ใช่คำถาม)
+$_qa_qview    = (string)($_GET['qa_qview']    ?? 'all');
+if (!in_array($_qa_qview, ['all', 'show_all', 'no'], true)) $_qa_qview = 'all';
 
 $_qa_where  = 'WHERE 1=1';
 $_qa_params = [];
@@ -48,6 +51,12 @@ if ($_qa_date !== '') {
     $_qa_where   .= ' AND DATE(created_at) = ?';
     $_qa_params[] = $_qa_date;
 }
+// ซ่อน "ไม่ใช่คำถาม" ออกจาก default view — admin toggle ดูได้
+if ($_qa_qview === 'all') {
+    $_qa_where .= " AND is_question IN ('yes','unknown')";
+} elseif ($_qa_qview === 'no') {
+    $_qa_where .= " AND is_question = 'no'";
+}
 
 $_qa_total      = 0;
 $_qa_totalPages = 0;
@@ -70,6 +79,7 @@ try {
     $_qa_offset = ($_qa_page - 1) * $_qa_perPage;
 
     // group_status priority: approved > needs_edit > generated > rejected > pending
+    // is_question priority: no (admin marked) > yes > unknown — ใช้ MAX('no'>'yes'>'unknown' ด้วย ENUM ordering)
     $sr = $pdo->prepare("
         SELECT
             TRIM(question) AS group_key,
@@ -88,6 +98,11 @@ try {
                 WHEN SUM(status='rejected') > 0   THEN 'rejected'
                 ELSE 'pending'
             END AS status,
+            CASE
+                WHEN SUM(is_question='no')  > 0 THEN 'no'
+                WHEN SUM(is_question='yes') > 0 THEN 'yes'
+                ELSE 'unknown'
+            END AS is_question,
             GROUP_CONCAT(DISTINCT source ORDER BY source) AS sources,
             MIN(id) AS sample_id
           FROM sys_ai_qa_log
@@ -102,6 +117,24 @@ try {
     $_qa_statSource   = $pdo->query("SELECT source,   COUNT(*) FROM sys_ai_qa_log GROUP BY source")->fetchAll(PDO::FETCH_KEY_PAIR);
     $_qa_statStatus   = $pdo->query("SELECT status,   COUNT(*) FROM sys_ai_qa_log GROUP BY status")->fetchAll(PDO::FETCH_KEY_PAIR);
     $_qa_statCategory = $pdo->query("SELECT category, COUNT(*) FROM sys_ai_qa_log WHERE category IS NOT NULL GROUP BY category ORDER BY COUNT(*) DESC")->fetchAll(PDO::FETCH_KEY_PAIR);
+
+    // นับจำนวนกลุ่มของ is_question แต่ละแบบ — ใช้กับ stat card + คำเตือนปุ่มคัดกรอง
+    // (นับเป็น "กลุ่ม" ตาม distinct question ให้ตรงกับการนับใน table)
+    $_qa_statQuestion = ['unknown' => 0, 'yes' => 0, 'no' => 0];
+    try {
+        $rs = $pdo->query("
+            SELECT iq, COUNT(*) AS n FROM (
+                SELECT CASE
+                    WHEN SUM(is_question='no')  > 0 THEN 'no'
+                    WHEN SUM(is_question='yes') > 0 THEN 'yes'
+                    ELSE 'unknown'
+                END AS iq
+                FROM sys_ai_qa_log
+                GROUP BY TRIM(question)
+            ) t GROUP BY iq
+        ")->fetchAll(PDO::FETCH_KEY_PAIR);
+        foreach ($rs as $k => $v) $_qa_statQuestion[(string)$k] = (int)$v;
+    } catch (PDOException) {}
 } catch (PDOException $e) {
     $_qa_dbError = $e->getMessage();
 }
@@ -112,6 +145,7 @@ $_qa_filterQs = http_build_query(array_filter([
     'qa_category' => $_qa_category,
     'qa_status'   => $_qa_status,
     'qa_date'     => $_qa_date,
+    'qa_qview'    => $_qa_qview !== 'all' ? $_qa_qview : '',
 ]));
 $_qa_pgQs = $_qa_filterQs ? '&'.$_qa_filterQs : '';
 
@@ -239,17 +273,29 @@ function _qa_source_badge(string $s): string {
                 AI QA Lab
             </h1>
             <p class="text-sm text-gray-500 mt-1">
-                Sandbox สำหรับทดสอบคำตอบของ AI — เก็บคำถามจริงจาก chat &amp; LINE
-                แล้วให้ AI ร่างคำตอบ ก่อน approve เพื่อใช้เป็นฐาน FAQ
+                Sandbox สำหรับทดสอบคำตอบของ AI — เก็บข้อความทั้งหมดจาก chat &amp; LINE
+                ให้ AI <b>คัดกรองว่าเป็นคำถามจริงหรือไม่</b> แล้วร่างคำตอบ ก่อน approve เพื่อใช้เป็นฐาน FAQ
                 (AI ไม่ตอบกลับ user โดยตรง)
             </p>
         </div>
         <?php if ($_qa_tab === 'captured'): ?>
-            <button id="btn-bulk-generate"
-                class="px-4 py-2 bg-purple-600 text-white rounded-xl text-sm font-bold shadow hover:bg-purple-700 transition flex items-center gap-2">
-                <i class="fa-solid fa-wand-magic-sparkles"></i>
-                สร้างคำตอบจาก AI (batch)
-            </button>
+            <div class="flex items-center gap-2 flex-wrap">
+                <?php $unknownCnt = (int)$_qa_statQuestion['unknown']; ?>
+                <button id="btn-classify"
+                    class="px-4 py-2 bg-cyan-600 text-white rounded-xl text-sm font-bold shadow hover:bg-cyan-700 transition flex items-center gap-2 <?= $unknownCnt === 0 ? 'opacity-60' : '' ?>"
+                    title="ให้ AI ตัดสินว่าข้อความใดเป็นคำถามจริง — ตัวที่ตัดสินว่าไม่ใช่จะถูกซ่อนจาก default view">
+                    <i class="fa-solid fa-circle-question"></i>
+                    AI คัดกรองคำถาม
+                    <?php if ($unknownCnt > 0): ?>
+                        <span class="bg-white/25 px-2 py-0.5 rounded-full text-xs"><?= number_format($unknownCnt) ?></span>
+                    <?php endif; ?>
+                </button>
+                <button id="btn-bulk-generate"
+                    class="px-4 py-2 bg-purple-600 text-white rounded-xl text-sm font-bold shadow hover:bg-purple-700 transition flex items-center gap-2">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+                    สร้างคำตอบจาก AI (batch)
+                </button>
+            </div>
         <?php else: ?>
             <button id="btn-faq-create"
                 class="px-4 py-2 bg-emerald-600 text-white rounded-xl text-sm font-bold shadow hover:bg-emerald-700 transition flex items-center gap-2">
@@ -275,10 +321,17 @@ function _qa_source_badge(string $s): string {
     <!-- ════════════ TAB: CAPTURED QUESTIONS ════════════ -->
 
     <!-- Stats cards -->
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
         <div class="bg-white rounded-2xl border border-gray-200 p-4">
-            <div class="text-xs text-gray-500 font-bold uppercase tracking-wider">ทั้งหมด</div>
+            <div class="text-xs text-gray-500 font-bold uppercase tracking-wider">ที่แสดง</div>
             <div class="text-2xl font-black text-gray-900 mt-1"><?= number_format($_qa_total) ?></div>
+            <?php if ($_qa_qview === 'all' && $_qa_statQuestion['no'] > 0): ?>
+                <div class="text-[10px] text-gray-400 mt-0.5">ซ่อนไม่ใช่คำถาม <?= number_format($_qa_statQuestion['no']) ?> กลุ่ม</div>
+            <?php endif; ?>
+        </div>
+        <div class="bg-white rounded-2xl border border-gray-200 p-4">
+            <div class="text-xs text-gray-500 font-bold uppercase tracking-wider">ยังไม่คัดกรอง</div>
+            <div class="text-2xl font-black text-cyan-600 mt-1"><?= number_format((int)$_qa_statQuestion['unknown']) ?></div>
         </div>
         <div class="bg-white rounded-2xl border border-gray-200 p-4">
             <div class="text-xs text-gray-500 font-bold uppercase tracking-wider">รอประมวลผล</div>
@@ -341,6 +394,32 @@ function _qa_source_badge(string $s): string {
             </select>
             <input type="date" name="qa_date" value="<?= htmlspecialchars($_qa_date) ?>" class="qa-input">
         </div>
+
+        <!-- View toggle: คำถามจริงเท่านั้น / แสดงทั้งหมด / เฉพาะไม่ใช่คำถาม -->
+        <div class="mt-3 flex flex-wrap items-center gap-2">
+            <span class="text-xs text-gray-500 font-bold mr-1">มุมมอง:</span>
+            <?php
+            $views = [
+                'all'      => ['คำถามจริง',         'fa-circle-check',      'emerald'],
+                'show_all' => ['แสดงทั้งหมด',        'fa-eye',                'gray'],
+                'no'       => ['เฉพาะไม่ใช่คำถาม',  'fa-comment-slash',     'rose'],
+            ];
+            foreach ($views as $key => [$label, $icon, $tone]):
+                $active = $_qa_qview === $key;
+                $cls = $active
+                    ? "bg-{$tone}-50 text-{$tone}-700 border-{$tone}-300"
+                    : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50';
+            ?>
+                <label class="cursor-pointer px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 <?= $cls ?>">
+                    <input type="radio" name="qa_qview" value="<?= $key ?>" <?= $active ? 'checked' : '' ?> class="hidden">
+                    <i class="fa-solid <?= $icon ?>"></i> <?= $label ?>
+                    <?php if ($key === 'no' && $_qa_statQuestion['no'] > 0): ?>
+                        <span class="bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded-full text-[10px]"><?= number_format($_qa_statQuestion['no']) ?></span>
+                    <?php endif; ?>
+                </label>
+            <?php endforeach; ?>
+        </div>
+
         <div class="mt-3 flex gap-2 justify-end">
             <a href="?section=ai_qa_lab" class="px-4 py-2 text-sm font-bold text-gray-600 hover:bg-gray-100 rounded-xl">ล้าง</a>
             <button type="submit" class="px-5 py-2 bg-gray-900 text-white text-sm font-bold rounded-xl hover:bg-gray-800">
@@ -373,6 +452,7 @@ function _qa_source_badge(string $s): string {
                 <?php else: foreach ($_qa_logs as $r):
                     $occ     = (int)($r['occurrences'] ?? 1);
                     $sources = array_filter(explode(',', (string)($r['sources'] ?? '')));
+                    $isQ     = (string)($r['is_question'] ?? 'unknown');
                 ?>
                     <tr class="qa-row border-b border-gray-100"
                         data-group-key="<?= htmlspecialchars((string)$r['group_key'], ENT_QUOTES) ?>"
@@ -381,6 +461,7 @@ function _qa_source_badge(string $s): string {
                         data-answer="<?= htmlspecialchars((string)($r['ai_answer'] ?? ''), ENT_QUOTES) ?>"
                         data-category="<?= htmlspecialchars((string)($r['category'] ?? ''), ENT_QUOTES) ?>"
                         data-status="<?= htmlspecialchars((string)$r['status'], ENT_QUOTES) ?>"
+                        data-is-question="<?= htmlspecialchars($isQ, ENT_QUOTES) ?>"
                         data-note="<?= htmlspecialchars((string)($r['reviewer_note'] ?? ''), ENT_QUOTES) ?>">
                         <td class="px-4 py-3 text-xs text-gray-500 whitespace-nowrap"><?= date('d/m H:i', strtotime((string)$r['latest_at'])) ?></td>
                         <td class="px-4 py-3">
@@ -389,8 +470,17 @@ function _qa_source_badge(string $s): string {
                             <?php endforeach; ?>
                         </td>
                         <td class="px-4 py-3 max-w-md">
-                            <div class="flex items-start gap-2">
-                                <div class="text-gray-900 line-clamp-2 flex-1"><?= htmlspecialchars(mb_substr((string)$r['question'], 0, 200)) ?></div>
+                            <div class="flex items-start gap-2 flex-wrap">
+                                <div class="text-gray-900 line-clamp-2 flex-1 <?= $isQ === 'no' ? 'opacity-60' : '' ?>"><?= htmlspecialchars(mb_substr((string)$r['question'], 0, 200)) ?></div>
+                                <?php if ($isQ === 'no'): ?>
+                                    <span class="qa-chip shrink-0 bg-rose-50 text-rose-700 border border-rose-200" title="AI ตัดสินว่าไม่ใช่คำถามจริง">
+                                        <i class="fa-solid fa-comment-slash"></i> ไม่ใช่คำถาม
+                                    </span>
+                                <?php elseif ($isQ === 'unknown'): ?>
+                                    <span class="qa-chip shrink-0 bg-cyan-50 text-cyan-700 border border-cyan-200" title="ยังไม่ได้คัดกรอง — กดปุ่ม 'AI คัดกรองคำถาม'">
+                                        <i class="fa-solid fa-circle-question"></i> ยังไม่คัดกรอง
+                                    </span>
+                                <?php endif; ?>
                                 <?php if ($occ > 1): ?>
                                     <span class="qa-chip shrink-0 bg-amber-50 text-amber-700 border border-amber-200" title="ถูกถาม <?= $occ ?> ครั้ง">
                                         <i class="fa-solid fa-layer-group"></i> ×<?= $occ ?>
@@ -424,6 +514,15 @@ function _qa_source_badge(string $s): string {
                             <button class="qa-act qa-promote p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg" title="ทำเป็น FAQ">
                                 <i class="fa-solid fa-bookmark text-xs"></i>
                             </button>
+                            <?php if ($isQ === 'no'): ?>
+                                <button class="qa-act qa-mark-yes p-1.5 text-cyan-600 hover:bg-cyan-50 rounded-lg" title="กลับเป็นคำถาม (AI ตัดสินผิด)">
+                                    <i class="fa-solid fa-rotate-left text-xs"></i>
+                                </button>
+                            <?php else: ?>
+                                <button class="qa-act qa-mark-no p-1.5 text-gray-500 hover:bg-gray-100 rounded-lg" title="ทำเครื่องหมายว่าไม่ใช่คำถาม (จะถูกซ่อนจาก default view)">
+                                    <i class="fa-solid fa-comment-slash text-xs"></i>
+                                </button>
+                            <?php endif; ?>
                             <button class="qa-act qa-delete p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg" title="ลบทั้งกลุ่ม">
                                 <i class="fa-solid fa-trash text-xs"></i>
                             </button>
@@ -813,6 +912,78 @@ function _qa_source_badge(string $s): string {
         } else {
             Swal.fire({ icon: 'error', title: 'ไม่สำเร็จ', text: res.message || '' });
         }
+    });
+
+    // ─── AI คัดกรองคำถาม (batch classifier) ──────────────────────────────
+    document.getElementById('btn-classify')?.addEventListener('click', async () => {
+        const { isConfirmed, value } = await Swal.fire({
+            icon: 'question',
+            title: 'AI คัดกรองคำถาม',
+            html: 'AI จะตัดสินว่าข้อความใดเป็น "คำถามจริง" และข้อความใดไม่ใช่<br><span class="text-xs text-gray-500">ตัวที่ AI ตัดสินว่าไม่ใช่คำถามจะถูกซ่อนจาก default view (ยังอยู่ใน DB)</span>',
+            input: 'number',
+            inputLabel: 'จำนวนกลุ่มที่จะคัดกรอง (สูงสุด 100)',
+            inputValue: 50,
+            inputAttributes: { min: 1, max: 100, step: 1 },
+            showCancelButton: true,
+            confirmButtonText: 'เริ่มคัดกรอง',
+            cancelButtonText: 'ยกเลิก',
+            confirmButtonColor: '#0891b2',
+        });
+        if (!isConfirmed) return;
+        Swal.fire({
+            title: 'กำลังให้ AI คัดกรอง…',
+            html: 'อาจใช้เวลา 5–15 วินาที',
+            allowOutsideClick: false,
+            didOpen: () => Swal.showLoading(),
+        });
+        const res = await api('classify_questions', { limit: value || 50 });
+        if (res.ok) {
+            if ((res.processed || 0) === 0) {
+                Swal.fire({ icon: 'info', title: 'ไม่มีข้อความที่ต้องคัดกรอง', text: res.message || '' });
+                return;
+            }
+            Swal.fire({
+                icon: 'success',
+                title: 'เสร็จแล้ว',
+                html: `คัดกรอง <b>${res.processed}</b> กลุ่ม<br>คำถามจริง: <b class="text-emerald-600">${res.yes}</b> · ไม่ใช่คำถาม: <b class="text-rose-600">${res.no}</b>${res.skipped ? '<br><span class="text-xs text-gray-500">ข้าม: '+res.skipped+'</span>' : ''}`,
+            }).then(() => location.reload());
+        } else {
+            Swal.fire({ icon: 'error', title: 'คัดกรองไม่สำเร็จ', text: res.message || '' });
+        }
+    });
+
+    // ─── Override ผลคัดกรองรายแถว ─────────────────────────────────────────
+    document.querySelectorAll('.qa-mark-no').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const tr = btn.closest('tr');
+            const { isConfirmed } = await Swal.fire({
+                icon: 'question',
+                title: 'ทำเครื่องหมายว่าไม่ใช่คำถาม?',
+                text: 'กลุ่มนี้จะถูกซ่อนจาก default view (ยังคงอยู่ใน DB)',
+                showCancelButton: true,
+                confirmButtonText: 'ยืนยัน',
+                cancelButtonText: 'ยกเลิก',
+                confirmButtonColor: '#64748b',
+            });
+            if (!isConfirmed) return;
+            const res = await api('mark_question', { group_key: tr.dataset.groupKey, verdict: 'no' });
+            if (res.ok) location.reload();
+            else Swal.fire({ icon: 'error', title: 'บันทึกไม่สำเร็จ', text: res.message || '' });
+        });
+    });
+
+    document.querySelectorAll('.qa-mark-yes').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const tr = btn.closest('tr');
+            const res = await api('mark_question', { group_key: tr.dataset.groupKey, verdict: 'yes' });
+            if (res.ok) location.reload();
+            else Swal.fire({ icon: 'error', title: 'บันทึกไม่สำเร็จ', text: res.message || '' });
+        });
+    });
+
+    // Auto-submit เมื่อกด radio "มุมมอง"
+    document.querySelectorAll('input[name="qa_qview"]').forEach(r => {
+        r.addEventListener('change', () => r.closest('form').submit());
     });
 
     window.qaCloseModal = function() {

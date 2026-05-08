@@ -3,10 +3,12 @@
  * portal/ajax_ai_qa.php — AI QA Lab AJAX endpoint
  *
  * Actions:
- * - generate     : เรียก Gemini ร่างคำตอบ + จัดหมวด (1 record)
- * - bulk_generate: เรียก Gemini สำหรับหลาย record ที่ status='pending'
- * - update       : บันทึก review (status, edited answer, category, note)
- * - delete       : ลบ record
+ * - generate           : เรียก Gemini ร่างคำตอบ + จัดหมวด (1 record)
+ * - bulk_generate      : เรียก Gemini สำหรับหลาย record ที่ status='pending'
+ * - update             : บันทึก review (status, edited answer, category, note)
+ * - delete             : ลบ record
+ * - classify_questions : ให้ AI คัดกรอง "ใช่/ไม่ใช่คำถามจริง" (batch บน rows is_question='unknown')
+ * - mark_question      : admin override ผลคัดกรองรายกลุ่ม (yes/no/unknown)
  */
 declare(strict_types=1);
 require_once __DIR__ . '/../config.php';
@@ -171,6 +173,75 @@ try {
         $del = $pdo->prepare("DELETE FROM sys_ai_qa_log WHERE TRIM(question) = :gk");
         $del->execute([':gk' => $groupKey]);
         echo json_encode(['ok' => true, 'deleted' => $del->rowCount()]);
+        exit;
+    }
+
+    // ─── Question classification (filter "ไม่ใช่คำถาม" ออกจาก default view) ─
+    if ($action === 'classify_questions') {
+        $limit = max(1, min(100, (int)($_POST['limit'] ?? 50)));
+
+        // dedupe: ส่งคำถาม distinct ที่ยัง is_question='unknown' ให้ AI ตัดสินทีเดียว
+        $rows = $pdo->prepare("
+            SELECT TRIM(question) AS group_key, MIN(created_at) AS earliest
+              FROM sys_ai_qa_log
+             WHERE is_question = 'unknown'
+             GROUP BY TRIM(question)
+             ORDER BY earliest ASC
+             LIMIT {$limit}
+        ");
+        $rows->execute();
+        $groups = $rows->fetchAll(PDO::FETCH_ASSOC);
+
+        if (empty($groups)) {
+            echo json_encode(['ok' => true, 'processed' => 0, 'yes' => 0, 'no' => 0, 'message' => 'ไม่มีข้อความที่ต้องคัดกรอง']);
+            exit;
+        }
+
+        $questions = array_map(fn($r) => (string)$r['group_key'], $groups);
+        $verdicts  = ai_qa_classify_questions($questions);
+
+        $upd = $pdo->prepare("
+            UPDATE sys_ai_qa_log
+               SET is_question = :v,
+                   question_check_at = NOW()
+             WHERE TRIM(question) = :gk
+               AND is_question = 'unknown'
+        ");
+
+        $yes = 0; $no = 0; $skipped = 0;
+        foreach ($groups as $i => $rec) {
+            $v = (string)($verdicts[$i] ?? 'unknown');
+            if ($v !== 'yes' && $v !== 'no') { $skipped++; continue; }
+            $upd->execute([':v' => $v, ':gk' => (string)$rec['group_key']]);
+            $v === 'yes' ? $yes++ : $no++;
+        }
+
+        echo json_encode([
+            'ok'        => true,
+            'processed' => count($groups),
+            'yes'       => $yes,
+            'no'        => $no,
+            'skipped'   => $skipped,
+        ]);
+        exit;
+    }
+
+    // Admin override AI's classification per group
+    if ($action === 'mark_question') {
+        $groupKey = trim((string)($_POST['group_key'] ?? ''));
+        $verdict  = (string)($_POST['verdict'] ?? '');
+        if ($groupKey === '' || !in_array($verdict, ['yes', 'no', 'unknown'], true)) {
+            echo json_encode(['ok' => false, 'message' => 'invalid input']);
+            exit;
+        }
+        $upd = $pdo->prepare("
+            UPDATE sys_ai_qa_log
+               SET is_question = :v,
+                   question_check_at = NOW()
+             WHERE TRIM(question) = :gk
+        ");
+        $upd->execute([':v' => $verdict, ':gk' => $groupKey]);
+        echo json_encode(['ok' => true, 'updated' => $upd->rowCount()]);
         exit;
     }
 
