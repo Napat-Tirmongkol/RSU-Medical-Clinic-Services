@@ -1344,6 +1344,9 @@ try {
                         <!-- SIDEBAR (4/12) -->
                         <aside class="lg:col-span-4 flex flex-col gap-5 au d3">
 
+                            <!-- Clinic Calendar widget (today + next 6 days) -->
+                            <?php include __DIR__ . '/_partials/dashboard_clinic_calendar.php'; ?>
+
                             <!-- Activity Feed (flat list, color-coded by event) -->
                             <div>
                                 <div class="sec-title mb-4">
