@@ -39,9 +39,34 @@ function send_line_push(string $to, array $messages, string $accessToken): bool 
 }
 
 /**
- * ฟังก์ชันกลางสำหรับยิง CURL ไปยัง LINE API
+ * แสดง Loading Indicator (จุด ๆ "กำลังพิมพ์...") ในแชทของ user
+ *
+ * ใช้ตอนกำลังประมวลผลที่อาจใช้เวลา (เช่น call Gemini) เพื่อให้ user เห็นว่าระบบกำลังทำงาน
+ * Auto-clear เมื่อ bot ส่ง message ถัดไป (หรือหมดเวลาตาม loadingSeconds)
+ *
+ * Best-effort: ถ้าฟังก์ชันนี้ล้มเหลว flow หลักไม่กระทบ
+ *
+ * @param string $chatId         LINE userId (1-on-1 chat เท่านั้น — ไม่รองรับ group)
+ * @param int    $loadingSeconds 5/10/15/20/25/30/40/50/60 (default 20)
+ * @see https://developers.line.biz/en/reference/messaging-api/#display-a-loading-indicator
  */
-function _send_line_curl(string $url, array $data, string $accessToken): bool {
+function send_line_loading_indicator(string $chatId, string $accessToken, int $loadingSeconds = 20): bool {
+    $url = 'https://api.line.me/v2/bot/chat/loading/start';
+    $data = [
+        'chatId'         => $chatId,
+        'loadingSeconds' => $loadingSeconds,
+    ];
+    // LINE API นี้ return 202 Accepted (ไม่ใช่ 200)
+    return _send_line_curl($url, $data, $accessToken, [200, 202]);
+}
+
+/**
+ * ฟังก์ชันกลางสำหรับยิง CURL ไปยัง LINE API
+ *
+ * @param array $okStatuses status codes ที่ถือว่าสำเร็จ (default [200])
+ *                          บาง endpoint เช่น chat/loading/start คืน 202
+ */
+function _send_line_curl(string $url, array $data, string $accessToken, array $okStatuses = [200]): bool {
     $ch = curl_init($url);
     curl_setopt_array($ch, [
         CURLOPT_POST           => true,
@@ -53,12 +78,13 @@ function _send_line_curl(string $url, array $data, string $accessToken): bool {
         ],
         CURLOPT_TIMEOUT        => 10
     ]);
-    
+
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
-    
-    if ($httpCode !== 200) {
+
+    $ok = in_array($httpCode, $okStatuses, true);
+    if (!$ok) {
         $body = $response ?: 'No response';
         $hint = '';
         if ($httpCode === 400) {
@@ -75,8 +101,8 @@ function _send_line_curl(string $url, array $data, string $accessToken): bool {
         }
         $GLOBALS['LAST_LINE_ERROR'] = $body . $hint;
     }
-    
-    return $httpCode === 200;
+
+    return $ok;
 }
 
 /**

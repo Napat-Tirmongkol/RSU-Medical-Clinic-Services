@@ -516,7 +516,17 @@ foreach ($data['events'] as $idx => $event) {
             }
 
             try {
-                $match = ai_qa_match_faq($pdo, $messageText);
+                $match = ai_qa_match_faq(
+                    $pdo,
+                    $messageText,
+                    // Phase 1 (exact) ไม่เจอ → กำลังเข้า Gemini ที่ช้า
+                    // → แสดง loading dots ในแชท user เพื่อบอกว่ากำลังคิด
+                    function () use ($userId, $accessToken) {
+                        if ($userId) {
+                            send_line_loading_indicator((string)$userId, $accessToken, 20);
+                        }
+                    }
+                );
             } catch (Throwable $e) {
                 line_webhook_log('AI QA Lab match failed', ['error' => $e->getMessage()], 'warning');
                 $match = null;

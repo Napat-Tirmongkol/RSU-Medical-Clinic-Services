@@ -641,9 +641,11 @@ PROMPT;
  *   ส่งคำถาม + list ของ candidate ให้ Gemini เลือก best match
  *   threshold confidence >= 0.7 (ถ้าต่ำกว่า return null)
  *
+ * @param callable|null $onSemanticPhase callback ก่อนเข้า Phase 2 (Gemini)
+ *        ใช้สำหรับ side effects เช่น แสดง loading indicator ใน LINE
  * @return array{answer:string, matched_via:string, source_id:int, confidence?:float}|null
  */
-function ai_qa_match_faq(PDO $pdo, string $question): ?array
+function ai_qa_match_faq(PDO $pdo, string $question, ?callable $onSemanticPhase = null): ?array
 {
     $q = trim($question);
     // ข้ามข้อความสั้น ๆ (ack, สวัสดี ฯลฯ) เพื่อไม่ false-match
@@ -704,6 +706,13 @@ function ai_qa_match_faq(PDO $pdo, string $question): ?array
     }
 
     // ── Phase 2: Gemini semantic match ────────────────────────────────────
+    // เรียก callback ให้ caller ทำ side effect (เช่น loading indicator ใน LINE)
+    // ก่อน Gemini call ที่อาจใช้เวลา 1-3 วิ
+    if ($onSemanticPhase !== null) {
+        try { $onSemanticPhase(); } catch (Throwable $e) {
+            error_log('ai_qa_match_faq onSemanticPhase callback failed: ' . $e->getMessage());
+        }
+    }
     return ai_qa_match_via_gemini($pdo, $q);
 }
 
