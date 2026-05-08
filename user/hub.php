@@ -1651,6 +1651,21 @@ $heroThemes = [
                             </button>
                         </div>
                     </div>
+
+                    <!-- Org chart entry -->
+                    <a href="org_chart.php"
+                       class="block pt-5 border-t border-slate-50 group">
+                        <div class="flex items-center gap-3 px-2 py-2 rounded-2xl hover:bg-emerald-50 transition-colors">
+                            <div class="w-11 h-11 rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-white shadow shrink-0">
+                                <i class="fa-solid fa-sitemap"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-[13px] font-black text-slate-800 leading-tight">ผังองค์กรคลินิก</p>
+                                <p class="text-[10px] font-bold text-slate-500 mt-0.5">โครงสร้างทีมและสายบังคับบัญชา</p>
+                            </div>
+                            <i class="fa-solid fa-chevron-right text-slate-300 group-hover:text-emerald-500 group-hover:translate-x-0.5 transition-all"></i>
+                        </div>
+                    </a>
                 </div>
             </section>
 

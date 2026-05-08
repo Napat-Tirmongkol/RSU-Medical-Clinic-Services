@@ -76,10 +76,74 @@ try {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         INDEX idx_type (type), INDEX idx_date (specific_date)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+    // Org Chart / Chain of Command
+    $pdo->exec("CREATE TABLE IF NOT EXISTS sys_org_positions (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        parent_id INT NULL,
+        title VARCHAR(255) NOT NULL,
+        short_title VARCHAR(100) NULL,
+        description TEXT NULL,
+        level TINYINT NOT NULL DEFAULT 0,
+        sort_order INT NOT NULL DEFAULT 0,
+        card_style ENUM('premium','simple') NOT NULL DEFAULT 'simple',
+        show_section_header TINYINT(1) NOT NULL DEFAULT 1,
+        is_active TINYINT(1) NOT NULL DEFAULT 1,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_parent (parent_id),
+        INDEX idx_active_sort (is_active, sort_order)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+    $pdo->exec("CREATE TABLE IF NOT EXISTS sys_org_members (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        position_id INT NULL,
+        prefix VARCHAR(50) NULL,
+        full_name VARCHAR(255) NOT NULL,
+        photo_url VARCHAR(500) NULL,
+        license_no VARCHAR(100) NULL,
+        responsibilities TEXT NULL,
+        department VARCHAR(255) NULL,
+        staff_id INT NULL,
+        user_id INT NULL,
+        display_order INT NOT NULL DEFAULT 0,
+        is_active TINYINT(1) NOT NULL DEFAULT 1,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_position (position_id),
+        INDEX idx_user (user_id),
+        INDEX idx_staff (staff_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 } catch (PDOException $e) {
     echo json_encode(['ok' => false, 'message' => 'Migration failed: ' . $e->getMessage()]);
     exit;
 }
+
+// Helper: recompute level for a position based on parent chain
+$_orgRecomputeLevel = function(PDO $pdo, int $posId) use (&$_orgRecomputeLevel): int {
+    $stmt = $pdo->prepare("SELECT parent_id FROM sys_org_positions WHERE id = ?");
+    $stmt->execute([$posId]);
+    $parentId = $stmt->fetchColumn();
+    $level = 0;
+    if ($parentId) {
+        $pStmt = $pdo->prepare("SELECT level FROM sys_org_positions WHERE id = ?");
+        $pStmt->execute([(int)$parentId]);
+        $parentLevel = (int)$pStmt->fetchColumn();
+        $level = $parentLevel + 1;
+    }
+    $pdo->prepare("UPDATE sys_org_positions SET level = ? WHERE id = ?")->execute([$level, $posId]);
+    return $level;
+};
+
+// Helper: cascade level recompute to descendants (after parent change)
+$_orgCascadeLevels = function(PDO $pdo, int $posId) use (&$_orgCascadeLevels, $_orgRecomputeLevel) {
+    $_orgRecomputeLevel($pdo, $posId);
+    $stmt = $pdo->prepare("SELECT id FROM sys_org_positions WHERE parent_id = ?");
+    $stmt->execute([$posId]);
+    foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $childId) {
+        $_orgCascadeLevels($pdo, (int)$childId);
+    }
+};
 
 $entity = $_POST['entity'] ?? '';
 $action = $_POST['action'] ?? '';
@@ -742,6 +806,265 @@ try {
             $stmt = $pdo->prepare("UPDATE sys_survey_questions SET sort_order = :so WHERE id = :id");
             foreach ($idList as $i => $id) {
                 $stmt->execute([':so' => $i + 1, ':id' => $id]);
+            }
+            echo json_encode(['ok'=>true, 'message'=>'จัดลำดับใหม่แล้ว']);
+            return;
+        }
+
+        // ── Org Chart: Positions ─────────────────────────────────────────
+        case 'position:list': {
+            // Return all positions + member counts
+            $rows = $pdo->query("SELECT p.*,
+                    (SELECT COUNT(*) FROM sys_org_members m WHERE m.position_id = p.id AND m.is_active = 1) AS member_count
+                FROM sys_org_positions p
+                WHERE p.is_active = 1
+                ORDER BY p.level ASC, p.sort_order ASC, p.id ASC")->fetchAll(PDO::FETCH_ASSOC);
+            echo json_encode(['ok' => true, 'data' => $rows]);
+            return;
+        }
+
+        case 'position:create': {
+            $title = trim((string)($_POST['title'] ?? ''));
+            if ($title === '') { echo json_encode(['ok'=>false,'message'=>'กรุณากรอกชื่อตำแหน่ง']); return; }
+            $parentId = !empty($_POST['parent_id']) ? (int)$_POST['parent_id'] : null;
+            $cardStyle = in_array($_POST['card_style'] ?? '', ['premium','simple'], true) ? $_POST['card_style'] : 'simple';
+
+            // Compute level from parent
+            $level = 0;
+            if ($parentId) {
+                $st = $pdo->prepare("SELECT level FROM sys_org_positions WHERE id = ?");
+                $st->execute([$parentId]);
+                $level = (int)$st->fetchColumn() + 1;
+            }
+            // Append to siblings
+            $sortStmt = $pdo->prepare("SELECT COALESCE(MAX(sort_order),-1)+1 FROM sys_org_positions WHERE " .
+                ($parentId ? "parent_id = ?" : "parent_id IS NULL"));
+            $sortStmt->execute($parentId ? [$parentId] : []);
+            $sortOrder = (int)$sortStmt->fetchColumn();
+
+            $stmt = $pdo->prepare("INSERT INTO sys_org_positions
+                (parent_id, title, short_title, description, level, sort_order, card_style, show_section_header)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+            $stmt->execute([
+                $parentId,
+                $title,
+                trim((string)($_POST['short_title'] ?? '')) ?: null,
+                trim((string)($_POST['description'] ?? '')) ?: null,
+                $level,
+                $sortOrder,
+                $cardStyle,
+                !empty($_POST['show_section_header']) ? 1 : 0,
+            ]);
+            echo json_encode(['ok'=>true, 'id'=>(int)$pdo->lastInsertId(), 'message'=>'เพิ่มตำแหน่งแล้ว']);
+            return;
+        }
+
+        case 'position:update': {
+            $id = (int)($_POST['id'] ?? 0);
+            if ($id <= 0) { echo json_encode(['ok'=>false,'message'=>'invalid id']); return; }
+            $title = trim((string)($_POST['title'] ?? ''));
+            if ($title === '') { echo json_encode(['ok'=>false,'message'=>'กรุณากรอกชื่อตำแหน่ง']); return; }
+            $cardStyle = in_array($_POST['card_style'] ?? '', ['premium','simple'], true) ? $_POST['card_style'] : 'simple';
+
+            $stmt = $pdo->prepare("UPDATE sys_org_positions SET
+                title = :t, short_title = :st, description = :d,
+                card_style = :cs, show_section_header = :sh
+                WHERE id = :id");
+            $stmt->execute([
+                ':t'  => $title,
+                ':st' => trim((string)($_POST['short_title'] ?? '')) ?: null,
+                ':d'  => trim((string)($_POST['description'] ?? '')) ?: null,
+                ':cs' => $cardStyle,
+                ':sh' => !empty($_POST['show_section_header']) ? 1 : 0,
+                ':id' => $id,
+            ]);
+            echo json_encode(['ok'=>true, 'message'=>'อัปเดตตำแหน่งแล้ว']);
+            return;
+        }
+
+        case 'position:delete': {
+            $id = (int)($_POST['id'] ?? 0);
+            if ($id <= 0) { echo json_encode(['ok'=>false,'message'=>'invalid id']); return; }
+            // Soft via is_active=0 keeps history; null parent_id of children + position_id of members
+            $pdo->prepare("UPDATE sys_org_positions SET parent_id = NULL WHERE parent_id = ?")->execute([$id]);
+            $pdo->prepare("UPDATE sys_org_members SET position_id = NULL WHERE position_id = ?")->execute([$id]);
+            $pdo->prepare("DELETE FROM sys_org_positions WHERE id = ?")->execute([$id]);
+            echo json_encode(['ok'=>true, 'message'=>'ลบตำแหน่งแล้ว สมาชิกย้ายไปยัง “ยังไม่จัด”']);
+            return;
+        }
+
+        case 'position:move': {
+            // Drag-drop: change parent + cascade levels
+            $id = (int)($_POST['id'] ?? 0);
+            $newParent = !empty($_POST['parent_id']) ? (int)$_POST['parent_id'] : null;
+            if ($id <= 0) { echo json_encode(['ok'=>false,'message'=>'invalid id']); return; }
+            // Prevent self-parent or cycle (simple check: cannot be own descendant)
+            if ($newParent === $id) { echo json_encode(['ok'=>false,'message'=>'ไม่สามารถตั้งเป็นแม่ตัวเองได้']); return; }
+            if ($newParent !== null) {
+                // Walk up newParent chain — if we hit $id, it's a cycle
+                $cur = $newParent;
+                $guard = 0;
+                while ($cur !== null && $guard++ < 50) {
+                    if ($cur === $id) { echo json_encode(['ok'=>false,'message'=>'ไม่สามารถย้ายเข้าไปในลูกหลานของตัวเองได้']); return; }
+                    $st = $pdo->prepare("SELECT parent_id FROM sys_org_positions WHERE id = ?");
+                    $st->execute([$cur]);
+                    $cur = $st->fetchColumn();
+                    if ($cur === false || $cur === null) break;
+                    $cur = (int)$cur;
+                }
+            }
+            $pdo->prepare("UPDATE sys_org_positions SET parent_id = ? WHERE id = ?")->execute([$newParent, $id]);
+            $_orgCascadeLevels($pdo, $id);
+            echo json_encode(['ok'=>true, 'message'=>'ย้ายตำแหน่งแล้ว']);
+            return;
+        }
+
+        case 'position:reorder': {
+            $ids = $_POST['ids'] ?? '';
+            $idList = array_values(array_filter(array_map('intval', explode(',', (string)$ids))));
+            if (empty($idList)) { echo json_encode(['ok'=>false,'message'=>'no ids']); return; }
+            $stmt = $pdo->prepare("UPDATE sys_org_positions SET sort_order = ? WHERE id = ?");
+            foreach ($idList as $i => $pid) {
+                $stmt->execute([$i, $pid]);
+            }
+            echo json_encode(['ok'=>true, 'message'=>'จัดลำดับใหม่แล้ว']);
+            return;
+        }
+
+        // ── Org Chart: Members ───────────────────────────────────────────
+        case 'org_member:list': {
+            $positionId = isset($_POST['position_id']) && $_POST['position_id'] !== '' ? (int)$_POST['position_id'] : null;
+            if ($positionId === null && empty($_POST['all'])) {
+                // Return all members with position info
+                $rows = $pdo->query("SELECT m.*, p.title AS position_title, p.card_style
+                    FROM sys_org_members m
+                    LEFT JOIN sys_org_positions p ON p.id = m.position_id
+                    WHERE m.is_active = 1
+                    ORDER BY m.position_id ASC, m.display_order ASC, m.id ASC")->fetchAll(PDO::FETCH_ASSOC);
+            } elseif ($positionId === null) {
+                $rows = $pdo->query("SELECT m.*, p.title AS position_title, p.card_style
+                    FROM sys_org_members m
+                    LEFT JOIN sys_org_positions p ON p.id = m.position_id
+                    ORDER BY m.position_id ASC, m.display_order ASC")->fetchAll(PDO::FETCH_ASSOC);
+            } else {
+                $st = $pdo->prepare("SELECT m.*, p.title AS position_title, p.card_style
+                    FROM sys_org_members m
+                    LEFT JOIN sys_org_positions p ON p.id = m.position_id
+                    WHERE m.position_id = ? AND m.is_active = 1
+                    ORDER BY m.display_order ASC, m.id ASC");
+                $st->execute([$positionId]);
+                $rows = $st->fetchAll(PDO::FETCH_ASSOC);
+            }
+            echo json_encode(['ok'=>true, 'data'=>$rows]);
+            return;
+        }
+
+        case 'org_member:create':
+        case 'org_member:update': {
+            $isUpdate = ($action === 'update');
+            $id = (int)($_POST['id'] ?? 0);
+            if ($isUpdate && $id <= 0) { echo json_encode(['ok'=>false,'message'=>'invalid id']); return; }
+            $fullName = trim((string)($_POST['full_name'] ?? ''));
+            if ($fullName === '') { echo json_encode(['ok'=>false,'message'=>'กรุณากรอกชื่อ-สกุล']); return; }
+
+            $positionId = !empty($_POST['position_id']) ? (int)$_POST['position_id'] : null;
+
+            // Photo upload (optional)
+            $photoUrl = trim((string)($_POST['photo_url'] ?? '')) ?: null;
+            if (!empty($_FILES['photo']['tmp_name']) && $_FILES['photo']['error'] === UPLOAD_ERR_OK) {
+                $allowedExt = ['jpg','jpeg','png','webp','gif'];
+                $ext = strtolower(pathinfo($_FILES['photo']['name'], PATHINFO_EXTENSION));
+                if (!in_array($ext, $allowedExt, true)) {
+                    echo json_encode(['ok'=>false,'message'=>'รองรับเฉพาะไฟล์ jpg/png/webp/gif']); return;
+                }
+                if ($_FILES['photo']['size'] > 5 * 1024 * 1024) {
+                    echo json_encode(['ok'=>false,'message'=>'ขนาดไฟล์ต้องไม่เกิน 5MB']); return;
+                }
+                $uploadDir = __DIR__ . '/../assets/uploads/org_members/';
+                if (!is_dir($uploadDir)) @mkdir($uploadDir, 0755, true);
+                $newName = 'om_' . date('Ymd_His') . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
+                if (move_uploaded_file($_FILES['photo']['tmp_name'], $uploadDir . $newName)) {
+                    $photoUrl = '../assets/uploads/org_members/' . $newName;
+                }
+            }
+
+            if ($isUpdate) {
+                // Build SET clause; only update photo_url if a new value was provided
+                $sql = "UPDATE sys_org_members SET
+                    position_id = :pid, prefix = :pf, full_name = :fn,
+                    license_no = :ln, responsibilities = :r, department = :d,
+                    staff_id = :sid, user_id = :uid, display_order = :ord";
+                $params = [
+                    ':pid' => $positionId,
+                    ':pf'  => trim((string)($_POST['prefix'] ?? '')) ?: null,
+                    ':fn'  => $fullName,
+                    ':ln'  => trim((string)($_POST['license_no'] ?? '')) ?: null,
+                    ':r'   => trim((string)($_POST['responsibilities'] ?? '')) ?: null,
+                    ':d'   => trim((string)($_POST['department'] ?? '')) ?: null,
+                    ':sid' => !empty($_POST['staff_id']) ? (int)$_POST['staff_id'] : null,
+                    ':uid' => !empty($_POST['user_id']) ? (int)$_POST['user_id'] : null,
+                    ':ord' => (int)($_POST['display_order'] ?? 0),
+                    ':id'  => $id,
+                ];
+                if ($photoUrl !== null) {
+                    $sql .= ", photo_url = :ph";
+                    $params[':ph'] = $photoUrl;
+                }
+                $sql .= " WHERE id = :id";
+                $pdo->prepare($sql)->execute($params);
+                echo json_encode(['ok'=>true, 'message'=>'อัปเดตสมาชิกแล้ว']);
+            } else {
+                // Append to siblings of target position
+                $sortStmt = $pdo->prepare("SELECT COALESCE(MAX(display_order),-1)+1 FROM sys_org_members WHERE " .
+                    ($positionId !== null ? "position_id = ?" : "position_id IS NULL"));
+                $sortStmt->execute($positionId !== null ? [$positionId] : []);
+                $displayOrder = (int)$sortStmt->fetchColumn();
+
+                $stmt = $pdo->prepare("INSERT INTO sys_org_members
+                    (position_id, prefix, full_name, photo_url, license_no, responsibilities, department, staff_id, user_id, display_order)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                $stmt->execute([
+                    $positionId,
+                    trim((string)($_POST['prefix'] ?? '')) ?: null,
+                    $fullName,
+                    $photoUrl,
+                    trim((string)($_POST['license_no'] ?? '')) ?: null,
+                    trim((string)($_POST['responsibilities'] ?? '')) ?: null,
+                    trim((string)($_POST['department'] ?? '')) ?: null,
+                    !empty($_POST['staff_id']) ? (int)$_POST['staff_id'] : null,
+                    !empty($_POST['user_id']) ? (int)$_POST['user_id'] : null,
+                    $displayOrder,
+                ]);
+                echo json_encode(['ok'=>true, 'id'=>(int)$pdo->lastInsertId(), 'message'=>'เพิ่มสมาชิกแล้ว']);
+            }
+            return;
+        }
+
+        case 'org_member:delete': {
+            $id = (int)($_POST['id'] ?? 0);
+            if ($id <= 0) { echo json_encode(['ok'=>false,'message'=>'invalid id']); return; }
+            $pdo->prepare("DELETE FROM sys_org_members WHERE id = ?")->execute([$id]);
+            echo json_encode(['ok'=>true, 'message'=>'ลบสมาชิกแล้ว']);
+            return;
+        }
+
+        case 'org_member:reassign': {
+            // Drag-drop member to different position
+            $id = (int)($_POST['id'] ?? 0);
+            $positionId = !empty($_POST['position_id']) ? (int)$_POST['position_id'] : null;
+            if ($id <= 0) { echo json_encode(['ok'=>false,'message'=>'invalid id']); return; }
+            $pdo->prepare("UPDATE sys_org_members SET position_id = ? WHERE id = ?")->execute([$positionId, $id]);
+            echo json_encode(['ok'=>true, 'message'=>'ย้ายสมาชิกแล้ว']);
+            return;
+        }
+
+        case 'org_member:reorder': {
+            $ids = $_POST['ids'] ?? '';
+            $idList = array_values(array_filter(array_map('intval', explode(',', (string)$ids))));
+            if (empty($idList)) { echo json_encode(['ok'=>false,'message'=>'no ids']); return; }
+            $stmt = $pdo->prepare("UPDATE sys_org_members SET display_order = ? WHERE id = ?");
+            foreach ($idList as $i => $mid) {
+                $stmt->execute([$i, $mid]);
             }
             echo json_encode(['ok'=>true, 'message'=>'จัดลำดับใหม่แล้ว']);
             return;

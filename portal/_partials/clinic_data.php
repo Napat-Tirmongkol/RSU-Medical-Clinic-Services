@@ -4,7 +4,7 @@
 // Each sub-view gets back to landing via ?section=clinic_data (no cd_view)
 
 $_view = $_GET['cd_view'] ?? '';
-$_validViews = ['profile','faculty','staff','rooms','hours','schedule','calendar','survey'];
+$_validViews = ['profile','faculty','staff','rooms','hours','schedule','calendar','survey','org_chart'];
 
 if (in_array($_view, $_validViews, true)) {
     include __DIR__ . '/clinic_data/' . $_view . '.php';
@@ -14,8 +14,8 @@ if (in_array($_view, $_validViews, true)) {
 // ─── Landing page: stats per entity + cards ─────────────────────────────────
 $pdo = db();
 
-$_counts = ['profile'=>0, 'faculty'=>0, 'staff'=>0, 'rooms'=>0, 'hours'=>0, 'insurance_partners'=>0];
-$_lastUpdated = ['profile'=>null, 'faculty'=>null, 'staff'=>null, 'rooms'=>null, 'hours'=>null];
+$_counts = ['profile'=>0, 'faculty'=>0, 'staff'=>0, 'rooms'=>0, 'hours'=>0, 'insurance_partners'=>0, 'org_chart'=>0];
+$_lastUpdated = ['profile'=>null, 'faculty'=>null, 'staff'=>null, 'rooms'=>null, 'hours'=>null, 'org_chart'=>null];
 
 // Helpers — silently ignore tables that don't exist yet
 $_safeCount = function (string $sql) use ($pdo): int {
@@ -39,6 +39,8 @@ try {
 $_lastUpdated['faculty'] = $_safeMax("SELECT MAX(updated_at) FROM sys_faculties");
 $_lastUpdated['staff']   = $_safeMax("SELECT MAX(updated_at) FROM sys_medical_staff");
 $_lastUpdated['rooms']   = $_safeMax("SELECT MAX(updated_at) FROM sys_clinic_rooms");
+$_counts['org_chart']    = $_safeCount("SELECT COUNT(*) FROM sys_org_positions WHERE is_active = 1");
+$_lastUpdated['org_chart'] = $_safeMax("SELECT MAX(updated_at) FROM sys_org_positions");
 
 $_relTime = function (?string $ts): string {
     if (!$ts) return 'ยังไม่เคยอัปเดต';
@@ -127,6 +129,17 @@ $_cards = [
         'count'   => $_safeCount("SELECT COUNT(*) FROM sys_doctor_schedule WHERE is_active = 1"),
         'count_label' => 'shift',
         'updated' => $_safeMax("SELECT MAX(updated_at) FROM sys_doctor_schedule") ? $_relTime($_safeMax("SELECT MAX(updated_at) FROM sys_doctor_schedule")) : null,
+    ],
+    [
+        'view'    => 'org_chart',
+        'title'   => 'ผังองค์กร / Chain of Command',
+        'desc'    => 'จัดการตำแหน่งและสมาชิกในผังองค์กร — ลากเรียงระดับชั้นได้',
+        'icon'    => 'fa-sitemap',
+        'tone'    => ['bg'=>'#ecfdf5','fg'=>'#059669','border'=>'#a7f3d0'],
+        'used_by' => ['user portal','about page'],
+        'count'   => $_counts['org_chart'],
+        'count_label' => 'ตำแหน่ง',
+        'updated' => $_relTime($_lastUpdated['org_chart']),
     ],
     [
         'view'    => 'survey',
