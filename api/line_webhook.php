@@ -88,6 +88,87 @@ function reply_text_message(string $text): array
     return ['type' => 'text', 'text' => $text];
 }
 
+/**
+ * Flex bubble สำหรับคำตอบที่ AI generate — มี header ระบุชัดว่าเป็น AI
+ * + ปุ่ม "คุยกับเจ้าหน้าที่" ลิงก์ไปเปิด chat modal ใน hub
+ *
+ * Tip: LINE Flex text limit ~2000 chars; truncate ไว้กันบางคำตอบยาวมาก
+ */
+function build_ai_reply_flex(string $answer): array
+{
+    $answer = trim($answer);
+    if ($answer === '') $answer = '(ไม่มีคำตอบ)';
+    if (mb_strlen($answer) > 1800) {
+        $answer = mb_substr($answer, 0, 1797) . '...';
+    }
+    $alt = mb_substr($answer, 0, 380);
+
+    return [
+        'type'    => 'flex',
+        'altText' => $alt,
+        'contents' => [
+            'type' => 'bubble',
+            'size' => 'mega',
+            'header' => [
+                'type'            => 'box',
+                'layout'          => 'horizontal',
+                'paddingAll'      => '14px',
+                'backgroundColor' => '#F5F3FF',
+                'contents' => [
+                    [
+                        'type' => 'text',
+                        'text' => '🤖',
+                        'size' => 'xl',
+                        'flex' => 0,
+                    ],
+                    [
+                        'type'         => 'box',
+                        'layout'       => 'vertical',
+                        'paddingStart' => '10px',
+                        'flex'         => 1,
+                        'contents' => [
+                            ['type' => 'text', 'text' => 'AI ตอบให้คุณ', 'size' => 'sm', 'weight' => 'bold', 'color' => '#7C3AED'],
+                            ['type' => 'text', 'text' => 'ตอบอัตโนมัติด้วย AI · ต้องการเจ้าหน้าที่กดปุ่มด้านล่าง', 'size' => 'xxs', 'color' => '#6B7280', 'wrap' => true],
+                        ],
+                    ],
+                ],
+            ],
+            'body' => [
+                'type'       => 'box',
+                'layout'     => 'vertical',
+                'paddingAll' => '18px',
+                'contents' => [
+                    [
+                        'type'  => 'text',
+                        'text'  => $answer,
+                        'size'  => 'md',
+                        'color' => '#1F2937',
+                        'wrap'  => true,
+                    ],
+                ],
+            ],
+            'footer' => [
+                'type'       => 'box',
+                'layout'     => 'vertical',
+                'paddingAll' => '12px',
+                'contents' => [
+                    [
+                        'type'   => 'button',
+                        'style'  => 'primary',
+                        'color'  => '#0F766E',
+                        'height' => 'sm',
+                        'action' => [
+                            'type'  => 'uri',
+                            'label' => '💬 คุยกับเจ้าหน้าที่',
+                            'uri'   => line_app_base_url() . '/user/hub.php?chat=1',
+                        ],
+                    ],
+                ],
+            ],
+        ],
+    ];
+}
+
 function build_registration_required_flex(): array
 {
     return [
@@ -467,7 +548,7 @@ foreach ($data['events'] as $idx => $event) {
                     'confidence'   => $match['confidence'] ?? null,
                 ]);
 
-                $messages = [reply_text_message((string)$match['answer'])];
+                $messages = [build_ai_reply_flex((string)$match['answer'])];
                 $replyOk = $replyToken
                     ? send_line_reply($replyToken, $messages, $accessToken)
                     : ($userId ? send_line_push($userId, $messages, $accessToken) : false);
