@@ -131,10 +131,11 @@ function ai_qa_build_clinic_context(PDO $pdo): string
     $tz  = new DateTimeZone(CLINIC_TZ_NAME);
     $now = new DateTimeImmutable('now', $tz);
 
-    // 7-day window (today + next 6 days) — ครอบคลุมทุก weekday
-    // เพื่อตอบคำถามเช่น "วันอาทิตย์เปิดไหม" ที่อาจอยู่อีกหลายวันข้างหน้า
+    // 31-day window (today + next 30 days) — ครอบคลุม update cycle รายเดือน
+    // admin อัปเดตตารางเดือนละครั้ง ดังนั้น context ต้องเห็นข้อมูลทั้งเดือน
+    // เพื่อตอบคำถามเช่น "วันที่ 25 เปิดไหม", "วันอาทิตย์หน้าหมอใครออกตรวจ"
     $days = [];
-    for ($i = 0; $i < 7; $i++) {
+    for ($i = 0; $i < 31; $i++) {
         $days[] = $now->modify("+{$i} day")->format('Y-m-d');
     }
 
@@ -233,10 +234,10 @@ function ai_qa_build_clinic_context(PDO $pdo): string
 [สถานะปัจจุบัน]
 {$statusText}
 
-[เวลาทำการ — 7 วันข้างหน้า ครอบคลุมทุก weekday]
+[เวลาทำการ — 31 วันข้างหน้า (ครอบคลุมทั้งเดือน — ใช้หาคำตอบสำหรับวันที่หรือ weekday ใด ๆ)]
 {$hoursText}
 
-[หมอออกตรวจ — 7 วันข้างหน้า]
+[หมอออกตรวจ — 31 วันข้างหน้า]
 {$doctorsText}
 
 [FAQ Knowledge Base]
