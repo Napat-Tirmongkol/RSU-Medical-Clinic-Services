@@ -94,6 +94,11 @@ $kpis = [
     'booking_rate' => 0,
     'bookings_today' => 0,
     'errors_today'   => 0,
+    // Staff-focused signals (today's check-in workload)
+    'slots_today'        => 0, // จำนวน time slots ของวันนี้
+    'appts_today'        => 0, // นัดหมายของวันนี้ (booked + confirmed + completed; ไม่นับ cancelled)
+    'checkins_today'     => 0, // เช็คอินสำเร็จวันนี้ (attended_at = วันนี้)
+    'pending_today'      => 0, // นัดวันนี้ที่ยังไม่เช็คอิน (slot_date = วันนี้ AND attended_at IS NULL AND ไม่ถูกยกเลิก)
 ];
 
 try {
@@ -127,6 +132,28 @@ try {
                 "SELECT COUNT(*) FROM sys_error_logs WHERE created_at >= NOW() - INTERVAL 24 HOUR"
             )->fetchColumn();
         }
+    } catch (PDOException $e) { /* ignore */ }
+
+    // Staff workload — เน้นการเช็คอินของวันนี้ (อิง slot_date = CURDATE())
+    try {
+        $kpis['slots_today'] = (int) $pdo->query(
+            "SELECT COUNT(*) FROM camp_slots WHERE slot_date = CURDATE()"
+        )->fetchColumn();
+
+        $todayRow = $pdo->query("
+            SELECT
+                SUM(CASE WHEN b.status NOT IN ('cancelled','cancelled_by_admin','expired') THEN 1 ELSE 0 END) AS appts_today,
+                SUM(CASE WHEN DATE(b.attended_at) = CURDATE() THEN 1 ELSE 0 END) AS checkins_today,
+                SUM(CASE WHEN b.attended_at IS NULL
+                          AND b.status IN ('booked','confirmed') THEN 1 ELSE 0 END) AS pending_today
+            FROM camp_bookings b
+            JOIN camp_slots s ON b.slot_id = s.id
+            WHERE s.slot_date = CURDATE()
+        ")->fetch(PDO::FETCH_ASSOC);
+
+        $kpis['appts_today']    = (int) ($todayRow['appts_today']    ?? 0);
+        $kpis['checkins_today'] = (int) ($todayRow['checkins_today'] ?? 0);
+        $kpis['pending_today']  = (int) ($todayRow['pending_today']  ?? 0);
     } catch (PDOException $e) { /* ignore */ }
 
     // Equipment borrows (optional module)
@@ -1027,36 +1054,79 @@ try {
 
                     <!-- ── PRIORITY PANEL: งานวันนี้ ──────────────────────────────── -->
                     <?php
-                    $borrowUrgent = $kpis['borrows'] > 0;
+                    // Role-aware capability flags
+                    // - Portal admin (ไม่ใช่ staff) → เห็นทุกอย่างตามเดิม
+                    // - Staff (is_ecampaign_staff) → จำกัดตาม access_* flag ที่ตั้งไว้ตอน login
+                    $canEcampaign  = !$isStaff || !empty($_SESSION['access_ecampaign']);
+                    $canEborrow    = !$isStaff || !empty($_SESSION['access_eborrow']);
+                    $canSystemLogs = !$isStaff || !empty($_SESSION['access_system_logs']);
+
                     $today_items = [];
-                    if ($kpis['bookings_today'] > 0) {
-                        $today_items[] = [
-                            'label' => 'การจองใหม่ใน 24 ชม.',
-                            'value' => $kpis['bookings_today'],
-                            'icon'  => 'fa-bullhorn',
-                            'tone'  => 'info',
-                            'href'  => '../admin/bookings.php',
-                        ];
+
+                    // e-Campaign signals — เน้น check-in workload วันนี้ (สำหรับ staff)
+                    if ($canEcampaign) {
+                        if ($kpis['pending_today'] > 0) {
+                            $today_items[] = [
+                                'label' => 'รอเช็คอินวันนี้',
+                                'value' => $kpis['pending_today'],
+                                'icon'  => 'fa-clock',
+                                'tone'  => 'warning',
+                                'href'  => '../admin/daily_report.php',
+                            ];
+                        }
+                        if ($kpis['checkins_today'] > 0) {
+                            $today_items[] = [
+                                'label' => 'เช็คอินสำเร็จวันนี้',
+                                'value' => $kpis['checkins_today'],
+                                'icon'  => 'fa-circle-check',
+                                'tone'  => 'success',
+                                'href'  => '../admin/daily_report.php',
+                            ];
+                        }
+                        if ($kpis['slots_today'] > 0) {
+                            $today_items[] = [
+                                'label' => 'Slot นัดหมายวันนี้',
+                                'value' => $kpis['slots_today'],
+                                'icon'  => 'fa-calendar-day',
+                                'tone'  => 'info',
+                                'href'  => '../admin/time_slots.php',
+                            ];
+                        }
+                        if ($kpis['bookings_today'] > 0) {
+                            $today_items[] = [
+                                'label' => 'การจองใหม่ใน 24 ชม.',
+                                'value' => $kpis['bookings_today'],
+                                'icon'  => 'fa-bullhorn',
+                                'tone'  => 'accent',
+                                'href'  => '../admin/bookings.php',
+                            ];
+                        }
                     }
-                    if ($borrowUrgent) {
-                        $today_items[] = [
-                            'label' => 'อุปกรณ์รออนุมัติ',
-                            'value' => $kpis['borrows'],
-                            'icon'  => 'fa-box-open',
-                            'tone'  => 'warning',
-                            'href'  => '../e_Borrow/admin/index.php',
-                        ];
+
+                    // e-Borrow signals — เฉพาะคนที่มีสิทธิ์ดูแล e-Borrow
+                    if ($canEborrow) {
+                        if ($kpis['borrows'] > 0) {
+                            $today_items[] = [
+                                'label' => 'อุปกรณ์รออนุมัติ',
+                                'value' => $kpis['borrows'],
+                                'icon'  => 'fa-box-open',
+                                'tone'  => 'warning',
+                                'href'  => '../e_Borrow/admin/index.php',
+                            ];
+                        }
+                        if ($kpis['borrows_overdue'] > 0) {
+                            $today_items[] = [
+                                'label' => 'เลยกำหนดคืน',
+                                'value' => $kpis['borrows_overdue'],
+                                'icon'  => 'fa-clock-rotate-left',
+                                'tone'  => 'danger',
+                                'href'  => '../e_Borrow/admin/return_dashboard.php',
+                            ];
+                        }
                     }
-                    if ($kpis['borrows_overdue'] > 0) {
-                        $today_items[] = [
-                            'label' => 'เลยกำหนดคืน',
-                            'value' => $kpis['borrows_overdue'],
-                            'icon'  => 'fa-clock-rotate-left',
-                            'tone'  => 'danger',
-                            'href'  => '../e_Borrow/admin/return_dashboard.php',
-                        ];
-                    }
-                    if ($kpis['errors_today'] > 0) {
+
+                    // System logs — เฉพาะคนดูแลระบบ
+                    if ($canSystemLogs && $kpis['errors_today'] > 0) {
                         $today_items[] = [
                             'label' => 'Error ใหม่ใน 24 ชม.',
                             'value' => $kpis['errors_today'],
@@ -1070,21 +1140,37 @@ try {
                         <div class="priority-panel">
                             <div class="priority-panel-head">
                                 <div>
-                                    <div class="eyebrow">งานวันนี้ · <?= date('j M Y') ?></div>
+                                    <div class="eyebrow">งานวันนี้ · <?= date('j M Y') ?><?= $isStaff ? ' · เจ้าหน้าที่' : '' ?></div>
                                     <h2 class="display-h2">สวัสดี<?= !empty($_SESSION['admin_username']) ? ' ' . htmlspecialchars(explode(' ', $_SESSION['admin_username'])[0]) : '' ?></h2>
                                 </div>
                                 <div class="kpi-mini-row">
-                                    <div class="kpi-mini">
-                                        <div class="kpi-mini-num" id="kpi-users" data-counter="<?= $kpis['users'] ?>"><?= number_format($kpis['users']) ?></div>
-                                        <div class="kpi-mini-label">บุคลากรและนักศึกษา</div>
-                                    </div>
-                                    <div class="kpi-mini">
-                                        <div class="kpi-mini-num">
-                                            <span id="kpi-used"><?= number_format($kpis['used_quota']) ?></span>
-                                            <span class="kpi-mini-num--sub">/ <?= number_format($kpis['total_quota']) ?></span>
+                                    <?php if ($isStaff && $canEcampaign): ?>
+                                        <!-- Staff view: เน้น check-in workload วันนี้ -->
+                                        <div class="kpi-mini">
+                                            <div class="kpi-mini-num">
+                                                <span><?= number_format($kpis['checkins_today']) ?></span>
+                                                <span class="kpi-mini-num--sub">/ <?= number_format($kpis['appts_today']) ?></span>
+                                            </div>
+                                            <div class="kpi-mini-label">เช็คอินวันนี้ · จากนัดหมายทั้งหมด</div>
                                         </div>
-                                        <div class="kpi-mini-label">ใช้ไปแล้ว · <?= number_format($kpis['camps']) ?> แคมเปญ active</div>
-                                    </div>
+                                        <div class="kpi-mini">
+                                            <div class="kpi-mini-num"><?= number_format($kpis['slots_today']) ?></div>
+                                            <div class="kpi-mini-label">Slot วันนี้ · <?= number_format($kpis['camps']) ?> แคมเปญ active</div>
+                                        </div>
+                                    <?php else: ?>
+                                        <!-- Admin / non-staff view: ภาพรวมระบบ -->
+                                        <div class="kpi-mini">
+                                            <div class="kpi-mini-num" id="kpi-users" data-counter="<?= $kpis['users'] ?>"><?= number_format($kpis['users']) ?></div>
+                                            <div class="kpi-mini-label">บุคลากรและนักศึกษา</div>
+                                        </div>
+                                        <div class="kpi-mini">
+                                            <div class="kpi-mini-num">
+                                                <span id="kpi-used"><?= number_format($kpis['used_quota']) ?></span>
+                                                <span class="kpi-mini-num--sub">/ <?= number_format($kpis['total_quota']) ?></span>
+                                            </div>
+                                            <div class="kpi-mini-label">ใช้ไปแล้ว · <?= number_format($kpis['camps']) ?> แคมเปญ active</div>
+                                        </div>
+                                    <?php endif; ?>
                                 </div>
                             </div>
                             <?php if (empty($today_items)): ?>
@@ -1309,15 +1395,47 @@ try {
                                 </a>
                             </div>
 
-                            <!-- Quick Shortcuts (flat) -->
+                            <!-- Quick Shortcuts (flat, role-aware) -->
+                            <?php
+                            // Build shortcuts ตามสิทธิ์ของ user
+                            // Staff (is_ecampaign_staff) → จำกัดตาม access_* flag
+                            // Non-staff portal admin → เห็นทุกอย่าง
+                            $quickShortcuts = [];
+
+                            if ($isStaff && $canEcampaign) {
+                                $quickShortcuts[] = ['url' => '../staff/index.php',        'icon' => 'fa-qrcode',         'label' => 'เปิดสแกน QR เช็คอิน'];
+                                $quickShortcuts[] = ['url' => '../admin/daily_report.php', 'icon' => 'fa-clipboard-list', 'label' => 'รายงานเช็คอินวันนี้'];
+                            }
+                            if ($canEcampaign) {
+                                $quickShortcuts[] = ['url' => '../admin/campaigns.php', 'icon' => 'fa-bullhorn',     'label' => 'Campaign Manager'];
+                                $quickShortcuts[] = ['url' => '../admin/bookings.php',  'icon' => 'fa-calendar-check', 'label' => 'รายการนัดหมาย'];
+                            }
+                            // Users Center — เฉพาะ portal admin หรือ staff role admin/superadmin
+                            if (!$isStaff || in_array($adminRole, ['admin', 'superadmin'], true)) {
+                                $quickShortcuts[] = ['url' => 'users.php', 'icon' => 'fa-users', 'label' => 'Users Center'];
+                            }
+                            $quickShortcuts[] = ['url' => '../asset/index.php',       'icon' => 'fa-boxes-stacked', 'label' => 'ครุภัณฑ์สำนักงาน'];
+                            $quickShortcuts[] = ['url' => '../consumables/index.php', 'icon' => 'fa-box-open',      'label' => 'วัสดุสิ้นเปลือง'];
+                            if ($canSystemLogs) {
+                                $quickShortcuts[] = [
+                                    'url'   => "javascript:switchSection('error_logs', document.querySelector('[data-section=error_logs]'))",
+                                    'icon'  => 'fa-bug',
+                                    'label' => 'Error Logs',
+                                ];
+                            }
+                            ?>
                             <div class="quick-list au d4">
                                 <div class="sec-title mb-3">ทางลัด</div>
                                 <ul class="quick-items">
-                                    <li><a href="users.php"><i class="fa-solid fa-users"></i> Users Center<i class="fa-solid fa-arrow-right ml-auto"></i></a></li>
-                                    <li><a href="../admin/campaigns.php"><i class="fa-solid fa-bullhorn"></i> Campaign Manager<i class="fa-solid fa-arrow-right ml-auto"></i></a></li>
-                                    <li><a href="../asset/index.php"><i class="fa-solid fa-boxes-stacked"></i> ครุภัณฑ์สำนักงาน<i class="fa-solid fa-arrow-right ml-auto"></i></a></li>
-                                    <li><a href="../consumables/index.php"><i class="fa-solid fa-box-open"></i> วัสดุสิ้นเปลือง<i class="fa-solid fa-arrow-right ml-auto"></i></a></li>
-                                    <li><a href="javascript:switchSection('error_logs', document.querySelector('[data-section=error_logs]'))"><i class="fa-solid fa-bug"></i> Error Logs<i class="fa-solid fa-arrow-right ml-auto"></i></a></li>
+                                    <?php foreach ($quickShortcuts as $sc): ?>
+                                        <li>
+                                            <a href="<?= htmlspecialchars($sc['url']) ?>">
+                                                <i class="fa-solid <?= htmlspecialchars($sc['icon']) ?>"></i>
+                                                <?= htmlspecialchars($sc['label']) ?>
+                                                <i class="fa-solid fa-arrow-right ml-auto"></i>
+                                            </a>
+                                        </li>
+                                    <?php endforeach; ?>
                                 </ul>
                             </div>
 
