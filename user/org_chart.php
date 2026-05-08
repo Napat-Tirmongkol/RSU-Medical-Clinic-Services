@@ -3,6 +3,13 @@
 declare(strict_types=1);
 session_start();
 require_once __DIR__ . '/../config.php';
+
+// Feature gated off for users — admins still maintain the chart from
+// portal/_partials/clinic_data/org_chart.php. Page kept for when the
+// feature is ready to launch publicly.
+header('Location: hub.php');
+exit;
+
 check_maintenance('e_campaign');
 
 $lineUserId = $_SESSION['line_user_id'] ?? '';
