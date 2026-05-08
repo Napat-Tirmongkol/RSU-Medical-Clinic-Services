@@ -830,7 +830,8 @@ PROMPT;
         'contents' => [['role' => 'user', 'parts' => [['text' => $prompt]]]],
         'generationConfig' => [
             'temperature'      => 0.2,
-            'maxOutputTokens'  => 256,
+            // Gemini 2.5-flash ใช้ "thinking tokens" กิน budget — ตั้งสูงไว้กัน MAX_TOKENS
+            'maxOutputTokens'  => 1024,
             'responseMimeType' => 'application/json',
             // schema ตายตัว — Gemini จะ output ตาม schema เด็ดขาด
             // ป้องกัน preamble "Here is the JSON requested:" ที่เคยเจอ
@@ -842,6 +843,11 @@ PROMPT;
                     'confidence'  => ['type' => 'NUMBER'],
                 ],
                 'required' => ['match_index', 'confidence'],
+            ],
+            // ปิด thinking — เราไม่ต้องการ reasoning chain แค่ classification
+            // Gemini 2.5+ default thinkingBudget=dynamic อาจกิน 200+ token
+            'thinkingConfig'   => [
+                'thinkingBudget' => 0,
             ],
         ],
     ], JSON_UNESCAPED_UNICODE);
