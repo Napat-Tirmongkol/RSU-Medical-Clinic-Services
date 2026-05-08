@@ -52,18 +52,30 @@
 
             <!-- User Identity & Logout -->
             <div class="flex items-center gap-2 sm:gap-3">
-                <div class="text-right hidden sm:block">
-                    <div
-                        class="text-[9px] font-extrabold uppercase tracking-widest text-slate-500 leading-none mb-1">
-                        Admin</div>
-                    <div class="text-[13px] font-black text-slate-900 leading-none">
-                        <?= htmlspecialchars($_SESSION['admin_username'] ?? 'Administrator') ?>
-                    </div>
-                </div>
-                <div class="w-9 h-9 rounded-xl flex flex-shrink-0 items-center justify-center shadow-md shadow-emerald-500/20 text-sm"
-                    style="background: linear-gradient(135deg, #2e9e63, #10b981); color:#fff;">
-                    <i class="fa-solid fa-user-shield"></i>
-                </div>
+                <?php
+                // profile.php อ้าง sys_staff (admin_id ของ staff) — ทำลิงก์เฉพาะ staff session
+                $_canEditProfile = !empty($_SESSION['is_ecampaign_staff']);
+                $_idTextHtml = '<div class="text-right hidden sm:block">'
+                             . '<div class="text-[9px] font-extrabold uppercase tracking-widest text-slate-500 leading-none mb-1">Admin</div>'
+                             . '<div class="text-[13px] font-black text-slate-900 leading-none">'
+                             .   htmlspecialchars($_SESSION['admin_username'] ?? 'Administrator')
+                             . '</div>'
+                             . '</div>';
+                $_idAvatarHtml = '<div class="w-9 h-9 rounded-xl flex flex-shrink-0 items-center justify-center shadow-md shadow-emerald-500/20 text-sm" style="background: linear-gradient(135deg, #2e9e63, #10b981); color:#fff;">'
+                               . '<i class="fa-solid fa-user-shield"></i>'
+                               . '</div>';
+                ?>
+                <?php if ($_canEditProfile): ?>
+                    <a href="profile.php" title="แก้ไขโปรไฟล์เจ้าหน้าที่"
+                        class="flex items-center gap-2 sm:gap-3 group hover:opacity-90 transition-opacity"
+                        style="text-decoration:none">
+                        <?= $_idTextHtml ?>
+                        <?= $_idAvatarHtml ?>
+                    </a>
+                <?php else: ?>
+                    <?= $_idTextHtml ?>
+                    <?= $_idAvatarHtml ?>
+                <?php endif; ?>
                 <a href="../admin/auth/logout.php" title="ออกจากระบบ"
                     class="w-9 h-9 rounded-xl bg-rose-50 text-rose-600 flex flex-shrink-0 items-center justify-center hover:bg-rose-500 hover:text-white transition-colors border border-rose-100 ml-1">
                     <i class="fa-solid fa-power-off text-xs"></i>
