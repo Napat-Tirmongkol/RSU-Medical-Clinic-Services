@@ -834,11 +834,12 @@ PROMPT;
             'responseMimeType' => 'application/json',
             // schema ตายตัว — Gemini จะ output ตาม schema เด็ดขาด
             // ป้องกัน preamble "Here is the JSON requested:" ที่เคยเจอ
+            // หมายเหตุ: Gemini API ต้อง type ตัวพิมพ์ใหญ่ (OBJECT/INTEGER/NUMBER)
             'responseSchema'   => [
-                'type' => 'object',
+                'type' => 'OBJECT',
                 'properties' => [
-                    'match_index' => ['type' => 'integer'],
-                    'confidence'  => ['type' => 'number'],
+                    'match_index' => ['type' => 'INTEGER'],
+                    'confidence'  => ['type' => 'NUMBER'],
                 ],
                 'required' => ['match_index', 'confidence'],
             ],
@@ -903,10 +904,16 @@ PROMPT;
             }
         }
         if (!is_array($parsed)) {
+            // log debug ข้อมูลละเอียดเมื่อ parse fail — finishReason/safety/blockReason
+            // ช่วย diagnose ทั้งกรณี text ว่าง (safety/MAX_TOKENS) และเจอ preamble
             ai_qa_debug_log('AI QA Gemini parse error — raw text not JSON', [
-                'model'        => $model,
-                'raw_snippet'  => mb_substr($text, 0, 200),
-                'elapsed_ms'   => $elapsedMs,
+                'model'         => $model,
+                'raw_snippet'   => mb_substr($text, 0, 200),
+                'finish_reason' => (string)($resp['candidates'][0]['finishReason'] ?? ''),
+                'block_reason'  => (string)($resp['promptFeedback']['blockReason'] ?? ''),
+                'safety_ratings' => $resp['candidates'][0]['safetyRatings'] ?? [],
+                'response_snippet' => mb_substr($raw, 0, 500),
+                'elapsed_ms'    => $elapsedMs,
             ], 'warning');
             return null;
         }
