@@ -40,15 +40,23 @@ function ensure_ai_qa_schema(PDO $pdo): void
             ai_model VARCHAR(64) NULL,
             ai_confidence DECIMAL(3,2) NULL,
             status ENUM('pending','generated','approved','rejected','needs_edit') NOT NULL DEFAULT 'pending',
+            is_question ENUM('unknown','yes','no') NOT NULL DEFAULT 'unknown',
+            question_check_at DATETIME NULL,
             reviewer_note TEXT NULL,
             reviewed_by INT UNSIGNED NULL,
             reviewed_at DATETIME NULL,
             created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
             INDEX idx_status_created (status, created_at),
             INDEX idx_category (category),
-            INDEX idx_source_created (source, created_at)
+            INDEX idx_source_created (source, created_at),
+            INDEX idx_is_question (is_question)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
     } catch (PDOException) {}
+
+    // Migration for existing installs — ignore "duplicate column" errors
+    try { $pdo->exec("ALTER TABLE sys_ai_qa_log ADD COLUMN is_question ENUM('unknown','yes','no') NOT NULL DEFAULT 'unknown' AFTER status"); } catch (PDOException) {}
+    try { $pdo->exec("ALTER TABLE sys_ai_qa_log ADD COLUMN question_check_at DATETIME NULL AFTER is_question"); } catch (PDOException) {}
+    try { $pdo->exec("ALTER TABLE sys_ai_qa_log ADD INDEX idx_is_question (is_question)"); } catch (PDOException) {}
 }
 
 /**
@@ -223,6 +231,117 @@ PROMPT;
         'confidence' => $confidence,
         'model'      => $usedModel,
     ];
+}
+
+/**
+ * ให้ Gemini ตัดสินทีเดียวว่าข้อความใดเป็น "คำถามจริง" และข้อความใดไม่ใช่
+ * รับ array ของคำถาม (1..N) → คืน array ของ 'yes'|'no' (index ตรงกับ input)
+ *
+ * คำถามจริง = ผู้ใช้ต้องการข้อมูล/คำตอบ (เช่น "เปิดกี่โมง", "หมอชื่ออะไรบ้าง")
+ * ไม่ใช่คำถาม = greeting, ack, statement, สติกเกอร์ข้อความ, สแปม, ข้อความสั้นๆ ไร้ความหมาย
+ *
+ * @param string[] $questions
+ * @return string[]  array ของ 'yes' หรือ 'no' (ความยาวเท่า input — fallback 'unknown' ถ้า AI ตอบไม่ครบ)
+ */
+function ai_qa_classify_questions(array $questions): array
+{
+    $apiKey = ai_qa_load_gemini_key();
+    if (!$apiKey) {
+        throw new RuntimeException('ยังไม่ได้ตั้งค่า GEMINI_API_KEY');
+    }
+    if (empty($questions)) return [];
+
+    // สร้าง numbered list ให้ AI mapping กลับได้แน่นอน
+    $lines = [];
+    foreach ($questions as $i => $q) {
+        $lines[] = ($i + 1) . '. ' . trim((string)$q);
+    }
+    $listText = implode("\n", $lines);
+    $count = count($questions);
+
+    $prompt = <<<PROMPT
+คุณกำลังช่วยคัดกรองข้อความที่ผู้ใช้พิมพ์เข้ามาในช่องแชทของคลินิกพยาบาล RSU Medical
+หน้าที่: ตัดสินว่าข้อความแต่ละชิ้นเป็น "คำถามจริง" หรือไม่
+
+นิยาม:
+- "yes" = ข้อความที่ผู้ใช้ต้องการได้ข้อมูล / คำตอบ / ความช่วยเหลือ
+  ตัวอย่าง: "เปิดกี่โมง", "หมอชื่ออะไร", "ขอใบรับรองยังไง", "วันนี้มีคิวว่างไหม", "ปวดท้องควรทำยังไง"
+  รวมถึงประโยคบอกเล่าที่บ่งบอกการขอความช่วยเหลือโดยนัย เช่น "อยากนัดหมอ", "ต้องการใบรับรอง"
+- "no" = ทุกอย่างที่ไม่ใช่คำถาม:
+  ทักทาย ("สวัสดี", "หวัดดี", "hi"), ตอบรับ/ขอบคุณ ("ครับ", "ค่ะ", "ok", "ขอบคุณ"),
+  ข้อความสั้นไร้ความหมาย, สแปม, สติกเกอร์ที่กลายเป็น text, ตัวเลขล้วน, อิโมจิล้วน,
+  ข้อความบอกเล่าทั่วไปที่ไม่ได้ขออะไร
+
+ข้อความ ({$count} รายการ):
+{$listText}
+
+ตอบกลับเป็น JSON ตาม schema นี้เท่านั้น (array ความยาว {$count} ตามลำดับเดียวกับ input):
+{"verdicts": ["yes" หรือ "no", ...]}
+PROMPT;
+
+    $body = json_encode([
+        'contents' => [[
+            'role'  => 'user',
+            'parts' => [['text' => $prompt]],
+        ]],
+        'generationConfig' => [
+            'temperature'      => 0.1,
+            'maxOutputTokens'  => 2048,
+            'responseMimeType' => 'application/json',
+        ],
+    ], JSON_UNESCAPED_UNICODE);
+
+    $models  = ['gemini-2.5-flash', 'gemini-2.0-flash'];
+    $rawText = '';
+    foreach ($models as $model) {
+        $url = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$apiKey}";
+        $ch  = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => $body,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
+            CURLOPT_TIMEOUT        => 60,
+            CURLOPT_CONNECTTIMEOUT => 15,
+            CURLOPT_SSL_VERIFYPEER => true,
+        ]);
+        $raw      = (string)curl_exec($ch);
+        $httpCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlErr  = curl_error($ch);
+        curl_close($ch);
+
+        if ($curlErr) {
+            throw new RuntimeException('Gemini connection error: ' . $curlErr);
+        }
+        if ($httpCode === 200) {
+            $rawText = $raw;
+            break;
+        }
+        if ($httpCode !== 404) {
+            $errMsg = json_decode($raw, true)['error']['message'] ?? "HTTP {$httpCode}";
+            throw new RuntimeException('Gemini error: ' . $errMsg);
+        }
+    }
+    if ($rawText === '') {
+        throw new RuntimeException('ไม่พบ model ที่ใช้งานได้');
+    }
+
+    $resp = json_decode($rawText, true);
+    $text = (string)($resp['candidates'][0]['content']['parts'][0]['text'] ?? '');
+    $text = preg_replace('/^```(?:json)?\s*/m', '', $text);
+    $text = preg_replace('/```\s*$/m', '', $text);
+    $text = trim($text);
+
+    $parsed   = json_decode($text, true);
+    $verdicts = is_array($parsed['verdicts'] ?? null) ? $parsed['verdicts'] : [];
+
+    // Normalize → length = count, แต่ละค่าเป็น 'yes'|'no' (อะไรก็ตามที่ AI ส่งกลับมาแปลกๆ → 'unknown')
+    $out = [];
+    for ($i = 0; $i < $count; $i++) {
+        $v = strtolower(trim((string)($verdicts[$i] ?? '')));
+        $out[] = ($v === 'yes' || $v === 'no') ? $v : 'unknown';
+    }
+    return $out;
 }
 
 /** จำนวน variant ที่ AI สร้างต่อครั้ง — คำสั่งใน prompt ก็ตรงกับค่านี้ */
