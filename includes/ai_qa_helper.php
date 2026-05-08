@@ -224,3 +224,146 @@ PROMPT;
         'model'      => $usedModel,
     ];
 }
+
+/** จำนวน variant ที่ AI สร้างต่อครั้ง — คำสั่งใน prompt ก็ตรงกับค่านี้ */
+const AI_FAQ_VARIANT_COUNT = 5;
+
+/**
+ * Schema ของ FAQ Knowledge Base — admin เขียนคำตอบเอง + AI gen variant คำถาม
+ * แยกจาก sys_ai_qa_log (ซึ่งเป็น raw capture) เพื่อให้ retention/usage ต่างกันได้
+ */
+function ensure_ai_faq_schema(PDO $pdo): void
+{
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS sys_ai_faq (
+            id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            category VARCHAR(64) NOT NULL DEFAULT 'อื่นๆ',
+            canonical_question TEXT NOT NULL,
+            answer MEDIUMTEXT NOT NULL,
+            source_qa_id INT UNSIGNED NULL,
+            is_active TINYINT(1) NOT NULL DEFAULT 1,
+            created_by INT UNSIGNED NULL,
+            updated_by INT UNSIGNED NULL,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX idx_category (category),
+            INDEX idx_active (is_active)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    } catch (PDOException) {}
+
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS sys_ai_faq_variants (
+            id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            faq_id INT UNSIGNED NOT NULL,
+            variant_question TEXT NOT NULL,
+            source ENUM('manual','ai_generated') NOT NULL DEFAULT 'manual',
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_faq (faq_id),
+            CONSTRAINT fk_faq_variant FOREIGN KEY (faq_id)
+                REFERENCES sys_ai_faq(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    } catch (PDOException) {}
+}
+
+/**
+ * ให้ Gemini เจน paraphrase 5 รูปแบบของคำถามต้นฉบับ
+ * ส่งคืน array ของ string — admin จะเลือก keep/edit/delete รายตัวก่อนบันทึก
+ *
+ * @return string[]
+ */
+function ai_faq_generate_variants(string $question): array
+{
+    $apiKey = ai_qa_load_gemini_key();
+    if (!$apiKey) {
+        throw new RuntimeException('ยังไม่ได้ตั้งค่า GEMINI_API_KEY');
+    }
+
+    $count = AI_FAQ_VARIANT_COUNT;
+    $prompt = <<<PROMPT
+คุณกำลังช่วยสร้างฐาน FAQ ของห้องพยาบาลคลินิก RSU Medical
+ผู้ใช้คนเดียวอาจถามเรื่องเดียวกันได้หลายแบบ — ทั้งภาษาทางการ ภาษาพูด คำสะกดผิด คำย่อ ประโยคยาว/สั้น
+
+หน้าที่: สร้าง paraphrase {$count} รูปแบบของคำถามต้นฉบับด้านล่าง
+ข้อกำหนด:
+- ภาษาไทยเท่านั้น
+- ความหมายเดิม แต่รูปประโยคต่างกัน — เช่น ทางการ vs ไม่ทางการ, สั้น vs ยาว, ถามตรง vs อ้อม
+- ห้ามซ้ำกับต้นฉบับ และห้ามซ้ำกันเอง
+- เป็นคำถามที่ผู้ใช้น่าจะพิมพ์จริงในแชท
+
+คำถามต้นฉบับ:
+{$question}
+
+ตอบกลับเป็น JSON ตาม schema นี้เท่านั้น:
+{"variants": ["...", "...", "...", "...", "..."]}
+PROMPT;
+
+    $body = json_encode([
+        'contents' => [[
+            'role'  => 'user',
+            'parts' => [['text' => $prompt]],
+        ]],
+        'generationConfig' => [
+            'temperature'      => 0.7,
+            'maxOutputTokens'  => 1024,
+            'responseMimeType' => 'application/json',
+        ],
+    ], JSON_UNESCAPED_UNICODE);
+
+    $models  = ['gemini-2.5-flash', 'gemini-2.0-flash'];
+    $rawText = '';
+
+    foreach ($models as $model) {
+        $url = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$apiKey}";
+        $ch  = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => $body,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
+            CURLOPT_TIMEOUT        => 45,
+            CURLOPT_CONNECTTIMEOUT => 15,
+            CURLOPT_SSL_VERIFYPEER => true,
+        ]);
+        $raw      = (string)curl_exec($ch);
+        $httpCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlErr  = curl_error($ch);
+        curl_close($ch);
+
+        if ($curlErr) {
+            throw new RuntimeException('Gemini connection error: ' . $curlErr);
+        }
+        if ($httpCode === 200) {
+            $rawText = $raw;
+            break;
+        }
+        if ($httpCode !== 404) {
+            $errMsg = json_decode($raw, true)['error']['message'] ?? "HTTP {$httpCode}";
+            throw new RuntimeException('Gemini error: ' . $errMsg);
+        }
+    }
+
+    if ($rawText === '') {
+        throw new RuntimeException('ไม่พบ model ที่ใช้งานได้');
+    }
+
+    $resp = json_decode($rawText, true);
+    $text = (string)($resp['candidates'][0]['content']['parts'][0]['text'] ?? '');
+    $text = preg_replace('/^```(?:json)?\s*/m', '', $text);
+    $text = preg_replace('/```\s*$/m', '', $text);
+    $text = trim($text);
+
+    $parsed   = json_decode($text, true);
+    $variants = is_array($parsed['variants'] ?? null) ? $parsed['variants'] : [];
+
+    $clean = [];
+    foreach ($variants as $v) {
+        $v = trim((string)$v);
+        if ($v === '' || mb_strlen($v) > 500) continue;
+        if (mb_strtolower($v) === mb_strtolower($question)) continue;
+        $clean[] = $v;
+    }
+    if (empty($clean)) {
+        throw new RuntimeException('AI ไม่ได้ส่ง variant กลับมา');
+    }
+    return $clean;
+}

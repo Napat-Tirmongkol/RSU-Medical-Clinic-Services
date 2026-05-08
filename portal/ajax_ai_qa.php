@@ -173,6 +173,147 @@ try {
         exit;
     }
 
+    // ─── FAQ Knowledge Base actions ─────────────────────────────────────
+    ensure_ai_faq_schema($pdo);
+
+    if ($action === 'faq_create') {
+        $q   = trim((string)($_POST['question'] ?? ''));
+        $a   = trim((string)($_POST['answer']   ?? ''));
+        $cat = (string)($_POST['category'] ?? 'อื่นๆ');
+        $src = (int)($_POST['source_qa_id'] ?? 0) ?: null;
+        if (!in_array($cat, AI_QA_CATEGORIES, true)) $cat = 'อื่นๆ';
+        if ($q === '' || $a === '') {
+            echo json_encode(['ok' => false, 'message' => 'กรอกคำถามและคำตอบ']);
+            exit;
+        }
+
+        $ins = $pdo->prepare("
+            INSERT INTO sys_ai_faq (category, canonical_question, answer, source_qa_id, created_by, updated_by)
+            VALUES (:cat, :q, :a, :src, :uid, :uid)
+        ");
+        $ins->execute([
+            ':cat' => $cat,
+            ':q'   => $q,
+            ':a'   => $a,
+            ':src' => $src,
+            ':uid' => $reviewerId ?: null,
+        ]);
+        echo json_encode(['ok' => true, 'id' => (int)$pdo->lastInsertId()]);
+        exit;
+    }
+
+    if ($action === 'faq_update') {
+        $id  = (int)($_POST['id'] ?? 0);
+        $q   = trim((string)($_POST['question'] ?? ''));
+        $a   = trim((string)($_POST['answer']   ?? ''));
+        $cat = (string)($_POST['category'] ?? 'อื่นๆ');
+        if (!in_array($cat, AI_QA_CATEGORIES, true)) $cat = 'อื่นๆ';
+        if ($id <= 0 || $q === '' || $a === '') {
+            echo json_encode(['ok' => false, 'message' => 'invalid input']);
+            exit;
+        }
+        $upd = $pdo->prepare("
+            UPDATE sys_ai_faq
+               SET category = :cat,
+                   canonical_question = :q,
+                   answer = :a,
+                   updated_by = :uid
+             WHERE id = :id
+        ");
+        $upd->execute([
+            ':cat' => $cat,
+            ':q'   => $q,
+            ':a'   => $a,
+            ':uid' => $reviewerId ?: null,
+            ':id'  => $id,
+        ]);
+        echo json_encode(['ok' => true]);
+        exit;
+    }
+
+    if ($action === 'faq_delete') {
+        $id = (int)($_POST['id'] ?? 0);
+        if ($id <= 0) {
+            echo json_encode(['ok' => false, 'message' => 'invalid id']);
+            exit;
+        }
+        // FK ON DELETE CASCADE จัดการ variants ให้
+        $pdo->prepare("DELETE FROM sys_ai_faq WHERE id = :id")->execute([':id' => $id]);
+        echo json_encode(['ok' => true]);
+        exit;
+    }
+
+    if ($action === 'faq_get') {
+        $id = (int)($_POST['id'] ?? 0);
+        if ($id <= 0) {
+            echo json_encode(['ok' => false, 'message' => 'invalid id']);
+            exit;
+        }
+        $row = $pdo->prepare("SELECT * FROM sys_ai_faq WHERE id = :id LIMIT 1");
+        $row->execute([':id' => $id]);
+        $faq = $row->fetch(PDO::FETCH_ASSOC);
+        if (!$faq) {
+            echo json_encode(['ok' => false, 'message' => 'not found']);
+            exit;
+        }
+        $vs = $pdo->prepare("
+            SELECT id, variant_question, source, created_at
+              FROM sys_ai_faq_variants
+             WHERE faq_id = :id
+             ORDER BY id ASC
+        ");
+        $vs->execute([':id' => $id]);
+        $variants = $vs->fetchAll(PDO::FETCH_ASSOC);
+        echo json_encode(['ok' => true, 'faq' => $faq, 'variants' => $variants]);
+        exit;
+    }
+
+    if ($action === 'faq_generate_variants') {
+        // คืน array ของ string ให้ admin เลือกก่อน save (ไม่ insert ทันที)
+        $question = trim((string)($_POST['question'] ?? ''));
+        if ($question === '') {
+            echo json_encode(['ok' => false, 'message' => 'no question']);
+            exit;
+        }
+        $variants = ai_faq_generate_variants($question);
+        echo json_encode(['ok' => true, 'variants' => $variants]);
+        exit;
+    }
+
+    if ($action === 'faq_save_variants') {
+        $faqId = (int)($_POST['faq_id'] ?? 0);
+        $list  = json_decode((string)($_POST['variants'] ?? '[]'), true);
+        $src   = ($_POST['source'] ?? 'manual') === 'ai_generated' ? 'ai_generated' : 'manual';
+        if ($faqId <= 0 || !is_array($list)) {
+            echo json_encode(['ok' => false, 'message' => 'invalid input']);
+            exit;
+        }
+        $ins = $pdo->prepare("
+            INSERT INTO sys_ai_faq_variants (faq_id, variant_question, source)
+            VALUES (:fid, :q, :src)
+        ");
+        $saved = 0;
+        foreach ($list as $v) {
+            $v = trim((string)$v);
+            if ($v === '' || mb_strlen($v) > 500) continue;
+            $ins->execute([':fid' => $faqId, ':q' => $v, ':src' => $src]);
+            $saved++;
+        }
+        echo json_encode(['ok' => true, 'saved' => $saved]);
+        exit;
+    }
+
+    if ($action === 'faq_delete_variant') {
+        $vid = (int)($_POST['id'] ?? 0);
+        if ($vid <= 0) {
+            echo json_encode(['ok' => false, 'message' => 'invalid id']);
+            exit;
+        }
+        $pdo->prepare("DELETE FROM sys_ai_faq_variants WHERE id = :id")->execute([':id' => $vid]);
+        echo json_encode(['ok' => true]);
+        exit;
+    }
+
     echo json_encode(['ok' => false, 'message' => 'unknown action']);
 } catch (Throwable $e) {
     error_log('ajax_ai_qa error (' . $action . '): ' . $e->getMessage());
