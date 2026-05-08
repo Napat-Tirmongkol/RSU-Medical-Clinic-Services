@@ -774,6 +774,8 @@ body[data-theme='dark'] .pin-btn.active {
 .priority-item--danger  .priority-item-icon  { background: var(--c-tone-danger-bg);  color: var(--c-tone-danger); }
 .priority-item--success { border-left-color: var(--c-tone-success); }
 .priority-item--success .priority-item-icon  { background: var(--c-tone-success-bg); color: var(--c-tone-success); }
+.priority-item--accent  { border-left-color: var(--c-tone-accent); }
+.priority-item--accent  .priority-item-icon  { background: var(--c-tone-accent-bg);  color: var(--c-tone-accent); }
 
 /* ── Activity List (flat, color-coded) ─────────────────── */
 .activity-list {

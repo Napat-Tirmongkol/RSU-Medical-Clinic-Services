@@ -14,6 +14,47 @@ if (!isset($pdo)) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $sectionAction = $_POST['action'] ?? '';
 
+    // Staff profile update — แก้ชื่อ/รหัสผ่านของ staff ที่ login อยู่ (sys_staff)
+    if ($sectionAction === 'update_profile' && !empty($_SESSION['is_ecampaign_staff']) && !empty($_SESSION['admin_id'])) {
+        validate_csrf_or_die();
+
+        $fullName        = trim($_POST['full_name']        ?? '');
+        $newPassword     = $_POST['new_password']          ?? '';
+        $confirmPassword = $_POST['confirm_password']      ?? '';
+        $staffId         = (int) $_SESSION['admin_id'];
+
+        if ($fullName === '') {
+            $_SESSION['profile_flash'] = ['type' => 'error', 'msg' => 'กรุณากรอกชื่อ-นามสกุล'];
+        } elseif ($newPassword !== '' && $newPassword !== $confirmPassword) {
+            $_SESSION['profile_flash'] = ['type' => 'error', 'msg' => 'รหัสผ่านใหม่และการยืนยันรหัสผ่านไม่ตรงกัน'];
+        } elseif ($newPassword !== '' && strlen($newPassword) < 6) {
+            $_SESSION['profile_flash'] = ['type' => 'error', 'msg' => 'รหัสผ่านใหม่ต้องมีอย่างน้อย 6 ตัวอักษร'];
+        } else {
+            try {
+                if ($newPassword !== '') {
+                    $hash = password_hash($newPassword, PASSWORD_DEFAULT);
+                    $pdo->prepare("UPDATE sys_staff SET full_name = :fname, password_hash = :pwd WHERE id = :id")
+                        ->execute([':fname' => $fullName, ':pwd' => $hash, ':id' => $staffId]);
+                } else {
+                    $pdo->prepare("UPDATE sys_staff SET full_name = :fname WHERE id = :id")
+                        ->execute([':fname' => $fullName, ':id' => $staffId]);
+                }
+                $_SESSION['admin_username'] = $fullName;
+                $_SESSION['full_name']      = $fullName;
+                $_SESSION['profile_flash']  = ['type' => 'success', 'msg' => 'อัปเดตข้อมูลโปรไฟล์เรียบร้อยแล้ว'];
+                if (function_exists('log_activity')) {
+                    log_activity('profile_update', "staff อัปเดตโปรไฟล์ของตนเอง", $staffId);
+                }
+            } catch (PDOException $e) {
+                $_SESSION['profile_flash'] = ['type' => 'error', 'msg' => 'เกิดข้อผิดพลาดในการบันทึกข้อมูล'];
+            }
+        }
+
+        // PRG redirect ป้องกัน double-submit เวลา refresh
+        header('Location: index.php?section=profile');
+        exit;
+    }
+
     // Error Logs actions
     if (in_array($sectionAction, ['save_alert_email', 'clear', 'delete_one', 'update_status'], true)) {
         try {
