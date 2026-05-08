@@ -533,7 +533,12 @@ foreach ($data['events'] as $idx => $event) {
                     // → แสดง loading dots ในแชท user เพื่อบอกว่ากำลังคิด
                     function () use ($userId, $accessToken) {
                         if ($userId) {
-                            send_line_loading_indicator((string)$userId, $accessToken, 20);
+                            $okIndicator = send_line_loading_indicator((string)$userId, $accessToken, 20);
+                            line_webhook_log('AI QA loading indicator', [
+                                'line_user_id' => line_mask_uid($userId),
+                                'ok' => $okIndicator,
+                                'line_error' => $okIndicator ? '' : get_last_line_error(),
+                            ], $okIndicator ? 'info' : 'warning');
                         }
                     }
                 );
@@ -592,7 +597,7 @@ foreach ($data['events'] as $idx => $event) {
             break;
 
         case 'message':
-            // ตอบกลับแบบง่ายถ้าเป็นข้อความตัวอักษร
+            // ตอบกลับแบบง่ายถ้าเป็นข้อความตัวอักษร (default fallback หลัง matcher miss)
             if ($replyToken && $event['message']['type'] === 'text') {
                 $userText = $event['message']['text'];
                 $messages = [
@@ -601,7 +606,18 @@ foreach ($data['events'] as $idx => $event) {
                         'text' => "เราได้รับข้อความของคุณแล้ว: \"$userText\"\n\nหากต้องการความช่วยเหลือเพิ่มเติม สามารถติดต่อเจ้าหน้าที่ได้โดยตรงค่ะ"
                     ]
                 ];
-                send_line_reply($replyToken, $messages, $accessToken);
+                $defaultOk = send_line_reply($replyToken, $messages, $accessToken);
+                line_webhook_log($defaultOk ? 'Default reply sent' : 'Default reply FAILED', [
+                    'line_user_id' => line_mask_uid($userId),
+                    'ok'           => $defaultOk,
+                    'line_error'   => $defaultOk ? '' : get_last_line_error(),
+                ], $defaultOk ? 'info' : 'warning');
+            } else {
+                line_webhook_log('Default reply skipped (no replyToken or non-text)', [
+                    'line_user_id' => line_mask_uid($userId),
+                    'has_reply_token' => !empty($replyToken),
+                    'message_type' => $event['message']['type'] ?? 'unknown',
+                ], 'warning');
             }
             break;
 

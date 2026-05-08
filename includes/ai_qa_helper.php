@@ -12,6 +12,19 @@
  */
 declare(strict_types=1);
 
+/**
+ * Helper สำหรับ log debug ของ AI QA matcher → ไปที่ sys_error_logs ที่ portal viewer อ่านได้
+ * เปิด/ปิดที่นี่จุดเดียว — ใช้ source 'ai_qa_helper.php' เพื่อให้กรองง่าย
+ */
+function ai_qa_debug_log(string $message, array $context = [], string $level = 'info'): void
+{
+    $ctxJson = $context ? json_encode($context, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) : '';
+    error_log('[AI QA] ' . $message . ($ctxJson ? ' ' . $ctxJson : ''));
+    if (function_exists('log_error_to_db')) {
+        log_error_to_db($message, $level, 'ai_qa_helper.php', $ctxJson ?: '');
+    }
+}
+
 /** Taxonomy ตั้งต้น — ขยายได้ภายหลังจาก outliers */
 const AI_QA_CATEGORIES = [
     'ประกัน',
@@ -648,8 +661,18 @@ PROMPT;
 function ai_qa_match_faq(PDO $pdo, string $question, ?callable $onSemanticPhase = null): ?array
 {
     $q = trim($question);
+    $qSnippet = mb_substr($q, 0, 120);
+
     // ข้ามข้อความสั้น ๆ (ack, สวัสดี ฯลฯ) เพื่อไม่ false-match
-    if ($q === '' || mb_strlen($q) < 4) return null;
+    if ($q === '' || mb_strlen($q) < 4) {
+        ai_qa_debug_log('AI QA matcher skipped — question too short', [
+            'len' => mb_strlen($q),
+            'question_snippet' => $qSnippet,
+        ]);
+        return null;
+    }
+
+    ai_qa_debug_log('AI QA matcher start', ['question_snippet' => $qSnippet]);
 
     ensure_ai_faq_schema($pdo);
     ensure_ai_qa_schema($pdo);
@@ -663,6 +686,7 @@ function ai_qa_match_faq(PDO $pdo, string $question, ?callable $onSemanticPhase 
     ");
     $stmt->execute([':q' => $q]);
     if ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        ai_qa_debug_log('AI QA Phase 1a HIT (canonical)', ['faq_id' => (int)$row['id']]);
         return [
             'answer'      => (string)$row['answer'],
             'matched_via' => 'exact_canonical',
@@ -680,6 +704,7 @@ function ai_qa_match_faq(PDO $pdo, string $question, ?callable $onSemanticPhase 
     ");
     $stmt->execute([':q' => $q]);
     if ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        ai_qa_debug_log('AI QA Phase 1b HIT (variant)', ['faq_id' => (int)$row['id']]);
         return [
             'answer'      => (string)$row['answer'],
             'matched_via' => 'exact_variant',
@@ -698,6 +723,7 @@ function ai_qa_match_faq(PDO $pdo, string $question, ?callable $onSemanticPhase 
     ");
     $stmt->execute([':q' => $q]);
     if ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        ai_qa_debug_log('AI QA Phase 1c HIT (approved)', ['qa_log_id' => (int)$row['id']]);
         return [
             'answer'      => (string)$row['ai_answer'],
             'matched_via' => 'exact_approved',
@@ -705,12 +731,14 @@ function ai_qa_match_faq(PDO $pdo, string $question, ?callable $onSemanticPhase 
         ];
     }
 
+    ai_qa_debug_log('AI QA Phase 1 MISS — proceed to Gemini', ['question_snippet' => $qSnippet]);
+
     // ── Phase 2: Gemini semantic match ────────────────────────────────────
     // เรียก callback ให้ caller ทำ side effect (เช่น loading indicator ใน LINE)
     // ก่อน Gemini call ที่อาจใช้เวลา 1-3 วิ
     if ($onSemanticPhase !== null) {
         try { $onSemanticPhase(); } catch (Throwable $e) {
-            error_log('ai_qa_match_faq onSemanticPhase callback failed: ' . $e->getMessage());
+            ai_qa_debug_log('AI QA onSemanticPhase callback failed', ['error' => $e->getMessage()], 'warning');
         }
     }
     return ai_qa_match_via_gemini($pdo, $q);
@@ -724,7 +752,10 @@ function ai_qa_match_faq(PDO $pdo, string $question, ?callable $onSemanticPhase 
 function ai_qa_match_via_gemini(PDO $pdo, string $question): ?array
 {
     $apiKey = ai_qa_load_gemini_key();
-    if (!$apiKey) return null;
+    if (!$apiKey) {
+        ai_qa_debug_log('AI QA Gemini abort — no API key', [], 'warning');
+        return null;
+    }
 
     // Build candidate pool — ทั้ง FAQ + approved Captured (dedupe)
     $candidates = [];
@@ -750,11 +781,22 @@ function ai_qa_match_via_gemini(PDO $pdo, string $question): ?array
         ")->fetchAll(PDO::FETCH_ASSOC);
         foreach ($rs2 as $r) $candidates[] = $r;
     } catch (Throwable $e) {
-        error_log('ai_qa_match_via_gemini pool fetch failed: ' . $e->getMessage());
+        ai_qa_debug_log('AI QA Gemini abort — candidate pool fetch failed', [
+            'error' => $e->getMessage(),
+        ], 'warning');
         return null;
     }
 
-    if (empty($candidates)) return null;
+    if (empty($candidates)) {
+        ai_qa_debug_log('AI QA Gemini abort — no candidates (FAQ ว่าง + ไม่มี approved)', [], 'warning');
+        return null;
+    }
+
+    ai_qa_debug_log('AI QA Gemini candidate pool ready', [
+        'total'    => count($candidates),
+        'faq_cnt'  => count(array_filter($candidates, fn($c) => $c['src'] === 'faq')),
+        'qa_cnt'   => count(array_filter($candidates, fn($c) => $c['src'] === 'qa')),
+    ]);
 
     // Build prompt
     $list = '';
@@ -803,14 +845,34 @@ PROMPT;
             CURLOPT_CONNECTTIMEOUT => 4,
             CURLOPT_SSL_VERIFYPEER => true,
         ]);
+        $tStart   = microtime(true);
         $raw      = (string)curl_exec($ch);
         $httpCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $curlErr  = curl_error($ch);
+        $elapsedMs = (int)round((microtime(true) - $tStart) * 1000);
         curl_close($ch);
 
-        if ($curlErr) return null;
-        if ($httpCode === 404) continue;
-        if ($httpCode !== 200) return null;
+        if ($curlErr) {
+            ai_qa_debug_log('AI QA Gemini curl error', [
+                'model'      => $model,
+                'curl_error' => $curlErr,
+                'elapsed_ms' => $elapsedMs,
+            ], 'warning');
+            return null;
+        }
+        if ($httpCode === 404) {
+            ai_qa_debug_log('AI QA Gemini 404 — fallback to next model', ['model' => $model]);
+            continue;
+        }
+        if ($httpCode !== 200) {
+            ai_qa_debug_log('AI QA Gemini non-200 response', [
+                'model'      => $model,
+                'http_code'  => $httpCode,
+                'elapsed_ms' => $elapsedMs,
+                'body'       => mb_substr($raw, 0, 400),
+            ], 'warning');
+            return null;
+        }
 
         $resp = json_decode($raw, true);
         $text = (string)($resp['candidates'][0]['content']['parts'][0]['text'] ?? '');
@@ -818,13 +880,38 @@ PROMPT;
         $text = preg_replace('/```\s*$/m', '', $text);
         $text = trim($text);
         $parsed = json_decode($text, true);
-        if (!is_array($parsed)) return null;
+        if (!is_array($parsed)) {
+            ai_qa_debug_log('AI QA Gemini parse error — raw text not JSON', [
+                'model'        => $model,
+                'raw_snippet'  => mb_substr($text, 0, 200),
+                'elapsed_ms'   => $elapsedMs,
+            ], 'warning');
+            return null;
+        }
 
         $idx  = (int)($parsed['match_index'] ?? -1);
         $conf = (float)($parsed['confidence'] ?? 0);
-        if ($idx < 0 || $idx >= count($candidates) || $conf < 0.7) return null;
+
+        if ($idx < 0 || $idx >= count($candidates) || $conf < 0.7) {
+            ai_qa_debug_log('AI QA Gemini rejected — no high-confidence match', [
+                'model'         => $model,
+                'match_index'   => $idx,
+                'confidence'    => $conf,
+                'pool_size'     => count($candidates),
+                'elapsed_ms'    => $elapsedMs,
+            ]);
+            return null;
+        }
 
         $matched = $candidates[$idx];
+        ai_qa_debug_log('AI QA Gemini MATCH', [
+            'model'      => $model,
+            'index'      => $idx,
+            'src'        => $matched['src'],
+            'source_id'  => (int)$matched['id'],
+            'confidence' => $conf,
+            'elapsed_ms' => $elapsedMs,
+        ]);
         return [
             'answer'      => (string)$matched['answer'],
             'matched_via' => 'gemini_' . $matched['src'],
@@ -832,6 +919,7 @@ PROMPT;
             'confidence'  => $conf,
         ];
     }
+    ai_qa_debug_log('AI QA Gemini exhausted all models — no match', [], 'warning');
 
     return null;
 }

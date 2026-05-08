@@ -277,6 +277,13 @@ function _qa_source_badge(string $s): string {
                 ให้ AI <b>คัดกรองว่าเป็นคำถามจริงหรือไม่</b> แล้วร่างคำตอบ ก่อน approve เพื่อใช้เป็นฐาน FAQ
                 (AI ไม่ตอบกลับ user โดยตรง)
             </p>
+            <a href="?section=error_logs&amp;el_q=AI%20QA&amp;el_level=info"
+               class="inline-flex items-center gap-1.5 mt-2 text-xs font-semibold text-slate-600 hover:text-purple-700 transition"
+               title="ดู Log การตอบกลับของ AI ใน LINE — กรอง source/keyword 'AI QA' ให้แล้ว">
+                <i class="fa-solid fa-clipboard-list"></i>
+                ดู Log การตอบกลับ AI
+                <i class="fa-solid fa-arrow-up-right-from-square text-xs opacity-60"></i>
+            </a>
         </div>
         <?php if ($_qa_tab === 'captured'): ?>
             <div class="flex items-center gap-2 flex-wrap">
