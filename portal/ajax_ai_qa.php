@@ -31,21 +31,14 @@ $reviewerId = (int)($_SESSION['admin_id'] ?? $_SESSION['user_id'] ?? 0);
 
 try {
     if ($action === 'generate') {
-        $id = (int)($_POST['id'] ?? 0);
-        if ($id <= 0) {
-            echo json_encode(['ok' => false, 'message' => 'invalid id']);
+        // group_key = ค่าที่ trim ของ question; UI ส่งมาจาก data-group-key
+        $groupKey = trim((string)($_POST['group_key'] ?? ''));
+        if ($groupKey === '') {
+            echo json_encode(['ok' => false, 'message' => 'invalid group_key']);
             exit;
         }
 
-        $row = $pdo->prepare("SELECT id, question FROM sys_ai_qa_log WHERE id = :id LIMIT 1");
-        $row->execute([':id' => $id]);
-        $rec = $row->fetch(PDO::FETCH_ASSOC);
-        if (!$rec) {
-            echo json_encode(['ok' => false, 'message' => 'record not found']);
-            exit;
-        }
-
-        $result = ai_qa_generate_answer((string)$rec['question']);
+        $result = ai_qa_generate_answer($groupKey);
 
         $upd = $pdo->prepare("
             UPDATE sys_ai_qa_log
@@ -54,19 +47,20 @@ try {
                    ai_model = :model,
                    ai_confidence = :conf,
                    status = 'generated'
-             WHERE id = :id
+             WHERE TRIM(question) = :gk
         ");
         $upd->execute([
             ':cat'   => $result['category'],
             ':ans'   => $result['answer'],
             ':model' => $result['model'],
             ':conf'  => $result['confidence'],
-            ':id'    => $id,
+            ':gk'    => $groupKey,
         ]);
 
         echo json_encode([
-            'ok'     => true,
-            'result' => $result,
+            'ok'      => true,
+            'result'  => $result,
+            'updated' => $upd->rowCount(),
         ]);
         exit;
     }
@@ -74,11 +68,14 @@ try {
     if ($action === 'bulk_generate') {
         $limit = max(1, min(20, (int)($_POST['limit'] ?? 10)));
 
+        // dedupe ก่อน — เลือก distinct question ที่ยังมี row pending,
+        // ประหยัด API call (ก่อนหน้านี้ Gemini ถูกเรียกซ้ำต่อ row ที่ซ้ำกัน)
         $rows = $pdo->prepare("
-            SELECT id, question
+            SELECT TRIM(question) AS group_key, MIN(created_at) AS earliest
               FROM sys_ai_qa_log
              WHERE status = 'pending'
-             ORDER BY created_at ASC
+             GROUP BY TRIM(question)
+             ORDER BY earliest ASC
              LIMIT {$limit}
         ");
         $rows->execute();
@@ -91,41 +88,45 @@ try {
                    ai_model = :model,
                    ai_confidence = :conf,
                    status = 'generated'
-             WHERE id = :id
+             WHERE TRIM(question) = :gk
+               AND status = 'pending'
         ");
 
-        $ok = 0; $fail = 0; $errors = [];
+        $ok = 0; $fail = 0; $rowsUpdated = 0; $errors = [];
         foreach ($list as $rec) {
+            $gk = (string)$rec['group_key'];
             try {
-                $result = ai_qa_generate_answer((string)$rec['question']);
+                $result = ai_qa_generate_answer($gk);
                 $upd->execute([
                     ':cat'   => $result['category'],
                     ':ans'   => $result['answer'],
                     ':model' => $result['model'],
                     ':conf'  => $result['confidence'],
-                    ':id'    => (int)$rec['id'],
+                    ':gk'    => $gk,
                 ]);
+                $rowsUpdated += $upd->rowCount();
                 $ok++;
             } catch (Throwable $e) {
                 $fail++;
-                $errors[] = '#' . $rec['id'] . ': ' . $e->getMessage();
+                $errors[] = mb_substr($gk, 0, 30) . ': ' . $e->getMessage();
             }
         }
 
         echo json_encode([
-            'ok'        => true,
-            'processed' => count($list),
-            'success'   => $ok,
-            'failed'    => $fail,
-            'errors'    => $errors,
+            'ok'           => true,
+            'processed'    => count($list),
+            'success'      => $ok,
+            'failed'       => $fail,
+            'rows_updated' => $rowsUpdated,
+            'errors'       => $errors,
         ]);
         exit;
     }
 
     if ($action === 'update') {
-        $id     = (int)($_POST['id'] ?? 0);
-        $status = (string)($_POST['status'] ?? '');
-        if ($id <= 0 || !in_array($status, AI_QA_STATUSES, true)) {
+        $groupKey = trim((string)($_POST['group_key'] ?? ''));
+        $status   = (string)($_POST['status'] ?? '');
+        if ($groupKey === '' || !in_array($status, AI_QA_STATUSES, true)) {
             echo json_encode(['ok' => false, 'message' => 'invalid input']);
             exit;
         }
@@ -146,7 +147,7 @@ try {
                    reviewer_note = NULLIF(:note, ''),
                    reviewed_by = :rid,
                    reviewed_at = NOW()
-             WHERE id = :id
+             WHERE TRIM(question) = :gk
         ");
         $upd->execute([
             ':st'   => $status,
@@ -154,22 +155,22 @@ try {
             ':ans'  => $answer,
             ':note' => $note,
             ':rid'  => $reviewerId ?: null,
-            ':id'   => $id,
+            ':gk'   => $groupKey,
         ]);
 
-        echo json_encode(['ok' => true]);
+        echo json_encode(['ok' => true, 'updated' => $upd->rowCount()]);
         exit;
     }
 
     if ($action === 'delete') {
-        $id = (int)($_POST['id'] ?? 0);
-        if ($id <= 0) {
-            echo json_encode(['ok' => false, 'message' => 'invalid id']);
+        $groupKey = trim((string)($_POST['group_key'] ?? ''));
+        if ($groupKey === '') {
+            echo json_encode(['ok' => false, 'message' => 'invalid group_key']);
             exit;
         }
-        $del = $pdo->prepare("DELETE FROM sys_ai_qa_log WHERE id = :id");
-        $del->execute([':id' => $id]);
-        echo json_encode(['ok' => true]);
+        $del = $pdo->prepare("DELETE FROM sys_ai_qa_log WHERE TRIM(question) = :gk");
+        $del->execute([':gk' => $groupKey]);
+        echo json_encode(['ok' => true, 'deleted' => $del->rowCount()]);
         exit;
     }
 
