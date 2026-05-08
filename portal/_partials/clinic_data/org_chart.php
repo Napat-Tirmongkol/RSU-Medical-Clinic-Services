@@ -254,9 +254,9 @@ $unassignedMembers = (int)$pdo->query("SELECT COUNT(*) FROM sys_org_members WHER
                         <textarea name="responsibilities" id="oc-mem-resp" rows="3" placeholder="• การรักษาและตรวจวินิจฉัยพยาบาลขั้นที่ 1&#10;• การประสาน&#10;• พยาบาลการแพทย์มหาวิทยาลัยรังสิต"></textarea>
                     </div>
 
-                    <!-- Staff link picker -->
+                    <!-- Staff account link picker -->
                     <div class="oc-form-row">
-                        <label>ลิงก์กับบุคลากรการแพทย์ <small class="text-slate-400 font-bold">(เลือกเพื่อ auto-fill ชื่อ/ใบอนุญาต/แผนก)</small></label>
+                        <label>ลิงก์กับบัญชี Staff <small class="text-slate-400 font-bold">(admin login จาก Identity & Governance — เลือกเพื่อให้ระบบ highlight ตอน staff คนนั้นล็อกอิน)</small></label>
                         <input type="hidden" name="staff_id" id="oc-mem-staff-id">
 
                         <!-- Linked badge (when already linked) -->
@@ -270,7 +270,7 @@ $unassignedMembers = (int)$pdo->query("SELECT COUNT(*) FROM sys_org_members WHER
 
                         <!-- Search box -->
                         <div id="oc-mem-staff-search-wrap" class="relative">
-                            <input type="text" id="oc-mem-staff-search" placeholder="ค้นหาด้วย ชื่อ / อีเมล / เบอร์ / ใบอนุญาต…" autocomplete="off">
+                            <input type="text" id="oc-mem-staff-search" placeholder="ค้นหาด้วย ชื่อ / username / อีเมล…" autocomplete="off">
                             <div id="oc-mem-staff-results" class="oc-staff-results" style="display:none;"></div>
                         </div>
                     </div>
@@ -548,7 +548,7 @@ $unassignedMembers = (int)$pdo->query("SELECT COUNT(*) FROM sys_org_members WHER
             : `<div class="oc-mem-photo-placeholder">${esc((m.full_name || '?').charAt(0))}</div>`;
         const positionLabel = m.position_title ? esc(m.position_title) : '<em class="text-amber-600">— ยังไม่จัด —</em>';
         const linkedBadge = m.staff_id
-            ? `<span class="oc-mem-linked-badge" title="ลิงก์กับ medical staff #${m.staff_id}"><i class="fa-solid fa-link text-[8px]"></i> Linked</span>`
+            ? `<span class="oc-mem-linked-badge" title="ลิงก์กับบัญชี Staff #${m.staff_id}"><i class="fa-solid fa-link text-[8px]"></i> Linked</span>`
             : '';
         return `
             <li class="oc-mem-card" data-id="${m.id}">
@@ -790,9 +790,9 @@ $unassignedMembers = (int)$pdo->query("SELECT COUNT(*) FROM sys_org_members WHER
 
     function ocShowLinkedStaff(staff) {
         document.getElementById('oc-mem-staff-id').value = staff.id;
-        const label = `${staff.title || ''} ${staff.full_name}`.trim()
-            + (staff.role ? ` · ${staff.role}` : '')
-            + (staff.department ? ` · ${staff.department}` : '');
+        const label = `${staff.full_name}`
+            + (staff.username ? ` · @${staff.username}` : '')
+            + (staff.role ? ` · ${staff.role}` : '');
         document.getElementById('oc-mem-staff-linked-name').textContent = label;
         document.getElementById('oc-mem-staff-linked').style.display = '';
         document.getElementById('oc-mem-staff-search-wrap').style.display = 'none';
@@ -806,15 +806,10 @@ $unassignedMembers = (int)$pdo->query("SELECT COUNT(*) FROM sys_org_members WHER
     window.ocPickStaff = function(staff, autoFill = true) {
         ocShowLinkedStaff(staff);
         if (!autoFill) return;
-        // Auto-fill empty form fields from staff record
-        const setIfEmpty = (id, value) => {
-            const el = document.getElementById(id);
-            if (el && !el.value && value) el.value = value;
-        };
-        setIfEmpty('oc-mem-prefix', staff.title);
-        setIfEmpty('oc-mem-name', staff.full_name);
-        setIfEmpty('oc-mem-dept', staff.department);
-        setIfEmpty('oc-mem-license', staff.license_no);
+        // Auto-fill full_name only if empty (sys_staff doesn't carry
+        // prefix / license / department — those stay manual)
+        const nameEl = document.getElementById('oc-mem-name');
+        if (nameEl && !nameEl.value && staff.full_name) nameEl.value = staff.full_name;
     };
 
     async function ocSearchStaff(q) {
@@ -822,19 +817,17 @@ $unassignedMembers = (int)$pdo->query("SELECT COUNT(*) FROM sys_org_members WHER
         const el = document.getElementById('oc-mem-staff-results');
         if (!r.ok) { el.style.display = 'none'; return; }
         if (!r.data || r.data.length === 0) {
-            el.innerHTML = `<div class="oc-staff-no-result">ไม่พบ medical staff ที่ตรงกับ "${esc(q)}"<br><small>ลองพิมพ์ชื่อ อีเมล หรือเบอร์โทร · หรือเพิ่ม staff ใหม่ที่หน้าบุคลากรการแพทย์</small></div>`;
+            el.innerHTML = `<div class="oc-staff-no-result">ไม่พบบัญชี Staff ที่ตรงกับ "${esc(q)}"<br><small>ลองพิมพ์ชื่อ username หรืออีเมล · หรือเพิ่ม Staff ที่หน้า Identity &amp; Governance</small></div>`;
             el.style.display = '';
             return;
         }
         el.innerHTML = r.data.map(s => `
             <div class="oc-staff-result-item" onclick='ocPickStaff(${JSON.stringify(s).replace(/'/g, "&apos;")})'>
-                <div class="oc-staff-result-name">${esc((s.title || '') + ' ' + s.full_name).trim()}</div>
+                <div class="oc-staff-result-name">${esc(s.full_name)}</div>
                 <div class="oc-staff-result-meta">
-                    <i class="fa-solid fa-stethoscope text-emerald-400"></i> ${esc(s.role || '-')}
-                    ${s.department ? ' · ' + esc(s.department) : ''}
+                    <i class="fa-solid fa-at text-emerald-400"></i> ${esc(s.username || '-')}
+                    ${s.role ? ' · <span class="text-emerald-600 font-bold">' + esc(s.role) + '</span>' : ''}
                     ${s.email ? ' · ' + esc(s.email) : ''}
-                    ${s.phone ? ' · ' + esc(s.phone) : ''}
-                    ${s.license_no ? ' · <span class="text-emerald-600 font-bold">ใบฯ ' + esc(s.license_no) + '</span>' : ''}
                 </div>
             </div>
         `).join('');

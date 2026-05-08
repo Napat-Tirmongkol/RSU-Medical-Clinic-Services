@@ -248,17 +248,17 @@ try {
             return;
 
         case 'staff:search': {
-            // For org-chart member picker: search active medical staff
-            // by name / email / phone. Returns top 20 matches.
+            // For org-chart member picker: search active sys_staff (admin
+            // login accounts) by username / full_name / email. Returns top 20.
             $q = trim((string)($_POST['q'] ?? ''));
-            $sql = "SELECT id, title, full_name, license_no, role, department, phone, email
-                    FROM sys_medical_staff
-                    WHERE is_active = 1";
+            $sql = "SELECT id, username, full_name, email, role, account_status
+                    FROM sys_staff
+                    WHERE (account_status IS NULL OR account_status = 'active')";
             $params = [];
             if ($q !== '') {
-                $sql .= " AND (full_name LIKE ? OR email LIKE ? OR phone LIKE ? OR license_no LIKE ?)";
+                $sql .= " AND (full_name LIKE ? OR username LIKE ? OR email LIKE ?)";
                 $like = "%$q%";
-                $params = [$like, $like, $like, $like];
+                $params = [$like, $like, $like];
             }
             $sql .= " ORDER BY full_name ASC LIMIT 20";
             $st = $pdo->prepare($sql);
@@ -268,11 +268,11 @@ try {
         }
 
         case 'staff:get': {
-            // Fetch single staff record by id (for refreshing linked-staff display)
+            // Fetch single sys_staff record by id (for refreshing linked badge)
             $id = (int)($_POST['id'] ?? 0);
             if ($id <= 0) { echo json_encode(['ok'=>false,'message'=>'invalid id']); return; }
-            $st = $pdo->prepare("SELECT id, title, full_name, license_no, role, department, phone, email
-                FROM sys_medical_staff WHERE id = ?");
+            $st = $pdo->prepare("SELECT id, username, full_name, email, role, account_status
+                FROM sys_staff WHERE id = ?");
             $st->execute([$id]);
             $row = $st->fetch(PDO::FETCH_ASSOC);
             echo json_encode(['ok' => (bool)$row, 'data' => $row ?: null]);

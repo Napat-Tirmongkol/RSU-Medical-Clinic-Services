@@ -47,7 +47,7 @@ try {
         license_no         VARCHAR(100) NULL COMMENT 'ใบอนุญาตฯ (premium card)',
         responsibilities   TEXT NULL COMMENT 'หน้าที่/บทบาท - bullet list',
         department         VARCHAR(255) NULL,
-        staff_id           INT NULL COMMENT 'FK สู่ sys_medical_staff (ถ้ามี)',
+        staff_id           INT NULL COMMENT 'FK สู่ sys_staff (admin login account ที่ลิงก์กับสมาชิก)',
         user_id            INT NULL COMMENT 'FK สู่ sys_users (เพื่อ highlight ตัวเอง)',
         display_order      INT NOT NULL DEFAULT 0,
         is_active          TINYINT(1) NOT NULL DEFAULT 1,
