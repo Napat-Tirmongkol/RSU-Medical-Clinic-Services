@@ -703,7 +703,7 @@ function _qa_source_badge(string $s): string {
             <h3 class="text-lg font-black text-gray-900 flex items-center gap-2">
                 <i class="fa-solid fa-pen-to-square text-purple-500"></i> Review AI Answer
             </h3>
-            <button type="button" onclick="qaCloseModal()" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-400">
+            <button type="button" id="qa-modal-close" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-400">
                 <i class="fa-solid fa-xmark"></i>
             </button>
         </div>
@@ -730,13 +730,13 @@ function _qa_source_badge(string $s): string {
             </div>
         </div>
         <div class="px-6 py-4 border-t border-gray-100 flex flex-wrap items-center justify-end gap-2">
-            <button type="button" onclick="qaSubmit('rejected')" class="px-4 py-2 text-sm font-bold text-rose-600 hover:bg-rose-50 rounded-xl">
+            <button type="button" data-qa-status="rejected" class="qa-modal-status px-4 py-2 text-sm font-bold text-rose-600 hover:bg-rose-50 rounded-xl">
                 <i class="fa-solid fa-xmark mr-1"></i> Reject
             </button>
-            <button type="button" onclick="qaSubmit('needs_edit')" class="px-4 py-2 text-sm font-bold text-amber-600 hover:bg-amber-50 rounded-xl">
+            <button type="button" data-qa-status="needs_edit" class="qa-modal-status px-4 py-2 text-sm font-bold text-amber-600 hover:bg-amber-50 rounded-xl">
                 <i class="fa-solid fa-pen mr-1"></i> Mark Needs Edit
             </button>
-            <button type="button" onclick="qaSubmit('approved')" class="px-5 py-2 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl">
+            <button type="button" data-qa-status="approved" class="qa-modal-status px-5 py-2 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl">
                 <i class="fa-solid fa-check mr-1"></i> Approve
             </button>
         </div>
@@ -750,7 +750,7 @@ function _qa_source_badge(string $s): string {
             <h3 id="faq-mod-title" class="text-lg font-black text-gray-900 flex items-center gap-2">
                 <i class="fa-solid fa-book-bookmark text-emerald-500"></i> FAQ
             </h3>
-            <button type="button" onclick="faqCloseModal()" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-400">
+            <button type="button" id="faq-modal-close" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-400">
                 <i class="fa-solid fa-xmark"></i>
             </button>
         </div>
@@ -795,8 +795,8 @@ function _qa_source_badge(string $s): string {
             </div>
         </div>
         <div class="px-6 py-4 border-t border-gray-100 flex items-center justify-end gap-2">
-            <button type="button" onclick="faqCloseModal()" class="px-4 py-2 text-sm font-bold text-gray-600 hover:bg-gray-100 rounded-xl">ยกเลิก</button>
-            <button type="button" onclick="faqSave()" class="px-5 py-2 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl">
+            <button type="button" id="faq-modal-cancel" class="px-4 py-2 text-sm font-bold text-gray-600 hover:bg-gray-100 rounded-xl">ยกเลิก</button>
+            <button type="button" id="faq-modal-save" class="px-5 py-2 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl">
                 <i class="fa-solid fa-check mr-1"></i> บันทึก
             </button>
         </div>
@@ -1026,30 +1026,39 @@ function _qa_source_badge(string $s): string {
         r.addEventListener('change', () => r.closest('form').submit());
     });
 
-    window.qaCloseModal = function() {
+    function qaCloseModal() {
         const m = document.getElementById('ai-qa-modal');
         m.classList.add('hidden');
         m.style.display = 'none';
         currentId = null;
-    };
+    }
+    document.getElementById('qa-modal-close')?.addEventListener('click', qaCloseModal);
 
-    window.qaSubmit = async function(status) {
+    async function qaSubmit(status) {
         if (!currentId) return;
-        const payload = {
-            group_key: currentId,
-            status: status,
-            category: document.getElementById('qa-mod-category').value,
-            answer: document.getElementById('qa-mod-answer').value,
-            reviewer_note: document.getElementById('qa-mod-note').value,
-        };
-        const res = await api('update', payload);
-        if (res.ok) {
-            Swal.fire({ icon: 'success', title: 'บันทึกแล้ว', timer: 900, showConfirmButton: false })
-                .then(() => location.reload());
-        } else {
-            Swal.fire({ icon: 'error', title: 'บันทึกไม่สำเร็จ', text: res.message || '' });
+        try {
+            const payload = {
+                group_key: currentId,
+                status: status,
+                category: document.getElementById('qa-mod-category').value,
+                answer: document.getElementById('qa-mod-answer').value,
+                reviewer_note: document.getElementById('qa-mod-note').value,
+            };
+            const res = await api('update', payload);
+            if (res.ok) {
+                Swal.fire({ icon: 'success', title: 'บันทึกแล้ว', timer: 900, showConfirmButton: false })
+                    .then(() => location.reload());
+            } else {
+                Swal.fire({ icon: 'error', title: 'บันทึกไม่สำเร็จ', text: res.message || '' });
+            }
+        } catch (e) {
+            console.error('qaSubmit error:', e);
+            Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาดที่เบราว์เซอร์', text: e.message });
         }
-    };
+    }
+    document.querySelectorAll('.qa-modal-status').forEach(btn => {
+        btn.addEventListener('click', () => qaSubmit(btn.dataset.qaStatus));
+    });
 
     // ─── Promote captured question → FAQ (in Captured tab) ───────────────
     document.querySelectorAll('.qa-promote').forEach(btn => {
@@ -1132,11 +1141,13 @@ function _qa_source_badge(string $s): string {
         m.style.display = 'flex';
     }
 
-    window.faqCloseModal = function() {
+    function faqCloseModal() {
         const m = document.getElementById('ai-faq-modal');
         m.classList.add('hidden');
         m.style.display = 'none';
-    };
+    }
+    document.getElementById('faq-modal-close')?.addEventListener('click', faqCloseModal);
+    document.getElementById('faq-modal-cancel')?.addEventListener('click', faqCloseModal);
 
     function renderVariants(list) {
         const box = document.getElementById('faq-variants-list');
@@ -1245,7 +1256,7 @@ function _qa_source_badge(string $s): string {
         }
     }
 
-    window.faqSave = async function() {
+    async function faqSave() {
         try {
             const id = document.getElementById('faq-mod-id').value;
             const payload = {
@@ -1288,6 +1299,7 @@ function _qa_source_badge(string $s): string {
             console.error('faqSave error:', e);
             Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาดที่เบราว์เซอร์', text: e.message });
         }
-    };
+    }
+    document.getElementById('faq-modal-save')?.addEventListener('click', faqSave);
 })();
 </script>
