@@ -510,6 +510,9 @@ function _qa_source_badge(string $s): string {
                                 <button class="qa-act qa-review px-3 py-1.5 bg-gray-900 text-white text-xs font-bold rounded-lg hover:bg-gray-800">
                                     <i class="fa-solid fa-pen-to-square"></i> Review
                                 </button>
+                                <button class="qa-act qa-regenerate p-1.5 text-purple-600 hover:bg-purple-50 rounded-lg" title="Generate ใหม่ (เขียนทับคำตอบเดิม + ใช้ clinic context ล่าสุด)">
+                                    <i class="fa-solid fa-arrows-rotate text-xs"></i>
+                                </button>
                             <?php endif; ?>
                             <button class="qa-act qa-promote p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg" title="ทำเป็น FAQ">
                                 <i class="fa-solid fa-bookmark text-xs"></i>
@@ -845,6 +848,43 @@ function _qa_source_badge(string $s): string {
                 Swal.fire({ icon: 'error', title: 'เครือข่ายผิดพลาด', text: e.message });
                 btn.disabled = false;
                 btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Generate';
+            }
+        });
+    });
+
+    document.querySelectorAll('.qa-regenerate').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const tr = btn.closest('tr');
+            const status = tr.dataset.status;
+            const isApproved = status === 'approved' || status === 'needs_edit';
+            const { isConfirmed } = await Swal.fire({
+                icon: 'warning',
+                title: 'Generate ใหม่?',
+                html: isApproved
+                    ? 'คำตอบนี้ <b>ถูก review แล้ว</b> — การ generate ใหม่จะเขียนทับคำตอบเดิมและรีเซ็ตสถานะเป็น "AI ร่างแล้ว"<br><span class="text-xs text-gray-500">หมายเหตุของผู้ตรวจจะยังคงอยู่</span>'
+                    : 'คำตอบเดิมจะถูกเขียนทับ',
+                showCancelButton: true,
+                confirmButtonText: 'Generate ใหม่',
+                cancelButtonText: 'ยกเลิก',
+                confirmButtonColor: '#7c3aed',
+            });
+            if (!isConfirmed) return;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-xs"></i>';
+            try {
+                const res = await api('generate', { group_key: tr.dataset.groupKey });
+                if (res.ok) {
+                    Swal.fire({ icon: 'success', title: 'Generate ใหม่เรียบร้อย', timer: 1200, showConfirmButton: false })
+                        .then(() => location.reload());
+                } else {
+                    Swal.fire({ icon: 'error', title: 'ไม่สำเร็จ', text: res.message || '' });
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fa-solid fa-arrows-rotate text-xs"></i>';
+                }
+            } catch (e) {
+                Swal.fire({ icon: 'error', title: 'เครือข่ายผิดพลาด', text: e.message });
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-arrows-rotate text-xs"></i>';
             }
         });
     });
