@@ -601,7 +601,7 @@ function _qa_source_badge(string $s): string {
             <h3 class="text-lg font-black text-gray-900 flex items-center gap-2">
                 <i class="fa-solid fa-pen-to-square text-purple-500"></i> Review AI Answer
             </h3>
-            <button onclick="qaCloseModal()" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-400">
+            <button type="button" onclick="qaCloseModal()" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-400">
                 <i class="fa-solid fa-xmark"></i>
             </button>
         </div>
@@ -628,13 +628,13 @@ function _qa_source_badge(string $s): string {
             </div>
         </div>
         <div class="px-6 py-4 border-t border-gray-100 flex flex-wrap items-center justify-end gap-2">
-            <button onclick="qaSubmit('rejected')" class="px-4 py-2 text-sm font-bold text-rose-600 hover:bg-rose-50 rounded-xl">
+            <button type="button" onclick="qaSubmit('rejected')" class="px-4 py-2 text-sm font-bold text-rose-600 hover:bg-rose-50 rounded-xl">
                 <i class="fa-solid fa-xmark mr-1"></i> Reject
             </button>
-            <button onclick="qaSubmit('needs_edit')" class="px-4 py-2 text-sm font-bold text-amber-600 hover:bg-amber-50 rounded-xl">
+            <button type="button" onclick="qaSubmit('needs_edit')" class="px-4 py-2 text-sm font-bold text-amber-600 hover:bg-amber-50 rounded-xl">
                 <i class="fa-solid fa-pen mr-1"></i> Mark Needs Edit
             </button>
-            <button onclick="qaSubmit('approved')" class="px-5 py-2 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl">
+            <button type="button" onclick="qaSubmit('approved')" class="px-5 py-2 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl">
                 <i class="fa-solid fa-check mr-1"></i> Approve
             </button>
         </div>
@@ -648,7 +648,7 @@ function _qa_source_badge(string $s): string {
             <h3 id="faq-mod-title" class="text-lg font-black text-gray-900 flex items-center gap-2">
                 <i class="fa-solid fa-book-bookmark text-emerald-500"></i> FAQ
             </h3>
-            <button onclick="faqCloseModal()" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-400">
+            <button type="button" onclick="faqCloseModal()" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-400">
                 <i class="fa-solid fa-xmark"></i>
             </button>
         </div>
@@ -693,8 +693,8 @@ function _qa_source_badge(string $s): string {
             </div>
         </div>
         <div class="px-6 py-4 border-t border-gray-100 flex items-center justify-end gap-2">
-            <button onclick="faqCloseModal()" class="px-4 py-2 text-sm font-bold text-gray-600 hover:bg-gray-100 rounded-xl">ยกเลิก</button>
-            <button onclick="faqSave()" class="px-5 py-2 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl">
+            <button type="button" onclick="faqCloseModal()" class="px-4 py-2 text-sm font-bold text-gray-600 hover:bg-gray-100 rounded-xl">ยกเลิก</button>
+            <button type="button" onclick="faqSave()" class="px-5 py-2 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl">
                 <i class="fa-solid fa-check mr-1"></i> บันทึก
             </button>
         </div>
@@ -710,9 +710,20 @@ function _qa_source_badge(string $s): string {
         const fd = new FormData();
         fd.append('action', action);
         fd.append('csrf_token', csrfToken);
-        Object.entries(payload || {}).forEach(([k, v]) => fd.append(k, v));
+        Object.entries(payload || {}).forEach(([k, v]) => fd.append(k, v ?? ''));
         return fetch('ajax_ai_qa.php', { method: 'POST', body: fd })
-            .then(r => r.json());
+            .then(async r => {
+                const text = await r.text();
+                try {
+                    return JSON.parse(text);
+                } catch (e) {
+                    // Server returned non-JSON (likely session expired → CSRF die, or PHP error)
+                    console.error('Non-JSON response from ajax_ai_qa.php:', { status: r.status, body: text.slice(0, 500) });
+                    return { ok: false, message: r.status === 403
+                        ? 'Session หมดอายุ — รีเฟรชหน้าแล้วลองใหม่'
+                        : 'Server error (HTTP ' + r.status + ')' };
+                }
+            });
     }
 
     document.querySelectorAll('.qa-generate').forEach(btn => {
@@ -1024,42 +1035,47 @@ function _qa_source_badge(string $s): string {
     }
 
     window.faqSave = async function() {
-        const id = document.getElementById('faq-mod-id').value;
-        const payload = {
-            question: document.getElementById('faq-mod-question').value,
-            answer: document.getElementById('faq-mod-answer').value,
-            category: document.getElementById('faq-mod-category').value,
-        };
-        if (!payload.question.trim() || !payload.answer.trim()) {
-            Swal.fire({ icon: 'warning', title: 'กรอกคำถามและคำตอบให้ครบ' });
-            return;
-        }
+        try {
+            const id = document.getElementById('faq-mod-id').value;
+            const payload = {
+                question: document.getElementById('faq-mod-question').value,
+                answer: document.getElementById('faq-mod-answer').value,
+                category: document.getElementById('faq-mod-category').value,
+            };
+            if (!payload.question.trim() || !payload.answer.trim()) {
+                Swal.fire({ icon: 'warning', title: 'กรอกคำถามและคำตอบให้ครบ' });
+                return;
+            }
 
-        let res;
-        if (id) {
-            res = await api('faq_update', { ...payload, id });
-        } else {
-            const srcQa = document.getElementById('faq-mod-source-qa-id').value;
-            res = await api('faq_create', { ...payload, source_qa_id: srcQa || '' });
-        }
-        if (!res.ok) {
-            Swal.fire({ icon: 'error', title: 'บันทึกไม่สำเร็จ', text: res.message || '' });
-            return;
-        }
-        // ถ้าเพิ่งสร้างใหม่ → ใส่ id แล้วเปิด variants section ให้กด generate ได้เลย
-        if (!id && res.id) {
-            document.getElementById('faq-mod-id').value = res.id;
-            document.getElementById('faq-variants-section').classList.remove('hidden');
-            renderVariants([]);
-            Swal.fire({
-                icon: 'success',
-                title: 'สร้าง FAQ แล้ว',
-                text: 'กด "ให้ AI เจน 5 รูปแบบ" เพื่อเพิ่ม variant คำถาม หรือปิด modal เพื่อกลับ',
-                timer: 2500,
-            });
-        } else {
-            Swal.fire({ icon: 'success', title: 'บันทึกแล้ว', timer: 900, showConfirmButton: false })
-                .then(() => location.reload());
+            let res;
+            if (id) {
+                res = await api('faq_update', { ...payload, id });
+            } else {
+                const srcQa = document.getElementById('faq-mod-source-qa-id').value;
+                res = await api('faq_create', { ...payload, source_qa_id: srcQa || '' });
+            }
+            if (!res.ok) {
+                Swal.fire({ icon: 'error', title: 'บันทึกไม่สำเร็จ', text: res.message || '' });
+                return;
+            }
+            // ถ้าเพิ่งสร้างใหม่ → ใส่ id แล้วเปิด variants section ให้กด generate ได้เลย
+            if (!id && res.id) {
+                document.getElementById('faq-mod-id').value = res.id;
+                document.getElementById('faq-variants-section').classList.remove('hidden');
+                renderVariants([]);
+                Swal.fire({
+                    icon: 'success',
+                    title: 'สร้าง FAQ แล้ว',
+                    text: 'กด "ให้ AI เจน 5 รูปแบบ" เพื่อเพิ่ม variant คำถาม หรือปิด modal เพื่อกลับ',
+                    timer: 2500,
+                });
+            } else {
+                Swal.fire({ icon: 'success', title: 'บันทึกแล้ว', timer: 900, showConfirmButton: false })
+                    .then(() => location.reload());
+            }
+        } catch (e) {
+            console.error('faqSave error:', e);
+            Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาดที่เบราว์เซอร์', text: e.message });
         }
     };
 })();
