@@ -1164,6 +1164,40 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 
 /* ════════════════════════════════════════════════════════════
+   DARK MODE — DESIGN TOKEN (CSS VARIABLE) OVERRIDES
+   Newer dashboard components (.priority-panel, .activity-list,
+   .priority-item, .kpi-mini, .sec-title etc.) read from --c-*
+   tokens defined at :root. Re-declaring them on the dark body
+   automatically themes all 100+ usages without per-class rules.
+   ════════════════════════════════════════════════════════════ */
+body[data-theme='dark'] {
+    --c-bg:        #0b1121;
+    --c-surface:   #1e293b;
+    --c-surface-2: #0f172a;
+    --c-border:    #334155;
+    --c-border-2:  #1e293b;
+    --c-ink-1:     #f1f5f9;
+    --c-ink-2:     #cbd5e1;
+    --c-ink-3:     #94a3b8;
+    --c-ink-4:     #64748b;
+
+    --c-tone-info-bg:    rgba(59, 130, 246, 0.15);  --c-tone-info:    #93c5fd;
+    --c-tone-success-bg: rgba(16, 185, 129, 0.15);  --c-tone-success: #6ee7b7;
+    --c-tone-warning-bg: rgba(245, 158, 11, 0.15);  --c-tone-warning: #fcd34d;
+    --c-tone-danger-bg:  rgba(244, 63, 94, 0.15);   --c-tone-danger:  #fca5a5;
+    --c-tone-accent-bg:  rgba(139, 92, 246, 0.15);  --c-tone-accent:  #c4b5fd;
+    --c-tone-neutral-bg: rgba(100, 116, 139, 0.20); --c-tone-neutral: #cbd5e1;
+
+    --c-primary-tint:   rgba(46, 158, 99, 0.12);
+    --c-primary-tint-2: rgba(46, 158, 99, 0.18);
+    --c-primary-border: rgba(46, 158, 99, 0.35);
+}
+/* Hardcoded border in .priority-empty bypasses tokens */
+body[data-theme='dark'] .priority-empty {
+    border-color: rgba(16, 185, 129, 0.35) !important;
+}
+
+/* ════════════════════════════════════════════════════════════
    DARK MODE — PARTIAL-SCOPED CLASS OVERRIDES
    Each portal/_partials/*.php defines its own scoped CSS
    (.pf-card, .stg-card, .line-card, .qa-input, etc.) that
