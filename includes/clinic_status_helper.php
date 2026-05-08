@@ -27,6 +27,9 @@ const CLINIC_FAQ_DEFAULTS = [
     'enabled'                => 1,
     'only_when_closed'       => 0,
     'rate_limit_hours'       => 0,
+    // Comma/newline-separated keywords — ถ้าข้อความมีคำใดคำหนึ่ง webhook จะไม่ตอบ
+    // (ปล่อยให้ LINE OA built-in keyword auto-reply ตอบเอง — กันตอบซ้ำ)
+    'blocked_keywords'       => '',
     'msg_open_now_title'     => 'เปิดอยู่ในขณะนี้',
     'msg_open_now_sub'       => 'ปิด {close_time} น. (อีก {time_left})',
     'msg_before_open_title'  => 'ยังไม่เปิดให้บริการ',
@@ -48,6 +51,7 @@ function ensure_clinic_faq_tables(PDO $pdo): void
             enabled TINYINT(1) NOT NULL DEFAULT 1,
             only_when_closed TINYINT(1) NOT NULL DEFAULT 0,
             rate_limit_hours INT NOT NULL DEFAULT 0,
+            blocked_keywords TEXT NULL,
             msg_open_now_title     VARCHAR(160) NOT NULL DEFAULT 'เปิดอยู่ในขณะนี้',
             msg_open_now_sub       VARCHAR(255) NOT NULL DEFAULT 'ปิด {close_time} น. (อีก {time_left})',
             msg_before_open_title  VARCHAR(160) NOT NULL DEFAULT 'ยังไม่เปิดให้บริการ',
@@ -58,9 +62,12 @@ function ensure_clinic_faq_tables(PDO $pdo): void
             msg_closed_today_sub   VARCHAR(255) NOT NULL DEFAULT 'จะเปิด{next_label} เวลา {next_time} น.',
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-        // Migration for existing tables that predate this column
+        // Migration for existing tables that predate these columns
         try {
             $pdo->exec("ALTER TABLE sys_line_faq_settings ADD COLUMN only_when_closed TINYINT(1) NOT NULL DEFAULT 0 AFTER enabled");
+        } catch (PDOException) {}  // column already exists → ignore
+        try {
+            $pdo->exec("ALTER TABLE sys_line_faq_settings ADD COLUMN blocked_keywords TEXT NULL AFTER rate_limit_hours");
         } catch (PDOException) {}  // column already exists → ignore
 
         $pdo->exec("CREATE TABLE IF NOT EXISTS sys_line_faq_log (
@@ -120,6 +127,9 @@ function save_clinic_faq_settings(PDO $pdo, array $data): bool
             $values[$k] = !empty($data[$k]) ? 1 : 0;
         } elseif ($k === 'rate_limit_hours') {
             $values[$k] = max(0, min(720, (int)$data[$k]));   // 0..720 ชั่วโมง (30 วัน)
+        } elseif ($k === 'blocked_keywords') {
+            // TEXT column — เก็บได้ยาว, cap 5000 chars กัน abuse
+            $values[$k] = mb_substr(trim((string)$data[$k]), 0, 5000);
         } else {
             $v = trim((string)$data[$k]);
             $values[$k] = $v !== '' ? mb_substr($v, 0, 255) : $default;
@@ -129,13 +139,13 @@ function save_clinic_faq_settings(PDO $pdo, array $data): bool
     try {
         $stmt = $pdo->prepare("
             INSERT INTO sys_line_faq_settings
-                (id, enabled, only_when_closed, rate_limit_hours,
+                (id, enabled, only_when_closed, rate_limit_hours, blocked_keywords,
                  msg_open_now_title, msg_open_now_sub,
                  msg_before_open_title, msg_before_open_sub,
                  msg_after_close_title, msg_after_close_sub,
                  msg_closed_today_title, msg_closed_today_sub)
             VALUES
-                (1, :enabled, :only_when_closed, :rate_limit_hours,
+                (1, :enabled, :only_when_closed, :rate_limit_hours, :blocked_keywords,
                  :msg_open_now_title, :msg_open_now_sub,
                  :msg_before_open_title, :msg_before_open_sub,
                  :msg_after_close_title, :msg_after_close_sub,
@@ -144,6 +154,7 @@ function save_clinic_faq_settings(PDO $pdo, array $data): bool
                 enabled                = VALUES(enabled),
                 only_when_closed       = VALUES(only_when_closed),
                 rate_limit_hours       = VALUES(rate_limit_hours),
+                blocked_keywords       = VALUES(blocked_keywords),
                 msg_open_now_title     = VALUES(msg_open_now_title),
                 msg_open_now_sub       = VALUES(msg_open_now_sub),
                 msg_before_open_title  = VALUES(msg_before_open_title),
@@ -168,6 +179,28 @@ function save_clinic_faq_settings(PDO $pdo, array $data): bool
  *
  * @return bool true = อนุญาต, false = ติด rate limit
  */
+/**
+ * เช็คว่าข้อความมี keyword ที่อยู่ใน blocklist หรือไม่
+ * blocklist รับเป็น string คั่นด้วย comma หรือ newline
+ * Match แบบ case-insensitive substring
+ *
+ * @return string|null คำที่ตรง (สำหรับ log) หรือ null ถ้าไม่ตรง
+ */
+function find_blocked_keyword(string $message, string $blocklist): ?string
+{
+    $msg = mb_strtolower(trim($message), 'UTF-8');
+    if ($msg === '' || trim($blocklist) === '') return null;
+
+    // split โดยทั้ง newline + comma
+    $tokens = preg_split('/[\r\n,]+/', $blocklist) ?: [];
+    foreach ($tokens as $kw) {
+        $kw = mb_strtolower(trim($kw), 'UTF-8');
+        if ($kw === '') continue;
+        if (str_contains($msg, $kw)) return $kw;
+    }
+    return null;
+}
+
 function check_clinic_faq_rate_limit(PDO $pdo, string $lineUserId, string $intentType, int $windowHours): bool
 {
     if ($lineUserId === '' || $windowHours <= 0) return true;

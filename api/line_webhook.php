@@ -498,6 +498,23 @@ foreach ($data['events'] as $idx => $event) {
         continue;
     }
 
+    // ── Blocklist: ถ้าข้อความมี keyword ที่ admin ตั้ง blocklist ไว้
+    //    → webhook ไม่ตอบ (ไม่ทั้ง matcher และ default) ปล่อยให้ LINE OA
+    //    built-in keyword auto-reply ตอบเอง — กันตอบซ้ำ
+    if ($type === 'message' && $messageText !== '') {
+        $pdo = db();
+        $faqSettingsForBlock = get_clinic_faq_settings($pdo);
+        $hitKeyword = find_blocked_keyword($messageText, (string)($faqSettingsForBlock['blocked_keywords'] ?? ''));
+        if ($hitKeyword !== null) {
+            line_webhook_log('Webhook skipped — message hit blocked keyword (LINE OA auto-reply will handle)', [
+                'line_user_id' => line_mask_uid($userId),
+                'matched_keyword' => $hitKeyword,
+                'message_snippet' => mb_substr($messageText, 0, 80),
+            ]);
+            continue;
+        }
+    }
+
     // ── AI QA Lab — match คำถามกับ FAQ Knowledge Base (admin-curated) ──
     // แทนที่ legacy clinic_status_intent — รองรับคำถามทุกแบบที่ admin ตั้งไว้
     if ($type === 'message' && $messageText !== '') {
