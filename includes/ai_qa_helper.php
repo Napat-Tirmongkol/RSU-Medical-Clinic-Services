@@ -128,17 +128,23 @@ function ai_qa_build_clinic_context(PDO $pdo): string
 {
     require_once __DIR__ . '/clinic_status_helper.php';
 
-    $tz    = new DateTimeZone(CLINIC_TZ_NAME);
-    $now   = new DateTimeImmutable('now', $tz);
-    $today = $now->format('Y-m-d');
-    $tmrw  = $now->modify('+1 day')->format('Y-m-d');
+    $tz  = new DateTimeZone(CLINIC_TZ_NAME);
+    $now = new DateTimeImmutable('now', $tz);
+
+    // 31-day window (today + next 30 days) — ครอบคลุม update cycle รายเดือน
+    // admin อัปเดตตารางเดือนละครั้ง ดังนั้น context ต้องเห็นข้อมูลทั้งเดือน
+    // เพื่อตอบคำถามเช่น "วันที่ 25 เปิดไหม", "วันอาทิตย์หน้าหมอใครออกตรวจ"
+    $days = [];
+    for ($i = 0; $i < 31; $i++) {
+        $days[] = $now->modify("+{$i} day")->format('Y-m-d');
+    }
 
     // ── Clinic profile ────────────────────────────────────────────────────
     $profile = get_clinic_profile_brief($pdo);
     $name    = $profile['name']  !== '' ? $profile['name']  : '(ไม่มีข้อมูล)';
     $phone   = $profile['phone'] !== '' ? $profile['phone'] : '(ไม่มีข้อมูล)';
 
-    // ── Status + hours (today / tomorrow) ─────────────────────────────────
+    // ── Status ─────────────────────────────────────────────────────────────
     $status = get_clinic_current_status($pdo);
     $statusText = match ($status['state'] ?? '') {
         'open_now'    => 'เปิดอยู่ตอนนี้',
@@ -148,6 +154,7 @@ function ai_qa_build_clinic_context(PDO $pdo): string
         default       => '(ไม่ทราบสถานะ)',
     };
 
+    // ── Formatters ────────────────────────────────────────────────────────
     $fmtHours = function (array $h, string $date): string {
         $label = clinic_format_thai_date($date);
         if (!empty($h['closed'])) {
@@ -178,10 +185,20 @@ function ai_qa_build_clinic_context(PDO $pdo): string
         return implode("\n", $lines);
     };
 
-    $hoursTodayText = $fmtHours(get_clinic_hours_for_date($pdo, $today), $today);
-    $hoursTmrwText  = $fmtHours(get_clinic_hours_for_date($pdo, $tmrw), $tmrw);
-    $docTodayText   = $fmtDoctors(get_clinic_doctors_for_date($pdo, $today));
-    $docTmrwText    = $fmtDoctors(get_clinic_doctors_for_date($pdo, $tmrw));
+    // ── Build 7-day forecast ──────────────────────────────────────────────
+    $hoursBlock   = [];
+    $doctorsBlock = [];
+    foreach ($days as $i => $d) {
+        $tag = $i === 0 ? ' [วันนี้]' : ($i === 1 ? ' [พรุ่งนี้]' : '');
+        $hoursBlock[] = $fmtHours(get_clinic_hours_for_date($pdo, $d), $d) . $tag;
+
+        $shifts = get_clinic_doctors_for_date($pdo, $d);
+        $docText = $fmtDoctors($shifts);
+        $dayLabel = clinic_format_thai_date($d);
+        $doctorsBlock[] = "● {$dayLabel}{$tag}\n" . preg_replace('/^/m', '  ', $docText);
+    }
+    $hoursText   = implode("\n", $hoursBlock);
+    $doctorsText = implode("\n\n", $doctorsBlock);
 
     // ── FAQ Knowledge Base (admin-curated) ────────────────────────────────
     $faqLines = [];
@@ -204,25 +221,24 @@ function ai_qa_build_clinic_context(PDO $pdo): string
     } catch (PDOException) {}
     $faqText = empty($faqLines) ? '(ยังไม่มี FAQ ใน knowledge base)' : implode("\n\n", $faqLines);
 
+    $todayLabel = clinic_format_thai_date($days[0]);
+
     return <<<CTX
 ═══ ข้อมูลคลินิก (ใช้ตอบคำถาม) ═══
 
 [ข้อมูลทั่วไป]
 ชื่อคลินิก: {$name}
 เบอร์ติดต่อ: {$phone}
+วันนี้: {$todayLabel}
 
 [สถานะปัจจุบัน]
 {$statusText}
 
-[เวลาทำการ]
-{$hoursTodayText}
-{$hoursTmrwText}
+[เวลาทำการ — 31 วันข้างหน้า (ครอบคลุมทั้งเดือน — ใช้หาคำตอบสำหรับวันที่หรือ weekday ใด ๆ)]
+{$hoursText}
 
-[หมอออกตรวจวันนี้ ({$today})]
-{$docTodayText}
-
-[หมอออกตรวจพรุ่งนี้ ({$tmrw})]
-{$docTmrwText}
+[หมอออกตรวจ — 31 วันข้างหน้า]
+{$doctorsText}
 
 [FAQ Knowledge Base]
 {$faqText}
