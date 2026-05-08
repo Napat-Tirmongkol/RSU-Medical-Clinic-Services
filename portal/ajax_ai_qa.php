@@ -189,14 +189,15 @@ try {
 
         $ins = $pdo->prepare("
             INSERT INTO sys_ai_faq (category, canonical_question, answer, source_qa_id, created_by, updated_by)
-            VALUES (:cat, :q, :a, :src, :uid, :uid)
+            VALUES (:cat, :q, :a, :src, :created_by, :updated_by)
         ");
         $ins->execute([
-            ':cat' => $cat,
-            ':q'   => $q,
-            ':a'   => $a,
-            ':src' => $src,
-            ':uid' => $reviewerId ?: null,
+            ':cat'        => $cat,
+            ':q'          => $q,
+            ':a'          => $a,
+            ':src'        => $src,
+            ':created_by' => $reviewerId ?: null,
+            ':updated_by' => $reviewerId ?: null,
         ]);
         echo json_encode(['ok' => true, 'id' => (int)$pdo->lastInsertId()]);
         exit;
