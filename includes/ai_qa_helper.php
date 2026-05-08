@@ -832,6 +832,16 @@ PROMPT;
             'temperature'      => 0.2,
             'maxOutputTokens'  => 256,
             'responseMimeType' => 'application/json',
+            // schema ตายตัว — Gemini จะ output ตาม schema เด็ดขาด
+            // ป้องกัน preamble "Here is the JSON requested:" ที่เคยเจอ
+            'responseSchema'   => [
+                'type' => 'object',
+                'properties' => [
+                    'match_index' => ['type' => 'integer'],
+                    'confidence'  => ['type' => 'number'],
+                ],
+                'required' => ['match_index', 'confidence'],
+            ],
         ],
     ], JSON_UNESCAPED_UNICODE);
 
@@ -883,6 +893,15 @@ PROMPT;
         $text = preg_replace('/```\s*$/m', '', $text);
         $text = trim($text);
         $parsed = json_decode($text, true);
+        // Fallback: ถ้า direct parse fail (เช่น Gemini ใส่ preamble "Here is..."),
+        // ลองหา { ... } แรกในข้อความ
+        if (!is_array($parsed)) {
+            $start = strpos($text, '{');
+            $end   = strrpos($text, '}');
+            if ($start !== false && $end !== false && $end > $start) {
+                $parsed = json_decode(substr($text, $start, $end - $start + 1), true);
+            }
+        }
         if (!is_array($parsed)) {
             ai_qa_debug_log('AI QA Gemini parse error — raw text not JSON', [
                 'model'        => $model,
