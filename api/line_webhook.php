@@ -456,6 +456,9 @@ foreach ($data['events'] as $idx => $event) {
     $userId = $event['source']['userId'] ?? null;
     $messageText = (($event['message']['type'] ?? '') === 'text') ? (string)($event['message']['text'] ?? '') : '';
     $postbackData = ($type === 'postback') ? (string)($event['postback']['data'] ?? '') : '';
+    // LINE redelivery: ส่งซ้ำเมื่อ delivery แรก timeout — replyToken จะหายไป (ใช้แล้ว)
+    // เราต้อง fallback ไป push เพราะ reply ไม่ได้
+    $isRedelivery = !empty($event['deliveryContext']['isRedelivery']);
 
     line_webhook_log('Webhook event received', [
         'index' => $idx,
@@ -465,6 +468,7 @@ foreach ($data['events'] as $idx => $event) {
         'message_text' => $messageText,
         'postback_data' => $postbackData,
         'has_reply_token' => !empty($replyToken),
+        'is_redelivery' => $isRedelivery,
     ]);
 
     // Mirror text questions to AI QA Lab (sandbox) — runs before any reply branch
@@ -598,7 +602,7 @@ foreach ($data['events'] as $idx => $event) {
 
         case 'message':
             // ตอบกลับแบบง่ายถ้าเป็นข้อความตัวอักษร (default fallback หลัง matcher miss)
-            if ($replyToken && $event['message']['type'] === 'text') {
+            if ($event['message']['type'] === 'text') {
                 $userText = $event['message']['text'];
                 $messages = [
                     [
@@ -606,16 +610,21 @@ foreach ($data['events'] as $idx => $event) {
                         'text' => "เราได้รับข้อความของคุณแล้ว: \"$userText\"\n\nหากต้องการความช่วยเหลือเพิ่มเติม สามารถติดต่อเจ้าหน้าที่ได้โดยตรงค่ะ"
                     ]
                 ];
-                $defaultOk = send_line_reply($replyToken, $messages, $accessToken);
+                // Fallback to push เมื่อไม่มี replyToken (เคส LINE redelivery)
+                $defaultOk = $replyToken
+                    ? send_line_reply($replyToken, $messages, $accessToken)
+                    : ($userId ? send_line_push($userId, $messages, $accessToken) : false);
+                $method = $replyToken ? 'reply' : ($userId ? 'push' : 'none');
                 line_webhook_log($defaultOk ? 'Default reply sent' : 'Default reply FAILED', [
-                    'line_user_id' => line_mask_uid($userId),
-                    'ok'           => $defaultOk,
-                    'line_error'   => $defaultOk ? '' : get_last_line_error(),
+                    'line_user_id'  => line_mask_uid($userId),
+                    'ok'            => $defaultOk,
+                    'method'        => $method,
+                    'is_redelivery' => $isRedelivery,
+                    'line_error'    => $defaultOk ? '' : get_last_line_error(),
                 ], $defaultOk ? 'info' : 'warning');
             } else {
-                line_webhook_log('Default reply skipped (no replyToken or non-text)', [
+                line_webhook_log('Default reply skipped (non-text message)', [
                     'line_user_id' => line_mask_uid($userId),
-                    'has_reply_token' => !empty($replyToken),
                     'message_type' => $event['message']['type'] ?? 'unknown',
                 ], 'warning');
             }
