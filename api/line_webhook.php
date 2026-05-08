@@ -128,7 +128,7 @@ function build_ai_reply_flex(string $answer): array
                         'flex'         => 1,
                         'contents' => [
                             ['type' => 'text', 'text' => 'AI ตอบให้คุณ', 'size' => 'sm', 'weight' => 'bold', 'color' => '#7C3AED'],
-                            ['type' => 'text', 'text' => 'ตอบอัตโนมัติด้วย AI · ต้องการเจ้าหน้าที่กดปุ่มด้านล่าง', 'size' => 'xxs', 'color' => '#6B7280', 'wrap' => true],
+                            ['type' => 'text', 'text' => 'ระบบตอบอัตโนมัติ', 'size' => 'xxs', 'color' => '#6B7280', 'wrap' => true],
                         ],
                     ],
                 ],
@@ -144,24 +144,6 @@ function build_ai_reply_flex(string $answer): array
                         'size'  => 'md',
                         'color' => '#1F2937',
                         'wrap'  => true,
-                    ],
-                ],
-            ],
-            'footer' => [
-                'type'       => 'box',
-                'layout'     => 'vertical',
-                'paddingAll' => '12px',
-                'contents' => [
-                    [
-                        'type'   => 'button',
-                        'style'  => 'primary',
-                        'color'  => '#0F766E',
-                        'height' => 'sm',
-                        'action' => [
-                            'type'  => 'uri',
-                            'label' => '💬 คุยกับเจ้าหน้าที่',
-                            'uri'   => line_app_base_url() . '/user/hub.php?chat=1',
-                        ],
                     ],
                 ],
             ],

@@ -564,17 +564,6 @@ $heroThemes = [
         function hideContact() { document.getElementById('contact-modal').classList.add('hidden'); }
         function showChat() { document.getElementById('chat-modal').classList.remove('hidden'); document.getElementById('chat-modal').classList.add('flex'); const content = document.getElementById('chat-content'); content.scrollTop = content.scrollHeight; if (typeof initChat === 'function') initChat(); }
         function hideChat() { document.getElementById('chat-modal').classList.add('hidden'); }
-
-        // Auto-open chat when arriving from LINE AI flex bubble (?chat=1)
-        if (new URLSearchParams(location.search).get('chat') === '1') {
-            window.addEventListener('DOMContentLoaded', () => {
-                showChat();
-                // ลบ ?chat=1 ออกจาก URL หลังเปิดแล้ว — กันปิดแล้วเด้งเปิดอีก
-                const url = new URL(location.href);
-                url.searchParams.delete('chat');
-                history.replaceState(null, '', url.pathname + url.search);
-            });
-        }
         function showUpcoming(name) { document.getElementById('upcoming-name').innerText = name; document.getElementById('upcoming-modal').classList.remove('hidden'); document.getElementById('upcoming-modal').classList.add('flex'); }
         function hideUpcoming() { document.getElementById('upcoming-modal').classList.add('hidden'); }
 
