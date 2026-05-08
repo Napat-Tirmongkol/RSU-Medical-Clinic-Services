@@ -679,7 +679,7 @@ function ai_qa_match_faq(PDO $pdo, string $question, ?callable $onSemanticPhase 
 
     // ── Phase 1a: canonical question ──────────────────────────────────────
     $stmt = $pdo->prepare("
-        SELECT id, answer
+        SELECT id, answer, category
           FROM sys_ai_faq
          WHERE is_active = 1 AND TRIM(canonical_question) = :q
          LIMIT 1
@@ -689,6 +689,7 @@ function ai_qa_match_faq(PDO $pdo, string $question, ?callable $onSemanticPhase 
         ai_qa_debug_log('AI QA Phase 1a HIT (canonical)', ['faq_id' => (int)$row['id']]);
         return [
             'answer'      => (string)$row['answer'],
+            'category'    => (string)($row['category'] ?? 'อื่นๆ'),
             'matched_via' => 'exact_canonical',
             'source_id'   => (int)$row['id'],
         ];
@@ -696,7 +697,7 @@ function ai_qa_match_faq(PDO $pdo, string $question, ?callable $onSemanticPhase 
 
     // ── Phase 1b: FAQ variants ────────────────────────────────────────────
     $stmt = $pdo->prepare("
-        SELECT f.id, f.answer
+        SELECT f.id, f.answer, f.category
           FROM sys_ai_faq f
           JOIN sys_ai_faq_variants v ON v.faq_id = f.id
          WHERE f.is_active = 1 AND TRIM(v.variant_question) = :q
@@ -707,6 +708,7 @@ function ai_qa_match_faq(PDO $pdo, string $question, ?callable $onSemanticPhase 
         ai_qa_debug_log('AI QA Phase 1b HIT (variant)', ['faq_id' => (int)$row['id']]);
         return [
             'answer'      => (string)$row['answer'],
+            'category'    => (string)($row['category'] ?? 'อื่นๆ'),
             'matched_via' => 'exact_variant',
             'source_id'   => (int)$row['id'],
         ];
@@ -714,7 +716,7 @@ function ai_qa_match_faq(PDO $pdo, string $question, ?callable $onSemanticPhase 
 
     // ── Phase 1c: approved Captured ───────────────────────────────────────
     $stmt = $pdo->prepare("
-        SELECT id, ai_answer
+        SELECT id, ai_answer, category
           FROM sys_ai_qa_log
          WHERE status = 'approved' AND ai_answer IS NOT NULL
            AND TRIM(question) = :q
@@ -726,6 +728,7 @@ function ai_qa_match_faq(PDO $pdo, string $question, ?callable $onSemanticPhase 
         ai_qa_debug_log('AI QA Phase 1c HIT (approved)', ['qa_log_id' => (int)$row['id']]);
         return [
             'answer'      => (string)$row['ai_answer'],
+            'category'    => (string)($row['category'] ?? 'อื่นๆ'),
             'matched_via' => 'exact_approved',
             'source_id'   => (int)$row['id'],
         ];
@@ -762,7 +765,7 @@ function ai_qa_match_via_gemini(PDO $pdo, string $question): ?array
 
     try {
         $rs = $pdo->query("
-            SELECT 'faq' AS src, id, canonical_question AS q, answer
+            SELECT 'faq' AS src, id, canonical_question AS q, answer, category
               FROM sys_ai_faq
              WHERE is_active = 1
              ORDER BY updated_at DESC
@@ -772,7 +775,7 @@ function ai_qa_match_via_gemini(PDO $pdo, string $question): ?array
 
         $rs2 = $pdo->query("
             SELECT 'qa' AS src, MIN(id) AS id,
-                   MAX(question) AS q, MAX(ai_answer) AS answer
+                   MAX(question) AS q, MAX(ai_answer) AS answer, MAX(category) AS category
               FROM sys_ai_qa_log
              WHERE status = 'approved' AND ai_answer IS NOT NULL
              GROUP BY TRIM(question)
@@ -914,6 +917,7 @@ PROMPT;
         ]);
         return [
             'answer'      => (string)$matched['answer'],
+            'category'    => (string)($matched['category'] ?? 'อื่นๆ'),
             'matched_via' => 'gemini_' . $matched['src'],
             'source_id'   => (int)$matched['id'],
             'confidence'  => $conf,

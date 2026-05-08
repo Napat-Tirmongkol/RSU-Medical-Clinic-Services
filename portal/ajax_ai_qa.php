@@ -40,7 +40,22 @@ try {
             exit;
         }
 
-        $result = ai_qa_generate_answer($groupKey, $pdo);
+        // Reuse-before-regenerate: เช็คว่ามีคำตอบที่ approve แล้ว/อยู่ใน FAQ
+        // ที่ใกล้เคียงกันไหม (exact + Gemini semantic ≥0.7) — ถ้ามีก็ใช้ซ้ำ
+        // ไม่ต้อง gen ใหม่ ประหยัด API + admin approve ได้เร็ว
+        $matched = ai_qa_match_faq($pdo, $groupKey);
+        $reused = $matched !== null;
+
+        if ($reused) {
+            $result = [
+                'category'   => (string)($matched['category'] ?? 'อื่นๆ'),
+                'answer'     => (string)$matched['answer'],
+                'model'      => 'reused:' . $matched['matched_via'],
+                'confidence' => (float)($matched['confidence'] ?? 1.0),
+            ];
+        } else {
+            $result = ai_qa_generate_answer($groupKey, $pdo);
+        }
 
         $upd = $pdo->prepare("
             UPDATE sys_ai_qa_log
@@ -63,6 +78,8 @@ try {
             'ok'      => true,
             'result'  => $result,
             'updated' => $upd->rowCount(),
+            'reused'  => $reused,
+            'matched_via' => $reused ? $matched['matched_via'] : null,
         ]);
         exit;
     }
@@ -94,11 +111,23 @@ try {
                AND status = 'pending'
         ");
 
-        $ok = 0; $fail = 0; $rowsUpdated = 0; $errors = [];
+        $ok = 0; $fail = 0; $rowsUpdated = 0; $reusedCnt = 0; $errors = [];
         foreach ($list as $rec) {
             $gk = (string)$rec['group_key'];
             try {
-                $result = ai_qa_generate_answer($gk, $pdo);
+                // Reuse-before-regenerate (เหมือน single generate)
+                $matched = ai_qa_match_faq($pdo, $gk);
+                if ($matched !== null) {
+                    $result = [
+                        'category'   => (string)($matched['category'] ?? 'อื่นๆ'),
+                        'answer'     => (string)$matched['answer'],
+                        'model'      => 'reused:' . $matched['matched_via'],
+                        'confidence' => (float)($matched['confidence'] ?? 1.0),
+                    ];
+                    $reusedCnt++;
+                } else {
+                    $result = ai_qa_generate_answer($gk, $pdo);
+                }
                 $upd->execute([
                     ':cat'   => $result['category'],
                     ':ans'   => $result['answer'],
@@ -118,6 +147,7 @@ try {
             'ok'           => true,
             'processed'    => count($list),
             'success'      => $ok,
+            'reused'       => $reusedCnt,
             'failed'       => $fail,
             'rows_updated' => $rowsUpdated,
             'errors'       => $errors,

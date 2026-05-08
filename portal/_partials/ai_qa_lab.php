@@ -844,7 +844,10 @@ function _qa_source_badge(string $s): string {
             try {
                 const res = await api('generate', { group_key });
                 if (res.ok) {
-                    Swal.fire({ icon: 'success', title: 'AI ร่างคำตอบเรียบร้อย', timer: 1200, showConfirmButton: false })
+                    const title = res.reused
+                        ? 'พบคำตอบที่อนุมัติแล้ว — ใช้ซ้ำได้เลย'
+                        : 'AI ร่างคำตอบเรียบร้อย';
+                    Swal.fire({ icon: 'success', title, timer: 1500, showConfirmButton: false })
                         .then(() => location.reload());
                 } else {
                     Swal.fire({ icon: 'error', title: 'ไม่สำเร็จ', text: res.message || 'unknown error' });
@@ -951,10 +954,13 @@ function _qa_source_badge(string $s): string {
         });
         const res = await api('bulk_generate', { limit: value || 10 });
         if (res.ok) {
+            const reusedNote = (res.reused > 0)
+                ? `<br><span class="text-xs text-emerald-600">↻ ใช้คำตอบเดิม ${res.reused} กลุ่ม (ไม่ต้อง gen ใหม่)</span>`
+                : '';
             Swal.fire({
                 icon: 'success',
                 title: 'เสร็จแล้ว',
-                html: `ประมวลผล <b>${res.processed}</b> กลุ่ม (อัปเดต <b>${res.rows_updated || 0}</b> records)<br>สำเร็จ <b>${res.success}</b> · ล้มเหลว <b>${res.failed}</b>`,
+                html: `ประมวลผล <b>${res.processed}</b> กลุ่ม (อัปเดต <b>${res.rows_updated || 0}</b> records)<br>สำเร็จ <b>${res.success}</b> · ล้มเหลว <b>${res.failed}</b>${reusedNote}`,
             }).then(() => location.reload());
         } else {
             Swal.fire({ icon: 'error', title: 'ไม่สำเร็จ', text: res.message || '' });
