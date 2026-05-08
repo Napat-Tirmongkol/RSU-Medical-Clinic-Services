@@ -531,7 +531,10 @@ $ocPreview = ocrBuildChart($ocPreviewPositions, $ocPreviewMembers, null);
             el.innerHTML = '<div class="oc-empty-state"><i class="fa-solid fa-folder-open text-3xl mb-2 block text-slate-300"></i>ยังไม่มีตำแหน่ง<br><button onclick="ocAddPosition(null)" class="mt-2 text-emerald-600 underline font-bold">เพิ่มตำแหน่งแรก</button></div>';
             return;
         }
-        el.innerHTML = ocRenderTreeNodes(tree, null);
+        // Root needs its own .oc-tree-list wrapper so Sortable can pick up
+        // top-level positions and admins can reorder them. Empty data-parent-id
+        // signals "root" to the move/reorder handlers.
+        el.innerHTML = `<ul class="oc-tree-list" data-parent-id="">${ocRenderTreeNodes(tree, null)}</ul>`;
         ocInitSortableTree();
     };
 
