@@ -118,11 +118,123 @@ function ai_qa_load_gemini_key(): string
 }
 
 /**
+ * สร้าง "clinic context" ให้ AI ใช้ตอบคำถามจากข้อมูลจริงของคลินิก
+ * รวม: ชื่อ/เบอร์คลินิก, สถานะตอนนี้ (เปิด/ปิด), เวลาวันนี้+พรุ่งนี้,
+ *      หมอที่ออกตรวจวันนี้+พรุ่งนี้, FAQ ที่ admin curate ไว้
+ *
+ * ค่าที่ขาดให้แทนด้วย "(ไม่มีข้อมูล)" — AI จะรู้ตัวว่าต้อง fallback ไปเป็น placeholder
+ */
+function ai_qa_build_clinic_context(PDO $pdo): string
+{
+    require_once __DIR__ . '/clinic_status_helper.php';
+
+    $tz    = new DateTimeZone(CLINIC_TZ_NAME);
+    $now   = new DateTimeImmutable('now', $tz);
+    $today = $now->format('Y-m-d');
+    $tmrw  = $now->modify('+1 day')->format('Y-m-d');
+
+    // ── Clinic profile ────────────────────────────────────────────────────
+    $profile = get_clinic_profile_brief($pdo);
+    $name    = $profile['name']  !== '' ? $profile['name']  : '(ไม่มีข้อมูล)';
+    $phone   = $profile['phone'] !== '' ? $profile['phone'] : '(ไม่มีข้อมูล)';
+
+    // ── Status + hours (today / tomorrow) ─────────────────────────────────
+    $status = get_clinic_current_status($pdo);
+    $statusText = match ($status['state'] ?? '') {
+        'open_now'    => 'เปิดอยู่ตอนนี้',
+        'before_open' => 'ยังไม่เปิด (จะเปิดวันนี้เวลา ' . ($status['today_open'] ?? '') . ')',
+        'after_close' => 'ปิดแล้วสำหรับวันนี้',
+        'closed'      => 'วันนี้ปิดทำการ',
+        default       => '(ไม่ทราบสถานะ)',
+    };
+
+    $fmtHours = function (array $h, string $date): string {
+        $label = clinic_format_thai_date($date);
+        if (!empty($h['closed'])) {
+            $note = !empty($h['note']) ? ' — ' . $h['note'] : '';
+            return "{$label}: ปิดทำการ{$note}";
+        }
+        if (empty($h['open_time']) || empty($h['close_time'])) {
+            return "{$label}: (ไม่มีข้อมูลเวลาเปิด-ปิด)";
+        }
+        $note = !empty($h['note']) ? ' — ' . $h['note'] : '';
+        return "{$label}: {$h['open_time']}–{$h['close_time']}{$note}";
+    };
+    $fmtDoctors = function (array $shifts): string {
+        if (empty($shifts)) return '(ไม่มีหมอออกตรวจ)';
+        $lines = [];
+        foreach ($shifts as $s) {
+            $title = trim((string)($s['doc_title'] ?? ''));
+            $dname = trim((string)($s['doc_name']  ?? ''));
+            $start = (string)($s['start_time'] ?? '');
+            $end   = (string)($s['end_time']   ?? '');
+            $room  = trim((string)($s['room_name'] ?? ''));
+            $svc   = trim((string)($s['service_type'] ?? ''));
+            $time  = ($start && $end) ? substr($start, 0, 5) . '–' . substr($end, 0, 5) : '';
+            $extras = array_filter([$svc, $room ? 'ห้อง ' . $room : '']);
+            $lines[] = '• ' . trim("{$title} {$dname}") . ($time ? " ({$time})" : '') .
+                       (!empty($extras) ? ' — ' . implode(', ', $extras) : '');
+        }
+        return implode("\n", $lines);
+    };
+
+    $hoursTodayText = $fmtHours(get_clinic_hours_for_date($pdo, $today), $today);
+    $hoursTmrwText  = $fmtHours(get_clinic_hours_for_date($pdo, $tmrw), $tmrw);
+    $docTodayText   = $fmtDoctors(get_clinic_doctors_for_date($pdo, $today));
+    $docTmrwText    = $fmtDoctors(get_clinic_doctors_for_date($pdo, $tmrw));
+
+    // ── FAQ Knowledge Base (admin-curated) ────────────────────────────────
+    $faqLines = [];
+    try {
+        ensure_ai_faq_schema($pdo);
+        $rs = $pdo->query("
+            SELECT category, canonical_question, answer
+              FROM sys_ai_faq
+             WHERE is_active = 1
+             ORDER BY updated_at DESC
+             LIMIT 30
+        ")->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($rs as $f) {
+            $q = trim((string)$f['canonical_question']);
+            $a = trim((string)$f['answer']);
+            $c = trim((string)$f['category']);
+            if ($q === '' || $a === '') continue;
+            $faqLines[] = "[{$c}] ถาม: {$q}\n      ตอบ: {$a}";
+        }
+    } catch (PDOException) {}
+    $faqText = empty($faqLines) ? '(ยังไม่มี FAQ ใน knowledge base)' : implode("\n\n", $faqLines);
+
+    return <<<CTX
+═══ ข้อมูลคลินิก (ใช้ตอบคำถาม) ═══
+
+[ข้อมูลทั่วไป]
+ชื่อคลินิก: {$name}
+เบอร์ติดต่อ: {$phone}
+
+[สถานะปัจจุบัน]
+{$statusText}
+
+[เวลาทำการ]
+{$hoursTodayText}
+{$hoursTmrwText}
+
+[หมอออกตรวจวันนี้ ({$today})]
+{$docTodayText}
+
+[หมอออกตรวจพรุ่งนี้ ({$tmrw})]
+{$docTmrwText}
+
+[FAQ Knowledge Base]
+{$faqText}
+CTX;
+}
+
+/**
  * เรียก Gemini เพื่อจัดหมวด + ร่างคำตอบ — คืน array หรือ throw
  *
  * @return array{category:string, answer:string, confidence:float, model:string}
  */
-function ai_qa_generate_answer(string $question): array
+function ai_qa_generate_answer(string $question, ?PDO $pdo = null): array
 {
     $apiKey = ai_qa_load_gemini_key();
     if (!$apiKey) {
@@ -130,19 +242,31 @@ function ai_qa_generate_answer(string $question): array
     }
 
     $categoriesList = implode(' | ', AI_QA_CATEGORIES);
+    $clinicContext  = $pdo ? ai_qa_build_clinic_context($pdo) : '(ไม่ได้ส่ง PDO เข้ามา — ไม่มี clinic context)';
 
     $systemPrompt = <<<PROMPT
 คุณคือผู้ช่วยตอบคำถามของห้องพยาบาลคลินิก RSU Medical
-หน้าที่: รับคำถามจากผู้ใช้ → จัดหมวดหมู่ + ร่างคำตอบเบื้องต้นเป็นภาษาไทย
-สำคัญ: คำตอบนี้จะถูก admin ตรวจสอบก่อนส่ง — อย่าใส่ข้อมูลเฉพาะเจาะจง (ตัวเลข, วันที่, ชื่อหมอ) ที่คุณไม่แน่ใจ ให้ใช้ placeholder เช่น "(ขอข้อมูลจากเจ้าหน้าที่)" แทน
+หน้าที่: รับคำถามจากผู้ใช้ → จัดหมวดหมู่ + ร่างคำตอบเบื้องต้นเป็นภาษาไทย โดย**ใช้ข้อมูลจริงของคลินิก**ที่ให้ไว้ด้านล่าง
+
+กฎสำคัญ:
+1. ใช้ข้อมูลจาก "ข้อมูลคลินิก" ด้านล่างเป็นแหล่งข้อมูลหลัก — เวลาเปิด-ปิด, สถานะ, ชื่อหมอ, ตารางออกตรวจ, FAQ
+2. ถ้าคำถามตรง/ใกล้เคียงกับ FAQ — ให้ตอบโดยอิงคำตอบใน FAQ (ปรับสำนวนให้ลื่น)
+3. ถ้าข้อมูลที่จำเป็นไม่อยู่ใน context — ใช้ placeholder "(ขอข้อมูลจากเจ้าหน้าที่)" แทนการเดา
+4. ห้ามแต่งตัวเลข/วันที่/ชื่อหมอเอง — ถ้าไม่มีใน context ให้ใส่ placeholder เท่านั้น
+5. คำตอบนี้จะถูก admin ตรวจสอบก่อนส่งให้ user จริง — ดังนั้นเขียนสุภาพ กระชับ ตรงประเด็น
+6. confidence: สูง (0.8+) ถ้าตอบจากข้อมูลที่ชัดใน context, ต่ำ (0.3-) ถ้าต้องใช้ placeholder หลายจุด
+
+{$clinicContext}
+
+═══════════════════
 
 หมวดหมู่ที่อนุญาต (เลือก 1 หมวดเท่านั้น): {$categoriesList}
 
 ตอบกลับเป็น JSON ตาม schema นี้เท่านั้น:
 {
   "category": "ชื่อหมวดจาก list ด้านบน",
-  "answer": "คำตอบภาษาไทย สุภาพ กระชับ 2-4 ประโยค",
-  "confidence": 0.0 ถึง 1.0 (ความมั่นใจในคำตอบ — ถ้าคำถามคลุมเครือให้ต่ำลง)
+  "answer": "คำตอบภาษาไทย สุภาพ กระชับ 2-4 ประโยค (อิงจาก context จริง)",
+  "confidence": 0.0 ถึง 1.0
 }
 
 คำถามจากผู้ใช้:

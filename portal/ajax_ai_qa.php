@@ -40,7 +40,7 @@ try {
             exit;
         }
 
-        $result = ai_qa_generate_answer($groupKey);
+        $result = ai_qa_generate_answer($groupKey, $pdo);
 
         $upd = $pdo->prepare("
             UPDATE sys_ai_qa_log
@@ -98,7 +98,7 @@ try {
         foreach ($list as $rec) {
             $gk = (string)$rec['group_key'];
             try {
-                $result = ai_qa_generate_answer($gk);
+                $result = ai_qa_generate_answer($gk, $pdo);
                 $upd->execute([
                     ':cat'   => $result['category'],
                     ':ans'   => $result['answer'],
