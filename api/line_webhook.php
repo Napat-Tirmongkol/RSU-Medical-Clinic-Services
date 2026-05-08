@@ -501,7 +501,17 @@ foreach ($data['events'] as $idx => $event) {
         $pdo = db();
         $faqSettings = get_clinic_faq_settings($pdo);
 
-        if ((int)$faqSettings['enabled']) {
+        if (!(int)$faqSettings['enabled']) {
+            line_webhook_log('AI QA Lab disabled (FAQ enabled=0)', [
+                'line_user_id' => line_mask_uid($userId),
+            ]);
+        } elseif ((int)$faqSettings['only_when_closed'] && get_clinic_current_status($pdo)['is_open_now']) {
+            // admin ตั้ง only_when_closed=1 และคลินิกเปิดอยู่ → ข้าม AI reply
+            // (ตกไป default reply — เพื่อบีบให้ user คุยกับเจ้าหน้าที่ตอนเปิดทำการ)
+            line_webhook_log('AI QA Lab skipped (clinic is open, only_when_closed=1)', [
+                'line_user_id' => line_mask_uid($userId),
+            ]);
+        } else {
             // Rate limit (per LINE user) ใช้ key 'ai_qa' รวมทุกประเภทคำถาม
             $allowed = $userId
                 ? check_clinic_faq_rate_limit($pdo, (string)$userId, 'ai_qa', (int)$faqSettings['rate_limit_hours'])
@@ -558,10 +568,6 @@ foreach ($data['events'] as $idx => $event) {
             }
 
             line_webhook_log('AI QA Lab no match (fallthrough to default reply)', [
-                'line_user_id' => line_mask_uid($userId),
-            ]);
-        } else {
-            line_webhook_log('AI QA Lab disabled (FAQ enabled=0)', [
                 'line_user_id' => line_mask_uid($userId),
             ]);
         }
