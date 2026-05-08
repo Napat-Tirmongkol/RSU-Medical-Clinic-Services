@@ -334,7 +334,10 @@ $unassignedMembers = (int)$pdo->query("SELECT COUNT(*) FROM sys_org_members WHER
 <script src="../assets/vendor/Sortable.min.js"></script>
 <script>
 (function() {
-    const CSRF = (typeof portal_CSRF !== 'undefined') ? portal_CSRF : '';
+    // CSRF is defined later in portal/index.php — read lazily on each request
+    function getCSRF() {
+        return (typeof portal_CSRF !== 'undefined') ? portal_CSRF : '';
+    }
 
     // State
     window.ocPositions = [];
@@ -351,18 +354,24 @@ $unassignedMembers = (int)$pdo->query("SELECT COUNT(*) FROM sys_org_members WHER
             body = data;
             body.append('entity', entity);
             body.append('action', action);
-            body.append('csrf_token', CSRF);
+            body.append('csrf_token', getCSRF());
         } else {
             body = new FormData();
             body.append('entity', entity);
             body.append('action', action);
-            body.append('csrf_token', CSRF);
+            body.append('csrf_token', getCSRF());
             Object.entries(data || {}).forEach(([k, v]) => {
                 if (v !== null && v !== undefined) body.append(k, v);
             });
         }
         const res = await fetch('ajax_clinic_master.php', { method: 'POST', body });
-        return res.json();
+        const text = await res.text();
+        try {
+            return JSON.parse(text);
+        } catch (e) {
+            // Server returned non-JSON (e.g. 403 CSRF error page)
+            return { ok: false, message: text.substring(0, 200) || ('HTTP ' + res.status) };
+        }
     }
 
     // ── Load all data ────────────────────────────────────────────────
@@ -720,7 +729,12 @@ $unassignedMembers = (int)$pdo->query("SELECT COUNT(*) FROM sys_org_members WHER
         document.getElementById(modalId).style.display = 'none';
     };
 
-    // Init
-    ocLoadAll();
+    // Init — defer until after portal_CSRF script (defined later in portal/index.php) has run
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', ocLoadAll);
+    } else {
+        // Already past parsing — wait one tick so any pending inline scripts complete
+        setTimeout(ocLoadAll, 0);
+    }
 })();
 </script>
