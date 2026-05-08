@@ -57,20 +57,43 @@ $_qa_statStatus = [];
 $_qa_statCategory = [];
 
 try {
-    $sc = $pdo->prepare("SELECT COUNT(*) FROM sys_ai_qa_log $_qa_where");
+    // Group by trimmed question to collapse duplicates ("ประกาศฉีดวัคซีน" × 4 → 1 row)
+    $sc = $pdo->prepare("
+        SELECT COUNT(*) FROM (
+            SELECT 1 FROM sys_ai_qa_log $_qa_where GROUP BY TRIM(question)
+        ) t
+    ");
     $sc->execute($_qa_params);
     $_qa_total      = (int)$sc->fetchColumn();
     $_qa_totalPages = max(1, (int)ceil($_qa_total / $_qa_perPage));
     if ($_qa_page > $_qa_totalPages) $_qa_page = $_qa_totalPages;
     $_qa_offset = ($_qa_page - 1) * $_qa_perPage;
 
+    // group_status priority: approved > needs_edit > generated > rejected > pending
     $sr = $pdo->prepare("
-        SELECT id, source, source_ref_id, user_id, line_user_id, question,
-               category, ai_answer, ai_model, ai_confidence, status,
-               reviewer_note, reviewed_by, reviewed_at, created_at
+        SELECT
+            TRIM(question) AS group_key,
+            MAX(question) AS question,
+            COUNT(*) AS occurrences,
+            MAX(created_at) AS latest_at,
+            MAX(category) AS category,
+            MAX(ai_answer) AS ai_answer,
+            MAX(ai_confidence) AS ai_confidence,
+            MAX(ai_model) AS ai_model,
+            MAX(reviewer_note) AS reviewer_note,
+            CASE
+                WHEN SUM(status='approved') > 0   THEN 'approved'
+                WHEN SUM(status='needs_edit') > 0 THEN 'needs_edit'
+                WHEN SUM(status='generated') > 0  THEN 'generated'
+                WHEN SUM(status='rejected') > 0   THEN 'rejected'
+                ELSE 'pending'
+            END AS status,
+            GROUP_CONCAT(DISTINCT source ORDER BY source) AS sources,
+            MIN(id) AS sample_id
           FROM sys_ai_qa_log
           $_qa_where
-          ORDER BY created_at DESC
+          GROUP BY TRIM(question)
+          ORDER BY latest_at DESC
           LIMIT $_qa_perPage OFFSET $_qa_offset
     ");
     $sr->execute($_qa_params);
@@ -347,18 +370,33 @@ function _qa_source_badge(string $s): string {
                         <i class="fa-solid fa-inbox text-3xl mb-2 block"></i>
                         ยังไม่มีคำถามที่เข้าเงื่อนไขการกรอง
                     </td></tr>
-                <?php else: foreach ($_qa_logs as $r): ?>
+                <?php else: foreach ($_qa_logs as $r):
+                    $occ     = (int)($r['occurrences'] ?? 1);
+                    $sources = array_filter(explode(',', (string)($r['sources'] ?? '')));
+                ?>
                     <tr class="qa-row border-b border-gray-100"
-                        data-id="<?= (int)$r['id'] ?>"
+                        data-group-key="<?= htmlspecialchars((string)$r['group_key'], ENT_QUOTES) ?>"
+                        data-sample-id="<?= (int)($r['sample_id'] ?? 0) ?>"
                         data-question="<?= htmlspecialchars((string)$r['question'], ENT_QUOTES) ?>"
                         data-answer="<?= htmlspecialchars((string)($r['ai_answer'] ?? ''), ENT_QUOTES) ?>"
                         data-category="<?= htmlspecialchars((string)($r['category'] ?? ''), ENT_QUOTES) ?>"
                         data-status="<?= htmlspecialchars((string)$r['status'], ENT_QUOTES) ?>"
                         data-note="<?= htmlspecialchars((string)($r['reviewer_note'] ?? ''), ENT_QUOTES) ?>">
-                        <td class="px-4 py-3 text-xs text-gray-500 whitespace-nowrap"><?= date('d/m H:i', strtotime((string)$r['created_at'])) ?></td>
-                        <td class="px-4 py-3"><span class="qa-chip" style="<?= _qa_source_badge((string)$r['source']) ?>"><?= strtoupper((string)$r['source']) ?></span></td>
+                        <td class="px-4 py-3 text-xs text-gray-500 whitespace-nowrap"><?= date('d/m H:i', strtotime((string)$r['latest_at'])) ?></td>
+                        <td class="px-4 py-3">
+                            <?php foreach ($sources as $src): ?>
+                                <span class="qa-chip" style="<?= _qa_source_badge($src) ?>"><?= strtoupper(htmlspecialchars($src)) ?></span>
+                            <?php endforeach; ?>
+                        </td>
                         <td class="px-4 py-3 max-w-md">
-                            <div class="text-gray-900 line-clamp-2"><?= htmlspecialchars(mb_substr((string)$r['question'], 0, 200)) ?></div>
+                            <div class="flex items-start gap-2">
+                                <div class="text-gray-900 line-clamp-2 flex-1"><?= htmlspecialchars(mb_substr((string)$r['question'], 0, 200)) ?></div>
+                                <?php if ($occ > 1): ?>
+                                    <span class="qa-chip shrink-0 bg-amber-50 text-amber-700 border border-amber-200" title="ถูกถาม <?= $occ ?> ครั้ง">
+                                        <i class="fa-solid fa-layer-group"></i> ×<?= $occ ?>
+                                    </span>
+                                <?php endif; ?>
+                            </div>
                             <?php if (!empty($r['ai_answer'])): ?>
                                 <div class="text-xs text-gray-500 mt-1 line-clamp-1"><i class="fa-solid fa-robot mr-1"></i><?= htmlspecialchars(mb_substr((string)$r['ai_answer'], 0, 120)) ?></div>
                             <?php endif; ?>
@@ -375,18 +413,18 @@ function _qa_source_badge(string $s): string {
                         <td class="px-4 py-3"><span class="qa-chip" style="<?= _qa_status_badge((string)$r['status']) ?>"><?= htmlspecialchars(_qa_status_label((string)$r['status'])) ?></span></td>
                         <td class="px-4 py-3 text-right whitespace-nowrap">
                             <?php if ($r['status'] === 'pending'): ?>
-                                <button class="qa-act qa-generate px-3 py-1.5 bg-purple-600 text-white text-xs font-bold rounded-lg hover:bg-purple-700" data-id="<?= (int)$r['id'] ?>">
+                                <button class="qa-act qa-generate px-3 py-1.5 bg-purple-600 text-white text-xs font-bold rounded-lg hover:bg-purple-700">
                                     <i class="fa-solid fa-wand-magic-sparkles"></i> Generate
                                 </button>
                             <?php else: ?>
-                                <button class="qa-act qa-review px-3 py-1.5 bg-gray-900 text-white text-xs font-bold rounded-lg hover:bg-gray-800" data-id="<?= (int)$r['id'] ?>">
+                                <button class="qa-act qa-review px-3 py-1.5 bg-gray-900 text-white text-xs font-bold rounded-lg hover:bg-gray-800">
                                     <i class="fa-solid fa-pen-to-square"></i> Review
                                 </button>
                             <?php endif; ?>
-                            <button class="qa-act qa-promote p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg" data-id="<?= (int)$r['id'] ?>" title="ทำเป็น FAQ">
+                            <button class="qa-act qa-promote p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg" title="ทำเป็น FAQ">
                                 <i class="fa-solid fa-bookmark text-xs"></i>
                             </button>
-                            <button class="qa-act qa-delete p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg" data-id="<?= (int)$r['id'] ?>" title="ลบ">
+                            <button class="qa-act qa-delete p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg" title="ลบทั้งกลุ่ม">
                                 <i class="fa-solid fa-trash text-xs"></i>
                             </button>
                         </td>
@@ -679,11 +717,12 @@ function _qa_source_badge(string $s): string {
 
     document.querySelectorAll('.qa-generate').forEach(btn => {
         btn.addEventListener('click', async () => {
-            const id = btn.dataset.id;
+            const tr = btn.closest('tr');
+            const group_key = tr.dataset.groupKey;
             btn.disabled = true;
             btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
             try {
-                const res = await api('generate', { id });
+                const res = await api('generate', { group_key });
                 if (res.ok) {
                     Swal.fire({ icon: 'success', title: 'AI ร่างคำตอบเรียบร้อย', timer: 1200, showConfirmButton: false })
                         .then(() => location.reload());
@@ -703,7 +742,7 @@ function _qa_source_badge(string $s): string {
     document.querySelectorAll('.qa-review').forEach(btn => {
         btn.addEventListener('click', () => {
             const tr = btn.closest('tr');
-            currentId = tr.dataset.id;
+            currentId = tr.dataset.groupKey;
             document.getElementById('qa-mod-question').textContent = tr.dataset.question;
             document.getElementById('qa-mod-answer').value = tr.dataset.answer;
             document.getElementById('qa-mod-category').value = tr.dataset.category || 'อื่นๆ';
@@ -716,17 +755,18 @@ function _qa_source_badge(string $s): string {
 
     document.querySelectorAll('.qa-delete').forEach(btn => {
         btn.addEventListener('click', async () => {
+            const tr = btn.closest('tr');
             const { isConfirmed } = await Swal.fire({
                 icon: 'warning',
-                title: 'ลบรายการนี้?',
-                text: 'การลบไม่สามารถย้อนกลับได้',
+                title: 'ลบกลุ่มคำถามนี้?',
+                text: 'จะลบทุก occurrence ของคำถามนี้ — ย้อนกลับไม่ได้',
                 showCancelButton: true,
-                confirmButtonText: 'ลบ',
+                confirmButtonText: 'ลบทั้งหมด',
                 cancelButtonText: 'ยกเลิก',
                 confirmButtonColor: '#e11d48',
             });
             if (!isConfirmed) return;
-            const res = await api('delete', { id: btn.dataset.id });
+            const res = await api('delete', { group_key: tr.dataset.groupKey });
             if (res.ok) location.reload();
             else Swal.fire({ icon: 'error', title: 'ลบไม่สำเร็จ', text: res.message || '' });
         });
@@ -757,7 +797,7 @@ function _qa_source_badge(string $s): string {
             Swal.fire({
                 icon: 'success',
                 title: 'เสร็จแล้ว',
-                html: `ประมวลผล <b>${res.processed}</b> รายการ<br>สำเร็จ <b>${res.success}</b> · ล้มเหลว <b>${res.failed}</b>`,
+                html: `ประมวลผล <b>${res.processed}</b> กลุ่ม (อัปเดต <b>${res.rows_updated || 0}</b> records)<br>สำเร็จ <b>${res.success}</b> · ล้มเหลว <b>${res.failed}</b>`,
             }).then(() => location.reload());
         } else {
             Swal.fire({ icon: 'error', title: 'ไม่สำเร็จ', text: res.message || '' });
@@ -774,7 +814,7 @@ function _qa_source_badge(string $s): string {
     window.qaSubmit = async function(status) {
         if (!currentId) return;
         const payload = {
-            id: currentId,
+            group_key: currentId,
             status: status,
             category: document.getElementById('qa-mod-category').value,
             answer: document.getElementById('qa-mod-answer').value,
@@ -794,7 +834,7 @@ function _qa_source_badge(string $s): string {
         btn.addEventListener('click', () => {
             const tr = btn.closest('tr');
             faqOpenModal({
-                source_qa_id: tr.dataset.id,
+                source_qa_id: tr.dataset.sampleId,
                 question: tr.dataset.question,
                 answer: tr.dataset.answer || '',
                 category: tr.dataset.category || 'อื่นๆ',
