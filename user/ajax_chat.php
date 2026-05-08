@@ -51,8 +51,12 @@ try {
 
         $stmt = $pdo->prepare("INSERT INTO sys_chat_messages (sender_type, user_id, message) VALUES ('user', :uid, :msg)");
         $stmt->execute([':uid' => $userId, ':msg' => $message]);
-        
+
         $msgId = $pdo->lastInsertId();
+
+        // Mirror question to AI QA Lab (sandbox) — failure must not break chat flow
+        require_once __DIR__ . '/../includes/ai_qa_helper.php';
+        capture_ai_qa($pdo, 'chat', $message, (int)$userId, null, (string)$msgId);
 
         // ── Pusher Trigger (Optional) ──
         // If you have Pusher credentials, you would trigger an event here.

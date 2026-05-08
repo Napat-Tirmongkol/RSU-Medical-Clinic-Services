@@ -404,6 +404,14 @@ foreach ($data['events'] as $idx => $event) {
         'has_reply_token' => !empty($replyToken),
     ]);
 
+    // Mirror text questions to AI QA Lab (sandbox) — runs before any reply branch
+    // so we capture every user question regardless of whether the system answers it.
+    if ($type === 'message' && $messageText !== '') {
+        require_once __DIR__ . '/../includes/ai_qa_helper.php';
+        $lineMsgId = (string)($event['message']['id'] ?? '');
+        capture_ai_qa(db(), 'line', $messageText, null, $userId, $lineMsgId !== '' ? $lineMsgId : null);
+    }
+
     if ($userId && is_insurance_request($event)) {
         line_webhook_log('Insurance request detected', [
             'line_user_id' => line_mask_uid($userId),

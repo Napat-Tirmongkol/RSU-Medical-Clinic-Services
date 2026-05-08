@@ -908,6 +908,10 @@ try {
                     <div class="psb-icon"><i class="fa-solid fa-wand-magic-sparkles" style="color:#8b5cf6"></i></div>
                     <span class="psb-label" style="color:#7c3aed;font-weight:900">AI Assistant</span>
                 </button>
+                <button class="psb-item <?= $activeSection==='ai_qa_lab'?'psb-active':'' ?>" data-section="ai_qa_lab" onclick="switchSection('ai_qa_lab',this)">
+                    <div class="psb-icon"><i class="fa-solid fa-flask-vial" style="color:#a855f7"></i></div>
+                    <span class="psb-label" style="color:#7c3aed;font-weight:900">AI QA Lab</span>
+                </button>
             <?php endif; ?>
 
             <?php /* ── สิทธิ์ & ความปลอดภัย ──────────────────────────────── */ ?>
@@ -2417,6 +2421,12 @@ try {
                 <?php include __DIR__ . '/_partials/ai_assistant.php'; ?>
             </div>
 
+            <!-- ════════════ SECTION: AI QA LAB ════════════ -->
+            <div id="section-ai_qa_lab" class="portal-section"
+                style="<?= $activeSection==='ai_qa_lab'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); background:#f8fafc; overflow-y:auto;">
+                <?php include __DIR__ . '/_partials/ai_qa_lab.php'; ?>
+            </div>
+
             <!-- ════════════ SECTION: INSURANCE SYNC HUB ════════════ -->
             <div id="section-insurance_sync" class="portal-section"
                 style="<?= $activeSection==='insurance_sync'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); background:#f8fafc; overflow-y:auto;">
@@ -3779,6 +3789,7 @@ try {
         const ALL_COMMANDS = [
             { id: 'dashboard',     label: 'Dashboard',           desc: 'ภาพรวม + งานวันนี้', shortcut: 'g d', icon: 'fa-chart-pie',          tone: 'success', type: 'section', target: 'dashboard' },
             { id: 'ai_assistant',  label: 'AI Assistant',        desc: 'ผู้ช่วย AI',         icon: 'fa-wand-magic-sparkles', tone: 'accent', type: 'section', target: 'ai_assistant' },
+            { id: 'ai_qa_lab',     label: 'AI QA Lab',           desc: 'Sandbox คำถามจาก user', icon: 'fa-flask-vial',      tone: 'accent', type: 'section', target: 'ai_qa_lab' },
             { id: 'identity',      label: 'Identity & Governance', desc: 'จัดการสิทธิ์ผู้ใช้', shortcut: 'g i', icon: 'fa-id-card-clip',  tone: 'info',    type: 'section', target: 'identity' },
             { id: 'insurance_sync', label: 'Insurance Hub',      desc: 'ระบบสิทธิ์ประกัน',   icon: 'fa-shield-halved',      tone: 'info',    type: 'section', target: 'insurance_sync' },
             { id: 'registry_upload', label: 'อัพโหลดรายชื่อ',    desc: 'ทะเบียน',            icon: 'fa-id-card-clip',      tone: 'info',    type: 'section', target: 'registry_upload' },
