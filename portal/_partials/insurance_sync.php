@@ -526,12 +526,10 @@ try {
                 return s ? `<span class="ins-badge" style="background:#f8fafc;color:#475569;border:1px solid #e2e8f0">${s}</span>` : '—';
             };
             const today = new Date(); today.setHours(0,0,0,0);
-            const in30  = new Date(today); in30.setDate(today.getDate() + 30);
             const expiryInfo = (ce) => {
                 if (!ce) return { row: '', badge: '' };
                 const d = new Date(ce);
                 if (d < today)  return { row: 'bg-red-50/40',    badge: '<span class="ml-1.5 text-[9px] font-black text-red-500 bg-red-50 border border-red-100 px-1.5 py-0.5 rounded">หมดแล้ว</span>' };
-                if (d <= in30)  return { row: 'bg-amber-50/40',  badge: '<span class="ml-1.5 text-[9px] font-black text-amber-600 bg-amber-50 border border-amber-100 px-1.5 py-0.5 rounded">ใกล้หมด</span>' };
                 return { row: '', badge: '' };
             };
             const dateRange = (s, e) => {

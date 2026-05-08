@@ -357,6 +357,7 @@ if ($action === 'upload') {
         }
 
         // Inactivate members not in file — skipped in append mode
+        // Skip flipping to Inactive while coverage_end is still in the future (active coverage period)
         if ($uploadMode === 'full_sync') {
             $inactivate = $pdo->prepare("
                 UPDATE insurance_members
@@ -365,6 +366,7 @@ if ($action === 'upload') {
                 WHERE member_id = :mid
                   AND insurance_status = 'Active'
                   AND manually_overridden = 0
+                  AND (coverage_end IS NULL OR coverage_end < CURDATE())
             ");
             foreach ($existing as $mid) {
                 if (!isset($csvIdSet[$mid])) {
@@ -957,6 +959,7 @@ if ($action === 'upload_combined') {
         }
 
         // Inactivate anyone in DB but not in finalRows (full_sync semantics)
+        // Skip flipping to Inactive while coverage_end is still in the future (active coverage period)
         $inactivate = $pdo->prepare("
             UPDATE insurance_members
             SET insurance_status = 'Inactive',
@@ -964,6 +967,7 @@ if ($action === 'upload_combined') {
             WHERE member_id = :mid
               AND insurance_status = 'Active'
               AND manually_overridden = 0
+              AND (coverage_end IS NULL OR coverage_end < CURDATE())
         ");
         // Update remarks + coverage_end for those matched in resigned file (only when not protected)
         $applyResign = $pdo->prepare("
