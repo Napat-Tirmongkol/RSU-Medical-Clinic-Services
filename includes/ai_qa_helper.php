@@ -628,3 +628,201 @@ PROMPT;
     }
     return $clean;
 }
+
+/**
+ * Hybrid FAQ matcher — ใช้ใน LINE webhook เพื่อตอบกลับ user อัตโนมัติ
+ *
+ * Phase 1 (เร็ว, ฟรี): exact match ตามลำดับความน่าเชื่อถือ
+ *   1a. sys_ai_faq.canonical_question  (admin curate โดยตรง)
+ *   1b. sys_ai_faq_variants            (admin/AI generate variant)
+ *   1c. sys_ai_qa_log status='approved' (admin approve answer ของ AI)
+ *
+ * Phase 2 (กิน API): Gemini semantic match ถ้า phase 1 ไม่เจอ
+ *   ส่งคำถาม + list ของ candidate ให้ Gemini เลือก best match
+ *   threshold confidence >= 0.7 (ถ้าต่ำกว่า return null)
+ *
+ * @return array{answer:string, matched_via:string, source_id:int, confidence?:float}|null
+ */
+function ai_qa_match_faq(PDO $pdo, string $question): ?array
+{
+    $q = trim($question);
+    // ข้ามข้อความสั้น ๆ (ack, สวัสดี ฯลฯ) เพื่อไม่ false-match
+    if ($q === '' || mb_strlen($q) < 4) return null;
+
+    ensure_ai_faq_schema($pdo);
+    ensure_ai_qa_schema($pdo);
+
+    // ── Phase 1a: canonical question ──────────────────────────────────────
+    $stmt = $pdo->prepare("
+        SELECT id, answer
+          FROM sys_ai_faq
+         WHERE is_active = 1 AND TRIM(canonical_question) = :q
+         LIMIT 1
+    ");
+    $stmt->execute([':q' => $q]);
+    if ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        return [
+            'answer'      => (string)$row['answer'],
+            'matched_via' => 'exact_canonical',
+            'source_id'   => (int)$row['id'],
+        ];
+    }
+
+    // ── Phase 1b: FAQ variants ────────────────────────────────────────────
+    $stmt = $pdo->prepare("
+        SELECT f.id, f.answer
+          FROM sys_ai_faq f
+          JOIN sys_ai_faq_variants v ON v.faq_id = f.id
+         WHERE f.is_active = 1 AND TRIM(v.variant_question) = :q
+         LIMIT 1
+    ");
+    $stmt->execute([':q' => $q]);
+    if ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        return [
+            'answer'      => (string)$row['answer'],
+            'matched_via' => 'exact_variant',
+            'source_id'   => (int)$row['id'],
+        ];
+    }
+
+    // ── Phase 1c: approved Captured ───────────────────────────────────────
+    $stmt = $pdo->prepare("
+        SELECT id, ai_answer
+          FROM sys_ai_qa_log
+         WHERE status = 'approved' AND ai_answer IS NOT NULL
+           AND TRIM(question) = :q
+         ORDER BY reviewed_at DESC
+         LIMIT 1
+    ");
+    $stmt->execute([':q' => $q]);
+    if ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        return [
+            'answer'      => (string)$row['ai_answer'],
+            'matched_via' => 'exact_approved',
+            'source_id'   => (int)$row['id'],
+        ];
+    }
+
+    // ── Phase 2: Gemini semantic match ────────────────────────────────────
+    return ai_qa_match_via_gemini($pdo, $q);
+}
+
+/**
+ * Phase 2 ของ ai_qa_match_faq — ใช้ Gemini เลือกคำถามที่ใกล้เคียงที่สุด
+ * จาก pool ของ FAQ + approved Captured
+ * Threshold confidence ≥ 0.7 ถึงจะถือว่า match จริง
+ */
+function ai_qa_match_via_gemini(PDO $pdo, string $question): ?array
+{
+    $apiKey = ai_qa_load_gemini_key();
+    if (!$apiKey) return null;
+
+    // Build candidate pool — ทั้ง FAQ + approved Captured (dedupe)
+    $candidates = [];
+
+    try {
+        $rs = $pdo->query("
+            SELECT 'faq' AS src, id, canonical_question AS q, answer
+              FROM sys_ai_faq
+             WHERE is_active = 1
+             ORDER BY updated_at DESC
+             LIMIT 50
+        ")->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($rs as $r) $candidates[] = $r;
+
+        $rs2 = $pdo->query("
+            SELECT 'qa' AS src, MIN(id) AS id,
+                   MAX(question) AS q, MAX(ai_answer) AS answer
+              FROM sys_ai_qa_log
+             WHERE status = 'approved' AND ai_answer IS NOT NULL
+             GROUP BY TRIM(question)
+             ORDER BY MAX(reviewed_at) DESC
+             LIMIT 50
+        ")->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($rs2 as $r) $candidates[] = $r;
+    } catch (Throwable $e) {
+        error_log('ai_qa_match_via_gemini pool fetch failed: ' . $e->getMessage());
+        return null;
+    }
+
+    if (empty($candidates)) return null;
+
+    // Build prompt
+    $list = '';
+    foreach ($candidates as $i => $c) {
+        $shortQ = mb_substr(preg_replace('/\s+/', ' ', trim((string)$c['q'])), 0, 200);
+        $list .= "[{$i}] {$shortQ}\n";
+    }
+
+    $prompt = <<<PROMPT
+คุณกำลังจับคู่คำถามจาก user กับคำถามที่ห้องพยาบาลคลินิก RSU Medical มีคำตอบไว้แล้ว
+
+คำถามจาก user:
+{$question}
+
+รายการคำถามที่มีคำตอบ:
+{$list}
+
+ตอบเป็น JSON ตาม schema นี้เท่านั้น:
+{"match_index": <-1 หรือเลขในรายการ>, "confidence": <0.0-1.0>}
+
+กฎ:
+- ตอบ -1 ถ้าไม่มีคำถามไหนใกล้เคียงพอ (ความมั่นใจต่ำกว่า 0.7)
+- ตอบเลข index ถ้าเจอคำถามที่ความหมายเดียวกัน — แม้พิมพ์ต่าง สะกดผิด ภาษาต่าง
+- คำถามต่างหัวข้อกัน → -1
+PROMPT;
+
+    $body = json_encode([
+        'contents' => [['role' => 'user', 'parts' => [['text' => $prompt]]]],
+        'generationConfig' => [
+            'temperature'      => 0.2,
+            'maxOutputTokens'  => 256,
+            'responseMimeType' => 'application/json',
+        ],
+    ], JSON_UNESCAPED_UNICODE);
+
+    foreach (['gemini-2.5-flash', 'gemini-2.0-flash'] as $model) {
+        $url = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$apiKey}";
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => $body,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
+            // webhook ต้องตอบกลับ LINE ภายใน ~5s — set timeout สั้นกว่า answer-gen
+            CURLOPT_TIMEOUT        => 8,
+            CURLOPT_CONNECTTIMEOUT => 4,
+            CURLOPT_SSL_VERIFYPEER => true,
+        ]);
+        $raw      = (string)curl_exec($ch);
+        $httpCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlErr  = curl_error($ch);
+        curl_close($ch);
+
+        if ($curlErr) return null;
+        if ($httpCode === 404) continue;
+        if ($httpCode !== 200) return null;
+
+        $resp = json_decode($raw, true);
+        $text = (string)($resp['candidates'][0]['content']['parts'][0]['text'] ?? '');
+        $text = preg_replace('/^```(?:json)?\s*/m', '', $text);
+        $text = preg_replace('/```\s*$/m', '', $text);
+        $text = trim($text);
+        $parsed = json_decode($text, true);
+        if (!is_array($parsed)) return null;
+
+        $idx  = (int)($parsed['match_index'] ?? -1);
+        $conf = (float)($parsed['confidence'] ?? 0);
+        if ($idx < 0 || $idx >= count($candidates) || $conf < 0.7) return null;
+
+        $matched = $candidates[$idx];
+        return [
+            'answer'      => (string)$matched['answer'],
+            'matched_via' => 'gemini_' . $matched['src'],
+            'source_id'   => (int)$matched['id'],
+            'confidence'  => $conf,
+        ];
+    }
+
+    return null;
+}

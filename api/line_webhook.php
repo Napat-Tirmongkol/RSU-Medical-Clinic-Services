@@ -431,67 +431,66 @@ foreach ($data['events'] as $idx => $event) {
         continue;
     }
 
-    // ── คำถามพื้นฐาน: "วันนี้คลินิกเปิดไหม", "เปิดกี่โมง", "ตารางแพทย์วันนี้" ──
-    if ($type === 'message' && $messageText !== ''
-        && ($intent = detect_clinic_status_intent($messageText)) !== null) {
+    // ── AI QA Lab — match คำถามกับ FAQ Knowledge Base (admin-curated) ──
+    // แทนที่ legacy clinic_status_intent — รองรับคำถามทุกแบบที่ admin ตั้งไว้
+    if ($type === 'message' && $messageText !== '') {
+        require_once __DIR__ . '/../includes/ai_qa_helper.php';
         $pdo = db();
         $faqSettings = get_clinic_faq_settings($pdo);
 
-        line_webhook_log('Clinic status intent detected', [
-            'line_user_id' => line_mask_uid($userId),
-            'intent_type'  => $intent['type'],
-            'date'         => $intent['date'],
-            'offset'       => $intent['offset'],
-            'enabled'      => $faqSettings['enabled'],
-            'has_reply_token' => !empty($replyToken),
-        ]);
-
-        // ถ้า admin ปิด FAQ ไว้ → ตกไป fallback ปกติ
-        if (!(int)$faqSettings['enabled']) {
-            line_webhook_log('Clinic FAQ disabled, falling through to default reply', [
-                'line_user_id' => line_mask_uid($userId),
-            ]);
-        } elseif ((int)$faqSettings['only_when_closed'] && get_clinic_current_status($pdo)['is_open_now']) {
-            // only_when_closed = 1 และคลินิกเปิดอยู่ → ไม่ตอบ FAQ (ตกไป default reply)
-            line_webhook_log('Clinic FAQ skipped (clinic is open, only_when_closed=1)', [
-                'line_user_id' => line_mask_uid($userId),
-                'intent_type'  => $intent['type'],
-            ]);
-        } else {
-            // เช็ค rate limit ก่อนตอบ — ป้องกัน spam
+        if ((int)$faqSettings['enabled']) {
+            // Rate limit (per LINE user) ใช้ key 'ai_qa' รวมทุกประเภทคำถาม
             $allowed = $userId
-                ? check_clinic_faq_rate_limit($pdo, (string)$userId, (string)$intent['type'], (int)$faqSettings['rate_limit_hours'])
+                ? check_clinic_faq_rate_limit($pdo, (string)$userId, 'ai_qa', (int)$faqSettings['rate_limit_hours'])
                 : true;
 
             if (!$allowed) {
-                line_webhook_log('Clinic FAQ rate limited (silent skip)', [
+                line_webhook_log('AI QA Lab rate limited (silent skip)', [
                     'line_user_id'     => line_mask_uid($userId),
-                    'intent_type'      => $intent['type'],
                     'rate_limit_hours' => $faqSettings['rate_limit_hours'],
                 ]);
                 continue;
             }
 
             try {
-                $messages = build_clinic_status_messages($pdo, $intent);
+                $match = ai_qa_match_faq($pdo, $messageText);
             } catch (Throwable $e) {
-                line_webhook_log('Clinic status build failed', ['error' => $e->getMessage()], 'error');
-                $messages = [reply_text_message('ขออภัย ระบบไม่สามารถตรวจสอบเวลาทำการได้ในขณะนี้ กรุณาลองใหม่อีกครั้ง')];
+                line_webhook_log('AI QA Lab match failed', ['error' => $e->getMessage()], 'warning');
+                $match = null;
             }
-            $replyOk = $replyToken
-                ? send_line_reply($replyToken, $messages, $accessToken)
-                : ($userId ? send_line_push($userId, $messages, $accessToken) : false);
 
-            if ($replyOk && $userId) {
-                log_clinic_faq_reply($pdo, (string)$userId, (string)$intent['type']);
+            if ($match !== null) {
+                line_webhook_log('AI QA Lab match found', [
+                    'line_user_id' => line_mask_uid($userId),
+                    'matched_via'  => $match['matched_via'],
+                    'source_id'    => $match['source_id'] ?? null,
+                    'confidence'   => $match['confidence'] ?? null,
+                ]);
+
+                $messages = [reply_text_message((string)$match['answer'])];
+                $replyOk = $replyToken
+                    ? send_line_reply($replyToken, $messages, $accessToken)
+                    : ($userId ? send_line_push($userId, $messages, $accessToken) : false);
+
+                if ($replyOk && $userId) {
+                    log_clinic_faq_reply($pdo, (string)$userId, 'ai_qa');
+                }
+                line_webhook_log($replyToken ? 'AI QA reply sent' : 'AI QA push sent', [
+                    'line_user_id' => line_mask_uid($userId),
+                    'ok'           => $replyOk,
+                    'method'       => $replyToken ? 'reply' : 'push',
+                    'line_error'   => $replyOk ? '' : get_last_line_error(),
+                ], $replyOk ? 'info' : 'warning');
+                continue;
             }
-            line_webhook_log($replyToken ? 'Clinic status reply sent' : 'Clinic status push sent', [
+
+            line_webhook_log('AI QA Lab no match (fallthrough to default reply)', [
                 'line_user_id' => line_mask_uid($userId),
-                'ok'     => $replyOk,
-                'method' => $replyToken ? 'reply' : 'push',
-                'line_error' => $replyOk ? '' : get_last_line_error(),
-            ], $replyOk ? 'info' : 'warning');
-            continue;
+            ]);
+        } else {
+            line_webhook_log('AI QA Lab disabled (FAQ enabled=0)', [
+                'line_user_id' => line_mask_uid($userId),
+            ]);
         }
     }
 
