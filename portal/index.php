@@ -931,6 +931,12 @@ try {
                     <div class="psb-icon"><i class="fa-solid fa-chart-pie" style="color:#059669"></i></div>
                     <span class="psb-label" style="color:#059669;font-weight:900">Dashboard</span>
                 </button>
+                <?php if ($isStaff): ?>
+                    <button class="psb-item <?= $activeSection==='profile'?'psb-active':'' ?>" data-section="profile" onclick="switchSection('profile',this)">
+                        <div class="psb-icon"><i class="fa-solid fa-user-pen" style="color:#0891b2"></i></div>
+                        <span class="psb-label" style="color:#0e7490;font-weight:900">โปรไฟล์ของฉัน</span>
+                    </button>
+                <?php endif; ?>
                 <button class="psb-item" data-section="ai_assistant" onclick="switchSection('ai_assistant',this)">
                     <div class="psb-icon"><i class="fa-solid fa-wand-magic-sparkles" style="color:#8b5cf6"></i></div>
                     <span class="psb-label" style="color:#7c3aed;font-weight:900">AI Assistant</span>
@@ -2599,12 +2605,24 @@ try {
                 ?>
             </div>
 
+            <!-- ════════════ SECTION: PROFILE (staff self-service) ════════════ -->
+            <div id="section-profile" class="portal-section"
+                style="<?= $activeSection==='profile'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); background:#f8fafc; overflow-y:auto;">
+                <?php
+                if ($isStaff) {
+                    include __DIR__ . '/_partials/profile.php';
+                } else {
+                    echo '<div style="padding:100px;text-align:center;font-weight:900;color:#dc2626"><i class="fa-solid fa-shield-slash mb-4" style="font-size:4rem;display:block"></i> ACCESS DENIED<br><span style="font-size:14px;color:#94a3b8;font-weight:600">หน้าโปรไฟล์ใช้ได้เฉพาะบัญชีเจ้าหน้าที่ (e-Campaign Staff)</span></div>';
+                }
+                ?>
+            </div>
+
             <!-- ════════════ SECTION: ACTIVITY LOGS ════════════ -->
             <div id="section-activity_logs" class="portal-section"
                 style="<?= $activeSection==='activity_logs'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); background:#f8fafc; overflow-y:auto;">
-                <?php 
+                <?php
                 if ($adminRole === 'superadmin' || !empty($_SESSION['access_system_logs'])) {
-                    include __DIR__ . '/_partials/activity_logs.php'; 
+                    include __DIR__ . '/_partials/activity_logs.php';
                 } else {
                     echo '<div style="padding:100px;text-align:center;font-weight:900;color:#dc2626"><i class="fa-solid fa-shield-slash mb-4" style="font-size:4rem;display:block"></i> ACCESS DENIED<br><span style="font-size:14px;color:#94a3b8;font-weight:600">You do not have permission to view activity logs.</span></div>';
                 }

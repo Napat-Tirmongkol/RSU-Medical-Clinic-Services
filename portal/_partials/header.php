@@ -66,9 +66,10 @@
                                . '</div>';
                 ?>
                 <?php if ($_canEditProfile): ?>
-                    <a href="profile.php" title="แก้ไขโปรไฟล์เจ้าหน้าที่"
+                    <a href="index.php?section=profile" title="แก้ไขโปรไฟล์เจ้าหน้าที่"
                         class="flex items-center gap-2 sm:gap-3 group hover:opacity-90 transition-opacity"
-                        style="text-decoration:none">
+                        style="text-decoration:none"
+                        onclick="if (typeof switchSection === 'function') { event.preventDefault(); switchSection('profile', document.querySelector('[data-section=profile]')); }">
                         <?= $_idTextHtml ?>
                         <?= $_idAvatarHtml ?>
                     </a>
