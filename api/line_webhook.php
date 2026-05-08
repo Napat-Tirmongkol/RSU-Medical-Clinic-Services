@@ -522,63 +522,64 @@ foreach ($data['events'] as $idx => $event) {
                 : true;
 
             if (!$allowed) {
-                line_webhook_log('AI QA Lab rate limited (silent skip)', [
+                // ถูก rate limit — ข้าม matcher แต่ตกไป default reply ปกติ
+                // (ไม่ continue เพื่อให้ user ยังได้ข้อความ "เราได้รับข้อความ...")
+                line_webhook_log('AI QA Lab rate limited — fallthrough to default reply', [
                     'line_user_id'     => line_mask_uid($userId),
                     'rate_limit_hours' => $faqSettings['rate_limit_hours'],
                 ]);
-                continue;
-            }
-
-            try {
-                $match = ai_qa_match_faq(
-                    $pdo,
-                    $messageText,
-                    // Phase 1 (exact) ไม่เจอ → กำลังเข้า Gemini ที่ช้า
-                    // → แสดง loading dots ในแชท user เพื่อบอกว่ากำลังคิด
-                    function () use ($userId, $accessToken) {
-                        if ($userId) {
-                            $okIndicator = send_line_loading_indicator((string)$userId, $accessToken, 20);
-                            line_webhook_log('AI QA loading indicator', [
-                                'line_user_id' => line_mask_uid($userId),
-                                'ok' => $okIndicator,
-                                'line_error' => $okIndicator ? '' : get_last_line_error(),
-                            ], $okIndicator ? 'info' : 'warning');
+            } else {
+                try {
+                    $match = ai_qa_match_faq(
+                        $pdo,
+                        $messageText,
+                        // Phase 1 (exact) ไม่เจอ → กำลังเข้า Gemini ที่ช้า
+                        // → แสดง loading dots ในแชท user เพื่อบอกว่ากำลังคิด
+                        function () use ($userId, $accessToken) {
+                            if ($userId) {
+                                $okIndicator = send_line_loading_indicator((string)$userId, $accessToken, 20);
+                                line_webhook_log('AI QA loading indicator', [
+                                    'line_user_id' => line_mask_uid($userId),
+                                    'ok' => $okIndicator,
+                                    'line_error' => $okIndicator ? '' : get_last_line_error(),
+                                ], $okIndicator ? 'info' : 'warning');
+                            }
                         }
-                    }
-                );
-            } catch (Throwable $e) {
-                line_webhook_log('AI QA Lab match failed', ['error' => $e->getMessage()], 'warning');
-                $match = null;
-            }
-
-            if ($match !== null) {
-                line_webhook_log('AI QA Lab match found', [
-                    'line_user_id' => line_mask_uid($userId),
-                    'matched_via'  => $match['matched_via'],
-                    'source_id'    => $match['source_id'] ?? null,
-                    'confidence'   => $match['confidence'] ?? null,
-                ]);
-
-                $messages = [build_ai_reply_flex((string)$match['answer'])];
-                $replyOk = $replyToken
-                    ? send_line_reply($replyToken, $messages, $accessToken)
-                    : ($userId ? send_line_push($userId, $messages, $accessToken) : false);
-
-                if ($replyOk && $userId) {
-                    log_clinic_faq_reply($pdo, (string)$userId, 'ai_qa');
+                    );
+                } catch (Throwable $e) {
+                    line_webhook_log('AI QA Lab match failed', ['error' => $e->getMessage()], 'warning');
+                    $match = null;
                 }
-                line_webhook_log($replyToken ? 'AI QA reply sent' : 'AI QA push sent', [
-                    'line_user_id' => line_mask_uid($userId),
-                    'ok'           => $replyOk,
-                    'method'       => $replyToken ? 'reply' : 'push',
-                    'line_error'   => $replyOk ? '' : get_last_line_error(),
-                ], $replyOk ? 'info' : 'warning');
-                continue;
-            }
 
-            line_webhook_log('AI QA Lab no match (fallthrough to default reply)', [
-                'line_user_id' => line_mask_uid($userId),
-            ]);
+                if ($match !== null) {
+                    line_webhook_log('AI QA Lab match found', [
+                        'line_user_id' => line_mask_uid($userId),
+                        'matched_via'  => $match['matched_via'],
+                        'source_id'    => $match['source_id'] ?? null,
+                        'confidence'   => $match['confidence'] ?? null,
+                    ]);
+
+                    $messages = [build_ai_reply_flex((string)$match['answer'])];
+                    $replyOk = $replyToken
+                        ? send_line_reply($replyToken, $messages, $accessToken)
+                        : ($userId ? send_line_push($userId, $messages, $accessToken) : false);
+
+                    if ($replyOk && $userId) {
+                        log_clinic_faq_reply($pdo, (string)$userId, 'ai_qa');
+                    }
+                    line_webhook_log($replyToken ? 'AI QA reply sent' : 'AI QA push sent', [
+                        'line_user_id' => line_mask_uid($userId),
+                        'ok'           => $replyOk,
+                        'method'       => $replyToken ? 'reply' : 'push',
+                        'line_error'   => $replyOk ? '' : get_last_line_error(),
+                    ], $replyOk ? 'info' : 'warning');
+                    continue;
+                }
+
+                line_webhook_log('AI QA Lab no match (fallthrough to default reply)', [
+                    'line_user_id' => line_mask_uid($userId),
+                ]);
+            }
         }
     }
 
