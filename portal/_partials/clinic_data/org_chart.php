@@ -253,9 +253,26 @@ $unassignedMembers = (int)$pdo->query("SELECT COUNT(*) FROM sys_org_members WHER
                         <label>หน้าที่ / บทบาท <small class="text-slate-400 font-bold">(สำหรับการ์ด Premium)</small></label>
                         <textarea name="responsibilities" id="oc-mem-resp" rows="3" placeholder="• การรักษาและตรวจวินิจฉัยพยาบาลขั้นที่ 1&#10;• การประสาน&#10;• พยาบาลการแพทย์มหาวิทยาลัยรังสิต"></textarea>
                     </div>
+
+                    <!-- Staff link picker -->
                     <div class="oc-form-row">
-                        <label>ผูกกับบัญชีผู้ใช้ <small class="text-slate-400 font-bold">(เพื่อ highlight ตัวเองในผัง)</small></label>
-                        <input type="number" name="user_id" id="oc-mem-user-id" placeholder="sys_users.id (ปล่อยว่างถ้าไม่ผูก)">
+                        <label>ลิงก์กับบุคลากรการแพทย์ <small class="text-slate-400 font-bold">(เลือกเพื่อ auto-fill ชื่อ/ใบอนุญาต/แผนก)</small></label>
+                        <input type="hidden" name="staff_id" id="oc-mem-staff-id">
+
+                        <!-- Linked badge (when already linked) -->
+                        <div id="oc-mem-staff-linked" class="oc-staff-linked" style="display:none;">
+                            <i class="fa-solid fa-link text-emerald-500"></i>
+                            <span class="flex-1" id="oc-mem-staff-linked-name"></span>
+                            <button type="button" class="oc-staff-unlink" onclick="ocUnlinkStaff()" title="ยกเลิกการลิงก์">
+                                <i class="fa-solid fa-xmark"></i>
+                            </button>
+                        </div>
+
+                        <!-- Search box -->
+                        <div id="oc-mem-staff-search-wrap" class="relative">
+                            <input type="text" id="oc-mem-staff-search" placeholder="ค้นหาด้วย ชื่อ / อีเมล / เบอร์ / ใบอนุญาต…" autocomplete="off">
+                            <div id="oc-mem-staff-results" class="oc-staff-results" style="display:none;"></div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -329,6 +346,21 @@ $unassignedMembers = (int)$pdo->query("SELECT COUNT(*) FROM sys_org_members WHER
 
 /* Empty state in members list */
 .oc-empty-state { text-align: center; padding: 2rem 1rem; color: #94a3b8; font-size: .85rem; }
+
+/* Staff link picker */
+.oc-staff-linked { display: flex; align-items: center; gap: .5rem; padding: .55rem .75rem; background: #ecfdf5; border: 1.5px solid #a7f3d0; border-radius: .55rem; font-size: .85rem; font-weight: 700; color: #065f46; }
+.oc-staff-unlink { width: 1.5rem; height: 1.5rem; border-radius: .35rem; background: #fff; border: 1px solid #a7f3d0; color: #065f46; cursor: pointer; font-size: .75rem; display: flex; align-items: center; justify-content: center; }
+.oc-staff-unlink:hover { background: #fee2e2; color: #dc2626; border-color: #fecaca; }
+.oc-staff-results { position: absolute; top: 100%; left: 0; right: 0; max-height: 280px; overflow-y: auto; background: #fff; border: 1.5px solid #e2e8f0; border-radius: .55rem; margin-top: .25rem; box-shadow: 0 10px 30px rgba(0,0,0,.1); z-index: 10; }
+.oc-staff-result-item { padding: .55rem .75rem; cursor: pointer; border-bottom: 1px solid #f1f5f9; font-size: .82rem; transition: background .12s; }
+.oc-staff-result-item:hover, .oc-staff-result-item.is-active { background: #ecfdf5; }
+.oc-staff-result-item:last-child { border-bottom: none; }
+.oc-staff-result-name { font-weight: 800; color: #0f172a; }
+.oc-staff-result-meta { font-size: .72rem; color: #64748b; font-weight: 600; margin-top: .15rem; }
+.oc-staff-no-result { padding: .75rem; text-align: center; color: #94a3b8; font-size: .82rem; font-weight: 600; }
+
+/* Member card linked badge */
+.oc-mem-linked-badge { display: inline-flex; align-items: center; gap: .25rem; padding: .1rem .4rem; border-radius: .35rem; background: #ecfdf5; color: #065f46; font-size: .65rem; font-weight: 800; border: 1px solid #a7f3d0; margin-left: .35rem; }
 </style>
 
 <script src="../assets/vendor/Sortable.min.js"></script>
@@ -515,12 +547,15 @@ $unassignedMembers = (int)$pdo->query("SELECT COUNT(*) FROM sys_org_members WHER
             ? `<img src="${esc(m.photo_url)}" class="oc-mem-photo" alt="">`
             : `<div class="oc-mem-photo-placeholder">${esc((m.full_name || '?').charAt(0))}</div>`;
         const positionLabel = m.position_title ? esc(m.position_title) : '<em class="text-amber-600">— ยังไม่จัด —</em>';
+        const linkedBadge = m.staff_id
+            ? `<span class="oc-mem-linked-badge" title="ลิงก์กับ medical staff #${m.staff_id}"><i class="fa-solid fa-link text-[8px]"></i> Linked</span>`
+            : '';
         return `
             <li class="oc-mem-card" data-id="${m.id}">
                 <i class="fa-solid fa-grip-vertical text-slate-300 text-[10px]"></i>
                 ${photo}
                 <div class="oc-mem-info">
-                    <div class="oc-mem-name">${esc((m.prefix || '') + ' ' + m.full_name).trim()}</div>
+                    <div class="oc-mem-name">${esc((m.prefix || '') + ' ' + m.full_name).trim()}${linkedBadge}</div>
                     <div class="oc-mem-meta">${positionLabel}${m.department ? ' · ' + esc(m.department) : ''}</div>
                 </div>
                 <div class="oc-mem-actions">
@@ -651,15 +686,16 @@ $unassignedMembers = (int)$pdo->query("SELECT COUNT(*) FROM sys_org_members WHER
         document.getElementById('oc-mem-modal-title').textContent = 'เพิ่มสมาชิก';
         document.getElementById('oc-mem-id').value = '';
         document.getElementById('oc-mem-position').value = positionId || '';
-        ['oc-mem-prefix','oc-mem-name','oc-mem-dept','oc-mem-license','oc-mem-resp','oc-mem-user-id','oc-mem-photo-url']
+        ['oc-mem-prefix','oc-mem-name','oc-mem-dept','oc-mem-license','oc-mem-resp','oc-mem-photo-url','oc-mem-staff-id']
             .forEach(id => { document.getElementById(id).value = ''; });
         document.getElementById('oc-mem-photo').value = '';
         document.getElementById('oc-mem-photo-preview').style.display = 'none';
         document.getElementById('oc-mem-photo-placeholder').style.display = '';
+        ocClearStaffPicker();
         document.getElementById('oc-mem-modal').style.display = 'flex';
     };
 
-    window.ocEditMember = function(id) {
+    window.ocEditMember = async function(id) {
         const m = window.ocMembers.find(x => Number(x.id) === Number(id));
         if (!m) return;
         document.getElementById('oc-mem-modal-title').textContent = 'แก้ไขสมาชิก';
@@ -670,7 +706,7 @@ $unassignedMembers = (int)$pdo->query("SELECT COUNT(*) FROM sys_org_members WHER
         document.getElementById('oc-mem-dept').value = m.department || '';
         document.getElementById('oc-mem-license').value = m.license_no || '';
         document.getElementById('oc-mem-resp').value = m.responsibilities || '';
-        document.getElementById('oc-mem-user-id').value = m.user_id || '';
+        document.getElementById('oc-mem-staff-id').value = m.staff_id || '';
         document.getElementById('oc-mem-photo-url').value = m.photo_url || '';
         document.getElementById('oc-mem-photo').value = '';
 
@@ -682,6 +718,18 @@ $unassignedMembers = (int)$pdo->query("SELECT COUNT(*) FROM sys_org_members WHER
         } else {
             document.getElementById('oc-mem-photo-preview').style.display = 'none';
             document.getElementById('oc-mem-photo-placeholder').style.display = '';
+        }
+
+        // Resolve linked staff display name
+        if (m.staff_id) {
+            const r = await ocPost('staff', 'get', { id: m.staff_id });
+            if (r.ok && r.data) {
+                ocShowLinkedStaff(r.data);
+            } else {
+                ocClearStaffPicker();
+            }
+        } else {
+            ocClearStaffPicker();
         }
         document.getElementById('oc-mem-modal').style.display = 'flex';
     };
@@ -728,6 +776,98 @@ $unassignedMembers = (int)$pdo->query("SELECT COUNT(*) FROM sys_org_members WHER
     window.ocCloseModal = function(modalId) {
         document.getElementById(modalId).style.display = 'none';
     };
+
+    // ── Staff picker (search-as-you-type) ────────────────────────────
+    let ocStaffSearchTimer = null;
+
+    function ocClearStaffPicker() {
+        document.getElementById('oc-mem-staff-id').value = '';
+        document.getElementById('oc-mem-staff-linked').style.display = 'none';
+        document.getElementById('oc-mem-staff-search-wrap').style.display = '';
+        document.getElementById('oc-mem-staff-search').value = '';
+        document.getElementById('oc-mem-staff-results').style.display = 'none';
+    }
+
+    function ocShowLinkedStaff(staff) {
+        document.getElementById('oc-mem-staff-id').value = staff.id;
+        const label = `${staff.title || ''} ${staff.full_name}`.trim()
+            + (staff.role ? ` · ${staff.role}` : '')
+            + (staff.department ? ` · ${staff.department}` : '');
+        document.getElementById('oc-mem-staff-linked-name').textContent = label;
+        document.getElementById('oc-mem-staff-linked').style.display = '';
+        document.getElementById('oc-mem-staff-search-wrap').style.display = 'none';
+        document.getElementById('oc-mem-staff-results').style.display = 'none';
+    }
+
+    window.ocUnlinkStaff = function() {
+        ocClearStaffPicker();
+    };
+
+    window.ocPickStaff = function(staff, autoFill = true) {
+        ocShowLinkedStaff(staff);
+        if (!autoFill) return;
+        // Auto-fill empty form fields from staff record
+        const setIfEmpty = (id, value) => {
+            const el = document.getElementById(id);
+            if (el && !el.value && value) el.value = value;
+        };
+        setIfEmpty('oc-mem-prefix', staff.title);
+        setIfEmpty('oc-mem-name', staff.full_name);
+        setIfEmpty('oc-mem-dept', staff.department);
+        setIfEmpty('oc-mem-license', staff.license_no);
+    };
+
+    async function ocSearchStaff(q) {
+        const r = await ocPost('staff', 'search', { q });
+        const el = document.getElementById('oc-mem-staff-results');
+        if (!r.ok) { el.style.display = 'none'; return; }
+        if (!r.data || r.data.length === 0) {
+            el.innerHTML = `<div class="oc-staff-no-result">ไม่พบ medical staff ที่ตรงกับ "${esc(q)}"<br><small>ลองพิมพ์ชื่อ อีเมล หรือเบอร์โทร · หรือเพิ่ม staff ใหม่ที่หน้าบุคลากรการแพทย์</small></div>`;
+            el.style.display = '';
+            return;
+        }
+        el.innerHTML = r.data.map(s => `
+            <div class="oc-staff-result-item" onclick='ocPickStaff(${JSON.stringify(s).replace(/'/g, "&apos;")})'>
+                <div class="oc-staff-result-name">${esc((s.title || '') + ' ' + s.full_name).trim()}</div>
+                <div class="oc-staff-result-meta">
+                    <i class="fa-solid fa-stethoscope text-emerald-400"></i> ${esc(s.role || '-')}
+                    ${s.department ? ' · ' + esc(s.department) : ''}
+                    ${s.email ? ' · ' + esc(s.email) : ''}
+                    ${s.phone ? ' · ' + esc(s.phone) : ''}
+                    ${s.license_no ? ' · <span class="text-emerald-600 font-bold">ใบฯ ' + esc(s.license_no) + '</span>' : ''}
+                </div>
+            </div>
+        `).join('');
+        el.style.display = '';
+    }
+
+    // Wire up search input — debounce 250ms
+    document.addEventListener('input', (e) => {
+        if (e.target.id !== 'oc-mem-staff-search') return;
+        const q = e.target.value.trim();
+        clearTimeout(ocStaffSearchTimer);
+        if (q.length < 1) {
+            // Show top-20 list when empty (helpful)
+            ocStaffSearchTimer = setTimeout(() => ocSearchStaff(''), 100);
+            return;
+        }
+        ocStaffSearchTimer = setTimeout(() => ocSearchStaff(q), 250);
+    });
+
+    // Show top results when focusing empty search box
+    document.addEventListener('focusin', (e) => {
+        if (e.target.id !== 'oc-mem-staff-search') return;
+        ocSearchStaff(e.target.value.trim());
+    });
+
+    // Hide dropdown when clicking outside picker
+    document.addEventListener('click', (e) => {
+        const wrap = document.getElementById('oc-mem-staff-search-wrap');
+        if (!wrap || !wrap.contains(e.target)) {
+            const el = document.getElementById('oc-mem-staff-results');
+            if (el) el.style.display = 'none';
+        }
+    });
 
     // Init — defer until after portal_CSRF script (defined later in portal/index.php) has run
     if (document.readyState === 'loading') {

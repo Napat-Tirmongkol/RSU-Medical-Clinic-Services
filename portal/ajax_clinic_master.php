@@ -247,6 +247,38 @@ try {
             echo json_encode(['ok' => true]);
             return;
 
+        case 'staff:search': {
+            // For org-chart member picker: search active medical staff
+            // by name / email / phone. Returns top 20 matches.
+            $q = trim((string)($_POST['q'] ?? ''));
+            $sql = "SELECT id, title, full_name, license_no, role, department, phone, email
+                    FROM sys_medical_staff
+                    WHERE is_active = 1";
+            $params = [];
+            if ($q !== '') {
+                $sql .= " AND (full_name LIKE ? OR email LIKE ? OR phone LIKE ? OR license_no LIKE ?)";
+                $like = "%$q%";
+                $params = [$like, $like, $like, $like];
+            }
+            $sql .= " ORDER BY full_name ASC LIMIT 20";
+            $st = $pdo->prepare($sql);
+            $st->execute($params);
+            echo json_encode(['ok' => true, 'data' => $st->fetchAll(PDO::FETCH_ASSOC)]);
+            return;
+        }
+
+        case 'staff:get': {
+            // Fetch single staff record by id (for refreshing linked-staff display)
+            $id = (int)($_POST['id'] ?? 0);
+            if ($id <= 0) { echo json_encode(['ok'=>false,'message'=>'invalid id']); return; }
+            $st = $pdo->prepare("SELECT id, title, full_name, license_no, role, department, phone, email
+                FROM sys_medical_staff WHERE id = ?");
+            $st->execute([$id]);
+            $row = $st->fetch(PDO::FETCH_ASSOC);
+            echo json_encode(['ok' => (bool)$row, 'data' => $row ?: null]);
+            return;
+        }
+
         // ── Rooms ────────────────────────────────────────────────────────
         case 'rooms:add':
             $stmt = $pdo->prepare("INSERT INTO sys_clinic_rooms (code, name, type, capacity, floor, notes)
