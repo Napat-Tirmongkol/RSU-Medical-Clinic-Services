@@ -81,4 +81,85 @@
     .ai-review-body ol     { @apply list-decimal pl-5 mb-2 space-y-1; }
     .ai-review-body li     { @apply leading-relaxed; }
     .ai-review-body strong { @apply font-semibold; }
+
+    /* ── Org Chart / Chain of Command ─────────────────────────────────── */
+    .org-section-title {
+        @apply text-center text-xl font-black text-slate-800 mb-1 tracking-wide;
+    }
+    .org-section-underline {
+        @apply mx-auto h-[2px] w-32 bg-gradient-to-r from-transparent via-emerald-400 to-transparent mb-6;
+    }
+    .org-row {
+        @apply flex flex-wrap items-stretch justify-center gap-5 mb-10;
+    }
+
+    /* Premium card — gradient background with title overlay (top tier) */
+    .org-card-premium {
+        @apply relative rounded-3xl overflow-hidden shadow-lg w-72 transition-all;
+        background: linear-gradient(135deg, #34d399 0%, #10b981 45%, #059669 100%);
+    }
+    .org-card-premium:hover {
+        @apply shadow-2xl -translate-y-1;
+    }
+    .org-card-premium .ocp-bg-shapes {
+        @apply absolute inset-0 pointer-events-none opacity-90;
+    }
+    .org-card-premium .ocp-title {
+        @apply relative z-10 text-white font-black text-2xl leading-tight px-5 pt-4 drop-shadow;
+    }
+    .org-card-premium .ocp-subtitle {
+        @apply relative z-10 text-white/90 text-xs font-bold px-5 pb-3;
+    }
+    .org-card-premium .ocp-photo {
+        @apply relative z-10 w-32 h-32 mx-auto rounded-full border-4 border-white shadow-xl object-cover bg-slate-100;
+    }
+    .org-card-premium .ocp-photo-wrap {
+        @apply relative z-10 flex justify-center -mb-4 mt-2;
+    }
+    .org-card-premium .ocp-name-pill {
+        @apply relative z-10 mx-auto mt-6 mb-3 inline-block bg-white px-5 py-1.5 rounded-full shadow-md text-emerald-700 font-black text-sm;
+    }
+    .org-card-premium .ocp-license {
+        @apply relative z-10 mx-3 mb-3 px-3 py-1.5 rounded-full bg-white/95 text-emerald-700 text-xs font-bold text-center shadow;
+    }
+    .org-card-premium .ocp-body {
+        @apply relative z-10 bg-white/95 mx-3 mb-3 rounded-2xl px-3 py-2 text-[11px] text-slate-700 leading-relaxed;
+    }
+    .org-card-premium .ocp-body strong { @apply text-emerald-700 font-black; }
+
+    /* Simple card — bottom tier */
+    .org-card-simple {
+        @apply relative rounded-3xl overflow-hidden shadow-md w-44 transition-all bg-white;
+        border: 1px solid rgba(16, 185, 129, .15);
+    }
+    .org-card-simple:hover {
+        @apply shadow-xl -translate-y-1;
+    }
+    .org-card-simple .ocs-bg {
+        @apply relative pt-3 pb-2 px-3;
+        background: linear-gradient(160deg, #34d399 0%, #10b981 100%);
+    }
+    .org-card-simple .ocs-photo {
+        @apply w-32 h-32 mx-auto rounded-2xl border-2 border-white shadow-lg object-cover bg-slate-100;
+    }
+    .org-card-simple .ocs-pills {
+        @apply px-3 py-3 flex flex-col gap-1.5 items-center;
+    }
+    .org-card-simple .ocs-name-pill {
+        @apply inline-block bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full text-[11px] font-black border border-emerald-100 max-w-full truncate;
+    }
+    .org-card-simple .ocs-role-pill {
+        @apply inline-block bg-white text-slate-600 px-3 py-1 rounded-full text-[10px] font-bold border border-slate-200;
+    }
+
+    /* Self-highlight + chain trace (user-facing view) */
+    .org-card-me {
+        outline: 4px solid #f59e0b;
+        outline-offset: 3px;
+        @apply ring-4 ring-amber-200/60 z-10;
+    }
+    .org-card-in-chain {
+        outline: 3px dashed #fbbf24;
+        outline-offset: 2px;
+    }
 }
