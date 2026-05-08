@@ -1102,6 +1102,30 @@ try {
             return;
         }
 
+        case 'org:render': {
+            // Build the chart HTML server-side so the admin preview tab can
+            // refresh without a full page reload after edits.
+            require_once __DIR__ . '/../includes/org_chart_renderer.php';
+            $positions = $pdo->query("SELECT * FROM sys_org_positions WHERE is_active = 1 ORDER BY level ASC, sort_order ASC, id ASC")->fetchAll(PDO::FETCH_ASSOC);
+            $members   = $pdo->query("SELECT * FROM sys_org_members   WHERE is_active = 1 ORDER BY position_id ASC, display_order ASC, id ASC")->fetchAll(PDO::FETCH_ASSOC);
+            $built = ocrBuildChart($positions, $members, null);
+            $html = $built['html'];
+            if (empty($positions) || empty($members)) {
+                $html = '<div class="text-center py-14 text-slate-400">'
+                      . '<i class="fa-solid fa-folder-open text-5xl mb-3 block text-slate-200"></i>'
+                      . '<p class="text-sm font-bold">ยังไม่มีข้อมูลผังองค์กร</p>'
+                      . '<p class="text-[11px] font-medium mt-1">เพิ่มตำแหน่งและสมาชิกในแท็บ "จัดการ" ก่อน</p>'
+                      . '</div>';
+            }
+            echo json_encode([
+                'ok' => true,
+                'html' => $html,
+                'totalPositions' => $built['totalPositions'],
+                'totalMembers'   => $built['totalMembers'],
+            ]);
+            return;
+        }
+
         default:
             echo json_encode(['ok' => false, 'message' => "Unknown action: $entity:$action"]);
             return;

@@ -47,6 +47,14 @@ try {
 $totalPositions = (int)$pdo->query("SELECT COUNT(*) FROM sys_org_positions WHERE is_active = 1")->fetchColumn();
 $totalMembers   = (int)$pdo->query("SELECT COUNT(*) FROM sys_org_members WHERE is_active = 1")->fetchColumn();
 $unassignedMembers = (int)$pdo->query("SELECT COUNT(*) FROM sys_org_members WHERE is_active = 1 AND position_id IS NULL")->fetchColumn();
+
+// Build the rendered preview HTML server-side so admins see the actual
+// org chart users would see (with users feature gated, this is the only
+// way to inspect the result while editing).
+require_once __DIR__ . '/../../../includes/org_chart_renderer.php';
+$ocPreviewPositions = $pdo->query("SELECT * FROM sys_org_positions WHERE is_active = 1 ORDER BY level ASC, sort_order ASC, id ASC")->fetchAll(PDO::FETCH_ASSOC);
+$ocPreviewMembers   = $pdo->query("SELECT * FROM sys_org_members WHERE is_active = 1 ORDER BY position_id ASC, display_order ASC, id ASC")->fetchAll(PDO::FETCH_ASSOC);
+$ocPreview = ocrBuildChart($ocPreviewPositions, $ocPreviewMembers, null);
 ?>
 <div class="max-w-[1400px] mx-auto px-4 py-6">
     <a href="?section=clinic_data" class="inline-flex items-center gap-2 text-xs font-black text-slate-500 hover:text-emerald-600 mb-4">
@@ -71,12 +79,21 @@ $unassignedMembers = (int)$pdo->query("SELECT COUNT(*) FROM sys_org_members WHER
                 <i class="fa-solid fa-users text-[9px]"></i>
                 <span id="oc-total-mem"><?= $totalMembers ?></span> สมาชิก
             </span>
-            <a href="../user/org_chart.php" target="_blank" rel="noopener"
-               class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white border border-slate-200 text-slate-600 hover:border-emerald-300 hover:text-emerald-600 text-[10px] font-black uppercase tracking-widest">
-                <i class="fa-solid fa-eye text-[9px]"></i> ดูผัง
-            </a>
         </div>
     </div>
+
+    <!-- View toggle: Manage vs Preview -->
+    <div class="oc-view-tabs">
+        <button type="button" class="oc-view-tab is-active" data-view="manage" onclick="ocSwitchView('manage')">
+            <i class="fa-solid fa-pen-to-square"></i> จัดการ
+        </button>
+        <button type="button" class="oc-view-tab" data-view="preview" onclick="ocSwitchView('preview')">
+            <i class="fa-solid fa-eye"></i> ดูผัง
+        </button>
+    </div>
+
+    <!-- ── View: Manage ─────────────────────────────────────────────────── -->
+    <div id="oc-view-manage">
 
     <!-- Toolbar -->
     <div class="flex flex-wrap gap-2 mb-4">
@@ -141,6 +158,50 @@ $unassignedMembers = (int)$pdo->query("SELECT COUNT(*) FROM sys_org_members WHER
             <?php endif; ?>
         </div>
     </div>
+
+    </div><!-- /#oc-view-manage -->
+
+    <!-- ── View: Preview (rendered chart, what users will see) ────────── -->
+    <div id="oc-view-preview" style="display:none;">
+        <div class="oc-preview-toolbar">
+            <div class="flex items-center gap-2 text-[12px] font-bold text-slate-500">
+                <i class="fa-solid fa-circle-info text-amber-400"></i>
+                แสดงผังตามที่ผู้ใช้จะเห็น (ไม่ไฮไลต์ "ตัวเอง" เพราะเป็นมุมมอง admin)
+            </div>
+            <button type="button" onclick="ocRefreshPreview()" class="oc-preview-refresh-btn">
+                <i class="fa-solid fa-rotate"></i> รีเฟรช
+            </button>
+        </div>
+
+        <div class="oc-preview-frame">
+            <div class="oc-preview-stats">
+                <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-white shadow">
+                    <i class="fa-solid fa-people-group"></i>
+                </div>
+                <div>
+                    <p class="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Chain of Command</p>
+                    <h3 class="text-base font-black text-slate-800 mt-0.5">โครงสร้างคลินิก</h3>
+                    <p class="text-[11px] font-bold text-slate-500 mt-0.5">
+                        <span id="oc-preview-pos-count"><?= $ocPreview['totalPositions'] ?></span> ตำแหน่ง ·
+                        <span id="oc-preview-mem-count"><?= $ocPreview['totalMembers'] ?></span> สมาชิก
+                    </p>
+                </div>
+            </div>
+
+            <div class="oc-preview-chart" id="oc-preview-html">
+                <?php if (empty($ocPreviewPositions) || empty($ocPreviewMembers)): ?>
+                    <div class="text-center py-14 text-slate-400">
+                        <i class="fa-solid fa-folder-open text-5xl mb-3 block text-slate-200"></i>
+                        <p class="text-sm font-bold">ยังไม่มีข้อมูลผังองค์กร</p>
+                        <p class="text-[11px] font-medium mt-1">เพิ่มตำแหน่งและสมาชิกในแท็บ "จัดการ" ก่อน</p>
+                    </div>
+                <?php else: ?>
+                    <?= $ocPreview['html'] ?>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div><!-- /#oc-view-preview -->
+
 </div>
 
 <!-- ══════════════ Modal: Position ══════════════ -->
@@ -361,6 +422,26 @@ $unassignedMembers = (int)$pdo->query("SELECT COUNT(*) FROM sys_org_members WHER
 
 /* Member card linked badge */
 .oc-mem-linked-badge { display: inline-flex; align-items: center; gap: .25rem; padding: .1rem .4rem; border-radius: .35rem; background: #ecfdf5; color: #065f46; font-size: .65rem; font-weight: 800; border: 1px solid #a7f3d0; margin-left: .35rem; }
+
+/* View toggle tabs (Manage / Preview) */
+.oc-view-tabs { display: inline-flex; gap: .35rem; padding: .35rem; background: #f1f5f9; border-radius: .9rem; margin-bottom: 1.25rem; }
+.oc-view-tab { display: inline-flex; align-items: center; gap: .45rem; padding: .55rem 1.1rem; border-radius: .65rem; font-size: .82rem; font-weight: 800; color: #64748b; background: transparent; border: none; cursor: pointer; transition: all .18s; }
+.oc-view-tab:hover { color: #0f172a; background: rgba(255,255,255,.65); }
+.oc-view-tab.is-active { background: #fff; color: #047857; box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+.oc-view-tab i { font-size: .8rem; }
+
+/* Preview pane */
+.oc-preview-toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .75rem; padding: .8rem 1rem; background: #fffbeb; border: 1px solid #fde68a; border-radius: .9rem; margin-bottom: 1rem; }
+.oc-preview-refresh-btn { display: inline-flex; align-items: center; gap: .4rem; padding: .45rem .9rem; border-radius: .55rem; background: #fff; border: 1px solid #fde68a; color: #b45309; font-size: .78rem; font-weight: 800; cursor: pointer; transition: all .15s; }
+.oc-preview-refresh-btn:hover { background: #fef3c7; border-color: #fcd34d; }
+.oc-preview-refresh-btn:disabled { opacity: .55; cursor: wait; }
+.oc-preview-frame { background: #f8faff; border: 1.5px solid #e2e8f0; border-radius: 1.5rem; padding: 1.5rem 1rem; }
+.oc-preview-stats { display: flex; align-items: center; gap: 1rem; padding: 1rem 1.25rem; background: #fff; border: 1px solid #f1f5f9; border-radius: 1.5rem; margin-bottom: 1.25rem; box-shadow: 0 1px 3px rgba(0,0,0,.03); }
+.oc-preview-chart { background: #fff; border: 1px solid #f1f5f9; border-radius: 1.5rem; padding: 1.25rem; box-shadow: 0 1px 3px rgba(0,0,0,.03); }
+@media (max-width: 640px) {
+    .oc-preview-frame { padding: .75rem .5rem; }
+    .oc-preview-chart { padding: .85rem; }
+}
 </style>
 
 <script src="../assets/vendor/Sortable.min.js"></script>
@@ -861,6 +942,40 @@ $unassignedMembers = (int)$pdo->query("SELECT COUNT(*) FROM sys_org_members WHER
             if (el) el.style.display = 'none';
         }
     });
+
+    // ── View toggle (Manage / Preview) ────────────────────────────────
+    // Initial render is server-side; switching back into preview re-fetches
+    // so admins always see the latest after editing in the manage tab.
+    let ocPreviewLoadedAt = Date.now();
+
+    window.ocSwitchView = function(view) {
+        const manageEl = document.getElementById('oc-view-manage');
+        const previewEl = document.getElementById('oc-view-preview');
+        if (!manageEl || !previewEl) return;
+        manageEl.style.display = (view === 'manage') ? '' : 'none';
+        previewEl.style.display = (view === 'preview') ? '' : 'none';
+        document.querySelectorAll('.oc-view-tab').forEach(b => {
+            b.classList.toggle('is-active', b.dataset.view === view);
+        });
+        // Refresh on every entry into preview so edits made in manage
+        // tab show up immediately without an explicit click.
+        if (view === 'preview') ocRefreshPreview();
+    };
+
+    window.ocRefreshPreview = async function() {
+        const btn = document.querySelector('.oc-preview-refresh-btn');
+        if (btn) btn.disabled = true;
+        const r = await ocPost('org', 'render', {});
+        if (btn) btn.disabled = false;
+        if (!r || !r.ok) {
+            Swal.fire({ icon: 'error', title: 'รีเฟรชไม่สำเร็จ', text: r?.message || '' });
+            return;
+        }
+        document.getElementById('oc-preview-html').innerHTML = r.html || '';
+        document.getElementById('oc-preview-pos-count').textContent = r.totalPositions ?? 0;
+        document.getElementById('oc-preview-mem-count').textContent = r.totalMembers ?? 0;
+        ocPreviewLoadedAt = Date.now();
+    };
 
     // Init — defer until after portal_CSRF script (defined later in portal/index.php) has run
     if (document.readyState === 'loading') {
