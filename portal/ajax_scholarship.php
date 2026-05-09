@@ -153,6 +153,10 @@ function handle_dashboard(PDO $pdo, string $action): void
         INNER JOIN sys_users u ON u.id = s.user_id
         ORDER BY l.event_at DESC LIMIT 10")->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
+    $settings = get_scholarship_settings($pdo);
+    $rate = (float)$settings['pay_rate_per_hour'];
+    $monthPay = $monthSplit['paid'] * $rate;
+
     echo json_encode([
         'ok' => true,
         'kpis' => [
@@ -161,6 +165,8 @@ function handle_dashboard(PDO $pdo, string $action): void
             'today_shifts' => $todayShifts,
             'month_hours' => round($monthSplit['hours'], 1),
             'month_paid' => round($monthSplit['paid'], 1),
+            'month_pay' => round($monthPay, 2),
+            'pay_rate' => $rate,
         ],
         'daily' => $dailyArr,
         'top' => $topRows,
@@ -493,7 +499,12 @@ function handle_reports(PDO $pdo, string $action): void
         $to   = (string)($_POST['to']   ?? date('Y-m-t'));
 
         $rows = compute_report_rows($pdo, $from, $to);
-        echo json_encode(['ok' => true, 'rows' => $rows], JSON_UNESCAPED_UNICODE);
+        $settings = get_scholarship_settings($pdo);
+        echo json_encode([
+            'ok' => true,
+            'rows' => $rows,
+            'pay_rate' => (float)$settings['pay_rate_per_hour'],
+        ], JSON_UNESCAPED_UNICODE);
         return;
     }
 
@@ -507,18 +518,26 @@ function handle_reports(PDO $pdo, string $action): void
         header('Content-Type: text/csv; charset=utf-8');
         header('Content-Disposition: attachment; filename="' . $filename . '"');
 
+        $settings = get_scholarship_settings($pdo);
+        $rate = (float)$settings['pay_rate_per_hour'];
+
         echo "\xEF\xBB\xBF"; // UTF-8 BOM
         $out = fopen('php://output', 'w');
         fputcsv($out, ['ชื่อ', 'รหัสนักศึกษา', 'คณะ', 'ภาคเรียน', 'จำนวนครั้งเข้างาน',
-            'ชั่วโมงทุน', 'ชั่วโมงค่าตอบแทน', 'ชั่วโมงรวม', 'เป้าชั่วโมง', '% ความคืบหน้า (ทุน)']);
+            'ชั่วโมงทุน', 'ชั่วโมงค่าตอบแทน', 'ชั่วโมงรวม',
+            'อัตรา (บาท/ชม.)', 'เงินค่าตอบแทน (บาท)',
+            'เป้าชั่วโมง', '% ความคืบหน้า (ทุน)']);
         foreach ($rows as $r) {
             $pct = (int)$r['max_hours'] > 0 ? round(($r['hours_scholarship'] / $r['max_hours']) * 100) . '%' : '-';
+            $pay = (float)$r['hours_paid'] * $rate;
             fputcsv($out, [
                 $r['full_name'], $r['student_code'], $r['faculty'], $r['semester'],
                 $r['checkins'],
                 number_format((float)$r['hours_scholarship'], 2),
                 number_format((float)$r['hours_paid'], 2),
                 number_format((float)$r['hours'], 2),
+                number_format($rate, 2),
+                number_format($pay, 2),
                 $r['max_hours'] > 0 ? $r['max_hours'] : '-', $pct,
             ]);
         }
@@ -631,6 +650,7 @@ function handle_settings(PDO $pdo, string $action): void
             'grace_before_min' => $_POST['grace_before_min'] ?? SCHOLARSHIP_GRACE_BEFORE_MIN,
             'require_approval' => $_POST['require_approval'] ?? 0,
             'gps_required' => $_POST['gps_required'] ?? 0,
+            'pay_rate_per_hour' => $_POST['pay_rate_per_hour'] ?? 0,
         ]);
         echo json_encode(['ok' => $ok]);
         return;

@@ -284,6 +284,10 @@ $displayName = trim((string)($user['full_name'] ?? ''))
         </div>
 
         <!-- ─── Hours Stats (แยก ทุน / ค่าตอบแทน) ─── -->
+        <?php
+            $payRate = (float)($settings['pay_rate_per_hour'] ?? 0);
+            $payMonth = $splitMonth['paid'] * $payRate;
+        ?>
         <div class="space-y-3">
             <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 px-1">สรุปชั่วโมงเดือนนี้</p>
             <div class="grid grid-cols-2 gap-3">
@@ -298,6 +302,15 @@ $displayName = trim((string)($user['full_name'] ?? ''))
                     <p class="text-xs text-slate-500">ชั่วโมง</p>
                 </div>
             </div>
+            <?php if ($payRate > 0): ?>
+                <div class="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl px-4 py-3 flex items-center justify-between">
+                    <div>
+                        <p class="text-[10px] font-black uppercase tracking-widest text-amber-700"><i class="fa-solid fa-money-bill-wave mr-1"></i>เงินค่าตอบแทนเดือนนี้</p>
+                        <p class="text-[10px] text-amber-600/70 mt-0.5">อัตรา <?= number_format($payRate, 2) ?> บาท/ชม.</p>
+                    </div>
+                    <p class="text-xl font-black text-amber-700"><?= number_format($payMonth, 2) ?> <span class="text-xs font-bold text-amber-600">฿</span></p>
+                </div>
+            <?php endif; ?>
             <div class="bg-white rounded-2xl px-4 py-3 flex items-center justify-between border border-slate-100">
                 <span class="text-xs font-black text-slate-500 uppercase tracking-widest">รวมทั้งหมด (สะสม)</span>
                 <span class="text-base font-black text-slate-900">

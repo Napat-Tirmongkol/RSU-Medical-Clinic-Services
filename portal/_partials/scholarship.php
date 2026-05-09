@@ -148,7 +148,7 @@ $portalCsrf = get_csrf_token();
     <div class="sch-pane" data-pane="dashboard">
 
         <!-- KPI cards -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3 mb-5">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mb-3">
             <div class="sch-kpi">
                 <div class="sch-kpi-icon" style="background:#dbeafe;color:#2563eb"><i class="fa-solid fa-graduation-cap"></i></div>
                 <p class="sch-kpi-label">นักศึกษา Active</p>
@@ -167,6 +167,8 @@ $portalCsrf = get_csrf_token();
                 <p class="sch-kpi-value text-cyan-600" id="kpi-today">–</p>
                 <p class="sch-kpi-foot">กะ</p>
             </div>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-5">
             <div class="sch-kpi">
                 <div class="sch-kpi-icon" style="background:#d1fae5;color:#059669"><i class="fa-solid fa-graduation-cap"></i></div>
                 <p class="sch-kpi-label">ชม.ทุน เดือนนี้</p>
@@ -178,6 +180,12 @@ $portalCsrf = get_csrf_token();
                 <p class="sch-kpi-label">ชม.ค่าตอบแทน เดือนนี้</p>
                 <p class="sch-kpi-value text-amber-600" id="kpi-month-paid">–</p>
                 <p class="sch-kpi-foot">ชั่วโมง</p>
+            </div>
+            <div class="sch-kpi">
+                <div class="sch-kpi-icon" style="background:#fef3c7;color:#d97706"><i class="fa-solid fa-money-bill-wave"></i></div>
+                <p class="sch-kpi-label">เงินค่าตอบแทนเดือนนี้</p>
+                <p class="sch-kpi-value text-amber-700" id="kpi-month-pay">–</p>
+                <p class="sch-kpi-foot" id="kpi-pay-rate-foot">บาท</p>
             </div>
         </div>
 
@@ -341,6 +349,25 @@ $portalCsrf = get_csrf_token();
                     <label class="sch-label">เข้างานก่อนกะได้ (นาที)</label>
                     <input type="number" min="0" id="set-grace" class="sch-input" value="<?= (int)$settings['grace_before_min'] ?>">
                 </div>
+
+                <hr class="border-slate-100 my-2">
+
+                <!-- ─── ค่าตอบแทน ─── -->
+                <div class="bg-amber-50 border border-amber-100 rounded-xl p-4">
+                    <label class="sch-label flex items-center gap-1.5">
+                        <i class="fa-solid fa-coins text-amber-500"></i>
+                        อัตราค่าตอบแทน (บาท/ชั่วโมง)
+                    </label>
+                    <input type="number" step="0.01" min="0" id="set-pay-rate" class="sch-input"
+                           value="<?= htmlspecialchars((string)($settings['pay_rate_per_hour'] ?? 0), ENT_QUOTES) ?>"
+                           placeholder="เช่น 50.00">
+                    <p class="text-[11px] text-slate-500 mt-1.5">
+                        <i class="fa-solid fa-circle-info"></i>
+                        ใช้คำนวณเฉพาะชั่วโมงประเภท "ค่าตอบแทน" (paid) — 0 = ไม่คำนวณเงิน
+                    </p>
+                </div>
+
+                <hr class="border-slate-100 my-2">
 
                 <label class="flex items-center gap-3 cursor-pointer p-3 rounded-xl bg-slate-50">
                     <input type="checkbox" id="set-require-approval" <?= (int)$settings['require_approval'] ? 'checked' : '' ?>>
@@ -571,6 +598,12 @@ $portalCsrf = get_csrf_token();
         document.getElementById('kpi-today').textContent = j.kpis.today_shifts;
         document.getElementById('kpi-month-hours').textContent = j.kpis.month_hours.toFixed(1);
         document.getElementById('kpi-month-paid').textContent = j.kpis.month_paid.toFixed(1);
+        document.getElementById('kpi-month-pay').textContent =
+            (j.kpis.month_pay || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        document.getElementById('kpi-pay-rate-foot').textContent =
+            j.kpis.pay_rate > 0
+                ? `บาท · อัตรา ${j.kpis.pay_rate.toFixed(2)} ฿/ชม.`
+                : 'บาท · ยังไม่ตั้งอัตรา';
 
         // Daily chart
         const labels = j.daily.map(d => d.label);
@@ -1143,36 +1176,45 @@ $portalCsrf = get_csrf_token();
             wrap.innerHTML = '<p class="text-center text-slate-400 py-10">ไม่มีข้อมูลในช่วงที่เลือก</p>';
             return;
         }
+        const rate = parseFloat(j.pay_rate || 0);
         let totalScholar = 0, totalPaid = 0;
         let html = '<table class="sch-table"><thead><tr>'
             + '<th>นักศึกษา</th><th>คณะ</th><th>เข้างาน</th>'
             + '<th><i class="fa-solid fa-graduation-cap text-emerald-500 mr-1"></i>ชม.ทุน</th>'
             + '<th><i class="fa-solid fa-coins text-amber-500 mr-1"></i>ชม.ค่าตอบแทน</th>'
+            + (rate > 0 ? '<th><i class="fa-solid fa-money-bill-wave text-amber-600 mr-1"></i>เงิน (บาท)</th>' : '')
             + '<th>รวม</th><th>เป้า (ทุน)</th><th>%</th>'
             + '</tr></thead><tbody>';
         for (const r of j.rows) {
             totalScholar += parseFloat(r.hours_scholarship);
             totalPaid += parseFloat(r.hours_paid);
             const pct = r.max_hours > 0 ? Math.round((r.hours_scholarship / r.max_hours) * 100) : null;
+            const pay = parseFloat(r.hours_paid) * rate;
             html += `<tr>
                 <td><p class="font-black">${escHtml(r.full_name)}</p><p class="text-xs text-slate-500">${escHtml(r.student_code || '-')}</p></td>
                 <td class="text-xs">${escHtml(r.faculty || '-')}</td>
                 <td>${r.checkins}</td>
                 <td class="font-bold text-emerald-700">${parseFloat(r.hours_scholarship).toFixed(2)}</td>
                 <td class="font-bold text-amber-700">${parseFloat(r.hours_paid).toFixed(2)}</td>
+                ${rate > 0 ? `<td class="font-bold text-amber-700">${pay.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>` : ''}
                 <td class="font-black">${parseFloat(r.hours).toFixed(2)}</td>
                 <td class="text-xs">${r.max_hours > 0 ? r.max_hours : '-'}</td>
                 <td>${pct === null ? '-' : `<span class="font-bold ${pct >= 100 ? 'text-emerald-600' : pct >= 50 ? 'text-amber-600' : 'text-slate-500'}">${pct}%</span>`}</td>
             </tr>`;
         }
         const totalAll = totalScholar + totalPaid;
+        const totalPay = totalPaid * rate;
         html += `</tbody><tfoot><tr style="border-top:2px solid #e2e8f0">
             <td colspan="3" class="text-right font-black p-3">รวมทั้งหมด</td>
             <td class="font-black p-3 text-emerald-700">${totalScholar.toFixed(2)}</td>
             <td class="font-black p-3 text-amber-700">${totalPaid.toFixed(2)}</td>
+            ${rate > 0 ? `<td class="font-black p-3 text-amber-700">${totalPay.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>` : ''}
             <td class="font-black p-3">${totalAll.toFixed(2)} ชม.</td>
             <td colspan="2"></td>
         </tr></tfoot></table>`;
+        if (rate > 0) {
+            html += `<p class="text-xs text-slate-400 mt-2 text-right">อัตรา ${rate.toLocaleString('th-TH', { minimumFractionDigits: 2 })} บาท/ชม.</p>`;
+        }
         wrap.innerHTML = html;
     }
     window.loadReports = loadReports;
@@ -1205,6 +1247,7 @@ $portalCsrf = get_csrf_token();
             grace_before_min: document.getElementById('set-grace').value,
             require_approval: document.getElementById('set-require-approval').checked ? 1 : 0,
             gps_required: document.getElementById('set-gps-required').checked ? 1 : 0,
+            pay_rate_per_hour: document.getElementById('set-pay-rate').value || 0,
         };
         const j = await api('settings', 'save', data);
         if (j.ok) Swal.fire({ icon:'success', title:'บันทึกแล้ว', timer:1200, showConfirmButton:false });
