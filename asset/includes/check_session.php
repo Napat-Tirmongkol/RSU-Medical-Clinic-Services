@@ -25,32 +25,41 @@ if (!function_exists('_asset_abs_url')) {
 @session_start();
 
 // ── SSO sync จาก Hub Portal (เหมือน e_Borrow) ────────────────────────────
+// แยก context ตาม login source:
+//   - Portal admin (sys_admins) → admin_id = sys_admins.id, is_portal_admin = true
+//   - e-Campaign Staff (sys_staff) → admin_id = sys_staff.id, is_ecampaign_staff = true
 if (!isset($_SESSION['user_id'])
     && isset($_SESSION['admin_logged_in'], $_SESSION['admin_id'])
     && $_SESSION['admin_logged_in'] === true) {
     try {
         require_once __DIR__ . '/db_connect.php';
-        $p     = db();
-        $uname = $_SESSION['admin_username'] ?? '';
+        $p = db();
+        $isPortalAdmin = empty($_SESSION['is_ecampaign_staff']);
 
-        $s = $p->prepare("SELECT id, full_name, role FROM sys_staff WHERE username = :u AND account_status = 'active' LIMIT 1");
-        $s->execute([':u' => $uname]);
-        $row = $s->fetch();
-
-        if ($row) {
-            $allowedRoles = ['admin', 'editor', 'employee', 'librarian'];
-            $_SESSION['user_id']   = $row['id'];
-            $_SESSION['full_name'] = $row['full_name'];
-            $_SESSION['role']      = in_array($row['role'], $allowedRoles, true) ? $row['role'] : 'employee';
-        } else {
+        if ($isPortalAdmin) {
+            // Portal admin path — ตรวจ sys_admins ตรงๆ ผ่าน id (ไม่ใช้ username เพราะอาจชน sys_staff)
             $sa = $p->prepare("SELECT id, full_name FROM sys_admins WHERE id = :id LIMIT 1");
-            $sa->execute([':id' => $_SESSION['admin_id'] ?? null]);
+            $sa->execute([':id' => (int)$_SESSION['admin_id']]);
             $admin = $sa->fetch();
             if ($admin) {
-                $_SESSION['user_id']         = (int) $_SESSION['admin_id'];
+                $_SESSION['user_id']         = (int)$admin['id'];
                 $_SESSION['full_name']       = $admin['full_name'];
                 $_SESSION['role']            = 'admin';
                 $_SESSION['is_portal_admin'] = true;
+            } else {
+                header('Location: ' . _asset_abs_url('../portal/login.php?error=no_admin_account'));
+                exit;
+            }
+        } else {
+            // Staff path — admin_id คือ sys_staff.id (set ที่ admin/auth/staff_login.php)
+            $s = $p->prepare("SELECT id, full_name, role FROM sys_staff WHERE id = :id AND account_status = 'active' LIMIT 1");
+            $s->execute([':id' => (int)$_SESSION['admin_id']]);
+            $row = $s->fetch();
+            if ($row) {
+                $allowedRoles = ['admin', 'editor', 'employee', 'librarian'];
+                $_SESSION['user_id']   = (int)$row['id'];
+                $_SESSION['full_name'] = $row['full_name'];
+                $_SESSION['role']      = in_array($row['role'], $allowedRoles, true) ? $row['role'] : 'employee';
             } else {
                 header('Location: ' . _asset_abs_url('../portal/login.php?error=no_staff_account'));
                 exit;
@@ -81,8 +90,14 @@ if (!function_exists('asset_can_manage')) {
 if (!function_exists('asset_require_manage')) {
     function asset_require_manage(): void {
         if (!asset_can_manage()) {
-            http_response_code(403);
-            exit('สิทธิ์ไม่เพียงพอ (admin/editor เท่านั้น)');
+            require_once __DIR__ . '/../../includes/access_denied_page.php';
+            render_access_denied([
+                'flag'       => 'role: admin / editor',
+                'module'     => 'Asset Inventory — โหมดจัดการ (admin/editor)',
+                'hub_url'    => _asset_abs_url('../portal/index.php'),
+                'logout_url' => _asset_abs_url('../portal/logout.php'),
+                'tailwind'   => _asset_abs_url('../assets/css/tailwind.min.css'),
+            ]);
         }
     }
 }
@@ -123,8 +138,14 @@ if (empty($_SESSION['is_portal_admin'])) {
             }
         }
         if ((int)$hasFlag !== 1) {
-            http_response_code(403);
-            exit('สิทธิ์ไม่เพียงพอ — โปรดติดต่อผู้ดูแลระบบเพื่อขอสิทธิ์ access_asset');
+            require_once __DIR__ . '/../../includes/access_denied_page.php';
+            render_access_denied([
+                'flag'       => 'access_asset',
+                'module'     => 'Asset Inventory (ครุภัณฑ์สำนักงาน)',
+                'hub_url'    => _asset_abs_url('../portal/index.php'),
+                'logout_url' => _asset_abs_url('../portal/logout.php'),
+                'tailwind'   => _asset_abs_url('../assets/css/tailwind.min.css'),
+            ]);
         }
     }
 }
