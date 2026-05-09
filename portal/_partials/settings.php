@@ -68,9 +68,18 @@ $whitelistText      = implode("\n", $whitelistArr);
     </div>
 
     <!-- Tabs (sticky-ish near top of pane) -->
-    <div class="bg-white border border-gray-200 rounded-2xl p-1.5 flex gap-1 mb-6 shadow-sm">
+    <div class="bg-white border border-gray-200 rounded-2xl p-1.5 flex gap-1 mb-6 shadow-sm overflow-x-auto">
         <button type="button" class="stg-tab" data-tab="system">
             <i class="fa-solid fa-server"></i>System
+        </button>
+        <button type="button" class="stg-tab" data-tab="maintenance">
+            <i class="fa-solid fa-screwdriver-wrench"></i>Maintenance
+        </button>
+        <button type="button" class="stg-tab" data-tab="announcement">
+            <i class="fa-solid fa-bullhorn"></i>Announcement
+        </button>
+        <button type="button" class="stg-tab" data-tab="whitelist">
+            <i class="fa-solid fa-user-shield"></i>Whitelist
         </button>
         <button type="button" class="stg-tab" data-tab="config">
             <i class="fa-solid fa-sliders"></i>Configuration
@@ -83,10 +92,8 @@ $whitelistText      = implode("\n", $whitelistArr);
         </button>
     </div>
 
-    <!-- ═════════ TAB: System ═════════ -->
+    <!-- ═════════ TAB: System (overview + deployment) ═════════ -->
     <div class="stg-pane space-y-6" data-pane="system">
-
-        <!-- Status banner + Git Pull (the single one) -->
         <div class="rounded-2xl border p-5 flex items-center gap-5"
              style="<?= $allOnline ? 'background:#f0fdf4; border-color:#bbf7d0;' : 'background:#fffbeb; border-color:#fef3c7;' ?>">
             <div class="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 text-xl"
@@ -98,7 +105,7 @@ $whitelistText      = implode("\n", $whitelistArr);
                     <?= $allOnline ? 'ทุกระบบพร้อมใช้งาน' : 'บางระบบปิดปรับปรุง' ?>
                 </div>
                 <p class="text-slate-600 text-xs mt-0.5 font-medium">
-                    <?= $allOnline ? 'ผู้ใช้ทุกคนสามารถเข้าใช้งานได้ตามปกติ' : 'คุณสามารถเปิดระบบที่ปิดอยู่ได้จากรายการด้านล่าง' ?>
+                    <?= $allOnline ? 'ผู้ใช้ทุกคนสามารถเข้าใช้งานได้ตามปกติ' : 'ดูรายละเอียดที่แท็บ Maintenance เพื่อเปิดระบบที่ปิดอยู่' ?>
                 </p>
             </div>
             <button onclick="triggerGitPull()" class="stg-btn-ghost whitespace-nowrap">
@@ -106,13 +113,50 @@ $whitelistText      = implode("\n", $whitelistArr);
             </button>
         </div>
 
-        <!-- Service toggles -->
+        <!-- Quick links to other tabs -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <button type="button" onclick="document.querySelector('.stg-tab[data-tab=maintenance]').click()" class="stg-card text-left hover:shadow-md transition-all cursor-pointer">
+                <div class="stg-card-body flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-base"><i class="fa-solid fa-screwdriver-wrench"></i></div>
+                    <div class="flex-1 min-w-0">
+                        <div class="font-black text-slate-800 text-sm">Maintenance</div>
+                        <div class="text-[11px] text-slate-500 font-medium">เปิด/ปิดบริการแต่ละโมดูล</div>
+                    </div>
+                    <i class="fa-solid fa-arrow-right text-slate-300"></i>
+                </div>
+            </button>
+            <button type="button" onclick="document.querySelector('.stg-tab[data-tab=announcement]').click()" class="stg-card text-left hover:shadow-md transition-all cursor-pointer">
+                <div class="stg-card-body flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-base"><i class="fa-solid fa-bullhorn"></i></div>
+                    <div class="flex-1 min-w-0">
+                        <div class="font-black text-slate-800 text-sm">Announcement</div>
+                        <div class="text-[11px] text-slate-500 font-medium">ประกาศปิดปรับปรุงระบบ</div>
+                    </div>
+                    <i class="fa-solid fa-arrow-right text-slate-300"></i>
+                </div>
+            </button>
+            <button type="button" onclick="document.querySelector('.stg-tab[data-tab=whitelist]').click()" class="stg-card text-left hover:shadow-md transition-all cursor-pointer">
+                <div class="stg-card-body flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-base"><i class="fa-solid fa-user-shield"></i></div>
+                    <div class="flex-1 min-w-0">
+                        <div class="font-black text-slate-800 text-sm">Whitelist</div>
+                        <div class="text-[11px] text-slate-500 font-medium">LINE User ID ที่เข้าได้ขณะปิด</div>
+                    </div>
+                    <i class="fa-solid fa-arrow-right text-slate-300"></i>
+                </div>
+            </button>
+        </div>
+    </div>
+
+    <!-- ═════════ TAB: Maintenance (service toggles) ═════════ -->
+    <div class="stg-pane space-y-6" data-pane="maintenance" hidden>
         <div class="stg-card">
             <div class="stg-card-head">
-                <h3>Services &amp; Maintenance</h3>
+                <h3><i class="fa-solid fa-screwdriver-wrench text-emerald-500 mr-1.5"></i>Services &amp; Maintenance</h3>
                 <span class="text-[10px] font-bold text-slate-400 bg-white px-2 py-1 rounded-lg border border-gray-100">REAL-TIME</span>
             </div>
             <div class="stg-card-body">
+                <p class="text-xs text-slate-500 font-medium mb-4 -mt-1">เปิด/ปิดบริการแต่ละโมดูล — ผู้ใช้จะเห็นหน้าปิดปรับปรุงเฉพาะโมดูลที่ปิด</p>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <?php foreach ($mProjects as $p):
                         $isActive = $mData[$p['key']] ?? true;
@@ -141,58 +185,59 @@ $whitelistText      = implode("\n", $whitelistArr);
                 </div>
             </div>
         </div>
+    </div>
 
-        <!-- Announcement + Whitelist (consolidated under System) -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <!-- Announcement -->
-            <div class="stg-card">
-                <div class="stg-card-head">
-                    <h3><i class="fa-solid fa-bullhorn text-amber-500 mr-1.5"></i>ประกาศปิดปรับปรุงระบบ</h3>
+    <!-- ═════════ TAB: Announcement ═════════ -->
+    <div class="stg-pane space-y-6" data-pane="announcement" hidden>
+        <div class="stg-card">
+            <div class="stg-card-head">
+                <h3><i class="fa-solid fa-bullhorn text-amber-500 mr-1.5"></i>ประกาศปิดปรับปรุงระบบ</h3>
+            </div>
+            <div class="stg-card-body space-y-4">
+                <p class="text-xs text-slate-500 font-medium -mt-2">แสดงแถบแจ้งเตือนแผนการปิดระบบให้ผู้ใช้งานทราบล่วงหน้า</p>
+
+                <div class="flex p-1 bg-slate-50 rounded-2xl border border-slate-100 w-fit min-w-[200px]">
+                    <button type="button" onclick="setAnnStatus(0)" id="btn-ann-off"
+                            class="ann-status-btn flex-1 px-6 py-2 rounded-xl text-xs font-black transition-all <?= !$announcementActive ? 'bg-white shadow-sm text-slate-600 border border-slate-200' : 'text-slate-400 hover:text-slate-600' ?>">
+                        ปิดประกาศ
+                    </button>
+                    <button type="button" onclick="setAnnStatus(1)" id="btn-ann-on"
+                            class="ann-status-btn flex-1 px-6 py-2 rounded-xl text-xs font-black transition-all <?= $announcementActive ? 'bg-white shadow-sm text-amber-600 border border-amber-100' : 'text-slate-400 hover:text-slate-600' ?>">
+                        เปิดประกาศ
+                    </button>
+                    <input type="hidden" id="announcement-toggle-val" value="<?= $announcementActive ? '1' : '0' ?>">
                 </div>
-                <div class="stg-card-body space-y-4">
-                    <p class="text-xs text-slate-500 font-medium -mt-2">แสดงแถบแจ้งเตือนแผนการปิดระบบให้ผู้ใช้งานทราบล่วงหน้า</p>
 
-                    <div class="flex p-1 bg-slate-50 rounded-2xl border border-slate-100 w-fit min-w-[200px]">
-                        <button type="button" onclick="setAnnStatus(0)" id="btn-ann-off"
-                                class="ann-status-btn flex-1 px-6 py-2 rounded-xl text-xs font-black transition-all <?= !$announcementActive ? 'bg-white shadow-sm text-slate-600 border border-slate-200' : 'text-slate-400 hover:text-slate-600' ?>">
-                            ปิดประกาศ
-                        </button>
-                        <button type="button" onclick="setAnnStatus(1)" id="btn-ann-on"
-                                class="ann-status-btn flex-1 px-6 py-2 rounded-xl text-xs font-black transition-all <?= $announcementActive ? 'bg-white shadow-sm text-amber-600 border border-amber-100' : 'text-slate-400 hover:text-slate-600' ?>">
-                            เปิดประกาศ
-                        </button>
-                        <input type="hidden" id="announcement-toggle-val" value="<?= $announcementActive ? '1' : '0' ?>">
-                    </div>
+                <textarea id="announcement-message" rows="4"
+                          placeholder="เช่น: ขออภัยในความไม่สะดวก จะทำการปิดปรับปรุงระบบในวันที่ 24 เม.ย. เวลา 23:00 - 05:00 น."
+                          class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-amber-100 focus:border-amber-400 transition-all"><?= htmlspecialchars($announcementMsg) ?></textarea>
 
-                    <textarea id="announcement-message" rows="3"
-                              placeholder="เช่น: ขออภัยในความไม่สะดวก จะทำการปิดปรับปรุงระบบในวันที่ 24 เม.ย. เวลา 23:00 - 05:00 น."
-                              class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-amber-100 focus:border-amber-400 transition-all"><?= htmlspecialchars($announcementMsg) ?></textarea>
-
-                    <div class="flex justify-end">
-                        <button onclick="saveAnnouncement()" class="stg-btn-primary">
-                            <i class="fa-solid fa-save"></i> บันทึกประกาศ
-                        </button>
-                    </div>
+                <div class="flex justify-end">
+                    <button onclick="saveAnnouncement()" class="stg-btn-primary">
+                        <i class="fa-solid fa-save"></i> บันทึกประกาศ
+                    </button>
                 </div>
             </div>
+        </div>
+    </div>
 
-            <!-- Whitelist -->
-            <div class="stg-card">
-                <div class="stg-card-head">
-                    <h3><i class="fa-solid fa-user-shield text-blue-500 mr-1.5"></i>Maintenance Whitelist</h3>
-                </div>
-                <div class="stg-card-body space-y-4">
-                    <p class="text-xs text-slate-500 font-medium -mt-2">LINE User ID ของผู้ที่อนุญาตให้เข้าใช้งานได้ขณะปิดปรับปรุง (1 รายการต่อบรรทัด)</p>
+    <!-- ═════════ TAB: Whitelist ═════════ -->
+    <div class="stg-pane space-y-6" data-pane="whitelist" hidden>
+        <div class="stg-card">
+            <div class="stg-card-head">
+                <h3><i class="fa-solid fa-user-shield text-blue-500 mr-1.5"></i>Maintenance Whitelist</h3>
+            </div>
+            <div class="stg-card-body space-y-4">
+                <p class="text-xs text-slate-500 font-medium -mt-2">LINE User ID ของผู้ที่อนุญาตให้เข้าใช้งานได้ขณะปิดปรับปรุง (1 รายการต่อบรรทัด)</p>
 
-                    <textarea id="maintenance-whitelist" rows="6"
-                              placeholder="Ua1234567890abcdef..."
-                              class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-mono font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all"><?= htmlspecialchars($whitelistText) ?></textarea>
+                <textarea id="maintenance-whitelist" rows="8"
+                          placeholder="Ua1234567890abcdef..."
+                          class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-mono font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all"><?= htmlspecialchars($whitelistText) ?></textarea>
 
-                    <div class="flex justify-end">
-                        <button onclick="saveWhitelist()" class="stg-btn-primary">
-                            <i class="fa-solid fa-check-double"></i> อัปเดต Whitelist
-                        </button>
-                    </div>
+                <div class="flex justify-end">
+                    <button onclick="saveWhitelist()" class="stg-btn-primary">
+                        <i class="fa-solid fa-check-double"></i> อัปเดต Whitelist
+                    </button>
                 </div>
             </div>
         </div>
@@ -363,7 +408,7 @@ $whitelistText      = implode("\n", $whitelistArr);
 <script>
     // ── Tab switcher ───────────────────────────────────────────────────
     (function () {
-        const VALID = ['system', 'config', 'integrations', 'logs'];
+        const VALID = ['system', 'maintenance', 'announcement', 'whitelist', 'config', 'integrations', 'logs'];
 
         // Paint DOM only (no URL mutation) — safe to call on any page load.
         function paintSettingsTab(name) {
