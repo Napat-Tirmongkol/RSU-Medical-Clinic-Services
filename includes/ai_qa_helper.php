@@ -539,8 +539,10 @@ function ai_faq_generate_variants(string $question): array
         throw new RuntimeException('ยังไม่ได้ตั้งค่า GEMINI_API_KEY');
     }
 
-    $count = AI_FAQ_VARIANT_COUNT;
-    $prompt = <<<PROMPT
+    // Inner closure: 1 attempt at given temperature. Returns [clean, rawText, parsedCount].
+    $callOnce = function (float $temperature) use ($apiKey, $question): array {
+        $count = AI_FAQ_VARIANT_COUNT;
+        $prompt = <<<PROMPT
 คุณกำลังช่วยสร้างฐาน FAQ ของห้องพยาบาลคลินิก RSU Medical
 ผู้ใช้คนเดียวอาจถามเรื่องเดียวกันได้หลายแบบ — ทั้งภาษาทางการ ภาษาพูด คำสะกดผิด คำย่อ ประโยคยาว/สั้น
 
@@ -558,75 +560,96 @@ function ai_faq_generate_variants(string $question): array
 {"variants": ["...", "...", "...", "...", "..."]}
 PROMPT;
 
-    $body = json_encode([
-        'contents' => [[
-            'role'  => 'user',
-            'parts' => [['text' => $prompt]],
-        ]],
-        'generationConfig' => [
-            'temperature'      => 0.7,
-            'maxOutputTokens'  => 1024,
-            'responseMimeType' => 'application/json',
-        ],
-    ], JSON_UNESCAPED_UNICODE);
+        $body = json_encode([
+            'contents' => [[
+                'role'  => 'user',
+                'parts' => [['text' => $prompt]],
+            ]],
+            'generationConfig' => [
+                'temperature'      => $temperature,
+                'maxOutputTokens'  => 1024,
+                'responseMimeType' => 'application/json',
+            ],
+        ], JSON_UNESCAPED_UNICODE);
 
-    $models  = ['gemini-2.5-flash', 'gemini-2.0-flash'];
-    $rawText = '';
+        $models  = ['gemini-2.5-flash', 'gemini-2.0-flash'];
+        $rawText = '';
 
-    foreach ($models as $model) {
-        $url = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$apiKey}";
-        $ch  = curl_init($url);
-        curl_setopt_array($ch, [
-            CURLOPT_POST           => true,
-            CURLOPT_POSTFIELDS     => $body,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
-            CURLOPT_TIMEOUT        => 45,
-            CURLOPT_CONNECTTIMEOUT => 15,
-            CURLOPT_SSL_VERIFYPEER => true,
-        ]);
-        $raw      = (string)curl_exec($ch);
-        $httpCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $curlErr  = curl_error($ch);
-        curl_close($ch);
+        foreach ($models as $model) {
+            $url = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$apiKey}";
+            $ch  = curl_init($url);
+            curl_setopt_array($ch, [
+                CURLOPT_POST           => true,
+                CURLOPT_POSTFIELDS     => $body,
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
+                CURLOPT_TIMEOUT        => 45,
+                CURLOPT_CONNECTTIMEOUT => 15,
+                CURLOPT_SSL_VERIFYPEER => true,
+            ]);
+            $raw      = (string)curl_exec($ch);
+            $httpCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $curlErr  = curl_error($ch);
+            curl_close($ch);
 
-        if ($curlErr) {
-            throw new RuntimeException('Gemini connection error: ' . $curlErr);
+            if ($curlErr) {
+                throw new RuntimeException('Gemini connection error: ' . $curlErr);
+            }
+            if ($httpCode === 200) {
+                $rawText = $raw;
+                break;
+            }
+            if ($httpCode !== 404) {
+                $errMsg = json_decode($raw, true)['error']['message'] ?? "HTTP {$httpCode}";
+                throw new RuntimeException('Gemini error: ' . $errMsg);
+            }
         }
-        if ($httpCode === 200) {
-            $rawText = $raw;
-            break;
+
+        if ($rawText === '') {
+            throw new RuntimeException('ไม่พบ model ที่ใช้งานได้');
         }
-        if ($httpCode !== 404) {
-            $errMsg = json_decode($raw, true)['error']['message'] ?? "HTTP {$httpCode}";
-            throw new RuntimeException('Gemini error: ' . $errMsg);
+
+        $resp = json_decode($rawText, true);
+        $text = (string)($resp['candidates'][0]['content']['parts'][0]['text'] ?? '');
+        $text = preg_replace('/^```(?:json)?\s*/m', '', $text);
+        $text = preg_replace('/```\s*$/m', '', $text);
+        $text = trim($text);
+
+        $parsed   = json_decode($text, true);
+        $variants = is_array($parsed['variants'] ?? null) ? $parsed['variants'] : [];
+
+        $clean = [];
+        foreach ($variants as $v) {
+            $v = trim((string)$v);
+            if ($v === '' || mb_strlen($v) > 500) continue;
+            if (mb_strtolower($v) === mb_strtolower($question)) continue;
+            $clean[] = $v;
         }
-    }
+        return [$clean, $rawText, count($variants)];
+    };
 
-    if ($rawText === '') {
-        throw new RuntimeException('ไม่พบ model ที่ใช้งานได้');
-    }
+    // First attempt — default temperature
+    [$clean, $raw1, $parsed1] = $callOnce(0.7);
+    if (!empty($clean)) return $clean;
 
-    $resp = json_decode($rawText, true);
-    $text = (string)($resp['candidates'][0]['content']['parts'][0]['text'] ?? '');
-    $text = preg_replace('/^```(?:json)?\s*/m', '', $text);
-    $text = preg_replace('/```\s*$/m', '', $text);
-    $text = trim($text);
+    // Retry once with higher temperature — handles intermittent empty/dup-only responses
+    [$clean, $raw2, $parsed2] = $callOnce(1.0);
+    if (!empty($clean)) return $clean;
 
-    $parsed   = json_decode($text, true);
-    $variants = is_array($parsed['variants'] ?? null) ? $parsed['variants'] : [];
+    // Both attempts produced nothing usable — log raw responses for debugging
+    error_log(sprintf(
+        'ai_faq_generate_variants exhausted retries. q=%s parsed1=%d parsed2=%d raw1=%s raw2=%s',
+        $question,
+        $parsed1,
+        $parsed2,
+        substr($raw1, 0, 500),
+        substr($raw2, 0, 500)
+    ));
 
-    $clean = [];
-    foreach ($variants as $v) {
-        $v = trim((string)$v);
-        if ($v === '' || mb_strlen($v) > 500) continue;
-        if (mb_strtolower($v) === mb_strtolower($question)) continue;
-        $clean[] = $v;
+    if ($parsed1 === 0 && $parsed2 === 0) {
+        throw new RuntimeException('AI ไม่ได้ส่ง variant กลับมา (response ว่าง 2 ครั้ง) — ลองพิมพ์คำถามให้ยาวขึ้น');
     }
-    if (empty($clean)) {
-        throw new RuntimeException('AI ไม่ได้ส่ง variant กลับมา');
-    }
-    return $clean;
+    throw new RuntimeException('AI ส่ง variant แต่ซ้ำกับต้นฉบับทั้งหมด — ลองปรับคำถามต้นฉบับให้กว้างขึ้น');
 }
 
 /**
