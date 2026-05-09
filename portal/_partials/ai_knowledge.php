@@ -14,7 +14,7 @@ $_aik_sources = [
         'color'  => '#0ea5e9',
         'title'  => 'ข้อมูลทั่วไปของคลินิก',
         'desc'   => 'ชื่อ, เบอร์โทร — AI ใช้แทรกในคำตอบ',
-        'target' => 'clinic_profile',
+        'url'    => '?section=clinic_data&cd_view=profile',
         'status' => 'มีหน้าจัดการแล้ว',
     ],
     [
@@ -22,7 +22,7 @@ $_aik_sources = [
         'color'  => '#10b981',
         'title'  => 'เวลาเปิด-ปิด (31 วันข้างหน้า)',
         'desc'   => 'AI ใช้ตอบ "วันนี้/พรุ่งนี้/วันที่ X เปิดไหม", "เปิดกี่โมง"',
-        'target' => 'clinic_calendar',
+        'url'    => '?section=clinic_data&cd_view=calendar',
         'status' => 'มีหน้าจัดการแล้ว',
     ],
     [
@@ -30,7 +30,7 @@ $_aik_sources = [
         'color'  => '#f59e0b',
         'title'  => 'ตารางหมอออกตรวจ',
         'desc'   => 'AI ใช้ตอบ "หมอใครออกตรวจวัน X", "วัน Y มีหมอไหม"',
-        'target' => 'doctor_schedule',
+        'url'    => '?section=clinic_data&cd_view=schedule',
         'status' => 'มีหน้าจัดการแล้ว',
     ],
     [
@@ -38,7 +38,7 @@ $_aik_sources = [
         'color'  => '#a855f7',
         'title'  => 'FAQ Knowledge Base',
         'desc'   => 'คำถาม-คำตอบที่ admin curate — matcher ใช้ตรง',
-        'target' => 'ai_qa_lab',
+        'url'    => '?section=ai_qa_lab',
         'status' => 'จัดการที่ AI QA Lab → FAQ tab',
     ],
 ];
@@ -179,8 +179,7 @@ $_aik_sources = [
         </h2>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
             <?php foreach ($_aik_sources as $s): ?>
-            <button type="button" onclick="switchSection('<?= htmlspecialchars($s['target']) ?>', document.querySelector('[data-section=<?= htmlspecialchars($s['target']) ?>]'))"
-                class="aik-source-card text-left">
+            <a href="<?= htmlspecialchars($s['url']) ?>" class="aik-source-card text-left">
                 <div class="aik-source-icon" style="background: <?= htmlspecialchars($s['color']) ?>">
                     <i class="fa-solid <?= htmlspecialchars($s['icon']) ?>"></i>
                 </div>
@@ -191,7 +190,7 @@ $_aik_sources = [
                         <i class="fa-solid fa-arrow-right"></i> <?= htmlspecialchars($s['status']) ?>
                     </div>
                 </div>
-            </button>
+            </a>
             <?php endforeach; ?>
         </div>
     </div>
