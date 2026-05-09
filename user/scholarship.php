@@ -504,10 +504,9 @@ if (btn && !btn.disabled) {
             const inTs = new Date(OPEN_CLOCK_IN.event_at.replace(' ', 'T')).getTime();
             const nowTs = Date.now();
             const diffMs = Math.max(0, nowTs - inTs);
-            const totalMin = Math.floor(diffMs / 60000);
+            const totalMin = Math.round(diffMs / 60000); // ปัดเป็นค่าใกล้เคียง
             const hours = Math.floor(totalMin / 60);
             const mins = totalMin % 60;
-            const decimalHours = (diffMs / 3600000).toFixed(2);
 
             const ct = OPEN_CLOCK_IN.comp_type || 'hours';
             const ctLabel = ct === 'paid' ? 'ค่าตอบแทน' : 'ส่งชั่วโมงทุน';
@@ -542,10 +541,9 @@ if (btn && !btn.disabled) {
                         </div>
                         <div style="border-top:1px dashed #cbd5e1;padding-top:.75rem;text-align:center">
                             <p style="font-size:.7rem;color:#64748b;text-transform:uppercase;letter-spacing:.05em;font-weight:800;margin:0">รวมเวลาทำงาน</p>
-                            <p style="font-size:1.75rem;font-weight:900;color:#0f172a;margin:.25rem 0;font-variant-numeric:tabular-nums">
+                            <p style="font-size:1.75rem;font-weight:900;color:#0f172a;margin:.25rem 0 0;font-variant-numeric:tabular-nums">
                                 ${hours} ชม. ${mins} นาที
                             </p>
-                            <p style="font-size:.75rem;color:#94a3b8;margin:0">≈ ${decimalHours} ชั่วโมง</p>
                         </div>
                         ${noteMsg}
                     </div>
