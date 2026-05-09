@@ -85,9 +85,13 @@ function ensure_scholarship_schema(PDO $pdo): void
             radius_m INT UNSIGNED NOT NULL DEFAULT " . SCHOLARSHIP_DEFAULT_RADIUS_M . ",
             grace_before_min INT UNSIGNED NOT NULL DEFAULT " . SCHOLARSHIP_GRACE_BEFORE_MIN . ",
             require_approval TINYINT(1) NOT NULL DEFAULT 1,
+            gps_required TINYINT(1) NOT NULL DEFAULT 1,
             updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY (id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+        // Self-healing: ถ้าตารางมีอยู่แล้วแต่ไม่มี column gps_required ให้เพิ่ม
+        try { $pdo->exec("ALTER TABLE sys_scholarship_settings ADD COLUMN IF NOT EXISTS gps_required TINYINT(1) NOT NULL DEFAULT 1"); } catch (PDOException) {}
 
         // Seed singleton row
         $pdo->exec("INSERT IGNORE INTO sys_scholarship_settings (id) VALUES (1)");
@@ -109,8 +113,11 @@ function get_scholarship_settings(PDO $pdo): array
             'radius_m' => SCHOLARSHIP_DEFAULT_RADIUS_M,
             'grace_before_min' => SCHOLARSHIP_GRACE_BEFORE_MIN,
             'require_approval' => 1,
+            'gps_required' => 1,
         ];
     }
+    // ค่า default สำหรับ row ที่สร้างก่อนเพิ่ม column
+    $row['gps_required'] = isset($row['gps_required']) ? (int)$row['gps_required'] : 1;
     return $row;
 }
 
@@ -122,7 +129,8 @@ function save_scholarship_settings(PDO $pdo, array $data): bool
         clinic_lng = :lng,
         radius_m = :radius,
         grace_before_min = :grace,
-        require_approval = :req
+        require_approval = :req,
+        gps_required = :gps
         WHERE id = 1");
     return $stmt->execute([
         ':lat' => $data['clinic_lat'] !== '' && $data['clinic_lat'] !== null ? (float)$data['clinic_lat'] : null,
@@ -130,6 +138,7 @@ function save_scholarship_settings(PDO $pdo, array $data): bool
         ':radius' => max(10, (int)($data['radius_m'] ?? SCHOLARSHIP_DEFAULT_RADIUS_M)),
         ':grace' => max(0, (int)($data['grace_before_min'] ?? SCHOLARSHIP_GRACE_BEFORE_MIN)),
         ':req' => !empty($data['require_approval']) ? 1 : 0,
+        ':gps' => isset($data['gps_required']) ? (!empty($data['gps_required']) ? 1 : 0) : 1,
     ]);
 }
 

@@ -211,32 +211,45 @@ $portalCsrf = get_csrf_token();
         <div class="sch-card max-w-2xl">
             <h3 class="text-base font-black text-slate-900 mb-4">ตั้งค่าระบบ</h3>
             <div class="space-y-4">
-                <div>
-                    <label class="sch-label">พิกัดคลินิก (Latitude)</label>
-                    <input type="number" step="any" id="set-lat" class="sch-input" placeholder="เช่น 13.7563" value="<?= htmlspecialchars((string)($settings['clinic_lat'] ?? ''), ENT_QUOTES) ?>">
-                </div>
-                <div>
-                    <label class="sch-label">พิกัดคลินิก (Longitude)</label>
-                    <input type="number" step="any" id="set-lng" class="sch-input" placeholder="เช่น 100.5018" value="<?= htmlspecialchars((string)($settings['clinic_lng'] ?? ''), ENT_QUOTES) ?>">
-                </div>
-                <div class="flex items-end gap-2">
-                    <button class="sch-btn sch-btn--ghost" onclick="useCurrentLocation()" type="button">
-                        <i class="fa-solid fa-location-crosshairs"></i>ใช้ตำแหน่งปัจจุบัน
-                    </button>
-                    <button class="sch-btn sch-btn--ghost" onclick="openMapPreview()" type="button">
-                        <i class="fa-solid fa-map"></i>ดูในแผนที่
-                    </button>
-                </div>
-                <div class="grid grid-cols-2 gap-4">
+
+                <!-- GPS toggle (master switch) -->
+                <label class="flex items-start gap-3 cursor-pointer p-4 rounded-xl bg-emerald-50 border border-emerald-100">
+                    <input type="checkbox" id="set-gps-required" <?= (int)$settings['gps_required'] ? 'checked' : '' ?> class="mt-0.5">
+                    <div>
+                        <p class="text-sm font-black text-slate-800">ตรวจ GPS ตำแหน่งทำงาน</p>
+                        <p class="text-xs text-slate-500 mt-0.5">เปิด: บังคับให้ user อยู่ในรัศมีคลินิก · ปิด: เจ้าหน้าที่อนุมัติด้วยตนเอง (ไม่ขอ GPS)</p>
+                    </div>
+                </label>
+
+                <!-- GPS-related fields (disabled when GPS off) -->
+                <div id="gps-fieldset" class="space-y-4 pl-1">
+                    <div>
+                        <label class="sch-label">พิกัดคลินิก (Latitude)</label>
+                        <input type="number" step="any" id="set-lat" class="sch-input" placeholder="เช่น 13.7563" value="<?= htmlspecialchars((string)($settings['clinic_lat'] ?? ''), ENT_QUOTES) ?>">
+                    </div>
+                    <div>
+                        <label class="sch-label">พิกัดคลินิก (Longitude)</label>
+                        <input type="number" step="any" id="set-lng" class="sch-input" placeholder="เช่น 100.5018" value="<?= htmlspecialchars((string)($settings['clinic_lng'] ?? ''), ENT_QUOTES) ?>">
+                    </div>
+                    <div class="flex items-end gap-2">
+                        <button class="sch-btn sch-btn--ghost" onclick="useCurrentLocation()" type="button">
+                            <i class="fa-solid fa-location-crosshairs"></i>ใช้ตำแหน่งปัจจุบัน
+                        </button>
+                        <button class="sch-btn sch-btn--ghost" onclick="openMapPreview()" type="button">
+                            <i class="fa-solid fa-map"></i>ดูในแผนที่
+                        </button>
+                    </div>
                     <div>
                         <label class="sch-label">รัศมี GPS (เมตร)</label>
                         <input type="number" min="10" id="set-radius" class="sch-input" value="<?= (int)$settings['radius_m'] ?>">
                     </div>
-                    <div>
-                        <label class="sch-label">เข้างานก่อนกะได้ (นาที)</label>
-                        <input type="number" min="0" id="set-grace" class="sch-input" value="<?= (int)$settings['grace_before_min'] ?>">
-                    </div>
                 </div>
+
+                <div>
+                    <label class="sch-label">เข้างานก่อนกะได้ (นาที)</label>
+                    <input type="number" min="0" id="set-grace" class="sch-input" value="<?= (int)$settings['grace_before_min'] ?>">
+                </div>
+
                 <label class="flex items-center gap-3 cursor-pointer p-3 rounded-xl bg-slate-50">
                     <input type="checkbox" id="set-require-approval" <?= (int)$settings['require_approval'] ? 'checked' : '' ?>>
                     <span class="text-sm font-bold text-slate-700">ต้องให้พนักงานอนุมัติทุกครั้ง</span>
@@ -727,6 +740,15 @@ $portalCsrf = get_csrf_token();
     };
 
     // ────── SETTINGS ──────
+    function applyGpsToggleState() {
+        const on = document.getElementById('set-gps-required').checked;
+        const fs = document.getElementById('gps-fieldset');
+        fs.style.opacity = on ? '1' : '.45';
+        fs.style.pointerEvents = on ? '' : 'none';
+    }
+    document.getElementById('set-gps-required').addEventListener('change', applyGpsToggleState);
+    applyGpsToggleState();
+
     window.saveSettings = async function() {
         const data = {
             clinic_lat: document.getElementById('set-lat').value,
@@ -734,6 +756,7 @@ $portalCsrf = get_csrf_token();
             radius_m: document.getElementById('set-radius').value,
             grace_before_min: document.getElementById('set-grace').value,
             require_approval: document.getElementById('set-require-approval').checked ? 1 : 0,
+            gps_required: document.getElementById('set-gps-required').checked ? 1 : 0,
         };
         const j = await api('settings', 'save', data);
         if (j.ok) Swal.fire({ icon:'success', title:'บันทึกแล้ว', timer:1200, showConfirmButton:false });

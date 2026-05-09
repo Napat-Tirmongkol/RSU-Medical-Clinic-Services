@@ -51,11 +51,6 @@ $lat = isset($_POST['lat']) && $_POST['lat'] !== '' ? (float)$_POST['lat'] : nul
 $lng = isset($_POST['lng']) && $_POST['lng'] !== '' ? (float)$_POST['lng'] : null;
 $accuracy = isset($_POST['accuracy']) ? (float)$_POST['accuracy'] : 0;
 
-if ($lat === null || $lng === null) {
-    echo json_encode(['ok' => false, 'error' => 'ไม่พบข้อมูลตำแหน่ง GPS']);
-    exit;
-}
-
 $pdo = db();
 ensure_scholarship_schema($pdo);
 
@@ -71,19 +66,24 @@ if ($student['status'] !== 'active') {
 
 $studentId = (int)$student['id'];
 $settings = get_scholarship_settings($pdo);
+$gpsRequired = !empty($settings['gps_required']);
 
-// คำนวณระยะจากคลินิก (ถ้าตั้งพิกัดไว้)
+// ถ้าเปิด GPS check → ต้องส่งพิกัดมา
+if ($gpsRequired && ($lat === null || $lng === null)) {
+    echo json_encode(['ok' => false, 'error' => 'ไม่พบข้อมูลตำแหน่ง GPS — กรุณาอนุญาตให้แอปเข้าถึงตำแหน่ง']);
+    exit;
+}
+
+// คำนวณระยะจากคลินิก (ถ้ามีทั้งพิกัดคลินิกและพิกัด user)
 $distanceM = null;
 $withinRadius = 0;
-if ($settings['clinic_lat'] !== null && $settings['clinic_lng'] !== null) {
+if ($lat !== null && $lng !== null
+    && $settings['clinic_lat'] !== null && $settings['clinic_lng'] !== null) {
     $distanceM = scholarship_distance_meters(
         (float)$settings['clinic_lat'], (float)$settings['clinic_lng'],
         $lat, $lng
     );
     $withinRadius = $distanceM <= (float)$settings['radius_m'] ? 1 : 0;
-} else {
-    // ยังไม่ตั้งพิกัด → ผ่าน (อนุโลม) แต่ flag = 0
-    $withinRadius = 0;
 }
 
 // หา shift ที่ active ตอนนี้ (สำหรับ clock_in)
@@ -101,7 +101,8 @@ if ($action === 'clock_in') {
         echo json_encode(['ok' => false, 'error' => 'ยังไม่ถึงเวลาเข้างาน หรือไม่อยู่ในกะที่ลงทะเบียนไว้']);
         exit;
     }
-    if ($settings['clinic_lat'] !== null && !$withinRadius) {
+    // เช็ครัศมี GPS เฉพาะตอนเปิด gps_required
+    if ($gpsRequired && $settings['clinic_lat'] !== null && !$withinRadius) {
         echo json_encode([
             'ok' => false,
             'error' => sprintf('คุณอยู่นอกพื้นที่คลินิก (ห่าง %.0f ม. รัศมีที่อนุญาต %d ม.)',

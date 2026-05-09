@@ -397,6 +397,7 @@ function handle_settings(PDO $pdo, string $action): void
             'radius_m' => $_POST['radius_m'] ?? SCHOLARSHIP_DEFAULT_RADIUS_M,
             'grace_before_min' => $_POST['grace_before_min'] ?? SCHOLARSHIP_GRACE_BEFORE_MIN,
             'require_approval' => $_POST['require_approval'] ?? 0,
+            'gps_required' => $_POST['gps_required'] ?? 0,
         ]);
         echo json_encode(['ok' => $ok]);
         return;

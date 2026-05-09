@@ -270,8 +270,13 @@ $displayName = trim((string)($user['full_name'] ?? ''))
                 <span class="text-base"><?= vh($btnLabel) ?></span>
             </button>
             <p class="text-xs text-slate-400 mt-3 px-8">
-                <i class="fa-solid fa-location-dot mr-1"></i>
-                ระบบจะขอตำแหน่ง GPS เพื่อยืนยันว่าอยู่ในคลินิก (รัศมี <?= (int)$settings['radius_m'] ?> ม.)
+                <?php if (!empty($settings['gps_required'])): ?>
+                    <i class="fa-solid fa-location-dot mr-1"></i>
+                    ระบบจะขอตำแหน่ง GPS เพื่อยืนยันว่าอยู่ในคลินิก (รัศมี <?= (int)$settings['radius_m'] ?> ม.)
+                <?php else: ?>
+                    <i class="fa-solid fa-user-check mr-1"></i>
+                    เจ้าหน้าที่จะตรวจสอบและอนุมัติการเข้า-ออกงานด้วยตนเอง
+                <?php endif; ?>
             </p>
         </div>
 
@@ -352,6 +357,7 @@ include __DIR__ . '/../includes/user_bottom_nav.php';
 
 <script>
 const CSRF_TOKEN = <?= json_encode($csrfToken, JSON_UNESCAPED_SLASHES) ?>;
+const GPS_REQUIRED = <?= !empty($settings['gps_required']) ? 'true' : 'false' ?>;
 
 // Live clock
 function updateClock() {
@@ -371,7 +377,9 @@ if (btn && !btn.disabled) {
         const labelMap = { clock_in: 'เข้างาน', clock_out: 'ออกงาน' };
         const confirm = await Swal.fire({
             title: `ยืนยัน${labelMap[action]}?`,
-            text: 'ระบบจะขอตำแหน่ง GPS และส่งให้เจ้าหน้าที่อนุมัติ',
+            text: GPS_REQUIRED
+                ? 'ระบบจะขอตำแหน่ง GPS และส่งให้เจ้าหน้าที่อนุมัติ'
+                : 'ส่งคำขอให้เจ้าหน้าที่อนุมัติด้วยตนเอง',
             icon: 'question',
             showCancelButton: true,
             confirmButtonText: `ยืนยัน${labelMap[action]}`,
@@ -380,26 +388,13 @@ if (btn && !btn.disabled) {
         });
         if (!confirm.isConfirmed) return;
 
-        // ขอ GPS
-        if (!navigator.geolocation) {
-            Swal.fire('ไม่รองรับ GPS', 'อุปกรณ์ของคุณไม่รองรับการระบุตำแหน่ง', 'error');
-            return;
-        }
-
-        Swal.fire({
-            title: 'กำลังระบุตำแหน่ง...',
-            html: 'กรุณาอนุญาตการเข้าถึงตำแหน่ง',
-            allowOutsideClick: false,
-            didOpen: () => Swal.showLoading(),
-        });
-
-        navigator.geolocation.getCurrentPosition(async pos => {
+        async function submitClock(lat, lng, accuracy) {
             const fd = new FormData();
             fd.append('csrf_token', CSRF_TOKEN);
             fd.append('action', action);
-            fd.append('lat', pos.coords.latitude);
-            fd.append('lng', pos.coords.longitude);
-            fd.append('accuracy', pos.coords.accuracy || 0);
+            if (lat != null) fd.append('lat', lat);
+            if (lng != null) fd.append('lng', lng);
+            fd.append('accuracy', accuracy || 0);
 
             try {
                 const r = await fetch('ajax_scholarship_clock.php', { method: 'POST', body: fd });
@@ -418,15 +413,41 @@ if (btn && !btn.disabled) {
             } catch (err) {
                 Swal.fire('Network Error', 'ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์', 'error');
             }
-        }, err => {
-            Swal.fire({
-                icon: 'error',
-                title: 'ไม่สามารถระบุตำแหน่ง',
-                text: err.code === err.PERMISSION_DENIED
-                    ? 'กรุณาอนุญาตการเข้าถึง GPS ในการตั้งค่าเบราว์เซอร์'
-                    : 'ระบบไม่สามารถดึงตำแหน่งได้ กรุณาลองใหม่',
-            });
-        }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+        }
+
+        // ปิด GPS check → ส่งคำขอเลย ไม่ต้องขอตำแหน่ง
+        if (!GPS_REQUIRED) {
+            Swal.fire({ title: 'กำลังส่งคำขอ...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+            await submitClock(null, null, 0);
+            return;
+        }
+
+        // เปิด GPS check → ขอตำแหน่งก่อน
+        if (!navigator.geolocation) {
+            Swal.fire('ไม่รองรับ GPS', 'อุปกรณ์ของคุณไม่รองรับการระบุตำแหน่ง', 'error');
+            return;
+        }
+
+        Swal.fire({
+            title: 'กำลังระบุตำแหน่ง...',
+            html: 'กรุณาอนุญาตการเข้าถึงตำแหน่ง',
+            allowOutsideClick: false,
+            didOpen: () => Swal.showLoading(),
+        });
+
+        navigator.geolocation.getCurrentPosition(
+            pos => submitClock(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy || 0),
+            err => {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'ไม่สามารถระบุตำแหน่ง',
+                    text: err.code === err.PERMISSION_DENIED
+                        ? 'กรุณาอนุญาตการเข้าถึง GPS ในการตั้งค่าเบราว์เซอร์'
+                        : 'ระบบไม่สามารถดึงตำแหน่งได้ กรุณาลองใหม่',
+                });
+            },
+            { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+        );
     });
 }
 </script>
