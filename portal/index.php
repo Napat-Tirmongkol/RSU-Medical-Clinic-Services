@@ -1760,6 +1760,8 @@ try {
                                 (<?= count($allAdmins) ?>)</button>
                             <button class="id-tab" data-tab="staff" onclick="switchIdTab('staff',this)">Staff
                                 (<?= count($allStaff) ?>)</button>
+                            <button class="id-tab" data-tab="positions" onclick="switchIdTab('positions',this)">ตำแหน่งงาน
+                                (<?= count($allPositions ?? []) ?>)</button>
                         <?php endif; ?>
                     </div>
 
@@ -2138,6 +2140,109 @@ try {
                         </div>
                     </div>
 
+                    <!-- PANEL: Positions (ตำแหน่งงาน) -->
+                    <?php if ($adminRole === 'superadmin'): ?>
+                    <div id="id-panel-positions" class="id-panel">
+                        <div style="background:#fff;border-radius:18px;border:1.5px solid #e2e8f0;overflow:hidden">
+                            <div style="padding:20px 24px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+                                <div>
+                                    <div style="font-size:14px;font-weight:900;color:#1e293b;display:flex;align-items:center;gap:8px">
+                                        <i class="fa-solid fa-user-tag" style="color:#7c3aed"></i>
+                                        ตำแหน่งงาน (Position-based Access)
+                                    </div>
+                                    <p style="margin:4px 0 0;font-size:11px;color:#64748b;font-weight:600">
+                                        สร้างตำแหน่งและกำหนด flag preset — staff ที่ผูกตำแหน่งจะได้รับ flag แบบ live link
+                                    </p>
+                                </div>
+                                <button type="button" onclick="openAddPositionModal()" style="padding:10px 16px;border-radius:10px;border:none;background:linear-gradient(135deg,#7c3aed,#6d28d9);color:#fff;font-weight:900;font-size:12px;cursor:pointer;display:inline-flex;align-items:center;gap:8px;box-shadow:0 6px 14px -3px rgba(124,58,237,.35)">
+                                    <i class="fa-solid fa-plus"></i> สร้างตำแหน่งใหม่
+                                </button>
+                            </div>
+
+                            <?php if (empty($allPositions)): ?>
+                                <div style="padding:60px 20px;text-align:center;color:#94a3b8">
+                                    <i class="fa-solid fa-user-tag" style="font-size:38px;display:block;margin-bottom:12px;opacity:.4"></i>
+                                    <p style="font-size:13px;font-weight:700;margin:0">ยังไม่มีตำแหน่งงานในระบบ</p>
+                                    <p style="font-size:11px;color:#cbd5e1;margin:6px 0 0">คลิก "สร้างตำแหน่งใหม่" เพื่อเริ่มต้น</p>
+                                </div>
+                            <?php else: ?>
+                                <div style="overflow-x:auto">
+                                    <table style="width:100%;border-collapse:collapse;font-size:13px" id="idPositionTable">
+                                        <thead>
+                                            <tr style="background:#f8fafc;border-bottom:1.5px solid #e2e8f0">
+                                                <th style="padding:14px 18px;text-align:left;font-size:10px;font-weight:900;color:#64748b;text-transform:uppercase;letter-spacing:.15em">ตำแหน่ง</th>
+                                                <th style="padding:14px 18px;text-align:left;font-size:10px;font-weight:900;color:#64748b;text-transform:uppercase;letter-spacing:.15em">Flag ที่กำหนด</th>
+                                                <th style="padding:14px 18px;text-align:center;font-size:10px;font-weight:900;color:#64748b;text-transform:uppercase;letter-spacing:.15em;width:120px">ผูกแล้ว</th>
+                                                <th style="padding:14px 18px;text-align:right;font-size:10px;font-weight:900;color:#64748b;text-transform:uppercase;letter-spacing:.15em;width:120px">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <?php
+                                            $flagLabelMap = [
+                                                'access_eborrow'        => ['e-Borrow',         '#f97316'],
+                                                'access_ecampaign'      => ['e-Campaign',       '#2563eb'],
+                                                'access_insurance'      => ['Insurance',        '#10b981'],
+                                                'access_registry'       => ['Registry',         '#06b6d4'],
+                                                'access_system_logs'    => ['Logs',             '#64748b'],
+                                                'access_site_settings'  => ['Settings',         '#7c3aed'],
+                                                'access_edms'           => ['EDMS',             '#0ea5e9'],
+                                                'access_ai'             => ['AI Suite',         '#a855f7'],
+                                                'access_consumables'    => ['Consumables',      '#f43f5e'],
+                                                'access_asset'          => ['Asset',            '#f59e0b'],
+                                            ];
+                                            foreach ($allPositions as $pos):
+                                                $posFlags = json_decode($pos['flags'] ?? '{}', true) ?: [];
+                                                $activeFlags = array_keys(array_filter($posFlags, fn($v) => (int)$v === 1));
+                                            ?>
+                                            <tr style="border-bottom:1px solid #f1f5f9" class="hover:bg-slate-50/50 transition-colors">
+                                                <td style="padding:14px 18px;vertical-align:top">
+                                                    <div style="font-weight:800;color:#1e293b;font-size:13.5px;display:flex;align-items:center;gap:8px">
+                                                        <i class="fa-solid fa-user-tag" style="color:#7c3aed;font-size:11px"></i>
+                                                        <?= htmlspecialchars($pos['name']) ?>
+                                                    </div>
+                                                    <?php if (!empty($pos['description'])): ?>
+                                                        <div style="font-size:11px;color:#64748b;font-weight:600;margin-top:3px"><?= htmlspecialchars($pos['description']) ?></div>
+                                                    <?php endif; ?>
+                                                </td>
+                                                <td style="padding:14px 18px">
+                                                    <?php if (empty($activeFlags)): ?>
+                                                        <span style="font-size:11px;color:#cbd5e1;font-weight:700">— ไม่มี flag —</span>
+                                                    <?php else: ?>
+                                                        <div style="display:flex;flex-wrap:wrap;gap:5px">
+                                                            <?php foreach ($activeFlags as $f):
+                                                                [$label, $color] = $flagLabelMap[$f] ?? [$f, '#64748b'];
+                                                            ?>
+                                                                <span style="font-size:10px;font-weight:800;padding:3px 9px;border-radius:99px;background:<?= $color ?>15;color:<?= $color ?>;border:1px solid <?= $color ?>40">
+                                                                    <?= htmlspecialchars($label) ?>
+                                                                </span>
+                                                            <?php endforeach; ?>
+                                                        </div>
+                                                    <?php endif; ?>
+                                                </td>
+                                                <td style="padding:14px 18px;text-align:center">
+                                                    <span style="display:inline-block;font-size:11px;font-weight:900;padding:4px 10px;border-radius:99px;background:#eff6ff;color:#2563eb;border:1px solid #bfdbfe"><?= (int)($pos['staff_count'] ?? 0) ?> คน</span>
+                                                </td>
+                                                <td style="padding:14px 18px;text-align:right">
+                                                    <div style="display:flex;gap:6px;justify-content:flex-end">
+                                                        <button type="button" onclick='openEditPositionModal(<?= json_encode($pos) ?>)' style="width:32px;height:32px;border-radius:9px;border:1.5px solid #e2e8f0;background:#fff;color:#64748b;cursor:pointer" title="แก้ไข"><i class="fa-solid fa-pen-to-square" style="font-size:12px"></i></button>
+                                                        <form method="POST" style="display:inline" onsubmit="return confirmDeletePosition(this, '<?= htmlspecialchars(addslashes($pos['name']), ENT_QUOTES) ?>', <?= (int)($pos['staff_count'] ?? 0) ?>)">
+                                                            <input type="hidden" name="action" value="delete_position">
+                                                            <input type="hidden" name="position_id" value="<?= (int)$pos['id'] ?>">
+                                                            <?php csrf_field(); ?>
+                                                            <button type="submit" style="width:32px;height:32px;border-radius:9px;border:1.5px solid #fee2e2;background:#fff;color:#ef4444;cursor:pointer" title="ลบ"><i class="fa-solid fa-trash-can" style="font-size:12px"></i></button>
+                                                        </form>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                            <?php endforeach; ?>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                    <?php endif; ?>
+
                 </div>
             </div><!-- /section-identity -->
 
@@ -2358,6 +2463,26 @@ try {
                                         <i class="fa-solid fa-shield-halved"></i> กำหนดสิทธิ์รายระบบ
                                     </div>
 
+                                    <!-- Position selector (staff only) — Hybrid: ผูก position = lock flag, Custom = override เอง -->
+                                    <div id="govPositionWrap" style="display:none">
+                                        <label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:800;color:#475569;margin-bottom:6px">
+                                            <i class="fa-solid fa-user-tag" style="color:#7c3aed"></i> ตำแหน่งงาน
+                                            <span style="color:#94a3b8;font-weight:normal;font-size:11px">(ผูกแล้ว flag จะ lock ตามตำแหน่ง)</span>
+                                        </label>
+                                        <select name="position_id" id="govPositionId" class="premium-input" style="width:100%;background-image:none" onchange="onGovPositionChange()">
+                                            <option value="">— Custom (กำหนด flag เอง) —</option>
+                                            <?php foreach (($allPositions ?? []) as $pos): ?>
+                                                <option value="<?= (int)$pos['id'] ?>" data-flags='<?= htmlspecialchars($pos['flags'] ?? '{}', ENT_QUOTES) ?>'>
+                                                    <?= htmlspecialchars($pos['name']) ?><?= !empty($pos['description']) ? ' — ' . htmlspecialchars($pos['description']) : '' ?>
+                                                </option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                        <p id="govPositionLockNote" style="display:none;margin:6px 0 0;font-size:11px;color:#7c3aed;font-weight:700">
+                                            <i class="fa-solid fa-lock"></i> Flag ของตำแหน่งจะถูก apply ทันที (live link) — ปลด lock โดยเลือก "Custom"
+                                        </p>
+                                    </div>
+
+
                                     <!-- e-Borrow Card -->
                                     <div id="govEbCard" onclick="toggleGovAccess('govEbAccess', 'govEbRole', this)" class="premium-role-card orange p-4" style="border-radius:18px;border:1.5px solid #fed7aa;background:#fffaf5;cursor:pointer;transition:all 0.2s">
                                         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
@@ -2498,6 +2623,76 @@ try {
                         </div>
                     </div>
                 </div>
+
+                <!-- Position (ตำแหน่งงาน) Modal -->
+                <?php if ($adminRole === 'superadmin'): ?>
+                <div id="idPosModal" style="display:none;position:fixed;inset:0;z-index:400;background:rgba(15,23,42,.6);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:20px">
+                    <div style="background:#fff;border-radius:24px;width:100%;max-width:540px;max-height:90vh;overflow-y:auto;box-shadow:0 25px 50px -12px rgba(0,0,0,0.25)">
+                        <form method="POST" id="idPosForm">
+                            <?php csrf_field(); ?>
+                            <input type="hidden" name="action" id="posAction" value="add_position">
+                            <input type="hidden" name="position_id" id="posId" value="">
+
+                            <div style="padding:22px 26px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;justify-content:space-between">
+                                <div style="display:flex;align-items:center;gap:10px">
+                                    <div style="width:38px;height:38px;background:#f5f3ff;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#7c3aed">
+                                        <i class="fa-solid fa-user-tag"></i>
+                                    </div>
+                                    <span id="posModalTitle" style="font-size:15px;font-weight:900;color:#1e293b">สร้างตำแหน่งใหม่</span>
+                                </div>
+                                <button type="button" onclick="document.getElementById('idPosModal').style.display='none'" style="width:32px;height:32px;border-radius:9px;border:1.5px solid #e2e8f0;background:#f8fafc;color:#64748b;cursor:pointer"><i class="fa-solid fa-xmark"></i></button>
+                            </div>
+
+                            <div style="padding:22px 26px;display:flex;flex-direction:column;gap:16px">
+                                <div>
+                                    <label style="display:block;font-size:12px;font-weight:800;color:#475569;margin-bottom:6px">ชื่อตำแหน่ง <span style="color:#ef4444">*</span></label>
+                                    <input type="text" name="position_name" id="posName" required class="premium-input" style="width:100%" placeholder="เช่น ธุรการ, ดูแลข้อมูลคลินิก, ดูแลนักศึกษาทุน">
+                                </div>
+                                <div>
+                                    <label style="display:block;font-size:12px;font-weight:800;color:#475569;margin-bottom:6px">คำอธิบาย <span style="font-weight:normal;color:#94a3b8;font-size:11px">(ไม่บังคับ)</span></label>
+                                    <textarea name="position_description" id="posDescription" class="premium-input" style="width:100%;min-height:60px;resize:vertical" placeholder="หน้าที่ความรับผิดชอบหรือ scope ของตำแหน่งนี้"></textarea>
+                                </div>
+
+                                <div>
+                                    <label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:800;color:#475569;margin-bottom:8px">
+                                        <i class="fa-solid fa-shield-halved" style="color:#7c3aed"></i> เลือก Flag ที่ตำแหน่งนี้จะได้รับ
+                                    </label>
+                                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                                        <?php
+                                        $posFlagInputs = [
+                                            'access_eborrow'        => ['e-Borrow',         'fa-toolbox',            '#f97316'],
+                                            'access_ecampaign'      => ['e-Campaign',       'fa-bullhorn',           '#2563eb'],
+                                            'access_insurance'      => ['Insurance Sync',   'fa-shield-halved',      '#10b981'],
+                                            'access_registry'       => ['Registry Upload',  'fa-id-card-clip',       '#06b6d4'],
+                                            'access_system_logs'    => ['System Logs',      'fa-list-ul',            '#64748b'],
+                                            'access_site_settings'  => ['Site Settings',    'fa-sliders',            '#7c3aed'],
+                                            'access_edms'           => ['EDMS',             'fa-folder-open',        '#0ea5e9'],
+                                            'access_ai'             => ['AI Suite',         'fa-wand-magic-sparkles','#a855f7'],
+                                            'access_consumables'    => ['Consumables',      'fa-syringe',            '#f43f5e'],
+                                            'access_asset'          => ['Asset Inventory',  'fa-warehouse',          '#f59e0b'],
+                                        ];
+                                        foreach ($posFlagInputs as $key => [$label, $icon, $color]):
+                                        ?>
+                                            <label style="display:flex;align-items:center;gap:8px;padding:10px 12px;border:1.5px solid #e2e8f0;border-radius:10px;cursor:pointer;transition:all .15s;background:#fff" class="pos-flag-card">
+                                                <input type="checkbox" name="flag_<?= $key ?>" id="posFlag_<?= $key ?>" value="1" style="width:15px;height:15px;cursor:pointer">
+                                                <i class="fa-solid <?= $icon ?>" style="color:<?= $color ?>;font-size:11px"></i>
+                                                <span style="font-size:11.5px;font-weight:700;color:#475569"><?= $label ?></span>
+                                            </label>
+                                        <?php endforeach; ?>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div style="padding:18px 26px;background:#f8fafc;border-top:1px solid #f1f5f9;display:flex;gap:10px">
+                                <button type="button" onclick="document.getElementById('idPosModal').style.display='none'" style="flex:1;padding:11px;border-radius:11px;border:1.5px solid #e2e8f0;background:#fff;color:#475569;font-weight:800;font-size:13px;cursor:pointer">ยกเลิก</button>
+                                <button type="submit" style="flex:2;padding:11px;border-radius:11px;border:none;background:linear-gradient(135deg,#7c3aed,#6d28d9);color:#fff;font-weight:900;font-size:13px;cursor:pointer;box-shadow:0 8px 16px -4px rgba(124,58,237,.3);display:flex;align-items:center;justify-content:center;gap:8px">
+                                    <i class="fa-solid fa-floppy-disk"></i> บันทึกตำแหน่ง
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+                <?php endif; ?>
 
                 <!-- Add Privilege Modal -->
                 <div id="privModal" style="display:none;position:fixed;inset:0;z-index:500;background:rgba(15,23,42,.6);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:20px">
@@ -3425,6 +3620,7 @@ try {
             document.getElementById('govAction').value = (mode === 'add' ? 'add_identity_gov' : 'save_identity_gov');
             
             // Set visuals based on type
+            const govPosWrap = document.getElementById('govPositionWrap');
             if (type === 'admin') {
                 title.textContent = (mode === 'add' ? 'เพิ่ม System Admin' : 'จัดการสิทธิ์ System Admin');
                 icon.style.background = '#f5f3ff';
@@ -3433,10 +3629,12 @@ try {
                 document.getElementById('govAdminOnlyCard').style.display = 'block';
                 document.getElementById('govEbCard').style.opacity = '0.5'; // Adms might not need borrow roles
                 document.getElementById('govEcCard').style.opacity = '1';
+                if (govPosWrap) govPosWrap.style.display = 'none';
             } else {
                 title.textContent = (mode === 'add' ? 'เพิ่ม Staff Record' : 'จัดการสิทธิ์ Staff & Roles');
                 icon.style.background = '#eff6ff';
                 icon.style.color = '#2563eb';
+                if (govPosWrap) govPosWrap.style.display = 'block';
                 icon.innerHTML = '<i class="fa-solid fa-id-card-clip"></i>';
                 document.getElementById('govAdminOnlyCard').style.display = 'none';
                 document.getElementById('govEbCard').style.opacity = '1';
@@ -3457,7 +3655,7 @@ try {
                         document.getElementById('govEbRole').value = data.role || 'employee';
                         document.getElementById('govEcAccess').checked = parseInt(data.access_ecampaign) === 1;
                         document.getElementById('govEcRole').value = data.ecampaign_role || 'editor';
-                        
+
                         document.getElementById('govInsAccess').checked = parseInt(data.access_insurance) === 1;
                         document.getElementById('govLogsAccess').checked = parseInt(data.access_system_logs) === 1;
                         document.getElementById('govSettAccess').checked = parseInt(data.access_site_settings) === 1;
@@ -3466,6 +3664,13 @@ try {
                         document.getElementById('govAiAccess').checked = parseInt(data.access_ai) === 1;
                         document.getElementById('govConsumablesAccess').checked = parseInt(data.access_consumables) === 1;
                         document.getElementById('govAssetAccess').checked = parseInt(data.access_asset) === 1;
+
+                        // Position (Hybrid live link)
+                        const posSel = document.getElementById('govPositionId');
+                        if (posSel) {
+                            posSel.value = data.position_id ? String(data.position_id) : '';
+                            onGovPositionChange();
+                        }
                     }
                 } else {
                     // Reset Extension Checkboxes for new records
@@ -3477,12 +3682,127 @@ try {
                     document.getElementById('govAiAccess').checked = false;
                     document.getElementById('govConsumablesAccess').checked = false;
                     document.getElementById('govAssetAccess').checked = false;
+                    const posSel = document.getElementById('govPositionId');
+                    if (posSel) { posSel.value = ''; onGovPositionChange(); }
                 }
             // Update UI States
             syncGovUI('govEbAccess', 'govEbRole', 'govEbCard');
             syncGovUI('govEcAccess', 'govEcRole', 'govEcCard');
 
             m.style.display = 'flex';
+        }
+
+        /**
+         * Position Modal — สร้าง / แก้ไข / ลบ ตำแหน่งงาน
+         */
+        const POS_FLAG_KEYS = [
+            'access_eborrow','access_ecampaign','access_insurance','access_registry',
+            'access_system_logs','access_site_settings','access_edms',
+            'access_ai','access_consumables','access_asset'
+        ];
+
+        function openAddPositionModal() {
+            const modal = document.getElementById('idPosModal');
+            if (!modal) return;
+            document.getElementById('posModalTitle').textContent = 'สร้างตำแหน่งใหม่';
+            document.getElementById('posAction').value = 'add_position';
+            document.getElementById('posId').value = '';
+            document.getElementById('posName').value = '';
+            document.getElementById('posDescription').value = '';
+            POS_FLAG_KEYS.forEach(k => {
+                const cb = document.getElementById('posFlag_' + k);
+                if (cb) cb.checked = false;
+            });
+            modal.style.display = 'flex';
+        }
+
+        function openEditPositionModal(pos) {
+            const modal = document.getElementById('idPosModal');
+            if (!modal) return;
+            document.getElementById('posModalTitle').textContent = 'แก้ไขตำแหน่ง: ' + (pos.name || '');
+            document.getElementById('posAction').value = 'edit_position';
+            document.getElementById('posId').value = pos.id || '';
+            document.getElementById('posName').value = pos.name || '';
+            document.getElementById('posDescription').value = pos.description || '';
+            let flags = {};
+            try { flags = JSON.parse(pos.flags || '{}') || {}; } catch (e) { flags = {}; }
+            POS_FLAG_KEYS.forEach(k => {
+                const cb = document.getElementById('posFlag_' + k);
+                if (cb) cb.checked = parseInt(flags[k]) === 1;
+            });
+            modal.style.display = 'flex';
+        }
+
+        function confirmDeletePosition(formEl, name, staffCount) {
+            const msg = staffCount > 0
+                ? `ต้องการลบตำแหน่ง "${name}"?\nstaff ${staffCount} คนที่ผูกอยู่จะถูกเปลี่ยนเป็น Custom (ติ๊ก flag เอง) อัตโนมัติ`
+                : `ต้องการลบตำแหน่ง "${name}"?`;
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({
+                    title: 'ยืนยันการลบตำแหน่ง',
+                    text: msg,
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonText: 'ลบเลย',
+                    cancelButtonText: 'ยกเลิก',
+                    confirmButtonColor: '#ef4444',
+                    cancelButtonColor: '#94a3b8',
+                    reverseButtons: true
+                }).then((r) => { if (r.isConfirmed) formEl.submit(); });
+                return false;
+            }
+            return confirm(msg);
+        }
+
+        /**
+         * Position change handler — Hybrid (Live Link)
+         *   - มี position → load flag จาก position แล้ว disable checkboxes
+         *   - Custom (NULL) → enable checkboxes ให้ติ๊กเอง
+         */
+        const GOV_FLAG_MAP = [
+            ['access_eborrow',       'govEbAccess'],
+            ['access_ecampaign',     'govEcAccess'],
+            ['access_insurance',     'govInsAccess'],
+            ['access_registry',      'govRegAccess'],
+            ['access_system_logs',   'govLogsAccess'],
+            ['access_site_settings', 'govSettAccess'],
+            ['access_edms',          'govEdmsAccess'],
+            ['access_ai',            'govAiAccess'],
+            ['access_consumables',   'govConsumablesAccess'],
+            ['access_asset',         'govAssetAccess'],
+        ];
+
+        function onGovPositionChange() {
+            const sel = document.getElementById('govPositionId');
+            const note = document.getElementById('govPositionLockNote');
+            if (!sel) return;
+
+            const opt = sel.options[sel.selectedIndex];
+            const flagsRaw = opt ? opt.getAttribute('data-flags') : null;
+            const isCustom = !sel.value || !flagsRaw;
+
+            if (isCustom) {
+                if (note) note.style.display = 'none';
+                GOV_FLAG_MAP.forEach(([key, id]) => {
+                    const cb = document.getElementById(id);
+                    if (!cb) return;
+                    cb.disabled = false;
+                    const card = cb.closest('.premium-role-card');
+                    if (card) card.style.filter = 'none';
+                });
+            } else {
+                let posFlags = {};
+                try { posFlags = JSON.parse(flagsRaw) || {}; } catch (e) { posFlags = {}; }
+                if (note) note.style.display = 'block';
+                GOV_FLAG_MAP.forEach(([key, id]) => {
+                    const cb = document.getElementById(id);
+                    if (!cb) return;
+                    cb.checked = parseInt(posFlags[key]) === 1;
+                    cb.disabled = true;
+                    const card = cb.closest('.premium-role-card');
+                    if (card) card.style.filter = 'grayscale(0.4) opacity(0.85)';
+                });
+            }
         }
 
         /**
