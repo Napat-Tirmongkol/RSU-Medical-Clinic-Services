@@ -205,6 +205,7 @@ function get_latest_scholarship_log(PDO $pdo, int $studentId): ?array
 /**
  * รวมชั่วโมง approved ของนักศึกษาในช่วง date range
  * คู่ของ clock_in/clock_out ที่ approved ทั้งคู่จะถูกนับ
+ * นโยบาย: ปัด "ลง" เป็นชั่วโมงเต็มต่อ session (1ชม.30นาที = 1ชม., 2ชม.59นาที = 2ชม.)
  * @param string|null $compType 'hours' | 'paid' | null (=ทุกประเภท)
  */
 function sum_scholarship_hours(PDO $pdo, int $studentId, ?string $fromDate = null, ?string $toDate = null, ?string $compType = null): float
@@ -221,7 +222,7 @@ function sum_scholarship_hours(PDO $pdo, int $studentId, ?string $fromDate = nul
     $stmt->execute($params);
     $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    $totalSec = 0;
+    $totalHours = 0;
     $openIn = null;
     $openType = null;
     foreach ($rows as $r) {
@@ -230,13 +231,14 @@ function sum_scholarship_hours(PDO $pdo, int $studentId, ?string $fromDate = nul
             $openType = $r['comp_type'] ?? 'hours';
         } elseif ($r['action'] === 'clock_out' && $openIn !== null) {
             if ($compType === null || $compType === $openType) {
-                $totalSec += max(0, strtotime($r['event_at']) - $openIn);
+                $sec = max(0, strtotime($r['event_at']) - $openIn);
+                $totalHours += (int)floor($sec / 3600); // ปัดลงเป็นชั่วโมงเต็มต่อ session
             }
             $openIn = null;
             $openType = null;
         }
     }
-    return round($totalSec / 3600, 2);
+    return (float)$totalHours;
 }
 
 /**

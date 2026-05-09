@@ -507,6 +507,8 @@ if (btn && !btn.disabled) {
             const totalMin = Math.round(diffMs / 60000); // ปัดเป็นค่าใกล้เคียง
             const hours = Math.floor(totalMin / 60);
             const mins = totalMin % 60;
+            // นโยบาย: ปัดลงเป็นชั่วโมงเต็ม (1ชม.30 = 1ชม., 2ชม.59 = 2ชม.)
+            const countedHours = Math.floor(diffMs / 3600000);
 
             const ct = OPEN_CLOCK_IN.comp_type || 'hours';
             const ctLabel = ct === 'paid' ? 'ค่าตอบแทน' : 'ส่งชั่วโมงทุน';
@@ -539,10 +541,17 @@ if (btn && !btn.disabled) {
                                 <i class="fa-solid ${ctIcon}"></i>${ctLabel}
                             </span>
                         </div>
-                        <div style="border-top:1px dashed #cbd5e1;padding-top:.75rem;text-align:center">
-                            <p style="font-size:.7rem;color:#64748b;text-transform:uppercase;letter-spacing:.05em;font-weight:800;margin:0">รวมเวลาทำงาน</p>
-                            <p style="font-size:1.75rem;font-weight:900;color:#0f172a;margin:.25rem 0 0;font-variant-numeric:tabular-nums">
-                                ${hours} ชม. ${mins} นาที
+                        <div style="border-top:1px dashed #cbd5e1;padding-top:.75rem">
+                            <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:.5rem">
+                                <span style="font-size:.75rem;color:#64748b">ทำงานจริง</span>
+                                <span style="font-size:1rem;font-weight:800;color:#475569;font-variant-numeric:tabular-nums">${hours} ชม. ${mins} นาที</span>
+                            </div>
+                            <div style="display:flex;justify-content:space-between;align-items:baseline;background:#fff;border:2px solid #10b981;border-radius:.65rem;padding:.6rem .85rem">
+                                <span style="font-size:.75rem;color:#065f46;font-weight:800">นับเข้าระบบ</span>
+                                <span style="font-size:1.5rem;font-weight:900;color:#065f46;font-variant-numeric:tabular-nums">${countedHours} ชั่วโมง</span>
+                            </div>
+                            <p style="font-size:.7rem;color:#94a3b8;margin:.5rem 0 0;text-align:center">
+                                <i class="fa-solid fa-circle-info"></i> ปัดลงเป็นชั่วโมงเต็ม (เศษนาทีไม่นับ)
                             </p>
                         </div>
                         ${noteMsg}
