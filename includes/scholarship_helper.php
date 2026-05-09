@@ -99,6 +99,20 @@ function ensure_scholarship_schema(PDO $pdo): void
 
         // Seed singleton row
         $pdo->exec("INSERT IGNORE INTO sys_scholarship_settings (id) VALUES (1)");
+
+        // ปรับชั่วโมงด้วยมือโดย admin (บวก/ลบ ได้ — ไม่แตะ clock_logs เพื่อรักษา audit trail)
+        $pdo->exec("CREATE TABLE IF NOT EXISTS sys_scholarship_manual_adjustments (
+            id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            student_id INT UNSIGNED NOT NULL,
+            comp_type ENUM('hours','paid') NOT NULL DEFAULT 'hours',
+            hours_delta DECIMAL(6,2) NOT NULL,
+            adjusted_date DATE NOT NULL,
+            reason VARCHAR(255) NOT NULL DEFAULT '',
+            created_by INT UNSIGNED NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            KEY idx_student_date (student_id, adjusted_date),
+            KEY idx_comp (comp_type)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
     } catch (PDOException $e) {
         error_log('[scholarship_helper] schema migration failed: ' . $e->getMessage());
     }
@@ -238,7 +252,27 @@ function sum_scholarship_hours(PDO $pdo, int $studentId, ?string $fromDate = nul
             $openType = null;
         }
     }
+    // บวก/ลบ adjustment ที่ admin ปรับด้วยมือ
+    $totalHours += sum_scholarship_adjustments($pdo, $studentId, $fromDate, $toDate, $compType);
+
     return (float)$totalHours;
+}
+
+/**
+ * รวม manual adjustment ในช่วง date range
+ */
+function sum_scholarship_adjustments(PDO $pdo, int $studentId, ?string $fromDate = null, ?string $toDate = null, ?string $compType = null): float
+{
+    ensure_scholarship_schema($pdo);
+    $sql = "SELECT COALESCE(SUM(hours_delta), 0) FROM sys_scholarship_manual_adjustments
+        WHERE student_id = :sid";
+    $params = [':sid' => $studentId];
+    if ($fromDate) { $sql .= " AND adjusted_date >= :from"; $params[':from'] = $fromDate; }
+    if ($toDate)   { $sql .= " AND adjusted_date <= :to";   $params[':to']   = $toDate; }
+    if ($compType) { $sql .= " AND comp_type = :ct";        $params[':ct']   = $compType; }
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    return (float)$stmt->fetchColumn();
 }
 
 /**

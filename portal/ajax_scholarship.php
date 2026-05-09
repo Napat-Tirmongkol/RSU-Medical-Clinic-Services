@@ -37,6 +37,7 @@ try {
         case 'shifts':      handle_shifts($pdo, $action, $adminId); break;
         case 'reports':     handle_reports($pdo, $action); break;
         case 'settings':    handle_settings($pdo, $action); break;
+        case 'adjustments': handle_adjustments($pdo, $action, $adminId); break;
         default:
             echo json_encode(['ok' => false, 'error' => 'Unknown entity']);
     }
@@ -391,6 +392,61 @@ function compute_report_rows(PDO $pdo, string $from, string $to): array
         ];
     }
     return $rows;
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// MANUAL ADJUSTMENTS — admin ปรับชั่วโมงบวก/ลบด้วยมือ
+// ─────────────────────────────────────────────────────────────────────
+function handle_adjustments(PDO $pdo, string $action, int $adminId): void
+{
+    if ($action === 'list') {
+        $studentId = (int)($_POST['student_id'] ?? 0);
+        if (!$studentId) { echo json_encode(['ok' => false, 'error' => 'missing student_id']); return; }
+        $stmt = $pdo->prepare("SELECT a.*, COALESCE(u.full_name, '') AS created_by_name
+            FROM sys_scholarship_manual_adjustments a
+            LEFT JOIN sys_users u ON u.id = a.created_by
+            WHERE a.student_id = :sid
+            ORDER BY a.adjusted_date DESC, a.id DESC LIMIT 100");
+        $stmt->execute([':sid' => $studentId]);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        echo json_encode(['ok' => true, 'rows' => $rows], JSON_UNESCAPED_UNICODE);
+        return;
+    }
+
+    if ($action === 'create') {
+        $studentId = (int)($_POST['student_id'] ?? 0);
+        $compType = (string)($_POST['comp_type'] ?? 'hours');
+        $delta = (float)($_POST['hours_delta'] ?? 0);
+        $date = (string)($_POST['adjusted_date'] ?? date('Y-m-d'));
+        $reason = mb_substr(trim((string)($_POST['reason'] ?? '')), 0, 255);
+
+        if (!$studentId) { echo json_encode(['ok' => false, 'error' => 'missing student_id']); return; }
+        if (!in_array($compType, ['hours', 'paid'], true)) { echo json_encode(['ok' => false, 'error' => 'invalid comp_type']); return; }
+        if ($delta == 0) { echo json_encode(['ok' => false, 'error' => 'จำนวนชั่วโมงต้องไม่เป็น 0']); return; }
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) { echo json_encode(['ok' => false, 'error' => 'รูปแบบวันที่ไม่ถูกต้อง']); return; }
+        if ($reason === '') { echo json_encode(['ok' => false, 'error' => 'กรุณาระบุเหตุผล']); return; }
+
+        $stmt = $pdo->prepare("INSERT INTO sys_scholarship_manual_adjustments
+            (student_id, comp_type, hours_delta, adjusted_date, reason, created_by)
+            VALUES (:sid, :ct, :h, :d, :r, :by)");
+        $stmt->execute([
+            ':sid' => $studentId, ':ct' => $compType, ':h' => $delta,
+            ':d' => $date, ':r' => $reason, ':by' => $adminId,
+        ]);
+        echo json_encode(['ok' => true]);
+        return;
+    }
+
+    if ($action === 'delete') {
+        $id = (int)($_POST['id'] ?? 0);
+        if (!$id) { echo json_encode(['ok' => false, 'error' => 'missing id']); return; }
+        $stmt = $pdo->prepare("DELETE FROM sys_scholarship_manual_adjustments WHERE id = :id");
+        $stmt->execute([':id' => $id]);
+        echo json_encode(['ok' => true]);
+        return;
+    }
+
+    echo json_encode(['ok' => false, 'error' => 'Unknown action']);
 }
 
 // ─────────────────────────────────────────────────────────────────────

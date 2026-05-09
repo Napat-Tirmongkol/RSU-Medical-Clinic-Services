@@ -321,6 +321,60 @@ $portalCsrf = get_csrf_token();
     </div>
 </div>
 
+<!-- ─── MODAL: MANUAL ADJUSTMENT ─── -->
+<div class="sch-modal-backdrop" id="adjust-modal">
+    <div class="sch-modal-box" style="max-width:640px">
+        <h3 class="text-lg font-black mb-1">ปรับชั่วโมงด้วยมือ</h3>
+        <p class="text-xs text-slate-500 mb-4">บวก/ลบ ชั่วโมงสะสมของนักศึกษา (ไม่กระทบ clock log เดิม)</p>
+        <input type="hidden" id="adj-student-id">
+        <div class="bg-slate-50 rounded-xl px-4 py-3 mb-4">
+            <p class="text-xs text-slate-500">นักศึกษา</p>
+            <p class="font-black text-slate-900" id="adj-student-name">-</p>
+            <p class="text-xs text-slate-500 mt-1">ชั่วโมงสะสมปัจจุบัน: <span class="font-black text-emerald-600" id="adj-current-hours">0</span> ชั่วโมง</p>
+        </div>
+
+        <div class="space-y-3">
+            <div>
+                <label class="sch-label">ประเภท</label>
+                <div class="grid grid-cols-2 gap-2">
+                    <label class="cursor-pointer rounded-xl border-2 border-emerald-200 bg-emerald-50 p-2.5 text-center text-sm font-black text-emerald-700" id="adj-ct-hours-lbl">
+                        <input type="radio" name="adj-ct" value="hours" checked class="hidden">
+                        <i class="fa-solid fa-graduation-cap mr-1"></i>ส่งชั่วโมงทุน
+                    </label>
+                    <label class="cursor-pointer rounded-xl border-2 border-amber-200 bg-amber-50 p-2.5 text-center text-sm font-black text-amber-700" id="adj-ct-paid-lbl">
+                        <input type="radio" name="adj-ct" value="paid" class="hidden">
+                        <i class="fa-solid fa-coins mr-1"></i>ค่าตอบแทน
+                    </label>
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="sch-label">จำนวนชั่วโมง (+/-)</label>
+                    <input type="number" step="0.25" id="adj-delta" class="sch-input" placeholder="เช่น 5 หรือ -2.5">
+                    <p class="text-[10px] text-slate-500 mt-1">ใส่ค่าลบ (-) เพื่อหักออก</p>
+                </div>
+                <div>
+                    <label class="sch-label">วันที่บันทึก</label>
+                    <input type="date" id="adj-date" class="sch-input">
+                </div>
+            </div>
+            <div>
+                <label class="sch-label">เหตุผล <span class="text-rose-500">*</span></label>
+                <input type="text" id="adj-reason" class="sch-input" placeholder="เช่น ชดเชยกะที่ระบบไม่บันทึก, หักจากการลา">
+            </div>
+        </div>
+
+        <div class="flex justify-end gap-2 mt-5">
+            <button class="sch-btn sch-btn--ghost" onclick="closeModal('adjust-modal')">ปิด</button>
+            <button class="sch-btn" onclick="saveAdjustment()"><i class="fa-solid fa-floppy-disk"></i>บันทึกการปรับ</button>
+        </div>
+
+        <hr class="my-5 border-slate-100">
+        <h4 class="text-sm font-black text-slate-700 mb-3">ประวัติการปรับ</h4>
+        <div id="adj-history-wrap" class="max-h-64 overflow-y-auto"></div>
+    </div>
+</div>
+
 <!-- ─── MODAL: SHIFT ─── -->
 <div class="sch-modal-backdrop" id="shift-modal">
     <div class="sch-modal-box">
@@ -513,8 +567,9 @@ $portalCsrf = get_csrf_token();
                 <td class="text-xs font-bold">${hoursDisp}</td>
                 <td>${stat}</td>
                 <td class="text-right">
-                    <button class="sch-btn sch-btn--xs sch-btn--ghost" onclick='editStudent(${JSON.stringify(r).replaceAll("'","&#39;")})'><i class="fa-solid fa-pen"></i></button>
-                    <button class="sch-btn sch-btn--xs sch-btn--danger" onclick="deleteStudent(${r.id})"><i class="fa-solid fa-trash"></i></button>
+                    <button class="sch-btn sch-btn--xs sch-btn--ghost" title="ปรับชั่วโมง" onclick='openAdjustModal(${r.id}, ${JSON.stringify(r.full_name).replaceAll("'","&#39;")}, ${parseFloat(r.hours_total)})'><i class="fa-solid fa-sliders"></i></button>
+                    <button class="sch-btn sch-btn--xs sch-btn--ghost" title="แก้ไข" onclick='editStudent(${JSON.stringify(r).replaceAll("'","&#39;")})'><i class="fa-solid fa-pen"></i></button>
+                    <button class="sch-btn sch-btn--xs sch-btn--danger" title="ลบ" onclick="deleteStudent(${r.id})"><i class="fa-solid fa-trash"></i></button>
                 </td>
             </tr>`;
         }
@@ -736,6 +791,108 @@ $portalCsrf = get_csrf_token();
         const j = await api('shifts', 'delete', { id });
         if (j.ok) { closeModal('shift-modal'); loadShifts(); }
         else Swal.fire('ไม่สำเร็จ', j.error || '', 'error');
+    };
+
+    // ────── MANUAL ADJUSTMENT ──────
+    function syncAdjCtRadio() {
+        const v = document.querySelector('input[name="adj-ct"]:checked').value;
+        document.getElementById('adj-ct-hours-lbl').style.boxShadow = v === 'hours' ? '0 0 0 4px rgba(16,185,129,.25)' : '';
+        document.getElementById('adj-ct-paid-lbl').style.boxShadow = v === 'paid' ? '0 0 0 4px rgba(245,158,11,.25)' : '';
+    }
+    document.getElementById('adj-ct-hours-lbl').addEventListener('click', () => {
+        document.querySelector('input[name="adj-ct"][value="hours"]').checked = true; syncAdjCtRadio();
+    });
+    document.getElementById('adj-ct-paid-lbl').addEventListener('click', () => {
+        document.querySelector('input[name="adj-ct"][value="paid"]').checked = true; syncAdjCtRadio();
+    });
+
+    window.openAdjustModal = async function(studentId, studentName, currentHours) {
+        document.getElementById('adj-student-id').value = studentId;
+        document.getElementById('adj-student-name').textContent = studentName;
+        document.getElementById('adj-current-hours').textContent = parseFloat(currentHours).toFixed(1);
+        document.getElementById('adj-delta').value = '';
+        document.getElementById('adj-reason').value = '';
+        document.getElementById('adj-date').value = new Date().toISOString().slice(0, 10);
+        document.querySelector('input[name="adj-ct"][value="hours"]').checked = true;
+        syncAdjCtRadio();
+        showModal('adjust-modal');
+        await loadAdjustments(studentId);
+    };
+
+    async function loadAdjustments(studentId) {
+        const wrap = document.getElementById('adj-history-wrap');
+        wrap.innerHTML = '<p class="text-center text-xs text-slate-400 py-3"><i class="fa-solid fa-spinner fa-spin mr-1"></i>กำลังโหลด…</p>';
+        const j = await api('adjustments', 'list', { student_id: studentId });
+        if (!j.ok) { wrap.innerHTML = `<p class="text-center text-rose-500 py-3 text-xs">${j.error || ''}</p>`; return; }
+        if (j.rows.length === 0) {
+            wrap.innerHTML = '<p class="text-center text-xs text-slate-400 py-3">ยังไม่มีประวัติการปรับ</p>';
+            return;
+        }
+        let html = '<div class="space-y-2">';
+        for (const r of j.rows) {
+            const delta = parseFloat(r.hours_delta);
+            const isPos = delta > 0;
+            const ctLabel = r.comp_type === 'paid' ? 'ค่าตอบแทน' : 'ทุน';
+            const ctColor = r.comp_type === 'paid' ? 'text-amber-600' : 'text-emerald-600';
+            html += `<div class="flex items-center gap-2 p-2 rounded-lg bg-slate-50 text-xs">
+                <span class="font-black ${isPos ? 'text-emerald-600' : 'text-rose-600'}" style="min-width:60px">
+                    ${isPos ? '+' : ''}${delta.toFixed(2)} ชม.
+                </span>
+                <span class="${ctColor} font-bold" style="min-width:75px">[${ctLabel}]</span>
+                <span class="flex-1 text-slate-600 truncate">${escHtml(r.reason)}</span>
+                <span class="text-slate-400">${escHtml(r.adjusted_date)}</span>
+                <button class="text-rose-500 hover:bg-rose-50 w-7 h-7 rounded-lg" onclick="deleteAdjustment(${r.id}, ${r.student_id})" title="ลบ">
+                    <i class="fa-solid fa-trash text-[11px]"></i>
+                </button>
+            </div>`;
+        }
+        html += '</div>';
+        wrap.innerHTML = html;
+    }
+
+    window.saveAdjustment = async function() {
+        const studentId = document.getElementById('adj-student-id').value;
+        const data = {
+            student_id: studentId,
+            comp_type: document.querySelector('input[name="adj-ct"]:checked').value,
+            hours_delta: document.getElementById('adj-delta').value,
+            adjusted_date: document.getElementById('adj-date').value,
+            reason: document.getElementById('adj-reason').value,
+        };
+        if (!data.hours_delta || parseFloat(data.hours_delta) === 0) {
+            Swal.fire('กรุณาใส่จำนวนชั่วโมง (ไม่เป็น 0)', '', 'warning'); return;
+        }
+        if (!data.reason.trim()) {
+            Swal.fire('กรุณาระบุเหตุผล', '', 'warning'); return;
+        }
+        const j = await api('adjustments', 'create', data);
+        if (j.ok) {
+            Swal.fire({ icon: 'success', title: 'บันทึกแล้ว', timer: 1000, showConfirmButton: false });
+            document.getElementById('adj-delta').value = '';
+            document.getElementById('adj-reason').value = '';
+            await loadAdjustments(studentId);
+            loadStudents(); // refresh ตารางหลักให้ชั่วโมงสะสมอัพเดท
+        } else {
+            Swal.fire('ไม่สำเร็จ', j.error || '', 'error');
+        }
+    };
+
+    window.deleteAdjustment = async function(id, studentId) {
+        const r = await Swal.fire({
+            title: 'ลบรายการนี้?',
+            text: 'ชั่วโมงสะสมจะถูกคำนวณใหม่',
+            icon: 'warning',
+            showCancelButton: true, confirmButtonText: 'ลบ', cancelButtonText: 'ยกเลิก',
+            confirmButtonColor: '#f43f5e',
+        });
+        if (!r.isConfirmed) return;
+        const j = await api('adjustments', 'delete', { id });
+        if (j.ok) {
+            await loadAdjustments(studentId);
+            loadStudents();
+        } else {
+            Swal.fire('ไม่สำเร็จ', j.error || '', 'error');
+        }
     };
 
     // ────── REPORTS ──────
