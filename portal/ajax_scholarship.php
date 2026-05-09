@@ -55,8 +55,9 @@ function handle_approvals(PDO $pdo, string $action, int $adminId): void
         $where = "WHERE l.status = 'pending'";
         $params = [];
         if ($q !== '') {
-            $where .= " AND (u.full_name LIKE :q OR s.student_code LIKE :q OR s.faculty LIKE :q)";
-            $params[':q'] = '%' . $q . '%';
+            $where .= " AND (u.full_name LIKE :q1 OR s.student_code LIKE :q2 OR s.faculty LIKE :q3)";
+            $like = '%' . $q . '%';
+            $params[':q1'] = $like; $params[':q2'] = $like; $params[':q3'] = $like;
         }
         $sql = "SELECT l.*, u.full_name AS student_name, s.student_code, s.faculty,
                        sh.shift_date, sh.start_time AS sh_start, sh.end_time AS sh_end
@@ -110,8 +111,9 @@ function handle_students(PDO $pdo, string $action): void
         $where = "WHERE 1=1";
         $params = [];
         if ($q !== '') {
-            $where .= " AND (u.full_name LIKE :q OR s.student_code LIKE :q OR s.faculty LIKE :q)";
-            $params[':q'] = '%' . $q . '%';
+            $where .= " AND (u.full_name LIKE :q1 OR s.student_code LIKE :q2 OR s.faculty LIKE :q3)";
+            $like = '%' . $q . '%';
+            $params[':q1'] = $like; $params[':q2'] = $like; $params[':q3'] = $like;
         }
         if (in_array($statusF, ['active','inactive'], true)) {
             $where .= " AND s.status = :st";
@@ -154,10 +156,11 @@ function handle_students(PDO $pdo, string $action): void
         if ($q === '' || mb_strlen($q) < 2) { echo json_encode(['ok' => true, 'rows' => []]); return; }
         $stmt = $pdo->prepare("SELECT id, full_name, first_name, last_name, phone_number AS phone, student_personnel_id
             FROM sys_users
-            WHERE (full_name LIKE :q OR first_name LIKE :q OR last_name LIKE :q
-                   OR phone_number LIKE :q OR student_personnel_id LIKE :q OR email LIKE :q)
+            WHERE (full_name LIKE :q1 OR first_name LIKE :q2 OR last_name LIKE :q3
+                   OR phone_number LIKE :q4 OR student_personnel_id LIKE :q5 OR email LIKE :q6)
             LIMIT 15");
-        $stmt->execute([':q' => '%' . $q . '%']);
+        $like = '%' . $q . '%';
+        $stmt->execute([':q1' => $like, ':q2' => $like, ':q3' => $like, ':q4' => $like, ':q5' => $like, ':q6' => $like]);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
         echo json_encode(['ok' => true, 'rows' => $rows], JSON_UNESCAPED_UNICODE);
         return;
