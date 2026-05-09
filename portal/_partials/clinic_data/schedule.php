@@ -559,6 +559,20 @@ async function dsSave(e) {
     const fd = new FormData(e.target);
     const data = Object.fromEntries(fd.entries());
     if (data.type === 'override' && data.specific_date && dsHolidayBlock(data.specific_date)) return;
+    if (data.type !== 'off') {
+        if (!data.start_time || !data.end_time) {
+            Swal.fire({ icon: 'warning', title: 'กรุณาระบุเวลา', text: 'ต้องระบุเวลาเริ่มและเวลาสิ้นสุด' });
+            return;
+        }
+        if (data.start_time >= data.end_time) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'เวลาไม่ถูกต้อง',
+                text: `เวลาเริ่ม (${data.start_time}) ต้องน้อยกว่าเวลาสิ้นสุด (${data.end_time})`,
+            });
+            return;
+        }
+    }
     const action = data.id ? 'update' : 'add';
     const res = await dsPost(action, data);
     if (res.ok) {
