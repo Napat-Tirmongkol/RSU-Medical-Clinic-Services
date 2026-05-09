@@ -98,6 +98,15 @@ if ($adminRole === 'superadmin') {
         if (!in_array('access_edms', $cols)) {
             $pdo->exec("ALTER TABLE sys_staff ADD COLUMN access_edms TINYINT(1) DEFAULT 0");
         }
+        if (!in_array('access_ai', $cols)) {
+            $pdo->exec("ALTER TABLE sys_staff ADD COLUMN access_ai TINYINT(1) DEFAULT 0");
+        }
+        if (!in_array('access_consumables', $cols)) {
+            $pdo->exec("ALTER TABLE sys_staff ADD COLUMN access_consumables TINYINT(1) DEFAULT 0");
+        }
+        if (!in_array('access_asset', $cols)) {
+            $pdo->exec("ALTER TABLE sys_staff ADD COLUMN access_asset TINYINT(1) DEFAULT 0");
+        }
 
         $allStaff = $pdo->query("
             SELECT id, username, full_name, email, role, account_status, linked_line_user_id,
@@ -108,7 +117,10 @@ if ($adminRole === 'superadmin') {
                    IFNULL(access_system_logs, 0) AS access_system_logs,
                    IFNULL(access_site_settings, 0) AS access_site_settings,
                    IFNULL(access_registry, 0) AS access_registry,
-                   IFNULL(access_edms, 0) AS access_edms
+                   IFNULL(access_edms, 0) AS access_edms,
+                   IFNULL(access_ai, 0) AS access_ai,
+                   IFNULL(access_consumables, 0) AS access_consumables,
+                   IFNULL(access_asset, 0) AS access_asset
             FROM sys_staff ORDER BY role ASC, full_name ASC
         ")->fetchAll(PDO::FETCH_ASSOC);
     } catch (PDOException $e) {

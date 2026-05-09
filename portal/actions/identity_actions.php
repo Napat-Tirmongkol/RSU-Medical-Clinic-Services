@@ -65,8 +65,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($type === 'admin') {
                     // Ensure status column exists in sys_admins for consistency
                     try { $pdo->exec("ALTER TABLE sys_admins ADD COLUMN status VARCHAR(20) DEFAULT 'active' AFTER role"); } catch(PDOException $e) {}
-                    
+
                     $role = $_POST['admin_role'] ?? 'admin';
+                    // Whitelist admin role (ป้องกัน privilege escalation จาก POST)
+                    $allowedAdminRoles = ['admin', 'editor', 'superadmin'];
+                    if (!in_array($role, $allowedAdminRoles, true)) $role = 'admin';
                     if ($action === 'add_identity_gov') {
                         $hashed = password_hash($password ?: bin2hex(random_bytes(8)), PASSWORD_DEFAULT);
                         $stmt = $pdo->prepare("INSERT INTO sys_admins (full_name, username, email, password, role, status) VALUES (?, ?, ?, ?, ?, ?)");
@@ -90,19 +93,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $settAccess = (int)($_POST['sett_access'] ?? 0);
                     $regAccess = (int)($_POST['reg_access'] ?? 0);
                     $edmsAccess = (int)($_POST['edms_access'] ?? 0);
+                    $aiAccess = (int)($_POST['ai_access'] ?? 0);
+                    $consumablesAccess = (int)($_POST['consumables_access'] ?? 0);
+                    $assetAccess = (int)($_POST['asset_access'] ?? 0);
 
-                    // Ensure access_registry / access_edms columns exist (for existing installs)
+                    // Whitelist e-Borrow role (ป้องกัน privilege escalation จาก POST)
+                    $allowedEbRoles = ['admin', 'librarian', 'employee'];
+                    if (!in_array($ebRole, $allowedEbRoles, true)) $ebRole = 'employee';
+
+                    // Whitelist e-Campaign role
+                    $allowedEcRoles = ['superadmin', 'admin', 'editor'];
+                    if (!in_array($ecRole, $allowedEcRoles, true)) $ecRole = 'editor';
+
+                    // Ensure new flag columns exist (for existing installs)
                     try { $pdo->exec("ALTER TABLE sys_staff ADD COLUMN access_registry TINYINT(1) DEFAULT 0"); } catch(PDOException $e) {}
                     try { $pdo->exec("ALTER TABLE sys_staff ADD COLUMN access_edms TINYINT(1) DEFAULT 0"); } catch(PDOException $e) {}
+                    try { $pdo->exec("ALTER TABLE sys_staff ADD COLUMN access_ai TINYINT(1) DEFAULT 0"); } catch(PDOException $e) {}
+                    try { $pdo->exec("ALTER TABLE sys_staff ADD COLUMN access_consumables TINYINT(1) DEFAULT 0"); } catch(PDOException $e) {}
+                    try { $pdo->exec("ALTER TABLE sys_staff ADD COLUMN access_asset TINYINT(1) DEFAULT 0"); } catch(PDOException $e) {}
 
                     if ($action === 'add_identity_gov') {
                         $hashed = password_hash($password ?: bin2hex(random_bytes(8)), PASSWORD_DEFAULT);
-                        $pdo->prepare("INSERT INTO sys_staff (full_name, username, email, password_hash, role, access_eborrow, account_status, access_ecampaign, ecampaign_role, access_insurance, access_system_logs, access_site_settings, access_registry, access_edms) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
-                            ->execute([$fullName, $username, $email, $hashed, $ebRole, $ebAccess, $status, $ecAccess, $ecRole, $insAccess, $logsAccess, $settAccess, $regAccess, $edmsAccess]);
+                        $pdo->prepare("INSERT INTO sys_staff (full_name, username, email, password_hash, role, access_eborrow, account_status, access_ecampaign, ecampaign_role, access_insurance, access_system_logs, access_site_settings, access_registry, access_edms, access_ai, access_consumables, access_asset) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+                            ->execute([$fullName, $username, $email, $hashed, $ebRole, $ebAccess, $status, $ecAccess, $ecRole, $insAccess, $logsAccess, $settAccess, $regAccess, $edmsAccess, $aiAccess, $consumablesAccess, $assetAccess]);
                         $targetId = (int)$pdo->lastInsertId();
                     } else {
-                        $pdo->prepare("UPDATE sys_staff SET full_name=?, username=?, email=?, role=?, access_eborrow=?, account_status=?, access_ecampaign=?, ecampaign_role=?, access_insurance=?, access_system_logs=?, access_site_settings=?, access_registry=?, access_edms=? WHERE id=?")
-                            ->execute([$fullName, $username, $email, $ebRole, $ebAccess, $status, $ecAccess, $ecRole, $insAccess, $logsAccess, $settAccess, $regAccess, $edmsAccess, $targetId]);
+                        $pdo->prepare("UPDATE sys_staff SET full_name=?, username=?, email=?, role=?, access_eborrow=?, account_status=?, access_ecampaign=?, ecampaign_role=?, access_insurance=?, access_system_logs=?, access_site_settings=?, access_registry=?, access_edms=?, access_ai=?, access_consumables=?, access_asset=? WHERE id=?")
+                            ->execute([$fullName, $username, $email, $ebRole, $ebAccess, $status, $ecAccess, $ecRole, $insAccess, $logsAccess, $settAccess, $regAccess, $edmsAccess, $aiAccess, $consumablesAccess, $assetAccess, $targetId]);
                         if (!empty($password)) $pdo->prepare("UPDATE sys_staff SET password_hash=? WHERE id=?")->execute([password_hash($password, PASSWORD_DEFAULT), $targetId]);
                     }
                 }

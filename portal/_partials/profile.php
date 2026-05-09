@@ -21,7 +21,10 @@ if ($staffId > 0) {
                                   IFNULL(access_registry,0)  AS access_registry,
                                   IFNULL(access_edms,0)      AS access_edms,
                                   IFNULL(access_system_logs,0)   AS access_system_logs,
-                                  IFNULL(access_site_settings,0) AS access_site_settings
+                                  IFNULL(access_site_settings,0) AS access_site_settings,
+                                  IFNULL(access_ai,0)            AS access_ai,
+                                  IFNULL(access_consumables,0)   AS access_consumables,
+                                  IFNULL(access_asset,0)         AS access_asset
                            FROM sys_staff WHERE id = :id LIMIT 1");
     $stmt->execute([':id' => $staffId]);
     $me = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -33,13 +36,16 @@ unset($_SESSION['profile_flash']);
 
 // แมป access flag → label สำหรับโชว์สิทธิ์ที่ได้รับ
 $accessLabels = [
-    'access_ecampaign'      => ['e-Campaign',          'fa-bullhorn',        'emerald'],
-    'access_eborrow'        => ['e-Borrow',            'fa-toolbox',         'slate'],
-    'access_insurance'      => ['Insurance Sync',      'fa-shield-halved',   'indigo'],
-    'access_registry'       => ['Registry Upload',     'fa-id-card-clip',    'cyan'],
-    'access_edms'           => ['e-DMS',               'fa-folder-open',     'amber'],
-    'access_system_logs'    => ['System Logs',         'fa-bug',             'rose'],
-    'access_site_settings'  => ['Site Settings',       'fa-gears',           'purple'],
+    'access_ecampaign'      => ['e-Campaign',          'fa-bullhorn',           'emerald'],
+    'access_eborrow'        => ['e-Borrow',            'fa-toolbox',            'slate'],
+    'access_insurance'      => ['Insurance Sync',      'fa-shield-halved',      'indigo'],
+    'access_registry'       => ['Registry Upload',     'fa-id-card-clip',       'cyan'],
+    'access_edms'           => ['e-DMS',               'fa-folder-open',        'amber'],
+    'access_system_logs'    => ['System Logs',         'fa-bug',                'rose'],
+    'access_site_settings'  => ['Site Settings',       'fa-gears',              'purple'],
+    'access_ai'             => ['AI Suite',            'fa-wand-magic-sparkles','purple'],
+    'access_consumables'    => ['Consumables',         'fa-syringe',            'rose'],
+    'access_asset'          => ['Asset Inventory',     'fa-warehouse',          'amber'],
 ];
 ?>
 

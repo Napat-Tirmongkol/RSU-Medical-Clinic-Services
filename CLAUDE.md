@@ -84,3 +84,24 @@
 - `build_clinic_simulated_status(state)` — hardcode ค่าทดสอบ (ห้ามเอาค่าจริงมาใช้ใน production)
 - `build_clinic_test_flex(pdo, state)` — override ด้วยเวลาจริงจาก DB ก่อน render preview
 - `get_clinic_hours_for_date(pdo, date)` — ดึงเวลาเปิด/ปิดจริงของวันนั้น
+
+### Permissions / Access Flags
+- **Roles**:
+  - `sys_admins.role` ENUM: `admin` / `editor` / `superadmin` (whitelist บังคับใน `portal/actions/identity_actions.php`)
+  - `sys_staff.role` (e-Borrow / Asset / Consumables): whitelist `admin` / `librarian` / `employee` (`editor` คงไว้ใน sub-module check_session เพื่อ legacy)
+  - `sys_staff.ecampaign_role` ENUM: `editor` / `admin` / `superadmin`
+- **Module access flags บน sys_staff** (TINYINT(1) DEFAULT 0):
+  - `access_eborrow` · `access_ecampaign` · `access_insurance` · `access_registry` · `access_system_logs` · `access_site_settings` · `access_edms`
+  - `access_ai` · `access_consumables` · `access_asset` (ใหม่)
+- **UI จัดการสิทธิ์ที่เป็นทางการ**: `portal/index.php?section=identity` (Identity & Governance) — modal มี audit log + justification ตาม ISO 27001
+  - `portal/manage_admins.php` ถูก deprecate แล้ว — redirect ไปหน้า identity
+- **Section gate pattern** (portal partials): ตรวจ `$adminRole === 'superadmin' || !empty($_SESSION['access_xxx'])` ก่อน include partial; ถ้าไม่ผ่านให้ render `ACCESS DENIED` block
+- **Sub-module gate** (consumables/asset): ตรวจใน `includes/check_session.php` หลัง SSO sync — `is_portal_admin` ผ่านเสมอ, `sys_staff` role admin/editor ผ่าน, role อื่นต้องมี flag = 1
+- **เมื่อเพิ่ม access flag ใหม่** ต้องอัปเดต 7 จุด:
+  1. สร้าง migration ใน `database/migrations/`
+  2. `portal/queries/identity_queries.php` (auto-migrate column + SELECT)
+  3. `admin/auth/staff_login.php` (SELECT + `$_SESSION` + check บัญชีไม่มีสิทธิ์ใดๆ)
+  4. `portal/actions/identity_actions.php` (POST handler — INSERT/UPDATE)
+  5. `portal/index.php` Identity Governance modal: checkbox + JS load/reset + table icon column
+  6. `portal/_partials/profile.php` `$accessLabels` array (self-service display)
+  7. `portal/index.php` section gate ของ partial นั้นๆ + sidebar nav visibility

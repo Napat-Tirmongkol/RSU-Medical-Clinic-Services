@@ -937,22 +937,24 @@ try {
                         <span class="psb-label" style="color:#0e7490;font-weight:900">โปรไฟล์ของฉัน</span>
                     </button>
                 <?php endif; ?>
-                <button class="psb-item" data-section="ai_assistant" onclick="switchSection('ai_assistant',this)">
-                    <div class="psb-icon"><i class="fa-solid fa-wand-magic-sparkles" style="color:#8b5cf6"></i></div>
-                    <span class="psb-label" style="color:#7c3aed;font-weight:900">AI Assistant</span>
-                </button>
-                <button class="psb-item <?= $activeSection==='ai_qa_lab'?'psb-active':'' ?>" data-section="ai_qa_lab" onclick="switchSection('ai_qa_lab',this)">
-                    <div class="psb-icon"><i class="fa-solid fa-flask-vial" style="color:#a855f7"></i></div>
-                    <span class="psb-label" style="color:#7c3aed;font-weight:900">AI QA Lab</span>
-                </button>
-                <button class="psb-item <?= $activeSection==='ai_prompts'?'psb-active':'' ?>" data-section="ai_prompts" onclick="switchSection('ai_prompts',this)">
-                    <div class="psb-icon"><i class="fa-solid fa-code" style="color:#a855f7"></i></div>
-                    <span class="psb-label" style="color:#7c3aed;font-weight:900">AI Prompts</span>
-                </button>
-                <button class="psb-item <?= $activeSection==='ai_knowledge'?'psb-active':'' ?>" data-section="ai_knowledge" onclick="switchSection('ai_knowledge',this)">
-                    <div class="psb-icon"><i class="fa-solid fa-database" style="color:#10b981"></i></div>
-                    <span class="psb-label" style="color:#059669;font-weight:900">AI Knowledge</span>
-                </button>
+                <?php if ($isSuper || !empty($_SESSION['access_ai'])): ?>
+                    <button class="psb-item" data-section="ai_assistant" onclick="switchSection('ai_assistant',this)">
+                        <div class="psb-icon"><i class="fa-solid fa-wand-magic-sparkles" style="color:#8b5cf6"></i></div>
+                        <span class="psb-label" style="color:#7c3aed;font-weight:900">AI Assistant</span>
+                    </button>
+                    <button class="psb-item <?= $activeSection==='ai_qa_lab'?'psb-active':'' ?>" data-section="ai_qa_lab" onclick="switchSection('ai_qa_lab',this)">
+                        <div class="psb-icon"><i class="fa-solid fa-flask-vial" style="color:#a855f7"></i></div>
+                        <span class="psb-label" style="color:#7c3aed;font-weight:900">AI QA Lab</span>
+                    </button>
+                    <button class="psb-item <?= $activeSection==='ai_prompts'?'psb-active':'' ?>" data-section="ai_prompts" onclick="switchSection('ai_prompts',this)">
+                        <div class="psb-icon"><i class="fa-solid fa-code" style="color:#a855f7"></i></div>
+                        <span class="psb-label" style="color:#7c3aed;font-weight:900">AI Prompts</span>
+                    </button>
+                    <button class="psb-item <?= $activeSection==='ai_knowledge'?'psb-active':'' ?>" data-section="ai_knowledge" onclick="switchSection('ai_knowledge',this)">
+                        <div class="psb-icon"><i class="fa-solid fa-database" style="color:#10b981"></i></div>
+                        <span class="psb-label" style="color:#059669;font-weight:900">AI Knowledge</span>
+                    </button>
+                <?php endif; ?>
             <?php endif; ?>
 
             <?php /* ── สิทธิ์ & ความปลอดภัย ──────────────────────────────── */ ?>
@@ -991,7 +993,7 @@ try {
                         <span class="psb-label" style="color:#0e7490;font-weight:900">สถานะเอกสาร</span>
                     </button>
                 <?php endif; ?>
-                <?php if (!$registryOnly && $isSuper): ?>
+                <?php if (!$registryOnly && ($isSuper || !empty($_SESSION['access_insurance']))): ?>
                     <button class="psb-item" data-section="manage_insurance_partners" onclick="switchSection('manage_insurance_partners',this)">
                         <div class="psb-icon"><i class="fa-solid fa-handshake" style="color:#10b981"></i></div>
                         <span class="psb-label" style="color:#059669;font-weight:900">Insurance Partners</span>
@@ -2039,6 +2041,9 @@ try {
                                             <th style="padding:16px 20px;text-align:center;font-size:10px;font-weight:900;color:#64748b;text-transform:uppercase;letter-spacing:.15em;width:80px" title="Insurance Sync"><i class="fa-solid fa-shield-heart"></i></th>
                                             <th style="padding:16px 20px;text-align:center;font-size:10px;font-weight:900;color:#64748b;text-transform:uppercase;letter-spacing:.15em;width:80px" title="System Logs"><i class="fa-solid fa-list-ul"></i></th>
                                             <th style="padding:16px 20px;text-align:center;font-size:10px;font-weight:900;color:#64748b;text-transform:uppercase;letter-spacing:.15em;width:80px" title="System Settings"><i class="fa-solid fa-sliders"></i></th>
+                                            <th style="padding:16px 20px;text-align:center;font-size:10px;font-weight:900;color:#64748b;text-transform:uppercase;letter-spacing:.15em;width:80px" title="AI Suite"><i class="fa-solid fa-wand-magic-sparkles"></i></th>
+                                            <th style="padding:16px 20px;text-align:center;font-size:10px;font-weight:900;color:#64748b;text-transform:uppercase;letter-spacing:.15em;width:80px" title="Consumables"><i class="fa-solid fa-syringe"></i></th>
+                                            <th style="padding:16px 20px;text-align:center;font-size:10px;font-weight:900;color:#64748b;text-transform:uppercase;letter-spacing:.15em;width:80px" title="Asset"><i class="fa-solid fa-warehouse"></i></th>
                                             <th style="padding:16px 20px;text-align:center;font-size:10px;font-weight:900;color:#64748b;text-transform:uppercase;letter-spacing:.15em;width:100px">Status</th>
                                             <th style="padding:16px 20px;text-align:right;font-size:10px;font-weight:900;color:#64748b;text-transform:uppercase;letter-spacing:.15em">Actions</th>
                                         </tr>
@@ -2081,6 +2086,14 @@ try {
                                             $insIcon = $insAccess ? '<i class="fa-solid fa-circle-check text-emerald-500"></i>' : '<i class="fa-solid fa-circle-minus text-slate-200"></i>';
                                             $logsIcon = $logsAccess ? '<i class="fa-solid fa-circle-check text-emerald-500"></i>' : '<i class="fa-solid fa-circle-minus text-slate-200"></i>';
                                             $settIcon = $settAccess ? '<i class="fa-solid fa-circle-check text-emerald-500"></i>' : '<i class="fa-solid fa-circle-minus text-slate-200"></i>';
+
+                                            // New extension flags
+                                            $aiAccess = (int)($st['access_ai'] ?? 0);
+                                            $consAccess = (int)($st['access_consumables'] ?? 0);
+                                            $assetAccess = (int)($st['access_asset'] ?? 0);
+                                            $aiIcon = $aiAccess ? '<i class="fa-solid fa-circle-check text-emerald-500"></i>' : '<i class="fa-solid fa-circle-minus text-slate-200"></i>';
+                                            $consIcon = $consAccess ? '<i class="fa-solid fa-circle-check text-emerald-500"></i>' : '<i class="fa-solid fa-circle-minus text-slate-200"></i>';
+                                            $assetIcon = $assetAccess ? '<i class="fa-solid fa-circle-check text-emerald-500"></i>' : '<i class="fa-solid fa-circle-minus text-slate-200"></i>';
                                             ?>
                                             <tr style="border-bottom:1px solid #f1f5f9" class="id-staff-row hover:bg-slate-50/50 transition-colors">
                                                 <td style="padding:16px 20px">
@@ -2099,6 +2112,9 @@ try {
                                                 <td style="padding:16px 20px;text-align:center"><?= $insIcon ?></td>
                                                 <td style="padding:16px 20px;text-align:center"><?= $logsIcon ?></td>
                                                 <td style="padding:16px 20px;text-align:center"><?= $settIcon ?></td>
+                                                <td style="padding:16px 20px;text-align:center"><?= $aiIcon ?></td>
+                                                <td style="padding:16px 20px;text-align:center"><?= $consIcon ?></td>
+                                                <td style="padding:16px 20px;text-align:center"><?= $assetIcon ?></td>
                                                 <td style="padding:16px 20px;text-align:center">
                                                     <span style="font-size:10px;font-weight:900;padding:4px 10px;border-radius:99px;background:<?= $isActive ? '#f0fdf4;color:#16a34a;border:1px solid #bbf7d0' : '#fef2f2;color:#dc2626;border:1px solid #fecaca' ?>"><?= strtoupper($st['account_status']) ?></span>
                                                 </td>
@@ -2434,6 +2450,30 @@ try {
                                                 </div>
                                                 <input type="checkbox" name="edms_access" id="govEdmsAccess" value="1" style="width:16px;height:16px" onclick="event.stopPropagation()">
                                             </div>
+                                            <!-- AI Suite (Assistant / QA Lab / Prompts / Knowledge) -->
+                                            <div onclick="document.getElementById('govAiAccess').click()" class="premium-role-card" style="border-radius:14px;border:1.5px solid #e2e8f0;background:#fff;cursor:pointer;padding:12px;transition:all 0.2s;display:flex;align-items:center;justify-content:space-between">
+                                                <div style="display:flex;align-items:center;gap:10px">
+                                                    <i class="fa-solid fa-wand-magic-sparkles text-purple-500"></i>
+                                                    <span style="font-weight:800;font-size:12px;color:#475569">AI Suite (Assistant / QA / Prompts / Knowledge)</span>
+                                                </div>
+                                                <input type="checkbox" name="ai_access" id="govAiAccess" value="1" style="width:16px;height:16px" onclick="event.stopPropagation()">
+                                            </div>
+                                            <!-- Consumables (วัสดุสิ้นเปลือง) -->
+                                            <div onclick="document.getElementById('govConsumablesAccess').click()" class="premium-role-card" style="border-radius:14px;border:1.5px solid #e2e8f0;background:#fff;cursor:pointer;padding:12px;transition:all 0.2s;display:flex;align-items:center;justify-content:space-between">
+                                                <div style="display:flex;align-items:center;gap:10px">
+                                                    <i class="fa-solid fa-syringe text-rose-500"></i>
+                                                    <span style="font-weight:800;font-size:12px;color:#475569">วัสดุสิ้นเปลือง (Consumables)</span>
+                                                </div>
+                                                <input type="checkbox" name="consumables_access" id="govConsumablesAccess" value="1" style="width:16px;height:16px" onclick="event.stopPropagation()">
+                                            </div>
+                                            <!-- Asset (ครุภัณฑ์) -->
+                                            <div onclick="document.getElementById('govAssetAccess').click()" class="premium-role-card" style="border-radius:14px;border:1.5px solid #e2e8f0;background:#fff;cursor:pointer;padding:12px;transition:all 0.2s;display:flex;align-items:center;justify-content:space-between">
+                                                <div style="display:flex;align-items:center;gap:10px">
+                                                    <i class="fa-solid fa-warehouse text-amber-500"></i>
+                                                    <span style="font-weight:800;font-size:12px;color:#475569">ครุภัณฑ์ (Asset Inventory)</span>
+                                                </div>
+                                                <input type="checkbox" name="asset_access" id="govAssetAccess" value="1" style="width:16px;height:16px" onclick="event.stopPropagation()">
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -2554,26 +2594,55 @@ try {
                 ?>
             </div>
 
+            <?php
+                // AI Suite gate (รวม Assistant / QA Lab / Prompts / Knowledge)
+                $hasAi = $isSuper || !empty($_SESSION['access_ai']);
+                $aiDeniedHtml = '<div style="padding:100px;text-align:center;font-weight:900;color:#dc2626"><i class="fa-solid fa-shield-slash mb-4" style="font-size:4rem;display:block"></i> ACCESS DENIED<br><span style="font-size:14px;color:#94a3b8;font-weight:600">ต้องมีสิทธิ์ access_ai</span></div>';
+            ?>
             <!-- ════════════ SECTION: AI ASSISTANT ════════════ -->
             <div id="section-ai_assistant" class="portal-section"
                 style="<?= $activeSection==='ai_assistant'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); overflow:hidden;">
-                <?php include __DIR__ . '/_partials/ai_assistant.php'; ?>
+                <?php
+                if ($hasAi) {
+                    include __DIR__ . '/_partials/ai_assistant.php';
+                } else {
+                    echo $aiDeniedHtml;
+                }
+                ?>
             </div>
 
             <!-- ════════════ SECTION: AI QA LAB ════════════ -->
             <div id="section-ai_prompts" class="portal-section"
                 style="<?= $activeSection==='ai_prompts'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); background:#f8fafc; overflow-y:auto;">
-                <?php include __DIR__ . '/_partials/ai_prompts.php'; ?>
+                <?php
+                if ($hasAi) {
+                    include __DIR__ . '/_partials/ai_prompts.php';
+                } else {
+                    echo $aiDeniedHtml;
+                }
+                ?>
             </div>
 
             <div id="section-ai_knowledge" class="portal-section"
                 style="<?= $activeSection==='ai_knowledge'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); background:#f8fafc; overflow-y:auto;">
-                <?php include __DIR__ . '/_partials/ai_knowledge.php'; ?>
+                <?php
+                if ($hasAi) {
+                    include __DIR__ . '/_partials/ai_knowledge.php';
+                } else {
+                    echo $aiDeniedHtml;
+                }
+                ?>
             </div>
 
             <div id="section-ai_qa_lab" class="portal-section"
                 style="<?= $activeSection==='ai_qa_lab'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); background:#f8fafc; overflow-y:auto;">
-                <?php include __DIR__ . '/_partials/ai_qa_lab.php'; ?>
+                <?php
+                if ($hasAi) {
+                    include __DIR__ . '/_partials/ai_qa_lab.php';
+                } else {
+                    echo $aiDeniedHtml;
+                }
+                ?>
             </div>
 
             <!-- ════════════ SECTION: INSURANCE SYNC HUB ════════════ -->
@@ -2604,10 +2673,10 @@ try {
             <div id="section-manage_insurance_partners" class="portal-section"
                 style="<?= $activeSection==='manage_insurance_partners'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); background:#f8fafc; overflow-y:auto;">
                 <?php
-                if ($adminRole === 'superadmin') {
+                if ($adminRole === 'superadmin' || !empty($_SESSION['access_insurance'])) {
                     include __DIR__ . '/_partials/manage_insurance_partners.php';
                 } else {
-                    echo '<div style="padding:100px;text-align:center;font-weight:900;color:#dc2626"><i class="fa-solid fa-shield-slash mb-4" style="font-size:4rem;display:block"></i> ACCESS DENIED<br><span style="font-size:14px;color:#94a3b8;font-weight:600">Superadmin only.</span></div>';
+                    echo '<div style="padding:100px;text-align:center;font-weight:900;color:#dc2626"><i class="fa-solid fa-shield-slash mb-4" style="font-size:4rem;display:block"></i> ACCESS DENIED<br><span style="font-size:14px;color:#94a3b8;font-weight:600">ต้องมีสิทธิ์ access_insurance</span></div>';
                 }
                 ?>
             </div>
@@ -2696,10 +2765,16 @@ try {
                 ?>
             </div>
 
-            <!-- ════════════ SECTION: SENTRY TEST ════════════ -->
+            <!-- ════════════ SECTION: SENTRY TEST (superadmin only) ════════════ -->
             <div id="section-sentry_test" class="portal-section"
                 style="<?= $activeSection==='sentry_test'?'':'display:none;' ?> background:#f8fafc; overflow-y:auto;">
-                <?php include __DIR__ . '/_partials/sentry_test.php'; ?>
+                <?php
+                if ($isSuper) {
+                    include __DIR__ . '/_partials/sentry_test.php';
+                } else {
+                    echo '<div style="padding:100px;text-align:center;font-weight:900;color:#dc2626"><i class="fa-solid fa-shield-slash mb-4" style="font-size:4rem;display:block"></i> ACCESS DENIED<br><span style="font-size:14px;color:#94a3b8;font-weight:600">Superadmin only.</span></div>';
+                }
+                ?>
             </div>
 
             <!-- ════════════ SECTION: EDMS (สารบรรณอิเล็กทรอนิกส์) ════════════ -->
@@ -3388,6 +3463,9 @@ try {
                         document.getElementById('govSettAccess').checked = parseInt(data.access_site_settings) === 1;
                         document.getElementById('govRegAccess').checked = parseInt(data.access_registry) === 1;
                         document.getElementById('govEdmsAccess').checked = parseInt(data.access_edms) === 1;
+                        document.getElementById('govAiAccess').checked = parseInt(data.access_ai) === 1;
+                        document.getElementById('govConsumablesAccess').checked = parseInt(data.access_consumables) === 1;
+                        document.getElementById('govAssetAccess').checked = parseInt(data.access_asset) === 1;
                     }
                 } else {
                     // Reset Extension Checkboxes for new records
@@ -3396,6 +3474,9 @@ try {
                     document.getElementById('govSettAccess').checked = false;
                     document.getElementById('govRegAccess').checked = false;
                     document.getElementById('govEdmsAccess').checked = false;
+                    document.getElementById('govAiAccess').checked = false;
+                    document.getElementById('govConsumablesAccess').checked = false;
+                    document.getElementById('govAssetAccess').checked = false;
                 }
             // Update UI States
             syncGovUI('govEbAccess', 'govEbRole', 'govEbCard');
