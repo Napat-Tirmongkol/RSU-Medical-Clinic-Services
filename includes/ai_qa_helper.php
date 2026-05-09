@@ -137,13 +137,15 @@ function ai_qa_load_gemini_key(): string
  *
  * ค่าที่ขาดให้แทนด้วย "(ไม่มีข้อมูล)" — AI จะรู้ตัวว่าต้อง fallback ไปเป็น placeholder
  */
-function ai_qa_build_clinic_context(PDO $pdo): string
+function ai_qa_build_clinic_context(PDO $pdo, ?DateTimeImmutable $asOf = null): string
 {
     require_once __DIR__ . '/clinic_status_helper.php';
     require_once __DIR__ . '/ai_knowledge_helper.php';
 
     $tz  = new DateTimeZone(CLINIC_TZ_NAME);
-    $now = new DateTimeImmutable('now', $tz);
+    // $asOf = "now" by default; for retrospective FAQ generation (Captured Questions),
+    // callers pass the question's created_at so [สถานะ] / [วันนี้] match user's actual moment.
+    $now = $asOf ? $asOf->setTimezone($tz) : new DateTimeImmutable('now', $tz);
 
     // 31-day window (today + next 30 days) — ครอบคลุม update cycle รายเดือน
     // admin อัปเดตตารางเดือนละครั้ง ดังนั้น context ต้องเห็นข้อมูลทั้งเดือน
@@ -159,7 +161,7 @@ function ai_qa_build_clinic_context(PDO $pdo): string
     $phone   = $profile['phone'] !== '' ? $profile['phone'] : '(ไม่มีข้อมูล)';
 
     // ── Status ─────────────────────────────────────────────────────────────
-    $status = get_clinic_current_status($pdo);
+    $status = get_clinic_current_status($pdo, $now);
     $statusText = match ($status['state'] ?? '') {
         'open_now'    => 'เปิดอยู่ตอนนี้',
         'before_open' => 'ยังไม่เปิด (จะเปิดวันนี้เวลา ' . ($status['today_open'] ?? '') . ')',
@@ -270,7 +272,7 @@ CTX;
  *
  * @return array{category:string, answer:string, confidence:float, model:string}
  */
-function ai_qa_generate_answer(string $question, ?PDO $pdo = null): array
+function ai_qa_generate_answer(string $question, ?PDO $pdo = null, ?DateTimeImmutable $askedAt = null): array
 {
     $apiKey = ai_qa_load_gemini_key();
     if (!$apiKey) {
@@ -278,7 +280,9 @@ function ai_qa_generate_answer(string $question, ?PDO $pdo = null): array
     }
 
     $categoriesList = implode(' | ', AI_QA_CATEGORIES);
-    $clinicContext  = $pdo ? ai_qa_build_clinic_context($pdo) : '(ไม่ได้ส่ง PDO เข้ามา — ไม่มี clinic context)';
+    $clinicContext  = $pdo
+        ? ai_qa_build_clinic_context($pdo, $askedAt)
+        : '(ไม่ได้ส่ง PDO เข้ามา — ไม่มี clinic context)';
 
     require_once __DIR__ . '/ai_prompts_helper.php';
     $systemPrompt = get_ai_prompt('generator', [
