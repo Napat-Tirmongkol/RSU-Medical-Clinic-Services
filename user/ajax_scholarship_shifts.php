@@ -75,10 +75,10 @@ try {
                 echo json_encode(['ok' => false, 'error' => 'เวลาเริ่มต้องมาก่อนเวลาสิ้นสุด']); return;
             }
 
-            // กันลงซ้ำเวลาเดียวกัน
+            // กันลงซ้ำเวลาเดียวกัน (interval overlap: start_time < new_end AND end_time > new_start)
             $dup = $pdo->prepare("SELECT id FROM sys_scholarship_shifts
                 WHERE student_id = :sid AND shift_date = :d AND status != 'cancelled'
-                  AND ((start_time <= :st AND end_time > :st) OR (start_time < :et AND end_time >= :et) OR (start_time >= :st AND end_time <= :et))
+                  AND start_time < :et AND end_time > :st
                 LIMIT 1");
             $dup->execute([':sid' => $studentId, ':d' => $date, ':st' => $start, ':et' => $end]);
             if ($dup->fetchColumn()) {
@@ -122,5 +122,5 @@ try {
     echo json_encode(['ok' => false, 'error' => 'Unknown action']);
 } catch (Throwable $e) {
     error_log('[ajax_scholarship_shifts] ' . $e->getMessage());
-    echo json_encode(['ok' => false, 'error' => 'Server error']);
+    echo json_encode(['ok' => false, 'error' => 'Server error: ' . $e->getMessage()]);
 }
