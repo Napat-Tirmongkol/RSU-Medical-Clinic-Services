@@ -269,6 +269,18 @@ $webhookUrl = "$protocol://$host$uri";
                 </div>
             </div>
 
+            <!-- Default reply toggle — กัน reply ซ้อนกับ LINE OA auto-reply -->
+            <label style="display:flex;align-items:center;gap:14px;padding:14px 16px;border:1.5px solid #e2e8f0;border-radius:12px;cursor:pointer;background:#fafafa;margin-top:12px">
+                <span class="line-toggle line-toggle--purple">
+                    <input type="checkbox" id="faq_default_reply_enabled" name="default_reply_enabled" value="1">
+                    <span class="line-toggle-slider"></span>
+                </span>
+                <div style="flex:1">
+                    <div style="font-size:13px;font-weight:800;color:#0f172a">ส่งข้อความ "เราได้รับข้อความของคุณแล้ว..."</div>
+                    <div style="font-size:11px;color:#64748b;font-weight:500">เมื่อ AI matcher ไม่ match — ปิดเพื่อกัน reply ซ้อนกับ LINE OA auto-reply</div>
+                </div>
+            </label>
+
             <!-- Blocked keywords — webhook ไม่ตอบเมื่อข้อความมีคำเหล่านี้ -->
             <div style="background:#fff7ed;border:1.5px solid #fed7aa;border-radius:12px;padding:14px 16px;margin-top:12px">
                 <label class="line-label" style="margin-bottom:6px;display:flex;align-items:center;gap:8px;color:#9a3412">
@@ -756,6 +768,7 @@ function sendTestLineP() {
         document.getElementById('faq_only_when_closed').checked = !!Number(s.only_when_closed);
         document.getElementById('faq_rate_limit_hours').value = Number(s.rate_limit_hours || 0);
         document.getElementById('faq_blocked_keywords').value = String(s.blocked_keywords || '');
+        document.getElementById('faq_default_reply_enabled').checked = !!Number(s.default_reply_enabled);
         FAQ_KEYS.forEach(function (k) {
             var el = document.getElementById(k);
             if (el) el.value = s[k] || '';
@@ -794,6 +807,7 @@ function sendTestLineP() {
         // checkbox ที่ unchecked จะไม่ส่งใน FormData — บังคับให้ส่ง 0
         if (!document.getElementById('faq_enabled').checked) fd.set('enabled', '0');
         if (!document.getElementById('faq_only_when_closed').checked) fd.set('only_when_closed', '0');
+        if (!document.getElementById('faq_default_reply_enabled').checked) fd.set('default_reply_enabled', '0');
 
         var btn = document.getElementById('faqSaveBtn');
         btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> กำลังบันทึก...';
