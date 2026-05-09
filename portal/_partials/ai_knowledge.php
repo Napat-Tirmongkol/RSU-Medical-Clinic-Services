@@ -149,9 +149,14 @@ $_aik_sources = [
                 ข้อมูลที่ AI ใช้อ้างอิงตอนตอบคำถาม — preview, links ไปจัดการ, custom notes
             </p>
         </div>
-        <button id="aik-refresh" class="px-3 py-2 bg-white text-gray-700 text-xs font-bold rounded-lg border border-gray-300 hover:bg-gray-50">
-            <i class="fa-solid fa-rotate"></i> Refresh preview
-        </button>
+        <div class="flex gap-2">
+            <button id="aik-diagnose" class="px-3 py-2 bg-amber-50 text-amber-700 text-xs font-bold rounded-lg border border-amber-300 hover:bg-amber-100">
+                <i class="fa-solid fa-stethoscope"></i> ตรวจสอบข้อมูลตารางหมอ
+            </button>
+            <button id="aik-refresh" class="px-3 py-2 bg-white text-gray-700 text-xs font-bold rounded-lg border border-gray-300 hover:bg-gray-50">
+                <i class="fa-solid fa-rotate"></i> Refresh preview
+            </button>
+        </div>
     </div>
 
     <!-- Preview -->
@@ -243,6 +248,22 @@ $_aik_sources = [
         </div>
     </div>
 
+    <!-- Diagnostic modal -->
+    <div id="aik-diag-modal" class="fixed inset-0 bg-black/50 z-50 hidden items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[92vh] flex flex-col">
+            <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+                <div>
+                    <div class="text-xs font-bold text-amber-700 uppercase">🔍 Diagnostic</div>
+                    <h3 class="text-lg font-black text-gray-900">ตรวจสอบข้อมูลตารางหมอ</h3>
+                </div>
+                <button id="aik-diag-close" class="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+            </div>
+            <div class="px-6 py-4 overflow-y-auto flex-1">
+                <pre id="aik-diag-output" class="aik-preview" style="background:#1e293b;max-height:none">กำลังโหลด...</pre>
+            </div>
+        </div>
+    </div>
+
     <!-- Edit/Create modal -->
     <div id="aik-modal" class="fixed inset-0 bg-black/50 z-50 hidden items-center justify-center p-4">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[92vh] flex flex-col">
@@ -301,6 +322,33 @@ $_aik_sources = [
     }
     document.getElementById('aik-refresh').addEventListener('click', loadPreview);
     loadPreview();
+
+    // ── Diagnostic ────────────────────────────────────────────────────────
+    const DIAG_MODAL = document.getElementById('aik-diag-modal');
+    const DIAG_OUT   = document.getElementById('aik-diag-output');
+
+    document.getElementById('aik-diagnose').addEventListener('click', async () => {
+        DIAG_OUT.textContent = 'กำลังโหลด...';
+        DIAG_MODAL.classList.remove('hidden');
+        DIAG_MODAL.classList.add('flex');
+        try {
+            const r = await fetch('ajax_ai_knowledge.php?action=diagnose');
+            const j = await r.json();
+            DIAG_OUT.textContent = JSON.stringify(j, null, 2);
+        } catch (e) {
+            DIAG_OUT.textContent = 'Error: ' + e.message;
+        }
+    });
+    document.getElementById('aik-diag-close').addEventListener('click', () => {
+        DIAG_MODAL.classList.add('hidden');
+        DIAG_MODAL.classList.remove('flex');
+    });
+    DIAG_MODAL.addEventListener('click', (e) => {
+        if (e.target === DIAG_MODAL) {
+            DIAG_MODAL.classList.add('hidden');
+            DIAG_MODAL.classList.remove('flex');
+        }
+    });
 
     // ── Modal ─────────────────────────────────────────────────────────────
     const MODAL = document.getElementById('aik-modal');

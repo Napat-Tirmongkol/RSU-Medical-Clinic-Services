@@ -49,6 +49,75 @@ try {
             return;
         }
 
+        case 'diagnose': {
+            require_once __DIR__ . '/../includes/clinic_status_helper.php';
+            $tz = new DateTimeZone(CLINIC_TZ_NAME);
+            $today = (new DateTimeImmutable('now', $tz))->format('Y-m-d');
+            $weekday = (int)(new DateTimeImmutable($today, $tz))->format('w');
+            $weekdayName = ['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์'][$weekday];
+
+            $diag = [
+                'ok'      => true,
+                'today'   => $today,
+                'weekday' => $weekday,
+                'weekday_name' => $weekdayName,
+                'tz'      => $tz->getName(),
+            ];
+
+            try {
+                // Raw counts
+                $diag['counts'] = [
+                    'sys_doctor_schedule_total'   => (int)$pdo->query("SELECT COUNT(*) FROM sys_doctor_schedule")->fetchColumn(),
+                    'sys_doctor_schedule_active'  => (int)$pdo->query("SELECT COUNT(*) FROM sys_doctor_schedule WHERE is_active = 1")->fetchColumn(),
+                    'sys_doctor_schedule_regular' => (int)$pdo->query("SELECT COUNT(*) FROM sys_doctor_schedule WHERE is_active = 1 AND type = 'regular'")->fetchColumn(),
+                    'sys_medical_staff_total'     => (int)$pdo->query("SELECT COUNT(*) FROM sys_medical_staff")->fetchColumn(),
+                    'sys_medical_staff_active'    => (int)$pdo->query("SELECT COUNT(*) FROM sys_medical_staff WHERE is_active = 1")->fetchColumn(),
+                ];
+
+                // Sample regular shifts (any weekday)
+                $sample = $pdo->query("
+                    SELECT s.id, s.staff_id, s.type, s.weekday, s.specific_date, s.is_active,
+                           s.start_time, s.end_time,
+                           ms.full_name, ms.is_active AS staff_active
+                      FROM sys_doctor_schedule s
+                      LEFT JOIN sys_medical_staff ms ON s.staff_id = ms.id
+                     WHERE s.is_active = 1
+                     ORDER BY s.id DESC
+                     LIMIT 8
+                ")->fetchAll(PDO::FETCH_ASSOC);
+                $diag['sample_shifts'] = $sample;
+
+                // Run the EXACT query that get_clinic_doctors_for_date uses
+                $stmt = $pdo->prepare("
+                    SELECT s.id, s.staff_id, s.type, s.weekday, s.specific_date,
+                           s.start_time, s.end_time,
+                           ms.full_name AS doc_name, ms.is_active AS staff_active
+                      FROM sys_doctor_schedule s
+                      LEFT JOIN sys_medical_staff ms ON s.staff_id = ms.id
+                     WHERE s.is_active = 1
+                       AND (
+                           s.specific_date = :d
+                           OR (
+                               s.type = 'regular'
+                               AND s.weekday = :wd
+                               AND (s.recur_end_date IS NULL OR s.recur_end_date = '0000-00-00' OR s.recur_end_date >= :d)
+                           )
+                       )
+                ");
+                $stmt->execute([':d' => $today, ':wd' => $weekday]);
+                $diag['today_shifts_raw'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+                // Helper output (post-processed)
+                $diag['today_shifts_processed'] = get_clinic_doctors_for_date($pdo, $today);
+            } catch (Throwable $e) {
+                $diag['ok'] = false;
+                $diag['error'] = $e->getMessage();
+            }
+
+            echo json_encode($diag, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+            return;
+        }
+
         case 'create': {
             _csrf_or_die();
             $label = (string)($_POST['label'] ?? '');
