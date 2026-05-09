@@ -40,27 +40,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
             $pdo = db();
             $stmt = $pdo->prepare("
-                SELECT id, username, password_hash, full_name, role, account_status,
-                       IFNULL(access_ecampaign, 0) AS access_ecampaign,
-                       IFNULL(ecampaign_role, 'editor') AS ecampaign_role,
-                       IFNULL(access_eborrow, 0) AS access_eborrow,
-                       IFNULL(access_insurance, 0) AS access_insurance,
-                       IFNULL(access_system_logs, 0) AS access_system_logs,
-                       IFNULL(access_site_settings, 0) AS access_site_settings,
-                       IFNULL(access_registry, 0) AS access_registry,
-                       IFNULL(access_edms, 0) AS access_edms
-                FROM sys_staff
-                WHERE username = :uname
+                SELECT s.id, s.username, s.password_hash, s.full_name, s.role, s.account_status,
+                       s.position_id,
+                       p.flags AS position_flags,
+                       IFNULL(s.access_ecampaign, 0) AS access_ecampaign,
+                       IFNULL(s.ecampaign_role, 'editor') AS ecampaign_role,
+                       IFNULL(s.access_eborrow, 0) AS access_eborrow,
+                       IFNULL(s.access_insurance, 0) AS access_insurance,
+                       IFNULL(s.access_system_logs, 0) AS access_system_logs,
+                       IFNULL(s.access_site_settings, 0) AS access_site_settings,
+                       IFNULL(s.access_registry, 0) AS access_registry,
+                       IFNULL(s.access_edms, 0) AS access_edms,
+                       IFNULL(s.access_ai, 0) AS access_ai,
+                       IFNULL(s.access_consumables, 0) AS access_consumables,
+                       IFNULL(s.access_asset, 0) AS access_asset
+                FROM sys_staff s
+                LEFT JOIN sys_staff_positions p ON p.id = s.position_id
+                WHERE s.username = :uname
                 LIMIT 1
             ");
             $stmt->execute([':uname' => $username]);
             $staff = $stmt->fetch(PDO::FETCH_ASSOC);
 
+            // Live link: ถ้าผูก position อยู่ ใช้ flag จาก position แทน flag ใน sys_staff
+            if ($staff && !empty($staff['position_id']) && !empty($staff['position_flags'])) {
+                $posFlags = json_decode($staff['position_flags'], true) ?: [];
+                foreach ([
+                    'access_ecampaign','access_eborrow','access_insurance','access_system_logs',
+                    'access_site_settings','access_registry','access_edms',
+                    'access_ai','access_consumables','access_asset'
+                ] as $flagKey) {
+                    $staff[$flagKey] = (int)($posFlags[$flagKey] ?? 0);
+                }
+            }
+
             if ($staff && password_verify($password, $staff['password_hash'])) {
 
                 if ($staff['account_status'] === 'disabled') {
                     $error = 'บัญชีนี้ถูกระงับการใช้งาน กรุณาติดต่อผู้ดูแลระบบ';
-                } elseif (!(int)$staff['access_ecampaign'] && !(int)$staff['access_eborrow'] && !(int)$staff['access_insurance'] && !(int)$staff['access_registry'] && !(int)$staff['access_edms']) {
+                } elseif (!(int)$staff['access_ecampaign'] && !(int)$staff['access_eborrow'] && !(int)$staff['access_insurance'] && !(int)$staff['access_registry'] && !(int)$staff['access_edms'] && !(int)$staff['access_ai'] && !(int)$staff['access_consumables'] && !(int)$staff['access_asset']) {
                     $error = 'บัญชีนี้ยังไม่ได้รับสิทธิ์เข้าใช้งานระบบใดๆ กรุณาติดต่อผู้ดูแลระบบ';
                 } else {
                     // Whitelist ecampaign_role ป้องกัน privilege escalation
@@ -85,6 +103,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $_SESSION['access_site_settings']  = (int)$staff['access_site_settings'];
                     $_SESSION['access_registry']       = (int)$staff['access_registry'];
                     $_SESSION['access_edms']           = (int)$staff['access_edms'];
+                    $_SESSION['access_ai']             = (int)$staff['access_ai'];
+                    $_SESSION['access_consumables']    = (int)$staff['access_consumables'];
+                    $_SESSION['access_asset']          = (int)$staff['access_asset'];
 
                     $_SESSION['_admin_last_activity']  = time();
 

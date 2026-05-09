@@ -97,3 +97,30 @@ if (!isset($_SESSION['user_id'])) {
     header('Location: ' . _csm_abs_url('../portal/login.php'));
     exit;
 }
+
+// ── Module Access Gate (access_consumables) ──────────────────────────────
+// portal admin (sys_admins) → ผ่านเสมอ
+// sys_staff role 'admin'/'editor' → ผ่าน (ผู้ดูแลคลังเดิม backward compat)
+// sys_staff role อื่น → ต้องมี access_consumables = 1
+if (empty($_SESSION['is_portal_admin'])) {
+    $stRole = $_SESSION['role'] ?? '';
+    if (!in_array($stRole, ['admin', 'editor'], true)) {
+        $hasFlag = $_SESSION['access_consumables'] ?? null;
+        if ($hasFlag === null) {
+            // fallback: re-fetch จาก DB (session เก่าก่อน migration)
+            try {
+                if (!isset($p)) { require_once __DIR__ . '/db_connect.php'; $p = db(); }
+                $stmt = $p->prepare("SELECT IFNULL(access_consumables, 0) FROM sys_staff WHERE id = :id LIMIT 1");
+                $stmt->execute([':id' => $_SESSION['user_id']]);
+                $hasFlag = (int)$stmt->fetchColumn();
+                $_SESSION['access_consumables'] = $hasFlag;
+            } catch (Throwable $e) {
+                $hasFlag = 0;
+            }
+        }
+        if ((int)$hasFlag !== 1) {
+            http_response_code(403);
+            exit('สิทธิ์ไม่เพียงพอ — โปรดติดต่อผู้ดูแลระบบเพื่อขอสิทธิ์ access_consumables');
+        }
+    }
+}

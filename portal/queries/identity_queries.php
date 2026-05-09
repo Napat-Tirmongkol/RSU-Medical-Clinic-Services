@@ -76,10 +76,11 @@ try {
 
 $allAdmins = [];
 $allStaff  = [];
+$allPositions = [];
 
 if ($adminRole === 'superadmin') {
     $allAdmins = $pdo->query("SELECT * FROM sys_admins ORDER BY id DESC")->fetchAll(PDO::FETCH_ASSOC);
-    
+
     // Auto-migrate sys_staff columns if missing (only check once per load)
     try {
         $cols = $pdo->query("DESCRIBE sys_staff")->fetchAll(PDO::FETCH_COLUMN);
@@ -98,18 +99,61 @@ if ($adminRole === 'superadmin') {
         if (!in_array('access_edms', $cols)) {
             $pdo->exec("ALTER TABLE sys_staff ADD COLUMN access_edms TINYINT(1) DEFAULT 0");
         }
+        if (!in_array('access_ai', $cols)) {
+            $pdo->exec("ALTER TABLE sys_staff ADD COLUMN access_ai TINYINT(1) DEFAULT 0");
+        }
+        if (!in_array('access_consumables', $cols)) {
+            $pdo->exec("ALTER TABLE sys_staff ADD COLUMN access_consumables TINYINT(1) DEFAULT 0");
+        }
+        if (!in_array('access_asset', $cols)) {
+            $pdo->exec("ALTER TABLE sys_staff ADD COLUMN access_asset TINYINT(1) DEFAULT 0");
+        }
+        if (!in_array('position_id', $cols)) {
+            $pdo->exec("ALTER TABLE sys_staff ADD COLUMN position_id INT UNSIGNED NULL AFTER role");
+            try { $pdo->exec("ALTER TABLE sys_staff ADD INDEX idx_position (position_id)"); } catch (PDOException $e) {}
+        }
+
+        // Auto-create sys_staff_positions if missing
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS sys_staff_positions (
+                id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                name VARCHAR(100) NOT NULL UNIQUE,
+                description VARCHAR(500) NULL,
+                flags JSON NOT NULL,
+                created_by INT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                INDEX idx_name (name)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        ");
 
         $allStaff = $pdo->query("
-            SELECT id, username, full_name, email, role, account_status, linked_line_user_id,
-                   IFNULL(access_eborrow, 1) AS access_eborrow,
-                   IFNULL(access_ecampaign, 0) AS access_ecampaign,
-                   IFNULL(ecampaign_role, 'admin') AS ecampaign_role,
-                   IFNULL(access_insurance, 0) AS access_insurance,
-                   IFNULL(access_system_logs, 0) AS access_system_logs,
-                   IFNULL(access_site_settings, 0) AS access_site_settings,
-                   IFNULL(access_registry, 0) AS access_registry,
-                   IFNULL(access_edms, 0) AS access_edms
-            FROM sys_staff ORDER BY role ASC, full_name ASC
+            SELECT s.id, s.username, s.full_name, s.email, s.role, s.account_status, s.linked_line_user_id,
+                   s.position_id,
+                   p.name AS position_name,
+                   p.flags AS position_flags,
+                   IFNULL(s.access_eborrow, 1) AS access_eborrow,
+                   IFNULL(s.access_ecampaign, 0) AS access_ecampaign,
+                   IFNULL(s.ecampaign_role, 'admin') AS ecampaign_role,
+                   IFNULL(s.access_insurance, 0) AS access_insurance,
+                   IFNULL(s.access_system_logs, 0) AS access_system_logs,
+                   IFNULL(s.access_site_settings, 0) AS access_site_settings,
+                   IFNULL(s.access_registry, 0) AS access_registry,
+                   IFNULL(s.access_edms, 0) AS access_edms,
+                   IFNULL(s.access_ai, 0) AS access_ai,
+                   IFNULL(s.access_consumables, 0) AS access_consumables,
+                   IFNULL(s.access_asset, 0) AS access_asset
+            FROM sys_staff s
+            LEFT JOIN sys_staff_positions p ON p.id = s.position_id
+            ORDER BY s.role ASC, s.full_name ASC
+        ")->fetchAll(PDO::FETCH_ASSOC);
+
+        // นับจำนวน staff ที่ผูกอยู่แต่ละ position (สำหรับ UI)
+        $allPositions = $pdo->query("
+            SELECT p.id, p.name, p.description, p.flags, p.created_at, p.updated_at,
+                   (SELECT COUNT(*) FROM sys_staff WHERE position_id = p.id) AS staff_count
+            FROM sys_staff_positions p
+            ORDER BY p.name ASC
         ")->fetchAll(PDO::FETCH_ASSOC);
     } catch (PDOException $e) {
         // Fallback for safety: if something still fails, try query without new columns

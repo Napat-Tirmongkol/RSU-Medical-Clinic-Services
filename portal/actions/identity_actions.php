@@ -65,8 +65,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($type === 'admin') {
                     // Ensure status column exists in sys_admins for consistency
                     try { $pdo->exec("ALTER TABLE sys_admins ADD COLUMN status VARCHAR(20) DEFAULT 'active' AFTER role"); } catch(PDOException $e) {}
-                    
+
                     $role = $_POST['admin_role'] ?? 'admin';
+                    // Whitelist admin role (ป้องกัน privilege escalation จาก POST)
+                    $allowedAdminRoles = ['admin', 'editor', 'superadmin'];
+                    if (!in_array($role, $allowedAdminRoles, true)) $role = 'admin';
                     if ($action === 'add_identity_gov') {
                         $hashed = password_hash($password ?: bin2hex(random_bytes(8)), PASSWORD_DEFAULT);
                         $stmt = $pdo->prepare("INSERT INTO sys_admins (full_name, username, email, password, role, status) VALUES (?, ?, ?, ?, ?, ?)");
@@ -90,19 +93,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $settAccess = (int)($_POST['sett_access'] ?? 0);
                     $regAccess = (int)($_POST['reg_access'] ?? 0);
                     $edmsAccess = (int)($_POST['edms_access'] ?? 0);
+                    $aiAccess = (int)($_POST['ai_access'] ?? 0);
+                    $consumablesAccess = (int)($_POST['consumables_access'] ?? 0);
+                    $assetAccess = (int)($_POST['asset_access'] ?? 0);
 
-                    // Ensure access_registry / access_edms columns exist (for existing installs)
+                    // Whitelist e-Borrow role (ป้องกัน privilege escalation จาก POST)
+                    $allowedEbRoles = ['admin', 'librarian', 'employee'];
+                    if (!in_array($ebRole, $allowedEbRoles, true)) $ebRole = 'employee';
+
+                    // Whitelist e-Campaign role
+                    $allowedEcRoles = ['superadmin', 'admin', 'editor'];
+                    if (!in_array($ecRole, $allowedEcRoles, true)) $ecRole = 'editor';
+
+                    // Ensure new flag columns exist (for existing installs)
                     try { $pdo->exec("ALTER TABLE sys_staff ADD COLUMN access_registry TINYINT(1) DEFAULT 0"); } catch(PDOException $e) {}
                     try { $pdo->exec("ALTER TABLE sys_staff ADD COLUMN access_edms TINYINT(1) DEFAULT 0"); } catch(PDOException $e) {}
+                    try { $pdo->exec("ALTER TABLE sys_staff ADD COLUMN access_ai TINYINT(1) DEFAULT 0"); } catch(PDOException $e) {}
+                    try { $pdo->exec("ALTER TABLE sys_staff ADD COLUMN access_consumables TINYINT(1) DEFAULT 0"); } catch(PDOException $e) {}
+                    try { $pdo->exec("ALTER TABLE sys_staff ADD COLUMN access_asset TINYINT(1) DEFAULT 0"); } catch(PDOException $e) {}
+
+                    // Position (NULL = Custom). ถ้าผูก position จะ override flag ตอน login (live link)
+                    $positionId = null;
+                    if (isset($_POST['position_id']) && $_POST['position_id'] !== '' && $_POST['position_id'] !== '0') {
+                        $positionId = (int)$_POST['position_id'];
+                        // Validate ว่า position มีอยู่จริง
+                        $exists = $pdo->prepare("SELECT 1 FROM sys_staff_positions WHERE id = ? LIMIT 1");
+                        $exists->execute([$positionId]);
+                        if (!$exists->fetchColumn()) $positionId = null;
+                    }
+
+                    // Ensure position_id column exists
+                    try { $pdo->exec("ALTER TABLE sys_staff ADD COLUMN position_id INT UNSIGNED NULL AFTER role"); } catch(PDOException $e) {}
 
                     if ($action === 'add_identity_gov') {
                         $hashed = password_hash($password ?: bin2hex(random_bytes(8)), PASSWORD_DEFAULT);
-                        $pdo->prepare("INSERT INTO sys_staff (full_name, username, email, password_hash, role, access_eborrow, account_status, access_ecampaign, ecampaign_role, access_insurance, access_system_logs, access_site_settings, access_registry, access_edms) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
-                            ->execute([$fullName, $username, $email, $hashed, $ebRole, $ebAccess, $status, $ecAccess, $ecRole, $insAccess, $logsAccess, $settAccess, $regAccess, $edmsAccess]);
+                        $pdo->prepare("INSERT INTO sys_staff (full_name, username, email, password_hash, role, position_id, access_eborrow, account_status, access_ecampaign, ecampaign_role, access_insurance, access_system_logs, access_site_settings, access_registry, access_edms, access_ai, access_consumables, access_asset) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+                            ->execute([$fullName, $username, $email, $hashed, $ebRole, $positionId, $ebAccess, $status, $ecAccess, $ecRole, $insAccess, $logsAccess, $settAccess, $regAccess, $edmsAccess, $aiAccess, $consumablesAccess, $assetAccess]);
                         $targetId = (int)$pdo->lastInsertId();
                     } else {
-                        $pdo->prepare("UPDATE sys_staff SET full_name=?, username=?, email=?, role=?, access_eborrow=?, account_status=?, access_ecampaign=?, ecampaign_role=?, access_insurance=?, access_system_logs=?, access_site_settings=?, access_registry=?, access_edms=? WHERE id=?")
-                            ->execute([$fullName, $username, $email, $ebRole, $ebAccess, $status, $ecAccess, $ecRole, $insAccess, $logsAccess, $settAccess, $regAccess, $edmsAccess, $targetId]);
+                        $pdo->prepare("UPDATE sys_staff SET full_name=?, username=?, email=?, role=?, position_id=?, access_eborrow=?, account_status=?, access_ecampaign=?, ecampaign_role=?, access_insurance=?, access_system_logs=?, access_site_settings=?, access_registry=?, access_edms=?, access_ai=?, access_consumables=?, access_asset=? WHERE id=?")
+                            ->execute([$fullName, $username, $email, $ebRole, $positionId, $ebAccess, $status, $ecAccess, $ecRole, $insAccess, $logsAccess, $settAccess, $regAccess, $edmsAccess, $aiAccess, $consumablesAccess, $assetAccess, $targetId]);
                         if (!empty($password)) $pdo->prepare("UPDATE sys_staff SET password_hash=? WHERE id=?")->execute([password_hash($password, PASSWORD_DEFAULT), $targetId]);
                     }
                 }
@@ -117,6 +147,80 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 exit;
             } catch (PDOException $e) { $idError = "Error: " . $e->getMessage(); }
         } else { $idError = "กรุณากรอกข้อมูลให้ครบถ้วนและระบุเหตุผลความจำเป็น"; }
+    }
+
+    // (0c) STAFF POSITION CRUD (superadmin only) — ตำแหน่งงาน + flag preset
+    if (in_array($action, ['add_position', 'edit_position', 'delete_position'], true) && $adminRole === 'superadmin') {
+        if (function_exists('validate_csrf_or_die')) validate_csrf_or_die();
+
+        // Whitelist flag keys ที่ระบบรู้จัก (ป้องกันยัด key แปลกปลอม)
+        $allowedFlagKeys = [
+            'access_ecampaign','access_eborrow','access_insurance','access_system_logs',
+            'access_site_settings','access_registry','access_edms',
+            'access_ai','access_consumables','access_asset',
+        ];
+
+        // Ensure table exists
+        try {
+            $pdo->exec("
+                CREATE TABLE IF NOT EXISTS sys_staff_positions (
+                    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                    name VARCHAR(100) NOT NULL UNIQUE,
+                    description VARCHAR(500) NULL,
+                    flags JSON NOT NULL,
+                    created_by INT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    INDEX idx_name (name)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            ");
+        } catch (PDOException $e) { /* silent */ }
+
+        if ($action === 'delete_position') {
+            $posId = (int)($_POST['position_id'] ?? 0);
+            if ($posId > 0) {
+                try {
+                    // Unlink staff ที่ผูกกับ position นี้ (ทำให้กลายเป็น Custom)
+                    $pdo->prepare("UPDATE sys_staff SET position_id = NULL WHERE position_id = ?")->execute([$posId]);
+                    $pdo->prepare("DELETE FROM sys_staff_positions WHERE id = ?")->execute([$posId]);
+                    log_activity("Deleted Position", "ลบตำแหน่งงาน ID: $posId");
+                    header('Location: index.php?section=identity&tab=positions&saved=1'); exit;
+                } catch (PDOException $e) { $idError = "ลบตำแหน่งไม่สำเร็จ: " . $e->getMessage(); }
+            }
+        } else {
+            // add_position / edit_position
+            $posId   = (int)($_POST['position_id'] ?? 0);
+            $name    = trim($_POST['position_name'] ?? '');
+            $desc    = trim($_POST['position_description'] ?? '');
+
+            // กรอง flag จาก POST ตาม whitelist
+            $flagsObj = [];
+            foreach ($allowedFlagKeys as $k) {
+                $flagsObj[$k] = isset($_POST['flag_' . $k]) ? 1 : 0;
+            }
+            $flagsJson = json_encode($flagsObj, JSON_UNESCAPED_UNICODE);
+
+            if ($name === '') {
+                $idError = "กรุณาระบุชื่อตำแหน่ง";
+            } else {
+                try {
+                    if ($action === 'add_position') {
+                        $pdo->prepare("INSERT INTO sys_staff_positions (name, description, flags, created_by) VALUES (?,?,?,?)")
+                            ->execute([$name, $desc ?: null, $flagsJson, $_SESSION['admin_id'] ?? null]);
+                        log_activity("Added Position", "เพิ่มตำแหน่งงาน: $name");
+                    } else {
+                        $pdo->prepare("UPDATE sys_staff_positions SET name=?, description=?, flags=? WHERE id=?")
+                            ->execute([$name, $desc ?: null, $flagsJson, $posId]);
+                        log_activity("Updated Position", "แก้ไขตำแหน่งงาน ID: $posId ($name)");
+                    }
+                    header('Location: index.php?section=identity&tab=positions&saved=1'); exit;
+                } catch (PDOException $e) {
+                    $idError = (str_contains($e->getMessage(), 'Duplicate'))
+                        ? "ชื่อตำแหน่งนี้มีอยู่แล้ว"
+                        : "บันทึกตำแหน่งไม่สำเร็จ: " . $e->getMessage();
+                }
+            }
+        }
     }
 
     // Keep old delete handlers for now
