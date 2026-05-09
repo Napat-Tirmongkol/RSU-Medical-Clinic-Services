@@ -92,6 +92,15 @@ function ensure_ai_prompts_schema(PDO $pdo): void
             updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             updated_by INT UNSIGNED NULL
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        // ประวัติทุกครั้งที่ save — เก็บล่าสุด 50 versions / key
+        $pdo->exec("CREATE TABLE IF NOT EXISTS sys_ai_prompts_history (
+            id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            prompt_key VARCHAR(64) NOT NULL,
+            content TEXT NOT NULL,
+            saved_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            saved_by INT UNSIGNED NULL,
+            INDEX idx_key_time (prompt_key, saved_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
         $done = true;
     } catch (Throwable $e) {
         error_log('ensure_ai_prompts_schema failed: ' . $e->getMessage());
@@ -174,6 +183,36 @@ function save_ai_prompt(PDO $pdo, string $key, string $content, ?int $adminId = 
     if (!isset(AI_PROMPT_DEFAULTS[$key])) return false;
     ensure_ai_prompts_schema($pdo);
     try {
+        // 1) snapshot ค่าปัจจุบัน (ถ้ามี) เข้า history ก่อน — ให้ rollback ได้
+        $cur = $pdo->prepare("SELECT content, updated_by FROM sys_ai_prompts WHERE prompt_key = :k LIMIT 1");
+        $cur->execute([':k' => $key]);
+        $curRow = $cur->fetch(PDO::FETCH_ASSOC);
+        if ($curRow && trim((string)$curRow['content']) !== '' && (string)$curRow['content'] !== $content) {
+            $hist = $pdo->prepare("
+                INSERT INTO sys_ai_prompts_history (prompt_key, content, saved_by)
+                VALUES (:k, :c, :u)
+            ");
+            $hist->execute([
+                ':k' => $key,
+                ':c' => (string)$curRow['content'],
+                ':u' => $curRow['updated_by'] !== null ? (int)$curRow['updated_by'] : null,
+            ]);
+
+            // 2) auto-prune — เก็บล่าสุด 50 versions / key
+            $pdo->prepare("
+                DELETE FROM sys_ai_prompts_history
+                WHERE prompt_key = :k
+                  AND id NOT IN (
+                    SELECT id FROM (
+                      SELECT id FROM sys_ai_prompts_history
+                      WHERE prompt_key = :k2
+                      ORDER BY saved_at DESC LIMIT 50
+                    ) AS keep_set
+                  )
+            ")->execute([':k' => $key, ':k2' => $key]);
+        }
+
+        // 3) upsert ค่าใหม่
         $stmt = $pdo->prepare("
             INSERT INTO sys_ai_prompts (prompt_key, content, updated_by)
             VALUES (:k, :c, :u)
@@ -182,6 +221,60 @@ function save_ai_prompt(PDO $pdo, string $key, string $content, ?int $adminId = 
         return $stmt->execute([':k' => $key, ':c' => $content, ':u' => $adminId]);
     } catch (Throwable $e) {
         error_log("save_ai_prompt failed for {$key}: " . $e->getMessage());
+        return false;
+    }
+}
+
+/** ดู history versions ของ prompt key (สูงสุด 50 ล่าสุด) */
+function list_ai_prompt_history(PDO $pdo, string $key, int $limit = 50): array
+{
+    if (!isset(AI_PROMPT_DEFAULTS[$key])) return [];
+    ensure_ai_prompts_schema($pdo);
+    try {
+        $stmt = $pdo->prepare("
+            SELECT h.id, h.content, h.saved_at, h.saved_by, u.full_name AS saved_by_name
+              FROM sys_ai_prompts_history h
+              LEFT JOIN sys_users u ON u.id = h.saved_by
+             WHERE h.prompt_key = :k
+             ORDER BY h.saved_at DESC
+             LIMIT " . max(1, min(100, $limit))
+        );
+        $stmt->execute([':k' => $key]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    } catch (Throwable $e) {
+        // ลอง fallback ถ้า join sys_users fail (ไม่มี table หรือไม่มี column)
+        try {
+            $stmt = $pdo->prepare("
+                SELECT id, content, saved_at, saved_by
+                  FROM sys_ai_prompts_history
+                 WHERE prompt_key = :k
+                 ORDER BY saved_at DESC
+                 LIMIT " . max(1, min(100, $limit))
+            );
+            $stmt->execute([':k' => $key]);
+            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+            foreach ($rows as &$r) $r['saved_by_name'] = null;
+            return $rows;
+        } catch (Throwable $e2) {
+            error_log("list_ai_prompt_history failed for {$key}: " . $e2->getMessage());
+            return [];
+        }
+    }
+}
+
+/** rollback prompt ไป version ที่ระบุ — สร้าง history snapshot ของค่าปัจจุบันด้วย */
+function rollback_ai_prompt(PDO $pdo, int $historyId, ?int $adminId = null): bool
+{
+    ensure_ai_prompts_schema($pdo);
+    try {
+        $stmt = $pdo->prepare("SELECT prompt_key, content FROM sys_ai_prompts_history WHERE id = :id LIMIT 1");
+        $stmt->execute([':id' => $historyId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$row) return false;
+        // save_ai_prompt() snapshot current ลง history แล้วเขียนค่าใหม่
+        return save_ai_prompt($pdo, (string)$row['prompt_key'], (string)$row['content'], $adminId);
+    } catch (Throwable $e) {
+        error_log("rollback_ai_prompt failed for id={$historyId}: " . $e->getMessage());
         return false;
     }
 }

@@ -189,6 +189,9 @@ $_aip_prompts = list_ai_prompts($pdo);
                 <button type="button" class="ap-edit-btn px-3 py-1.5 bg-purple-600 text-white text-xs font-bold rounded-lg hover:bg-purple-700">
                     <i class="fa-solid fa-pen"></i> แก้ไข
                 </button>
+                <button type="button" class="ap-history-btn px-3 py-1.5 bg-white text-slate-700 text-xs font-bold rounded-lg border border-slate-300 hover:bg-slate-50">
+                    <i class="fa-solid fa-clock-rotate-left"></i> ประวัติ
+                </button>
                 <?php if ($p['is_custom']): ?>
                 <button type="button" class="ap-reset-btn px-3 py-1.5 bg-white text-gray-600 text-xs font-bold rounded-lg border border-gray-300 hover:bg-gray-50">
                     <i class="fa-solid fa-rotate-left"></i> รีเซ็ต
@@ -289,6 +292,27 @@ $_aip_prompts = list_ai_prompts($pdo);
                 <button id="ap-test-done" class="px-4 py-2 bg-white text-gray-700 text-sm font-bold rounded-lg border border-gray-300 hover:bg-gray-50">
                     ปิด
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- History modal (hidden by default) -->
+    <div id="ap-history-modal" class="fixed inset-0 bg-black/50 z-50 hidden items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[92vh] flex flex-col">
+            <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+                <div>
+                    <div class="text-xs font-bold text-slate-600 uppercase">📜 ประวัติการแก้</div>
+                    <h3 id="ap-history-title" class="text-lg font-black text-gray-900"></h3>
+                </div>
+                <button id="ap-history-close" class="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+            </div>
+            <div class="px-6 py-4 overflow-y-auto flex-1">
+                <div id="ap-history-empty" class="hidden text-center py-12 text-gray-400">
+                    <i class="fa-solid fa-clock-rotate-left text-4xl mb-3 block"></i>
+                    <div class="text-sm font-bold">ยังไม่มีประวัติ</div>
+                    <div class="text-xs mt-1">ประวัติจะเก็บอัตโนมัติเมื่อ admin save prompt ครั้งถัดไป (เก็บล่าสุด 50 versions)</div>
+                </div>
+                <div id="ap-history-list" class="space-y-2"></div>
             </div>
         </div>
     </div>
@@ -418,6 +442,126 @@ $_aip_prompts = list_ai_prompts($pdo);
     document.getElementById('ap-test-close').addEventListener('click', closeTest);
     document.getElementById('ap-test-done').addEventListener('click', closeTest);
     TEST_MODAL.addEventListener('click', (e) => { if (e.target === TEST_MODAL) closeTest(); });
+
+    // ── History ───────────────────────────────────────────────────────────
+    const HIST_MODAL = document.getElementById('ap-history-modal');
+    const HIST_TITLE = document.getElementById('ap-history-title');
+    const HIST_LIST  = document.getElementById('ap-history-list');
+    const HIST_EMPTY = document.getElementById('ap-history-empty');
+
+    function fmtTime(t) {
+        if (!t) return '';
+        try {
+            const d = new Date(t.replace(' ', 'T') + 'Z');
+            return d.toLocaleString('th-TH', { hour12: false });
+        } catch { return t; }
+    }
+
+    async function openHistory(key) {
+        const p = PROMPTS[key];
+        if (!p) return;
+        HIST_TITLE.textContent = p.label;
+        HIST_LIST.innerHTML = '<div class="text-center text-gray-400 py-8"><i class="fa-solid fa-spinner fa-spin"></i> กำลังโหลด...</div>';
+        HIST_EMPTY.classList.add('hidden');
+        HIST_MODAL.classList.remove('hidden');
+        HIST_MODAL.classList.add('flex');
+
+        try {
+            const r = await fetch('ajax_ai_prompts.php?action=history&key=' + encodeURIComponent(key));
+            const j = await r.json();
+            if (!j.ok) throw new Error(j.error || 'load failed');
+            renderHistory(j.history || []);
+        } catch (e) {
+            HIST_LIST.innerHTML = `<div class="text-center text-rose-600 py-8"><i class="fa-solid fa-circle-xmark"></i> โหลดไม่สำเร็จ: ${e.message}</div>`;
+        }
+    }
+
+    function renderHistory(items) {
+        HIST_LIST.innerHTML = '';
+        if (!items.length) {
+            HIST_EMPTY.classList.remove('hidden');
+            return;
+        }
+        HIST_EMPTY.classList.add('hidden');
+        items.forEach(item => {
+            const len = (item.content || '').length;
+            const who = item.saved_by_name || (item.saved_by ? `admin#${item.saved_by}` : '—');
+            const div = document.createElement('div');
+            div.className = 'border border-slate-200 rounded-lg overflow-hidden';
+            div.innerHTML = `
+                <div class="flex items-center justify-between px-4 py-3 bg-slate-50">
+                    <div>
+                        <div class="text-xs font-bold text-slate-700">${fmtTime(item.saved_at)}</div>
+                        <div class="text-[10px] text-slate-500 mt-0.5">โดย ${who} · ${len} chars</div>
+                    </div>
+                    <div class="flex gap-2">
+                        <button type="button" class="ap-hist-view px-3 py-1.5 bg-white text-slate-700 text-[11px] font-bold rounded border border-slate-300 hover:bg-slate-100">
+                            <i class="fa-solid fa-eye"></i> ดู
+                        </button>
+                        <button type="button" class="ap-hist-rollback px-3 py-1.5 bg-amber-600 text-white text-[11px] font-bold rounded hover:bg-amber-700" data-id="${item.id}">
+                            <i class="fa-solid fa-rotate-left"></i> Rollback
+                        </button>
+                    </div>
+                </div>
+                <pre class="ap-textarea hidden" style="margin:10px 14px 14px;border-color:#e2e8f0;max-height:280px"></pre>
+            `;
+            const pre = div.querySelector('pre');
+            pre.textContent = item.content || '';
+
+            div.querySelector('.ap-hist-view').addEventListener('click', () => {
+                pre.classList.toggle('hidden');
+            });
+            div.querySelector('.ap-hist-rollback').addEventListener('click', async (ev) => {
+                const id = ev.currentTarget.dataset.id;
+                const { isConfirmed } = await Swal.fire({
+                    icon: 'warning',
+                    title: 'Rollback ไป version นี้?',
+                    text: 'ค่าปัจจุบันจะถูกบันทึกลง history ก่อน — สามารถ rollback กลับได้อีก',
+                    showCancelButton: true,
+                    confirmButtonText: 'Rollback',
+                    cancelButtonText: 'ยกเลิก',
+                    confirmButtonColor: '#d97706',
+                });
+                if (!isConfirmed) return;
+                const fd = new FormData();
+                fd.append('action', 'rollback');
+                fd.append('history_id', id);
+                fd.append('csrf_token', CSRF);
+                try {
+                    const r = await fetch('ajax_ai_prompts.php', { method: 'POST', body: fd });
+                    const j = await r.json();
+                    if (j.ok) {
+                        Swal.fire({ icon: 'success', title: 'Rollback แล้ว', timer: 1200, showConfirmButton: false })
+                            .then(() => location.reload());
+                    } else {
+                        Swal.fire({ icon: 'error', title: 'ไม่สำเร็จ', text: j.error || j.message || '' });
+                    }
+                } catch (e) {
+                    Swal.fire({ icon: 'error', title: 'เครือข่ายผิดพลาด', text: e.message });
+                }
+            });
+
+            HIST_LIST.appendChild(div);
+        });
+    }
+
+    document.querySelectorAll('.ap-history-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const key = btn.closest('[data-key]').dataset.key;
+            openHistory(key);
+        });
+    });
+
+    document.getElementById('ap-history-close').addEventListener('click', () => {
+        HIST_MODAL.classList.add('hidden');
+        HIST_MODAL.classList.remove('flex');
+    });
+    HIST_MODAL.addEventListener('click', (e) => {
+        if (e.target === HIST_MODAL) {
+            HIST_MODAL.classList.add('hidden');
+            HIST_MODAL.classList.remove('flex');
+        }
+    });
 
     document.getElementById('ap-test-run').addEventListener('click', async () => {
         if (!testKey) return;
