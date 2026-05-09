@@ -273,36 +273,12 @@ function ai_qa_generate_answer(string $question, ?PDO $pdo = null): array
     $categoriesList = implode(' | ', AI_QA_CATEGORIES);
     $clinicContext  = $pdo ? ai_qa_build_clinic_context($pdo) : '(ไม่ได้ส่ง PDO เข้ามา — ไม่มี clinic context)';
 
-    $systemPrompt = <<<PROMPT
-คุณคือผู้ช่วยตอบคำถามของห้องพยาบาลคลินิก RSU Medical
-หน้าที่: รับคำถามจากผู้ใช้ → จัดหมวดหมู่ + ร่างคำตอบเบื้องต้น โดย**ใช้ข้อมูลจริงของคลินิก**ที่ให้ไว้ด้านล่าง
-
-กฎสำคัญ:
-1. **ตอบเป็นภาษาเดียวกับที่ผู้ใช้ถาม** — ถ้า user ถามภาษาอังกฤษ ตอบภาษาอังกฤษ, ถามภาษาไทย ตอบภาษาไทย, ถามผสม → ใช้ภาษาที่เป็นภาษาหลักของคำถาม
-2. ใช้ข้อมูลจาก "ข้อมูลคลินิก" ด้านล่างเป็นแหล่งข้อมูลหลัก — เวลาเปิด-ปิด, สถานะ, ชื่อหมอ, ตารางออกตรวจ, FAQ
-3. ถ้าคำถามตรง/ใกล้เคียงกับ FAQ — ให้ตอบโดยอิงคำตอบใน FAQ (ปรับสำนวนให้ลื่น และแปลเป็นภาษาของผู้ถามถ้าจำเป็น)
-4. ถ้าข้อมูลที่จำเป็นไม่อยู่ใน context — ใช้ placeholder ในภาษาที่เหมาะสม: ไทย "(ขอข้อมูลจากเจ้าหน้าที่)" / English "(please contact staff)"
-5. ห้ามแต่งตัวเลข/วันที่/ชื่อหมอเอง — ถ้าไม่มีใน context ให้ใส่ placeholder เท่านั้น
-6. คำตอบนี้จะถูก admin ตรวจสอบก่อนส่งให้ user จริง — ดังนั้นเขียนสุภาพ กระชับ ตรงประเด็น
-7. confidence: สูง (0.8+) ถ้าตอบจากข้อมูลที่ชัดใน context, ต่ำ (0.3-) ถ้าต้องใช้ placeholder หลายจุด
-
-{$clinicContext}
-
-═══════════════════
-
-หมวดหมู่ที่อนุญาต (เลือก 1 หมวดเท่านั้น): {$categoriesList}
-หมายเหตุ: category ใช้ภาษาไทยตาม list เสมอ — แม้คำตอบจะเป็นภาษาอังกฤษ
-
-ตอบกลับเป็น JSON ตาม schema นี้เท่านั้น:
-{
-  "category": "ชื่อหมวดจาก list ด้านบน (ภาษาไทย)",
-  "answer": "คำตอบในภาษาเดียวกับคำถาม สุภาพ กระชับ 2-4 ประโยค (อิงจาก context จริง)",
-  "confidence": 0.0 ถึง 1.0
-}
-
-คำถามจากผู้ใช้:
-{$question}
-PROMPT;
+    require_once __DIR__ . '/ai_prompts_helper.php';
+    $systemPrompt = get_ai_prompt('generator', [
+        'question'        => $question,
+        'clinic_context'  => $clinicContext,
+        'categories_list' => $categoriesList,
+    ]);
 
     $body = json_encode([
         'contents' => [[
@@ -808,23 +784,11 @@ function ai_qa_match_via_gemini(PDO $pdo, string $question): ?array
         $list .= "[{$i}] {$shortQ}\n";
     }
 
-    $prompt = <<<PROMPT
-คุณกำลังจับคู่คำถามจาก user กับคำถามที่ห้องพยาบาลคลินิก RSU Medical มีคำตอบไว้แล้ว
-
-คำถามจาก user:
-{$question}
-
-รายการคำถามที่มีคำตอบ:
-{$list}
-
-ตอบเป็น JSON ตาม schema นี้เท่านั้น:
-{"match_index": <-1 หรือเลขในรายการ>, "confidence": <0.0-1.0>}
-
-กฎ:
-- ตอบ -1 ถ้าไม่มีคำถามไหนใกล้เคียงพอ (ความมั่นใจต่ำกว่า 0.7)
-- ตอบเลข index ถ้าเจอคำถามที่ความหมายเดียวกัน — แม้พิมพ์ต่าง สะกดผิด ภาษาต่าง
-- คำถามต่างหัวข้อกัน → -1
-PROMPT;
+    require_once __DIR__ . '/ai_prompts_helper.php';
+    $prompt = get_ai_prompt('matcher', [
+        'question'        => $question,
+        'candidates_list' => $list,
+    ]);
 
     $body = json_encode([
         'contents' => [['role' => 'user', 'parts' => [['text' => $prompt]]]],

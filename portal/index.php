@@ -945,6 +945,10 @@ try {
                     <div class="psb-icon"><i class="fa-solid fa-flask-vial" style="color:#a855f7"></i></div>
                     <span class="psb-label" style="color:#7c3aed;font-weight:900">AI QA Lab</span>
                 </button>
+                <button class="psb-item <?= $activeSection==='ai_prompts'?'psb-active':'' ?>" data-section="ai_prompts" onclick="switchSection('ai_prompts',this)">
+                    <div class="psb-icon"><i class="fa-solid fa-code" style="color:#a855f7"></i></div>
+                    <span class="psb-label" style="color:#7c3aed;font-weight:900">AI Prompts</span>
+                </button>
             <?php endif; ?>
 
             <?php /* ── สิทธิ์ & ความปลอดภัย ──────────────────────────────── */ ?>
@@ -2549,6 +2553,11 @@ try {
             </div>
 
             <!-- ════════════ SECTION: AI QA LAB ════════════ -->
+            <div id="section-ai_prompts" class="portal-section"
+                style="<?= $activeSection==='ai_prompts'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); background:#f8fafc; overflow-y:auto;">
+                <?php include __DIR__ . '/_partials/ai_prompts.php'; ?>
+            </div>
+
             <div id="section-ai_qa_lab" class="portal-section"
                 style="<?= $activeSection==='ai_qa_lab'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); background:#f8fafc; overflow-y:auto;">
                 <?php include __DIR__ . '/_partials/ai_qa_lab.php'; ?>
