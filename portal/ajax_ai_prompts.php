@@ -63,6 +63,30 @@ try {
             return;
         }
 
+        case 'history': {
+            $key = trim((string)($_GET['key'] ?? $_POST['key'] ?? ''));
+            if ($key === '') throw new RuntimeException('Missing key');
+            echo json_encode([
+                'ok'      => true,
+                'history' => list_ai_prompt_history($pdo, $key, 50),
+            ], JSON_UNESCAPED_UNICODE);
+            return;
+        }
+
+        case 'rollback': {
+            if (!isset($_POST['csrf_token']) || !verify_csrf_token($_POST['csrf_token'])) {
+                throw new RuntimeException('Invalid CSRF token');
+            }
+            $historyId = (int)($_POST['history_id'] ?? 0);
+            if ($historyId <= 0) throw new RuntimeException('Missing history_id');
+            $ok = rollback_ai_prompt($pdo, $historyId, $adminId);
+            echo json_encode([
+                'ok'      => $ok,
+                'message' => $ok ? 'Rollback สำเร็จ' : 'Rollback ไม่สำเร็จ',
+            ], JSON_UNESCAPED_UNICODE);
+            return;
+        }
+
         case 'test': {
             if (!isset($_POST['csrf_token']) || !verify_csrf_token($_POST['csrf_token'])) {
                 throw new RuntimeException('Invalid CSRF token');
