@@ -332,6 +332,19 @@ $portalCsrf = get_csrf_token();
                 <select id="shift-student" class="sch-input"></select>
             </div>
             <div>
+                <label class="sch-label">ประเภทเวลา</label>
+                <div class="grid grid-cols-2 gap-2">
+                    <label class="cursor-pointer rounded-xl border-2 border-emerald-200 bg-emerald-50 p-2.5 text-center text-sm font-black text-emerald-700" id="shift-ct-hours-lbl">
+                        <input type="radio" name="shift-ct" value="hours" checked class="hidden">
+                        <i class="fa-solid fa-graduation-cap mr-1"></i>ส่งชั่วโมงทุน
+                    </label>
+                    <label class="cursor-pointer rounded-xl border-2 border-amber-200 bg-amber-50 p-2.5 text-center text-sm font-black text-amber-700" id="shift-ct-paid-lbl">
+                        <input type="radio" name="shift-ct" value="paid" class="hidden">
+                        <i class="fa-solid fa-coins mr-1"></i>ค่าตอบแทน
+                    </label>
+                </div>
+            </div>
+            <div>
                 <label class="sch-label">วันที่</label>
                 <input type="date" id="shift-date" class="sch-input">
             </div>
@@ -408,13 +421,16 @@ $portalCsrf = get_csrf_token();
             return;
         }
         let html = '<table class="sch-table"><thead><tr>'
-            + '<th>นักศึกษา</th><th>ประเภท</th><th>เวลา</th><th>ระยะ GPS</th><th>กะ</th><th class="text-right">การจัดการ</th>'
+            + '<th>นักศึกษา</th><th>ประเภท</th><th>หมวด</th><th>เวลา</th><th>ระยะ GPS</th><th>กะ</th><th class="text-right">การจัดการ</th>'
             + '</tr></thead><tbody>';
         for (const r of j.rows) {
             const isIn = r.action === 'clock_in';
             const distHtml = r.distance_m === null
                 ? '<span class="text-slate-400">-</span>'
                 : `${Math.round(r.distance_m)} ม.${!r.within_radius ? ' <span class="text-amber-600 font-black">⚠</span>' : ''}`;
+            const ct = (r.comp_type || 'hours') === 'paid'
+                ? '<span class="sch-status-badge bg-amber-50 text-amber-700"><i class="fa-solid fa-coins mr-1"></i>ค่าตอบแทน</span>'
+                : '<span class="sch-status-badge bg-emerald-50 text-emerald-700"><i class="fa-solid fa-graduation-cap mr-1"></i>ทุน</span>';
             html += `<tr>
                 <td>
                     <p class="font-black text-slate-900">${escHtml(r.student_name)}</p>
@@ -425,6 +441,7 @@ $portalCsrf = get_csrf_token();
                         ${isIn ? 'เข้างาน' : 'ออกงาน'}
                     </span>
                 </td>
+                <td>${ct}</td>
                 <td class="font-mono text-xs">${escHtml(r.event_at)}</td>
                 <td class="text-xs">${distHtml}</td>
                 <td class="text-xs text-slate-500">${r.shift_label || '-'}</td>
@@ -622,7 +639,7 @@ $portalCsrf = get_csrf_token();
             return;
         }
         let html = '<table class="sch-table"><thead><tr>'
-            + '<th>วันที่</th><th>นักศึกษา</th><th>เวลา</th><th>ชั่วโมง</th><th>สถานะ</th><th class="text-right">จัดการ</th>'
+            + '<th>วันที่</th><th>นักศึกษา</th><th>เวลา</th><th>ชั่วโมง</th><th>ประเภท</th><th>สถานะ</th><th class="text-right">จัดการ</th>'
             + '</tr></thead><tbody>';
         for (const r of j.rows) {
             const stat = ({
@@ -630,11 +647,15 @@ $portalCsrf = get_csrf_token();
                 completed: '<span class="sch-status-badge bg-emerald-50 text-emerald-700">เสร็จสิ้น</span>',
                 cancelled: '<span class="sch-status-badge bg-slate-100 text-slate-500">ยกเลิก</span>',
             })[r.status] || r.status;
+            const ct = (r.comp_type || 'hours') === 'paid'
+                ? '<span class="sch-status-badge bg-amber-50 text-amber-700"><i class="fa-solid fa-coins mr-1"></i>ค่าตอบแทน</span>'
+                : '<span class="sch-status-badge bg-emerald-50 text-emerald-700"><i class="fa-solid fa-graduation-cap mr-1"></i>ทุน</span>';
             html += `<tr>
                 <td class="font-bold">${escHtml(r.shift_date)}</td>
                 <td>${escHtml(r.student_name)}</td>
                 <td class="font-mono text-xs">${escHtml(r.start_time.substr(0,5))} – ${escHtml(r.end_time.substr(0,5))}</td>
                 <td class="text-xs">${parseFloat(r.planned_hours).toFixed(1)}</td>
+                <td>${ct}</td>
                 <td>${stat}</td>
                 <td class="text-right">
                     <button class="sch-btn sch-btn--xs sch-btn--ghost" onclick='editShift(${JSON.stringify(r).replaceAll("'","&#39;")})'><i class="fa-solid fa-pen"></i></button>
@@ -647,9 +668,27 @@ $portalCsrf = get_csrf_token();
     }
     window.loadShifts = loadShifts;
 
+    function syncShiftCtRadio() {
+        const v = document.querySelector('input[name="shift-ct"]:checked').value;
+        document.getElementById('shift-ct-hours-lbl').style.boxShadow = v === 'hours' ? '0 0 0 4px rgba(16,185,129,.25)' : '';
+        document.getElementById('shift-ct-paid-lbl').style.boxShadow = v === 'paid' ? '0 0 0 4px rgba(245,158,11,.25)' : '';
+    }
+    document.getElementById('shift-ct-hours-lbl').addEventListener('click', () => {
+        document.querySelector('input[name="shift-ct"][value="hours"]').checked = true; syncShiftCtRadio();
+    });
+    document.getElementById('shift-ct-paid-lbl').addEventListener('click', () => {
+        document.querySelector('input[name="shift-ct"][value="paid"]').checked = true; syncShiftCtRadio();
+    });
+
+    function setShiftCt(val) {
+        document.querySelector(`input[name="shift-ct"][value="${val || 'hours'}"]`).checked = true;
+        syncShiftCtRadio();
+    }
+
     window.openShiftModal = function() {
         document.getElementById('shift-modal-title').textContent = 'เพิ่มกะ';
         ['shift-id','shift-date','shift-start','shift-end','shift-notes'].forEach(id => document.getElementById(id).value = '');
+        setShiftCt('hours');
         const sel = document.getElementById('shift-student');
         sel.innerHTML = studentsCache.filter(s => s.status === 'active')
             .map(s => `<option value="${s.id}">${escHtml(s.full_name)}</option>`).join('');
@@ -666,6 +705,7 @@ $portalCsrf = get_csrf_token();
         document.getElementById('shift-start').value = r.start_time.substr(0,5);
         document.getElementById('shift-end').value = r.end_time.substr(0,5);
         document.getElementById('shift-notes').value = r.notes || '';
+        setShiftCt(r.comp_type || 'hours');
         document.getElementById('shift-delete-btn').style.display = 'inline-flex';
         showModal('shift-modal');
     };
@@ -679,6 +719,7 @@ $portalCsrf = get_csrf_token();
             start_time: document.getElementById('shift-start').value,
             end_time: document.getElementById('shift-end').value,
             notes: document.getElementById('shift-notes').value,
+            comp_type: document.querySelector('input[name="shift-ct"]:checked').value,
         };
         if (!data.student_id || !data.shift_date || !data.start_time || !data.end_time) {
             Swal.fire('กรอกข้อมูลให้ครบ', '', 'warning'); return;
@@ -708,23 +749,36 @@ $portalCsrf = get_csrf_token();
             wrap.innerHTML = '<p class="text-center text-slate-400 py-10">ไม่มีข้อมูลในช่วงที่เลือก</p>';
             return;
         }
-        let totalHours = 0;
+        let totalScholar = 0, totalPaid = 0;
         let html = '<table class="sch-table"><thead><tr>'
-            + '<th>นักศึกษา</th><th>คณะ</th><th>เข้างาน (ครั้ง)</th><th>ชั่วโมงรวม</th><th>เป้า</th><th>%</th>'
+            + '<th>นักศึกษา</th><th>คณะ</th><th>เข้างาน</th>'
+            + '<th><i class="fa-solid fa-graduation-cap text-emerald-500 mr-1"></i>ชม.ทุน</th>'
+            + '<th><i class="fa-solid fa-coins text-amber-500 mr-1"></i>ชม.ค่าตอบแทน</th>'
+            + '<th>รวม</th><th>เป้า (ทุน)</th><th>%</th>'
             + '</tr></thead><tbody>';
         for (const r of j.rows) {
-            totalHours += parseFloat(r.hours);
-            const pct = r.max_hours > 0 ? Math.round((r.hours / r.max_hours) * 100) : null;
+            totalScholar += parseFloat(r.hours_scholarship);
+            totalPaid += parseFloat(r.hours_paid);
+            const pct = r.max_hours > 0 ? Math.round((r.hours_scholarship / r.max_hours) * 100) : null;
             html += `<tr>
                 <td><p class="font-black">${escHtml(r.full_name)}</p><p class="text-xs text-slate-500">${escHtml(r.student_code || '-')}</p></td>
                 <td class="text-xs">${escHtml(r.faculty || '-')}</td>
                 <td>${r.checkins}</td>
-                <td class="font-bold">${parseFloat(r.hours).toFixed(2)}</td>
+                <td class="font-bold text-emerald-700">${parseFloat(r.hours_scholarship).toFixed(2)}</td>
+                <td class="font-bold text-amber-700">${parseFloat(r.hours_paid).toFixed(2)}</td>
+                <td class="font-black">${parseFloat(r.hours).toFixed(2)}</td>
                 <td class="text-xs">${r.max_hours > 0 ? r.max_hours : '-'}</td>
                 <td>${pct === null ? '-' : `<span class="font-bold ${pct >= 100 ? 'text-emerald-600' : pct >= 50 ? 'text-amber-600' : 'text-slate-500'}">${pct}%</span>`}</td>
             </tr>`;
         }
-        html += `</tbody><tfoot><tr style="border-top:2px solid #e2e8f0"><td colspan="3" class="text-right font-black p-3">รวม</td><td colspan="3" class="font-black p-3">${totalHours.toFixed(2)} ชม.</td></tr></tfoot></table>`;
+        const totalAll = totalScholar + totalPaid;
+        html += `</tbody><tfoot><tr style="border-top:2px solid #e2e8f0">
+            <td colspan="3" class="text-right font-black p-3">รวมทั้งหมด</td>
+            <td class="font-black p-3 text-emerald-700">${totalScholar.toFixed(2)}</td>
+            <td class="font-black p-3 text-amber-700">${totalPaid.toFixed(2)}</td>
+            <td class="font-black p-3">${totalAll.toFixed(2)} ชม.</td>
+            <td colspan="2"></td>
+        </tr></tfoot></table>`;
         wrap.innerHTML = html;
     }
     window.loadReports = loadReports;

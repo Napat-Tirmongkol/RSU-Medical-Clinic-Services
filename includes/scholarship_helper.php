@@ -43,6 +43,7 @@ function ensure_scholarship_schema(PDO $pdo): void
             start_time TIME NOT NULL,
             end_time TIME NOT NULL,
             planned_hours DECIMAL(5,2) NOT NULL DEFAULT 0,
+            comp_type ENUM('hours','paid') NOT NULL DEFAULT 'hours',
             status ENUM('scheduled','completed','cancelled') NOT NULL DEFAULT 'scheduled',
             created_by INT UNSIGNED NULL,
             notes VARCHAR(255) NOT NULL DEFAULT '',
@@ -52,12 +53,14 @@ function ensure_scholarship_schema(PDO $pdo): void
             KEY idx_date (shift_date),
             KEY idx_status (status)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        try { $pdo->exec("ALTER TABLE sys_scholarship_shifts ADD COLUMN IF NOT EXISTS comp_type ENUM('hours','paid') NOT NULL DEFAULT 'hours' AFTER planned_hours"); } catch (PDOException) {}
 
         $pdo->exec("CREATE TABLE IF NOT EXISTS sys_scholarship_clock_logs (
             id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
             student_id INT UNSIGNED NOT NULL,
             shift_id INT UNSIGNED NULL,
             action ENUM('clock_in','clock_out') NOT NULL,
+            comp_type ENUM('hours','paid') NOT NULL DEFAULT 'hours',
             event_at DATETIME NOT NULL,
             gps_lat DECIMAL(10,7) NULL,
             gps_lng DECIMAL(10,7) NULL,
@@ -77,6 +80,7 @@ function ensure_scholarship_schema(PDO $pdo): void
             KEY idx_status (status),
             KEY idx_event_at (event_at)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        try { $pdo->exec("ALTER TABLE sys_scholarship_clock_logs ADD COLUMN IF NOT EXISTS comp_type ENUM('hours','paid') NOT NULL DEFAULT 'hours' AFTER action"); } catch (PDOException) {}
 
         $pdo->exec("CREATE TABLE IF NOT EXISTS sys_scholarship_settings (
             id TINYINT UNSIGNED NOT NULL DEFAULT 1,
@@ -201,11 +205,12 @@ function get_latest_scholarship_log(PDO $pdo, int $studentId): ?array
 /**
  * รวมชั่วโมง approved ของนักศึกษาในช่วง date range
  * คู่ของ clock_in/clock_out ที่ approved ทั้งคู่จะถูกนับ
+ * @param string|null $compType 'hours' | 'paid' | null (=ทุกประเภท)
  */
-function sum_scholarship_hours(PDO $pdo, int $studentId, ?string $fromDate = null, ?string $toDate = null): float
+function sum_scholarship_hours(PDO $pdo, int $studentId, ?string $fromDate = null, ?string $toDate = null, ?string $compType = null): float
 {
     ensure_scholarship_schema($pdo);
-    $sql = "SELECT action, event_at FROM sys_scholarship_clock_logs
+    $sql = "SELECT action, comp_type, event_at FROM sys_scholarship_clock_logs
         WHERE student_id = :sid AND status = 'approved'";
     $params = [':sid' => $studentId];
     if ($fromDate) { $sql .= " AND event_at >= :from"; $params[':from'] = $fromDate . ' 00:00:00'; }
@@ -218,15 +223,31 @@ function sum_scholarship_hours(PDO $pdo, int $studentId, ?string $fromDate = nul
 
     $totalSec = 0;
     $openIn = null;
+    $openType = null;
     foreach ($rows as $r) {
         if ($r['action'] === 'clock_in') {
             $openIn = strtotime($r['event_at']);
+            $openType = $r['comp_type'] ?? 'hours';
         } elseif ($r['action'] === 'clock_out' && $openIn !== null) {
-            $totalSec += max(0, strtotime($r['event_at']) - $openIn);
+            if ($compType === null || $compType === $openType) {
+                $totalSec += max(0, strtotime($r['event_at']) - $openIn);
+            }
             $openIn = null;
+            $openType = null;
         }
     }
     return round($totalSec / 3600, 2);
+}
+
+/**
+ * แยกชั่วโมงตามประเภท → ['hours' => X, 'paid' => Y]
+ */
+function sum_scholarship_hours_split(PDO $pdo, int $studentId, ?string $fromDate = null, ?string $toDate = null): array
+{
+    return [
+        'hours' => sum_scholarship_hours($pdo, $studentId, $fromDate, $toDate, 'hours'),
+        'paid'  => sum_scholarship_hours($pdo, $studentId, $fromDate, $toDate, 'paid'),
+    ];
 }
 
 /**

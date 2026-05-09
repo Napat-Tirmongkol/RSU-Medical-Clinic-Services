@@ -60,12 +60,13 @@ if ($lastLog && $lastLog['action'] === 'clock_in' && $lastLog['status'] !== 'rej
     $nextAction = 'clock_out';
 }
 
-// ชั่วโมงสะสมเดือนนี้
+// ชั่วโมงสะสมเดือนนี้ + รวมทั้งหมด (แยกประเภท: ทุน vs ค่าตอบแทน)
 $monthFrom = date('Y-m-01', $now);
 $monthTo = date('Y-m-t', $now);
-$hoursMonth = $student ? sum_scholarship_hours($pdo, (int)$student['id'], $monthFrom, $monthTo) : 0;
-// ชั่วโมงสะสมรวมทั้งหมด (นับ semester ปัจจุบันถ้ามี → ตอนนี้ใช้รวม)
-$hoursTotal = $student ? sum_scholarship_hours($pdo, (int)$student['id']) : 0;
+$splitMonth = $student ? sum_scholarship_hours_split($pdo, (int)$student['id'], $monthFrom, $monthTo) : ['hours' => 0, 'paid' => 0];
+$splitTotal = $student ? sum_scholarship_hours_split($pdo, (int)$student['id']) : ['hours' => 0, 'paid' => 0];
+$hoursMonth = $splitMonth['hours'] + $splitMonth['paid'];
+$hoursTotal = $splitTotal['hours'] + $splitTotal['paid'];
 
 // log 10 รายการล่าสุด
 $recentLogs = [];
@@ -282,23 +283,29 @@ $displayName = trim((string)($user['full_name'] ?? ''))
             </p>
         </div>
 
-        <!-- ─── Hours Stats ─── -->
-        <div class="grid grid-cols-2 gap-3">
-            <div class="stat-card p-4">
-                <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">เดือนนี้</p>
-                <p class="text-2xl font-black text-slate-900 mt-1"><?= number_format($hoursMonth, 1) ?></p>
-                <p class="text-xs text-slate-500">ชั่วโมง</p>
+        <!-- ─── Hours Stats (แยก ทุน / ค่าตอบแทน) ─── -->
+        <div class="space-y-3">
+            <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 px-1">สรุปชั่วโมงเดือนนี้</p>
+            <div class="grid grid-cols-2 gap-3">
+                <div class="stat-card p-4 border-l-4 border-l-emerald-400">
+                    <p class="text-[10px] font-black uppercase tracking-widest text-emerald-600"><i class="fa-solid fa-graduation-cap mr-1"></i>ส่งชั่วโมงทุน</p>
+                    <p class="text-2xl font-black text-slate-900 mt-1"><?= number_format($splitMonth['hours'], 1) ?></p>
+                    <p class="text-xs text-slate-500">ชั่วโมง</p>
+                </div>
+                <div class="stat-card p-4 border-l-4 border-l-amber-400">
+                    <p class="text-[10px] font-black uppercase tracking-widest text-amber-600"><i class="fa-solid fa-coins mr-1"></i>ค่าตอบแทน</p>
+                    <p class="text-2xl font-black text-slate-900 mt-1"><?= number_format($splitMonth['paid'], 1) ?></p>
+                    <p class="text-xs text-slate-500">ชั่วโมง</p>
+                </div>
             </div>
-            <div class="stat-card p-4">
-                <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">รวมทั้งหมด</p>
-                <p class="text-2xl font-black text-slate-900 mt-1"><?= number_format($hoursTotal, 1) ?></p>
-                <p class="text-xs text-slate-500">
-                    <?php if ((int)$student['max_hours'] > 0): ?>
-                        / <?= (int)$student['max_hours'] ?> ชม.
-                    <?php else: ?>
-                        ชั่วโมง
-                    <?php endif; ?>
-                </p>
+            <div class="bg-white rounded-2xl px-4 py-3 flex items-center justify-between border border-slate-100">
+                <span class="text-xs font-black text-slate-500 uppercase tracking-widest">รวมทั้งหมด (สะสม)</span>
+                <span class="text-base font-black text-slate-900">
+                    <?= number_format($splitTotal['hours'], 1) ?>
+                    <span class="text-xs text-slate-400">+</span>
+                    <?= number_format($splitTotal['paid'], 1) ?>
+                    <span class="text-xs text-slate-400">= <?= number_format($hoursTotal, 1) ?> ชม.</span>
+                </span>
             </div>
         </div>
 
@@ -325,7 +332,12 @@ $displayName = trim((string)($user['full_name'] ?? ''))
                 </button>
             </div>
             <div class="space-y-2">
-                <?php foreach ($upcomingShifts as $sh): ?>
+                <?php foreach ($upcomingShifts as $sh):
+                    $shCt = $sh['comp_type'] ?? 'hours';
+                    $ctBadge = $shCt === 'paid'
+                        ? ['bg-amber-50', 'text-amber-700', 'fa-coins', 'ค่าตอบแทน']
+                        : ['bg-emerald-50', 'text-emerald-700', 'fa-graduation-cap', 'ทุน'];
+                ?>
                 <div class="flex items-center gap-3 p-2.5 rounded-xl bg-slate-50">
                     <div class="w-10 h-10 rounded-xl bg-white text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-100">
                         <i class="fa-solid fa-calendar-check"></i>
@@ -336,6 +348,9 @@ $displayName = trim((string)($user['full_name'] ?? ''))
                             <?= vh(substr((string)$sh['start_time'], 0, 5)) ?> – <?= vh(substr((string)$sh['end_time'], 0, 5)) ?>
                             <?php if ((float)$sh['planned_hours'] > 0): ?>· <?= number_format((float)$sh['planned_hours'], 1) ?> ชม.<?php endif; ?>
                         </p>
+                        <span class="inline-flex items-center gap-1 mt-1 px-1.5 py-0.5 text-[10px] font-black rounded-full <?= $ctBadge[0] ?> <?= $ctBadge[1] ?>">
+                            <i class="fa-solid <?= $ctBadge[2] ?> text-[8px]"></i><?= $ctBadge[3] ?>
+                        </span>
                     </div>
                     <button onclick="deleteShift(<?= (int)$sh['id'] ?>)" class="w-8 h-8 rounded-lg bg-white text-rose-500 hover:bg-rose-50 flex items-center justify-center transition" title="ลบ">
                         <i class="fa-solid fa-trash text-xs"></i>
@@ -361,13 +376,18 @@ $displayName = trim((string)($user['full_name'] ?? ''))
                         'approved' => ['emerald-50', 'emerald-600', 'อนุมัติแล้ว'],
                         'rejected' => ['slate-100', 'slate-500', 'ไม่อนุมัติ'],
                     ][$log['status']] ?? ['slate-50', 'slate-500', $log['status']];
+                    $logCt = $log['comp_type'] ?? 'hours';
+                    $ctIcon = $logCt === 'paid' ? 'fa-coins text-amber-500' : 'fa-graduation-cap text-emerald-500';
                 ?>
                 <div class="flex items-center gap-3 p-2.5 rounded-xl hover:bg-slate-50 transition">
                     <div class="w-9 h-9 rounded-xl <?= $isIn ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600' ?> flex items-center justify-center shrink-0">
                         <i class="fa-solid <?= $isIn ? 'fa-right-to-bracket' : 'fa-right-from-bracket' ?>"></i>
                     </div>
                     <div class="flex-1 min-w-0">
-                        <p class="text-sm font-bold text-slate-900"><?= $isIn ? 'เข้างาน' : 'ออกงาน' ?></p>
+                        <p class="text-sm font-bold text-slate-900">
+                            <?= $isIn ? 'เข้างาน' : 'ออกงาน' ?>
+                            <i class="fa-solid <?= $ctIcon ?> text-[10px] ml-1" title="<?= $logCt === 'paid' ? 'ค่าตอบแทน' : 'ทุน' ?>"></i>
+                        </p>
                         <p class="text-xs text-slate-500"><?= vh(date('d/m/Y H:i', strtotime($log['event_at']))) ?></p>
                     </div>
                     <span class="px-2 py-0.5 text-[10px] font-black rounded-full bg-<?= $statusBadge[0] ?> text-<?= $statusBadge[1] ?>">
@@ -391,6 +411,8 @@ include __DIR__ . '/../includes/user_bottom_nav.php';
 <script>
 const CSRF_TOKEN = <?= json_encode($csrfToken, JSON_UNESCAPED_SLASHES) ?>;
 const GPS_REQUIRED = <?= !empty($settings['gps_required']) ? 'true' : 'false' ?>;
+// ถ้าอยู่ในกะ → comp_type มาจากกะ ไม่ต้องถาม / ถ้าไม่อยู่ในกะ (ad-hoc) → ถามก่อน clock-in
+const ACTIVE_SHIFT_COMP_TYPE = <?= json_encode($activeShift['comp_type'] ?? null, JSON_UNESCAPED_SLASHES) ?>;
 
 // Live clock
 function updateClock() {
@@ -408,6 +430,51 @@ if (btn && !btn.disabled) {
     btn.addEventListener('click', async () => {
         const action = btn.dataset.action;
         const labelMap = { clock_in: 'เข้างาน', clock_out: 'ออกงาน' };
+
+        // ถ้า clock_in + ad-hoc (ไม่อยู่ในกะ) → ถาม comp_type ก่อน
+        let pickedCompType = null;
+        if (action === 'clock_in' && !ACTIVE_SHIFT_COMP_TYPE) {
+            const r = await Swal.fire({
+                title: 'ประเภทเวลาทำงาน',
+                html: `
+                    <p style="font-size:.85rem;color:#64748b;margin-bottom:1rem">เลือกว่างานครั้งนี้นับเป็นอะไร</p>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem">
+                        <label style="cursor:pointer;border:2px solid #d1fae5;background:#ecfdf5;border-radius:1rem;padding:1rem;text-align:center;font-weight:800;color:#065f46" id="ct-hours-lbl">
+                            <input type="radio" name="ct" value="hours" checked style="display:none">
+                            <i class="fa-solid fa-graduation-cap" style="display:block;font-size:1.25rem;margin-bottom:.25rem"></i>
+                            ส่งชั่วโมงทุน
+                        </label>
+                        <label style="cursor:pointer;border:2px solid #fef3c7;background:#fffbeb;border-radius:1rem;padding:1rem;text-align:center;font-weight:800;color:#92400e" id="ct-paid-lbl">
+                            <input type="radio" name="ct" value="paid" style="display:none">
+                            <i class="fa-solid fa-coins" style="display:block;font-size:1.25rem;margin-bottom:.25rem"></i>
+                            ค่าตอบแทน
+                        </label>
+                    </div>
+                `,
+                showCancelButton: true,
+                confirmButtonText: 'ถัดไป',
+                cancelButtonText: 'ยกเลิก',
+                confirmButtonColor: '#10b981',
+                didOpen: () => {
+                    const sync = () => {
+                        const v = document.querySelector('input[name="ct"]:checked').value;
+                        document.getElementById('ct-hours-lbl').style.boxShadow = v === 'hours' ? '0 0 0 4px rgba(16,185,129,.25)' : '';
+                        document.getElementById('ct-paid-lbl').style.boxShadow = v === 'paid' ? '0 0 0 4px rgba(245,158,11,.25)' : '';
+                    };
+                    document.getElementById('ct-hours-lbl').addEventListener('click', () => {
+                        document.querySelector('input[name="ct"][value="hours"]').checked = true; sync();
+                    });
+                    document.getElementById('ct-paid-lbl').addEventListener('click', () => {
+                        document.querySelector('input[name="ct"][value="paid"]').checked = true; sync();
+                    });
+                    sync();
+                },
+                preConfirm: () => document.querySelector('input[name="ct"]:checked').value,
+            });
+            if (!r.isConfirmed) return;
+            pickedCompType = r.value;
+        }
+
         const confirm = await Swal.fire({
             title: `ยืนยัน${labelMap[action]}?`,
             text: GPS_REQUIRED
@@ -425,6 +492,7 @@ if (btn && !btn.disabled) {
             const fd = new FormData();
             fd.append('csrf_token', CSRF_TOKEN);
             fd.append('action', action);
+            if (pickedCompType) fd.append('comp_type', pickedCompType);
             if (lat != null) fd.append('lat', lat);
             if (lng != null) fd.append('lng', lng);
             fd.append('accuracy', accuracy || 0);
@@ -491,6 +559,17 @@ window.openShiftModal = async function() {
         title: 'ลงตารางมาทำงาน',
         html: `
             <div style="text-align:left">
+                <label style="display:block;font-size:.7rem;font-weight:800;color:#4b5563;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.35rem">ประเภท</label>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-bottom:.75rem">
+                    <label style="cursor:pointer;border:2px solid #d1fae5;background:#ecfdf5;border-radius:.85rem;padding:.65rem;text-align:center;font-weight:800;color:#065f46;font-size:.8rem" id="sch-ct-hours-lbl">
+                        <input type="radio" name="sch-ct" value="hours" checked style="display:none">
+                        <i class="fa-solid fa-graduation-cap" style="margin-right:.35rem"></i>ส่งชั่วโมงทุน
+                    </label>
+                    <label style="cursor:pointer;border:2px solid #fef3c7;background:#fffbeb;border-radius:.85rem;padding:.65rem;text-align:center;font-weight:800;color:#92400e;font-size:.8rem" id="sch-ct-paid-lbl">
+                        <input type="radio" name="sch-ct" value="paid" style="display:none">
+                        <i class="fa-solid fa-coins" style="margin-right:.35rem"></i>ค่าตอบแทน
+                    </label>
+                </div>
                 <label style="display:block;font-size:.7rem;font-weight:800;color:#4b5563;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.35rem">วันที่</label>
                 <input id="sch-date" type="date" min="${todayStr}" value="${todayStr}" class="swal2-input" style="margin:0 0 .75rem;width:100%">
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem">
@@ -512,11 +591,26 @@ window.openShiftModal = async function() {
         confirmButtonText: 'บันทึก',
         cancelButtonText: 'ยกเลิก',
         confirmButtonColor: '#10b981',
+        didOpen: () => {
+            const sync = () => {
+                const v = document.querySelector('input[name="sch-ct"]:checked').value;
+                document.getElementById('sch-ct-hours-lbl').style.boxShadow = v === 'hours' ? '0 0 0 4px rgba(16,185,129,.25)' : '';
+                document.getElementById('sch-ct-paid-lbl').style.boxShadow = v === 'paid' ? '0 0 0 4px rgba(245,158,11,.25)' : '';
+            };
+            document.getElementById('sch-ct-hours-lbl').addEventListener('click', () => {
+                document.querySelector('input[name="sch-ct"][value="hours"]').checked = true; sync();
+            });
+            document.getElementById('sch-ct-paid-lbl').addEventListener('click', () => {
+                document.querySelector('input[name="sch-ct"][value="paid"]').checked = true; sync();
+            });
+            sync();
+        },
         preConfirm: () => {
             const date = document.getElementById('sch-date').value;
             const start = document.getElementById('sch-start').value;
             const end = document.getElementById('sch-end').value;
             const notes = document.getElementById('sch-notes').value;
+            const compType = document.querySelector('input[name="sch-ct"]:checked').value;
             if (!date || !start || !end) {
                 Swal.showValidationMessage('กรอกวันและเวลาให้ครบ');
                 return false;
@@ -525,7 +619,7 @@ window.openShiftModal = async function() {
                 Swal.showValidationMessage('เวลาเริ่มต้องมาก่อนเวลาสิ้นสุด');
                 return false;
             }
-            return { date, start, end, notes };
+            return { date, start, end, notes, compType };
         }
     });
 
@@ -536,6 +630,7 @@ window.openShiftModal = async function() {
     fd.append('shift_date', r.value.date);
     fd.append('start_time', r.value.start);
     fd.append('end_time', r.value.end);
+    fd.append('comp_type', r.value.compType);
     fd.append('notes', r.value.notes || '');
     try {
         const resp = await fetch('ajax_scholarship_shifts.php', { method: 'POST', body: fd });

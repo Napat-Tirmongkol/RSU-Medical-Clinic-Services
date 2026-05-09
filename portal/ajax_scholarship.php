@@ -266,6 +266,8 @@ function handle_shifts(PDO $pdo, string $action, int $adminId): void
         $start = (string)($_POST['start_time'] ?? '');
         $end = (string)($_POST['end_time'] ?? '');
         $notes = trim((string)($_POST['notes'] ?? ''));
+        $compType = (string)($_POST['comp_type'] ?? 'hours');
+        if (!in_array($compType, ['hours', 'paid'], true)) $compType = 'hours';
 
         if (!$studentId || !$date || !$start || !$end) {
             echo json_encode(['ok' => false, 'error' => 'กรอกข้อมูลให้ครบ']); return;
@@ -278,20 +280,20 @@ function handle_shifts(PDO $pdo, string $action, int $adminId): void
 
         $params = [
             ':sid' => $studentId, ':d' => $date, ':st' => $start, ':et' => $end,
-            ':h' => round($hours, 2), ':n' => $notes,
+            ':h' => round($hours, 2), ':ct' => $compType, ':n' => $notes,
         ];
 
         if ($action === 'create') {
             $params[':by'] = $adminId;
             $stmt = $pdo->prepare("INSERT INTO sys_scholarship_shifts
-                (student_id, shift_date, start_time, end_time, planned_hours, notes, created_by)
-                VALUES (:sid, :d, :st, :et, :h, :n, :by)");
+                (student_id, shift_date, start_time, end_time, planned_hours, comp_type, notes, created_by)
+                VALUES (:sid, :d, :st, :et, :h, :ct, :n, :by)");
             $stmt->execute($params);
         } else {
             $params[':id'] = $id;
             $stmt = $pdo->prepare("UPDATE sys_scholarship_shifts SET
                 student_id = :sid, shift_date = :d, start_time = :st, end_time = :et,
-                planned_hours = :h, notes = :n
+                planned_hours = :h, comp_type = :ct, notes = :n
                 WHERE id = :id");
             $stmt->execute($params);
         }
@@ -337,12 +339,16 @@ function handle_reports(PDO $pdo, string $action): void
 
         echo "\xEF\xBB\xBF"; // UTF-8 BOM
         $out = fopen('php://output', 'w');
-        fputcsv($out, ['ชื่อ', 'รหัสนักศึกษา', 'คณะ', 'ภาคเรียน', 'จำนวนครั้งเข้างาน', 'ชั่วโมงรวม', 'เป้าชั่วโมง', '% ความคืบหน้า']);
+        fputcsv($out, ['ชื่อ', 'รหัสนักศึกษา', 'คณะ', 'ภาคเรียน', 'จำนวนครั้งเข้างาน',
+            'ชั่วโมงทุน', 'ชั่วโมงค่าตอบแทน', 'ชั่วโมงรวม', 'เป้าชั่วโมง', '% ความคืบหน้า (ทุน)']);
         foreach ($rows as $r) {
-            $pct = (int)$r['max_hours'] > 0 ? round(($r['hours'] / $r['max_hours']) * 100) . '%' : '-';
+            $pct = (int)$r['max_hours'] > 0 ? round(($r['hours_scholarship'] / $r['max_hours']) * 100) . '%' : '-';
             fputcsv($out, [
                 $r['full_name'], $r['student_code'], $r['faculty'], $r['semester'],
-                $r['checkins'], number_format((float)$r['hours'], 2),
+                $r['checkins'],
+                number_format((float)$r['hours_scholarship'], 2),
+                number_format((float)$r['hours_paid'], 2),
+                number_format((float)$r['hours'], 2),
                 $r['max_hours'] > 0 ? $r['max_hours'] : '-', $pct,
             ]);
         }
@@ -364,7 +370,7 @@ function compute_report_rows(PDO $pdo, string $from, string $to): array
 
     $rows = [];
     foreach ($students as $s) {
-        $hours = sum_scholarship_hours($pdo, (int)$s['id'], $from, $to);
+        $split = sum_scholarship_hours_split($pdo, (int)$s['id'], $from, $to);
         $cntStmt = $pdo->prepare("SELECT COUNT(*) FROM sys_scholarship_clock_logs
             WHERE student_id = :sid AND action = 'clock_in' AND status = 'approved'
               AND event_at >= :from AND event_at <= :to");
@@ -378,7 +384,9 @@ function compute_report_rows(PDO $pdo, string $from, string $to): array
             'faculty' => $s['faculty'],
             'semester' => $s['semester'],
             'checkins' => $checkins,
-            'hours' => $hours,
+            'hours_scholarship' => (float)$split['hours'],
+            'hours_paid' => (float)$split['paid'],
+            'hours' => (float)($split['hours'] + $split['paid']),
             'max_hours' => (int)$s['max_hours'],
         ];
     }

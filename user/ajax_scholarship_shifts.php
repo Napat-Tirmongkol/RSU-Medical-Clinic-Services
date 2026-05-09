@@ -67,6 +67,8 @@ try {
             $start = (string)($_POST['start_time'] ?? '');
             $end = (string)($_POST['end_time'] ?? '');
             $notes = mb_substr(trim((string)($_POST['notes'] ?? '')), 0, 200);
+            $compType = (string)($_POST['comp_type'] ?? 'hours');
+            if (!in_array($compType, ['hours', 'paid'], true)) $compType = 'hours';
 
             if (!$date || !$start || !$end) { echo json_encode(['ok' => false, 'error' => 'กรอกข้อมูลให้ครบ']); return; }
             if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) { echo json_encode(['ok' => false, 'error' => 'รูปแบบวันที่ไม่ถูกต้อง']); return; }
@@ -87,11 +89,11 @@ try {
 
             $hours = round((strtotime("$date $end") - strtotime("$date $start")) / 3600, 2);
             $stmt = $pdo->prepare("INSERT INTO sys_scholarship_shifts
-                (student_id, shift_date, start_time, end_time, planned_hours, notes, created_by)
-                VALUES (:sid, :d, :st, :et, :h, :n, :by)");
+                (student_id, shift_date, start_time, end_time, planned_hours, comp_type, notes, created_by)
+                VALUES (:sid, :d, :st, :et, :h, :ct, :n, :by)");
             $stmt->execute([
                 ':sid' => $studentId, ':d' => $date, ':st' => $start, ':et' => $end,
-                ':h' => $hours, ':n' => $notes, ':by' => (int)$userId,
+                ':h' => $hours, ':ct' => $compType, ':n' => $notes, ':by' => (int)$userId,
             ]);
             echo json_encode(['ok' => true, 'message' => 'ลงตารางเรียบร้อย']);
             return;

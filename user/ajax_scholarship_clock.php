@@ -92,6 +92,11 @@ $activeShift = find_active_scholarship_shift($pdo, $studentId, 'now');
 // State validation
 $lastLog = get_latest_scholarship_log($pdo, $studentId);
 
+// ประเภทค่าตอบแทน — กำหนดต่อ session
+//  clock_in: ใช้จาก shift ถ้ามี ไม่งั้นใช้จาก POST (ad-hoc)
+//  clock_out: inherit จาก clock_in ก่อนหน้า
+$compType = 'hours';
+
 if ($action === 'clock_in') {
     if ($lastLog && $lastLog['action'] === 'clock_in' && $lastLog['status'] !== 'rejected') {
         echo json_encode(['ok' => false, 'error' => 'คุณยังไม่ได้ออกงานครั้งก่อน']);
@@ -107,13 +112,20 @@ if ($action === 'clock_in') {
         exit;
     }
     $shiftId = $activeShift ? (int)$activeShift['id'] : null;
+    if ($activeShift && !empty($activeShift['comp_type'])) {
+        $compType = $activeShift['comp_type'];
+    } else {
+        $postCt = (string)($_POST['comp_type'] ?? 'hours');
+        $compType = in_array($postCt, ['hours', 'paid'], true) ? $postCt : 'hours';
+    }
 } else { // clock_out
     if (!$lastLog || $lastLog['action'] !== 'clock_in' || $lastLog['status'] === 'rejected') {
         echo json_encode(['ok' => false, 'error' => 'ยังไม่ได้เข้างาน หรือคำขอเข้างานก่อนหน้าถูกปฏิเสธ']);
         exit;
     }
-    // shift_id ใช้ shift เดียวกับ clock_in (ถ้ามี)
+    // shift_id และ comp_type ใช้ตาม clock_in ก่อนหน้า
     $shiftId = $lastLog['shift_id'] ? (int)$lastLog['shift_id'] : null;
+    $compType = $lastLog['comp_type'] ?? 'hours';
     // ไม่จำกัดเวลาออกงาน — เลยกะได้ (overtime)
 }
 
@@ -123,13 +135,14 @@ $ua = mb_substr((string)($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 255);
 
 try {
     $stmt = $pdo->prepare("INSERT INTO sys_scholarship_clock_logs
-        (student_id, shift_id, action, event_at, gps_lat, gps_lng, gps_accuracy,
+        (student_id, shift_id, action, comp_type, event_at, gps_lat, gps_lng, gps_accuracy,
          distance_m, within_radius, ip_address, user_agent, status)
-        VALUES (:sid, :shift, :act, NOW(), :lat, :lng, :acc, :dist, :wr, :ip, :ua, :status)");
+        VALUES (:sid, :shift, :act, :ct, NOW(), :lat, :lng, :acc, :dist, :wr, :ip, :ua, :status)");
     $stmt->execute([
         ':sid' => $studentId,
         ':shift' => $shiftId,
         ':act' => $action,
+        ':ct' => $compType,
         ':lat' => $lat,
         ':lng' => $lng,
         ':acc' => $accuracy,
