@@ -1041,6 +1041,10 @@ try {
                     <div class="psb-icon"><i class="fa-solid fa-hospital" style="color:#0d9488"></i></div>
                     <span class="psb-label" style="color:#0f766e;font-weight:900">ข้อมูลคลินิก</span>
                 </button>
+                <button class="psb-item <?= $activeSection==='scholarship'?'psb-active':'' ?>" data-section="scholarship" onclick="switchSection('scholarship',this)">
+                    <div class="psb-icon"><i class="fa-solid fa-graduation-cap" style="color:#10b981"></i></div>
+                    <span class="psb-label" style="color:#059669;font-weight:900">นักศึกษาทุน</span>
+                </button>
             <?php endif; ?>
 
             <?php /* ── ตั้งค่า (ล่างสุด) ─────────────────────────────────── */ ?>
@@ -2588,6 +2592,12 @@ try {
             <div id="section-clinic_data" class="portal-section"
                 style="<?= $activeSection==='clinic_data'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); background:#f8fafc; overflow-y:auto;">
                 <?php include __DIR__ . '/_partials/clinic_data.php'; ?>
+            </div>
+
+            <!-- ════════════ SECTION: SCHOLARSHIP (นักศึกษาทุน) ════════════ -->
+            <div id="section-scholarship" class="portal-section"
+                style="<?= $activeSection==='scholarship'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); background:#f8fafc; overflow-y:auto;">
+                <?php include __DIR__ . '/_partials/scholarship.php'; ?>
             </div>
 
             <!-- ════════════ SECTION: MANAGE INSURANCE PARTNERS ════════════ -->
