@@ -183,6 +183,9 @@ $_aip_prompts = list_ai_prompts($pdo);
                 <p class="text-xs text-gray-500 mt-1"><?= htmlspecialchars($p['description']) ?></p>
             </div>
             <div class="flex flex-col gap-2 shrink-0">
+                <button type="button" class="ap-test-btn px-3 py-1.5 bg-cyan-600 text-white text-xs font-bold rounded-lg hover:bg-cyan-700">
+                    <i class="fa-solid fa-flask"></i> ทดสอบ
+                </button>
                 <button type="button" class="ap-edit-btn px-3 py-1.5 bg-purple-600 text-white text-xs font-bold rounded-lg hover:bg-purple-700">
                     <i class="fa-solid fa-pen"></i> แก้ไข
                 </button>
@@ -219,6 +222,76 @@ $_aip_prompts = list_ai_prompts($pdo);
         <?php endif; ?>
     </div>
     <?php endforeach; ?>
+
+    <!-- Test modal (hidden by default) -->
+    <div id="ap-test-modal" class="fixed inset-0 bg-black/50 z-50 hidden items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[92vh] flex flex-col">
+            <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+                <div>
+                    <div class="text-xs font-bold text-cyan-600 uppercase">🧪 Test sandbox</div>
+                    <h3 id="ap-test-title" class="text-lg font-black text-gray-900"></h3>
+                </div>
+                <button id="ap-test-close" class="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+            </div>
+            <div class="px-6 py-4 overflow-y-auto flex-1">
+                <!-- Variables section -->
+                <div class="mb-4">
+                    <div class="text-xs font-bold text-gray-700 mb-2">
+                        <i class="fa-solid fa-code"></i> ตัวแปร (placeholders) — แก้ค่าตัวอย่างได้ตามใจ
+                    </div>
+                    <div id="ap-test-vars" class="space-y-2"></div>
+                </div>
+
+                <!-- Optional prompt content override -->
+                <details class="mb-4">
+                    <summary class="text-xs font-bold text-gray-600 cursor-pointer hover:text-cyan-700 select-none">
+                        <i class="fa-solid fa-pen-to-square mr-1"></i> ทดสอบกับ prompt ที่แก้ใน sandbox นี้ (ไม่ save)
+                    </summary>
+                    <textarea id="ap-test-content" class="ap-textarea-edit mt-2" style="min-height:180px"></textarea>
+                </details>
+
+                <button id="ap-test-run" class="w-full px-4 py-3 bg-cyan-600 text-white text-sm font-bold rounded-lg hover:bg-cyan-700 flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-play"></i>
+                    Run test (ยิง Gemini จริง · ไม่บันทึก)
+                </button>
+
+                <!-- Result section -->
+                <div id="ap-test-result" class="mt-4 hidden">
+                    <div class="text-xs font-bold text-gray-700 mb-2 flex items-center gap-2">
+                        <i class="fa-solid fa-vial"></i> ผลลัพธ์
+                        <span id="ap-test-meta" class="ml-auto text-[10px] font-normal text-gray-500"></span>
+                    </div>
+
+                    <div id="ap-test-result-error" class="hidden bg-rose-50 border border-rose-200 rounded-lg px-4 py-3 mb-3">
+                        <div class="text-sm font-bold text-rose-700"><i class="fa-solid fa-circle-xmark"></i> Error</div>
+                        <pre id="ap-test-error-text" class="text-xs text-rose-700 mt-1 whitespace-pre-wrap"></pre>
+                    </div>
+
+                    <details class="mb-3">
+                        <summary class="text-xs font-bold text-gray-600 cursor-pointer hover:text-cyan-700 select-none">
+                            <i class="fa-solid fa-eye mr-1"></i> ดู prompt ที่ resolve แล้ว (ส่งจริงให้ Gemini)
+                        </summary>
+                        <pre id="ap-test-resolved" class="ap-textarea mt-2" style="max-height:240px"></pre>
+                    </details>
+
+                    <div class="mb-3">
+                        <div class="text-xs font-bold text-gray-700 mb-1">Response (text)</div>
+                        <pre id="ap-test-response" class="ap-textarea" style="max-height:280px;background:#0f172a;color:#e2e8f0"></pre>
+                    </div>
+
+                    <div id="ap-test-parsed-wrap" class="mb-3 hidden">
+                        <div class="text-xs font-bold text-gray-700 mb-1">Parsed JSON</div>
+                        <pre id="ap-test-parsed" class="ap-textarea" style="background:#ecfdf5;color:#065f46;border-color:#a7f3d0"></pre>
+                    </div>
+                </div>
+            </div>
+            <div class="px-6 py-3 border-t border-gray-200 flex justify-end">
+                <button id="ap-test-done" class="px-4 py-2 bg-white text-gray-700 text-sm font-bold rounded-lg border border-gray-300 hover:bg-gray-50">
+                    ปิด
+                </button>
+            </div>
+        </div>
+    </div>
 
     <!-- Edit modal (hidden by default) -->
     <div id="ap-edit-modal" class="fixed inset-0 bg-black/50 z-50 hidden items-center justify-center p-4">
@@ -284,6 +357,126 @@ $_aip_prompts = list_ai_prompts($pdo);
             const key = btn.closest('[data-key]').dataset.key;
             openEdit(key);
         });
+    });
+
+    // ── Test sandbox ──────────────────────────────────────────────────────
+    const TEST_MODAL = document.getElementById('ap-test-modal');
+    const TEST_TITLE = document.getElementById('ap-test-title');
+    const TEST_VARS  = document.getElementById('ap-test-vars');
+    const TEST_CONTENT = document.getElementById('ap-test-content');
+    const TEST_RESULT = document.getElementById('ap-test-result');
+    const TEST_META = document.getElementById('ap-test-meta');
+    const TEST_ERR = document.getElementById('ap-test-result-error');
+    const TEST_ERR_TEXT = document.getElementById('ap-test-error-text');
+    const TEST_RESOLVED = document.getElementById('ap-test-resolved');
+    const TEST_RESPONSE = document.getElementById('ap-test-response');
+    const TEST_PARSED_WRAP = document.getElementById('ap-test-parsed-wrap');
+    const TEST_PARSED = document.getElementById('ap-test-parsed');
+    let testKey = null;
+
+    function openTest(key) {
+        const p = PROMPTS[key];
+        if (!p) return;
+        testKey = key;
+        TEST_TITLE.textContent = p.label;
+        TEST_CONTENT.value = p.content;
+        TEST_RESULT.classList.add('hidden');
+
+        // Build variable inputs from placeholders + samples
+        TEST_VARS.innerHTML = '';
+        const samples = p.samples || {};
+        Object.entries(p.placeholders || {}).forEach(([name, desc]) => {
+            const wrap = document.createElement('div');
+            wrap.innerHTML = `
+                <label class="text-[11px] font-bold text-gray-600 flex items-center gap-1.5">
+                    <span class="ap-pill">{${name}}</span>
+                    <span class="font-normal text-gray-500">${desc}</span>
+                </label>
+                <textarea class="ap-textarea-edit ap-test-var" data-name="${name}" rows="3"
+                    style="min-height:60px;font-size:12px;margin-top:4px"></textarea>
+            `;
+            TEST_VARS.appendChild(wrap);
+            wrap.querySelector('textarea').value = samples[name] || '';
+        });
+
+        TEST_MODAL.classList.remove('hidden');
+        TEST_MODAL.classList.add('flex');
+    }
+    function closeTest() {
+        TEST_MODAL.classList.add('hidden');
+        TEST_MODAL.classList.remove('flex');
+        testKey = null;
+    }
+
+    document.querySelectorAll('.ap-test-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const key = btn.closest('[data-key]').dataset.key;
+            openTest(key);
+        });
+    });
+
+    document.getElementById('ap-test-close').addEventListener('click', closeTest);
+    document.getElementById('ap-test-done').addEventListener('click', closeTest);
+    TEST_MODAL.addEventListener('click', (e) => { if (e.target === TEST_MODAL) closeTest(); });
+
+    document.getElementById('ap-test-run').addEventListener('click', async () => {
+        if (!testKey) return;
+        const vars = {};
+        document.querySelectorAll('.ap-test-var').forEach(t => {
+            vars[t.dataset.name] = t.value;
+        });
+        const content = TEST_CONTENT.value.trim();
+        if (content === '') {
+            Swal.fire({ icon: 'warning', title: 'Content ว่าง' });
+            return;
+        }
+
+        const btn = document.getElementById('ap-test-run');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> กำลังรัน...';
+
+        const fd = new FormData();
+        fd.append('action', 'test');
+        fd.append('key', testKey);
+        fd.append('content', content);
+        fd.append('vars', JSON.stringify(vars));
+        fd.append('csrf_token', CSRF);
+
+        try {
+            const r = await fetch('ajax_ai_prompts.php', { method: 'POST', body: fd });
+            const j = await r.json();
+            TEST_RESULT.classList.remove('hidden');
+            TEST_RESOLVED.textContent = j.resolved_prompt || '(ไม่มี)';
+
+            if (!j.ok) {
+                TEST_ERR.classList.remove('hidden');
+                TEST_ERR_TEXT.textContent = (j.error || '') + (j.response_raw ? '\n\n' + j.response_raw : '');
+                TEST_RESPONSE.textContent = '';
+                TEST_PARSED_WRAP.classList.add('hidden');
+                TEST_META.textContent = (j.elapsed_ms !== undefined ? `${j.elapsed_ms}ms` : '');
+            } else {
+                TEST_ERR.classList.add('hidden');
+                TEST_RESPONSE.textContent = j.response_text || '(empty)';
+                if (j.parsed) {
+                    TEST_PARSED_WRAP.classList.remove('hidden');
+                    TEST_PARSED.textContent = JSON.stringify(j.parsed, null, 2);
+                } else {
+                    TEST_PARSED_WRAP.classList.add('hidden');
+                }
+                const u = j.usage || {};
+                TEST_META.textContent =
+                    `${j.model || ''} · ${j.elapsed_ms || 0}ms` +
+                    (j.finish_reason ? ` · ${j.finish_reason}` : '') +
+                    (u.totalTokenCount ? ` · ${u.totalTokenCount} tokens` : '');
+            }
+        } catch (e) {
+            TEST_RESULT.classList.remove('hidden');
+            TEST_ERR.classList.remove('hidden');
+            TEST_ERR_TEXT.textContent = 'เครือข่ายผิดพลาด: ' + e.message;
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-play"></i> Run test (ยิง Gemini จริง · ไม่บันทึก)';
+        }
     });
 
     document.querySelectorAll('.ap-reset-btn').forEach(btn => {

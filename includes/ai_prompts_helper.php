@@ -163,6 +163,7 @@ function list_ai_prompts(PDO $pdo): array
             'content'      => $isCustom ? (string)$dbRow['content'] : $meta['content'],
             'is_custom'    => (bool)$isCustom,
             'updated_at'   => $dbRow['updated_at'] ?? null,
+            'samples'      => AI_PROMPT_TEST_SAMPLES[$key] ?? [],
         ];
     }
     return $out;
@@ -183,6 +184,153 @@ function save_ai_prompt(PDO $pdo, string $key, string $content, ?int $adminId = 
         error_log("save_ai_prompt failed for {$key}: " . $e->getMessage());
         return false;
     }
+}
+
+/** ค่า sample สำหรับ test sandbox — pre-fill ตอนกด ทดสอบ ในแต่ละ prompt */
+const AI_PROMPT_TEST_SAMPLES = [
+    'matcher' => [
+        'question'        => 'วันอาทิตย์เปิดไหมครับ',
+        'candidates_list' => "[0] วันอาทิตย์คลินิกเปิดไหม\n[1] ตารางออกตรวจของหมอ\n[2] ฉีดวัคซีน HPV ราคาเท่าไหร่",
+    ],
+    'generator' => [
+        'question'        => 'วันอาทิตย์เปิดไหมครับ',
+        'clinic_context'  => "ข้อมูลคลินิก:\n- จันทร์-ศุกร์ 08:00-20:00\n- เสาร์ 09:00-15:00\n- อาทิตย์ ปิด\n(วันนี้เป็นวันเสาร์)",
+        'categories_list' => 'เวลาเปิด-ปิด | ตารางหมอ | บริการ | ราคา | อื่นๆ',
+    ],
+];
+
+/**
+ * Gemini generationConfig ของแต่ละ prompt key — ต้องตรงกับ production
+ * ที่ใช้ใน ai_qa_helper.php (matcher = strict schema, generator = JSON mime)
+ */
+function get_test_generation_config_for(string $key): array
+{
+    return match ($key) {
+        'matcher' => [
+            'temperature'      => 0.2,
+            'maxOutputTokens'  => 1024,
+            'responseMimeType' => 'application/json',
+            'responseSchema'   => [
+                'type'       => 'OBJECT',
+                'properties' => [
+                    'match_index' => ['type' => 'INTEGER'],
+                    'confidence'  => ['type' => 'NUMBER'],
+                ],
+                'required'   => ['match_index', 'confidence'],
+            ],
+            'thinkingConfig'   => ['thinkingBudget' => 0],
+        ],
+        'generator' => [
+            'temperature'      => 0.3,
+            'maxOutputTokens'  => 1024,
+            'responseMimeType' => 'application/json',
+        ],
+        default => [
+            'temperature'     => 0.3,
+            'maxOutputTokens' => 1024,
+        ],
+    };
+}
+
+/**
+ * ทดสอบ prompt — resolve placeholders + ยิง Gemini จริง + คืน response
+ * + parse JSON + meta (model, elapsed_ms, finishReason, usage)
+ *
+ * ไม่ save อะไรลง DB — ใช้ดู output ก่อน admin กด save จริง
+ */
+function test_ai_prompt(string $key, string $content, array $vars): array
+{
+    if (!isset(AI_PROMPT_DEFAULTS[$key])) {
+        throw new InvalidArgumentException("Unknown prompt key: {$key}");
+    }
+    require_once __DIR__ . '/ai_qa_helper.php';
+
+    $apiKey = ai_qa_load_gemini_key();
+    if (!$apiKey) {
+        return ['ok' => false, 'error' => 'GEMINI_API_KEY ยังไม่ได้ตั้งค่า'];
+    }
+
+    // Resolve placeholders (เหมือน get_ai_prompt)
+    $resolved = $content;
+    foreach ($vars as $name => $value) {
+        $resolved = str_replace('{' . $name . '}', (string)$value, $resolved);
+    }
+
+    $body = json_encode([
+        'contents' => [['role' => 'user', 'parts' => [['text' => $resolved]]]],
+        'generationConfig' => get_test_generation_config_for($key),
+    ], JSON_UNESCAPED_UNICODE);
+
+    $model = 'gemini-2.5-flash';
+    $url = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$apiKey}";
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_POST           => true,
+        CURLOPT_POSTFIELDS     => $body,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
+        CURLOPT_TIMEOUT        => 30,
+        CURLOPT_CONNECTTIMEOUT => 5,
+        CURLOPT_SSL_VERIFYPEER => true,
+    ]);
+    $tStart   = microtime(true);
+    $raw      = (string)curl_exec($ch);
+    $httpCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlErr  = curl_error($ch);
+    $elapsedMs = (int)round((microtime(true) - $tStart) * 1000);
+    curl_close($ch);
+
+    if ($curlErr) {
+        return [
+            'ok'              => false,
+            'error'           => 'curl: ' . $curlErr,
+            'resolved_prompt' => $resolved,
+            'elapsed_ms'      => $elapsedMs,
+        ];
+    }
+    if ($httpCode !== 200) {
+        return [
+            'ok'              => false,
+            'error'           => "HTTP {$httpCode}",
+            'response_raw'    => mb_substr($raw, 0, 2000),
+            'resolved_prompt' => $resolved,
+            'elapsed_ms'      => $elapsedMs,
+        ];
+    }
+
+    $resp = json_decode($raw, true);
+    $text = (string)($resp['candidates'][0]['content']['parts'][0]['text'] ?? '');
+    $finishReason = (string)($resp['candidates'][0]['finishReason'] ?? '');
+
+    // ลอง parse JSON (matcher/generator คาดว่า output เป็น JSON)
+    $parsed = null;
+    if ($text !== '') {
+        $cleaned = preg_replace('/^```(?:json)?\s*/m', '', $text);
+        $cleaned = preg_replace('/```\s*$/m', '', $cleaned);
+        $cleaned = trim($cleaned);
+        $tryParsed = json_decode($cleaned, true);
+        if (is_array($tryParsed)) {
+            $parsed = $tryParsed;
+        } else {
+            $start = strpos($cleaned, '{');
+            $end   = strrpos($cleaned, '}');
+            if ($start !== false && $end !== false && $end > $start) {
+                $maybe = json_decode(substr($cleaned, $start, $end - $start + 1), true);
+                if (is_array($maybe)) $parsed = $maybe;
+            }
+        }
+    }
+
+    return [
+        'ok'              => true,
+        'resolved_prompt' => $resolved,
+        'response_text'   => $text,
+        'parsed'          => $parsed,
+        'finish_reason'   => $finishReason,
+        'usage'           => $resp['usageMetadata'] ?? [],
+        'elapsed_ms'      => $elapsedMs,
+        'model'           => $model,
+    ];
 }
 
 function reset_ai_prompt(PDO $pdo, string $key): bool

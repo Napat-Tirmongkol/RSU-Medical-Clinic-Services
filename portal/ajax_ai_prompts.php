@@ -63,6 +63,23 @@ try {
             return;
         }
 
+        case 'test': {
+            if (!isset($_POST['csrf_token']) || !verify_csrf_token($_POST['csrf_token'])) {
+                throw new RuntimeException('Invalid CSRF token');
+            }
+            $key = trim((string)($_POST['key'] ?? ''));
+            $content = (string)($_POST['content'] ?? '');
+            $varsJson = (string)($_POST['vars'] ?? '{}');
+            $vars = json_decode($varsJson, true);
+            if (!is_array($vars)) $vars = [];
+            if ($key === '' || trim($content) === '') {
+                throw new RuntimeException('Missing key or content');
+            }
+            $result = test_ai_prompt($key, $content, $vars);
+            echo json_encode($result, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+            return;
+        }
+
         default:
             throw new RuntimeException('Unknown action');
     }
