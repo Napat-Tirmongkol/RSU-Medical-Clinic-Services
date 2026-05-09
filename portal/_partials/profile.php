@@ -24,7 +24,8 @@ if ($staffId > 0) {
                                   IFNULL(access_site_settings,0) AS access_site_settings,
                                   IFNULL(access_ai,0)            AS access_ai,
                                   IFNULL(access_consumables,0)   AS access_consumables,
-                                  IFNULL(access_asset,0)         AS access_asset
+                                  IFNULL(access_asset,0)         AS access_asset,
+                                  IFNULL(access_scholarship,0)   AS access_scholarship
                            FROM sys_staff WHERE id = :id LIMIT 1");
     $stmt->execute([':id' => $staffId]);
     $me = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -46,6 +47,7 @@ $accessLabels = [
     'access_ai'             => ['AI Suite',            'fa-wand-magic-sparkles','purple'],
     'access_consumables'    => ['Consumables',         'fa-syringe',            'rose'],
     'access_asset'          => ['Asset Inventory',     'fa-warehouse',          'amber'],
+    'access_scholarship'    => ['Scholarship',         'fa-graduation-cap',     'emerald'],
 ];
 ?>
 

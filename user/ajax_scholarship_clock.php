@@ -89,51 +89,58 @@ if ($lat !== null && $lng !== null
 // หา shift ที่ active ตอนนี้ (เพื่อ link ถ้ามี — ถ้าไม่มีก็ ad-hoc)
 $activeShift = find_active_scholarship_shift($pdo, $studentId, 'now');
 
-// State validation
-$lastLog = get_latest_scholarship_log($pdo, $studentId);
-
-// ประเภทค่าตอบแทน — กำหนดต่อ session
-//  clock_in: ใช้จาก shift ถ้ามี ไม่งั้นใช้จาก POST (ad-hoc)
-//  clock_out: inherit จาก clock_in ก่อนหน้า
-$compType = 'hours';
-
-if ($action === 'clock_in') {
-    if ($lastLog && $lastLog['action'] === 'clock_in' && $lastLog['status'] !== 'rejected') {
-        echo json_encode(['ok' => false, 'error' => 'คุณยังไม่ได้ออกงานครั้งก่อน']);
-        exit;
-    }
-    // ad-hoc clock-in: ไม่บังคับว่าต้องมีกะ — link กับกะปัจจุบันถ้ามี ไม่งั้น NULL
-    if ($gpsRequired && $settings['clinic_lat'] !== null && !$withinRadius) {
-        echo json_encode([
-            'ok' => false,
-            'error' => sprintf('คุณอยู่นอกพื้นที่คลินิก (ห่าง %.0f ม. รัศมีที่อนุญาต %d ม.)',
-                $distanceM, (int)$settings['radius_m'])
-        ]);
-        exit;
-    }
-    $shiftId = $activeShift ? (int)$activeShift['id'] : null;
-    if ($activeShift && !empty($activeShift['comp_type'])) {
-        $compType = $activeShift['comp_type'];
-    } else {
-        $postCt = (string)($_POST['comp_type'] ?? 'hours');
-        $compType = in_array($postCt, ['hours', 'paid'], true) ? $postCt : 'hours';
-    }
-} else { // clock_out
-    if (!$lastLog || $lastLog['action'] !== 'clock_in' || $lastLog['status'] === 'rejected') {
-        echo json_encode(['ok' => false, 'error' => 'ยังไม่ได้เข้างาน หรือคำขอเข้างานก่อนหน้าถูกปฏิเสธ']);
-        exit;
-    }
-    // shift_id และ comp_type ใช้ตาม clock_in ก่อนหน้า
-    $shiftId = $lastLog['shift_id'] ? (int)$lastLog['shift_id'] : null;
-    $compType = $lastLog['comp_type'] ?? 'hours';
-    // ไม่จำกัดเวลาออกงาน — เลยกะได้ (overtime)
-}
-
-// Insert log
+// Insert log inside a transaction with row-level lock เพื่อกัน race condition:
+// ถ้า user ส่ง clock_in/clock_out 2 request พร้อมกัน, ไม่มี lock จะผ่าน state validation ทั้งคู่
+// ทำให้เกิด log ซ้อน → admin approve เป็นชั่วโมงคูณสอง
 $ip = $_SERVER['REMOTE_ADDR'] ?? '';
 $ua = mb_substr((string)($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 255);
 
+$pdo->beginTransaction();
 try {
+    // Lock latest log ของ student คนนี้ (กัน parallel clock event)
+    $lockStmt = $pdo->prepare("SELECT id, action, status, shift_id, comp_type
+        FROM sys_scholarship_clock_logs
+        WHERE student_id = :sid
+        ORDER BY event_at DESC, id DESC LIMIT 1
+        FOR UPDATE");
+    $lockStmt->execute([':sid' => $studentId]);
+    $lastLog = $lockStmt->fetch(PDO::FETCH_ASSOC) ?: null;
+
+    // ประเภทค่าตอบแทน
+    $compType = 'hours';
+
+    if ($action === 'clock_in') {
+        if ($lastLog && $lastLog['action'] === 'clock_in' && $lastLog['status'] !== 'rejected') {
+            $pdo->rollBack();
+            echo json_encode(['ok' => false, 'error' => 'คุณยังไม่ได้ออกงานครั้งก่อน']);
+            exit;
+        }
+        if ($gpsRequired && $settings['clinic_lat'] !== null && !$withinRadius) {
+            $pdo->rollBack();
+            echo json_encode([
+                'ok' => false,
+                'error' => sprintf('คุณอยู่นอกพื้นที่คลินิก (ห่าง %.0f ม. รัศมีที่อนุญาต %d ม.)',
+                    $distanceM, (int)$settings['radius_m'])
+            ]);
+            exit;
+        }
+        $shiftId = $activeShift ? (int)$activeShift['id'] : null;
+        if ($activeShift && !empty($activeShift['comp_type'])) {
+            $compType = $activeShift['comp_type'];
+        } else {
+            $postCt = (string)($_POST['comp_type'] ?? 'hours');
+            $compType = in_array($postCt, ['hours', 'paid'], true) ? $postCt : 'hours';
+        }
+    } else { // clock_out
+        if (!$lastLog || $lastLog['action'] !== 'clock_in' || $lastLog['status'] === 'rejected') {
+            $pdo->rollBack();
+            echo json_encode(['ok' => false, 'error' => 'ยังไม่ได้เข้างาน หรือคำขอเข้างานก่อนหน้าถูกปฏิเสธ']);
+            exit;
+        }
+        $shiftId = $lastLog['shift_id'] ? (int)$lastLog['shift_id'] : null;
+        $compType = $lastLog['comp_type'] ?? 'hours';
+    }
+
     $stmt = $pdo->prepare("INSERT INTO sys_scholarship_clock_logs
         (student_id, shift_id, action, comp_type, event_at, gps_lat, gps_lng, gps_accuracy,
          distance_m, within_radius, ip_address, user_agent, status)
@@ -153,6 +160,8 @@ try {
         ':status' => $settings['require_approval'] ? 'pending' : 'approved',
     ]);
 
+    $pdo->commit();
+
     echo json_encode([
         'ok' => true,
         'message' => $settings['require_approval']
@@ -160,6 +169,7 @@ try {
             : ($action === 'clock_in' ? 'เข้างานสำเร็จ' : 'ออกงานสำเร็จ'),
     ], JSON_UNESCAPED_UNICODE);
 } catch (PDOException $e) {
+    if ($pdo->inTransaction()) $pdo->rollBack();
     error_log('[ajax_scholarship_clock] ' . $e->getMessage());
     echo json_encode(['ok' => false, 'error' => 'บันทึกไม่สำเร็จ']);
 }
