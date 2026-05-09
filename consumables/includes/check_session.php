@@ -89,7 +89,7 @@ if (!function_exists('csm_require_manage')) {
                 'flag'       => 'role: admin / editor',
                 'module'     => 'Consumables — โหมดจัดการ (admin/editor)',
                 'hub_url'    => _csm_abs_url('../portal/index.php'),
-                'logout_url' => _csm_abs_url('../portal/logout.php'),
+                'logout_url' => _csm_abs_url('../admin/auth/logout.php'),
                 'tailwind'   => _csm_abs_url('../assets/css/tailwind.min.css'),
             ]);
         }
@@ -137,7 +137,7 @@ if (empty($_SESSION['is_portal_admin'])) {
                 'flag'       => 'access_consumables',
                 'module'     => 'Consumables (สินค้าสิ้นเปลือง)',
                 'hub_url'    => _csm_abs_url('../portal/index.php'),
-                'logout_url' => _csm_abs_url('../portal/logout.php'),
+                'logout_url' => _csm_abs_url('../admin/auth/logout.php'),
                 'tailwind'   => _csm_abs_url('../assets/css/tailwind.min.css'),
             ]);
         }
