@@ -620,6 +620,16 @@ foreach ($data['events'] as $idx => $event) {
 
         case 'message':
             // ตอบกลับแบบง่ายถ้าเป็นข้อความตัวอักษร (default fallback หลัง matcher miss)
+            // เช็ค toggle default_reply_enabled — admin ปิดได้เพื่อกัน reply ซ้อน
+            // กับ LINE OA built-in keyword auto-reply
+            $defaultReplySettings = $faqSettings ?? get_clinic_faq_settings(db());
+            if (!(int)($defaultReplySettings['default_reply_enabled'] ?? 0)) {
+                line_webhook_log('Default reply disabled by setting (silent)', [
+                    'line_user_id' => line_mask_uid($userId),
+                    'message_text' => mb_substr((string)($event['message']['text'] ?? ''), 0, 80),
+                ]);
+                break;
+            }
             if ($event['message']['type'] === 'text') {
                 $userText = $event['message']['text'];
                 $messages = [
