@@ -95,7 +95,7 @@ if (!function_exists('asset_require_manage')) {
                 'flag'       => 'role: admin / editor',
                 'module'     => 'Asset Inventory — โหมดจัดการ (admin/editor)',
                 'hub_url'    => _asset_abs_url('../portal/index.php'),
-                'logout_url' => _asset_abs_url('../portal/logout.php'),
+                'logout_url' => _asset_abs_url('../admin/auth/logout.php'),
                 'tailwind'   => _asset_abs_url('../assets/css/tailwind.min.css'),
             ]);
         }
@@ -143,7 +143,7 @@ if (empty($_SESSION['is_portal_admin'])) {
                 'flag'       => 'access_asset',
                 'module'     => 'Asset Inventory (ครุภัณฑ์สำนักงาน)',
                 'hub_url'    => _asset_abs_url('../portal/index.php'),
-                'logout_url' => _asset_abs_url('../portal/logout.php'),
+                'logout_url' => _asset_abs_url('../admin/auth/logout.php'),
                 'tailwind'   => _asset_abs_url('../assets/css/tailwind.min.css'),
             ]);
         }
