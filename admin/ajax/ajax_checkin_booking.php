@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require_once __DIR__ . '/../includes/auth.php';
+require_once __DIR__ . '/../../includes/vaccination_helper.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -68,6 +69,8 @@ try {
     }
 
     $pdo->commit();
+
+    record_vaccination_from_booking($pdo, $bookingId);
 
     $adminId = (int)($_SESSION['admin_id'] ?? $_SESSION['staff_id'] ?? 0) ?: null;
     log_activity(

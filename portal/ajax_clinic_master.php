@@ -1056,9 +1056,32 @@ try {
                 if ($_FILES['photo']['size'] > 5 * 1024 * 1024) {
                     echo json_encode(['ok'=>false,'message'=>'ขนาดไฟล์ต้องไม่เกิน 5MB']); return;
                 }
+                // Verify ว่าเป็นรูปจริง (กัน polyglot/PHP-disguised-as-jpg)
+                $imgInfo = @getimagesize($_FILES['photo']['tmp_name']);
+                $allowedMime = [
+                    IMAGETYPE_JPEG => 'jpg', IMAGETYPE_PNG => 'png',
+                    IMAGETYPE_WEBP => 'webp', IMAGETYPE_GIF => 'gif',
+                ];
+                if (!$imgInfo || !isset($allowedMime[$imgInfo[2]])) {
+                    echo json_encode(['ok'=>false,'message'=>'ไฟล์ไม่ใช่รูปภาพที่ถูกต้อง']); return;
+                }
+                // ใช้นามสกุลตาม MIME ที่ตรวจจริง — ไม่เชื่อ extension ของ user
+                $safeExt = $allowedMime[$imgInfo[2]];
                 $uploadDir = __DIR__ . '/../assets/uploads/org_members/';
                 if (!is_dir($uploadDir)) @mkdir($uploadDir, 0755, true);
-                $newName = 'om_' . date('Ymd_His') . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
+
+                // Defense-in-depth: deny script execution ใน upload dir (ทั้ง Apache และ Nginx config-friendly)
+                $htaccess = $uploadDir . '.htaccess';
+                if (!file_exists($htaccess)) {
+                    @file_put_contents($htaccess, "# Auto-generated — block any script execution\n"
+                        . "<FilesMatch \"\\.(php|php3|php4|php5|php7|phtml|phar|pl|py|cgi|sh)$\">\n"
+                        . "    Require all denied\n"
+                        . "</FilesMatch>\n"
+                        . "Options -ExecCGI -Indexes\n"
+                        . "AddType text/plain .php .phtml .phar .pl .py\n");
+                }
+
+                $newName = 'om_' . date('Ymd_His') . '_' . bin2hex(random_bytes(4)) . '.' . $safeExt;
                 if (move_uploaded_file($_FILES['photo']['tmp_name'], $uploadDir . $newName)) {
                     $photoUrl = '../assets/uploads/org_members/' . $newName;
                 }
@@ -1180,5 +1203,6 @@ try {
             return;
     }
 } catch (PDOException $e) {
-    echo json_encode(['ok' => false, 'message' => 'DB error: ' . $e->getMessage()]);
+    error_log('[ajax_clinic_master] ' . $e->getMessage());
+    echo json_encode(['ok' => false, 'message' => 'DB error']);
 }

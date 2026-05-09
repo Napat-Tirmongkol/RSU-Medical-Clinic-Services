@@ -3,6 +3,7 @@
 declare(strict_types=1);
 session_start();
 require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../includes/vaccination_helper.php';
 
 $pdo        = db();
 $campaignId = (int)($_GET['campaign'] ?? 0);
@@ -109,6 +110,7 @@ if (!$token_ok || !$campaign) {
                 } else {
                     $pdo->prepare("UPDATE camp_bookings SET attended_at = NOW(), status = 'completed' WHERE id = ?")
                         ->execute([$bookingId]);
+                    record_vaccination_from_booking($pdo, $bookingId);
                     // Force the post-checkin survey before showing success
                     header('Location: post_checkin_survey.php?booking=' . $bookingId);
                     exit;

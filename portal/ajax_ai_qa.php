@@ -19,6 +19,14 @@ require_once __DIR__ . '/../includes/clinic_status_helper.php'; // CLINIC_TZ_NAM
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
 
+// Authorization: ตรงกับ section gate ใน portal/index.php — superadmin หรือมี access_ai
+$_role = $_SESSION['admin_role'] ?? '';
+if ($_role !== 'superadmin' && empty($_SESSION['access_ai'])) {
+    http_response_code(403);
+    echo json_encode(['ok' => false, 'message' => 'Permission denied (access_ai required)']);
+    exit;
+}
+
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     echo json_encode(['ok' => false, 'message' => 'POST only']);
     exit;
@@ -444,5 +452,5 @@ try {
     echo json_encode(['ok' => false, 'message' => 'unknown action']);
 } catch (Throwable $e) {
     error_log('ajax_ai_qa error (' . $action . '): ' . $e->getMessage());
-    echo json_encode(['ok' => false, 'message' => $e->getMessage()]);
+    echo json_encode(['ok' => false, 'message' => 'Server error']);
 }

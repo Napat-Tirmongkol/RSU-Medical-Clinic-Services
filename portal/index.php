@@ -951,6 +951,7 @@ try {
             $hasSysLogs     = $isSuper || !empty($_SESSION['access_system_logs']);
             $hasSiteSet     = $isSuper || !empty($_SESSION['access_site_settings']);
             $hasEdms        = $isSuper || !empty($_SESSION['access_edms']);
+            $hasScholarship = $isSuper || !empty($_SESSION['access_scholarship']);
 
             // EDMS pending count badge — count routings where current user is recipient and status is open
             $edmsInboxBadge = 0;
@@ -1129,10 +1130,12 @@ try {
                         <div class="psb-icon"><i class="fa-solid fa-hospital" style="color:#0d9488"></i></div>
                         <span class="psb-label" style="color:#0f766e;font-weight:900">ข้อมูลคลินิก</span>
                     </button>
-                    <button class="psb-item <?= $activeSection==='scholarship'?'psb-active':'' ?>" data-section="scholarship" onclick="switchSection('scholarship',this)">
-                        <div class="psb-icon"><i class="fa-solid fa-graduation-cap" style="color:#10b981"></i></div>
-                        <span class="psb-label" style="color:#059669;font-weight:900">นักศึกษาทุน</span>
-                    </button>
+                    <?php if ($hasScholarship): ?>
+                        <button class="psb-item <?= $activeSection==='scholarship'?'psb-active':'' ?>" data-section="scholarship" onclick="switchSection('scholarship',this)">
+                            <div class="psb-icon"><i class="fa-solid fa-graduation-cap" style="color:#10b981"></i></div>
+                            <span class="psb-label" style="color:#059669;font-weight:900">นักศึกษาทุน</span>
+                        </button>
+                    <?php endif; ?>
                 </div>
             <?php endif; ?>
 
@@ -2139,6 +2142,7 @@ try {
                                             <th style="padding:16px 20px;text-align:center;font-size:10px;font-weight:900;color:#64748b;text-transform:uppercase;letter-spacing:.15em;width:80px" title="AI Suite"><i class="fa-solid fa-wand-magic-sparkles"></i></th>
                                             <th style="padding:16px 20px;text-align:center;font-size:10px;font-weight:900;color:#64748b;text-transform:uppercase;letter-spacing:.15em;width:80px" title="Consumables"><i class="fa-solid fa-syringe"></i></th>
                                             <th style="padding:16px 20px;text-align:center;font-size:10px;font-weight:900;color:#64748b;text-transform:uppercase;letter-spacing:.15em;width:80px" title="Asset"><i class="fa-solid fa-warehouse"></i></th>
+                                            <th style="padding:16px 20px;text-align:center;font-size:10px;font-weight:900;color:#64748b;text-transform:uppercase;letter-spacing:.15em;width:80px" title="Scholarship"><i class="fa-solid fa-graduation-cap"></i></th>
                                             <th style="padding:16px 20px;text-align:center;font-size:10px;font-weight:900;color:#64748b;text-transform:uppercase;letter-spacing:.15em;width:100px">Status</th>
                                             <th style="padding:16px 20px;text-align:right;font-size:10px;font-weight:900;color:#64748b;text-transform:uppercase;letter-spacing:.15em">Actions</th>
                                         </tr>
@@ -2186,9 +2190,11 @@ try {
                                             $aiAccess = (int)($st['access_ai'] ?? 0);
                                             $consAccess = (int)($st['access_consumables'] ?? 0);
                                             $assetAccess = (int)($st['access_asset'] ?? 0);
+                                            $scholarAccess = (int)($st['access_scholarship'] ?? 0);
                                             $aiIcon = $aiAccess ? '<i class="fa-solid fa-circle-check text-emerald-500"></i>' : '<i class="fa-solid fa-circle-minus text-slate-200"></i>';
                                             $consIcon = $consAccess ? '<i class="fa-solid fa-circle-check text-emerald-500"></i>' : '<i class="fa-solid fa-circle-minus text-slate-200"></i>';
                                             $assetIcon = $assetAccess ? '<i class="fa-solid fa-circle-check text-emerald-500"></i>' : '<i class="fa-solid fa-circle-minus text-slate-200"></i>';
+                                            $scholarIcon = $scholarAccess ? '<i class="fa-solid fa-circle-check text-emerald-500"></i>' : '<i class="fa-solid fa-circle-minus text-slate-200"></i>';
                                             ?>
                                             <tr style="border-bottom:1px solid #f1f5f9" class="id-staff-row hover:bg-slate-50/50 transition-colors">
                                                 <td style="padding:16px 20px">
@@ -2210,6 +2216,7 @@ try {
                                                 <td style="padding:16px 20px;text-align:center"><?= $aiIcon ?></td>
                                                 <td style="padding:16px 20px;text-align:center"><?= $consIcon ?></td>
                                                 <td style="padding:16px 20px;text-align:center"><?= $assetIcon ?></td>
+                                                <td style="padding:16px 20px;text-align:center"><?= $scholarIcon ?></td>
                                                 <td style="padding:16px 20px;text-align:center">
                                                     <span style="font-size:10px;font-weight:900;padding:4px 10px;border-radius:99px;background:<?= $isActive ? '#f0fdf4;color:#16a34a;border:1px solid #bbf7d0' : '#fef2f2;color:#dc2626;border:1px solid #fecaca' ?>"><?= strtoupper($st['account_status']) ?></span>
                                                 </td>
@@ -2282,6 +2289,7 @@ try {
                                                 'access_ai'             => ['AI Suite',         '#a855f7'],
                                                 'access_consumables'    => ['Consumables',      '#f43f5e'],
                                                 'access_asset'          => ['Asset',            '#f59e0b'],
+                                                'access_scholarship'    => ['Scholarship',      '#10b981'],
                                             ];
                                             foreach ($allPositions as $pos):
                                                 $posFlags = json_decode($pos['flags'] ?? '{}', true) ?: [];
@@ -2692,6 +2700,14 @@ try {
                                                 </div>
                                                 <input type="checkbox" name="asset_access" id="govAssetAccess" value="1" style="width:16px;height:16px" onclick="event.stopPropagation()">
                                             </div>
+                                            <!-- Scholarship (นักศึกษาทุน) -->
+                                            <div onclick="document.getElementById('govScholarshipAccess').click()" class="premium-role-card" style="border-radius:14px;border:1.5px solid #e2e8f0;background:#fff;cursor:pointer;padding:12px;transition:all 0.2s;display:flex;align-items:center;justify-content:space-between">
+                                                <div style="display:flex;align-items:center;gap:10px">
+                                                    <i class="fa-solid fa-graduation-cap text-emerald-500"></i>
+                                                    <span style="font-weight:800;font-size:12px;color:#475569">นักศึกษาทุน (Scholarship)</span>
+                                                </div>
+                                                <input type="checkbox" name="scholarship_access" id="govScholarshipAccess" value="1" style="width:16px;height:16px" onclick="event.stopPropagation()">
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -2763,6 +2779,7 @@ try {
                                             'access_ai'             => ['AI Suite',         'fa-wand-magic-sparkles','#a855f7'],
                                             'access_consumables'    => ['Consumables',      'fa-syringe',            '#f43f5e'],
                                             'access_asset'          => ['Asset Inventory',  'fa-warehouse',          '#f59e0b'],
+                                            'access_scholarship'    => ['Scholarship',      'fa-graduation-cap',     '#10b981'],
                                         ];
                                         foreach ($posFlagInputs as $key => [$label, $icon, $color]):
                                         ?>
@@ -2954,7 +2971,13 @@ try {
             <!-- ════════════ SECTION: SCHOLARSHIP (นักศึกษาทุน) ════════════ -->
             <div id="section-scholarship" class="portal-section"
                 style="<?= $activeSection==='scholarship'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); background:#f8fafc; overflow-y:auto;">
-                <?php include __DIR__ . '/_partials/scholarship.php'; ?>
+                <?php
+                if ($hasScholarship) {
+                    include __DIR__ . '/_partials/scholarship.php';
+                } else {
+                    echo '<div style="padding:100px;text-align:center;font-weight:900;color:#dc2626"><i class="fa-solid fa-shield-slash mb-4" style="font-size:4rem;display:block"></i> ACCESS DENIED<br><span style="font-size:14px;color:#94a3b8;font-weight:600">ต้องมีสิทธิ์ access_scholarship</span></div>';
+                }
+                ?>
             </div>
 
             <!-- ════════════ SECTION: MANAGE INSURANCE PARTNERS ════════════ -->
@@ -3757,6 +3780,7 @@ try {
                         document.getElementById('govAiAccess').checked = parseInt(data.access_ai) === 1;
                         document.getElementById('govConsumablesAccess').checked = parseInt(data.access_consumables) === 1;
                         document.getElementById('govAssetAccess').checked = parseInt(data.access_asset) === 1;
+                        document.getElementById('govScholarshipAccess').checked = parseInt(data.access_scholarship) === 1;
 
                         // Position (Hybrid live link)
                         const posSel = document.getElementById('govPositionId');
@@ -3775,6 +3799,7 @@ try {
                     document.getElementById('govAiAccess').checked = false;
                     document.getElementById('govConsumablesAccess').checked = false;
                     document.getElementById('govAssetAccess').checked = false;
+                    document.getElementById('govScholarshipAccess').checked = false;
                     const posSel = document.getElementById('govPositionId');
                     if (posSel) { posSel.value = ''; onGovPositionChange(); }
                 }
@@ -3791,7 +3816,7 @@ try {
         const POS_FLAG_KEYS = [
             'access_eborrow','access_ecampaign','access_insurance','access_registry',
             'access_system_logs','access_site_settings','access_edms',
-            'access_ai','access_consumables','access_asset'
+            'access_ai','access_consumables','access_asset','access_scholarship'
         ];
 
         function openAddPositionModal() {
@@ -3863,6 +3888,7 @@ try {
             ['access_ai',            'govAiAccess'],
             ['access_consumables',   'govConsumablesAccess'],
             ['access_asset',         'govAssetAccess'],
+            ['access_scholarship',   'govScholarshipAccess'],
         ];
 
         function onGovPositionChange() {

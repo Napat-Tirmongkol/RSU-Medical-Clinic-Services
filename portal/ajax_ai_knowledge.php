@@ -11,10 +11,11 @@ require_once __DIR__ . '/../includes/ai_knowledge_helper.php';
 header('Content-Type: application/json; charset=utf-8');
 
 if (session_status() === PHP_SESSION_NONE) session_start();
+// Authorization: ตรงกับ section gate ใน portal/index.php — superadmin หรือมี access_ai
 $_role = $_SESSION['admin_role'] ?? '';
-if ($_role !== 'superadmin' && $_role !== 'admin') {
+if ($_role !== 'superadmin' && empty($_SESSION['access_ai'])) {
     http_response_code(403);
-    echo json_encode(['ok' => false, 'error' => 'Permission denied']);
+    echo json_encode(['ok' => false, 'error' => 'Permission denied (access_ai required)']);
     exit;
 }
 
@@ -169,6 +170,12 @@ try {
             throw new RuntimeException('Unknown action');
     }
 } catch (Throwable $e) {
+    error_log('[ajax_ai_knowledge] ' . $e->getMessage());
     http_response_code(400);
-    echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    // Validation errors (RuntimeException) สามารถโชว์ได้ — DB errors ปิด
+    $isValidation = $e instanceof RuntimeException;
+    echo json_encode([
+        'ok'    => false,
+        'error' => $isValidation ? $e->getMessage() : 'Server error',
+    ], JSON_UNESCAPED_UNICODE);
 }
