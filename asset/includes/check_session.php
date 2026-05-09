@@ -81,8 +81,14 @@ if (!function_exists('asset_can_manage')) {
 if (!function_exists('asset_require_manage')) {
     function asset_require_manage(): void {
         if (!asset_can_manage()) {
-            http_response_code(403);
-            exit('สิทธิ์ไม่เพียงพอ (admin/editor เท่านั้น)');
+            require_once __DIR__ . '/../../includes/access_denied_page.php';
+            render_access_denied([
+                'flag'       => 'role: admin / editor',
+                'module'     => 'Asset Inventory — โหมดจัดการ (admin/editor)',
+                'hub_url'    => _asset_abs_url('../portal/index.php'),
+                'logout_url' => _asset_abs_url('../portal/logout.php'),
+                'tailwind'   => _asset_abs_url('../assets/css/tailwind.min.css'),
+            ]);
         }
     }
 }
@@ -123,8 +129,14 @@ if (empty($_SESSION['is_portal_admin'])) {
             }
         }
         if ((int)$hasFlag !== 1) {
-            http_response_code(403);
-            exit('สิทธิ์ไม่เพียงพอ — โปรดติดต่อผู้ดูแลระบบเพื่อขอสิทธิ์ access_asset');
+            require_once __DIR__ . '/../../includes/access_denied_page.php';
+            render_access_denied([
+                'flag'       => 'access_asset',
+                'module'     => 'Asset Inventory (ครุภัณฑ์สำนักงาน)',
+                'hub_url'    => _asset_abs_url('../portal/index.php'),
+                'logout_url' => _asset_abs_url('../portal/logout.php'),
+                'tailwind'   => _asset_abs_url('../assets/css/tailwind.min.css'),
+            ]);
         }
     }
 }

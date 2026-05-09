@@ -77,8 +77,14 @@ if (!function_exists('csm_can_manage')) {
 if (!function_exists('csm_require_manage')) {
     function csm_require_manage(): void {
         if (!csm_can_manage()) {
-            http_response_code(403);
-            exit('สิทธิ์ไม่เพียงพอ (admin/editor เท่านั้น)');
+            require_once __DIR__ . '/../../includes/access_denied_page.php';
+            render_access_denied([
+                'flag'       => 'role: admin / editor',
+                'module'     => 'Consumables — โหมดจัดการ (admin/editor)',
+                'hub_url'    => _csm_abs_url('../portal/index.php'),
+                'logout_url' => _csm_abs_url('../portal/logout.php'),
+                'tailwind'   => _csm_abs_url('../assets/css/tailwind.min.css'),
+            ]);
         }
     }
 }
@@ -119,8 +125,14 @@ if (empty($_SESSION['is_portal_admin'])) {
             }
         }
         if ((int)$hasFlag !== 1) {
-            http_response_code(403);
-            exit('สิทธิ์ไม่เพียงพอ — โปรดติดต่อผู้ดูแลระบบเพื่อขอสิทธิ์ access_consumables');
+            require_once __DIR__ . '/../../includes/access_denied_page.php';
+            render_access_denied([
+                'flag'       => 'access_consumables',
+                'module'     => 'Consumables (สินค้าสิ้นเปลือง)',
+                'hub_url'    => _csm_abs_url('../portal/index.php'),
+                'logout_url' => _csm_abs_url('../portal/logout.php'),
+                'tailwind'   => _csm_abs_url('../assets/css/tailwind.min.css'),
+            ]);
         }
     }
 }
