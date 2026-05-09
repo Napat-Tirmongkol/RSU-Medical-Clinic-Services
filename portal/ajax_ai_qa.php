@@ -14,6 +14,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/../includes/ai_qa_helper.php';
+require_once __DIR__ . '/../includes/clinic_status_helper.php'; // CLINIC_TZ_NAME for backdated context
 
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
@@ -54,7 +55,22 @@ try {
                 'confidence' => (float)($matched['confidence'] ?? 1.0),
             ];
         } else {
-            $result = ai_qa_generate_answer($groupKey, $pdo);
+            // Backdate context to the moment the user actually asked, so AI's status/today
+            // labels match user's situation (not admin's review time, which can be hours later).
+            $askedAtRow = $pdo->prepare("
+                SELECT MIN(created_at) AS earliest
+                  FROM sys_ai_qa_log
+                 WHERE TRIM(question) = :q
+            ");
+            $askedAtRow->execute([':q' => $groupKey]);
+            $earliest = (string)($askedAtRow->fetchColumn() ?: '');
+            $askedAt = null;
+            if ($earliest !== '') {
+                try {
+                    $askedAt = new DateTimeImmutable($earliest, new DateTimeZone(CLINIC_TZ_NAME));
+                } catch (Exception) { /* keep null → falls back to "now" */ }
+            }
+            $result = ai_qa_generate_answer($groupKey, $pdo, $askedAt);
         }
 
         $upd = $pdo->prepare("
@@ -126,7 +142,15 @@ try {
                     ];
                     $reusedCnt++;
                 } else {
-                    $result = ai_qa_generate_answer($gk, $pdo);
+                    // Backdate context — same rationale as single generate above
+                    $askedAt = null;
+                    $earliest = (string)($rec['earliest'] ?? '');
+                    if ($earliest !== '') {
+                        try {
+                            $askedAt = new DateTimeImmutable($earliest, new DateTimeZone(CLINIC_TZ_NAME));
+                        } catch (Exception) { /* keep null */ }
+                    }
+                    $result = ai_qa_generate_answer($gk, $pdo, $askedAt);
                 }
                 $upd->execute([
                     ':cat'   => $result['category'],

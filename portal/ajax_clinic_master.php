@@ -605,6 +605,22 @@ try {
 
         case 'schedule:add': {
             $type = $_POST['type'] ?? 'regular';
+            // Validate start_time < end_time (skip for 'off' which has no times)
+            if ($type !== 'off') {
+                $st = trim((string)($_POST['start_time'] ?? ''));
+                $et = trim((string)($_POST['end_time']   ?? ''));
+                if ($st === '' || $et === '') {
+                    echo json_encode(['ok' => false, 'message' => 'กรุณาระบุเวลาเริ่ม-สิ้นสุด']);
+                    return;
+                }
+                if (strcmp($st, $et) >= 0) {
+                    echo json_encode([
+                        'ok' => false,
+                        'message' => "เวลาเริ่ม ({$st}) ต้องน้อยกว่าเวลาสิ้นสุด ({$et})",
+                    ]);
+                    return;
+                }
+            }
             // Block override shifts on closed-day holidays
             if ($type === 'override') {
                 $sd = trim((string)($_POST['specific_date'] ?? ''));
@@ -648,6 +664,25 @@ try {
             // When 'type' is absent  → partial drag-drop update; preserve existing type fields via COALESCE.
             $id   = (int)$_POST['id'];
             $type = isset($_POST['type']) && $_POST['type'] !== '' ? $_POST['type'] : null;
+
+            // Validate start_time < end_time
+            // Full modal save (type present, !off): both times required.
+            // Partial drag-drop (type null): validate only when both provided.
+            $stPost = isset($_POST['start_time']) ? trim((string)$_POST['start_time']) : '';
+            $etPost = isset($_POST['end_time'])   ? trim((string)$_POST['end_time'])   : '';
+            if ($type !== null && $type !== 'off') {
+                if ($stPost === '' || $etPost === '') {
+                    echo json_encode(['ok' => false, 'message' => 'กรุณาระบุเวลาเริ่ม-สิ้นสุด']);
+                    return;
+                }
+            }
+            if ($stPost !== '' && $etPost !== '' && strcmp($stPost, $etPost) >= 0) {
+                echo json_encode([
+                    'ok' => false,
+                    'message' => "เวลาเริ่ม ({$stPost}) ต้องน้อยกว่าเวลาสิ้นสุด ({$etPost})",
+                ]);
+                return;
+            }
 
             // Block override shifts on closed-day holidays (covers both modal save and drag-drop)
             $effectiveDate = null;
