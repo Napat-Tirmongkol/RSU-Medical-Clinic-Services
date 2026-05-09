@@ -42,7 +42,9 @@ try {
             $data = [
                 'enabled'                => (int)!empty($_POST['enabled']) && $_POST['enabled'] !== '0' ? 1 : 0,
                 'only_when_closed'       => !empty($_POST['only_when_closed']) && $_POST['only_when_closed'] !== '0' ? 1 : 0,
-                'rate_limit_hours'       => (int)($_POST['rate_limit_hours'] ?? 24),
+                'rate_limit_hours'       => (int)($_POST['rate_limit_hours'] ?? 0),
+                'default_reply_enabled'  => !empty($_POST['default_reply_enabled']) && $_POST['default_reply_enabled'] !== '0' ? 1 : 0,
+                'blocked_keywords'       => (string)($_POST['blocked_keywords'] ?? ''),
                 'msg_open_now_title'     => (string)($_POST['msg_open_now_title']     ?? ''),
                 'msg_open_now_sub'       => (string)($_POST['msg_open_now_sub']       ?? ''),
                 'msg_before_open_title'  => (string)($_POST['msg_before_open_title']  ?? ''),
