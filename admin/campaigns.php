@@ -342,6 +342,8 @@ require_once __DIR__ . '/includes/header.php';
     }
 
     /* ── Modal ────────────────────────────────────────────────── */
+    #campaignModal { z-index: 200; }
+    #campQrOverlay { z-index: 210; }
     .modal-glass {
         background: #fff;
         box-shadow: 0 32px 64px rgba(0,0,0,.22), 0 0 0 1px rgba(0,0,0,.04);

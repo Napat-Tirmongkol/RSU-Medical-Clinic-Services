@@ -238,8 +238,6 @@ $healthOverview = [
     'vaccine_total'      => 0,
     'vaccine_last'       => null,
     'vaccine_next_due'   => null,
-    'healthcheck_total'  => 0,
-    'healthcheck_last'   => null,
     'upcoming_list'      => [],
 ];
 if ($user && isset($pdo)) {
@@ -279,26 +277,6 @@ if ($user && isset($pdo)) {
         $ndStmt->execute([':uid' => $user['id'], ':today' => $today]);
         $healthOverview['vaccine_next_due'] = $ndStmt->fetch(PDO::FETCH_ASSOC) ?: null;
     } catch (Exception $e) { /* table may not exist yet */ }
-
-    try {
-        // Health check summary (from camp_bookings + camp_list)
-        $hcStmt = $pdo->prepare("
-            SELECT COUNT(*) AS total,
-                   MAX(s.slot_date) AS last_at
-            FROM camp_bookings b
-            JOIN camp_list c ON b.campaign_id = c.id
-            JOIN camp_slots s ON b.slot_id = s.id
-            WHERE b.student_id = :sid
-              AND c.type = 'health_check'
-              AND b.status = 'completed'
-        ");
-        $hcStmt->execute([':sid' => $user['id']]);
-        $hcRow = $hcStmt->fetch(PDO::FETCH_ASSOC);
-        if ($hcRow) {
-            $healthOverview['healthcheck_total'] = (int)($hcRow['total'] ?? 0);
-            $healthOverview['healthcheck_last']  = $hcRow['last_at'] ?: null;
-        }
-    } catch (Exception $e) { /* ignore */ }
 
     // Upcoming appointments (top 3)
     foreach ($booking_list as $b) {
@@ -464,7 +442,7 @@ if ($next_appt) {
         'kind'      => 'empty',
         'eyebrow'   => 'วันนี้ของคุณ',
         'title'     => 'ไม่มีรายการเร่งด่วน',
-        'detail'    => 'ดูแลสุขภาพของคุณ — ตรวจสุขภาพประจำปีหรือฉีดวัคซีนตามกำหนด',
+        'detail'    => 'ดูแลสุขภาพของคุณ — ฉีดวัคซีนตามกำหนดหรือดูแคมเปญที่เปิดรับ',
         'icon'      => 'fa-heart-pulse',
         'theme'     => 'brand',
         'action'    => 'showCampaigns()',
@@ -1516,16 +1494,6 @@ $heroThemes = [
                             <p class="mt-0.5 text-[10px] font-bold text-slate-500"><?= count($booking_list) ?> ครั้ง</p>
                         </a>
 
-                        <!-- Health checks — ACTIVE (existing in Health Overview modal) -->
-                        <button onclick="showVaccinationHistory()"
-                            class="text-left p-4 rounded-2xl bg-green-50/60 border border-green-100 active:scale-95 transition-all">
-                            <div class="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-green-600 shadow-sm mb-3">
-                                <i class="fa-solid fa-stethoscope"></i>
-                            </div>
-                            <p class="text-[13px] font-black text-slate-900 leading-tight">ตรวจสุขภาพ</p>
-                            <p class="mt-0.5 text-[10px] font-bold text-slate-500"><?= (int)($healthOverview['healthcheck_total'] ?? 0) ?> ครั้ง</p>
-                        </button>
-
                         <!-- Prescriptions — COMING SOON -->
                         <button onclick="showUpcoming('ใบสั่งยา / ยาที่ใช้อยู่')"
                             class="relative text-left p-4 rounded-2xl bg-slate-50 border border-slate-100 active:scale-95 transition-all opacity-90">
@@ -2416,13 +2384,11 @@ document.getElementById('insDetailModal').addEventListener('click', function(e) 
                     $hoVaccTotal     = $healthOverview['vaccine_total'];
                     $hoVaccLast      = $healthOverview['vaccine_last_detail'] ?? null;
                     $hoVaccNextDue   = $healthOverview['vaccine_next_due'] ?? null;
-                    $hoHcTotal       = $healthOverview['healthcheck_total'];
-                    $hoHcLast        = $healthOverview['healthcheck_last'];
                     $hoUpcoming      = $healthOverview['upcoming_list'];
                 ?>
 
                 <!-- Quick stats -->
-                <div class="grid grid-cols-3 gap-3">
+                <div class="grid grid-cols-2 gap-3">
                     <div class="rounded-2xl border border-emerald-100 bg-white p-4">
                         <div class="mb-2 flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
                             <i class="fa-solid fa-syringe text-sm"></i>
@@ -2430,14 +2396,6 @@ document.getElementById('insDetailModal').addEventListener('click', function(e) 
                         <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">วัคซีน</p>
                         <p class="mt-1 text-xl font-black text-slate-900"><?= $hoVaccTotal ?></p>
                         <p class="text-[10px] font-bold text-slate-400">รายการ</p>
-                    </div>
-                    <div class="rounded-2xl border border-green-100 bg-white p-4">
-                        <div class="mb-2 flex h-9 w-9 items-center justify-center rounded-xl bg-green-50 text-green-600">
-                            <i class="fa-solid fa-stethoscope text-sm"></i>
-                        </div>
-                        <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">ตรวจสุขภาพ</p>
-                        <p class="mt-1 text-xl font-black text-slate-900"><?= $hoHcTotal ?></p>
-                        <p class="text-[10px] font-bold text-slate-400">ครั้ง</p>
                     </div>
                     <div class="rounded-2xl border border-blue-100 bg-white p-4">
                         <div class="mb-2 flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
@@ -2500,24 +2458,6 @@ document.getElementById('insDetailModal').addEventListener('click', function(e) 
                             <div class="min-w-0 flex-1">
                                 <p class="truncate text-sm font-black text-slate-900"><?= htmlspecialchars($hoVaccLast['vaccine_name'], ENT_QUOTES, 'UTF-8') ?><?= $hoVaccLast['dose_number'] ? ' · เข็มที่ ' . (int)$hoVaccLast['dose_number'] : '' ?></p>
                                 <p class="text-[11px] font-bold text-slate-500"><?= htmlspecialchars(formatThaiDate(substr((string)$hoVaccLast['vaccinated_at'], 0, 10)), ENT_QUOTES, 'UTF-8') ?></p>
-                            </div>
-                        </div>
-                    <?php endif; ?>
-                </div>
-
-                <!-- Health check card -->
-                <div class="rounded-2xl border border-slate-200 bg-white p-5">
-                    <p class="mb-3 text-[11px] font-black uppercase tracking-widest text-slate-400">ตรวจสุขภาพล่าสุด</p>
-                    <?php if (!$hoHcLast): ?>
-                        <p class="py-4 text-center text-xs font-bold text-slate-400">ยังไม่มีประวัติการตรวจสุขภาพ</p>
-                    <?php else: ?>
-                        <div class="flex items-center gap-3">
-                            <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-green-50 text-green-600">
-                                <i class="fa-solid fa-stethoscope"></i>
-                            </div>
-                            <div class="min-w-0 flex-1">
-                                <p class="text-sm font-black text-slate-900">ตรวจสุขภาพ</p>
-                                <p class="text-[11px] font-bold text-slate-500"><?= htmlspecialchars(formatThaiDate($hoHcLast), ENT_QUOTES, 'UTF-8') ?></p>
                             </div>
                         </div>
                     <?php endif; ?>
