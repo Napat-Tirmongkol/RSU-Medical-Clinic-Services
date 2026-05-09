@@ -105,3 +105,40 @@
   5. `portal/index.php` Identity Governance modal: checkbox + JS load/reset + table icon column
   6. `portal/_partials/profile.php` `$accessLabels` array (self-service display)
   7. `portal/index.php` section gate ของ partial นั้นๆ + sidebar nav visibility
+
+---
+
+## Portal Sidebar — กฎการจัดกลุ่มเมนู (`portal/index.php`)
+
+Sidebar ใช้ `psb-section-label` (กลุ่ม) + `psb-item` (เมนู) — โครงสร้างแบ่งเป็น 8 sections **ห้ามเพิ่มเมนูลอยๆ** ทุกเมนูใหม่ต้องเข้ากลุ่มที่มีอยู่ หรือเพิ่ม section ใหม่ที่ตำแหน่งเหมาะสม
+
+### ลำดับ section (จากบนลงล่าง)
+1. **OVERVIEW** (icon: `fa-chart-line`) — Dashboard, โปรไฟล์ของฉัน
+2. **AI Suite** (icon: `fa-wand-magic-sparkles`) — AI Assistant, AI QA Lab, AI Prompts, AI Knowledge — ต้อง gate ด้วย `access_ai`
+3. **สิทธิ์ & ความปลอดภัย** (icon: `fa-shield-halved`) — Identity & Governance, ISO Governance
+4. **ประกันสุขภาพ** (icon: `fa-hospital-user`) — Insurance Hub, อัพโหลดรายชื่อ, สถานะเอกสาร, Insurance Partners
+5. **สื่อสาร** (icon: `fa-bullhorn`) — ประกาศ, สารบรรณอิเล็กทรอนิกส์ (EDMS)
+6. **ติดตามระบบ** (icon: `fa-binoculars`) — Activity Logs, Error Logs
+7. *(spacer `<div style="flex:1"></div>`)*
+8. **ข้อมูลหลัก** (icon: `fa-database`) — ข้อมูลคลินิก, นักศึกษาทุน, Master Data อื่นๆ
+9. **ตั้งค่า** (icon: `fa-gear`) — Settings (อยู่ล่างสุดเสมอ)
+
+### กติกาเมื่อเพิ่มเมนูใหม่
+1. **เลือก section ที่ตรงหน้าที่** — ห้ามใส่ใน OVERVIEW เป็น default
+   - งานเกี่ยวกับ AI/LLM → **AI Suite**
+   - งานเกี่ยวกับสิทธิ์/audit/ISO → **สิทธิ์ & ความปลอดภัย**
+   - ประกัน/ทะเบียนผู้ป่วย → **ประกันสุขภาพ**
+   - แจ้ง/ส่งสาร → **สื่อสาร**
+   - log/monitor → **ติดตามระบบ**
+   - master data ของคลินิก/บุคลากร → **ข้อมูลหลัก**
+   - การตั้งค่าระบบทั้งคลินิก → **ตั้งค่า**
+2. **ถ้าไม่เข้ากลุ่มไหน** → สร้าง section ใหม่พร้อม `psb-section-label` ที่มี FontAwesome icon prefix และคำอธิบายภาษาไทย
+3. **Section label format** ต้องเป็น:
+   ```html
+   <div class="psb-section-label"><i class="fa-solid fa-XXX" style="margin-right:6px;color:#XXX"></i>ชื่อกลุ่ม</div>
+   ```
+4. **Gate ทุก section** ด้วย `if (!$registryOnly && ...)` — `registryOnly` ใช้กับ partner ภายนอกที่อัพโหลดรายชื่ออย่างเดียว
+5. **เมนูที่ต้อง access flag** ใส่เงื่อนไข `$isSuper || !empty($_SESSION['access_xxx'])` เสมอ
+6. **Settings ต้องอยู่ล่างสุด** — ไม่ย้ายไปกลาง sidebar ไม่ว่ากรณีใด
+
+หลังเพิ่มเมนูใหม่ — รีวิวว่า sidebar ยังอ่านง่าย ไม่ยาวจนต้อง scroll เกินจอ desktop (>10 เมนูต่อ section ถือว่ามากเกิน → split section)
