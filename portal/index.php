@@ -949,6 +949,10 @@ try {
                     <div class="psb-icon"><i class="fa-solid fa-code" style="color:#a855f7"></i></div>
                     <span class="psb-label" style="color:#7c3aed;font-weight:900">AI Prompts</span>
                 </button>
+                <button class="psb-item <?= $activeSection==='ai_knowledge'?'psb-active':'' ?>" data-section="ai_knowledge" onclick="switchSection('ai_knowledge',this)">
+                    <div class="psb-icon"><i class="fa-solid fa-database" style="color:#10b981"></i></div>
+                    <span class="psb-label" style="color:#059669;font-weight:900">AI Knowledge</span>
+                </button>
             <?php endif; ?>
 
             <?php /* ── สิทธิ์ & ความปลอดภัย ──────────────────────────────── */ ?>
@@ -2556,6 +2560,11 @@ try {
             <div id="section-ai_prompts" class="portal-section"
                 style="<?= $activeSection==='ai_prompts'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); background:#f8fafc; overflow-y:auto;">
                 <?php include __DIR__ . '/_partials/ai_prompts.php'; ?>
+            </div>
+
+            <div id="section-ai_knowledge" class="portal-section"
+                style="<?= $activeSection==='ai_knowledge'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); background:#f8fafc; overflow-y:auto;">
+                <?php include __DIR__ . '/_partials/ai_knowledge.php'; ?>
             </div>
 
             <div id="section-ai_qa_lab" class="portal-section"

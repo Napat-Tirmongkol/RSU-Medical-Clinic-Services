@@ -140,6 +140,7 @@ function ai_qa_load_gemini_key(): string
 function ai_qa_build_clinic_context(PDO $pdo): string
 {
     require_once __DIR__ . '/clinic_status_helper.php';
+    require_once __DIR__ . '/ai_knowledge_helper.php';
 
     $tz  = new DateTimeZone(CLINIC_TZ_NAME);
     $now = new DateTimeImmutable('now', $tz);
@@ -234,6 +235,12 @@ function ai_qa_build_clinic_context(PDO $pdo): string
     } catch (PDOException) {}
     $faqText = empty($faqLines) ? '(ยังไม่มี FAQ ใน knowledge base)' : implode("\n\n", $faqLines);
 
+    // ── Custom notes (services / pricing / policies / etc.) ───────────────
+    $notesText = render_clinic_notes_block($pdo);
+    $notesSection = $notesText !== ''
+        ? "\n\n[ข้อมูลเพิ่มเติม / บริการ / ราคา / นโยบาย]\n{$notesText}"
+        : '';
+
     $todayLabel = clinic_format_thai_date($days[0]);
 
     return <<<CTX
@@ -254,7 +261,7 @@ function ai_qa_build_clinic_context(PDO $pdo): string
 {$doctorsText}
 
 [FAQ Knowledge Base]
-{$faqText}
+{$faqText}{$notesSection}
 CTX;
 }
 
