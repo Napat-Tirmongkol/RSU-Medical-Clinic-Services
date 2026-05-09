@@ -564,20 +564,32 @@ $portalCsrf = get_csrf_token();
         if (q.length < 2) { box.classList.add('hidden'); return; }
         const j = await api('students', 'search_users', { q });
         if (!j.ok || j.rows.length === 0) { box.innerHTML = '<p class="p-2 text-xs text-slate-400">ไม่พบ</p>'; box.classList.remove('hidden'); return; }
-        box.innerHTML = j.rows.map(u =>
-            `<button type="button" class="block w-full text-left px-3 py-2 hover:bg-slate-50 border-b border-slate-100 last:border-0" onclick="pickUser(${u.id}, '${escAttr(u.full_name)}')">
+        // เก็บ row ไว้ใน cache เพื่อให้ pickUser ดึงข้อมูลมาเติมฟอร์มได้ครบ
+        window.__userPickCache = {};
+        box.innerHTML = j.rows.map(u => {
+            window.__userPickCache[u.id] = u;
+            return `<button type="button" class="block w-full text-left px-3 py-2 hover:bg-slate-50 border-b border-slate-100 last:border-0" onclick="pickUser(${u.id})">
                 <span class="text-sm font-bold">${escHtml(u.full_name)}</span>
                 <span class="text-xs text-slate-500 block">${escHtml(u.phone || '')} ${escHtml(u.student_personnel_id || '')}</span>
-            </button>`).join('');
+            </button>`;
+        }).join('');
         box.classList.remove('hidden');
     }, 300));
-    window.pickUser = function(id, name) {
+    window.pickUser = function(id) {
+        const u = (window.__userPickCache || {})[id];
+        if (!u) return;
         document.getElementById('stu-user-id').value = id;
         document.getElementById('stu-user-search').value = '';
         document.getElementById('stu-user-suggest').classList.add('hidden');
         const sel = document.getElementById('stu-user-selected');
-        sel.textContent = '✓ ' + name;
+        sel.textContent = '✓ ' + u.full_name;
         sel.classList.remove('hidden');
+
+        // Auto-fill ถ้าฟิลด์ในฟอร์มยังว่างอยู่ (ไม่ทับสิ่งที่ admin พิมพ์ไว้)
+        const codeEl = document.getElementById('stu-code');
+        if (!codeEl.value.trim() && u.student_personnel_id) codeEl.value = u.student_personnel_id;
+        const facEl = document.getElementById('stu-faculty');
+        if (!facEl.value.trim() && u.department) facEl.value = u.department;
     };
 
     // ────── SHIFTS ──────

@@ -154,7 +154,8 @@ function handle_students(PDO $pdo, string $action): void
     if ($action === 'search_users') {
         $q = trim((string)($_POST['q'] ?? ''));
         if ($q === '' || mb_strlen($q) < 2) { echo json_encode(['ok' => true, 'rows' => []]); return; }
-        $stmt = $pdo->prepare("SELECT id, full_name, first_name, last_name, phone_number AS phone, student_personnel_id
+        $stmt = $pdo->prepare("SELECT id, full_name, first_name, last_name, phone_number AS phone,
+                                       student_personnel_id, department, email
             FROM sys_users
             WHERE (full_name LIKE :q1 OR first_name LIKE :q2 OR last_name LIKE :q3
                    OR phone_number LIKE :q4 OR student_personnel_id LIKE :q5 OR email LIKE :q6)
