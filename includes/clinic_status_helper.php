@@ -443,6 +443,10 @@ function get_clinic_doctors_for_date(PDO $pdo, string $date): array
     } catch (PDOException) {} // already exists → ignore
 
     try {
+        // ใช้ LEFT JOIN ms + ไม่ filter ms.is_active — ให้ตรงกับ schedule:list ใน
+        // calendar UI ที่ admin ดูอยู่ (calendar แสดง shift แม้ staff inactive)
+        // ก่อนหน้านี้ AI ใช้ INNER + ms.is_active=1 → ถ้า staff inactive ตาราง
+        // คาเลนดาร์มีหมอแต่ AI เห็น "(ไม่มีหมอออกตรวจ)" → ตอบผิด
         $stmt = $pdo->prepare("
             SELECT s.id, s.staff_id, s.type, s.specific_date, s.weekday,
                    s.start_time, s.end_time, s.service_type, s.notes,
@@ -452,9 +456,9 @@ function get_clinic_doctors_for_date(PDO $pdo, string $date): array
                    cr.name   AS room_name,
                    cr.code   AS room_code
             FROM sys_doctor_schedule s
-            JOIN sys_medical_staff ms ON s.staff_id = ms.id
+            LEFT JOIN sys_medical_staff ms ON s.staff_id = ms.id
             LEFT JOIN sys_clinic_rooms cr ON s.room_id = cr.id
-            WHERE s.is_active = 1 AND ms.is_active = 1
+            WHERE s.is_active = 1
               AND (
                   s.specific_date = :d
                   OR (
