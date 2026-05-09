@@ -413,6 +413,18 @@ const CSRF_TOKEN = <?= json_encode($csrfToken, JSON_UNESCAPED_SLASHES) ?>;
 const GPS_REQUIRED = <?= !empty($settings['gps_required']) ? 'true' : 'false' ?>;
 // ถ้าอยู่ในกะ → comp_type มาจากกะ ไม่ต้องถาม / ถ้าไม่อยู่ในกะ (ad-hoc) → ถามก่อน clock-in
 const ACTIVE_SHIFT_COMP_TYPE = <?= json_encode($activeShift['comp_type'] ?? null, JSON_UNESCAPED_SLASHES) ?>;
+// ข้อมูล clock_in ค้างอยู่ (ใช้สรุปก่อนยืนยันออกงาน)
+const OPEN_CLOCK_IN = <?php
+    if ($lastLog && $lastLog['action'] === 'clock_in' && $lastLog['status'] !== 'rejected') {
+        echo json_encode([
+            'event_at' => $lastLog['event_at'],
+            'comp_type' => $lastLog['comp_type'] ?? 'hours',
+            'status' => $lastLog['status'],
+        ], JSON_UNESCAPED_SLASHES);
+    } else {
+        echo 'null';
+    }
+?>;
 
 // Live clock
 function updateClock() {
@@ -475,7 +487,8 @@ if (btn && !btn.disabled) {
             pickedCompType = r.value;
         }
 
-        const confirm = await Swal.fire({
+        // สรุปก่อนยืนยันออกงาน — โชว์เวลาเข้างาน + ระยะเวลา + ประเภท
+        let confirmCfg = {
             title: `ยืนยัน${labelMap[action]}?`,
             text: GPS_REQUIRED
                 ? 'ระบบจะขอตำแหน่ง GPS และส่งให้เจ้าหน้าที่อนุมัติ'
@@ -485,7 +498,67 @@ if (btn && !btn.disabled) {
             confirmButtonText: `ยืนยัน${labelMap[action]}`,
             cancelButtonText: 'ยกเลิก',
             confirmButtonColor: action === 'clock_in' ? '#10b981' : '#f43f5e',
-        });
+        };
+
+        if (action === 'clock_out' && OPEN_CLOCK_IN) {
+            const inTs = new Date(OPEN_CLOCK_IN.event_at.replace(' ', 'T')).getTime();
+            const nowTs = Date.now();
+            const diffMs = Math.max(0, nowTs - inTs);
+            const totalMin = Math.floor(diffMs / 60000);
+            const hours = Math.floor(totalMin / 60);
+            const mins = totalMin % 60;
+            const decimalHours = (diffMs / 3600000).toFixed(2);
+
+            const ct = OPEN_CLOCK_IN.comp_type || 'hours';
+            const ctLabel = ct === 'paid' ? 'ค่าตอบแทน' : 'ส่งชั่วโมงทุน';
+            const ctColor = ct === 'paid' ? '#92400e' : '#065f46';
+            const ctBg = ct === 'paid' ? '#fffbeb' : '#ecfdf5';
+            const ctBorder = ct === 'paid' ? '#fde68a' : '#a7f3d0';
+            const ctIcon = ct === 'paid' ? 'fa-coins' : 'fa-graduation-cap';
+
+            const inTimeStr = OPEN_CLOCK_IN.event_at.slice(11, 16);
+            const inDateStr = OPEN_CLOCK_IN.event_at.slice(0, 10);
+            const todayStr = new Date().toISOString().slice(0, 10);
+            const inDisplay = inDateStr === todayStr
+                ? `วันนี้ ${inTimeStr}`
+                : `${inDateStr} ${inTimeStr}`;
+            const noteMsg = OPEN_CLOCK_IN.status === 'pending'
+                ? '<p style="font-size:.7rem;color:#f59e0b;margin-top:.5rem"><i class="fa-solid fa-circle-info"></i> clock-in ยังรออนุมัติ — ชั่วโมงจะนับเมื่ออนุมัติครบทั้งคู่</p>'
+                : '';
+
+            confirmCfg = {
+                title: 'ยืนยันออกงาน?',
+                html: `
+                    <div style="text-align:left;background:#f8fafc;border-radius:1rem;padding:1rem;margin:.75rem 0">
+                        <div style="display:flex;justify-content:space-between;font-size:.8rem;color:#64748b;margin-bottom:.5rem">
+                            <span>เข้างานเมื่อ</span>
+                            <span style="font-weight:800;color:#0f172a">${inDisplay}</span>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;font-size:.8rem;color:#64748b;margin-bottom:.75rem">
+                            <span>ประเภท</span>
+                            <span style="display:inline-flex;align-items:center;gap:.25rem;padding:.15rem .5rem;border-radius:99px;background:${ctBg};border:1px solid ${ctBorder};color:${ctColor};font-weight:800;font-size:.7rem">
+                                <i class="fa-solid ${ctIcon}"></i>${ctLabel}
+                            </span>
+                        </div>
+                        <div style="border-top:1px dashed #cbd5e1;padding-top:.75rem;text-align:center">
+                            <p style="font-size:.7rem;color:#64748b;text-transform:uppercase;letter-spacing:.05em;font-weight:800;margin:0">รวมเวลาทำงาน</p>
+                            <p style="font-size:1.75rem;font-weight:900;color:#0f172a;margin:.25rem 0;font-variant-numeric:tabular-nums">
+                                ${hours} ชม. ${mins} นาที
+                            </p>
+                            <p style="font-size:.75rem;color:#94a3b8;margin:0">≈ ${decimalHours} ชั่วโมง</p>
+                        </div>
+                        ${noteMsg}
+                    </div>
+                    <p style="font-size:.8rem;color:#64748b;margin:.5rem 0 0">${GPS_REQUIRED ? 'ระบบจะขอตำแหน่ง GPS และส่งให้เจ้าหน้าที่อนุมัติ' : 'ส่งคำขอให้เจ้าหน้าที่อนุมัติด้วยตนเอง'}</p>
+                `,
+                showCancelButton: true,
+                confirmButtonText: 'ยืนยันออกงาน',
+                cancelButtonText: 'ยกเลิก',
+                confirmButtonColor: '#f43f5e',
+            };
+        }
+
+        const confirm = await Swal.fire(confirmCfg);
         if (!confirm.isConfirmed) return;
 
         async function submitClock(lat, lng, accuracy) {
