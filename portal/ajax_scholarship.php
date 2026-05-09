@@ -32,6 +32,7 @@ $adminId = (int)($_SESSION['admin_id'] ?? $_SESSION['student_id'] ?? 0);
 
 try {
     switch ($entity) {
+        case 'dashboard':   handle_dashboard($pdo, $action); break;
         case 'approvals':   handle_approvals($pdo, $action, $adminId); break;
         case 'students':    handle_students($pdo, $action); break;
         case 'shifts':      handle_shifts($pdo, $action, $adminId); break;
@@ -44,6 +45,174 @@ try {
 } catch (Throwable $e) {
     error_log('[ajax_scholarship] ' . $e->getMessage());
     echo json_encode(['ok' => false, 'error' => 'Server error: ' . $e->getMessage()]);
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// DASHBOARD
+// ─────────────────────────────────────────────────────────────────────
+function handle_dashboard(PDO $pdo, string $action): void
+{
+    if ($action !== 'get') { echo json_encode(['ok' => false, 'error' => 'Unknown action']); return; }
+
+    $today = date('Y-m-d');
+    $monthFrom = date('Y-m-01');
+    $monthTo = date('Y-m-t');
+    $from30 = date('Y-m-d', strtotime('-29 days'));
+
+    // KPIs ─────────────────────────────────
+    $activeStudents = (int)$pdo->query("SELECT COUNT(*) FROM sys_scholarship_students WHERE status='active'")->fetchColumn();
+    $pendingCount = (int)$pdo->query("SELECT COUNT(*) FROM sys_scholarship_clock_logs WHERE status='pending'")->fetchColumn();
+    $todayShifts = (int)$pdo->query("SELECT COUNT(*) FROM sys_scholarship_shifts WHERE shift_date='$today' AND status != 'cancelled'")->fetchColumn();
+
+    // ชั่วโมงเดือนนี้รวมทุกคน (แยกประเภท)
+    $monthSplit = ['hours' => 0.0, 'paid' => 0.0];
+    $stmt = $pdo->query("SELECT id FROM sys_scholarship_students WHERE status='active'");
+    $activeIds = $stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
+    foreach ($activeIds as $sid) {
+        $split = sum_scholarship_hours_split($pdo, (int)$sid, $monthFrom, $monthTo);
+        $monthSplit['hours'] += $split['hours'];
+        $monthSplit['paid']  += $split['paid'];
+    }
+
+    // Daily 30-day chart ──────────────────
+    $daily = compute_dashboard_daily($pdo, $from30, $today);
+    // เติมวันที่ขาดเป็น 0 และเรียงตามลำดับ
+    $dailyArr = [];
+    for ($i = 29; $i >= 0; $i--) {
+        $d = date('Y-m-d', strtotime("-$i days"));
+        $dailyArr[] = [
+            'date' => $d,
+            'label' => date('d/m', strtotime($d)),
+            'hours' => $daily[$d]['hours'] ?? 0,
+            'paid'  => $daily[$d]['paid']  ?? 0,
+        ];
+    }
+
+    // Top 5 students this month ───────────
+    $topRows = [];
+    foreach ($activeIds as $sid) {
+        $split = sum_scholarship_hours_split($pdo, (int)$sid, $monthFrom, $monthTo);
+        $sum = $split['hours'] + $split['paid'];
+        if ($sum <= 0) continue;
+        $topRows[] = [
+            'student_id' => (int)$sid,
+            'hours_scholarship' => $split['hours'],
+            'hours_paid'  => $split['paid'],
+            'total' => $sum,
+        ];
+    }
+    usort($topRows, fn($a, $b) => $b['total'] <=> $a['total']);
+    $topRows = array_slice($topRows, 0, 5);
+    // เติมชื่อ
+    if ($topRows) {
+        $ids = implode(',', array_map(fn($r) => (int)$r['student_id'], $topRows));
+        $names = $pdo->query("SELECT s.id, u.full_name, s.student_code, s.faculty
+            FROM sys_scholarship_students s
+            INNER JOIN sys_users u ON u.id = s.user_id
+            WHERE s.id IN ($ids)")->fetchAll(PDO::FETCH_ASSOC);
+        $nameMap = [];
+        foreach ($names as $n) $nameMap[$n['id']] = $n;
+        foreach ($topRows as &$tr) {
+            $info = $nameMap[$tr['student_id']] ?? null;
+            $tr['full_name'] = $info['full_name'] ?? '-';
+            $tr['student_code'] = $info['student_code'] ?? '';
+            $tr['faculty'] = $info['faculty'] ?? '';
+        }
+    }
+
+    // Today's shift status ────────────────
+    $shStmt = $pdo->prepare("SELECT sh.*, u.full_name AS student_name, s.student_code
+        FROM sys_scholarship_shifts sh
+        INNER JOIN sys_scholarship_students s ON s.id = sh.student_id
+        INNER JOIN sys_users u ON u.id = s.user_id
+        WHERE sh.shift_date = :today AND sh.status != 'cancelled'
+        ORDER BY sh.start_time ASC");
+    $shStmt->execute([':today' => $today]);
+    $todayList = $shStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    foreach ($todayList as &$sh) {
+        // ตรวจว่ามี clock_in ของวันนี้ของ student คนนี้บ้างไหม
+        $cl = $pdo->prepare("SELECT action, status, event_at FROM sys_scholarship_clock_logs
+            WHERE student_id = :sid AND event_at >= :start
+            ORDER BY event_at DESC LIMIT 1");
+        $cl->execute([':sid' => $sh['student_id'], ':start' => $today . ' 00:00:00']);
+        $latest = $cl->fetch(PDO::FETCH_ASSOC);
+        if (!$latest) {
+            $sh['arrival_status'] = 'absent';
+        } elseif ($latest['action'] === 'clock_in') {
+            $sh['arrival_status'] = 'in';
+        } else {
+            $sh['arrival_status'] = 'out';
+        }
+        $sh['latest_event_at'] = $latest['event_at'] ?? null;
+    }
+
+    // Recent activity (10 latest) ─────────
+    $recent = $pdo->query("SELECT l.*, u.full_name AS student_name
+        FROM sys_scholarship_clock_logs l
+        INNER JOIN sys_scholarship_students s ON s.id = l.student_id
+        INNER JOIN sys_users u ON u.id = s.user_id
+        ORDER BY l.event_at DESC LIMIT 10")->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+    echo json_encode([
+        'ok' => true,
+        'kpis' => [
+            'active_students' => $activeStudents,
+            'pending' => $pendingCount,
+            'today_shifts' => $todayShifts,
+            'month_hours' => round($monthSplit['hours'], 1),
+            'month_paid' => round($monthSplit['paid'], 1),
+        ],
+        'daily' => $dailyArr,
+        'top' => $topRows,
+        'today_list' => $todayList,
+        'recent' => $recent,
+    ], JSON_UNESCAPED_UNICODE);
+}
+
+function compute_dashboard_daily(PDO $pdo, string $fromDate, string $toDate): array
+{
+    $stmt = $pdo->prepare("SELECT student_id, action, comp_type, event_at
+        FROM sys_scholarship_clock_logs
+        WHERE status = 'approved'
+          AND event_at >= :from AND event_at <= :to
+        ORDER BY student_id ASC, event_at ASC, id ASC");
+    $stmt->execute([':from' => $fromDate . ' 00:00:00', ':to' => $toDate . ' 23:59:59']);
+    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    $byDate = [];
+    $openByStudent = [];
+    foreach ($rows as $r) {
+        $sid = (int)$r['student_id'];
+        if ($r['action'] === 'clock_in') {
+            $openByStudent[$sid] = $r;
+        } elseif ($r['action'] === 'clock_out' && isset($openByStudent[$sid])) {
+            $in = $openByStudent[$sid];
+            $sec = max(0, strtotime($r['event_at']) - strtotime($in['event_at']));
+            $h = (int)floor($sec / 3600);
+            if ($h > 0) {
+                $date = substr($in['event_at'], 0, 10);
+                $type = $in['comp_type'] ?? 'hours';
+                if (!isset($byDate[$date])) $byDate[$date] = ['hours' => 0, 'paid' => 0];
+                $byDate[$date][$type] += $h;
+            }
+            unset($openByStudent[$sid]);
+        }
+    }
+
+    // ผนวก adjustments เข้าไปด้วย
+    $adj = $pdo->prepare("SELECT adjusted_date, comp_type, SUM(hours_delta) AS total
+        FROM sys_scholarship_manual_adjustments
+        WHERE adjusted_date >= :from AND adjusted_date <= :to
+        GROUP BY adjusted_date, comp_type");
+    $adj->execute([':from' => $fromDate, ':to' => $toDate]);
+    foreach ($adj->fetchAll(PDO::FETCH_ASSOC) as $a) {
+        $d = $a['adjusted_date'];
+        $t = $a['comp_type'];
+        if (!isset($byDate[$d])) $byDate[$d] = ['hours' => 0, 'paid' => 0];
+        $byDate[$d][$t] += (float)$a['total'];
+    }
+
+    return $byDate;
 }
 
 // ─────────────────────────────────────────────────────────────────────

@@ -22,8 +22,27 @@ require_once __DIR__ . '/../../includes/csrf.php';
 $portalCsrf = get_csrf_token();
 ?>
 
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
 <style>
     .sch-card { background:#fff; border:1.5px solid #e2e8f0; border-radius:1.25rem; padding:1.5rem; }
+    .sch-kpi {
+        background:#fff; border:1.5px solid #e2e8f0; border-radius:1.25rem;
+        padding:1.25rem; position:relative; overflow:hidden;
+    }
+    .sch-kpi-icon {
+        position:absolute; top:1rem; right:1rem; width:2.5rem; height:2.5rem;
+        border-radius:.75rem; display:flex; align-items:center; justify-content:center;
+        font-size:1.05rem;
+    }
+    .sch-kpi-label { font-size:.7rem; font-weight:800; color:#64748b; text-transform:uppercase; letter-spacing:.05em; }
+    .sch-kpi-value { font-size:1.875rem; font-weight:900; color:#0f172a; margin-top:.5rem; line-height:1; }
+    .sch-kpi-foot { font-size:.72rem; color:#94a3b8; margin-top:.4rem; }
+    .sch-rank-pill {
+        display:inline-flex; align-items:center; justify-content:center;
+        width:1.5rem; height:1.5rem; border-radius:99px;
+        font-size:.7rem; font-weight:900; color:#fff;
+    }
     .sch-tab {
         padding:.65rem 1.1rem; border-radius:.85rem; font-size:.85rem; font-weight:800;
         color:#475569; cursor:pointer; transition:all .15s; white-space:nowrap;
@@ -104,7 +123,10 @@ $portalCsrf = get_csrf_token();
 
     <!-- Tabs -->
     <div class="flex gap-2 mb-5 overflow-x-auto pb-2">
-        <button class="sch-tab active" data-tab="approvals">
+        <button class="sch-tab active" data-tab="dashboard">
+            <i class="fa-solid fa-chart-pie mr-1.5"></i>Dashboard
+        </button>
+        <button class="sch-tab" data-tab="approvals">
             <i class="fa-solid fa-circle-check mr-1.5"></i>รออนุมัติ
             <?php if ($cntPending > 0): ?><span class="sch-badge"><?= $cntPending > 99 ? '99+' : $cntPending ?></span><?php endif; ?>
         </button>
@@ -122,8 +144,78 @@ $portalCsrf = get_csrf_token();
         </button>
     </div>
 
+    <!-- ─── TAB: DASHBOARD ─── -->
+    <div class="sch-pane" data-pane="dashboard">
+
+        <!-- KPI cards -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3 mb-5">
+            <div class="sch-kpi">
+                <div class="sch-kpi-icon" style="background:#dbeafe;color:#2563eb"><i class="fa-solid fa-graduation-cap"></i></div>
+                <p class="sch-kpi-label">นักศึกษา Active</p>
+                <p class="sch-kpi-value" id="kpi-students">–</p>
+                <p class="sch-kpi-foot">คน</p>
+            </div>
+            <div class="sch-kpi">
+                <div class="sch-kpi-icon" style="background:#fee2e2;color:#dc2626"><i class="fa-solid fa-bell"></i></div>
+                <p class="sch-kpi-label">รออนุมัติ</p>
+                <p class="sch-kpi-value text-rose-600" id="kpi-pending">–</p>
+                <p class="sch-kpi-foot">รายการ</p>
+            </div>
+            <div class="sch-kpi">
+                <div class="sch-kpi-icon" style="background:#cffafe;color:#0891b2"><i class="fa-solid fa-calendar-day"></i></div>
+                <p class="sch-kpi-label">กะวันนี้</p>
+                <p class="sch-kpi-value text-cyan-600" id="kpi-today">–</p>
+                <p class="sch-kpi-foot">กะ</p>
+            </div>
+            <div class="sch-kpi">
+                <div class="sch-kpi-icon" style="background:#d1fae5;color:#059669"><i class="fa-solid fa-graduation-cap"></i></div>
+                <p class="sch-kpi-label">ชม.ทุน เดือนนี้</p>
+                <p class="sch-kpi-value text-emerald-600" id="kpi-month-hours">–</p>
+                <p class="sch-kpi-foot">ชั่วโมง</p>
+            </div>
+            <div class="sch-kpi">
+                <div class="sch-kpi-icon" style="background:#fef3c7;color:#d97706"><i class="fa-solid fa-coins"></i></div>
+                <p class="sch-kpi-label">ชม.ค่าตอบแทน เดือนนี้</p>
+                <p class="sch-kpi-value text-amber-600" id="kpi-month-paid">–</p>
+                <p class="sch-kpi-foot">ชั่วโมง</p>
+            </div>
+        </div>
+
+        <!-- Charts row -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-3 mb-5">
+            <div class="sch-card lg:col-span-2">
+                <h3 class="text-sm font-black text-slate-900 mb-3">ชั่วโมงรายวัน 30 วันล่าสุด</h3>
+                <div style="position:relative;height:280px"><canvas id="chart-daily"></canvas></div>
+            </div>
+            <div class="sch-card">
+                <h3 class="text-sm font-black text-slate-900 mb-3">สัดส่วนเดือนนี้</h3>
+                <div style="position:relative;height:280px"><canvas id="chart-split"></canvas></div>
+            </div>
+        </div>
+
+        <!-- Lower row: top + today status -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-3 mb-5">
+            <div class="sch-card">
+                <h3 class="text-sm font-black text-slate-900 mb-3"><i class="fa-solid fa-trophy text-amber-500 mr-1"></i>Top 5 เดือนนี้</h3>
+                <div id="dash-top-wrap"></div>
+            </div>
+            <div class="sch-card">
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="text-sm font-black text-slate-900"><i class="fa-solid fa-calendar-day text-cyan-500 mr-1"></i>กะวันนี้</h3>
+                </div>
+                <div id="dash-today-wrap"></div>
+            </div>
+        </div>
+
+        <!-- Recent activity -->
+        <div class="sch-card">
+            <h3 class="text-sm font-black text-slate-900 mb-3"><i class="fa-solid fa-clock-rotate-left text-slate-400 mr-1"></i>กิจกรรมล่าสุด</h3>
+            <div id="dash-recent-wrap"></div>
+        </div>
+    </div>
+
     <!-- ─── TAB: APPROVALS ─── -->
-    <div class="sch-pane" data-pane="approvals">
+    <div class="sch-pane hidden" data-pane="approvals">
         <div class="sch-card">
             <div class="flex items-center justify-between mb-4">
                 <h3 class="text-base font-black text-slate-900">รายการรออนุมัติ</h3>
@@ -442,6 +534,7 @@ $portalCsrf = get_csrf_token();
                 p.classList.toggle('hidden', p.dataset.pane !== tab);
             });
             const loader = ({
+                dashboard: loadDashboard,
                 approvals: loadApprovals,
                 students: loadStudents,
                 shifts: loadShifts,
@@ -462,6 +555,150 @@ $portalCsrf = get_csrf_token();
         return r.json();
     }
     window.__schApi = api;
+
+    // ────── DASHBOARD ──────
+    let dashChartDaily = null, dashChartSplit = null;
+
+    async function loadDashboard() {
+        const j = await api('dashboard', 'get', {});
+        if (!j.ok) {
+            document.getElementById('kpi-students').textContent = 'Err';
+            return;
+        }
+        // KPIs
+        document.getElementById('kpi-students').textContent = j.kpis.active_students;
+        document.getElementById('kpi-pending').textContent = j.kpis.pending;
+        document.getElementById('kpi-today').textContent = j.kpis.today_shifts;
+        document.getElementById('kpi-month-hours').textContent = j.kpis.month_hours.toFixed(1);
+        document.getElementById('kpi-month-paid').textContent = j.kpis.month_paid.toFixed(1);
+
+        // Daily chart
+        const labels = j.daily.map(d => d.label);
+        const dataHours = j.daily.map(d => d.hours);
+        const dataPaid = j.daily.map(d => d.paid);
+        if (dashChartDaily) dashChartDaily.destroy();
+        dashChartDaily = new Chart(document.getElementById('chart-daily'), {
+            type: 'bar',
+            data: {
+                labels,
+                datasets: [
+                    { label: 'ส่งชั่วโมงทุน', data: dataHours, backgroundColor: '#10b981', stack: 'h' },
+                    { label: 'ค่าตอบแทน',     data: dataPaid,  backgroundColor: '#f59e0b', stack: 'h' },
+                ],
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { position: 'bottom', labels: { font: { weight: 'bold' } } } },
+                scales: {
+                    x: { stacked: true, ticks: { font: { size: 10 } } },
+                    y: { stacked: true, beginAtZero: true, ticks: { precision: 0 } },
+                },
+            },
+        });
+
+        // Split donut
+        if (dashChartSplit) dashChartSplit.destroy();
+        const splitTotal = j.kpis.month_hours + j.kpis.month_paid;
+        if (splitTotal > 0) {
+            dashChartSplit = new Chart(document.getElementById('chart-split'), {
+                type: 'doughnut',
+                data: {
+                    labels: ['ส่งชั่วโมงทุน', 'ค่าตอบแทน'],
+                    datasets: [{
+                        data: [j.kpis.month_hours, j.kpis.month_paid],
+                        backgroundColor: ['#10b981', '#f59e0b'],
+                        borderWidth: 0,
+                    }],
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false, cutout: '65%',
+                    plugins: {
+                        legend: { position: 'bottom', labels: { font: { weight: 'bold' } } },
+                        tooltip: { callbacks: { label: c => `${c.label}: ${c.parsed.toFixed(1)} ชม.` } },
+                    },
+                },
+            });
+        } else {
+            const ctx = document.getElementById('chart-split');
+            ctx.parentElement.innerHTML = '<p class="text-center text-sm text-slate-400 py-20">ยังไม่มีข้อมูลเดือนนี้</p>';
+        }
+
+        // Top
+        const tw = document.getElementById('dash-top-wrap');
+        if (j.top.length === 0) {
+            tw.innerHTML = '<p class="text-center text-sm text-slate-400 py-6">ยังไม่มีข้อมูลเดือนนี้</p>';
+        } else {
+            const medals = ['#fbbf24', '#94a3b8', '#d97706', '#64748b', '#64748b'];
+            tw.innerHTML = '<div class="space-y-2">' + j.top.map((r, i) => `
+                <div class="flex items-center gap-3 p-2 rounded-xl hover:bg-slate-50">
+                    <span class="sch-rank-pill" style="background:${medals[i] || '#64748b'}">${i + 1}</span>
+                    <div class="flex-1 min-w-0">
+                        <p class="font-black text-sm text-slate-900 truncate">${escHtml(r.full_name)}</p>
+                        <p class="text-xs text-slate-500 truncate">${escHtml(r.student_code || '-')} · ${escHtml(r.faculty || '-')}</p>
+                    </div>
+                    <div class="text-right shrink-0">
+                        <p class="font-black text-sm">${parseFloat(r.total).toFixed(1)} <span class="text-xs text-slate-400 font-normal">ชม.</span></p>
+                        <p class="text-[10px] text-slate-500">
+                            <span class="text-emerald-600">🎓 ${parseFloat(r.hours_scholarship).toFixed(0)}</span> ·
+                            <span class="text-amber-600">🪙 ${parseFloat(r.hours_paid).toFixed(0)}</span>
+                        </p>
+                    </div>
+                </div>`).join('') + '</div>';
+        }
+
+        // Today's shift status
+        const dw = document.getElementById('dash-today-wrap');
+        if (j.today_list.length === 0) {
+            dw.innerHTML = '<p class="text-center text-sm text-slate-400 py-6">วันนี้ไม่มีกะ</p>';
+        } else {
+            dw.innerHTML = '<div class="space-y-2">' + j.today_list.map(sh => {
+                const stat = ({
+                    in:     ['bg-emerald-50 text-emerald-700', 'fa-circle-check', 'อยู่ในงาน'],
+                    out:    ['bg-slate-100 text-slate-500',    'fa-circle-stop',  'ออกแล้ว'],
+                    absent: ['bg-rose-50 text-rose-600',       'fa-circle-xmark', 'ยังไม่มา'],
+                })[sh.arrival_status] || ['bg-slate-50 text-slate-500', 'fa-question', '-'];
+                const ct = (sh.comp_type || 'hours') === 'paid'
+                    ? '<i class="fa-solid fa-coins text-amber-500 text-[10px]" title="ค่าตอบแทน"></i>'
+                    : '<i class="fa-solid fa-graduation-cap text-emerald-500 text-[10px]" title="ทุน"></i>';
+                return `<div class="flex items-center gap-3 p-2 rounded-xl bg-slate-50">
+                    <div class="text-xs font-mono font-black text-slate-700 shrink-0" style="min-width:75px">
+                        ${sh.start_time.substr(0,5)}–${sh.end_time.substr(0,5)}
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-bold text-slate-900 truncate">${escHtml(sh.student_name)} ${ct}</p>
+                        <p class="text-[10px] text-slate-500 truncate">${escHtml(sh.student_code || '-')}</p>
+                    </div>
+                    <span class="sch-status-badge ${stat[0]} shrink-0">
+                        <i class="fa-solid ${stat[1]} mr-1"></i>${stat[2]}
+                    </span>
+                </div>`;
+            }).join('') + '</div>';
+        }
+
+        // Recent activity
+        const rw = document.getElementById('dash-recent-wrap');
+        if (j.recent.length === 0) {
+            rw.innerHTML = '<p class="text-center text-sm text-slate-400 py-6">ยังไม่มีกิจกรรม</p>';
+        } else {
+            rw.innerHTML = '<div class="grid grid-cols-1 md:grid-cols-2 gap-2">' + j.recent.map(l => {
+                const isIn = l.action === 'clock_in';
+                const stat = ({
+                    pending:  ['text-rose-600', 'รออนุมัติ'],
+                    approved: ['text-emerald-600', 'อนุมัติ'],
+                    rejected: ['text-slate-500', 'ปฏิเสธ'],
+                })[l.status] || ['text-slate-500', l.status];
+                const ct = (l.comp_type || 'hours') === 'paid' ? 'fa-coins text-amber-500' : 'fa-graduation-cap text-emerald-500';
+                return `<div class="flex items-center gap-2 p-2 rounded-xl hover:bg-slate-50 text-xs">
+                    <i class="fa-solid ${isIn ? 'fa-right-to-bracket text-emerald-500' : 'fa-right-from-bracket text-rose-500'}"></i>
+                    <span class="font-bold text-slate-700 truncate flex-1">${escHtml(l.student_name)}</span>
+                    <i class="fa-solid ${ct} text-[10px]"></i>
+                    <span class="text-slate-400 font-mono">${l.event_at.substr(5, 11)}</span>
+                    <span class="font-bold ${stat[0]}">${stat[1]}</span>
+                </div>`;
+            }).join('') + '</div>';
+        }
+    }
+    window.loadDashboard = loadDashboard;
 
     // ────── APPROVALS ──────
     async function loadApprovals() {
@@ -1023,7 +1260,7 @@ $portalCsrf = get_csrf_token();
         return html;
     }
 
-    // ── Init: load default tab
-    loadApprovals();
+    // ── Init: load default tab (Dashboard)
+    loadDashboard();
 })();
 </script>
