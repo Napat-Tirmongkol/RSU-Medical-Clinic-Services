@@ -927,7 +927,7 @@ try {
 
             <?php /* ── OVERVIEW ───────────────────────────────────────────── */ ?>
             <?php if (!$registryOnly): ?>
-                <div class="psb-section-label" style="margin-top:4px">OVERVIEW</div>
+                <div class="psb-section-label" style="margin-top:4px"><i class="fa-solid fa-chart-line" style="margin-right:6px;color:#94a3b8"></i>OVERVIEW</div>
                 <button class="psb-item <?= $activeSection==='dashboard'?'psb-active':'' ?>" data-section="dashboard" onclick="switchSection('dashboard',this)">
                     <div class="psb-icon"><i class="fa-solid fa-chart-pie" style="color:#059669"></i></div>
                     <span class="psb-label" style="color:#059669;font-weight:900">Dashboard</span>
@@ -938,29 +938,32 @@ try {
                         <span class="psb-label" style="color:#0e7490;font-weight:900">โปรไฟล์ของฉัน</span>
                     </button>
                 <?php endif; ?>
-                <?php if ($isSuper || !empty($_SESSION['access_ai'])): ?>
-                    <button class="psb-item" data-section="ai_assistant" onclick="switchSection('ai_assistant',this)">
-                        <div class="psb-icon"><i class="fa-solid fa-wand-magic-sparkles" style="color:#8b5cf6"></i></div>
-                        <span class="psb-label" style="color:#7c3aed;font-weight:900">AI Assistant</span>
-                    </button>
-                    <button class="psb-item <?= $activeSection==='ai_qa_lab'?'psb-active':'' ?>" data-section="ai_qa_lab" onclick="switchSection('ai_qa_lab',this)">
-                        <div class="psb-icon"><i class="fa-solid fa-flask-vial" style="color:#a855f7"></i></div>
-                        <span class="psb-label" style="color:#7c3aed;font-weight:900">AI QA Lab</span>
-                    </button>
-                    <button class="psb-item <?= $activeSection==='ai_prompts'?'psb-active':'' ?>" data-section="ai_prompts" onclick="switchSection('ai_prompts',this)">
-                        <div class="psb-icon"><i class="fa-solid fa-code" style="color:#a855f7"></i></div>
-                        <span class="psb-label" style="color:#7c3aed;font-weight:900">AI Prompts</span>
-                    </button>
-                    <button class="psb-item <?= $activeSection==='ai_knowledge'?'psb-active':'' ?>" data-section="ai_knowledge" onclick="switchSection('ai_knowledge',this)">
-                        <div class="psb-icon"><i class="fa-solid fa-database" style="color:#10b981"></i></div>
-                        <span class="psb-label" style="color:#059669;font-weight:900">AI Knowledge</span>
-                    </button>
-                <?php endif; ?>
+            <?php endif; ?>
+
+            <?php /* ── AI SUITE ────────────────────────────────────────────── */ ?>
+            <?php if (!$registryOnly && ($isSuper || !empty($_SESSION['access_ai']))): ?>
+                <div class="psb-section-label"><i class="fa-solid fa-wand-magic-sparkles" style="margin-right:6px;color:#a855f7"></i>AI Suite</div>
+                <button class="psb-item" data-section="ai_assistant" onclick="switchSection('ai_assistant',this)">
+                    <div class="psb-icon"><i class="fa-solid fa-wand-magic-sparkles" style="color:#8b5cf6"></i></div>
+                    <span class="psb-label" style="color:#7c3aed;font-weight:900">AI Assistant</span>
+                </button>
+                <button class="psb-item <?= $activeSection==='ai_qa_lab'?'psb-active':'' ?>" data-section="ai_qa_lab" onclick="switchSection('ai_qa_lab',this)">
+                    <div class="psb-icon"><i class="fa-solid fa-flask-vial" style="color:#a855f7"></i></div>
+                    <span class="psb-label" style="color:#7c3aed;font-weight:900">AI QA Lab</span>
+                </button>
+                <button class="psb-item <?= $activeSection==='ai_prompts'?'psb-active':'' ?>" data-section="ai_prompts" onclick="switchSection('ai_prompts',this)">
+                    <div class="psb-icon"><i class="fa-solid fa-code" style="color:#a855f7"></i></div>
+                    <span class="psb-label" style="color:#7c3aed;font-weight:900">AI Prompts</span>
+                </button>
+                <button class="psb-item <?= $activeSection==='ai_knowledge'?'psb-active':'' ?>" data-section="ai_knowledge" onclick="switchSection('ai_knowledge',this)">
+                    <div class="psb-icon"><i class="fa-solid fa-database" style="color:#10b981"></i></div>
+                    <span class="psb-label" style="color:#059669;font-weight:900">AI Knowledge</span>
+                </button>
             <?php endif; ?>
 
             <?php /* ── สิทธิ์ & ความปลอดภัย ──────────────────────────────── */ ?>
             <?php if (!$registryOnly): ?>
-                <div class="psb-section-label">สิทธิ์ &amp; ความปลอดภัย</div>
+                <div class="psb-section-label"><i class="fa-solid fa-shield-halved" style="margin-right:6px;color:#2563eb"></i>สิทธิ์ &amp; ความปลอดภัย</div>
                 <button class="psb-item" data-section="identity" onclick="switchSection('identity',this)">
                     <div class="psb-icon"><i class="fa-solid fa-id-card-clip" style="color:#2563eb"></i></div>
                     <span class="psb-label" style="color:#1d4ed8;font-weight:900">Identity &amp; Governance</span>
@@ -975,7 +978,7 @@ try {
 
             <?php /* ── ประกันสุขภาพ ─────────────────────────────────────── */ ?>
             <?php if (!$registryOnly || $hasRegistry || $hasInsurance): ?>
-                <div class="psb-section-label">ประกันสุขภาพ</div>
+                <div class="psb-section-label"><i class="fa-solid fa-hospital-user" style="margin-right:6px;color:#0ea5e9"></i>ประกันสุขภาพ</div>
                 <?php if (!$registryOnly): ?>
                     <button class="psb-item" data-section="insurance_sync" onclick="switchSection('insurance_sync',this)">
                         <div class="psb-icon"><i class="fa-solid fa-shield-halved" style="color:#0ea5e9"></i></div>
@@ -1004,7 +1007,7 @@ try {
 
             <?php /* ── สื่อสาร ──────────────────────────────────────────── */ ?>
             <?php if (!$registryOnly): ?>
-                <div class="psb-section-label">สื่อสาร</div>
+                <div class="psb-section-label"><i class="fa-solid fa-bullhorn" style="margin-right:6px;color:#7c3aed"></i>สื่อสาร</div>
                 <button class="psb-item" data-section="announcements" onclick="switchSection('announcements',this)">
                     <div class="psb-icon"><i class="fa-solid fa-bullhorn" style="color:#7c3aed"></i></div>
                     <span class="psb-label" style="color:#6d28d9;font-weight:900">ประกาศ</span>
@@ -1024,7 +1027,7 @@ try {
 
             <?php /* ── ติดตามระบบ ──────────────────────────────────────── */ ?>
             <?php if (!$registryOnly && $hasSysLogs): ?>
-                <div class="psb-section-label">ติดตามระบบ</div>
+                <div class="psb-section-label"><i class="fa-solid fa-binoculars" style="margin-right:6px;color:#64748b"></i>ติดตามระบบ</div>
                 <button class="psb-item" data-section="activity_logs" onclick="switchSection('activity_logs',this)">
                     <div class="psb-icon"><i class="fa-solid fa-file-lines" style="color:#64748b"></i></div>
                     <span class="psb-label" style="color:#475569;font-weight:900">Activity Logs</span>
@@ -1039,7 +1042,7 @@ try {
 
             <?php /* ── ข้อมูลหลัก (Master Data) ─────────────────────────── */ ?>
             <?php if (!$registryOnly && $hasSiteSet): ?>
-                <div class="psb-section-label">ข้อมูลหลัก</div>
+                <div class="psb-section-label"><i class="fa-solid fa-database" style="margin-right:6px;color:#0d9488"></i>ข้อมูลหลัก</div>
                 <button class="psb-item <?= $activeSection==='clinic_data'?'psb-active':'' ?>" data-section="clinic_data" onclick="switchSection('clinic_data',this)">
                     <div class="psb-icon"><i class="fa-solid fa-hospital" style="color:#0d9488"></i></div>
                     <span class="psb-label" style="color:#0f766e;font-weight:900">ข้อมูลคลินิก</span>
@@ -1054,7 +1057,7 @@ try {
 
             <?php /* ── ตั้งค่า (ล่างสุด) ─────────────────────────────────── */ ?>
             <?php if (!$registryOnly && $hasSiteSet): ?>
-                <div class="psb-section-label">ตั้งค่า</div>
+                <div class="psb-section-label"><i class="fa-solid fa-gear" style="margin-right:6px;color:#d97706"></i>ตั้งค่า</div>
                 <button class="psb-item" data-section="settings" onclick="switchSection('settings',this)">
                     <div class="psb-icon"><i class="fa-solid fa-gear" style="color:#d97706"></i></div>
                     <span class="psb-label" style="color:#b45309;font-weight:900">Settings</span>
