@@ -86,7 +86,7 @@ if ($lat !== null && $lng !== null
     $withinRadius = $distanceM <= (float)$settings['radius_m'] ? 1 : 0;
 }
 
-// หา shift ที่ active ตอนนี้ (สำหรับ clock_in)
+// หา shift ที่ active ตอนนี้ (เพื่อ link ถ้ามี — ถ้าไม่มีก็ ad-hoc)
 $activeShift = find_active_scholarship_shift($pdo, $studentId, 'now');
 
 // State validation
@@ -97,11 +97,7 @@ if ($action === 'clock_in') {
         echo json_encode(['ok' => false, 'error' => 'คุณยังไม่ได้ออกงานครั้งก่อน']);
         exit;
     }
-    if (!$activeShift) {
-        echo json_encode(['ok' => false, 'error' => 'ยังไม่ถึงเวลาเข้างาน หรือไม่อยู่ในกะที่ลงทะเบียนไว้']);
-        exit;
-    }
-    // เช็ครัศมี GPS เฉพาะตอนเปิด gps_required
+    // ad-hoc clock-in: ไม่บังคับว่าต้องมีกะ — link กับกะปัจจุบันถ้ามี ไม่งั้น NULL
     if ($gpsRequired && $settings['clinic_lat'] !== null && !$withinRadius) {
         echo json_encode([
             'ok' => false,
@@ -110,7 +106,7 @@ if ($action === 'clock_in') {
         ]);
         exit;
     }
-    $shiftId = (int)$activeShift['id'];
+    $shiftId = $activeShift ? (int)$activeShift['id'] : null;
 } else { // clock_out
     if (!$lastLog || $lastLog['action'] !== 'clock_in' || $lastLog['status'] === 'rejected') {
         echo json_encode(['ok' => false, 'error' => 'ยังไม่ได้เข้างาน หรือคำขอเข้างานก่อนหน้าถูกปฏิเสธ']);

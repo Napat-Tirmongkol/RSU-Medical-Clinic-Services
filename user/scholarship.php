@@ -42,6 +42,16 @@ $todayShifts = $student ? get_scholarship_shifts_for_date($pdo, (int)$student['i
 $activeShift = $student ? find_active_scholarship_shift($pdo, (int)$student['id'], 'now') : null;
 $lastLog = $student ? get_latest_scholarship_log($pdo, (int)$student['id']) : null;
 
+// ตารางที่ลงไว้ล่วงหน้า (ไม่นับวันนี้)
+$upcomingShifts = [];
+if ($student) {
+    $stmt = $pdo->prepare("SELECT * FROM sys_scholarship_shifts
+        WHERE student_id = :sid AND status != 'cancelled' AND shift_date > :today
+        ORDER BY shift_date ASC, start_time ASC LIMIT 10");
+    $stmt->execute([':sid' => $student['id'], ':today' => $today]);
+    $upcomingShifts = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+}
+
 // คำนวณ state ปัจจุบัน:
 // - ถ้า log ล่าสุดเป็น clock_in (status=approved/pending) → user กำลัง "ทำงาน" → ปุ่มต่อไป = ออกงาน
 // - ถ้าไม่มี log หรือล่าสุดเป็น clock_out → ปุ่มต่อไป = เข้างาน
@@ -195,15 +205,20 @@ $displayName = trim((string)($user['full_name'] ?? ''))
                 <p class="text-xs text-slate-500 mt-1"><?= vh(thai_weekday($today)) ?> · <?= vh(format_scholarship_thai_date($today)) ?></p>
             </div>
 
+            <div class="flex items-center justify-between mb-2">
+                <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">กะวันนี้</p>
+                <button onclick="openShiftModal()" class="text-xs font-black text-emerald-600 active:scale-95 transition">
+                    <i class="fa-solid fa-plus mr-1"></i>ลงตาราง
+                </button>
+            </div>
             <?php if (empty($todayShifts)): ?>
                 <div class="bg-slate-50 rounded-2xl p-4 text-center">
-                    <i class="fa-solid fa-calendar-xmark text-2xl text-slate-300 mb-2"></i>
-                    <p class="text-sm font-bold text-slate-500">วันนี้ไม่มีกะ</p>
-                    <p class="text-xs text-slate-400 mt-1">กรุณาตรวจสอบตารางกับเจ้าหน้าที่</p>
+                    <i class="fa-solid fa-calendar-day text-2xl text-slate-300 mb-2"></i>
+                    <p class="text-sm font-bold text-slate-500">วันนี้ยังไม่มีกะ</p>
+                    <p class="text-xs text-slate-400 mt-1">เข้างานได้เลย หรือกด "ลงตาราง" เพื่อระบุเวลา</p>
                 </div>
             <?php else: ?>
                 <div class="space-y-2">
-                    <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">กะวันนี้</p>
                     <?php foreach ($todayShifts as $sh): ?>
                         <?php
                             $isActive = $activeShift && (int)$activeShift['id'] === (int)$sh['id'];
@@ -237,29 +252,16 @@ $displayName = trim((string)($user['full_name'] ?? ''))
         <!-- ─── Clock In/Out Big Button ─── -->
         <div class="text-center py-2">
             <?php
-                $btnClass = 'clock-btn-disabled';
-                $btnLabel = 'ไม่อยู่ในช่วงกะ';
-                $btnIcon = 'fa-circle-xmark';
-                $btnDisabled = true;
-
-                if ($activeShift) {
-                    if ($nextAction === 'clock_in') {
-                        $btnClass = 'clock-btn-in';
-                        $btnLabel = 'เข้างาน';
-                        $btnIcon = 'fa-right-to-bracket';
-                        $btnDisabled = false;
-                    } else {
-                        $btnClass = 'clock-btn-out';
-                        $btnLabel = 'ออกงาน';
-                        $btnIcon = 'fa-right-from-bracket';
-                        $btnDisabled = false;
-                    }
-                } elseif ($nextAction === 'clock_out') {
-                    // ออกกะมาแล้วแต่ยังไม่ clock out → อนุญาตให้ clock out (overtime)
+                // ปุ่มเข้า/ออกงาน — ad-hoc: เข้าได้ตลอด ตราบใดที่ยังไม่เข้าค้างอยู่
+                $btnDisabled = false;
+                if ($nextAction === 'clock_in') {
+                    $btnClass = 'clock-btn-in';
+                    $btnLabel = $activeShift ? 'เข้างาน' : 'เริ่มงาน';
+                    $btnIcon = 'fa-right-to-bracket';
+                } else {
                     $btnClass = 'clock-btn-out';
-                    $btnLabel = 'ออกงาน (เลยกะ)';
+                    $btnLabel = $activeShift ? 'ออกงาน' : 'ออกงาน';
                     $btnIcon = 'fa-right-from-bracket';
-                    $btnDisabled = false;
                 }
             ?>
             <button id="clock-btn"
@@ -311,6 +313,37 @@ $displayName = trim((string)($user['full_name'] ?? ''))
                     <div class="h-full bg-gradient-to-r from-emerald-400 to-emerald-600 rounded-full transition-all" style="width: <?= $pct ?>%"></div>
                 </div>
             </div>
+        <?php endif; ?>
+
+        <!-- ─── Upcoming Shifts (ตารางที่ลงไว้) ─── -->
+        <?php if (!empty($upcomingShifts)): ?>
+        <div class="bg-white rounded-3xl p-5 shadow-sm border border-slate-100">
+            <div class="flex items-center justify-between mb-3">
+                <h3 class="text-sm font-black text-slate-900">ตารางที่ลงไว้</h3>
+                <button onclick="openShiftModal()" class="text-xs font-black text-emerald-600 active:scale-95">
+                    <i class="fa-solid fa-plus mr-1"></i>ลงตาราง
+                </button>
+            </div>
+            <div class="space-y-2">
+                <?php foreach ($upcomingShifts as $sh): ?>
+                <div class="flex items-center gap-3 p-2.5 rounded-xl bg-slate-50">
+                    <div class="w-10 h-10 rounded-xl bg-white text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-100">
+                        <i class="fa-solid fa-calendar-check"></i>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-black text-slate-900"><?= vh(thai_weekday($sh['shift_date'])) ?> · <?= vh(format_scholarship_thai_date($sh['shift_date'])) ?></p>
+                        <p class="text-xs text-slate-500">
+                            <?= vh(substr((string)$sh['start_time'], 0, 5)) ?> – <?= vh(substr((string)$sh['end_time'], 0, 5)) ?>
+                            <?php if ((float)$sh['planned_hours'] > 0): ?>· <?= number_format((float)$sh['planned_hours'], 1) ?> ชม.<?php endif; ?>
+                        </p>
+                    </div>
+                    <button onclick="deleteShift(<?= (int)$sh['id'] ?>)" class="w-8 h-8 rounded-lg bg-white text-rose-500 hover:bg-rose-50 flex items-center justify-center transition" title="ลบ">
+                        <i class="fa-solid fa-trash text-xs"></i>
+                    </button>
+                </div>
+                <?php endforeach; ?>
+            </div>
+        </div>
         <?php endif; ?>
 
         <!-- ─── Recent Logs ─── -->
@@ -450,6 +483,100 @@ if (btn && !btn.disabled) {
         );
     });
 }
+
+// ─── Self-scheduling: ลงตารางมาทำงาน ───
+window.openShiftModal = async function() {
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const r = await Swal.fire({
+        title: 'ลงตารางมาทำงาน',
+        html: `
+            <div style="text-align:left">
+                <label style="display:block;font-size:.7rem;font-weight:800;color:#4b5563;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.35rem">วันที่</label>
+                <input id="sch-date" type="date" min="${todayStr}" value="${todayStr}" class="swal2-input" style="margin:0 0 .75rem;width:100%">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem">
+                    <div>
+                        <label style="display:block;font-size:.7rem;font-weight:800;color:#4b5563;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.35rem">เริ่ม</label>
+                        <input id="sch-start" type="time" value="09:00" class="swal2-input" style="margin:0;width:100%">
+                    </div>
+                    <div>
+                        <label style="display:block;font-size:.7rem;font-weight:800;color:#4b5563;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.35rem">สิ้นสุด</label>
+                        <input id="sch-end" type="time" value="12:00" class="swal2-input" style="margin:0;width:100%">
+                    </div>
+                </div>
+                <label style="display:block;font-size:.7rem;font-weight:800;color:#4b5563;text-transform:uppercase;letter-spacing:.05em;margin:.75rem 0 .35rem">หมายเหตุ (ถ้ามี)</label>
+                <input id="sch-notes" type="text" placeholder="เช่น สอนน้อง, ช่วยจัดเอกสาร" class="swal2-input" style="margin:0;width:100%">
+            </div>
+        `,
+        focusConfirm: false,
+        showCancelButton: true,
+        confirmButtonText: 'บันทึก',
+        cancelButtonText: 'ยกเลิก',
+        confirmButtonColor: '#10b981',
+        preConfirm: () => {
+            const date = document.getElementById('sch-date').value;
+            const start = document.getElementById('sch-start').value;
+            const end = document.getElementById('sch-end').value;
+            const notes = document.getElementById('sch-notes').value;
+            if (!date || !start || !end) {
+                Swal.showValidationMessage('กรอกวันและเวลาให้ครบ');
+                return false;
+            }
+            if (start >= end) {
+                Swal.showValidationMessage('เวลาเริ่มต้องมาก่อนเวลาสิ้นสุด');
+                return false;
+            }
+            return { date, start, end, notes };
+        }
+    });
+
+    if (!r.isConfirmed) return;
+    const fd = new FormData();
+    fd.append('csrf_token', CSRF_TOKEN);
+    fd.append('action', 'create');
+    fd.append('shift_date', r.value.date);
+    fd.append('start_time', r.value.start);
+    fd.append('end_time', r.value.end);
+    fd.append('notes', r.value.notes || '');
+    try {
+        const resp = await fetch('ajax_scholarship_shifts.php', { method: 'POST', body: fd });
+        const j = await resp.json();
+        if (j.ok) {
+            await Swal.fire({ icon: 'success', title: 'ลงตารางแล้ว', timer: 1200, showConfirmButton: false });
+            location.reload();
+        } else {
+            Swal.fire('ไม่สำเร็จ', j.error || '', 'error');
+        }
+    } catch (err) {
+        Swal.fire('Network Error', '', 'error');
+    }
+};
+
+window.deleteShift = async function(id) {
+    const r = await Swal.fire({
+        title: 'ลบกะนี้?',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'ลบ',
+        cancelButtonText: 'ยกเลิก',
+        confirmButtonColor: '#f43f5e',
+    });
+    if (!r.isConfirmed) return;
+    const fd = new FormData();
+    fd.append('csrf_token', CSRF_TOKEN);
+    fd.append('action', 'delete');
+    fd.append('id', id);
+    try {
+        const resp = await fetch('ajax_scholarship_shifts.php', { method: 'POST', body: fd });
+        const j = await resp.json();
+        if (j.ok) {
+            location.reload();
+        } else {
+            Swal.fire('ไม่สำเร็จ', j.error || '', 'error');
+        }
+    } catch (err) {
+        Swal.fire('Network Error', '', 'error');
+    }
+};
 </script>
 </body>
 </html>
