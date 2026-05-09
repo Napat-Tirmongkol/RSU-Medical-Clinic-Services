@@ -2,8 +2,17 @@
 /**
  * portal/_partials/scholarship.php
  * จัดการระบบนักศึกษาทุน — students, shifts, approvals, reports, settings
+ *
+ * Defense-in-depth gate: portal/index.php ห่อด้วย $hasScholarship แล้ว
+ * แต่ตรวจซ้ำในนี้กันถูก include ตรงจากที่อื่น
  */
 declare(strict_types=1);
+
+$_partialRole = $_SESSION['admin_role'] ?? '';
+if ($_partialRole !== 'superadmin' && empty($_SESSION['access_scholarship'])) {
+    echo '<div style="padding:100px;text-align:center;font-weight:900;color:#dc2626"><i class="fa-solid fa-shield-slash mb-4" style="font-size:4rem;display:block"></i> ACCESS DENIED<br><span style="font-size:14px;color:#94a3b8;font-weight:600">ต้องมีสิทธิ์ access_scholarship</span></div>';
+    return;
+}
 
 require_once __DIR__ . '/../../includes/scholarship_helper.php';
 
@@ -12,11 +21,13 @@ ensure_scholarship_schema($pdo);
 
 $settings = get_scholarship_settings($pdo);
 
-// Counters
+// Counters — ใช้ prepared placeholder (กัน pattern bad-practice แม้ $today จะมาจาก server)
 $cntStudents = (int)$pdo->query("SELECT COUNT(*) FROM sys_scholarship_students WHERE status='active'")->fetchColumn();
 $cntPending  = (int)$pdo->query("SELECT COUNT(*) FROM sys_scholarship_clock_logs WHERE status='pending'")->fetchColumn();
 $today = date('Y-m-d');
-$cntTodayShifts = (int)$pdo->query("SELECT COUNT(*) FROM sys_scholarship_shifts WHERE shift_date = '$today' AND status != 'cancelled'")->fetchColumn();
+$_cntStmt = $pdo->prepare("SELECT COUNT(*) FROM sys_scholarship_shifts WHERE shift_date = :d AND status != 'cancelled'");
+$_cntStmt->execute([':d' => $today]);
+$cntTodayShifts = (int)$_cntStmt->fetchColumn();
 
 require_once __DIR__ . '/../../includes/csrf.php';
 $portalCsrf = get_csrf_token();
@@ -1220,13 +1231,25 @@ $portalCsrf = get_csrf_token();
     window.loadReports = loadReports;
 
     window.exportReportCSV = function() {
-        const params = new URLSearchParams({
+        // POST form (ไม่ใช้ GET) — กัน CSRF token leak ผ่าน Referer/server log
+        const f = document.createElement('form');
+        f.method = 'POST';
+        f.action = AJAX;
+        f.style.display = 'none';
+        const fields = {
             entity: 'reports', action: 'export_csv',
             csrf_token: PORTAL_CSRF,
             from: document.getElementById('rep-from').value,
             to: document.getElementById('rep-to').value,
-        });
-        window.location.href = AJAX + '?' + params.toString();
+        };
+        for (const k in fields) {
+            const i = document.createElement('input');
+            i.type = 'hidden'; i.name = k; i.value = fields[k];
+            f.appendChild(i);
+        }
+        document.body.appendChild(f);
+        f.submit();
+        setTimeout(() => f.remove(), 1000);
     };
 
     // ────── SETTINGS ──────

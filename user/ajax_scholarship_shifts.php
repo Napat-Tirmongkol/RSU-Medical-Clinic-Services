@@ -124,5 +124,5 @@ try {
     echo json_encode(['ok' => false, 'error' => 'Unknown action']);
 } catch (Throwable $e) {
     error_log('[ajax_scholarship_shifts] ' . $e->getMessage());
-    echo json_encode(['ok' => false, 'error' => 'Server error: ' . $e->getMessage()]);
+    echo json_encode(['ok' => false, 'error' => 'Server error']);
 }

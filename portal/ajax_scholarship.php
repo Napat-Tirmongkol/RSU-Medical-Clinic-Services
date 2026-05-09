@@ -10,14 +10,23 @@ require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/../includes/scholarship_helper.php';
 
+// Authorization: superadmin หรือมี access_scholarship flag เท่านั้น
+$_role = $_SESSION['admin_role'] ?? '';
+if ($_role !== 'superadmin' && empty($_SESSION['access_scholarship'])) {
+    header('Content-Type: application/json; charset=utf-8');
+    http_response_code(403);
+    echo json_encode(['ok' => false, 'error' => 'Permission denied (access_scholarship required)']);
+    exit;
+}
+
 $pdo = db();
 ensure_scholarship_schema($pdo);
 
 $action = $_REQUEST['action'] ?? '';
 $entity = $_REQUEST['entity'] ?? '';
 
-// CSRF (ยกเว้น GET export_csv ที่ส่ง csrf ใน query string เช่นกัน)
-if (!isset($_REQUEST['csrf_token']) || !verify_csrf_token($_REQUEST['csrf_token'])) {
+// CSRF (POST only — รองรับ GET เฉพาะ no-op ไม่ใช้แล้ว เพราะ CSV export ย้ายเป็น POST แล้ว)
+if (!isset($_POST['csrf_token']) || !verify_csrf_token($_POST['csrf_token'])) {
     header('Content-Type: application/json; charset=utf-8');
     echo json_encode(['ok' => false, 'error' => 'Invalid CSRF token']);
     exit;
@@ -44,7 +53,7 @@ try {
     }
 } catch (Throwable $e) {
     error_log('[ajax_scholarship] ' . $e->getMessage());
-    echo json_encode(['ok' => false, 'error' => 'Server error: ' . $e->getMessage()]);
+    echo json_encode(['ok' => false, 'error' => 'Server error']);
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -62,7 +71,9 @@ function handle_dashboard(PDO $pdo, string $action): void
     // KPIs ─────────────────────────────────
     $activeStudents = (int)$pdo->query("SELECT COUNT(*) FROM sys_scholarship_students WHERE status='active'")->fetchColumn();
     $pendingCount = (int)$pdo->query("SELECT COUNT(*) FROM sys_scholarship_clock_logs WHERE status='pending'")->fetchColumn();
-    $todayShifts = (int)$pdo->query("SELECT COUNT(*) FROM sys_scholarship_shifts WHERE shift_date='$today' AND status != 'cancelled'")->fetchColumn();
+    $tsStmt = $pdo->prepare("SELECT COUNT(*) FROM sys_scholarship_shifts WHERE shift_date = :d AND status != 'cancelled'");
+    $tsStmt->execute([':d' => $today]);
+    $todayShifts = (int)$tsStmt->fetchColumn();
 
     // ชั่วโมงเดือนนี้รวมทุกคน (แยกประเภท)
     $monthSplit = ['hours' => 0.0, 'paid' => 0.0];
@@ -509,8 +520,8 @@ function handle_reports(PDO $pdo, string $action): void
     }
 
     if ($action === 'export_csv') {
-        $from = (string)($_GET['from'] ?? date('Y-m-01'));
-        $to   = (string)($_GET['to']   ?? date('Y-m-t'));
+        $from = (string)($_POST['from'] ?? date('Y-m-01'));
+        $to   = (string)($_POST['to']   ?? date('Y-m-t'));
 
         $rows = compute_report_rows($pdo, $from, $to);
 

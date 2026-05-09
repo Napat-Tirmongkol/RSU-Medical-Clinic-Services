@@ -134,5 +134,6 @@ try {
             return;
     }
 } catch (Throwable $e) {
-    echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
+    error_log('[ajax_line_faq] ' . $e->getMessage());
+    echo json_encode(['ok' => false, 'error' => 'Server error']);
 }
