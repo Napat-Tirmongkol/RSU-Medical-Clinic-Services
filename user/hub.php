@@ -169,6 +169,20 @@ try {
         $borrow_total_fine = 0.0;
     }
 
+    // Scholarship — แสดง tile ในหน้า services เฉพาะคนที่ลงทะเบียนเป็นนักศึกษาทุน
+    $scholarship_active = false;
+    $scholarship_pending_count = 0;
+    try {
+        require_once __DIR__ . '/../includes/scholarship_helper.php';
+        $sch = get_scholarship_student_by_user($pdo, (int)$user['id']);
+        if ($sch && $sch['status'] === 'active') {
+            $scholarship_active = true;
+            $st = $pdo->prepare("SELECT COUNT(*) FROM sys_scholarship_clock_logs WHERE student_id = :sid AND status = 'pending'");
+            $st->execute([':sid' => $sch['id']]);
+            $scholarship_pending_count = (int)$st->fetchColumn();
+        }
+    } catch (Throwable $e) { /* helper หรือ schema ยังไม่พร้อม — ปล่อยผ่าน */ }
+
     // Insurance record (linked by student_personnel_id = member_id)
     $insurance = null;
     if (defined('SITE_SHOW_INSURANCE') && SITE_SHOW_INSURANCE && !empty($user['student_personnel_id'])) {
@@ -1566,6 +1580,19 @@ $heroThemes = [
                             </div>
                             <p class="text-[13px] font-black leading-tight">จองคิว /<br>แคมเปญ</p>
                         </button>
+
+                        <?php if ($scholarship_active): ?>
+                        <button onclick="window.location.href='scholarship.php'"
+                            class="relative flex flex-col items-start p-5 rounded-2xl bg-emerald-50 border border-emerald-100 active:scale-95 transition-all text-left group">
+                            <?php if ($scholarship_pending_count > 0): ?>
+                                <span class="absolute top-3 right-3 w-5 h-5 bg-rose-500 text-white text-[9px] font-black rounded-full flex items-center justify-center border-2 border-white shadow"><?= $scholarship_pending_count ?></span>
+                            <?php endif; ?>
+                            <div class="w-10 h-10 rounded-2xl bg-white flex items-center justify-center mb-3 shadow-sm border border-emerald-50">
+                                <i class="fa-solid fa-graduation-cap text-emerald-500 text-sm"></i>
+                            </div>
+                            <p class="text-[13px] font-black leading-tight text-slate-800">เก็บชั่วโมง<br>ทุน</p>
+                        </button>
+                        <?php endif; ?>
 
                         <button onclick="showBorrowFlow()"
                             class="relative flex flex-col items-start p-5 rounded-2xl <?= $borrow_online ? 'bg-amber-50 border border-amber-100' : 'bg-slate-100 border border-slate-200 opacity-60' ?> active:scale-95 transition-all text-left group">
