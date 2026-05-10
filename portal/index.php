@@ -2761,6 +2761,40 @@ try {
                                                 </div>
                                                 <input type="checkbox" name="dashboard_admin_access" id="govDashboardAccess" value="1" style="width:16px;height:16px" onclick="event.stopPropagation()">
                                             </div>
+                                            <!-- Monthly Report (กรอกรายงานประจำเดือน) -->
+                                            <div onclick="document.getElementById('govMonthlyReportAccess').click()" class="premium-role-card" style="border-radius:14px;border:1.5px solid #e2e8f0;background:#fff;cursor:pointer;padding:12px;transition:all 0.2s;display:flex;align-items:center;justify-content:space-between">
+                                                <div style="display:flex;align-items:center;gap:10px">
+                                                    <i class="fa-solid fa-clipboard-list text-amber-500"></i>
+                                                    <span style="font-weight:800;font-size:12px;color:#475569">รายงานประจำเดือน (กรอก/แก้ของฝ่ายตัวเอง)</span>
+                                                </div>
+                                                <input type="checkbox" name="monthly_report_access" id="govMonthlyReportAccess" value="1" style="width:16px;height:16px" onclick="event.stopPropagation()">
+                                            </div>
+                                            <!-- Director View (ผู้อำนวยการ) -->
+                                            <div onclick="document.getElementById('govDirectorViewAccess').click()" class="premium-role-card" style="border-radius:14px;border:1.5px solid #e2e8f0;background:#fff;cursor:pointer;padding:12px;transition:all 0.2s;display:flex;align-items:center;justify-content:space-between">
+                                                <div style="display:flex;align-items:center;gap:10px">
+                                                    <i class="fa-solid fa-user-tie text-rose-500"></i>
+                                                    <span style="font-weight:800;font-size:12px;color:#475569">ผู้อำนวยการ (ดูทุกฝ่าย + อนุมัติรายงาน)</span>
+                                                </div>
+                                                <input type="checkbox" name="director_view_access" id="govDirectorViewAccess" value="1" style="width:16px;height:16px" onclick="event.stopPropagation()">
+                                            </div>
+                                            <!-- Department dropdown -->
+                                            <div class="premium-role-card" style="border-radius:14px;border:1.5px solid #e2e8f0;background:#fff;padding:12px;display:flex;align-items:center;justify-content:space-between;gap:10px">
+                                                <div style="display:flex;align-items:center;gap:10px;min-width:0">
+                                                    <i class="fa-solid fa-sitemap text-indigo-500"></i>
+                                                    <span style="font-weight:800;font-size:12px;color:#475569;white-space:nowrap">ฝ่าย/หน่วยงาน</span>
+                                                </div>
+                                                <select name="department_id" id="govDepartmentId" class="premium-input" style="flex:1;height:32px;padding:0 8px;font-size:12px;font-weight:700">
+                                                    <option value="">— ไม่ระบุ —</option>
+                                                    <?php
+                                                    try {
+                                                        $deptRows = $pdo->query("SELECT id, name FROM sys_departments WHERE active=1 ORDER BY sort_order, name")->fetchAll(PDO::FETCH_ASSOC);
+                                                        foreach ($deptRows as $d) {
+                                                            echo '<option value="' . (int)$d['id'] . '">' . htmlspecialchars($d['name']) . '</option>';
+                                                        }
+                                                    } catch (PDOException $e) { /* table not yet created */ }
+                                                    ?>
+                                                </select>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -3884,6 +3918,12 @@ try {
                         document.getElementById('govAssetAccess').checked = parseInt(data.access_asset) === 1;
                         document.getElementById('govScholarshipAccess').checked = parseInt(data.access_scholarship) === 1;
                         document.getElementById('govDashboardAccess').checked = parseInt(data.access_dashboard_admin) === 1;
+                        const mrEl = document.getElementById('govMonthlyReportAccess');
+                        if (mrEl) mrEl.checked = parseInt(data.access_monthly_report) === 1;
+                        const dvEl = document.getElementById('govDirectorViewAccess');
+                        if (dvEl) dvEl.checked = parseInt(data.access_director_view) === 1;
+                        const deptSel = document.getElementById('govDepartmentId');
+                        if (deptSel) deptSel.value = data.department_id ? String(data.department_id) : '';
 
                         // Position (Hybrid live link)
                         const posSel = document.getElementById('govPositionId');
@@ -3904,6 +3944,12 @@ try {
                     document.getElementById('govAssetAccess').checked = false;
                     document.getElementById('govScholarshipAccess').checked = false;
                     document.getElementById('govDashboardAccess').checked = false;
+                    const mrElR = document.getElementById('govMonthlyReportAccess');
+                    if (mrElR) mrElR.checked = false;
+                    const dvElR = document.getElementById('govDirectorViewAccess');
+                    if (dvElR) dvElR.checked = false;
+                    const deptSelR = document.getElementById('govDepartmentId');
+                    if (deptSelR) deptSelR.value = '';
                     const posSel = document.getElementById('govPositionId');
                     if (posSel) { posSel.value = ''; onGovPositionChange(); }
                 }
@@ -3995,6 +4041,8 @@ try {
             ['access_asset',         'govAssetAccess'],
             ['access_scholarship',   'govScholarshipAccess'],
             ['access_dashboard_admin','govDashboardAccess'],
+            ['access_monthly_report','govMonthlyReportAccess'],
+            ['access_director_view', 'govDirectorViewAccess'],
         ];
 
         function onGovPositionChange() {
