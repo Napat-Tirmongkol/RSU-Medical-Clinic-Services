@@ -21,7 +21,7 @@ try {
         SELECT
             COUNT(*)                                                          AS total,
             SUM(status IN ('approved','active'))                              AS approved,
-            SUM(status IN ('pending','submitted'))                            AS pending,
+            SUM(status = 'pending')                                           AS pending,
             SUM(status = 'rejected')                                          AS rejected,
             SUM(status = 'active' AND coverage_end BETWEEN CURDATE()
                 AND DATE_ADD(CURDATE(), INTERVAL 30 DAY))                     AS expiring,
@@ -302,10 +302,10 @@ $gcOver = kpi_override_status($pdo);
             </div>
             <?php if (!empty($gcOver['gold_approved'])): ?><span class="km-override-badge">OVERRIDE</span><?php endif; ?>
         </div>
-        <div class="gc-stat-card km-card cursor-pointer hover:ring-2 hover:ring-blue-300 transition-all" data-kpi-key="gold_pending_docs" data-kpi-label="บัตรทอง — รอเอกสาร" onclick="gcQuickFilter('submitted')" title="คลิกเพื่อดูเฉพาะใบสมัครที่ส่งแล้ว — รออนุมัติ">
+        <div class="gc-stat-card km-card cursor-pointer hover:ring-2 hover:ring-blue-300 transition-all" data-kpi-key="gold_pending_docs" data-kpi-label="บัตรทอง — รอเอกสาร" onclick="gcQuickFilter('pending')" title="คลิกเพื่อดูเฉพาะคนที่รอเอกสาร (จาก bulk import)">
             <div class="gc-icon-tile bg-blue-50 text-blue-500"><i class="fa-solid fa-hourglass-half"></i></div>
             <div class="km-body">
-                <p class="km-label text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">รอ/ส่งแล้ว <i class="fa-solid fa-arrow-down ml-1 text-blue-400 text-[8px]"></i></p>
+                <p class="km-label text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">รอเอกสาร <i class="fa-solid fa-arrow-down ml-1 text-blue-400 text-[8px]"></i></p>
                 <p class="km-value text-2xl font-black text-slate-800 leading-none" data-value="<?= (int)$stats['pending'] ?>"><?= number_format($stats['pending']) ?></p>
             </div>
             <?php if (!empty($gcOver['gold_pending_docs'])): ?><span class="km-override-badge">OVERRIDE</span><?php endif; ?>
@@ -1216,19 +1216,9 @@ $gcOver = kpi_override_status($pdo);
                     ${r.doc_count > 0 ? `<span class="inline-flex items-center gap-1 text-amber-600 font-black text-xs"><i class="fa-solid fa-paperclip"></i> ${r.doc_count}</span>` : '<span class="text-slate-300 text-xs">—</span>'}
                 </td>
                 <td class="px-5 py-3 text-right">
-                    <div class="flex justify-end items-center gap-1">
-                        ${r.status === 'submitted' || r.status === 'pending' ? `
-                            <button onclick="gcQuickApprove(${r.id}, '${escapeHtml(r.full_name).replace(/'/g, "\\'")}')" class="px-2.5 py-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 rounded-lg text-xs font-black transition-colors" title="อนุมัติ">
-                                <i class="fa-solid fa-circle-check"></i>
-                            </button>
-                            <button onclick="gcQuickReject(${r.id}, '${escapeHtml(r.full_name).replace(/'/g, "\\'")}')" class="px-2.5 py-1.5 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-lg text-xs font-black transition-colors" title="ไม่อนุมัติ">
-                                <i class="fa-solid fa-circle-xmark"></i>
-                            </button>
-                        ` : ''}
-                        <button onclick="gcOpenMemberModal(${r.id})" class="px-3 py-1.5 bg-amber-50 text-amber-600 hover:bg-amber-100 rounded-lg text-xs font-black transition-colors">
-                            <i class="fa-solid fa-pen-to-square"></i> แก้ไข
-                        </button>
-                    </div>
+                    <button onclick="gcOpenMemberModal(${r.id})" class="px-3 py-1.5 bg-amber-50 text-amber-600 hover:bg-amber-100 rounded-lg text-xs font-black transition-colors">
+                        <i class="fa-solid fa-pen-to-square"></i> แก้ไข
+                    </button>
                 </td>
             </tr>`;
         });
@@ -1366,8 +1356,9 @@ $gcOver = kpi_override_status($pdo);
                 renderDocs(r.documents || []);
                 renderHist(r.history || []);
 
-                // Show Review Banner ถ้า status = submitted หรือ pending
-                if (m.status === 'submitted' || m.status === 'pending') {
+                // Show Review Banner เฉพาะ status='submitted' (= user submit จาก LIFF)
+                // ไม่แสดงสำหรับ pending (bulk import) เพราะไม่ใช่ review flow
+                if (m.status === 'submitted') {
                     gcShowReviewBanner(m, r.documents || []);
                 }
             });
