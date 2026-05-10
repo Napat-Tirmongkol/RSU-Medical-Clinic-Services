@@ -382,6 +382,8 @@ $categoryMap = [
     'asset_management' => 'core',
     'consumables' => 'core',
     'insurance_sync' => 'core',
+    'insurance_dashboard' => 'core',
+    'gold_card' => 'core',
     'system_logs' => 'tools',
     'privilege_inventory' => 'tools',
     'admin_tool' => 'tools',
@@ -952,6 +954,7 @@ try {
             $hasSiteSet     = $isSuper || !empty($_SESSION['access_site_settings']);
             $hasEdms        = $isSuper || !empty($_SESSION['access_edms']);
             $hasScholarship = $isSuper || !empty($_SESSION['access_scholarship']);
+            $hasDashboardAdmin = $isSuper || !empty($_SESSION['access_dashboard_admin']);
 
             // EDMS pending count badge — count routings where current user is recipient and status is open
             $edmsInboxBadge = 0;
@@ -1045,9 +1048,17 @@ try {
                 </button>
                 <div class="psb-group" data-group="insurance">
                     <?php if (!$registryOnly): ?>
+                        <button class="psb-item <?= $activeSection==='insurance_dashboard'?'psb-active':'' ?>" data-section="insurance_dashboard" onclick="switchSection('insurance_dashboard',this)">
+                            <div class="psb-icon"><i class="fa-solid fa-chart-pie" style="color:#3b82f6"></i></div>
+                            <span class="psb-label" style="color:#1d4ed8;font-weight:900">Insurance Dashboard</span>
+                        </button>
                         <button class="psb-item" data-section="insurance_sync" onclick="switchSection('insurance_sync',this)">
                             <div class="psb-icon"><i class="fa-solid fa-shield-halved" style="color:#0ea5e9"></i></div>
                             <span class="psb-label" style="color:#0284c7;font-weight:900">Insurance Hub</span>
+                        </button>
+                        <button class="psb-item <?= $activeSection==='gold_card'?'psb-active':'' ?>" data-section="gold_card" onclick="switchSection('gold_card',this)">
+                            <div class="psb-icon"><i class="fa-solid fa-id-card" style="color:#f59e0b"></i></div>
+                            <span class="psb-label" style="color:#b45309;font-weight:900">บัตรทอง</span>
                         </button>
                     <?php endif; ?>
                     <?php if ($hasRegistry): ?>
@@ -2143,6 +2154,7 @@ try {
                                             <th style="padding:16px 20px;text-align:center;font-size:10px;font-weight:900;color:#64748b;text-transform:uppercase;letter-spacing:.15em;width:80px" title="Consumables"><i class="fa-solid fa-syringe"></i></th>
                                             <th style="padding:16px 20px;text-align:center;font-size:10px;font-weight:900;color:#64748b;text-transform:uppercase;letter-spacing:.15em;width:80px" title="Asset"><i class="fa-solid fa-warehouse"></i></th>
                                             <th style="padding:16px 20px;text-align:center;font-size:10px;font-weight:900;color:#64748b;text-transform:uppercase;letter-spacing:.15em;width:80px" title="Scholarship"><i class="fa-solid fa-graduation-cap"></i></th>
+                                            <th style="padding:16px 20px;text-align:center;font-size:10px;font-weight:900;color:#64748b;text-transform:uppercase;letter-spacing:.15em;width:80px" title="Dashboard Editor"><i class="fa-solid fa-chart-pie"></i></th>
                                             <th style="padding:16px 20px;text-align:center;font-size:10px;font-weight:900;color:#64748b;text-transform:uppercase;letter-spacing:.15em;width:100px">Status</th>
                                             <th style="padding:16px 20px;text-align:right;font-size:10px;font-weight:900;color:#64748b;text-transform:uppercase;letter-spacing:.15em">Actions</th>
                                         </tr>
@@ -2191,10 +2203,12 @@ try {
                                             $consAccess = (int)($st['access_consumables'] ?? 0);
                                             $assetAccess = (int)($st['access_asset'] ?? 0);
                                             $scholarAccess = (int)($st['access_scholarship'] ?? 0);
+                                            $dashAccess = (int)($st['access_dashboard_admin'] ?? 0);
                                             $aiIcon = $aiAccess ? '<i class="fa-solid fa-circle-check text-emerald-500"></i>' : '<i class="fa-solid fa-circle-minus text-slate-200"></i>';
                                             $consIcon = $consAccess ? '<i class="fa-solid fa-circle-check text-emerald-500"></i>' : '<i class="fa-solid fa-circle-minus text-slate-200"></i>';
                                             $assetIcon = $assetAccess ? '<i class="fa-solid fa-circle-check text-emerald-500"></i>' : '<i class="fa-solid fa-circle-minus text-slate-200"></i>';
                                             $scholarIcon = $scholarAccess ? '<i class="fa-solid fa-circle-check text-emerald-500"></i>' : '<i class="fa-solid fa-circle-minus text-slate-200"></i>';
+                                            $dashIcon = $dashAccess ? '<i class="fa-solid fa-circle-check text-emerald-500"></i>' : '<i class="fa-solid fa-circle-minus text-slate-200"></i>';
                                             ?>
                                             <tr style="border-bottom:1px solid #f1f5f9" class="id-staff-row hover:bg-slate-50/50 transition-colors">
                                                 <td style="padding:16px 20px">
@@ -2217,6 +2231,7 @@ try {
                                                 <td style="padding:16px 20px;text-align:center"><?= $consIcon ?></td>
                                                 <td style="padding:16px 20px;text-align:center"><?= $assetIcon ?></td>
                                                 <td style="padding:16px 20px;text-align:center"><?= $scholarIcon ?></td>
+                                                <td style="padding:16px 20px;text-align:center"><?= $dashIcon ?></td>
                                                 <td style="padding:16px 20px;text-align:center">
                                                     <span style="font-size:10px;font-weight:900;padding:4px 10px;border-radius:99px;background:<?= $isActive ? '#f0fdf4;color:#16a34a;border:1px solid #bbf7d0' : '#fef2f2;color:#dc2626;border:1px solid #fecaca' ?>"><?= strtoupper($st['account_status']) ?></span>
                                                 </td>
@@ -2290,6 +2305,7 @@ try {
                                                 'access_consumables'    => ['Consumables',      '#f43f5e'],
                                                 'access_asset'          => ['Asset',            '#f59e0b'],
                                                 'access_scholarship'    => ['Scholarship',      '#10b981'],
+                                                'access_dashboard_admin'=> ['Dashboard Editor', '#3b82f6'],
                                             ];
                                             foreach ($allPositions as $pos):
                                                 $posFlags = json_decode($pos['flags'] ?? '{}', true) ?: [];
@@ -2708,6 +2724,14 @@ try {
                                                 </div>
                                                 <input type="checkbox" name="scholarship_access" id="govScholarshipAccess" value="1" style="width:16px;height:16px" onclick="event.stopPropagation()">
                                             </div>
+                                            <!-- Dashboard Admin (แก้ไข Insurance Dashboard) -->
+                                            <div onclick="document.getElementById('govDashboardAccess').click()" class="premium-role-card" style="border-radius:14px;border:1.5px solid #e2e8f0;background:#fff;cursor:pointer;padding:12px;transition:all 0.2s;display:flex;align-items:center;justify-content:space-between">
+                                                <div style="display:flex;align-items:center;gap:10px">
+                                                    <i class="fa-solid fa-chart-pie text-blue-500"></i>
+                                                    <span style="font-weight:800;font-size:12px;color:#475569">Insurance Dashboard Editor (สิทธิ์แก้ไข widget)</span>
+                                                </div>
+                                                <input type="checkbox" name="dashboard_admin_access" id="govDashboardAccess" value="1" style="width:16px;height:16px" onclick="event.stopPropagation()">
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -2780,6 +2804,7 @@ try {
                                             'access_consumables'    => ['Consumables',      'fa-syringe',            '#f43f5e'],
                                             'access_asset'          => ['Asset Inventory',  'fa-warehouse',          '#f59e0b'],
                                             'access_scholarship'    => ['Scholarship',      'fa-graduation-cap',     '#10b981'],
+                                            'access_dashboard_admin'=> ['Dashboard Editor', 'fa-chart-pie',          '#3b82f6'],
                                         ];
                                         foreach ($posFlagInputs as $key => [$label, $icon, $color]):
                                         ?>
@@ -2953,11 +2978,35 @@ try {
             <!-- ════════════ SECTION: INSURANCE SYNC HUB ════════════ -->
             <div id="section-insurance_sync" class="portal-section"
                 style="<?= $activeSection==='insurance_sync'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); background:#f8fafc; overflow-y:auto;">
-                <?php 
+                <?php
                 if ($adminRole === 'superadmin' || !empty($_SESSION['access_insurance'])) {
-                    include __DIR__ . '/_partials/insurance_sync.php'; 
+                    include __DIR__ . '/_partials/insurance_sync.php';
                 } else {
                     echo '<div style="padding:100px;text-align:center;font-weight:900;color:#dc2626"><i class="fa-solid fa-shield-slash mb-4" style="font-size:4rem;display:block"></i> ACCESS DENIED</div>';
+                }
+                ?>
+            </div>
+
+            <!-- ════════════ SECTION: INSURANCE DASHBOARD (Admin View+Edit) ════════════ -->
+            <div id="section-insurance_dashboard" class="portal-section"
+                style="<?= $activeSection==='insurance_dashboard'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); background:#f8fafc; overflow-y:auto;">
+                <?php
+                if ($adminRole === 'superadmin' || !empty($_SESSION['access_insurance']) || !empty($_SESSION['access_dashboard_admin'])) {
+                    include __DIR__ . '/_partials/insurance_dashboard.php';
+                } else {
+                    echo '<div style="padding:100px;text-align:center;font-weight:900;color:#dc2626"><i class="fa-solid fa-shield-slash mb-4" style="font-size:4rem;display:block"></i> ACCESS DENIED<br><span style="font-size:14px;color:#94a3b8;font-weight:600">ต้องมีสิทธิ์ access_insurance หรือ access_dashboard_admin</span></div>';
+                }
+                ?>
+            </div>
+
+            <!-- ════════════ SECTION: GOLD CARD (บัตรทอง) ════════════ -->
+            <div id="section-gold_card" class="portal-section"
+                style="<?= $activeSection==='gold_card'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); background:#f8fafc; overflow-y:auto;">
+                <?php
+                if ($adminRole === 'superadmin' || !empty($_SESSION['access_insurance'])) {
+                    include __DIR__ . '/_partials/gold_card.php';
+                } else {
+                    echo '<div style="padding:100px;text-align:center;font-weight:900;color:#dc2626"><i class="fa-solid fa-shield-slash mb-4" style="font-size:4rem;display:block"></i> ACCESS DENIED<br><span style="font-size:14px;color:#94a3b8;font-weight:600">ต้องมีสิทธิ์ access_insurance</span></div>';
                 }
                 ?>
             </div>
@@ -3781,6 +3830,7 @@ try {
                         document.getElementById('govConsumablesAccess').checked = parseInt(data.access_consumables) === 1;
                         document.getElementById('govAssetAccess').checked = parseInt(data.access_asset) === 1;
                         document.getElementById('govScholarshipAccess').checked = parseInt(data.access_scholarship) === 1;
+                        document.getElementById('govDashboardAccess').checked = parseInt(data.access_dashboard_admin) === 1;
 
                         // Position (Hybrid live link)
                         const posSel = document.getElementById('govPositionId');
@@ -3800,6 +3850,7 @@ try {
                     document.getElementById('govConsumablesAccess').checked = false;
                     document.getElementById('govAssetAccess').checked = false;
                     document.getElementById('govScholarshipAccess').checked = false;
+                    document.getElementById('govDashboardAccess').checked = false;
                     const posSel = document.getElementById('govPositionId');
                     if (posSel) { posSel.value = ''; onGovPositionChange(); }
                 }
@@ -3816,7 +3867,8 @@ try {
         const POS_FLAG_KEYS = [
             'access_eborrow','access_ecampaign','access_insurance','access_registry',
             'access_system_logs','access_site_settings','access_edms',
-            'access_ai','access_consumables','access_asset','access_scholarship'
+            'access_ai','access_consumables','access_asset','access_scholarship',
+            'access_dashboard_admin'
         ];
 
         function openAddPositionModal() {
@@ -3889,6 +3941,7 @@ try {
             ['access_consumables',   'govConsumablesAccess'],
             ['access_asset',         'govAssetAccess'],
             ['access_scholarship',   'govScholarshipAccess'],
+            ['access_dashboard_admin','govDashboardAccess'],
         ];
 
         function onGovPositionChange() {
@@ -4479,6 +4532,8 @@ try {
             { id: 'ai_qa_lab',     label: 'AI QA Lab',           desc: 'Sandbox คำถามจาก user', icon: 'fa-flask-vial',      tone: 'accent', type: 'section', target: 'ai_qa_lab' },
             { id: 'identity',      label: 'Identity & Governance', desc: 'จัดการสิทธิ์ผู้ใช้', shortcut: 'g i', icon: 'fa-id-card-clip',  tone: 'info',    type: 'section', target: 'identity' },
             { id: 'insurance_sync', label: 'Insurance Hub',      desc: 'ระบบสิทธิ์ประกัน',   icon: 'fa-shield-halved',      tone: 'info',    type: 'section', target: 'insurance_sync' },
+            { id: 'insurance_dashboard', label: 'Insurance Dashboard', desc: 'ภาพรวม + แก้ widgets', icon: 'fa-chart-pie',     tone: 'info',    type: 'section', target: 'insurance_dashboard' },
+            { id: 'gold_card',     label: 'บัตรทอง',             desc: 'จัดการบัตรทอง + เอกสาร', icon: 'fa-id-card',         tone: 'warning', type: 'section', target: 'gold_card' },
             { id: 'registry_upload', label: 'อัพโหลดรายชื่อ',    desc: 'ทะเบียน',            icon: 'fa-id-card-clip',      tone: 'info',    type: 'section', target: 'registry_upload' },
             { id: 'batch_status',  label: 'สถานะเอกสาร',         desc: 'Insurance Batch',    icon: 'fa-list-check',         tone: 'info',    type: 'section', target: 'batch_status' },
             { id: 'manage_insurance_partners', label: 'Insurance Partners', desc: 'จัดการพาร์ทเนอร์', icon: 'fa-handshake', tone: 'success', type: 'section', target: 'manage_insurance_partners' },
