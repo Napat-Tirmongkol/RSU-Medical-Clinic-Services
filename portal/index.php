@@ -1059,7 +1059,7 @@ try {
                         </button>
                         <button class="psb-item <?= $activeSection==='gold_card_pending'?'psb-active':'' ?>" data-section="gold_card_pending" onclick="switchSection('gold_card_pending',this)">
                             <div class="psb-icon"><i class="fa-solid fa-hourglass-half" style="color:#3b82f6"></i></div>
-                            <span class="psb-label" style="color:#1d4ed8;font-weight:900">ใบสมัครรออนุมัติ</span>
+                            <span class="psb-label" style="color:#1d4ed8;font-weight:900">ย้ายสิทธิ์บัตรทอง</span>
                             <?php
                             $pendingBadgeCount = 0;
                             try { $pendingBadgeCount = (int)db()->query("SELECT COUNT(*) FROM gold_card_members WHERE status = 'submitted'")->fetchColumn(); }
@@ -4557,7 +4557,7 @@ try {
             { id: 'identity',      label: 'Identity & Governance', desc: 'จัดการสิทธิ์ผู้ใช้', shortcut: 'g i', icon: 'fa-id-card-clip',  tone: 'info',    type: 'section', target: 'identity' },
             { id: 'insurance_sync', label: 'Insurance Hub',      desc: 'ระบบสิทธิ์ประกัน',   icon: 'fa-shield-halved',      tone: 'info',    type: 'section', target: 'insurance_sync' },
             { id: 'insurance_dashboard', label: 'Dashboard Workbook', desc: 'ภาพรวม + แก้ widgets · Multi-workbook', icon: 'fa-chart-pie',     tone: 'info',    type: 'section', target: 'insurance_dashboard' },
-            { id: 'gold_card_pending', label: 'ใบสมัครรออนุมัติ', desc: 'คิวสมัครบัตรทองจาก user', icon: 'fa-hourglass-half', tone: 'info',    type: 'section', target: 'gold_card_pending' },
+            { id: 'gold_card_pending', label: 'ย้ายสิทธิ์บัตรทอง', desc: 'คิวคำขอย้ายสิทธิ์บัตรทองจาก user', icon: 'fa-hourglass-half', tone: 'info',    type: 'section', target: 'gold_card_pending' },
             { id: 'gold_card',     label: 'บัตรทอง',             desc: 'จัดการบัตรทอง + เอกสาร', icon: 'fa-id-card',         tone: 'warning', type: 'section', target: 'gold_card' },
             { id: 'registry_upload', label: 'อัพโหลดรายชื่อ',    desc: 'ทะเบียน',            icon: 'fa-id-card-clip',      tone: 'info',    type: 'section', target: 'registry_upload' },
             { id: 'batch_status',  label: 'สถานะเอกสาร',         desc: 'Insurance Batch',    icon: 'fa-list-check',         tone: 'info',    type: 'section', target: 'batch_status' },

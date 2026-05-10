@@ -57,9 +57,9 @@ $gcpCsrfToken = function_exists('get_csrf_token') ? get_csrf_token() : ($_SESSIO
                 <i class="fa-solid fa-hourglass-half"></i>
             </div>
             <div class="flex-1 min-w-[250px]">
-                <h2 class="text-base font-black text-slate-800">📥 ใบสมัครรออนุมัติ</h2>
+                <h2 class="text-base font-black text-slate-800">📥 ย้ายสิทธิ์บัตรทอง</h2>
                 <p class="text-xs font-bold text-slate-500 mt-1 leading-relaxed">
-                    คิวการสมัครบัตรทองจาก user ผ่าน LINE — ตรวจสอบรูปและลายเซ็นแล้วกดอนุมัติ/ไม่อนุมัติ
+                    คิวคำขอย้ายสิทธิ์บัตรทองจาก user ผ่าน LINE — ตรวจสอบรูปและลายเซ็นแล้วกดอนุมัติ/ไม่อนุมัติ
                     <br><span class="text-blue-600">→ หลังอนุมัติ ระบบจะตั้งวันคุ้มครอง 1 ปีอัตโนมัติ</span>
                 </p>
             </div>
