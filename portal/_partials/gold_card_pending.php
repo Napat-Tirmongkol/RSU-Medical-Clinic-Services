@@ -21,6 +21,7 @@ try {
 } catch (PDOException $e) { /* table may not exist yet */ }
 
 $gcpEndpoint = 'ajax_gold_card.php';
+$gcpCsrfToken = function_exists('get_csrf_token') ? get_csrf_token() : ($_SESSION['csrf_token'] ?? '');
 ?>
 <style>
     #section-gold_card_pending .gcp-card { background:#fff; border:1px solid #e2e8f0; border-radius:18px; padding:18px; transition:all 0.2s; }
@@ -107,7 +108,7 @@ $gcpEndpoint = 'ajax_gold_card.php';
 <script>
 (function(){
     const ENDPOINT = '<?= $gcpEndpoint ?>';
-    const CSRF = (typeof window.portal_CSRF !== 'undefined') ? window.portal_CSRF : (window.PORTAL_CSRF || '');
+    const CSRF = '<?= htmlspecialchars($gcpCsrfToken, ENT_QUOTES) ?>';
     const PAGE_SIZE = 20;
     let currentPage = 1;
 
