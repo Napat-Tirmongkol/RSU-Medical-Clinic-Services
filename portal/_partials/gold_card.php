@@ -171,6 +171,55 @@ $gcOver = kpi_override_status($pdo);
         background: #f59e0b; color: #fff;
         box-shadow: 0 4px 10px -2px rgba(245,158,11,.4);
     }
+
+    /* Delete buttons (folder + tile) */
+    #section-gold_card .gc-tile-delete {
+        position: absolute; top: 6px; right: 6px;
+        width: 26px; height: 26px; border-radius: 8px; border: none;
+        background: rgba(220, 38, 38, .92); color: #fff;
+        cursor: pointer; opacity: 0;
+        font-size: 11px; z-index: 5;
+        display: flex; align-items: center; justify-content: center;
+        transition: opacity .2s, transform .25s cubic-bezier(.34,1.56,.64,1), background .15s;
+        transform: scale(.7) rotate(-8deg);
+    }
+    #section-gold_card .gc-folder-tile,
+    #section-gold_card .gc-member-tile { position: relative; }
+    #section-gold_card .gc-folder-tile:hover .gc-tile-delete,
+    #section-gold_card .gc-member-tile:hover .gc-tile-delete {
+        opacity: 1; transform: scale(1) rotate(0);
+    }
+    #section-gold_card .gc-tile-delete:hover {
+        background: #b91c1c; transform: scale(1.12) rotate(4deg) !important;
+    }
+
+    #section-gold_card .gc-folder-delete-bar {
+        background: linear-gradient(135deg, #fef2f2, #fee2e2);
+        border: 1.5px solid #fecaca;
+        border-radius: 14px;
+        padding: 12px 16px;
+        display: flex; align-items: center; gap: 12px;
+        margin-bottom: 18px;
+    }
+    #section-gold_card .gc-folder-delete-bar .gc-warn-icon {
+        width: 32px; height: 32px; border-radius: 8px;
+        background: #fee2e2; color: #dc2626;
+        display: flex; align-items: center; justify-content: center; font-size: 14px;
+        flex-shrink: 0;
+    }
+    #section-gold_card .gc-folder-delete-btn {
+        height: 36px; padding: 0 14px;
+        background: #dc2626; color: #fff; border: none;
+        border-radius: 10px; font-size: 12px; font-weight: 900;
+        cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
+        transition: background .15s, transform .12s, box-shadow .15s;
+        box-shadow: 0 6px 12px -3px rgba(220,38,38,.4);
+    }
+    #section-gold_card .gc-folder-delete-btn:hover {
+        background: #b91c1c; transform: translateY(-1px);
+        box-shadow: 0 10px 18px -3px rgba(220,38,38,.55);
+    }
+    #section-gold_card .gc-folder-delete-btn:active { transform: translateY(1px); }
 </style>
 
 <div id="section-gold_card-content" class="px-5 md:px-8 py-8 space-y-7">
@@ -705,6 +754,9 @@ $gcOver = kpi_override_status($pdo);
                     const ratio = f.count > 0 ? (f.approved / f.count * 100) : 0;
                     html += `
                         <div class="gc-folder-tile" onclick="gcOpenFolder(${f.year}, ${f.month})">
+                            <button class="gc-tile-delete" onclick="event.stopPropagation(); gcDeleteFolder(${f.year}, ${f.month}, false, '${escapeAttr(f.full_label)}', ${f.count})" title="ลบโฟลเดอร์นี้">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
                             <i class="fa-solid fa-folder gc-folder-icon"></i>
                             <div class="gc-folder-name">${escapeHtml(f.label)}</div>
                             <span class="gc-folder-count">${f.count.toLocaleString()} ราย</span>
@@ -759,6 +811,31 @@ $gcOver = kpi_override_status($pdo);
                 return;
             }
             const rows = r.rows || [];
+
+            // หา label โฟลเดอร์ปัจจุบันสำหรับ delete bar
+            const folderLabel = (year !== null && month !== null)
+                ? ((folderState.tree || []).find(f => f.year === year && f.month === month) || {}).full_label
+                  || `${month}/${year + 543}`
+                : 'ไม่ระบุเดือน';
+            const noDateFlag = (year === null && month === null) ? 'true' : 'false';
+
+            let html = '';
+
+            // Folder delete bar (เฉพาะตอนเข้าใน folder)
+            if (rows.length > 0) {
+                html += `
+                <div class="gc-folder-delete-bar">
+                    <div class="gc-warn-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                    <div class="flex-1 min-w-0">
+                        <div class="text-[13px] font-black text-rose-800">${escapeHtml(folderLabel)}</div>
+                        <div class="text-[11px] text-rose-700 font-bold">${rows.length.toLocaleString()} ไฟล์ในโฟลเดอร์นี้</div>
+                    </div>
+                    <button class="gc-folder-delete-btn" onclick="gcDeleteFolder(${year}, ${month}, ${noDateFlag}, '${escapeAttr(folderLabel)}', ${rows.length})">
+                        <i class="fa-solid fa-trash-can"></i> ลบโฟลเดอร์ทั้งหมด
+                    </button>
+                </div>`;
+            }
+
             if (rows.length === 0) {
                 wrap.innerHTML = `<div class="text-center text-slate-400 font-bold py-12">
                     <i class="fa-solid fa-folder-open text-4xl mb-3 opacity-40"></i>
@@ -767,13 +844,17 @@ $gcOver = kpi_override_status($pdo);
                 return;
             }
 
-            let html = `<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">`;
+            html += `<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">`;
             rows.forEach(r => {
                 const cidLast4 = (r.citizen_id || '').slice(-4);
+                const safeName = (r.full_name || '').replace(/'/g, '&#39;');
                 html += `
                     <div class="gc-member-tile" onclick="gcOpenMemberModal(${r.id})">
+                        <button class="gc-tile-delete" onclick="event.stopPropagation(); gcDeleteMemberFromFolder(${r.id}, '${escapeAttr(r.full_name || '(ไม่มีชื่อ)')}', ${r.doc_count || 0})" title="ลบไฟล์นี้">
+                            <i class="fa-solid fa-trash"></i>
+                        </button>
                         <div class="gc-file-icon"><i class="fa-solid fa-file-lines"></i></div>
-                        <div class="flex-1 min-w-0">
+                        <div class="flex-1 min-w-0 pr-6">
                             <div class="font-black text-slate-800 text-sm truncate">${escapeHtml(r.full_name || '(ไม่มีชื่อ)')}</div>
                             <div class="flex items-center gap-2 mt-1 flex-wrap">
                                 ${statusBadge(r.status)}
@@ -793,6 +874,67 @@ $gcOver = kpi_override_status($pdo);
             wrap.innerHTML = html;
         });
     };
+
+    window.gcDeleteMemberFromFolder = async function(memberId, name, docCount) {
+        const docMsg = docCount > 0 ? `<br><b class="text-rose-700">+ เอกสารแนบ ${docCount} ไฟล์</b>` : '';
+        const { isConfirmed } = await Swal.fire({
+            icon: 'warning',
+            title: 'ยืนยันการลบ?',
+            html: `จะลบ <b>${escapeHtml(name)}</b> ออกจากระบบ${docMsg}`,
+            showCancelButton: true,
+            confirmButtonText: 'ลบ',
+            cancelButtonText: 'ยกเลิก',
+            confirmButtonColor: '#dc2626',
+            reverseButtons: true,
+        });
+        if (!isConfirmed) return;
+        gcPost('member', 'delete', { id: memberId }).then(r => {
+            if (r.status === 'ok') {
+                Swal.fire({ icon: 'success', title: 'ลบแล้ว', timer: 1200, showConfirmButton: false });
+                // Refresh ภายในโฟลเดอร์
+                gcOpenFolder(folderState.openYear, folderState.openMonth);
+            } else {
+                Swal.fire({ icon: 'error', title: 'ผิดพลาด', text: r.message });
+            }
+        });
+    };
+
+    window.gcDeleteFolder = async function(year, month, noDate, label, count) {
+        const { isConfirmed } = await Swal.fire({
+            icon: 'warning',
+            title: 'ลบทั้งโฟลเดอร์?',
+            html: `<div class="text-left">
+                <p>โฟลเดอร์: <b>${escapeHtml(label)}</b></p>
+                <p>จะลบ <b class="text-rose-700">${count.toLocaleString()} รายการ</b> + เอกสารทั้งหมด</p>
+                <p class="mt-2 text-xs text-slate-500">การลบนี้ไม่สามารถย้อนกลับได้</p>
+            </div>`,
+            showCancelButton: true,
+            confirmButtonText: 'ลบทั้งหมด',
+            cancelButtonText: 'ยกเลิก',
+            confirmButtonColor: '#dc2626',
+            reverseButtons: true,
+            input: 'text',
+            inputPlaceholder: 'พิมพ์ "ลบ" เพื่อยืนยัน',
+            inputValidator: v => v !== 'ลบ' ? 'พิมพ์คำว่า "ลบ" ให้ตรง' : null,
+        });
+        if (!isConfirmed) return;
+
+        const params = noDate ? { no_date: 1 } : { year: year, month: month };
+        gcPost('folder', 'delete', params).then(r => {
+            if (r.status === 'ok') {
+                Swal.fire({ icon: 'success', title: 'ลบโฟลเดอร์แล้ว', text: r.message, timer: 1500, showConfirmButton: false });
+                gcFolderHome(); // กลับไปหน้า root + reload
+            } else {
+                Swal.fire({ icon: 'error', title: 'ผิดพลาด', text: r.message });
+            }
+        });
+    };
+
+    // Helper สำหรับ HTML attribute (escape quote)
+    function escapeAttr(s) {
+        return String(s ?? '').replace(/[&<>"']/g, c =>
+            ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
 
     // ── load members table ──────────────────────────────────────────
     window.gcLoadMembers = function(page) {
@@ -1099,45 +1241,56 @@ $gcOver = kpi_override_status($pdo);
         searchTimer = setTimeout(() => gcLoadMembers(1), 350);
     });
 
-    // ── Charts ──────────────────────────────────────────────────────
-    function loadCharts() {
-        if (typeof Chart === 'undefined') { setTimeout(loadCharts, 200); return; }
+    // ── Charts (use dedicated endpoint, not public widget API) ──────
+    let trendChart = null, hospChart = null;
+    window.gcReloadCharts = function() {
+        if (typeof Chart === 'undefined') { setTimeout(gcReloadCharts, 200); return; }
 
-        // Trend (use public API via direct fetch — no auth needed since we're admin)
-        fetch('../api/dashboard_public.php', { credentials: 'omit' })
-            .then(r => r.json())
-            .then(d => {
-                const trendW = (d.widgets || []).find(w => w.data_source === 'gold_trend_12m');
-                if (trendW) {
-                    new Chart(document.getElementById('gcTrendChart'), {
-                        type: 'line',
-                        data: {
-                            labels: trendW.data.labels,
-                            datasets: [{
-                                label: 'จำนวนผู้ลงทะเบียน', data: trendW.data.series[0].data,
-                                borderColor: '#f59e0b', backgroundColor: 'rgba(245, 158, 11, 0.1)',
-                                tension: 0.3, fill: true, borderWidth: 2.5, pointRadius: 4,
-                            }],
-                        },
-                        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
-                    });
-                }
-                const hospW = (d.widgets || []).find(w => w.data_source === 'gold_by_hospital');
-                if (hospW) {
-                    new Chart(document.getElementById('gcHospChart'), {
-                        type: 'bar',
-                        data: {
-                            labels: hospW.data.labels,
-                            datasets: [{
-                                label: 'จำนวน', data: hospW.data.values,
-                                backgroundColor: '#fbbf24', borderRadius: 6,
-                            }]
-                        },
-                        options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
-                    });
-                }
-            });
-    }
+        gcPost('chart', 'overview', {}).then(d => {
+            if (d.status !== 'ok') return;
+
+            const trend = d.trend || {};
+            if (trend.labels && trend.series && trend.series[0]) {
+                if (trendChart) trendChart.destroy();
+                trendChart = new Chart(document.getElementById('gcTrendChart'), {
+                    type: 'line',
+                    data: {
+                        labels: trend.labels,
+                        datasets: [{
+                            label: 'จำนวนผู้ลงทะเบียน',
+                            data: trend.series[0].data,
+                            borderColor: '#f59e0b',
+                            backgroundColor: 'rgba(245, 158, 11, 0.15)',
+                            tension: 0.3, fill: true, borderWidth: 2.5, pointRadius: 4,
+                        }],
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+                    }
+                });
+            }
+
+            const hosp = d.hospital || {};
+            if (hosp.labels && hosp.values) {
+                if (hospChart) hospChart.destroy();
+                hospChart = new Chart(document.getElementById('gcHospChart'), {
+                    type: 'bar',
+                    data: {
+                        labels: hosp.labels,
+                        datasets: [{ label: 'จำนวน', data: hosp.values, backgroundColor: '#fbbf24', borderRadius: 6 }]
+                    },
+                    options: {
+                        indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: { x: { beginAtZero: true, ticks: { precision: 0 } } }
+                    }
+                });
+            }
+        });
+    };
+    function loadCharts() { gcReloadCharts(); }
 
     // ── Utils ───────────────────────────────────────────────────────
     function escapeHtml(s) {

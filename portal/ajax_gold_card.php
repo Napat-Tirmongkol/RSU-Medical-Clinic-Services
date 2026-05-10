@@ -195,6 +195,63 @@ function gc_match_user(PDO $pdo, string $filename): array
 try {
     switch ("$entity:$action") {
 
+        case 'chart:overview': {
+            // Built-in charts สำหรับหน้า gold_card (ไม่ผูกกับ widget config)
+            require_once __DIR__ . '/../includes/dashboard_data_sources.php';
+            json_ok([
+                'trend'    => dashboard_resolve_data($pdo, 'gold_trend_12m'),
+                'hospital' => dashboard_resolve_data($pdo, 'gold_by_hospital'),
+            ]);
+        }
+
+        case 'folder:delete': {
+            // ลบสมาชิกทั้งหมดในโฟลเดอร์ year+month (หรือ no_date)
+            $year   = (int)($_POST['year'] ?? 0);
+            $month  = (int)($_POST['month'] ?? 0);
+            $noDate = !empty($_POST['no_date']);
+
+            $where = ''; $params = [];
+            if ($noDate) {
+                $where = 'WHERE application_date IS NULL';
+            } elseif ($year > 1900 && $month >= 1 && $month <= 12) {
+                $where = 'WHERE YEAR(application_date) = ? AND MONTH(application_date) = ?';
+                $params = [$year, $month];
+            } else {
+                json_err('ระบุ year/month หรือ no_date ไม่ถูกต้อง');
+            }
+
+            // Lookup ids ที่จะลบ
+            $sel = $pdo->prepare("SELECT id FROM gold_card_members $where");
+            $sel->execute($params);
+            $ids = $sel->fetchAll(PDO::FETCH_COLUMN);
+            if (empty($ids)) json_err('โฟลเดอร์ว่าง — ไม่มีอะไรให้ลบ');
+
+            // ลบไฟล์เอกสารออกจาก disk ก่อน (FK CASCADE จะลบ rows ใน DB)
+            $placeholders = implode(',', array_fill(0, count($ids), '?'));
+            $docs = $pdo->prepare("SELECT stored_path FROM gold_card_documents WHERE member_id IN ($placeholders)");
+            $docs->execute($ids);
+            $base = gold_card_uploads_dir();
+            foreach ($docs->fetchAll(PDO::FETCH_COLUMN) as $sp) {
+                $p = $base . '/' . $sp;
+                if (is_file($p)) @unlink($p);
+            }
+
+            // ลบสมาชิก
+            $del = $pdo->prepare("DELETE FROM gold_card_members $where");
+            $del->execute($params);
+            $deleted = $del->rowCount();
+
+            gold_card_log_history($pdo, null, 'folder_deleted', null, [
+                'year' => $year, 'month' => $month, 'no_date' => $noDate,
+                'deleted_count' => $deleted, 'member_ids' => array_slice($ids, 0, 50),
+            ], $adminId);
+
+            json_ok([
+                'deleted' => $deleted,
+                'message' => "ลบโฟลเดอร์เรียบร้อย — $deleted รายการ",
+            ]);
+        }
+
         case 'folder:tree': {
             // คืน folder hierarchy: group by year + month ของ application_date
             $rows = $pdo->query("
