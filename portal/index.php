@@ -2960,6 +2960,8 @@ try {
                                             'access_asset'          => ['Asset Inventory',  'fa-warehouse',          '#f59e0b'],
                                             'access_scholarship'    => ['Scholarship',      'fa-graduation-cap',     '#10b981'],
                                             'access_dashboard_admin'=> ['Dashboard Editor', 'fa-chart-pie',          '#3b82f6'],
+                                            'access_monthly_report' => ['รายงานประจำเดือน',  'fa-clipboard-list',     '#f59e0b'],
+                                            'access_director_view'  => ['ผู้อำนวยการ',       'fa-user-tie',           '#f43f5e'],
                                         ];
                                         foreach ($posFlagInputs as $key => [$label, $icon, $color]):
                                         ?>
@@ -4059,7 +4061,7 @@ try {
             'access_eborrow','access_ecampaign','access_insurance','access_registry',
             'access_system_logs','access_site_settings','access_edms',
             'access_ai','access_consumables','access_asset','access_scholarship',
-            'access_dashboard_admin'
+            'access_dashboard_admin','access_monthly_report','access_director_view'
         ];
 
         function openAddPositionModal() {
