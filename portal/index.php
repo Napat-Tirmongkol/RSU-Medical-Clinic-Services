@@ -402,17 +402,23 @@ $categoryMap = [
 
 /**
  * (3) RECENT ACTIVITY FETCH
- * ดึงความเคลื่อนไหวล่าสุดจาก sys_activity_logs มาแสดงที่ Dashboard
+ * แสดงเฉพาะกิจกรรมของ user ปัจจุบัน (privacy: ไม่ปนกับคนอื่น)
  */
 $recentActivity = [];
-try {
-    $sql = "SELECT l.action, l.description, l.timestamp as created_at, a.full_name as admin_name 
-            FROM sys_activity_logs l
-            LEFT JOIN sys_admins a ON l.user_id = a.id
-            ORDER BY l.timestamp DESC 
-            LIMIT 5";
-    $recentActivity = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
-} catch (PDOException $e) { /* silent */
+$_currentUserId = $_SESSION['admin_id'] ?? null;
+if ($_currentUserId) {
+    try {
+        $stmt = $pdo->prepare("SELECT action, description, timestamp as created_at
+                               FROM sys_activity_logs
+                               WHERE user_id = :uid
+                               ORDER BY timestamp DESC
+                               LIMIT 5");
+        $stmt->execute([':uid' => (int)$_currentUserId]);
+        $recentActivity = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $_myName = $_SESSION['admin_username'] ?? '';
+        foreach ($recentActivity as &$_r) { $_r['admin_name'] = $_myName; }
+        unset($_r);
+    } catch (PDOException $e) { /* table not ready */ }
 }
 
 /**
@@ -1519,10 +1525,10 @@ try {
                             <!-- Clinic Calendar widget (today + next 6 days) -->
                             <?php include __DIR__ . '/_partials/dashboard_clinic_calendar.php'; ?>
 
-                            <!-- Activity Feed (flat list, color-coded by event) -->
+                            <!-- Activity Feed (flat list, color-coded by event) — ของฉันเท่านั้น -->
                             <div>
                                 <div class="sec-title mb-4">
-                                    ความเคลื่อนไหวล่าสุด
+                                    กิจกรรมของฉันล่าสุด
                                     <?php if (!empty($recentActivity)): ?>
                                         <span class="ml-auto eyebrow"><?= count($recentActivity) ?> รายการ</span>
                                     <?php endif; ?>
@@ -1566,14 +1572,16 @@ try {
                                     <?php endforeach; else: ?>
                                         <li class="activity-empty">
                                             <i class="fa-solid fa-circle-check"></i>
-                                            ไม่มีความเคลื่อนไหวใน 24 ชั่วโมงที่ผ่านมา
+                                            ยังไม่มีกิจกรรมของคุณในระบบ
                                         </li>
                                     <?php endif; ?>
                                 </ul>
+                                <?php if ($isSuper || !empty($_SESSION['access_system_logs'])): ?>
                                 <a href="javascript:switchSection('activity_logs', document.querySelector('[data-section=activity_logs]'))"
                                     class="activity-view-all">
-                                    ดูทั้งหมด <i class="fa-solid fa-arrow-right text-[10px]"></i>
+                                    ดูของระบบทั้งหมด <i class="fa-solid fa-arrow-right text-[10px]"></i>
                                 </a>
+                                <?php endif; ?>
                             </div>
 
                             <!-- Quick Shortcuts (flat, role-aware) -->
