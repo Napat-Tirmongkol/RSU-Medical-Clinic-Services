@@ -385,6 +385,7 @@ $categoryMap = [
     'insurance_dashboard' => 'core',
     'gold_card' => 'core',
     'gold_card_pending' => 'core',
+    'monthly_report' => 'core',
     'system_logs' => 'tools',
     'privilege_inventory' => 'tools',
     'admin_tool' => 'tools',
@@ -956,6 +957,7 @@ try {
             $hasEdms        = $isSuper || !empty($_SESSION['access_edms']);
             $hasScholarship = $isSuper || !empty($_SESSION['access_scholarship']);
             $hasDashboardAdmin = $isSuper || !empty($_SESSION['access_dashboard_admin']);
+            $hasMonthlyReport  = $isSuper || !empty($_SESSION['access_monthly_report']) || !empty($_SESSION['access_director_view']);
 
             // EDMS pending count badge — count routings where current user is recipient and status is open
             $edmsInboxBadge = 0;
@@ -1135,6 +1137,21 @@ try {
                     <button class="psb-item" data-section="error_logs" onclick="switchSection('error_logs',this)">
                         <div class="psb-icon"><i class="fa-solid fa-bug" style="color:#ef4444"></i></div>
                         <span class="psb-label" style="color:#dc2626;font-weight:900">Error Logs</span>
+                    </button>
+                </div>
+            <?php endif; ?>
+
+            <?php /* ── รายงาน ─────────────────────────────────────────────── */ ?>
+            <?php if (!$registryOnly && $hasMonthlyReport): ?>
+                <button type="button" class="psb-section-toggle" data-group="reports" onclick="togglePsbGroup('reports',this)">
+                    <i class="fa-solid fa-clipboard-list" style="color:#f59e0b"></i>
+                    <span>รายงาน</span>
+                    <i class="fa-solid fa-chevron-down psb-chevron"></i>
+                </button>
+                <div class="psb-group" data-group="reports">
+                    <button class="psb-item <?= $activeSection==='monthly_report'?'psb-active':'' ?>" data-section="monthly_report" onclick="switchSection('monthly_report',this)">
+                        <div class="psb-icon"><i class="fa-solid fa-calendar-days" style="color:#f59e0b"></i></div>
+                        <span class="psb-label" style="color:#b45309;font-weight:900">รายงานประจำเดือน</span>
                     </button>
                 </div>
             <?php endif; ?>
@@ -3116,11 +3133,23 @@ try {
             <!-- ════════════ SECTION: ERROR LOGS ════════════ -->
             <div id="section-error_logs" class="portal-section"
                 style="<?= $activeSection==='error_logs'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); background:#f8fafc; overflow-y:auto;">
-                <?php 
+                <?php
                 if ($adminRole === 'superadmin' || !empty($_SESSION['access_system_logs'])) {
-                    include __DIR__ . '/_partials/error_logs.php'; 
+                    include __DIR__ . '/_partials/error_logs.php';
                 } else {
                     echo '<div style="padding:100px;text-align:center;font-weight:900;color:#dc2626"><i class="fa-solid fa-shield-slash mb-4" style="font-size:4rem;display:block"></i> ACCESS DENIED<br><span style="font-size:14px;color:#94a3b8;font-weight:600">You do not have permission to view system error logs.</span></div>';
+                }
+                ?>
+            </div>
+
+            <!-- ════════════ SECTION: MONTHLY REPORT ════════════ -->
+            <div id="section-monthly_report" class="portal-section"
+                style="<?= $activeSection==='monthly_report'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); background:#f8fafc; overflow-y:auto;">
+                <?php
+                if ($adminRole === 'superadmin' || !empty($_SESSION['access_monthly_report']) || !empty($_SESSION['access_director_view'])) {
+                    include __DIR__ . '/_partials/monthly_report.php';
+                } else {
+                    echo '<div style="padding:100px;text-align:center;font-weight:900;color:#dc2626"><i class="fa-solid fa-shield-slash mb-4" style="font-size:4rem;display:block"></i> ACCESS DENIED<br><span style="font-size:14px;color:#94a3b8;font-weight:600">ต้องมีสิทธิ์ access_monthly_report หรือ access_director_view</span></div>';
                 }
                 ?>
             </div>

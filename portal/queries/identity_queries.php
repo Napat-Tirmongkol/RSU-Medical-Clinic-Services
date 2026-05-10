@@ -114,6 +114,15 @@ if ($adminRole === 'superadmin') {
         if (!in_array('access_dashboard_admin', $cols)) {
             $pdo->exec("ALTER TABLE sys_staff ADD COLUMN access_dashboard_admin TINYINT(1) DEFAULT 0");
         }
+        if (!in_array('access_monthly_report', $cols)) {
+            $pdo->exec("ALTER TABLE sys_staff ADD COLUMN access_monthly_report TINYINT(1) DEFAULT 0");
+        }
+        if (!in_array('access_director_view', $cols)) {
+            $pdo->exec("ALTER TABLE sys_staff ADD COLUMN access_director_view TINYINT(1) DEFAULT 0");
+        }
+        if (!in_array('department_id', $cols)) {
+            $pdo->exec("ALTER TABLE sys_staff ADD COLUMN department_id INT UNSIGNED NULL AFTER role");
+        }
         if (!in_array('position_id', $cols)) {
             $pdo->exec("ALTER TABLE sys_staff ADD COLUMN position_id INT UNSIGNED NULL AFTER role");
             try { $pdo->exec("ALTER TABLE sys_staff ADD INDEX idx_position (position_id)"); } catch (PDOException $e) {}
@@ -150,7 +159,10 @@ if ($adminRole === 'superadmin') {
                    IFNULL(s.access_consumables, 0) AS access_consumables,
                    IFNULL(s.access_asset, 0) AS access_asset,
                    IFNULL(s.access_scholarship, 0) AS access_scholarship,
-                   IFNULL(s.access_dashboard_admin, 0) AS access_dashboard_admin
+                   IFNULL(s.access_dashboard_admin, 0) AS access_dashboard_admin,
+                   IFNULL(s.access_monthly_report, 0) AS access_monthly_report,
+                   IFNULL(s.access_director_view, 0) AS access_director_view,
+                   s.department_id
             FROM sys_staff s
             LEFT JOIN sys_staff_positions p ON p.id = s.position_id
             ORDER BY s.role ASC, s.full_name ASC
