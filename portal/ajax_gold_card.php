@@ -708,20 +708,26 @@ try {
             if ($message === '')       json_err('กรุณาพิมพ์ข้อความ');
             if (mb_strlen($message) > 4000) json_err('ข้อความยาวเกิน 4,000 ตัวอักษร');
 
-            // หา linked user → line_user_id
-            $stmt = $pdo->prepare("
-                SELECT m.id, m.full_name, m.linked_user_id, m.citizen_id, m.status,
-                       u.line_user_id, u.full_name AS user_name
-                FROM gold_card_members m
-                LEFT JOIN sys_users u ON u.id = m.linked_user_id
-                WHERE m.id = ? LIMIT 1
-            ");
+            // หา linked user → line_user_id (ลอง _new ก่อน เพราะระบบ migrate provider)
+            // sys_users มีทั้ง line_user_id (old) และ line_user_id_new (current)
+            $sysCols = array_column($pdo->query("SHOW COLUMNS FROM sys_users")->fetchAll(PDO::FETCH_ASSOC), 'Field');
+            $hasNew = in_array('line_user_id_new', $sysCols, true);
+
+            $sql = "SELECT m.id, m.full_name, m.linked_user_id, m.citizen_id, m.status,
+                           u.line_user_id" . ($hasNew ? ", u.line_user_id_new" : "") . ", u.full_name AS user_name
+                    FROM gold_card_members m
+                    LEFT JOIN sys_users u ON u.id = m.linked_user_id
+                    WHERE m.id = ? LIMIT 1";
+            $stmt = $pdo->prepare($sql);
             $stmt->execute([$id]);
             $row = $stmt->fetch(PDO::FETCH_ASSOC);
             if (!$row) json_err('ไม่พบสมาชิก');
 
-            $lineUserId = trim((string)($row['line_user_id'] ?? ''));
-            if ($lineUserId === '') {
+            // ลำดับ priority: line_user_id_new (channel ปัจจุบัน) → line_user_id (channel เก่า — ใช้ accessToken เก่าถ้ามี)
+            $lineUserIdNew = trim((string)($row['line_user_id_new'] ?? ''));
+            $lineUserIdOld = trim((string)($row['line_user_id']     ?? ''));
+
+            if ($lineUserIdNew === '' && $lineUserIdOld === '') {
                 json_err('สมาชิกยังไม่ได้ผูกกับบัญชี LINE — ส่งข้อความไม่ได้ (ใช้เบอร์โทรแทน)');
             }
 
@@ -734,17 +740,37 @@ try {
             $statusLine = $statusLabel ? "\n📌 สถานะปัจจุบัน: $statusLabel" : '';
             $finalText = "📋 แจ้งจากระบบบัตรทอง\n" . str_repeat('—', 18) . "\n" . $message . $statusLine . "\n\nสำนักงานสวัสดิการสุขภาพ มหาวิทยาลัยรังสิต";
 
-            require_once __DIR__ . '/../line_api/line_message_helper.php';
-            $code = sendLinePushMessage($lineUserId, [['type' => 'text', 'text' => $finalText]]);
-
-            if ($code !== 200) {
-                json_err("ส่งข้อความไม่สำเร็จ (HTTP $code) — ตรวจสอบ LINE token");
+            require_once __DIR__ . '/../includes/line_helper.php';
+            $accessToken = defined('LINE_MESSAGING_CHANNEL_ACCESS_TOKEN') ? LINE_MESSAGING_CHANNEL_ACCESS_TOKEN : '';
+            if ($accessToken === '') {
+                $secrets = require __DIR__ . '/../config/secrets.php';
+                $accessToken = $secrets['LINE_MESSAGING_CHANNEL_ACCESS_TOKEN'] ?? '';
+            }
+            if ($accessToken === '') {
+                json_err('LINE_MESSAGING_CHANNEL_ACCESS_TOKEN ไม่ได้ตั้งค่าใน secrets.php');
             }
 
-            // Log to history (truncate ถ้ายาวเกินไปสำหรับ field new_value)
+            $messages = [['type' => 'text', 'text' => $finalText]];
+
+            // ลองส่งทั้ง line_user_id_new และ line_user_id (ตัวไหนสำเร็จก่อนใช้ตัวนั้น)
+            $sentTo = null; $lastErr = '';
+            foreach (array_filter([$lineUserIdNew, $lineUserIdOld]) as $tryUid) {
+                if (send_line_push($tryUid, $messages, $accessToken)) {
+                    $sentTo = $tryUid;
+                    break;
+                }
+                $lastErr = function_exists('get_last_line_error') ? get_last_line_error() : '';
+            }
+
+            if (!$sentTo) {
+                $tail = $lastErr ? " — $lastErr" : '';
+                json_err("ส่งข้อความไม่สำเร็จ$tail");
+            }
+
+            // Log to history
             gold_card_log_history($pdo, $id, 'message_sent', null, [
                 'message' => mb_substr($message, 0, 1000),
-                'sent_to_line_id' => $lineUserId,
+                'sent_to_line_id' => $sentTo,
             ], $adminId);
 
             json_ok(['message' => 'ส่งข้อความผ่าน LINE สำเร็จ', 'recipient' => $row['user_name']]);
