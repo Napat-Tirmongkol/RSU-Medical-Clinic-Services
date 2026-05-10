@@ -18,7 +18,7 @@ if ($lineUserId === '' && !$isTest) {
 $userData = [
     'prefix' => '', 'first_name' => '', 'last_name' => '', 'full_name' => '',
     'id_number' => '', 'citizen_id' => '', 'phone' => '', 'status' => '',
-    'email' => '', 'gender' => '', 'department' => '',
+    'email' => '', 'gender' => '', 'date_of_birth' => '', 'department' => '',
     'picture_url' => '',
     'blood_type' => '', 'height_cm' => '', 'weight_kg' => '',
     'allergies' => '', 'chronic_conditions' => '',
@@ -33,6 +33,7 @@ try {
 
     // Self-healing migration for new columns
     $newCols = [
+        'date_of_birth'              => "DATE NULL DEFAULT NULL",
         'blood_type'                 => "VARCHAR(8) NOT NULL DEFAULT ''",
         'height_cm'                  => "DECIMAL(5,2) NULL DEFAULT NULL",
         'weight_kg'                  => "DECIMAL(5,2) NULL DEFAULT NULL",
@@ -62,6 +63,7 @@ try {
             'status'         => $user['status'] ?? '',
             'email'          => $user['email'] ?? '',
             'gender'         => $user['gender'] ?? '',
+            'date_of_birth'  => $user['date_of_birth'] ?? '',
             'department'     => $user['department'] ?? '',
             'picture_url'    => $user['picture_url'] ?? '',
             'blood_type'     => $user['blood_type'] ?? '',
@@ -512,6 +514,18 @@ function vh(?string $s): string { return htmlspecialchars((string) $s, ENT_QUOTE
                             </label>
                             <?php endforeach; ?>
                         </div>
+                    </div>
+
+                    <!-- Date of Birth -->
+                    <?php
+                        $dobValue = $userData['date_of_birth'] ?? '';
+                        if ($dobValue === '0000-00-00') $dobValue = '';
+                    ?>
+                    <div class="space-y-1.5">
+                        <label class="text-sm font-bold text-slate-700">วันเดือนปีเกิด</label>
+                        <input type="date" name="date_of_birth" value="<?= vh($dobValue) ?>" max="<?= date('Y-m-d') ?>" <?= $readonlyAttr ?>
+                            class="field-input w-full h-14 px-4 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-4 focus:ring-green-50 outline-none font-bold">
+                        <p class="text-[11px] text-slate-400 font-semibold">ใช้สำหรับสมัครสิทธิ/บัตรทอง — กรอกตามบัตรประชาชน</p>
                     </div>
                 </div>
 
