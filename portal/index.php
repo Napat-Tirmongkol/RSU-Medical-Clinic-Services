@@ -1087,7 +1087,7 @@ try {
                             <span class="psb-label" style="color:#0e7490;font-weight:900">สถานะเอกสาร</span>
                         </button>
                     <?php endif; ?>
-                    <?php if (!$registryOnly && ($isSuper || !empty($_SESSION['access_insurance']))): ?>
+                    <?php if (!$registryOnly && $isSuper): ?>
                         <button class="psb-item" data-section="manage_insurance_partners" onclick="switchSection('manage_insurance_partners',this)">
                             <div class="psb-icon"><i class="fa-solid fa-handshake" style="color:#10b981"></i></div>
                             <span class="psb-label" style="color:#059669;font-weight:900">Insurance Partners</span>
@@ -3192,10 +3192,10 @@ try {
             <div id="section-manage_insurance_partners" class="portal-section"
                 style="<?= $activeSection==='manage_insurance_partners'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); background:#f8fafc; overflow-y:auto;">
                 <?php
-                if ($adminRole === 'superadmin' || !empty($_SESSION['access_insurance'])) {
+                if ($adminRole === 'superadmin') {
                     include __DIR__ . '/_partials/manage_insurance_partners.php';
                 } else {
-                    echo '<div style="padding:100px;text-align:center;font-weight:900;color:#dc2626"><i class="fa-solid fa-shield-slash mb-4" style="font-size:4rem;display:block"></i> ACCESS DENIED<br><span style="font-size:14px;color:#94a3b8;font-weight:600">ต้องมีสิทธิ์ access_insurance</span></div>';
+                    echo '<div style="padding:100px;text-align:center;font-weight:900;color:#dc2626"><i class="fa-solid fa-shield-slash mb-4" style="font-size:4rem;display:block"></i> ACCESS DENIED<br><span style="font-size:14px;color:#94a3b8;font-weight:600">เฉพาะ superadmin เท่านั้น</span></div>';
                 }
                 ?>
             </div>
@@ -4851,7 +4851,9 @@ try {
             { id: 'gold_card',     label: 'บัตรทอง',             desc: 'จัดการบัตรทอง + เอกสาร', icon: 'fa-id-card',         tone: 'warning', type: 'section', target: 'gold_card' },
             { id: 'registry_upload', label: 'อัพโหลดรายชื่อ',    desc: 'ทะเบียน',            icon: 'fa-id-card-clip',      tone: 'info',    type: 'section', target: 'registry_upload' },
             { id: 'batch_status',  label: 'สถานะเอกสาร',         desc: 'Insurance Batch',    icon: 'fa-list-check',         tone: 'info',    type: 'section', target: 'batch_status' },
+<?php if ($isSuper): ?>
             { id: 'manage_insurance_partners', label: 'Insurance Partners', desc: 'จัดการพาร์ทเนอร์', icon: 'fa-handshake', tone: 'success', type: 'section', target: 'manage_insurance_partners' },
+<?php endif; ?>
             { id: 'announcements', label: 'ประกาศ',              desc: 'จัดการประกาศ Hub',  shortcut: 'g a', icon: 'fa-bullhorn',           tone: 'accent',  type: 'section', target: 'announcements' },
             { id: 'activity_logs', label: 'Activity Logs',       desc: 'บันทึกกิจกรรมระบบ',  icon: 'fa-file-lines',         tone: 'neutral', type: 'section', target: 'activity_logs' },
             { id: 'error_logs',    label: 'Error Logs',          desc: 'บันทึกข้อผิดพลาด',  shortcut: 'g e', icon: 'fa-bug',                tone: 'danger',  type: 'section', target: 'error_logs' },
