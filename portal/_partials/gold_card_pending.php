@@ -414,8 +414,12 @@ $gcpCsrfToken = function_exists('get_csrf_token') ? get_csrf_token() : ($_SESSIO
     };
 
     // เปิด full edit modal ของ gold_card section (มี tabs ครบ)
+    // หลังปิด modal → กลับมาหน้า pending อัตโนมัติ (gcCloseMemberModal เช็ค flag นี้)
     window.gcpOpenDetail = function(id) {
         if (typeof window.gcOpenMemberModal === 'function') {
+            window._gcReturnToPending = true;
+            window._gcpReturnPage = currentPage || 1;
+
             // Switch to gold_card section first (ทำให้ modal โหลดได้)
             if (typeof window.switchSection === 'function') {
                 const goldBtn = document.querySelector('[data-section="gold_card"]');

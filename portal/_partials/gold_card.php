@@ -1460,6 +1460,18 @@ $gcOver = kpi_override_status($pdo);
         const modal = document.getElementById('gcMemberModal');
         modal.classList.add('hidden');
         modal.classList.remove('flex');
+
+        // ถ้าเปิดมาจากหน้า "ใบสมัครรออนุมัติ" → กลับไปยังหน้านั้น
+        if (window._gcReturnToPending) {
+            window._gcReturnToPending = false;
+            const pendingBtn = document.querySelector('[data-section="gold_card_pending"]');
+            if (pendingBtn && typeof window.switchSection === 'function') {
+                setTimeout(() => {
+                    window.switchSection('gold_card_pending', pendingBtn);
+                    if (typeof window.gcpLoadList === 'function') window.gcpLoadList(window._gcpReturnPage || 1);
+                }, 50);
+            }
+        }
     };
 
     window.gcSwitchTab = function(tab) {
