@@ -249,6 +249,124 @@ function gc_read_docx_created(string $path): ?DateTime
  *          'label'=>'พ.ค. 68', 'source'=>'pdf|exif|docx']
  * หรือ null ถ้าอ่านไม่ได้
  */
+// ── OCR (Tesseract on-premise) — PDPA-safe extraction of citizen_id + name ──
+/**
+ * ตรวจว่า server พร้อม OCR ไหม (tesseract + pdftoppm + Thai language pack)
+ */
+function gc_check_ocr_environment(): array
+{
+    $hasTess = false; $hasPdf = false; $hasThai = false;
+    @exec('which tesseract 2>/dev/null', $out1, $code1);
+    if ($code1 === 0 && !empty($out1)) $hasTess = true;
+    @exec('which pdftoppm 2>/dev/null', $out2, $code2);
+    if ($code2 === 0 && !empty($out2)) $hasPdf = true;
+    if ($hasTess) {
+        @exec('tesseract --list-langs 2>&1', $langs, $code3);
+        foreach ($langs ?? [] as $l) {
+            if (trim($l) === 'tha') { $hasThai = true; break; }
+        }
+    }
+    $ready = $hasTess && $hasPdf && $hasThai;
+    $hint = '';
+    if (!$ready) {
+        $missingPkg = [];
+        if (!$hasTess) $missingPkg[] = 'tesseract-ocr';
+        if (!$hasThai) $missingPkg[] = 'tesseract-ocr-tha';
+        if (!$hasPdf)  $missingPkg[] = 'poppler-utils';
+        $hint = 'ติดตั้ง: sudo apt-get install -y ' . implode(' ', $missingPkg);
+    }
+    return [
+        'tesseract'     => $hasTess,
+        'pdftoppm'      => $hasPdf,
+        'thai_langpack' => $hasThai,
+        'ready'         => $ready,
+        'hint'          => $hint,
+    ];
+}
+
+/**
+ * Validate Thai citizen ID with Mod-11 checksum
+ */
+function gc_citizen_mod11(string $id): bool
+{
+    if (!preg_match('/^\d{13}$/', $id)) return false;
+    $sum = 0;
+    for ($i = 0; $i < 12; $i++) $sum += (int)$id[$i] * (13 - $i);
+    return ((11 - ($sum % 11)) % 10) === (int)$id[12];
+}
+
+/**
+ * OCR extract citizen_id + name from a PDF/image file (on-premise Tesseract — PDPA-safe)
+ */
+function gc_ocr_extract(string $filePath, string $origExt): array
+{
+    if (!is_file($filePath) || !is_readable($filePath)) {
+        return ['ok' => false, 'error' => 'ไฟล์อ่านไม่ได้'];
+    }
+    $tmpDir = sys_get_temp_dir() . '/gc_ocr_' . bin2hex(random_bytes(6));
+    if (!@mkdir($tmpDir, 0700, true)) {
+        return ['ok' => false, 'error' => 'สร้าง temp dir ไม่ได้'];
+    }
+    $cleanup = function() use ($tmpDir) {
+        if (is_dir($tmpDir)) {
+            foreach (glob("$tmpDir/*") ?: [] as $f) @unlink($f);
+            @rmdir($tmpDir);
+        }
+    };
+    try {
+        $ext = strtolower($origExt);
+        $imageFiles = [];
+        if ($ext === 'pdf') {
+            $base = $tmpDir . '/page';
+            @exec('pdftoppm -f 1 -l 2 -r 200 -png ' . escapeshellarg($filePath) . ' ' . escapeshellarg($base) . ' 2>&1', $out, $code);
+            if ($code !== 0) throw new RuntimeException('pdftoppm failed: ' . implode("\n", $out ?? []));
+            $imageFiles = glob("$base*.png") ?: [];
+            if (empty($imageFiles)) throw new RuntimeException('PDF ไม่ผลิต PNG ออกมา');
+        } elseif (in_array($ext, ['jpg','jpeg','png','webp','gif','bmp','tiff','tif'], true)) {
+            $imageFiles = [$filePath];
+        } else {
+            throw new RuntimeException("ไม่รองรับ extension: $ext");
+        }
+        $allText = '';
+        foreach ($imageFiles as $img) {
+            $outBase = $tmpDir . '/ocr_' . bin2hex(random_bytes(4));
+            @exec('tesseract ' . escapeshellarg($img) . ' ' . escapeshellarg($outBase) . ' -l tha+eng 2>&1', $tOut, $tCode);
+            if ($tCode === 0 && is_file($outBase . '.txt')) {
+                $allText .= ($allText ? "\n" : '') . file_get_contents($outBase . '.txt');
+            }
+        }
+        if ($allText === '') throw new RuntimeException('OCR ไม่ผลิตข้อความ');
+
+        // หา 13 หลักที่ผ่าน Mod-11
+        $citizenId = null;
+        if (preg_match_all('/[\d\s\-]{13,20}/', $allText, $matches)) {
+            foreach ($matches[0] as $m) {
+                $digits = preg_replace('/\D/', '', $m);
+                if (strlen($digits) === 13 && gc_citizen_mod11($digits)) {
+                    $citizenId = $digits;
+                    break;
+                }
+            }
+        }
+        // หา name (heuristic จากคำนำหน้า)
+        $name = null;
+        if (preg_match('/(?:นาย|นาง(?:สาว)?|ด\.ช\.|ด\.ญ\.|น\.ส\.)\s*([\p{Thai}\s]{2,40}?)(?:\s+\d|\s+เลข|\n|$)/u', $allText, $nm)) {
+            $name = trim(preg_replace('/\s+/', ' ', $nm[1]));
+        }
+
+        $cleanup();
+        return [
+            'ok' => true,
+            'citizen_id' => $citizenId,
+            'name' => $name,
+            'raw_text' => mb_substr($allText, 0, 2000),
+        ];
+    } catch (Throwable $e) {
+        $cleanup();
+        return ['ok' => false, 'error' => $e->getMessage()];
+    }
+}
+
 function gc_read_file_creation(string $path, string $filename): ?array
 {
     static $thaiMonths = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
@@ -876,6 +994,69 @@ try {
             header('Content-Length: ' . filesize($path));
             readfile($path);
             exit;
+        }
+
+        case 'system:ocr_check': {
+            // Check ว่า Tesseract + pdftoppm + Thai langpack พร้อมใช้ไหม
+            json_ok(['env' => gc_check_ocr_environment()]);
+        }
+
+        case 'bulk:ocr_extract': {
+            // OCR หลายๆ ไฟล์ (PDPA-safe — รันใน server เดียวกัน)
+            // Files: $_FILES['files']['name'][...]
+            // Returns: array of {filename, ok, citizen_id, name, error}
+            if (empty($_FILES['files']['name'])) json_err('ไม่พบไฟล์');
+            if (!is_array($_FILES['files']['name'])) json_err('ใช้ <input type="file" multiple> เท่านั้น');
+
+            $env = gc_check_ocr_environment();
+            if (!$env['ready']) {
+                json_err('Server ยังไม่พร้อมใช้ OCR — ' . $env['hint'], 503);
+            }
+
+            @set_time_limit(300); // 5 min for batch OCR
+
+            $names   = $_FILES['files']['name'];
+            $errors  = $_FILES['files']['error'];
+            $tmps    = $_FILES['files']['tmp_name'];
+            $report  = [];
+
+            foreach ($names as $i => $fname) {
+                if (($errors[$i] ?? UPLOAD_ERR_OK) !== UPLOAD_ERR_OK) {
+                    $report[] = ['index' => $i, 'filename' => $fname, 'ok' => false, 'error' => 'upload failed'];
+                    continue;
+                }
+                $ext = strtolower(pathinfo($fname, PATHINFO_EXTENSION));
+                $result = gc_ocr_extract($tmps[$i], $ext);
+
+                // Match กับ sys_users.citizen_id (ถ้า extract ได้)
+                $matchedUser = null;
+                if (!empty($result['citizen_id'])) {
+                    $stm = $pdo->prepare("SELECT id, full_name, citizen_id, line_user_id
+                                          FROM sys_users WHERE citizen_id = ? LIMIT 1");
+                    $stm->execute([$result['citizen_id']]);
+                    $matchedUser = $stm->fetch(PDO::FETCH_ASSOC) ?: null;
+                }
+
+                // Suggest filename
+                $suggested = null;
+                if (!empty($result['citizen_id'])) {
+                    $namePart = $result['name'] ?? ($matchedUser['full_name'] ?? '');
+                    $namePart = preg_replace('/[\\\\\/:*?"<>|]/u', '', $namePart);
+                    $suggested = $result['citizen_id'] . ($namePart !== '' ? '_' . trim($namePart) : '') . '.' . $ext;
+                }
+
+                $report[] = [
+                    'index'        => $i,
+                    'filename'     => $fname,
+                    'ok'           => $result['ok'],
+                    'citizen_id'   => $result['citizen_id'] ?? null,
+                    'name'         => $result['name'] ?? null,
+                    'matched_user' => $matchedUser,
+                    'suggested_filename' => $suggested,
+                    'error'        => $result['error'] ?? null,
+                ];
+            }
+            json_ok(['report' => $report]);
         }
 
         case 'bulk:scan': {

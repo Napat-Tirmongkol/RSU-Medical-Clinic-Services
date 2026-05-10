@@ -657,11 +657,35 @@ $gcOver = kpi_override_status($pdo);
 
                 <div id="gcBulkFileList" class="hidden space-y-1 text-xs text-slate-600 font-bold max-h-32 overflow-y-auto bg-slate-50 rounded-xl p-3"></div>
 
-                <div class="flex justify-end">
+                <!-- OCR Toggle (Tesseract on-premise — PDPA-safe) -->
+                <div id="gcOcrToggleWrap" class="bg-gradient-to-br from-purple-50 to-indigo-50 border border-purple-200 rounded-2xl p-4">
+                    <label class="flex items-start gap-3 cursor-pointer">
+                        <input type="checkbox" id="gcOcrToggle" class="mt-1 w-5 h-5 accent-purple-500" onchange="gcOcrCheckEnv()">
+                        <div class="flex-1">
+                            <p class="text-sm font-black text-slate-800 flex items-center gap-2">
+                                <i class="fa-solid fa-eye text-purple-600"></i>
+                                อ่านเลขบัตรประชาชนจาก PDF อัตโนมัติ (OCR)
+                                <span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[9px] font-black uppercase tracking-widest">PDPA-safe</span>
+                            </p>
+                            <p class="text-[11px] font-bold text-slate-500 mt-1 leading-relaxed">
+                                ใช้ Tesseract OCR <b>บน server ของคลินิก</b> — ข้อมูลไม่ออกไป cloud · เพิ่ม suggested filename: <code class="bg-white px-1.5 py-0.5 rounded text-[10px]">{citizen_id}_{name}.pdf</code> · ใช้ citizen_id จับคู่ user แม่นยำกว่าจับชื่อ
+                            </p>
+                            <p id="gcOcrStatus" class="text-[11px] font-bold mt-2 hidden"></p>
+                        </div>
+                    </label>
+                </div>
+
+                <div class="flex justify-end gap-2">
+                    <button id="gcBulkOcrBtn" disabled onclick="gcBulkOcrRun()" class="hidden h-11 px-6 bg-purple-500 hover:bg-purple-600 text-white font-black rounded-xl text-sm shadow-lg disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2">
+                        <i class="fa-solid fa-eye"></i> เริ่ม OCR (อ่านเลขบัตร)
+                    </button>
                     <button id="gcBulkScanBtn" disabled onclick="gcBulkScan()" class="h-11 px-6 bg-blue-500 hover:bg-blue-600 text-white font-black rounded-xl text-sm shadow-lg disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2">
                         <i class="fa-solid fa-magnifying-glass"></i> สแกนและจับคู่
                     </button>
                 </div>
+
+                <!-- OCR Results Preview -->
+                <div id="gcOcrResults" class="hidden space-y-2"></div>
             </div>
 
             <!-- Step 2: Match results -->
@@ -1850,6 +1874,12 @@ $gcOver = kpi_override_status($pdo);
         list.innerHTML = html;
         list.classList.remove('hidden');
         document.getElementById('gcBulkScanBtn').disabled = false;
+        // Enable OCR button if env ready + toggle on
+        const ocrBtn = document.getElementById('gcBulkOcrBtn');
+        const ocrToggle = document.getElementById('gcOcrToggle');
+        if (ocrBtn && ocrToggle && ocrToggle.checked && gcOcrEnvReady) {
+            ocrBtn.disabled = false;
+        }
     }
 
     document.getElementById('gcBulkFiles').addEventListener('change', bulkOnFilesSelected);
@@ -1888,6 +1918,12 @@ $gcOver = kpi_override_status($pdo);
         list.innerHTML = html;
         list.classList.remove('hidden');
         document.getElementById('gcBulkScanBtn').disabled = false;
+        // Enable OCR button if env ready + toggle on
+        const ocrBtn = document.getElementById('gcBulkOcrBtn');
+        const ocrToggle = document.getElementById('gcOcrToggle');
+        if (ocrBtn && ocrToggle && ocrToggle.checked && gcOcrEnvReady) {
+            ocrBtn.disabled = false;
+        }
     }
 
     window.gcBulkScan = function() {
@@ -1907,6 +1943,115 @@ $gcOver = kpi_override_status($pdo);
             document.getElementById('gcBulkStep2').classList.remove('hidden');
         });
     };
+
+    // ── OCR (Tesseract on-premise — PDPA-safe) ────────────────────────────
+    let gcOcrEnvReady = null; // null=unchecked, true/false
+
+    window.gcOcrCheckEnv = async function() {
+        const toggle    = document.getElementById('gcOcrToggle');
+        const statusEl  = document.getElementById('gcOcrStatus');
+        const ocrBtn    = document.getElementById('gcBulkOcrBtn');
+
+        if (!toggle.checked) {
+            statusEl.classList.add('hidden');
+            ocrBtn.classList.add('hidden');
+            return;
+        }
+        statusEl.classList.remove('hidden');
+        statusEl.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> กำลังตรวจสอบ Tesseract บน server...';
+        statusEl.className = 'text-[11px] font-bold mt-2 text-slate-500';
+
+        const r = await gcPost('system', 'ocr_check', {});
+        if (r.status !== 'ok' || !r.env) {
+            statusEl.innerHTML = '<i class="fa-solid fa-circle-exclamation mr-1"></i> ตรวจสอบไม่สำเร็จ';
+            statusEl.className = 'text-[11px] font-bold mt-2 text-rose-600';
+            ocrBtn.classList.add('hidden');
+            return;
+        }
+        gcOcrEnvReady = !!r.env.ready;
+        if (gcOcrEnvReady) {
+            statusEl.innerHTML = '<i class="fa-solid fa-circle-check mr-1"></i> Tesseract พร้อมใช้งาน — กดปุ่ม "เริ่ม OCR" ด้านล่าง';
+            statusEl.className = 'text-[11px] font-bold mt-2 text-emerald-600';
+            ocrBtn.classList.remove('hidden');
+            ocrBtn.disabled = !bulkFiles || bulkFiles.length === 0;
+        } else {
+            statusEl.innerHTML = `<i class="fa-solid fa-triangle-exclamation mr-1"></i> Server ยังไม่พร้อม — <code class="bg-white px-1.5 py-0.5 rounded text-[10px]">${escapeHtml(r.env.hint || '')}</code>`;
+            statusEl.className = 'text-[11px] font-bold mt-2 text-amber-700';
+            ocrBtn.classList.add('hidden');
+        }
+    };
+
+    window.gcBulkOcrRun = async function() {
+        if (!gcOcrEnvReady || !bulkFiles || bulkFiles.length === 0) return;
+        const supportedExt = ['pdf','jpg','jpeg','png','webp','tiff','tif','bmp','gif'];
+        const targets = bulkFiles.filter(f => {
+            const ext = (f.name.split('.').pop() || '').toLowerCase();
+            return supportedExt.includes(ext);
+        });
+        if (targets.length === 0) return Swal.fire({icon:'warning', title:'ไม่มีไฟล์ที่ OCR ได้', text:'รองรับเฉพาะ PDF/JPG/PNG'});
+
+        Swal.fire({ title: `กำลัง OCR ${targets.length} ไฟล์...`, html: 'กรุณารอสักครู่ (Tesseract on-premise — ข้อมูลไม่ออกไป cloud)', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+
+        const fd = new FormData();
+        targets.forEach(f => fd.append('files[]', f));
+
+        const r = await gcPost('bulk', 'ocr_extract', fd, true);
+        Swal.close();
+        if (r.status !== 'ok') return Swal.fire({icon:'error', title:'OCR ผิดพลาด', text:r.message || ''});
+
+        renderOcrResults(r.report);
+    };
+
+    function renderOcrResults(report) {
+        const wrap = document.getElementById('gcOcrResults');
+        const stats = { found: 0, no_id: 0, matched: 0, error: 0 };
+        report.forEach(r => {
+            if (!r.ok) stats.error++;
+            else if (r.citizen_id) {
+                stats.found++;
+                if (r.matched_user) stats.matched++;
+            } else stats.no_id++;
+        });
+
+        let html = `<div class="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-2 p-4 border-b border-slate-100">
+                <div class="bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 text-center"><p class="text-[10px] font-black text-emerald-600 uppercase">เจอเลขบัตร</p><p class="text-xl font-black text-emerald-700">${stats.found}</p></div>
+                <div class="bg-blue-50 border border-blue-200 rounded-xl px-3 py-2 text-center"><p class="text-[10px] font-black text-blue-600 uppercase">Match user</p><p class="text-xl font-black text-blue-700">${stats.matched}</p></div>
+                <div class="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 text-center"><p class="text-[10px] font-black text-amber-600 uppercase">ไม่เจอเลข</p><p class="text-xl font-black text-amber-700">${stats.no_id}</p></div>
+                <div class="bg-rose-50 border border-rose-200 rounded-xl px-3 py-2 text-center"><p class="text-[10px] font-black text-rose-600 uppercase">OCR error</p><p class="text-xl font-black text-rose-700">${stats.error}</p></div>
+            </div>
+            <div class="overflow-x-auto"><table class="w-full text-xs"><thead class="bg-slate-50 text-slate-500"><tr>
+                <th class="text-left px-3 py-2 font-black">ไฟล์เดิม</th>
+                <th class="text-left px-3 py-2 font-black">เลขบัตร</th>
+                <th class="text-left px-3 py-2 font-black">ชื่อจาก OCR</th>
+                <th class="text-left px-3 py-2 font-black">Match user</th>
+                <th class="text-left px-3 py-2 font-black">ชื่อไฟล์ใหม่</th>
+            </tr></thead><tbody>`;
+        report.forEach(r => {
+            const cidCell = r.citizen_id
+                ? `<code class="text-emerald-700 font-mono">${r.citizen_id}</code>`
+                : (r.ok ? '<span class="text-amber-500">—</span>' : `<span class="text-rose-500" title="${escapeHtml(r.error || '')}">err</span>`);
+            const matchCell = r.matched_user
+                ? `<span class="inline-flex items-center gap-1 text-blue-700 font-bold"><i class="fa-solid fa-user-check"></i> ${escapeHtml(r.matched_user.full_name || '—')}</span>`
+                : '<span class="text-slate-400">—</span>';
+            const renameCell = r.suggested_filename
+                ? `<code class="text-slate-700">${escapeHtml(r.suggested_filename)}</code>`
+                : '<span class="text-slate-400">—</span>';
+            html += `<tr class="border-t border-slate-100">
+                <td class="px-3 py-2 font-bold text-slate-700">${escapeHtml(r.filename)}</td>
+                <td class="px-3 py-2">${cidCell}</td>
+                <td class="px-3 py-2 text-slate-600">${escapeHtml(r.name || '—')}</td>
+                <td class="px-3 py-2">${matchCell}</td>
+                <td class="px-3 py-2">${renameCell}</td>
+            </tr>`;
+        });
+        html += '</tbody></table></div>';
+        html += `<div class="px-4 py-3 bg-purple-50 border-t border-purple-100 text-[11px] font-bold text-purple-700">
+            <i class="fa-solid fa-circle-info mr-1"></i> Tesseract OCR รันบน server เดียวกัน — ข้อมูลไม่ออกไปไหน · ใช้ชื่อไฟล์ใหม่เป็นแนวทาง · กด "สแกนและจับคู่" ด้านบนเพื่อดำเนินการต่อ
+        </div></div>`;
+        wrap.innerHTML = html;
+        wrap.classList.remove('hidden');
+    }
 
     function renderBulkResults(report) {
         const sum = { matched: 0, ambiguous: 0, no_match: 0, exists: 0 };
