@@ -8,6 +8,9 @@ if (isset($_SESSION['admin_id'])) {
     log_activity('Logout', "Admin '" . ($_SESSION['admin_username'] ?? 'Unknown') . "' ออกจากระบบ");
 }
 
+// จำสถานะก่อนล้าง session — staff กับ admin ไป login page คนละหน้า
+$wasStaff = !empty($_SESSION['is_ecampaign_staff']);
+
 // ล้าง session ทุก key ก่อน destroy (ป้องกัน session fixation)
 session_unset();
 session_destroy();
@@ -20,5 +23,5 @@ if (ini_get('session.use_cookies')) {
     );
 }
 
-header('Location: login.php');
+header('Location: ' . ($wasStaff ? 'staff_login.php' : 'login.php'));
 exit;
