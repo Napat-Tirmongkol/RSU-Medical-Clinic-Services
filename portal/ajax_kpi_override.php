@@ -72,9 +72,11 @@ function _kpi_compute_auto(PDO $pdo, string $key): int
             case 'gold_total':
                 return (int)$pdo->query("SELECT COUNT(*) FROM gold_card_members")->fetchColumn();
             case 'gold_approved':
-                return (int)$pdo->query("SELECT COUNT(*) FROM gold_card_members WHERE status IN ('approved','active')")->fetchColumn();
+                return (int)$pdo->query("SELECT COUNT(*) FROM gold_card_members WHERE status='approved'")->fetchColumn();
+            case 'gold_auto_matched':
+                return (int)$pdo->query("SELECT COUNT(*) FROM gold_card_members WHERE status='active'")->fetchColumn();
             case 'gold_pending_docs':
-                return (int)$pdo->query("SELECT COUNT(*) FROM gold_card_members WHERE status IN ('pending','submitted')")->fetchColumn();
+                return (int)$pdo->query("SELECT COUNT(*) FROM gold_card_members WHERE status='pending'")->fetchColumn();
             case 'gold_rejected':
                 return (int)$pdo->query("SELECT COUNT(*) FROM gold_card_members WHERE status='rejected'")->fetchColumn();
             case 'gold_expiring_30d':

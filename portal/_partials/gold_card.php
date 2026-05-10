@@ -15,12 +15,13 @@ $pdo = db();
 $csrfToken = get_csrf_token();
 $canEditKPI = ($_SESSION['admin_role'] ?? '') === 'superadmin' || !empty($_SESSION['access_dashboard_admin']);
 
-$stats = ['total'=>0,'approved'=>0,'pending'=>0,'rejected'=>0,'expiring'=>0,'staff'=>0,'student'=>0];
+$stats = ['total'=>0,'approved'=>0,'auto_matched'=>0,'pending'=>0,'rejected'=>0,'expiring'=>0,'staff'=>0,'student'=>0];
 try {
     $r = $pdo->query("
         SELECT
             COUNT(*)                                                          AS total,
-            SUM(status IN ('approved','active'))                              AS approved,
+            SUM(status = 'approved')                                          AS approved,
+            SUM(status = 'active')                                            AS auto_matched,
             SUM(status = 'pending')                                           AS pending,
             SUM(status = 'rejected')                                          AS rejected,
             SUM(status = 'active' AND coverage_end BETWEEN CURDATE()
@@ -34,11 +35,12 @@ try {
 
 // Apply KPI overrides + read status (badges)
 $gcAuto = $stats;
-$stats['total']    = kpi_with_override($pdo, 'gold_total',         $stats['total']);
-$stats['approved'] = kpi_with_override($pdo, 'gold_approved',      $stats['approved']);
-$stats['pending']  = kpi_with_override($pdo, 'gold_pending_docs',  $stats['pending']);
-$stats['rejected'] = kpi_with_override($pdo, 'gold_rejected',      $stats['rejected']);
-$stats['expiring'] = kpi_with_override($pdo, 'gold_expiring_30d',  $stats['expiring']);
+$stats['total']        = kpi_with_override($pdo, 'gold_total',         $stats['total']);
+$stats['approved']     = kpi_with_override($pdo, 'gold_approved',      $stats['approved']);
+$stats['auto_matched'] = kpi_with_override($pdo, 'gold_auto_matched',  $stats['auto_matched']);
+$stats['pending']      = kpi_with_override($pdo, 'gold_pending_docs',  $stats['pending']);
+$stats['rejected']     = kpi_with_override($pdo, 'gold_rejected',      $stats['rejected']);
+$stats['expiring']     = kpi_with_override($pdo, 'gold_expiring_30d',  $stats['expiring']);
 $gcOver = kpi_override_status($pdo);
 ?>
 
@@ -284,8 +286,8 @@ $gcOver = kpi_override_status($pdo);
         </div>
     </div>
 
-    <!-- ── KPI Cards (5 ใบ — overrideable) ─────────────────────────────── -->
-    <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
+    <!-- ── KPI Cards (6 ใบ — overrideable) ─────────────────────────────── -->
+    <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
         <div class="gc-stat-card km-card" data-kpi-key="gold_total" data-kpi-label="บัตรทอง — ทั้งหมด">
             <div class="gc-icon-tile bg-amber-50 text-amber-500"><i class="fa-solid fa-id-card"></i></div>
             <div class="km-body">
@@ -294,13 +296,21 @@ $gcOver = kpi_override_status($pdo);
             </div>
             <?php if (!empty($gcOver['gold_total'])): ?><span class="km-override-badge">OVERRIDE</span><?php endif; ?>
         </div>
-        <div class="gc-stat-card km-card" data-kpi-key="gold_approved" data-kpi-label="บัตรทอง — อนุมัติ">
-            <div class="gc-icon-tile bg-emerald-50 text-emerald-500"><i class="fa-solid fa-circle-check"></i></div>
+        <div class="gc-stat-card km-card cursor-pointer hover:ring-2 hover:ring-emerald-300 transition-all" data-kpi-key="gold_approved" data-kpi-label="บัตรทอง — Admin อนุมัติ" onclick="gcQuickFilter('approved')" title="คลิกดู — admin กดอนุมัติเอง">
+            <div class="gc-icon-tile bg-emerald-50 text-emerald-500"><i class="fa-solid fa-user-check"></i></div>
             <div class="km-body">
-                <p class="km-label text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">อนุมัติแล้ว</p>
+                <p class="km-label text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Admin อนุมัติ <i class="fa-solid fa-arrow-down ml-1 text-emerald-400 text-[8px]"></i></p>
                 <p class="km-value text-2xl font-black text-slate-800 leading-none" data-value="<?= (int)$stats['approved'] ?>"><?= number_format($stats['approved']) ?></p>
             </div>
             <?php if (!empty($gcOver['gold_approved'])): ?><span class="km-override-badge">OVERRIDE</span><?php endif; ?>
+        </div>
+        <div class="gc-stat-card km-card cursor-pointer hover:ring-2 hover:ring-teal-300 transition-all" data-kpi-key="gold_auto_matched" data-kpi-label="บัตรทอง — Auto-matched (Bulk)" onclick="gcQuickFilter('active')" title="คลิกดู — bulk import auto-match user สำเร็จ">
+            <div class="gc-icon-tile bg-teal-50 text-teal-500"><i class="fa-solid fa-link"></i></div>
+            <div class="km-body">
+                <p class="km-label text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Auto-matched <i class="fa-solid fa-arrow-down ml-1 text-teal-400 text-[8px]"></i></p>
+                <p class="km-value text-2xl font-black text-slate-800 leading-none" data-value="<?= (int)$stats['auto_matched'] ?>"><?= number_format($stats['auto_matched']) ?></p>
+            </div>
+            <?php if (!empty($gcOver['gold_auto_matched'])): ?><span class="km-override-badge">OVERRIDE</span><?php endif; ?>
         </div>
         <div class="gc-stat-card km-card cursor-pointer hover:ring-2 hover:ring-blue-300 transition-all" data-kpi-key="gold_pending_docs" data-kpi-label="บัตรทอง — รอเอกสาร" onclick="gcQuickFilter('pending')" title="คลิกเพื่อดูเฉพาะคนที่รอเอกสาร (จาก bulk import)">
             <div class="gc-icon-tile bg-blue-50 text-blue-500"><i class="fa-solid fa-hourglass-half"></i></div>
