@@ -423,6 +423,23 @@ $gcOver = kpi_override_status($pdo);
             <div id="gcBulkStep2" class="hidden space-y-4">
                 <div id="gcBulkSummary" class="grid grid-cols-2 md:grid-cols-4 gap-3"></div>
 
+                <!-- Quick Actions -->
+                <div class="flex flex-wrap items-center gap-2 px-1">
+                    <span class="text-[11px] font-black text-slate-500 uppercase tracking-widest mr-1">เลือก:</span>
+                    <button type="button" onclick="gcBulkSelectAll('all')" class="h-8 px-3 bg-amber-500 hover:bg-amber-600 text-white text-[11px] font-black rounded-lg flex items-center gap-1.5 transition-all active:scale-95">
+                        <i class="fa-solid fa-check-double"></i> ทั้งหมด
+                    </button>
+                    <button type="button" onclick="gcBulkSelectAll('matched')" class="h-8 px-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-[11px] font-black rounded-lg flex items-center gap-1.5 transition-all">
+                        <i class="fa-solid fa-circle-check"></i> เฉพาะที่จับคู่ได้
+                    </button>
+                    <button type="button" onclick="gcBulkSelectAll('with_user')" class="h-8 px-3 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-[11px] font-black rounded-lg flex items-center gap-1.5 transition-all">
+                        <i class="fa-solid fa-user-check"></i> ที่มีนักศึกษาแล้ว
+                    </button>
+                    <button type="button" onclick="gcBulkSelectAll('none')" class="h-8 px-3 bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200 text-[11px] font-black rounded-lg flex items-center gap-1.5 transition-all ml-auto">
+                        <i class="fa-solid fa-square"></i> ยกเลิก
+                    </button>
+                </div>
+
                 <div class="bg-white border border-slate-200 rounded-2xl overflow-hidden">
                     <table class="w-full text-xs">
                         <thead class="bg-slate-50 border-b border-slate-200">
@@ -432,7 +449,12 @@ $gcOver = kpi_override_status($pdo);
                                 <th class="px-3 py-2 text-left">ชื่อที่ดึง</th>
                                 <th class="px-3 py-2 text-center">สถานะ</th>
                                 <th class="px-3 py-2 text-left">นักศึกษา (sys_users)</th>
-                                <th class="px-3 py-2 text-center">ดำเนินการ</th>
+                                <th class="px-3 py-2 text-center">
+                                    <label class="inline-flex items-center gap-1 cursor-pointer">
+                                        <input type="checkbox" id="gcBulkMasterCheck" class="w-4 h-4 accent-amber-500" onchange="gcBulkToggleMaster(this)">
+                                        <span>นำเข้า</span>
+                                    </label>
+                                </th>
                             </tr>
                         </thead>
                         <tbody id="gcBulkResultRows"></tbody>
@@ -1173,9 +1195,47 @@ $gcOver = kpi_override_status($pdo);
     };
 
     window.gcBulkUpdateCount = function() {
+        const all = document.querySelectorAll('.gc-bulk-include');
         const checks = document.querySelectorAll('.gc-bulk-include:checked');
         document.getElementById('gcBulkCommitCount').textContent = checks.length;
         document.getElementById('gcBulkCommitBtn').disabled = checks.length === 0;
+
+        // Sync master checkbox indeterminate state
+        const master = document.getElementById('gcBulkMasterCheck');
+        if (master) {
+            master.checked = all.length > 0 && checks.length === all.length;
+            master.indeterminate = checks.length > 0 && checks.length < all.length;
+        }
+    };
+
+    /**
+     * เลือกตามเงื่อนไข:
+     *   'all'       — เลือกทุก row (รวม no_match)
+     *   'matched'   — เฉพาะ status === 'matched'
+     *   'with_user' — มี user (จาก match หรือ admin เลือกเอง)
+     *   'none'      — ยกเลิกทั้งหมด
+     */
+    window.gcBulkSelectAll = function(mode) {
+        document.querySelectorAll('.gc-bulk-include').forEach(cb => {
+            const tr = cb.closest('tr');
+            const idx = parseInt(tr.dataset.bulkIdx, 10);
+            const r = bulkScanReport[idx];
+            let on = false;
+            switch (mode) {
+                case 'all':       on = true; break;
+                case 'matched':   on = r.status === 'matched'; break;
+                case 'with_user': on = !!r.user; break;
+                case 'none':      on = false; break;
+            }
+            cb.checked = on;
+        });
+        gcBulkUpdateCount();
+    };
+
+    window.gcBulkToggleMaster = function(masterCb) {
+        const on = masterCb.checked;
+        document.querySelectorAll('.gc-bulk-include').forEach(cb => cb.checked = on);
+        gcBulkUpdateCount();
     };
 
     window.gcBulkCommit = function() {
