@@ -70,6 +70,14 @@ $mProjects = [
         'icon_color' => '#475569',
         'icon_bg' => '#f1f5f9',
     ],
+    [
+        'key' => 'gold_card_apply',
+        'title' => 'สมัครบัตรทอง',
+        'desc' => 'ปุ่ม "สมัครบัตรทอง" ในหน้า User Hub — ปิดเมื่อหยุดรับสมัคร',
+        'icon' => 'fa-shield-heart',
+        'icon_color' => '#d97706',
+        'icon_bg' => '#fef3c7',
+    ],
 ];
 $allOnline = true;
 foreach ($mProjects as $p) {

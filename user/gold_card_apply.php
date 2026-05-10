@@ -15,6 +15,7 @@ declare(strict_types=1);
 session_start();
 require_once __DIR__ . '/../config.php';
 check_maintenance('e_campaign');
+check_maintenance('gold_card_apply');
 
 $lineUserId = $_SESSION['line_user_id'] ?? '';
 if ($lineUserId === '') {
