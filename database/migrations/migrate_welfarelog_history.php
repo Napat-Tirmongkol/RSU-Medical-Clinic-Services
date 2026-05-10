@@ -132,11 +132,11 @@ echo "\n<span class='info'>📋 welfarelog columns: " . implode(', ', $wlCols) .
 
 $colMap = [
     'pid'      => pick_col($wlCols, ['pid', 'citizen_id', 'cid']),
-    'action'   => pick_col($wlCols, ['action', 'event', 'type']),
+    'action'   => pick_col($wlCols, ['activity', 'action', 'event', 'type']),
     'oldval'   => pick_col($wlCols, ['oldvalue', 'old_value', 'oldval', 'before']),
     'newval'   => pick_col($wlCols, ['newvalue', 'new_value', 'newval', 'after']),
     'uid'      => pick_col($wlCols, ['uid', 'user_id', 'admin_id', 'changed_by']),
-    'logdate'  => pick_col($wlCols, ['logdate', 'log_date', 'created_at', 'date', 'timestamp']),
+    'logdate'  => pick_col($wlCols, ['dateTime', 'datetime', 'logdate', 'log_date', 'created_at', 'date', 'timestamp']),
     'ip'       => pick_col($wlCols, ['ip', 'ip_address', 'remote_addr']),
 ];
 
@@ -218,7 +218,7 @@ while (true) {
             $action = trim((string)($row['c_action'] ?? 'unknown'));
             $oldVal = (string)($row['c_oldval'] ?? '');
             $newVal = (string)($row['c_newval'] ?? '');
-            $uid    = (int)($row['c_uid'] ?? 0);
+            $uidRaw = trim((string)($row['c_uid'] ?? ''));  // varchar in welfarelog — preserve as metadata
             $date   = normalize_datetime($row['c_logdate'] ?? null) ?? date('Y-m-d H:i:s');
             $ip     = trim((string)($row['c_ip'] ?? ''));
 
@@ -235,15 +235,20 @@ while (true) {
 
             // Action prefix carries legacy log_id for resume
             $actionTagged = "legacy:" . $action;
-            $oldValTagged = "log_id=$logId; pid=$pid\n" . $oldVal;
+            // Store metadata in old_value (legacy uid is varchar — can't map directly to sys_admins.id)
+            $metaParts = ["log_id=$logId", "pid=$pid"];
+            if ($uidRaw !== '') $metaParts[] = "legacy_uid=$uidRaw";
+            $oldValTagged = implode('; ', $metaParts) . ($oldVal !== '' ? "\n" . $oldVal : '');
+            // changed_by: only set if uid is purely numeric (safe to cast)
+            $changedBy = (ctype_digit($uidRaw) && (int)$uidRaw > 0) ? (int)$uidRaw : null;
 
             if (!$dryRun) {
                 $stmtInsert->execute([
                     $memberId,
                     mb_substr($actionTagged, 0, 50),
                     $oldValTagged,
-                    $newVal,
-                    $uid > 0 ? $uid : null,
+                    $newVal !== '' ? $newVal : null,
+                    $changedBy,
                     $date,
                     $ip ?: null,
                 ]);

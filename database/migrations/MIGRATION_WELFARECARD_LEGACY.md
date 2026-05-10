@@ -252,14 +252,14 @@ CREATE TABLE `welfarecard` (
 
 ### ⚠️ ฟิลด์ที่ระบบเก่า "ไม่มี" — จะเป็นค่าว่างใน gold_card_members
 
-| Field ในระบบใหม่ | Default | ผู้ใช้ต้องกรอกตอน |
+| Field ในระบบใหม่ | Default | ที่มา / ผู้ใช้ต้องกรอกตอน |
 |---|---|---|
-| `phone` | `''` | renewal |
+| `phone` | จาก `welfareuser.mobile` (auto-fill) | กรณีไม่มีใน welfareuser → renewal |
 | `hospital_main` | `''` | renewal |
 | `hospital_sub` | `''` | renewal |
 | `member_type` | `'บุคคลทั่วไป'` | renewal |
 | `position` | `''` | renewal |
-| `address` (ถ้ามีใน schema) | NULL | renewal |
+| `address` | NULL | renewal |
 
 **แนะนำ:** สร้าง dashboard widget แสดง "Member ที่ข้อมูลไม่ครบ" + ปุ่ม Bulk SMS ขอให้ผู้ใช้มาเติมข้อมูล
 
@@ -273,15 +273,47 @@ CREATE TABLE `welfarecard` (
 | หมดอายุ | `expired` |
 | รอดำเนินการ / (default) | `pending` |
 
-### `welfarelog` → `gold_card_history`
+### `welfarelog` → `gold_card_history` (confirmed schema)
+
+ระบบเก่า welfarelog มี **5 columns**:
+```sql
+CREATE TABLE `welfarelog` (
+  `id` int AUTO_INCREMENT,         -- → metadata (log_id=N)
+  `uid` varchar(10) NOT NULL,      -- → metadata (legacy_uid=N) — varchar ไม่ใช่ int
+  `activity` varchar(50) NOT NULL, -- → action (prefixed 'legacy:')
+  `pid` varchar(50) NOT NULL,      -- → resolve member_id
+  `dateTime` timestamp,            -- → changed_at (camelCase)
+);
+```
 
 | welfarelog | gold_card_history | Note |
 |---|---|---|
-| `id` | (in `old_value` as `log_id=N`) | for resume |
-| `pid` | → resolve `member_id` | join via citizen_id |
-| `action` | `action` | prefixed `legacy:` |
-| `oldvalue` | `old_value` | with metadata header |
-| `newvalue` | `new_value` |  |
-| `uid` | `changed_by` | admin_id (or NULL) |
-| `logdate` | `changed_at` |  |
-| `ip` | `ip_address` |  |
+| `id` | → metadata in `old_value` (`log_id=N`) | for resume detection |
+| `uid` (varchar) | → metadata in `old_value` (`legacy_uid=N`) | varchar — ไม่ map เข้า changed_by ตรงๆ |
+| `activity` | `action` (prefix `legacy:`) | ⚠️ ใช้ชื่อ `activity` ไม่ใช่ `action` |
+| `pid` | resolve → `member_id` | JOIN via gold_card_members.citizen_id |
+| `dateTime` | `changed_at` | ⚠️ camelCase |
+| (ไม่มี oldvalue/newvalue/ip) | `old_value`=NULL, `new_value`=NULL, `ip_address`=NULL |  |
+
+### `welfareuser` → enhances `gold_card_members` (confirmed schema)
+
+ระบบเก่า welfareuser มี **7 columns** (ใช้เพื่อ enrich + match user เท่านั้น):
+```sql
+CREATE TABLE `welfareuser` (
+  `id` int AUTO_INCREMENT,
+  `lineid` varchar(50) NOT NULL,    -- ⭐ ใช้ match กับ sys_users.line_user_id
+  `pid` varchar(13) NOT NULL,       -- ⭐ JOIN ไป welfarecard.pid
+  `uid` varchar(10) NOT NULL,       -- (ไม่ใช้)
+  `username` varchar(50) NOT NULL,  -- (ไม่ใช้ — ดึง name จาก welfarecard แทน)
+  `mobile` varchar(20),             -- ⭐ → gold_card_members.phone
+  `role` varchar(20),               -- (ไม่ใช้)
+);
+```
+
+**Logic ใน script:**
+1. Pre-load welfareuser ทั้งหมดเข้า PHP array (indexed by pid, latest entry by id DESC)
+2. ขณะ migrate welfarecard แต่ละ row:
+   - Lookup welfareuser by pid
+   - ถ้ามี `mobile` → set `gold_card_members.phone`
+   - ถ้ามี `lineid` → match `sys_users.line_user_id` (priority over citizen_id match)
+3. ถ้า lineid match ไม่ได้ → fallback citizen_id match

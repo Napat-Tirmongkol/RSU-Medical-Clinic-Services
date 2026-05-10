@@ -283,6 +283,37 @@ if ($sysUsersExists) {
     echo "<span class='info'>👤 sys_users matching: citizen=" . ($sysCitizenCol ?? 'none') . ", line=" . ($sysLineCol ?? 'none') . "</span>\n";
 }
 
+// ── 4.5. Pre-load welfareuser → indexed by pid (mobile + lineid lookup) ──────
+$wuByPid = [];
+if ($hasUserTable) {
+    $wuCols = get_columns($pdo, 'welfareuser');
+    $wuMobileCol = pick_col($wuCols, ['mobile', 'phone', 'tel', 'phone_number']);
+    $wuLineCol   = pick_col($wuCols, ['lineid', 'line_id', 'line_user_id', 'uid']);
+    $wuPidCol    = pick_col($wuCols, ['pid', 'citizen_id']);
+
+    if ($wuPidCol) {
+        $wuSelect = "SELECT `$wuPidCol` AS pid";
+        if ($wuMobileCol) $wuSelect .= ", `$wuMobileCol` AS mobile";
+        if ($wuLineCol)   $wuSelect .= ", `$wuLineCol` AS lineid";
+        $wuSelect .= " FROM welfareuser ORDER BY id DESC";
+
+        try {
+            $wuRows = $pdo->query($wuSelect)->fetchAll(PDO::FETCH_ASSOC);
+            foreach ($wuRows as $r) {
+                $p = trim((string)($r['pid'] ?? ''));
+                if ($p === '' || isset($wuByPid[$p])) continue; // first occurrence wins (latest by id DESC)
+                $wuByPid[$p] = [
+                    'mobile' => trim((string)($r['mobile'] ?? '')),
+                    'lineid' => trim((string)($r['lineid'] ?? '')),
+                ];
+            }
+            echo "<span class='info'>📞 welfareuser pre-loaded: " . count($wuByPid) . " unique pid (mobile=" . ($wuMobileCol ?: 'n/a') . ", lineid=" . ($wuLineCol ?: 'n/a') . ")</span>\n";
+        } catch (PDOException $e) {
+            echo "<span class='warn'>⚠ welfareuser load failed: " . htmlspecialchars($e->getMessage()) . "</span>\n";
+        }
+    }
+}
+
 // ── 5. Resume support: get already-migrated legacy_ids ───────────────────────
 $migratedRows = $pdo->query("SELECT legacy_id FROM gold_card_members WHERE legacy_id IS NOT NULL")->fetchAll(PDO::FETCH_COLUMN);
 $migratedSet = array_flip(array_map('intval', $migratedRows));
@@ -321,20 +352,23 @@ $stmtInsertDoc = $pdo->prepare("
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())
 ");
 
-// User matching
+// User matching: by line_id (preferred) + by citizen_id (fallback)
+$stmtMatchByLine    = ($sysLineCol    ? $pdo->prepare("SELECT id FROM sys_users WHERE `$sysLineCol`    = ? LIMIT 1") : null);
 $stmtMatchByCitizen = ($sysCitizenCol ? $pdo->prepare("SELECT id FROM sys_users WHERE `$sysCitizenCol` = ? LIMIT 1") : null);
 
 // ── 8. Main batch loop ───────────────────────────────────────────────────────
 $stats = [
-    'processed'   => 0,
-    'inserted'    => 0,
-    'skipped'     => 0,
-    'photos'      => 0,
-    'signatures'  => 0,
-    'no_photo'    => 0,
-    'no_sig'      => 0,
-    'matched_user'=> 0,
-    'errors'      => 0,
+    'processed'      => 0,
+    'inserted'       => 0,
+    'skipped'        => 0,
+    'photos'         => 0,
+    'signatures'     => 0,
+    'no_photo'       => 0,
+    'no_sig'         => 0,
+    'matched_line'   => 0,
+    'matched_citizen'=> 0,
+    'phones_filled'  => 0,
+    'errors'         => 0,
 ];
 
 $offset = 0;
@@ -375,6 +409,17 @@ while (true) {
             $position  = trim((string)($row['c_position'] ?? ''));
             $registrar = trim((string)($row['c_registrar'] ?? ''));
 
+            // Pull data from welfareuser (mobile + lineid for user matching)
+            $wu = $wuByPid[$pid] ?? null;
+            $wuMobile = $wu['mobile'] ?? '';
+            $wuLineId = $wu['lineid'] ?? '';
+
+            // Phone: prefer welfarecard.phone (if exists), fallback to welfareuser.mobile
+            if ($phone === '' && $wuMobile !== '') {
+                $phone = $wuMobile;
+                $stats['phones_filled']++;
+            }
+
             // Combine registrar info into remarks (audit trail)
             if ($registrar !== '') {
                 $registrarNote = "ผู้ลงทะเบียน (ระบบเก่า): $registrar";
@@ -385,12 +430,17 @@ while (true) {
             $appDate = $submitdate ? substr($submitdate, 0, 10) : null;
             $createdAt = $submitdate ?: date('Y-m-d H:i:s');
 
-            // Match user by citizen_id
+            // Match user: priority by lineid, fallback to citizen_id
             $linkedUserId = null;
-            if ($pid !== '' && $stmtMatchByCitizen) {
+            if ($wuLineId !== '' && $stmtMatchByLine) {
+                $stmtMatchByLine->execute([$wuLineId]);
+                $linkedUserId = $stmtMatchByLine->fetchColumn() ?: null;
+                if ($linkedUserId) $stats['matched_line']++;
+            }
+            if (!$linkedUserId && $pid !== '' && $stmtMatchByCitizen) {
                 $stmtMatchByCitizen->execute([$pid]);
                 $linkedUserId = $stmtMatchByCitizen->fetchColumn() ?: null;
-                if ($linkedUserId) $stats['matched_user']++;
+                if ($linkedUserId) $stats['matched_citizen']++;
             }
 
             $sourceFile = "welfarecard_legacy:$legacyId";
@@ -468,11 +518,12 @@ while (true) {
     $elapsed = microtime(true) - $startTime;
     $rate = $elapsed > 0 ? round($stats['processed'] / $elapsed, 1) : 0;
     $msg = sprintf(
-        "[%s] batch offset=%d → processed=%d (%.1f%%) | inserted=%d skipped=%d | sig=%d photo=%d | matched_user=%d errors=%d | %.1f rows/s",
+        "[%s] batch offset=%d → processed=%d (%.1f%%) | inserted=%d skipped=%d | sig=%d photo=%d phone=%d | match_line=%d match_cid=%d | err=%d | %.1f rows/s",
         date('H:i:s'), $offset, $stats['processed'], $pct,
         $stats['inserted'], $stats['skipped'],
-        $stats['signatures'], $stats['photos'],
-        $stats['matched_user'], $stats['errors'], $rate
+        $stats['signatures'], $stats['photos'], $stats['phones_filled'],
+        $stats['matched_line'], $stats['matched_citizen'],
+        $stats['errors'], $rate
     );
     echo "<span class='info'>$msg</span>\n";
     flush();
@@ -493,7 +544,9 @@ echo "\n<span class='ok'>✅ เสร็จสิ้น — ใช้เวล�
         <div class="stat"><div class="stat-num"><?= number_format($stats['skipped']) ?></div><div class="stat-label">Skipped</div></div>
         <div class="stat"><div class="stat-num"><?= number_format($stats['signatures']) ?></div><div class="stat-label">Signatures saved</div></div>
         <div class="stat"><div class="stat-num"><?= number_format($stats['photos']) ?></div><div class="stat-label">Photos copied</div></div>
-        <div class="stat"><div class="stat-num"><?= number_format($stats['matched_user']) ?></div><div class="stat-label">Matched users</div></div>
+        <div class="stat"><div class="stat-num"><?= number_format($stats['phones_filled']) ?></div><div class="stat-label">Phones filled (welfareuser)</div></div>
+        <div class="stat"><div class="stat-num"><?= number_format($stats['matched_line']) ?></div><div class="stat-label">Matched by LINE ID</div></div>
+        <div class="stat"><div class="stat-num"><?= number_format($stats['matched_citizen']) ?></div><div class="stat-label">Matched by Citizen ID</div></div>
         <div class="stat"><div class="stat-num" style="color:#f59e0b"><?= number_format($stats['no_photo']) ?></div><div class="stat-label">No photo</div></div>
         <div class="stat"><div class="stat-num" style="color:#ef4444"><?= number_format($stats['errors']) ?></div><div class="stat-label">Errors</div></div>
     </div>
