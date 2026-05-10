@@ -387,8 +387,8 @@ try {
                 <label class="block">
                     <div class="gc-dropzone" id="gcBulkDropzone">
                         <i class="fa-solid fa-cloud-arrow-up text-4xl mb-2"></i>
-                        <p id="gcDropzoneText" class="text-base font-black">ลากไฟล์มาวาง / คลิกเพื่อเลือก</p>
-                        <p class="text-xs font-bold mt-1 text-amber-600">เลือกได้หลายไฟล์พร้อมกัน · PDF / JPG / PNG / DOC · ≤20MB ต่อไฟล์</p>
+                        <p id="gcDropzoneText" class="text-base font-black">ลากไฟล์ <span class="text-amber-700">หรือลากทั้งโฟลเดอร์</span> มาวาง / คลิกเพื่อเลือก</p>
+                        <p class="text-xs font-bold mt-1 text-amber-600">รองรับโฟลเดอร์ที่มี subfolder รายเดือน · PDF / JPG / PNG / DOC · ≤20MB ต่อไฟล์</p>
                     </div>
                     <input type="file" id="gcBulkFiles" multiple accept=".pdf,.png,.jpg,.jpeg,.doc,.docx" class="hidden">
                 </label>
@@ -899,12 +899,119 @@ try {
     document.getElementById('gcBulkDropzone').addEventListener('click', () => document.getElementById('gcBulkFiles').click());
     ['dragenter','dragover'].forEach(ev => document.getElementById('gcBulkDropzone').addEventListener(ev, e => { e.preventDefault(); document.getElementById('gcBulkDropzone').classList.add('gc-drag-over'); }));
     ['dragleave','drop'].forEach(ev => document.getElementById('gcBulkDropzone').addEventListener(ev, e => { e.preventDefault(); document.getElementById('gcBulkDropzone').classList.remove('gc-drag-over'); }));
-    document.getElementById('gcBulkDropzone').addEventListener('drop', e => {
-        const dt = new DataTransfer();
-        for (const f of e.dataTransfer.files) dt.items.add(f);
-        document.getElementById('gcBulkFiles').files = dt.files;
-        bulkOnFilesSelected();
+    document.getElementById('gcBulkDropzone').addEventListener('drop', async e => {
+        e.preventDefault();
+        const items = e.dataTransfer.items;
+        if (!items || items.length === 0) return;
+
+        // ถ้า browser รองรับ webkitGetAsEntry → traverse ได้ทั้งโฟลเดอร์
+        const hasEntryAPI = items[0].webkitGetAsEntry !== undefined;
+        if (hasEntryAPI) {
+            Swal.fire({ title: 'กำลังสแกนโฟลเดอร์...', html: 'รอสักครู่', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+            try {
+                const collected = [];
+                const promises = [];
+                for (const it of items) {
+                    const entry = it.webkitGetAsEntry();
+                    if (!entry) continue;
+                    if (entry.isFile) {
+                        promises.push(new Promise(resolve => entry.file(f => {
+                            try { Object.defineProperty(f, 'webkitRelativePath', { value: entry.name, configurable: true }); } catch (_){}
+                            collected.push(f); resolve();
+                        }, () => resolve())));
+                    } else if (entry.isDirectory) {
+                        promises.push(readDirEntry(entry, entry.name + '/').then(arr => collected.push(...arr)));
+                        // ถ้า drop โฟลเดอร์ → switch UI ไป folder mode (ให้ตรงกับสิ่งที่ผู้ใช้คาดหวัง)
+                        if (bulkMode === 'files') gcSwitchMode('folder');
+                    }
+                }
+                await Promise.all(promises);
+                Swal.close();
+                if (collected.length === 0) {
+                    Swal.fire({ icon: 'info', title: 'ไม่พบไฟล์ในโฟลเดอร์' });
+                    return;
+                }
+                applyDroppedFiles(collected);
+            } catch (err) {
+                Swal.close();
+                console.error(err);
+                Swal.fire({ icon: 'error', title: 'อ่านโฟลเดอร์ไม่สำเร็จ', text: String(err) });
+            }
+        } else {
+            // Fallback: ใช้เฉพาะ files (browser เก่า ไม่มี webkitGetAsEntry)
+            const dt = new DataTransfer();
+            for (const f of e.dataTransfer.files) dt.items.add(f);
+            document.getElementById('gcBulkFiles').files = dt.files;
+            bulkOnFilesSelected();
+        }
     });
+
+    // อ่าน FileSystemDirectoryEntry ทั้งหมดแบบ recursive (handle batch ของ readEntries)
+    function readDirEntry(dirEntry, basePath) {
+        return new Promise((resolve, reject) => {
+            const reader = dirEntry.createReader();
+            const all = [];
+            const readBatch = () => {
+                reader.readEntries(async batch => {
+                    if (batch.length === 0) {
+                        // อ่าน entries ทั้งหมดของ folder นี้แล้ว → recurse
+                        const sub = [];
+                        for (const entry of all) {
+                            const path = basePath + entry.name;
+                            if (entry.isFile) {
+                                await new Promise(r => entry.file(f => {
+                                    try { Object.defineProperty(f, 'webkitRelativePath', { value: path, configurable: true }); } catch (_){}
+                                    sub.push(f); r();
+                                }, () => r()));
+                            } else if (entry.isDirectory) {
+                                const inner = await readDirEntry(entry, path + '/');
+                                sub.push(...inner);
+                            }
+                        }
+                        resolve(sub);
+                    } else {
+                        all.push(...batch);
+                        readBatch(); // readEntries อาจคืนทีละ batch — ต้องเรียกซ้ำจน batch ว่าง
+                    }
+                }, reject);
+            };
+            readBatch();
+        });
+    }
+
+    function applyDroppedFiles(files) {
+        // ใส่ลง bulkFiles + อัปเดต UI (ข้าม input.files เพราะ DataTransfer ไม่ทำงานกับ folder-traversed File)
+        const allowExt = /\.(pdf|png|jpe?g|docx?)$/i;
+        bulkFiles = files.filter(f => allowExt.test(f.name));
+        if (bulkFiles.length === 0) {
+            Swal.fire({ icon: 'warning', title: 'ไม่พบไฟล์ที่รองรับ', text: 'รองรับ PDF / JPG / PNG / DOC / DOCX' });
+            return;
+        }
+
+        const list = document.getElementById('gcBulkFileList');
+        const byFolder = {};
+        bulkFiles.forEach(f => {
+            const path = f.webkitRelativePath || '';
+            const parts = path.split('/').filter(Boolean);
+            const folder = parts.length > 1 ? parts.slice(0, -1).join('/') : '(root)';
+            (byFolder[folder] = byFolder[folder] || []).push(f);
+        });
+        const folderCount = Object.keys(byFolder).length;
+        const skipped = files.length - bulkFiles.length;
+
+        let html = `<div class="font-black text-slate-700 mb-1">📎 ${bulkFiles.length} ไฟล์`;
+        if (folderCount > 1) html += ` ใน ${folderCount} โฟลเดอร์`;
+        if (skipped > 0) html += ` <span class="text-rose-500">(ข้าม ${skipped} ไฟล์ที่ไม่รองรับ)</span>`;
+        html += `</div>`;
+        Object.entries(byFolder).slice(0, 20).forEach(([folder, arr]) => {
+            html += `<div class="text-amber-700"><i class="fa-solid fa-folder mr-1"></i> ${escapeHtml(folder)} <span class="text-slate-400">(${arr.length} ไฟล์)</span></div>`;
+        });
+        if (folderCount > 20) html += `<div class="text-slate-400">... และอีก ${folderCount - 20} โฟลเดอร์</div>`;
+        list.innerHTML = html;
+        list.classList.remove('hidden');
+        document.getElementById('gcBulkScanBtn').disabled = false;
+    }
+
     document.getElementById('gcBulkFiles').addEventListener('change', bulkOnFilesSelected);
 
     function bulkOnFilesSelected() {
