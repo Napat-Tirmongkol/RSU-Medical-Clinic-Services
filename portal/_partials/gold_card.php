@@ -1180,6 +1180,44 @@ $gcOver = kpi_override_status($pdo);
     window.gcQuickApprove = (id, name) => gcQuickStatusChange(id, name, 'approved');
     window.gcQuickReject  = (id, name) => gcQuickStatusChange(id, name, 'rejected');
 
+    // ── Send LINE message to member ──────────────────────────────────────
+    const GC_MSG_TEMPLATES = [
+        { label: '⏰ ใกล้หมดอายุ',   text: 'แจ้งเตือน: บัตรทองของท่านใกล้หมดอายุ กรุณาติดต่อเพื่อต่ออายุ' },
+        { label: '🏥 เปลี่ยนโรงพยาบาล', text: 'ท่านสามารถเปลี่ยนโรงพยาบาลหลักได้ — กรุณาติดต่อกลับที่ห้องพยาบาลในเวลาทำการ' },
+        { label: '📞 ติดต่อกลับ',     text: 'กรุณาติดต่อกลับที่ห้องพยาบาล โทร 02-791-6000 ต่อ 4499' },
+        { label: '✅ บัตรพร้อมใช้',   text: 'บัตรทองของท่านพร้อมใช้งานแล้ว — สามารถใช้สิทธิรักษาได้ที่โรงพยาบาลหลักที่ลงทะเบียนไว้' },
+    ];
+
+    window.gcSendMessage = async function(id, name) {
+        const tplHtml = GC_MSG_TEMPLATES.map(t =>
+            `<button type="button" onclick="document.getElementById('swal2-textarea').value=${JSON.stringify(t.text)};"
+                class="m-1 px-3 py-1.5 rounded-lg bg-slate-50 hover:bg-purple-100 border border-slate-200 hover:border-purple-300 text-xs font-bold text-slate-700 hover:text-purple-700 transition-all">${t.label}</button>`
+        ).join('');
+
+        const result = await Swal.fire({
+            title: 'ส่งข้อความผ่าน LINE',
+            html: `<div class="text-left mb-2"><b class="text-base">${name}</b><br><span class="text-xs text-slate-500">ข้อความจะถูกส่งจาก LINE Official</span></div>
+                   <div class="flex flex-wrap justify-center mb-2 mt-3">${tplHtml}</div>`,
+            input: 'textarea',
+            inputPlaceholder: 'พิมพ์ข้อความ...',
+            inputAttributes: { maxlength: 4000, rows: 5 },
+            inputValidator: (v) => !v || v.trim() === '' ? 'กรุณาพิมพ์ข้อความ' : undefined,
+            showCancelButton: true,
+            confirmButtonText: '📤 ส่งผ่าน LINE',
+            cancelButtonText: 'ยกเลิก',
+            confirmButtonColor: '#a855f7',
+            width: '500px',
+        });
+        if (!result.isConfirmed) return;
+
+        const send = await gcPost('member', 'send_message', { id, message: result.value });
+        if (send.status === 'ok') {
+            Swal.fire({icon:'success', title:'ส่งสำเร็จ', text:`ส่งถึง ${send.recipient || name}`, timer:1800, showConfirmButton:false});
+        } else {
+            Swal.fire({icon:'error', title:'ส่งไม่สำเร็จ', text: send.message || ''});
+        }
+    };
+
     function renderTable(rows, total, page, pages) {
         const wrap = document.getElementById('gcTableWrap');
         if (!rows.length) {
@@ -1216,9 +1254,15 @@ $gcOver = kpi_override_status($pdo);
                     ${r.doc_count > 0 ? `<span class="inline-flex items-center gap-1 text-amber-600 font-black text-xs"><i class="fa-solid fa-paperclip"></i> ${r.doc_count}</span>` : '<span class="text-slate-300 text-xs">—</span>'}
                 </td>
                 <td class="px-5 py-3 text-right">
-                    <button onclick="gcOpenMemberModal(${r.id})" class="px-3 py-1.5 bg-amber-50 text-amber-600 hover:bg-amber-100 rounded-lg text-xs font-black transition-colors">
-                        <i class="fa-solid fa-pen-to-square"></i> แก้ไข
-                    </button>
+                    <div class="flex justify-end items-center gap-1">
+                        ${r.linked_user_id ? `
+                            <button onclick="gcSendMessage(${r.id}, '${escapeHtml(r.full_name).replace(/'/g, "\\'")}')" class="px-2.5 py-1.5 bg-purple-50 text-purple-600 hover:bg-purple-100 rounded-lg text-xs font-black transition-colors" title="ส่งข้อความผ่าน LINE">
+                                <i class="fa-solid fa-comment-dots"></i>
+                            </button>` : ''}
+                        <button onclick="gcOpenMemberModal(${r.id})" class="px-3 py-1.5 bg-amber-50 text-amber-600 hover:bg-amber-100 rounded-lg text-xs font-black transition-colors">
+                            <i class="fa-solid fa-pen-to-square"></i> แก้ไข
+                        </button>
+                    </div>
                 </td>
             </tr>`;
         });

@@ -700,6 +700,56 @@ try {
             }
         }
 
+        case 'member:send_message': {
+            // ส่งข้อความผ่าน LINE Messaging API ไปหา user ที่เป็นสมาชิก
+            $id      = (int)($_POST['id'] ?? 0);
+            $message = trim((string)($_POST['message'] ?? ''));
+            if ($id <= 0)              json_err('ระบุ id ไม่ถูกต้อง');
+            if ($message === '')       json_err('กรุณาพิมพ์ข้อความ');
+            if (mb_strlen($message) > 4000) json_err('ข้อความยาวเกิน 4,000 ตัวอักษร');
+
+            // หา linked user → line_user_id
+            $stmt = $pdo->prepare("
+                SELECT m.id, m.full_name, m.linked_user_id, m.citizen_id, m.status,
+                       u.line_user_id, u.full_name AS user_name
+                FROM gold_card_members m
+                LEFT JOIN sys_users u ON u.id = m.linked_user_id
+                WHERE m.id = ? LIMIT 1
+            ");
+            $stmt->execute([$id]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$row) json_err('ไม่พบสมาชิก');
+
+            $lineUserId = trim((string)($row['line_user_id'] ?? ''));
+            if ($lineUserId === '') {
+                json_err('สมาชิกยังไม่ได้ผูกกับบัญชี LINE — ส่งข้อความไม่ได้ (ใช้เบอร์โทรแทน)');
+            }
+
+            // Compose final message with header/footer
+            $statusLabel = [
+                'submitted'=>'รออนุมัติ', 'pending'=>'รอเอกสาร',
+                'approved'=>'อนุมัติแล้ว', 'active'=>'ใช้งานได้',
+                'rejected'=>'ไม่อนุมัติ',  'expired'=>'หมดอายุ',
+            ][$row['status'] ?? ''] ?? '';
+            $statusLine = $statusLabel ? "\n📌 สถานะปัจจุบัน: $statusLabel" : '';
+            $finalText = "📋 แจ้งจากระบบบัตรทอง\n" . str_repeat('—', 18) . "\n" . $message . $statusLine . "\n\nสำนักงานสวัสดิการสุขภาพ มหาวิทยาลัยรังสิต";
+
+            require_once __DIR__ . '/../line_api/line_message_helper.php';
+            $code = sendLinePushMessage($lineUserId, [['type' => 'text', 'text' => $finalText]]);
+
+            if ($code !== 200) {
+                json_err("ส่งข้อความไม่สำเร็จ (HTTP $code) — ตรวจสอบ LINE token");
+            }
+
+            // Log to history (truncate ถ้ายาวเกินไปสำหรับ field new_value)
+            gold_card_log_history($pdo, $id, 'message_sent', null, [
+                'message' => mb_substr($message, 0, 1000),
+                'sent_to_line_id' => $lineUserId,
+            ], $adminId);
+
+            json_ok(['message' => 'ส่งข้อความผ่าน LINE สำเร็จ', 'recipient' => $row['user_name']]);
+        }
+
         case 'member:delete': {
             $id = (int)($_POST['id'] ?? 0);
             if ($id <= 0) json_err('ระบุ id ไม่ถูกต้อง');

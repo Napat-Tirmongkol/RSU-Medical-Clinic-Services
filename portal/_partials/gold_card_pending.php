@@ -230,8 +230,11 @@ $gcpEndpoint = 'ajax_gold_card.php';
                             <button onclick="gcpReject(${r.id}, '${escapeHtml(r.full_name || '').replace(/'/g, "\\'")}')" class="gcp-action-btn bg-rose-500 hover:bg-rose-600 text-white shadow-md shadow-rose-200">
                                 <i class="fa-solid fa-circle-xmark"></i> ไม่อนุมัติ
                             </button>
+                            <button onclick="gcpSendMessage(${r.id}, '${escapeHtml(r.full_name || '').replace(/'/g, "\\'")}', ${r.linked_user_id ? 'true' : 'false'})" class="gcp-action-btn bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200" ${!r.linked_user_id ? 'title="ผู้สมัครยังไม่ได้ผูก LINE"' : ''}>
+                                <i class="fa-solid fa-comment-dots"></i> ส่งข้อความ
+                            </button>
                             <button onclick="gcpOpenDetail(${r.id})" class="gcp-action-btn bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200">
-                                <i class="fa-solid fa-pen-to-square"></i> ดู / แก้ไขรายละเอียด
+                                <i class="fa-solid fa-pen-to-square"></i> ดู / แก้ไข
                             </button>
                         </div>
                     </div>
@@ -345,6 +348,53 @@ $gcpEndpoint = 'ajax_gold_card.php';
 
     window.gcpApprove = (id, name) => gcpStatusChange(id, name, 'approved');
     window.gcpReject  = (id, name) => gcpStatusChange(id, name, 'rejected');
+
+    // Quick message templates (admin click → fill textarea)
+    const MSG_TEMPLATES = [
+        { label: '📷 ขอรูปใหม่',     text: 'รูปถ่ายไม่ชัด/ไม่ตรง กรุณาอัปโหลดรูปคู่บัตรประชาชนใหม่ที่หน้าตรง ไม่ใส่หมวก/แว่นกันแดด' },
+        { label: '✍️ ขอเซ็นใหม่',   text: 'ลายมือชื่อไม่ชัด กรุณาเซ็นใหม่อีกครั้งให้ชัดเจน' },
+        { label: '📄 เอกสารไม่ครบ', text: 'เอกสารยังไม่ครบ กรุณาเตรียมและติดต่อกลับที่ห้องพยาบาล' },
+        { label: '📞 ติดต่อกลับ',   text: 'กรุณาติดต่อกลับที่ห้องพยาบาล โทร 02-791-6000 ต่อ 4499 ในเวลาทำการ' },
+    ];
+
+    window.gcpSendMessage = async function(id, name, hasLineUser) {
+        if (!hasLineUser) {
+            return Swal.fire({
+                icon:'warning',
+                title:'ส่งข้อความไม่ได้',
+                html:`<b>${name}</b><br><span class="text-slate-500 text-sm">ผู้สมัครยังไม่ได้ผูกบัญชี LINE — โปรดติดต่อทางเบอร์โทรแทน</span>`,
+            });
+        }
+
+        // Build templates HTML
+        const tplHtml = MSG_TEMPLATES.map((t, i) =>
+            `<button type="button" onclick="document.getElementById('swal2-textarea').value=${JSON.stringify(t.text)};"
+                class="m-1 px-3 py-1.5 rounded-lg bg-slate-50 hover:bg-purple-100 border border-slate-200 hover:border-purple-300 text-xs font-bold text-slate-700 hover:text-purple-700 transition-all">${t.label}</button>`
+        ).join('');
+
+        const result = await Swal.fire({
+            title: 'ส่งข้อความผ่าน LINE',
+            html: `<div class="text-left mb-2"><b class="text-base">${name}</b><br><span class="text-xs text-slate-500">ข้อความจะถูกส่งจาก LINE Official ของคลินิก</span></div>
+                   <div class="flex flex-wrap justify-center mb-2 mt-3">${tplHtml}</div>`,
+            input: 'textarea',
+            inputPlaceholder: 'พิมพ์ข้อความที่ต้องการส่ง... หรือคลิก template ด้านบน',
+            inputAttributes: { maxlength: 4000, rows: 5 },
+            inputValidator: (v) => !v || v.trim() === '' ? 'กรุณาพิมพ์ข้อความ' : undefined,
+            showCancelButton: true,
+            confirmButtonText: '📤 ส่งผ่าน LINE',
+            cancelButtonText: 'ยกเลิก',
+            confirmButtonColor: '#a855f7',
+            width: '500px',
+        });
+        if (!result.isConfirmed) return;
+
+        const send = await gcpPost('member', 'send_message', { id, message: result.value });
+        if (send.status === 'ok') {
+            Swal.fire({icon:'success', title:'ส่งข้อความสำเร็จ', text:`ส่งถึง ${send.recipient || name}`, timer:1800, showConfirmButton:false});
+        } else {
+            Swal.fire({icon:'error', title:'ส่งไม่สำเร็จ', text: send.message || ''});
+        }
+    };
 
     // เปิด full edit modal ของ gold_card section (มี tabs ครบ)
     window.gcpOpenDetail = function(id) {
