@@ -51,19 +51,32 @@ if (!dashboard_rate_limit_check($ip)) {
     exit;
 }
 
+// ── Filter params (year/month) ────────────────────────────────────────────────
+$year  = isset($_GET['year'])  && ctype_digit((string)$_GET['year'])  ? (int)$_GET['year']  : null;
+$month = isset($_GET['month']) && ctype_digit((string)$_GET['month']) ? (int)$_GET['month'] : null;
+if ($year !== null && ($year < 2000 || $year > 3000)) $year = null;
+if ($month !== null && ($month < 1 || $month > 12))   $month = null;
+$filter = ['year' => $year, 'month' => $month];
+$hasFilter = $year !== null || $month !== null;
+
 // ── Build response ────────────────────────────────────────────────────────────
 header('Content-Type: application/json; charset=utf-8');
-header('Cache-Control: public, max-age=300'); // 5 minutes
+// ลด cache duration เมื่อมี filter (แต่ละ filter combination cache แยก)
+header('Cache-Control: public, max-age=' . ($hasFilter ? 60 : 300));
 header('X-Content-Type-Options: nosniff');
 
 $pdo = db();
 $out = [
     'ok'           => true,
     'generated_at' => date('c'),
+    'filter'       => ['year' => $year, 'month' => $month],
     'widgets'      => [],
 ];
 
 try {
+    // Available years สำหรับ populate dropdown
+    $out['available_years'] = dashboard_available_years($pdo);
+
     $rows = $pdo->query("
         SELECT id, widget_type, title, subtitle, data_source, color_theme, size, sort_order
         FROM ins_dashboard_widgets
@@ -72,7 +85,7 @@ try {
     ")->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
     foreach ($rows as $w) {
-        $data = dashboard_resolve_data($pdo, (string)$w['data_source']);
+        $data = dashboard_resolve_data($pdo, (string)$w['data_source'], $filter);
         $out['widgets'][] = [
             'id'          => (int)$w['id'],
             'type'        => $w['widget_type'],

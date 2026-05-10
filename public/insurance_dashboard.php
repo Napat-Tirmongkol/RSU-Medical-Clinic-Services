@@ -51,6 +51,34 @@ $apiUrl = '../api/dashboard_public.php';
     .ip-card { animation: ip-fade-in .4s ease-out backwards; }
     .ip-skeleton { background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%); background-size: 200% 100%; animation: ip-skel 1.5s infinite; }
     @keyframes ip-skel { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; }}
+
+    .ip-filter {
+        display: inline-flex; align-items: center; gap: 6px;
+        background: #fff; border: 1.5px solid #e2e8f0; border-radius: 14px;
+        padding: 4px 6px 4px 14px;
+        box-shadow: 0 2px 8px rgba(15,23,42,.04);
+        transition: border-color .15s, box-shadow .15s, transform .15s;
+    }
+    .ip-filter:hover { border-color: #cbd5e1; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(15,23,42,.06); }
+    .ip-filter:focus-within { border-color: #3b82f6; box-shadow: 0 0 0 4px rgba(59,130,246,.12); }
+    .ip-filter-label { font-size: 11px; font-weight: 900; color: #94a3b8; text-transform: uppercase; letter-spacing: .08em; }
+    .ip-filter-select {
+        border: none; outline: none; background: transparent;
+        font-size: 13px; font-weight: 900; color: #0f172a;
+        padding: 6px 26px 6px 8px; cursor: pointer; appearance: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748b' stroke-width='3'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");
+        background-repeat: no-repeat; background-position: right 6px center; background-size: 12px;
+        font-family: inherit;
+    }
+    .ip-filter-select:hover { color: #1d4ed8; }
+    .ip-filter-clear {
+        height: 28px; padding: 0 12px;
+        border: 1.5px solid #e2e8f0; background: #fff; color: #64748b;
+        border-radius: 9px; font-size: 11px; font-weight: 900; cursor: pointer;
+        display: inline-flex; align-items: center; gap: 5px;
+        transition: all .15s;
+    }
+    .ip-filter-clear:hover { background: #fef2f2; border-color: #fecaca; color: #dc2626; }
 </style>
 </head>
 <body>
@@ -72,6 +100,37 @@ $apiUrl = '../api/dashboard_public.php';
             <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
             อัปเดตล่าสุด: <span id="ipUpdatedAt">กำลังโหลด...</span>
         </div>
+    </div>
+
+    <!-- Filter Bar (Year / Month) -->
+    <div class="flex flex-wrap justify-center items-center gap-3 mb-6">
+        <div class="ip-filter">
+            <span class="ip-filter-label"><i class="fa-solid fa-calendar"></i> ปี</span>
+            <select id="ipFilterYear" class="ip-filter-select" onchange="onFilterChange()">
+                <option value="">ทุกปี</option>
+            </select>
+        </div>
+        <div class="ip-filter">
+            <span class="ip-filter-label"><i class="fa-solid fa-calendar-day"></i> เดือน</span>
+            <select id="ipFilterMonth" class="ip-filter-select" onchange="onFilterChange()">
+                <option value="">ทุกเดือน</option>
+                <option value="1">มกราคม</option>
+                <option value="2">กุมภาพันธ์</option>
+                <option value="3">มีนาคม</option>
+                <option value="4">เมษายน</option>
+                <option value="5">พฤษภาคม</option>
+                <option value="6">มิถุนายน</option>
+                <option value="7">กรกฎาคม</option>
+                <option value="8">สิงหาคม</option>
+                <option value="9">กันยายน</option>
+                <option value="10">ตุลาคม</option>
+                <option value="11">พฤศจิกายน</option>
+                <option value="12">ธันวาคม</option>
+            </select>
+        </div>
+        <button id="ipFilterClear" class="ip-filter-clear hidden" onclick="clearFilters()">
+            <i class="fa-solid fa-xmark"></i> ล้างตัวกรอง
+        </button>
     </div>
 
     <!-- Loading state -->
@@ -119,15 +178,59 @@ const SIZE_CLASS = {
     xl: 'col-span-12',
 };
 
+let availableYearsLoaded = false;
+
+function getFilterParams() {
+    const y = document.getElementById('ipFilterYear').value;
+    const m = document.getElementById('ipFilterMonth').value;
+    const params = new URLSearchParams();
+    if (y) params.set('year', y);
+    if (m) params.set('month', m);
+    return params.toString();
+}
+
+function onFilterChange() {
+    const hasFilter = document.getElementById('ipFilterYear').value ||
+                      document.getElementById('ipFilterMonth').value;
+    document.getElementById('ipFilterClear').classList.toggle('hidden', !hasFilter);
+    loadDashboard();
+}
+
+function clearFilters() {
+    document.getElementById('ipFilterYear').value = '';
+    document.getElementById('ipFilterMonth').value = '';
+    onFilterChange();
+}
+
+function populateYearDropdown(years) {
+    if (availableYearsLoaded) return;
+    const sel = document.getElementById('ipFilterYear');
+    const current = sel.value;
+    sel.innerHTML = '<option value="">ทุกปี</option>';
+    (years || []).forEach(y => {
+        const beYear = y + 543;
+        const opt = document.createElement('option');
+        opt.value = String(y);
+        opt.textContent = String(beYear); // แสดง ปี พ.ศ.
+        sel.appendChild(opt);
+    });
+    sel.value = current;
+    availableYearsLoaded = true;
+}
+
 function loadDashboard() {
     document.getElementById('ipLoading').classList.remove('hidden');
     document.getElementById('ipGrid').classList.add('hidden');
     document.getElementById('ipError').classList.add('hidden');
 
-    fetch('<?= $apiUrl ?>', { credentials: 'omit' })
+    const qs = getFilterParams();
+    const url = '<?= $apiUrl ?>' + (qs ? '?' + qs : '');
+
+    fetch(url, { credentials: 'omit' })
         .then(r => r.json())
         .then(d => {
             if (!d.ok) throw new Error(d.message || 'fetch failed');
+            populateYearDropdown(d.available_years || []);
             renderGrid(d);
         })
         .catch(err => {
