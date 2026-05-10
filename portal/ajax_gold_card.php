@@ -435,8 +435,7 @@ try {
             // Built-in charts สำหรับหน้า gold_card (ไม่ผูกกับ widget config)
             require_once __DIR__ . '/../includes/dashboard_data_sources.php';
             json_ok([
-                'trend'    => dashboard_resolve_data($pdo, 'gold_trend_12m'),
-                'hospital' => dashboard_resolve_data($pdo, 'gold_by_hospital'),
+                'trend' => dashboard_resolve_data($pdo, 'gold_trend_12m'),
             ]);
         }
 

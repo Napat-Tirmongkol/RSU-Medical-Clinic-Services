@@ -374,28 +374,16 @@ $gcOver = kpi_override_status($pdo);
         </div>
     </div>
 
-    <!-- ── Charts row (Trend + Hospital Bar) ──────────────────────────── -->
-    <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        <div class="bg-white rounded-[1.5rem] border border-slate-200 shadow-sm p-6">
-            <div class="flex items-center justify-between mb-4">
-                <div>
-                    <h3 class="text-sm font-black text-slate-800">แนวโน้มการลงทะเบียน</h3>
-                    <p class="text-xs text-slate-400 font-bold mt-0.5">12 เดือนล่าสุด</p>
-                </div>
-                <i class="fa-solid fa-chart-line text-amber-400"></i>
+    <!-- ── Trend Chart (เต็มความกว้าง — Top รพ. ลบออกเพราะทุกคนถูกย้ายไป รพ.41392) ── -->
+    <div class="bg-white rounded-[1.5rem] border border-slate-200 shadow-sm p-6">
+        <div class="flex items-center justify-between mb-4">
+            <div>
+                <h3 class="text-sm font-black text-slate-800">แนวโน้มการลงทะเบียน</h3>
+                <p class="text-xs text-slate-400 font-bold mt-0.5">12 เดือนล่าสุด</p>
             </div>
-            <div style="height:240px"><canvas id="gcTrendChart"></canvas></div>
+            <i class="fa-solid fa-chart-line text-amber-400"></i>
         </div>
-        <div class="bg-white rounded-[1.5rem] border border-slate-200 shadow-sm p-6">
-            <div class="flex items-center justify-between mb-4">
-                <div>
-                    <h3 class="text-sm font-black text-slate-800">Top รพ.หลัก</h3>
-                    <p class="text-xs text-slate-400 font-bold mt-0.5">10 อันดับแรก</p>
-                </div>
-                <i class="fa-solid fa-hospital text-amber-400"></i>
-            </div>
-            <div style="height:240px"><canvas id="gcHospChart"></canvas></div>
-        </div>
+        <div style="height:240px"><canvas id="gcTrendChart"></canvas></div>
     </div>
 
     <!-- ── View Toggle + List/Folder Panel ────────────────────────────── -->
@@ -1727,7 +1715,7 @@ window.gcToggleApplyEnabled = async function() {
     });
 
     // ── Charts (use dedicated endpoint, not public widget API) ──────
-    let trendChart = null, hospChart = null;
+    let trendChart = null;
     window.gcReloadCharts = function() {
         if (typeof Chart === 'undefined') { setTimeout(gcReloadCharts, 200); return; }
 
@@ -1757,22 +1745,6 @@ window.gcToggleApplyEnabled = async function() {
                 });
             }
 
-            const hosp = d.hospital || {};
-            if (hosp.labels && hosp.values) {
-                if (hospChart) hospChart.destroy();
-                hospChart = new Chart(document.getElementById('gcHospChart'), {
-                    type: 'bar',
-                    data: {
-                        labels: hosp.labels,
-                        datasets: [{ label: 'จำนวน', data: hosp.values, backgroundColor: '#fbbf24', borderRadius: 6 }]
-                    },
-                    options: {
-                        indexAxis: 'y', responsive: true, maintainAspectRatio: false,
-                        plugins: { legend: { display: false } },
-                        scales: { x: { beginAtZero: true, ticks: { precision: 0 } } }
-                    }
-                });
-            }
         });
     };
     function loadCharts() { gcReloadCharts(); }
