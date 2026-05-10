@@ -19,6 +19,7 @@ require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../includes/ajax_helpers.php';
 require_once __DIR__ . '/../includes/csrf.php';
 require_once __DIR__ . '/../includes/kpi_override_helper.php';
+require_once __DIR__ . '/../includes/dashboard_data_sources.php';
 
 $adminRole = $_SESSION['admin_role'] ?? '';
 $adminId   = (int)($_SESSION['admin_id'] ?? 0);
@@ -46,6 +47,48 @@ try {
         INDEX idx_active (is_active)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 } catch (PDOException $e) { /* silent */ }
+
+/**
+ * คำนวณค่าจริงของ KPI โดยตรงจาก DB — bypass override ทุกตัว
+ */
+function _kpi_compute_auto(PDO $pdo, string $key): int
+{
+    try {
+        switch ($key) {
+            case 'mti_total_active':
+                return (int)$pdo->query("SELECT COUNT(*) FROM insurance_members WHERE insurance_status='Active'")->fetchColumn();
+            case 'mti_total_all':
+                return (int)$pdo->query("SELECT COUNT(*) FROM insurance_members")->fetchColumn();
+            case 'mti_staff':
+                return (int)$pdo->query("SELECT COUNT(*) FROM insurance_members WHERE member_status='บุคลากร'")->fetchColumn();
+            case 'mti_student':
+                return (int)$pdo->query("SELECT COUNT(*) FROM insurance_members WHERE member_status='นักศึกษา'")->fetchColumn();
+            case 'mti_manual_override':
+                return (int)$pdo->query("SELECT COUNT(*) FROM insurance_members WHERE manually_overridden=1")->fetchColumn();
+            case 'mti_expiring_30d':
+                return (int)$pdo->query("SELECT COUNT(*) FROM insurance_members
+                    WHERE insurance_status='Active'
+                      AND coverage_end BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 30 DAY)")->fetchColumn();
+            case 'gold_total':
+                return (int)$pdo->query("SELECT COUNT(*) FROM gold_card_members")->fetchColumn();
+            case 'gold_approved':
+                return (int)$pdo->query("SELECT COUNT(*) FROM gold_card_members WHERE status IN ('approved','active')")->fetchColumn();
+            case 'gold_pending_docs':
+                return (int)$pdo->query("SELECT COUNT(*) FROM gold_card_members WHERE status IN ('pending','submitted')")->fetchColumn();
+            case 'gold_rejected':
+                return (int)$pdo->query("SELECT COUNT(*) FROM gold_card_members WHERE status='rejected'")->fetchColumn();
+            case 'gold_expiring_30d':
+                return (int)$pdo->query("SELECT COUNT(*) FROM gold_card_members
+                    WHERE status='active'
+                      AND coverage_end BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 30 DAY)")->fetchColumn();
+            case 'coverage_total':
+                $mti  = (int)$pdo->query("SELECT COUNT(DISTINCT citizen_id) FROM insurance_members WHERE insurance_status='Active'")->fetchColumn();
+                $gold = (int)$pdo->query("SELECT COUNT(DISTINCT citizen_id) FROM gold_card_members WHERE status IN ('approved','active')")->fetchColumn();
+                return $mti + $gold;
+        }
+    } catch (PDOException $e) { /* tables may not exist */ }
+    return 0;
+}
 
 try {
     switch ($action) {
@@ -90,13 +133,20 @@ try {
             $stmt = $pdo->prepare("SELECT override_value, is_active, note, updated_at FROM ins_kpi_overrides WHERE kpi_key = ?");
             $stmt->execute([$key]);
             $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            // คำนวณ auto value จริงจาก DB (ผ่าน data resolver โดยไม่ใช้ override)
+            // Resolver เมื่อไม่มี filter จะ apply override — ดังนั้นใช้ filter dummy ([year=>0]
+            // ก็ไม่ work เพราะมัน trigger filter mode) → เรียก raw computation ตรง
+            $autoValue = _kpi_compute_auto($pdo, $key);
+
             json_ok([
-                'kpi_key'   => $key,
-                'label'     => $catalog[$key]['label'],
-                'value'     => $row ? (int)$row['override_value'] : null,
-                'is_active' => $row ? (int)$row['is_active'] : 0,
-                'note'      => $row['note'] ?? '',
-                'updated_at'=> $row['updated_at'] ?? null,
+                'kpi_key'    => $key,
+                'label'      => $catalog[$key]['label'],
+                'value'      => $row ? (int)$row['override_value'] : null,
+                'auto_value' => $autoValue,
+                'is_active'  => $row ? (int)$row['is_active'] : 0,
+                'note'       => $row['note'] ?? '',
+                'updated_at' => $row['updated_at'] ?? null,
             ]);
         }
 
@@ -109,13 +159,14 @@ try {
             foreach ($catalog as $key => $meta) {
                 $r = $byKey[$key] ?? null;
                 $out[] = [
-                    'kpi_key'   => $key,
-                    'label'     => $meta['label'],
-                    'group'     => $meta['group'],
-                    'value'     => $r ? (int)$r['override_value'] : null,
-                    'is_active' => $r ? (int)$r['is_active'] : 0,
-                    'note'      => $r['note'] ?? '',
-                    'updated_at'=> $r['updated_at'] ?? null,
+                    'kpi_key'    => $key,
+                    'label'      => $meta['label'],
+                    'group'      => $meta['group'],
+                    'value'      => $r ? (int)$r['override_value'] : null,
+                    'auto_value' => _kpi_compute_auto($pdo, $key),
+                    'is_active'  => $r ? (int)$r['is_active'] : 0,
+                    'note'       => $r['note'] ?? '',
+                    'updated_at' => $r['updated_at'] ?? null,
                 ];
             }
             json_ok(['overrides' => $out]);

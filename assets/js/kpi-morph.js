@@ -381,8 +381,9 @@
                 return;
             }
 
-            const valueEl = card.querySelector('.km-value');
-            const autoValue = parseInt(valueEl?.dataset.value || '0', 10);
+            // ค่าจริงจาก DB (server ส่งมาแล้ว — ไม่ใช้ค่าใน data-value
+            // เพราะมันคือค่าที่ override ทับไปแล้ว)
+            const autoValue = (typeof r.auto_value === 'number') ? r.auto_value : 0;
             const overrideValue = r.value !== null ? r.value : autoValue;
             const isOverride = r.is_active === 1;
             const note = r.note || '';
