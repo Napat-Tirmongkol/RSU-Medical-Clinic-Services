@@ -437,6 +437,50 @@ $gcOver = kpi_override_status($pdo);
             </button>
         </div>
 
+        <!-- Review Banner (แสดงเฉพาะ status=submitted/pending) -->
+        <div id="gcReviewBanner" class="hidden px-7 py-5 bg-gradient-to-br from-amber-50 to-orange-50 border-b border-amber-200">
+            <div class="flex items-start gap-4">
+                <div class="flex gap-3 shrink-0">
+                    <!-- Photo thumbnail -->
+                    <div id="gcReviewPhoto" class="w-24 h-24 rounded-2xl bg-white border-2 border-amber-200 overflow-hidden cursor-pointer relative group hidden" onclick="gcReviewLightbox('photo')">
+                        <img id="gcReviewPhotoImg" class="w-full h-full object-cover" alt="Photo">
+                        <div class="absolute inset-0 bg-black/0 group-hover:bg-black/40 flex items-center justify-center text-white text-lg opacity-0 group-hover:opacity-100 transition-all">
+                            <i class="fa-solid fa-magnifying-glass-plus"></i>
+                        </div>
+                        <span class="absolute top-1 left-1 px-1.5 py-0.5 rounded bg-black/60 text-white text-[8px] font-black">รูป</span>
+                    </div>
+                    <!-- Signature thumbnail -->
+                    <div id="gcReviewSig" class="w-24 h-24 rounded-2xl bg-white border-2 border-amber-200 overflow-hidden cursor-pointer relative group hidden" onclick="gcReviewLightbox('signature')">
+                        <img id="gcReviewSigImg" class="w-full h-full object-contain" alt="Signature">
+                        <div class="absolute inset-0 bg-black/0 group-hover:bg-black/40 flex items-center justify-center text-white text-lg opacity-0 group-hover:opacity-100 transition-all">
+                            <i class="fa-solid fa-magnifying-glass-plus"></i>
+                        </div>
+                        <span class="absolute top-1 left-1 px-1.5 py-0.5 rounded bg-black/60 text-white text-[8px] font-black">เซ็น</span>
+                    </div>
+                    <div id="gcReviewNoDocs" class="w-24 h-24 rounded-2xl bg-amber-100/50 border-2 border-dashed border-amber-300 flex flex-col items-center justify-center text-amber-600 hidden">
+                        <i class="fa-solid fa-file-circle-question text-2xl mb-1"></i>
+                        <span class="text-[9px] font-black text-center">ไม่มีไฟล์<br>แนบ</span>
+                    </div>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2 mb-1">
+                        <span id="gcReviewStatusBadge" class="inline-flex px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-700 text-[10px] font-black uppercase tracking-widest"></span>
+                        <span class="text-[11px] font-bold text-amber-700">รอเจ้าหน้าที่ตรวจสอบและอนุมัติ</span>
+                    </div>
+                    <p id="gcReviewName" class="text-base font-black text-slate-900 leading-tight truncate"></p>
+                    <p id="gcReviewMeta" class="text-[11px] font-bold text-slate-500 mt-0.5"></p>
+                    <div class="flex gap-2 mt-3">
+                        <button type="button" onclick="gcReviewApprove()" class="flex-1 h-10 px-4 bg-emerald-500 hover:bg-emerald-600 text-white font-black rounded-xl text-sm shadow-md shadow-emerald-200 active:scale-95 transition-all flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-circle-check"></i> อนุมัติ
+                        </button>
+                        <button type="button" onclick="gcReviewReject()" class="flex-1 h-10 px-4 bg-rose-500 hover:bg-rose-600 text-white font-black rounded-xl text-sm shadow-md shadow-rose-200 active:scale-95 transition-all flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-circle-xmark"></i> ไม่อนุมัติ
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Tabs (เฉพาะตอน edit) -->
         <div id="gcTabs" class="px-7 pt-3 flex gap-2 border-b border-slate-100 hidden shrink-0">
             <button class="gc-tab gc-active-tab" data-tab="info" onclick="gcSwitchTab('info')">📋 ข้อมูล</button>
@@ -1123,6 +1167,9 @@ $gcOver = kpi_override_status($pdo);
             return Swal.fire({icon:'error', title:'บันทึกไม่สำเร็จ', text: saveRes.message || ''});
         }
         Swal.fire({icon:'success', title:`${labels[newStatus]}สำเร็จ`, timer:1200, showConfirmButton:false});
+        // Close modal if open (in case action came from review banner)
+        const modal = document.getElementById('gcMemberModal');
+        if (modal && !modal.classList.contains('hidden')) gcCloseMemberModal();
         gcLoadMembers(currentPage);
     }
     window.gcQuickApprove = (id, name) => gcQuickStatusChange(id, name, 'approved');
@@ -1209,12 +1256,88 @@ $gcOver = kpi_override_status($pdo);
         pager.innerHTML = html;
     }
 
+    // ── modal: Review Banner state + helpers ─────────────────────────
+    let currentReviewMember = null;
+
+    function gcShowReviewBanner(member, docs) {
+        const banner = document.getElementById('gcReviewBanner');
+        const photoBox = document.getElementById('gcReviewPhoto');
+        const sigBox   = document.getElementById('gcReviewSig');
+        const noBox    = document.getElementById('gcReviewNoDocs');
+        const photoImg = document.getElementById('gcReviewPhotoImg');
+        const sigImg   = document.getElementById('gcReviewSigImg');
+
+        const photoDoc = docs.find(d => d.doc_type === 'photo');
+        const sigDoc   = docs.find(d => d.doc_type === 'signature');
+
+        photoBox.classList.toggle('hidden', !photoDoc);
+        sigBox.classList.toggle('hidden', !sigDoc);
+        noBox.classList.toggle('hidden', !!photoDoc || !!sigDoc);
+
+        if (photoDoc) {
+            photoImg.src = `${ENDPOINT}?entity=document&action=download&id=${photoDoc.id}`;
+            photoBox.dataset.docId = photoDoc.id;
+        }
+        if (sigDoc) {
+            sigImg.src = `${ENDPOINT}?entity=document&action=download&id=${sigDoc.id}`;
+            sigBox.dataset.docId = sigDoc.id;
+        }
+
+        const STATUS_BADGES = {
+            submitted: { label: 'ส่งใบสมัคร', cls: 'bg-blue-100 text-blue-700' },
+            pending:   { label: 'รอเอกสาร',  cls: 'bg-amber-100 text-amber-700' },
+        };
+        const sb = STATUS_BADGES[member.status] || STATUS_BADGES.submitted;
+        const badge = document.getElementById('gcReviewStatusBadge');
+        badge.textContent = sb.label;
+        badge.className = `inline-flex px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest ${sb.cls}`;
+
+        document.getElementById('gcReviewName').textContent = member.full_name || '—';
+        const cidMask = (member.citizen_id || '').length === 13
+            ? `${member.citizen_id.substr(0,1)}-${member.citizen_id.substr(1,4)}-${member.citizen_id.substr(5,5)}-${member.citizen_id.substr(10,2)}-${member.citizen_id.substr(12,1)}`
+            : (member.citizen_id || '—');
+        const submittedDate = member.created_at ? new Date(member.created_at).toLocaleDateString('th-TH') : '';
+        document.getElementById('gcReviewMeta').textContent = `${cidMask} · ${member.member_type || 'บุคคลทั่วไป'}${submittedDate ? ' · สมัครเมื่อ ' + submittedDate : ''}`;
+
+        currentReviewMember = member;
+        banner.classList.remove('hidden');
+    }
+
+    window.gcReviewLightbox = function(type) {
+        const docId = type === 'photo'
+            ? document.getElementById('gcReviewPhoto').dataset.docId
+            : document.getElementById('gcReviewSig').dataset.docId;
+        if (!docId) return;
+        const url = `${ENDPOINT}?entity=document&action=download&id=${docId}`;
+        Swal.fire({
+            html: `<img src="${url}" style="max-width:100%; max-height:75vh; border-radius:12px; background: ${type==='signature'?'#fff':'transparent'}" alt="${type}">`,
+            width: '90%',
+            showConfirmButton: false,
+            showCloseButton: true,
+            background: '#0f172a',
+            customClass: { popup: 'gc-lightbox-popup' },
+        });
+    };
+
+    window.gcReviewApprove = function() {
+        if (!currentReviewMember) return;
+        gcQuickApprove(currentReviewMember.id, currentReviewMember.full_name || '');
+    };
+    window.gcReviewReject = function() {
+        if (!currentReviewMember) return;
+        gcQuickReject(currentReviewMember.id, currentReviewMember.full_name || '');
+    };
+
     // ── modal ────────────────────────────────────────────────────────
     window.gcOpenMemberModal = function(id) {
         const modal = document.getElementById('gcMemberModal');
         document.getElementById('gcMemberId').value = id || 0;
         document.getElementById('gcMemberError').classList.add('hidden');
         gcSwitchTab('info');
+
+        // Hide review banner by default
+        document.getElementById('gcReviewBanner').classList.add('hidden');
+        currentReviewMember = null;
 
         if (id) {
             document.getElementById('gcMemberModalTitle').textContent = 'แก้ไขสมาชิก';
@@ -1237,6 +1360,11 @@ $gcOver = kpi_override_status($pdo);
                 document.getElementById('gcRemarks').value   = m.remarks || '';
                 renderDocs(r.documents || []);
                 renderHist(r.history || []);
+
+                // Show Review Banner ถ้า status = submitted หรือ pending
+                if (m.status === 'submitted' || m.status === 'pending') {
+                    gcShowReviewBanner(m, r.documents || []);
+                }
             });
         } else {
             document.getElementById('gcMemberModalTitle').textContent = 'เพิ่มสมาชิกบัตรทอง';

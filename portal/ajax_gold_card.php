@@ -27,15 +27,19 @@ if (!$hasAccess) {
     json_err('ไม่มีสิทธิ์เข้าถึงระบบบัตรทอง', 403);
 }
 
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    json_err('Method not allowed', 405);
+// Allow GET for document:download (inline image preview in <img src>)
+$entity = $_POST['entity'] ?? $_GET['entity'] ?? '';
+$action = $_POST['action'] ?? $_GET['action'] ?? '';
+$isInlinePreview = ($entity === 'document' && $action === 'download' && $_SERVER['REQUEST_METHOD'] === 'GET');
+
+if (!$isInlinePreview) {
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        json_err('Method not allowed', 405);
+    }
+    if (function_exists('validate_csrf_or_die')) validate_csrf_or_die();
 }
 
-if (function_exists('validate_csrf_or_die')) validate_csrf_or_die();
-
-$pdo    = db();
-$entity = $_POST['entity'] ?? '';
-$action = $_POST['action'] ?? '';
+$pdo = db();
 
 // ── Helper: file storage dir ──────────────────────────────────────────────────
 function gold_card_uploads_dir(): string
