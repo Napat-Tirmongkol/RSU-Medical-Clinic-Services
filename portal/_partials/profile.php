@@ -28,7 +28,8 @@ if ($staffId > 0) {
                                   IFNULL(access_scholarship,0)   AS access_scholarship,
                                   IFNULL(access_dashboard_admin,0) AS access_dashboard_admin,
                                   IFNULL(access_monthly_report,0) AS access_monthly_report,
-                                  IFNULL(access_director_view,0)  AS access_director_view
+                                  IFNULL(access_director_view,0)  AS access_director_view,
+                                  IFNULL(access_identity,0)       AS access_identity
                            FROM sys_staff WHERE id = :id LIMIT 1");
     $stmt->execute([':id' => $staffId]);
     $me = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -54,6 +55,7 @@ $accessLabels = [
     'access_dashboard_admin'=> ['Dashboard Editor',    'fa-chart-pie',          'blue'],
     'access_monthly_report' => ['รายงานประจำเดือน',     'fa-clipboard-list',     'amber'],
     'access_director_view'  => ['ผู้อำนวยการ',          'fa-user-tie',           'rose'],
+    'access_identity'       => ['Identity & Governance', 'fa-id-card-clip',       'blue'],
 ];
 ?>
 

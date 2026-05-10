@@ -100,6 +100,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $dashboardAccess   = (int)($_POST['dashboard_admin_access'] ?? 0);
                     $monthlyReportAccess = (int)($_POST['monthly_report_access'] ?? 0);
                     $directorViewAccess  = (int)($_POST['director_view_access'] ?? 0);
+                    $identityAccess      = (int)($_POST['identity_access'] ?? 0);
                     $departmentId      = isset($_POST['department_id']) && $_POST['department_id'] !== '' ? (int)$_POST['department_id'] : null;
 
                     // Whitelist e-Borrow role (ป้องกัน privilege escalation จาก POST)
@@ -120,6 +121,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     try { $pdo->exec("ALTER TABLE sys_staff ADD COLUMN access_dashboard_admin TINYINT(1) DEFAULT 0"); } catch(PDOException $e) {}
                     try { $pdo->exec("ALTER TABLE sys_staff ADD COLUMN access_monthly_report TINYINT(1) DEFAULT 0"); } catch(PDOException $e) {}
                     try { $pdo->exec("ALTER TABLE sys_staff ADD COLUMN access_director_view TINYINT(1) DEFAULT 0"); } catch(PDOException $e) {}
+                    try { $pdo->exec("ALTER TABLE sys_staff ADD COLUMN access_identity TINYINT(1) DEFAULT 0"); } catch(PDOException $e) {}
                     try { $pdo->exec("ALTER TABLE sys_staff ADD COLUMN department_id INT UNSIGNED NULL AFTER role"); } catch(PDOException $e) {}
 
                     // Position (NULL = Custom). ถ้าผูก position จะ override flag ตอน login (live link)
@@ -137,12 +139,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                     if ($action === 'add_identity_gov') {
                         $hashed = password_hash($password ?: bin2hex(random_bytes(8)), PASSWORD_DEFAULT);
-                        $pdo->prepare("INSERT INTO sys_staff (full_name, username, email, password_hash, role, position_id, department_id, access_eborrow, account_status, access_ecampaign, ecampaign_role, access_insurance, access_system_logs, access_site_settings, access_registry, access_edms, access_ai, access_consumables, access_asset, access_scholarship, access_dashboard_admin, access_monthly_report, access_director_view) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
-                            ->execute([$fullName, $username, $email, $hashed, $ebRole, $positionId, $departmentId, $ebAccess, $status, $ecAccess, $ecRole, $insAccess, $logsAccess, $settAccess, $regAccess, $edmsAccess, $aiAccess, $consumablesAccess, $assetAccess, $scholarshipAccess, $dashboardAccess, $monthlyReportAccess, $directorViewAccess]);
+                        $pdo->prepare("INSERT INTO sys_staff (full_name, username, email, password_hash, role, position_id, department_id, access_eborrow, account_status, access_ecampaign, ecampaign_role, access_insurance, access_system_logs, access_site_settings, access_registry, access_edms, access_ai, access_consumables, access_asset, access_scholarship, access_dashboard_admin, access_monthly_report, access_director_view, access_identity) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+                            ->execute([$fullName, $username, $email, $hashed, $ebRole, $positionId, $departmentId, $ebAccess, $status, $ecAccess, $ecRole, $insAccess, $logsAccess, $settAccess, $regAccess, $edmsAccess, $aiAccess, $consumablesAccess, $assetAccess, $scholarshipAccess, $dashboardAccess, $monthlyReportAccess, $directorViewAccess, $identityAccess]);
                         $targetId = (int)$pdo->lastInsertId();
                     } else {
-                        $pdo->prepare("UPDATE sys_staff SET full_name=?, username=?, email=?, role=?, position_id=?, department_id=?, access_eborrow=?, account_status=?, access_ecampaign=?, ecampaign_role=?, access_insurance=?, access_system_logs=?, access_site_settings=?, access_registry=?, access_edms=?, access_ai=?, access_consumables=?, access_asset=?, access_scholarship=?, access_dashboard_admin=?, access_monthly_report=?, access_director_view=? WHERE id=?")
-                            ->execute([$fullName, $username, $email, $ebRole, $positionId, $departmentId, $ebAccess, $status, $ecAccess, $ecRole, $insAccess, $logsAccess, $settAccess, $regAccess, $edmsAccess, $aiAccess, $consumablesAccess, $assetAccess, $scholarshipAccess, $dashboardAccess, $monthlyReportAccess, $directorViewAccess, $targetId]);
+                        $pdo->prepare("UPDATE sys_staff SET full_name=?, username=?, email=?, role=?, position_id=?, department_id=?, access_eborrow=?, account_status=?, access_ecampaign=?, ecampaign_role=?, access_insurance=?, access_system_logs=?, access_site_settings=?, access_registry=?, access_edms=?, access_ai=?, access_consumables=?, access_asset=?, access_scholarship=?, access_dashboard_admin=?, access_monthly_report=?, access_director_view=?, access_identity=? WHERE id=?")
+                            ->execute([$fullName, $username, $email, $ebRole, $positionId, $departmentId, $ebAccess, $status, $ecAccess, $ecRole, $insAccess, $logsAccess, $settAccess, $regAccess, $edmsAccess, $aiAccess, $consumablesAccess, $assetAccess, $scholarshipAccess, $dashboardAccess, $monthlyReportAccess, $directorViewAccess, $identityAccess, $targetId]);
                         if (!empty($password)) $pdo->prepare("UPDATE sys_staff SET password_hash=? WHERE id=?")->execute([password_hash($password, PASSWORD_DEFAULT), $targetId]);
                     }
                 }
@@ -178,6 +180,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'access_site_settings','access_registry','access_edms',
             'access_ai','access_consumables','access_asset','access_scholarship',
             'access_dashboard_admin','access_monthly_report','access_director_view',
+            'access_identity',
         ];
 
         // Ensure table exists

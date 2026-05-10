@@ -1037,10 +1037,12 @@ try {
                     <i class="fa-solid fa-chevron-down psb-chevron"></i>
                 </button>
                 <div class="psb-group" data-group="security">
+                    <?php if ($isSuper || !empty($_SESSION['access_identity'])): ?>
                     <button class="psb-item" data-section="identity" onclick="switchSection('identity',this)">
                         <div class="psb-icon"><i class="fa-solid fa-id-card-clip" style="color:#2563eb"></i></div>
                         <span class="psb-label" style="color:#1d4ed8;font-weight:900">Identity &amp; Governance</span>
                     </button>
+                    <?php endif; ?>
                     <?php if ($isSuper): ?>
                         <button class="psb-item" data-section="privilege_inventory" onclick="switchSection('privilege_inventory',this)">
                             <div class="psb-icon"><i class="fa-solid fa-shield-halved" style="color:#10b981"></i></div>
@@ -1427,7 +1429,7 @@ try {
                                     'live_support_chat'  => 'access_ecampaign',
                                     'line_messaging'     => null, // superadmin only
                                     'privilege_inventory'=> null, // superadmin only
-                                    'identity_governance'=> '',   // admin role check below
+                                    'identity_governance'=> 'access_identity',
                                 ];
                                 foreach ($projects as $proj):
                                     $hasAccess = false;
@@ -1860,8 +1862,11 @@ try {
             </form>
 
             <!-- ════════════ SECTION: IDENTITY & GOVERNANCE ════════════ -->
-            <div id="section-identity" class="portal-section" 
+            <div id="section-identity" class="portal-section"
                 style="<?= $activeSection==='identity'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); background:#f8fafc; overflow-y:auto;">
+                <?php if (!($isSuper || !empty($_SESSION['access_identity']))): ?>
+                    <div style="padding:100px;text-align:center;font-weight:900;color:#dc2626"><i class="fa-solid fa-shield-slash mb-4" style="font-size:4rem;display:block"></i> ACCESS DENIED<br><span style="font-size:14px;color:#94a3b8;font-weight:600">ต้องมีสิทธิ์ access_identity</span></div>
+                <?php else: ?>
                 <div class="px-5 md:px-8 py-8">
 
                     <?php if ($idSaved): ?>
@@ -2494,6 +2499,7 @@ try {
                     <?php endif; ?>
 
                 </div>
+                <?php endif; ?>
             </div><!-- /section-identity -->
 
             <!-- Edit Modal (Identity) -->
@@ -2881,6 +2887,14 @@ try {
                                                 </div>
                                                 <input type="checkbox" name="director_view_access" id="govDirectorViewAccess" value="1" style="width:16px;height:16px" onclick="event.stopPropagation()">
                                             </div>
+                                            <!-- Identity & Governance (จัดการสิทธิ์ผู้ใช้) -->
+                                            <div onclick="document.getElementById('govIdentityAccess').click()" class="premium-role-card" style="border-radius:14px;border:1.5px solid #e2e8f0;background:#fff;cursor:pointer;padding:12px;transition:all 0.2s;display:flex;align-items:center;justify-content:space-between">
+                                                <div style="display:flex;align-items:center;gap:10px">
+                                                    <i class="fa-solid fa-id-card-clip text-blue-600"></i>
+                                                    <span style="font-weight:800;font-size:12px;color:#475569">Identity &amp; Governance (จัดการสิทธิ์/ตำแหน่ง/ฝ่าย)</span>
+                                                </div>
+                                                <input type="checkbox" name="identity_access" id="govIdentityAccess" value="1" style="width:16px;height:16px" onclick="event.stopPropagation()">
+                                            </div>
                                             <!-- Department dropdown -->
                                             <div class="premium-role-card" style="border-radius:14px;border:1.5px solid #e2e8f0;background:#fff;padding:12px;display:flex;align-items:center;justify-content:space-between;gap:10px">
                                                 <div style="display:flex;align-items:center;gap:10px;min-width:0">
@@ -2974,6 +2988,7 @@ try {
                                             'access_dashboard_admin'=> ['Dashboard Editor', 'fa-chart-pie',          '#3b82f6'],
                                             'access_monthly_report' => ['รายงานประจำเดือน',  'fa-clipboard-list',     '#f59e0b'],
                                             'access_director_view'  => ['ผู้อำนวยการ',       'fa-user-tie',           '#f43f5e'],
+                                            'access_identity'       => ['Identity & Gov',     'fa-id-card-clip',       '#2563eb'],
                                         ];
                                         foreach ($posFlagInputs as $key => [$label, $icon, $color]):
                                         ?>
@@ -4028,6 +4043,8 @@ try {
                         if (mrEl) mrEl.checked = parseInt(data.access_monthly_report) === 1;
                         const dvEl = document.getElementById('govDirectorViewAccess');
                         if (dvEl) dvEl.checked = parseInt(data.access_director_view) === 1;
+                        const idEl = document.getElementById('govIdentityAccess');
+                        if (idEl) idEl.checked = parseInt(data.access_identity) === 1;
                         const deptSel = document.getElementById('govDepartmentId');
                         if (deptSel) deptSel.value = data.department_id ? String(data.department_id) : '';
 
@@ -4054,6 +4071,8 @@ try {
                     if (mrElR) mrElR.checked = false;
                     const dvElR = document.getElementById('govDirectorViewAccess');
                     if (dvElR) dvElR.checked = false;
+                    const idElR = document.getElementById('govIdentityAccess');
+                    if (idElR) idElR.checked = false;
                     const deptSelR = document.getElementById('govDepartmentId');
                     if (deptSelR) deptSelR.value = '';
                     const posSel = document.getElementById('govPositionId');
@@ -4073,7 +4092,8 @@ try {
             'access_eborrow','access_ecampaign','access_insurance','access_registry',
             'access_system_logs','access_site_settings','access_edms',
             'access_ai','access_consumables','access_asset','access_scholarship',
-            'access_dashboard_admin','access_monthly_report','access_director_view'
+            'access_dashboard_admin','access_monthly_report','access_director_view',
+            'access_identity'
         ];
 
         function openAddPositionModal() {
@@ -4278,6 +4298,7 @@ try {
             ['access_dashboard_admin','govDashboardAccess'],
             ['access_monthly_report','govMonthlyReportAccess'],
             ['access_director_view', 'govDirectorViewAccess'],
+            ['access_identity',      'govIdentityAccess'],
         ];
 
         function onGovPositionChange() {

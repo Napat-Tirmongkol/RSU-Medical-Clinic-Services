@@ -121,6 +121,9 @@ if ($adminRole === 'superadmin') {
         if (!in_array('access_director_view', $cols)) {
             $pdo->exec("ALTER TABLE sys_staff ADD COLUMN access_director_view TINYINT(1) DEFAULT 0");
         }
+        if (!in_array('access_identity', $cols)) {
+            $pdo->exec("ALTER TABLE sys_staff ADD COLUMN access_identity TINYINT(1) DEFAULT 0");
+        }
         if (!in_array('department_id', $cols)) {
             $pdo->exec("ALTER TABLE sys_staff ADD COLUMN department_id INT UNSIGNED NULL AFTER role");
         }
@@ -163,6 +166,7 @@ if ($adminRole === 'superadmin') {
                    IFNULL(s.access_dashboard_admin, 0) AS access_dashboard_admin,
                    IFNULL(s.access_monthly_report, 0) AS access_monthly_report,
                    IFNULL(s.access_director_view, 0) AS access_director_view,
+                   IFNULL(s.access_identity, 0) AS access_identity,
                    s.department_id
             FROM sys_staff s
             LEFT JOIN sys_staff_positions p ON p.id = s.position_id
