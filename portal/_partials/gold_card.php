@@ -270,7 +270,12 @@ $gcOver = kpi_override_status($pdo);
             <h1 class="text-2xl font-black text-slate-800 flex items-center gap-3">
                 <span class="text-3xl">🪪</span> บัตรทอง (Universal Coverage)
             </h1>
-            <p class="text-sm text-slate-500 font-bold mt-1">จัดการผู้มีสิทธิ์บัตรทอง · เอกสารสมัคร · สถานะอนุมัติ</p>
+            <p class="text-sm text-slate-500 font-bold mt-1">จัดการสมาชิกที่ผ่านการอนุมัติแล้ว · นำเข้าเอกสารจากใบสมัครที่เสร็จสิ้น</p>
+            <p class="text-xs text-blue-600 font-bold mt-1">
+                <i class="fa-solid fa-circle-info mr-1"></i>
+                ใบสมัครจาก user ผ่าน LINE ดูได้ที่เมนู
+                <button type="button" onclick="if(window.switchSection){const b=document.querySelector('[data-section=\'gold_card_pending\']');if(b)switchSection('gold_card_pending',b);}" class="underline hover:text-blue-800 font-black">⏳ ใบสมัครรออนุมัติ</button>
+            </p>
         </div>
         <div class="flex items-center gap-2">
             <button onclick="gcOpenMemberModal(null)" class="h-11 px-5 bg-amber-500 hover:bg-amber-600 text-white font-black rounded-2xl shadow-lg shadow-amber-200 active:scale-95 transition-all flex items-center gap-2">
@@ -330,9 +335,9 @@ $gcOver = kpi_override_status($pdo);
                 <i class="fa-solid fa-folder-arrow-up"></i>
             </div>
             <div class="flex-1 min-w-[250px]">
-                <h3 class="text-base font-black text-slate-800">📁 นำเข้าจากไฟล์ (Bulk Import)</h3>
+                <h3 class="text-base font-black text-slate-800">📁 นำเข้าจากไฟล์ (Bulk Import) <span class="ml-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-black uppercase tracking-widest">เฉพาะที่สมัครเสร็จแล้ว</span></h3>
                 <p class="text-xs font-bold text-slate-500 mt-1 leading-relaxed">
-                    อัปโหลดไฟล์เอกสารบัตรทองหลายๆ ไฟล์พร้อมกัน · ระบบจะอ่านชื่อจากไฟล์แล้วจับคู่กับนักศึกษาในระบบ
+                    อัปโหลดไฟล์เอกสารของผู้ที่ผ่านการอนุมัติบัตรทองเรียบร้อยแล้ว · ระบบจะอ่านชื่อจากไฟล์แล้วจับคู่กับนักศึกษาในระบบ
                     <br><span class="text-amber-600">→ ถ้าชื่อตรงกัน นักศึกษาจะได้สถานะ Active บัตรทองในโปรไฟล์อัตโนมัติ</span>
                 </p>
             </div>

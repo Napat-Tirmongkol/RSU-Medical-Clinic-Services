@@ -1062,7 +1062,7 @@ try {
                             <span class="psb-label" style="color:#1d4ed8;font-weight:900">ใบสมัครรออนุมัติ</span>
                             <?php
                             $pendingBadgeCount = 0;
-                            try { $pendingBadgeCount = (int)db()->query("SELECT COUNT(*) FROM gold_card_members WHERE status IN ('submitted','pending')")->fetchColumn(); }
+                            try { $pendingBadgeCount = (int)db()->query("SELECT COUNT(*) FROM gold_card_members WHERE status = 'submitted'")->fetchColumn(); }
                             catch (PDOException) {}
                             if ($pendingBadgeCount > 0): ?>
                                 <span class="ml-auto px-2 py-0.5 rounded-full bg-rose-500 text-white text-[10px] font-black"><?= $pendingBadgeCount > 99 ? '99+' : $pendingBadgeCount ?></span>

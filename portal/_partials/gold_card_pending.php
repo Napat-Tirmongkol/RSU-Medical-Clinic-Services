@@ -13,10 +13,11 @@ declare(strict_types=1);
 
 if (!isset($pdo)) $pdo = db();
 
-// Pending count for header
+// Pending count for header — เฉพาะ user submit ผ่าน LIFF (status=submitted)
+// ไม่นับ status=pending จาก bulk import เพราะอยู่อีก section
 $pendingCount = 0;
 try {
-    $pendingCount = (int)$pdo->query("SELECT COUNT(*) FROM gold_card_members WHERE status IN ('submitted','pending')")->fetchColumn();
+    $pendingCount = (int)$pdo->query("SELECT COUNT(*) FROM gold_card_members WHERE status = 'submitted'")->fetchColumn();
 } catch (PDOException $e) { /* table may not exist yet */ }
 
 $gcpEndpoint = 'ajax_gold_card.php';
