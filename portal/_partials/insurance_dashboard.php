@@ -10,10 +10,12 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/dashboard_data_sources.php';
+require_once __DIR__ . '/../../includes/kpi_override_helper.php';
 
 $pdo       = db();
 $csrfToken = get_csrf_token();
 $canEdit   = ($_SESSION['admin_role'] ?? '') === 'superadmin' || !empty($_SESSION['access_dashboard_admin']);
+$kpiCatalogGlobal = function_exists('kpi_override_catalog') ? kpi_override_catalog() : [];
 
 // โหลดทุก widget + resolve data server-side
 $widgets = [];
@@ -144,9 +146,7 @@ $publicUrl = $_scheme . ($_SERVER['HTTP_HOST'] ?? 'localhost') . $_basePath . '/
                 $autoVal = (int)($w['data']['auto'] ?? $val);
                 $isOverridden = $autoVal !== $val;
                 $kpiKey = $w['data_source'] ?? '';
-                $kpiAllowed = require_once __DIR__ . '/../../includes/kpi_override_helper.php';
-                $kpiCatalog = function_exists('kpi_override_catalog') ? kpi_override_catalog() : [];
-                $isEditableKpi = isset($kpiCatalog[$kpiKey]);
+                $isEditableKpi = isset($kpiCatalogGlobal[$kpiKey]);
                 $colorMap = ['blue'=>'bg-blue-50 text-blue-500','emerald'=>'bg-emerald-50 text-emerald-500','amber'=>'bg-amber-50 text-amber-500','rose'=>'bg-rose-50 text-rose-500','purple'=>'bg-purple-50 text-purple-500','cyan'=>'bg-cyan-50 text-cyan-500','indigo'=>'bg-indigo-50 text-indigo-500','slate'=>'bg-slate-50 text-slate-500'];
                 $iconBg = $colorMap[$w['color_theme']] ?? $colorMap['blue'];
             ?>

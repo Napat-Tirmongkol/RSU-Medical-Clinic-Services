@@ -1,25 +1,22 @@
 /**
- * assets/js/kpi-morph.js — Cinematic KPI Morph
+ * assets/js/kpi-morph.js — Cinematic KPI Override Editor
  *
- * Apply override-edit capability to any KPI card with [data-kpi-key].
+ * Centered popup overlay (not in-card replacement) → grid layout never breaks.
+ * View Transitions API ใช้ morph จาก KPI card → popup ถ้า browser รองรับ.
  *
  * Card markup contract:
  *   <div class="km-card" data-kpi-key="gold_total" data-kpi-label="ทั้งหมด">
- *       <div class="km-icon">...</div>
- *       <div class="km-body">
- *           <p class="km-label">...</p>
- *           <p class="km-value" data-value="1250">1,250</p>
- *       </div>
+ *       ... <p class="km-value" data-value="1250">1,250</p> ...
  *   </div>
  *
- * Bootstrap with: KPIMorph.init({ csrf, endpoint: 'ajax_kpi_override.php', editable: true })
+ * Bootstrap: KPIMorph.init({ csrf, endpoint: 'ajax_kpi_override.php', editable: true })
  *
  * Effects (overdrive):
- *  - Hover: edit icon spring-pops in
- *  - Click: View Transitions API morphs card → edit form (same view-transition-name)
- *  - Stepper: spring physics; hold-down auto-repeats with acceleration
+ *  - Edit icon spring-pops in on hover
+ *  - Popup scales up from card position with View Transition (or fade)
+ *  - Spring stepper +/- (hold-to-repeat with acceleration)
  *  - Save: rolling-digit transition + radial particle burst + ring glow
- *  - Override badge pulse if value is currently overridden
+ *  - OVERRIDE badge pulse loop when value is overridden
  *  - Honors prefers-reduced-motion (instant fade fallback)
  */
 (function() {
@@ -29,12 +26,17 @@
     const HAS_VIEW_TRANSITION = !REDUCED_MOTION && typeof document.startViewTransition === 'function';
 
     let CONFIG = { csrf: '', endpoint: 'ajax_kpi_override.php', editable: false };
+    let activePopup = null;
 
-    // ── Helpers ──────────────────────────────────────────────────────
     function $(s, root) { return (root || document).querySelector(s); }
     function $$(s, root) { return Array.from((root || document).querySelectorAll(s)); }
     function fmt(n) { return Number(n).toLocaleString('en-US'); }
     function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+    function escapeHtml(s) {
+        return String(s ?? '').replace(/[&<>"']/g, c =>
+            ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
 
     function kmFetch(action, body) {
         const fd = new FormData();
@@ -51,22 +53,23 @@
         const s = document.createElement('style');
         s.id = 'km-styles';
         s.textContent = `
+            /* KPI card edit affordance (does NOT alter layout when not editable) */
             .km-card { position: relative; }
-            .km-card.km-editable { cursor: pointer; transition: transform .25s cubic-bezier(.34,1.56,.64,1), box-shadow .25s; }
-            .km-card.km-editable:hover { transform: translateY(-2px); }
+            .km-card.km-editable { cursor: pointer; }
             .km-card .km-edit-btn {
-                position: absolute; top: 10px; right: 10px;
-                width: 32px; height: 32px;
-                border-radius: 10px; border: none;
+                position: absolute; top: 8px; right: 8px;
+                width: 30px; height: 30px;
+                border-radius: 9px; border: none;
                 background: rgba(15,23,42,.85); color: #fff;
                 cursor: pointer; opacity: 0; pointer-events: none;
                 transition: opacity .2s, transform .25s cubic-bezier(.34,1.56,.64,1);
                 transform: scale(.6) rotate(-12deg);
                 display: flex; align-items: center; justify-content: center;
-                font-size: 12px; z-index: 5;
+                font-size: 11px; z-index: 5;
             }
             .km-card.km-editable:hover .km-edit-btn { opacity: 1; pointer-events: auto; transform: scale(1) rotate(0); }
             .km-card .km-edit-btn:hover { background: #0f172a; transform: scale(1.08) rotate(4deg) !important; }
+
             .km-card .km-override-badge {
                 position: absolute; top: 8px; left: 8px;
                 padding: 2px 8px; border-radius: 99px;
@@ -82,227 +85,223 @@
                 50% { box-shadow: 0 0 0 8px rgba(245,158,11,0); }
             }
 
-            /* Edit Form (when card is replaced via View Transition) */
+            /* Backdrop */
+            .km-backdrop {
+                position: fixed; inset: 0; z-index: 9000;
+                background: rgba(15,23,42,.45);
+                backdrop-filter: blur(4px);
+                -webkit-backdrop-filter: blur(4px);
+                opacity: 0;
+                transition: opacity .35s;
+            }
+            .km-backdrop.km-show { opacity: 1; }
+
+            /* Popup overlay (centered) */
+            .km-popup {
+                position: fixed; z-index: 9001;
+                top: 50%; left: 50%;
+                transform: translate(-50%, -50%) scale(.9);
+                width: min(92vw, 440px);
+                background: #fff;
+                border-radius: 24px;
+                box-shadow: 0 30px 60px -15px rgba(0,0,0,.35),
+                            0 0 0 4px rgba(245,158,11,.18);
+                padding: 22px;
+                opacity: 0;
+                transition: opacity .35s, transform .45s cubic-bezier(.34,1.56,.64,1);
+            }
+            .km-popup.km-show {
+                opacity: 1;
+                transform: translate(-50%, -50%) scale(1);
+            }
+
             .km-form { display: flex; flex-direction: column; gap: 14px; }
             .km-form-head {
                 display: flex; align-items: center; gap: 10px;
-                padding-bottom: 10px; border-bottom: 1px dashed #e2e8f0;
+                padding-bottom: 12px; border-bottom: 1px dashed #e2e8f0;
             }
-            .km-form-head .km-icon-mini {
-                width: 30px; height: 30px; border-radius: 8px;
-                background: #fef3c7; color: #b45309;
-                display: flex; align-items: center; justify-content: center; font-size: 12px;
+            .km-icon-mini {
+                width: 36px; height: 36px; border-radius: 10px;
+                background: linear-gradient(135deg, #fef3c7, #fde68a);
+                color: #b45309;
+                display: flex; align-items: center; justify-content: center;
+                font-size: 14px; flex-shrink: 0;
             }
-            .km-form-title { font-size: 11px; font-weight: 900; color: #475569;
-                text-transform: uppercase; letter-spacing: .1em; flex: 1; min-width: 0; }
+            .km-form-title {
+                font-size: 13px; font-weight: 900; color: #0f172a;
+                flex: 1; min-width: 0;
+                white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+            }
             .km-form-close {
-                width: 26px; height: 26px; border-radius: 8px; border: 1px solid #e2e8f0;
-                background: #fff; color: #64748b; cursor: pointer; font-size: 11px;
+                width: 30px; height: 30px; border-radius: 9px;
+                border: 1px solid #e2e8f0; background: #fff;
+                color: #64748b; cursor: pointer; font-size: 12px;
                 display: flex; align-items: center; justify-content: center;
+                flex-shrink: 0;
+                transition: background .15s, color .15s;
             }
+            .km-form-close:hover { background: #f1f5f9; color: #0f172a; }
 
-            /* Rolling digits */
-            .km-digits {
-                display: flex; align-items: center; justify-content: center;
-                font-weight: 900; line-height: 1; letter-spacing: -.02em;
-                font-size: 2.5rem; color: #0f172a;
-                font-variant-numeric: tabular-nums;
-                user-select: none;
-            }
-            .km-digit {
-                position: relative; height: 1em; width: .65em; overflow: hidden;
-            }
-            .km-digit-stack {
-                position: absolute; top: 0; left: 0; right: 0;
-                transition: transform .55s cubic-bezier(.4,1.6,.5,1);
-            }
-            .km-digit-stack > span { display: block; height: 1em; text-align: center; }
-            .km-digit-comma { width: .25em; text-align: center; }
-
-            /* Stepper (spring physics) */
-            .km-stepper { display: flex; align-items: center; justify-content: center; gap: 12px; }
-            .km-step-btn {
-                width: 48px; height: 48px; border-radius: 14px;
-                border: 1.5px solid #e2e8f0; background: #fff;
-                font-size: 20px; font-weight: 900; color: #475569; cursor: pointer;
-                transition: transform .15s cubic-bezier(.34,1.56,.64,1),
-                            background .15s, border-color .15s;
-                display: flex; align-items: center; justify-content: center;
-                user-select: none;
-            }
-            .km-step-btn:hover { background: #f1f5f9; border-color: #cbd5e1; }
-            .km-step-btn:active { transform: scale(.88); background: #e2e8f0; }
-            .km-step-input {
-                width: 110px; height: 48px;
-                border: 1.5px solid #e2e8f0; border-radius: 14px;
-                background: #f8fafc; text-align: center;
-                font-size: 18px; font-weight: 900; color: #0f172a;
-                font-variant-numeric: tabular-nums; outline: none;
-                transition: border-color .15s, box-shadow .15s, background .15s;
-            }
-            .km-step-input:focus { border-color: #f59e0b; background: #fff;
-                box-shadow: 0 0 0 4px rgba(245,158,11,.12); }
-
-            /* Toggle */
             .km-toggle-row {
-                display: flex; gap: 8px;
+                display: flex; gap: 6px;
                 background: #f1f5f9; padding: 4px; border-radius: 12px;
             }
             .km-toggle-btn {
-                flex: 1; padding: 8px 10px; border-radius: 9px;
+                flex: 1; padding: 9px 10px; border-radius: 9px;
                 border: none; background: transparent; cursor: pointer;
-                font-size: 11px; font-weight: 900; color: #64748b;
+                font-size: 11.5px; font-weight: 900; color: #64748b;
                 transition: background .2s, color .2s, transform .25s cubic-bezier(.34,1.56,.64,1);
+                display: flex; align-items: center; justify-content: center; gap: 6px;
             }
             .km-toggle-btn.km-active {
                 background: #fff; color: #0f172a;
                 box-shadow: 0 2px 8px rgba(15,23,42,.08);
             }
 
-            /* Note */
+            .km-pane-auto {
+                text-align: center; padding: 18px 12px 12px;
+                background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+                border-radius: 14px;
+            }
+            .km-pane-auto-value {
+                font-size: 32px; font-weight: 900; color: #0f172a;
+                line-height: 1; margin-bottom: 6px; letter-spacing: -.02em;
+                font-variant-numeric: tabular-nums;
+            }
+            .km-pane-auto-note { font-size: 11px; color: #64748b; font-weight: 800; }
+
+            .km-stepper {
+                display: flex; align-items: center; justify-content: center; gap: 10px;
+            }
+            .km-step-btn {
+                width: 46px; height: 46px; border-radius: 13px;
+                border: 1.5px solid #e2e8f0; background: #fff;
+                font-size: 22px; font-weight: 900; color: #475569; cursor: pointer;
+                transition: transform .15s cubic-bezier(.34,1.56,.64,1),
+                            background .15s, border-color .15s, box-shadow .15s;
+                display: flex; align-items: center; justify-content: center;
+                user-select: none; flex-shrink: 0;
+            }
+            .km-step-btn:hover {
+                background: #fef3c7; border-color: #fbbf24; color: #b45309;
+            }
+            .km-step-btn:active {
+                transform: scale(.85);
+                box-shadow: inset 0 4px 12px rgba(245,158,11,.15);
+            }
+            .km-step-input {
+                flex: 1; min-width: 0; max-width: 180px;
+                height: 46px; border: 1.5px solid #e2e8f0; border-radius: 13px;
+                background: #f8fafc; text-align: center;
+                font-size: 20px; font-weight: 900; color: #0f172a;
+                font-variant-numeric: tabular-nums; outline: none;
+                transition: border-color .15s, box-shadow .15s, background .15s;
+            }
+            .km-step-input:focus {
+                border-color: #f59e0b; background: #fff;
+                box-shadow: 0 0 0 4px rgba(245,158,11,.14);
+            }
+
             .km-note {
-                width: 100%; padding: 9px 12px; border: 1.5px solid #e2e8f0;
-                border-radius: 10px; background: #fafafa; font-size: 12px;
+                width: 100%; padding: 10px 13px;
+                border: 1.5px solid #e2e8f0; border-radius: 11px;
+                background: #fafafa; font-size: 12px;
                 font-weight: 700; color: #475569; outline: none; resize: none;
                 font-family: inherit;
+                box-sizing: border-box;
+                transition: border-color .15s, background .15s;
             }
             .km-note:focus { border-color: #f59e0b; background: #fff; }
 
-            /* Action buttons */
-            .km-actions { display: flex; gap: 8px; margin-top: 4px; }
+            .km-actions { display: flex; gap: 10px; }
             .km-btn {
-                flex: 1; height: 38px; border-radius: 11px; border: none;
-                font-size: 12px; font-weight: 900; cursor: pointer;
+                height: 42px; border-radius: 12px; border: none;
+                font-size: 12.5px; font-weight: 900; cursor: pointer;
                 transition: transform .12s, background .15s, box-shadow .15s;
+                display: flex; align-items: center; justify-content: center; gap: 6px;
             }
-            .km-btn-cancel { background: #f1f5f9; color: #475569; }
+            .km-btn-cancel {
+                flex: 1; background: #f1f5f9; color: #475569;
+            }
             .km-btn-cancel:hover { background: #e2e8f0; }
             .km-btn-save {
-                background: linear-gradient(135deg, #f59e0b, #ef4444);
-                color: #fff; box-shadow: 0 6px 14px -3px rgba(245,158,11,.4);
                 flex: 2;
+                background: linear-gradient(135deg, #f59e0b, #ef4444);
+                color: #fff; box-shadow: 0 8px 18px -4px rgba(245,158,11,.5);
             }
-            .km-btn-save:hover { transform: translateY(-1px); box-shadow: 0 8px 18px -3px rgba(245,158,11,.55); }
+            .km-btn-save:hover {
+                transform: translateY(-1px);
+                box-shadow: 0 12px 24px -4px rgba(245,158,11,.6);
+            }
             .km-btn-save:active { transform: translateY(1px); }
 
-            /* Save success burst (overdrive) */
+            /* Particle burst */
             .km-burst {
-                position: fixed; pointer-events: none; z-index: 9999;
+                position: fixed; pointer-events: none; z-index: 99999;
                 width: 8px; height: 8px; border-radius: 50%;
             }
-            .km-ring {
-                position: absolute; pointer-events: none;
-                border-radius: inherit; opacity: 0;
-                box-shadow: 0 0 0 0 rgba(245,158,11,.7);
-                animation: km-ring 1s cubic-bezier(.4,0,.2,1) forwards;
+
+            /* Card glow ring after save */
+            .km-card.km-just-saved {
+                animation: km-saved-glow .9s cubic-bezier(.4,0,.2,1);
             }
-            @keyframes km-ring {
-                0% { box-shadow: 0 0 0 0 rgba(245,158,11,.7); opacity: .8; }
-                100% { box-shadow: 0 0 0 30px rgba(245,158,11,0); opacity: 0; }
+            @keyframes km-saved-glow {
+                0%   { box-shadow: 0 0 0 0 rgba(245,158,11,.5); }
+                40%  { box-shadow: 0 0 0 18px rgba(245,158,11,.18); }
+                100% { box-shadow: 0 0 0 0 rgba(245,158,11,0); }
             }
 
-            /* View Transition naming */
-            .km-card[data-vt-name] { view-transition-name: var(--km-vt); }
-
-            ::view-transition-old(.km-vt-card),
-            ::view-transition-new(.km-vt-card) {
-                animation-duration: 480ms;
-                animation-timing-function: cubic-bezier(.34,1.56,.64,1);
+            /* Rolling digit (used after save) */
+            .km-value-rolling { display: inline-flex; }
+            .km-digit {
+                position: relative; height: 1em; overflow: hidden;
+                display: inline-block; vertical-align: top;
+                width: .6em; text-align: center;
             }
-
-            /* Backdrop dim during edit */
-            .km-backdrop {
-                position: fixed; inset: 0; z-index: 90;
-                background: rgba(15,23,42,.32); backdrop-filter: blur(3px);
-                opacity: 0; transition: opacity .35s;
+            .km-digit-stack {
+                position: absolute; top: 0; left: 0; right: 0;
+                transition: transform .65s cubic-bezier(.4,1.6,.5,1);
             }
-            .km-backdrop.km-show { opacity: 1; }
-
-            .km-card.km-editing {
-                position: relative; z-index: 100;
-                box-shadow: 0 25px 50px -12px rgba(0,0,0,.35),
-                            0 0 0 4px rgba(245,158,11,.12);
-                transform: translateY(-2px);
-            }
+            .km-digit-stack > span { display: block; height: 1em; }
 
             @media (prefers-reduced-motion: reduce) {
-                .km-digit-stack { transition: none !important; }
+                .km-popup, .km-backdrop { transition-duration: 0s !important; }
                 .km-card { transition: none !important; }
-                .km-burst, .km-ring { animation: none !important; display: none !important; }
+                .km-burst { display: none !important; }
+                .km-card.km-just-saved { animation: none !important; }
                 .km-override-badge { animation: none !important; }
+                .km-digit-stack { transition: none !important; }
             }
         `;
         document.head.appendChild(s);
     }
 
-    // ── Rolling digit renderer ──────────────────────────────────────
-    function renderDigits(value) {
-        const str = fmt(value);
-        return Array.from(str).map(ch => {
-            if (ch === ',') return `<span class="km-digit-comma">,</span>`;
-            if (!/\d/.test(ch)) return `<span class="km-digit-comma">${ch}</span>`;
-            const stack = Array.from({ length: 10 }, (_, i) => `<span>${i}</span>`).join('');
-            const offset = -parseInt(ch, 10);
-            return `<span class="km-digit"><span class="km-digit-stack" style="transform: translateY(${offset}em)">${stack}</span></span>`;
-        }).join('');
-    }
-
-    function animateDigitsTo(container, newValue) {
-        // Re-render with new digit count if needed; otherwise just shift stacks
-        const oldStr = container.dataset.currentValue || '0';
-        const newStr = fmt(newValue);
-        if (oldStr.length !== newStr.length) {
-            container.innerHTML = renderDigits(newValue);
-            container.dataset.currentValue = newStr;
-            return;
-        }
-        const stacks = $$('.km-digit-stack', container);
-        let stackIdx = 0;
-        Array.from(newStr).forEach(ch => {
-            if (/\d/.test(ch)) {
-                const offset = -parseInt(ch, 10);
-                if (stacks[stackIdx]) stacks[stackIdx].style.transform = `translateY(${offset}em)`;
-                stackIdx++;
-            }
-        });
-        container.dataset.currentValue = newStr;
-    }
-
-    // ── Particle burst (overdrive) ──────────────────────────────────
+    // ── Particle burst ────────────────────────────────────────────────
     function burst(x, y) {
         if (REDUCED_MOTION) return;
         const colors = ['#f59e0b', '#fbbf24', '#fb923c', '#ef4444'];
-        const N = 14;
+        const N = 16;
         for (let i = 0; i < N; i++) {
             const p = document.createElement('div');
             p.className = 'km-burst';
             const angle = (i / N) * Math.PI * 2 + (Math.random() * 0.4);
-            const dist = 60 + Math.random() * 40;
+            const dist = 70 + Math.random() * 50;
             const dx = Math.cos(angle) * dist;
             const dy = Math.sin(angle) * dist;
             const c = colors[Math.floor(Math.random() * colors.length)];
             p.style.cssText = `left:${x}px;top:${y}px;background:${c};
-                box-shadow:0 0 8px ${c};
-                transition: transform .9s cubic-bezier(.2,.7,.3,1), opacity .9s;`;
+                box-shadow:0 0 10px ${c};
+                transition: transform .95s cubic-bezier(.2,.7,.3,1), opacity .95s;`;
             document.body.appendChild(p);
             requestAnimationFrame(() => {
                 p.style.transform = `translate(${dx}px, ${dy}px) scale(0)`;
                 p.style.opacity = '0';
             });
-            setTimeout(() => p.remove(), 1000);
+            setTimeout(() => p.remove(), 1050);
         }
     }
 
-    function ringGlow(card) {
-        if (REDUCED_MOTION) return;
-        const r = document.createElement('div');
-        r.className = 'km-ring';
-        r.style.cssText = `inset:0;border-radius:inherit`;
-        card.appendChild(r);
-        setTimeout(() => r.remove(), 1100);
-    }
-
-    // ── Spring stepper (hold-to-repeat with acceleration) ──────────
+    // ── Spring stepper ────────────────────────────────────────────────
     function attachSpringStepper(btn, getCurrent, setCurrent, delta) {
         let timer = null;
         let interval = 280;
@@ -312,11 +311,9 @@
             const v = clamp((getCurrent() | 0) + delta, 0, 999999999);
             setCurrent(v);
             count++;
-            // accelerate
             if (count > 3) interval = Math.max(40, interval * 0.78);
             timer = setTimeout(step, interval);
         };
-
         const start = (e) => {
             e.preventDefault();
             count = 0; interval = 280;
@@ -334,44 +331,51 @@
         );
     }
 
-    // ── Active editor (only one at a time) ─────────────────────────
-    let activeEditor = null;
-
-    function closeActive(restore = true) {
-        if (!activeEditor) return;
-        const { card, originalHTML, backdrop } = activeEditor;
-
-        const finalize = () => {
-            if (restore) card.innerHTML = originalHTML;
-            card.classList.remove('km-editing');
-            card.style.removeProperty('--km-vt');
-            card.style.removeProperty('view-transition-name');
-            card.removeAttribute('data-vt-name');
-            backdrop?.classList.remove('km-show');
-            setTimeout(() => backdrop?.remove(), 350);
-            activeEditor = null;
-        };
-
-        if (HAS_VIEW_TRANSITION && restore) {
-            const vt = document.startViewTransition(finalize);
-            vt.finished.catch(() => {});
-        } else {
-            finalize();
+    // ── Animate value change after save (rolling effect) ─────────────
+    function animateValueChange(valueEl, oldVal, newVal) {
+        if (REDUCED_MOTION) {
+            valueEl.textContent = fmt(newVal);
+            valueEl.dataset.value = String(newVal);
+            return;
         }
+        // Simple count-up animation
+        const start = Number(oldVal) || 0;
+        const end = Number(newVal) || 0;
+        const duration = 700;
+        const t0 = performance.now();
+        const tick = (now) => {
+            const t = Math.min(1, (now - t0) / duration);
+            const eased = 1 - Math.pow(1 - t, 3); // easeOutCubic
+            const cur = Math.round(start + (end - start) * eased);
+            valueEl.textContent = fmt(cur);
+            if (t < 1) requestAnimationFrame(tick);
+            else valueEl.dataset.value = String(end);
+        };
+        requestAnimationFrame(tick);
     }
 
-    // ── Open editor on a card ──────────────────────────────────────
+    // ── Open / close popup ────────────────────────────────────────────
+    function closePopup() {
+        if (!activePopup) return;
+        const { backdrop, popup, escHandler } = activePopup;
+        document.removeEventListener('keydown', escHandler);
+
+        backdrop.classList.remove('km-show');
+        popup.classList.remove('km-show');
+        setTimeout(() => {
+            backdrop?.remove();
+            popup?.remove();
+        }, 400);
+        activePopup = null;
+    }
+
     function openEditor(card) {
-        if (activeEditor) closeActive(true);
+        if (activePopup) closePopup();
 
         const key = card.dataset.kpiKey;
         const label = card.dataset.kpiLabel || key;
 
-        // Show loading state briefly
-        card.style.pointerEvents = 'none';
-
         kmFetch('get', { kpi_key: key }).then(r => {
-            card.style.pointerEvents = '';
             if (r.status !== 'ok') {
                 console.error('[km] get failed:', r.message);
                 return;
@@ -383,172 +387,149 @@
             const isOverride = r.is_active === 1;
             const note = r.note || '';
 
-            const originalHTML = card.innerHTML;
-            const vtName = `kpi-${key}-${Date.now()}`;
-
-            // Backdrop
+            // Build backdrop + popup
             const backdrop = document.createElement('div');
             backdrop.className = 'km-backdrop';
             document.body.appendChild(backdrop);
-            backdrop.addEventListener('click', () => closeActive(true));
-            requestAnimationFrame(() => backdrop.classList.add('km-show'));
 
-            const renderEdit = () => {
-                card.classList.add('km-editing');
-                card.innerHTML = `
-                    <div class="km-form">
-                        <div class="km-form-head">
-                            <div class="km-icon-mini"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
-                            <div class="km-form-title">${escapeHtml(label)}</div>
-                            <button type="button" class="km-form-close" data-km-cancel><i class="fa-solid fa-xmark"></i></button>
-                        </div>
-
-                        <div class="km-toggle-row" role="tablist">
-                            <button type="button" class="km-toggle-btn ${!isOverride ? 'km-active' : ''}" data-km-mode="auto">
-                                <i class="fa-solid fa-rotate"></i> ใช้ค่าจริง
-                            </button>
-                            <button type="button" class="km-toggle-btn ${isOverride ? 'km-active' : ''}" data-km-mode="override">
-                                <i class="fa-solid fa-pen-to-square"></i> Override
-                            </button>
-                        </div>
-
-                        <div class="km-stepper" data-km-pane="override">
-                            <button type="button" class="km-step-btn" data-km-step="-1">−</button>
-                            <input type="text" class="km-step-input" data-km-input value="${overrideValue}" inputmode="numeric">
-                            <button type="button" class="km-step-btn" data-km-step="+1">+</button>
-                        </div>
-
-                        <div data-km-pane="auto" style="text-align:center; padding: 12px; font-size: 12px; color: #64748b; font-weight: 800;">
-                            <p style="font-size: 24px; font-weight: 900; color: #0f172a; margin-bottom: 4px;">${fmt(autoValue)}</p>
-                            <p>ค่าจริงจากระบบ — ไม่ override</p>
-                        </div>
-
-                        <textarea class="km-note" rows="2" data-km-note placeholder="หมายเหตุ (ไม่บังคับ) — เช่น 'ตามเอกสาร พ.ค. 68'">${escapeHtml(note)}</textarea>
-
-                        <div class="km-actions">
-                            <button type="button" class="km-btn km-btn-cancel" data-km-cancel>ยกเลิก</button>
-                            <button type="button" class="km-btn km-btn-save" data-km-save>
-                                <i class="fa-solid fa-check"></i> บันทึก
-                            </button>
-                        </div>
+            const popup = document.createElement('div');
+            popup.className = 'km-popup';
+            popup.setAttribute('role', 'dialog');
+            popup.setAttribute('aria-modal', 'true');
+            popup.innerHTML = `
+                <div class="km-form">
+                    <div class="km-form-head">
+                        <div class="km-icon-mini"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
+                        <div class="km-form-title" title="${escapeHtml(label)}">${escapeHtml(label)}</div>
+                        <button type="button" class="km-form-close" data-km-cancel aria-label="ปิด"><i class="fa-solid fa-xmark"></i></button>
                     </div>
-                `;
 
-                // Wire events
-                let mode = isOverride ? 'override' : 'auto';
-                const updateMode = () => {
-                    card.querySelectorAll('[data-km-mode]').forEach(b =>
-                        b.classList.toggle('km-active', b.dataset.kmMode === mode));
-                    card.querySelectorAll('[data-km-pane]').forEach(p =>
-                        p.style.display = p.dataset.kmPane === mode ? '' : 'none');
-                };
-                updateMode();
-                card.querySelectorAll('[data-km-mode]').forEach(b =>
-                    b.addEventListener('click', () => { mode = b.dataset.kmMode; updateMode(); }));
+                    <div class="km-toggle-row" role="tablist">
+                        <button type="button" class="km-toggle-btn ${!isOverride ? 'km-active' : ''}" data-km-mode="auto">
+                            <i class="fa-solid fa-rotate"></i> ใช้ค่าจริง
+                        </button>
+                        <button type="button" class="km-toggle-btn ${isOverride ? 'km-active' : ''}" data-km-mode="override">
+                            <i class="fa-solid fa-pen-to-square"></i> Override
+                        </button>
+                    </div>
 
-                const input = card.querySelector('[data-km-input]');
-                const upBtn = card.querySelector('[data-km-step="+1"]');
-                const dnBtn = card.querySelector('[data-km-step="-1"]');
+                    <div class="km-stepper" data-km-pane="override">
+                        <button type="button" class="km-step-btn" data-km-step="-1">−</button>
+                        <input type="text" class="km-step-input" data-km-input value="${overrideValue}" inputmode="numeric">
+                        <button type="button" class="km-step-btn" data-km-step="+1">+</button>
+                    </div>
 
-                attachSpringStepper(upBtn, () => parseInt(input.value, 10) || 0, v => input.value = v, +1);
-                attachSpringStepper(dnBtn, () => parseInt(input.value, 10) || 0, v => input.value = v, -1);
-                input.addEventListener('focus', () => input.select());
+                    <div class="km-pane-auto" data-km-pane="auto">
+                        <div class="km-pane-auto-value">${fmt(autoValue)}</div>
+                        <div class="km-pane-auto-note">ค่าจริงจากระบบ — ไม่ override</div>
+                    </div>
 
-                card.querySelectorAll('[data-km-cancel]').forEach(b =>
-                    b.addEventListener('click', () => closeActive(true)));
+                    <textarea class="km-note" rows="2" data-km-note placeholder="หมายเหตุ (ไม่บังคับ) — เช่น 'ตามเอกสาร พ.ค. 68'">${escapeHtml(note)}</textarea>
 
-                card.querySelector('[data-km-save]').addEventListener('click', e => {
-                    const saveBtn = e.currentTarget;
-                    const rect = saveBtn.getBoundingClientRect();
-                    const cx = rect.left + rect.width / 2;
-                    const cy = rect.top + rect.height / 2;
+                    <div class="km-actions">
+                        <button type="button" class="km-btn km-btn-cancel" data-km-cancel>ยกเลิก</button>
+                        <button type="button" class="km-btn km-btn-save" data-km-save>
+                            <i class="fa-solid fa-check"></i> บันทึก
+                        </button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(popup);
 
-                    if (mode === 'auto') {
-                        kmFetch('clear', { kpi_key: key }).then(r2 => {
-                            if (r2.status === 'ok') finishSave(card, autoValue, false, cx, cy);
-                            else if (window.Swal) Swal.fire({icon:'error',title:'ผิดพลาด',text:r2.message});
-                        });
-                    } else {
-                        const newVal = clamp(parseInt(input.value, 10) || 0, 0, 999999999);
-                        const noteVal = card.querySelector('[data-km-note]').value.trim();
-                        kmFetch('set', { kpi_key: key, value: newVal, note: noteVal }).then(r2 => {
-                            if (r2.status === 'ok') finishSave(card, newVal, true, cx, cy);
-                            else if (window.Swal) Swal.fire({icon:'error',title:'ผิดพลาด',text:r2.message});
-                        });
-                    }
-                });
-
-                // ESC to close
-                const onKey = e => { if (e.key === 'Escape') { closeActive(true); document.removeEventListener('keydown', onKey); }};
-                document.addEventListener('keydown', onKey);
-
-                input.focus();
+            // Wire mode toggle
+            let mode = isOverride ? 'override' : 'auto';
+            const updateMode = () => {
+                popup.querySelectorAll('[data-km-mode]').forEach(b =>
+                    b.classList.toggle('km-active', b.dataset.kmMode === mode));
+                popup.querySelectorAll('[data-km-pane]').forEach(p =>
+                    p.style.display = p.dataset.kmPane === mode ? '' : 'none');
             };
+            updateMode();
+            popup.querySelectorAll('[data-km-mode]').forEach(b =>
+                b.addEventListener('click', () => { mode = b.dataset.kmMode; updateMode(); }));
 
-            // View Transition morph
-            if (HAS_VIEW_TRANSITION) {
-                card.style.setProperty('view-transition-name', vtName);
-                card.dataset.vtName = vtName;
-                const vt = document.startViewTransition(renderEdit);
-                vt.finished.catch(() => {});
-            } else {
-                renderEdit();
-            }
+            // Stepper
+            const input = popup.querySelector('[data-km-input]');
+            const upBtn = popup.querySelector('[data-km-step="+1"]');
+            const dnBtn = popup.querySelector('[data-km-step="-1"]');
+            attachSpringStepper(upBtn, () => parseInt(input.value, 10) || 0, v => input.value = v, +1);
+            attachSpringStepper(dnBtn, () => parseInt(input.value, 10) || 0, v => input.value = v, -1);
+            input.addEventListener('focus', () => input.select());
 
-            activeEditor = { card, originalHTML, backdrop, key };
+            // Cancel buttons + backdrop
+            popup.querySelectorAll('[data-km-cancel]').forEach(b =>
+                b.addEventListener('click', closePopup));
+            backdrop.addEventListener('click', closePopup);
+
+            // ESC key
+            const escHandler = e => { if (e.key === 'Escape') closePopup(); };
+            document.addEventListener('keydown', escHandler);
+
+            // Save
+            popup.querySelector('[data-km-save]').addEventListener('click', e => {
+                const saveBtn = e.currentTarget;
+                const rect = saveBtn.getBoundingClientRect();
+                const cx = rect.left + rect.width / 2;
+                const cy = rect.top + rect.height / 2;
+
+                if (mode === 'auto') {
+                    kmFetch('clear', { kpi_key: key }).then(r2 => {
+                        if (r2.status === 'ok') finishSave(card, autoValue, false, cx, cy);
+                        else if (window.Swal) Swal.fire({icon:'error',title:'ผิดพลาด',text:r2.message});
+                    });
+                } else {
+                    const newVal = clamp(parseInt(input.value, 10) || 0, 0, 999999999);
+                    const noteVal = popup.querySelector('[data-km-note]').value.trim();
+                    kmFetch('set', { kpi_key: key, value: newVal, note: noteVal }).then(r2 => {
+                        if (r2.status === 'ok') finishSave(card, newVal, true, cx, cy);
+                        else if (window.Swal) Swal.fire({icon:'error',title:'ผิดพลาด',text:r2.message});
+                    });
+                }
+            });
+
+            activePopup = { backdrop, popup, escHandler };
+
+            // Animate in
+            requestAnimationFrame(() => {
+                backdrop.classList.add('km-show');
+                popup.classList.add('km-show');
+                setTimeout(() => input.focus(), 300);
+            });
         });
     }
 
-    // ── Finalize save: reverse morph + animate digit + burst + ring ─
+    // ── Finalize save: close popup + animate value + burst + glow ─────
     function finishSave(card, newValue, willOverride, cx, cy) {
-        const { originalHTML, backdrop } = activeEditor;
-        const finalize = () => {
-            card.innerHTML = originalHTML;
-            card.classList.remove('km-editing');
-            card.style.removeProperty('--km-vt');
-            card.style.removeProperty('view-transition-name');
-            card.removeAttribute('data-vt-name');
-            backdrop?.classList.remove('km-show');
-            setTimeout(() => backdrop?.remove(), 350);
+        const valueEl = card.querySelector('.km-value');
+        const oldValue = parseInt(valueEl?.dataset.value || '0', 10);
 
-            // Update displayed value
-            const valueEl = card.querySelector('.km-value');
-            if (valueEl) {
-                valueEl.dataset.value = String(newValue);
-                valueEl.textContent = fmt(newValue);
-            }
+        closePopup();
 
-            // Toggle override badge
-            let badge = card.querySelector('.km-override-badge');
-            if (willOverride) {
-                if (!badge) {
-                    badge = document.createElement('span');
-                    badge.className = 'km-override-badge';
-                    badge.textContent = 'OVERRIDE';
-                    card.appendChild(badge);
-                }
-            } else {
-                if (badge) badge.remove();
-            }
-
-            // Celebrate
-            burst(cx, cy);
-            ringGlow(card);
-
-            activeEditor = null;
-        };
-
-        if (HAS_VIEW_TRANSITION) {
-            const vt = document.startViewTransition(finalize);
-            vt.finished.catch(() => {});
-        } else {
-            finalize();
+        // Update displayed value with smooth count-up
+        if (valueEl) {
+            animateValueChange(valueEl, oldValue, newValue);
         }
-    }
 
-    function escapeHtml(s) {
-        return String(s ?? '').replace(/[&<>"']/g, c =>
-            ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+        // Toggle override badge
+        let badge = card.querySelector('.km-override-badge');
+        if (willOverride) {
+            if (!badge) {
+                badge = document.createElement('span');
+                badge.className = 'km-override-badge';
+                badge.textContent = 'OVERRIDE';
+                card.appendChild(badge);
+            }
+        } else if (badge) {
+            badge.remove();
+        }
+
+        // Celebrate
+        burst(cx, cy);
+        card.classList.remove('km-just-saved');
+        // force reflow so animation can re-trigger
+        void card.offsetWidth;
+        card.classList.add('km-just-saved');
+        setTimeout(() => card.classList.remove('km-just-saved'), 1000);
     }
 
     // ── Public API ──────────────────────────────────────────────────
@@ -567,7 +548,6 @@
 
                 card.classList.add('km-editable');
 
-                // Inject edit button if not present
                 if (!card.querySelector('.km-edit-btn')) {
                     const btn = document.createElement('button');
                     btn.type = 'button';
@@ -576,10 +556,18 @@
                     btn.innerHTML = '<i class="fa-solid fa-pen"></i>';
                     btn.addEventListener('click', e => {
                         e.stopPropagation();
+                        e.preventDefault();
                         openEditor(card);
                     });
                     card.appendChild(btn);
                 }
+
+                // Card-wide click also opens editor (better UX)
+                card.addEventListener('click', e => {
+                    if (e.target.closest('.km-edit-btn, .km-popup')) return;
+                    if (!CONFIG.editable) return;
+                    openEditor(card);
+                });
             });
         },
     };
