@@ -3,9 +3,7 @@
  * public/insurance_dashboard.php
  *
  * Public dashboard — เปิดให้บุคคลภายนอกดูได้โดยไม่ต้อง login
- * - ไม่มี session, ไม่มี CSRF
- * - แสดงเฉพาะ widget ที่ admin ตั้ง is_visible=1 AND is_public=1
- * - ดึงข้อมูลผ่าน /api/dashboard_public.php (cached 5 นาที)
+ * รองรับ multi-workbook: /public/insurance_dashboard.php?wb=<slug>
  */
 declare(strict_types=1);
 
@@ -13,7 +11,11 @@ require_once __DIR__ . '/../config.php';
 
 $pageTitle = (defined('SITE_NAME') ? SITE_NAME : 'RSU Medical Clinic') . ' — Insurance Dashboard';
 
-// Compute API URL relative to this script
+// อ่าน workbook slug จาก URL (ถ้ามี) — ไว้ส่งให้ JS เริ่ม fetch
+$wbSlug = isset($_GET['wb']) ? trim((string)$_GET['wb']) : '';
+$wbSlug = preg_replace('/[^a-z0-9_\-]/', '', strtolower($wbSlug));
+
+// API base URL
 $apiUrl = '../api/dashboard_public.php';
 ?><!DOCTYPE html>
 <html lang="th">
@@ -79,6 +81,21 @@ $apiUrl = '../api/dashboard_public.php';
         transition: all .15s;
     }
     .ip-filter-clear:hover { background: #fef2f2; border-color: #fecaca; color: #dc2626; }
+
+    .ip-wb-tab {
+        display: inline-flex; align-items: center; gap: 8px;
+        padding: 8px 16px; border-radius: 12px;
+        font-size: 13px; font-weight: 800; color: #64748b;
+        text-decoration: none; white-space: nowrap;
+        background: #fff; border: 1.5px solid #e2e8f0;
+        transition: all .2s;
+    }
+    .ip-wb-tab:hover { transform: translateY(-1px); box-shadow: 0 6px 14px rgba(15,23,42,.08); }
+    .ip-wb-tab.ip-wb-active {
+        color: #fff; border-color: transparent;
+        background: linear-gradient(135deg, var(--wb-color, #3b82f6), color-mix(in srgb, var(--wb-color, #3b82f6) 75%, white));
+        box-shadow: 0 8px 18px -4px color-mix(in srgb, var(--wb-color, #3b82f6) 50%, transparent);
+    }
 </style>
 </head>
 <body>
@@ -86,14 +103,14 @@ $apiUrl = '../api/dashboard_public.php';
 <div class="max-w-7xl mx-auto px-4 md:px-8 py-8">
 
     <!-- Header -->
-    <div class="text-center mb-10">
+    <div class="text-center mb-6">
         <div class="inline-flex items-center gap-3 mb-3">
-            <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-500 text-white flex items-center justify-center text-2xl shadow-lg shadow-blue-200">
+            <div id="ipHeaderIcon" class="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-500 text-white flex items-center justify-center text-2xl shadow-lg shadow-blue-200">
                 <i class="fa-solid fa-shield-heart"></i>
             </div>
             <div class="text-left">
-                <h1 class="text-2xl md:text-3xl font-black text-slate-800">Insurance Dashboard</h1>
-                <p class="text-xs md:text-sm text-slate-500 font-bold">ภาพรวมสิทธิ์ประกันสุขภาพและบัตรทอง · เปิดเผยต่อสาธารณะ</p>
+                <h1 id="ipHeaderTitle" class="text-2xl md:text-3xl font-black text-slate-800">Insurance Dashboard</h1>
+                <p id="ipHeaderSubtitle" class="text-xs md:text-sm text-slate-500 font-bold">ภาพรวมสิทธิ์ประกันสุขภาพและบัตรทอง · เปิดเผยต่อสาธารณะ</p>
             </div>
         </div>
         <div class="inline-flex items-center gap-2">
@@ -106,6 +123,9 @@ $apiUrl = '../api/dashboard_public.php';
             </button>
         </div>
     </div>
+
+    <!-- Workbook Tabs (rendered after fetch) -->
+    <div id="ipWorkbookTabs" class="flex flex-wrap justify-center items-center gap-2 mb-5"></div>
 
     <!-- Filter Bar (Year / Month) -->
     <div class="flex flex-wrap justify-center items-center gap-3 mb-6">
@@ -185,13 +205,56 @@ const SIZE_CLASS = {
 
 let availableYearsLoaded = false;
 
+// อ่าน wb จาก URL ปัจจุบัน
+function getWBSlug() {
+    const url = new URL(location.href);
+    return url.searchParams.get('wb') || '';
+}
+
 function getFilterParams() {
     const y = document.getElementById('ipFilterYear').value;
     const m = document.getElementById('ipFilterMonth').value;
     const params = new URLSearchParams();
     if (y) params.set('year', y);
     if (m) params.set('month', m);
+    const wb = getWBSlug();
+    if (wb) params.set('wb', wb);
     return params.toString();
+}
+
+const COLOR_HEX_FULL = {
+    blue:'#3b82f6', emerald:'#10b981', amber:'#f59e0b', rose:'#f43f5e',
+    purple:'#a855f7', cyan:'#06b6d4', indigo:'#6366f1', slate:'#64748b'
+};
+
+function renderWorkbookTabs(workbooks, activeSlug) {
+    const wrap = document.getElementById('ipWorkbookTabs');
+    if (!workbooks || workbooks.length <= 1) { wrap.innerHTML = ''; return; }
+    let html = '';
+    workbooks.forEach(wb => {
+        const isActive = wb.slug === activeSlug;
+        const color = COLOR_HEX_FULL[wb.color] || COLOR_HEX_FULL.blue;
+        html += `<a href="?wb=${encodeURIComponent(wb.slug)}"
+                    class="ip-wb-tab ${isActive ? 'ip-wb-active' : ''}"
+                    style="--wb-color:${color}">
+                    <i class="fa-solid ${escapeAttr(wb.icon || 'fa-chart-pie')}"></i>
+                    <span>${escapeHtml(wb.name)}</span>
+                 </a>`;
+    });
+    wrap.innerHTML = html;
+}
+
+function applyWorkbookHeader(wb) {
+    if (!wb) return;
+    const color = COLOR_HEX_FULL[wb.color] || COLOR_HEX_FULL.blue;
+    document.getElementById('ipHeaderTitle').textContent = wb.name || 'Insurance Dashboard';
+    if (wb.description) {
+        document.getElementById('ipHeaderSubtitle').textContent = wb.description;
+    }
+    const iconEl = document.getElementById('ipHeaderIcon');
+    iconEl.style.background = `linear-gradient(135deg, ${color}, ${color}cc)`;
+    iconEl.innerHTML = `<i class="fa-solid ${escapeAttr(wb.icon || 'fa-chart-pie')}"></i>`;
+    document.title = wb.name + ' — Insurance Dashboard';
 }
 
 function onFilterChange() {
@@ -253,6 +316,10 @@ function loadDashboard(forceFresh) {
 
 function renderGrid(d) {
     document.getElementById('ipUpdatedAt').textContent = formatThaiDateTime(d.generated_at);
+
+    // Workbook tabs + header
+    if (d.workbook) applyWorkbookHeader(d.workbook);
+    if (d.public_workbooks) renderWorkbookTabs(d.public_workbooks, d.workbook ? d.workbook.slug : '');
 
     const grid = document.getElementById('ipGrid');
     grid.innerHTML = '';

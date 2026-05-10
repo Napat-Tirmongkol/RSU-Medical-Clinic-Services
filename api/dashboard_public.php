@@ -59,6 +59,10 @@ if ($month !== null && ($month < 1 || $month > 12))   $month = null;
 $filter = ['year' => $year, 'month' => $month];
 $hasFilter = $year !== null || $month !== null;
 
+// ── Workbook param (?wb=<slug>) ───────────────────────────────────────────────
+$wbSlug = isset($_GET['wb']) ? trim((string)$_GET['wb']) : '';
+$wbSlug = preg_replace('/[^a-z0-9_\-]/', '', strtolower($wbSlug));
+
 // ── Build response ────────────────────────────────────────────────────────────
 header('Content-Type: application/json; charset=utf-8');
 // Cache 30 วินาที — สั้นพอที่ override จะเด้งมาเร็ว แต่ยังป้องกัน hammer ได้
@@ -71,10 +75,11 @@ try {
     $etagSrc = $pdo->query("
         SELECT GREATEST(
             COALESCE((SELECT MAX(updated_at) FROM ins_kpi_overrides), '0'),
-            COALESCE((SELECT MAX(updated_at) FROM ins_dashboard_widgets), '0')
+            COALESCE((SELECT MAX(updated_at) FROM ins_dashboard_widgets), '0'),
+            COALESCE((SELECT MAX(updated_at) FROM ins_dashboard_workbooks), '0')
         ) AS t
     ")->fetchColumn();
-    $etag = '"' . md5(($etagSrc ?: '0') . '|' . ($year ?? '') . '|' . ($month ?? '')) . '"';
+    $etag = '"' . md5(($etagSrc ?: '0') . '|' . ($year ?? '') . '|' . ($month ?? '') . '|' . $wbSlug) . '"';
     header('ETag: ' . $etag);
     if (($_SERVER['HTTP_IF_NONE_MATCH'] ?? '') === $etag) {
         http_response_code(304);
@@ -93,12 +98,63 @@ try {
     // Available years สำหรับ populate dropdown
     $out['available_years'] = dashboard_available_years($pdo);
 
-    $rows = $pdo->query("
-        SELECT id, widget_type, title, subtitle, data_source, color_theme, size, sort_order
-        FROM ins_dashboard_widgets
-        WHERE is_visible = 1 AND is_public = 1
-        ORDER BY sort_order ASC, id ASC
-    ")->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    // ── Resolve workbook ────────────────────────────────────────────────
+    $wb = null;
+    try {
+        if ($wbSlug !== '') {
+            $stmt = $pdo->prepare("SELECT * FROM ins_dashboard_workbooks WHERE slug = ? AND is_public = 1 LIMIT 1");
+            $stmt->execute([$wbSlug]);
+            $wb = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+            if (!$wb) {
+                http_response_code(404);
+                $out['ok'] = false;
+                $out['message'] = 'ไม่พบ workbook หรือไม่ได้เปิด public: ' . htmlspecialchars($wbSlug);
+                echo json_encode($out, JSON_UNESCAPED_UNICODE);
+                exit;
+            }
+        } else {
+            // ใช้ default workbook
+            $wb = $pdo->query("SELECT * FROM ins_dashboard_workbooks WHERE is_default = 1 AND is_public = 1 LIMIT 1")->fetch(PDO::FETCH_ASSOC) ?: null;
+            if (!$wb) {
+                // fallback: เอา public ตัวแรก
+                $wb = $pdo->query("SELECT * FROM ins_dashboard_workbooks WHERE is_public = 1 ORDER BY sort_order ASC, id ASC LIMIT 1")->fetch(PDO::FETCH_ASSOC) ?: null;
+            }
+        }
+    } catch (PDOException $e) { /* table not migrated yet */ }
+
+    $out['workbook'] = $wb ? [
+        'id'          => (int)$wb['id'],
+        'slug'        => $wb['slug'],
+        'name'        => $wb['name'],
+        'description' => $wb['description'],
+        'icon'        => $wb['icon'],
+        'color'       => $wb['color'],
+    ] : null;
+
+    // List ของ workbook public ทั้งหมด (ให้ frontend แสดง tabs)
+    try {
+        $out['public_workbooks'] = $pdo->query("
+            SELECT id, slug, name, icon, color, is_default
+            FROM ins_dashboard_workbooks
+            WHERE is_public = 1
+            ORDER BY sort_order ASC, id ASC
+        ")->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    } catch (PDOException $e) { $out['public_workbooks'] = []; }
+
+    // Widgets เฉพาะ workbook นี้
+    $widgetsSql = "SELECT id, widget_type, title, subtitle, data_source, color_theme, size, sort_order
+                   FROM ins_dashboard_widgets
+                   WHERE is_visible = 1 AND is_public = 1";
+    $widgetsParams = [];
+    if ($wb) {
+        $widgetsSql .= " AND workbook_id = ?";
+        $widgetsParams[] = (int)$wb['id'];
+    }
+    $widgetsSql .= " ORDER BY sort_order ASC, id ASC";
+
+    $stmt = $pdo->prepare($widgetsSql);
+    $stmt->execute($widgetsParams);
+    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
     foreach ($rows as $w) {
         $data = dashboard_resolve_data($pdo, (string)$w['data_source'], $filter);

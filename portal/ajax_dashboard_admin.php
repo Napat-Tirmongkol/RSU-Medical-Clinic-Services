@@ -43,9 +43,152 @@ try {
 } catch (PDOException $e) {
     json_err('ตาราง ins_dashboard_widgets ยังไม่ถูกสร้าง — กรุณารัน migrate_dashboard_builder.php ก่อน');
 }
+try {
+    $pdo->query("SELECT 1 FROM ins_dashboard_workbooks LIMIT 1");
+} catch (PDOException $e) {
+    json_err('ตาราง ins_dashboard_workbooks ยังไม่ถูกสร้าง — กรุณารัน migrate_dashboard_workbooks.php ก่อน');
+}
+
+// Helper: หา workbook_id ของ default (กรณีไม่ส่งมา)
+function _default_workbook_id(PDO $pdo): int
+{
+    $id = (int)$pdo->query("SELECT id FROM ins_dashboard_workbooks WHERE is_default = 1 LIMIT 1")->fetchColumn();
+    if (!$id) {
+        $id = (int)$pdo->query("SELECT id FROM ins_dashboard_workbooks ORDER BY sort_order ASC, id ASC LIMIT 1")->fetchColumn();
+    }
+    return $id;
+}
 
 try {
     switch ("$entity:$action") {
+
+        // ════════════ WORKBOOKS ════════════
+        case 'workbook:list': {
+            $rows = $pdo->query("
+                SELECT w.*,
+                    (SELECT COUNT(*) FROM ins_dashboard_widgets WHERE workbook_id = w.id) AS widget_count
+                FROM ins_dashboard_workbooks w
+                ORDER BY w.sort_order ASC, w.id ASC
+            ")->fetchAll(PDO::FETCH_ASSOC);
+            json_ok(['workbooks' => $rows]);
+        }
+
+        case 'workbook:get': {
+            $id = (int)($_POST['id'] ?? 0);
+            if ($id <= 0) json_err('ระบุ id ไม่ถูกต้อง');
+            $stmt = $pdo->prepare("SELECT * FROM ins_dashboard_workbooks WHERE id = ?");
+            $stmt->execute([$id]);
+            $w = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$w) json_err('ไม่พบ workbook');
+            json_ok(['workbook' => $w]);
+        }
+
+        case 'workbook:save': {
+            $id          = (int)($_POST['id'] ?? 0);
+            $name        = trim((string)($_POST['name'] ?? ''));
+            $slugInput   = trim((string)($_POST['slug'] ?? ''));
+            $description = trim((string)($_POST['description'] ?? ''));
+            $icon        = trim((string)($_POST['icon'] ?? 'fa-chart-pie'));
+            $color       = trim((string)($_POST['color'] ?? 'blue'));
+            $isPublic    = (int)($_POST['is_public'] ?? 0) ? 1 : 0;
+            $isDefault   = (int)($_POST['is_default'] ?? 0) ? 1 : 0;
+
+            if ($name === '') json_err('กรุณาระบุชื่อ workbook');
+
+            // Build slug จาก name ถ้าไม่ส่งมา
+            $slug = $slugInput !== '' ? $slugInput : $name;
+            $slug = preg_replace('/[^a-z0-9_\-]/', '-', strtolower($slug));
+            $slug = preg_replace('/-+/', '-', trim($slug, '-'));
+            if ($slug === '') $slug = 'workbook-' . time();
+            $slug = substr($slug, 0, 60);
+
+            // Ensure uniqueness
+            $base = $slug; $i = 2;
+            while (true) {
+                $check = $pdo->prepare("SELECT id FROM ins_dashboard_workbooks WHERE slug = ? AND id <> ? LIMIT 1");
+                $check->execute([$slug, $id ?: 0]);
+                if (!$check->fetchColumn()) break;
+                $slug = $base . '-' . $i++;
+            }
+
+            $pdo->beginTransaction();
+            try {
+                // Default toggle: ถ้า is_default=1 → unset default ของอื่นๆ
+                if ($isDefault) {
+                    $pdo->prepare("UPDATE ins_dashboard_workbooks SET is_default = 0")->execute();
+                }
+
+                if ($id > 0) {
+                    $pdo->prepare("UPDATE ins_dashboard_workbooks SET
+                        slug=?, name=?, description=?, icon=?, color=?, is_public=?, is_default=?
+                        WHERE id=?")
+                        ->execute([$slug, $name, $description, $icon, $color, $isPublic, $isDefault, $id]);
+                } else {
+                    $maxOrder = (int)$pdo->query("SELECT COALESCE(MAX(sort_order),0) FROM ins_dashboard_workbooks")->fetchColumn();
+                    $pdo->prepare("INSERT INTO ins_dashboard_workbooks
+                        (slug, name, description, icon, color, is_public, is_default, sort_order, created_by)
+                        VALUES (?,?,?,?,?,?,?,?,?)")
+                        ->execute([$slug, $name, $description, $icon, $color, $isPublic, $isDefault, $maxOrder + 1, $adminId ?: null]);
+                    $id = (int)$pdo->lastInsertId();
+                }
+
+                // ตรวจให้แน่ใจว่ามี default workbook อย่างน้อย 1 ตัว
+                $hasDefault = (int)$pdo->query("SELECT COUNT(*) FROM ins_dashboard_workbooks WHERE is_default = 1")->fetchColumn();
+                if (!$hasDefault) {
+                    $firstId = (int)$pdo->query("SELECT id FROM ins_dashboard_workbooks ORDER BY sort_order ASC, id ASC LIMIT 1")->fetchColumn();
+                    if ($firstId) $pdo->prepare("UPDATE ins_dashboard_workbooks SET is_default = 1 WHERE id = ?")->execute([$firstId]);
+                }
+
+                $pdo->commit();
+            } catch (Throwable $e) {
+                $pdo->rollBack();
+                throw $e;
+            }
+            json_ok(['id' => $id, 'slug' => $slug, 'message' => 'บันทึก workbook เรียบร้อย']);
+        }
+
+        case 'workbook:delete': {
+            $id = (int)($_POST['id'] ?? 0);
+            if ($id <= 0) json_err('ระบุ id ไม่ถูกต้อง');
+
+            // ห้ามลบ default ถ้าเหลือ workbook ตัวเดียว
+            $total = (int)$pdo->query("SELECT COUNT(*) FROM ins_dashboard_workbooks")->fetchColumn();
+            if ($total <= 1) json_err('ลบไม่ได้ — ต้องมีอย่างน้อย 1 workbook ในระบบ');
+
+            // หา default ใหม่ (ถ้าลบ default)
+            $isDef = (int)$pdo->query("SELECT is_default FROM ins_dashboard_workbooks WHERE id = $id")->fetchColumn();
+
+            $pdo->beginTransaction();
+            try {
+                $pdo->prepare("DELETE FROM ins_dashboard_widgets WHERE workbook_id = ?")->execute([$id]);
+                $pdo->prepare("DELETE FROM ins_dashboard_workbooks WHERE id = ?")->execute([$id]);
+
+                if ($isDef) {
+                    $first = (int)$pdo->query("SELECT id FROM ins_dashboard_workbooks ORDER BY sort_order ASC, id ASC LIMIT 1")->fetchColumn();
+                    if ($first) $pdo->prepare("UPDATE ins_dashboard_workbooks SET is_default = 1 WHERE id = ?")->execute([$first]);
+                }
+                $pdo->commit();
+            } catch (Throwable $e) {
+                $pdo->rollBack();
+                throw $e;
+            }
+            json_ok(['message' => 'ลบ workbook + widget ในนั้นเรียบร้อย']);
+        }
+
+        case 'workbook:reorder': {
+            $orderJson = $_POST['order'] ?? '[]';
+            $order = json_decode($orderJson, true);
+            if (!is_array($order)) json_err('order ไม่ถูกต้อง');
+            $stmt = $pdo->prepare("UPDATE ins_dashboard_workbooks SET sort_order = ? WHERE id = ?");
+            $pdo->beginTransaction();
+            try {
+                foreach ($order as $i => $id) $stmt->execute([$i + 1, (int)$id]);
+                $pdo->commit();
+            } catch (Throwable $e) {
+                $pdo->rollBack(); throw $e;
+            }
+            json_ok(['message' => 'จัดลำดับเรียบร้อย']);
+        }
 
         case 'catalog:get': {
             $catalog = dashboard_data_sources_catalog();
@@ -66,9 +209,11 @@ try {
         }
 
         case 'widget:list': {
-            $rows = $pdo->query("SELECT * FROM ins_dashboard_widgets ORDER BY sort_order ASC, id ASC")
-                        ->fetchAll(PDO::FETCH_ASSOC);
-            json_ok(['widgets' => $rows]);
+            $workbookId = (int)($_POST['workbook_id'] ?? 0);
+            if ($workbookId <= 0) $workbookId = _default_workbook_id($pdo);
+            $stmt = $pdo->prepare("SELECT * FROM ins_dashboard_widgets WHERE workbook_id = ? ORDER BY sort_order ASC, id ASC");
+            $stmt->execute([$workbookId]);
+            json_ok(['widgets' => $stmt->fetchAll(PDO::FETCH_ASSOC), 'workbook_id' => $workbookId]);
         }
 
         case 'widget:get': {
@@ -83,6 +228,8 @@ try {
 
         case 'widget:save': {
             $id          = (int)($_POST['id'] ?? 0);
+            $workbookId  = (int)($_POST['workbook_id'] ?? 0);
+            if ($workbookId <= 0) $workbookId = _default_workbook_id($pdo);
             $widgetType  = trim((string)($_POST['widget_type'] ?? 'kpi'));
             $title       = trim((string)($_POST['title'] ?? ''));
             $subtitle    = trim((string)($_POST['subtitle'] ?? ''));
@@ -118,13 +265,13 @@ try {
                 ]);
                 json_ok(['id' => $id, 'message' => 'บันทึกการแก้ไขเรียบร้อย']);
             } else {
-                $maxOrder = (int)$pdo->query("SELECT COALESCE(MAX(sort_order),0) FROM ins_dashboard_widgets")->fetchColumn();
+                $maxOrder = (int)$pdo->query("SELECT COALESCE(MAX(sort_order),0) FROM ins_dashboard_widgets WHERE workbook_id = $workbookId")->fetchColumn();
                 $stmt = $pdo->prepare("INSERT INTO ins_dashboard_widgets
-                    (widget_type, title, subtitle, data_source, color_theme, size,
+                    (workbook_id, widget_type, title, subtitle, data_source, color_theme, size,
                      is_visible, is_public, sort_order, created_by)
-                    VALUES (?,?,?,?,?,?,?,?,?,?)");
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?)");
                 $stmt->execute([
-                    $widgetType, $title, $subtitle, $dataSource, $colorTheme, $size,
+                    $workbookId, $widgetType, $title, $subtitle, $dataSource, $colorTheme, $size,
                     $isVisible, $isPublic, $maxOrder + 1, $adminId ?: null
                 ]);
                 json_ok(['id' => (int)$pdo->lastInsertId(), 'message' => 'เพิ่ม widget เรียบร้อย']);

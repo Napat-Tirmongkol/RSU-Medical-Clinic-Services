@@ -17,20 +17,45 @@ $csrfToken = get_csrf_token();
 $canEdit   = ($_SESSION['admin_role'] ?? '') === 'superadmin' || !empty($_SESSION['access_dashboard_admin']);
 $kpiCatalogGlobal = function_exists('kpi_override_catalog') ? kpi_override_catalog() : [];
 
-// โหลดทุก widget + resolve data server-side
-$widgets = [];
+// โหลด workbooks + active workbook
+$workbooks = [];
+$activeWorkbook = null;
 try {
-    $rows = $pdo->query("SELECT * FROM ins_dashboard_widgets ORDER BY sort_order ASC, id ASC")
-                ->fetchAll(PDO::FETCH_ASSOC) ?: [];
-    foreach ($rows as $w) {
-        $w['data'] = dashboard_resolve_data($pdo, (string)$w['data_source']);
-        $widgets[] = $w;
+    $workbooks = $pdo->query("
+        SELECT w.*, (SELECT COUNT(*) FROM ins_dashboard_widgets WHERE workbook_id = w.id) AS widget_count
+        FROM ins_dashboard_workbooks w
+        ORDER BY w.sort_order ASC, w.id ASC
+    ")->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+    // หา active workbook จาก ?wb=slug หรือ default
+    $wbReq = isset($_GET['wb']) ? trim((string)$_GET['wb']) : '';
+    if ($wbReq !== '') {
+        foreach ($workbooks as $wb) if ($wb['slug'] === $wbReq) { $activeWorkbook = $wb; break; }
     }
-} catch (PDOException $e) { /* tables may not exist */ }
+    if (!$activeWorkbook) {
+        foreach ($workbooks as $wb) if ((int)$wb['is_default'] === 1) { $activeWorkbook = $wb; break; }
+    }
+    if (!$activeWorkbook && !empty($workbooks)) $activeWorkbook = $workbooks[0];
+} catch (PDOException $e) { /* tables not migrated */ }
+
+// โหลด widget ของ active workbook
+$widgets = [];
+if ($activeWorkbook) {
+    try {
+        $stmt = $pdo->prepare("SELECT * FROM ins_dashboard_widgets WHERE workbook_id = ? ORDER BY sort_order ASC, id ASC");
+        $stmt->execute([(int)$activeWorkbook['id']]);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        foreach ($rows as $w) {
+            $w['data'] = dashboard_resolve_data($pdo, (string)$w['data_source']);
+            $widgets[] = $w;
+        }
+    } catch (PDOException $e) { /* tables may not exist */ }
+}
 
 $_scheme = ((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ? 'https://' : 'http://');
 $_basePath = rtrim(dirname(dirname($_SERVER['SCRIPT_NAME'] ?? '/')), '/');
-$publicUrl = $_scheme . ($_SERVER['HTTP_HOST'] ?? 'localhost') . $_basePath . '/public/insurance_dashboard.php';
+$publicUrlBase = $_scheme . ($_SERVER['HTTP_HOST'] ?? 'localhost') . $_basePath . '/public/insurance_dashboard.php';
+$publicUrl = $publicUrlBase . ($activeWorkbook ? ('?wb=' . urlencode($activeWorkbook['slug'])) : '');
 ?>
 
 <style>
@@ -75,6 +100,53 @@ $publicUrl = $_scheme . ($_SERVER['HTTP_HOST'] ?? 'localhost') . $_basePath . '/
         background:#f1f5f9; color:#64748b; font-size:.65rem; font-weight:900;
         letter-spacing:.05em;
     }
+
+    /* Workbook tabs */
+    #section-insurance_dashboard .wb-tab {
+        display: inline-flex; align-items: center; gap: 8px;
+        padding: 8px 14px; border-radius: 11px;
+        font-size: 12.5px; font-weight: 800; color: #64748b;
+        text-decoration: none; white-space: nowrap;
+        transition: all .15s; border: 1.5px solid transparent;
+        flex-shrink: 0;
+    }
+    #section-insurance_dashboard .wb-tab:hover { background: #f1f5f9; color: #0f172a; }
+    #section-insurance_dashboard .wb-tab.wb-tab-active {
+        background: linear-gradient(135deg, var(--wb-color, #3b82f6), color-mix(in srgb, var(--wb-color, #3b82f6) 75%, white));
+        color: #fff;
+        box-shadow: 0 6px 14px -4px color-mix(in srgb, var(--wb-color, #3b82f6) 40%, transparent);
+    }
+    #section-insurance_dashboard .wb-tab-count {
+        background: rgba(255,255,255,.25); padding: 1px 7px; border-radius: 99px;
+        font-size: 10px; font-weight: 900; letter-spacing: .04em;
+        color: inherit;
+    }
+    #section-insurance_dashboard .wb-tab:not(.wb-tab-active) .wb-tab-count {
+        background: #f1f5f9; color: #94a3b8;
+    }
+    #section-insurance_dashboard .wb-tab-add {
+        height: 36px; padding: 0 14px;
+        border-radius: 11px; border: 1.5px dashed #cbd5e1;
+        background: #fff; color: #64748b;
+        font-size: 12px; font-weight: 800; cursor: pointer;
+        display: inline-flex; align-items: center; gap: 6px;
+        transition: all .15s; flex-shrink: 0;
+    }
+    #section-insurance_dashboard .wb-tab-add:hover {
+        border-color: #3b82f6; color: #1d4ed8; background: #eff6ff;
+    }
+
+    /* Workbook icon picker / color picker */
+    #section-insurance_dashboard .wb-pill {
+        width: 38px; height: 38px; border-radius: 11px;
+        border: 2px solid transparent; cursor: pointer;
+        display: flex; align-items: center; justify-content: center;
+        transition: all .15s;
+    }
+    #section-insurance_dashboard .wb-pill:hover { transform: scale(1.05); }
+    #section-insurance_dashboard .wb-pill.wb-selected {
+        border-color: #0f172a; transform: scale(1.08);
+    }
 </style>
 
 <div id="section-insurance_dashboard-content" class="px-5 md:px-8 py-8 space-y-7 id-page">
@@ -84,10 +156,23 @@ $publicUrl = $_scheme . ($_SERVER['HTTP_HOST'] ?? 'localhost') . $_basePath . '/
         <div>
             <h1 class="text-2xl font-black text-slate-800 flex items-center gap-3">
                 <span class="text-3xl">📊</span> Insurance Dashboard
+                <?php if ($activeWorkbook): ?>
+                    <span class="text-sm font-bold text-slate-400">/ <?= htmlspecialchars($activeWorkbook['name']) ?></span>
+                <?php endif; ?>
             </h1>
-            <p class="text-sm text-slate-500 font-bold mt-1">ภาพรวมประกันอุบัติเหตุ + บัตรทอง · แก้ไขได้ตามต้องการ</p>
+            <p class="text-sm text-slate-500 font-bold mt-1">
+                <?= $activeWorkbook && !empty($activeWorkbook['description'])
+                    ? htmlspecialchars($activeWorkbook['description'])
+                    : 'ภาพรวมประกันอุบัติเหตุ + บัตรทอง · แก้ไขได้ตามต้องการ' ?>
+            </p>
         </div>
         <div class="flex items-center gap-2 flex-wrap">
+            <?php if ($canEdit && $activeWorkbook): ?>
+            <button onclick="idOpenWorkbookModal(<?= (int)$activeWorkbook['id'] ?>)"
+               class="h-11 px-4 bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 font-black rounded-xl text-xs flex items-center gap-2 transition-all">
+                <i class="fa-solid fa-cog text-purple-500"></i> ตั้งค่า workbook
+            </button>
+            <?php endif; ?>
             <a href="<?= htmlspecialchars($publicUrl) ?>" target="_blank"
                class="h-11 px-4 bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 font-black rounded-xl text-xs flex items-center gap-2 transition-all">
                 <i class="fa-solid fa-globe text-blue-500"></i> ดูหน้า Public
@@ -107,12 +192,45 @@ $publicUrl = $_scheme . ($_SERVER['HTTP_HOST'] ?? 'localhost') . $_basePath . '/
         </div>
     </div>
 
+    <!-- ── Workbook Tabs ──────────────────────────────────────────── -->
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm px-3 py-2 flex items-center gap-2 overflow-x-auto">
+        <?php foreach ($workbooks as $wb):
+            $isActive = $activeWorkbook && (int)$activeWorkbook['id'] === (int)$wb['id'];
+        ?>
+            <a href="?section=insurance_dashboard&wb=<?= urlencode($wb['slug']) ?>"
+               class="wb-tab <?= $isActive ? 'wb-tab-active' : '' ?>"
+               style="<?= $isActive ? '--wb-color:#'.([
+                   'blue'=>'3b82f6','emerald'=>'10b981','amber'=>'f59e0b','rose'=>'f43f5e',
+                   'purple'=>'a855f7','cyan'=>'06b6d4','indigo'=>'6366f1','slate'=>'64748b'
+               ][$wb['color']] ?? '3b82f6').';' : '' ?>">
+                <i class="fa-solid <?= htmlspecialchars($wb['icon'] ?: 'fa-chart-pie') ?>"></i>
+                <span><?= htmlspecialchars($wb['name']) ?></span>
+                <?php if ((int)$wb['is_public'] === 1): ?>
+                    <i class="fa-solid fa-globe text-[9px] opacity-60" title="Public"></i>
+                <?php endif; ?>
+                <span class="wb-tab-count"><?= (int)$wb['widget_count'] ?></span>
+            </a>
+        <?php endforeach; ?>
+        <?php if ($canEdit): ?>
+            <button onclick="idOpenWorkbookModal(null)" class="wb-tab-add ml-auto" title="สร้าง Workbook ใหม่">
+                <i class="fa-solid fa-plus"></i> สร้าง Workbook
+            </button>
+        <?php endif; ?>
+    </div>
+
     <?php if (empty($widgets)): ?>
         <div class="id-card text-center py-16 text-slate-400 font-bold">
             <i class="fa-solid fa-chart-pie text-5xl mb-3 opacity-40"></i>
-            <p class="text-base">ยังไม่มี widget ใน Dashboard</p>
+            <p class="text-base">
+                <?= $activeWorkbook ? 'Workbook นี้ยังไม่มี widget' : 'ยังไม่มี widget ใน Dashboard' ?>
+            </p>
             <?php if ($canEdit): ?>
                 <p class="text-xs mt-1 text-slate-300">คลิก "โหมดแก้ไข" → "เพิ่ม Widget" เพื่อเริ่มสร้าง</p>
+                <?php if ($activeWorkbook): ?>
+                    <button onclick="idOpenWorkbookModal(<?= (int)$activeWorkbook['id'] ?>)" class="mt-3 h-9 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-black rounded-lg text-xs">
+                        <i class="fa-solid fa-cog mr-1"></i> ตั้งค่า workbook
+                    </button>
+                <?php endif; ?>
             <?php endif; ?>
         </div>
     <?php else: ?>
@@ -182,6 +300,103 @@ $publicUrl = $_scheme . ($_SERVER['HTTP_HOST'] ?? 'localhost') . $_basePath . '/
 
     <?php endif; ?>
 </div>
+
+<!-- ════════════ Workbook Modal ════════════ -->
+<?php if ($canEdit): ?>
+<div id="idWorkbookModal" class="fixed inset-0 hidden items-center justify-center bg-black/50 backdrop-blur-sm id-modal">
+    <div class="bg-white rounded-[2rem] w-full max-w-xl mx-4 shadow-2xl flex flex-col id-modal-box">
+        <div class="px-7 pt-6 pb-4 border-b border-slate-100 flex items-center justify-between shrink-0">
+            <h3 id="idWorkbookModalTitle" class="text-lg font-black text-slate-900">สร้าง Workbook</h3>
+            <button onclick="idCloseWorkbookModal()" class="w-9 h-9 bg-slate-50 text-slate-400 hover:text-slate-600 rounded-full flex items-center justify-center">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+        <div class="overflow-y-auto flex-1 px-7 py-5 space-y-5">
+            <input type="hidden" id="idwbIdField" value="0">
+
+            <div>
+                <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">ชื่อ Workbook <span class="text-rose-500">*</span></label>
+                <input type="text" id="idwbName" placeholder="เช่น ภาพรวม / ผู้บริหาร / สาธารณะ"
+                    class="w-full h-11 px-4 border border-slate-200 rounded-xl text-sm font-bold focus:ring-4 focus:ring-blue-500/10 outline-none bg-slate-50">
+            </div>
+
+            <div>
+                <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">
+                    Slug (URL) <span class="text-slate-400 font-normal text-[11px]">— เว้นว่างให้ระบบ generate ให้</span>
+                </label>
+                <div class="flex items-center bg-slate-50 border border-slate-200 rounded-xl overflow-hidden focus-within:ring-4 focus-within:ring-blue-500/10">
+                    <span class="px-3 text-xs font-mono text-slate-400 border-r border-slate-200 bg-slate-100 h-11 flex items-center">/public/?wb=</span>
+                    <input type="text" id="idwbSlug" placeholder="auto-generate"
+                        class="flex-1 h-11 px-3 text-sm font-bold font-mono outline-none bg-transparent">
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">คำอธิบาย</label>
+                <textarea id="idwbDescription" rows="2" placeholder="บอกย่อๆ ว่า workbook นี้คืออะไร"
+                    class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-bold focus:ring-4 focus:ring-blue-500/10 outline-none bg-slate-50"></textarea>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">ไอคอน</label>
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <?php foreach (['fa-chart-pie','fa-chart-line','fa-chart-bar','fa-shield-halved','fa-id-card','fa-hospital','fa-user-tie','fa-globe','fa-briefcase','fa-flag'] as $icn): ?>
+                            <div class="wb-pill bg-slate-100 text-slate-600" data-icon="<?= $icn ?>" onclick="idSelectWBIcon('<?= $icn ?>')">
+                                <i class="fa-solid <?= $icn ?>"></i>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">สี</label>
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <?php foreach ([
+                            'blue'=>'#3b82f6','emerald'=>'#10b981','amber'=>'#f59e0b','rose'=>'#f43f5e',
+                            'purple'=>'#a855f7','cyan'=>'#06b6d4','indigo'=>'#6366f1','slate'=>'#64748b'
+                        ] as $name => $hex): ?>
+                            <div class="wb-pill" data-color="<?= $name ?>" style="background:<?= $hex ?>" onclick="idSelectWBColor('<?= $name ?>')"></div>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+                <label class="flex items-center gap-2 cursor-pointer p-3 bg-emerald-50 border border-emerald-200 rounded-xl">
+                    <input type="checkbox" id="idwbIsPublic" class="w-4 h-4 accent-emerald-600">
+                    <div class="flex-1">
+                        <div class="text-xs font-black text-emerald-800">เปิด Public</div>
+                        <div class="text-[10px] font-bold text-emerald-600">เข้าถึงผ่าน URL ได้</div>
+                    </div>
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer p-3 bg-blue-50 border border-blue-200 rounded-xl">
+                    <input type="checkbox" id="idwbIsDefault" class="w-4 h-4 accent-blue-600">
+                    <div class="flex-1">
+                        <div class="text-xs font-black text-blue-800">Workbook หลัก</div>
+                        <div class="text-[10px] font-bold text-blue-600">โหลดเป็น default</div>
+                    </div>
+                </label>
+            </div>
+
+            <div id="idwbPublicUrlPreview" class="bg-slate-50 border border-slate-200 rounded-xl p-3 hidden">
+                <div class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Public URL</div>
+                <div class="text-xs font-mono text-blue-600 break-all" id="idwbPublicUrlText"></div>
+            </div>
+
+            <div id="idwbError" class="hidden text-xs font-bold text-rose-600 bg-rose-50 border border-rose-100 rounded-xl px-4 py-3"></div>
+        </div>
+        <div class="px-7 py-4 bg-slate-50 border-t border-slate-100 flex gap-3 shrink-0">
+            <button onclick="idCloseWorkbookModal()" class="flex-1 h-11 bg-white border border-slate-200 text-slate-600 font-black rounded-xl text-sm hover:bg-slate-100">ยกเลิก</button>
+            <button id="idwbDeleteBtn" onclick="idDeleteWorkbook()" class="hidden h-11 px-4 bg-rose-50 border border-rose-200 text-rose-600 font-black rounded-xl text-sm hover:bg-rose-100">
+                <i class="fa-solid fa-trash"></i> ลบ
+            </button>
+            <button onclick="idSaveWorkbook()" class="h-11 px-6 bg-blue-500 hover:bg-blue-600 text-white font-black rounded-xl text-sm shadow-lg shadow-blue-200 flex items-center gap-2" style="flex:2">
+                <i class="fa-solid fa-floppy-disk"></i> บันทึก
+            </button>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
 
 <!-- ════════════ Widget Modal ════════════ -->
 <?php if ($canEdit): ?>
@@ -358,6 +573,12 @@ $publicUrl = $_scheme . ($_SERVER['HTTP_HOST'] ?? 'localhost') . $_basePath . '/
         'id'=>(int)$w['id'], 'type'=>$w['widget_type'], 'data_source'=>$w['data_source'],
         'color'=>$w['color_theme'], 'data'=>$w['data']
     ], $widgets), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+    const ACTIVE_WORKBOOK = <?= json_encode($activeWorkbook ? [
+        'id'   => (int)$activeWorkbook['id'],
+        'slug' => $activeWorkbook['slug'],
+        'name' => $activeWorkbook['name'],
+    ] : null, JSON_UNESCAPED_UNICODE) ?>;
+    const PUBLIC_URL_BASE = <?= json_encode($publicUrlBase) ?>;
     let catalog = null;
 
     const COLOR_HEX = {
@@ -541,6 +762,7 @@ $publicUrl = $_scheme . ($_SERVER['HTTP_HOST'] ?? 'localhost') . $_basePath . '/
         const id = document.getElementById('idwIdField').value;
         const data = {
             id, widget_type: selectedType,
+            workbook_id: ACTIVE_WORKBOOK ? ACTIVE_WORKBOOK.id : 0,
             title: document.getElementById('idwTitle').value.trim(),
             subtitle: document.getElementById('idwSubtitle').value.trim(),
             data_source: document.getElementById('idwDataSource').value,
@@ -638,6 +860,124 @@ $publicUrl = $_scheme . ($_SERVER['HTTP_HOST'] ?? 'localhost') . $_basePath . '/
         adPost('dataset', 'delete', { id }).then(r => {
             if (r.status === 'ok') loadDatasets();
             else Swal.fire({icon:'error',title:'ผิดพลาด',text:r.message});
+        });
+    };
+
+    // ── Workbook CRUD ───────────────────────────────────────────────
+    let selectedWBIcon = 'fa-chart-pie';
+    let selectedWBColor = 'blue';
+
+    window.idOpenWorkbookModal = function(id) {
+        const modal = document.getElementById('idWorkbookModal');
+        document.getElementById('idwbIdField').value = id || 0;
+        document.getElementById('idwbError').classList.add('hidden');
+
+        if (id) {
+            document.getElementById('idWorkbookModalTitle').textContent = 'แก้ไข Workbook';
+            document.getElementById('idwbDeleteBtn').classList.remove('hidden');
+            adPost('workbook', 'get', { id }).then(r => {
+                if (r.status !== 'ok') { Swal.fire({icon:'error',title:'ผิดพลาด',text:r.message}); return; }
+                const w = r.workbook;
+                document.getElementById('idwbName').value = w.name || '';
+                document.getElementById('idwbSlug').value = w.slug || '';
+                document.getElementById('idwbDescription').value = w.description || '';
+                document.getElementById('idwbIsPublic').checked = parseInt(w.is_public) === 1;
+                document.getElementById('idwbIsDefault').checked = parseInt(w.is_default) === 1;
+                selectedWBIcon = w.icon || 'fa-chart-pie';
+                selectedWBColor = w.color || 'blue';
+                syncWBPills();
+                updatePublicUrlPreview();
+            });
+        } else {
+            document.getElementById('idWorkbookModalTitle').textContent = 'สร้าง Workbook';
+            document.getElementById('idwbDeleteBtn').classList.add('hidden');
+            ['idwbName','idwbSlug','idwbDescription'].forEach(k => document.getElementById(k).value = '');
+            document.getElementById('idwbIsPublic').checked = false;
+            document.getElementById('idwbIsDefault').checked = false;
+            selectedWBIcon = 'fa-chart-pie'; selectedWBColor = 'blue';
+            syncWBPills();
+            updatePublicUrlPreview();
+        }
+        modal.classList.remove('hidden'); modal.classList.add('flex');
+    };
+
+    window.idCloseWorkbookModal = function() {
+        const modal = document.getElementById('idWorkbookModal');
+        modal.classList.add('hidden'); modal.classList.remove('flex');
+    };
+
+    window.idSelectWBIcon = function(icon) { selectedWBIcon = icon; syncWBPills(); };
+    window.idSelectWBColor = function(color) { selectedWBColor = color; syncWBPills(); };
+
+    function syncWBPills() {
+        document.querySelectorAll('.wb-pill[data-icon]').forEach(p =>
+            p.classList.toggle('wb-selected', p.dataset.icon === selectedWBIcon));
+        document.querySelectorAll('.wb-pill[data-color]').forEach(p =>
+            p.classList.toggle('wb-selected', p.dataset.color === selectedWBColor));
+    }
+
+    function updatePublicUrlPreview() {
+        const slug = document.getElementById('idwbSlug').value.trim() ||
+            slugify(document.getElementById('idwbName').value.trim());
+        const isPublic = document.getElementById('idwbIsPublic').checked;
+        const wrap = document.getElementById('idwbPublicUrlPreview');
+        if (isPublic && slug) {
+            document.getElementById('idwbPublicUrlText').textContent = PUBLIC_URL_BASE + '?wb=' + slug;
+            wrap.classList.remove('hidden');
+        } else {
+            wrap.classList.add('hidden');
+        }
+    }
+    function slugify(s) {
+        return String(s || '').toLowerCase().replace(/[^a-z0-9_\-]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '').substr(0, 60);
+    }
+    ['idwbName','idwbSlug','idwbIsPublic'].forEach(k => {
+        const el = document.getElementById(k);
+        if (el) el.addEventListener('input', updatePublicUrlPreview);
+        if (el && el.type === 'checkbox') el.addEventListener('change', updatePublicUrlPreview);
+    });
+
+    window.idSaveWorkbook = function() {
+        const id = document.getElementById('idwbIdField').value;
+        const data = {
+            id,
+            name: document.getElementById('idwbName').value.trim(),
+            slug: document.getElementById('idwbSlug').value.trim(),
+            description: document.getElementById('idwbDescription').value.trim(),
+            icon: selectedWBIcon,
+            color: selectedWBColor,
+            is_public: document.getElementById('idwbIsPublic').checked ? 1 : 0,
+            is_default: document.getElementById('idwbIsDefault').checked ? 1 : 0,
+        };
+        adPost('workbook', 'save', data).then(r => {
+            const err = document.getElementById('idwbError');
+            if (r.status === 'ok') {
+                err.classList.add('hidden');
+                Swal.fire({ icon:'success', title:'บันทึกแล้ว', timer:1200, showConfirmButton:false }).then(() => {
+                    location.href = '?section=insurance_dashboard&wb=' + encodeURIComponent(r.slug);
+                });
+            } else {
+                err.textContent = r.message || 'บันทึกไม่สำเร็จ';
+                err.classList.remove('hidden');
+            }
+        });
+    };
+
+    window.idDeleteWorkbook = async function() {
+        const id = document.getElementById('idwbIdField').value;
+        if (!id || id == 0) return;
+        const { isConfirmed } = await Swal.fire({
+            icon: 'warning', title: 'ลบ Workbook นี้?',
+            html: '<b class="text-rose-700">Widget ทั้งหมดใน workbook นี้จะถูกลบด้วย</b><br>การลบนี้ไม่สามารถย้อนกลับได้',
+            showCancelButton: true, confirmButtonText: 'ลบ', cancelButtonText: 'ยกเลิก',
+            confirmButtonColor: '#dc2626', reverseButtons: true
+        });
+        if (!isConfirmed) return;
+        adPost('workbook', 'delete', { id }).then(r => {
+            if (r.status === 'ok') {
+                Swal.fire({ icon:'success', title:'ลบแล้ว', timer:1200, showConfirmButton:false })
+                    .then(() => location.href = '?section=insurance_dashboard');
+            } else Swal.fire({ icon:'error', title:'ผิดพลาด', text:r.message });
         });
     };
 
