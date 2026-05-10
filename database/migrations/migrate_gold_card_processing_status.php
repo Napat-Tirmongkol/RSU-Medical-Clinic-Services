@@ -23,11 +23,12 @@ try {
 }
 
 // ── 2) Expand doc_type ENUM in gold_card_documents ──────────────────────────
+// NOTE: รวม 'signature' ที่ self-healing ใน user/ajax_gold_card_apply.php เพิ่มไว้
 try {
     $pdo->exec("ALTER TABLE gold_card_documents
-        MODIFY doc_type ENUM('id_copy','house_reg','application','photo','medical','approval','other')
+        MODIFY doc_type ENUM('id_copy','house_reg','application','photo','medical','signature','approval','other')
         NOT NULL DEFAULT 'other'");
-    $results[] = '✅ gold_card_documents.doc_type — เพิ่ม `approval` แล้ว';
+    $results[] = '✅ gold_card_documents.doc_type — เพิ่ม `approval` แล้ว (รวม `signature` เดิม)';
 } catch (PDOException $e) {
     $results[] = '❌ gold_card_documents.doc_type: ' . $e->getMessage();
 }

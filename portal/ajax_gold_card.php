@@ -930,7 +930,7 @@ try {
         case 'document:upload': {
             $memberId = (int)($_POST['member_id'] ?? 0);
             $docType  = trim((string)($_POST['doc_type'] ?? 'other'));
-            $allowed  = ['id_copy','house_reg','application','photo','medical','approval','other'];
+            $allowed  = ['id_copy','house_reg','application','photo','medical','signature','approval','other'];
             if (!in_array($docType, $allowed, true)) $docType = 'other';
 
             if ($memberId <= 0) json_err('ระบุ member_id ไม่ถูกต้อง');
