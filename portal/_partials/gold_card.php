@@ -297,10 +297,10 @@ $gcOver = kpi_override_status($pdo);
             </div>
             <?php if (!empty($gcOver['gold_approved'])): ?><span class="km-override-badge">OVERRIDE</span><?php endif; ?>
         </div>
-        <div class="gc-stat-card km-card" data-kpi-key="gold_pending_docs" data-kpi-label="บัตรทอง — รอเอกสาร">
+        <div class="gc-stat-card km-card cursor-pointer hover:ring-2 hover:ring-blue-300 transition-all" data-kpi-key="gold_pending_docs" data-kpi-label="บัตรทอง — รอเอกสาร" onclick="gcQuickFilter('submitted')" title="คลิกเพื่อดูเฉพาะใบสมัครที่ส่งแล้ว — รออนุมัติ">
             <div class="gc-icon-tile bg-blue-50 text-blue-500"><i class="fa-solid fa-hourglass-half"></i></div>
             <div class="km-body">
-                <p class="km-label text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">รอ/ส่งแล้ว</p>
+                <p class="km-label text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">รอ/ส่งแล้ว <i class="fa-solid fa-arrow-down ml-1 text-blue-400 text-[8px]"></i></p>
                 <p class="km-value text-2xl font-black text-slate-800 leading-none" data-value="<?= (int)$stats['pending'] ?>"><?= number_format($stats['pending']) ?></p>
             </div>
             <?php if (!empty($gcOver['gold_pending_docs'])): ?><span class="km-override-badge">OVERRIDE</span><?php endif; ?>
@@ -1044,6 +1044,90 @@ $gcOver = kpi_override_status($pdo);
             });
     };
 
+    // ── Quick filter (clicked from KPI tile) ─────────────────────────────
+    window.gcQuickFilter = function(status) {
+        const sel = document.getElementById('gcFilterStatus');
+        if (!sel) return;
+        sel.value = status;
+        gcLoadMembers(1);
+        document.querySelector('#gcTableWrap')?.scrollIntoView({behavior:'smooth', block:'start'});
+    };
+
+    // ── Quick approve / reject buttons in row ────────────────────────────
+    async function gcQuickStatusChange(id, name, newStatus) {
+        const labels = { approved:'อนุมัติ', rejected:'ไม่อนุมัติ' };
+        const colors = { approved:'#10b981', rejected:'#ef4444' };
+        const icons  = { approved:'success', rejected:'warning' };
+
+        let inputOpts = {};
+        if (newStatus === 'rejected') {
+            inputOpts = {
+                input: 'textarea',
+                inputLabel: 'เหตุผลที่ไม่อนุมัติ (จะบันทึกใน remarks)',
+                inputPlaceholder: 'เช่น เอกสารไม่ครบ / ข้อมูลไม่ตรง',
+                inputValidator: (v) => !v || v.trim() === '' ? 'กรุณาระบุเหตุผล' : undefined,
+            };
+        }
+
+        const result = await Swal.fire({
+            icon: icons[newStatus],
+            title: `ยืนยัน${labels[newStatus]}?`,
+            html: `<b>${name}</b><br><span class="text-slate-500 text-sm">การกระทำนี้จะแจ้งสถานะให้ผู้สมัครเห็นที่ profile ทันที</span>`,
+            showCancelButton: true,
+            confirmButtonText: labels[newStatus],
+            cancelButtonText: 'ยกเลิก',
+            confirmButtonColor: colors[newStatus],
+            ...inputOpts,
+        });
+        if (!result.isConfirmed) return;
+
+        // Fetch current member data first (member:save needs all fields)
+        const cur = await gcPost('member', 'get', { id });
+        if (cur.status !== 'ok') {
+            return Swal.fire({icon:'error', title:'โหลดข้อมูลไม่สำเร็จ', text: cur.message || ''});
+        }
+        const m = cur.member || {};
+        const newRemarks = (newStatus === 'rejected' && result.value)
+            ? ((m.remarks ? m.remarks + '\n' : '') + `[${new Date().toLocaleDateString('th-TH')}] ไม่อนุมัติ: ${result.value}`)
+            : (m.remarks || '');
+
+        // Set coverage_start when approving (1 year coverage default)
+        let extra = {};
+        if (newStatus === 'approved') {
+            const today = new Date();
+            const oneYear = new Date(today); oneYear.setFullYear(today.getFullYear() + 1);
+            extra = {
+                coverage_start: m.coverage_start || today.toISOString().slice(0,10),
+                coverage_end:   m.coverage_end   || oneYear.toISOString().slice(0,10),
+            };
+        }
+
+        const saveRes = await gcPost('member', 'save', {
+            id,
+            citizen_id:    m.citizen_id    || '',
+            full_name:     m.full_name     || '',
+            member_type:   m.member_type   || 'บุคคลทั่วไป',
+            position:      m.position      || '',
+            phone:         m.phone         || '',
+            hospital_main: m.hospital_main || '',
+            hospital_sub:  m.hospital_sub  || '',
+            application_date: m.application_date || '',
+            coverage_start:   m.coverage_start   || '',
+            coverage_end:     m.coverage_end     || '',
+            status:        newStatus,
+            remarks:       newRemarks,
+            ...extra,
+        });
+
+        if (saveRes.status !== 'ok') {
+            return Swal.fire({icon:'error', title:'บันทึกไม่สำเร็จ', text: saveRes.message || ''});
+        }
+        Swal.fire({icon:'success', title:`${labels[newStatus]}สำเร็จ`, timer:1200, showConfirmButton:false});
+        gcLoadMembers(currentPage);
+    }
+    window.gcQuickApprove = (id, name) => gcQuickStatusChange(id, name, 'approved');
+    window.gcQuickReject  = (id, name) => gcQuickStatusChange(id, name, 'rejected');
+
     function renderTable(rows, total, page, pages) {
         const wrap = document.getElementById('gcTableWrap');
         if (!rows.length) {
@@ -1080,9 +1164,19 @@ $gcOver = kpi_override_status($pdo);
                     ${r.doc_count > 0 ? `<span class="inline-flex items-center gap-1 text-amber-600 font-black text-xs"><i class="fa-solid fa-paperclip"></i> ${r.doc_count}</span>` : '<span class="text-slate-300 text-xs">—</span>'}
                 </td>
                 <td class="px-5 py-3 text-right">
-                    <button onclick="gcOpenMemberModal(${r.id})" class="px-3 py-1.5 bg-amber-50 text-amber-600 hover:bg-amber-100 rounded-lg text-xs font-black transition-colors">
-                        <i class="fa-solid fa-pen-to-square"></i> แก้ไข
-                    </button>
+                    <div class="flex justify-end items-center gap-1">
+                        ${r.status === 'submitted' || r.status === 'pending' ? `
+                            <button onclick="gcQuickApprove(${r.id}, '${escapeHtml(r.full_name).replace(/'/g, "\\'")}')" class="px-2.5 py-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 rounded-lg text-xs font-black transition-colors" title="อนุมัติ">
+                                <i class="fa-solid fa-circle-check"></i>
+                            </button>
+                            <button onclick="gcQuickReject(${r.id}, '${escapeHtml(r.full_name).replace(/'/g, "\\'")}')" class="px-2.5 py-1.5 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-lg text-xs font-black transition-colors" title="ไม่อนุมัติ">
+                                <i class="fa-solid fa-circle-xmark"></i>
+                            </button>
+                        ` : ''}
+                        <button onclick="gcOpenMemberModal(${r.id})" class="px-3 py-1.5 bg-amber-50 text-amber-600 hover:bg-amber-100 rounded-lg text-xs font-black transition-colors">
+                            <i class="fa-solid fa-pen-to-square"></i> แก้ไข
+                        </button>
+                    </div>
                 </td>
             </tr>`;
         });
