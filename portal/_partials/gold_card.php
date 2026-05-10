@@ -99,6 +99,78 @@ $gcOver = kpi_override_status($pdo);
     #section-gold_card .gc-dropzone:hover, #section-gold_card .gc-dropzone.gc-drag-over {
         border-color:#f59e0b; background:#fef3c7; transform:scale(1.01);
     }
+
+    /* Folder browser view */
+    #section-gold_card .gc-folder-tile {
+        background: linear-gradient(135deg, #fffbeb, #fef3c7);
+        border: 1.5px solid #fde68a;
+        border-radius: 16px;
+        padding: 18px 16px;
+        display: flex; flex-direction: column; align-items: center;
+        cursor: pointer; transition: all .2s cubic-bezier(.34,1.56,.64,1);
+        position: relative; overflow: hidden;
+        min-height: 120px;
+    }
+    #section-gold_card .gc-folder-tile:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 12px 24px -8px rgba(245,158,11,.4);
+        border-color: #f59e0b;
+    }
+    #section-gold_card .gc-folder-icon {
+        font-size: 38px; color: #f59e0b; line-height: 1; margin-bottom: 8px;
+        filter: drop-shadow(0 4px 6px rgba(245,158,11,.25));
+    }
+    #section-gold_card .gc-folder-name {
+        font-size: 13px; font-weight: 900; color: #78350f;
+        line-height: 1.2; text-align: center; margin-bottom: 4px;
+    }
+    #section-gold_card .gc-folder-count {
+        font-size: 11px; font-weight: 800; color: #b45309;
+        background: rgba(255,255,255,.8); padding: 2px 9px; border-radius: 99px;
+    }
+    #section-gold_card .gc-folder-bar {
+        position: absolute; bottom: 0; left: 0; right: 0;
+        height: 4px; background: rgba(245,158,11,.15);
+    }
+    #section-gold_card .gc-folder-bar-fill {
+        height: 100%; background: linear-gradient(90deg, #10b981, #34d399);
+        transition: width .6s ease;
+    }
+    #section-gold_card .gc-member-tile {
+        background: #fff; border: 1.5px solid #e2e8f0;
+        border-radius: 14px; padding: 14px;
+        cursor: pointer; transition: all .15s;
+        display: flex; gap: 12px; align-items: flex-start;
+    }
+    #section-gold_card .gc-member-tile:hover {
+        border-color: #f59e0b; transform: translateY(-2px);
+        box-shadow: 0 8px 20px -6px rgba(0,0,0,.1);
+    }
+    #section-gold_card .gc-file-icon {
+        width: 44px; height: 44px; border-radius: 10px;
+        background: linear-gradient(135deg, #dbeafe, #bfdbfe);
+        color: #1d4ed8; display: flex; align-items: center; justify-content: center;
+        font-size: 18px; flex-shrink: 0;
+    }
+    #section-gold_card .gc-breadcrumb {
+        display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+        font-size: 12px; font-weight: 800; color: #64748b;
+    }
+    #section-gold_card .gc-breadcrumb a {
+        color: #b45309; cursor: pointer; transition: color .15s;
+    }
+    #section-gold_card .gc-breadcrumb a:hover { color: #78350f; text-decoration: underline; }
+    #section-gold_card .gc-view-tab {
+        padding: 8px 14px; border-radius: 10px; font-size: 12px; font-weight: 900;
+        color: #64748b; cursor: pointer; transition: all .15s;
+        background: transparent; border: none;
+        display: flex; align-items: center; gap: 6px;
+    }
+    #section-gold_card .gc-view-tab:hover { background: #f1f5f9; color: #0f172a; }
+    #section-gold_card .gc-view-tab.gc-view-active {
+        background: #f59e0b; color: #fff;
+        box-shadow: 0 4px 10px -2px rgba(245,158,11,.4);
+    }
 </style>
 
 <div id="section-gold_card-content" class="px-5 md:px-8 py-8 space-y-7">
@@ -205,38 +277,63 @@ $gcOver = kpi_override_status($pdo);
         </div>
     </div>
 
-    <!-- ── Search/Filter + Table ──────────────────────────────────────── -->
+    <!-- ── View Toggle + List/Folder Panel ────────────────────────────── -->
     <div class="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden">
         <div class="px-6 py-5 border-b border-slate-100 flex flex-wrap items-center gap-3">
             <h3 class="text-base font-black text-slate-800 flex-1 min-w-[150px]">รายชื่อผู้มีสิทธิ์</h3>
-            <div class="relative">
-                <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-300 text-xs"></i>
-                <input type="text" id="gcSearch" placeholder="ค้นหาชื่อ/เลขบัตร/เบอร์..."
-                    class="h-10 pl-9 pr-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold focus:ring-4 focus:ring-amber-500/10 outline-none w-60">
+
+            <!-- View tabs -->
+            <div class="flex items-center bg-slate-50 border border-slate-200 rounded-xl p-1 gap-1">
+                <button id="gcViewTabTable" type="button" class="gc-view-tab gc-view-active" onclick="gcSwitchView('table')">
+                    <i class="fa-solid fa-table-list"></i> ตาราง
+                </button>
+                <button id="gcViewTabFolder" type="button" class="gc-view-tab" onclick="gcSwitchView('folder')">
+                    <i class="fa-solid fa-folder-tree"></i> โฟลเดอร์
+                </button>
             </div>
-            <select id="gcFilterType" onchange="gcLoadMembers(1)"
-                class="h-10 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold focus:ring-4 focus:ring-amber-500/10 outline-none">
-                <option value="">ทุกประเภท</option>
-                <option value="บุคลากร">บุคลากร</option>
-                <option value="นักศึกษา">นักศึกษา</option>
-                <option value="บุคคลทั่วไป">บุคคลทั่วไป</option>
-            </select>
-            <select id="gcFilterStatus" onchange="gcLoadMembers(1)"
-                class="h-10 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold focus:ring-4 focus:ring-amber-500/10 outline-none">
-                <option value="">ทุกสถานะ</option>
-                <option value="pending">รอเอกสาร</option>
-                <option value="submitted">ส่งแล้ว</option>
-                <option value="approved">อนุมัติ</option>
-                <option value="active">ใช้งาน</option>
-                <option value="rejected">ไม่ผ่าน</option>
-                <option value="expired">หมดอายุ</option>
-            </select>
+
+            <div id="gcTableFilters" class="flex items-center gap-2 flex-wrap">
+                <div class="relative">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-300 text-xs"></i>
+                    <input type="text" id="gcSearch" placeholder="ค้นหาชื่อ/เลขบัตร/เบอร์..."
+                        class="h-10 pl-9 pr-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold focus:ring-4 focus:ring-amber-500/10 outline-none w-60">
+                </div>
+                <select id="gcFilterType" onchange="gcLoadMembers(1)"
+                    class="h-10 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold focus:ring-4 focus:ring-amber-500/10 outline-none">
+                    <option value="">ทุกประเภท</option>
+                    <option value="บุคลากร">บุคลากร</option>
+                    <option value="นักศึกษา">นักศึกษา</option>
+                    <option value="บุคคลทั่วไป">บุคคลทั่วไป</option>
+                </select>
+                <select id="gcFilterStatus" onchange="gcLoadMembers(1)"
+                    class="h-10 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold focus:ring-4 focus:ring-amber-500/10 outline-none">
+                    <option value="">ทุกสถานะ</option>
+                    <option value="pending">รอเอกสาร</option>
+                    <option value="submitted">ส่งแล้ว</option>
+                    <option value="approved">อนุมัติ</option>
+                    <option value="active">ใช้งาน</option>
+                    <option value="rejected">ไม่ผ่าน</option>
+                    <option value="expired">หมดอายุ</option>
+                </select>
+            </div>
         </div>
 
-        <div id="gcTableWrap" class="min-h-[200px]"></div>
-        <div id="gcPagerWrap" class="px-6 py-4 flex items-center justify-between border-t border-slate-100 hidden flex-wrap gap-3">
-            <div id="gcPagerInfo" class="text-xs font-bold text-slate-500"></div>
-            <div id="gcPager" class="flex items-center gap-1.5"></div>
+        <!-- Table view -->
+        <div id="gcTableView">
+            <div id="gcTableWrap" class="min-h-[200px]"></div>
+            <div id="gcPagerWrap" class="px-6 py-4 flex items-center justify-between border-t border-slate-100 hidden flex-wrap gap-3">
+                <div id="gcPagerInfo" class="text-xs font-bold text-slate-500"></div>
+                <div id="gcPager" class="flex items-center gap-1.5"></div>
+            </div>
+        </div>
+
+        <!-- Folder view -->
+        <div id="gcFolderView" class="hidden p-6">
+            <div id="gcFolderBreadcrumb" class="gc-breadcrumb mb-5">
+                <i class="fa-solid fa-folder-open text-amber-500"></i>
+                <a onclick="gcFolderHome()">บัตรทอง</a>
+            </div>
+            <div id="gcFolderContent" class="min-h-[200px]"></div>
         </div>
     </div>
 </div>
@@ -523,6 +620,179 @@ $gcOver = kpi_override_status($pdo);
     function statusBadge(s) {
         return `<span class="gc-badge gc-badge-${s}">${STATUS_LABELS[s] || s}</span>`;
     }
+
+    // ── View toggle (Table / Folder) ────────────────────────────────
+    let currentView = 'table';
+    let folderState = { tree: null, openYear: null, openMonth: null };
+
+    window.gcSwitchView = function(mode) {
+        currentView = mode;
+        document.getElementById('gcViewTabTable').classList.toggle('gc-view-active', mode === 'table');
+        document.getElementById('gcViewTabFolder').classList.toggle('gc-view-active', mode === 'folder');
+        document.getElementById('gcTableView').classList.toggle('hidden', mode !== 'table');
+        document.getElementById('gcFolderView').classList.toggle('hidden', mode !== 'folder');
+        document.getElementById('gcTableFilters').classList.toggle('hidden', mode !== 'table');
+
+        if (mode === 'folder') gcFolderHome();
+    };
+
+    window.gcFolderHome = function() {
+        folderState.openYear = null;
+        folderState.openMonth = null;
+        gcRenderFolderBreadcrumb();
+        gcRenderFolderRoot();
+    };
+
+    function gcRenderFolderBreadcrumb() {
+        const bc = document.getElementById('gcFolderBreadcrumb');
+        let html = `<i class="fa-solid fa-folder-open text-amber-500"></i>
+                    <a onclick="gcFolderHome()">บัตรทอง</a>`;
+        if (folderState.openYear !== null && folderState.openMonth !== null) {
+            const tile = (folderState.tree || []).find(f =>
+                f.year === folderState.openYear && f.month === folderState.openMonth);
+            if (tile) {
+                html += ` <span class="text-slate-300">/</span>
+                          <span class="text-slate-700">${escapeHtml(tile.label)}</span>`;
+            }
+        }
+        bc.innerHTML = html;
+    }
+
+    function gcRenderFolderRoot() {
+        const wrap = document.getElementById('gcFolderContent');
+        wrap.innerHTML = `<div class="text-center text-slate-400 font-bold py-8">
+            <i class="fa-solid fa-spinner fa-spin text-2xl mb-2"></i>
+            <p class="text-sm">กำลังโหลดโฟลเดอร์...</p>
+        </div>`;
+
+        gcPost('folder', 'tree', {}).then(r => {
+            if (r.status !== 'ok') {
+                wrap.innerHTML = `<div class="text-rose-500 font-bold py-8 text-center">${r.message || 'โหลดไม่สำเร็จ'}</div>`;
+                return;
+            }
+            folderState.tree = r.folders;
+            const folders = r.folders || [];
+            const noDate = r.no_date_count || 0;
+
+            if (folders.length === 0 && noDate === 0) {
+                wrap.innerHTML = `<div class="text-center text-slate-400 font-bold py-12">
+                    <i class="fa-solid fa-folder-open text-4xl mb-3 opacity-40"></i>
+                    <p>ยังไม่มีโฟลเดอร์</p>
+                    <p class="text-xs mt-2 text-slate-300">โฟลเดอร์จะถูกสร้างอัตโนมัติเมื่อมีสมาชิกที่ระบุวันสมัคร</p>
+                </div>`;
+                return;
+            }
+
+            // Group folders by year
+            const byYear = {};
+            folders.forEach(f => { (byYear[f.year] = byYear[f.year] || []).push(f); });
+            const years = Object.keys(byYear).sort((a, b) => b - a);
+
+            let html = '';
+            years.forEach(y => {
+                const beYear = parseInt(y, 10) + 543;
+                const yearFolders = byYear[y];
+                const totalInYear = yearFolders.reduce((s, f) => s + f.count, 0);
+                html += `<div class="mb-7">
+                    <div class="flex items-center gap-2 mb-3 text-xs font-black text-slate-500 uppercase tracking-widest">
+                        <i class="fa-solid fa-calendar-days text-amber-500"></i>
+                        พ.ศ. ${beYear}
+                        <span class="text-slate-300">·</span>
+                        <span class="text-amber-700 normal-case">${totalInYear.toLocaleString()} ราย</span>
+                    </div>
+                    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6 gap-3">`;
+                yearFolders.forEach(f => {
+                    const ratio = f.count > 0 ? (f.approved / f.count * 100) : 0;
+                    html += `
+                        <div class="gc-folder-tile" onclick="gcOpenFolder(${f.year}, ${f.month})">
+                            <i class="fa-solid fa-folder gc-folder-icon"></i>
+                            <div class="gc-folder-name">${escapeHtml(f.label)}</div>
+                            <span class="gc-folder-count">${f.count.toLocaleString()} ราย</span>
+                            <div class="gc-folder-bar"><div class="gc-folder-bar-fill" style="width:${ratio}%"></div></div>
+                        </div>`;
+                });
+                html += `</div></div>`;
+            });
+
+            // No-date folder (if any)
+            if (noDate > 0) {
+                html += `<div class="mb-3">
+                    <div class="flex items-center gap-2 mb-3 text-xs font-black text-slate-500 uppercase tracking-widest">
+                        <i class="fa-solid fa-circle-question text-slate-400"></i> ไม่ระบุวันสมัคร
+                    </div>
+                    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6 gap-3">
+                        <div class="gc-folder-tile" style="background:linear-gradient(135deg,#f1f5f9,#e2e8f0);border-color:#cbd5e1" onclick="gcOpenFolder(null, null)">
+                            <i class="fa-solid fa-folder-minus gc-folder-icon" style="color:#64748b"></i>
+                            <div class="gc-folder-name" style="color:#334155">ไม่ระบุเดือน</div>
+                            <span class="gc-folder-count" style="background:rgba(255,255,255,.9);color:#475569">${noDate.toLocaleString()} ราย</span>
+                        </div>
+                    </div>
+                </div>`;
+            }
+
+            wrap.innerHTML = html;
+        });
+    }
+
+    window.gcOpenFolder = function(year, month) {
+        folderState.openYear = year;
+        folderState.openMonth = month;
+        gcRenderFolderBreadcrumb();
+
+        const wrap = document.getElementById('gcFolderContent');
+        wrap.innerHTML = `<div class="text-center text-slate-400 font-bold py-8">
+            <i class="fa-solid fa-spinner fa-spin text-2xl mb-2"></i>
+            <p class="text-sm">กำลังโหลดสมาชิก...</p>
+        </div>`;
+
+        const params = { page: 1, page_size: 100 };
+        if (year !== null && month !== null) {
+            params.year = year;
+            params.month = month;
+        } else {
+            params.no_date = 1;
+        }
+
+        gcPost('member', 'list', params).then(r => {
+            if (r.status !== 'ok') {
+                wrap.innerHTML = `<div class="text-rose-500 font-bold py-8 text-center">${r.message || 'โหลดไม่สำเร็จ'}</div>`;
+                return;
+            }
+            const rows = r.rows || [];
+            if (rows.length === 0) {
+                wrap.innerHTML = `<div class="text-center text-slate-400 font-bold py-12">
+                    <i class="fa-solid fa-folder-open text-4xl mb-3 opacity-40"></i>
+                    <p>โฟลเดอร์ว่าง</p>
+                </div>`;
+                return;
+            }
+
+            let html = `<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">`;
+            rows.forEach(r => {
+                const cidLast4 = (r.citizen_id || '').slice(-4);
+                html += `
+                    <div class="gc-member-tile" onclick="gcOpenMemberModal(${r.id})">
+                        <div class="gc-file-icon"><i class="fa-solid fa-file-lines"></i></div>
+                        <div class="flex-1 min-w-0">
+                            <div class="font-black text-slate-800 text-sm truncate">${escapeHtml(r.full_name || '(ไม่มีชื่อ)')}</div>
+                            <div class="flex items-center gap-2 mt-1 flex-wrap">
+                                ${statusBadge(r.status)}
+                                ${r.doc_count > 0 ? `<span class="text-[11px] font-black text-amber-600"><i class="fa-solid fa-paperclip"></i> ${r.doc_count}</span>` : ''}
+                            </div>
+                            <div class="text-[10px] text-slate-400 font-bold mt-1 truncate">
+                                ${cidLast4 ? `xxxx-${cidLast4}` : ''}
+                                ${r.hospital_main ? `· ${escapeHtml(r.hospital_main)}` : ''}
+                            </div>
+                        </div>
+                    </div>`;
+            });
+            html += `</div>
+                <div class="text-center text-xs text-slate-400 font-bold mt-5">
+                    รวม ${r.total} รายการ${r.total > 100 ? ' · แสดง 100 แรก' : ''}
+                </div>`;
+            wrap.innerHTML = html;
+        });
+    };
 
     // ── load members table ──────────────────────────────────────────
     window.gcLoadMembers = function(page) {

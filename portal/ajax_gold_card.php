@@ -158,6 +158,12 @@ function gc_parse_thai_month_folder(string $folderName): ?array
     return null;
 }
 
+function _safe_count(PDO $pdo, string $sql): int
+{
+    try { return (int)$pdo->query($sql)->fetchColumn(); }
+    catch (PDOException $e) { return 0; }
+}
+
 function gc_match_user(PDO $pdo, string $filename): array
 {
     $name = gc_extract_name($filename);
@@ -189,6 +195,40 @@ function gc_match_user(PDO $pdo, string $filename): array
 try {
     switch ("$entity:$action") {
 
+        case 'folder:tree': {
+            // คืน folder hierarchy: group by year + month ของ application_date
+            $rows = $pdo->query("
+                SELECT
+                    YEAR(application_date)  AS y,
+                    MONTH(application_date) AS m,
+                    COUNT(*)                AS cnt,
+                    SUM(status IN ('approved','active'))            AS approved,
+                    SUM(status IN ('pending','submitted'))          AS pending
+                FROM gold_card_members
+                WHERE application_date IS NOT NULL
+                GROUP BY y, m
+                ORDER BY y DESC, m ASC
+            ")->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+            $thaiAbbr = ['','มค','กพ','มีค','เมย','พค','มิย','กค','สค','กย','ตค','พย','ธค'];
+            $folders = [];
+            foreach ($rows as $r) {
+                $y = (int)$r['y']; $m = (int)$r['m'];
+                $beShort = substr((string)($y + 543), -2);
+                $folders[] = [
+                    'year'      => $y,
+                    'month'     => $m,
+                    'label'     => $m . $thaiAbbr[$m] . $beShort,            // 5พค68
+                    'full_label'=> $thaiAbbr[$m] . ' ' . ($y + 543),         // พค 2568
+                    'count'     => (int)$r['cnt'],
+                    'approved'  => (int)$r['approved'],
+                    'pending'   => (int)$r['pending'],
+                ];
+            }
+            $noDate = (int)_safe_count($pdo, "SELECT COUNT(*) FROM gold_card_members WHERE application_date IS NULL");
+            json_ok(['folders' => $folders, 'no_date_count' => $noDate]);
+        }
+
         case 'member:stats': {
             $row = $pdo->query("
                 SELECT
@@ -213,6 +253,9 @@ try {
             $type     = trim((string)($_POST['type'] ?? ''));
             $status   = trim((string)($_POST['status'] ?? ''));
             $hospital = trim((string)($_POST['hospital'] ?? ''));
+            $year     = isset($_POST['year'])  && ctype_digit((string)$_POST['year'])  ? (int)$_POST['year']  : null;
+            $month    = isset($_POST['month']) && ctype_digit((string)$_POST['month']) ? (int)$_POST['month'] : null;
+            $noDate   = !empty($_POST['no_date']); // กรองเฉพาะคนที่ application_date เป็น NULL
 
             $where = [];
             $params = [];
@@ -225,6 +268,15 @@ try {
             if ($type !== '')     { $where[] = "member_type = :type";    $params[':type'] = $type; }
             if ($status !== '')   { $where[] = "status = :status";       $params[':status'] = $status; }
             if ($hospital !== '') { $where[] = "hospital_main LIKE :h";  $params[':h'] = "%$hospital%"; }
+            if ($noDate)          { $where[] = "application_date IS NULL"; }
+            if ($year !== null && $year >= 2000 && $year <= 3000) {
+                $where[] = "YEAR(application_date) = :year";
+                $params[':year'] = $year;
+            }
+            if ($month !== null && $month >= 1 && $month <= 12) {
+                $where[] = "MONTH(application_date) = :month";
+                $params[':month'] = $month;
+            }
 
             $whereSql = $where ? ('WHERE ' . implode(' AND ', $where)) : '';
 
