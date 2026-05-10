@@ -1414,25 +1414,37 @@ try {
                             <!-- Cards -->
                             <div id="project-container" class="grid grid-cols-1 sm:grid-cols-2 gap-5">
                                 <?php $cardIdx = 0;
+                                // Map project → required access flag (strict: ต้องมี flag จริงๆ ถึงเห็นการ์ด)
+                                // null = superadmin only, '' = ใครก็ได้ที่เป็น admin role
+                                $projectFlagMap = [
+                                    'e_campaign'         => 'access_ecampaign',
+                                    'staff_checkin'      => 'access_ecampaign',
+                                    'e_borrow'           => 'access_eborrow',
+                                    'asset_management'   => 'access_asset',
+                                    'consumables'        => 'access_consumables',
+                                    'system_logs'        => 'access_system_logs',
+                                    'insurance_sync'     => 'access_insurance',
+                                    'live_support_chat'  => 'access_ecampaign',
+                                    'line_messaging'     => null, // superadmin only
+                                    'privilege_inventory'=> null, // superadmin only
+                                    'identity_governance'=> '',   // admin role check below
+                                ];
                                 foreach ($projects as $proj):
-                                    // Robust access control check
                                     $hasAccess = false;
                                     if ($adminRole === 'superadmin') {
                                         $hasAccess = true;
                                     } else {
-                                        // Check project-specific flags
-                                        if ($proj['id'] === 'e_borrow' && !empty($_SESSION['access_eborrow'])) $hasAccess = true;
-                                        elseif ($proj['id'] === 'e_campaign' && !empty($_SESSION['access_ecampaign'])) $hasAccess = true;
-                                        elseif ($proj['id'] === 'insurance_sync' && !empty($_SESSION['access_insurance'])) $hasAccess = true;
-                                        elseif ($proj['id'] === 'system_logs' && !empty($_SESSION['access_system_logs'])) $hasAccess = true;
-                                        elseif ($proj['id'] === 'line_messaging' && !empty($_SESSION['access_site_settings'])) $hasAccess = true;
-                                        elseif ($proj['id'] === 'privilege_inventory' && $adminRole === 'superadmin') $hasAccess = true;
-                                        elseif ($proj['id'] === 'identity_governance' && in_array($adminRole, ['admin', 'superadmin'])) $hasAccess = true;
-                                        
-                                        // Fallback to role-based or staff-visibility
-                                        if (!$hasAccess) {
+                                        $reqFlag = $projectFlagMap[$proj['id']] ?? '__unknown__';
+                                        if ($reqFlag === null) {
+                                            $hasAccess = false; // superadmin only
+                                        } elseif ($reqFlag === '') {
+                                            $hasAccess = in_array($adminRole, ['admin', 'superadmin'], true);
+                                        } elseif ($reqFlag === '__unknown__') {
+                                            // Project ใหม่ที่ยังไม่ map — fallback ไป role-based เดิม (ไม่ปลอดภัย)
                                             if (in_array($adminRole, $proj['allowed_roles'])) $hasAccess = true;
                                             if ($isStaff && ($proj['staff_visible'] ?? false)) $hasAccess = true;
+                                        } else {
+                                            $hasAccess = !empty($_SESSION[$reqFlag]);
                                         }
                                     }
 
