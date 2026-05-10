@@ -342,7 +342,7 @@ $gcOver = kpi_override_status($pdo);
     <div class="bg-gradient-to-br from-amber-50 via-white to-orange-50 border border-amber-200 rounded-[2rem] p-6 shadow-sm">
         <div class="flex flex-wrap items-start gap-5">
             <div class="w-14 h-14 rounded-2xl bg-white shadow-sm flex items-center justify-center text-amber-500 text-2xl shrink-0">
-                <i class="fa-solid fa-folder-arrow-up"></i>
+                <i class="fa-solid fa-folder-tree"></i>
             </div>
             <div class="flex-1 min-w-[250px]">
                 <h3 class="text-base font-black text-slate-800">📁 นำเข้าจากไฟล์ (Bulk Import) <span class="ml-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-black uppercase tracking-widest">เฉพาะที่สมัครเสร็จแล้ว</span></h3>
@@ -624,7 +624,7 @@ $gcOver = kpi_override_status($pdo);
 <div id="gcBulkModal" class="fixed inset-0 hidden items-center justify-center bg-black/50 backdrop-blur-sm gc-modal">
     <div class="bg-white rounded-[2rem] w-full max-w-5xl mx-4 shadow-2xl flex flex-col gc-modal-box">
         <div class="px-7 pt-6 pb-4 border-b border-slate-100 flex items-center justify-between shrink-0">
-            <h3 class="text-lg font-black text-slate-900"><i class="fa-solid fa-folder-arrow-up text-amber-500 mr-2"></i> นำเข้าจากไฟล์ (Bulk Import)</h3>
+            <h3 class="text-lg font-black text-slate-900"><i class="fa-solid fa-folder-tree text-amber-500 mr-2"></i> นำเข้าจากไฟล์ (Bulk Import)</h3>
             <button onclick="gcCloseBulkModal()" class="w-9 h-9 bg-slate-50 text-slate-400 hover:text-slate-600 rounded-full flex items-center justify-center"><i class="fa-solid fa-xmark"></i></button>
         </div>
 
