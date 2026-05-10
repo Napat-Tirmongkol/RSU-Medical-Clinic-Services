@@ -1898,6 +1898,8 @@ try {
                                 (<?= count($allStaff) ?>)</button>
                             <button class="id-tab" data-tab="positions" onclick="switchIdTab('positions',this)">ตำแหน่งงาน
                                 (<?= count($allPositions ?? []) ?>)</button>
+                            <button class="id-tab" data-tab="departments" onclick="switchIdTab('departments',this)">ฝ่าย/หน่วยงาน
+                                (<?= count($allDepartments ?? []) ?>)</button>
                         <?php endif; ?>
                     </div>
 
@@ -2377,6 +2379,88 @@ try {
                                                             <?php csrf_field(); ?>
                                                             <button type="submit" style="width:32px;height:32px;border-radius:9px;border:1.5px solid #fee2e2;background:#fff;color:#ef4444;cursor:pointer" title="ลบ"><i class="fa-solid fa-trash-can" style="font-size:12px"></i></button>
                                                         </form>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                            <?php endforeach; ?>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                    <?php endif; ?>
+
+                    <!-- PANEL: Departments (ฝ่าย/หน่วยงาน) -->
+                    <?php if ($adminRole === 'superadmin'): ?>
+                    <div id="id-panel-departments" class="id-panel">
+                        <div style="background:#fff;border-radius:18px;border:1.5px solid #e2e8f0;overflow:hidden">
+                            <div style="padding:20px 24px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+                                <div>
+                                    <div style="font-size:14px;font-weight:900;color:#1e293b;display:flex;align-items:center;gap:8px">
+                                        <i class="fa-solid fa-sitemap" style="color:#6366f1"></i>
+                                        ฝ่าย/หน่วยงาน (Department Master)
+                                    </div>
+                                    <p style="margin:4px 0 0;font-size:11px;color:#64748b;font-weight:600">
+                                        จัดการฝ่ายของคลินิก — ใช้ผูกกับ Staff (ผู้กรอกรายงาน) และ Template ของรายงานประจำเดือน
+                                    </p>
+                                </div>
+                                <button type="button" onclick="openAddDeptModal()" style="padding:10px 16px;border-radius:10px;border:none;background:linear-gradient(135deg,#6366f1,#4f46e5);color:#fff;font-weight:900;font-size:12px;cursor:pointer;display:inline-flex;align-items:center;gap:8px;box-shadow:0 6px 14px -3px rgba(99,102,241,.35)">
+                                    <i class="fa-solid fa-plus"></i> เพิ่มฝ่ายใหม่
+                                </button>
+                            </div>
+
+                            <?php if (empty($allDepartments)): ?>
+                                <div style="padding:60px 20px;text-align:center;color:#94a3b8">
+                                    <i class="fa-solid fa-sitemap" style="font-size:38px;display:block;margin-bottom:12px;opacity:.4"></i>
+                                    <p style="font-size:13px;font-weight:700;margin:0">ยังไม่มีฝ่ายในระบบ</p>
+                                    <p style="font-size:11px;color:#cbd5e1;margin:6px 0 0">คลิก "เพิ่มฝ่ายใหม่" เพื่อเริ่มต้น</p>
+                                </div>
+                            <?php else: ?>
+                                <div style="overflow-x:auto">
+                                    <table style="width:100%;border-collapse:collapse;font-size:13px" id="idDeptTable">
+                                        <thead>
+                                            <tr style="background:#f8fafc;border-bottom:1.5px solid #e2e8f0">
+                                                <th style="padding:14px 18px;text-align:left;font-size:10px;font-weight:900;color:#64748b;text-transform:uppercase;letter-spacing:.15em">ชื่อฝ่าย</th>
+                                                <th style="padding:14px 18px;text-align:center;font-size:10px;font-weight:900;color:#64748b;text-transform:uppercase;letter-spacing:.15em;width:90px">ลำดับ</th>
+                                                <th style="padding:14px 18px;text-align:center;font-size:10px;font-weight:900;color:#64748b;text-transform:uppercase;letter-spacing:.15em;width:120px">Staff ที่ผูก</th>
+                                                <th style="padding:14px 18px;text-align:center;font-size:10px;font-weight:900;color:#64748b;text-transform:uppercase;letter-spacing:.15em;width:120px">รายงาน</th>
+                                                <th style="padding:14px 18px;text-align:center;font-size:10px;font-weight:900;color:#64748b;text-transform:uppercase;letter-spacing:.15em;width:90px">สถานะ</th>
+                                                <th style="padding:14px 18px;text-align:right;font-size:10px;font-weight:900;color:#64748b;text-transform:uppercase;letter-spacing:.15em;width:120px">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <?php foreach ($allDepartments as $dept): ?>
+                                            <tr style="border-bottom:1px solid #f1f5f9" class="hover:bg-slate-50/50 transition-colors">
+                                                <td style="padding:14px 18px;vertical-align:top">
+                                                    <div style="font-weight:800;color:#1e293b;font-size:13.5px;display:flex;align-items:center;gap:8px">
+                                                        <i class="fa-solid fa-building" style="color:#6366f1;font-size:11px"></i>
+                                                        <?= htmlspecialchars($dept['name']) ?>
+                                                    </div>
+                                                    <?php if (!empty($dept['description'])): ?>
+                                                        <div style="font-size:11px;color:#64748b;font-weight:600;margin-top:3px"><?= htmlspecialchars($dept['description']) ?></div>
+                                                    <?php endif; ?>
+                                                </td>
+                                                <td style="padding:14px 18px;text-align:center">
+                                                    <span style="font-size:12px;font-weight:800;color:#475569"><?= (int)($dept['sort_order'] ?? 0) ?></span>
+                                                </td>
+                                                <td style="padding:14px 18px;text-align:center">
+                                                    <span style="display:inline-block;font-size:11px;font-weight:900;padding:4px 10px;border-radius:99px;background:#eff6ff;color:#2563eb;border:1px solid #bfdbfe"><?= (int)($dept['staff_count'] ?? 0) ?> คน</span>
+                                                </td>
+                                                <td style="padding:14px 18px;text-align:center">
+                                                    <span style="display:inline-block;font-size:11px;font-weight:900;padding:4px 10px;border-radius:99px;background:#fef3c7;color:#92400e;border:1px solid #fde68a"><?= (int)($dept['report_count'] ?? 0) ?></span>
+                                                </td>
+                                                <td style="padding:14px 18px;text-align:center">
+                                                    <?php if ((int)$dept['active'] === 1): ?>
+                                                        <span style="font-size:10px;font-weight:900;padding:3px 9px;border-radius:99px;background:#d1fae5;color:#065f46">เปิดใช้</span>
+                                                    <?php else: ?>
+                                                        <span style="font-size:10px;font-weight:900;padding:3px 9px;border-radius:99px;background:#f1f5f9;color:#64748b">ปิด</span>
+                                                    <?php endif; ?>
+                                                </td>
+                                                <td style="padding:14px 18px;text-align:right">
+                                                    <div style="display:flex;gap:6px;justify-content:flex-end">
+                                                        <button type="button" onclick='openEditDeptModal(<?= json_encode($dept, JSON_UNESCAPED_UNICODE) ?>)' style="width:32px;height:32px;border-radius:9px;border:1.5px solid #e2e8f0;background:#fff;color:#64748b;cursor:pointer" title="แก้ไข"><i class="fa-solid fa-pen-to-square" style="font-size:12px"></i></button>
+                                                        <button type="button" onclick="deleteDept(<?= (int)$dept['id'] ?>, <?= json_encode($dept['name'], JSON_UNESCAPED_UNICODE) ?>, <?= (int)$dept['staff_count'] ?>, <?= (int)$dept['report_count'] ?>)" style="width:32px;height:32px;border-radius:9px;border:1.5px solid #fecaca;background:#fff;color:#dc2626;cursor:pointer" title="ลบ"><i class="fa-solid fa-trash" style="font-size:12px"></i></button>
                                                     </div>
                                                 </td>
                                             </tr>
@@ -4021,6 +4105,135 @@ try {
                 return false;
             }
             return confirm(msg);
+        }
+
+        /**
+         * Department CRUD — ผ่าน ajax_monthly_report.php (entity=department)
+         * ใช้ SweetAlert2 form แทน modal แยก (form สั้นพอ)
+         */
+        async function deptAjax(action, payload) {
+            const fd = new FormData();
+            fd.append('entity', 'department');
+            fd.append('action', action);
+            fd.append('csrf_token', portal_CSRF);
+            for (const [k, v] of Object.entries(payload)) fd.append(k, v);
+            const r = await fetch('ajax_monthly_report.php', { method: 'POST', body: fd, credentials: 'same-origin' });
+            return r.json();
+        }
+
+        function deptFormHtml(dept) {
+            const d = dept || {};
+            const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+            return `
+                <div style="text-align:left;display:flex;flex-direction:column;gap:12px">
+                    <div>
+                        <label style="display:block;font-size:12px;font-weight:900;color:#475569;margin-bottom:4px">ชื่อฝ่าย <span style="color:#ef4444">*</span></label>
+                        <input id="swDeptName" type="text" value="${esc(d.name || '')}" class="swal2-input" style="margin:0;width:100%" placeholder="เช่น หน่วยบริการสุขภาพ">
+                    </div>
+                    <div>
+                        <label style="display:block;font-size:12px;font-weight:900;color:#475569;margin-bottom:4px">คำอธิบาย (optional)</label>
+                        <textarea id="swDeptDesc" class="swal2-textarea" style="margin:0;width:100%;min-height:60px" placeholder="หน้าที่หลักของฝ่ายนี้">${esc(d.description || '')}</textarea>
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+                        <div>
+                            <label style="display:block;font-size:12px;font-weight:900;color:#475569;margin-bottom:4px">ลำดับการแสดง</label>
+                            <input id="swDeptSort" type="number" value="${parseInt(d.sort_order ?? 0) || 0}" class="swal2-input" style="margin:0;width:100%">
+                        </div>
+                        <div>
+                            <label style="display:block;font-size:12px;font-weight:900;color:#475569;margin-bottom:4px">สถานะ</label>
+                            <select id="swDeptActive" class="swal2-select" style="margin:0;width:100%">
+                                <option value="1" ${(d.active ?? 1) == 1 ? 'selected' : ''}>เปิดใช้งาน</option>
+                                <option value="0" ${(d.active ?? 1) == 0 ? 'selected' : ''}>ปิด</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>`;
+        }
+
+        async function openAddDeptModal() {
+            const result = await Swal.fire({
+                title: '<i class="fa-solid fa-plus" style="color:#6366f1"></i> เพิ่มฝ่ายใหม่',
+                html: deptFormHtml(null),
+                showCancelButton: true,
+                confirmButtonText: 'บันทึก',
+                cancelButtonText: 'ยกเลิก',
+                confirmButtonColor: '#6366f1',
+                focusConfirm: false,
+                preConfirm: () => {
+                    const name = document.getElementById('swDeptName').value.trim();
+                    if (!name) { Swal.showValidationMessage('กรุณาระบุชื่อฝ่าย'); return false; }
+                    return {
+                        name,
+                        description: document.getElementById('swDeptDesc').value.trim(),
+                        sort_order:  document.getElementById('swDeptSort').value || 0,
+                        active:      document.getElementById('swDeptActive').value,
+                    };
+                }
+            });
+            if (!result.isConfirmed) return;
+            const res = await deptAjax('save', result.value);
+            if (res.status === 'ok') {
+                await Swal.fire({ icon:'success', title:'เพิ่มเรียบร้อย', timer:1100, showConfirmButton:false });
+                location.reload();
+            } else {
+                Swal.fire({ icon:'error', title:'บันทึกไม่สำเร็จ', text: res.message || '' });
+            }
+        }
+
+        async function openEditDeptModal(dept) {
+            const result = await Swal.fire({
+                title: '<i class="fa-solid fa-pen-to-square" style="color:#6366f1"></i> แก้ไขฝ่าย',
+                html: deptFormHtml(dept),
+                showCancelButton: true,
+                confirmButtonText: 'บันทึก',
+                cancelButtonText: 'ยกเลิก',
+                confirmButtonColor: '#6366f1',
+                focusConfirm: false,
+                preConfirm: () => {
+                    const name = document.getElementById('swDeptName').value.trim();
+                    if (!name) { Swal.showValidationMessage('กรุณาระบุชื่อฝ่าย'); return false; }
+                    return {
+                        id: dept.id,
+                        name,
+                        description: document.getElementById('swDeptDesc').value.trim(),
+                        sort_order:  document.getElementById('swDeptSort').value || 0,
+                        active:      document.getElementById('swDeptActive').value,
+                    };
+                }
+            });
+            if (!result.isConfirmed) return;
+            const res = await deptAjax('save', result.value);
+            if (res.status === 'ok') {
+                await Swal.fire({ icon:'success', title:'บันทึกเรียบร้อย', timer:1100, showConfirmButton:false });
+                location.reload();
+            } else {
+                Swal.fire({ icon:'error', title:'บันทึกไม่สำเร็จ', text: res.message || '' });
+            }
+        }
+
+        async function deleteDept(id, name, staffCount, reportCount) {
+            if (reportCount > 0) {
+                return Swal.fire({
+                    icon:'error', title:'ลบไม่ได้',
+                    html: `ฝ่าย "<b>${name}</b>" มีรายงาน ${reportCount} ฉบับในระบบ<br><span style="font-size:12px;color:#64748b">ต้องลบรายงานก่อน หรือเปลี่ยนสถานะเป็น "ปิด" แทน</span>`,
+                });
+            }
+            const warn = staffCount > 0
+                ? `ฝ่าย "${name}" มี staff ${staffCount} คนผูกอยู่<br>หลังลบ — ค่า department_id ของ staff ทั้งหมดจะกลายเป็น NULL`
+                : `ลบฝ่าย "${name}"?`;
+            const { isConfirmed } = await Swal.fire({
+                icon:'warning', title:'ยืนยันการลบฝ่าย', html: warn,
+                showCancelButton:true, confirmButtonText:'ลบเลย', cancelButtonText:'ยกเลิก',
+                confirmButtonColor:'#ef4444', reverseButtons:true,
+            });
+            if (!isConfirmed) return;
+            const res = await deptAjax('delete', { id });
+            if (res.status === 'ok') {
+                await Swal.fire({ icon:'success', title:'ลบเรียบร้อย', timer:1100, showConfirmButton:false });
+                location.reload();
+            } else {
+                Swal.fire({ icon:'error', title:'ลบไม่สำเร็จ', text: res.message || '' });
+            }
         }
 
         /**

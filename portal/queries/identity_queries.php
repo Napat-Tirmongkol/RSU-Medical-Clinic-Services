@@ -77,6 +77,7 @@ try {
 $allAdmins = [];
 $allStaff  = [];
 $allPositions = [];
+$allDepartments = [];
 
 if ($adminRole === 'superadmin') {
     $allAdmins = $pdo->query("SELECT * FROM sys_admins ORDER BY id DESC")->fetchAll(PDO::FETCH_ASSOC);
@@ -175,6 +176,17 @@ if ($adminRole === 'superadmin') {
             FROM sys_staff_positions p
             ORDER BY p.name ASC
         ")->fetchAll(PDO::FETCH_ASSOC);
+
+        // ฝ่าย/หน่วยงาน + count staff/reports ที่ผูก
+        try {
+            $allDepartments = $pdo->query("
+                SELECT d.id, d.name, d.description, d.sort_order, d.active, d.created_at,
+                       (SELECT COUNT(*) FROM sys_staff WHERE department_id = d.id) AS staff_count,
+                       (SELECT COUNT(*) FROM sys_monthly_reports WHERE department_id = d.id) AS report_count
+                FROM sys_departments d
+                ORDER BY d.sort_order, d.name
+            ")->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) { $allDepartments = []; }
     } catch (PDOException $e) {
         // Fallback for safety: if something still fails, try query without new columns
         try {

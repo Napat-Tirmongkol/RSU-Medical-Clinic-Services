@@ -113,6 +113,7 @@ try {
             if ((int)$cnt->fetchColumn() > 0) {
                 json_err('ลบไม่ได้ — มีรายงานของฝ่ายนี้อยู่ในระบบ');
             }
+            $pdo->prepare("UPDATE sys_staff SET department_id = NULL WHERE department_id = ?")->execute([$id]);
             $pdo->prepare("DELETE FROM sys_report_templates WHERE department_id = ?")->execute([$id]);
             $pdo->prepare("DELETE FROM sys_departments WHERE id = ?")->execute([$id]);
             json_ok(['message' => 'ลบฝ่ายเรียบร้อย']);
