@@ -220,6 +220,26 @@ $gcOver = kpi_override_status($pdo);
         box-shadow: 0 10px 18px -3px rgba(220,38,38,.55);
     }
     #section-gold_card .gc-folder-delete-btn:active { transform: translateY(1px); }
+
+    /* Bulk scan: month source badges */
+    #section-gold_card .gc-month-badge {
+        display: inline-flex; align-items: center; gap: 4px;
+        padding: 3px 8px; border-radius: 99px;
+        font-size: 10px; font-weight: 900; line-height: 1;
+        white-space: nowrap;
+    }
+    #section-gold_card .gc-month-active {
+        background: linear-gradient(135deg, #f59e0b, #f97316);
+        color: #fff;
+        box-shadow: 0 2px 6px rgba(245,158,11,.35);
+    }
+    #section-gold_card .gc-month-inactive {
+        background: #f1f5f9; color: #94a3b8;
+        text-decoration: line-through;
+    }
+    #section-gold_card .gc-month-empty {
+        color: #cbd5e1; font-size: 16px; font-weight: 400; line-height: 1;
+    }
 </style>
 
 <div id="section-gold_card-content" class="px-5 md:px-8 py-8 space-y-7">
@@ -591,7 +611,8 @@ $gcOver = kpi_override_status($pdo);
                         <thead class="bg-slate-50 border-b border-slate-200">
                             <tr class="text-[10px] font-black text-slate-500 uppercase tracking-widest">
                                 <th class="px-3 py-2 text-left">ไฟล์</th>
-                                <th class="px-3 py-2 text-center">เดือน</th>
+                                <th class="px-3 py-2 text-center" title="เดือนที่อ่านจากชื่อโฟลเดอร์">📁 Folder</th>
+                                <th class="px-3 py-2 text-center" title="เดือนที่อ่านจาก PDF/EXIF/DOCX metadata">📄 Metadata</th>
                                 <th class="px-3 py-2 text-left">ชื่อที่ดึง</th>
                                 <th class="px-3 py-2 text-center">สถานะ</th>
                                 <th class="px-3 py-2 text-left">นักศึกษา (sys_users)</th>
@@ -1548,14 +1569,20 @@ $gcOver = kpi_override_status($pdo);
 
         const tbody = document.getElementById('gcBulkResultRows');
         tbody.innerHTML = report.map((r, i) => {
-            const monthCell = r.month_info
-                ? `<span class="gc-badge bg-amber-50 text-amber-700 border border-amber-200" title="${escapeHtml(r.month_info.folder)}">${escapeHtml(r.month_info.label)}</span>`
-                : `<span class="text-slate-300 text-[11px]">—</span>`;
+            // Metadata ชนะ folder — ตัวที่ active = ตัวที่ใช้จริง
+            const useMeta = !!r.meta_month;
+            const folderCell = r.folder_month
+                ? `<span class="gc-month-badge ${useMeta ? 'gc-month-inactive' : 'gc-month-active'}" title="${escapeHtml(r.folder_month.folder || '')}">${escapeHtml(r.folder_month.label)}</span>`
+                : `<span class="gc-month-empty">—</span>`;
+            const metaCell = r.meta_month
+                ? `<span class="gc-month-badge gc-month-active" title="จาก ${escapeHtml(r.meta_month.source || '')} · ${escapeHtml(r.meta_month.iso || '')}">${escapeHtml(r.meta_month.label)}</span>`
+                : `<span class="gc-month-empty">—</span>`;
 
             if (r.already_exists) {
                 return `<tr class="border-b border-slate-100 bg-slate-50">
                     <td class="px-3 py-2 font-mono text-slate-500">${escapeHtml(r.filename)}</td>
-                    <td class="px-3 py-2 text-center">${monthCell}</td>
+                    <td class="px-3 py-2 text-center">${folderCell}</td>
+                    <td class="px-3 py-2 text-center">${metaCell}</td>
                     <td class="px-3 py-2 text-slate-500">${escapeHtml(r.extracted_name || '—')}</td>
                     <td class="px-3 py-2 text-center"><span class="gc-badge bg-slate-200 text-slate-600">มีอยู่แล้ว</span></td>
                     <td class="px-3 py-2 text-slate-400" colspan="2">ข้าม (ไฟล์/ผู้ใช้นี้มีอยู่แล้ว)</td>
@@ -1581,7 +1608,8 @@ $gcOver = kpi_override_status($pdo);
             const checked = r.status === 'matched' ? 'checked' : '';
             return `<tr class="border-b border-slate-100" data-bulk-idx="${i}">
                 <td class="px-3 py-2 font-mono text-slate-700 text-[11px]" title="${escapeHtml(r.rel_path || r.filename)}">${escapeHtml(r.filename)}</td>
-                <td class="px-3 py-2 text-center">${monthCell}</td>
+                <td class="px-3 py-2 text-center">${folderCell}</td>
+                <td class="px-3 py-2 text-center">${metaCell}</td>
                 <td class="px-3 py-2 text-slate-700">${escapeHtml(r.extracted_name || '—')}</td>
                 <td class="px-3 py-2 text-center">${statusBadge}</td>
                 <td class="px-3 py-2">${userCell}</td>

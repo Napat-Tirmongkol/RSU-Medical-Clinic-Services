@@ -164,6 +164,120 @@ function _safe_count(PDO $pdo, string $sql): int
     catch (PDOException $e) { return 0; }
 }
 
+/**
+ * อ่าน CreationDate จาก PDF (รองรับ /Info dictionary + XMP metadata)
+ * Read แค่ 64KB หัว+ท้าย — metadata มักอยู่ที่หัวหรือท้ายไฟล์
+ */
+function gc_read_pdf_creation(string $path): ?DateTime
+{
+    $sz = @filesize($path);
+    if (!$sz || $sz <= 0) return null;
+    $chunk = 64 * 1024;
+    $head = @file_get_contents($path, false, null, 0, min($chunk, $sz)) ?: '';
+    $tail = '';
+    if ($sz > $chunk) {
+        $tail = @file_get_contents($path, false, null, max(0, $sz - $chunk)) ?: '';
+    }
+    $data = $head . $tail;
+
+    // /CreationDate (D:20250515143025+07'00')
+    if (preg_match('/\/CreationDate\s*\(\s*D:(\d{4})(\d{2})(\d{2})(\d{2})?(\d{2})?(\d{2})?/', $data, $m)) {
+        try {
+            $y = $m[1]; $mo = $m[2]; $d = $m[3];
+            $h = $m[4] ?? '00'; $mi = $m[5] ?? '00'; $s = $m[6] ?? '00';
+            return new DateTime("$y-$mo-$d $h:$mi:$s");
+        } catch (Exception $e) { /* fall through */ }
+    }
+    // XMP <xmp:CreateDate>2025-05-15T14:30:25+07:00</xmp:CreateDate>
+    if (preg_match('/<xmp:CreateDate[^>]*>([^<]+)<\/xmp:CreateDate>/', $data, $m)) {
+        try { return new DateTime($m[1]); } catch (Exception $e) {}
+    }
+    // Fallback: <pdf:CreationDate> (ใน XMP บาง spec)
+    if (preg_match('/<pdf:CreationDate[^>]*>([^<]+)<\/pdf:CreationDate>/', $data, $m)) {
+        try { return new DateTime($m[1]); } catch (Exception $e) {}
+    }
+    return null;
+}
+
+/** อ่าน DateTimeOriginal จาก EXIF ของ JPEG/PNG */
+function gc_read_image_exif(string $path): ?DateTime
+{
+    if (!function_exists('exif_read_data')) return null;
+    $exif = @exif_read_data($path, 'EXIF', false, false);
+    if (!is_array($exif)) return null;
+
+    $candidates = [
+        $exif['DateTimeOriginal']  ?? null,
+        $exif['DateTimeDigitized'] ?? null,
+        $exif['DateTime']          ?? null,
+        $exif['EXIF']['DateTimeOriginal']  ?? null,
+        $exif['EXIF']['DateTimeDigitized'] ?? null,
+    ];
+    foreach ($candidates as $s) {
+        if (!$s) continue;
+        // Format: "2024:05:15 14:30:25"
+        $dt = DateTime::createFromFormat('Y:m:d H:i:s', $s);
+        if ($dt) return $dt;
+        try { return new DateTime($s); } catch (Exception $e) {}
+    }
+    return null;
+}
+
+/** อ่าน dcterms:created จาก docProps/core.xml ของ DOCX */
+function gc_read_docx_created(string $path): ?DateTime
+{
+    if (!class_exists('ZipArchive')) return null;
+    $zip = new ZipArchive();
+    if ($zip->open($path) !== true) return null;
+    $xml = $zip->getFromName('docProps/core.xml');
+    $zip->close();
+    if (!$xml) return null;
+
+    if (preg_match('/<dcterms:created[^>]*>([^<]+)<\/dcterms:created>/', $xml, $m)) {
+        try { return new DateTime($m[1]); } catch (Exception $e) {}
+    }
+    return null;
+}
+
+/**
+ * Dispatcher: อ่านวันสร้างจาก metadata ของไฟล์ใดๆ
+ * คืน array ['year'=>int, 'month'=>1-12, 'application_date'=>YYYY-MM-DD,
+ *          'label'=>'พ.ค. 68', 'source'=>'pdf|exif|docx']
+ * หรือ null ถ้าอ่านไม่ได้
+ */
+function gc_read_file_creation(string $path, string $filename): ?array
+{
+    static $thaiMonths = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+    $ext = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
+    $dt = null; $source = null;
+
+    if ($ext === 'pdf') {
+        $dt = gc_read_pdf_creation($path);
+        $source = 'pdf';
+    } elseif (in_array($ext, ['jpg', 'jpeg', 'png'], true)) {
+        $dt = gc_read_image_exif($path);
+        $source = 'exif';
+    } elseif ($ext === 'docx') {
+        $dt = gc_read_docx_created($path);
+        $source = 'docx';
+    }
+
+    if (!$dt) return null;
+
+    $y = (int)$dt->format('Y');
+    $m = (int)$dt->format('n');
+    if ($y < 1990 || $y > 3000 || $m < 1 || $m > 12) return null;
+
+    return [
+        'year'             => $y,
+        'month'            => $m,
+        'application_date' => sprintf('%04d-%02d-01', $y, $m),
+        'label'            => $thaiMonths[$m - 1] . ' ' . substr((string)($y + 543), -2),
+        'source'           => $source,
+        'iso'              => $dt->format('Y-m-d H:i:s'),
+    ];
+}
+
 function gc_match_user(PDO $pdo, string $filename): array
 {
     $name = gc_extract_name($filename);
@@ -584,18 +698,16 @@ try {
                 $match = gc_match_user($pdo, $fname);
                 $extracted = $match['name'];
 
-                // ── Parse เดือนจาก path (ถ้ามี) ────────────────────────
-                $monthInfo = null;
+                // ── Parse เดือนจาก path (folder mode) ──────────────────
+                $folderMonth = null;
                 $relPath = is_array($paths) && isset($paths[$i]) ? (string)$paths[$i] : '';
                 if ($relPath !== '') {
-                    // ลำดับ: เลือก folder ตัวสุดท้ายก่อนชื่อไฟล์
                     $segments = array_filter(explode('/', str_replace('\\', '/', $relPath)));
                     array_pop($segments); // ตัด filename
-                    // หา folder แรกที่ parse เป็นเดือนได้ (เริ่มจากใกล้ไฟล์ที่สุด)
                     foreach (array_reverse($segments) as $seg) {
                         $parsed = gc_parse_thai_month_folder($seg);
                         if ($parsed) {
-                            $monthInfo = $parsed + [
+                            $folderMonth = $parsed + [
                                 'folder' => $seg,
                                 'application_date' => sprintf('%04d-%02d-01', $parsed['year'], $parsed['month']),
                                 'label' => $thaiMonths[$parsed['month'] - 1] . ' ' . substr((string)($parsed['year'] + 543), -2),
@@ -604,6 +716,16 @@ try {
                         }
                     }
                 }
+
+                // ── Parse เดือนจาก metadata ของไฟล์ (ใหม่) ─────────────
+                $tmpName = $_FILES['files']['tmp_name'][$i] ?? '';
+                $metaMonth = null;
+                if ($tmpName && is_uploaded_file($tmpName)) {
+                    $metaMonth = gc_read_file_creation($tmpName, $fname);
+                }
+
+                // ── Effective month: metadata wins over folder ─────────
+                $effective = $metaMonth ?: $folderMonth;
 
                 // Check ซ้ำ
                 $existsId = null;
@@ -628,7 +750,9 @@ try {
                     'user'       => $match['user'] ?? null,
                     'candidates' => $match['candidates'] ?? [],
                     'already_exists' => $existsId,
-                    'month_info' => $monthInfo,
+                    'folder_month' => $folderMonth,  // จากชื่อโฟลเดอร์
+                    'meta_month'   => $metaMonth,    // จาก PDF/EXIF/DOCX metadata
+                    'month_info'   => $effective,    // ใช้ตอน commit (metadata ชนะ)
                 ];
             }
             json_ok(['report' => $report]);
