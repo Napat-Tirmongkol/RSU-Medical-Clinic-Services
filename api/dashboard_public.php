@@ -61,11 +61,27 @@ $hasFilter = $year !== null || $month !== null;
 
 // ── Build response ────────────────────────────────────────────────────────────
 header('Content-Type: application/json; charset=utf-8');
-// ลด cache duration เมื่อมี filter (แต่ละ filter combination cache แยก)
-header('Cache-Control: public, max-age=' . ($hasFilter ? 60 : 300));
+// Cache 30 วินาที — สั้นพอที่ override จะเด้งมาเร็ว แต่ยังป้องกัน hammer ได้
+header('Cache-Control: public, max-age=' . ($hasFilter ? 30 : 30) . ', must-revalidate');
 header('X-Content-Type-Options: nosniff');
 
+// ETag ตาม latest update เพื่อให้ browser revalidate ได้
 $pdo = db();
+try {
+    $etagSrc = $pdo->query("
+        SELECT GREATEST(
+            COALESCE((SELECT MAX(updated_at) FROM ins_kpi_overrides), '0'),
+            COALESCE((SELECT MAX(updated_at) FROM ins_dashboard_widgets), '0')
+        ) AS t
+    ")->fetchColumn();
+    $etag = '"' . md5(($etagSrc ?: '0') . '|' . ($year ?? '') . '|' . ($month ?? '')) . '"';
+    header('ETag: ' . $etag);
+    if (($_SERVER['HTTP_IF_NONE_MATCH'] ?? '') === $etag) {
+        http_response_code(304);
+        exit;
+    }
+} catch (PDOException $e) { /* tables may not exist yet */ }
+
 $out = [
     'ok'           => true,
     'generated_at' => date('c'),

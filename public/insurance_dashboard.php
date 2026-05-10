@@ -96,9 +96,14 @@ $apiUrl = '../api/dashboard_public.php';
                 <p class="text-xs md:text-sm text-slate-500 font-bold">ภาพรวมสิทธิ์ประกันสุขภาพและบัตรทอง · เปิดเผยต่อสาธารณะ</p>
             </div>
         </div>
-        <div class="inline-flex items-center gap-2 bg-white border border-slate-200 rounded-full px-4 py-1.5 text-xs font-bold text-slate-500 shadow-sm">
-            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-            อัปเดตล่าสุด: <span id="ipUpdatedAt">กำลังโหลด...</span>
+        <div class="inline-flex items-center gap-2">
+            <div class="inline-flex items-center gap-2 bg-white border border-slate-200 rounded-full px-4 py-1.5 text-xs font-bold text-slate-500 shadow-sm">
+                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                อัปเดตล่าสุด: <span id="ipUpdatedAt">กำลังโหลด...</span>
+            </div>
+            <button onclick="loadDashboard(true)" class="inline-flex items-center gap-2 bg-white hover:bg-slate-50 border border-slate-200 rounded-full px-3 py-1.5 text-xs font-bold text-slate-600 shadow-sm transition-all" title="รีเฟรชข้อมูล">
+                <i class="fa-solid fa-arrows-rotate"></i> รีเฟรช
+            </button>
         </div>
     </div>
 
@@ -218,15 +223,21 @@ function populateYearDropdown(years) {
     availableYearsLoaded = true;
 }
 
-function loadDashboard() {
+function loadDashboard(forceFresh) {
     document.getElementById('ipLoading').classList.remove('hidden');
     document.getElementById('ipGrid').classList.add('hidden');
     document.getElementById('ipError').classList.add('hidden');
 
     const qs = getFilterParams();
-    const url = '<?= $apiUrl ?>' + (qs ? '?' + qs : '');
+    let url = '<?= $apiUrl ?>' + (qs ? '?' + qs : '');
+    // Cache buster เมื่อกดรีเฟรชเอง (เพื่อข้ามทั้ง browser cache + ETag)
+    if (forceFresh) url += (url.includes('?') ? '&' : '?') + '_t=' + Date.now();
 
-    fetch(url, { credentials: 'omit' })
+    fetch(url, {
+        credentials: 'omit',
+        // ใช้ no-cache → revalidate กับ server ทุกครั้ง (ETag ดูแล 304)
+        cache: forceFresh ? 'reload' : 'no-cache',
+    })
         .then(r => r.json())
         .then(d => {
             if (!d.ok) throw new Error(d.message || 'fetch failed');
@@ -370,8 +381,8 @@ function escapeHtml(s) {
 function escapeAttr(s) { return String(s ?? '').replace(/[^a-z0-9_-]/gi, ''); }
 
 loadDashboard();
-// Auto-refresh ทุก 5 นาที (เท่ากับ cache header)
-setInterval(loadDashboard, 5 * 60 * 1000);
+// Auto-refresh ทุก 1 นาที (เพื่อให้ admin override เด้งมาเร็ว)
+setInterval(() => loadDashboard(false), 60 * 1000);
 </script>
 
 </body>
