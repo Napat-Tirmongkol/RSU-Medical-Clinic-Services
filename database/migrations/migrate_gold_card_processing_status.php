@@ -7,8 +7,9 @@
  *   3. ได้ PDF อนุมัติกลับ     → upload เป็น doc_type='approval'  ← NEW
  *   4. admin กดอนุมัติ         → approved (require ≥1 doc 'approval' ก่อน)
  */
-require_once __DIR__ . '/../../includes/db.php';
+require_once __DIR__ . '/../../config.php';
 
+$pdo = db();
 $results = [];
 
 // ── 1) Expand status ENUM in gold_card_members ──────────────────────────────
