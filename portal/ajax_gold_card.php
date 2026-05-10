@@ -574,6 +574,27 @@ try {
             $stmt->execute();
             $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+            // Optional: include documents inline (for pending review queue)
+            if (!empty($_POST['include_docs']) && !empty($rows)) {
+                $ids = array_column($rows, 'id');
+                if ($ids) {
+                    $place = implode(',', array_fill(0, count($ids), '?'));
+                    $docStmt = $pdo->prepare("SELECT id, member_id, doc_type, file_name, mime_type
+                                              FROM gold_card_documents
+                                              WHERE member_id IN ($place)
+                                              ORDER BY uploaded_at DESC");
+                    $docStmt->execute($ids);
+                    $docsByMember = [];
+                    foreach ($docStmt->fetchAll(PDO::FETCH_ASSOC) as $d) {
+                        $docsByMember[(int)$d['member_id']][] = $d;
+                    }
+                    foreach ($rows as &$row) {
+                        $row['documents'] = $docsByMember[(int)$row['id']] ?? [];
+                    }
+                    unset($row);
+                }
+            }
+
             json_ok([
                 'rows'      => $rows,
                 'total'     => $total,

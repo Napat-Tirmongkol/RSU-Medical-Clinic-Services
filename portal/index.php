@@ -384,6 +384,7 @@ $categoryMap = [
     'insurance_sync' => 'core',
     'insurance_dashboard' => 'core',
     'gold_card' => 'core',
+    'gold_card_pending' => 'core',
     'system_logs' => 'tools',
     'privilege_inventory' => 'tools',
     'admin_tool' => 'tools',
@@ -1055,6 +1056,17 @@ try {
                         <button class="psb-item" data-section="insurance_sync" onclick="switchSection('insurance_sync',this)">
                             <div class="psb-icon"><i class="fa-solid fa-shield-halved" style="color:#0ea5e9"></i></div>
                             <span class="psb-label" style="color:#0284c7;font-weight:900">Insurance Hub</span>
+                        </button>
+                        <button class="psb-item <?= $activeSection==='gold_card_pending'?'psb-active':'' ?>" data-section="gold_card_pending" onclick="switchSection('gold_card_pending',this)">
+                            <div class="psb-icon"><i class="fa-solid fa-hourglass-half" style="color:#3b82f6"></i></div>
+                            <span class="psb-label" style="color:#1d4ed8;font-weight:900">ใบสมัครรออนุมัติ</span>
+                            <?php
+                            $pendingBadgeCount = 0;
+                            try { $pendingBadgeCount = (int)db()->query("SELECT COUNT(*) FROM gold_card_members WHERE status IN ('submitted','pending')")->fetchColumn(); }
+                            catch (PDOException) {}
+                            if ($pendingBadgeCount > 0): ?>
+                                <span class="ml-auto px-2 py-0.5 rounded-full bg-rose-500 text-white text-[10px] font-black"><?= $pendingBadgeCount > 99 ? '99+' : $pendingBadgeCount ?></span>
+                            <?php endif; ?>
                         </button>
                         <button class="psb-item <?= $activeSection==='gold_card'?'psb-active':'' ?>" data-section="gold_card" onclick="switchSection('gold_card',this)">
                             <div class="psb-icon"><i class="fa-solid fa-id-card" style="color:#f59e0b"></i></div>
@@ -2999,6 +3011,18 @@ try {
                 ?>
             </div>
 
+            <!-- ════════════ SECTION: GOLD CARD PENDING REVIEW ════════════ -->
+            <div id="section-gold_card_pending" class="portal-section"
+                style="<?= $activeSection==='gold_card_pending'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); background:#f8fafc; overflow-y:auto;">
+                <?php
+                if ($adminRole === 'superadmin' || !empty($_SESSION['access_insurance'])) {
+                    include __DIR__ . '/_partials/gold_card_pending.php';
+                } else {
+                    echo '<div style="padding:100px;text-align:center;font-weight:900;color:#dc2626"><i class="fa-solid fa-shield-slash mb-4" style="font-size:4rem;display:block"></i> ACCESS DENIED<br><span style="font-size:14px;color:#94a3b8;font-weight:600">ต้องมีสิทธิ์ access_insurance</span></div>';
+                }
+                ?>
+            </div>
+
             <!-- ════════════ SECTION: GOLD CARD (บัตรทอง) ════════════ -->
             <div id="section-gold_card" class="portal-section"
                 style="<?= $activeSection==='gold_card'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); background:#f8fafc; overflow-y:auto;">
@@ -4533,6 +4557,7 @@ try {
             { id: 'identity',      label: 'Identity & Governance', desc: 'จัดการสิทธิ์ผู้ใช้', shortcut: 'g i', icon: 'fa-id-card-clip',  tone: 'info',    type: 'section', target: 'identity' },
             { id: 'insurance_sync', label: 'Insurance Hub',      desc: 'ระบบสิทธิ์ประกัน',   icon: 'fa-shield-halved',      tone: 'info',    type: 'section', target: 'insurance_sync' },
             { id: 'insurance_dashboard', label: 'Insurance Dashboard', desc: 'ภาพรวม + แก้ widgets', icon: 'fa-chart-pie',     tone: 'info',    type: 'section', target: 'insurance_dashboard' },
+            { id: 'gold_card_pending', label: 'ใบสมัครรออนุมัติ', desc: 'คิวสมัครบัตรทองจาก user', icon: 'fa-hourglass-half', tone: 'info',    type: 'section', target: 'gold_card_pending' },
             { id: 'gold_card',     label: 'บัตรทอง',             desc: 'จัดการบัตรทอง + เอกสาร', icon: 'fa-id-card',         tone: 'warning', type: 'section', target: 'gold_card' },
             { id: 'registry_upload', label: 'อัพโหลดรายชื่อ',    desc: 'ทะเบียน',            icon: 'fa-id-card-clip',      tone: 'info',    type: 'section', target: 'registry_upload' },
             { id: 'batch_status',  label: 'สถานะเอกสาร',         desc: 'Insurance Batch',    icon: 'fa-list-check',         tone: 'info',    type: 'section', target: 'batch_status' },
