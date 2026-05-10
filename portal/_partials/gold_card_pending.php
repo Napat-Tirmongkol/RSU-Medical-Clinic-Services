@@ -269,12 +269,24 @@ $gcpCsrfToken = function_exists('get_csrf_token') ? get_csrf_token() : ($_SESSIO
     }
 
     window.gcpLightbox = function(url, type) {
+        const isSignature = type === 'signature';
         Swal.fire({
-            html: `<img src="${url}" style="max-width:100%; max-height:75vh; border-radius:12px; background:${type==='signature'?'#fff':'transparent'}" alt="${type}">`,
-            width: '90%',
+            html: `<div style="display:flex; align-items:center; justify-content:center; min-height:60vh;">
+                       <img src="${url}"
+                            style="max-width:100%; max-height:80vh; width:auto; height:auto; object-fit:contain;
+                                   border-radius:12px; ${isSignature ? 'background:#fff; padding:24px;' : ''}
+                                   box-shadow:0 20px 50px rgba(0,0,0,0.3);"
+                            alt="${type}">
+                   </div>
+                   <p style="text-align:center; color:#64748b; font-weight:700; font-size:13px; margin-top:12px;">
+                       ${isSignature ? '✍️ ลายมือชื่อ' : '📷 รูปถ่ายคู่บัตรประชาชน'}
+                   </p>`,
+            width: 'auto',
+            padding: '20px',
             showConfirmButton: false,
             showCloseButton: true,
-            background: '#0f172a',
+            background: '#fff',
+            customClass: { popup: 'gcp-lightbox-popup' },
         });
     };
 
