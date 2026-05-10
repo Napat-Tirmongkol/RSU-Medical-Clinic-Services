@@ -60,12 +60,13 @@ $gcOver = kpi_override_status($pdo);
         padding:3px 10px; border-radius:99px; font-size:10px;
         font-weight:900; letter-spacing:.05em; display:inline-block;
     }
-    #section-gold_card .gc-badge-pending  { background:#fef9c3; color:#a16207; border:1px solid #fde68a; }
-    #section-gold_card .gc-badge-submitted{ background:#dbeafe; color:#1e40af; border:1px solid #bfdbfe; }
-    #section-gold_card .gc-badge-approved { background:#f0fdf4; color:#16a34a; border:1px solid #bbf7d0; }
-    #section-gold_card .gc-badge-active   { background:#ecfdf5; color:#059669; border:1px solid #a7f3d0; }
-    #section-gold_card .gc-badge-rejected { background:#fef2f2; color:#dc2626; border:1px solid #fecaca; }
-    #section-gold_card .gc-badge-expired  { background:#f3f4f6; color:#6b7280; border:1px solid #e5e7eb; }
+    #section-gold_card .gc-badge-pending   { background:#fef9c3; color:#a16207; border:1px solid #fde68a; }
+    #section-gold_card .gc-badge-submitted { background:#dbeafe; color:#1e40af; border:1px solid #bfdbfe; }
+    #section-gold_card .gc-badge-processing{ background:#ede9fe; color:#6d28d9; border:1px solid #ddd6fe; }
+    #section-gold_card .gc-badge-approved  { background:#f0fdf4; color:#16a34a; border:1px solid #bbf7d0; }
+    #section-gold_card .gc-badge-active    { background:#ecfdf5; color:#059669; border:1px solid #a7f3d0; }
+    #section-gold_card .gc-badge-rejected  { background:#fef2f2; color:#dc2626; border:1px solid #fecaca; }
+    #section-gold_card .gc-badge-expired   { background:#f3f4f6; color:#6b7280; border:1px solid #e5e7eb; }
     #section-gold_card .gc-pager-btn {
         min-width:34px; height:34px; padding:0 10px;
         border-radius:9px; border:1.5px solid #e2e8f0; background:#fff;
@@ -414,6 +415,7 @@ $gcOver = kpi_override_status($pdo);
                     <option value="">ทุกสถานะ</option>
                     <option value="pending">รอเอกสาร</option>
                     <option value="submitted">ส่งแล้ว</option>
+                    <option value="processing">กำลังย้าย</option>
                     <option value="approved">อนุมัติ</option>
                     <option value="active">ใช้งาน</option>
                     <option value="rejected">ไม่ผ่าน</option>
@@ -553,12 +555,14 @@ $gcOver = kpi_override_status($pdo);
                         <select id="gcStatus"
                             class="w-full h-11 px-4 border border-slate-200 rounded-xl text-sm font-bold focus:ring-4 focus:ring-amber-500/10 outline-none bg-slate-50">
                             <option value="pending">รอเอกสาร</option>
-                            <option value="submitted">ส่งแล้ว</option>
-                            <option value="approved">อนุมัติ</option>
-                            <option value="active">ใช้งาน</option>
+                            <option value="submitted">ส่งแล้ว · พร้อมส่งย้าย</option>
+                            <option value="processing">กำลังย้าย · ที่หน่วยงาน</option>
+                            <option value="approved">อนุมัติ · มี PDF อนุมัติแล้ว</option>
+                            <option value="active">ใช้งาน · บัตรเปิดใช้</option>
                             <option value="rejected">ไม่ผ่าน</option>
                             <option value="expired">หมดอายุ</option>
                         </select>
+                        <p class="text-[10px] font-bold text-slate-400 mt-1">⚠ <b>approved/active</b> ต้องแนบ <b>"เอกสารอนุมัติจากหน่วยงาน (PDF)"</b> ในแท็บเอกสารก่อน</p>
                     </div>
                     <div>
                         <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">วันเริ่มคุ้มครอง</label>
@@ -594,6 +598,7 @@ $gcOver = kpi_override_status($pdo);
                         <option value="application">ใบสมัคร</option>
                         <option value="photo">รูปถ่าย</option>
                         <option value="medical">ใบรับรองแพทย์</option>
+                        <option value="approval" style="font-weight:900;color:#059669">⭐ เอกสารอนุมัติจากหน่วยงาน</option>
                         <option value="other">อื่นๆ</option>
                     </select>
                 </div>
@@ -758,12 +763,13 @@ $gcOver = kpi_override_status($pdo);
     }
 
     const STATUS_LABELS = {
-        pending: 'รอเอกสาร', submitted: 'ส่งแล้ว', approved: 'อนุมัติ',
-        active: 'ใช้งาน', rejected: 'ไม่ผ่าน', expired: 'หมดอายุ'
+        pending: 'รอเอกสาร', submitted: 'ส่งแล้ว', processing: 'กำลังย้าย',
+        approved: 'อนุมัติ', active: 'ใช้งาน', rejected: 'ไม่ผ่าน', expired: 'หมดอายุ'
     };
     const DOC_TYPE_LABELS = {
         id_copy: 'สำเนาบัตรประชาชน', house_reg: 'สำเนาทะเบียนบ้าน',
-        application: 'ใบสมัคร', photo: 'รูปถ่าย', medical: 'ใบรับรองแพทย์', other: 'อื่นๆ'
+        application: 'ใบสมัคร', photo: 'รูปถ่าย', medical: 'ใบรับรองแพทย์',
+        approval: 'เอกสารอนุมัติจากหน่วยงาน', other: 'อื่นๆ'
     };
 
     function statusBadge(s) {
@@ -1337,8 +1343,13 @@ $gcOver = kpi_override_status($pdo);
         }
 
         const STATUS_BADGES = {
-            submitted: { label: 'ส่งใบสมัคร', cls: 'bg-blue-100 text-blue-700' },
-            pending:   { label: 'รอเอกสาร',  cls: 'bg-amber-100 text-amber-700' },
+            submitted:  { label: 'ส่งใบสมัคร',   cls: 'bg-blue-100 text-blue-700' },
+            pending:    { label: 'รอเอกสาร',     cls: 'bg-amber-100 text-amber-700' },
+            processing: { label: 'กำลังย้าย',    cls: 'bg-violet-100 text-violet-700' },
+            approved:   { label: 'อนุมัติแล้ว',  cls: 'bg-emerald-100 text-emerald-700' },
+            active:     { label: 'ใช้งาน',       cls: 'bg-green-100 text-green-700' },
+            rejected:   { label: 'ไม่ผ่าน',      cls: 'bg-rose-100 text-rose-700' },
+            expired:    { label: 'หมดอายุ',      cls: 'bg-slate-100 text-slate-600' },
         };
         const sb = STATUS_BADGES[member.status] || STATUS_BADGES.submitted;
         const badge = document.getElementById('gcReviewStatusBadge');

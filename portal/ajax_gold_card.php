@@ -763,11 +763,21 @@ try {
             $status      = trim((string)($_POST['status'] ?? 'pending'));
             $remarks     = trim((string)($_POST['remarks'] ?? '')) ?: null;
 
-            $allowedStatus = ['pending','submitted','approved','active','rejected','expired'];
+            $allowedStatus = ['pending','submitted','processing','approved','active','rejected','expired'];
             if (!in_array($status, $allowedStatus, true)) $status = 'pending';
 
             if (strlen($citizenId) !== 13) json_err('เลขบัตรประชาชนต้องเป็น 13 หลัก');
             if ($fullName === '') json_err('กรุณาระบุชื่อ-นามสกุล');
+
+            // Guard: ก่อนเปลี่ยนเป็น approved/active ต้องมีเอกสาร doc_type='approval' อย่างน้อย 1 ไฟล์
+            if (in_array($status, ['approved','active'], true) && $id > 0) {
+                $docCheck = $pdo->prepare("SELECT COUNT(*) FROM gold_card_documents
+                                           WHERE member_id = ? AND doc_type = 'approval'");
+                $docCheck->execute([$id]);
+                if ((int)$docCheck->fetchColumn() === 0) {
+                    json_err('ต้องแนบ "เอกสารอนุมัติจากหน่วยงาน (PDF)" อย่างน้อย 1 ไฟล์ ก่อนเปลี่ยนเป็นสถานะอนุมัติ/ใช้งาน');
+                }
+            }
 
             if ($id > 0) {
                 $old = $pdo->prepare("SELECT * FROM gold_card_members WHERE id = ?");
@@ -920,7 +930,7 @@ try {
         case 'document:upload': {
             $memberId = (int)($_POST['member_id'] ?? 0);
             $docType  = trim((string)($_POST['doc_type'] ?? 'other'));
-            $allowed  = ['id_copy','house_reg','application','photo','medical','other'];
+            $allowed  = ['id_copy','house_reg','application','photo','medical','approval','other'];
             if (!in_array($docType, $allowed, true)) $docType = 'other';
 
             if ($memberId <= 0) json_err('ระบุ member_id ไม่ถูกต้อง');
