@@ -143,6 +143,7 @@ $gcpCsrfToken = function_exists('get_csrf_token') ? get_csrf_token() : ($_SESSIO
 
     window.gcpLoadList = function(page) {
         currentPage = page || 1;
+        window._gcpCurrentPage = currentPage; // expose สำหรับ modal close handler
         const search = document.getElementById('gcpSearch').value.trim();
         const type   = document.getElementById('gcpType').value;
 
@@ -295,34 +296,74 @@ $gcpCsrfToken = function_exists('get_csrf_token') ? get_csrf_token() : ($_SESSIO
         const colors = { approved:'#10b981', rejected:'#ef4444' };
         const icons  = { approved:'success', rejected:'warning' };
 
-        let inputOpts = {};
-        if (newStatus === 'rejected') {
-            inputOpts = {
+        // Step 1: load member + documents
+        const cur = await gcpPost('member', 'get', { id });
+        if (cur.status !== 'ok') return Swal.fire({icon:'error', title:'โหลดข้อมูลไม่สำเร็จ', text: cur.message || ''});
+        const m    = cur.member    || {};
+        const docs = cur.documents || [];
+        const hasApprovalDoc = docs.some(d => d.doc_type === 'approval');
+
+        // Step 2: For approved → ensure PDF attached (inline upload if missing)
+        if (newStatus === 'approved' && !hasApprovalDoc) {
+            const { value: file } = await Swal.fire({
+                icon: 'info',
+                title: 'แนบเอกสารอนุมัติก่อน',
+                html: `<b>${escapeHtml(name)}</b><br><span class="text-slate-500 text-sm">ต้องแนบ "เอกสารอนุมัติจากหน่วยงาน (PDF)" ก่อนกดอนุมัติ</span>`,
+                input: 'file',
+                inputAttributes: { accept: 'application/pdf' },
+                showCancelButton: true,
+                confirmButtonText: '📎 อัพโหลด + อนุมัติ',
+                cancelButtonText: 'ยกเลิก',
+                confirmButtonColor: colors.approved,
+                inputValidator: (value) => {
+                    if (!value) return 'กรุณาเลือกไฟล์ PDF';
+                    if (value.type !== 'application/pdf') return 'ต้องเป็นไฟล์ PDF เท่านั้น';
+                    if (value.size > 20 * 1024 * 1024) return 'ขนาดไฟล์เกิน 20MB';
+                }
+            });
+            if (!file) return;
+
+            Swal.fire({title:'กำลังอัพโหลด...', allowOutsideClick:false, didOpen:()=>Swal.showLoading()});
+            const fd = new FormData();
+            fd.append('entity', 'document');
+            fd.append('action', 'upload');
+            fd.append('csrf_token', CSRF);
+            fd.append('member_id', id);
+            fd.append('doc_type', 'approval');
+            fd.append('file', file);
+            const upRes  = await fetch(ENDPOINT, { method:'POST', body:fd, credentials:'same-origin' });
+            const upJson = await upRes.json();
+            if (upJson.status !== 'ok') {
+                return Swal.fire({icon:'error', title:'อัพโหลดไม่สำเร็จ', text: upJson.message || ''});
+            }
+        }
+
+        // Step 3: Confirm (rejected ต้องกรอกเหตุผล / approved ที่มี PDF อยู่แล้ว — ขอยืนยันธรรมดา / approved ที่เพิ่ง upload — ข้าม confirm)
+        let confirmedValue = null;
+        if (newStatus === 'rejected' || (newStatus === 'approved' && hasApprovalDoc)) {
+            const inputOpts = newStatus === 'rejected' ? {
                 input: 'textarea',
                 inputLabel: 'เหตุผลที่ไม่อนุมัติ (จะบันทึกใน remarks)',
                 inputPlaceholder: 'เช่น เอกสารไม่ครบ / ข้อมูลไม่ตรง',
                 inputValidator: (v) => !v || v.trim() === '' ? 'กรุณาระบุเหตุผล' : undefined,
-            };
+            } : {};
+            const result = await Swal.fire({
+                icon: icons[newStatus],
+                title: `ยืนยัน${labels[newStatus]}?`,
+                html: `<b>${escapeHtml(name)}</b><br><span class="text-slate-500 text-sm">การกระทำนี้จะแจ้งสถานะให้ผู้สมัครเห็นที่ profile ทันที</span>`,
+                showCancelButton: true,
+                confirmButtonText: labels[newStatus],
+                cancelButtonText: 'ยกเลิก',
+                confirmButtonColor: colors[newStatus],
+                ...inputOpts,
+            });
+            if (!result.isConfirmed) return;
+            confirmedValue = result.value;
         }
 
-        const result = await Swal.fire({
-            icon: icons[newStatus],
-            title: `ยืนยัน${labels[newStatus]}?`,
-            html: `<b>${name}</b><br><span class="text-slate-500 text-sm">การกระทำนี้จะแจ้งสถานะให้ผู้สมัครเห็นที่ profile ทันที</span>`,
-            showCancelButton: true,
-            confirmButtonText: labels[newStatus],
-            cancelButtonText: 'ยกเลิก',
-            confirmButtonColor: colors[newStatus],
-            ...inputOpts,
-        });
-        if (!result.isConfirmed) return;
-
-        const cur = await gcpPost('member', 'get', { id });
-        if (cur.status !== 'ok') return Swal.fire({icon:'error', title:'โหลดข้อมูลไม่สำเร็จ', text: cur.message || ''});
-
-        const m = cur.member || {};
-        const newRemarks = (newStatus === 'rejected' && result.value)
-            ? ((m.remarks ? m.remarks + '\n' : '') + `[${new Date().toLocaleDateString('th-TH')}] ไม่อนุมัติ: ${result.value}`)
+        // Step 4: Save status
+        const newRemarks = (newStatus === 'rejected' && confirmedValue)
+            ? ((m.remarks ? m.remarks + '\n' : '') + `[${new Date().toLocaleDateString('th-TH')}] ไม่อนุมัติ: ${confirmedValue}`)
             : (m.remarks || '');
 
         let extra = {};
@@ -413,21 +454,12 @@ $gcpCsrfToken = function_exists('get_csrf_token') ? get_csrf_token() : ($_SESSIO
         }
     };
 
-    // เปิด full edit modal ของ gold_card section (มี tabs ครบ)
-    // หลังปิด modal → กลับมาหน้า pending อัตโนมัติ (gcCloseMemberModal เช็ค flag นี้)
+    // เปิด edit modal โดยตรง (modal ถูก relocate ไป body แล้ว — เปิดได้ทุก section)
     window.gcpOpenDetail = function(id) {
         if (typeof window.gcOpenMemberModal === 'function') {
-            window._gcReturnToPending = true;
-            window._gcpReturnPage = currentPage || 1;
-
-            // Switch to gold_card section first (ทำให้ modal โหลดได้)
-            if (typeof window.switchSection === 'function') {
-                const goldBtn = document.querySelector('[data-section="gold_card"]');
-                if (goldBtn) window.switchSection('gold_card', goldBtn);
-            }
-            setTimeout(() => window.gcOpenMemberModal(id), 100);
+            window.gcOpenMemberModal(id);
         } else {
-            Swal.fire({icon:'info', title:'กรุณาคลิกเมนู "บัตรทอง" ก่อน', text:'แล้วค่อยกลับมาที่หน้านี้'});
+            Swal.fire({icon:'error', title:'ไม่สามารถเปิดหน้าต่างแก้ไข', text:'กรุณา refresh หน้าและลองใหม่'});
         }
     };
 

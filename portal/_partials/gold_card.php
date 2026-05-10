@@ -743,6 +743,24 @@ $gcOver = kpi_override_status($pdo);
     const PAGE_SIZE = 20;
     let currentPage = 1;
 
+    // ── Relocate modals to <body> ───────────────────────────────────────────
+    // ทำให้ modal เปิดได้ทุก section (ไม่ถูกซ่อนโดย display:none ของ section parent)
+    (function relocateModals() {
+        const move = () => {
+            ['gcMemberModal', 'gcBulkModal'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el && el.parentElement !== document.body) {
+                    document.body.appendChild(el);
+                }
+            });
+        };
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', move);
+        } else {
+            move();
+        }
+    })();
+
     // ── helpers ──────────────────────────────────────────────────────
     function gcPost(entity, action, extra = {}, isFormData = false) {
         let body;
@@ -1461,16 +1479,10 @@ $gcOver = kpi_override_status($pdo);
         modal.classList.add('hidden');
         modal.classList.remove('flex');
 
-        // ถ้าเปิดมาจากหน้า "ใบสมัครรออนุมัติ" → กลับไปยังหน้านั้น
-        if (window._gcReturnToPending) {
-            window._gcReturnToPending = false;
-            const pendingBtn = document.querySelector('[data-section="gold_card_pending"]');
-            if (pendingBtn && typeof window.switchSection === 'function') {
-                setTimeout(() => {
-                    window.switchSection('gold_card_pending', pendingBtn);
-                    if (typeof window.gcpLoadList === 'function') window.gcpLoadList(window._gcpReturnPage || 1);
-                }, 50);
-            }
+        // ถ้าเปิดมาจากหน้า pending → reload list ให้เห็น status ที่อัปเดตล่าสุด
+        const pendingSection = document.getElementById('section-gold_card_pending');
+        if (pendingSection && pendingSection.style.display !== 'none' && typeof window.gcpLoadList === 'function') {
+            window.gcpLoadList(window._gcpCurrentPage || 1);
         }
     };
 
