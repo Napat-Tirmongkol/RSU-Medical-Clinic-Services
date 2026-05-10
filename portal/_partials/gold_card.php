@@ -15,6 +15,11 @@ $pdo = db();
 $csrfToken = get_csrf_token();
 $canEditKPI = ($_SESSION['admin_role'] ?? '') === 'superadmin' || !empty($_SESSION['access_dashboard_admin']);
 
+// Read current "Gold Card application" enabled state from maintenance.json
+$gcMaintFile = __DIR__ . '/../../config/maintenance.json';
+$gcMaintData = file_exists($gcMaintFile) ? (json_decode((string)file_get_contents($gcMaintFile), true) ?: []) : [];
+$gcApplyEnabled = ($gcMaintData['gold_card_apply'] ?? true) !== false;
+
 $stats = ['total'=>0,'approved'=>0,'auto_matched'=>0,'pending'=>0,'rejected'=>0,'expiring'=>0,'staff'=>0,'student'=>0];
 try {
     $r = $pdo->query("
@@ -280,7 +285,18 @@ $gcOver = kpi_override_status($pdo);
                 <button type="button" onclick="if(window.switchSection){const b=document.querySelector('[data-section=\'gold_card_pending\']');if(b)switchSection('gold_card_pending',b);}" class="underline hover:text-blue-800 font-black">⏳ ใบสมัครรออนุมัติ</button>
             </p>
         </div>
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2 flex-wrap">
+            <!-- Apply Toggle: เปิด/ปิดการสมัครจากหน้า user -->
+            <button type="button" id="gcApplyToggleBtn" onclick="gcToggleApplyEnabled()"
+                    data-enabled="<?= $gcApplyEnabled ? '1' : '0' ?>"
+                    class="h-11 px-4 rounded-2xl border-2 font-black text-sm flex items-center gap-2 transition-all active:scale-95 <?= $gcApplyEnabled ? 'bg-emerald-50 border-emerald-300 text-emerald-700 hover:bg-emerald-100' : 'bg-rose-50 border-rose-300 text-rose-700 hover:bg-rose-100' ?>"
+                    title="<?= $gcApplyEnabled ? 'ผู้ใช้เห็นปุ่มสมัครบัตรทอง — กดเพื่อปิดรับสมัคร' : 'ผู้ใช้ไม่เห็นปุ่มสมัคร — กดเพื่อเปิดรับสมัคร' ?>">
+                <span class="relative flex h-2.5 w-2.5">
+                    <span class="<?= $gcApplyEnabled ? 'animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75' : '' ?>"></span>
+                    <span class="relative inline-flex rounded-full h-2.5 w-2.5 <?= $gcApplyEnabled ? 'bg-emerald-500' : 'bg-rose-500' ?>"></span>
+                </span>
+                <span id="gcApplyToggleLabel"><?= $gcApplyEnabled ? 'เปิดรับสมัคร' : 'ปิดรับสมัคร' ?></span>
+            </button>
             <button onclick="gcOpenMemberModal(null)" class="h-11 px-5 bg-amber-500 hover:bg-amber-600 text-white font-black rounded-2xl shadow-lg shadow-amber-200 active:scale-95 transition-all flex items-center gap-2">
                 <i class="fa-solid fa-plus"></i> เพิ่มสมาชิก
             </button>
@@ -737,6 +753,62 @@ $gcOver = kpi_override_status($pdo);
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script>
+// ── Toggle: เปิด/ปิดการสมัครบัตรทองจากหน้า user ───────────────────────────
+window.gcToggleApplyEnabled = async function() {
+    const btn = document.getElementById('gcApplyToggleBtn');
+    const currentEnabled = btn.dataset.enabled === '1';
+    const willEnable = !currentEnabled;
+
+    const { isConfirmed } = await Swal.fire({
+        icon: willEnable ? 'question' : 'warning',
+        title: willEnable ? 'เปิดรับสมัครบัตรทอง?' : 'ปิดรับสมัครบัตรทอง?',
+        html: willEnable
+            ? 'ผู้ใช้ทุกคนจะ<b>เห็น</b>ปุ่ม "สมัครบัตรทอง" ในหน้า hub อีกครั้ง'
+            : 'ผู้ใช้จะ<b>ไม่เห็น</b>ปุ่ม "สมัครบัตรทอง" และเข้าหน้าสมัครตรงๆ ก็จะถูกบล็อก<br><span style="font-size:12px;color:#64748b">(Admin / Whitelist ยังเข้าได้)</span>',
+        showCancelButton: true,
+        confirmButtonText: willEnable ? 'เปิด' : 'ปิดเลย',
+        cancelButtonText: 'ยกเลิก',
+        confirmButtonColor: willEnable ? '#10b981' : '#ef4444',
+        reverseButtons: true,
+    });
+    if (!isConfirmed) return;
+
+    const fd = new FormData();
+    fd.append('action', 'set');
+    fd.append('project', 'gold_card_apply');
+    fd.append('active', willEnable ? '1' : '0');
+    fd.append('csrf_token', portal_CSRF);
+
+    try {
+        const r = await fetch('ajax_maintenance.php', { method: 'POST', body: fd, credentials: 'same-origin' });
+        const d = await r.json();
+        if (!d.ok) throw new Error(d.message || 'unknown');
+
+        // อัปเดต UI
+        btn.dataset.enabled = willEnable ? '1' : '0';
+        const label = document.getElementById('gcApplyToggleLabel');
+        if (willEnable) {
+            btn.className = 'h-11 px-4 rounded-2xl border-2 font-black text-sm flex items-center gap-2 transition-all active:scale-95 bg-emerald-50 border-emerald-300 text-emerald-700 hover:bg-emerald-100';
+            btn.title = 'ผู้ใช้เห็นปุ่มสมัครบัตรทอง — กดเพื่อปิดรับสมัคร';
+            label.textContent = 'เปิดรับสมัคร';
+            btn.querySelector('span.relative').innerHTML = '<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span><span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>';
+        } else {
+            btn.className = 'h-11 px-4 rounded-2xl border-2 font-black text-sm flex items-center gap-2 transition-all active:scale-95 bg-rose-50 border-rose-300 text-rose-700 hover:bg-rose-100';
+            btn.title = 'ผู้ใช้ไม่เห็นปุ่มสมัคร — กดเพื่อเปิดรับสมัคร';
+            label.textContent = 'ปิดรับสมัคร';
+            btn.querySelector('span.relative').innerHTML = '<span></span><span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-500"></span>';
+        }
+
+        Swal.fire({
+            icon: 'success',
+            title: willEnable ? 'เปิดรับสมัครแล้ว' : 'ปิดรับสมัครแล้ว',
+            timer: 1300, showConfirmButton: false,
+        });
+    } catch (e) {
+        Swal.fire({ icon: 'error', title: 'บันทึกไม่สำเร็จ', text: String(e.message || e) });
+    }
+};
+
 (function(){
     const CSRF = '<?= htmlspecialchars($csrfToken, ENT_QUOTES) ?>';
     const ENDPOINT = 'ajax_gold_card.php';
