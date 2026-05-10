@@ -219,23 +219,49 @@ rm -rf /var/www/html/e-campaignv2/uploads/gold_card/legacy/
 
 ## 📝 Field Mapping Reference
 
-### `welfarecard` → `gold_card_members`
+### `welfarecard` → `gold_card_members` (confirmed schema)
+
+ระบบเก่ามี **8 columns**:
+```sql
+CREATE TABLE `welfarecard` (
+  `id` int NOT NULL,                  -- → legacy_id
+  `pid` varchar(13) NOT NULL,         -- → citizen_id
+  `username` varchar(50) NOT NULL,    -- → full_name (⚠ ชื่อ field คือ username)
+  `gender` varchar(10) NOT NULL,      -- → gender (ชาย/หญิง → male/female)
+  `birth` date NOT NULL,              -- → date_of_birth (⚠ ชื่อ field คือ birth)
+  `signature` longtext,               -- → gold_card_documents (extract as PNG)
+  `registrar` varchar(50),            -- → remarks ("ผู้ลงทะเบียน (ระบบเก่า): ...")
+  `status` varchar(50),               -- → status ENUM (mapped from Thai)
+  `submitdate` timestamp,             -- → application_date + created_at
+);
+```
 
 | welfarecard | gold_card_members | Note |
 |---|---|---|
 | `id` | `legacy_id` | resume support |
 | `pid` | `citizen_id` | 13 digits |
-| `name` | `full_name` |  |
-| `gender` (ชาย/หญิง) | `gender` (male/female) | mapped |
-| `dob` | `date_of_birth` |  |
-| `phone` | `phone` |  |
-| `hospital` | `hospital_main` |  |
-| `sub_hospital` | `hospital_sub` |  |
-| `signature` (base64) | → `gold_card_documents` doc_type=signature | extracted as PNG |
-| `status` (Thai) | `status` (ENUM) | mapped |
+| `username` | `full_name` | ⚠️ ใช้ชื่อ `username` ใน welfarecard |
+| `gender` (ชาย/หญิง) | `gender` (male/female) | mapped via `map_gender()` |
+| `birth` | `date_of_birth` | ⚠️ ใช้ชื่อ `birth` ใน welfarecard |
+| `signature` (base64 longtext) | → `gold_card_documents` doc_type='signature' | extracted as PNG file |
+| `registrar` | → `remarks` (concat) | "ผู้ลงทะเบียน (ระบบเก่า): {name}" |
+| `status` (Thai) | `status` (ENUM) | mapped via `map_status()` |
 | `submitdate` | `application_date` + `created_at` |  |
-| `remarks` | `remarks` |  |
-| (welfareuser join) | `linked_user_id` | by citizen_id match |
+| (welfareuser join) | `linked_user_id` | by citizen_id ↔ sys_users match |
+| **uploads/{pid}.jpg** | → `gold_card_documents` doc_type='photo' | copy to `uploads/gold_card/legacy/{y}/{m}/` |
+
+### ⚠️ ฟิลด์ที่ระบบเก่า "ไม่มี" — จะเป็นค่าว่างใน gold_card_members
+
+| Field ในระบบใหม่ | Default | ผู้ใช้ต้องกรอกตอน |
+|---|---|---|
+| `phone` | `''` | renewal |
+| `hospital_main` | `''` | renewal |
+| `hospital_sub` | `''` | renewal |
+| `member_type` | `'บุคคลทั่วไป'` | renewal |
+| `position` | `''` | renewal |
+| `address` (ถ้ามีใน schema) | NULL | renewal |
+
+**แนะนำ:** สร้าง dashboard widget แสดง "Member ที่ข้อมูลไม่ครบ" + ปุ่ม Bulk SMS ขอให้ผู้ใช้มาเติมข้อมูล
 
 ### Status mapping (Thai → ENUM)
 

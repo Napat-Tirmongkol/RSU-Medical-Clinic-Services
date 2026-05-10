@@ -244,9 +244,9 @@ echo "\n<span class='info'>📋 welfarecard columns (" . count($wcCols) . "): " 
 
 $colMap = [
     'pid'        => pick_col($wcCols, ['pid', 'citizen_id', 'cid', 'national_id', 'idcard']),
-    'name'       => pick_col($wcCols, ['name', 'fullname', 'full_name', 'fname']),
+    'name'       => pick_col($wcCols, ['username', 'name', 'fullname', 'full_name', 'fname']),
     'gender'     => pick_col($wcCols, ['gender', 'sex', 'title', 'prefix']),
-    'dob'        => pick_col($wcCols, ['dob', 'birthday', 'birthdate', 'date_of_birth', 'birth_date']),
+    'dob'        => pick_col($wcCols, ['birth', 'dob', 'birthday', 'birthdate', 'date_of_birth', 'birth_date']),
     'phone'      => pick_col($wcCols, ['phone', 'tel', 'telephone', 'mobile', 'phone_number']),
     'address'    => pick_col($wcCols, ['address', 'addr', 'home_address']),
     'hospital'   => pick_col($wcCols, ['hospital', 'hosp_main', 'main_hospital', 'hospital_main', 'hosp']),
@@ -257,6 +257,7 @@ $colMap = [
     'remarks'    => pick_col($wcCols, ['remarks', 'remark', 'note', 'comment', 'notes']),
     'member_type'=> pick_col($wcCols, ['member_type', 'type', 'category', 'role']),
     'position'   => pick_col($wcCols, ['position', 'job', 'occupation']),
+    'registrar'  => pick_col($wcCols, ['registrar', 'registered_by', 'staff_name']),
 ];
 
 echo "<span class='info'>🗺️  Column mapping:</span>\n";
@@ -372,6 +373,13 @@ while (true) {
             $remarks   = trim((string)($row['c_remarks'] ?? ''));
             $memberType= trim((string)($row['c_member_type'] ?? '')) ?: 'บุคคลทั่วไป';
             $position  = trim((string)($row['c_position'] ?? ''));
+            $registrar = trim((string)($row['c_registrar'] ?? ''));
+
+            // Combine registrar info into remarks (audit trail)
+            if ($registrar !== '') {
+                $registrarNote = "ผู้ลงทะเบียน (ระบบเก่า): $registrar";
+                $remarks = $remarks ? "$remarks\n$registrarNote" : $registrarNote;
+            }
 
             $status = map_status($statusRaw);
             $appDate = $submitdate ? substr($submitdate, 0, 10) : null;
