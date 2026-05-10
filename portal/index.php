@@ -1051,7 +1051,7 @@ try {
                     <?php if (!$registryOnly): ?>
                         <button class="psb-item <?= $activeSection==='insurance_dashboard'?'psb-active':'' ?>" data-section="insurance_dashboard" onclick="switchSection('insurance_dashboard',this)">
                             <div class="psb-icon"><i class="fa-solid fa-chart-pie" style="color:#3b82f6"></i></div>
-                            <span class="psb-label" style="color:#1d4ed8;font-weight:900">Insurance Dashboard</span>
+                            <span class="psb-label" style="color:#1d4ed8;font-weight:900">Dashboard Workbook</span>
                         </button>
                         <button class="psb-item" data-section="insurance_sync" onclick="switchSection('insurance_sync',this)">
                             <div class="psb-icon"><i class="fa-solid fa-shield-halved" style="color:#0ea5e9"></i></div>
@@ -2740,7 +2740,7 @@ try {
                                             <div onclick="document.getElementById('govDashboardAccess').click()" class="premium-role-card" style="border-radius:14px;border:1.5px solid #e2e8f0;background:#fff;cursor:pointer;padding:12px;transition:all 0.2s;display:flex;align-items:center;justify-content:space-between">
                                                 <div style="display:flex;align-items:center;gap:10px">
                                                     <i class="fa-solid fa-chart-pie text-blue-500"></i>
-                                                    <span style="font-weight:800;font-size:12px;color:#475569">Insurance Dashboard Editor (สิทธิ์แก้ไข widget)</span>
+                                                    <span style="font-weight:800;font-size:12px;color:#475569">Dashboard Workbook Editor (สิทธิ์แก้ไข widget)</span>
                                                 </div>
                                                 <input type="checkbox" name="dashboard_admin_access" id="govDashboardAccess" value="1" style="width:16px;height:16px" onclick="event.stopPropagation()">
                                             </div>
@@ -4556,7 +4556,7 @@ try {
             { id: 'ai_qa_lab',     label: 'AI QA Lab',           desc: 'Sandbox คำถามจาก user', icon: 'fa-flask-vial',      tone: 'accent', type: 'section', target: 'ai_qa_lab' },
             { id: 'identity',      label: 'Identity & Governance', desc: 'จัดการสิทธิ์ผู้ใช้', shortcut: 'g i', icon: 'fa-id-card-clip',  tone: 'info',    type: 'section', target: 'identity' },
             { id: 'insurance_sync', label: 'Insurance Hub',      desc: 'ระบบสิทธิ์ประกัน',   icon: 'fa-shield-halved',      tone: 'info',    type: 'section', target: 'insurance_sync' },
-            { id: 'insurance_dashboard', label: 'Insurance Dashboard', desc: 'ภาพรวม + แก้ widgets', icon: 'fa-chart-pie',     tone: 'info',    type: 'section', target: 'insurance_dashboard' },
+            { id: 'insurance_dashboard', label: 'Dashboard Workbook', desc: 'ภาพรวม + แก้ widgets · Multi-workbook', icon: 'fa-chart-pie',     tone: 'info',    type: 'section', target: 'insurance_dashboard' },
             { id: 'gold_card_pending', label: 'ใบสมัครรออนุมัติ', desc: 'คิวสมัครบัตรทองจาก user', icon: 'fa-hourglass-half', tone: 'info',    type: 'section', target: 'gold_card_pending' },
             { id: 'gold_card',     label: 'บัตรทอง',             desc: 'จัดการบัตรทอง + เอกสาร', icon: 'fa-id-card',         tone: 'warning', type: 'section', target: 'gold_card' },
             { id: 'registry_upload', label: 'อัพโหลดรายชื่อ',    desc: 'ทะเบียน',            icon: 'fa-id-card-clip',      tone: 'info',    type: 'section', target: 'registry_upload' },

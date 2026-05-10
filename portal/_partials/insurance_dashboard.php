@@ -155,7 +155,7 @@ $publicUrl = $publicUrlBase . ($activeWorkbook ? ('?wb=' . urlencode($activeWork
     <div class="flex flex-wrap items-center justify-between gap-4">
         <div>
             <h1 class="text-2xl font-black text-slate-800 flex items-center gap-3">
-                <span class="text-3xl">📊</span> Insurance Dashboard
+                <span class="text-3xl">📊</span> Dashboard Workbook
                 <?php if ($activeWorkbook): ?>
                     <span class="text-sm font-bold text-slate-400">/ <?= htmlspecialchars($activeWorkbook['name']) ?></span>
                 <?php endif; ?>
