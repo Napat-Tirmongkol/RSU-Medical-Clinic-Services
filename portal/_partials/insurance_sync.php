@@ -4,11 +4,14 @@
  */
 declare(strict_types=1);
 
+require_once __DIR__ . '/../../includes/kpi_override_helper.php';
+
 $pdo = db();
 $csrfToken = get_csrf_token();
+$canEditKPI = ($_SESSION['admin_role'] ?? '') === 'superadmin' || !empty($_SESSION['access_dashboard_admin']);
 
 // KPI stats + last sync — loaded server-side to avoid FOUC
-$stats = ['total_active' => 0, 'total_inactive' => 0, 'staff' => 0, 'student' => 0, 'manual_override' => 0, 'total' => 0];
+$stats = ['total_active' => 0, 'total_inactive' => 0, 'staff' => 0, 'student' => 0, 'manual_override' => 0, 'total' => 0, 'expiring_soon' => 0];
 $lastSync = null;
 try {
     $r = $pdo->query("
@@ -33,6 +36,14 @@ try {
         GROUP BY sync_id ORDER BY sync_id DESC LIMIT 1
     ")->fetch(PDO::FETCH_ASSOC) ?: null;
 } catch (PDOException $e) { /* table may not exist yet */ }
+
+// Apply KPI overrides (independent of insurance_members query)
+$stats['total_active']    = kpi_with_override($pdo, 'mti_total_active',    (int)$stats['total_active']);
+$stats['staff']           = kpi_with_override($pdo, 'mti_staff',           (int)$stats['staff']);
+$stats['student']         = kpi_with_override($pdo, 'mti_student',         (int)$stats['student']);
+$stats['manual_override'] = kpi_with_override($pdo, 'mti_manual_override', (int)$stats['manual_override']);
+$stats['expiring_soon']   = kpi_with_override($pdo, 'mti_expiring_30d',    (int)($stats['expiring_soon'] ?? 0));
+$insOver = kpi_override_status($pdo);
 ?>
 
 <style>
@@ -80,50 +91,55 @@ try {
 
     <!-- ── KPI Stat Cards ── -->
     <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
-        <div class="ins-stat-card">
+        <div class="ins-stat-card km-card" data-kpi-key="mti_total_active" data-kpi-label="ประกัน MTI — Active">
             <div class="w-11 h-11 rounded-2xl bg-emerald-50 text-emerald-500 flex items-center justify-center text-lg shrink-0">
                 <i class="fa-solid fa-shield-check"></i>
             </div>
-            <div>
-                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">มีสิทธิ์ (Active)</p>
-                <p class="text-2xl font-black text-slate-800 leading-none"><?= number_format($stats['total_active']) ?></p>
+            <div class="km-body">
+                <p class="km-label text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">มีสิทธิ์ (Active)</p>
+                <p class="km-value text-2xl font-black text-slate-800 leading-none" data-value="<?= (int)$stats['total_active'] ?>"><?= number_format($stats['total_active']) ?></p>
             </div>
+            <?php if (!empty($insOver['mti_total_active'])): ?><span class="km-override-badge">OVERRIDE</span><?php endif; ?>
         </div>
-        <div class="ins-stat-card">
+        <div class="ins-stat-card km-card" data-kpi-key="mti_staff" data-kpi-label="ประกัน MTI — บุคลากร">
             <div class="w-11 h-11 rounded-2xl bg-blue-50 text-blue-500 flex items-center justify-center text-lg shrink-0">
                 <i class="fa-solid fa-user-tie"></i>
             </div>
-            <div>
-                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">บุคลากร</p>
-                <p class="text-2xl font-black text-slate-800 leading-none"><?= number_format($stats['staff']) ?></p>
+            <div class="km-body">
+                <p class="km-label text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">บุคลากร</p>
+                <p class="km-value text-2xl font-black text-slate-800 leading-none" data-value="<?= (int)$stats['staff'] ?>"><?= number_format($stats['staff']) ?></p>
             </div>
+            <?php if (!empty($insOver['mti_staff'])): ?><span class="km-override-badge">OVERRIDE</span><?php endif; ?>
         </div>
-        <div class="ins-stat-card">
+        <div class="ins-stat-card km-card" data-kpi-key="mti_student" data-kpi-label="ประกัน MTI — นักศึกษา">
             <div class="w-11 h-11 rounded-2xl bg-amber-50 text-amber-500 flex items-center justify-center text-lg shrink-0">
                 <i class="fa-solid fa-user-graduate"></i>
             </div>
-            <div>
-                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">นักศึกษา</p>
-                <p class="text-2xl font-black text-slate-800 leading-none"><?= number_format($stats['student']) ?></p>
+            <div class="km-body">
+                <p class="km-label text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">นักศึกษา</p>
+                <p class="km-value text-2xl font-black text-slate-800 leading-none" data-value="<?= (int)$stats['student'] ?>"><?= number_format($stats['student']) ?></p>
             </div>
+            <?php if (!empty($insOver['mti_student'])): ?><span class="km-override-badge">OVERRIDE</span><?php endif; ?>
         </div>
-        <div class="ins-stat-card">
+        <div class="ins-stat-card km-card" data-kpi-key="mti_manual_override" data-kpi-label="ประกัน MTI — Manual Override">
             <div class="w-11 h-11 rounded-2xl bg-rose-50 text-rose-400 flex items-center justify-center text-lg shrink-0">
                 <i class="fa-solid fa-pen-to-square"></i>
             </div>
-            <div>
-                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Manual Override</p>
-                <p class="text-2xl font-black text-slate-800 leading-none"><?= number_format($stats['manual_override']) ?></p>
+            <div class="km-body">
+                <p class="km-label text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Manual Override</p>
+                <p class="km-value text-2xl font-black text-slate-800 leading-none" data-value="<?= (int)$stats['manual_override'] ?>"><?= number_format($stats['manual_override']) ?></p>
             </div>
+            <?php if (!empty($insOver['mti_manual_override'])): ?><span class="km-override-badge">OVERRIDE</span><?php endif; ?>
         </div>
-        <div class="ins-stat-card <?= ($stats['expiring_soon'] ?? 0) > 0 ? 'border-amber-200 bg-amber-50/50' : '' ?>" style="cursor:pointer" onclick="document.getElementById('insFilterStatus').value='expiring';loadInsMembers(1)">
+        <div class="ins-stat-card km-card <?= ($stats['expiring_soon'] ?? 0) > 0 ? 'border-amber-200 bg-amber-50/50' : '' ?>" data-kpi-key="mti_expiring_30d" data-kpi-label="ประกัน MTI — ใกล้หมดอายุ">
             <div class="w-11 h-11 rounded-2xl <?= ($stats['expiring_soon'] ?? 0) > 0 ? 'bg-amber-100 text-amber-500' : 'bg-slate-50 text-slate-300' ?> flex items-center justify-center text-lg shrink-0">
                 <i class="fa-solid fa-clock"></i>
             </div>
-            <div>
-                <p class="text-[10px] font-black <?= ($stats['expiring_soon'] ?? 0) > 0 ? 'text-amber-500' : 'text-slate-400' ?> uppercase tracking-widest leading-none mb-1">ใกล้หมดอายุ ≤30 วัน</p>
-                <p class="text-2xl font-black <?= ($stats['expiring_soon'] ?? 0) > 0 ? 'text-amber-600' : 'text-slate-800' ?> leading-none"><?= number_format($stats['expiring_soon'] ?? 0) ?></p>
+            <div class="km-body">
+                <p class="km-label text-[10px] font-black <?= ($stats['expiring_soon'] ?? 0) > 0 ? 'text-amber-500' : 'text-slate-400' ?> uppercase tracking-widest leading-none mb-1">ใกล้หมดอายุ ≤30 วัน</p>
+                <p class="km-value text-2xl font-black <?= ($stats['expiring_soon'] ?? 0) > 0 ? 'text-amber-600' : 'text-slate-800' ?> leading-none" data-value="<?= (int)($stats['expiring_soon'] ?? 0) ?>"><?= number_format($stats['expiring_soon'] ?? 0) ?></p>
             </div>
+            <?php if (!empty($insOver['mti_expiring_30d'])): ?><span class="km-override-badge">OVERRIDE</span><?php endif; ?>
         </div>
     </div>
 
@@ -918,6 +934,22 @@ try {
     loadInsHistory(1);
     loadInsMembers(1);
 })();
+</script>
+
+<!-- ⚡ Cinematic KPI Morph (overdrive) ─────────────────────────── -->
+<script src="../assets/js/kpi-morph.js"></script>
+<script>
+    (function bootKPIMorph(){
+        const init = () => {
+            if (!window.KPIMorph) { return setTimeout(init, 50); }
+            window.KPIMorph.init({
+                csrf: '<?= htmlspecialchars($csrfToken, ENT_QUOTES) ?>',
+                endpoint: 'ajax_kpi_override.php',
+                editable: <?= $canEditKPI ? 'true' : 'false' ?>,
+            });
+        };
+        init();
+    })();
 </script>
 
 <!-- ── User Preview Modal ────────────────────────────────────────────────────── -->

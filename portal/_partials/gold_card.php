@@ -9,8 +9,11 @@
  */
 declare(strict_types=1);
 
+require_once __DIR__ . '/../../includes/kpi_override_helper.php';
+
 $pdo = db();
 $csrfToken = get_csrf_token();
+$canEditKPI = ($_SESSION['admin_role'] ?? '') === 'superadmin' || !empty($_SESSION['access_dashboard_admin']);
 
 $stats = ['total'=>0,'approved'=>0,'pending'=>0,'rejected'=>0,'expiring'=>0,'staff'=>0,'student'=>0];
 try {
@@ -28,6 +31,15 @@ try {
     ")->fetch(PDO::FETCH_ASSOC);
     if ($r) $stats = array_map('intval', $r);
 } catch (PDOException $e) { /* table not migrated yet */ }
+
+// Apply KPI overrides + read status (badges)
+$gcAuto = $stats;
+$stats['total']    = kpi_with_override($pdo, 'gold_total',         $stats['total']);
+$stats['approved'] = kpi_with_override($pdo, 'gold_approved',      $stats['approved']);
+$stats['pending']  = kpi_with_override($pdo, 'gold_pending_docs',  $stats['pending']);
+$stats['rejected'] = kpi_with_override($pdo, 'gold_rejected',      $stats['rejected']);
+$stats['expiring'] = kpi_with_override($pdo, 'gold_expiring_30d',  $stats['expiring']);
+$gcOver = kpi_override_status($pdo);
 ?>
 
 <style>
@@ -106,42 +118,47 @@ try {
         </div>
     </div>
 
-    <!-- ── KPI Cards (5 ใบ) ───────────────────────────────────────────── -->
+    <!-- ── KPI Cards (5 ใบ — overrideable) ─────────────────────────────── -->
     <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
-        <div class="gc-stat-card">
+        <div class="gc-stat-card km-card" data-kpi-key="gold_total" data-kpi-label="บัตรทอง — ทั้งหมด">
             <div class="gc-icon-tile bg-amber-50 text-amber-500"><i class="fa-solid fa-id-card"></i></div>
-            <div>
-                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">ทั้งหมด</p>
-                <p class="text-2xl font-black text-slate-800 leading-none"><?= number_format($stats['total']) ?></p>
+            <div class="km-body">
+                <p class="km-label text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">ทั้งหมด</p>
+                <p class="km-value text-2xl font-black text-slate-800 leading-none" data-value="<?= (int)$stats['total'] ?>"><?= number_format($stats['total']) ?></p>
             </div>
+            <?php if (!empty($gcOver['gold_total'])): ?><span class="km-override-badge">OVERRIDE</span><?php endif; ?>
         </div>
-        <div class="gc-stat-card">
+        <div class="gc-stat-card km-card" data-kpi-key="gold_approved" data-kpi-label="บัตรทอง — อนุมัติ">
             <div class="gc-icon-tile bg-emerald-50 text-emerald-500"><i class="fa-solid fa-circle-check"></i></div>
-            <div>
-                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">อนุมัติแล้ว</p>
-                <p class="text-2xl font-black text-slate-800 leading-none"><?= number_format($stats['approved']) ?></p>
+            <div class="km-body">
+                <p class="km-label text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">อนุมัติแล้ว</p>
+                <p class="km-value text-2xl font-black text-slate-800 leading-none" data-value="<?= (int)$stats['approved'] ?>"><?= number_format($stats['approved']) ?></p>
             </div>
+            <?php if (!empty($gcOver['gold_approved'])): ?><span class="km-override-badge">OVERRIDE</span><?php endif; ?>
         </div>
-        <div class="gc-stat-card">
+        <div class="gc-stat-card km-card" data-kpi-key="gold_pending_docs" data-kpi-label="บัตรทอง — รอเอกสาร">
             <div class="gc-icon-tile bg-blue-50 text-blue-500"><i class="fa-solid fa-hourglass-half"></i></div>
-            <div>
-                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">รอ/ส่งแล้ว</p>
-                <p class="text-2xl font-black text-slate-800 leading-none"><?= number_format($stats['pending']) ?></p>
+            <div class="km-body">
+                <p class="km-label text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">รอ/ส่งแล้ว</p>
+                <p class="km-value text-2xl font-black text-slate-800 leading-none" data-value="<?= (int)$stats['pending'] ?>"><?= number_format($stats['pending']) ?></p>
             </div>
+            <?php if (!empty($gcOver['gold_pending_docs'])): ?><span class="km-override-badge">OVERRIDE</span><?php endif; ?>
         </div>
-        <div class="gc-stat-card">
+        <div class="gc-stat-card km-card" data-kpi-key="gold_rejected" data-kpi-label="บัตรทอง — ไม่ผ่าน">
             <div class="gc-icon-tile bg-rose-50 text-rose-500"><i class="fa-solid fa-circle-xmark"></i></div>
-            <div>
-                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">ไม่ผ่าน</p>
-                <p class="text-2xl font-black text-slate-800 leading-none"><?= number_format($stats['rejected']) ?></p>
+            <div class="km-body">
+                <p class="km-label text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">ไม่ผ่าน</p>
+                <p class="km-value text-2xl font-black text-slate-800 leading-none" data-value="<?= (int)$stats['rejected'] ?>"><?= number_format($stats['rejected']) ?></p>
             </div>
+            <?php if (!empty($gcOver['gold_rejected'])): ?><span class="km-override-badge">OVERRIDE</span><?php endif; ?>
         </div>
-        <div class="gc-stat-card <?= $stats['expiring'] > 0 ? 'border-amber-300 bg-amber-50/50' : '' ?>">
+        <div class="gc-stat-card km-card <?= $stats['expiring'] > 0 ? 'border-amber-300 bg-amber-50/50' : '' ?>" data-kpi-key="gold_expiring_30d" data-kpi-label="บัตรทอง — ใกล้หมด ≤30 วัน">
             <div class="gc-icon-tile <?= $stats['expiring'] > 0 ? 'bg-amber-100 text-amber-600' : 'bg-slate-50 text-slate-300' ?>"><i class="fa-solid fa-clock"></i></div>
-            <div>
-                <p class="text-[10px] font-black <?= $stats['expiring'] > 0 ? 'text-amber-600' : 'text-slate-400' ?> uppercase tracking-widest leading-none mb-1">ใกล้หมด ≤30วัน</p>
-                <p class="text-2xl font-black leading-none <?= $stats['expiring'] > 0 ? 'text-amber-700' : 'text-slate-800' ?>"><?= number_format($stats['expiring']) ?></p>
+            <div class="km-body">
+                <p class="km-label text-[10px] font-black <?= $stats['expiring'] > 0 ? 'text-amber-600' : 'text-slate-400' ?> uppercase tracking-widest leading-none mb-1">ใกล้หมด ≤30วัน</p>
+                <p class="km-value text-2xl font-black leading-none <?= $stats['expiring'] > 0 ? 'text-amber-700' : 'text-slate-800' ?>" data-value="<?= (int)$stats['expiring'] ?>"><?= number_format($stats['expiring']) ?></p>
             </div>
+            <?php if (!empty($gcOver['gold_expiring_30d'])): ?><span class="km-override-badge">OVERRIDE</span><?php endif; ?>
         </div>
     </div>
 
@@ -1202,4 +1219,20 @@ try {
     gcLoadMembers(1);
     loadCharts();
 })();
+</script>
+
+<!-- ⚡ Cinematic KPI Morph (overdrive) ─────────────────────────── -->
+<script src="../assets/js/kpi-morph.js"></script>
+<script>
+    (function bootKPIMorph(){
+        const init = () => {
+            if (!window.KPIMorph) { return setTimeout(init, 50); }
+            window.KPIMorph.init({
+                csrf: '<?= htmlspecialchars($csrfToken, ENT_QUOTES) ?>',
+                endpoint: 'ajax_kpi_override.php',
+                editable: <?= $canEditKPI ? 'true' : 'false' ?>,
+            });
+        };
+        init();
+    })();
 </script>

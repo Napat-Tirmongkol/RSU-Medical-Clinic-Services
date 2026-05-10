@@ -141,20 +141,31 @@ $publicUrl = $_scheme . ($_SERVER['HTTP_HOST'] ?? 'localhost') . $_basePath . '/
 
             <?php if ($w['widget_type'] === 'kpi'):
                 $val = (int)($w['data']['value'] ?? 0);
+                $autoVal = (int)($w['data']['auto'] ?? $val);
+                $isOverridden = $autoVal !== $val;
+                $kpiKey = $w['data_source'] ?? '';
+                $kpiAllowed = require_once __DIR__ . '/../../includes/kpi_override_helper.php';
+                $kpiCatalog = function_exists('kpi_override_catalog') ? kpi_override_catalog() : [];
+                $isEditableKpi = isset($kpiCatalog[$kpiKey]);
                 $colorMap = ['blue'=>'bg-blue-50 text-blue-500','emerald'=>'bg-emerald-50 text-emerald-500','amber'=>'bg-amber-50 text-amber-500','rose'=>'bg-rose-50 text-rose-500','purple'=>'bg-purple-50 text-purple-500','cyan'=>'bg-cyan-50 text-cyan-500','indigo'=>'bg-indigo-50 text-indigo-500','slate'=>'bg-slate-50 text-slate-500'];
                 $iconBg = $colorMap[$w['color_theme']] ?? $colorMap['blue'];
             ?>
-                <div class="flex items-start gap-4">
+                <div class="flex items-start gap-4 <?= $isEditableKpi ? 'km-card' : '' ?>"
+                     <?php if ($isEditableKpi): ?>
+                        data-kpi-key="<?= htmlspecialchars($kpiKey) ?>"
+                        data-kpi-label="<?= htmlspecialchars($w['title']) ?>"
+                     <?php endif; ?>>
                     <div class="w-12 h-12 rounded-2xl <?= $iconBg ?> flex items-center justify-center text-xl shrink-0">
                         <i class="fa-solid fa-chart-simple"></i>
                     </div>
-                    <div class="flex-1 min-w-0">
-                        <p class="id-kpi-label mb-1 truncate"><?= htmlspecialchars($w['title']) ?></p>
-                        <p class="id-kpi-value"><?= number_format($val) ?></p>
+                    <div class="flex-1 min-w-0 km-body">
+                        <p class="km-label id-kpi-label mb-1 truncate"><?= htmlspecialchars($w['title']) ?></p>
+                        <p class="km-value id-kpi-value" data-value="<?= $val ?>"><?= number_format($val) ?></p>
                         <?php if (!empty($w['subtitle'])): ?>
                             <p class="text-xs text-slate-400 font-bold mt-2"><?= htmlspecialchars($w['subtitle']) ?></p>
                         <?php endif; ?>
                     </div>
+                    <?php if ($isOverridden): ?><span class="km-override-badge">OVERRIDE</span><?php endif; ?>
                 </div>
             <?php else: ?>
                 <div class="mb-3">
@@ -637,4 +648,20 @@ $publicUrl = $_scheme . ($_SERVER['HTTP_HOST'] ?? 'localhost') . $_basePath . '/
     // ── init ────────────────────────────────────────────────────────
     renderAllCharts();
 })();
+</script>
+
+<!-- ⚡ Cinematic KPI Morph (overdrive) ─────────────────────────── -->
+<script src="../assets/js/kpi-morph.js"></script>
+<script>
+    (function bootKPIMorph(){
+        const init = () => {
+            if (!window.KPIMorph) { return setTimeout(init, 50); }
+            window.KPIMorph.init({
+                csrf: '<?= htmlspecialchars($csrfToken, ENT_QUOTES) ?>',
+                endpoint: 'ajax_kpi_override.php',
+                editable: <?= $canEdit ? 'true' : 'false' ?>,
+            });
+        };
+        init();
+    })();
 </script>

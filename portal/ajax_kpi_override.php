@@ -1,0 +1,130 @@
+<?php
+/**
+ * portal/ajax_kpi_override.php
+ * Admin endpoint สำหรับ override KPI value
+ *
+ * Permission: superadmin หรือ access_dashboard_admin
+ *
+ * actions:
+ *   set    — POST kpi_key, value, note → upsert + is_active=1
+ *   clear  — POST kpi_key              → is_active=0 (เก็บ history)
+ *   get    — POST kpi_key              → คืน {value, is_active, note, updated_at}
+ *   list   — คืนทั้งหมด (พร้อม catalog)
+ */
+declare(strict_types=1);
+
+require_once __DIR__ . '/includes/auth.php';
+header('Content-Type: application/json; charset=utf-8');
+require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../includes/ajax_helpers.php';
+require_once __DIR__ . '/../includes/csrf.php';
+require_once __DIR__ . '/../includes/kpi_override_helper.php';
+
+$adminRole = $_SESSION['admin_role'] ?? '';
+$adminId   = (int)($_SESSION['admin_id'] ?? 0);
+$isSuper   = $adminRole === 'superadmin';
+$canEdit   = $isSuper || !empty($_SESSION['access_dashboard_admin']);
+
+if (!$canEdit) json_err('ไม่มีสิทธิ์แก้ไขค่า KPI', 403);
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') json_err('Method not allowed', 405);
+if (function_exists('validate_csrf_or_die')) validate_csrf_or_die();
+
+$pdo    = db();
+$action = $_POST['action'] ?? '';
+$catalog = kpi_override_catalog();
+
+// Auto-migrate guard
+try {
+    $pdo->exec("CREATE TABLE IF NOT EXISTS ins_kpi_overrides (
+        kpi_key VARCHAR(100) NOT NULL PRIMARY KEY,
+        override_value BIGINT NOT NULL DEFAULT 0,
+        is_active TINYINT(1) NOT NULL DEFAULT 1,
+        note VARCHAR(500) NOT NULL DEFAULT '',
+        updated_by INT UNSIGNED NULL,
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_active (is_active)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+} catch (PDOException $e) { /* silent */ }
+
+try {
+    switch ($action) {
+
+        case 'set': {
+            $key   = trim((string)($_POST['kpi_key'] ?? ''));
+            $value = (int)($_POST['value'] ?? 0);
+            $note  = trim((string)($_POST['note'] ?? ''));
+
+            if (!isset($catalog[$key])) json_err('KPI key ไม่ถูกต้อง: ' . htmlspecialchars($key));
+            if ($value < 0) json_err('ค่าต้อง ≥ 0');
+
+            $stmt = $pdo->prepare("INSERT INTO ins_kpi_overrides
+                (kpi_key, override_value, is_active, note, updated_by)
+                VALUES (?, ?, 1, ?, ?)
+                ON DUPLICATE KEY UPDATE
+                    override_value = VALUES(override_value),
+                    is_active      = 1,
+                    note           = VALUES(note),
+                    updated_by     = VALUES(updated_by)");
+            $stmt->execute([$key, $value, $note, $adminId ?: null]);
+
+            json_ok([
+                'kpi_key'   => $key,
+                'value'     => $value,
+                'is_active' => 1,
+                'message'   => 'ตั้งค่า override เรียบร้อย',
+            ]);
+        }
+
+        case 'clear': {
+            $key = trim((string)($_POST['kpi_key'] ?? ''));
+            if (!isset($catalog[$key])) json_err('KPI key ไม่ถูกต้อง');
+            $pdo->prepare("UPDATE ins_kpi_overrides SET is_active = 0, updated_by = ? WHERE kpi_key = ?")
+                ->execute([$adminId ?: null, $key]);
+            json_ok(['kpi_key' => $key, 'message' => 'ปิดการ override แล้ว — ใช้ค่าจริง']);
+        }
+
+        case 'get': {
+            $key = trim((string)($_POST['kpi_key'] ?? ''));
+            if (!isset($catalog[$key])) json_err('KPI key ไม่ถูกต้อง');
+            $stmt = $pdo->prepare("SELECT override_value, is_active, note, updated_at FROM ins_kpi_overrides WHERE kpi_key = ?");
+            $stmt->execute([$key]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            json_ok([
+                'kpi_key'   => $key,
+                'label'     => $catalog[$key]['label'],
+                'value'     => $row ? (int)$row['override_value'] : null,
+                'is_active' => $row ? (int)$row['is_active'] : 0,
+                'note'      => $row['note'] ?? '',
+                'updated_at'=> $row['updated_at'] ?? null,
+            ]);
+        }
+
+        case 'list': {
+            $rows = $pdo->query("SELECT * FROM ins_kpi_overrides")->fetchAll(PDO::FETCH_ASSOC) ?: [];
+            $byKey = [];
+            foreach ($rows as $r) $byKey[$r['kpi_key']] = $r;
+
+            $out = [];
+            foreach ($catalog as $key => $meta) {
+                $r = $byKey[$key] ?? null;
+                $out[] = [
+                    'kpi_key'   => $key,
+                    'label'     => $meta['label'],
+                    'group'     => $meta['group'],
+                    'value'     => $r ? (int)$r['override_value'] : null,
+                    'is_active' => $r ? (int)$r['is_active'] : 0,
+                    'note'      => $r['note'] ?? '',
+                    'updated_at'=> $r['updated_at'] ?? null,
+                ];
+            }
+            json_ok(['overrides' => $out]);
+        }
+
+        default:
+            json_err('ไม่รู้จัก action — ' . htmlspecialchars($action));
+    }
+} catch (Throwable $e) {
+    error_log('[ajax_kpi_override] ' . $e->getMessage());
+    json_err('ระบบขัดข้อง: ' . $e->getMessage(), 500);
+}

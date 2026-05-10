@@ -21,6 +21,8 @@ declare(strict_types=1);
 
 if (!function_exists('dashboard_data_sources_catalog')) {
 
+    require_once __DIR__ . '/kpi_override_helper.php';
+
     /**
      * คืน catalog ของ predefined sources (ไม่รวม custom datasets)
      * @return array<string, array{label:string, shape:string, widgets:array<string>}>
@@ -153,26 +155,23 @@ if (!function_exists('dashboard_data_sources_catalog')) {
         }
 
         switch ($key) {
-            case 'mti_total_active':
-                return [
-                    'shape' => 'count',
-                    'value' => (int)_safe_scalar($pdo, "SELECT COUNT(*) FROM insurance_members WHERE insurance_status='Active'"),
-                ];
+            case 'mti_total_active': {
+                $auto = (int)_safe_scalar($pdo, "SELECT COUNT(*) FROM insurance_members WHERE insurance_status='Active'");
+                return ['shape' => 'count', 'value' => kpi_with_override($pdo, $key, $auto), 'auto' => $auto];
+            }
 
-            case 'mti_total_all':
-                return [
-                    'shape' => 'count',
-                    'value' => (int)_safe_scalar($pdo, "SELECT COUNT(*) FROM insurance_members"),
-                ];
+            case 'mti_total_all': {
+                $auto = (int)_safe_scalar($pdo, "SELECT COUNT(*) FROM insurance_members");
+                return ['shape' => 'count', 'value' => kpi_with_override($pdo, $key, $auto), 'auto' => $auto];
+            }
 
-            case 'mti_expiring_30d':
-                return [
-                    'shape' => 'count',
-                    'value' => (int)_safe_scalar($pdo,
-                        "SELECT COUNT(*) FROM insurance_members
-                         WHERE insurance_status='Active'
-                           AND coverage_end BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 30 DAY)"),
-                ];
+            case 'mti_expiring_30d': {
+                $auto = (int)_safe_scalar($pdo,
+                    "SELECT COUNT(*) FROM insurance_members
+                     WHERE insurance_status='Active'
+                       AND coverage_end BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 30 DAY)");
+                return ['shape' => 'count', 'value' => kpi_with_override($pdo, $key, $auto), 'auto' => $auto];
+            }
 
             case 'mti_breakdown_type':
                 return _resolve_breakdown($pdo,
@@ -188,25 +187,20 @@ if (!function_exists('dashboard_data_sources_catalog')) {
                 return _resolve_monthly_trend($pdo, 'insurance_members', 'created_at', 'ประกันอุบัติเหตุ');
 
             // ── บัตรทอง ─────────────────────────────────────────────
-            case 'gold_total':
-                return [
-                    'shape' => 'count',
-                    'value' => (int)_safe_scalar($pdo, "SELECT COUNT(*) FROM gold_card_members"),
-                ];
+            case 'gold_total': {
+                $auto = (int)_safe_scalar($pdo, "SELECT COUNT(*) FROM gold_card_members");
+                return ['shape' => 'count', 'value' => kpi_with_override($pdo, $key, $auto), 'auto' => $auto];
+            }
 
-            case 'gold_approved':
-                return [
-                    'shape' => 'count',
-                    'value' => (int)_safe_scalar($pdo,
-                        "SELECT COUNT(*) FROM gold_card_members WHERE status IN ('approved','active')"),
-                ];
+            case 'gold_approved': {
+                $auto = (int)_safe_scalar($pdo, "SELECT COUNT(*) FROM gold_card_members WHERE status IN ('approved','active')");
+                return ['shape' => 'count', 'value' => kpi_with_override($pdo, $key, $auto), 'auto' => $auto];
+            }
 
-            case 'gold_pending_docs':
-                return [
-                    'shape' => 'count',
-                    'value' => (int)_safe_scalar($pdo,
-                        "SELECT COUNT(*) FROM gold_card_members WHERE status IN ('pending','submitted')"),
-                ];
+            case 'gold_pending_docs': {
+                $auto = (int)_safe_scalar($pdo, "SELECT COUNT(*) FROM gold_card_members WHERE status IN ('pending','submitted')");
+                return ['shape' => 'count', 'value' => kpi_with_override($pdo, $key, $auto), 'auto' => $auto];
+            }
 
             case 'gold_by_status':
                 $statusLabels = [
@@ -240,12 +234,14 @@ if (!function_exists('dashboard_data_sources_catalog')) {
                 return _resolve_monthly_trend($pdo, 'gold_card_members', 'created_at', 'บัตรทอง');
 
             // ── Combined ────────────────────────────────────────────
-            case 'coverage_total':
+            case 'coverage_total': {
                 $mti  = (int)_safe_scalar($pdo,
                     "SELECT COUNT(DISTINCT citizen_id) FROM insurance_members WHERE insurance_status='Active'");
                 $gold = (int)_safe_scalar($pdo,
                     "SELECT COUNT(DISTINCT citizen_id) FROM gold_card_members WHERE status IN ('approved','active')");
-                return ['shape' => 'count', 'value' => $mti + $gold];
+                $auto = $mti + $gold;
+                return ['shape' => 'count', 'value' => kpi_with_override($pdo, $key, $auto), 'auto' => $auto];
+            }
 
             case 'coverage_compare_trend':
                 $mti  = _resolve_monthly_trend($pdo, 'insurance_members', 'created_at', 'ประกัน MTI');
