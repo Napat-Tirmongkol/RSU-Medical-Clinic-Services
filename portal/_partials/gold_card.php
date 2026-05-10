@@ -1181,22 +1181,26 @@ $gcOver = kpi_override_status($pdo);
     window.gcQuickReject  = (id, name) => gcQuickStatusChange(id, name, 'rejected');
 
     // ── Send LINE message to member ──────────────────────────────────────
-    const GC_MSG_TEMPLATES = [
+    window.GC_MSG_TEMPLATES = [
         { label: '⏰ ใกล้หมดอายุ',   text: 'แจ้งเตือน: บัตรทองของท่านใกล้หมดอายุ กรุณาติดต่อเพื่อต่ออายุ' },
         { label: '🏥 เปลี่ยนโรงพยาบาล', text: 'ท่านสามารถเปลี่ยนโรงพยาบาลหลักได้ — กรุณาติดต่อกลับที่ห้องพยาบาลในเวลาทำการ' },
         { label: '📞 ติดต่อกลับ',     text: 'กรุณาติดต่อกลับที่ห้องพยาบาล โทร 02-791-6000 ต่อ 4499' },
         { label: '✅ บัตรพร้อมใช้',   text: 'บัตรทองของท่านพร้อมใช้งานแล้ว — สามารถใช้สิทธิรักษาได้ที่โรงพยาบาลหลักที่ลงทะเบียนไว้' },
     ];
+    window.gcFillTpl = function(idx) {
+        const ta = document.getElementById('swal2-textarea');
+        if (ta && window.GC_MSG_TEMPLATES[idx]) ta.value = window.GC_MSG_TEMPLATES[idx].text;
+    };
 
     window.gcSendMessage = async function(id, name) {
-        const tplHtml = GC_MSG_TEMPLATES.map(t =>
-            `<button type="button" onclick="document.getElementById('swal2-textarea').value=${JSON.stringify(t.text)};"
-                class="m-1 px-3 py-1.5 rounded-lg bg-slate-50 hover:bg-purple-100 border border-slate-200 hover:border-purple-300 text-xs font-bold text-slate-700 hover:text-purple-700 transition-all">${t.label}</button>`
+        const tplHtml = window.GC_MSG_TEMPLATES.map((t, i) =>
+            `<button type="button" onclick="window.gcFillTpl(${i})"
+                class="m-1 px-3 py-1.5 rounded-lg bg-slate-50 hover:bg-purple-100 border border-slate-200 hover:border-purple-300 text-xs font-bold text-slate-700 hover:text-purple-700 transition-all">${escapeHtml(t.label)}</button>`
         ).join('');
 
         const result = await Swal.fire({
             title: 'ส่งข้อความผ่าน LINE',
-            html: `<div class="text-left mb-2"><b class="text-base">${name}</b><br><span class="text-xs text-slate-500">ข้อความจะถูกส่งจาก LINE Official</span></div>
+            html: `<div class="text-left mb-2"><b class="text-base">${escapeHtml(name)}</b><br><span class="text-xs text-slate-500">ข้อความจะถูกส่งจาก LINE Official</span></div>
                    <div class="flex flex-wrap justify-center mb-2 mt-3">${tplHtml}</div>`,
             input: 'textarea',
             inputPlaceholder: 'พิมพ์ข้อความ...',
