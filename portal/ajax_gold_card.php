@@ -318,6 +318,107 @@ try {
             ]);
         }
 
+        case 'folder:download': {
+            // ดาวน์โหลด ZIP ของทุกเอกสารใน folder year+month (หรือ no_date)
+            if (!class_exists('ZipArchive')) json_err('PHP ext-zip ไม่พร้อมใช้งาน');
+
+            $year   = (int)($_POST['year'] ?? 0);
+            $month  = (int)($_POST['month'] ?? 0);
+            $noDate = !empty($_POST['no_date']);
+
+            $where = ''; $params = [];
+            if ($noDate) {
+                $where = 'WHERE m.application_date IS NULL';
+            } elseif ($year > 1900 && $month >= 1 && $month <= 12) {
+                $where = 'WHERE YEAR(m.application_date) = ? AND MONTH(m.application_date) = ?';
+                $params = [$year, $month];
+            } else {
+                json_err('ระบุ year/month หรือ no_date ไม่ถูกต้อง');
+            }
+
+            $sql = "SELECT m.id AS member_id, m.full_name, m.citizen_id,
+                           d.id AS doc_id, d.doc_type, d.file_name, d.stored_path
+                    FROM gold_card_members m
+                    INNER JOIN gold_card_documents d ON d.member_id = m.id
+                    $where
+                    ORDER BY m.full_name ASC, d.uploaded_at ASC";
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($params);
+            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            if (empty($rows)) json_err('โฟลเดอร์ว่าง — ไม่มีไฟล์ให้ดาวน์โหลด');
+
+            // ชื่อโฟลเดอร์ใน ZIP + ชื่อ file ZIP
+            $thaiAbbr = ['','มค','กพ','มีค','เมย','พค','มิย','กค','สค','กย','ตค','พย','ธค'];
+            $zipFolderName = $noDate
+                ? 'ไม่ระบุเดือน'
+                : $month . $thaiAbbr[$month] . substr((string)($year + 543), -2);
+
+            // สร้าง ZIP ใน temp file
+            $tmpZip = tempnam(sys_get_temp_dir(), 'gc_zip_');
+            $zip = new ZipArchive();
+            if ($zip->open($tmpZip, ZipArchive::OVERWRITE | ZipArchive::CREATE) !== true) {
+                @unlink($tmpZip);
+                json_err('สร้าง ZIP ไม่สำเร็จ');
+            }
+
+            $base = gold_card_uploads_dir();
+            $added = 0;
+            $missing = 0;
+            $usedNames = [];
+
+            foreach ($rows as $r) {
+                $src = $base . '/' . $r['stored_path'];
+                if (!is_file($src)) { $missing++; continue; }
+
+                // Sanitize folder name (member name) — ตัดอักขระที่ใช้ใน path ไม่ได้
+                $memName = preg_replace('/[\/\\\\:*?"<>|\x00-\x1f]/u', '_', $r['full_name'] ?: ('member_' . $r['member_id']));
+                $memName = trim($memName) ?: ('member_' . $r['member_id']);
+
+                // Sanitize filename
+                $fileName = preg_replace('/[\/\\\\:*?"<>|\x00-\x1f]/u', '_', $r['file_name']);
+
+                // Avoid name collision in same member folder (เผื่อชื่อไฟล์ซ้ำ)
+                $internalPath = "$zipFolderName/$memName/$fileName";
+                $i = 2;
+                while (isset($usedNames[$internalPath])) {
+                    $info = pathinfo($fileName);
+                    $newName = $info['filename'] . "_$i" . (isset($info['extension']) ? '.' . $info['extension'] : '');
+                    $internalPath = "$zipFolderName/$memName/$newName";
+                    $i++;
+                }
+                $usedNames[$internalPath] = true;
+
+                $zip->addFile($src, $internalPath);
+                $added++;
+            }
+
+            // เพิ่มไฟล์ index.txt สรุปเนื้อหา
+            $summary = "📦 บัตรทอง — โฟลเดอร์ $zipFolderName\n";
+            $summary .= "สร้างเมื่อ: " . date('Y-m-d H:i:s') . "\n";
+            $summary .= "ไฟล์ทั้งหมด: $added" . ($missing > 0 ? " (ไฟล์หายจาก storage: $missing)" : '') . "\n";
+            $summary .= "สมาชิก: " . count(array_unique(array_column($rows, 'member_id'))) . " ราย\n";
+            $zip->addFromString("$zipFolderName/_README.txt", $summary);
+
+            $zip->close();
+
+            if ($added === 0) {
+                @unlink($tmpZip);
+                json_err('ไม่พบไฟล์เอกสารใน storage');
+            }
+
+            // Stream ZIP กลับ
+            $zipFileName = 'gold_card_' . $zipFolderName . '.zip';
+            header_remove('Content-Type');
+            header('Content-Type: application/zip');
+            header('Content-Disposition: attachment; filename="' . rawurlencode($zipFileName) . '"; filename*=UTF-8\'\'' . rawurlencode($zipFileName));
+            header('Content-Length: ' . filesize($tmpZip));
+            header('Cache-Control: no-store');
+            readfile($tmpZip);
+            @unlink($tmpZip);
+            exit;
+        }
+
         case 'folder:delete': {
             // ลบสมาชิกทั้งหมดในโฟลเดอร์ year+month (หรือ no_date)
             $year   = (int)($_POST['year'] ?? 0);

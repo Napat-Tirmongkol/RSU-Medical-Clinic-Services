@@ -173,24 +173,30 @@ $gcOver = kpi_override_status($pdo);
     }
 
     /* Delete buttons (folder + tile) */
-    #section-gold_card .gc-tile-delete {
-        position: absolute; top: 6px; right: 6px;
+    #section-gold_card .gc-tile-delete,
+    #section-gold_card .gc-tile-download {
+        position: absolute; top: 6px;
         width: 26px; height: 26px; border-radius: 8px; border: none;
-        background: rgba(220, 38, 38, .92); color: #fff;
-        cursor: pointer; opacity: 0;
+        color: #fff; cursor: pointer; opacity: 0;
         font-size: 11px; z-index: 5;
         display: flex; align-items: center; justify-content: center;
         transition: opacity .2s, transform .25s cubic-bezier(.34,1.56,.64,1), background .15s;
         transform: scale(.7) rotate(-8deg);
     }
+    #section-gold_card .gc-tile-delete   { right: 6px;  background: rgba(220, 38, 38, .92); }
+    #section-gold_card .gc-tile-download { right: 38px; background: rgba(16, 185, 129, .92); }
     #section-gold_card .gc-folder-tile,
     #section-gold_card .gc-member-tile { position: relative; }
     #section-gold_card .gc-folder-tile:hover .gc-tile-delete,
+    #section-gold_card .gc-folder-tile:hover .gc-tile-download,
     #section-gold_card .gc-member-tile:hover .gc-tile-delete {
         opacity: 1; transform: scale(1) rotate(0);
     }
     #section-gold_card .gc-tile-delete:hover {
         background: #b91c1c; transform: scale(1.12) rotate(4deg) !important;
+    }
+    #section-gold_card .gc-tile-download:hover {
+        background: #047857; transform: scale(1.12) rotate(-4deg) !important;
     }
 
     #section-gold_card .gc-folder-delete-bar {
@@ -220,6 +226,20 @@ $gcOver = kpi_override_status($pdo);
         box-shadow: 0 10px 18px -3px rgba(220,38,38,.55);
     }
     #section-gold_card .gc-folder-delete-btn:active { transform: translateY(1px); }
+
+    #section-gold_card .gc-folder-download-btn {
+        height: 36px; padding: 0 14px;
+        background: #10b981; color: #fff; border: none;
+        border-radius: 10px; font-size: 12px; font-weight: 900;
+        cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
+        transition: background .15s, transform .12s, box-shadow .15s;
+        box-shadow: 0 6px 12px -3px rgba(16,185,129,.4);
+    }
+    #section-gold_card .gc-folder-download-btn:hover {
+        background: #059669; transform: translateY(-1px);
+        box-shadow: 0 10px 18px -3px rgba(16,185,129,.55);
+    }
+    #section-gold_card .gc-folder-download-btn:active { transform: translateY(1px); }
 
     /* Bulk scan: month source badges */
     #section-gold_card .gc-month-badge {
@@ -775,6 +795,9 @@ $gcOver = kpi_override_status($pdo);
                     const ratio = f.count > 0 ? (f.approved / f.count * 100) : 0;
                     html += `
                         <div class="gc-folder-tile" onclick="gcOpenFolder(${f.year}, ${f.month})">
+                            <button class="gc-tile-download" onclick="event.stopPropagation(); gcDownloadFolder(${f.year}, ${f.month}, false, '${escapeAttr(f.full_label)}')" title="ดาวน์โหลด ZIP">
+                                <i class="fa-solid fa-cloud-arrow-down"></i>
+                            </button>
                             <button class="gc-tile-delete" onclick="event.stopPropagation(); gcDeleteFolder(${f.year}, ${f.month}, false, '${escapeAttr(f.full_label)}', ${f.count})" title="ลบโฟลเดอร์นี้">
                                 <i class="fa-solid fa-trash"></i>
                             </button>
@@ -842,17 +865,20 @@ $gcOver = kpi_override_status($pdo);
 
             let html = '';
 
-            // Folder delete bar (เฉพาะตอนเข้าใน folder)
+            // Folder action bar (download + delete)
             if (rows.length > 0) {
                 html += `
                 <div class="gc-folder-delete-bar">
-                    <div class="gc-warn-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                    <div class="gc-warn-icon"><i class="fa-solid fa-folder"></i></div>
                     <div class="flex-1 min-w-0">
                         <div class="text-[13px] font-black text-rose-800">${escapeHtml(folderLabel)}</div>
                         <div class="text-[11px] text-rose-700 font-bold">${rows.length.toLocaleString()} ไฟล์ในโฟลเดอร์นี้</div>
                     </div>
+                    <button class="gc-folder-download-btn" onclick="gcDownloadFolder(${year}, ${month}, ${noDateFlag}, '${escapeAttr(folderLabel)}')">
+                        <i class="fa-solid fa-cloud-arrow-down"></i> ดาวน์โหลด ZIP
+                    </button>
                     <button class="gc-folder-delete-btn" onclick="gcDeleteFolder(${year}, ${month}, ${noDateFlag}, '${escapeAttr(folderLabel)}', ${rows.length})">
-                        <i class="fa-solid fa-trash-can"></i> ลบโฟลเดอร์ทั้งหมด
+                        <i class="fa-solid fa-trash-can"></i> ลบทั้งโฟลเดอร์
                     </button>
                 </div>`;
             }
@@ -918,6 +944,50 @@ $gcOver = kpi_override_status($pdo);
                 Swal.fire({ icon: 'error', title: 'ผิดพลาด', text: r.message });
             }
         });
+    };
+
+    window.gcDownloadFolder = function(year, month, noDate, label) {
+        Swal.fire({
+            title: 'กำลังเตรียม ZIP...',
+            html: `รวมไฟล์ในโฟลเดอร์ <b>${escapeHtml(label)}</b><br><span class="text-xs text-slate-400">โฟลเดอร์ใหญ่อาจใช้เวลา ~30 วินาที</span>`,
+            allowOutsideClick: false, didOpen: () => Swal.showLoading()
+        });
+
+        const fd = new FormData();
+        fd.append('entity', 'folder');
+        fd.append('action', 'download');
+        fd.append('csrf_token', CSRF);
+        if (noDate) fd.append('no_date', '1');
+        else { fd.append('year', year); fd.append('month', month); }
+
+        fetch(ENDPOINT, { method: 'POST', body: fd, credentials: 'same-origin' })
+            .then(async r => {
+                const ct = r.headers.get('Content-Type') || '';
+                if (ct.includes('application/zip')) {
+                    return r.blob().then(blob => ({ ok: true, blob }));
+                }
+                // Server ตอบ JSON error → แสดง message
+                return r.json().then(j => ({ ok: false, message: j.message || 'ดาวน์โหลดไม่สำเร็จ' }));
+            })
+            .then(res => {
+                Swal.close();
+                if (!res.ok) {
+                    Swal.fire({ icon: 'error', title: 'ผิดพลาด', text: res.message });
+                    return;
+                }
+                const url = URL.createObjectURL(res.blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'gold_card_' + label.replace(/[^฀-๿a-zA-Z0-9_\-]/g, '_') + '.zip';
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                setTimeout(() => URL.revokeObjectURL(url), 5000);
+            })
+            .catch(err => {
+                Swal.close();
+                Swal.fire({ icon: 'error', title: 'เครือข่ายขัดข้อง', text: String(err) });
+            });
     };
 
     window.gcDeleteFolder = async function(year, month, noDate, label, count) {
