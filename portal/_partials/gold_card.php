@@ -145,6 +145,25 @@ try {
         </div>
     </div>
 
+    <!-- ── Bulk Import Card ───────────────────────────────────────────── -->
+    <div class="bg-gradient-to-br from-amber-50 via-white to-orange-50 border border-amber-200 rounded-[2rem] p-6 shadow-sm">
+        <div class="flex flex-wrap items-start gap-5">
+            <div class="w-14 h-14 rounded-2xl bg-white shadow-sm flex items-center justify-center text-amber-500 text-2xl shrink-0">
+                <i class="fa-solid fa-folder-arrow-up"></i>
+            </div>
+            <div class="flex-1 min-w-[250px]">
+                <h3 class="text-base font-black text-slate-800">📁 นำเข้าจากไฟล์ (Bulk Import)</h3>
+                <p class="text-xs font-bold text-slate-500 mt-1 leading-relaxed">
+                    อัปโหลดไฟล์เอกสารบัตรทองหลายๆ ไฟล์พร้อมกัน · ระบบจะอ่านชื่อจากไฟล์แล้วจับคู่กับนักศึกษาในระบบ
+                    <br><span class="text-amber-600">→ ถ้าชื่อตรงกัน นักศึกษาจะได้สถานะ Active บัตรทองในโปรไฟล์อัตโนมัติ</span>
+                </p>
+            </div>
+            <button onclick="gcOpenBulkModal()" class="h-12 px-6 bg-amber-500 hover:bg-amber-600 text-white font-black rounded-2xl shadow-lg shadow-amber-200 active:scale-95 transition-all flex items-center gap-2 text-sm">
+                <i class="fa-solid fa-cloud-arrow-up"></i> เริ่มนำเข้า
+            </button>
+        </div>
+    </div>
+
     <!-- ── Charts row (Trend + Hospital Bar) ──────────────────────────── -->
     <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <div class="bg-white rounded-[1.5rem] border border-slate-200 shadow-sm p-6">
@@ -335,6 +354,82 @@ try {
             <button onclick="gcSaveMember()" class="flex-2 h-11 px-6 bg-amber-500 hover:bg-amber-600 text-white font-black rounded-xl text-sm shadow-lg shadow-amber-200 transition-all flex items-center justify-center gap-2" style="flex:2">
                 <i class="fa-solid fa-floppy-disk"></i> บันทึก
             </button>
+        </div>
+    </div>
+</div>
+
+<!-- ════════════ BULK IMPORT MODAL ════════════ -->
+<div id="gcBulkModal" class="fixed inset-0 hidden items-center justify-center bg-black/50 backdrop-blur-sm gc-modal">
+    <div class="bg-white rounded-[2rem] w-full max-w-5xl mx-4 shadow-2xl flex flex-col gc-modal-box">
+        <div class="px-7 pt-6 pb-4 border-b border-slate-100 flex items-center justify-between shrink-0">
+            <h3 class="text-lg font-black text-slate-900"><i class="fa-solid fa-folder-arrow-up text-amber-500 mr-2"></i> นำเข้าจากไฟล์ (Bulk Import)</h3>
+            <button onclick="gcCloseBulkModal()" class="w-9 h-9 bg-slate-50 text-slate-400 hover:text-slate-600 rounded-full flex items-center justify-center"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+
+        <div class="overflow-y-auto flex-1 px-7 py-5 space-y-5">
+            <!-- Step 1: Select files -->
+            <div id="gcBulkStep1" class="space-y-4">
+                <div class="bg-blue-50 border border-blue-200 rounded-2xl p-4 text-xs text-blue-800 font-bold leading-relaxed">
+                    <p class="mb-1"><i class="fa-solid fa-circle-info mr-1"></i> <b>วิธีตั้งชื่อไฟล์:</b></p>
+                    <p class="text-blue-700">ใช้ชื่อนักศึกษาเป็นชื่อไฟล์ เช่น <code class="bg-white px-2 py-0.5 rounded">นายสมชาย ใจดี.pdf</code> หรือ <code class="bg-white px-2 py-0.5 rounded">63123456_นายสมชาย ใจดี.pdf</code> (ระบบตัดเลขนำหน้าออกอัตโนมัติ)</p>
+                </div>
+
+                <label class="block">
+                    <div class="gc-dropzone" id="gcBulkDropzone">
+                        <i class="fa-solid fa-cloud-arrow-up text-4xl mb-2"></i>
+                        <p class="text-base font-black">ลากไฟล์มาวาง / คลิกเพื่อเลือก</p>
+                        <p class="text-xs font-bold mt-1 text-amber-600">เลือกได้หลายไฟล์พร้อมกัน · PDF / JPG / PNG / DOC · ≤20MB ต่อไฟล์</p>
+                    </div>
+                    <input type="file" id="gcBulkFiles" multiple accept=".pdf,.png,.jpg,.jpeg,.doc,.docx" class="hidden">
+                </label>
+
+                <div id="gcBulkFileList" class="hidden space-y-1 text-xs text-slate-600 font-bold max-h-32 overflow-y-auto bg-slate-50 rounded-xl p-3"></div>
+
+                <div class="flex justify-end">
+                    <button id="gcBulkScanBtn" disabled onclick="gcBulkScan()" class="h-11 px-6 bg-blue-500 hover:bg-blue-600 text-white font-black rounded-xl text-sm shadow-lg disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2">
+                        <i class="fa-solid fa-magnifying-glass"></i> สแกนและจับคู่
+                    </button>
+                </div>
+            </div>
+
+            <!-- Step 2: Match results -->
+            <div id="gcBulkStep2" class="hidden space-y-4">
+                <div id="gcBulkSummary" class="grid grid-cols-2 md:grid-cols-4 gap-3"></div>
+
+                <div class="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+                    <table class="w-full text-xs">
+                        <thead class="bg-slate-50 border-b border-slate-200">
+                            <tr class="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                                <th class="px-3 py-2 text-left">ไฟล์</th>
+                                <th class="px-3 py-2 text-left">ชื่อที่ดึง</th>
+                                <th class="px-3 py-2 text-center">สถานะ</th>
+                                <th class="px-3 py-2 text-left">นักศึกษา (sys_users)</th>
+                                <th class="px-3 py-2 text-center">ดำเนินการ</th>
+                            </tr>
+                        </thead>
+                        <tbody id="gcBulkResultRows"></tbody>
+                    </table>
+                </div>
+
+                <div class="flex justify-between items-center gap-3">
+                    <button onclick="gcBulkBackToStep1()" class="h-11 px-5 bg-white border border-slate-200 text-slate-600 font-black rounded-xl text-sm hover:bg-slate-50">
+                        <i class="fa-solid fa-arrow-left mr-1"></i> ย้อนกลับ
+                    </button>
+                    <button id="gcBulkCommitBtn" onclick="gcBulkCommit()" class="h-11 px-6 bg-amber-500 hover:bg-amber-600 text-white font-black rounded-xl text-sm shadow-lg shadow-amber-200 flex items-center gap-2">
+                        <i class="fa-solid fa-check-double"></i> ยืนยันสร้าง <span id="gcBulkCommitCount" class="bg-white/20 px-2 py-0.5 rounded text-[10px]">0</span> รายการ
+                    </button>
+                </div>
+            </div>
+
+            <!-- Step 3: Result -->
+            <div id="gcBulkStep3" class="hidden space-y-4 text-center py-8">
+                <div class="w-16 h-16 mx-auto rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center text-3xl">
+                    <i class="fa-solid fa-circle-check"></i>
+                </div>
+                <h4 class="text-lg font-black text-slate-800">นำเข้าเสร็จสิ้น</h4>
+                <div id="gcBulkResultText" class="text-sm text-slate-600 font-bold"></div>
+                <button onclick="gcCloseBulkModal(); location.reload();" class="h-11 px-6 bg-blue-500 text-white font-black rounded-xl text-sm">เสร็จสิ้น</button>
+            </div>
         </div>
     </div>
 </div>
@@ -735,6 +830,186 @@ try {
         while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
         return n.toFixed(1) + ' ' + u[i];
     }
+
+    // ── BULK IMPORT ─────────────────────────────────────────────────
+    let bulkFiles = null;       // FileList from input
+    let bulkScanReport = null;  // server response
+    let bulkSelectedItems = [];
+
+    window.gcOpenBulkModal = function() {
+        const modal = document.getElementById('gcBulkModal');
+        modal.classList.remove('hidden'); modal.classList.add('flex');
+        gcBulkBackToStep1();
+        document.getElementById('gcBulkFiles').value = '';
+        bulkFiles = null;
+        document.getElementById('gcBulkScanBtn').disabled = true;
+        document.getElementById('gcBulkFileList').classList.add('hidden');
+    };
+    window.gcCloseBulkModal = function() {
+        const modal = document.getElementById('gcBulkModal');
+        modal.classList.add('hidden'); modal.classList.remove('flex');
+    };
+    window.gcBulkBackToStep1 = function() {
+        document.getElementById('gcBulkStep1').classList.remove('hidden');
+        document.getElementById('gcBulkStep2').classList.add('hidden');
+        document.getElementById('gcBulkStep3').classList.add('hidden');
+    };
+
+    document.getElementById('gcBulkDropzone').addEventListener('click', () => document.getElementById('gcBulkFiles').click());
+    ['dragenter','dragover'].forEach(ev => document.getElementById('gcBulkDropzone').addEventListener(ev, e => { e.preventDefault(); document.getElementById('gcBulkDropzone').classList.add('gc-drag-over'); }));
+    ['dragleave','drop'].forEach(ev => document.getElementById('gcBulkDropzone').addEventListener(ev, e => { e.preventDefault(); document.getElementById('gcBulkDropzone').classList.remove('gc-drag-over'); }));
+    document.getElementById('gcBulkDropzone').addEventListener('drop', e => {
+        const dt = new DataTransfer();
+        for (const f of e.dataTransfer.files) dt.items.add(f);
+        document.getElementById('gcBulkFiles').files = dt.files;
+        bulkOnFilesSelected();
+    });
+    document.getElementById('gcBulkFiles').addEventListener('change', bulkOnFilesSelected);
+
+    function bulkOnFilesSelected() {
+        const input = document.getElementById('gcBulkFiles');
+        if (!input.files || input.files.length === 0) return;
+        bulkFiles = input.files;
+        const list = document.getElementById('gcBulkFileList');
+        list.innerHTML = `<div class="font-black text-slate-700 mb-1">📎 เลือกแล้ว ${bulkFiles.length} ไฟล์:</div>` +
+            Array.from(bulkFiles).map(f => `<div>• ${escapeHtml(f.name)} <span class="text-slate-400">(${formatBytes(f.size)})</span></div>`).join('');
+        list.classList.remove('hidden');
+        document.getElementById('gcBulkScanBtn').disabled = false;
+    }
+
+    window.gcBulkScan = function() {
+        if (!bulkFiles || bulkFiles.length === 0) return;
+        const fd = new FormData();
+        for (const f of bulkFiles) fd.append('files[]', f);
+        Swal.fire({ title: 'กำลังสแกน...', html: 'กรุณารอสักครู่', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+        gcPost('bulk', 'scan', fd, true).then(r => {
+            Swal.close();
+            if (r.status !== 'ok') { Swal.fire({icon:'error',title:'ผิดพลาด',text:r.message}); return; }
+            bulkScanReport = r.report;
+            renderBulkResults(r.report);
+            document.getElementById('gcBulkStep1').classList.add('hidden');
+            document.getElementById('gcBulkStep2').classList.remove('hidden');
+        });
+    };
+
+    function renderBulkResults(report) {
+        const sum = { matched: 0, ambiguous: 0, no_match: 0, exists: 0 };
+        report.forEach(r => {
+            if (r.already_exists) sum.exists++;
+            else if (r.status === 'matched') sum.matched++;
+            else if (r.status === 'ambiguous') sum.ambiguous++;
+            else sum.no_match++;
+        });
+
+        document.getElementById('gcBulkSummary').innerHTML = `
+            <div class="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3"><p class="text-[10px] font-black text-emerald-600 uppercase">จับคู่สำเร็จ</p><p class="text-2xl font-black text-emerald-700">${sum.matched}</p></div>
+            <div class="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3"><p class="text-[10px] font-black text-amber-600 uppercase">ต้องเลือก</p><p class="text-2xl font-black text-amber-700">${sum.ambiguous}</p></div>
+            <div class="bg-rose-50 border border-rose-200 rounded-xl px-4 py-3"><p class="text-[10px] font-black text-rose-600 uppercase">ไม่พบในระบบ</p><p class="text-2xl font-black text-rose-700">${sum.no_match}</p></div>
+            <div class="bg-slate-100 border border-slate-200 rounded-xl px-4 py-3"><p class="text-[10px] font-black text-slate-500 uppercase">มีในระบบแล้ว</p><p class="text-2xl font-black text-slate-700">${sum.exists}</p></div>
+        `;
+
+        const tbody = document.getElementById('gcBulkResultRows');
+        tbody.innerHTML = report.map((r, i) => {
+            if (r.already_exists) {
+                return `<tr class="border-b border-slate-100 bg-slate-50">
+                    <td class="px-3 py-2 font-mono text-slate-500">${escapeHtml(r.filename)}</td>
+                    <td class="px-3 py-2 text-slate-500">${escapeHtml(r.extracted_name || '—')}</td>
+                    <td class="px-3 py-2 text-center"><span class="gc-badge bg-slate-200 text-slate-600">มีอยู่แล้ว</span></td>
+                    <td class="px-3 py-2 text-slate-400" colspan="2">ข้าม (ไฟล์/ผู้ใช้นี้มีอยู่แล้ว)</td>
+                </tr>`;
+            }
+            const statusBadge = {
+                matched:   `<span class="gc-badge gc-badge-active">✓ จับคู่ได้</span>`,
+                ambiguous: `<span class="gc-badge gc-badge-pending">⚠ ซ้ำ ${r.candidates.length} คน</span>`,
+                no_match:  `<span class="gc-badge gc-badge-rejected">✗ ไม่พบ</span>`,
+                no_name:   `<span class="gc-badge gc-badge-rejected">ชื่อว่าง</span>`,
+                upload_error: `<span class="gc-badge gc-badge-rejected">upload error</span>`,
+            }[r.status] || r.status;
+
+            const userCell = r.user
+                ? `<div class="font-black text-slate-800">${escapeHtml(r.user.full_name)}</div>
+                   <div class="text-[10px] text-slate-500">รหัส: ${escapeHtml(r.user.student_personnel_id || '—')} · บัตรปชช.: ${escapeHtml(r.user.citizen_id || '—')}</div>`
+                : `<select id="gcBulkSel_${i}" class="text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-slate-50 w-full" onchange="gcBulkSelectChange(${i},this.value)">
+                       <option value="">— เลือกผู้ใช้ (พิมพ์เพื่อค้นหา) —</option>
+                       ${(r.candidates || []).map(c => `<option value='${JSON.stringify(c)}'>${escapeHtml(c.full_name)} (${escapeHtml(c.student_personnel_id || '-')})</option>`).join('')}
+                   </select>
+                   <input type="text" placeholder="ค้นหาชื่อ/รหัส..." class="mt-1 text-xs border border-slate-200 rounded-lg px-2 py-1 bg-white w-full" onkeyup="gcBulkSearchUser(${i}, this.value)">`;
+
+            const checked = r.status === 'matched' ? 'checked' : '';
+            return `<tr class="border-b border-slate-100" data-bulk-idx="${i}">
+                <td class="px-3 py-2 font-mono text-slate-700">${escapeHtml(r.filename)}</td>
+                <td class="px-3 py-2 text-slate-700">${escapeHtml(r.extracted_name || '—')}</td>
+                <td class="px-3 py-2 text-center">${statusBadge}</td>
+                <td class="px-3 py-2">${userCell}</td>
+                <td class="px-3 py-2 text-center">
+                    <label class="inline-flex items-center gap-1 cursor-pointer">
+                        <input type="checkbox" class="gc-bulk-include w-4 h-4 accent-amber-500" ${checked} onchange="gcBulkUpdateCount()">
+                        <span class="text-[11px] font-bold">นำเข้า</span>
+                    </label>
+                </td>
+            </tr>`;
+        }).join('');
+
+        gcBulkUpdateCount();
+    }
+
+    window.gcBulkSelectChange = function(i, val) {
+        if (!val) { bulkScanReport[i].user = null; return; }
+        try { bulkScanReport[i].user = JSON.parse(val); } catch {}
+        gcBulkUpdateCount();
+    };
+
+    let userSearchTimer;
+    window.gcBulkSearchUser = function(i, q) {
+        clearTimeout(userSearchTimer);
+        userSearchTimer = setTimeout(() => {
+            if (q.length < 2) return;
+            gcPost('bulk', 'search_users', { q }).then(r => {
+                if (r.status !== 'ok') return;
+                const sel = document.getElementById('gcBulkSel_' + i);
+                sel.innerHTML = '<option value="">— เลือก —</option>' +
+                    r.users.map(u => `<option value='${JSON.stringify(u)}'>${escapeHtml(u.full_name)} (${escapeHtml(u.student_personnel_id || '-')})</option>`).join('');
+            });
+        }, 300);
+    };
+
+    window.gcBulkUpdateCount = function() {
+        const checks = document.querySelectorAll('.gc-bulk-include:checked');
+        document.getElementById('gcBulkCommitCount').textContent = checks.length;
+        document.getElementById('gcBulkCommitBtn').disabled = checks.length === 0;
+    };
+
+    window.gcBulkCommit = function() {
+        const items = [];
+        document.querySelectorAll('.gc-bulk-include:checked').forEach(cb => {
+            const tr = cb.closest('tr');
+            const idx = parseInt(tr.dataset.bulkIdx);
+            const r = bulkScanReport[idx];
+            items.push({
+                index: idx,
+                name: r.user ? r.user.full_name : (r.extracted_name || ''),
+                user_id: r.user ? r.user.id : null,
+                citizen_id: r.user ? r.user.citizen_id : null,
+            });
+        });
+        if (items.length === 0) { Swal.fire({icon:'info',title:'ยังไม่ได้เลือกรายการ'}); return; }
+
+        const fd = new FormData();
+        for (const f of bulkFiles) fd.append('files[]', f);
+        fd.append('items', JSON.stringify(items));
+
+        Swal.fire({ title: 'กำลังนำเข้า...', html: `กำลังประมวลผล ${items.length} รายการ`, allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+        gcPost('bulk', 'commit', fd, true).then(r => {
+            Swal.close();
+            if (r.status !== 'ok') { Swal.fire({icon:'error',title:'ผิดพลาด',text:r.message}); return; }
+            document.getElementById('gcBulkStep2').classList.add('hidden');
+            document.getElementById('gcBulkStep3').classList.remove('hidden');
+            document.getElementById('gcBulkResultText').innerHTML =
+                `สร้าง <b class="text-emerald-600 text-lg">${r.created}</b> รายการ` +
+                (r.skipped > 0 ? ` · ข้าม <b class="text-slate-500">${r.skipped}</b>` : '') +
+                (r.errors && r.errors.length > 0 ? `<div class="mt-3 text-xs text-rose-500 max-h-32 overflow-y-auto">${r.errors.map(e => '• ' + escapeHtml(e)).join('<br>')}</div>` : '');
+        });
+    };
 
     // ── init ────────────────────────────────────────────────────────
     gcLoadMembers(1);

@@ -101,6 +101,55 @@ try {
     json_err('ตาราง gold_card_members ยังไม่ถูกสร้าง — กรุณารัน migrate_gold_card_module.php ก่อน');
 }
 
+// Auto-add bulk import columns ถ้าไม่มี (self-healing)
+try {
+    $cols = $pdo->query("SHOW COLUMNS FROM gold_card_members")->fetchAll(PDO::FETCH_COLUMN);
+    if (!in_array('linked_user_id', $cols, true)) {
+        $pdo->exec("ALTER TABLE gold_card_members ADD COLUMN linked_user_id INT UNSIGNED NULL AFTER citizen_id, ADD INDEX idx_linked_user (linked_user_id)");
+    }
+    if (!in_array('source_filename', $cols, true)) {
+        $pdo->exec("ALTER TABLE gold_card_members ADD COLUMN source_filename VARCHAR(500) NULL AFTER remarks");
+    }
+} catch (PDOException $e) { /* silent */ }
+
+// ── Helper: ดึงชื่อจาก filename + match กับ sys_users ─────────────────────────
+function gc_extract_name(string $filename): string
+{
+    $name = pathinfo($filename, PATHINFO_FILENAME);
+    // ลบเลขนำหน้า เช่น "63123456_นายสมชาย" หรือ "631234_..."
+    $name = preg_replace('/^[\d_\-\s.]+/u', '', $name);
+    // ลบ suffix ที่เป็นตัวเลข/วันที่ ที่ตามหลัง _ หรือ -
+    $name = preg_replace('/[_\-\s]+\d+$/u', '', $name);
+    return trim($name);
+}
+
+function gc_match_user(PDO $pdo, string $filename): array
+{
+    $name = gc_extract_name($filename);
+    if ($name === '') return ['status' => 'no_name', 'name' => '', 'candidates' => []];
+
+    // 1) Exact match
+    $stmt = $pdo->prepare("SELECT id, full_name, citizen_id, student_personnel_id, status
+                           FROM sys_users WHERE TRIM(full_name) = ? LIMIT 5");
+    $stmt->execute([$name]);
+    $exact = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    if (count($exact) === 1) return ['status' => 'matched', 'name' => $name, 'user' => $exact[0]];
+    if (count($exact) > 1)   return ['status' => 'ambiguous', 'name' => $name, 'candidates' => $exact];
+
+    // 2) Fuzzy match (substring)
+    $stmt = $pdo->prepare("SELECT id, full_name, citizen_id, student_personnel_id, status
+                           FROM sys_users
+                           WHERE full_name LIKE CONCAT('%', ?, '%')
+                              OR ? LIKE CONCAT('%', full_name, '%')
+                           LIMIT 5");
+    $stmt->execute([$name, $name]);
+    $fuzzy = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    if (count($fuzzy) === 1) return ['status' => 'matched', 'name' => $name, 'user' => $fuzzy[0]];
+    if (count($fuzzy) > 1)   return ['status' => 'ambiguous', 'name' => $name, 'candidates' => $fuzzy];
+
+    return ['status' => 'no_match', 'name' => $name, 'candidates' => []];
+}
+
 // ── Dispatch ──────────────────────────────────────────────────────────────────
 try {
     switch ("$entity:$action") {
@@ -366,6 +415,174 @@ try {
             header('Content-Length: ' . filesize($path));
             readfile($path);
             exit;
+        }
+
+        case 'bulk:scan': {
+            // รับไฟล์หลายๆ ไฟล์ → preview ผลการ match (ยังไม่ commit)
+            // Files ส่งมาเป็น $_FILES['files']['name'][...] (multiple)
+            if (empty($_FILES['files']['name'])) json_err('ไม่พบไฟล์');
+            if (!is_array($_FILES['files']['name'])) json_err('ใช้ <input type="file" multiple> เท่านั้น');
+
+            $report = [];
+            $names  = $_FILES['files']['name'];
+            $errors = $_FILES['files']['error'];
+            $sizes  = $_FILES['files']['size'];
+
+            foreach ($names as $i => $fname) {
+                if ($errors[$i] !== UPLOAD_ERR_OK) {
+                    $report[] = ['filename' => $fname, 'status' => 'upload_error', 'name' => '', 'size' => 0];
+                    continue;
+                }
+                $match = gc_match_user($pdo, $fname);
+                $extracted = $match['name'];
+
+                // Check if already exists
+                $existsId = null;
+                if (!empty($match['user']['citizen_id'])) {
+                    $st = $pdo->prepare("SELECT id FROM gold_card_members WHERE citizen_id = ? LIMIT 1");
+                    $st->execute([$match['user']['citizen_id']]);
+                    $existsId = (int)$st->fetchColumn() ?: null;
+                }
+                if (!$existsId) {
+                    $st = $pdo->prepare("SELECT id FROM gold_card_members WHERE source_filename = ? LIMIT 1");
+                    $st->execute([$fname]);
+                    $existsId = (int)$st->fetchColumn() ?: null;
+                }
+
+                $report[] = [
+                    'index'      => $i,
+                    'filename'   => $fname,
+                    'extracted_name' => $extracted,
+                    'size'       => $sizes[$i],
+                    'status'     => $match['status'],
+                    'user'       => $match['user'] ?? null,
+                    'candidates' => $match['candidates'] ?? [],
+                    'already_exists' => $existsId,
+                ];
+            }
+            json_ok(['report' => $report]);
+        }
+
+        case 'bulk:commit': {
+            // Commit รายการที่ admin confirm แล้ว
+            // POST: items[] = JSON array of:
+            //   { filename, name, user_id (nullable), citizen_id (nullable), tmp_idx }
+            // Files ยัง stay ใน $_FILES['files']
+            if (empty($_FILES['files']['name'])) json_err('ไม่พบไฟล์');
+            $itemsJson = $_POST['items'] ?? '[]';
+            $items = json_decode($itemsJson, true);
+            if (!is_array($items)) json_err('items ไม่ถูกต้อง');
+
+            $created = 0; $skipped = 0; $errs = [];
+
+            foreach ($items as $it) {
+                $idx       = (int)($it['index'] ?? -1);
+                $filename  = $_FILES['files']['name'][$idx] ?? '';
+                $tmpName   = $_FILES['files']['tmp_name'][$idx] ?? '';
+                $errCode   = $_FILES['files']['error'][$idx] ?? UPLOAD_ERR_NO_FILE;
+                $userId    = !empty($it['user_id']) ? (int)$it['user_id'] : null;
+                $citizenId = !empty($it['citizen_id']) ? preg_replace('/\D/', '', (string)$it['citizen_id']) : null;
+                $fullName  = trim((string)($it['name'] ?? ''));
+
+                if ($errCode !== UPLOAD_ERR_OK || !is_uploaded_file($tmpName)) {
+                    $skipped++; $errs[] = "$filename: upload error"; continue;
+                }
+                if ($fullName === '') { $skipped++; $errs[] = "$filename: ไม่มีชื่อ"; continue; }
+
+                // Skip duplicates
+                if ($citizenId) {
+                    $st = $pdo->prepare("SELECT id FROM gold_card_members WHERE citizen_id = ? LIMIT 1");
+                    $st->execute([$citizenId]);
+                    if ($st->fetchColumn()) { $skipped++; $errs[] = "$filename: citizen_id ซ้ำ"; continue; }
+                }
+
+                // INSERT member
+                $stmt = $pdo->prepare("INSERT INTO gold_card_members
+                    (citizen_id, linked_user_id, full_name, member_type, status,
+                     source_filename, application_date, coverage_start, created_by)
+                    VALUES (?,?,?,?,?,?,?,?,?)");
+                $memberType = $userId ? 'นักศึกษา' : 'บุคคลทั่วไป';
+                $stmt->execute([
+                    $citizenId ?: null,
+                    $userId,
+                    $fullName,
+                    $memberType,
+                    $userId ? 'active' : 'pending',
+                    $filename,
+                    date('Y-m-d'),
+                    date('Y-m-d'),
+                    $adminId ?: null
+                ]);
+                $newId = (int)$pdo->lastInsertId();
+
+                // Save file
+                $saved = gold_card_save_uploaded_file([
+                    'name' => $filename, 'tmp_name' => $tmpName,
+                    'error' => UPLOAD_ERR_OK,
+                    'size' => $_FILES['files']['size'][$idx] ?? 0,
+                    'type' => $_FILES['files']['type'][$idx] ?? null,
+                ], $newId);
+
+                if ($saved) {
+                    $pdo->prepare("INSERT INTO gold_card_documents
+                        (member_id, doc_type, file_name, stored_path, mime_type, file_size, sha1_hash, uploaded_by)
+                        VALUES (?,?,?,?,?,?,?,?)")
+                       ->execute([
+                            $newId, 'application',
+                            $saved['file_name'], $saved['stored_path'],
+                            $saved['mime_type'], $saved['file_size'], $saved['sha1_hash'],
+                            $adminId ?: null,
+                       ]);
+                }
+
+                gold_card_log_history($pdo, $newId, 'bulk_imported', null, [
+                    'filename' => $filename, 'matched_user_id' => $userId
+                ], $adminId);
+                $created++;
+            }
+
+            json_ok([
+                'created' => $created,
+                'skipped' => $skipped,
+                'errors'  => $errs,
+                'message' => "สร้าง $created รายการ" . ($skipped > 0 ? " · ข้าม $skipped" : ''),
+            ]);
+        }
+
+        case 'bulk:link_user': {
+            // Manual link: admin เลือก member + user จาก dropdown
+            $memberId = (int)($_POST['member_id'] ?? 0);
+            $userId   = (int)($_POST['user_id'] ?? 0);
+            if ($memberId <= 0 || $userId <= 0) json_err('ระบุ member_id + user_id ไม่ถูกต้อง');
+
+            $u = $pdo->prepare("SELECT id, full_name, citizen_id FROM sys_users WHERE id = ? LIMIT 1");
+            $u->execute([$userId]);
+            $user = $u->fetch(PDO::FETCH_ASSOC);
+            if (!$user) json_err('ไม่พบ user');
+
+            $pdo->prepare("UPDATE gold_card_members
+                           SET linked_user_id = ?, citizen_id = COALESCE(NULLIF(citizen_id,''), ?), status = 'active'
+                           WHERE id = ?")
+                ->execute([$userId, $user['citizen_id'] ?: null, $memberId]);
+
+            gold_card_log_history($pdo, $memberId, 'linked_to_user', null, [
+                'user_id' => $userId, 'user_name' => $user['full_name']
+            ], $adminId);
+
+            json_ok(['message' => 'Link เรียบร้อย — สถานะเปลี่ยนเป็น Active']);
+        }
+
+        case 'bulk:search_users': {
+            // ค้นหา users ใน sys_users สำหรับ manual matching dropdown
+            $q = trim((string)($_POST['q'] ?? ''));
+            if (mb_strlen($q) < 2) json_ok(['users' => []]);
+            $stmt = $pdo->prepare("SELECT id, full_name, citizen_id, student_personnel_id, status
+                                   FROM sys_users
+                                   WHERE full_name LIKE ? OR student_personnel_id LIKE ? OR citizen_id LIKE ?
+                                   ORDER BY full_name ASC LIMIT 20");
+            $like = "%$q%";
+            $stmt->execute([$like, $like, $like]);
+            json_ok(['users' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
         }
 
         default:

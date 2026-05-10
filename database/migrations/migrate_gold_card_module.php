@@ -18,7 +18,8 @@ $results = [];
 try {
     $pdo->exec("CREATE TABLE IF NOT EXISTS gold_card_members (
         id                INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-        citizen_id        VARCHAR(13)              NOT NULL,
+        citizen_id        VARCHAR(13)              NULL,
+        linked_user_id    INT UNSIGNED             NULL,
         full_name         VARCHAR(255)             NOT NULL DEFAULT '',
         member_type       VARCHAR(50)              NOT NULL DEFAULT 'บุคคลทั่วไป',
         position          VARCHAR(100)             NOT NULL DEFAULT '',
@@ -31,10 +32,12 @@ try {
         status            ENUM('pending','submitted','approved','active','rejected','expired')
                                                    NOT NULL DEFAULT 'pending',
         remarks           TEXT                     NULL,
+        source_filename   VARCHAR(500)             NULL,
         created_by        INT UNSIGNED             NULL,
         created_at        DATETIME                 NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at        DATETIME                 NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         UNIQUE KEY uniq_citizen_id (citizen_id),
+        INDEX idx_linked_user (linked_user_id),
         INDEX idx_status (status),
         INDEX idx_member_type (member_type),
         INDEX idx_hospital_main (hospital_main),
