@@ -56,6 +56,10 @@ $reset   = !empty($_GET['reset']);
 $limit   = isset($_GET['limit']) ? max(1, (int)$_GET['limit']) : 0;
 $adminId = (int)($_SESSION['admin_id'] ?? 0);
 
+// Cross-DB support: ?legacy_db=rsu  → query tables ใน DB อื่นบน server เดียวกัน
+$LEGACY_DB = preg_replace('/[^a-zA-Z0-9_]/', '', trim($_GET['legacy_db'] ?? ''));
+$DB_PREFIX = $LEGACY_DB !== '' ? "`$LEGACY_DB`." : '';
+
 // ── Config ───────────────────────────────────────────────────────────────────
 $LEGACY_UPLOADS_DIR = dirname(__DIR__, 2) . '/welfarecard_old/uploads';
 $NEW_UPLOADS_BASE   = dirname(__DIR__, 2) . '/uploads/gold_card';
@@ -97,13 +101,13 @@ function normalize_datetime(?string $d): ?string {
     return $ts ? date('Y-m-d H:i:s', $ts) : null;
 }
 
-function table_exists(PDO $pdo, string $name): bool {
-    try { $pdo->query("SELECT 1 FROM `$name` LIMIT 1"); return true; }
+function table_exists(PDO $pdo, string $name, string $dbPrefix = ''): bool {
+    try { $pdo->query("SELECT 1 FROM {$dbPrefix}`$name` LIMIT 1"); return true; }
     catch (PDOException $e) { return false; }
 }
 
-function get_columns(PDO $pdo, string $table): array {
-    return array_column($pdo->query("SHOW COLUMNS FROM `$table`")->fetchAll(PDO::FETCH_ASSOC), 'Field');
+function get_columns(PDO $pdo, string $table, string $dbPrefix = ''): array {
+    return array_column($pdo->query("SHOW COLUMNS FROM {$dbPrefix}`$table`")->fetchAll(PDO::FETCH_ASSOC), 'Field');
 }
 
 /** หาคอลัมน์ที่มีจริงจาก list ตามลำดับความสำคัญ */
@@ -211,6 +215,7 @@ header('Content-Type: text/html; charset=utf-8');
         <?php if ($dryRun): ?><span class="badge dry">⚠ DRY-RUN — ไม่เขียน DB</span><?php else: ?><span class="badge live">🔥 LIVE MODE</span><?php endif; ?>
         <?php if ($reset): ?><span class="badge reset">🗑 RESET — ลบ bulk-import เก่า</span><?php endif; ?>
         <?php if ($limit): ?><span class="badge dry">📏 LIMIT <?= $limit ?></span><?php endif; ?>
+        <?php if ($LEGACY_DB): ?><span class="badge live">🔗 Source DB: <?= htmlspecialchars($LEGACY_DB) ?></span><?php endif; ?>
     </div>
     <div class="log" id="log"><?php
 
@@ -218,15 +223,16 @@ flush();
 $startTime = microtime(true);
 
 // ── 1. Verify source tables ──────────────────────────────────────────────────
-echo "[" . date('H:i:s') . "] เริ่ม migration...\n";
-if (!table_exists($pdo, 'welfarecard')) {
-    echo "<span class='err'>❌ ตาราง `welfarecard` ไม่พบ — กรุณา import welfarecard.sql ก่อน</span>\n";
+echo "[" . date('H:i:s') . "] เริ่ม migration" . ($LEGACY_DB ? " (cross-DB: $LEGACY_DB)" : "") . "...\n";
+if (!table_exists($pdo, 'welfarecard', $DB_PREFIX)) {
+    echo "<span class='err'>❌ ตาราง `welfarecard` ไม่พบ" . ($LEGACY_DB ? " ใน database `$LEGACY_DB`" : "") . "</span>\n";
+    echo "<span class='warn'>💡 ลองเพิ่ม <code>?legacy_db=rsu</code> ใน URL — ถ้าตารางอยู่ใน DB อื่นบน server เดียวกัน</span>\n";
     echo "</div></body></html>";
     exit;
 }
-echo "<span class='ok'>✓ พบตาราง `welfarecard`</span>\n";
+echo "<span class='ok'>✓ พบตาราง `welfarecard`" . ($LEGACY_DB ? " ใน `$LEGACY_DB`" : "") . "</span>\n";
 
-$hasUserTable = table_exists($pdo, 'welfareuser');
+$hasUserTable = table_exists($pdo, 'welfareuser', $DB_PREFIX);
 echo $hasUserTable
     ? "<span class='ok'>✓ พบตาราง `welfareuser`</span>\n"
     : "<span class='warn'>⚠ ไม่พบ `welfareuser` — จะ skip user matching</span>\n";
@@ -239,7 +245,7 @@ if ($reset && !$dryRun) {
 }
 
 // ── 3. Detect welfarecard schema ─────────────────────────────────────────────
-$wcCols = get_columns($pdo, 'welfarecard');
+$wcCols = get_columns($pdo, 'welfarecard', $DB_PREFIX);
 echo "\n<span class='info'>📋 welfarecard columns (" . count($wcCols) . "): " . implode(', ', $wcCols) . "</span>\n";
 
 $colMap = [
@@ -286,7 +292,7 @@ if ($sysUsersExists) {
 // ── 4.5. Pre-load welfareuser → indexed by pid (mobile + lineid lookup) ──────
 $wuByPid = [];
 if ($hasUserTable) {
-    $wuCols = get_columns($pdo, 'welfareuser');
+    $wuCols = get_columns($pdo, 'welfareuser', $DB_PREFIX);
     $wuMobileCol = pick_col($wuCols, ['mobile', 'phone', 'tel', 'phone_number']);
     $wuLineCol   = pick_col($wuCols, ['lineid', 'line_id', 'line_user_id', 'uid']);
     $wuPidCol    = pick_col($wuCols, ['pid', 'citizen_id']);
@@ -295,7 +301,7 @@ if ($hasUserTable) {
         $wuSelect = "SELECT `$wuPidCol` AS pid";
         if ($wuMobileCol) $wuSelect .= ", `$wuMobileCol` AS mobile";
         if ($wuLineCol)   $wuSelect .= ", `$wuLineCol` AS lineid";
-        $wuSelect .= " FROM welfareuser ORDER BY id DESC";
+        $wuSelect .= " FROM {$DB_PREFIX}`welfareuser` ORDER BY id DESC";
 
         try {
             $wuRows = $pdo->query($wuSelect)->fetchAll(PDO::FETCH_ASSOC);
@@ -320,7 +326,7 @@ $migratedSet = array_flip(array_map('intval', $migratedRows));
 echo "<span class='info'>♻️  Resume: skip " . count($migratedSet) . " records ที่ migrate แล้ว</span>\n";
 
 // ── 6. Total count ───────────────────────────────────────────────────────────
-$total = (int)$pdo->query("SELECT COUNT(*) FROM welfarecard")->fetchColumn();
+$total = (int)$pdo->query("SELECT COUNT(*) FROM {$DB_PREFIX}`welfarecard`")->fetchColumn();
 $todo  = $total - count($migratedSet);
 echo "<span class='info'>📊 Total welfarecard: $total | จะ migrate: $todo " . ($limit ? "(limit $limit)" : "") . "</span>\n\n";
 
@@ -335,7 +341,7 @@ $selectFields = ['id'];
 foreach ($colMap as $logical => $actual) {
     if ($actual) $selectFields[] = "`$actual` AS `c_$logical`";
 }
-$selectSql = "SELECT " . implode(', ', $selectFields) . " FROM welfarecard ORDER BY id ASC LIMIT ? OFFSET ?";
+$selectSql = "SELECT " . implode(', ', $selectFields) . " FROM {$DB_PREFIX}`welfarecard` ORDER BY id ASC LIMIT ? OFFSET ?";
 $stmtSelect = $pdo->prepare($selectSql);
 
 // Prepared statements for INSERT

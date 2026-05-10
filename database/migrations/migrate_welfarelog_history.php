@@ -49,14 +49,18 @@ $dryRun  = !empty($_GET['dry']);
 $reset   = !empty($_GET['reset']);
 $limit   = isset($_GET['limit']) ? max(1, (int)$_GET['limit']) : 0;
 
+// Cross-DB support: ?legacy_db=rsu  → query welfarelog ใน DB อื่น
+$LEGACY_DB = preg_replace('/[^a-zA-Z0-9_]/', '', trim($_GET['legacy_db'] ?? ''));
+$DB_PREFIX = $LEGACY_DB !== '' ? "`$LEGACY_DB`." : '';
+
 $BATCH = 500;
 
-function table_exists(PDO $pdo, string $name): bool {
-    try { $pdo->query("SELECT 1 FROM `$name` LIMIT 1"); return true; }
+function table_exists(PDO $pdo, string $name, string $dbPrefix = ''): bool {
+    try { $pdo->query("SELECT 1 FROM {$dbPrefix}`$name` LIMIT 1"); return true; }
     catch (PDOException $e) { return false; }
 }
-function get_columns(PDO $pdo, string $table): array {
-    return array_column($pdo->query("SHOW COLUMNS FROM `$table`")->fetchAll(PDO::FETCH_ASSOC), 'Field');
+function get_columns(PDO $pdo, string $table, string $dbPrefix = ''): array {
+    return array_column($pdo->query("SHOW COLUMNS FROM {$dbPrefix}`$table`")->fetchAll(PDO::FETCH_ASSOC), 'Field');
 }
 function pick_col(array $available, array $candidates): ?string {
     foreach ($candidates as $c) if (in_array($c, $available, true)) return $c;
@@ -104,20 +108,22 @@ header('Content-Type: text/html; charset=utf-8');
         <?php if ($dryRun): ?><span class="badge dry">⚠ DRY-RUN</span><?php else: ?><span class="badge live">🔥 LIVE</span><?php endif; ?>
         <?php if ($reset): ?><span class="badge reset">🗑 RESET</span><?php endif; ?>
         <?php if ($limit): ?><span class="badge dry">📏 LIMIT <?= $limit ?></span><?php endif; ?>
+        <?php if ($LEGACY_DB): ?><span class="badge live">🔗 Source DB: <?= htmlspecialchars($LEGACY_DB) ?></span><?php endif; ?>
     </div>
     <div class="log"><?php
 
 flush();
 $startTime = microtime(true);
 
-echo "[" . date('H:i:s') . "] เริ่ม...\n";
+echo "[" . date('H:i:s') . "] เริ่ม" . ($LEGACY_DB ? " (cross-DB: $LEGACY_DB)" : "") . "...\n";
 
-if (!table_exists($pdo, 'welfarelog')) {
-    echo "<span class='err'>❌ ตาราง `welfarelog` ไม่พบ — กรุณา import welfarelog.sql ก่อน</span>";
+if (!table_exists($pdo, 'welfarelog', $DB_PREFIX)) {
+    echo "<span class='err'>❌ ตาราง `welfarelog` ไม่พบ" . ($LEGACY_DB ? " ใน database `$LEGACY_DB`" : "") . "</span>\n";
+    echo "<span class='warn'>💡 ลองเพิ่ม <code>?legacy_db=rsu</code> ใน URL</span>\n";
     echo "</div></body></html>";
     exit;
 }
-echo "<span class='ok'>✓ พบ welfarelog</span>\n";
+echo "<span class='ok'>✓ พบ welfarelog" . ($LEGACY_DB ? " ใน `$LEGACY_DB`" : "") . "</span>\n";
 
 // Reset
 if ($reset && !$dryRun) {
@@ -127,7 +133,7 @@ if ($reset && !$dryRun) {
 }
 
 // Detect schema
-$wlCols = get_columns($pdo, 'welfarelog');
+$wlCols = get_columns($pdo, 'welfarelog', $DB_PREFIX);
 echo "\n<span class='info'>📋 welfarelog columns: " . implode(', ', $wlCols) . "</span>\n";
 
 $colMap = [
@@ -165,7 +171,7 @@ try {
 echo "<span class='info'>♻️  Resume: skip " . count($alreadyMigrated) . " logs ที่ migrate แล้ว</span>\n";
 
 // Total
-$total = (int)$pdo->query("SELECT COUNT(*) FROM welfarelog")->fetchColumn();
+$total = (int)$pdo->query("SELECT COUNT(*) FROM {$DB_PREFIX}`welfarelog`")->fetchColumn();
 echo "<span class='info'>📊 Total welfarelog: $total</span>\n\n";
 
 // Build SELECT
@@ -173,7 +179,7 @@ $selectFields = ['id'];
 foreach ($colMap as $logical => $actual) {
     if ($actual) $selectFields[] = "`$actual` AS `c_$logical`";
 }
-$selectSql = "SELECT " . implode(', ', $selectFields) . " FROM welfarelog ORDER BY id ASC LIMIT ? OFFSET ?";
+$selectSql = "SELECT " . implode(', ', $selectFields) . " FROM {$DB_PREFIX}`welfarelog` ORDER BY id ASC LIMIT ? OFFSET ?";
 $stmtSelect = $pdo->prepare($selectSql);
 
 // Match pid → member_id

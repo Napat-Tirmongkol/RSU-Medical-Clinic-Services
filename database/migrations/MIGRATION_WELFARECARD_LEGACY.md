@@ -23,10 +23,9 @@
 
 - [ ] **Backup database** ทั้งหมดก่อน (`mysqldump`)
 - [ ] **Login เป็น superadmin** ที่ portal — migration scripts ตรวจสิทธิ์เข้ม
-- [ ] **Import legacy SQL** เข้า database เดียวกันกับระบบใหม่:
-  - `welfarecard.sql` → ตาราง `welfarecard`
-  - `welfarelog.sql` → ตาราง `welfarelog`
-  - `welfareuser.sql` → ตาราง `welfareuser`
+- [ ] **Legacy tables พร้อม** — มี 2 ตัวเลือก:
+  - **A. Cross-DB (ง่ายสุด)** — ถ้า legacy `rsu` DB อยู่บน MySQL server เดียวกัน → ไม่ต้อง import เพิ่ม! ใช้ `?legacy_db=rsu` ใน URL
+  - **B. Import** — ถ้า DB อยู่คนละ server → import 3 tables เข้า Main DB ก่อน
 - [ ] **Upload uploads folder** ไปที่: `/var/www/html/e-campaignv2/welfarecard_old/uploads/`
 - [ ] ตรวจ permission: PHP เขียนได้ที่ `uploads/gold_card/legacy/`
 
@@ -49,8 +48,15 @@ URL: https://healthycampus.rsu.ac.th/e-campaignv2/database/migrations/migrate_go
 ---
 
 ### **Step 2: Data Migration (Dry-run)** — ทดสอบก่อน
+
+**ถ้าใช้ Cross-DB (rsu DB อยู่ server เดียวกัน):**
 ```
-URL: https://healthycampus.rsu.ac.th/e-campaignv2/database/migrations/migrate_welfarecard_legacy_data.php?dry=1
+URL: ...migrate_welfarecard_legacy_data.php?dry=1&legacy_db=rsu
+```
+
+**ถ้า Import เข้า Main DB แล้ว:**
+```
+URL: ...migrate_welfarecard_legacy_data.php?dry=1
 ```
 
 ✅ **Expected output:**
