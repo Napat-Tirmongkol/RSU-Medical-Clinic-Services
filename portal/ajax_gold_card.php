@@ -371,20 +371,21 @@ try {
                 $src = $base . '/' . $r['stored_path'];
                 if (!is_file($src)) { $missing++; continue; }
 
-                // Sanitize folder name (member name) — ตัดอักขระที่ใช้ใน path ไม่ได้
+                // ใช้ชื่อสมาชิกเป็นชื่อไฟล์ (flat) — ตัดอักขระที่ใช้ใน path ไม่ได้
                 $memName = preg_replace('/[\/\\\\:*?"<>|\x00-\x1f]/u', '_', $r['full_name'] ?: ('member_' . $r['member_id']));
                 $memName = trim($memName) ?: ('member_' . $r['member_id']);
 
-                // Sanitize filename
-                $fileName = preg_replace('/[\/\\\\:*?"<>|\x00-\x1f]/u', '_', $r['file_name']);
+                // เก็บ extension จากไฟล์ต้นทาง
+                $ext = pathinfo($r['file_name'], PATHINFO_EXTENSION);
+                $extPart = $ext ? '.' . strtolower($ext) : '';
 
-                // Avoid name collision in same member folder (เผื่อชื่อไฟล์ซ้ำ)
-                $internalPath = "$zipFolderName/$memName/$fileName";
+                // Flat structure: ZIP/<folder>/<ชื่อสมาชิก>.<ext>
+                $internalPath = "$zipFolderName/$memName$extPart";
+
+                // Collision (สมาชิกคนเดียวกันมีหลายไฟล์ หรือชื่อซ้ำ) → append _2, _3
                 $i = 2;
                 while (isset($usedNames[$internalPath])) {
-                    $info = pathinfo($fileName);
-                    $newName = $info['filename'] . "_$i" . (isset($info['extension']) ? '.' . $info['extension'] : '');
-                    $internalPath = "$zipFolderName/$memName/$newName";
+                    $internalPath = "$zipFolderName/{$memName}_{$i}{$extPart}";
                     $i++;
                 }
                 $usedNames[$internalPath] = true;
