@@ -369,15 +369,25 @@ try {
         <div class="overflow-y-auto flex-1 px-7 py-5 space-y-5">
             <!-- Step 1: Select files -->
             <div id="gcBulkStep1" class="space-y-4">
-                <div class="bg-blue-50 border border-blue-200 rounded-2xl p-4 text-xs text-blue-800 font-bold leading-relaxed">
-                    <p class="mb-1"><i class="fa-solid fa-circle-info mr-1"></i> <b>วิธีตั้งชื่อไฟล์:</b></p>
-                    <p class="text-blue-700">ใช้ชื่อนักศึกษาเป็นชื่อไฟล์ เช่น <code class="bg-white px-2 py-0.5 rounded">นายสมชาย ใจดี.pdf</code> หรือ <code class="bg-white px-2 py-0.5 rounded">63123456_นายสมชาย ใจดี.pdf</code> (ระบบตัดเลขนำหน้าออกอัตโนมัติ)</p>
+                <div class="bg-blue-50 border border-blue-200 rounded-2xl p-4 text-xs text-blue-800 font-bold leading-relaxed space-y-2">
+                    <p><i class="fa-solid fa-circle-info mr-1"></i> <b>วิธีตั้งชื่อไฟล์:</b> ใช้ชื่อนักศึกษา เช่น <code class="bg-white px-2 py-0.5 rounded">นายสมชาย ใจดี.pdf</code> (ตัดเลขนำหน้าออกอัตโนมัติ)</p>
+                    <p><i class="fa-solid fa-folder-tree mr-1 text-amber-600"></i> <b>โหมดโฟลเดอร์:</b> ชื่อโฟลเดอร์ <code class="bg-white px-2 py-0.5 rounded">5พค68</code> หรือ <code class="bg-white px-2 py-0.5 rounded">1มค 68</code> = เดือน พ.ค. 2568 → บันทึกเป็น <b>วันลงทะเบียน</b></p>
+                </div>
+
+                <!-- Mode Toggle -->
+                <div class="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-2xl p-1.5 w-fit">
+                    <button type="button" id="gcModeFiles" onclick="gcSwitchMode('files')" class="gc-mode-btn h-9 px-4 rounded-xl text-xs font-black flex items-center gap-2 transition-all bg-white text-slate-800 shadow-sm">
+                        <i class="fa-solid fa-file-circle-plus"></i> เลือกไฟล์
+                    </button>
+                    <button type="button" id="gcModeFolder" onclick="gcSwitchMode('folder')" class="gc-mode-btn h-9 px-4 rounded-xl text-xs font-black flex items-center gap-2 transition-all text-slate-500">
+                        <i class="fa-solid fa-folder-tree"></i> เลือกโฟลเดอร์ (รวมเดือน)
+                    </button>
                 </div>
 
                 <label class="block">
                     <div class="gc-dropzone" id="gcBulkDropzone">
                         <i class="fa-solid fa-cloud-arrow-up text-4xl mb-2"></i>
-                        <p class="text-base font-black">ลากไฟล์มาวาง / คลิกเพื่อเลือก</p>
+                        <p id="gcDropzoneText" class="text-base font-black">ลากไฟล์มาวาง / คลิกเพื่อเลือก</p>
                         <p class="text-xs font-bold mt-1 text-amber-600">เลือกได้หลายไฟล์พร้อมกัน · PDF / JPG / PNG / DOC · ≤20MB ต่อไฟล์</p>
                     </div>
                     <input type="file" id="gcBulkFiles" multiple accept=".pdf,.png,.jpg,.jpeg,.doc,.docx" class="hidden">
@@ -401,6 +411,7 @@ try {
                         <thead class="bg-slate-50 border-b border-slate-200">
                             <tr class="text-[10px] font-black text-slate-500 uppercase tracking-widest">
                                 <th class="px-3 py-2 text-left">ไฟล์</th>
+                                <th class="px-3 py-2 text-center">เดือน</th>
                                 <th class="px-3 py-2 text-left">ชื่อที่ดึง</th>
                                 <th class="px-3 py-2 text-center">สถานะ</th>
                                 <th class="px-3 py-2 text-left">นักศึกษา (sys_users)</th>
@@ -834,16 +845,46 @@ try {
     // ── BULK IMPORT ─────────────────────────────────────────────────
     let bulkFiles = null;       // FileList from input
     let bulkScanReport = null;  // server response
-    let bulkSelectedItems = [];
+    let bulkMode = 'files';     // 'files' | 'folder'
+
+    window.gcSwitchMode = function(mode) {
+        bulkMode = mode;
+        const filesBtn  = document.getElementById('gcModeFiles');
+        const folderBtn = document.getElementById('gcModeFolder');
+        const input     = document.getElementById('gcBulkFiles');
+        const dzText    = document.getElementById('gcDropzoneText');
+
+        if (mode === 'folder') {
+            folderBtn.classList.add('bg-white','text-slate-800','shadow-sm');
+            folderBtn.classList.remove('text-slate-500');
+            filesBtn.classList.remove('bg-white','text-slate-800','shadow-sm');
+            filesBtn.classList.add('text-slate-500');
+            input.setAttribute('webkitdirectory', '');
+            input.setAttribute('directory', '');
+            input.removeAttribute('accept');
+            dzText.textContent = 'คลิกเพื่อเลือกโฟลเดอร์ (รวมโฟลเดอร์ย่อยอัตโนมัติ)';
+        } else {
+            filesBtn.classList.add('bg-white','text-slate-800','shadow-sm');
+            filesBtn.classList.remove('text-slate-500');
+            folderBtn.classList.remove('bg-white','text-slate-800','shadow-sm');
+            folderBtn.classList.add('text-slate-500');
+            input.removeAttribute('webkitdirectory');
+            input.removeAttribute('directory');
+            input.setAttribute('accept', '.pdf,.png,.jpg,.jpeg,.doc,.docx');
+            dzText.textContent = 'ลากไฟล์มาวาง / คลิกเพื่อเลือก';
+        }
+        // reset selection
+        input.value = '';
+        bulkFiles = null;
+        document.getElementById('gcBulkScanBtn').disabled = true;
+        document.getElementById('gcBulkFileList').classList.add('hidden');
+    };
 
     window.gcOpenBulkModal = function() {
         const modal = document.getElementById('gcBulkModal');
         modal.classList.remove('hidden'); modal.classList.add('flex');
         gcBulkBackToStep1();
-        document.getElementById('gcBulkFiles').value = '';
-        bulkFiles = null;
-        document.getElementById('gcBulkScanBtn').disabled = true;
-        document.getElementById('gcBulkFileList').classList.add('hidden');
+        gcSwitchMode('files');
     };
     window.gcCloseBulkModal = function() {
         const modal = document.getElementById('gcBulkModal');
@@ -869,10 +910,35 @@ try {
     function bulkOnFilesSelected() {
         const input = document.getElementById('gcBulkFiles');
         if (!input.files || input.files.length === 0) return;
-        bulkFiles = input.files;
+        // กรองเฉพาะไฟล์ที่ extension ถูกต้อง (folder mode อาจมี junk)
+        const allowExt = /\.(pdf|png|jpe?g|docx?)$/i;
+        bulkFiles = Array.from(input.files).filter(f => allowExt.test(f.name));
+        if (bulkFiles.length === 0) {
+            Swal.fire({ icon: 'warning', title: 'ไม่พบไฟล์ที่รองรับ', text: 'รองรับ PDF / JPG / PNG / DOC / DOCX' });
+            return;
+        }
+
         const list = document.getElementById('gcBulkFileList');
-        list.innerHTML = `<div class="font-black text-slate-700 mb-1">📎 เลือกแล้ว ${bulkFiles.length} ไฟล์:</div>` +
-            Array.from(bulkFiles).map(f => `<div>• ${escapeHtml(f.name)} <span class="text-slate-400">(${formatBytes(f.size)})</span></div>`).join('');
+        // จัดกลุ่มตามโฟลเดอร์ (ถ้ามี webkitRelativePath)
+        const byFolder = {};
+        bulkFiles.forEach(f => {
+            const path = f.webkitRelativePath || '';
+            const parts = path.split('/').filter(Boolean);
+            const folder = parts.length > 1 ? parts.slice(0, -1).join('/') : '(root)';
+            (byFolder[folder] = byFolder[folder] || []).push(f);
+        });
+        const folderCount = Object.keys(byFolder).length;
+        const skipped = input.files.length - bulkFiles.length;
+
+        let html = `<div class="font-black text-slate-700 mb-1">📎 ${bulkFiles.length} ไฟล์`;
+        if (folderCount > 1) html += ` ใน ${folderCount} โฟลเดอร์`;
+        if (skipped > 0) html += ` <span class="text-rose-500">(ข้าม ${skipped} ไฟล์ที่ไม่รองรับ)</span>`;
+        html += `</div>`;
+        Object.entries(byFolder).slice(0, 20).forEach(([folder, files]) => {
+            html += `<div class="text-amber-700"><i class="fa-solid fa-folder mr-1"></i> ${escapeHtml(folder)} <span class="text-slate-400">(${files.length} ไฟล์)</span></div>`;
+        });
+        if (folderCount > 20) html += `<div class="text-slate-400">... และอีก ${folderCount - 20} โฟลเดอร์</div>`;
+        list.innerHTML = html;
         list.classList.remove('hidden');
         document.getElementById('gcBulkScanBtn').disabled = false;
     }
@@ -880,7 +946,10 @@ try {
     window.gcBulkScan = function() {
         if (!bulkFiles || bulkFiles.length === 0) return;
         const fd = new FormData();
-        for (const f of bulkFiles) fd.append('files[]', f);
+        bulkFiles.forEach(f => {
+            fd.append('files[]', f);
+            fd.append('paths[]', f.webkitRelativePath || f.name);
+        });
         Swal.fire({ title: 'กำลังสแกน...', html: 'กรุณารอสักครู่', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
         gcPost('bulk', 'scan', fd, true).then(r => {
             Swal.close();
@@ -910,9 +979,14 @@ try {
 
         const tbody = document.getElementById('gcBulkResultRows');
         tbody.innerHTML = report.map((r, i) => {
+            const monthCell = r.month_info
+                ? `<span class="gc-badge bg-amber-50 text-amber-700 border border-amber-200" title="${escapeHtml(r.month_info.folder)}">${escapeHtml(r.month_info.label)}</span>`
+                : `<span class="text-slate-300 text-[11px]">—</span>`;
+
             if (r.already_exists) {
                 return `<tr class="border-b border-slate-100 bg-slate-50">
                     <td class="px-3 py-2 font-mono text-slate-500">${escapeHtml(r.filename)}</td>
+                    <td class="px-3 py-2 text-center">${monthCell}</td>
                     <td class="px-3 py-2 text-slate-500">${escapeHtml(r.extracted_name || '—')}</td>
                     <td class="px-3 py-2 text-center"><span class="gc-badge bg-slate-200 text-slate-600">มีอยู่แล้ว</span></td>
                     <td class="px-3 py-2 text-slate-400" colspan="2">ข้าม (ไฟล์/ผู้ใช้นี้มีอยู่แล้ว)</td>
@@ -937,7 +1011,8 @@ try {
 
             const checked = r.status === 'matched' ? 'checked' : '';
             return `<tr class="border-b border-slate-100" data-bulk-idx="${i}">
-                <td class="px-3 py-2 font-mono text-slate-700">${escapeHtml(r.filename)}</td>
+                <td class="px-3 py-2 font-mono text-slate-700 text-[11px]" title="${escapeHtml(r.rel_path || r.filename)}">${escapeHtml(r.filename)}</td>
+                <td class="px-3 py-2 text-center">${monthCell}</td>
                 <td class="px-3 py-2 text-slate-700">${escapeHtml(r.extracted_name || '—')}</td>
                 <td class="px-3 py-2 text-center">${statusBadge}</td>
                 <td class="px-3 py-2">${userCell}</td>
@@ -990,12 +1065,17 @@ try {
                 name: r.user ? r.user.full_name : (r.extracted_name || ''),
                 user_id: r.user ? r.user.id : null,
                 citizen_id: r.user ? r.user.citizen_id : null,
+                application_date: r.month_info ? r.month_info.application_date : null,
+                coverage_start: r.month_info ? r.month_info.application_date : null,
             });
         });
         if (items.length === 0) { Swal.fire({icon:'info',title:'ยังไม่ได้เลือกรายการ'}); return; }
 
         const fd = new FormData();
-        for (const f of bulkFiles) fd.append('files[]', f);
+        bulkFiles.forEach(f => {
+            fd.append('files[]', f);
+            fd.append('paths[]', f.webkitRelativePath || f.name);
+        });
         fd.append('items', JSON.stringify(items));
 
         Swal.fire({ title: 'กำลังนำเข้า...', html: `กำลังประมวลผล ${items.length} รายการ`, allowOutsideClick: false, didOpen: () => Swal.showLoading() });

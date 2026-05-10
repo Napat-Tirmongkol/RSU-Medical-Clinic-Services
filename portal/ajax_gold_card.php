@@ -123,6 +123,41 @@ function gc_extract_name(string $filename): string
     return trim($name);
 }
 
+/**
+ * Parse Thai month folder name → ['year' => int (CE), 'month' => 1-12] | null
+ * Patterns supported:
+ *   "1มค68", "1มค 68", "มค68", "5พค 2568", "5 พ.ค. 68"
+ */
+function gc_parse_thai_month_folder(string $folderName): ?array
+{
+    static $months = [
+        'มกราคม'=>1,'มค'=>1,'ม.ค.'=>1,
+        'กุมภาพันธ์'=>2,'กพ'=>2,'ก.พ.'=>2,
+        'มีนาคม'=>3,'มีค'=>3,'มี.ค.'=>3,
+        'เมษายน'=>4,'เมย'=>4,'เม.ย.'=>4,
+        'พฤษภาคม'=>5,'พค'=>5,'พ.ค.'=>5,
+        'มิถุนายน'=>6,'มิย'=>6,'มิ.ย.'=>6,
+        'กรกฎาคม'=>7,'กค'=>7,'ก.ค.'=>7,
+        'สิงหาคม'=>8,'สค'=>8,'ส.ค.'=>8,
+        'กันยายน'=>9,'กย'=>9,'ก.ย.'=>9,
+        'ตุลาคม'=>10,'ตค'=>10,'ต.ค.'=>10,
+        'พฤศจิกายน'=>11,'พย'=>11,'พ.ย.'=>11,
+        'ธันวาคม'=>12,'ธค'=>12,'ธ.ค.'=>12,
+    ];
+    // Strip leading digits + separators (e.g. "1มค68" → "มค68")
+    $s = preg_replace('/^[\d\s_\-.]+/u', '', $folderName);
+    foreach ($months as $abbr => $m) {
+        // ตามด้วยปี 2-4 หลัก (อาจมีช่องว่าง/เครื่องหมาย)
+        if (preg_match('/^' . preg_quote($abbr, '/') . '[\s_\-.]*(\d{2,4})/u', $s, $mt)) {
+            $year = (int)$mt[1];
+            if ($year < 100) $year += 2500; // 2-digit → BE century
+            if ($year > 2400) $year -= 543; // BE to CE
+            return ['year' => $year, 'month' => $m];
+        }
+    }
+    return null;
+}
+
 function gc_match_user(PDO $pdo, string $filename): array
 {
     $name = gc_extract_name($filename);
@@ -419,7 +454,8 @@ try {
 
         case 'bulk:scan': {
             // รับไฟล์หลายๆ ไฟล์ → preview ผลการ match (ยังไม่ commit)
-            // Files ส่งมาเป็น $_FILES['files']['name'][...] (multiple)
+            // Files: $_FILES['files']['name'][...]
+            // Optional: paths[] = relative path of each file (for folder upload เพื่อ parse เดือน)
             if (empty($_FILES['files']['name'])) json_err('ไม่พบไฟล์');
             if (!is_array($_FILES['files']['name'])) json_err('ใช้ <input type="file" multiple> เท่านั้น');
 
@@ -427,6 +463,9 @@ try {
             $names  = $_FILES['files']['name'];
             $errors = $_FILES['files']['error'];
             $sizes  = $_FILES['files']['size'];
+            $paths  = $_POST['paths'] ?? [];
+
+            $thaiMonths = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
 
             foreach ($names as $i => $fname) {
                 if ($errors[$i] !== UPLOAD_ERR_OK) {
@@ -436,7 +475,28 @@ try {
                 $match = gc_match_user($pdo, $fname);
                 $extracted = $match['name'];
 
-                // Check if already exists
+                // ── Parse เดือนจาก path (ถ้ามี) ────────────────────────
+                $monthInfo = null;
+                $relPath = is_array($paths) && isset($paths[$i]) ? (string)$paths[$i] : '';
+                if ($relPath !== '') {
+                    // ลำดับ: เลือก folder ตัวสุดท้ายก่อนชื่อไฟล์
+                    $segments = array_filter(explode('/', str_replace('\\', '/', $relPath)));
+                    array_pop($segments); // ตัด filename
+                    // หา folder แรกที่ parse เป็นเดือนได้ (เริ่มจากใกล้ไฟล์ที่สุด)
+                    foreach (array_reverse($segments) as $seg) {
+                        $parsed = gc_parse_thai_month_folder($seg);
+                        if ($parsed) {
+                            $monthInfo = $parsed + [
+                                'folder' => $seg,
+                                'application_date' => sprintf('%04d-%02d-01', $parsed['year'], $parsed['month']),
+                                'label' => $thaiMonths[$parsed['month'] - 1] . ' ' . substr((string)($parsed['year'] + 543), -2),
+                            ];
+                            break;
+                        }
+                    }
+                }
+
+                // Check ซ้ำ
                 $existsId = null;
                 if (!empty($match['user']['citizen_id'])) {
                     $st = $pdo->prepare("SELECT id FROM gold_card_members WHERE citizen_id = ? LIMIT 1");
@@ -452,12 +512,14 @@ try {
                 $report[] = [
                     'index'      => $i,
                     'filename'   => $fname,
+                    'rel_path'   => $relPath,
                     'extracted_name' => $extracted,
                     'size'       => $sizes[$i],
                     'status'     => $match['status'],
                     'user'       => $match['user'] ?? null,
                     'candidates' => $match['candidates'] ?? [],
                     'already_exists' => $existsId,
+                    'month_info' => $monthInfo,
                 ];
             }
             json_ok(['report' => $report]);
@@ -483,6 +545,8 @@ try {
                 $userId    = !empty($it['user_id']) ? (int)$it['user_id'] : null;
                 $citizenId = !empty($it['citizen_id']) ? preg_replace('/\D/', '', (string)$it['citizen_id']) : null;
                 $fullName  = trim((string)($it['name'] ?? ''));
+                $applyDate = !empty($it['application_date']) ? (string)$it['application_date'] : date('Y-m-d');
+                $covStart  = !empty($it['coverage_start']) ? (string)$it['coverage_start'] : $applyDate;
 
                 if ($errCode !== UPLOAD_ERR_OK || !is_uploaded_file($tmpName)) {
                     $skipped++; $errs[] = "$filename: upload error"; continue;
@@ -509,8 +573,8 @@ try {
                     $memberType,
                     $userId ? 'active' : 'pending',
                     $filename,
-                    date('Y-m-d'),
-                    date('Y-m-d'),
+                    $applyDate,
+                    $covStart,
                     $adminId ?: null
                 ]);
                 $newId = (int)$pdo->lastInsertId();
