@@ -1648,23 +1648,15 @@ $gcOver = kpi_override_status($pdo);
                 ? `<span class="gc-month-badge gc-month-active" title="จาก ${escapeHtml(r.meta_month.source || '')} · ${escapeHtml(r.meta_month.iso || '')}">${escapeHtml(r.meta_month.label)}</span>`
                 : `<span class="gc-month-empty">—</span>`;
 
-            if (r.already_exists) {
-                return `<tr class="border-b border-slate-100 bg-slate-50">
-                    <td class="px-3 py-2 font-mono text-slate-500">${escapeHtml(r.filename)}</td>
-                    <td class="px-3 py-2 text-center">${folderCell}</td>
-                    <td class="px-3 py-2 text-center">${metaCell}</td>
-                    <td class="px-3 py-2 text-slate-500">${escapeHtml(r.extracted_name || '—')}</td>
-                    <td class="px-3 py-2 text-center"><span class="gc-badge bg-slate-200 text-slate-600">มีอยู่แล้ว</span></td>
-                    <td class="px-3 py-2 text-slate-400" colspan="2">ข้าม (ไฟล์/ผู้ใช้นี้มีอยู่แล้ว)</td>
-                </tr>`;
-            }
-            const statusBadge = {
-                matched:   `<span class="gc-badge gc-badge-active">✓ จับคู่ได้</span>`,
-                ambiguous: `<span class="gc-badge gc-badge-pending">⚠ ซ้ำ ${r.candidates.length} คน</span>`,
-                no_match:  `<span class="gc-badge gc-badge-rejected">✗ ไม่พบ</span>`,
-                no_name:   `<span class="gc-badge gc-badge-rejected">ชื่อว่าง</span>`,
-                upload_error: `<span class="gc-badge gc-badge-rejected">upload error</span>`,
-            }[r.status] || r.status;
+            const statusBadge = r.already_exists
+                ? `<span class="gc-badge bg-slate-200 text-slate-600" title="ไฟล์/ผู้ใช้มีอยู่แล้ว — กดนำเข้าจะเพิ่มเป็นเอกสารแนบของคนเดิม">📎 มีอยู่แล้ว</span>`
+                : ({
+                    matched:   `<span class="gc-badge gc-badge-active">✓ จับคู่ได้</span>`,
+                    ambiguous: `<span class="gc-badge gc-badge-pending">⚠ ซ้ำ ${r.candidates.length} คน</span>`,
+                    no_match:  `<span class="gc-badge gc-badge-rejected">✗ ไม่พบ</span>`,
+                    no_name:   `<span class="gc-badge gc-badge-rejected">ชื่อว่าง</span>`,
+                    upload_error: `<span class="gc-badge gc-badge-rejected">upload error</span>`,
+                  }[r.status] || r.status);
 
             const userCell = r.user
                 ? `<div class="font-black text-slate-800">${escapeHtml(r.user.full_name)}</div>
@@ -1789,9 +1781,12 @@ $gcOver = kpi_override_status($pdo);
             if (r.status !== 'ok') { Swal.fire({icon:'error',title:'ผิดพลาด',text:r.message}); return; }
             document.getElementById('gcBulkStep2').classList.add('hidden');
             document.getElementById('gcBulkStep3').classList.remove('hidden');
+            const parts = [];
+            if (r.created > 0)  parts.push(`สร้างใหม่ <b class="text-emerald-600 text-lg">${r.created}</b>`);
+            if (r.attached > 0) parts.push(`เพิ่มเอกสาร <b class="text-blue-600 text-lg">${r.attached}</b>`);
+            if (r.skipped > 0)  parts.push(`ข้าม <b class="text-slate-500">${r.skipped}</b>`);
             document.getElementById('gcBulkResultText').innerHTML =
-                `สร้าง <b class="text-emerald-600 text-lg">${r.created}</b> รายการ` +
-                (r.skipped > 0 ? ` · ข้าม <b class="text-slate-500">${r.skipped}</b>` : '') +
+                (parts.length ? parts.join(' · ') + ' รายการ' : 'ไม่มีรายการที่ดำเนินการ') +
                 (r.errors && r.errors.length > 0 ? `<div class="mt-3 text-xs text-rose-500 max-h-32 overflow-y-auto">${r.errors.map(e => '• ' + escapeHtml(e)).join('<br>')}</div>` : '');
         });
     };

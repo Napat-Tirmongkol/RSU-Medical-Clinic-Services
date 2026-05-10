@@ -870,7 +870,7 @@ try {
             $items = json_decode($itemsJson, true);
             if (!is_array($items)) json_err('items ไม่ถูกต้อง');
 
-            $created = 0; $skipped = 0; $errs = [];
+            $created = 0; $attached = 0; $skipped = 0; $errs = [];
 
             foreach ($items as $it) {
                 $idx       = (int)($it['index'] ?? -1);
@@ -888,33 +888,58 @@ try {
                 }
                 if ($fullName === '') { $skipped++; $errs[] = "$filename: ไม่มีชื่อ"; continue; }
 
-                // Skip duplicates
+                // ── Check existing member (citizen_id หรือ linked user) ──
+                $existingId = null;
                 if ($citizenId) {
                     $st = $pdo->prepare("SELECT id FROM gold_card_members WHERE citizen_id = ? LIMIT 1");
                     $st->execute([$citizenId]);
-                    if ($st->fetchColumn()) { $skipped++; $errs[] = "$filename: citizen_id ซ้ำ"; continue; }
+                    $existingId = (int)$st->fetchColumn() ?: null;
+                }
+                if (!$existingId && $userId) {
+                    $st = $pdo->prepare("SELECT id FROM gold_card_members WHERE linked_user_id = ? LIMIT 1");
+                    $st->execute([$userId]);
+                    $existingId = (int)$st->fetchColumn() ?: null;
                 }
 
-                // INSERT member
-                $stmt = $pdo->prepare("INSERT INTO gold_card_members
-                    (citizen_id, linked_user_id, full_name, member_type, status,
-                     source_filename, application_date, coverage_start, created_by)
-                    VALUES (?,?,?,?,?,?,?,?,?)");
-                $memberType = $userId ? 'นักศึกษา' : 'บุคคลทั่วไป';
-                $stmt->execute([
-                    $citizenId ?: null,
-                    $userId,
-                    $fullName,
-                    $memberType,
-                    $userId ? 'active' : 'pending',
-                    $filename,
-                    $applyDate,
-                    $covStart,
-                    $adminId ?: null
-                ]);
-                $newId = (int)$pdo->lastInsertId();
+                if ($existingId) {
+                    // ── สมาชิกมีอยู่แล้ว → เพิ่มไฟล์เป็นเอกสารแนบเพิ่ม ──
+                    $newId = $existingId;
+                    $isNewMember = false;
+                } else {
+                    // ── สมาชิกใหม่ → สร้าง record + attach file ──
+                    $stmt = $pdo->prepare("INSERT INTO gold_card_members
+                        (citizen_id, linked_user_id, full_name, member_type, status,
+                         source_filename, application_date, coverage_start, created_by)
+                        VALUES (?,?,?,?,?,?,?,?,?)");
+                    $memberType = $userId ? 'นักศึกษา' : 'บุคคลทั่วไป';
+                    $stmt->execute([
+                        $citizenId ?: null,
+                        $userId,
+                        $fullName,
+                        $memberType,
+                        $userId ? 'active' : 'pending',
+                        $filename,
+                        $applyDate,
+                        $covStart,
+                        $adminId ?: null
+                    ]);
+                    $newId = (int)$pdo->lastInsertId();
+                    $isNewMember = true;
+                }
 
-                // Save file
+                // ── Skip ถ้าไฟล์เดียวกัน (sha1) แนบให้สมาชิกเดียวกันแล้ว ──
+                $sha = sha1_file($tmpName) ?: '';
+                if (!$isNewMember && $sha) {
+                    $dup = $pdo->prepare("SELECT id FROM gold_card_documents WHERE member_id = ? AND sha1_hash = ? LIMIT 1");
+                    $dup->execute([$newId, $sha]);
+                    if ($dup->fetchColumn()) {
+                        $skipped++;
+                        $errs[] = "$filename: ไฟล์เดิม (hash ซ้ำ) — ข้าม";
+                        continue;
+                    }
+                }
+
+                // ── Save file ──
                 $saved = gold_card_save_uploaded_file([
                     'name' => $filename, 'tmp_name' => $tmpName,
                     'error' => UPLOAD_ERR_OK,
@@ -934,17 +959,29 @@ try {
                        ]);
                 }
 
-                gold_card_log_history($pdo, $newId, 'bulk_imported', null, [
-                    'filename' => $filename, 'matched_user_id' => $userId
-                ], $adminId);
-                $created++;
+                gold_card_log_history($pdo, $newId,
+                    $isNewMember ? 'bulk_imported' : 'doc_attached_via_bulk',
+                    null,
+                    [
+                        'filename' => $filename,
+                        'matched_user_id' => $userId,
+                        'is_new_member' => $isNewMember,
+                    ], $adminId);
+
+                if ($isNewMember) $created++;
+                else $attached++;
             }
 
+            $msgParts = [];
+            if ($created > 0)  $msgParts[] = "สร้างใหม่ $created";
+            if ($attached > 0) $msgParts[] = "เพิ่มเอกสาร $attached";
+            if ($skipped > 0)  $msgParts[] = "ข้าม $skipped";
             json_ok([
-                'created' => $created,
-                'skipped' => $skipped,
-                'errors'  => $errs,
-                'message' => "สร้าง $created รายการ" . ($skipped > 0 ? " · ข้าม $skipped" : ''),
+                'created'  => $created,
+                'attached' => $attached,
+                'skipped'  => $skipped,
+                'errors'   => $errs,
+                'message'  => $msgParts ? implode(' · ', $msgParts) . ' รายการ' : 'ไม่มีรายการที่ดำเนินการ',
             ]);
         }
 
