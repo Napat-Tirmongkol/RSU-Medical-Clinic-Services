@@ -5109,6 +5109,214 @@ try {
     })();
     </script>
 
+<!-- ════════════════════ App Switcher (Phase 1) ════════════════════ -->
+<style>
+    #app-switcher-backdrop {
+        position: fixed; inset: 0; z-index: 9000;
+        background: rgba(15,23,42,.55); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+        opacity: 0; pointer-events: none; transition: opacity .25s;
+        display: flex; align-items: center; justify-content: center;
+        padding: 20px;
+    }
+    #app-switcher-backdrop.show { opacity: 1; pointer-events: auto; }
+    #app-switcher-modal {
+        background: #fff; border-radius: 24px;
+        width: 100%; max-width: 900px;
+        max-height: 90vh; overflow-y: auto;
+        box-shadow: 0 25px 60px -10px rgba(0,0,0,.35);
+        transform: scale(.95); transition: transform .25s cubic-bezier(.34,1.56,.64,1);
+        padding: 24px;
+    }
+    #app-switcher-backdrop.show #app-switcher-modal { transform: scale(1); }
+    .aps-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; padding-bottom: 16px; border-bottom: 1.5px solid #f1f5f9; }
+    .aps-head h2 { margin: 0; font-size: 18px; font-weight: 900; color: #0f172a; display: flex; align-items: center; gap: 10px; }
+    .aps-head .aps-close { width: 36px; height: 36px; border-radius: 10px; border: none; background: #f1f5f9; color: #475569; cursor: pointer; font-size: 14px; display: flex; align-items: center; justify-content: center; transition: background .15s; }
+    .aps-head .aps-close:hover { background: #e2e8f0; color: #0f172a; }
+    .aps-section-label { font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: .12em; color: #94a3b8; margin: 18px 0 10px; }
+    .aps-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+    .aps-card {
+        display: flex; flex-direction: column; gap: 8px;
+        padding: 16px; border-radius: 16px; cursor: pointer;
+        background: #f8fafc; border: 1.5px solid #e2e8f0;
+        text-decoration: none; color: #0f172a;
+        transition: transform .15s, box-shadow .15s, border-color .15s, background .15s;
+    }
+    .aps-card:hover { transform: translateY(-2px); box-shadow: 0 8px 18px rgba(0,0,0,.08); }
+    .aps-card.current { border-color: #10b981; background: #ecfdf5; box-shadow: inset 0 0 0 1px #10b981; }
+    .aps-card.current::after { content: 'อยู่ที่นี่'; position: absolute; }
+    .aps-card-icon { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+    .aps-card-title { font-size: 14px; font-weight: 900; line-height: 1.2; }
+    .aps-card-desc { font-size: 11px; color: #64748b; font-weight: 500; line-height: 1.4; }
+    .aps-footer { margin-top: 20px; padding-top: 14px; border-top: 1.5px dashed #e2e8f0; font-size: 11px; color: #94a3b8; text-align: center; }
+    .aps-footer kbd { background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 4px; padding: 1px 6px; font-family: monospace; font-size: 10px; }
+
+    @media (prefers-reduced-motion: reduce) {
+        #app-switcher-backdrop, #app-switcher-modal { transition: none !important; }
+    }
+</style>
+
+<div id="app-switcher-backdrop" onclick="if(event.target===this)closeAppSwitcher()">
+    <div id="app-switcher-modal" role="dialog" aria-modal="true">
+        <div class="aps-head">
+            <h2><i class="fa-solid fa-grip" style="color:#2e9e63"></i>เลือกระบบที่ต้องการใช้งาน</h2>
+            <button class="aps-close" onclick="closeAppSwitcher()" aria-label="ปิด"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+
+        <div class="aps-section-label">โมดูลใน Portal</div>
+        <div class="aps-grid">
+            <a class="aps-card" data-app="overview"  href="index.php?section=dashboard">
+                <div class="aps-card-icon" style="background:#ecfdf5;color:#059669"><i class="fa-solid fa-chart-line"></i></div>
+                <div class="aps-card-title">ภาพรวม</div>
+                <div class="aps-card-desc">Dashboard · โปรไฟล์ของฉัน</div>
+            </a>
+            <a class="aps-card" data-app="ai"        href="index.php?section=ai_assistant">
+                <div class="aps-card-icon" style="background:#f5f3ff;color:#7c3aed"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
+                <div class="aps-card-title">AI Suite</div>
+                <div class="aps-card-desc">AI Assistant · QA Lab · Prompts</div>
+            </a>
+            <a class="aps-card" data-app="security"  href="index.php?section=identity">
+                <div class="aps-card-icon" style="background:#eef2ff;color:#4f46e5"><i class="fa-solid fa-shield-halved"></i></div>
+                <div class="aps-card-title">สิทธิ์ &amp; ความปลอดภัย</div>
+                <div class="aps-card-desc">Identity Governance · ISO</div>
+            </a>
+            <a class="aps-card" data-app="insurance" href="index.php?section=insurance_hub">
+                <div class="aps-card-icon" style="background:#fff1f2;color:#e11d48"><i class="fa-solid fa-hospital-user"></i></div>
+                <div class="aps-card-title">ประกันสุขภาพ</div>
+                <div class="aps-card-desc">Insurance Hub · บัตรทอง · Partners</div>
+            </a>
+            <a class="aps-card" data-app="comm"      href="index.php?section=announcements">
+                <div class="aps-card-icon" style="background:#eff6ff;color:#2563eb"><i class="fa-solid fa-bullhorn"></i></div>
+                <div class="aps-card-title">สื่อสาร</div>
+                <div class="aps-card-desc">ประกาศ · EDMS</div>
+            </a>
+            <a class="aps-card" data-app="monitor"   href="index.php?section=activity_logs">
+                <div class="aps-card-icon" style="background:#f1f5f9;color:#475569"><i class="fa-solid fa-binoculars"></i></div>
+                <div class="aps-card-title">ติดตามระบบ</div>
+                <div class="aps-card-desc">Activity Logs · Error Logs</div>
+            </a>
+            <a class="aps-card" data-app="masterdata" href="index.php?section=clinic_data">
+                <div class="aps-card-icon" style="background:#ecfeff;color:#0891b2"><i class="fa-solid fa-database"></i></div>
+                <div class="aps-card-title">ข้อมูลหลัก</div>
+                <div class="aps-card-desc">คลินิก · นักศึกษาทุน · Master</div>
+            </a>
+            <a class="aps-card" data-app="settings"  href="index.php?section=settings">
+                <div class="aps-card-icon" style="background:#f9fafb;color:#374151"><i class="fa-solid fa-gear"></i></div>
+                <div class="aps-card-title">ตั้งค่า</div>
+                <div class="aps-card-desc">Settings</div>
+            </a>
+        </div>
+
+        <div class="aps-section-label">โมดูลภายนอก (เปิดในแท็บใหม่)</div>
+        <div class="aps-grid">
+            <a class="aps-card" href="../admin/index.php" target="_blank" rel="noopener">
+                <div class="aps-card-icon" style="background:#dcfce7;color:#15803d"><i class="fa-solid fa-bullhorn"></i></div>
+                <div class="aps-card-title">e-Campaign</div>
+                <div class="aps-card-desc">จองรอบบริการ · รายงานประจำวัน</div>
+            </a>
+            <a class="aps-card" href="../e_Borrow/admin/index.php" target="_blank" rel="noopener">
+                <div class="aps-card-icon" style="background:#ffedd5;color:#c2410c"><i class="fa-solid fa-toolbox"></i></div>
+                <div class="aps-card-title">e-Borrow</div>
+                <div class="aps-card-desc">ยืม-คืนอุปกรณ์</div>
+            </a>
+            <a class="aps-card" href="../consumables/admin/index.php" target="_blank" rel="noopener">
+                <div class="aps-card-icon" style="background:#fce7f3;color:#be185d"><i class="fa-solid fa-syringe"></i></div>
+                <div class="aps-card-title">Consumables</div>
+                <div class="aps-card-desc">เวชภัณฑ์สิ้นเปลือง</div>
+            </a>
+            <a class="aps-card" href="../asset/admin/index.php" target="_blank" rel="noopener">
+                <div class="aps-card-icon" style="background:#fef3c7;color:#b45309"><i class="fa-solid fa-warehouse"></i></div>
+                <div class="aps-card-title">Asset Inventory</div>
+                <div class="aps-card-desc">ครุภัณฑ์ · ทะเบียนทรัพย์สิน</div>
+            </a>
+        </div>
+
+        <div class="aps-footer">
+            กด <kbd>ESC</kbd> เพื่อปิด · กด <kbd>⌘K</kbd> เพื่อค้นหาเร็ว
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    const APP_LABELS = {
+        overview: 'ภาพรวม', ai: 'AI Suite', security: 'สิทธิ์ & ความปลอดภัย',
+        insurance: 'ประกันสุขภาพ', comm: 'สื่อสาร', monitor: 'ติดตามระบบ',
+        masterdata: 'ข้อมูลหลัก', settings: 'ตั้งค่า',
+    };
+
+    function currentAppKey() {
+        // หา group ที่มี active item
+        const active = document.querySelector('.psb-item.psb-active');
+        if (!active) return null;
+        const grp = active.closest('.psb-group');
+        return grp ? grp.getAttribute('data-group') : null;
+    }
+
+    function markCurrentApp() {
+        const key = currentAppKey();
+        if (!key) return;
+        // ใส่ class current ที่การ์ดของ app นั้น
+        document.querySelectorAll('.aps-card[data-app="' + key + '"]').forEach(c => c.classList.add('current'));
+        // อัพเดต label ใน topbar
+        const lbl = document.getElementById('app-current-label');
+        if (lbl && APP_LABELS[key]) lbl.textContent = '· ' + APP_LABELS[key];
+    }
+
+    window.openAppSwitcher = function() {
+        document.getElementById('app-switcher-backdrop').classList.add('show');
+        document.body.style.overflow = 'hidden';
+    };
+    window.closeAppSwitcher = function() {
+        document.getElementById('app-switcher-backdrop').classList.remove('show');
+        document.body.style.overflow = '';
+    };
+
+    // ESC ปิด
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Escape' && document.getElementById('app-switcher-backdrop').classList.contains('show')) {
+            closeAppSwitcher();
+        }
+    });
+
+    // Phase 2: Sidebar contextualization — show current app only
+    function applyCurrentAppOnly() {
+        const key = currentAppKey();
+        if (!key) return;
+        document.querySelectorAll('.psb-group').forEach(grp => {
+            const k = grp.getAttribute('data-group');
+            if (!k) return;
+            const btn = document.querySelector('.psb-section-toggle[data-group="' + k + '"]');
+            if (k === key) {
+                grp.classList.remove('collapsed');
+                if (btn) btn.classList.remove('collapsed');
+            } else {
+                grp.classList.add('collapsed');
+                if (btn) btn.classList.add('collapsed');
+            }
+        });
+    }
+    window.applyCurrentAppOnly = applyCurrentAppOnly;
+
+    function applyAndMark() {
+        markCurrentApp();
+        if (localStorage.getItem('portal_current_app_only') !== '0') {
+            applyCurrentAppOnly();
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        applyAndMark();
+        // เมื่อ user คลิก sidebar item (อาจข้าม group) — re-apply
+        document.querySelectorAll('.psb-item').forEach(item => {
+            item.addEventListener('click', () => {
+                // รอ switchSection อัพเดต psb-active ก่อน
+                setTimeout(applyAndMark, 0);
+            });
+        });
+    });
+})();
+</script>
+
 </body>
 
 </html>
