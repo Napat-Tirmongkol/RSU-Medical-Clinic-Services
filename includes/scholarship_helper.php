@@ -115,6 +115,42 @@ function ensure_scholarship_schema(PDO $pdo): void
             KEY idx_student_date (student_id, adjusted_date),
             KEY idx_comp (comp_type)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+        // ── รอบงานที่ admin เปิดให้นักศึกษาจอง (คล้าย camp_slots) ──
+        $pdo->exec("CREATE TABLE IF NOT EXISTS sys_scholarship_slots (
+            id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            slot_date DATE NOT NULL,
+            start_time TIME NOT NULL,
+            end_time TIME NOT NULL,
+            max_capacity INT UNSIGNED NOT NULL DEFAULT 1,
+            comp_type ENUM('hours','paid') NOT NULL DEFAULT 'hours',
+            notes VARCHAR(255) NOT NULL DEFAULT '',
+            status ENUM('open','closed','cancelled') NOT NULL DEFAULT 'open',
+            created_by INT UNSIGNED NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            KEY idx_date (slot_date),
+            KEY idx_status (status),
+            KEY idx_date_status (slot_date, status)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+        $pdo->exec("CREATE TABLE IF NOT EXISTS sys_scholarship_slot_bookings (
+            id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            slot_id INT UNSIGNED NOT NULL,
+            student_id INT UNSIGNED NOT NULL,
+            shift_id INT UNSIGNED NULL,
+            status ENUM('booked','cancelled') NOT NULL DEFAULT 'booked',
+            booked_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            cancelled_at DATETIME NULL,
+            cancel_reason VARCHAR(255) NOT NULL DEFAULT '',
+            UNIQUE KEY uniq_slot_student (slot_id, student_id),
+            KEY idx_student (student_id),
+            KEY idx_status (status)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+        try { $pdo->exec("ALTER TABLE sys_scholarship_settings ADD COLUMN IF NOT EXISTS cancel_cutoff_hours INT UNSIGNED NOT NULL DEFAULT 24"); } catch (PDOException) {}
+        try { $pdo->exec("ALTER TABLE sys_scholarship_shifts ADD COLUMN IF NOT EXISTS slot_id INT UNSIGNED NULL AFTER student_id"); } catch (PDOException) {}
+        try { $pdo->exec("ALTER TABLE sys_scholarship_shifts ADD INDEX idx_slot (slot_id)"); } catch (PDOException) {}
     } catch (PDOException $e) {
         error_log('[scholarship_helper] schema migration failed: ' . $e->getMessage());
     }
@@ -140,6 +176,7 @@ function get_scholarship_settings(PDO $pdo): array
     // ค่า default สำหรับ row ที่สร้างก่อนเพิ่ม column
     $row['gps_required'] = isset($row['gps_required']) ? (int)$row['gps_required'] : 1;
     $row['pay_rate_per_hour'] = isset($row['pay_rate_per_hour']) ? (float)$row['pay_rate_per_hour'] : 0;
+    $row['cancel_cutoff_hours'] = isset($row['cancel_cutoff_hours']) ? (int)$row['cancel_cutoff_hours'] : 24;
     return $row;
 }
 
@@ -153,7 +190,8 @@ function save_scholarship_settings(PDO $pdo, array $data): bool
         grace_before_min = :grace,
         require_approval = :req,
         gps_required = :gps,
-        pay_rate_per_hour = :rate
+        pay_rate_per_hour = :rate,
+        cancel_cutoff_hours = :cutoff
         WHERE id = 1");
     return $stmt->execute([
         ':lat' => $data['clinic_lat'] !== '' && $data['clinic_lat'] !== null ? (float)$data['clinic_lat'] : null,
@@ -163,7 +201,97 @@ function save_scholarship_settings(PDO $pdo, array $data): bool
         ':req' => !empty($data['require_approval']) ? 1 : 0,
         ':gps' => isset($data['gps_required']) ? (!empty($data['gps_required']) ? 1 : 0) : 1,
         ':rate' => max(0, (float)($data['pay_rate_per_hour'] ?? 0)),
+        ':cutoff' => max(0, (int)($data['cancel_cutoff_hours'] ?? 24)),
     ]);
+}
+
+/**
+ * ดึงรายการ slot ที่ admin เปิด พร้อมจำนวนคนที่จองแล้ว
+ * คืน array รวม "booked_count" และ "available" (max - booked)
+ *
+ * @param string|null $fromDate กรองตั้งแต่วันที่ (รวม) — null = ไม่กรอง
+ * @param string|null $toDate กรองถึงวันที่ (รวม) — null = ไม่กรอง
+ * @param array $statuses เฉพาะ status เหล่านี้ default ['open']
+ * @param int|null $excludeBookedByStudent ถ้าระบุ student_id จะกรอง slot ที่นักศึกษาคนนี้จองอยู่แล้วออก
+ */
+function get_open_scholarship_slots(
+    PDO $pdo,
+    ?string $fromDate = null,
+    ?string $toDate = null,
+    array $statuses = ['open'],
+    ?int $excludeBookedByStudent = null
+): array {
+    ensure_scholarship_schema($pdo);
+
+    $statusList = array_values(array_filter($statuses, fn($s) => in_array($s, ['open','closed','cancelled'], true)));
+    if (empty($statusList)) $statusList = ['open'];
+    $placeholders = implode(',', array_fill(0, count($statusList), '?'));
+
+    $sql = "SELECT s.*,
+            COALESCE((SELECT COUNT(*) FROM sys_scholarship_slot_bookings b
+                      WHERE b.slot_id = s.id AND b.status = 'booked'), 0) AS booked_count
+        FROM sys_scholarship_slots s
+        WHERE s.status IN ($placeholders)";
+    $params = $statusList;
+
+    if ($fromDate) { $sql .= " AND s.slot_date >= ?"; $params[] = $fromDate; }
+    if ($toDate)   { $sql .= " AND s.slot_date <= ?"; $params[] = $toDate; }
+
+    if ($excludeBookedByStudent !== null) {
+        $sql .= " AND s.id NOT IN (
+            SELECT slot_id FROM sys_scholarship_slot_bookings
+            WHERE student_id = ? AND status = 'booked'
+        )";
+        $params[] = $excludeBookedByStudent;
+    }
+
+    $sql .= " ORDER BY s.slot_date ASC, s.start_time ASC";
+
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    foreach ($rows as &$r) {
+        $r['booked_count'] = (int)$r['booked_count'];
+        $r['max_capacity'] = (int)$r['max_capacity'];
+        $r['available']    = max(0, $r['max_capacity'] - $r['booked_count']);
+    }
+    return $rows;
+}
+
+/**
+ * ดึงรายการ slot ที่นักศึกษาคนนี้จองอยู่ (active = status='booked')
+ */
+function get_student_slot_bookings(PDO $pdo, int $studentId, bool $upcomingOnly = true): array
+{
+    ensure_scholarship_schema($pdo);
+    $sql = "SELECT b.*, s.slot_date, s.start_time, s.end_time, s.comp_type, s.notes AS slot_notes, s.status AS slot_status
+        FROM sys_scholarship_slot_bookings b
+        INNER JOIN sys_scholarship_slots s ON s.id = b.slot_id
+        WHERE b.student_id = :sid AND b.status = 'booked'";
+    $params = [':sid' => $studentId];
+    if ($upcomingOnly) {
+        $sql .= " AND (s.slot_date > CURDATE()
+                   OR (s.slot_date = CURDATE() AND s.end_time >= CURTIME()))";
+    }
+    $sql .= " ORDER BY s.slot_date ASC, s.start_time ASC";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+}
+
+/**
+ * ตรวจว่าเลย cutoff เวลายกเลิกหรือยัง
+ * คืน [bool $allowed, string $reason]
+ */
+function can_cancel_scholarship_slot(array $slot, int $cutoffHours): array
+{
+    $slotStart = strtotime($slot['slot_date'] . ' ' . $slot['start_time']);
+    if (!$slotStart) return [false, 'ข้อมูลเวลาผิดพลาด'];
+    $deadline = $slotStart - ($cutoffHours * 3600);
+    if (time() > $deadline) {
+        return [false, "ยกเลิกได้ก่อนรอบเริ่ม {$cutoffHours} ชม. เท่านั้น"];
+    }
+    return [true, ''];
 }
 
 /**

@@ -42,15 +42,19 @@ $todayShifts = $student ? get_scholarship_shifts_for_date($pdo, (int)$student['i
 $activeShift = $student ? find_active_scholarship_shift($pdo, (int)$student['id'], 'now') : null;
 $lastLog = $student ? get_latest_scholarship_log($pdo, (int)$student['id']) : null;
 
-// ตารางที่ลงไว้ล่วงหน้า (ไม่นับวันนี้)
+// ตารางที่ลงไว้ล่วงหน้า (admin assign แล้ว — ไม่ใช่จองจาก slot)
 $upcomingShifts = [];
 if ($student) {
     $stmt = $pdo->prepare("SELECT * FROM sys_scholarship_shifts
         WHERE student_id = :sid AND status != 'cancelled' AND shift_date > :today
+          AND slot_id IS NULL
         ORDER BY shift_date ASC, start_time ASC LIMIT 10");
     $stmt->execute([':sid' => $student['id'], ':today' => $today]);
     $upcomingShifts = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 }
+
+// รอบที่นักศึกษาจองไว้ (จาก sys_scholarship_slots)
+$myBookings = $student ? get_student_slot_bookings($pdo, (int)$student['id'], true) : [];
 
 // คำนวณ state ปัจจุบัน:
 // - ถ้า log ล่าสุดเป็น clock_in (status=approved/pending) → user กำลัง "ทำงาน" → ปุ่มต่อไป = ออกงาน
@@ -335,7 +339,56 @@ $displayName = trim((string)($user['full_name'] ?? ''))
             </div>
         <?php endif; ?>
 
-        <!-- ─── Upcoming Shifts (ตารางที่ลงไว้) ─── -->
+        <!-- ─── รอบงานว่างให้จอง ─── -->
+        <div class="bg-white rounded-3xl p-5 shadow-sm border border-slate-100">
+            <div class="flex items-center justify-between mb-3">
+                <h3 class="text-sm font-black text-slate-900"><i class="fa-solid fa-layer-group text-emerald-600 mr-1.5"></i>รอบงานว่าง</h3>
+                <button onclick="reloadOpenSlots()" class="text-xs font-black text-emerald-600 active:scale-95">
+                    <i class="fa-solid fa-rotate"></i>
+                </button>
+            </div>
+            <div id="open-slots-wrap" class="space-y-2">
+                <p class="text-center text-xs text-slate-400 py-4"><i class="fa-solid fa-spinner fa-spin mr-2"></i>กำลังโหลด…</p>
+            </div>
+        </div>
+
+        <!-- ─── รอบที่จองไว้ ─── -->
+        <?php if (!empty($myBookings)): ?>
+        <div class="bg-white rounded-3xl p-5 shadow-sm border border-slate-100">
+            <div class="flex items-center justify-between mb-3">
+                <h3 class="text-sm font-black text-slate-900"><i class="fa-solid fa-bookmark text-amber-600 mr-1.5"></i>รอบที่จองไว้</h3>
+                <span class="text-xs font-black text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full"><?= count($myBookings) ?> รอบ</span>
+            </div>
+            <div class="space-y-2">
+                <?php foreach ($myBookings as $bk):
+                    $bkCt = $bk['comp_type'] ?? 'hours';
+                    $ctBadge = $bkCt === 'paid'
+                        ? ['bg-amber-50', 'text-amber-700', 'fa-coins', 'ค่าตอบแทน']
+                        : ['bg-emerald-50', 'text-emerald-700', 'fa-graduation-cap', 'ทุน'];
+                ?>
+                <div class="flex items-center gap-3 p-2.5 rounded-xl bg-amber-50/50 border border-amber-100">
+                    <div class="w-10 h-10 rounded-xl bg-white text-amber-600 flex items-center justify-center shrink-0 border border-amber-100">
+                        <i class="fa-solid fa-calendar-check"></i>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-black text-slate-900"><?= vh(thai_weekday($bk['slot_date'])) ?> · <?= vh(format_scholarship_thai_date($bk['slot_date'])) ?></p>
+                        <p class="text-xs text-slate-500">
+                            <?= vh(substr((string)$bk['start_time'], 0, 5)) ?> – <?= vh(substr((string)$bk['end_time'], 0, 5)) ?>
+                        </p>
+                        <span class="inline-flex items-center gap-1 mt-1 px-1.5 py-0.5 text-[10px] font-black rounded-full <?= $ctBadge[0] ?> <?= $ctBadge[1] ?>">
+                            <i class="fa-solid <?= $ctBadge[2] ?> text-[8px]"></i><?= $ctBadge[3] ?>
+                        </span>
+                    </div>
+                    <button onclick="cancelMyBooking(<?= (int)$bk['id'] ?>)" class="w-8 h-8 rounded-lg bg-white text-rose-500 hover:bg-rose-50 flex items-center justify-center transition" title="ยกเลิกการจอง">
+                        <i class="fa-solid fa-xmark text-xs"></i>
+                    </button>
+                </div>
+                <?php endforeach; ?>
+            </div>
+        </div>
+        <?php endif; ?>
+
+        <!-- ─── Upcoming Shifts (admin จัดให้) ─── -->
         <?php if (!empty($upcomingShifts)): ?>
         <div class="bg-white rounded-3xl p-5 shadow-sm border border-slate-100">
             <div class="flex items-center justify-between mb-3">
@@ -765,6 +818,120 @@ window.deleteShift = async function(id) {
         Swal.fire('Network Error', '', 'error');
     }
 };
+
+// ────────── รอบงานว่าง / จอง / ยกเลิกการจอง ──────────
+async function loadOpenSlots() {
+    const wrap = document.getElementById('open-slots-wrap');
+    if (!wrap) return;
+    try {
+        const fd = new FormData();
+        fd.append('csrf_token', '<?= htmlspecialchars(generate_csrf_token(), ENT_QUOTES) ?>');
+        fd.append('action', 'list_open');
+        const r = await fetch('ajax_scholarship_booking.php', { method: 'POST', body: fd });
+        const j = await r.json();
+        if (!j.ok) {
+            wrap.innerHTML = `<p class="text-center text-xs text-rose-500 py-4">${j.error || 'โหลดไม่สำเร็จ'}</p>`;
+            return;
+        }
+        if (!j.rows.length) {
+            wrap.innerHTML = '<p class="text-center text-xs text-slate-400 py-4">ไม่มีรอบว่างในช่วง 14 วันข้างหน้า</p>';
+            return;
+        }
+        // group by date
+        const byDate = {};
+        j.rows.forEach(s => { (byDate[s.slot_date] = byDate[s.slot_date] || []).push(s); });
+        let html = '';
+        Object.keys(byDate).sort().forEach(d => {
+            const dateLabel = formatThaiSlotDate(d);
+            html += `<p class="text-[11px] font-black text-slate-500 mt-2 mb-1">${dateLabel}</p>`;
+            byDate[d].forEach(s => {
+                const pct = s.max_capacity > 0 ? (s.booked_count / s.max_capacity) : 0;
+                const capCls = pct >= 1 ? 'text-rose-600' : pct >= 0.8 ? 'text-amber-600' : 'text-emerald-600';
+                const ctBadge = s.comp_type === 'paid'
+                    ? '<span class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-black rounded-full bg-amber-50 text-amber-700"><i class="fa-solid fa-coins text-[8px]"></i>ค่าตอบแทน</span>'
+                    : '<span class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-black rounded-full bg-emerald-50 text-emerald-700"><i class="fa-solid fa-graduation-cap text-[8px]"></i>ทุน</span>';
+                const full = s.available <= 0;
+                const btn = full
+                    ? '<button disabled class="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-400 text-xs font-black cursor-not-allowed">เต็ม</button>'
+                    : `<button onclick="bookSlot(${s.id})" class="px-3 py-1.5 rounded-lg bg-emerald-500 text-white text-xs font-black hover:bg-emerald-600 active:scale-95 transition">จอง</button>`;
+                const notes = s.notes ? `<p class="text-[11px] text-slate-500 mt-0.5">${escapeHtmlSlot(s.notes)}</p>` : '';
+                html += `<div class="flex items-center gap-3 p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-black text-slate-900">${s.start_time.substring(0,5)} – ${s.end_time.substring(0,5)}</p>
+                        <p class="text-[11px] ${capCls} font-black">รับ ${s.booked_count}/${s.max_capacity} คน</p>
+                        <div class="mt-1">${ctBadge}</div>
+                        ${notes}
+                    </div>
+                    ${btn}
+                </div>`;
+            });
+        });
+        wrap.innerHTML = html;
+    } catch (err) {
+        wrap.innerHTML = '<p class="text-center text-xs text-rose-500 py-4">โหลดไม่สำเร็จ</p>';
+    }
+}
+function reloadOpenSlots() { loadOpenSlots(); }
+
+function formatThaiSlotDate(d) {
+    const months = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+    const [y, m, day] = d.split('-');
+    return `${parseInt(day,10)} ${months[parseInt(m,10)-1]} ${parseInt(y,10)+543}`;
+}
+function escapeHtmlSlot(s) {
+    const div = document.createElement('div'); div.textContent = String(s || ''); return div.innerHTML;
+}
+
+async function bookSlot(slotId) {
+    const c = await Swal.fire({
+        icon: 'question', title: 'จองรอบนี้?',
+        text: 'เมื่อจองแล้ว ระบบจะสร้างกะให้คุณ พร้อมเข้างานในเวลาที่กำหนด',
+        showCancelButton: true, confirmButtonText: 'จอง', cancelButtonText: 'ยกเลิก',
+        confirmButtonColor: '#10b981',
+    });
+    if (!c.isConfirmed) return;
+    try {
+        const fd = new FormData();
+        fd.append('csrf_token', '<?= htmlspecialchars(generate_csrf_token(), ENT_QUOTES) ?>');
+        fd.append('action', 'book');
+        fd.append('slot_id', String(slotId));
+        const r = await fetch('ajax_scholarship_booking.php', { method: 'POST', body: fd });
+        const j = await r.json();
+        if (!j.ok) { Swal.fire('จองไม่สำเร็จ', j.error || '', 'error'); return; }
+        await Swal.fire({ icon: 'success', title: 'จองสำเร็จ', text: j.message || '', timer: 1500, showConfirmButton: false });
+        location.reload();
+    } catch (err) {
+        Swal.fire('Network Error', '', 'error');
+    }
+}
+
+async function cancelMyBooking(bookingId) {
+    const c = await Swal.fire({
+        icon: 'warning', title: 'ยกเลิกการจอง?',
+        input: 'text', inputLabel: 'เหตุผล (ไม่บังคับ)',
+        inputPlaceholder: 'เช่น ติดธุระ',
+        showCancelButton: true, confirmButtonText: 'ยกเลิกการจอง', cancelButtonText: 'ปิด',
+        confirmButtonColor: '#e11d48',
+    });
+    if (!c.isConfirmed) return;
+    try {
+        const fd = new FormData();
+        fd.append('csrf_token', '<?= htmlspecialchars(generate_csrf_token(), ENT_QUOTES) ?>');
+        fd.append('action', 'cancel');
+        fd.append('booking_id', String(bookingId));
+        fd.append('reason', c.value || '');
+        const r = await fetch('ajax_scholarship_booking.php', { method: 'POST', body: fd });
+        const j = await r.json();
+        if (!j.ok) { Swal.fire('ยกเลิกไม่สำเร็จ', j.error || '', 'error'); return; }
+        await Swal.fire({ icon: 'success', title: 'ยกเลิกแล้ว', timer: 1200, showConfirmButton: false });
+        location.reload();
+    } catch (err) {
+        Swal.fire('Network Error', '', 'error');
+    }
+}
+
+// Auto-load open slots on page ready
+document.addEventListener('DOMContentLoaded', loadOpenSlots);
 </script>
 </body>
 </html>
