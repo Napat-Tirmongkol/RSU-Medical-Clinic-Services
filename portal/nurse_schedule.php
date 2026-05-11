@@ -117,9 +117,19 @@ $NS_CSRF_TOKEN = get_csrf_token();
   .filter-card {
     background: white; border: 1px solid #e2e8f0; border-radius: 14px;
     padding: 10px 14px; transition: all 0.15s;
+    min-width: 0;   /* allow shrink inside grid */
   }
   .filter-card:focus-within { border-color: #2e9e63; box-shadow: 0 0 0 3px rgba(46,158,99,0.15); }
-  .filter-label { font-size: 11px; color: #64748b; font-weight: 500; display: flex; align-items: center; gap: 4px; }
+  .filter-label {
+    font-size: 11px; color: #64748b; font-weight: 500;
+    display: flex; align-items: center; gap: 4px;
+    flex-wrap: wrap;    /* label wrap ได้บนจอแคบ */
+  }
+  /* Stepper inputs ใน filter-card — shrink เท่ากันทุกตัว */
+  .filter-card input[type="number"] {
+    min-width: 0;
+    width: 100%;
+  }
   .filter-select {
     width: 100%; border: none; outline: none; background: transparent;
     font-size: 14px; font-weight: 500; color: #1e293b; margin-top: 2px;
@@ -350,21 +360,21 @@ $NS_CSRF_TOKEN = get_csrf_token();
           <select id="yearSelect" class="filter-select" onchange="onMonthChange()"></select>
         </div>
         <!-- Weekday staffing -->
-        <div class="filter-card">
+        <div class="filter-card" style="min-width:0">
           <div class="filter-label"><i data-lucide="sun" class="w-3 h-3"></i> วันธรรมดา ช/บ/ด</div>
-          <div class="flex gap-1 mt-1">
-            <input type="number" id="reqWdCh" min="0" max="20" value="3" class="w-12 text-center text-sm font-semibold text-blue-700 border rounded px-1 py-0.5">
-            <input type="number" id="reqWdBa" min="0" max="20" value="2" class="w-12 text-center text-sm font-semibold text-blue-700 border rounded px-1 py-0.5">
-            <input type="number" id="reqWdDu" min="0" max="20" value="2" class="w-12 text-center text-sm font-semibold text-blue-700 border rounded px-1 py-0.5">
+          <div class="flex gap-1 mt-1 w-full">
+            <input type="number" id="reqWdCh" min="0" max="20" value="3" class="flex-1 min-w-0 text-center text-sm font-semibold text-blue-700 border rounded px-1 py-0.5">
+            <input type="number" id="reqWdBa" min="0" max="20" value="2" class="flex-1 min-w-0 text-center text-sm font-semibold text-blue-700 border rounded px-1 py-0.5">
+            <input type="number" id="reqWdDu" min="0" max="20" value="2" class="flex-1 min-w-0 text-center text-sm font-semibold text-blue-700 border rounded px-1 py-0.5">
           </div>
         </div>
         <!-- Weekend staffing -->
-        <div class="filter-card">
+        <div class="filter-card" style="min-width:0">
           <div class="filter-label"><i data-lucide="moon" class="w-3 h-3"></i> วันหยุด ช/บ/ด</div>
-          <div class="flex gap-1 mt-1">
-            <input type="number" id="reqWeCh" min="0" max="20" value="2" class="w-12 text-center text-sm font-semibold text-blue-700 border rounded px-1 py-0.5">
-            <input type="number" id="reqWeBa" min="0" max="20" value="2" class="w-12 text-center text-sm font-semibold text-blue-700 border rounded px-1 py-0.5">
-            <input type="number" id="reqWeDu" min="0" max="20" value="2" class="w-12 text-center text-sm font-semibold text-blue-700 border rounded px-1 py-0.5">
+          <div class="flex gap-1 mt-1 w-full">
+            <input type="number" id="reqWeCh" min="0" max="20" value="2" class="flex-1 min-w-0 text-center text-sm font-semibold text-blue-700 border rounded px-1 py-0.5">
+            <input type="number" id="reqWeBa" min="0" max="20" value="2" class="flex-1 min-w-0 text-center text-sm font-semibold text-blue-700 border rounded px-1 py-0.5">
+            <input type="number" id="reqWeDu" min="0" max="20" value="2" class="flex-1 min-w-0 text-center text-sm font-semibold text-blue-700 border rounded px-1 py-0.5">
           </div>
         </div>
         <!-- Action buttons (4 columns wide on lg) -->
