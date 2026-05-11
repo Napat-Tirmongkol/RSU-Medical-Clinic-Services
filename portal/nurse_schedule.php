@@ -15,7 +15,7 @@ $NS_CSRF_TOKEN = get_csrf_token();
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ระบบจัดตารางเวรพยาบาล v2.7.1 — Srimahasarakham Nursing College</title>
+<title>ตารางเวรพยาบาล · RSU Medical Clinic</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;500;600;700;800&family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -32,11 +32,11 @@ $NS_CSRF_TOKEN = get_csrf_token();
 
   /* ===== HEADER GRADIENT (NCDs-style) ===== */
   .ncds-header {
-    background: linear-gradient(135deg, #06b6d4 0%, #0ea5e9 35%, #3b82f6 100%);
-    box-shadow: 0 4px 20px rgba(14, 165, 233, 0.25);
+    background: linear-gradient(135deg, #10b981 0%, #2e9e63 35%, #34d399 100%);
+    box-shadow: 0 4px 20px rgba(46, 158, 99, 0.25);
   }
   .ncds-subheader {
-    background: linear-gradient(135deg, #0891b2 0%, #0284c7 50%, #2563eb 100%);
+    background: linear-gradient(135deg, #059669 0%, #0d8a52 50%, #2563eb 100%);
   }
 
   /* ===== STAT CARDS (compact half-width) ===== */
@@ -71,12 +71,12 @@ $NS_CSRF_TOKEN = get_csrf_token();
   .stat-card .stat-label { font-size: 0.75rem; font-weight: 500; opacity: 0.95; }
   .stat-card .stat-sub { font-size: 0.65rem; opacity: 0.8; margin-top: 1px; }
   .card-teal   { background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%); }
-  .card-blue   { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); }
+  .card-blue   { background: linear-gradient(135deg, #34d399 0%, #2563eb 100%); }
   .card-amber  { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); }
   .card-purple { background: linear-gradient(135deg, #a855f7 0%, #9333ea 100%); }
   .card-orange { background: linear-gradient(135deg, #f97316 0%, #ea580c 100%); }
   .card-red    { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); }
-  .card-cyan   { background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%); }
+  .card-cyan   { background: linear-gradient(135deg, #10b981 0%, #059669 100%); }
   .card-pink   { background: linear-gradient(135deg, #ec4899 0%, #db2777 100%); }
 
   /* ===== BADGES ===== */
@@ -104,8 +104,8 @@ $NS_CSRF_TOKEN = get_csrf_token();
     padding: 8px 16px; border-radius: 10px; font-weight: 500; font-size: 14px;
     transition: all 0.15s;
   }
-  .btn-primary { background: #0ea5e9; color: white; }
-  .btn-primary:hover { background: #0284c7; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(14,165,233,0.4); }
+  .btn-primary { background: #2e9e63; color: white; }
+  .btn-primary:hover { background: #0d8a52; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(46,158,99,0.4); }
   .btn-success { background: #10b981; color: white; }
   .btn-success:hover { background: #059669; }
   .btn-danger { background: #ef4444; color: white; }
@@ -118,7 +118,7 @@ $NS_CSRF_TOKEN = get_csrf_token();
     background: white; border: 1px solid #e2e8f0; border-radius: 14px;
     padding: 10px 14px; transition: all 0.15s;
   }
-  .filter-card:focus-within { border-color: #0ea5e9; box-shadow: 0 0 0 3px rgba(14,165,233,0.15); }
+  .filter-card:focus-within { border-color: #2e9e63; box-shadow: 0 0 0 3px rgba(46,158,99,0.15); }
   .filter-label { font-size: 11px; color: #64748b; font-weight: 500; display: flex; align-items: center; gap: 4px; }
   .filter-select {
     width: 100%; border: none; outline: none; background: transparent;
@@ -136,10 +136,10 @@ $NS_CSRF_TOKEN = get_csrf_token();
     color: #64748b; display: flex; align-items: center; gap: 6px;
     transition: all 0.15s; cursor: pointer; white-space: nowrap;
   }
-  .tab-btn:hover { background: #f1f5f9; color: #0ea5e9; }
+  .tab-btn:hover { background: #f1f5f9; color: #2e9e63; }
   .tab-btn.active {
-    background: linear-gradient(135deg, #06b6d4 0%, #0ea5e9 100%);
-    color: white; box-shadow: 0 4px 12px rgba(14,165,233,0.3);
+    background: linear-gradient(135deg, #10b981 0%, #2e9e63 100%);
+    color: white; box-shadow: 0 4px 12px rgba(46,158,99,0.3);
   }
   .tab-btn .count-bubble {
     padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 600;
@@ -159,7 +159,7 @@ $NS_CSRF_TOKEN = get_csrf_token();
   }
   .schedule-table thead { position: sticky; top: 0; z-index: 5; }
   .schedule-table thead th {
-    background: linear-gradient(135deg, #0891b2 0%, #0284c7 100%);
+    background: linear-gradient(135deg, #059669 0%, #0d8a52 100%);
     color: white; padding: 8px 6px; font-weight: 500;
     border-right: 1px solid rgba(255,255,255,0.15);
   }
@@ -171,13 +171,13 @@ $NS_CSRF_TOKEN = get_csrf_token();
     border-right: 1px solid #f1f5f9;
     text-align: center; padding: 0; vertical-align: middle;
   }
-  .schedule-table tbody tr:hover { background: rgba(14,165,233,0.04); }
+  .schedule-table tbody tr:hover { background: rgba(46,158,99,0.04); }
   .day-cell {
     width: 38px; height: 32px; cursor: pointer;
     font-weight: 600; letter-spacing: 0.3px; font-size: 13px;
     transition: all 0.1s;
   }
-  .day-cell:hover { box-shadow: inset 0 0 0 2px #0ea5e9; }
+  .day-cell:hover { box-shadow: inset 0 0 0 2px #2e9e63; }
   .day-cell.weekend-cell { background: rgba(252, 231, 243, 0.4); }
   .day-cell.today { box-shadow: inset 0 0 0 2px #f59e0b; }
 
@@ -192,9 +192,9 @@ $NS_CSRF_TOKEN = get_csrf_token();
     display: inline-block; padding: 3px 10px; border-radius: 8px;
     font-size: 11px; font-weight: 600; white-space: nowrap;
   }
-  .pos-head    { background: linear-gradient(135deg, #06b6d4, #0891b2); color: white; }
-  .pos-deputy  { background: linear-gradient(135deg, #0ea5e9, #0284c7); color: white; }
-  .pos-shift   { background: linear-gradient(135deg, #3b82f6, #2563eb); color: white; }
+  .pos-head    { background: linear-gradient(135deg, #10b981, #059669); color: white; }
+  .pos-deputy  { background: linear-gradient(135deg, #2e9e63, #0d8a52); color: white; }
+  .pos-shift   { background: linear-gradient(135deg, #34d399, #2563eb); color: white; }
   .pos-rn      { background: linear-gradient(135deg, #14b8a6, #0d9488); color: white; }
   .pos-tech    { background: linear-gradient(135deg, #a855f7, #9333ea); color: white; }
   .pos-aide    { background: linear-gradient(135deg, #f97316, #ea580c); color: white; }
@@ -210,10 +210,10 @@ $NS_CSRF_TOKEN = get_csrf_token();
     min-width: 48px; text-align: center;
   }
   .shift-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 14px rgba(0,0,0,0.12); }
-  .shift-btn.selected { border-color: #0ea5e9; box-shadow: 0 0 0 3px rgba(14,165,233,0.25); transform: translateY(-1px); }
+  .shift-btn.selected { border-color: #2e9e63; box-shadow: 0 0 0 3px rgba(46,158,99,0.25); transform: translateY(-1px); }
 
   /* Stat cells in schedule */
-  .stat-col { background: #f8fafc; font-weight: 600; color: #0284c7; }
+  .stat-col { background: #f8fafc; font-weight: 600; color: #0d8a52; }
 
   /* Summary card */
   .summary-card {
@@ -221,12 +221,12 @@ $NS_CSRF_TOKEN = get_csrf_token();
     border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.05);
     transition: all 0.15s;
   }
-  .summary-card:hover { box-shadow: 0 8px 20px rgba(14,165,233,0.12); transform: translateY(-2px); }
+  .summary-card:hover { box-shadow: 0 8px 20px rgba(46,158,99,0.12); transform: translateY(-2px); }
   .progress-bar {
     height: 6px; background: #e2e8f0; border-radius: 999px; overflow: hidden; margin-top: 6px;
   }
   .progress-fill {
-    height: 100%; background: linear-gradient(90deg, #06b6d4, #0ea5e9);
+    height: 100%; background: linear-gradient(90deg, #10b981, #2e9e63);
     transition: width 0.4s ease;
   }
 
@@ -269,18 +269,12 @@ $NS_CSRF_TOKEN = get_csrf_token();
   /* Help cards */
   .help-card {
     background: white; border-radius: 14px; padding: 20px;
-    border-left: 4px solid #0ea5e9; box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    border-left: 4px solid #2e9e63; box-shadow: 0 1px 3px rgba(0,0,0,0.05);
     margin-bottom: 14px;
   }
   .help-card.warn { border-left-color: #f59e0b; background: #fffbeb; }
   .help-card.danger { border-left-color: #ef4444; background: #fef2f2; }
   .help-card.success { border-left-color: #10b981; background: #ecfdf5; }
-
-  /* Footer */
-  .footer-strip {
-    background: linear-gradient(135deg, #0c4a6e 0%, #0e7490 50%, #1e40af 100%);
-    color: white; padding: 12px 24px; font-size: 12px;
-  }
 
   /* Print */
   @media print {
@@ -291,13 +285,13 @@ $NS_CSRF_TOKEN = get_csrf_token();
 
   /* Loading overlay */
   .loader-backdrop {
-    position: fixed; inset: 0; background: rgba(14, 165, 233, 0.08);
+    position: fixed; inset: 0; background: rgba(46, 158, 99, 0.08);
     backdrop-filter: blur(2px); z-index: 9999;
     display: flex; align-items: center; justify-content: center;
   }
   .loader-spinner {
     width: 50px; height: 50px; border: 4px solid #dbeafe;
-    border-top-color: #0ea5e9; border-radius: 50%;
+    border-top-color: #2e9e63; border-radius: 50%;
     animation: spin 0.8s linear infinite;
   }
   @keyframes spin { to { transform: rotate(360deg); } }
@@ -312,8 +306,8 @@ $NS_CSRF_TOKEN = get_csrf_token();
       <!-- Left: Title only (logo + subtitle removed per request) -->
       <div class="flex items-center gap-3">
         <div>
-          <h1 class="text-xl md:text-2xl font-bold tracking-tight">ระบบจัดตารางเวรพยาบาล</h1>
-          <p class="text-xs md:text-sm text-cyan-50/90">v2.7.1 Standalone Edition</p>
+          <h1 class="text-xl md:text-2xl font-bold tracking-tight">ตารางเวรพยาบาล</h1>
+          <p class="text-xs md:text-sm text-emerald-50/90">RSU Medical Clinic</p>
         </div>
       </div>
 
@@ -745,34 +739,10 @@ $NS_CSRF_TOKEN = get_csrf_token();
           <li>เปิดในเครื่องอื่น = เริ่มข้อมูลใหม่</li>
         </ul>
       </div>
-
-      <div class="help-card danger">
-        <h4 class="font-semibold text-red-900 mb-2 flex items-center gap-2">
-          <i data-lucide="user-cog" class="w-4 h-4"></i> ติดต่อผู้พัฒนา
-        </h4>
-        <p class="text-sm text-red-800"><b>ดร.ณัฐวุฒิ สุริยะ</b> · อาจารย์</p>
-        <p class="text-xs text-red-700 mt-1">
-          📞 063-172-5460 · ✉️ natthawut@smnc.ac.th<br>
-          🏢 วิทยาลัยพยาบาลศรีมหาสารคาม คณะพยาบาลศาสตร์ สถาบันพระบรมราชชนก
-        </p>
-      </div>
     </div>
   </section>
 
 </main>
-
-<!-- ============== FOOTER ============== -->
-<footer class="footer-strip no-print">
-  <div class="max-w-[1600px] mx-auto flex items-center justify-between gap-4 flex-wrap">
-    <div class="flex items-center gap-3">
-      <i data-lucide="hospital" class="w-4 h-4 opacity-80"></i>
-      <span class="opacity-90">© 2026 ระบบจัดตารางเวรพยาบาล v2.7.1 · วิทยาลัยพยาบาลศรีมหาสารคาม</span>
-    </div>
-    <div class="opacity-80">
-      พัฒนาโดย ดร.ณัฐวุฒิ สุริยะ · 063-172-5460 · natthawut@smnc.ac.th
-    </div>
-  </div>
-</footer>
 
 
 <!-- ============== JAVASCRIPT ============== -->
@@ -1108,7 +1078,7 @@ const showSuccess = (txt) => Swal.fire({ icon:'success', title:txt, timer:1800, 
 const showError = (txt) => Swal.fire({ icon:'error', title:'ผิดพลาด', text:txt });
 const showWarn = (txt) => Swal.fire({ icon:'warning', title:'แจ้งเตือน', text:txt, toast:true, position:'top', timer:2500, showConfirmButton:false });
 const showInfo = (txt) => Swal.fire({ icon:'info', title:'แจ้งเตือน', text:txt });
-const confirmAct = (title, text) => Swal.fire({ icon:'question', title, text, showCancelButton:true, confirmButtonText:'ยืนยัน', cancelButtonText:'ยกเลิก', confirmButtonColor:'#0ea5e9' });
+const confirmAct = (title, text) => Swal.fire({ icon:'question', title, text, showCancelButton:true, confirmButtonText:'ยืนยัน', cancelButtonText:'ยกเลิก', confirmButtonColor:'#2e9e63' });
 
 // ========= INIT =========
 function initSelectors() {
@@ -2149,7 +2119,7 @@ function openAddNurse() {
     showCancelButton: true,
     confirmButtonText: 'เพิ่ม',
     cancelButtonText: 'ยกเลิก',
-    confirmButtonColor: '#0ea5e9',
+    confirmButtonColor: '#2e9e63',
     preConfirm: () => {
       const name = document.getElementById('nName').value.trim();
       const pos = document.getElementById('nPos').value;
@@ -2190,7 +2160,7 @@ function editNurse(id) {
     showCancelButton: true,
     confirmButtonText: 'บันทึก',
     cancelButtonText: 'ยกเลิก',
-    confirmButtonColor: '#0ea5e9',
+    confirmButtonColor: '#2e9e63',
     preConfirm: () => {
       const name = document.getElementById('eName').value.trim();
       const pos = document.getElementById('ePos').value;
@@ -2314,7 +2284,7 @@ function openHolidayManager() {
     showCancelButton: false,
     showConfirmButton: true,
     confirmButtonText: 'ปิด',
-    confirmButtonColor: '#0ea5e9',
+    confirmButtonColor: '#2e9e63',
     didOpen: () => { if (typeof lucide !== 'undefined') lucide.createIcons(); }
   });
 }
@@ -2372,7 +2342,7 @@ function exportScheduleExcel() {
   const aoa = [];
 
   // Header rows
-  aoa.push(['ตารางการปฏิบัติงาน วิทยาลัยพยาบาลศรีมหาสารคาม']);
+  aoa.push(['ตารางการปฏิบัติงาน RSU Medical Clinic']);
   aoa.push([`ประจำเดือน ${THAI_MONTHS[state.month-1]} พ.ศ. ${state.year}`]);
   const req = state.requirements;
   aoa.push([`อัตรากำลัง: วันธรรมดา ช=${req.weekday.ch} บ=${req.weekday.ba} ด=${req.weekday.du} | วันหยุด ช=${req.weekend.ch} บ=${req.weekend.ba} ด=${req.weekend.du}`]);
@@ -2477,7 +2447,7 @@ function exportOTExcel() {
   const ot = computeOT();
   const aoa = [];
   aoa.push([`รายงานการคำนวณ OT — ${THAI_MONTHS[state.month-1]} ${state.year}`]);
-  aoa.push([`วิทยาลัยพยาบาลศรีมหาสารคาม | เกณฑ์ภาระงานปกติ: ${state.otSettings.threshold} เวร/เดือน`]);
+  aoa.push([`RSU Medical Clinic | เกณฑ์ภาระงานปกติ: ${state.otSettings.threshold} เวร/เดือน`]);
   aoa.push([]);
   aoa.push(['ที่','ชื่อ-นามสกุล','ตำแหน่ง','ช (รวม)','บ (รวม)','ด (รวม)','ชบ','ดบ','DN','รวมหน่วย','OT (หน่วย)','จำนวนเงิน (บาท)']);
   ot.rows.forEach((r,i) => {
