@@ -878,6 +878,7 @@ const state = {
   otSettings: structuredClone(DEFAULT_OT),
   customHolidays: {},   // key: 'yBE-M-D' → name (user-added overrides/additions)
   removedHolidays: {},  // key: 'yBE-M-D' → true (built-in holidays user removed)
+  clinicHolidays: {},   // key: 'yBE-M-D' → note (จาก sys_clinic_hours — read-only)
   selectedShift: null,
   selectedLeave: 'V',
   otReport: [],
@@ -907,6 +908,8 @@ function isHoliday(yBE, m, d) {
   const customKey = `${yBE}-${m}-${d}`;
   // User removed this holiday → not a holiday
   if (state.removedHolidays && state.removedHolidays[customKey]) return null;
+  // Clinic calendar (sys_clinic_hours) — read-only จากปฏิทินคลินิก, มีน้ำหนักสูง
+  if (state.clinicHolidays && state.clinicHolidays[customKey]) return state.clinicHolidays[customKey];
   // User added custom
   if (state.customHolidays && state.customHolidays[customKey]) return state.customHolidays[customKey];
   // Variable holidays for this specific year
@@ -914,6 +917,10 @@ function isHoliday(yBE, m, d) {
   // Fixed holidays (recurring)
   if (FIXED_HOLIDAYS[key]) return FIXED_HOLIDAYS[key];
   return null;
+}
+// Check if a day is a clinic-defined closure (different from public holidays)
+function isClinicHoliday(yBE, m, d) {
+  return !!(state.clinicHolidays && state.clinicHolidays[`${yBE}-${m}-${d}`]);
 }
 // "Rest day" = treated like weekend for staffing/heads rule
 const isRestDay = (yBE, m, d) => isWeekend(yBE, m, d) || isHoliday(yBE, m, d) !== null;
@@ -1032,6 +1039,7 @@ async function loadFromStorage() {
     state.otSettings      = serverData.otSettings || structuredClone(DEFAULT_OT);
     state.customHolidays  = serverData.customHolidays || {};
     state.removedHolidays = serverData.removedHolidays || {};
+    state.clinicHolidays  = serverData.clinicHolidays || {};
     // Migration: "บด" → "ดบ"
     for (const key in state.schedule) {
       if (state.schedule[key] === 'บด') state.schedule[key] = 'ดบ';
@@ -1226,9 +1234,15 @@ function renderSchedule() {
   for (let d=1; d<=days; d++) {
     const we = isRestDay(state.year, state.month, d);
     const holidayName = isHoliday(state.year, state.month, d);
+    const clinicSource = isClinicHoliday(state.year, state.month, d);
     const today = tdy.y===state.year && tdy.m===state.month && tdy.d===d;
-    const tip = holidayName ? ` title="${holidayName.replace(/"/g,'&quot;')}"` : '';
-    const indicator = holidayName ? '<sup style="font-size:8px;color:#fde047">★</sup>' : '';
+    const tipText = holidayName ? (clinicSource ? '🏥 ' + holidayName + ' (จากปฏิทินคลินิก)' : holidayName) : '';
+    const tip = tipText ? ` title="${tipText.replace(/"/g,'&quot;')}"` : '';
+    const indicator = holidayName
+      ? (clinicSource
+          ? '<sup style="font-size:9px;color:#fca5a5" aria-label="คลินิกปิด">🏥</sup>'
+          : '<sup style="font-size:8px;color:#fde047">★</sup>')
+      : '';
     html += `<th class="${we?'weekend-header':''}" style="min-width:38px;${today?'background:linear-gradient(135deg,#f59e0b,#d97706)!important;':''}"${tip}>${d}${indicator}</th>`;
   }
   ['ช','บ','ด','ชบ','ดบ','DN','O','V','T','รวม'].forEach(s => {

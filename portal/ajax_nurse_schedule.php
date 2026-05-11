@@ -4,6 +4,7 @@
 declare(strict_types=1);
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/includes/auth.php';
+require_once __DIR__ . '/../includes/clinic_status_helper.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -69,6 +70,23 @@ try {
 
         $decode = fn($s, $default) => is_string($s) && $s !== '' ? (json_decode($s, true) ?? $default) : $default;
 
+        // ดึงวันที่คลินิกปิด (จาก sys_clinic_hours) สำหรับเดือนนี้
+        // คีย์รูปแบบ "YBE-M-D" (Buddhist year)
+        $clinicHolidays = new stdClass();
+        try {
+            $yCE = $year - 543;
+            $daysInMonth = (int)(new DateTimeImmutable("$yCE-$month-01"))->format('t');
+            for ($d = 1; $d <= $daysInMonth; $d++) {
+                $ceDate = sprintf('%04d-%02d-%02d', $yCE, $month, $d);
+                $hours = get_clinic_hours_for_date($pdo, $ceDate);
+                if (!empty($hours['closed']) && (($hours['source'] ?? '') !== 'no_regular')) {
+                    $note = trim((string)($hours['note'] ?? ''));
+                    if ($note === '') $note = 'คลินิกปิด';
+                    $clinicHolidays->{"$year-$month-$d"} = $note;
+                }
+            }
+        } catch (Throwable $e) { /* clinic_hours อาจยังไม่มี */ }
+
         echo json_encode([
             'ok' => true,
             'data' => [
@@ -79,6 +97,7 @@ try {
                 'removedHolidays' => $decode($g['removed_holidays_json'] ?? null, (object)[]),
                 'schedule'        => $decode($m['schedule_json'] ?? null, (object)[]),
                 'leaves'          => $decode($m['leaves_json'] ?? null, (object)[]),
+                'clinicHolidays'  => $clinicHolidays,
             ],
             'global_updated_at'  => $g['updated_at'] ?? null,
             'monthly_updated_at' => $m['updated_at'] ?? null,
