@@ -1202,6 +1202,10 @@ try {
                             <span class="psb-label" style="color:#059669;font-weight:900">นักศึกษาทุน</span>
                         </button>
                     <?php endif; ?>
+                    <button class="psb-item <?= $activeSection==='nurse_schedule'?'psb-active':'' ?>" data-section="nurse_schedule" onclick="switchSection('nurse_schedule',this)">
+                        <div class="psb-icon"><i class="fa-solid fa-user-nurse" style="color:#0ea5e9"></i></div>
+                        <span class="psb-label" style="color:#0284c7;font-weight:900">ตารางเวรพยาบาล</span>
+                    </button>
                 </div>
             <?php endif; ?>
 
@@ -3243,6 +3247,15 @@ try {
                 ?>
             </div>
 
+            <!-- ════════════ SECTION: NURSE SCHEDULE (ตารางเวรพยาบาล) ════════════ -->
+            <div id="section-nurse_schedule" class="portal-section"
+                style="<?= $activeSection==='nurse_schedule'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); padding:0; overflow:hidden;">
+                <iframe src="nurse_schedule.php"
+                    style="width:100%; height:100%; border:0; display:block;"
+                    title="ระบบจัดตารางเวรพยาบาล"
+                    loading="lazy"></iframe>
+            </div>
+
             <!-- ════════════ SECTION: MANAGE INSURANCE PARTNERS ════════════ -->
             <div id="section-manage_insurance_partners" class="portal-section"
                 style="<?= $activeSection==='manage_insurance_partners'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); background:#f8fafc; overflow-y:auto;">
@@ -5198,6 +5211,11 @@ try {
                 <div class="aps-card-icon" style="background:#ecfeff;color:#0891b2"><i class="fa-solid fa-database"></i></div>
                 <div class="aps-card-title">ข้อมูลหลัก</div>
                 <div class="aps-card-desc">คลินิก · นักศึกษาทุน · Master</div>
+            </a>
+            <a class="aps-card" data-app="masterdata" href="index.php?section=nurse_schedule">
+                <div class="aps-card-icon" style="background:#e0f2fe;color:#0284c7"><i class="fa-solid fa-user-nurse"></i></div>
+                <div class="aps-card-title">ตารางเวรพยาบาล</div>
+                <div class="aps-card-desc">จัดเวร · ใบลา · OT · สรุป</div>
             </a>
             <a class="aps-card" data-app="settings"  href="index.php?section=settings">
                 <div class="aps-card-icon" style="background:#f9fafb;color:#374151"><i class="fa-solid fa-gear"></i></div>
