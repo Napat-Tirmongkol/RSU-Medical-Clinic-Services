@@ -711,10 +711,16 @@ function handle_slots(PDO $pdo, string $action, int $adminId): void
         }
 
         // 1) ดึง slot + booking + student ในช่วงเดียวกัน 1 query
+        //    + check ว่า booking นี้ clock-in แล้วยัง (จาก clock_logs ผูก shift_id)
         $sql = "SELECT s.id AS slot_id, s.slot_date, s.start_time, s.end_time,
                        s.max_capacity, s.comp_type, s.status AS slot_status, s.notes AS slot_notes,
-                       b.id AS booking_id, b.status AS booking_status,
-                       u.full_name AS student_name, ss.student_code
+                       b.id AS booking_id, b.shift_id, b.status AS booking_status,
+                       u.full_name AS student_name, ss.student_code,
+                       EXISTS(SELECT 1 FROM sys_scholarship_clock_logs cl
+                              WHERE cl.shift_id = b.shift_id
+                                AND cl.action = 'clock_in'
+                                AND cl.status != 'rejected'
+                              LIMIT 1) AS attended
                 FROM sys_scholarship_slots s
                 LEFT JOIN sys_scholarship_slot_bookings b
                     ON b.slot_id = s.id AND b.status = 'booked'
@@ -743,14 +749,18 @@ function handle_slots(PDO $pdo, string $action, int $adminId): void
                     'status' => $r['slot_status'],
                     'notes' => $r['slot_notes'],
                     'bookings' => [],
+                    'attended_count' => 0,
                 ];
                 $slotMap[$r['slot_id']] = &$byDay[$day]['slots'][count($byDay[$day]['slots']) - 1];
             }
             if (!empty($r['booking_id'])) {
+                $attended = (int)$r['attended'] === 1;
                 $slotMap[$r['slot_id']]['bookings'][] = [
                     'name' => $r['student_name'],
                     'code' => $r['student_code'],
+                    'attended' => $attended,
                 ];
+                if ($attended) $slotMap[$r['slot_id']]['attended_count']++;
             }
         }
         unset($slotMap);
