@@ -14,15 +14,33 @@ $base_url = explode('/e_Borrow', $_SERVER['SCRIPT_NAME'])[0] . '/e_Borrow/';
     <base href="<?php echo $base_url; ?>">
 
     <style>
-        /* Smooth Page Transition */
-        body {
-            opacity: 1;
-            transition: opacity 0.25s ease-out, transform 0.25s ease-out;
+        /* ── Page transition (cross-document View Transitions API) ── */
+        @view-transition { navigation: auto; }
+
+        ::view-transition-old(root) {
+            animation: ebPageOut 200ms cubic-bezier(.4,0,.2,1) both;
+        }
+        ::view-transition-new(root) {
+            animation: ebPageIn 360ms cubic-bezier(.16,1,.3,1) both;
+        }
+        @keyframes ebPageOut {
+            to { opacity: 0; transform: translateY(-6px); }
+        }
+        @keyframes ebPageIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to   { opacity: 1; transform: translateY(0); }
         }
 
-        body.page-transitioning {
-            opacity: 0;
-            transform: translateY(10px);
+        /* Fallback for browsers without view transitions (Firefox, older Safari) */
+        @supports not (view-transition-name: none) {
+            body { animation: ebPageIn 380ms cubic-bezier(.16,1,.3,1) both; }
+        }
+
+        /* Respect reduced motion */
+        @media (prefers-reduced-motion: reduce) {
+            ::view-transition-old(root),
+            ::view-transition-new(root) { animation: none !important; }
+            body { animation: none !important; }
         }
 
         /* Theme Toggle Button visibility fix */
@@ -63,6 +81,15 @@ $base_url = explode('/e_Borrow', $_SERVER['SCRIPT_NAME'])[0] . '/e_Borrow/';
                 }
             } catch (e) { console.error('Theme init error:', e); }
         })();
+
+        // Suppress harmless AbortError from skipped View Transitions
+        // (เกิดเมื่อนำทางซ้ำเร็วๆ / ไป download / กด back ระหว่าง transition)
+        window.addEventListener('unhandledrejection', function(e) {
+            var r = e.reason;
+            if (r && r.name === 'AbortError' && /transition/i.test(r.message || '')) {
+                e.preventDefault();
+            }
+        });
     </script>
 
     <meta name="csrf-token" content="<?= htmlspecialchars($_SESSION['csrf_token'] ?? '', ENT_QUOTES) ?>">
@@ -75,11 +102,7 @@ $base_url = explode('/e_Borrow', $_SERVER['SCRIPT_NAME'])[0] . '/e_Borrow/';
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 </head>
 
-<body class="page-transitioning">
-
-    <script>
-        window.addEventListener('DOMContentLoaded', () => document.body.classList.remove('page-transitioning'));
-    </script>
+<body>
 
     <?php $user_role = $_SESSION['role'] ?? 'employee'; ?>
     <header class="header">

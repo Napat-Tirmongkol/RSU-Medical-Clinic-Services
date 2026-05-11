@@ -149,6 +149,35 @@ if (!function_exists('renderPageHeader')) {
         }
         .animate-slide-up { animation: adminSlideUp .4s cubic-bezier(.16,1,.3,1) both; }
 
+        /* ── Page transition (cross-document View Transitions API) ── */
+        @view-transition { navigation: auto; }
+
+        ::view-transition-old(root) {
+            animation: adminPageOut 200ms cubic-bezier(.4,0,.2,1) both;
+        }
+        ::view-transition-new(root) {
+            animation: adminPageIn 360ms cubic-bezier(.16,1,.3,1) both;
+        }
+        @keyframes adminPageOut {
+            to { opacity: 0; transform: translateY(-6px); }
+        }
+        @keyframes adminPageIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Fallback for browsers without view transitions (Firefox, older Safari) */
+        @supports not (view-transition-name: none) {
+            body { animation: adminPageIn 380ms cubic-bezier(.16,1,.3,1) both; }
+        }
+
+        /* Respect reduced motion */
+        @media (prefers-reduced-motion: reduce) {
+            ::view-transition-old(root),
+            ::view-transition-new(root) { animation: none !important; }
+            body { animation: none !important; }
+        }
+
         /* ── Mobile sidebar overlay ───────────────────────────── */
 
         /* Control sidebar visibility with pure CSS (not Tailwind responsive) */
@@ -202,6 +231,17 @@ if (!function_exists('renderPageHeader')) {
     <script>window.sentryOnLoad = function() { Sentry.init({ tracesSampleRate: 0.1 }); };</script>
     <script src="https://js.sentry-cdn.com/<?= htmlspecialchars(SENTRY_BROWSER_KEY, ENT_QUOTES) ?>.min.js" crossorigin="anonymous" defer></script>
     <?php endif; ?>
+
+    <!-- Suppress harmless AbortError from skipped View Transitions
+         (เกิดเมื่อนำทางซ้ำเร็วๆ / ไป download / กด back ระหว่าง transition) -->
+    <script>
+        window.addEventListener('unhandledrejection', function(e) {
+            var r = e.reason;
+            if (r && r.name === 'AbortError' && /transition/i.test(r.message || '')) {
+                e.preventDefault();
+            }
+        });
+    </script>
 
     <!-- Theme Sync Support -->
     <script>
