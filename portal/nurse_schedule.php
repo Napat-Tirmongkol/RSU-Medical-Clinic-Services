@@ -706,15 +706,16 @@ $NS_CSRF_TOKEN = get_csrf_token();
       </div>
 
       <div class="help-card">
-        <h4 class="font-semibold text-cyan-800 mb-2 flex items-center gap-2">
-          <i data-lucide="layers" class="w-4 h-4"></i> ประเภทเวร 9 แบบ
-        </h4>
-        <div class="grid grid-cols-3 gap-2 text-xs">
-          <div><b>ช</b> เช้า</div><div><b>บ</b> บ่าย</div><div><b>ด</b> ดึก</div>
-          <div><b>ชบ</b> โย้หน้า (ช+บ)</div><div><b>ดบ</b> โย้หลัง (ด+บ)</div><div><b>DN</b> Day+Night</div>
-          <div><b>O</b> OFF</div><div><b>V</b> ลาพักร้อน</div><div><b>T</b> ลาประชุม</div>
+        <div class="flex items-center justify-between mb-2">
+          <h4 class="font-semibold text-cyan-800 flex items-center gap-2">
+            <i data-lucide="layers" class="w-4 h-4"></i> ประเภทเวร 9 แบบ
+          </h4>
+          <button onclick="openEditShiftTypes()" class="btn-solid btn-primary text-xs" title="แก้ชื่อ + สี">
+            <i data-lucide="palette" class="w-3 h-3"></i> ปรับแต่ง
+          </button>
         </div>
-        <p class="text-xs text-slate-500 mt-3">⚠️ ใช้ <b>"ดบ"</b> เท่านั้น (ไม่ใช่ "บด")</p>
+        <div id="shiftTypesLegend" class="grid grid-cols-3 gap-2 text-xs"></div>
+        <p class="text-xs text-slate-500 mt-3">⚠️ ใช้ <b>"ดบ"</b> เท่านั้น (ไม่ใช่ "บด") · รหัส (label) แก้ไม่ได้ · แก้ได้เฉพาะชื่อ+สี</p>
       </div>
 
       <div class="help-card success">
@@ -753,7 +754,7 @@ $NS_CSRF_TOKEN = get_csrf_token();
 <!-- ============== JAVASCRIPT ============== -->
 <script>
 // ========= CONSTANTS =========
-const SHIFT_TYPES = {
+const DEFAULT_SHIFT_TYPES = {
   'ช':  { label: 'ช',  name: 'เช้า',       bg: '#fef9c3', fg: '#854d0e', order: 1 },
   'บ':  { label: 'บ',  name: 'บ่าย',       bg: '#bae6fd', fg: '#075985', order: 2 },
   'ด':  { label: 'ด',  name: 'ดึก',        bg: '#a5f3fc', fg: '#155e75', order: 3 },
@@ -764,6 +765,20 @@ const SHIFT_TYPES = {
   'V':  { label: 'V',  name: 'ลาพักร้อน',   bg: '#bbf7d0', fg: '#14532d', order: 8 },
   'T':  { label: 'T',  name: 'ลาประชุม',    bg: '#fbcfe8', fg: '#831843', order: 9 }
 };
+// SHIFT_TYPES = defaults merged with state.shiftTypes (user overrides)
+let SHIFT_TYPES = structuredClone(DEFAULT_SHIFT_TYPES);
+function applyShiftTypeOverrides() {
+  SHIFT_TYPES = structuredClone(DEFAULT_SHIFT_TYPES);
+  const ov = state.shiftTypes || {};
+  for (const k in ov) {
+    if (SHIFT_TYPES[k] && ov[k]) {
+      // override only name/bg/fg — never label (code) or order
+      if (ov[k].name) SHIFT_TYPES[k].name = ov[k].name;
+      if (ov[k].bg)   SHIFT_TYPES[k].bg   = ov[k].bg;
+      if (ov[k].fg)   SHIFT_TYPES[k].fg   = ov[k].fg;
+    }
+  }
+}
 
 const POSITIONS = {
   'หัวหน้าหอผู้ป่วย':    { icon: '⭐', cls: 'pos-head',   weekdayMorningOnly: true,  maxOne: true  },
@@ -879,6 +894,7 @@ const state = {
   customHolidays: {},   // key: 'yBE-M-D' → name (user-added overrides/additions)
   removedHolidays: {},  // key: 'yBE-M-D' → true (built-in holidays user removed)
   clinicHolidays: {},   // key: 'yBE-M-D' → note (จาก sys_clinic_hours — read-only)
+  shiftTypes: {},       // key: 'ช'|'บ'|... → {name?, bg?, fg?} overrides ของ DEFAULT_SHIFT_TYPES
   selectedShift: null,
   selectedLeave: 'V',
   otReport: [],
@@ -990,6 +1006,7 @@ async function serverSave() {
       otSettings: state.otSettings,
       customHolidays: state.customHolidays || {},
       removedHolidays: state.removedHolidays || {},
+      shiftTypes: state.shiftTypes || {},
     };
     const fd = new FormData();
     fd.append('csrf_token', NS_CSRF);
@@ -1017,6 +1034,7 @@ function persistAll() {
     requirements: state.requirements, otSettings: state.otSettings,
     customHolidays: state.customHolidays || {},
     removedHolidays: state.removedHolidays || {},
+    shiftTypes: state.shiftTypes || {},
     savedAt: new Date().toISOString()
   };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -1040,6 +1058,8 @@ async function loadFromStorage() {
     state.customHolidays  = serverData.customHolidays || {};
     state.removedHolidays = serverData.removedHolidays || {};
     state.clinicHolidays  = serverData.clinicHolidays || {};
+    state.shiftTypes      = serverData.shiftTypes || {};
+    applyShiftTypeOverrides();
     // Migration: "บด" → "ดบ"
     for (const key in state.schedule) {
       if (state.schedule[key] === 'บด') state.schedule[key] = 'ดบ';
@@ -1050,6 +1070,7 @@ async function loadFromStorage() {
       year: state.year, month: state.month,
       nurses: state.nurses, schedule: state.schedule, leaves: state.leaves,
       requirements: state.requirements, otSettings: state.otSettings,
+      shiftTypes: state.shiftTypes,
       customHolidays: state.customHolidays, removedHolidays: state.removedHolidays,
       savedAt: new Date().toISOString(),
     }));
@@ -1071,6 +1092,8 @@ async function loadFromStorage() {
     state.otSettings = data.otSettings || structuredClone(DEFAULT_OT);
     state.customHolidays = data.customHolidays || {};
     state.removedHolidays = data.removedHolidays || {};
+    state.shiftTypes = data.shiftTypes || {};
+    applyShiftTypeOverrides();
     for (const key in state.schedule) {
       if (state.schedule[key] === 'บด') state.schedule[key] = 'ดบ';
     }
@@ -1177,6 +1200,95 @@ function switchTab(name) {
 }
 
 // ========= PALETTES =========
+// แสดง legend "ประเภทเวร 9 แบบ" จาก SHIFT_TYPES (รวม override ของผู้ใช้)
+function renderShiftTypesLegend() {
+  const wrap = document.getElementById('shiftTypesLegend');
+  if (!wrap) return;
+  const order = ['ช','บ','ด','ชบ','ดบ','DN','O','V','T'];
+  wrap.innerHTML = order.map(code => {
+    const t = SHIFT_TYPES[code];
+    if (!t) return '';
+    const isDefault = !state.shiftTypes?.[code];
+    return `<div title="${isDefault ? 'ค่ามาตรฐาน' : 'ปรับแต่งแล้ว'}">
+      <span style="display:inline-block;min-width:26px;padding:1px 6px;border-radius:6px;background:${t.bg};color:${t.fg};font-weight:800;text-align:center;margin-right:4px">${t.label}</span>${t.name}
+    </div>`;
+  }).join('');
+}
+
+window.openEditShiftTypes = function() {
+  const order = ['ช','บ','ด','ชบ','ดบ','DN','O','V','T'];
+  const rows = order.map(code => {
+    const t = SHIFT_TYPES[code];
+    return `<tr>
+      <td style="padding:6px 8px;text-align:center;font-weight:900;background:${t.bg};color:${t.fg};border-radius:6px;min-width:36px">${t.label}</td>
+      <td style="padding:4px 6px"><input class="st-name swal2-input" data-code="${code}" value="${t.name.replace(/"/g,'&quot;')}" style="margin:0;font-size:13px;height:32px;padding:4px 8px;width:100%"></td>
+      <td style="padding:4px 6px;text-align:center"><input class="st-bg" data-code="${code}" type="color" value="${t.bg}" style="width:36px;height:32px;border:1px solid #cbd5e1;border-radius:6px;cursor:pointer"></td>
+      <td style="padding:4px 6px;text-align:center"><input class="st-fg" data-code="${code}" type="color" value="${t.fg}" style="width:36px;height:32px;border:1px solid #cbd5e1;border-radius:6px;cursor:pointer"></td>
+    </tr>`;
+  }).join('');
+  Swal.fire({
+    title: 'ปรับแต่งประเภทเวร',
+    html: `<p class="text-xs text-slate-500 text-left mb-3">รหัส (label) แก้ไม่ได้ — แก้ได้แค่ชื่อ + สีพื้น + สีอักษร · กด "คืนค่ามาตรฐาน" เพื่อ reset ทั้งหมด</p>
+      <table style="width:100%;font-size:13px">
+        <thead><tr style="font-size:11px;color:#64748b">
+          <th style="padding:4px 6px">รหัส</th><th style="padding:4px 6px;text-align:left">ชื่อ</th><th style="padding:4px 6px">พื้น</th><th style="padding:4px 6px">อักษร</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`,
+    showCancelButton: true,
+    showDenyButton: true,
+    confirmButtonText: 'บันทึก',
+    denyButtonText: 'คืนค่ามาตรฐาน',
+    cancelButtonText: 'ยกเลิก',
+    confirmButtonColor: '#2e9e63',
+    denyButtonColor: '#64748b',
+    width: 560,
+    preConfirm: () => {
+      const overrides = {};
+      document.querySelectorAll('.st-name').forEach(inp => {
+        const code = inp.dataset.code;
+        const name = inp.value.trim();
+        const bg = document.querySelector(`.st-bg[data-code="${code}"]`).value;
+        const fg = document.querySelector(`.st-fg[data-code="${code}"]`).value;
+        const def = DEFAULT_SHIFT_TYPES[code];
+        // เก็บเฉพาะที่เปลี่ยนจาก default
+        const diff = {};
+        if (name && name !== def.name) diff.name = name;
+        if (bg && bg.toLowerCase() !== def.bg.toLowerCase()) diff.bg = bg;
+        if (fg && fg.toLowerCase() !== def.fg.toLowerCase()) diff.fg = fg;
+        if (Object.keys(diff).length) overrides[code] = diff;
+      });
+      return overrides;
+    }
+  }).then(r => {
+    if (r.isDenied) {
+      // คืนค่ามาตรฐานทั้งหมด
+      state.shiftTypes = {};
+      applyShiftTypeOverrides();
+      state.dirty = true;
+      persistAll();
+      renderShiftTypesLegend();
+      renderShiftPalette();
+      renderLeavePalette();
+      renderSchedule();
+      renderLeaves();
+      Swal.fire({ icon: 'success', title: 'คืนค่ามาตรฐานแล้ว', timer: 1200, showConfirmButton: false });
+      return;
+    }
+    if (!r.isConfirmed) return;
+    state.shiftTypes = r.value || {};
+    applyShiftTypeOverrides();
+    state.dirty = true;
+    persistAll();
+    renderShiftTypesLegend();
+    renderShiftPalette();
+    renderLeavePalette();
+    renderSchedule();
+    renderLeaves();
+    Swal.fire({ icon: 'success', title: 'บันทึกแล้ว', timer: 1200, showConfirmButton: false });
+  });
+};
+
 function renderShiftPalette() {
   const wrap = document.getElementById('shiftPalette');
   wrap.innerHTML = '';
@@ -2666,6 +2778,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   loadOTToUI();
   renderShiftPalette();
   renderLeavePalette();
+  renderShiftTypesLegend();
   renderDashboard();
   updateHolidayBadge();
   lucide.createIcons();
