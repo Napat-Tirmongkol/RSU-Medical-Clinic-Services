@@ -42,6 +42,8 @@ $gcpCsrfToken = function_exists('get_csrf_token') ? get_csrf_token() : ($_SESSIO
     #section-gold_card_pending .gcp-pager-btn:disabled { opacity:0.4; cursor:not-allowed; }
     #section-gold_card_pending .gcp-pager-btn.gcp-active { background:#f59e0b; border-color:#f59e0b; color:white; }
     #section-gold_card_pending .gcp-empty { padding:60px 20px; text-align:center; }
+    .gcp-lightbox-dl:hover { background:#0284c7 !important; transform:translateY(-1px); box-shadow:0 10px 22px rgba(14,165,233,0.4) !important; }
+    .gcp-lightbox-dl:active { transform:translateY(0); }
     @media (max-width: 640px) {
         #section-gold_card_pending .gcp-card-inner { flex-direction:column; gap:14px; }
         #section-gold_card_pending .gcp-thumb-stack { flex-direction:row; }
@@ -192,18 +194,23 @@ $gcpCsrfToken = function_exists('get_csrf_token') ? get_csrf_token() : ($_SESSIO
             const sigDoc   = (r.documents || []).find(d => d.doc_type === 'signature');
             const photoUrl = photoDoc ? `${ENDPOINT}?entity=document&action=download&id=${photoDoc.id}` : '';
             const sigUrl   = sigDoc   ? `${ENDPOINT}?entity=document&action=download&id=${sigDoc.id}` : '';
+            const safeName = (r.full_name || 'member').replace(/[^฀-๿a-zA-Z0-9_-]+/g, '_').slice(0, 60) || 'member';
+            const photoFile = (photoDoc && photoDoc.file_name) || `${safeName}_photo.jpg`;
+            const sigFile   = (sigDoc && sigDoc.file_name) || `${safeName}_signature.png`;
+            const photoFileJs = escapeHtml(photoFile).replace(/'/g, "\\'");
+            const sigFileJs   = escapeHtml(sigFile).replace(/'/g, "\\'");
 
             return `<div class="gcp-card">
                 <div class="gcp-card-inner flex gap-4 items-start">
                     <div class="gcp-thumb-stack flex flex-col gap-2 shrink-0">
                         ${photoUrl
-                            ? `<div class="gcp-thumb" onclick="gcpLightbox('${photoUrl}','photo')">
+                            ? `<div class="gcp-thumb" onclick="gcpLightbox('${photoUrl}','photo','${photoFileJs}')">
                                 <span class="gcp-thumb-tag">รูป</span>
                                 <img src="${photoUrl}" alt="photo">
                                </div>`
                             : `<div class="gcp-thumb-empty"><i class="fa-solid fa-image text-2xl mb-1"></i>ไม่มีรูป</div>`}
                         ${sigUrl
-                            ? `<div class="gcp-thumb gcp-thumb-sig" onclick="gcpLightbox('${sigUrl}','signature')">
+                            ? `<div class="gcp-thumb gcp-thumb-sig" onclick="gcpLightbox('${sigUrl}','signature','${sigFileJs}')">
                                 <span class="gcp-thumb-tag">เซ็น</span>
                                 <img src="${sigUrl}" alt="signature">
                                </div>`
@@ -269,8 +276,12 @@ $gcpCsrfToken = function_exists('get_csrf_token') ? get_csrf_token() : ($_SESSIO
         pager.innerHTML = html;
     }
 
-    window.gcpLightbox = function(url, type) {
+    window.gcpLightbox = function(url, type, fileName) {
         const isSignature = type === 'signature';
+        const safeName = fileName || (isSignature ? 'signature.png' : 'photo.jpg');
+        const dlUrl = url + '&disposition=attachment';
+        const dlUrlAttr  = escapeHtml(dlUrl);
+        const dlNameAttr = escapeHtml(safeName);
         Swal.fire({
             html: `<div style="display:flex; align-items:center; justify-content:center; min-height:60vh;">
                        <img src="${url}"
@@ -279,9 +290,15 @@ $gcpCsrfToken = function_exists('get_csrf_token') ? get_csrf_token() : ($_SESSIO
                                    box-shadow:0 20px 50px rgba(0,0,0,0.3);"
                             alt="${type}">
                    </div>
-                   <p style="text-align:center; color:#64748b; font-weight:700; font-size:13px; margin-top:12px;">
-                       ${isSignature ? '✍️ ลายมือชื่อ' : '📷 รูปถ่ายคู่บัตรประชาชน'}
-                   </p>`,
+                   <div style="display:flex; align-items:center; justify-content:center; gap:14px; margin-top:14px; flex-wrap:wrap;">
+                       <p style="color:#64748b; font-weight:700; font-size:13px; margin:0;">
+                           ${isSignature ? '✍️ ลายมือชื่อ' : '📷 รูปถ่ายคู่บัตรประชาชน'}
+                       </p>
+                       <a href="${dlUrlAttr}" download="${dlNameAttr}" class="gcp-lightbox-dl"
+                          style="display:inline-flex; align-items:center; gap:8px; padding:9px 16px; border-radius:10px; background:#0ea5e9; color:#fff; font-weight:900; font-size:13px; text-decoration:none; box-shadow:0 6px 16px rgba(14,165,233,0.3); transition:all 0.15s;">
+                           <i class="fa-solid fa-download"></i> ดาวน์โหลดรูป
+                       </a>
+                   </div>`,
             width: 'auto',
             padding: '20px',
             showConfirmButton: false,
