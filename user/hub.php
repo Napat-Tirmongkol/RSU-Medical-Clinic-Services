@@ -1593,14 +1593,17 @@ $heroThemes = [
                             <p class="text-[13px] font-black leading-tight text-slate-700">ปรึกษาแพทย์<br>ออนไลน์</p>
                         </button>
 
-                        <button onclick="showUpcoming('เคลมประกัน / ตรวจสอบสิทธิ์')"
-                            class="relative flex flex-col items-start p-5 rounded-2xl bg-slate-50 border border-slate-100 active:scale-95 transition-all text-left opacity-90">
-                            <span class="absolute top-3 right-3 px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[8px] font-black uppercase tracking-widest">Soon</span>
-                            <div class="w-10 h-10 rounded-2xl bg-white flex items-center justify-center mb-3 shadow-sm border border-slate-100 text-indigo-500">
+                        <?php if (!is_under_maintenance('gold_card_apply')): ?>
+                        <button onclick="window.location.href='gold_card_apply.php'"
+                            class="relative flex flex-col items-start p-5 rounded-2xl bg-gradient-to-br from-amber-50 to-orange-100 border border-amber-200 active:scale-95 transition-all text-left group overflow-hidden">
+                            <div class="absolute -right-4 -top-4 w-16 h-16 bg-amber-200/40 rounded-full blur-xl group-hover:scale-150 transition-transform"></div>
+                            <div class="w-10 h-10 rounded-2xl bg-white flex items-center justify-center mb-3 shadow-sm border border-amber-100 text-amber-600 relative">
                                 <i class="fa-solid fa-shield-heart text-sm"></i>
                             </div>
-                            <p class="text-[13px] font-black leading-tight text-slate-700">เคลม<br>ประกัน</p>
+                            <p class="text-[13px] font-black leading-tight text-slate-800 relative">สมัคร<br>บัตรทอง</p>
+                            <span class="text-[9px] font-black text-amber-700 uppercase tracking-widest mt-1 relative">UC Coverage</span>
                         </button>
+                        <?php endif; ?>
 
                         <button onclick="showUpcoming('ชำระค่าบริการ')"
                             class="relative flex flex-col items-start p-5 rounded-2xl bg-slate-50 border border-slate-100 active:scale-95 transition-all text-left opacity-90">

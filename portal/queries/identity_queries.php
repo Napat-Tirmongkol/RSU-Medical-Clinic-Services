@@ -77,6 +77,7 @@ try {
 $allAdmins = [];
 $allStaff  = [];
 $allPositions = [];
+$allDepartments = [];
 
 if ($adminRole === 'superadmin') {
     $allAdmins = $pdo->query("SELECT * FROM sys_admins ORDER BY id DESC")->fetchAll(PDO::FETCH_ASSOC);
@@ -110,6 +111,21 @@ if ($adminRole === 'superadmin') {
         }
         if (!in_array('access_scholarship', $cols)) {
             $pdo->exec("ALTER TABLE sys_staff ADD COLUMN access_scholarship TINYINT(1) DEFAULT 0");
+        }
+        if (!in_array('access_dashboard_admin', $cols)) {
+            $pdo->exec("ALTER TABLE sys_staff ADD COLUMN access_dashboard_admin TINYINT(1) DEFAULT 0");
+        }
+        if (!in_array('access_monthly_report', $cols)) {
+            $pdo->exec("ALTER TABLE sys_staff ADD COLUMN access_monthly_report TINYINT(1) DEFAULT 0");
+        }
+        if (!in_array('access_director_view', $cols)) {
+            $pdo->exec("ALTER TABLE sys_staff ADD COLUMN access_director_view TINYINT(1) DEFAULT 0");
+        }
+        if (!in_array('access_identity', $cols)) {
+            $pdo->exec("ALTER TABLE sys_staff ADD COLUMN access_identity TINYINT(1) DEFAULT 0");
+        }
+        if (!in_array('department_id', $cols)) {
+            $pdo->exec("ALTER TABLE sys_staff ADD COLUMN department_id INT UNSIGNED NULL AFTER role");
         }
         if (!in_array('position_id', $cols)) {
             $pdo->exec("ALTER TABLE sys_staff ADD COLUMN position_id INT UNSIGNED NULL AFTER role");
@@ -146,7 +162,12 @@ if ($adminRole === 'superadmin') {
                    IFNULL(s.access_ai, 0) AS access_ai,
                    IFNULL(s.access_consumables, 0) AS access_consumables,
                    IFNULL(s.access_asset, 0) AS access_asset,
-                   IFNULL(s.access_scholarship, 0) AS access_scholarship
+                   IFNULL(s.access_scholarship, 0) AS access_scholarship,
+                   IFNULL(s.access_dashboard_admin, 0) AS access_dashboard_admin,
+                   IFNULL(s.access_monthly_report, 0) AS access_monthly_report,
+                   IFNULL(s.access_director_view, 0) AS access_director_view,
+                   IFNULL(s.access_identity, 0) AS access_identity,
+                   s.department_id
             FROM sys_staff s
             LEFT JOIN sys_staff_positions p ON p.id = s.position_id
             ORDER BY s.role ASC, s.full_name ASC
@@ -159,6 +180,17 @@ if ($adminRole === 'superadmin') {
             FROM sys_staff_positions p
             ORDER BY p.name ASC
         ")->fetchAll(PDO::FETCH_ASSOC);
+
+        // ฝ่าย/หน่วยงาน + count staff/reports ที่ผูก
+        try {
+            $allDepartments = $pdo->query("
+                SELECT d.id, d.name, d.description, d.sort_order, d.active, d.created_at,
+                       (SELECT COUNT(*) FROM sys_staff WHERE department_id = d.id) AS staff_count,
+                       (SELECT COUNT(*) FROM sys_monthly_reports WHERE department_id = d.id) AS report_count
+                FROM sys_departments d
+                ORDER BY d.sort_order, d.name
+            ")->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) { $allDepartments = []; }
     } catch (PDOException $e) {
         // Fallback for safety: if something still fails, try query without new columns
         try {

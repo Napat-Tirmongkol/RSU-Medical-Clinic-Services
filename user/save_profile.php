@@ -31,6 +31,15 @@ $phoneNumber = preg_replace('/\D/', '', (string) ($_POST['phone_number'] ?? ''))
 $status      = trim((string) ($_POST['status']       ?? ''));
 $email       = trim((string) ($_POST['email']        ?? ''));
 $gender      = trim((string) ($_POST['gender']       ?? ''));
+$dobInput    = trim((string) ($_POST['date_of_birth'] ?? ''));
+// Validate DOB: empty OR Y-m-d format AND not future
+$dateOfBirth = null;
+if ($dobInput !== '') {
+    $dt = DateTime::createFromFormat('Y-m-d', $dobInput);
+    if ($dt && $dt->format('Y-m-d') === $dobInput && $dt <= new DateTime()) {
+        $dateOfBirth = $dobInput;
+    }
+}
 $department  = trim((string) ($_POST['department']   ?? ''));
 $redirectBack = trim((string) ($_POST['redirect_back'] ?? ''));
 
@@ -88,6 +97,7 @@ try {
         'prefix'                     => "VARCHAR(20) NOT NULL DEFAULT ''",
         'first_name'                 => "VARCHAR(100) NOT NULL DEFAULT ''",
         'last_name'                  => "VARCHAR(100) NOT NULL DEFAULT ''",
+        'date_of_birth'              => "DATE NULL DEFAULT NULL",
         'blood_type'                 => "VARCHAR(8) NOT NULL DEFAULT ''",
         'height_cm'                  => "DECIMAL(5,2) NULL DEFAULT NULL",
         'weight_kg'                  => "DECIMAL(5,2) NULL DEFAULT NULL",
@@ -118,6 +128,7 @@ try {
         ':status'     => $status,
         ':email'      => $email,
         ':gender'     => $gender,
+        ':dob'        => $dateOfBirth,
         ':dept'       => $department,
         ':blood'      => $bloodType,
         ':height'     => $heightCm,
@@ -135,7 +146,7 @@ try {
                     prefix = :prefix, first_name = :first_name, last_name = :last_name,
                     full_name = :name, student_personnel_id = :sid,
                     citizen_id = :cid, phone_number = :phone, status = :status,
-                    email = :email, gender = :gender, department = :dept,
+                    email = :email, gender = :gender, date_of_birth = :dob, department = :dept,
                     blood_type = :blood, height_cm = :height, weight_kg = :weight,
                     allergies = :allergies, chronic_conditions = :chronic,
                     emergency_contact_name = :em_name,
@@ -146,13 +157,13 @@ try {
         $sql = "INSERT INTO sys_users
                     (line_user_id, prefix, first_name, last_name, full_name,
                      student_personnel_id, citizen_id, phone_number, status, email,
-                     gender, department, blood_type, height_cm, weight_kg,
+                     gender, date_of_birth, department, blood_type, height_cm, weight_kg,
                      allergies, chronic_conditions,
                      emergency_contact_name, emergency_contact_phone, emergency_contact_relation)
                 VALUES
                     (:line_id, :prefix, :first_name, :last_name, :name,
                      :sid, :cid, :phone, :status, :email,
-                     :gender, :dept, :blood, :height, :weight,
+                     :gender, :dob, :dept, :blood, :height, :weight,
                      :allergies, :chronic,
                      :em_name, :em_phone, :em_rel)";
     }

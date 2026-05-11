@@ -70,6 +70,14 @@ $mProjects = [
         'icon_color' => '#475569',
         'icon_bg' => '#f1f5f9',
     ],
+    [
+        'key' => 'gold_card_apply',
+        'title' => 'สมัครบัตรทอง',
+        'desc' => 'ปุ่ม "สมัครบัตรทอง" ในหน้า User Hub — ปิดเมื่อหยุดรับสมัคร',
+        'icon' => 'fa-shield-heart',
+        'icon_color' => '#d97706',
+        'icon_bg' => '#fef3c7',
+    ],
 ];
 $allOnline = true;
 foreach ($mProjects as $p) {
@@ -382,6 +390,10 @@ $categoryMap = [
     'asset_management' => 'core',
     'consumables' => 'core',
     'insurance_sync' => 'core',
+    'insurance_dashboard' => 'core',
+    'gold_card' => 'core',
+    'gold_card_pending' => 'core',
+    'monthly_report' => 'core',
     'system_logs' => 'tools',
     'privilege_inventory' => 'tools',
     'admin_tool' => 'tools',
@@ -390,17 +402,23 @@ $categoryMap = [
 
 /**
  * (3) RECENT ACTIVITY FETCH
- * ดึงความเคลื่อนไหวล่าสุดจาก sys_activity_logs มาแสดงที่ Dashboard
+ * แสดงเฉพาะกิจกรรมของ user ปัจจุบัน (privacy: ไม่ปนกับคนอื่น)
  */
 $recentActivity = [];
-try {
-    $sql = "SELECT l.action, l.description, l.timestamp as created_at, a.full_name as admin_name 
-            FROM sys_activity_logs l
-            LEFT JOIN sys_admins a ON l.user_id = a.id
-            ORDER BY l.timestamp DESC 
-            LIMIT 5";
-    $recentActivity = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
-} catch (PDOException $e) { /* silent */
+$_currentUserId = $_SESSION['admin_id'] ?? null;
+if ($_currentUserId) {
+    try {
+        $stmt = $pdo->prepare("SELECT action, description, timestamp as created_at
+                               FROM sys_activity_logs
+                               WHERE user_id = :uid
+                               ORDER BY timestamp DESC
+                               LIMIT 5");
+        $stmt->execute([':uid' => (int)$_currentUserId]);
+        $recentActivity = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $_myName = $_SESSION['admin_username'] ?? '';
+        foreach ($recentActivity as &$_r) { $_r['admin_name'] = $_myName; }
+        unset($_r);
+    } catch (PDOException $e) { /* table not ready */ }
 }
 
 /**
@@ -952,6 +970,8 @@ try {
             $hasSiteSet     = $isSuper || !empty($_SESSION['access_site_settings']);
             $hasEdms        = $isSuper || !empty($_SESSION['access_edms']);
             $hasScholarship = $isSuper || !empty($_SESSION['access_scholarship']);
+            $hasDashboardAdmin = $isSuper || !empty($_SESSION['access_dashboard_admin']);
+            $hasMonthlyReport  = $isSuper || !empty($_SESSION['access_monthly_report']) || !empty($_SESSION['access_director_view']);
 
             // EDMS pending count badge — count routings where current user is recipient and status is open
             $edmsInboxBadge = 0;
@@ -1023,10 +1043,12 @@ try {
                     <i class="fa-solid fa-chevron-down psb-chevron"></i>
                 </button>
                 <div class="psb-group" data-group="security">
+                    <?php if ($isSuper || !empty($_SESSION['access_identity'])): ?>
                     <button class="psb-item" data-section="identity" onclick="switchSection('identity',this)">
                         <div class="psb-icon"><i class="fa-solid fa-id-card-clip" style="color:#2563eb"></i></div>
                         <span class="psb-label" style="color:#1d4ed8;font-weight:900">Identity &amp; Governance</span>
                     </button>
+                    <?php endif; ?>
                     <?php if ($isSuper): ?>
                         <button class="psb-item" data-section="privilege_inventory" onclick="switchSection('privilege_inventory',this)">
                             <div class="psb-icon"><i class="fa-solid fa-shield-halved" style="color:#10b981"></i></div>
@@ -1045,9 +1067,28 @@ try {
                 </button>
                 <div class="psb-group" data-group="insurance">
                     <?php if (!$registryOnly): ?>
+                        <button class="psb-item <?= $activeSection==='insurance_dashboard'?'psb-active':'' ?>" data-section="insurance_dashboard" onclick="switchSection('insurance_dashboard',this)">
+                            <div class="psb-icon"><i class="fa-solid fa-chart-pie" style="color:#3b82f6"></i></div>
+                            <span class="psb-label" style="color:#1d4ed8;font-weight:900">Dashboard Workbook</span>
+                        </button>
                         <button class="psb-item" data-section="insurance_sync" onclick="switchSection('insurance_sync',this)">
                             <div class="psb-icon"><i class="fa-solid fa-shield-halved" style="color:#0ea5e9"></i></div>
                             <span class="psb-label" style="color:#0284c7;font-weight:900">Insurance Hub</span>
+                        </button>
+                        <button class="psb-item <?= $activeSection==='gold_card_pending'?'psb-active':'' ?>" data-section="gold_card_pending" onclick="switchSection('gold_card_pending',this)">
+                            <div class="psb-icon"><i class="fa-solid fa-hourglass-half" style="color:#3b82f6"></i></div>
+                            <span class="psb-label" style="color:#1d4ed8;font-weight:900">ย้ายสิทธิ์บัตรทอง</span>
+                            <?php
+                            $pendingBadgeCount = 0;
+                            try { $pendingBadgeCount = (int)db()->query("SELECT COUNT(*) FROM gold_card_members WHERE status = 'submitted'")->fetchColumn(); }
+                            catch (PDOException) {}
+                            if ($pendingBadgeCount > 0): ?>
+                                <span class="ml-auto px-2 py-0.5 rounded-full bg-rose-500 text-white text-[10px] font-black"><?= $pendingBadgeCount > 99 ? '99+' : $pendingBadgeCount ?></span>
+                            <?php endif; ?>
+                        </button>
+                        <button class="psb-item <?= $activeSection==='gold_card'?'psb-active':'' ?>" data-section="gold_card" onclick="switchSection('gold_card',this)">
+                            <div class="psb-icon"><i class="fa-solid fa-id-card" style="color:#f59e0b"></i></div>
+                            <span class="psb-label" style="color:#b45309;font-weight:900">บัตรทอง</span>
                         </button>
                     <?php endif; ?>
                     <?php if ($hasRegistry): ?>
@@ -1062,7 +1103,7 @@ try {
                             <span class="psb-label" style="color:#0e7490;font-weight:900">สถานะเอกสาร</span>
                         </button>
                     <?php endif; ?>
-                    <?php if (!$registryOnly && ($isSuper || !empty($_SESSION['access_insurance']))): ?>
+                    <?php if (!$registryOnly && $isSuper): ?>
                         <button class="psb-item" data-section="manage_insurance_partners" onclick="switchSection('manage_insurance_partners',this)">
                             <div class="psb-icon"><i class="fa-solid fa-handshake" style="color:#10b981"></i></div>
                             <span class="psb-label" style="color:#059669;font-weight:900">Insurance Partners</span>
@@ -1112,6 +1153,21 @@ try {
                     <button class="psb-item" data-section="error_logs" onclick="switchSection('error_logs',this)">
                         <div class="psb-icon"><i class="fa-solid fa-bug" style="color:#ef4444"></i></div>
                         <span class="psb-label" style="color:#dc2626;font-weight:900">Error Logs</span>
+                    </button>
+                </div>
+            <?php endif; ?>
+
+            <?php /* ── รายงาน ─────────────────────────────────────────────── */ ?>
+            <?php if (!$registryOnly && $hasMonthlyReport): ?>
+                <button type="button" class="psb-section-toggle" data-group="reports" onclick="togglePsbGroup('reports',this)">
+                    <i class="fa-solid fa-clipboard-list" style="color:#f59e0b"></i>
+                    <span>รายงาน</span>
+                    <i class="fa-solid fa-chevron-down psb-chevron"></i>
+                </button>
+                <div class="psb-group" data-group="reports">
+                    <button class="psb-item <?= $activeSection==='monthly_report'?'psb-active':'' ?>" data-section="monthly_report" onclick="switchSection('monthly_report',this)">
+                        <div class="psb-icon"><i class="fa-solid fa-calendar-days" style="color:#f59e0b"></i></div>
+                        <span class="psb-label" style="color:#b45309;font-weight:900">รายงานประจำเดือน</span>
                     </button>
                 </div>
             <?php endif; ?>
@@ -1366,25 +1422,37 @@ try {
                             <!-- Cards -->
                             <div id="project-container" class="grid grid-cols-1 sm:grid-cols-2 gap-5">
                                 <?php $cardIdx = 0;
+                                // Map project → required access flag (strict: ต้องมี flag จริงๆ ถึงเห็นการ์ด)
+                                // null = superadmin only, '' = ใครก็ได้ที่เป็น admin role
+                                $projectFlagMap = [
+                                    'e_campaign'         => 'access_ecampaign',
+                                    'staff_checkin'      => 'access_ecampaign',
+                                    'e_borrow'           => 'access_eborrow',
+                                    'asset_management'   => 'access_asset',
+                                    'consumables'        => 'access_consumables',
+                                    'system_logs'        => 'access_system_logs',
+                                    'insurance_sync'     => 'access_insurance',
+                                    'live_support_chat'  => 'access_ecampaign',
+                                    'line_messaging'     => null, // superadmin only
+                                    'privilege_inventory'=> null, // superadmin only
+                                    'identity_governance'=> 'access_identity',
+                                ];
                                 foreach ($projects as $proj):
-                                    // Robust access control check
                                     $hasAccess = false;
                                     if ($adminRole === 'superadmin') {
                                         $hasAccess = true;
                                     } else {
-                                        // Check project-specific flags
-                                        if ($proj['id'] === 'e_borrow' && !empty($_SESSION['access_eborrow'])) $hasAccess = true;
-                                        elseif ($proj['id'] === 'e_campaign' && !empty($_SESSION['access_ecampaign'])) $hasAccess = true;
-                                        elseif ($proj['id'] === 'insurance_sync' && !empty($_SESSION['access_insurance'])) $hasAccess = true;
-                                        elseif ($proj['id'] === 'system_logs' && !empty($_SESSION['access_system_logs'])) $hasAccess = true;
-                                        elseif ($proj['id'] === 'line_messaging' && !empty($_SESSION['access_site_settings'])) $hasAccess = true;
-                                        elseif ($proj['id'] === 'privilege_inventory' && $adminRole === 'superadmin') $hasAccess = true;
-                                        elseif ($proj['id'] === 'identity_governance' && in_array($adminRole, ['admin', 'superadmin'])) $hasAccess = true;
-                                        
-                                        // Fallback to role-based or staff-visibility
-                                        if (!$hasAccess) {
+                                        $reqFlag = $projectFlagMap[$proj['id']] ?? '__unknown__';
+                                        if ($reqFlag === null) {
+                                            $hasAccess = false; // superadmin only
+                                        } elseif ($reqFlag === '') {
+                                            $hasAccess = in_array($adminRole, ['admin', 'superadmin'], true);
+                                        } elseif ($reqFlag === '__unknown__') {
+                                            // Project ใหม่ที่ยังไม่ map — fallback ไป role-based เดิม (ไม่ปลอดภัย)
                                             if (in_array($adminRole, $proj['allowed_roles'])) $hasAccess = true;
                                             if ($isStaff && ($proj['staff_visible'] ?? false)) $hasAccess = true;
+                                        } else {
+                                            $hasAccess = !empty($_SESSION[$reqFlag]);
                                         }
                                     }
 
@@ -1457,10 +1525,10 @@ try {
                             <!-- Clinic Calendar widget (today + next 6 days) -->
                             <?php include __DIR__ . '/_partials/dashboard_clinic_calendar.php'; ?>
 
-                            <!-- Activity Feed (flat list, color-coded by event) -->
+                            <!-- Activity Feed (flat list, color-coded by event) — ของฉันเท่านั้น -->
                             <div>
                                 <div class="sec-title mb-4">
-                                    ความเคลื่อนไหวล่าสุด
+                                    กิจกรรมของฉันล่าสุด
                                     <?php if (!empty($recentActivity)): ?>
                                         <span class="ml-auto eyebrow"><?= count($recentActivity) ?> รายการ</span>
                                     <?php endif; ?>
@@ -1504,14 +1572,16 @@ try {
                                     <?php endforeach; else: ?>
                                         <li class="activity-empty">
                                             <i class="fa-solid fa-circle-check"></i>
-                                            ไม่มีความเคลื่อนไหวใน 24 ชั่วโมงที่ผ่านมา
+                                            ยังไม่มีกิจกรรมของคุณในระบบ
                                         </li>
                                     <?php endif; ?>
                                 </ul>
+                                <?php if ($isSuper || !empty($_SESSION['access_system_logs'])): ?>
                                 <a href="javascript:switchSection('activity_logs', document.querySelector('[data-section=activity_logs]'))"
                                     class="activity-view-all">
-                                    ดูทั้งหมด <i class="fa-solid fa-arrow-right text-[10px]"></i>
+                                    ดูของระบบทั้งหมด <i class="fa-solid fa-arrow-right text-[10px]"></i>
                                 </a>
+                                <?php endif; ?>
                             </div>
 
                             <!-- Quick Shortcuts (flat, role-aware) -->
@@ -1800,8 +1870,11 @@ try {
             </form>
 
             <!-- ════════════ SECTION: IDENTITY & GOVERNANCE ════════════ -->
-            <div id="section-identity" class="portal-section" 
+            <div id="section-identity" class="portal-section"
                 style="<?= $activeSection==='identity'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); background:#f8fafc; overflow-y:auto;">
+                <?php if (!($isSuper || !empty($_SESSION['access_identity']))): ?>
+                    <div style="padding:100px;text-align:center;font-weight:900;color:#dc2626"><i class="fa-solid fa-shield-slash mb-4" style="font-size:4rem;display:block"></i> ACCESS DENIED<br><span style="font-size:14px;color:#94a3b8;font-weight:600">ต้องมีสิทธิ์ access_identity</span></div>
+                <?php else: ?>
                 <div class="px-5 md:px-8 py-8">
 
                     <?php if ($idSaved): ?>
@@ -1858,6 +1931,8 @@ try {
                                 (<?= count($allStaff) ?>)</button>
                             <button class="id-tab" data-tab="positions" onclick="switchIdTab('positions',this)">ตำแหน่งงาน
                                 (<?= count($allPositions ?? []) ?>)</button>
+                            <button class="id-tab" data-tab="departments" onclick="switchIdTab('departments',this)">ฝ่าย/หน่วยงาน
+                                (<?= count($allDepartments ?? []) ?>)</button>
                         <?php endif; ?>
                     </div>
 
@@ -2143,6 +2218,7 @@ try {
                                             <th style="padding:16px 20px;text-align:center;font-size:10px;font-weight:900;color:#64748b;text-transform:uppercase;letter-spacing:.15em;width:80px" title="Consumables"><i class="fa-solid fa-syringe"></i></th>
                                             <th style="padding:16px 20px;text-align:center;font-size:10px;font-weight:900;color:#64748b;text-transform:uppercase;letter-spacing:.15em;width:80px" title="Asset"><i class="fa-solid fa-warehouse"></i></th>
                                             <th style="padding:16px 20px;text-align:center;font-size:10px;font-weight:900;color:#64748b;text-transform:uppercase;letter-spacing:.15em;width:80px" title="Scholarship"><i class="fa-solid fa-graduation-cap"></i></th>
+                                            <th style="padding:16px 20px;text-align:center;font-size:10px;font-weight:900;color:#64748b;text-transform:uppercase;letter-spacing:.15em;width:80px" title="Dashboard Editor"><i class="fa-solid fa-chart-pie"></i></th>
                                             <th style="padding:16px 20px;text-align:center;font-size:10px;font-weight:900;color:#64748b;text-transform:uppercase;letter-spacing:.15em;width:100px">Status</th>
                                             <th style="padding:16px 20px;text-align:right;font-size:10px;font-weight:900;color:#64748b;text-transform:uppercase;letter-spacing:.15em">Actions</th>
                                         </tr>
@@ -2191,10 +2267,12 @@ try {
                                             $consAccess = (int)($st['access_consumables'] ?? 0);
                                             $assetAccess = (int)($st['access_asset'] ?? 0);
                                             $scholarAccess = (int)($st['access_scholarship'] ?? 0);
+                                            $dashAccess = (int)($st['access_dashboard_admin'] ?? 0);
                                             $aiIcon = $aiAccess ? '<i class="fa-solid fa-circle-check text-emerald-500"></i>' : '<i class="fa-solid fa-circle-minus text-slate-200"></i>';
                                             $consIcon = $consAccess ? '<i class="fa-solid fa-circle-check text-emerald-500"></i>' : '<i class="fa-solid fa-circle-minus text-slate-200"></i>';
                                             $assetIcon = $assetAccess ? '<i class="fa-solid fa-circle-check text-emerald-500"></i>' : '<i class="fa-solid fa-circle-minus text-slate-200"></i>';
                                             $scholarIcon = $scholarAccess ? '<i class="fa-solid fa-circle-check text-emerald-500"></i>' : '<i class="fa-solid fa-circle-minus text-slate-200"></i>';
+                                            $dashIcon = $dashAccess ? '<i class="fa-solid fa-circle-check text-emerald-500"></i>' : '<i class="fa-solid fa-circle-minus text-slate-200"></i>';
                                             ?>
                                             <tr style="border-bottom:1px solid #f1f5f9" class="id-staff-row hover:bg-slate-50/50 transition-colors">
                                                 <td style="padding:16px 20px">
@@ -2217,6 +2295,7 @@ try {
                                                 <td style="padding:16px 20px;text-align:center"><?= $consIcon ?></td>
                                                 <td style="padding:16px 20px;text-align:center"><?= $assetIcon ?></td>
                                                 <td style="padding:16px 20px;text-align:center"><?= $scholarIcon ?></td>
+                                                <td style="padding:16px 20px;text-align:center"><?= $dashIcon ?></td>
                                                 <td style="padding:16px 20px;text-align:center">
                                                     <span style="font-size:10px;font-weight:900;padding:4px 10px;border-radius:99px;background:<?= $isActive ? '#f0fdf4;color:#16a34a;border:1px solid #bbf7d0' : '#fef2f2;color:#dc2626;border:1px solid #fecaca' ?>"><?= strtoupper($st['account_status']) ?></span>
                                                 </td>
@@ -2290,6 +2369,7 @@ try {
                                                 'access_consumables'    => ['Consumables',      '#f43f5e'],
                                                 'access_asset'          => ['Asset',            '#f59e0b'],
                                                 'access_scholarship'    => ['Scholarship',      '#10b981'],
+                                                'access_dashboard_admin'=> ['Dashboard Editor', '#3b82f6'],
                                             ];
                                             foreach ($allPositions as $pos):
                                                 $posFlags = json_decode($pos['flags'] ?? '{}', true) ?: [];
@@ -2344,7 +2424,90 @@ try {
                     </div>
                     <?php endif; ?>
 
+                    <!-- PANEL: Departments (ฝ่าย/หน่วยงาน) -->
+                    <?php if ($adminRole === 'superadmin'): ?>
+                    <div id="id-panel-departments" class="id-panel">
+                        <div style="background:#fff;border-radius:18px;border:1.5px solid #e2e8f0;overflow:hidden">
+                            <div style="padding:20px 24px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+                                <div>
+                                    <div style="font-size:14px;font-weight:900;color:#1e293b;display:flex;align-items:center;gap:8px">
+                                        <i class="fa-solid fa-sitemap" style="color:#6366f1"></i>
+                                        ฝ่าย/หน่วยงาน (Department Master)
+                                    </div>
+                                    <p style="margin:4px 0 0;font-size:11px;color:#64748b;font-weight:600">
+                                        จัดการฝ่ายของคลินิก — ใช้ผูกกับ Staff (ผู้กรอกรายงาน) และ Template ของรายงานประจำเดือน
+                                    </p>
+                                </div>
+                                <button type="button" onclick="openAddDeptModal()" style="padding:10px 16px;border-radius:10px;border:none;background:linear-gradient(135deg,#6366f1,#4f46e5);color:#fff;font-weight:900;font-size:12px;cursor:pointer;display:inline-flex;align-items:center;gap:8px;box-shadow:0 6px 14px -3px rgba(99,102,241,.35)">
+                                    <i class="fa-solid fa-plus"></i> เพิ่มฝ่ายใหม่
+                                </button>
+                            </div>
+
+                            <?php if (empty($allDepartments)): ?>
+                                <div style="padding:60px 20px;text-align:center;color:#94a3b8">
+                                    <i class="fa-solid fa-sitemap" style="font-size:38px;display:block;margin-bottom:12px;opacity:.4"></i>
+                                    <p style="font-size:13px;font-weight:700;margin:0">ยังไม่มีฝ่ายในระบบ</p>
+                                    <p style="font-size:11px;color:#cbd5e1;margin:6px 0 0">คลิก "เพิ่มฝ่ายใหม่" เพื่อเริ่มต้น</p>
+                                </div>
+                            <?php else: ?>
+                                <div style="overflow-x:auto">
+                                    <table style="width:100%;border-collapse:collapse;font-size:13px" id="idDeptTable">
+                                        <thead>
+                                            <tr style="background:#f8fafc;border-bottom:1.5px solid #e2e8f0">
+                                                <th style="padding:14px 18px;text-align:left;font-size:10px;font-weight:900;color:#64748b;text-transform:uppercase;letter-spacing:.15em">ชื่อฝ่าย</th>
+                                                <th style="padding:14px 18px;text-align:center;font-size:10px;font-weight:900;color:#64748b;text-transform:uppercase;letter-spacing:.15em;width:90px">ลำดับ</th>
+                                                <th style="padding:14px 18px;text-align:center;font-size:10px;font-weight:900;color:#64748b;text-transform:uppercase;letter-spacing:.15em;width:120px">Staff ที่ผูก</th>
+                                                <th style="padding:14px 18px;text-align:center;font-size:10px;font-weight:900;color:#64748b;text-transform:uppercase;letter-spacing:.15em;width:120px">รายงาน</th>
+                                                <th style="padding:14px 18px;text-align:center;font-size:10px;font-weight:900;color:#64748b;text-transform:uppercase;letter-spacing:.15em;width:90px">สถานะ</th>
+                                                <th style="padding:14px 18px;text-align:right;font-size:10px;font-weight:900;color:#64748b;text-transform:uppercase;letter-spacing:.15em;width:120px">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <?php foreach ($allDepartments as $dept): ?>
+                                            <tr style="border-bottom:1px solid #f1f5f9" class="hover:bg-slate-50/50 transition-colors">
+                                                <td style="padding:14px 18px;vertical-align:top">
+                                                    <div style="font-weight:800;color:#1e293b;font-size:13.5px;display:flex;align-items:center;gap:8px">
+                                                        <i class="fa-solid fa-building" style="color:#6366f1;font-size:11px"></i>
+                                                        <?= htmlspecialchars($dept['name']) ?>
+                                                    </div>
+                                                    <?php if (!empty($dept['description'])): ?>
+                                                        <div style="font-size:11px;color:#64748b;font-weight:600;margin-top:3px"><?= htmlspecialchars($dept['description']) ?></div>
+                                                    <?php endif; ?>
+                                                </td>
+                                                <td style="padding:14px 18px;text-align:center">
+                                                    <span style="font-size:12px;font-weight:800;color:#475569"><?= (int)($dept['sort_order'] ?? 0) ?></span>
+                                                </td>
+                                                <td style="padding:14px 18px;text-align:center">
+                                                    <span style="display:inline-block;font-size:11px;font-weight:900;padding:4px 10px;border-radius:99px;background:#eff6ff;color:#2563eb;border:1px solid #bfdbfe"><?= (int)($dept['staff_count'] ?? 0) ?> คน</span>
+                                                </td>
+                                                <td style="padding:14px 18px;text-align:center">
+                                                    <span style="display:inline-block;font-size:11px;font-weight:900;padding:4px 10px;border-radius:99px;background:#fef3c7;color:#92400e;border:1px solid #fde68a"><?= (int)($dept['report_count'] ?? 0) ?></span>
+                                                </td>
+                                                <td style="padding:14px 18px;text-align:center">
+                                                    <?php if ((int)$dept['active'] === 1): ?>
+                                                        <span style="font-size:10px;font-weight:900;padding:3px 9px;border-radius:99px;background:#d1fae5;color:#065f46">เปิดใช้</span>
+                                                    <?php else: ?>
+                                                        <span style="font-size:10px;font-weight:900;padding:3px 9px;border-radius:99px;background:#f1f5f9;color:#64748b">ปิด</span>
+                                                    <?php endif; ?>
+                                                </td>
+                                                <td style="padding:14px 18px;text-align:right">
+                                                    <div style="display:flex;gap:6px;justify-content:flex-end">
+                                                        <button type="button" onclick='openEditDeptModal(<?= json_encode($dept, JSON_UNESCAPED_UNICODE) ?>)' style="width:32px;height:32px;border-radius:9px;border:1.5px solid #e2e8f0;background:#fff;color:#64748b;cursor:pointer" title="แก้ไข"><i class="fa-solid fa-pen-to-square" style="font-size:12px"></i></button>
+                                                        <button type="button" onclick="deleteDept(<?= (int)$dept['id'] ?>, <?= json_encode($dept['name'], JSON_UNESCAPED_UNICODE) ?>, <?= (int)$dept['staff_count'] ?>, <?= (int)$dept['report_count'] ?>)" style="width:32px;height:32px;border-radius:9px;border:1.5px solid #fecaca;background:#fff;color:#dc2626;cursor:pointer" title="ลบ"><i class="fa-solid fa-trash" style="font-size:12px"></i></button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                            <?php endforeach; ?>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                    <?php endif; ?>
+
                 </div>
+                <?php endif; ?>
             </div><!-- /section-identity -->
 
             <!-- Edit Modal (Identity) -->
@@ -2708,6 +2871,56 @@ try {
                                                 </div>
                                                 <input type="checkbox" name="scholarship_access" id="govScholarshipAccess" value="1" style="width:16px;height:16px" onclick="event.stopPropagation()">
                                             </div>
+                                            <!-- Dashboard Admin (แก้ไข Insurance Dashboard) -->
+                                            <div onclick="document.getElementById('govDashboardAccess').click()" class="premium-role-card" style="border-radius:14px;border:1.5px solid #e2e8f0;background:#fff;cursor:pointer;padding:12px;transition:all 0.2s;display:flex;align-items:center;justify-content:space-between">
+                                                <div style="display:flex;align-items:center;gap:10px">
+                                                    <i class="fa-solid fa-chart-pie text-blue-500"></i>
+                                                    <span style="font-weight:800;font-size:12px;color:#475569">Dashboard Workbook Editor (สิทธิ์แก้ไข widget)</span>
+                                                </div>
+                                                <input type="checkbox" name="dashboard_admin_access" id="govDashboardAccess" value="1" style="width:16px;height:16px" onclick="event.stopPropagation()">
+                                            </div>
+                                            <!-- Monthly Report (กรอกรายงานประจำเดือน) -->
+                                            <div onclick="document.getElementById('govMonthlyReportAccess').click()" class="premium-role-card" style="border-radius:14px;border:1.5px solid #e2e8f0;background:#fff;cursor:pointer;padding:12px;transition:all 0.2s;display:flex;align-items:center;justify-content:space-between">
+                                                <div style="display:flex;align-items:center;gap:10px">
+                                                    <i class="fa-solid fa-clipboard-list text-amber-500"></i>
+                                                    <span style="font-weight:800;font-size:12px;color:#475569">รายงานประจำเดือน (กรอก/แก้ของฝ่ายตัวเอง)</span>
+                                                </div>
+                                                <input type="checkbox" name="monthly_report_access" id="govMonthlyReportAccess" value="1" style="width:16px;height:16px" onclick="event.stopPropagation()">
+                                            </div>
+                                            <!-- Director View (ผู้อำนวยการ) -->
+                                            <div onclick="document.getElementById('govDirectorViewAccess').click()" class="premium-role-card" style="border-radius:14px;border:1.5px solid #e2e8f0;background:#fff;cursor:pointer;padding:12px;transition:all 0.2s;display:flex;align-items:center;justify-content:space-between">
+                                                <div style="display:flex;align-items:center;gap:10px">
+                                                    <i class="fa-solid fa-user-tie text-rose-500"></i>
+                                                    <span style="font-weight:800;font-size:12px;color:#475569">ผู้อำนวยการ (ดูทุกฝ่าย + อนุมัติรายงาน)</span>
+                                                </div>
+                                                <input type="checkbox" name="director_view_access" id="govDirectorViewAccess" value="1" style="width:16px;height:16px" onclick="event.stopPropagation()">
+                                            </div>
+                                            <!-- Identity & Governance (จัดการสิทธิ์ผู้ใช้) -->
+                                            <div onclick="document.getElementById('govIdentityAccess').click()" class="premium-role-card" style="border-radius:14px;border:1.5px solid #e2e8f0;background:#fff;cursor:pointer;padding:12px;transition:all 0.2s;display:flex;align-items:center;justify-content:space-between">
+                                                <div style="display:flex;align-items:center;gap:10px">
+                                                    <i class="fa-solid fa-id-card-clip text-blue-600"></i>
+                                                    <span style="font-weight:800;font-size:12px;color:#475569">Identity &amp; Governance (จัดการสิทธิ์/ตำแหน่ง/ฝ่าย)</span>
+                                                </div>
+                                                <input type="checkbox" name="identity_access" id="govIdentityAccess" value="1" style="width:16px;height:16px" onclick="event.stopPropagation()">
+                                            </div>
+                                            <!-- Department dropdown -->
+                                            <div class="premium-role-card" style="border-radius:14px;border:1.5px solid #e2e8f0;background:#fff;padding:12px;display:flex;align-items:center;justify-content:space-between;gap:10px">
+                                                <div style="display:flex;align-items:center;gap:10px;min-width:0">
+                                                    <i class="fa-solid fa-sitemap text-indigo-500"></i>
+                                                    <span style="font-weight:800;font-size:12px;color:#475569;white-space:nowrap">ฝ่าย/หน่วยงาน</span>
+                                                </div>
+                                                <select name="department_id" id="govDepartmentId" class="premium-input" style="flex:1;height:32px;padding:0 8px;font-size:12px;font-weight:700">
+                                                    <option value="">— ไม่ระบุ —</option>
+                                                    <?php
+                                                    try {
+                                                        $deptRows = $pdo->query("SELECT id, name FROM sys_departments WHERE active=1 ORDER BY sort_order, name")->fetchAll(PDO::FETCH_ASSOC);
+                                                        foreach ($deptRows as $d) {
+                                                            echo '<option value="' . (int)$d['id'] . '">' . htmlspecialchars($d['name']) . '</option>';
+                                                        }
+                                                    } catch (PDOException $e) { /* table not yet created */ }
+                                                    ?>
+                                                </select>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -2780,6 +2993,10 @@ try {
                                             'access_consumables'    => ['Consumables',      'fa-syringe',            '#f43f5e'],
                                             'access_asset'          => ['Asset Inventory',  'fa-warehouse',          '#f59e0b'],
                                             'access_scholarship'    => ['Scholarship',      'fa-graduation-cap',     '#10b981'],
+                                            'access_dashboard_admin'=> ['Dashboard Editor', 'fa-chart-pie',          '#3b82f6'],
+                                            'access_monthly_report' => ['รายงานประจำเดือน',  'fa-clipboard-list',     '#f59e0b'],
+                                            'access_director_view'  => ['ผู้อำนวยการ',       'fa-user-tie',           '#f43f5e'],
+                                            'access_identity'       => ['Identity & Gov',     'fa-id-card-clip',       '#2563eb'],
                                         ];
                                         foreach ($posFlagInputs as $key => [$label, $icon, $color]):
                                         ?>
@@ -2953,11 +3170,47 @@ try {
             <!-- ════════════ SECTION: INSURANCE SYNC HUB ════════════ -->
             <div id="section-insurance_sync" class="portal-section"
                 style="<?= $activeSection==='insurance_sync'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); background:#f8fafc; overflow-y:auto;">
-                <?php 
+                <?php
                 if ($adminRole === 'superadmin' || !empty($_SESSION['access_insurance'])) {
-                    include __DIR__ . '/_partials/insurance_sync.php'; 
+                    include __DIR__ . '/_partials/insurance_sync.php';
                 } else {
                     echo '<div style="padding:100px;text-align:center;font-weight:900;color:#dc2626"><i class="fa-solid fa-shield-slash mb-4" style="font-size:4rem;display:block"></i> ACCESS DENIED</div>';
+                }
+                ?>
+            </div>
+
+            <!-- ════════════ SECTION: INSURANCE DASHBOARD (Admin View+Edit) ════════════ -->
+            <div id="section-insurance_dashboard" class="portal-section"
+                style="<?= $activeSection==='insurance_dashboard'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); background:#f8fafc; overflow-y:auto;">
+                <?php
+                if ($adminRole === 'superadmin' || !empty($_SESSION['access_insurance']) || !empty($_SESSION['access_dashboard_admin'])) {
+                    include __DIR__ . '/_partials/insurance_dashboard.php';
+                } else {
+                    echo '<div style="padding:100px;text-align:center;font-weight:900;color:#dc2626"><i class="fa-solid fa-shield-slash mb-4" style="font-size:4rem;display:block"></i> ACCESS DENIED<br><span style="font-size:14px;color:#94a3b8;font-weight:600">ต้องมีสิทธิ์ access_insurance หรือ access_dashboard_admin</span></div>';
+                }
+                ?>
+            </div>
+
+            <!-- ════════════ SECTION: GOLD CARD PENDING REVIEW ════════════ -->
+            <div id="section-gold_card_pending" class="portal-section"
+                style="<?= $activeSection==='gold_card_pending'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); background:#f8fafc; overflow-y:auto;">
+                <?php
+                if ($adminRole === 'superadmin' || !empty($_SESSION['access_insurance'])) {
+                    include __DIR__ . '/_partials/gold_card_pending.php';
+                } else {
+                    echo '<div style="padding:100px;text-align:center;font-weight:900;color:#dc2626"><i class="fa-solid fa-shield-slash mb-4" style="font-size:4rem;display:block"></i> ACCESS DENIED<br><span style="font-size:14px;color:#94a3b8;font-weight:600">ต้องมีสิทธิ์ access_insurance</span></div>';
+                }
+                ?>
+            </div>
+
+            <!-- ════════════ SECTION: GOLD CARD (บัตรทอง) ════════════ -->
+            <div id="section-gold_card" class="portal-section"
+                style="<?= $activeSection==='gold_card'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); background:#f8fafc; overflow-y:auto;">
+                <?php
+                if ($adminRole === 'superadmin' || !empty($_SESSION['access_insurance'])) {
+                    include __DIR__ . '/_partials/gold_card.php';
+                } else {
+                    echo '<div style="padding:100px;text-align:center;font-weight:900;color:#dc2626"><i class="fa-solid fa-shield-slash mb-4" style="font-size:4rem;display:block"></i> ACCESS DENIED<br><span style="font-size:14px;color:#94a3b8;font-weight:600">ต้องมีสิทธิ์ access_insurance</span></div>';
                 }
                 ?>
             </div>
@@ -2984,10 +3237,10 @@ try {
             <div id="section-manage_insurance_partners" class="portal-section"
                 style="<?= $activeSection==='manage_insurance_partners'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); background:#f8fafc; overflow-y:auto;">
                 <?php
-                if ($adminRole === 'superadmin' || !empty($_SESSION['access_insurance'])) {
+                if ($adminRole === 'superadmin') {
                     include __DIR__ . '/_partials/manage_insurance_partners.php';
                 } else {
-                    echo '<div style="padding:100px;text-align:center;font-weight:900;color:#dc2626"><i class="fa-solid fa-shield-slash mb-4" style="font-size:4rem;display:block"></i> ACCESS DENIED<br><span style="font-size:14px;color:#94a3b8;font-weight:600">ต้องมีสิทธิ์ access_insurance</span></div>';
+                    echo '<div style="padding:100px;text-align:center;font-weight:900;color:#dc2626"><i class="fa-solid fa-shield-slash mb-4" style="font-size:4rem;display:block"></i> ACCESS DENIED<br><span style="font-size:14px;color:#94a3b8;font-weight:600">เฉพาะ superadmin เท่านั้น</span></div>';
                 }
                 ?>
             </div>
@@ -3043,11 +3296,23 @@ try {
             <!-- ════════════ SECTION: ERROR LOGS ════════════ -->
             <div id="section-error_logs" class="portal-section"
                 style="<?= $activeSection==='error_logs'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); background:#f8fafc; overflow-y:auto;">
-                <?php 
+                <?php
                 if ($adminRole === 'superadmin' || !empty($_SESSION['access_system_logs'])) {
-                    include __DIR__ . '/_partials/error_logs.php'; 
+                    include __DIR__ . '/_partials/error_logs.php';
                 } else {
                     echo '<div style="padding:100px;text-align:center;font-weight:900;color:#dc2626"><i class="fa-solid fa-shield-slash mb-4" style="font-size:4rem;display:block"></i> ACCESS DENIED<br><span style="font-size:14px;color:#94a3b8;font-weight:600">You do not have permission to view system error logs.</span></div>';
+                }
+                ?>
+            </div>
+
+            <!-- ════════════ SECTION: MONTHLY REPORT ════════════ -->
+            <div id="section-monthly_report" class="portal-section"
+                style="<?= $activeSection==='monthly_report'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); background:#f8fafc; overflow-y:auto;">
+                <?php
+                if ($adminRole === 'superadmin' || !empty($_SESSION['access_monthly_report']) || !empty($_SESSION['access_director_view'])) {
+                    include __DIR__ . '/_partials/monthly_report.php';
+                } else {
+                    echo '<div style="padding:100px;text-align:center;font-weight:900;color:#dc2626"><i class="fa-solid fa-shield-slash mb-4" style="font-size:4rem;display:block"></i> ACCESS DENIED<br><span style="font-size:14px;color:#94a3b8;font-weight:600">ต้องมีสิทธิ์ access_monthly_report หรือ access_director_view</span></div>';
                 }
                 ?>
             </div>
@@ -3781,6 +4046,15 @@ try {
                         document.getElementById('govConsumablesAccess').checked = parseInt(data.access_consumables) === 1;
                         document.getElementById('govAssetAccess').checked = parseInt(data.access_asset) === 1;
                         document.getElementById('govScholarshipAccess').checked = parseInt(data.access_scholarship) === 1;
+                        document.getElementById('govDashboardAccess').checked = parseInt(data.access_dashboard_admin) === 1;
+                        const mrEl = document.getElementById('govMonthlyReportAccess');
+                        if (mrEl) mrEl.checked = parseInt(data.access_monthly_report) === 1;
+                        const dvEl = document.getElementById('govDirectorViewAccess');
+                        if (dvEl) dvEl.checked = parseInt(data.access_director_view) === 1;
+                        const idEl = document.getElementById('govIdentityAccess');
+                        if (idEl) idEl.checked = parseInt(data.access_identity) === 1;
+                        const deptSel = document.getElementById('govDepartmentId');
+                        if (deptSel) deptSel.value = data.department_id ? String(data.department_id) : '';
 
                         // Position (Hybrid live link)
                         const posSel = document.getElementById('govPositionId');
@@ -3800,6 +4074,15 @@ try {
                     document.getElementById('govConsumablesAccess').checked = false;
                     document.getElementById('govAssetAccess').checked = false;
                     document.getElementById('govScholarshipAccess').checked = false;
+                    document.getElementById('govDashboardAccess').checked = false;
+                    const mrElR = document.getElementById('govMonthlyReportAccess');
+                    if (mrElR) mrElR.checked = false;
+                    const dvElR = document.getElementById('govDirectorViewAccess');
+                    if (dvElR) dvElR.checked = false;
+                    const idElR = document.getElementById('govIdentityAccess');
+                    if (idElR) idElR.checked = false;
+                    const deptSelR = document.getElementById('govDepartmentId');
+                    if (deptSelR) deptSelR.value = '';
                     const posSel = document.getElementById('govPositionId');
                     if (posSel) { posSel.value = ''; onGovPositionChange(); }
                 }
@@ -3816,7 +4099,9 @@ try {
         const POS_FLAG_KEYS = [
             'access_eborrow','access_ecampaign','access_insurance','access_registry',
             'access_system_logs','access_site_settings','access_edms',
-            'access_ai','access_consumables','access_asset','access_scholarship'
+            'access_ai','access_consumables','access_asset','access_scholarship',
+            'access_dashboard_admin','access_monthly_report','access_director_view',
+            'access_identity'
         ];
 
         function openAddPositionModal() {
@@ -3873,6 +4158,135 @@ try {
         }
 
         /**
+         * Department CRUD — ผ่าน ajax_monthly_report.php (entity=department)
+         * ใช้ SweetAlert2 form แทน modal แยก (form สั้นพอ)
+         */
+        async function deptAjax(action, payload) {
+            const fd = new FormData();
+            fd.append('entity', 'department');
+            fd.append('action', action);
+            fd.append('csrf_token', portal_CSRF);
+            for (const [k, v] of Object.entries(payload)) fd.append(k, v);
+            const r = await fetch('ajax_monthly_report.php', { method: 'POST', body: fd, credentials: 'same-origin' });
+            return r.json();
+        }
+
+        function deptFormHtml(dept) {
+            const d = dept || {};
+            const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+            return `
+                <div style="text-align:left;display:flex;flex-direction:column;gap:12px">
+                    <div>
+                        <label style="display:block;font-size:12px;font-weight:900;color:#475569;margin-bottom:4px">ชื่อฝ่าย <span style="color:#ef4444">*</span></label>
+                        <input id="swDeptName" type="text" value="${esc(d.name || '')}" class="swal2-input" style="margin:0;width:100%" placeholder="เช่น หน่วยบริการสุขภาพ">
+                    </div>
+                    <div>
+                        <label style="display:block;font-size:12px;font-weight:900;color:#475569;margin-bottom:4px">คำอธิบาย (optional)</label>
+                        <textarea id="swDeptDesc" class="swal2-textarea" style="margin:0;width:100%;min-height:60px" placeholder="หน้าที่หลักของฝ่ายนี้">${esc(d.description || '')}</textarea>
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+                        <div>
+                            <label style="display:block;font-size:12px;font-weight:900;color:#475569;margin-bottom:4px">ลำดับการแสดง</label>
+                            <input id="swDeptSort" type="number" value="${parseInt(d.sort_order ?? 0) || 0}" class="swal2-input" style="margin:0;width:100%">
+                        </div>
+                        <div>
+                            <label style="display:block;font-size:12px;font-weight:900;color:#475569;margin-bottom:4px">สถานะ</label>
+                            <select id="swDeptActive" class="swal2-select" style="margin:0;width:100%">
+                                <option value="1" ${(d.active ?? 1) == 1 ? 'selected' : ''}>เปิดใช้งาน</option>
+                                <option value="0" ${(d.active ?? 1) == 0 ? 'selected' : ''}>ปิด</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>`;
+        }
+
+        async function openAddDeptModal() {
+            const result = await Swal.fire({
+                title: '<i class="fa-solid fa-plus" style="color:#6366f1"></i> เพิ่มฝ่ายใหม่',
+                html: deptFormHtml(null),
+                showCancelButton: true,
+                confirmButtonText: 'บันทึก',
+                cancelButtonText: 'ยกเลิก',
+                confirmButtonColor: '#6366f1',
+                focusConfirm: false,
+                preConfirm: () => {
+                    const name = document.getElementById('swDeptName').value.trim();
+                    if (!name) { Swal.showValidationMessage('กรุณาระบุชื่อฝ่าย'); return false; }
+                    return {
+                        name,
+                        description: document.getElementById('swDeptDesc').value.trim(),
+                        sort_order:  document.getElementById('swDeptSort').value || 0,
+                        active:      document.getElementById('swDeptActive').value,
+                    };
+                }
+            });
+            if (!result.isConfirmed) return;
+            const res = await deptAjax('save', result.value);
+            if (res.status === 'ok') {
+                await Swal.fire({ icon:'success', title:'เพิ่มเรียบร้อย', timer:1100, showConfirmButton:false });
+                location.reload();
+            } else {
+                Swal.fire({ icon:'error', title:'บันทึกไม่สำเร็จ', text: res.message || '' });
+            }
+        }
+
+        async function openEditDeptModal(dept) {
+            const result = await Swal.fire({
+                title: '<i class="fa-solid fa-pen-to-square" style="color:#6366f1"></i> แก้ไขฝ่าย',
+                html: deptFormHtml(dept),
+                showCancelButton: true,
+                confirmButtonText: 'บันทึก',
+                cancelButtonText: 'ยกเลิก',
+                confirmButtonColor: '#6366f1',
+                focusConfirm: false,
+                preConfirm: () => {
+                    const name = document.getElementById('swDeptName').value.trim();
+                    if (!name) { Swal.showValidationMessage('กรุณาระบุชื่อฝ่าย'); return false; }
+                    return {
+                        id: dept.id,
+                        name,
+                        description: document.getElementById('swDeptDesc').value.trim(),
+                        sort_order:  document.getElementById('swDeptSort').value || 0,
+                        active:      document.getElementById('swDeptActive').value,
+                    };
+                }
+            });
+            if (!result.isConfirmed) return;
+            const res = await deptAjax('save', result.value);
+            if (res.status === 'ok') {
+                await Swal.fire({ icon:'success', title:'บันทึกเรียบร้อย', timer:1100, showConfirmButton:false });
+                location.reload();
+            } else {
+                Swal.fire({ icon:'error', title:'บันทึกไม่สำเร็จ', text: res.message || '' });
+            }
+        }
+
+        async function deleteDept(id, name, staffCount, reportCount) {
+            if (reportCount > 0) {
+                return Swal.fire({
+                    icon:'error', title:'ลบไม่ได้',
+                    html: `ฝ่าย "<b>${name}</b>" มีรายงาน ${reportCount} ฉบับในระบบ<br><span style="font-size:12px;color:#64748b">ต้องลบรายงานก่อน หรือเปลี่ยนสถานะเป็น "ปิด" แทน</span>`,
+                });
+            }
+            const warn = staffCount > 0
+                ? `ฝ่าย "${name}" มี staff ${staffCount} คนผูกอยู่<br>หลังลบ — ค่า department_id ของ staff ทั้งหมดจะกลายเป็น NULL`
+                : `ลบฝ่าย "${name}"?`;
+            const { isConfirmed } = await Swal.fire({
+                icon:'warning', title:'ยืนยันการลบฝ่าย', html: warn,
+                showCancelButton:true, confirmButtonText:'ลบเลย', cancelButtonText:'ยกเลิก',
+                confirmButtonColor:'#ef4444', reverseButtons:true,
+            });
+            if (!isConfirmed) return;
+            const res = await deptAjax('delete', { id });
+            if (res.status === 'ok') {
+                await Swal.fire({ icon:'success', title:'ลบเรียบร้อย', timer:1100, showConfirmButton:false });
+                location.reload();
+            } else {
+                Swal.fire({ icon:'error', title:'ลบไม่สำเร็จ', text: res.message || '' });
+            }
+        }
+
+        /**
          * Position change handler — Hybrid (Live Link)
          *   - มี position → load flag จาก position แล้ว disable checkboxes
          *   - Custom (NULL) → enable checkboxes ให้ติ๊กเอง
@@ -3889,6 +4303,10 @@ try {
             ['access_consumables',   'govConsumablesAccess'],
             ['access_asset',         'govAssetAccess'],
             ['access_scholarship',   'govScholarshipAccess'],
+            ['access_dashboard_admin','govDashboardAccess'],
+            ['access_monthly_report','govMonthlyReportAccess'],
+            ['access_director_view', 'govDirectorViewAccess'],
+            ['access_identity',      'govIdentityAccess'],
         ];
 
         function onGovPositionChange() {
@@ -4479,9 +4897,14 @@ try {
             { id: 'ai_qa_lab',     label: 'AI QA Lab',           desc: 'Sandbox คำถามจาก user', icon: 'fa-flask-vial',      tone: 'accent', type: 'section', target: 'ai_qa_lab' },
             { id: 'identity',      label: 'Identity & Governance', desc: 'จัดการสิทธิ์ผู้ใช้', shortcut: 'g i', icon: 'fa-id-card-clip',  tone: 'info',    type: 'section', target: 'identity' },
             { id: 'insurance_sync', label: 'Insurance Hub',      desc: 'ระบบสิทธิ์ประกัน',   icon: 'fa-shield-halved',      tone: 'info',    type: 'section', target: 'insurance_sync' },
+            { id: 'insurance_dashboard', label: 'Dashboard Workbook', desc: 'ภาพรวม + แก้ widgets · Multi-workbook', icon: 'fa-chart-pie',     tone: 'info',    type: 'section', target: 'insurance_dashboard' },
+            { id: 'gold_card_pending', label: 'ย้ายสิทธิ์บัตรทอง', desc: 'คิวคำขอย้ายสิทธิ์บัตรทองจาก user', icon: 'fa-hourglass-half', tone: 'info',    type: 'section', target: 'gold_card_pending' },
+            { id: 'gold_card',     label: 'บัตรทอง',             desc: 'จัดการบัตรทอง + เอกสาร', icon: 'fa-id-card',         tone: 'warning', type: 'section', target: 'gold_card' },
             { id: 'registry_upload', label: 'อัพโหลดรายชื่อ',    desc: 'ทะเบียน',            icon: 'fa-id-card-clip',      tone: 'info',    type: 'section', target: 'registry_upload' },
             { id: 'batch_status',  label: 'สถานะเอกสาร',         desc: 'Insurance Batch',    icon: 'fa-list-check',         tone: 'info',    type: 'section', target: 'batch_status' },
+<?php if ($isSuper): ?>
             { id: 'manage_insurance_partners', label: 'Insurance Partners', desc: 'จัดการพาร์ทเนอร์', icon: 'fa-handshake', tone: 'success', type: 'section', target: 'manage_insurance_partners' },
+<?php endif; ?>
             { id: 'announcements', label: 'ประกาศ',              desc: 'จัดการประกาศ Hub',  shortcut: 'g a', icon: 'fa-bullhorn',           tone: 'accent',  type: 'section', target: 'announcements' },
             { id: 'activity_logs', label: 'Activity Logs',       desc: 'บันทึกกิจกรรมระบบ',  icon: 'fa-file-lines',         tone: 'neutral', type: 'section', target: 'activity_logs' },
             { id: 'error_logs',    label: 'Error Logs',          desc: 'บันทึกข้อผิดพลาด',  shortcut: 'g e', icon: 'fa-bug',                tone: 'danger',  type: 'section', target: 'error_logs' },

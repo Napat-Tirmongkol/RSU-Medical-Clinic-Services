@@ -46,14 +46,23 @@ RewriteRule ^favicon\.ico$ - [R=204,L]
     php_value session.cookie_samesite Lax
 </IfModule>
 
-# ─── Upload Limits (Insurance Sync Hub) ───────────────────────
+# ─── Upload Limits (Insurance Sync Hub + Gold Card Bulk Import) ───────
+# Note: PHP-FPM ใช้ค่าจาก .user.ini แทน — block นี้ใช้เฉพาะกรณี mod_php
 <IfModule mod_php.c>
-    php_value upload_max_filesize 30M
-    php_value post_max_size       64M
+    php_value upload_max_filesize 100M
+    php_value post_max_size       256M
+    php_value max_file_uploads    500
+    php_value max_input_vars      10000
+    php_value max_execution_time  300
+    php_value memory_limit        512M
 </IfModule>
 <IfModule mod_php8.c>
-    php_value upload_max_filesize 30M
-    php_value post_max_size       64M
+    php_value upload_max_filesize 100M
+    php_value post_max_size       256M
+    php_value max_file_uploads    500
+    php_value max_input_vars      10000
+    php_value max_execution_time  300
+    php_value memory_limit        512M
 </IfModule>
 
 # DirectoryIndex

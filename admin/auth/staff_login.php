@@ -54,7 +54,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                        IFNULL(s.access_ai, 0) AS access_ai,
                        IFNULL(s.access_consumables, 0) AS access_consumables,
                        IFNULL(s.access_asset, 0) AS access_asset,
-                       IFNULL(s.access_scholarship, 0) AS access_scholarship
+                       IFNULL(s.access_scholarship, 0) AS access_scholarship,
+                       IFNULL(s.access_dashboard_admin, 0) AS access_dashboard_admin,
+                       IFNULL(s.access_monthly_report, 0) AS access_monthly_report,
+                       IFNULL(s.access_director_view, 0) AS access_director_view,
+                       IFNULL(s.access_identity, 0) AS access_identity,
+                       s.department_id
                 FROM sys_staff s
                 LEFT JOIN sys_staff_positions p ON p.id = s.position_id
                 WHERE s.username = :uname
@@ -69,7 +74,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 foreach ([
                     'access_ecampaign','access_eborrow','access_insurance','access_system_logs',
                     'access_site_settings','access_registry','access_edms',
-                    'access_ai','access_consumables','access_asset','access_scholarship'
+                    'access_ai','access_consumables','access_asset','access_scholarship',
+                    'access_dashboard_admin','access_monthly_report','access_director_view',
+                    'access_identity'
                 ] as $flagKey) {
                     $staff[$flagKey] = (int)($posFlags[$flagKey] ?? 0);
                 }
@@ -79,7 +86,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 if ($staff['account_status'] === 'disabled') {
                     $error = 'บัญชีนี้ถูกระงับการใช้งาน กรุณาติดต่อผู้ดูแลระบบ';
-                } elseif (!(int)$staff['access_ecampaign'] && !(int)$staff['access_eborrow'] && !(int)$staff['access_insurance'] && !(int)$staff['access_registry'] && !(int)$staff['access_edms'] && !(int)$staff['access_ai'] && !(int)$staff['access_consumables'] && !(int)$staff['access_asset'] && !(int)$staff['access_scholarship']) {
+                } elseif (!(int)$staff['access_ecampaign'] && !(int)$staff['access_eborrow'] && !(int)$staff['access_insurance'] && !(int)$staff['access_registry'] && !(int)$staff['access_edms'] && !(int)$staff['access_ai'] && !(int)$staff['access_consumables'] && !(int)$staff['access_asset'] && !(int)$staff['access_scholarship'] && !(int)$staff['access_dashboard_admin'] && !(int)$staff['access_monthly_report'] && !(int)$staff['access_director_view'] && !(int)$staff['access_identity']) {
                     $error = 'บัญชีนี้ยังไม่ได้รับสิทธิ์เข้าใช้งานระบบใดๆ กรุณาติดต่อผู้ดูแลระบบ';
                 } else {
                     // Whitelist ecampaign_role ป้องกัน privilege escalation
@@ -108,6 +115,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $_SESSION['access_consumables']    = (int)$staff['access_consumables'];
                     $_SESSION['access_asset']          = (int)$staff['access_asset'];
                     $_SESSION['access_scholarship']    = (int)$staff['access_scholarship'];
+                    $_SESSION['access_dashboard_admin'] = (int)$staff['access_dashboard_admin'];
+                    $_SESSION['access_monthly_report']  = (int)$staff['access_monthly_report'];
+                    $_SESSION['access_director_view']   = (int)$staff['access_director_view'];
+                    $_SESSION['access_identity']        = (int)$staff['access_identity'];
+                    $_SESSION['department_id']          = $staff['department_id'] !== null ? (int)$staff['department_id'] : null;
 
                     $_SESSION['_admin_last_activity']  = time();
 

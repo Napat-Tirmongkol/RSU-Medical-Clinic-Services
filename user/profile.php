@@ -18,7 +18,7 @@ if ($lineUserId === '' && !$isTest) {
 $userData = [
     'prefix' => '', 'first_name' => '', 'last_name' => '', 'full_name' => '',
     'id_number' => '', 'citizen_id' => '', 'phone' => '', 'status' => '',
-    'email' => '', 'gender' => '', 'department' => '',
+    'email' => '', 'gender' => '', 'date_of_birth' => '', 'department' => '',
     'picture_url' => '',
     'blood_type' => '', 'height_cm' => '', 'weight_kg' => '',
     'allergies' => '', 'chronic_conditions' => '',
@@ -33,6 +33,7 @@ try {
 
     // Self-healing migration for new columns
     $newCols = [
+        'date_of_birth'              => "DATE NULL DEFAULT NULL",
         'blood_type'                 => "VARCHAR(8) NOT NULL DEFAULT ''",
         'height_cm'                  => "DECIMAL(5,2) NULL DEFAULT NULL",
         'weight_kg'                  => "DECIMAL(5,2) NULL DEFAULT NULL",
@@ -62,6 +63,7 @@ try {
             'status'         => $user['status'] ?? '',
             'email'          => $user['email'] ?? '',
             'gender'         => $user['gender'] ?? '',
+            'date_of_birth'  => $user['date_of_birth'] ?? '',
             'department'     => $user['department'] ?? '',
             'picture_url'    => $user['picture_url'] ?? '',
             'blood_type'     => $user['blood_type'] ?? '',
@@ -85,6 +87,28 @@ if (defined('SITE_SHOW_INSURANCE') && SITE_SHOW_INSURANCE && !empty($userData['i
         $insStmt = db()->prepare("SELECT * FROM insurance_members WHERE member_id = :mid LIMIT 1");
         $insStmt->execute([':mid' => $userData['id_number']]);
         $insurance = $insStmt->fetch(PDO::FETCH_ASSOC) ?: null;
+    } catch (Exception $e) { /* table may not exist yet */ }
+}
+
+// ── Gold Card lookup (Universal Coverage) ───────────────────────────
+// จับคู่ผ่าน 3 ทาง: linked_user_id (matched by bulk import), citizen_id, ชื่อตรง
+$goldCard = null;
+if (!empty($user['id']) || !empty($userData['citizen_id']) || !empty($userData['full_name'])) {
+    try {
+        $gcStmt = db()->prepare("SELECT * FROM gold_card_members
+                                 WHERE linked_user_id = :uid
+                                    OR (:cid <> '' AND citizen_id = :cid2)
+                                    OR (:fn <> '' AND TRIM(full_name) = :fn2)
+                                 ORDER BY (status = 'active') DESC, (status = 'approved') DESC, id DESC
+                                 LIMIT 1");
+        $gcStmt->execute([
+            ':uid'  => (int)($user['id'] ?? 0),
+            ':cid'  => $userData['citizen_id'] ?? '',
+            ':cid2' => $userData['citizen_id'] ?? '',
+            ':fn'   => $userData['full_name'] ?? '',
+            ':fn2'  => $userData['full_name'] ?? '',
+        ]);
+        $goldCard = $gcStmt->fetch(PDO::FETCH_ASSOC) ?: null;
     } catch (Exception $e) { /* table may not exist yet */ }
 }
 
@@ -342,6 +366,88 @@ function vh(?string $s): string { return htmlspecialchars((string) $s, ENT_QUOTE
             </div>
             <?php endif; ?>
 
+            <?php /* ── Gold Card (สิทธิ์บัตรทอง) ──────────────────────── */ ?>
+            <?php if ($goldCard !== null):
+                $gcActive = in_array($goldCard['status'] ?? '', ['approved', 'active'], true);
+                $gcHospMain = $goldCard['hospital_main'] ?? '';
+                $gcHospSub  = $goldCard['hospital_sub'] ?? '';
+                $gcCovStart = $goldCard['coverage_start'] ?? null;
+                $gcCovEnd   = $goldCard['coverage_end'] ?? null;
+                $gcStatusLabel = [
+                    'pending'=>'รอเอกสาร','submitted'=>'ส่งแล้ว','approved'=>'อนุมัติ',
+                    'active'=>'ใช้งาน','rejected'=>'ไม่ผ่าน','expired'=>'หมดอายุ'
+                ][$goldCard['status'] ?? 'pending'] ?? '—';
+                $thaiShortGc = function ($d) {
+                    if (!$d) return '—';
+                    $ts = strtotime($d);
+                    return date('d/m/', $ts) . substr((string)((int)date('Y', $ts) + 543), -2);
+                };
+            ?>
+            <div class="bg-white rounded-[2.5rem] p-6 border border-slate-50 shadow-sm mb-6">
+                <div class="flex items-center gap-2 mb-4">
+                    <span class="h-5 w-1 rounded-full bg-amber-500"></span>
+                    <h3 class="text-sm font-black uppercase tracking-widest text-slate-700">บัตรทอง</h3>
+                    <span class="ml-auto text-[10px] font-black text-slate-400 uppercase tracking-widest">Universal Coverage</span>
+                </div>
+
+                <?php if ($gcActive): ?>
+                    <div class="rounded-2xl bg-gradient-to-br from-amber-50 to-orange-100/60 border border-amber-200 p-5">
+                        <div class="flex items-start justify-between mb-4">
+                            <div>
+                                <p class="text-[10px] font-black uppercase tracking-widest text-amber-700">Universal Coverage</p>
+                                <h4 class="text-base font-black text-slate-900 leading-tight mt-0.5">บัตรทอง (สิทธิหลักประกันสุขภาพ)</h4>
+                            </div>
+                            <span class="inline-flex px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-black uppercase tracking-widest">Active</span>
+                        </div>
+
+                        <dl class="space-y-3 text-[13px]">
+                            <div class="grid grid-cols-[100px_1fr] gap-2">
+                                <dt class="text-slate-500 font-bold">ผู้ถือสิทธิ์</dt>
+                                <dd class="text-slate-900 font-black truncate"><?= vh($userData['full_name'] ?: ($goldCard['full_name'] ?? '—')) ?></dd>
+                            </div>
+                            <?php if ($gcHospMain): ?>
+                            <div class="grid grid-cols-[100px_1fr] gap-2">
+                                <dt class="text-slate-500 font-bold">รพ.หลัก</dt>
+                                <dd class="text-slate-900 font-black"><?= vh($gcHospMain) ?></dd>
+                            </div>
+                            <?php endif; ?>
+                            <?php if ($gcHospSub): ?>
+                            <div class="grid grid-cols-[100px_1fr] gap-2">
+                                <dt class="text-slate-500 font-bold">รพ.รอง</dt>
+                                <dd class="text-slate-700 font-bold"><?= vh($gcHospSub) ?></dd>
+                            </div>
+                            <?php endif; ?>
+                            <?php if ($gcCovStart || $gcCovEnd): ?>
+                            <div class="grid grid-cols-[100px_1fr] gap-2">
+                                <dt class="text-slate-500 font-bold">คุ้มครอง</dt>
+                                <dd class="text-slate-900 font-black tracking-wider"><?= vh($thaiShortGc($gcCovStart)) ?> — <?= vh($thaiShortGc($gcCovEnd)) ?></dd>
+                            </div>
+                            <?php endif; ?>
+                            <div class="grid grid-cols-[100px_1fr] gap-2 pt-2 border-t border-amber-200">
+                                <dt class="text-slate-500 font-bold">สิทธิประโยชน์</dt>
+                                <dd class="text-amber-700 font-black">รักษาฟรีตามสิทธิ์ <span class="text-[11px] text-slate-500 font-bold ml-1">@ รพ.ที่ขึ้นทะเบียน</span></dd>
+                            </div>
+                        </dl>
+                    </div>
+                <?php else: ?>
+                    <div class="rounded-2xl bg-slate-50 border border-slate-100 p-5">
+                        <div class="flex items-center gap-3 mb-2">
+                            <div class="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center">
+                                <i class="fa-solid fa-hourglass-half"></i>
+                            </div>
+                            <div>
+                                <p class="text-[10px] font-black uppercase tracking-widest text-amber-700"><?= vh($gcStatusLabel) ?></p>
+                                <p class="text-sm font-black text-slate-900">บัตรทองยังไม่พร้อมใช้งาน</p>
+                            </div>
+                        </div>
+                        <p class="text-[12px] font-bold text-slate-600 leading-relaxed">
+                            สิทธิ์บัตรทองของคุณอยู่ในสถานะ <b><?= vh($gcStatusLabel) ?></b> กรุณาติดต่อห้องพยาบาลเพื่อตรวจสอบ
+                        </p>
+                    </div>
+                <?php endif; ?>
+            </div>
+            <?php endif; ?>
+
             <form id="profileForm" action="save_profile.php" method="POST" class="space-y-6" novalidate>
                 <?php csrf_field(); ?>
                 <input type="hidden" name="redirect_back" value="<?= vh($redirectBack) ?>">
@@ -408,6 +514,18 @@ function vh(?string $s): string { return htmlspecialchars((string) $s, ENT_QUOTE
                             </label>
                             <?php endforeach; ?>
                         </div>
+                    </div>
+
+                    <!-- Date of Birth -->
+                    <?php
+                        $dobValue = $userData['date_of_birth'] ?? '';
+                        if ($dobValue === '0000-00-00') $dobValue = '';
+                    ?>
+                    <div class="space-y-1.5">
+                        <label class="text-sm font-bold text-slate-700">วันเดือนปีเกิด</label>
+                        <input type="date" name="date_of_birth" value="<?= vh($dobValue) ?>" max="<?= date('Y-m-d') ?>" <?= $readonlyAttr ?>
+                            class="field-input w-full h-14 px-4 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-4 focus:ring-green-50 outline-none font-bold">
+                        <p class="text-[11px] text-slate-400 font-semibold">ใช้สำหรับสมัครสิทธิ/บัตรทอง — กรอกตามบัตรประชาชน</p>
                     </div>
                 </div>
 

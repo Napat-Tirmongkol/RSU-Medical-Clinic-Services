@@ -5,7 +5,7 @@ require_once __DIR__ . '/includes/auth.php';
 
 header('Content-Type: application/json');
 
-$ALLOWED_PROJECTS = ['e_campaign', 'e_borrow'];
+$ALLOWED_PROJECTS = ['e_campaign', 'e_borrow', 'gold_card_apply'];
 $FILE = __DIR__ . '/../config/maintenance.json';
 
 function loadMaintenance(string $file): array {
