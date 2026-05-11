@@ -138,7 +138,13 @@ try {
             exit;
         }
         $shiftId = $lastLog['shift_id'] ? (int)$lastLog['shift_id'] : null;
-        $compType = $lastLog['comp_type'] ?? 'hours';
+        // ใช้ comp_type ที่ student เลือกตอนออกงาน (overrides clock_in)
+        $postCt = (string)($_POST['comp_type'] ?? '');
+        if (in_array($postCt, ['hours', 'paid'], true)) {
+            $compType = $postCt;
+        } else {
+            $compType = $lastLog['comp_type'] ?? 'hours';
+        }
     }
 
     $stmt = $pdo->prepare("INSERT INTO sys_scholarship_clock_logs
@@ -159,6 +165,14 @@ try {
         ':ua' => $ua,
         ':status' => $settings['require_approval'] ? 'pending' : 'approved',
     ]);
+
+    // เมื่อ student เลือกประเภทตอน clock_out → ปรับ clock_in log ที่จับคู่ให้ comp_type ตรงกัน
+    // (sum_scholarship_hours pair in/out + อ่าน comp_type จาก clock_in)
+    if ($action === 'clock_out' && $lastLog && $lastLog['action'] === 'clock_in'
+        && ($lastLog['comp_type'] ?? 'hours') !== $compType) {
+        $upd = $pdo->prepare("UPDATE sys_scholarship_clock_logs SET comp_type = :ct WHERE id = :id");
+        $upd->execute([':ct' => $compType, ':id' => (int)$lastLog['id']]);
+    }
 
     $pdo->commit();
 

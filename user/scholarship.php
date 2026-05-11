@@ -571,13 +571,14 @@ if (btn && !btn.disabled) {
         const action = btn.dataset.action;
         const labelMap = { clock_in: 'เข้างาน', clock_out: 'ออกงาน' };
 
-        // ถ้า clock_in + ad-hoc (ไม่อยู่ในกะ) → ถาม comp_type ก่อน
+        // ตอน clock_out → ให้นักศึกษาเลือกประเภทค่าตอบแทนของงานครั้งนี้
+        // (เลื่อนการเลือกจาก clock_in มาที่ clock_out เพื่อให้ตัดสินใจหลังทำงานจริง)
         let pickedCompType = null;
-        if (action === 'clock_in' && !ACTIVE_SHIFT_COMP_TYPE) {
+        if (action === 'clock_out') {
             const r = await Swal.fire({
-                title: 'ประเภทเวลาทำงาน',
+                title: 'จบงาน — เลือกประเภท',
                 html: `
-                    <p style="font-size:.85rem;color:#64748b;margin-bottom:1rem">เลือกว่างานครั้งนี้นับเป็นอะไร</p>
+                    <p style="font-size:.85rem;color:#64748b;margin-bottom:1rem">งานครั้งนี้คุณต้องการรับเป็น</p>
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem">
                         <label style="cursor:pointer;border:2px solid #d1fae5;background:#ecfdf5;border-radius:1rem;padding:1rem;text-align:center;font-weight:800;color:#065f46" id="ct-hours-lbl">
                             <input type="radio" name="ct" value="hours" checked style="display:none">
@@ -594,7 +595,7 @@ if (btn && !btn.disabled) {
                 showCancelButton: true,
                 confirmButtonText: 'ถัดไป',
                 cancelButtonText: 'ยกเลิก',
-                confirmButtonColor: '#10b981',
+                confirmButtonColor: '#f43f5e',
                 didOpen: () => {
                     const sync = () => {
                         const v = document.querySelector('input[name="ct"]:checked').value;
@@ -638,7 +639,7 @@ if (btn && !btn.disabled) {
             // นโยบาย: ปัดลงเป็นชั่วโมงเต็ม (1ชม.30 = 1ชม., 2ชม.59 = 2ชม.)
             const countedHours = Math.floor(diffMs / 3600000);
 
-            const ct = OPEN_CLOCK_IN.comp_type || 'hours';
+            const ct = pickedCompType || OPEN_CLOCK_IN.comp_type || 'hours';
             const ctLabel = ct === 'paid' ? 'ค่าตอบแทน' : 'ส่งชั่วโมงทุน';
             const ctColor = ct === 'paid' ? '#92400e' : '#065f46';
             const ctBg = ct === 'paid' ? '#fffbeb' : '#ecfdf5';
@@ -1013,9 +1014,6 @@ function openStDayModal(dateStr) {
         body += '<div class="space-y-2 text-left">' + slots.map(s => {
             const full = s.booked >= s.max;
             const mine = s.i_booked;
-            const ctBadge = s.comp_type === 'paid'
-                ? '<span class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-black rounded-full bg-amber-50 text-amber-700"><i class="fa-solid fa-coins text-[8px]"></i>ค่าตอบแทน</span>'
-                : '<span class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-black rounded-full bg-emerald-50 text-emerald-700"><i class="fa-solid fa-graduation-cap text-[8px]"></i>ทุน</span>';
             const capCls = full ? 'text-rose-600' : 'text-emerald-600';
             const btn = mine
                 ? '<span class="px-3 py-1.5 rounded-lg bg-blue-100 text-blue-700 text-xs font-black whitespace-nowrap"><i class="fa-solid fa-check mr-1"></i>จองแล้ว</span>'
@@ -1027,7 +1025,6 @@ function openStDayModal(dateStr) {
                 <div class="flex-1 min-w-0">
                     <p class="text-sm font-black text-slate-900">${s.start} – ${s.end}</p>
                     <p class="text-[11px] ${capCls} font-black">${s.booked}/${s.max} คน</p>
-                    <div class="mt-1">${ctBadge}</div>
                     ${notes}
                 </div>
                 ${btn}
