@@ -2,17 +2,35 @@
 <header class="portal-header au">
     <div class="w-full px-5 sm:px-8 py-3 flex items-center justify-between gap-4" style="min-height:60px">
 
-        <!-- Left: App Switcher -->
-        <div style="flex: 1; display: flex; justify-content: flex-start; gap: 10px; align-items: center;">
+        <!-- Left: App Switcher + Breadcrumb -->
+        <div style="flex: 1; display: flex; justify-content: flex-start; gap: 10px; align-items: center; min-width: 0;">
             <button id="app-switcher-btn" onclick="openAppSwitcher()" title="สลับระบบ (App Switcher)"
-                class="w-9 h-9 flex items-center justify-center rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900 transition-colors shadow-sm">
+                class="w-9 h-9 flex items-center justify-center rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900 transition-colors shadow-sm shrink-0">
                 <i class="fa-solid fa-grip"></i>
             </button>
-            <span id="app-current-label" class="text-xs font-black text-slate-500 hidden sm:inline-block"></span>
+            <nav id="portal-breadcrumb" class="text-xs font-bold text-slate-500 hidden md:flex items-center gap-1.5 min-w-0 flex-1" aria-label="breadcrumb">
+                <a href="index.php?section=dashboard" class="hover:text-slate-900 shrink-0">Portal</a>
+                <i class="fa-solid fa-chevron-right text-[8px] text-slate-300 shrink-0"></i>
+                <span id="bc-app" class="text-slate-600 shrink-0"></span>
+                <i class="fa-solid fa-chevron-right text-[8px] text-slate-300 shrink-0" id="bc-sep"></i>
+                <span id="bc-section" class="text-slate-900 font-black truncate"></span>
+            </nav>
         </div>
 
         <!-- Right Action Icons -->
         <div class="flex items-center gap-3 sm:gap-4">
+
+            <!-- Command palette ⌘K (visible trigger) -->
+            <button id="cmdk-topbar-btn" onclick="window.cmdkOpen && window.cmdkOpen()" title="ค้นหา (⌘K)"
+                class="hidden md:inline-flex items-center gap-2 px-3 h-9 rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900 transition-colors shadow-sm text-xs font-bold">
+                <i class="fa-solid fa-magnifying-glass text-[11px]"></i>
+                <span>ค้นหา</span>
+                <kbd class="px-1.5 py-0.5 rounded bg-white border border-slate-200 text-[10px] font-black text-slate-500 leading-none">⌘K</kbd>
+            </button>
+            <button id="cmdk-topbar-btn-mobile" onclick="window.cmdkOpen && window.cmdkOpen()" title="ค้นหา (⌘K)"
+                class="md:hidden w-9 h-9 flex items-center justify-center rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors shadow-sm">
+                <i class="fa-solid fa-magnifying-glass text-xs"></i>
+            </button>
 
             <!-- Dark Mode Toggle Button -->
             <button id="darkModeToggle" onclick="toggleDarkMode()" title="สลับโหมดมืด/สว่าง"
