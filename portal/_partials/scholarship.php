@@ -104,6 +104,40 @@ $portalCsrf = get_csrf_token();
     .pg-btn:hover:not(:disabled) { background:#f1f5f9; border-color:#cbd5e1; }
     .pg-btn:disabled, .pg-btn.disabled { opacity:.35; pointer-events:none; }
     .pg-btn.active { background:#10b981; color:#fff; border-color:#10b981; }
+
+    /* Calendar grid */
+    .cal-grid { display:grid; grid-template-columns:repeat(7, 1fr); gap:6px; }
+    .cal-head {
+        text-align:center; font-size:11px; font-weight:900; color:#64748b;
+        text-transform:uppercase; letter-spacing:.08em; padding:.4rem 0;
+    }
+    .cal-cell {
+        min-height:96px; padding:.5rem; border-radius:.8rem;
+        background:#fff; border:1.5px solid #e2e8f0;
+        cursor:pointer; transition:all .15s; position:relative; overflow:hidden;
+    }
+    .cal-cell:hover { border-color:#10b981; box-shadow:0 4px 12px rgba(16,185,129,.12); transform:translateY(-1px); }
+    .cal-cell.empty { background:#f8fafc; border-color:#f1f5f9; cursor:default; }
+    .cal-cell.empty:hover { transform:none; box-shadow:none; border-color:#f1f5f9; }
+    .cal-cell.today { border-color:#10b981; box-shadow:inset 0 0 0 1.5px #10b981; }
+    .cal-cell.closed { background:#fef2f2; border-color:#fecaca; }
+    .cal-cell.has-slots { background:linear-gradient(180deg, #f0fdf4 0%, #fff 60%); }
+    .cal-cell.full { background:#fffbeb; border-color:#fde68a; }
+    .cal-cell.past { opacity:.6; }
+    .cal-num { font-size:13px; font-weight:900; color:#0f172a; }
+    .cal-num.dim { color:#94a3b8; }
+    .cal-mini-badge {
+        display:inline-block; padding:1px 6px; border-radius:99px;
+        font-size:9px; font-weight:900; letter-spacing:.02em;
+    }
+    .cal-slot-row {
+        font-size:10.5px; color:#475569; line-height:1.3;
+        margin-top:3px; padding:2px 5px; border-radius:5px;
+        background:#f1f5f9; font-weight:700;
+        white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    }
+    .cal-slot-row.full { background:#fef3c7; color:#92400e; }
+    .cal-slot-row.empty-slot { background:#dcfce7; color:#166534; }
 </style>
 
 <div class="max-w-[1400px] mx-auto px-5 md:px-8 py-8">
@@ -149,6 +183,9 @@ $portalCsrf = get_csrf_token();
         </button>
         <button class="sch-tab" data-tab="slots">
             <i class="fa-solid fa-layer-group mr-1.5"></i>เปิดรอบงาน
+        </button>
+        <button class="sch-tab" data-tab="calendar">
+            <i class="fa-solid fa-calendar-week mr-1.5"></i>ปฏิทิน
         </button>
         <button class="sch-tab" data-tab="reports">
             <i class="fa-solid fa-chart-line mr-1.5"></i>รายงาน
@@ -324,6 +361,40 @@ $portalCsrf = get_csrf_token();
                 </div>
             </div>
             <div id="slot-table-wrap">
+                <p class="text-center text-sm text-slate-400 py-10"><i class="fa-solid fa-spinner fa-spin mr-2"></i>กำลังโหลด…</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ─── TAB: CALENDAR ─── -->
+    <div class="sch-pane hidden" data-pane="calendar">
+        <div class="sch-card">
+            <div class="flex items-center justify-between mb-4 flex-wrap gap-3">
+                <div>
+                    <h3 class="text-base font-black text-slate-900">ปฏิทินการทำงาน</h3>
+                    <p class="text-xs text-slate-500 mt-0.5">ดูใครจองรอบไหน · เชื่อมวันหยุดจากปฏิทินคลินิก</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button class="sch-btn sch-btn--ghost" onclick="calNavMonth(-1)" title="เดือนก่อน">
+                        <i class="fa-solid fa-chevron-left"></i>
+                    </button>
+                    <div id="cal-title" class="px-3 py-1.5 rounded-lg bg-slate-100 text-sm font-black text-slate-700 min-w-[140px] text-center"></div>
+                    <button class="sch-btn sch-btn--ghost" onclick="calNavMonth(1)" title="เดือนถัดไป">
+                        <i class="fa-solid fa-chevron-right"></i>
+                    </button>
+                    <button class="sch-btn sch-btn--ghost" onclick="calGoToday()">วันนี้</button>
+                </div>
+            </div>
+
+            <!-- Legend -->
+            <div class="flex flex-wrap gap-3 mb-3 text-[11px] text-slate-600">
+                <span class="inline-flex items-center gap-1.5"><span class="inline-block w-3 h-3 rounded bg-emerald-100 border border-emerald-200"></span>มีรอบเปิด</span>
+                <span class="inline-flex items-center gap-1.5"><span class="inline-block w-3 h-3 rounded bg-rose-50 border border-rose-200"></span>คลินิกหยุด</span>
+                <span class="inline-flex items-center gap-1.5"><span class="inline-block w-3 h-3 rounded bg-amber-50 border border-amber-200"></span>เต็มทุกรอบ</span>
+                <span class="inline-flex items-center gap-1.5"><i class="fa-solid fa-circle text-emerald-500 text-[6px]"></i>วันนี้</span>
+            </div>
+
+            <div id="cal-grid-wrap">
                 <p class="text-center text-sm text-slate-400 py-10"><i class="fa-solid fa-spinner fa-spin mr-2"></i>กำลังโหลด…</p>
             </div>
         </div>
@@ -708,6 +779,21 @@ $portalCsrf = get_csrf_token();
     </div>
 </div>
 
+<!-- ── MODAL: Day Detail (calendar click) ── -->
+<div class="sch-modal-backdrop" id="cal-day-modal">
+    <div class="sch-modal-box" style="max-width:560px">
+        <h3 class="text-lg font-black mb-1" id="cal-day-title">รายละเอียดวัน</h3>
+        <p class="text-xs text-slate-500 mb-3" id="cal-day-subtitle"></p>
+        <div id="cal-day-holiday-banner" class="hidden mb-3 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-sm font-bold">
+            <i class="fa-solid fa-calendar-xmark mr-1.5"></i><span id="cal-day-holiday-note"></span>
+        </div>
+        <div id="cal-day-wrap" class="space-y-3 max-h-96 overflow-y-auto"></div>
+        <div class="flex justify-end mt-5">
+            <button class="sch-btn sch-btn--ghost" onclick="closeModal('cal-day-modal')">ปิด</button>
+        </div>
+    </div>
+</div>
+
 <!-- ── MODAL: View Slot Bookings ── -->
 <div class="sch-modal-backdrop" id="slot-bookings-modal">
     <div class="sch-modal-box" style="max-width:560px">
@@ -744,6 +830,7 @@ $portalCsrf = get_csrf_token();
                 students: loadStudents,
                 shifts: loadShifts,
                 slots: loadSlots,
+                calendar: loadCalendar,
                 reports: loadReports,
             })[tab];
             if (loader) loader();
@@ -1714,6 +1801,178 @@ $portalCsrf = get_csrf_token();
                 ${badge}
             </div>`;
         }).join('');
+    };
+
+    // ──────────────────────────────────────────────────────────────────
+    // CALENDAR — ปฏิทินรอบงาน + วันหยุดคลินิก
+    // ──────────────────────────────────────────────────────────────────
+    let calYear = new Date().getFullYear();
+    let calMonth = new Date().getMonth(); // 0-11
+    let calData = null;
+
+    function thaiMonthName(m) {
+        const months = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน',
+                        'กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+        return months[m];
+    }
+
+    async function loadCalendar() {
+        const wrap = document.getElementById('cal-grid-wrap');
+        const title = document.getElementById('cal-title');
+        title.textContent = `${thaiMonthName(calMonth)} ${calYear + 543}`;
+        wrap.innerHTML = '<p class="text-center text-sm text-slate-400 py-10"><i class="fa-solid fa-spinner fa-spin mr-2"></i>กำลังโหลด…</p>';
+
+        // คำนวณช่วงที่ครอบคลุมทั้งเดือน (เริ่มอาทิตย์ก่อนวันแรก, จบเสาร์หลังวันสุดท้าย)
+        const first = new Date(calYear, calMonth, 1);
+        const last  = new Date(calYear, calMonth + 1, 0);
+        const startGrid = new Date(first);
+        startGrid.setDate(first.getDate() - first.getDay()); // ย้อนไปอาทิตย์
+        const endGrid = new Date(last);
+        endGrid.setDate(last.getDate() + (6 - last.getDay())); // เดินไปเสาร์
+        const fmt = d => d.toISOString().slice(0, 10);
+
+        const j = await api('slots', 'calendar', { from: fmt(startGrid), to: fmt(endGrid) });
+        if (!j.ok) { wrap.innerHTML = `<p class="text-center text-rose-500 py-6">${escTxt(j.error || 'โหลดไม่สำเร็จ')}</p>`; return; }
+        calData = j.days;
+
+        renderCalendar(startGrid, endGrid);
+    }
+    window.loadCalendar = loadCalendar;
+
+    function renderCalendar(startGrid, endGrid) {
+        const wrap = document.getElementById('cal-grid-wrap');
+        const today = new Date(); today.setHours(0,0,0,0);
+        const dayNames = ['อา.','จ.','อ.','พ.','พฤ.','ศ.','ส.'];
+
+        let html = '<div class="cal-grid">';
+        dayNames.forEach(d => { html += `<div class="cal-head">${d}</div>`; });
+
+        const cur = new Date(startGrid);
+        while (cur <= endGrid) {
+            const dateStr = cur.toISOString().slice(0, 10);
+            const dayInfo = calData[dateStr] || { clinic_closed: false, clinic_note: '', slots: [] };
+            const inMonth = cur.getMonth() === calMonth;
+            const isToday = cur.getTime() === today.getTime();
+            const isPast = cur < today;
+
+            const slots = dayInfo.slots || [];
+            const totalMax = slots.reduce((s, x) => s + (x.max || 0), 0);
+            const totalBooked = slots.reduce((s, x) => s + (x.bookings ? x.bookings.length : 0), 0);
+            const allFull = slots.length > 0 && totalBooked >= totalMax;
+
+            const cellCls = [
+                'cal-cell',
+                !inMonth ? 'empty' : '',
+                isToday ? 'today' : '',
+                isPast ? 'past' : '',
+                dayInfo.clinic_closed ? 'closed' :
+                  (allFull ? 'full' : (slots.length > 0 ? 'has-slots' : '')),
+            ].filter(Boolean).join(' ');
+
+            let cellContent = '';
+            if (inMonth) {
+                cellContent = `<div class="flex items-start justify-between">
+                    <span class="cal-num ${isPast && !isToday ? 'dim' : ''}">${cur.getDate()}</span>`;
+                if (dayInfo.clinic_closed) {
+                    cellContent += `<span class="cal-mini-badge bg-rose-100 text-rose-700" title="${escAttr(dayInfo.clinic_note)}">หยุด</span>`;
+                } else if (slots.length > 0) {
+                    cellContent += `<span class="cal-mini-badge ${allFull ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}">${totalBooked}/${totalMax}</span>`;
+                }
+                cellContent += '</div>';
+
+                if (slots.length > 0) {
+                    slots.slice(0, 3).forEach(s => {
+                        const sFull = s.bookings.length >= s.max;
+                        const sEmpty = s.bookings.length === 0;
+                        const cls = sFull ? 'cal-slot-row full' : (sEmpty ? 'cal-slot-row empty-slot' : 'cal-slot-row');
+                        cellContent += `<div class="${cls}">${s.start}–${s.end} ${s.bookings.length}/${s.max}</div>`;
+                    });
+                    if (slots.length > 3) {
+                        cellContent += `<div class="text-[10px] text-slate-400 mt-1 font-bold">+${slots.length - 3} รอบ</div>`;
+                    }
+                }
+            } else {
+                cellContent = `<span class="cal-num dim">${cur.getDate()}</span>`;
+            }
+
+            const click = inMonth ? `onclick="openCalDayModal('${dateStr}')"` : '';
+            html += `<div class="${cellCls}" ${click}>${cellContent}</div>`;
+            cur.setDate(cur.getDate() + 1);
+        }
+        html += '</div>';
+        wrap.innerHTML = html;
+    }
+
+    window.calNavMonth = function(delta) {
+        calMonth += delta;
+        if (calMonth < 0) { calMonth = 11; calYear--; }
+        else if (calMonth > 11) { calMonth = 0; calYear++; }
+        loadCalendar();
+    };
+    window.calGoToday = function() {
+        calYear = new Date().getFullYear();
+        calMonth = new Date().getMonth();
+        loadCalendar();
+    };
+
+    window.openCalDayModal = function(dateStr) {
+        const info = (calData || {})[dateStr];
+        if (!info) return;
+
+        const [y, m, d] = dateStr.split('-');
+        const months = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+        const weekdays = ['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัส','ศุกร์','เสาร์'];
+        const dt = new Date(dateStr + 'T00:00:00');
+        document.getElementById('cal-day-title').textContent =
+            `วัน${weekdays[dt.getDay()]}ที่ ${parseInt(d,10)} ${months[parseInt(m,10)-1]} ${parseInt(y,10)+543}`;
+
+        const sub = document.getElementById('cal-day-subtitle');
+        const banner = document.getElementById('cal-day-holiday-banner');
+        const bannerNote = document.getElementById('cal-day-holiday-note');
+        if (info.clinic_closed) {
+            banner.classList.remove('hidden');
+            bannerNote.textContent = 'คลินิกหยุด' + (info.clinic_note ? ` — ${info.clinic_note}` : '');
+        } else {
+            banner.classList.add('hidden');
+        }
+
+        const slots = info.slots || [];
+        sub.textContent = slots.length === 0
+            ? 'ไม่มีรอบงานในวันนี้'
+            : `${slots.length} รอบ`;
+
+        const wrap = document.getElementById('cal-day-wrap');
+        if (slots.length === 0) {
+            wrap.innerHTML = '<p class="text-center text-sm text-slate-400 py-6">ยังไม่ได้เปิดรอบสำหรับวันนี้</p>';
+        } else {
+            wrap.innerHTML = slots.map(s => {
+                const full = s.bookings.length >= s.max;
+                const compBadge = s.comp_type === 'paid'
+                    ? '<span class="cal-mini-badge bg-amber-50 text-amber-700">ค่าตอบแทน</span>'
+                    : '<span class="cal-mini-badge bg-emerald-50 text-emerald-700">ทุน</span>';
+                const capCls = full ? 'bg-rose-100 text-rose-700' :
+                              s.bookings.length === 0 ? 'bg-slate-100 text-slate-500' :
+                              'bg-emerald-100 text-emerald-700';
+                const namesHtml = s.bookings.length === 0
+                    ? '<p class="text-xs text-slate-400 italic mt-2">ยังไม่มีผู้จอง</p>'
+                    : '<div class="flex flex-wrap gap-1.5 mt-2">' + s.bookings.map(b =>
+                        `<span class="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 text-[11px] font-black">${escTxt(b.name)}${b.code ? ` <span class="text-emerald-500 font-normal">· ${escTxt(b.code)}</span>` : ''}</span>`
+                      ).join('') + '</div>';
+                const notes = s.notes ? `<p class="text-[11px] text-slate-500 mt-1">${escTxt(s.notes)}</p>` : '';
+                return `<div class="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                    <div class="flex items-center justify-between gap-2">
+                        <div class="text-sm font-black text-slate-900">${s.start}–${s.end}</div>
+                        <div class="flex items-center gap-1.5">
+                            ${compBadge}
+                            <span class="cal-mini-badge ${capCls}">${s.bookings.length}/${s.max}</span>
+                        </div>
+                    </div>
+                    ${notes}
+                    ${namesHtml}
+                </div>`;
+            }).join('');
+        }
+        document.getElementById('cal-day-modal').classList.add('show');
     };
 
     // ── Init: load default tab (Dashboard)
