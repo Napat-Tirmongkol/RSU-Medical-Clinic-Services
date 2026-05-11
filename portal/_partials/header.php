@@ -2,8 +2,13 @@
 <header class="portal-header au">
     <div class="w-full px-5 sm:px-8 py-3 flex items-center justify-between gap-4" style="min-height:60px">
 
-        <!-- Left/Center: (Search removed as per request) -->
-        <div style="flex: 1; display: flex; justify-content: flex-start;">
+        <!-- Left: App Switcher -->
+        <div style="flex: 1; display: flex; justify-content: flex-start; gap: 10px; align-items: center;">
+            <button id="app-switcher-btn" onclick="openAppSwitcher()" title="สลับระบบ (App Switcher)"
+                class="w-9 h-9 flex items-center justify-center rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900 transition-colors shadow-sm">
+                <i class="fa-solid fa-grip"></i>
+            </button>
+            <span id="app-current-label" class="text-xs font-black text-slate-500 hidden sm:inline-block"></span>
         </div>
 
         <!-- Right Action Icons -->
