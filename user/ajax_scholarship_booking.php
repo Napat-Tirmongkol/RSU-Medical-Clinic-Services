@@ -86,17 +86,58 @@ function list_open_slots(PDO $pdo, int $studentId): void
         return strtotime($r['slot_date'] . ' ' . $r['end_time']) > $now;
     }));
 
-    // Diagnostic log สำหรับช่วงดีบั๊ก (ดู PHP error log ถ้าผลลัพธ์ว่าง)
+    $response = ['ok' => true, 'rows' => $rows];
+
+    // Diagnostic เมื่อ result ว่าง — ใส่ใน response เพื่อ debug ง่ายขึ้น
     if (empty($rows)) {
-        $totalOpen = (int)$pdo->query("SELECT COUNT(*) FROM sys_scholarship_slots WHERE status='open'")->fetchColumn();
-        $totalAny  = (int)$pdo->query("SELECT COUNT(*) FROM sys_scholarship_slots")->fetchColumn();
-        error_log(sprintf(
-            '[scholarship_booking] list_open empty: studentId=%d from=%s to=%s before_time_filter=%d total_open=%d total_any=%d',
-            $studentId, $from, $to, $beforeFilter, $totalOpen, $totalAny
-        ));
+        $byStatus = [];
+        try {
+            $st = $pdo->query("SELECT status, COUNT(*) c FROM sys_scholarship_slots GROUP BY status");
+            foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
+                $byStatus[$r['status']] = (int)$r['c'];
+            }
+        } catch (Throwable $e) {}
+
+        $inRange = 0;
+        try {
+            $s = $pdo->prepare("SELECT COUNT(*) FROM sys_scholarship_slots WHERE slot_date BETWEEN ? AND ?");
+            $s->execute([$from, $to]);
+            $inRange = (int)$s->fetchColumn();
+        } catch (Throwable $e) {}
+
+        $studentBooked = 0;
+        try {
+            $s = $pdo->prepare("SELECT COUNT(*) FROM sys_scholarship_slot_bookings WHERE student_id = ? AND status = 'booked'");
+            $s->execute([$studentId]);
+            $studentBooked = (int)$s->fetchColumn();
+        } catch (Throwable $e) {}
+
+        $sample = [];
+        try {
+            $s = $pdo->prepare("SELECT id, slot_date, start_time, end_time, status, max_capacity
+                FROM sys_scholarship_slots
+                WHERE slot_date BETWEEN ? AND ?
+                ORDER BY slot_date ASC, start_time ASC LIMIT 5");
+            $s->execute([$from, $to]);
+            $sample = $s->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        } catch (Throwable $e) {}
+
+        $response['_diag'] = [
+            'studentId'          => $studentId,
+            'from'               => $from,
+            'to'                 => $to,
+            'now'                => date('Y-m-d H:i:s'),
+            'before_time_filter' => $beforeFilter,
+            'status_counts'      => $byStatus,
+            'in_date_range'      => $inRange,
+            'student_booked'     => $studentBooked,
+            'sample_in_range'    => $sample,
+        ];
+
+        error_log('[scholarship_booking] list_open empty: ' . json_encode($response['_diag'], JSON_UNESCAPED_UNICODE));
     }
 
-    echo json_encode(['ok' => true, 'rows' => $rows], JSON_UNESCAPED_UNICODE);
+    echo json_encode($response, JSON_UNESCAPED_UNICODE);
 }
 
 function list_my_bookings(PDO $pdo, int $studentId): void
