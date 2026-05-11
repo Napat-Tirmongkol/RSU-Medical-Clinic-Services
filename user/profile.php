@@ -87,37 +87,9 @@ try {
     }
 } catch (PDOException $e) { error_log($e->getMessage()); }
 
-// ── Insurance lookup (read-only display) ────────────────────────────
-$insurance = null;
-if (defined('SITE_SHOW_INSURANCE') && SITE_SHOW_INSURANCE && !empty($userData['id_number'])) {
-    try {
-        $insStmt = db()->prepare("SELECT * FROM insurance_members WHERE member_id = :mid LIMIT 1");
-        $insStmt->execute([':mid' => $userData['id_number']]);
-        $insurance = $insStmt->fetch(PDO::FETCH_ASSOC) ?: null;
-    } catch (Exception $e) { /* table may not exist yet */ }
-}
-
-// ── Gold Card lookup (Universal Coverage) ───────────────────────────
-// จับคู่ผ่าน 3 ทาง: linked_user_id (matched by bulk import), citizen_id, ชื่อตรง
-$goldCard = null;
-if (!empty($user['id']) || !empty($userData['citizen_id']) || !empty($userData['full_name'])) {
-    try {
-        $gcStmt = db()->prepare("SELECT * FROM gold_card_members
-                                 WHERE linked_user_id = :uid
-                                    OR (:cid <> '' AND citizen_id = :cid2)
-                                    OR (:fn <> '' AND TRIM(full_name) = :fn2)
-                                 ORDER BY (status = 'active') DESC, (status = 'approved') DESC, id DESC
-                                 LIMIT 1");
-        $gcStmt->execute([
-            ':uid'  => (int)($user['id'] ?? 0),
-            ':cid'  => $userData['citizen_id'] ?? '',
-            ':cid2' => $userData['citizen_id'] ?? '',
-            ':fn'   => $userData['full_name'] ?? '',
-            ':fn2'  => $userData['full_name'] ?? '',
-        ]);
-        $goldCard = $gcStmt->fetch(PDO::FETCH_ASSOC) ?: null;
-    } catch (Exception $e) { /* table may not exist yet */ }
-}
+// ── Insurance + Gold Card lookups: ย้ายไปโหลด async ผ่าน
+//    ajax_profile_coverage.php หลัง page render เสร็จ → ลด TTFB
+// (ของเดิม: query 2 รอบ พร้อม TRIM ใน WHERE → blocking)
 
 if ($userData['full_name'] !== '' && $userData['first_name'] === '' && $userData['last_name'] === '') {
     $parts = explode(' ', trim($userData['full_name']), 2);
@@ -138,13 +110,23 @@ $mode = ($_GET['mode'] ?? '') === 'edit' || !$isEditing ? 'edit' : 'view';
 $saved = isset($_GET['saved']);
 $err   = (string) ($_GET['error'] ?? '');
 
-// Faculty list
+// Faculty list (cache 1 hr — เปลี่ยนแปลงน้อย)
 $_facultyList = [];
-try {
-    $_pdo2 = db();
-    $stmt_fac = $_pdo2->query("SELECT name_th FROM sys_faculties ORDER BY name_th");
-    if ($stmt_fac) $_facultyList = $stmt_fac->fetchAll(PDO::FETCH_ASSOC);
-} catch (Exception $e) { error_log("Faculty query failed: " . $e->getMessage()); }
+$_facCache = dirname(__DIR__) . '/storage/cache/faculties.json';
+$_facTTL   = 3600;
+if (is_readable($_facCache) && (time() - (int)filemtime($_facCache)) < $_facTTL) {
+    $_facultyList = json_decode((string)file_get_contents($_facCache), true) ?: [];
+}
+if (empty($_facultyList)) {
+    try {
+        $stmt_fac = db()->query("SELECT name_th FROM sys_faculties ORDER BY name_th");
+        if ($stmt_fac) $_facultyList = $stmt_fac->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        if (!empty($_facultyList)) {
+            @mkdir(dirname($_facCache), 0755, true);
+            @file_put_contents($_facCache, json_encode($_facultyList, JSON_UNESCAPED_UNICODE));
+        }
+    } catch (Exception $e) { error_log("Faculty query failed: " . $e->getMessage()); }
+}
 
 // ── Profile completeness ──
 $weighted = [
@@ -179,8 +161,13 @@ function vh(?string $s): string { return htmlspecialchars((string) $s, ENT_QUOTE
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title><?= __('profile.heading_edit') ?> - RSU Medical</title>
     <link rel="icon" href="<?= defined('SITE_LOGO') && SITE_LOGO !== '' ? '../' . vh(SITE_LOGO) : '../favicon.ico?v=' . APP_VERSION ?>">
+    <!-- ── Resource hints: เริ่ม DNS/TLS handshake ก่อนใช้งานจริง ── -->
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+    <link rel="preconnect" href="https://ui-avatars.com" crossorigin>
     <link rel="stylesheet" href="../assets/css/tailwind.min.css?v=<?= APP_VERSION ?>">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css?v=<?= APP_VERSION ?>" rel="stylesheet">
+    <!-- Font Awesome async (preload + swap แทน blocking load) -->
+    <link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css?v=<?= APP_VERSION ?>" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css?v=<?= APP_VERSION ?>" rel="stylesheet"></noscript>
     <style>
         @font-face { font-family: 'RSU'; src: url('../assets/fonts/RSU_Regular.ttf') format('truetype'); font-weight: normal; }
         @font-face { font-family: 'RSU'; src: url('../assets/fonts/RSU_BOLD.ttf') format('truetype'); font-weight: bold; }
@@ -285,175 +272,26 @@ function vh(?string $s): string { return htmlspecialchars((string) $s, ENT_QUOTE
                 <?php endif; ?>
             </div>
 
+            <!-- ── Coverage sections (insurance + gold card) — โหลด async หลัง page render ── -->
             <?php if (defined('SITE_SHOW_INSURANCE') && SITE_SHOW_INSURANCE): ?>
-            <!-- ── Medical Coverage (read-only, full detail) ── -->
-            <div class="bg-white rounded-[2.5rem] p-6 border border-slate-50 shadow-sm mb-6">
-                <div class="flex items-center gap-2 mb-4">
-                    <span class="h-5 w-1 rounded-full bg-rose-500"></span>
-                    <h3 class="text-sm font-black uppercase tracking-widest text-slate-700">ความคุ้มครอง</h3>
-                    <span class="ml-auto text-[10px] font-black text-slate-400 uppercase tracking-widest">Medical Coverage</span>
-                </div>
-
-                <?php if ($insurance === null): ?>
-                    <div class="rounded-2xl bg-slate-50 border border-slate-100 p-5 flex flex-col items-center text-center gap-2">
-                        <div class="w-12 h-12 rounded-2xl bg-white border border-slate-100 text-slate-400 flex items-center justify-center text-xl">
-                            <i class="fa-solid fa-shield-xmark"></i>
-                        </div>
-                        <p class="text-sm font-black text-slate-700">ไม่พบข้อมูลประกัน</p>
-                        <p class="text-[11px] font-bold text-slate-400">กรุณาติดต่อเจ้าหน้าที่ห้องพยาบาล</p>
+            <div id="profile-coverage-insurance" class="mb-6">
+                <div class="bg-white rounded-[2.5rem] p-6 border border-slate-50 shadow-sm">
+                    <div class="flex items-center gap-2 mb-4">
+                        <span class="h-5 w-1 rounded-full bg-rose-500"></span>
+                        <h3 class="text-sm font-black uppercase tracking-widest text-slate-700">ความคุ้มครอง</h3>
+                        <span class="ml-auto text-[10px] font-black text-slate-400 uppercase tracking-widest">Medical Coverage</span>
                     </div>
-                <?php else:
-                    $insActive   = ($insurance['insurance_status'] ?? '') === 'Active';
-                    $coverEnd    = $insurance['coverage_end'] ?? null;
-                    $coverStart  = $insurance['coverage_start'] ?? null;
-                    $policyNo    = $insurance['policy_number'] ?? '';
-                    $memberType  = $insurance['member_status'] ?? '';
-                    $thaiShort   = function ($d) {
-                        if (!$d) return '—';
-                        $ts = strtotime($d);
-                        return date('d/m/', $ts) . substr((string)((int)date('Y', $ts) + 543), -2);
-                    };
-                ?>
-                    <?php if (!$insActive): ?>
-                        <div class="rounded-2xl bg-amber-50 border border-amber-100 p-5">
-                            <div class="flex items-center gap-3 mb-3">
-                                <div class="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center">
-                                    <i class="fa-solid fa-triangle-exclamation"></i>
-                                </div>
-                                <div>
-                                    <p class="text-[10px] font-black uppercase tracking-widest text-amber-700">Inactive</p>
-                                    <p class="text-sm font-black text-slate-900">สิทธิ์ประกันไม่พร้อมใช้งาน</p>
-                                </div>
-                            </div>
-                            <p class="text-[12px] font-bold text-amber-700 leading-relaxed">
-                                ข้อมูลประกันของคุณอยู่ในสถานะ Inactive กรุณาติดต่อห้องพยาบาลเพื่อตรวจสอบสิทธิ์
-                            </p>
+                    <div class="rounded-2xl bg-slate-50 border border-slate-100 p-5 flex items-center gap-3 animate-pulse">
+                        <div class="w-10 h-10 rounded-xl bg-slate-200"></div>
+                        <div class="flex-1 space-y-2">
+                            <div class="h-3 bg-slate-200 rounded w-2/3"></div>
+                            <div class="h-2.5 bg-slate-200 rounded w-1/2"></div>
                         </div>
-                    <?php else: ?>
-                        <div class="rounded-2xl bg-gradient-to-br from-rose-50 to-rose-100/60 border border-rose-100 p-5">
-                            <div class="flex items-start justify-between mb-4">
-                                <div>
-                                    <p class="text-[10px] font-black uppercase tracking-widest text-rose-600">Personal Accident</p>
-                                    <h4 class="text-base font-black text-slate-900 leading-tight mt-0.5">บัตรประกันอุบัติเหตุ</h4>
-                                </div>
-                                <span class="inline-flex px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-black uppercase tracking-widest">Active</span>
-                            </div>
-
-                            <dl class="space-y-3 text-[13px]">
-                                <div class="grid grid-cols-[100px_1fr] gap-2">
-                                    <dt class="text-slate-500 font-bold">เลขที่กรมธรรม์</dt>
-                                    <dd class="text-slate-900 font-black tracking-wider truncate"><?= $policyNo !== '' ? vh($policyNo) : '—' ?></dd>
-                                </div>
-                                <div class="grid grid-cols-[100px_1fr] gap-2">
-                                    <dt class="text-slate-500 font-bold">ผู้เอาประกัน</dt>
-                                    <dd class="text-slate-900 font-black truncate"><?= vh($userData['full_name'] ?: '—') ?></dd>
-                                </div>
-                                <div class="grid grid-cols-[100px_1fr] gap-2">
-                                    <dt class="text-slate-500 font-bold">เริ่มคุ้มครอง</dt>
-                                    <dd class="text-slate-900 font-black tracking-wider"><?= vh($thaiShort($coverStart)) ?></dd>
-                                </div>
-                                <div class="grid grid-cols-[100px_1fr] gap-2">
-                                    <dt class="text-slate-500 font-bold">สิ้นสุด</dt>
-                                    <dd class="text-slate-900 font-black tracking-wider"><?= vh($thaiShort($coverEnd)) ?></dd>
-                                </div>
-                                <div class="grid grid-cols-[100px_1fr] gap-2 pt-2 border-t border-rose-100">
-                                    <dt class="text-slate-500 font-bold">วงเงินรักษา</dt>
-                                    <dd class="text-rose-600 font-black text-lg leading-none">฿40,000<span class="text-[11px] text-slate-500 font-bold ml-1">/ ครั้ง</span></dd>
-                                </div>
-                                <?php if ($memberType): ?>
-                                <div class="grid grid-cols-[100px_1fr] gap-2">
-                                    <dt class="text-slate-500 font-bold">ประเภท</dt>
-                                    <dd class="text-slate-700 font-bold uppercase tracking-wide"><?= vh($memberType) ?></dd>
-                                </div>
-                                <?php endif; ?>
-                            </dl>
-                        </div>
-                    <?php endif; ?>
-                <?php endif; ?>
+                    </div>
+                </div>
             </div>
             <?php endif; ?>
-
-            <?php /* ── Gold Card (สิทธิ์บัตรทอง) ──────────────────────── */ ?>
-            <?php if ($goldCard !== null):
-                $gcActive = in_array($goldCard['status'] ?? '', ['approved', 'active'], true);
-                $gcHospMain = $goldCard['hospital_main'] ?? '';
-                $gcHospSub  = $goldCard['hospital_sub'] ?? '';
-                $gcCovStart = $goldCard['coverage_start'] ?? null;
-                $gcCovEnd   = $goldCard['coverage_end'] ?? null;
-                $gcStatusLabel = [
-                    'pending'=>'รอเอกสาร','submitted'=>'ส่งแล้ว','approved'=>'อนุมัติ',
-                    'active'=>'ใช้งาน','rejected'=>'ไม่ผ่าน','expired'=>'หมดอายุ'
-                ][$goldCard['status'] ?? 'pending'] ?? '—';
-                $thaiShortGc = function ($d) {
-                    if (!$d) return '—';
-                    $ts = strtotime($d);
-                    return date('d/m/', $ts) . substr((string)((int)date('Y', $ts) + 543), -2);
-                };
-            ?>
-            <div class="bg-white rounded-[2.5rem] p-6 border border-slate-50 shadow-sm mb-6">
-                <div class="flex items-center gap-2 mb-4">
-                    <span class="h-5 w-1 rounded-full bg-amber-500"></span>
-                    <h3 class="text-sm font-black uppercase tracking-widest text-slate-700">บัตรทอง</h3>
-                    <span class="ml-auto text-[10px] font-black text-slate-400 uppercase tracking-widest">Universal Coverage</span>
-                </div>
-
-                <?php if ($gcActive): ?>
-                    <div class="rounded-2xl bg-gradient-to-br from-amber-50 to-orange-100/60 border border-amber-200 p-5">
-                        <div class="flex items-start justify-between mb-4">
-                            <div>
-                                <p class="text-[10px] font-black uppercase tracking-widest text-amber-700">Universal Coverage</p>
-                                <h4 class="text-base font-black text-slate-900 leading-tight mt-0.5">บัตรทอง (สิทธิหลักประกันสุขภาพ)</h4>
-                            </div>
-                            <span class="inline-flex px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-black uppercase tracking-widest">Active</span>
-                        </div>
-
-                        <dl class="space-y-3 text-[13px]">
-                            <div class="grid grid-cols-[100px_1fr] gap-2">
-                                <dt class="text-slate-500 font-bold">ผู้ถือสิทธิ์</dt>
-                                <dd class="text-slate-900 font-black truncate"><?= vh($userData['full_name'] ?: ($goldCard['full_name'] ?? '—')) ?></dd>
-                            </div>
-                            <?php if ($gcHospMain): ?>
-                            <div class="grid grid-cols-[100px_1fr] gap-2">
-                                <dt class="text-slate-500 font-bold">รพ.หลัก</dt>
-                                <dd class="text-slate-900 font-black"><?= vh($gcHospMain) ?></dd>
-                            </div>
-                            <?php endif; ?>
-                            <?php if ($gcHospSub): ?>
-                            <div class="grid grid-cols-[100px_1fr] gap-2">
-                                <dt class="text-slate-500 font-bold">รพ.รอง</dt>
-                                <dd class="text-slate-700 font-bold"><?= vh($gcHospSub) ?></dd>
-                            </div>
-                            <?php endif; ?>
-                            <?php if ($gcCovStart || $gcCovEnd): ?>
-                            <div class="grid grid-cols-[100px_1fr] gap-2">
-                                <dt class="text-slate-500 font-bold">คุ้มครอง</dt>
-                                <dd class="text-slate-900 font-black tracking-wider"><?= vh($thaiShortGc($gcCovStart)) ?> — <?= vh($thaiShortGc($gcCovEnd)) ?></dd>
-                            </div>
-                            <?php endif; ?>
-                            <div class="grid grid-cols-[100px_1fr] gap-2 pt-2 border-t border-amber-200">
-                                <dt class="text-slate-500 font-bold">สิทธิประโยชน์</dt>
-                                <dd class="text-amber-700 font-black">รักษาฟรีตามสิทธิ์ <span class="text-[11px] text-slate-500 font-bold ml-1">@ รพ.ที่ขึ้นทะเบียน</span></dd>
-                            </div>
-                        </dl>
-                    </div>
-                <?php else: ?>
-                    <div class="rounded-2xl bg-slate-50 border border-slate-100 p-5">
-                        <div class="flex items-center gap-3 mb-2">
-                            <div class="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center">
-                                <i class="fa-solid fa-hourglass-half"></i>
-                            </div>
-                            <div>
-                                <p class="text-[10px] font-black uppercase tracking-widest text-amber-700"><?= vh($gcStatusLabel) ?></p>
-                                <p class="text-sm font-black text-slate-900">บัตรทองยังไม่พร้อมใช้งาน</p>
-                            </div>
-                        </div>
-                        <p class="text-[12px] font-bold text-slate-600 leading-relaxed">
-                            สิทธิ์บัตรทองของคุณอยู่ในสถานะ <b><?= vh($gcStatusLabel) ?></b> กรุณาติดต่อห้องพยาบาลเพื่อตรวจสอบ
-                        </p>
-                    </div>
-                <?php endif; ?>
-            </div>
-            <?php endif; ?>
+            <div id="profile-coverage-gold-card" class="mb-6"></div>
 
             <form id="profileForm" action="save_profile.php" method="POST" class="space-y-6" novalidate>
                 <?php csrf_field(); ?>
@@ -943,6 +781,30 @@ function vh(?string $s): string { return htmlspecialchars((string) $s, ENT_QUOTE
             deptAccept?.addEventListener('click', () => { if(_deptSuggested) deptInput.value = _deptSuggested; deptHint.classList.add('hidden'); });
             deptDismiss?.addEventListener('click', () => deptHint.classList.add('hidden'));
         });
+    </script>
+
+    <!-- ── Defer-load coverage (insurance + gold card) — non-blocking ── -->
+    <script>
+    (function () {
+        const insBox = document.getElementById('profile-coverage-insurance');
+        const gcBox  = document.getElementById('profile-coverage-gold-card');
+        if (!insBox && !gcBox) return;
+        fetch('ajax_profile_coverage.php', { credentials: 'same-origin' })
+            .then(r => r.ok ? r.json() : null)
+            .then(j => {
+                if (!j || !j.ok) {
+                    // ถ้า fetch fail ปล่อย skeleton แสดงไว้ (ไม่ใช่ critical)
+                    return;
+                }
+                if (insBox && typeof j.insurance_html === 'string') {
+                    insBox.innerHTML = j.insurance_html;
+                }
+                if (gcBox && typeof j.gold_card_html === 'string') {
+                    gcBox.innerHTML = j.gold_card_html;
+                }
+            })
+            .catch(() => { /* silent — skeleton remains */ });
+    })();
     </script>
 </body>
 </html>
