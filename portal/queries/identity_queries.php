@@ -131,6 +131,10 @@ if ($adminRole === 'superadmin') {
             $pdo->exec("ALTER TABLE sys_staff ADD COLUMN position_id INT UNSIGNED NULL AFTER role");
             try { $pdo->exec("ALTER TABLE sys_staff ADD INDEX idx_position (position_id)"); } catch (PDOException $e) {}
         }
+        if (!in_array('job_title', $cols)) {
+            // Job title แบบ free-text (เช่น "พยาบาล", "ธุรการ", "แพทย์") — ไม่เกี่ยวกับ permission
+            $pdo->exec("ALTER TABLE sys_staff ADD COLUMN job_title VARCHAR(120) NOT NULL DEFAULT '' AFTER position_id");
+        }
 
         // Auto-create sys_staff_positions if missing
         $pdo->exec("
@@ -151,6 +155,11 @@ if ($adminRole === 'superadmin') {
                    s.position_id,
                    p.name AS position_name,
                    p.flags AS position_flags,
+                   IFNULL(s.job_title, '') AS job_title,
+                   (SELECT op.title FROM sys_org_members om
+                      INNER JOIN sys_org_positions op ON op.id = om.position_id
+                      WHERE om.staff_id = s.id AND om.is_active = 1
+                      ORDER BY om.display_order ASC, om.id ASC LIMIT 1) AS org_position_title,
                    IFNULL(s.access_eborrow, 1) AS access_eborrow,
                    IFNULL(s.access_ecampaign, 0) AS access_ecampaign,
                    IFNULL(s.ecampaign_role, 'admin') AS ecampaign_role,

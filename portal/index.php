@@ -2295,7 +2295,18 @@ try {
                                                             <?= mb_substr($st['full_name'], 0, 1) ?>
                                                         </div>
                                                         <div>
-                                                            <div style="font-weight:800;color:#1e293b;font-size:13.5px"><?= htmlspecialchars($st['full_name']) ?></div>
+                                                            <div style="font-weight:800;color:#1e293b;font-size:13.5px;display:flex;align-items:center;gap:6px">
+                                                                <?= htmlspecialchars($st['full_name']) ?>
+                                                                <?php
+                                                                $_jt = trim((string)($st['job_title'] ?? ''));
+                                                                $_org = trim((string)($st['org_position_title'] ?? ''));
+                                                                $_label = $_jt !== '' ? $_jt : $_org;
+                                                                if ($_label !== ''):
+                                                                ?>
+                                                                <span title="<?= $_jt !== '' ? 'ตำแหน่งงาน' : 'จากผังองค์กร' ?>"
+                                                                      style="display:inline-block;padding:1px 7px;border-radius:99px;background:<?= $_jt !== '' ? '#ecfeff' : '#f1f5f9' ?>;color:<?= $_jt !== '' ? '#0891b2' : '#64748b' ?>;border:1px solid <?= $_jt !== '' ? '#a5f3fc' : '#e2e8f0' ?>;font-size:10px;font-weight:800"><?= htmlspecialchars($_label) ?></span>
+                                                                <?php endif; ?>
+                                                            </div>
                                                             <div style="font-size:11px;color:#64748b;font-weight:600">@<?= htmlspecialchars($st['username']) ?></div>
                                                         </div>
                                                     </div>
@@ -2741,11 +2752,38 @@ try {
                                         <i class="fa-solid fa-shield-halved"></i> กำหนดสิทธิ์รายระบบ
                                     </div>
 
-                                    <!-- Position selector (staff only) — Hybrid: ผูก position = lock flag, Custom = override เอง -->
+                                    <!-- Job Title (free-text descriptor — e.g. พยาบาล/ธุรการ) — ไม่เกี่ยวกับ permission -->
+                                    <div id="govJobTitleWrap" style="display:none">
+                                        <label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:800;color:#475569;margin-bottom:6px">
+                                            <i class="fa-solid fa-id-badge" style="color:#0891b2"></i> ตำแหน่งงาน (Job Title)
+                                            <span style="color:#94a3b8;font-weight:normal;font-size:11px">เช่น พยาบาล / ธุรการ / แพทย์ — ไม่เกี่ยวกับสิทธิ์</span>
+                                        </label>
+                                        <input type="text" name="job_title" id="govJobTitle" class="premium-input" style="width:100%" maxlength="120"
+                                               list="govJobTitleSuggest" placeholder="เช่น พยาบาล">
+                                        <datalist id="govJobTitleSuggest">
+                                            <option value="พยาบาลวิชาชีพ">
+                                            <option value="พยาบาลเทคนิค">
+                                            <option value="ผู้ช่วยพยาบาล">
+                                            <option value="แพทย์">
+                                            <option value="ผู้ช่วยแพทย์">
+                                            <option value="ธุรการ">
+                                            <option value="เภสัชกร">
+                                            <option value="ผู้ช่วยเภสัชกร">
+                                            <option value="หัวหน้าฝ่าย">
+                                            <option value="ผู้จัดการ">
+                                            <option value="IT Support">
+                                        </datalist>
+                                        <p id="govOrgPositionInfo" style="display:none;margin:6px 0 0;font-size:11px;color:#0891b2;font-weight:600">
+                                            <i class="fa-solid fa-sitemap"></i> ตำแหน่งในผังองค์กร: <span id="govOrgPositionTitle"></span>
+                                            <span style="color:#94a3b8">(แก้ที่ Chain of Command)</span>
+                                        </p>
+                                    </div>
+
+                                    <!-- Permission Template selector — Hybrid: ผูก position = lock flag, Custom = override เอง -->
                                     <div id="govPositionWrap" style="display:none">
                                         <label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:800;color:#475569;margin-bottom:6px">
-                                            <i class="fa-solid fa-user-tag" style="color:#7c3aed"></i> ตำแหน่งงาน
-                                            <span style="color:#94a3b8;font-weight:normal;font-size:11px">(ผูกแล้ว flag จะ lock ตามตำแหน่ง)</span>
+                                            <i class="fa-solid fa-user-tag" style="color:#7c3aed"></i> ชุดสิทธิ์ตำแหน่ง (Permission Template)
+                                            <span style="color:#94a3b8;font-weight:normal;font-size:11px">ผูกแล้ว flag จะ lock ตามตำแหน่ง</span>
                                         </label>
                                         <select name="position_id" id="govPositionId" class="premium-input" style="width:100%;background-image:none" onchange="onGovPositionChange()">
                                             <option value="">— Custom (กำหนด flag เอง) —</option>
@@ -4025,6 +4063,7 @@ try {
             
             // Set visuals based on type
             const govPosWrap = document.getElementById('govPositionWrap');
+            const govJobWrap = document.getElementById('govJobTitleWrap');
             if (type === 'admin') {
                 title.textContent = (mode === 'add' ? 'เพิ่ม System Admin' : 'จัดการสิทธิ์ System Admin');
                 icon.style.background = '#f5f3ff';
@@ -4034,11 +4073,13 @@ try {
                 document.getElementById('govEbCard').style.opacity = '0.5'; // Adms might not need borrow roles
                 document.getElementById('govEcCard').style.opacity = '1';
                 if (govPosWrap) govPosWrap.style.display = 'none';
+                if (govJobWrap) govJobWrap.style.display = 'none';
             } else {
                 title.textContent = (mode === 'add' ? 'เพิ่ม Staff Record' : 'จัดการสิทธิ์ Staff & Roles');
                 icon.style.background = '#eff6ff';
                 icon.style.color = '#2563eb';
                 if (govPosWrap) govPosWrap.style.display = 'block';
+                if (govJobWrap) govJobWrap.style.display = 'block';
                 icon.innerHTML = '<i class="fa-solid fa-id-card-clip"></i>';
                 document.getElementById('govAdminOnlyCard').style.display = 'none';
                 document.getElementById('govEbCard').style.opacity = '1';
@@ -4085,6 +4126,20 @@ try {
                             posSel.value = data.position_id ? String(data.position_id) : '';
                             onGovPositionChange();
                         }
+
+                        // Job title (free text) + Org chart position (read-only info)
+                        const jt = document.getElementById('govJobTitle');
+                        if (jt) jt.value = data.job_title || '';
+                        const orgInfo = document.getElementById('govOrgPositionInfo');
+                        const orgT = document.getElementById('govOrgPositionTitle');
+                        if (orgInfo && orgT) {
+                            if (data.org_position_title) {
+                                orgT.textContent = data.org_position_title;
+                                orgInfo.style.display = '';
+                            } else {
+                                orgInfo.style.display = 'none';
+                            }
+                        }
                     }
                 } else {
                     // Reset Extension Checkboxes for new records
@@ -4108,6 +4163,10 @@ try {
                     if (deptSelR) deptSelR.value = '';
                     const posSel = document.getElementById('govPositionId');
                     if (posSel) { posSel.value = ''; onGovPositionChange(); }
+                    const jtR = document.getElementById('govJobTitle');
+                    if (jtR) jtR.value = '';
+                    const orgInfoR = document.getElementById('govOrgPositionInfo');
+                    if (orgInfoR) orgInfoR.style.display = 'none';
                 }
             // Update UI States
             syncGovUI('govEbAccess', 'govEbRole', 'govEbCard');
