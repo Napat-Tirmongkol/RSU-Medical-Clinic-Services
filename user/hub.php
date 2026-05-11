@@ -1593,7 +1593,12 @@ $heroThemes = [
                             <p class="text-[13px] font-black leading-tight text-slate-700">ปรึกษาแพทย์<br>ออนไลน์</p>
                         </button>
 
-                        <?php if (!is_under_maintenance('gold_card_apply')): ?>
+                        <?php
+                        // บัตรทองเปิดให้สมัครเฉพาะนักศึกษา (sys_users.status === 'student')
+                        $gcShowApply = !is_under_maintenance('gold_card_apply')
+                                      && (($user['status'] ?? '') === 'student');
+                        if ($gcShowApply):
+                        ?>
                         <button onclick="window.location.href='gold_card_apply.php'"
                             class="relative flex flex-col items-start p-5 rounded-2xl bg-gradient-to-br from-amber-50 to-orange-100 border border-amber-200 active:scale-95 transition-all text-left group overflow-hidden">
                             <div class="absolute -right-4 -top-4 w-16 h-16 bg-amber-200/40 rounded-full blur-xl group-hover:scale-150 transition-transform"></div>
