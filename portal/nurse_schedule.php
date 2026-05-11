@@ -651,9 +651,14 @@ $NS_CSRF_TOKEN = get_csrf_token();
         <h3 class="font-semibold text-slate-700 flex items-center gap-2">
           <i data-lucide="users" class="w-4 h-4 text-cyan-600"></i> ทะเบียนพยาบาล
         </h3>
-        <button onclick="openAddNurse()" class="btn-solid btn-primary text-sm">
-          <i data-lucide="user-plus" class="w-3.5 h-3.5"></i> เพิ่มพยาบาล
-        </button>
+        <div class="flex items-center gap-2">
+          <button onclick="openImportNurses()" class="btn-solid btn-success text-sm" title="นำเข้าจาก Identity & Governance">
+            <i data-lucide="download" class="w-3.5 h-3.5"></i> นำเข้าจากทะเบียน
+          </button>
+          <button onclick="openAddNurse()" class="btn-solid btn-primary text-sm">
+            <i data-lucide="user-plus" class="w-3.5 h-3.5"></i> เพิ่มพยาบาล
+          </button>
+        </div>
       </div>
       <div id="nursesList" class="space-y-2"></div>
     </div>
@@ -2104,6 +2109,106 @@ function renderNursesList() {
     </div>`;
   }).join('');
   lucide.createIcons();
+}
+
+// แปลง job_title หรือ org_position_title → POSITIONS key
+function mapJobTitleToPosition(jt, orgTitle) {
+  const t = ((jt || '') + ' ' + (orgTitle || '')).trim();
+  if (!t) return 'พยาบาลวิชาชีพ';
+  if (/หัวหน้าหอ/i.test(t)) return 'หัวหน้าหอผู้ป่วย';
+  if (/รองหัวหน้า/i.test(t)) return 'รองหัวหน้าหอผู้ป่วย';
+  if (/หัวหน้าเวร|หัวหน้า/i.test(t)) return 'พยาบาลหัวหน้าเวร';
+  if (/ผู้ช่วยพยาบาล/i.test(t)) return 'ผู้ช่วยพยาบาล';
+  if (/พยาบาลเทคนิค|เทคนิค/i.test(t)) return 'พยาบาลเทคนิค';
+  if (/พยาบาลวิชาชีพ|วิชาชีพ|พยาบาล/i.test(t)) return 'พยาบาลวิชาชีพ';
+  return 'พยาบาลวิชาชีพ';
+}
+
+async function openImportNurses() {
+  showLoading('กำลังโหลดทะเบียน…');
+  let staff = [];
+  try {
+    const r = await fetch('ajax_nurse_register.php?action=list_staff_nurses', { credentials: 'same-origin' });
+    const j = await r.json();
+    if (!j.ok) throw new Error(j.error || 'ผิดพลาด');
+    staff = j.staff || [];
+  } catch (e) {
+    Swal.close();
+    Swal.fire({ icon: 'error', title: 'โหลดไม่สำเร็จ', text: e.message });
+    return;
+  }
+  Swal.close();
+
+  if (!staff.length) {
+    Swal.fire({
+      icon: 'info', title: 'ไม่พบรายชื่อพยาบาล',
+      html: 'ใน Identity & Governance ยังไม่มี staff ที่ใส่ <b>"ตำแหน่งงาน (Job Title)"</b> เป็น "พยาบาล..."<br><br>เปิดหน้า Identity → กรอก Job Title ก่อน',
+    });
+    return;
+  }
+
+  // เช็คว่าใครถูก import แล้ว (match by staffId)
+  const importedIds = new Set(state.nurses.filter(n => n.staffId).map(n => Number(n.staffId)));
+
+  const rows = staff.map(s => {
+    const sid = Number(s.staff_id);
+    const already = importedIds.has(sid);
+    const title = (s.job_title || s.org_position_title || '').trim();
+    const pos = mapJobTitleToPosition(s.job_title, s.org_position_title);
+    return `<label class="flex items-center gap-3 p-2 rounded-lg ${already ? 'bg-emerald-50' : 'bg-slate-50'} hover:bg-emerald-50 cursor-pointer mb-1">
+      <input type="checkbox" class="imp-nurse-cb" value="${sid}" data-name="${s.full_name.replace(/"/g, '&quot;')}" data-pos="${pos}" ${already ? 'checked disabled' : ''}>
+      <div class="flex-1 min-w-0">
+        <div class="font-semibold text-sm text-slate-800">${s.full_name} ${already ? '<span class=\"text-[10px] text-emerald-700 font-bold ml-1\">✓ นำเข้าแล้ว</span>' : ''}</div>
+        <div class="text-xs text-slate-500">${title || '—'} <span class="opacity-60">→ ${pos}</span></div>
+      </div>
+    </label>`;
+  }).join('');
+
+  Swal.fire({
+    title: 'นำเข้าจากทะเบียน Identity',
+    html: `<p class="text-xs text-slate-500 text-left mb-2">เลือกพยาบาลที่ต้องการเพิ่มเข้าระบบจัดเวร · ระบบจะเลือก "ตำแหน่งในเวร" ให้อัตโนมัติจาก Job Title</p>
+      <div class="text-left max-h-[400px] overflow-y-auto pr-1">${rows}</div>`,
+    showCancelButton: true,
+    confirmButtonText: 'นำเข้า',
+    cancelButtonText: 'ยกเลิก',
+    confirmButtonColor: '#2e9e63',
+    width: 560,
+    preConfirm: () => {
+      const checks = Array.from(document.querySelectorAll('.imp-nurse-cb:checked:not(:disabled)'));
+      if (!checks.length) {
+        Swal.showValidationMessage('เลือกอย่างน้อย 1 คน');
+        return false;
+      }
+      return checks.map(cb => ({
+        staffId: Number(cb.value),
+        name: cb.dataset.name,
+        position: cb.dataset.pos,
+      }));
+    }
+  }).then(r => {
+    if (!r.isConfirmed) return;
+    let added = 0;
+    r.value.forEach(item => {
+      // ตรวจ maxOne — ข้ามถ้าตำแหน่งนั้นเต็มอยู่แล้ว
+      let pos = item.position;
+      if (POSITIONS[pos]?.maxOne) {
+        const exists = state.nurses.find(n => n.position === pos && n.active !== false);
+        if (exists) pos = 'พยาบาลวิชาชีพ'; // fallback
+      }
+      const newId = 'N' + String(Date.now() + added).slice(-6);
+      state.nurses.push({
+        id: newId, name: item.name, position: pos,
+        order: state.nurses.length + 1, active: true,
+        staffId: item.staffId,
+      });
+      added++;
+    });
+    state.dirty = true;
+    persistAll();
+    renderNursesList();
+    renderSchedule();
+    Swal.fire({ icon: 'success', title: `นำเข้า ${added} คนแล้ว`, timer: 1500, showConfirmButton: false });
+  });
 }
 
 function openAddNurse() {
