@@ -286,6 +286,12 @@ $gcOver = kpi_override_status($pdo);
             </p>
         </div>
         <div class="flex items-center gap-2 flex-wrap">
+            <!-- Help: เปิดคู่มือใช้งานในแท็บใหม่ -->
+            <a href="../gold_card_help.php" target="_blank" rel="noopener"
+               class="h-11 px-4 rounded-2xl border-2 font-black text-sm flex items-center gap-2 transition-all active:scale-95 bg-amber-50 border-amber-300 text-amber-700 hover:bg-amber-500 hover:text-white hover:border-amber-500"
+               title="เปิดคู่มือใช้งานในแท็บใหม่">
+                <i class="fa-solid fa-book-open"></i>คู่มือ
+            </a>
             <!-- Apply Toggle: เปิด/ปิดการสมัครจากหน้า user -->
             <button type="button" id="gcApplyToggleBtn" onclick="gcToggleApplyEnabled()"
                     data-enabled="<?= $gcApplyEnabled ? '1' : '0' ?>"

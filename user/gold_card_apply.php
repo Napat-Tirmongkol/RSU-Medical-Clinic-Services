@@ -118,9 +118,16 @@ $__navActive = 'services';
     <div class="bg-gradient-to-br from-amber-500 to-orange-600 text-white px-6 pt-12 pb-20 relative overflow-hidden">
         <div class="absolute -right-12 -top-12 w-48 h-48 bg-white/10 rounded-full blur-3xl"></div>
         <div class="absolute -left-8 bottom-0 w-32 h-32 bg-white/5 rounded-full blur-2xl"></div>
-        <button onclick="history.back()" class="text-white/80 hover:text-white text-sm font-bold mb-4 active:scale-95 transition-all">
-            <i class="fa-solid fa-arrow-left mr-2"></i> กลับ
-        </button>
+        <div class="flex items-center justify-between mb-4">
+            <button onclick="history.back()" class="text-white/80 hover:text-white text-sm font-bold active:scale-95 transition-all">
+                <i class="fa-solid fa-arrow-left mr-2"></i> กลับ
+            </button>
+            <a href="../gold_card_help.php" target="_blank" rel="noopener"
+               class="text-white/80 hover:text-white text-sm font-bold active:scale-95 transition-all inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/15 backdrop-blur-sm border border-white/20"
+               title="ดูคู่มือ">
+                <i class="fa-solid fa-book-open"></i> คู่มือ
+            </a>
+        </div>
         <div class="flex items-center gap-3 mb-2">
             <div class="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center border border-white/30">
                 <i class="fa-solid fa-shield-heart text-2xl"></i>
