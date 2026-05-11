@@ -464,7 +464,13 @@ require_once __DIR__ . '/includes/header.php';
 </style>
 
 <?php
-$header_actions = '<button onclick="openAddModal()" class="bg-[#2e9e63] text-white px-6 py-3 rounded-2xl font-bold transition-all shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/40 hover:-translate-y-1 flex items-center gap-2" style="background-color: #2e9e63;">
+$header_actions = '
+<a href="../e_campaign_help.php" target="_blank" rel="noopener"
+   class="bg-emerald-50 text-emerald-700 border-2 border-emerald-200 px-4 py-3 rounded-2xl font-bold transition-all hover:bg-emerald-500 hover:text-white hover:border-emerald-500 inline-flex items-center gap-2"
+   title="เปิดคู่มือใช้งานในแท็บใหม่">
+    <i class="fa-solid fa-book-open"></i> คู่มือ
+</a>
+<button onclick="openAddModal()" class="bg-[#2e9e63] text-white px-6 py-3 rounded-2xl font-bold transition-all shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/40 hover:-translate-y-1 flex items-center gap-2" style="background-color: #2e9e63;">
     <i class="fa-solid fa-plus-circle text-lg"></i> สร้างแคมเปญใหม่
 </button>';
 renderPageHeader("จัดการแคมเปญ", "สร้างแคมเปญใหม่, กำหนดโควต้า, และตั้งเวลารับลงทะเบียน", $header_actions);
