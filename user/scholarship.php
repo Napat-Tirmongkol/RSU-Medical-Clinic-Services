@@ -207,9 +207,14 @@ $displayName = trim((string)($user['full_name'] ?? ''))
             <i class="fa-solid fa-chevron-left"></i>
         </button>
         <h1 class="text-base font-black text-slate-900">เก็บชั่วโมงทุน</h1>
-        <button onclick="window.location.href='scholarship_history.php'" class="w-11 h-11 flex items-center justify-center bg-slate-50 rounded-2xl text-slate-400 active:scale-90 transition" title="ประวัติ">
-            <i class="fa-solid fa-clock-rotate-left"></i>
-        </button>
+        <div class="flex items-center gap-1.5">
+            <button onclick="window.open('../scholarship_help.php', '_blank')" class="w-11 h-11 flex items-center justify-center bg-emerald-50 rounded-2xl text-emerald-600 active:scale-90 transition" title="คู่มือ">
+                <i class="fa-solid fa-book-open"></i>
+            </button>
+            <button onclick="window.location.href='scholarship_history.php'" class="w-11 h-11 flex items-center justify-center bg-slate-50 rounded-2xl text-slate-400 active:scale-90 transition" title="ประวัติ">
+                <i class="fa-solid fa-clock-rotate-left"></i>
+            </button>
+        </div>
     </header>
 
     <main class="px-5 pt-6 space-y-5">
