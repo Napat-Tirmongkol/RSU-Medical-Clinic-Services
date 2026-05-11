@@ -45,6 +45,7 @@ try {
         case 'approvals':   handle_approvals($pdo, $action, $adminId); break;
         case 'students':    handle_students($pdo, $action); break;
         case 'shifts':      handle_shifts($pdo, $action, $adminId); break;
+        case 'slots':       handle_slots($pdo, $action, $adminId); break;
         case 'reports':     handle_reports($pdo, $action); break;
         case 'settings':    handle_settings($pdo, $action); break;
         case 'adjustments': handle_adjustments($pdo, $action, $adminId); break;
@@ -494,6 +495,218 @@ function handle_shifts(PDO $pdo, string $action, int $adminId): void
         $stmt = $pdo->prepare("UPDATE sys_scholarship_shifts SET status = 'cancelled' WHERE id = :id");
         $stmt->execute([':id' => $id]);
         echo json_encode(['ok' => true]);
+        return;
+    }
+
+    echo json_encode(['ok' => false, 'error' => 'Unknown action']);
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// SLOTS — รอบงานที่ admin เปิดให้นักศึกษาทุนจอง (คล้าย camp_slots)
+// ─────────────────────────────────────────────────────────────────────
+function handle_slots(PDO $pdo, string $action, int $adminId): void
+{
+    if ($action === 'list') {
+        $from = (string)($_POST['from'] ?? '');
+        $to   = (string)($_POST['to']   ?? '');
+        $statusFilter = (string)($_POST['status_filter'] ?? 'all');
+        $page = max(1, (int)($_POST['page'] ?? 1));
+        $perPage = 20;
+
+        $statuses = ['open','closed','cancelled'];
+        if (in_array($statusFilter, $statuses, true)) $statuses = [$statusFilter];
+
+        $placeholders = implode(',', array_fill(0, count($statuses), '?'));
+        $where = "WHERE s.status IN ($placeholders)";
+        $params = $statuses;
+        if ($from) { $where .= " AND s.slot_date >= ?"; $params[] = $from; }
+        if ($to)   { $where .= " AND s.slot_date <= ?"; $params[] = $to; }
+
+        $cnt = $pdo->prepare("SELECT COUNT(*) FROM sys_scholarship_slots s $where");
+        $cnt->execute($params);
+        $total = (int)$cnt->fetchColumn();
+        $totalPages = max(1, (int)ceil($total / $perPage));
+        $page = min($page, $totalPages);
+        $offset = ($page - 1) * $perPage;
+
+        $sql = "SELECT s.*,
+                COALESCE((SELECT COUNT(*) FROM sys_scholarship_slot_bookings b
+                          WHERE b.slot_id = s.id AND b.status = 'booked'), 0) AS booked_count
+            FROM sys_scholarship_slots s
+            $where
+            ORDER BY s.slot_date DESC, s.start_time ASC
+            LIMIT $perPage OFFSET $offset";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        foreach ($rows as &$r) {
+            $r['booked_count'] = (int)$r['booked_count'];
+            $r['max_capacity'] = (int)$r['max_capacity'];
+            $r['available']    = max(0, $r['max_capacity'] - $r['booked_count']);
+        }
+        echo json_encode([
+            'ok' => true, 'rows' => $rows,
+            'pagination' => ['page' => $page, 'total_pages' => $totalPages, 'total' => $total],
+        ], JSON_UNESCAPED_UNICODE);
+        return;
+    }
+
+    if ($action === 'create' || $action === 'bulk_create') {
+        // bulk_create: รับ slot_dates (CSV) + times (array ของ ['start','end'])
+        // create: slot_date + start_time + end_time เดี่ยว
+        $maxCap = max(1, (int)($_POST['max_capacity'] ?? 1));
+        $compType = (string)($_POST['comp_type'] ?? 'hours');
+        if (!in_array($compType, ['hours','paid'], true)) $compType = 'hours';
+        $notes = trim((string)($_POST['notes'] ?? ''));
+
+        if ($action === 'create') {
+            $dates = [(string)($_POST['slot_date'] ?? '')];
+            $times = [[
+                'start' => (string)($_POST['start_time'] ?? ''),
+                'end'   => (string)($_POST['end_time'] ?? ''),
+            ]];
+        } else {
+            $datesRaw = $_POST['slot_dates'] ?? '';
+            $dates = array_filter(array_map('trim', is_array($datesRaw) ? $datesRaw : explode(',', $datesRaw)));
+            $timesRaw = $_POST['times'] ?? [];
+            $times = [];
+            if (is_array($timesRaw)) {
+                foreach ($timesRaw as $t) {
+                    if (is_array($t) && !empty($t['start']) && !empty($t['end'])) {
+                        $times[] = ['start' => $t['start'], 'end' => $t['end']];
+                    }
+                }
+            }
+        }
+
+        if (empty($dates) || empty($times)) {
+            echo json_encode(['ok' => false, 'error' => 'กรอกวันและเวลาให้ครบ']); return;
+        }
+
+        $stmt = $pdo->prepare("INSERT INTO sys_scholarship_slots
+            (slot_date, start_time, end_time, max_capacity, comp_type, notes, created_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?)");
+
+        $createdCount = 0;
+        $errors = [];
+        foreach ($dates as $d) {
+            if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $d)) {
+                $errors[] = "วันที่ไม่ถูกต้อง: $d"; continue;
+            }
+            foreach ($times as $t) {
+                $start = $t['start']; $end = $t['end'];
+                if (strtotime("$d $start") >= strtotime("$d $end")) {
+                    $errors[] = "$d $start-$end: เวลาเริ่มต้องมาก่อนเวลาสิ้นสุด"; continue;
+                }
+                try {
+                    $stmt->execute([$d, $start, $end, $maxCap, $compType, $notes, $adminId]);
+                    $createdCount++;
+                } catch (PDOException $e) {
+                    $errors[] = "$d $start-$end: " . $e->getMessage();
+                }
+            }
+        }
+
+        echo json_encode([
+            'ok' => $createdCount > 0,
+            'created' => $createdCount,
+            'errors' => $errors,
+        ], JSON_UNESCAPED_UNICODE);
+        return;
+    }
+
+    if ($action === 'update') {
+        $id = (int)($_POST['id'] ?? 0);
+        $date = (string)($_POST['slot_date'] ?? '');
+        $start = (string)($_POST['start_time'] ?? '');
+        $end = (string)($_POST['end_time'] ?? '');
+        $maxCap = max(1, (int)($_POST['max_capacity'] ?? 1));
+        $compType = (string)($_POST['comp_type'] ?? 'hours');
+        if (!in_array($compType, ['hours','paid'], true)) $compType = 'hours';
+        $notes = trim((string)($_POST['notes'] ?? ''));
+        $status = (string)($_POST['status'] ?? 'open');
+        if (!in_array($status, ['open','closed','cancelled'], true)) $status = 'open';
+
+        if (!$id || !$date || !$start || !$end) {
+            echo json_encode(['ok' => false, 'error' => 'กรอกข้อมูลให้ครบ']); return;
+        }
+        if (strtotime("$date $start") >= strtotime("$date $end")) {
+            echo json_encode(['ok' => false, 'error' => 'เวลาเริ่มต้องมาก่อนเวลาสิ้นสุด']); return;
+        }
+
+        // ห้ามลด max_capacity ต่ำกว่าจำนวนคนที่จองแล้ว
+        $cntStmt = $pdo->prepare("SELECT COUNT(*) FROM sys_scholarship_slot_bookings
+            WHERE slot_id = :id AND status = 'booked'");
+        $cntStmt->execute([':id' => $id]);
+        $booked = (int)$cntStmt->fetchColumn();
+        if ($maxCap < $booked) {
+            echo json_encode(['ok' => false, 'error' => "มีนักศึกษาจองแล้ว $booked คน — ลดจำนวนต่ำกว่านี้ไม่ได้"]);
+            return;
+        }
+
+        $stmt = $pdo->prepare("UPDATE sys_scholarship_slots SET
+            slot_date = :d, start_time = :st, end_time = :et,
+            max_capacity = :cap, comp_type = :ct, notes = :n, status = :s
+            WHERE id = :id");
+        $stmt->execute([
+            ':d' => $date, ':st' => $start, ':et' => $end,
+            ':cap' => $maxCap, ':ct' => $compType, ':n' => $notes,
+            ':s' => $status, ':id' => $id,
+        ]);
+        echo json_encode(['ok' => true]);
+        return;
+    }
+
+    if ($action === 'delete') {
+        $id = (int)($_POST['id'] ?? 0);
+        if (!$id) { echo json_encode(['ok' => false, 'error' => 'missing id']); return; }
+
+        // soft delete: status = cancelled (เก็บ booking history เพื่อ audit)
+        $pdo->beginTransaction();
+        try {
+            // ยกเลิกการจองทั้งหมดของ slot นี้ + ยกเลิก shift ที่ auto-สร้าง
+            $bookings = $pdo->prepare("SELECT id, shift_id FROM sys_scholarship_slot_bookings
+                WHERE slot_id = :id AND status = 'booked'");
+            $bookings->execute([':id' => $id]);
+            $bks = $bookings->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+            $cancelBooking = $pdo->prepare("UPDATE sys_scholarship_slot_bookings
+                SET status = 'cancelled', cancelled_at = NOW(), cancel_reason = 'admin ลบรอบ'
+                WHERE id = :bid");
+            $cancelShift = $pdo->prepare("UPDATE sys_scholarship_shifts
+                SET status = 'cancelled' WHERE id = :sid");
+            foreach ($bks as $b) {
+                $cancelBooking->execute([':bid' => (int)$b['id']]);
+                if (!empty($b['shift_id'])) $cancelShift->execute([':sid' => (int)$b['shift_id']]);
+            }
+
+            $pdo->prepare("UPDATE sys_scholarship_slots SET status = 'cancelled' WHERE id = :id")
+                ->execute([':id' => $id]);
+
+            $pdo->commit();
+            echo json_encode(['ok' => true, 'cancelled_bookings' => count($bks)]);
+        } catch (Throwable $e) {
+            $pdo->rollBack();
+            echo json_encode(['ok' => false, 'error' => 'ลบไม่สำเร็จ: ' . $e->getMessage()]);
+        }
+        return;
+    }
+
+    if ($action === 'bookings') {
+        // ดูรายชื่อนักศึกษาที่จอง slot หนึ่ง
+        $id = (int)($_POST['id'] ?? 0);
+        if (!$id) { echo json_encode(['ok' => false, 'error' => 'missing id']); return; }
+        $stmt = $pdo->prepare("SELECT b.*, u.full_name AS student_name, u.picture_url, ss.student_code
+            FROM sys_scholarship_slot_bookings b
+            INNER JOIN sys_scholarship_students ss ON ss.id = b.student_id
+            INNER JOIN sys_users u ON u.id = ss.user_id
+            WHERE b.slot_id = :id
+            ORDER BY b.status ASC, b.booked_at ASC");
+        $stmt->execute([':id' => $id]);
+        echo json_encode([
+            'ok' => true,
+            'rows' => $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [],
+        ], JSON_UNESCAPED_UNICODE);
         return;
     }
 

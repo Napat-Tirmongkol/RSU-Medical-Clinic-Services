@@ -147,6 +147,9 @@ $portalCsrf = get_csrf_token();
         <button class="sch-tab" data-tab="shifts">
             <i class="fa-solid fa-calendar-days mr-1.5"></i>ตารางกะ
         </button>
+        <button class="sch-tab" data-tab="slots">
+            <i class="fa-solid fa-layer-group mr-1.5"></i>เปิดรอบงาน
+        </button>
         <button class="sch-tab" data-tab="reports">
             <i class="fa-solid fa-chart-line mr-1.5"></i>รายงาน
         </button>
@@ -292,6 +295,35 @@ $portalCsrf = get_csrf_token();
                 </div>
             </div>
             <div id="shift-table-wrap">
+                <p class="text-center text-sm text-slate-400 py-10"><i class="fa-solid fa-spinner fa-spin mr-2"></i>กำลังโหลด…</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ─── TAB: SLOTS (รอบงานที่เปิดให้นักศึกษาจอง) ─── -->
+    <div class="sch-pane hidden" data-pane="slots">
+        <div class="sch-card">
+            <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+                <div>
+                    <h3 class="text-base font-black text-slate-900">เปิดรอบงานให้นักศึกษาจอง</h3>
+                    <p class="text-xs text-slate-500 mt-0.5">นักศึกษาจะเลือกรอบที่ว่าง แล้วจองเอง (จองทันที ไม่ต้องอนุมัติ)</p>
+                </div>
+                <div class="flex gap-2 items-center">
+                    <input type="date" id="slot-from" class="sch-input" style="width:160px" value="<?= date('Y-m-d') ?>">
+                    <input type="date" id="slot-to" class="sch-input" style="width:160px" value="<?= date('Y-m-d', strtotime('+30 days')) ?>">
+                    <select id="slot-status-filter" class="sch-input" style="width:130px">
+                        <option value="all">ทุกสถานะ</option>
+                        <option value="open" selected>เปิดรับ</option>
+                        <option value="closed">ปิดรับ</option>
+                        <option value="cancelled">ยกเลิก</option>
+                    </select>
+                    <button class="sch-btn sch-btn--ghost" onclick="loadSlots()">กรอง</button>
+                    <button class="sch-btn" onclick="openSlotCreateModal()">
+                        <i class="fa-solid fa-plus"></i>เปิดรอบใหม่
+                    </button>
+                </div>
+            </div>
+            <div id="slot-table-wrap">
                 <p class="text-center text-sm text-slate-400 py-10"><i class="fa-solid fa-spinner fa-spin mr-2"></i>กำลังโหลด…</p>
             </div>
         </div>
@@ -555,6 +587,141 @@ $portalCsrf = get_csrf_token();
     </div>
 </div>
 
+<!-- ── MODAL: Open Slot Rounds (bulk create) ── -->
+<div class="sch-modal-backdrop" id="slot-create-modal">
+    <div class="sch-modal-box" style="max-width:640px">
+        <h3 class="text-lg font-black mb-1">เปิดรอบงานใหม่</h3>
+        <p class="text-xs text-slate-500 mb-4">เลือกช่วงวันที่ + กำหนดเวลา · ระบบจะสร้างรอบให้ทุกวันที่เลือกในช่วง</p>
+
+        <div class="space-y-4">
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="sch-label">วันที่เริ่ม</label>
+                    <input type="date" id="slot-bulk-from" class="sch-input" value="<?= date('Y-m-d') ?>">
+                </div>
+                <div>
+                    <label class="sch-label">วันที่สิ้นสุด</label>
+                    <input type="date" id="slot-bulk-to" class="sch-input" value="<?= date('Y-m-d') ?>">
+                </div>
+            </div>
+
+            <div>
+                <label class="sch-label">วันในสัปดาห์ที่จะเปิดรอบ</label>
+                <div class="flex gap-1.5 flex-wrap">
+                    <?php $days = ['อา','จ','อ','พ','พฤ','ศ','ส']; foreach ($days as $i => $d): ?>
+                    <label class="cursor-pointer">
+                        <input type="checkbox" class="slot-dow hidden peer" value="<?= $i ?>" checked>
+                        <span class="inline-flex items-center justify-center w-10 h-10 rounded-xl border-2 border-slate-200 bg-white text-sm font-black text-slate-500 peer-checked:bg-emerald-500 peer-checked:text-white peer-checked:border-emerald-500 transition-all"><?= $d ?></span>
+                    </label>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+
+            <div>
+                <label class="sch-label">รอบเวลาในแต่ละวัน</label>
+                <div id="slot-times-wrap" class="space-y-2"></div>
+                <button type="button" class="sch-btn sch-btn--ghost mt-2" onclick="addSlotTimeRow()">
+                    <i class="fa-solid fa-plus"></i>เพิ่มรอบเวลา
+                </button>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="sch-label">รับนักศึกษา (คน/รอบ)</label>
+                    <input type="number" id="slot-bulk-cap" class="sch-input" min="1" value="2">
+                </div>
+                <div>
+                    <label class="sch-label">ประเภท</label>
+                    <select id="slot-bulk-ct" class="sch-input">
+                        <option value="hours">ส่งชั่วโมงทุน</option>
+                        <option value="paid">ค่าตอบแทน</option>
+                    </select>
+                </div>
+            </div>
+
+            <div>
+                <label class="sch-label">หมายเหตุ (ถ้ามี)</label>
+                <input type="text" id="slot-bulk-notes" class="sch-input" placeholder="เช่น ห้องตรวจ A">
+            </div>
+        </div>
+
+        <div class="flex justify-end gap-2 mt-5">
+            <button class="sch-btn sch-btn--ghost" onclick="closeModal('slot-create-modal')">ยกเลิก</button>
+            <button class="sch-btn" onclick="submitSlotCreate()">
+                <i class="fa-solid fa-floppy-disk"></i>สร้างรอบ
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ── MODAL: Edit Slot ── -->
+<div class="sch-modal-backdrop" id="slot-edit-modal">
+    <div class="sch-modal-box">
+        <h3 class="text-lg font-black mb-4">แก้ไขรอบงาน</h3>
+        <input type="hidden" id="slot-edit-id">
+        <div class="space-y-3">
+            <div>
+                <label class="sch-label">วันที่</label>
+                <input type="date" id="slot-edit-date" class="sch-input">
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="sch-label">เริ่ม</label>
+                    <input type="time" id="slot-edit-start" class="sch-input">
+                </div>
+                <div>
+                    <label class="sch-label">สิ้นสุด</label>
+                    <input type="time" id="slot-edit-end" class="sch-input">
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="sch-label">รับนักศึกษา (คน)</label>
+                    <input type="number" id="slot-edit-cap" class="sch-input" min="1">
+                </div>
+                <div>
+                    <label class="sch-label">ประเภท</label>
+                    <select id="slot-edit-ct" class="sch-input">
+                        <option value="hours">ส่งชั่วโมงทุน</option>
+                        <option value="paid">ค่าตอบแทน</option>
+                    </select>
+                </div>
+            </div>
+            <div>
+                <label class="sch-label">สถานะ</label>
+                <select id="slot-edit-status" class="sch-input">
+                    <option value="open">เปิดรับ</option>
+                    <option value="closed">ปิดรับ (เก็บไว้ดู)</option>
+                    <option value="cancelled">ยกเลิก</option>
+                </select>
+            </div>
+            <div>
+                <label class="sch-label">หมายเหตุ</label>
+                <input type="text" id="slot-edit-notes" class="sch-input">
+            </div>
+        </div>
+        <div class="flex justify-end gap-2 mt-5">
+            <button class="sch-btn sch-btn--ghost" onclick="closeModal('slot-edit-modal')">ยกเลิก</button>
+            <button class="sch-btn sch-btn--danger" onclick="deleteSlot()">ลบรอบนี้</button>
+            <button class="sch-btn" onclick="saveSlotEdit()"><i class="fa-solid fa-floppy-disk"></i>บันทึก</button>
+        </div>
+    </div>
+</div>
+
+<!-- ── MODAL: View Slot Bookings ── -->
+<div class="sch-modal-backdrop" id="slot-bookings-modal">
+    <div class="sch-modal-box" style="max-width:560px">
+        <h3 class="text-lg font-black mb-1">รายชื่อผู้จองรอบนี้</h3>
+        <p class="text-xs text-slate-500 mb-4" id="slot-bookings-subtitle"></p>
+        <div id="slot-bookings-wrap" class="space-y-2 max-h-96 overflow-y-auto">
+            <p class="text-center text-sm text-slate-400 py-6"><i class="fa-solid fa-spinner fa-spin mr-2"></i>กำลังโหลด…</p>
+        </div>
+        <div class="flex justify-end mt-5">
+            <button class="sch-btn sch-btn--ghost" onclick="closeModal('slot-bookings-modal')">ปิด</button>
+        </div>
+    </div>
+</div>
+
 <script>
 (function() {
     const PORTAL_CSRF = <?= json_encode($portalCsrf, JSON_UNESCAPED_SLASHES) ?>;
@@ -576,6 +743,7 @@ $portalCsrf = get_csrf_token();
                 approvals: loadApprovals,
                 students: loadStudents,
                 shifts: loadShifts,
+                slots: loadSlots,
                 reports: loadReports,
             })[tab];
             if (loader) loader();
@@ -1325,6 +1493,228 @@ $portalCsrf = get_csrf_token();
         html += `</div></div>`;
         return html;
     }
+
+    // ──────────────────────────────────────────────────────────────────
+    // SLOTS — รอบงานที่เปิดให้นักศึกษาจอง
+    // ──────────────────────────────────────────────────────────────────
+    function fmtSlotDate(s) {
+        const [y, m, d] = s.split('-');
+        const buddhist = parseInt(y, 10) + 543;
+        return `${d}/${m}/${buddhist}`;
+    }
+    function fmtSlotTime(t) { return (t || '').substring(0, 5); }
+    function escAttr(s) { return String(s || '').replace(/"/g, '&quot;'); }
+    function escTxt(s) {
+        const d = document.createElement('div'); d.textContent = String(s || ''); return d.innerHTML;
+    }
+
+    async function loadSlots() {
+        const wrap = document.getElementById('slot-table-wrap');
+        wrap.innerHTML = '<p class="text-center text-sm text-slate-400 py-10"><i class="fa-solid fa-spinner fa-spin mr-2"></i>กำลังโหลด…</p>';
+        const j = await api('slots', 'list', {
+            from: document.getElementById('slot-from').value,
+            to: document.getElementById('slot-to').value,
+            status_filter: document.getElementById('slot-status-filter').value,
+        });
+        if (!j.ok) { wrap.innerHTML = `<p class="text-center text-sm text-rose-500 py-6">${escTxt(j.error || 'โหลดไม่สำเร็จ')}</p>`; return; }
+        if (!j.rows.length) { wrap.innerHTML = '<p class="text-center text-sm text-slate-400 py-10"><i class="fa-solid fa-inbox text-3xl mb-2 block"></i>ยังไม่มีรอบในช่วงนี้</p>'; return; }
+
+        let html = '<table class="sch-table"><thead><tr>'
+            + '<th>วันที่</th><th>เวลา</th><th>ความจุ</th><th>ประเภท</th><th>สถานะ</th><th>หมายเหตุ</th><th>จัดการ</th>'
+            + '</tr></thead><tbody>';
+        j.rows.forEach(r => {
+            const pct = r.max_capacity > 0 ? Math.round(r.booked_count / r.max_capacity * 100) : 0;
+            const capCls = r.booked_count >= r.max_capacity ? 'bg-rose-100 text-rose-700'
+                          : pct >= 80 ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700';
+            const statusBadge = r.status === 'open'
+                ? '<span class="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-700 text-[11px] font-black">เปิดรับ</span>'
+                : r.status === 'closed'
+                  ? '<span class="px-2 py-0.5 rounded-md bg-slate-200 text-slate-600 text-[11px] font-black">ปิดรับ</span>'
+                  : '<span class="px-2 py-0.5 rounded-md bg-rose-100 text-rose-700 text-[11px] font-black">ยกเลิก</span>';
+            const compBadge = r.comp_type === 'paid'
+                ? '<span class="px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 text-[11px] font-black">ค่าตอบแทน</span>'
+                : '<span class="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 text-[11px] font-black">ชม.ทุน</span>';
+            html += `<tr>
+                <td>${fmtSlotDate(r.slot_date)}</td>
+                <td class="font-mono text-xs">${fmtSlotTime(r.start_time)}–${fmtSlotTime(r.end_time)}</td>
+                <td>
+                    <button class="px-2.5 py-1 rounded-lg ${capCls} text-[12px] font-black hover:opacity-80" onclick="viewSlotBookings(${r.id})">
+                        ${r.booked_count}/${r.max_capacity}
+                    </button>
+                </td>
+                <td>${compBadge}</td>
+                <td>${statusBadge}</td>
+                <td class="text-xs text-slate-600">${escTxt(r.notes)}</td>
+                <td>
+                    <button class="sch-btn sch-btn--ghost" style="padding:.35rem .6rem;font-size:11px"
+                        onclick='openSlotEditModal(${JSON.stringify(r).replace(/'/g, "&#39;")})'>
+                        <i class="fa-solid fa-pen"></i>
+                    </button>
+                </td>
+            </tr>`;
+        });
+        html += '</tbody></table>';
+        if (j.pagination) html += renderPagination(j.pagination, 'loadSlots');
+        wrap.innerHTML = html;
+    }
+    window.loadSlots = loadSlots;
+
+    // ── Create modal (bulk by date range × dow × time ranges)
+    function addSlotTimeRow() {
+        const wrap = document.getElementById('slot-times-wrap');
+        const row = document.createElement('div');
+        row.className = 'flex gap-2 items-center';
+        row.innerHTML = `
+            <input type="time" class="sch-input slot-time-start" value="08:00">
+            <span class="text-slate-400">–</span>
+            <input type="time" class="sch-input slot-time-end" value="12:00">
+            <button type="button" class="sch-btn sch-btn--ghost" style="padding:.5rem .75rem" onclick="this.parentElement.remove()">
+                <i class="fa-solid fa-xmark"></i>
+            </button>`;
+        wrap.appendChild(row);
+    }
+    window.addSlotTimeRow = addSlotTimeRow;
+
+    window.openSlotCreateModal = function() {
+        const wrap = document.getElementById('slot-times-wrap');
+        wrap.innerHTML = '';
+        addSlotTimeRow();
+        document.querySelectorAll('.slot-dow').forEach(c => c.checked = true);
+        document.getElementById('slot-bulk-cap').value = '2';
+        document.getElementById('slot-bulk-ct').value = 'hours';
+        document.getElementById('slot-bulk-notes').value = '';
+        document.getElementById('slot-create-modal').classList.add('show');
+    };
+
+    window.submitSlotCreate = async function() {
+        const from = document.getElementById('slot-bulk-from').value;
+        const to   = document.getElementById('slot-bulk-to').value;
+        if (!from || !to) { Swal.fire({ icon: 'warning', text: 'กรอกวันที่' }); return; }
+        if (from > to) { Swal.fire({ icon: 'warning', text: 'วันที่เริ่มต้องไม่หลังวันสิ้นสุด' }); return; }
+
+        const dowSet = new Set(Array.from(document.querySelectorAll('.slot-dow:checked')).map(c => parseInt(c.value, 10)));
+        if (!dowSet.size) { Swal.fire({ icon: 'warning', text: 'เลือกวันในสัปดาห์อย่างน้อย 1 วัน' }); return; }
+
+        // expand date range filtered by day-of-week
+        const dates = [];
+        let cur = new Date(from + 'T00:00:00');
+        const end = new Date(to + 'T00:00:00');
+        while (cur <= end) {
+            if (dowSet.has(cur.getDay())) {
+                dates.push(cur.toISOString().slice(0, 10));
+            }
+            cur.setDate(cur.getDate() + 1);
+        }
+        if (!dates.length) { Swal.fire({ icon: 'warning', text: 'ไม่มีวันที่ตรงเงื่อนไข' }); return; }
+
+        const rows = document.querySelectorAll('#slot-times-wrap > div');
+        const times = [];
+        rows.forEach(r => {
+            const s = r.querySelector('.slot-time-start').value;
+            const e = r.querySelector('.slot-time-end').value;
+            if (s && e) times.push({ start: s, end: e });
+        });
+        if (!times.length) { Swal.fire({ icon: 'warning', text: 'เพิ่มรอบเวลาอย่างน้อย 1 ช่วง' }); return; }
+
+        const fd = new FormData();
+        fd.append('csrf_token', PORTAL_CSRF);
+        fd.append('entity', 'slots');
+        fd.append('action', 'bulk_create');
+        fd.append('slot_dates', dates.join(','));
+        fd.append('max_capacity', document.getElementById('slot-bulk-cap').value);
+        fd.append('comp_type', document.getElementById('slot-bulk-ct').value);
+        fd.append('notes', document.getElementById('slot-bulk-notes').value);
+        times.forEach((t, i) => {
+            fd.append(`times[${i}][start]`, t.start);
+            fd.append(`times[${i}][end]`, t.end);
+        });
+        const r = await fetch(AJAX, { method: 'POST', body: fd });
+        const j = await r.json();
+        if (!j.ok && !j.created) {
+            Swal.fire({ icon: 'error', title: 'สร้างไม่สำเร็จ', text: (j.errors || []).join('\n') || j.error });
+            return;
+        }
+        const msg = `สร้างรอบสำเร็จ ${j.created} รอบ` + (j.errors && j.errors.length ? `\n(ข้อผิดพลาด ${j.errors.length} รายการ)` : '');
+        Swal.fire({ icon: 'success', title: 'เสร็จสิ้น', text: msg, timer: 1800, showConfirmButton: false });
+        closeModal('slot-create-modal');
+        loadSlots();
+    };
+
+    window.openSlotEditModal = function(slot) {
+        document.getElementById('slot-edit-id').value = slot.id;
+        document.getElementById('slot-edit-date').value = slot.slot_date;
+        document.getElementById('slot-edit-start').value = (slot.start_time || '').substring(0, 5);
+        document.getElementById('slot-edit-end').value = (slot.end_time || '').substring(0, 5);
+        document.getElementById('slot-edit-cap').value = slot.max_capacity;
+        document.getElementById('slot-edit-ct').value = slot.comp_type;
+        document.getElementById('slot-edit-status').value = slot.status;
+        document.getElementById('slot-edit-notes').value = slot.notes || '';
+        document.getElementById('slot-edit-modal').classList.add('show');
+    };
+
+    window.saveSlotEdit = async function() {
+        const j = await api('slots', 'update', {
+            id: document.getElementById('slot-edit-id').value,
+            slot_date: document.getElementById('slot-edit-date').value,
+            start_time: document.getElementById('slot-edit-start').value,
+            end_time: document.getElementById('slot-edit-end').value,
+            max_capacity: document.getElementById('slot-edit-cap').value,
+            comp_type: document.getElementById('slot-edit-ct').value,
+            status: document.getElementById('slot-edit-status').value,
+            notes: document.getElementById('slot-edit-notes').value,
+        });
+        if (!j.ok) { Swal.fire({ icon: 'error', text: j.error || 'บันทึกไม่สำเร็จ' }); return; }
+        Swal.fire({ icon: 'success', title: 'บันทึกแล้ว', timer: 1000, showConfirmButton: false });
+        closeModal('slot-edit-modal');
+        loadSlots();
+    };
+
+    window.deleteSlot = async function() {
+        const id = document.getElementById('slot-edit-id').value;
+        const c = await Swal.fire({
+            icon: 'warning', title: 'ลบรอบนี้?',
+            text: 'การจองทั้งหมดของรอบนี้จะถูกยกเลิกด้วย',
+            showCancelButton: true, confirmButtonText: 'ลบ', confirmButtonColor: '#e11d48', cancelButtonText: 'ยกเลิก',
+        });
+        if (!c.isConfirmed) return;
+        const j = await api('slots', 'delete', { id });
+        if (!j.ok) { Swal.fire({ icon: 'error', text: j.error || 'ลบไม่สำเร็จ' }); return; }
+        Swal.fire({ icon: 'success', title: 'ลบแล้ว', text: `ยกเลิกการจอง ${j.cancelled_bookings || 0} รายการ`, timer: 1500, showConfirmButton: false });
+        closeModal('slot-edit-modal');
+        loadSlots();
+    };
+
+    window.viewSlotBookings = async function(slotId) {
+        const modal = document.getElementById('slot-bookings-modal');
+        const wrap = document.getElementById('slot-bookings-wrap');
+        wrap.innerHTML = '<p class="text-center text-sm text-slate-400 py-6"><i class="fa-solid fa-spinner fa-spin mr-2"></i>กำลังโหลด…</p>';
+        modal.classList.add('show');
+
+        const j = await api('slots', 'bookings', { id: slotId });
+        if (!j.ok) { wrap.innerHTML = `<p class="text-rose-500 text-sm py-4">${escTxt(j.error)}</p>`; return; }
+        if (!j.rows.length) { wrap.innerHTML = '<p class="text-center text-sm text-slate-400 py-6">ยังไม่มีผู้จอง</p>'; return; }
+
+        const active = j.rows.filter(b => b.status === 'booked').length;
+        document.getElementById('slot-bookings-subtitle').textContent = `จองอยู่ ${active} คน · รวม ${j.rows.length} รายการ`;
+
+        wrap.innerHTML = j.rows.map(b => {
+            const ts = b.status === 'booked' ? b.booked_at : (b.cancelled_at || b.booked_at);
+            const dt = new Date(ts.replace(' ', 'T'));
+            const ds = `${dt.getDate().toString().padStart(2,'0')}/${(dt.getMonth()+1).toString().padStart(2,'0')}/${dt.getFullYear()+543} ${dt.getHours().toString().padStart(2,'0')}:${dt.getMinutes().toString().padStart(2,'0')}`;
+            const badge = b.status === 'booked'
+                ? '<span class="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-700 text-[10px] font-black">จองแล้ว</span>'
+                : `<span class="px-2 py-0.5 rounded-md bg-slate-200 text-slate-600 text-[10px] font-black">ยกเลิก</span>`;
+            const reason = b.cancel_reason ? `<p class="text-[11px] text-slate-500 mt-0.5">เหตุผล: ${escTxt(b.cancel_reason)}</p>` : '';
+            return `<div class="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-100">
+                <div class="flex-1 min-w-0">
+                    <p class="text-sm font-black text-slate-900 truncate">${escTxt(b.student_name)}</p>
+                    <p class="text-[11px] text-slate-500">รหัส: ${escTxt(b.student_code) || '—'} · ${ds}</p>
+                    ${reason}
+                </div>
+                ${badge}
+            </div>`;
+        }).join('');
+    };
 
     // ── Init: load default tab (Dashboard)
     loadDashboard();
