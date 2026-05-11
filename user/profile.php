@@ -31,7 +31,8 @@ $userData = [
 try {
     $pdo = db();
 
-    // Self-healing migration for new columns
+    // Self-healing migration — DESCRIBE ก่อนเพื่อ ALTER เฉพาะ column ที่ขาด
+    // (ของเดิมรัน ALTER 9 ครั้งทุก request ~50–500ms ตอนนี้เหลือ 1 DESCRIBE ~1ms)
     $newCols = [
         'date_of_birth'              => "DATE NULL DEFAULT NULL",
         'blood_type'                 => "VARCHAR(8) NOT NULL DEFAULT ''",
@@ -43,9 +44,15 @@ try {
         'emergency_contact_phone'    => "VARCHAR(20)  NOT NULL DEFAULT ''",
         'emergency_contact_relation' => "VARCHAR(50)  NOT NULL DEFAULT ''",
     ];
-    foreach ($newCols as $col => $def) {
-        try { $pdo->exec("ALTER TABLE sys_users ADD COLUMN IF NOT EXISTS {$col} {$def}"); } catch (PDOException) {}
-    }
+    try {
+        $existingCols = $pdo->query("DESCRIBE sys_users")->fetchAll(PDO::FETCH_COLUMN);
+        $have = array_flip($existingCols);
+        foreach ($newCols as $col => $def) {
+            if (!isset($have[$col])) {
+                try { $pdo->exec("ALTER TABLE sys_users ADD COLUMN {$col} {$def}"); } catch (PDOException) {}
+            }
+        }
+    } catch (PDOException $e) { error_log('[profile.php] schema check: ' . $e->getMessage()); }
 
     $stmt = $pdo->prepare("SELECT * FROM sys_users WHERE line_user_id = :line_id LIMIT 1");
     $stmt->execute([':line_id' => $lineUserId]);
