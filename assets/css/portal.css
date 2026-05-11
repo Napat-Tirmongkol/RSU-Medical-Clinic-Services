@@ -393,6 +393,37 @@ body {
     #app-shell { flex-direction: column; }
 }
 
+/* ── Responsive sidebar — ย่อขนาดบนจอ 11"/13" (1024–1366px) ── */
+@media (min-width: 768px) and (max-width: 1280px) {
+    #portal-sidebar { width: 220px; }
+    .psb-item {
+        padding: 7px 10px;
+        font-size: 12.5px;
+        gap: 8px;
+    }
+    .psb-icon {
+        width: 28px; height: 28px;
+        border-radius: 8px;
+        font-size: 13px;
+    }
+    .psb-section-toggle {
+        padding: 4px 10px;
+        font-size: 8.5px;
+    }
+    #psb-brand-text { font-size: 13px; }
+}
+/* จอเล็กกว่า 1024px → auto-collapse เป็น icon only */
+@media (min-width: 768px) and (max-width: 1023px) {
+    #portal-sidebar:not(.collapsed) { width: 64px; }
+    #portal-sidebar:not(.collapsed) #psb-brand-text { opacity: 0; width: 0; overflow: hidden; }
+    #portal-sidebar:not(.collapsed) .psb-label { opacity: 0; width: 0; overflow: hidden; }
+    #portal-sidebar:not(.collapsed) .psb-item { padding: 10px; justify-content: center; gap: 0; }
+    #portal-sidebar:not(.collapsed) .psb-section-label,
+    #portal-sidebar:not(.collapsed) .psb-section-toggle {
+        opacity: 0; pointer-events: none; height: 0; padding: 0; margin: 0;
+    }
+}
+
 /* ── Scrollbar ────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
