@@ -997,9 +997,10 @@ try {
             if (!is_file($path)) json_err('ไฟล์หายไปจาก storage');
 
             // Override JSON header
+            $disposition = (($_GET['disposition'] ?? $_POST['disposition'] ?? 'inline') === 'attachment') ? 'attachment' : 'inline';
             header_remove('Content-Type');
             header('Content-Type: ' . ($row['mime_type'] ?: 'application/octet-stream'));
-            header('Content-Disposition: inline; filename="' . rawurlencode($row['file_name']) . '"');
+            header('Content-Disposition: ' . $disposition . '; filename="' . rawurlencode($row['file_name']) . '"');
             header('Content-Length: ' . filesize($path));
             readfile($path);
             exit;
