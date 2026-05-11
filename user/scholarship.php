@@ -834,7 +834,13 @@ async function loadOpenSlots() {
             return;
         }
         if (!j.rows.length) {
-            wrap.innerHTML = '<p class="text-center text-xs text-slate-400 py-4">ไม่มีรอบว่างในช่วง 14 วันข้างหน้า</p>';
+            wrap.innerHTML = `<div class="text-center py-4">
+                <p class="text-xs text-slate-400 mb-2">ยังไม่มีรอบว่างในช่วง 30 วัน</p>
+                <button onclick="reloadOpenSlots()" class="text-xs font-black text-emerald-600 active:scale-95 px-3 py-1 rounded-lg border border-emerald-200 hover:bg-emerald-50">
+                    <i class="fa-solid fa-rotate mr-1"></i>โหลดอีกครั้ง
+                </button>
+                <p class="text-[10px] text-slate-400 mt-2">หาก admin เพิ่งเปิดรอบ กรุณารีเฟรช</p>
+            </div>`;
             return;
         }
         // group by date

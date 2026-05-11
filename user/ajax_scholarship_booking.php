@@ -74,16 +74,27 @@ try {
 
 function list_open_slots(PDO $pdo, int $studentId): void
 {
-    // default: 14 วันข้างหน้า
+    // default: 30 วันข้างหน้า
     $from = (string)($_POST['from'] ?? date('Y-m-d'));
-    $to   = (string)($_POST['to']   ?? date('Y-m-d', strtotime('+14 days')));
+    $to   = (string)($_POST['to']   ?? date('Y-m-d', strtotime('+30 days')));
     $rows = get_open_scholarship_slots($pdo, $from, $to, ['open'], $studentId);
 
     // กรอง slot ที่หมดอายุ (เริ่มไปแล้ว) ออก
     $now = time();
+    $beforeFilter = count($rows);
     $rows = array_values(array_filter($rows, function ($r) use ($now) {
         return strtotime($r['slot_date'] . ' ' . $r['end_time']) > $now;
     }));
+
+    // Diagnostic log สำหรับช่วงดีบั๊ก (ดู PHP error log ถ้าผลลัพธ์ว่าง)
+    if (empty($rows)) {
+        $totalOpen = (int)$pdo->query("SELECT COUNT(*) FROM sys_scholarship_slots WHERE status='open'")->fetchColumn();
+        $totalAny  = (int)$pdo->query("SELECT COUNT(*) FROM sys_scholarship_slots")->fetchColumn();
+        error_log(sprintf(
+            '[scholarship_booking] list_open empty: studentId=%d from=%s to=%s before_time_filter=%d total_open=%d total_any=%d',
+            $studentId, $from, $to, $beforeFilter, $totalOpen, $totalAny
+        ));
+    }
 
     echo json_encode(['ok' => true, 'rows' => $rows], JSON_UNESCAPED_UNICODE);
 }
