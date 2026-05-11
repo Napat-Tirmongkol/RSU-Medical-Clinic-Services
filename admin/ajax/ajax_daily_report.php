@@ -33,8 +33,13 @@ function type_where(string $type, string $date): array
                 [':tw1' => $date, ':tw2' => $date],
             ];
         case 'early':
+            // มาก่อนวันนัด = check-in ก่อนวันนัด, นับทั้ง 2 มุม:
+            // (1) นัดวันนี้ แต่ check-in ก่อนหน้านี้
+            // (2) check-in วันนี้สำหรับนัดในอนาคต
             return [
-                "DATE(b.attended_at) = :tw1 AND s.slot_date > :tw2",
+                "b.attended_at IS NOT NULL AND DATE(b.attended_at) < s.slot_date "
+                . "AND (s.slot_date = :tw1 OR DATE(b.attended_at) = :tw2) "
+                . "AND b.status NOT IN ('cancelled','cancelled_by_admin')",
                 [':tw1' => $date, ':tw2' => $date],
             ];
         case 'no_show':
@@ -62,7 +67,9 @@ function fetch_stats(PDO $pdo, string $date, int $cid): array
         SELECT
             SUM(CASE WHEN s.slot_date = :d1 AND DATE(b.attended_at) = :d2
                           AND b.status NOT IN ('cancelled','cancelled_by_admin') THEN 1 ELSE 0 END) AS on_schedule,
-            SUM(CASE WHEN DATE(b.attended_at) = :d3 AND s.slot_date > :d4
+            SUM(CASE WHEN b.attended_at IS NOT NULL AND DATE(b.attended_at) < s.slot_date
+                          AND (s.slot_date = :d3 OR DATE(b.attended_at) = :d4)
+                          AND b.status NOT IN ('cancelled','cancelled_by_admin')
                                                                                 THEN 1 ELSE 0 END) AS early_arrival,
             SUM(CASE WHEN s.slot_date = :d5 AND b.attended_at IS NULL
                           AND b.status NOT IN ('cancelled','cancelled_by_admin') THEN 1 ELSE 0 END) AS no_show,
@@ -164,7 +171,7 @@ if ($action === 'list') {
     $pages  = max(1, (int)ceil($total / $per));
     $offset = ($page - 1) * $per;
 
-    // list — CASE ใช้ :vt1–:vt4 แยกจาก :tw1–:tw3 เพื่อไม่ชนกัน
+    // list — CASE เปรียบเทียบ attended_at กับ slot_date ตรงๆ ไม่ต้องผูก :date
     $list_sql = "
         SELECT
             b.id,
@@ -179,9 +186,9 @@ if ($action === 'list') {
             b.status,
             CASE
                 WHEN b.status IN ('cancelled','cancelled_by_admin')         THEN 'cancelled'
-                WHEN s.slot_date = :vt1 AND DATE(b.attended_at) = :vt2     THEN 'on_schedule'
-                WHEN DATE(b.attended_at) = :vt3 AND s.slot_date > :vt4     THEN 'early'
                 WHEN b.attended_at IS NULL                                  THEN 'no_show'
+                WHEN DATE(b.attended_at) = s.slot_date                      THEN 'on_schedule'
+                WHEN DATE(b.attended_at) < s.slot_date                      THEN 'early'
                 ELSE 'other'
             END AS visit_type
         FROM camp_bookings b
@@ -197,12 +204,8 @@ if ($action === 'list') {
         LIMIT :lim OFFSET :off
     ";
 
-    $list_params = array_merge($base_params, [
-        ':vt1' => $date, ':vt2' => $date, ':vt3' => $date, ':vt4' => $date,
-    ]);
-
     $stmt = $pdo->prepare($list_sql);
-    foreach ($list_params as $k => $v) {
+    foreach ($base_params as $k => $v) {
         $stmt->bindValue($k, $v);
     }
     $stmt->bindValue(':lim', $per, PDO::PARAM_INT);

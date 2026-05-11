@@ -34,14 +34,19 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
     // Build WHERE
     $tw_conds = [
         'on_schedule' => ["s.slot_date = :tw1 AND DATE(b.attended_at) = :tw2 AND b.status NOT IN ('cancelled','cancelled_by_admin')", [':tw1'=>$date,':tw2'=>$date]],
-        'early'       => ["DATE(b.attended_at) = :tw1 AND s.slot_date > :tw2", [':tw1'=>$date,':tw2'=>$date]],
+        'early'       => [
+            "b.attended_at IS NOT NULL AND DATE(b.attended_at) < s.slot_date "
+            . "AND (s.slot_date = :tw1 OR DATE(b.attended_at) = :tw2) "
+            . "AND b.status NOT IN ('cancelled','cancelled_by_admin')",
+            [':tw1'=>$date,':tw2'=>$date],
+        ],
         'no_show'     => ["s.slot_date = :tw1 AND b.attended_at IS NULL AND b.status NOT IN ('cancelled','cancelled_by_admin')", [':tw1'=>$date]],
         'cancelled'   => ["s.slot_date = :tw1 AND b.status IN ('cancelled','cancelled_by_admin')", [':tw1'=>$date]],
         'all'         => ["(s.slot_date = :tw1 OR (DATE(b.attended_at) = :tw2 AND s.slot_date > :tw3))", [':tw1'=>$date,':tw2'=>$date,':tw3'=>$date]],
     ];
     [$tw_sql, $tw_p] = $tw_conds[$type];
     $cc = $cid > 0 ? ' AND b.campaign_id = :cid' : '';
-    $params = array_merge($tw_p, [':vt1'=>$date,':vt2'=>$date,':vt3'=>$date,':vt4'=>$date]);
+    $params = $tw_p;
     if ($cid > 0) $params[':cid'] = $cid;
 
     $sql = "
@@ -56,10 +61,10 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
             b.attended_at,
             b.status,
             CASE
-                WHEN b.status IN ('cancelled','cancelled_by_admin')         THEN 'ยกเลิก'
-                WHEN s.slot_date = :vt1 AND DATE(b.attended_at) = :vt2     THEN 'มาตามนัด'
-                WHEN DATE(b.attended_at) = :vt3 AND s.slot_date > :vt4     THEN 'มาก่อนวันนัด'
-                WHEN b.attended_at IS NULL                                  THEN 'ยังไม่มา'
+                WHEN b.status IN ('cancelled','cancelled_by_admin') THEN 'ยกเลิก'
+                WHEN b.attended_at IS NULL                          THEN 'ยังไม่มา'
+                WHEN DATE(b.attended_at) = s.slot_date              THEN 'มาตามนัด'
+                WHEN DATE(b.attended_at) < s.slot_date              THEN 'มาก่อนวันนัด'
                 ELSE 'อื่นๆ'
             END AS visit_type_th
         FROM camp_bookings b
