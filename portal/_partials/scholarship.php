@@ -676,6 +676,15 @@ $portalCsrf = get_csrf_token();
                 </div>
             </div>
 
+            <!-- Quick presets: เร่งการกรอกช่วงวันที่บ่อยๆ -->
+            <div class="flex flex-wrap gap-1.5">
+                <span class="text-[11px] font-bold text-slate-500 self-center mr-1">ช่วงด่วน:</span>
+                <button type="button" class="sch-btn sch-btn--ghost" style="padding:.3rem .7rem;font-size:11px" onclick="setBulkRange(0)">วันนี้</button>
+                <button type="button" class="sch-btn sch-btn--ghost" style="padding:.3rem .7rem;font-size:11px" onclick="setBulkRange(7)">+1 สัปดาห์</button>
+                <button type="button" class="sch-btn sch-btn--ghost" style="padding:.3rem .7rem;font-size:11px" onclick="setBulkRange(30)">+1 เดือน</button>
+                <button type="button" class="sch-btn sch-btn--ghost" style="padding:.3rem .7rem;font-size:11px" onclick="setBulkRange(120)">+ภาคเรียน (4 เดือน)</button>
+            </div>
+
             <div>
                 <label class="sch-label">วันในสัปดาห์ที่จะเปิดรอบ</label>
                 <div class="flex gap-1.5 flex-wrap">
@@ -1777,7 +1786,9 @@ $portalCsrf = get_csrf_token();
         if (!j.ok) { Swal.fire({ icon: 'error', text: j.error || 'บันทึกไม่สำเร็จ' }); return; }
         Swal.fire({ icon: 'success', title: 'บันทึกแล้ว', timer: 1000, showConfirmButton: false });
         closeModal('slot-edit-modal');
+        closeModal('cal-day-modal');
         loadSlots();
+        if (calData !== null) loadCalendar();
     };
 
     window.deleteSlot = async function() {
@@ -1795,7 +1806,9 @@ $portalCsrf = get_csrf_token();
             : 'รอบถูกลบเรียบร้อย';
         Swal.fire({ icon: 'success', title: 'ลบแล้ว', text: cancelledTxt, timer: 1500, showConfirmButton: false });
         closeModal('slot-edit-modal');
+        closeModal('cal-day-modal');
         loadSlots();
+        if (calData !== null) loadCalendar();
     };
 
     window.viewSlotBookings = async function(slotId) {
@@ -1980,9 +1993,13 @@ $portalCsrf = get_csrf_token();
         }
 
         const slots = info.slots || [];
+        const totalAttended = slots.reduce((s, x) => s + (x.attended_count || 0), 0);
+        const totalBooked   = slots.reduce((s, x) => s + (x.bookings ? x.bookings.length : 0), 0);
         sub.textContent = slots.length === 0
             ? 'ไม่มีรอบงานในวันนี้'
-            : `${slots.length} รอบ`;
+            : (totalBooked > 0
+                ? `${slots.length} รอบ · ${totalBooked} จอง · ${totalAttended} เช็คอินแล้ว`
+                : `${slots.length} รอบ`);
 
         const wrap = document.getElementById('cal-day-wrap');
         if (slots.length === 0) {
@@ -1996,26 +2013,74 @@ $portalCsrf = get_csrf_token();
                 const capCls = full ? 'bg-rose-100 text-rose-700' :
                               s.bookings.length === 0 ? 'bg-slate-100 text-slate-500' :
                               'bg-emerald-100 text-emerald-700';
+                const attendedTxt = s.bookings.length > 0
+                    ? `<span class="cal-mini-badge bg-blue-50 text-blue-700" title="เช็คอินแล้ว / จอง">${s.attended_count || 0}✓/${s.bookings.length}</span>`
+                    : '';
                 const namesHtml = s.bookings.length === 0
                     ? '<p class="text-xs text-slate-400 italic mt-2">ยังไม่มีผู้จอง</p>'
-                    : '<div class="flex flex-wrap gap-1.5 mt-2">' + s.bookings.map(b =>
-                        `<span class="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 text-[11px] font-black">${escTxt(b.name)}${b.code ? ` <span class="text-emerald-500 font-normal">· ${escTxt(b.code)}</span>` : ''}</span>`
-                      ).join('') + '</div>';
+                    : '<div class="flex flex-wrap gap-1.5 mt-2">' + s.bookings.map(b => {
+                        const cls = b.attended ? 'bg-blue-100 text-blue-700' : 'bg-emerald-50 text-emerald-700';
+                        const icon = b.attended ? '<i class="fa-solid fa-check mr-1 text-[9px]"></i>' : '';
+                        return `<span class="px-2 py-0.5 rounded-md ${cls} text-[11px] font-black" title="${b.attended ? 'เช็คอินแล้ว' : 'ยังไม่เช็คอิน'}">${icon}${escTxt(b.name)}${b.code ? ` <span class="font-normal opacity-70">· ${escTxt(b.code)}</span>` : ''}</span>`;
+                      }).join('') + '</div>';
                 const notes = s.notes ? `<p class="text-[11px] text-slate-500 mt-1">${escTxt(s.notes)}</p>` : '';
+                // ใช้ JSON.stringify เพื่อ pass slot data ไปที่ปุ่ม edit (ต้อง escape quotes)
+                const slotJson = JSON.stringify({
+                    id: s.id,
+                    slot_date: dateStr,
+                    start_time: s.start + ':00',
+                    end_time:   s.end + ':00',
+                    max_capacity: s.max,
+                    comp_type: s.comp_type,
+                    status: s.status || 'open',
+                    notes: s.notes || '',
+                }).replace(/'/g, '&#39;');
                 return `<div class="p-3 rounded-xl bg-slate-50 border border-slate-100">
                     <div class="flex items-center justify-between gap-2">
                         <div class="text-sm font-black text-slate-900">${s.start}–${s.end}</div>
-                        <div class="flex items-center gap-1.5">
+                        <div class="flex items-center gap-1.5 flex-wrap">
                             ${compBadge}
                             <span class="cal-mini-badge ${capCls}">${s.bookings.length}/${s.max}</span>
+                            ${attendedTxt}
                         </div>
                     </div>
                     ${notes}
                     ${namesHtml}
+                    <div class="flex justify-end gap-1 mt-2 pt-2 border-t border-slate-200">
+                        <button class="sch-btn sch-btn--ghost" style="padding:.35rem .6rem;font-size:11px"
+                            onclick='openSlotEditModal(${slotJson})' title="แก้ไขรอบ">
+                            <i class="fa-solid fa-pen"></i>แก้ไข
+                        </button>
+                        <button class="sch-btn sch-btn--ghost" style="padding:.35rem .6rem;font-size:11px;color:#dc2626"
+                            onclick="deleteSlotFromCalendar(${s.id}, ${s.bookings.length})" title="ลบรอบ">
+                            <i class="fa-solid fa-trash"></i>ลบ
+                        </button>
+                    </div>
                 </div>`;
             }).join('');
         }
         document.getElementById('cal-day-modal').classList.add('show');
+    };
+
+    // ลบ slot ตรงจากปฏิทิน (ไม่ต้องเปิด edit modal ก่อน)
+    window.deleteSlotFromCalendar = async function(id, bookingCount) {
+        const warnText = bookingCount > 0
+            ? `ลบถาวร — มีนักศึกษาจอง ${bookingCount} คน การจองทั้งหมดจะถูกยกเลิก`
+            : 'ลบรอบนี้ถาวร?';
+        const c = await Swal.fire({
+            icon: 'warning', title: 'ลบรอบนี้?', text: warnText,
+            showCancelButton: true, confirmButtonText: 'ลบ',
+            confirmButtonColor: '#e11d48', cancelButtonText: 'ยกเลิก',
+        });
+        if (!c.isConfirmed) return;
+        const j = await api('slots', 'delete', { id });
+        if (!j.ok) { Swal.fire({ icon: 'error', text: j.error || 'ลบไม่สำเร็จ' }); return; }
+        const okMsg = (j.cancelled_bookings || 0) > 0
+            ? `ยกเลิกการจอง ${j.cancelled_bookings} รายการ` : 'รอบถูกลบเรียบร้อย';
+        Swal.fire({ icon: 'success', title: 'ลบแล้ว', text: okMsg, timer: 1300, showConfirmButton: false });
+        closeModal('cal-day-modal');
+        loadCalendar();
+        if (typeof loadSlots === 'function') loadSlots();
     };
 
     // Helper: เปิด bulk-create modal สำหรับวันที่ที่แสดงอยู่ใน day-detail
@@ -2023,6 +2088,22 @@ $portalCsrf = get_csrf_token();
         if (!calCurrentDay) return;
         closeModal('cal-day-modal');
         openSlotCreateModal(calCurrentDay);
+    };
+
+    // Quick preset: ตั้ง date_to = date_from + offsetDays (offsetDays=0 = วันเดียว)
+    window.setBulkRange = function(offsetDays) {
+        const fromEl = document.getElementById('slot-bulk-from');
+        const toEl   = document.getElementById('slot-bulk-to');
+        if (!fromEl.value) {
+            fromEl.value = new Date().toISOString().slice(0, 10);
+        }
+        const from = new Date(fromEl.value + 'T00:00:00');
+        from.setDate(from.getDate() + offsetDays);
+        toEl.value = from.toISOString().slice(0, 10);
+        // ถ้า preset = ช่วงยาว ให้ check DoW ทุกวัน (ผู้ใช้ปรับเองได้)
+        if (offsetDays >= 7) {
+            document.querySelectorAll('.slot-dow').forEach(c => c.checked = true);
+        }
     };
 
     // ── Init: load default tab (Dashboard)
