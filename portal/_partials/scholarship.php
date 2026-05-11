@@ -705,18 +705,14 @@ $portalCsrf = get_csrf_token();
                 </button>
             </div>
 
-            <div class="grid grid-cols-2 gap-3">
-                <div>
-                    <label class="sch-label">รับนักศึกษา (คน/รอบ)</label>
-                    <input type="number" id="slot-bulk-cap" class="sch-input" min="1" value="2">
-                </div>
-                <div>
-                    <label class="sch-label">ประเภท</label>
-                    <select id="slot-bulk-ct" class="sch-input">
-                        <option value="hours">ส่งชั่วโมงทุน</option>
-                        <option value="paid">ค่าตอบแทน</option>
-                    </select>
-                </div>
+            <div>
+                <label class="sch-label">รับนักศึกษา (คน/รอบ)</label>
+                <input type="number" id="slot-bulk-cap" class="sch-input" min="1" value="2">
+                <p class="text-[11px] text-slate-500 mt-1">
+                    <i class="fa-solid fa-circle-info mr-0.5"></i>
+                    นักศึกษาจะเลือกประเภทค่าตอบแทน (ทุน/เงิน) ตอนออกงาน
+                </p>
+                <input type="hidden" id="slot-bulk-ct" value="hours">
             </div>
 
             <div>
@@ -754,18 +750,10 @@ $portalCsrf = get_csrf_token();
                     <input type="time" id="slot-edit-end" class="sch-input">
                 </div>
             </div>
-            <div class="grid grid-cols-2 gap-3">
-                <div>
-                    <label class="sch-label">รับนักศึกษา (คน)</label>
-                    <input type="number" id="slot-edit-cap" class="sch-input" min="1">
-                </div>
-                <div>
-                    <label class="sch-label">ประเภท</label>
-                    <select id="slot-edit-ct" class="sch-input">
-                        <option value="hours">ส่งชั่วโมงทุน</option>
-                        <option value="paid">ค่าตอบแทน</option>
-                    </select>
-                </div>
+            <div>
+                <label class="sch-label">รับนักศึกษา (คน)</label>
+                <input type="number" id="slot-edit-cap" class="sch-input" min="1">
+                <input type="hidden" id="slot-edit-ct" value="hours">
             </div>
             <div>
                 <label class="sch-label">สถานะ</label>
@@ -1622,7 +1610,7 @@ $portalCsrf = get_csrf_token();
         if (!j.rows.length) { wrap.innerHTML = '<p class="text-center text-sm text-slate-400 py-10"><i class="fa-solid fa-inbox text-3xl mb-2 block"></i>ยังไม่มีรอบในช่วงนี้</p>'; return; }
 
         let html = '<table class="sch-table"><thead><tr>'
-            + '<th>วันที่</th><th>เวลา</th><th>ความจุ</th><th>ประเภท</th><th>สถานะ</th><th>หมายเหตุ</th><th>จัดการ</th>'
+            + '<th>วันที่</th><th>เวลา</th><th>ความจุ</th><th>สถานะ</th><th>หมายเหตุ</th><th>จัดการ</th>'
             + '</tr></thead><tbody>';
         j.rows.forEach(r => {
             const pct = r.max_capacity > 0 ? Math.round(r.booked_count / r.max_capacity * 100) : 0;
@@ -1633,9 +1621,6 @@ $portalCsrf = get_csrf_token();
                 : r.status === 'closed'
                   ? '<span class="px-2 py-0.5 rounded-md bg-slate-200 text-slate-600 text-[11px] font-black">ปิดรับ</span>'
                   : '<span class="px-2 py-0.5 rounded-md bg-rose-100 text-rose-700 text-[11px] font-black">ยกเลิก</span>';
-            const compBadge = r.comp_type === 'paid'
-                ? '<span class="px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 text-[11px] font-black">ค่าตอบแทน</span>'
-                : '<span class="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 text-[11px] font-black">ชม.ทุน</span>';
             html += `<tr>
                 <td>${fmtSlotDate(r.slot_date)}</td>
                 <td class="font-mono text-xs">${fmtSlotTime(r.start_time)}–${fmtSlotTime(r.end_time)}</td>
@@ -1644,7 +1629,6 @@ $portalCsrf = get_csrf_token();
                         ${r.booked_count}/${r.max_capacity}
                     </button>
                 </td>
-                <td>${compBadge}</td>
                 <td>${statusBadge}</td>
                 <td class="text-xs text-slate-600">${escTxt(r.notes)}</td>
                 <td>
@@ -2007,9 +1991,6 @@ $portalCsrf = get_csrf_token();
         } else {
             wrap.innerHTML = slots.map(s => {
                 const full = s.bookings.length >= s.max;
-                const compBadge = s.comp_type === 'paid'
-                    ? '<span class="cal-mini-badge bg-amber-50 text-amber-700">ค่าตอบแทน</span>'
-                    : '<span class="cal-mini-badge bg-emerald-50 text-emerald-700">ทุน</span>';
                 const capCls = full ? 'bg-rose-100 text-rose-700' :
                               s.bookings.length === 0 ? 'bg-slate-100 text-slate-500' :
                               'bg-emerald-100 text-emerald-700';
@@ -2039,7 +2020,6 @@ $portalCsrf = get_csrf_token();
                     <div class="flex items-center justify-between gap-2">
                         <div class="text-sm font-black text-slate-900">${s.start}–${s.end}</div>
                         <div class="flex items-center gap-1.5 flex-wrap">
-                            ${compBadge}
                             <span class="cal-mini-badge ${capCls}">${s.bookings.length}/${s.max}</span>
                             ${attendedTxt}
                         </div>
