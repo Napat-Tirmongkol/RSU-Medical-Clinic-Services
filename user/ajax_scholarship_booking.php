@@ -13,6 +13,7 @@ session_start();
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../includes/csrf.php';
 require_once __DIR__ . '/../includes/scholarship_helper.php';
+require_once __DIR__ . '/../includes/clinic_status_helper.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -60,6 +61,7 @@ try {
     switch ($action) {
         case 'list_open':  list_open_slots($pdo, $studentId); break;
         case 'list_mine':  list_my_bookings($pdo, $studentId); break;
+        case 'calendar':   calendar_view($pdo, $studentId); break;
         case 'book':       book_slot($pdo, $studentId); break;
         case 'cancel':     cancel_booking($pdo, $studentId); break;
         default:
@@ -138,6 +140,64 @@ function list_open_slots(PDO $pdo, int $studentId): void
     }
 
     echo json_encode($response, JSON_UNESCAPED_UNICODE);
+}
+
+function calendar_view(PDO $pdo, int $studentId): void
+{
+    $from = (string)($_POST['from'] ?? date('Y-m-01'));
+    $to   = (string)($_POST['to']   ?? date('Y-m-t'));
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $from) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $to)) {
+        echo json_encode(['ok' => false, 'error' => 'Invalid date']); return;
+    }
+
+    // 1) ดึง slot open ในช่วง + flag ว่า student คนนี้จองอยู่ไหม
+    $sql = "SELECT s.id, s.slot_date, s.start_time, s.end_time,
+            s.max_capacity, s.comp_type, s.notes,
+            COALESCE((SELECT COUNT(*) FROM sys_scholarship_slot_bookings b
+                      WHERE b.slot_id = s.id AND b.status = 'booked'), 0) AS booked_count,
+            EXISTS(SELECT 1 FROM sys_scholarship_slot_bookings b2
+                   WHERE b2.slot_id = s.id AND b2.student_id = :sid AND b2.status = 'booked') AS i_booked
+        FROM sys_scholarship_slots s
+        WHERE s.status = 'open' AND s.slot_date BETWEEN :from AND :to
+        ORDER BY s.slot_date ASC, s.start_time ASC";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute([':sid' => $studentId, ':from' => $from, ':to' => $to]);
+    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+    $byDay = [];
+    foreach ($rows as $r) {
+        $d = $r['slot_date'];
+        if (!isset($byDay[$d])) $byDay[$d] = ['slots' => []];
+        $byDay[$d]['slots'][] = [
+            'id'        => (int)$r['id'],
+            'start'     => substr((string)$r['start_time'], 0, 5),
+            'end'       => substr((string)$r['end_time'], 0, 5),
+            'max'       => (int)$r['max_capacity'],
+            'booked'    => (int)$r['booked_count'],
+            'comp_type' => $r['comp_type'],
+            'notes'     => $r['notes'],
+            'i_booked'  => (int)$r['i_booked'] === 1,
+        ];
+    }
+
+    // 2) เติม clinic_closed ทุกวันในช่วง
+    $days = [];
+    $cur = new DateTime($from);
+    $endDate = new DateTime($to);
+    while ($cur <= $endDate) {
+        $d = $cur->format('Y-m-d');
+        $hours = get_clinic_hours_for_date($pdo, $d);
+        $days[$d] = [
+            'clinic_closed' => !empty($hours['closed']),
+            'clinic_note'   => $hours['note'] ?? '',
+            'slots'         => $byDay[$d]['slots'] ?? [],
+        ];
+        $cur->modify('+1 day');
+    }
+
+    echo json_encode([
+        'ok' => true, 'from' => $from, 'to' => $to, 'days' => $days,
+    ], JSON_UNESCAPED_UNICODE);
 }
 
 function list_my_bookings(PDO $pdo, int $studentId): void

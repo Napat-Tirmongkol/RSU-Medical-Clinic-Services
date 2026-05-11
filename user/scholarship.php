@@ -145,6 +145,56 @@ $displayName = trim((string)($user['full_name'] ?? ''))
             font-variant-numeric: tabular-nums;
             letter-spacing: 0.05em;
         }
+
+        /* Student calendar grid */
+        .st-cal-wrap { display:grid; grid-template-columns:repeat(7, 1fr); gap:4px; }
+        .st-cal-head {
+            text-align:center; font-size:10px; font-weight:900;
+            color:#94a3b8; padding:4px 0;
+            text-transform:uppercase; letter-spacing:.05em;
+        }
+        .st-cal-cell {
+            aspect-ratio: 1 / 1;
+            border-radius: 10px;
+            background: #fff;
+            border: 1.5px solid #e2e8f0;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            cursor: pointer; transition: transform .12s, box-shadow .12s;
+            position: relative;
+            font-size: 13px; font-weight: 900; color: #334155;
+            user-select: none;
+        }
+        .st-cal-cell:active { transform: scale(0.95); }
+        .st-cal-cell.empty {
+            background: transparent; border-color: transparent;
+            color: #cbd5e1; font-weight: 400; cursor: default;
+        }
+        .st-cal-cell.empty:active { transform: none; }
+        .st-cal-cell.past {
+            opacity: 0.45; cursor: default; background: #f8fafc;
+        }
+        .st-cal-cell.past:active { transform: none; }
+        .st-cal-cell.today {
+            box-shadow: 0 0 0 2px #10b981;
+        }
+        .st-cal-cell.has-open {
+            background: #ecfdf5; border-color: #86efac; color: #065f46;
+        }
+        .st-cal-cell.full {
+            background: #fef3c7; border-color: #fcd34d; color: #92400e;
+        }
+        .st-cal-cell.mine {
+            background: #dbeafe; border-color: #93c5fd; color: #1e40af;
+        }
+        .st-cal-cell.closed {
+            background: #fef2f2; border-color: #fecaca; color: #991b1b;
+        }
+        .st-cal-meta {
+            font-size: 8.5px; font-weight: 800;
+            margin-top: 1px; line-height: 1;
+            letter-spacing: .02em;
+        }
     </style>
 </head>
 <body class="text-slate-900 pb-32">
@@ -339,16 +389,28 @@ $displayName = trim((string)($user['full_name'] ?? ''))
             </div>
         <?php endif; ?>
 
-        <!-- ─── รอบงานว่างให้จอง ─── -->
+        <!-- ─── ปฏิทินรอบงาน (เลือกวันแล้วจอง) ─── -->
         <div class="bg-white rounded-3xl p-5 shadow-sm border border-slate-100">
             <div class="flex items-center justify-between mb-3">
-                <h3 class="text-sm font-black text-slate-900"><i class="fa-solid fa-layer-group text-emerald-600 mr-1.5"></i>รอบงานว่าง</h3>
-                <button onclick="reloadOpenSlots()" class="text-xs font-black text-emerald-600 active:scale-95">
-                    <i class="fa-solid fa-rotate"></i>
-                </button>
+                <h3 class="text-sm font-black text-slate-900"><i class="fa-solid fa-calendar-week text-emerald-600 mr-1.5"></i>ปฏิทินรอบงาน</h3>
+                <div class="flex items-center gap-1">
+                    <button onclick="stCalNav(-1)" class="w-7 h-7 rounded-lg border border-slate-200 active:scale-95 hover:bg-slate-50" aria-label="เดือนก่อน">
+                        <i class="fa-solid fa-chevron-left text-[10px] text-slate-500"></i>
+                    </button>
+                    <span id="st-cal-title" class="text-xs font-black text-slate-700 min-w-[100px] text-center">—</span>
+                    <button onclick="stCalNav(1)" class="w-7 h-7 rounded-lg border border-slate-200 active:scale-95 hover:bg-slate-50" aria-label="เดือนถัดไป">
+                        <i class="fa-solid fa-chevron-right text-[10px] text-slate-500"></i>
+                    </button>
+                </div>
             </div>
-            <div id="open-slots-wrap" class="space-y-2">
-                <p class="text-center text-xs text-slate-400 py-4"><i class="fa-solid fa-spinner fa-spin mr-2"></i>กำลังโหลด…</p>
+            <div id="st-cal-grid">
+                <p class="text-center text-xs text-slate-400 py-6"><i class="fa-solid fa-spinner fa-spin mr-2"></i>กำลังโหลด…</p>
+            </div>
+            <div class="flex flex-wrap gap-3 mt-3 text-[10px] text-slate-500">
+                <span class="inline-flex items-center gap-1"><span class="inline-block w-2.5 h-2.5 rounded bg-emerald-200 border border-emerald-300"></span>มีรอบเปิด</span>
+                <span class="inline-flex items-center gap-1"><span class="inline-block w-2.5 h-2.5 rounded bg-blue-200 border border-blue-300"></span>คุณจองอยู่</span>
+                <span class="inline-flex items-center gap-1"><span class="inline-block w-2.5 h-2.5 rounded bg-amber-200 border border-amber-300"></span>เต็มแล้ว</span>
+                <span class="inline-flex items-center gap-1"><span class="inline-block w-2.5 h-2.5 rounded bg-rose-100 border border-rose-200"></span>คลินิกหยุด</span>
             </div>
         </div>
 
@@ -819,90 +881,9 @@ window.deleteShift = async function(id) {
     }
 };
 
-// ────────── รอบงานว่าง / จอง / ยกเลิกการจอง ──────────
-async function loadOpenSlots() {
-    const wrap = document.getElementById('open-slots-wrap');
-    if (!wrap) return;
-    try {
-        const fd = new FormData();
-        fd.append('csrf_token', CSRF_TOKEN);
-        fd.append('action', 'list_open');
-        const r = await fetch('ajax_scholarship_booking.php', { method: 'POST', body: fd });
-        const j = await r.json();
-        if (!j.ok) {
-            wrap.innerHTML = `<p class="text-center text-xs text-rose-500 py-4">${j.error || 'โหลดไม่สำเร็จ'}</p>`;
-            return;
-        }
-        if (!j.rows.length) {
-            let diagHtml = '';
-            if (j._diag) {
-                const d = j._diag;
-                const statusList = Object.entries(d.status_counts || {}).map(([k,v]) => `${k}:${v}`).join(' · ') || 'ไม่มีข้อมูล';
-                let sampleHtml = '';
-                if (d.sample_in_range && d.sample_in_range.length) {
-                    sampleHtml = '<div class="mt-1.5 pt-1.5 border-t border-slate-200"><b>ตัวอย่างในช่วง:</b><br>' +
-                        d.sample_in_range.map(s => `#${s.id} ${s.slot_date} ${s.start_time.substring(0,5)}–${s.end_time.substring(0,5)} <b>status=${s.status}</b>`).join('<br>') +
-                        '</div>';
-                }
-                diagHtml = `<details class="mt-3 text-left">
-                    <summary class="text-[10px] text-slate-500 cursor-pointer">▸ ข้อมูลดีบั๊ก (ส่งให้ผู้พัฒนา)</summary>
-                    <div class="mt-1 p-2 bg-slate-50 rounded-md text-[10px] text-slate-600 font-mono">
-                        student_id: ${d.studentId}<br>
-                        ช่วง: ${d.from} → ${d.to}<br>
-                        เวลาปัจจุบัน: ${d.now}<br>
-                        สลอตทั้งหมด: ${statusList}<br>
-                        สลอตในช่วง: ${d.in_date_range}<br>
-                        นักศึกษาคนนี้จองอยู่: ${d.student_booked}<br>
-                        ก่อนกรองเวลา: ${d.before_time_filter}
-                        ${sampleHtml}
-                    </div>
-                </details>`;
-            }
-            wrap.innerHTML = `<div class="text-center py-4">
-                <p class="text-xs text-slate-400 mb-2">ยังไม่มีรอบว่างในช่วง 30 วัน</p>
-                <button onclick="reloadOpenSlots()" class="text-xs font-black text-emerald-600 active:scale-95 px-3 py-1 rounded-lg border border-emerald-200 hover:bg-emerald-50">
-                    <i class="fa-solid fa-rotate mr-1"></i>โหลดอีกครั้ง
-                </button>
-                <p class="text-[10px] text-slate-400 mt-2">หาก admin เพิ่งเปิดรอบ กรุณารีเฟรช</p>
-                ${diagHtml}
-            </div>`;
-            return;
-        }
-        // group by date
-        const byDate = {};
-        j.rows.forEach(s => { (byDate[s.slot_date] = byDate[s.slot_date] || []).push(s); });
-        let html = '';
-        Object.keys(byDate).sort().forEach(d => {
-            const dateLabel = formatThaiSlotDate(d);
-            html += `<p class="text-[11px] font-black text-slate-500 mt-2 mb-1">${dateLabel}</p>`;
-            byDate[d].forEach(s => {
-                const pct = s.max_capacity > 0 ? (s.booked_count / s.max_capacity) : 0;
-                const capCls = pct >= 1 ? 'text-rose-600' : pct >= 0.8 ? 'text-amber-600' : 'text-emerald-600';
-                const ctBadge = s.comp_type === 'paid'
-                    ? '<span class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-black rounded-full bg-amber-50 text-amber-700"><i class="fa-solid fa-coins text-[8px]"></i>ค่าตอบแทน</span>'
-                    : '<span class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-black rounded-full bg-emerald-50 text-emerald-700"><i class="fa-solid fa-graduation-cap text-[8px]"></i>ทุน</span>';
-                const full = s.available <= 0;
-                const btn = full
-                    ? '<button disabled class="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-400 text-xs font-black cursor-not-allowed">เต็ม</button>'
-                    : `<button onclick="bookSlot(${s.id})" class="px-3 py-1.5 rounded-lg bg-emerald-500 text-white text-xs font-black hover:bg-emerald-600 active:scale-95 transition">จอง</button>`;
-                const notes = s.notes ? `<p class="text-[11px] text-slate-500 mt-0.5">${escapeHtmlSlot(s.notes)}</p>` : '';
-                html += `<div class="flex items-center gap-3 p-2.5 rounded-xl bg-slate-50 border border-slate-100">
-                    <div class="flex-1 min-w-0">
-                        <p class="text-sm font-black text-slate-900">${s.start_time.substring(0,5)} – ${s.end_time.substring(0,5)}</p>
-                        <p class="text-[11px] ${capCls} font-black">รับ ${s.booked_count}/${s.max_capacity} คน</p>
-                        <div class="mt-1">${ctBadge}</div>
-                        ${notes}
-                    </div>
-                    ${btn}
-                </div>`;
-            });
-        });
-        wrap.innerHTML = html;
-    } catch (err) {
-        wrap.innerHTML = '<p class="text-center text-xs text-rose-500 py-4">โหลดไม่สำเร็จ</p>';
-    }
-}
-function reloadOpenSlots() { loadOpenSlots(); }
+// ────────── ปฏิทินรอบงาน / จอง / ยกเลิกการจอง ──────────
+let stCalDate = new Date();
+let stCalData = null;
 
 function formatThaiSlotDate(d) {
     const months = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
@@ -911,6 +892,156 @@ function formatThaiSlotDate(d) {
 }
 function escapeHtmlSlot(s) {
     const div = document.createElement('div'); div.textContent = String(s || ''); return div.innerHTML;
+}
+function fmtYMD(d) {
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+async function loadStCalendar() {
+    const grid = document.getElementById('st-cal-grid');
+    if (!grid) return;
+    grid.innerHTML = '<p class="text-center text-xs text-slate-400 py-6"><i class="fa-solid fa-spinner fa-spin mr-2"></i>กำลังโหลด…</p>';
+
+    const y = stCalDate.getFullYear();
+    const m = stCalDate.getMonth();
+    const firstDay = new Date(y, m, 1);
+    const lastDay  = new Date(y, m + 1, 0);
+    const startGrid = new Date(firstDay);
+    startGrid.setDate(firstDay.getDate() - firstDay.getDay()); // ย้อนไปอาทิตย์
+    const endGrid = new Date(lastDay);
+    endGrid.setDate(lastDay.getDate() + (6 - lastDay.getDay())); // เดินไปเสาร์
+
+    const monthNames = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+    document.getElementById('st-cal-title').textContent = `${monthNames[m]} ${y + 543}`;
+
+    try {
+        const fd = new FormData();
+        fd.append('csrf_token', CSRF_TOKEN);
+        fd.append('action', 'calendar');
+        fd.append('from', fmtYMD(startGrid));
+        fd.append('to',   fmtYMD(endGrid));
+        const r = await fetch('ajax_scholarship_booking.php', { method: 'POST', body: fd });
+        const j = await r.json();
+        if (!j.ok) {
+            grid.innerHTML = `<p class="text-center text-xs text-rose-500 py-4">${escapeHtmlSlot(j.error || 'โหลดไม่สำเร็จ')}</p>`;
+            return;
+        }
+        stCalData = j.days || {};
+        renderStCalendar(startGrid, endGrid);
+    } catch (err) {
+        grid.innerHTML = '<p class="text-center text-xs text-rose-500 py-4">โหลดไม่สำเร็จ</p>';
+    }
+}
+
+function renderStCalendar(startGrid, endGrid) {
+    const grid = document.getElementById('st-cal-grid');
+    const today = new Date(); today.setHours(0,0,0,0);
+    const m = stCalDate.getMonth();
+    const dayNames = ['อา.','จ.','อ.','พ.','พฤ.','ศ.','ส.'];
+
+    let html = '<div class="st-cal-wrap">';
+    dayNames.forEach(d => { html += `<div class="st-cal-head">${d}</div>`; });
+
+    const cur = new Date(startGrid);
+    while (cur <= endGrid) {
+        const dateStr = fmtYMD(cur);
+        const info = stCalData[dateStr] || { clinic_closed:false, slots:[] };
+        const inMonth = cur.getMonth() === m;
+        const isToday = cur.getTime() === today.getTime();
+        const isPast  = cur < today;
+
+        const slots = info.slots || [];
+        const mineCount = slots.filter(s => s.i_booked).length;
+        const totalMax = slots.reduce((s,x) => s + x.max, 0);
+        const totalBooked = slots.reduce((s,x) => s + x.booked, 0);
+        const hasOpen = slots.length > 0 && totalBooked < totalMax;
+        const allFull = slots.length > 0 && totalBooked >= totalMax;
+
+        const cls = [
+            'st-cal-cell',
+            !inMonth ? 'empty' : '',
+            isPast && !isToday ? 'past' : '',
+            isToday ? 'today' : '',
+            !inMonth || (isPast && !isToday) ? '' :
+              (info.clinic_closed ? 'closed' :
+                (mineCount > 0 ? 'mine' :
+                  (allFull ? 'full' : (hasOpen ? 'has-open' : '')))),
+        ].filter(Boolean).join(' ');
+
+        let content = `<span>${cur.getDate()}</span>`;
+        if (inMonth && !isPast) {
+            if (info.clinic_closed) {
+                content += '<span class="st-cal-meta">หยุด</span>';
+            } else if (mineCount > 0) {
+                content += '<span class="st-cal-meta">จองแล้ว</span>';
+            } else if (slots.length > 0) {
+                content += `<span class="st-cal-meta">${slots.length} รอบ</span>`;
+            }
+        }
+
+        const onclick = inMonth && !isPast ? `onclick="openStDayModal('${dateStr}')"` : '';
+        html += `<div class="${cls}" ${onclick}>${content}</div>`;
+        cur.setDate(cur.getDate() + 1);
+    }
+    html += '</div>';
+    grid.innerHTML = html;
+}
+
+function stCalNav(delta) {
+    stCalDate.setMonth(stCalDate.getMonth() + delta);
+    loadStCalendar();
+}
+
+function openStDayModal(dateStr) {
+    const info = (stCalData || {})[dateStr];
+    if (!info) return;
+    const slots = info.slots || [];
+
+    const weekdays = ['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์'];
+    const dt = new Date(dateStr + 'T00:00:00');
+    const title = `${weekdays[dt.getDay()]} · ${formatThaiSlotDate(dateStr)}`;
+
+    let body = '';
+    if (info.clinic_closed) {
+        body += `<div class="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold mb-3">
+            <i class="fa-solid fa-calendar-xmark mr-1"></i>คลินิกหยุดวันนี้${info.clinic_note ? ' — ' + escapeHtmlSlot(info.clinic_note) : ''}
+        </div>`;
+    }
+    if (slots.length === 0) {
+        body += '<p class="text-center text-sm text-slate-400 py-6">ยังไม่มีรอบเปิดในวันนี้</p>';
+    } else {
+        body += '<div class="space-y-2 text-left">' + slots.map(s => {
+            const full = s.booked >= s.max;
+            const mine = s.i_booked;
+            const ctBadge = s.comp_type === 'paid'
+                ? '<span class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-black rounded-full bg-amber-50 text-amber-700"><i class="fa-solid fa-coins text-[8px]"></i>ค่าตอบแทน</span>'
+                : '<span class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-black rounded-full bg-emerald-50 text-emerald-700"><i class="fa-solid fa-graduation-cap text-[8px]"></i>ทุน</span>';
+            const capCls = full ? 'text-rose-600' : 'text-emerald-600';
+            const btn = mine
+                ? '<span class="px-3 py-1.5 rounded-lg bg-blue-100 text-blue-700 text-xs font-black whitespace-nowrap"><i class="fa-solid fa-check mr-1"></i>จองแล้ว</span>'
+                : (full
+                    ? '<button disabled class="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-400 text-xs font-black whitespace-nowrap">เต็ม</button>'
+                    : `<button onclick="Swal.close(); bookSlot(${s.id})" class="px-3 py-1.5 rounded-lg bg-emerald-500 text-white text-xs font-black active:scale-95 whitespace-nowrap">จอง</button>`);
+            const notes = s.notes ? `<p class="text-[11px] text-slate-500 mt-0.5">${escapeHtmlSlot(s.notes)}</p>` : '';
+            return `<div class="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-100">
+                <div class="flex-1 min-w-0">
+                    <p class="text-sm font-black text-slate-900">${s.start} – ${s.end}</p>
+                    <p class="text-[11px] ${capCls} font-black">${s.booked}/${s.max} คน</p>
+                    <div class="mt-1">${ctBadge}</div>
+                    ${notes}
+                </div>
+                ${btn}
+            </div>`;
+        }).join('') + '</div>';
+    }
+
+    Swal.fire({
+        title: title,
+        html: body,
+        showCloseButton: true,
+        showConfirmButton: false,
+        width: 420,
+    });
 }
 
 async function bookSlot(slotId) {
@@ -962,7 +1093,7 @@ async function cancelMyBooking(bookingId) {
 }
 
 // Auto-load open slots on page ready
-document.addEventListener('DOMContentLoaded', loadOpenSlots);
+document.addEventListener('DOMContentLoaded', loadStCalendar);
 </script>
 </body>
 </html>
