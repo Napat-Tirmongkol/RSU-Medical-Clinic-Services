@@ -782,7 +782,13 @@ $portalCsrf = get_csrf_token();
 <!-- ── MODAL: Day Detail (calendar click) ── -->
 <div class="sch-modal-backdrop" id="cal-day-modal">
     <div class="sch-modal-box" style="max-width:560px">
-        <h3 class="text-lg font-black mb-1" id="cal-day-title">รายละเอียดวัน</h3>
+        <div class="flex items-start justify-between gap-3 mb-1">
+            <h3 class="text-lg font-black" id="cal-day-title">รายละเอียดวัน</h3>
+            <button id="cal-day-add-btn" class="sch-btn" style="padding:.4rem .8rem;font-size:12px;display:none"
+                onclick="addSlotFromDayModal()">
+                <i class="fa-solid fa-plus"></i>เพิ่มรอบในวันนี้
+            </button>
+        </div>
         <p class="text-xs text-slate-500 mb-3" id="cal-day-subtitle"></p>
         <div id="cal-day-holiday-banner" class="hidden mb-3 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-sm font-bold">
             <i class="fa-solid fa-calendar-xmark mr-1.5"></i><span id="cal-day-holiday-note"></span>
@@ -1662,7 +1668,7 @@ $portalCsrf = get_csrf_token();
     }
     window.addSlotTimeRow = addSlotTimeRow;
 
-    window.openSlotCreateModal = function() {
+    window.openSlotCreateModal = function(prefillDate) {
         const wrap = document.getElementById('slot-times-wrap');
         wrap.innerHTML = '';
         addSlotTimeRow();
@@ -1670,6 +1676,22 @@ $portalCsrf = get_csrf_token();
         document.getElementById('slot-bulk-cap').value = '2';
         document.getElementById('slot-bulk-ct').value = 'hours';
         document.getElementById('slot-bulk-notes').value = '';
+
+        if (prefillDate && /^\d{4}-\d{2}-\d{2}$/.test(prefillDate)) {
+            // จากปฏิทิน: ตั้ง date_from = date_to = วันที่คลิก
+            document.getElementById('slot-bulk-from').value = prefillDate;
+            document.getElementById('slot-bulk-to').value   = prefillDate;
+            // เลือก DoW ของวันนั้นเท่านั้น (ผู้ใช้ขยายเองได้)
+            const dow = new Date(prefillDate + 'T00:00:00').getDay();
+            document.querySelectorAll('.slot-dow').forEach(c => {
+                c.checked = parseInt(c.value, 10) === dow;
+            });
+        } else {
+            // กดจากปุ่ม "เปิดรอบใหม่" — default เป็นวันนี้
+            const today = new Date().toISOString().slice(0, 10);
+            document.getElementById('slot-bulk-from').value = today;
+            document.getElementById('slot-bulk-to').value   = today;
+        }
         document.getElementById('slot-create-modal').classList.add('show');
     };
 
@@ -1724,7 +1746,9 @@ $portalCsrf = get_csrf_token();
         const msg = `สร้างรอบสำเร็จ ${j.created} รอบ` + (j.errors && j.errors.length ? `\n(ข้อผิดพลาด ${j.errors.length} รายการ)` : '');
         Swal.fire({ icon: 'success', title: 'เสร็จสิ้น', text: msg, timer: 1800, showConfirmButton: false });
         closeModal('slot-create-modal');
+        // refresh ทั้ง slot list และปฏิทิน (ถ้า initialized แล้ว) — แล้วแต่ผู้ใช้กำลังดูแท็บไหน
         loadSlots();
+        if (calData !== null) loadCalendar();
     };
 
     window.openSlotEditModal = function(slot) {
@@ -1898,7 +1922,15 @@ $portalCsrf = get_csrf_token();
                 cellContent = `<span class="cal-num dim">${cur.getDate()}</span>`;
             }
 
-            const click = inMonth ? `onclick="openCalDayModal('${dateStr}')"` : '';
+            // Empty future cell (ไม่มี slot, ไม่ใช่วันหยุด, ไม่ใช่อดีต) → เปิด modal สร้างรอบทันที
+            // วันอื่น (มี slot / หยุด / past เดือนนี้) → ดู detail ผ่าน openCalDayModal
+            let click = '';
+            if (inMonth) {
+                const isEmptyFuture = !isPast && !dayInfo.clinic_closed && slots.length === 0;
+                click = isEmptyFuture
+                    ? `onclick="openSlotCreateModal('${dateStr}')"`
+                    : `onclick="openCalDayModal('${dateStr}')"`;
+            }
             html += `<div class="${cellCls}" ${click}>${cellContent}</div>`;
             cur.setDate(cur.getDate() + 1);
         }
@@ -1918,9 +1950,12 @@ $portalCsrf = get_csrf_token();
         loadCalendar();
     };
 
+    let calCurrentDay = null; // ใช้กับปุ่ม "เพิ่มรอบในวันนี้"
+
     window.openCalDayModal = function(dateStr) {
         const info = (calData || {})[dateStr];
         if (!info) return;
+        calCurrentDay = dateStr;
 
         const [y, m, d] = dateStr.split('-');
         const months = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
@@ -1928,6 +1963,11 @@ $portalCsrf = get_csrf_token();
         const dt = new Date(dateStr + 'T00:00:00');
         document.getElementById('cal-day-title').textContent =
             `วัน${weekdays[dt.getDay()]}ที่ ${parseInt(d,10)} ${months[parseInt(m,10)-1]} ${parseInt(y,10)+543}`;
+
+        // ปุ่ม "เพิ่มรอบในวันนี้" — แสดงเฉพาะวันในอนาคต (รวมวันนี้)
+        const today = new Date(); today.setHours(0,0,0,0);
+        const addBtn = document.getElementById('cal-day-add-btn');
+        addBtn.style.display = dt >= today ? '' : 'none';
 
         const sub = document.getElementById('cal-day-subtitle');
         const banner = document.getElementById('cal-day-holiday-banner');
@@ -1976,6 +2016,13 @@ $portalCsrf = get_csrf_token();
             }).join('');
         }
         document.getElementById('cal-day-modal').classList.add('show');
+    };
+
+    // Helper: เปิด bulk-create modal สำหรับวันที่ที่แสดงอยู่ใน day-detail
+    window.addSlotFromDayModal = function() {
+        if (!calCurrentDay) return;
+        closeModal('cal-day-modal');
+        openSlotCreateModal(calCurrentDay);
     };
 
     // ── Init: load default tab (Dashboard)
