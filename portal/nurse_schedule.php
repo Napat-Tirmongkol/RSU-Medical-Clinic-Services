@@ -1,11 +1,14 @@
 <?php
-// portal/nurse_schedule.php — ระบบจัดตารางเวรพยาบาล (drop-in standalone)
-// ใช้ผ่าน iframe ใน portal section หรือเข้าตรงได้
-// ข้อมูลเก็บใน browser localStorage (per-user, per-browser)
+// portal/nurse_schedule.php — ระบบจัดตารางเวรพยาบาล
+// Phase 2: ข้อมูลเก็บที่ server (sys_nurse_schedule_global + sys_nurse_schedule_monthly)
+//   ผ่าน portal/ajax_nurse_schedule.php · multi-user แชร์ข้อมูลร่วมกัน
+// localStorage เป็น offline cache ช่วยตอน server ไม่ตอบ
 declare(strict_types=1);
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/includes/auth.php';
+require_once __DIR__ . '/../includes/csrf.php';
 // auth.php จะ redirect ถ้าไม่ได้ login (admin/staff session ผ่านแล้ว)
+$NS_CSRF_TOKEN = get_csrf_token();
 ?>
 <!DOCTYPE html>
 <html lang="th">
@@ -952,7 +955,79 @@ function getMonthHolidays(yBE, m) {
 }
 
 // ========= STORAGE =========
+// ========= SERVER SYNC (Phase 2) =========
+const NS_AJAX = 'ajax_nurse_schedule.php';
+const NS_CSRF = <?= json_encode($NS_CSRF_TOKEN, JSON_UNESCAPED_SLASHES) ?>;
+let _saveTimer = null;
+let _isSaving = false;
+
+function _showSaveStatus(text, cls) {
+  let el = document.getElementById('ns-save-status');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'ns-save-status';
+    el.style.cssText = 'position:fixed;bottom:14px;right:14px;z-index:9999;'
+      + 'padding:7px 14px;border-radius:999px;font-size:12px;font-weight:700;'
+      + 'box-shadow:0 4px 12px rgba(0,0,0,0.12);transition:opacity .3s,transform .3s;'
+      + 'opacity:0;transform:translateY(8px);';
+    document.body.appendChild(el);
+  }
+  el.textContent = text;
+  el.style.background = cls === 'err' ? '#fee2e2' : (cls === 'ok' ? '#dcfce7' : '#dbeafe');
+  el.style.color      = cls === 'err' ? '#991b1b' : (cls === 'ok' ? '#166534' : '#1e40af');
+  el.style.opacity = '1'; el.style.transform = 'translateY(0)';
+  clearTimeout(el._hideTimer);
+  if (cls === 'ok') {
+    el._hideTimer = setTimeout(() => { el.style.opacity = '0'; el.style.transform = 'translateY(8px)'; }, 1800);
+  }
+}
+
+async function serverLoad(year, month) {
+  try {
+    const r = await fetch(`${NS_AJAX}?action=load&year=${year}&month=${month}`,
+      { credentials: 'same-origin' });
+    const j = await r.json();
+    if (!j.ok) { console.warn('serverLoad failed', j.error); return null; }
+    return j.data || null;
+  } catch (e) {
+    console.warn('serverLoad error', e);
+    return null;
+  }
+}
+
+async function serverSave() {
+  if (_isSaving) return;
+  _isSaving = true;
+  _showSaveStatus('กำลังบันทึก…', '');
+  try {
+    const payload = {
+      nurses: state.nurses,
+      schedule: state.schedule,
+      leaves: state.leaves,
+      requirements: state.requirements,
+      otSettings: state.otSettings,
+      customHolidays: state.customHolidays || {},
+      removedHolidays: state.removedHolidays || {},
+    };
+    const fd = new FormData();
+    fd.append('csrf_token', NS_CSRF);
+    fd.append('action', 'save');
+    fd.append('year', String(state.year));
+    fd.append('month', String(state.month));
+    fd.append('payload', JSON.stringify(payload));
+    const r = await fetch(NS_AJAX, { method: 'POST', body: fd, credentials: 'same-origin' });
+    const j = await r.json();
+    if (j.ok) _showSaveStatus('บันทึกแล้ว ✓', 'ok');
+    else _showSaveStatus('บันทึกล้มเหลว: ' + (j.error || ''), 'err');
+  } catch (e) {
+    _showSaveStatus('ออฟไลน์ · เก็บใน browser', 'err');
+  } finally {
+    _isSaving = false;
+  }
+}
+
 function persistAll() {
+  // เก็บใน localStorage เป็น cache ก่อน (เร็ว instant)
   const data = {
     year: state.year, month: state.month,
     nurses: state.nurses,
@@ -964,9 +1039,41 @@ function persistAll() {
   };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   state.dirty = false;
+
+  // Debounced save to server (800ms after last edit)
+  clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(serverSave, 800);
 }
 
-function loadFromStorage() {
+async function loadFromStorage() {
+  // ลอง server ก่อน (ของจริง shared ทุกคน)
+  const serverData = await serverLoad(state.year, state.month);
+  if (serverData) {
+    state.nurses          = (Array.isArray(serverData.nurses) && serverData.nurses.length)
+                             ? serverData.nurses : structuredClone(DEFAULT_NURSES);
+    state.schedule        = serverData.schedule || {};
+    state.leaves          = serverData.leaves || {};
+    state.requirements    = serverData.requirements || structuredClone(DEFAULT_REQ);
+    state.otSettings      = serverData.otSettings || structuredClone(DEFAULT_OT);
+    state.customHolidays  = serverData.customHolidays || {};
+    state.removedHolidays = serverData.removedHolidays || {};
+    // Migration: "บด" → "ดบ"
+    for (const key in state.schedule) {
+      if (state.schedule[key] === 'บด') state.schedule[key] = 'ดบ';
+    }
+    enforceHeadsWeekdayOnly();
+    // อัปเดต localStorage cache
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      year: state.year, month: state.month,
+      nurses: state.nurses, schedule: state.schedule, leaves: state.leaves,
+      requirements: state.requirements, otSettings: state.otSettings,
+      customHolidays: state.customHolidays, removedHolidays: state.removedHolidays,
+      savedAt: new Date().toISOString(),
+    }));
+    return true;
+  }
+
+  // Fallback: localStorage (offline หรือ server ไม่ตอบ)
   const raw = localStorage.getItem(STORAGE_KEY);
   if (!raw) {
     state.nurses = structuredClone(DEFAULT_NURSES);
@@ -981,15 +1088,10 @@ function loadFromStorage() {
     state.otSettings = data.otSettings || structuredClone(DEFAULT_OT);
     state.customHolidays = data.customHolidays || {};
     state.removedHolidays = data.removedHolidays || {};
-    // Migration: "บด" → "ดบ"
-    let migrated = 0;
     for (const key in state.schedule) {
-      if (state.schedule[key] === 'บด') { state.schedule[key] = 'ดบ'; migrated++; }
+      if (state.schedule[key] === 'บด') state.schedule[key] = 'ดบ';
     }
-    if (migrated > 0) console.log(`Migrated ${migrated} "บด" → "ดบ"`);
-    // Clean up any cached violations: heads must be weekday-only
-    const headsViolations = enforceHeadsWeekdayOnly();
-    if (headsViolations > 0) console.log(`Cleaned ${headsViolations} head/deputy weekend violations from cached data`);
+    enforceHeadsWeekdayOnly();
     return true;
   } catch(e) { console.error('Load error', e); return false; }
 }
@@ -2454,10 +2556,11 @@ function clearAll() {
   });
 }
 
-function onMonthChange() {
+async function onMonthChange() {
   state.month = +document.getElementById('monthSelect').value;
   state.year = +document.getElementById('yearSelect').value;
-  // Re-enforce heads when month/year changes (holidays may differ)
+  // โหลดข้อมูล schedule + leaves ของเดือนใหม่จาก server
+  await loadFromStorage();
   enforceHeadsWeekdayOnly();
   renderSchedule();
   renderLeaves();
@@ -2467,9 +2570,9 @@ function onMonthChange() {
 }
 
 // ========= STARTUP =========
-window.addEventListener('DOMContentLoaded', () => {
-  loadFromStorage();
-  initSelectors();
+window.addEventListener('DOMContentLoaded', async () => {
+  initSelectors();             // ต้อง init ก่อนเพื่อให้ state.year/month มีค่า
+  await loadFromStorage();     // โหลดข้อมูลจาก server (async)
   loadReqToUI();
   loadOTToUI();
   renderShiftPalette();
