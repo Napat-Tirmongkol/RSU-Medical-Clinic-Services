@@ -149,6 +149,11 @@ $portalCsrf = get_csrf_token();
             <p class="text-sm text-slate-500 mt-1">จัดการนักศึกษา · ตารางกะ · อนุมัติเข้า-ออกงาน · รายงาน</p>
         </div>
         <div class="flex items-center gap-3">
+            <a href="../scholarship_help.php" target="_blank" rel="noopener"
+               class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-black hover:bg-emerald-500 hover:text-white transition-colors"
+               title="เปิดคู่มือใช้งานในแท็บใหม่">
+                <i class="fa-solid fa-book-open"></i>คู่มือ
+            </a>
             <div class="text-right">
                 <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">นักศึกษาทุน</p>
                 <p class="text-lg font-black text-slate-900"><?= number_format($cntStudents) ?> คน</p>
