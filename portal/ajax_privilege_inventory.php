@@ -68,17 +68,11 @@ try {
     $stmt = $pdo->prepare($sql);
     $stmt->execute([$user_id, $role_assigned, $justification, $approved_by, $expiry_date, $document_path]);
 
-    // Log this activity (ISO requirement)
-    $adminName = $_SESSION['admin_full_name'] ?? 'System';
-    $log_sql = "INSERT INTO sys_activity_logs (admin_id, admin_name, action, description, timestamp)
-                VALUES (?, ?, ?, ?, NOW())";
-    $log_stmt = $pdo->prepare($log_sql);
-    $log_stmt->execute([
-        $_SESSION['admin_id'],
-        $adminName,
+    // Log this activity (ISO requirement) — ใช้ helper กลางใน config.php
+    log_activity(
         'ISO_PRIVILEGE_RECORD',
         "Recorded privileged access for Admin ID: $user_id ($role_assigned)"
-    ]);
+    );
 
     echo json_encode(['status' => 'success', 'message' => 'บันทึกข้อมูลสิทธิ์เรียบร้อยแล้ว']);
 
