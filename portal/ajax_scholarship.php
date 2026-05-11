@@ -9,6 +9,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/../includes/scholarship_helper.php';
+require_once __DIR__ . '/../includes/clinic_status_helper.php';
 
 // Authorization: superadmin หรือมี access_scholarship flag เท่านั้น
 $_role = $_SESSION['admin_role'] ?? '';
@@ -689,6 +690,80 @@ function handle_slots(PDO $pdo, string $action, int $adminId): void
             $pdo->rollBack();
             echo json_encode(['ok' => false, 'error' => 'ลบไม่สำเร็จ: ' . $e->getMessage()]);
         }
+        return;
+    }
+
+    if ($action === 'calendar') {
+        // คืน per-day summary: slots + bookings + clinic closure
+        $from = (string)($_POST['from'] ?? date('Y-m-01'));
+        $to   = (string)($_POST['to']   ?? date('Y-m-t'));
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $from) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $to)) {
+            echo json_encode(['ok' => false, 'error' => 'Invalid date']); return;
+        }
+
+        // 1) ดึง slot + booking + student ในช่วงเดียวกัน 1 query
+        $sql = "SELECT s.id AS slot_id, s.slot_date, s.start_time, s.end_time,
+                       s.max_capacity, s.comp_type, s.status AS slot_status, s.notes AS slot_notes,
+                       b.id AS booking_id, b.status AS booking_status,
+                       u.full_name AS student_name, ss.student_code
+                FROM sys_scholarship_slots s
+                LEFT JOIN sys_scholarship_slot_bookings b
+                    ON b.slot_id = s.id AND b.status = 'booked'
+                LEFT JOIN sys_scholarship_students ss ON ss.id = b.student_id
+                LEFT JOIN sys_users u ON u.id = ss.user_id
+                WHERE s.slot_date BETWEEN :from AND :to
+                  AND s.status != 'cancelled'
+                ORDER BY s.slot_date ASC, s.start_time ASC, b.booked_at ASC";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute([':from' => $from, ':to' => $to]);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+        // 2) group เป็น day → slots → bookings
+        $byDay = []; // 'YYYY-MM-DD' => ['slots' => [...]]
+        $slotMap = []; // slot_id => &$slotRef
+        foreach ($rows as $r) {
+            $day = $r['slot_date'];
+            if (!isset($byDay[$day])) $byDay[$day] = ['slots' => []];
+            if (!isset($slotMap[$r['slot_id']])) {
+                $byDay[$day]['slots'][] = [
+                    'id' => (int)$r['slot_id'],
+                    'start' => substr((string)$r['start_time'], 0, 5),
+                    'end'   => substr((string)$r['end_time'], 0, 5),
+                    'max'   => (int)$r['max_capacity'],
+                    'comp_type' => $r['comp_type'],
+                    'status' => $r['slot_status'],
+                    'notes' => $r['slot_notes'],
+                    'bookings' => [],
+                ];
+                $slotMap[$r['slot_id']] = &$byDay[$day]['slots'][count($byDay[$day]['slots']) - 1];
+            }
+            if (!empty($r['booking_id'])) {
+                $slotMap[$r['slot_id']]['bookings'][] = [
+                    'name' => $r['student_name'],
+                    'code' => $r['student_code'],
+                ];
+            }
+        }
+        unset($slotMap);
+
+        // 3) เติม clinic closure info ทุกวันในช่วง
+        $days = [];
+        $cur = new DateTime($from);
+        $endDate = new DateTime($to);
+        while ($cur <= $endDate) {
+            $d = $cur->format('Y-m-d');
+            $hours = get_clinic_hours_for_date($pdo, $d);
+            $days[$d] = [
+                'clinic_closed' => !empty($hours['closed']),
+                'clinic_note'   => $hours['note'] ?? '',
+                'clinic_source' => $hours['source'] ?? '',
+                'slots'         => $byDay[$d]['slots'] ?? [],
+            ];
+            $cur->modify('+1 day');
+        }
+
+        echo json_encode(['ok' => true, 'from' => $from, 'to' => $to, 'days' => $days],
+                         JSON_UNESCAPED_UNICODE);
         return;
     }
 
