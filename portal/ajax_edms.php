@@ -609,6 +609,28 @@ try {
             exit;
         }
 
+        // ════════════ CATEGORY: LIST ════════════
+        case 'category:list': {
+            $kind = $_REQUEST['kind'] ?? '';
+            $sql = "SELECT id, kind, code, name, color, sort_order, is_active,
+                           (SELECT COUNT(*) FROM sys_doc_documents
+                              WHERE priority_id = sys_doc_categories.id) AS used_count
+                    FROM sys_doc_categories";
+            $params = [];
+            if (in_array($kind, ['priority','confidentiality','custom'], true)) {
+                $sql .= " WHERE kind = ?";
+                $params[] = $kind;
+            }
+            $sql .= " ORDER BY kind ASC, sort_order ASC, name ASC";
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($params);
+            echo json_encode([
+                'ok' => true,
+                'categories' => $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [],
+            ], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
         // ════════════ CATEGORY: CRUD ════════════
         case 'category:create':
         case 'category:update': {

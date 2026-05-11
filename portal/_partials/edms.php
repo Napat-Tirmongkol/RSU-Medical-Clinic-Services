@@ -110,6 +110,11 @@ $tonePalette = [
             <p class="text-slate-500 text-sm font-medium">Electronic Document Management System (EDMS)</p>
         </div>
         <?php if (!empty($_SESSION['access_edms']) || ($_SESSION['admin_role'] ?? '') === 'superadmin'): ?>
+            <a href="?section=edms&edms_view=categories&kind=custom"
+                class="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 hover:bg-amber-100 text-xs font-black transition-colors"
+                title="เพิ่ม/แก้ไขหมวดหมู่เอกสาร">
+                <i class="fa-solid fa-tags"></i><span class="hidden sm:inline">จัดการหมวดหมู่</span>
+            </a>
             <span class="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-sky-50 border border-sky-100 text-sky-700 text-xs font-black uppercase tracking-widest">
                 <i class="fa-solid fa-circle-check"></i> Authorized
             </span>
