@@ -585,6 +585,16 @@ try {
     <link rel="stylesheet" href="../assets/css/portal.css?v=<?= @filemtime(__DIR__ . '/../assets/css/portal.css') ?: (defined('APP_BUILD') ? APP_BUILD : time()) ?>">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="../assets/js/safe-fetch.js?v=<?= @filemtime(__DIR__ . '/../assets/js/safe-fetch.js') ?: (defined('APP_BUILD') ? APP_BUILD : time()) ?>"></script>
+    <!-- Suppress harmless AbortError from skipped View Transitions
+         (เกิดเมื่อนำทางมาจากหน้า admin/e_Borrow ที่เปิด @view-transition แล้วถูกข้าม) -->
+    <script>
+        window.addEventListener('unhandledrejection', function(e) {
+            var r = e.reason;
+            if (r && r.name === 'AbortError' && /transition/i.test(r.message || '')) {
+                e.preventDefault();
+            }
+        });
+    </script>
     <style>
         /* ── Toggle Switch (Maintenance Mode) ──────────────────────────────── */
         .toggle-wrap {
