@@ -825,7 +825,7 @@ async function loadOpenSlots() {
     if (!wrap) return;
     try {
         const fd = new FormData();
-        fd.append('csrf_token', '<?= htmlspecialchars(generate_csrf_token(), ENT_QUOTES) ?>');
+        fd.append('csrf_token', CSRF_TOKEN);
         fd.append('action', 'list_open');
         const r = await fetch('ajax_scholarship_booking.php', { method: 'POST', body: fd });
         const j = await r.json();
@@ -892,7 +892,7 @@ async function bookSlot(slotId) {
     if (!c.isConfirmed) return;
     try {
         const fd = new FormData();
-        fd.append('csrf_token', '<?= htmlspecialchars(generate_csrf_token(), ENT_QUOTES) ?>');
+        fd.append('csrf_token', CSRF_TOKEN);
         fd.append('action', 'book');
         fd.append('slot_id', String(slotId));
         const r = await fetch('ajax_scholarship_booking.php', { method: 'POST', body: fd });
@@ -916,7 +916,7 @@ async function cancelMyBooking(bookingId) {
     if (!c.isConfirmed) return;
     try {
         const fd = new FormData();
-        fd.append('csrf_token', '<?= htmlspecialchars(generate_csrf_token(), ENT_QUOTES) ?>');
+        fd.append('csrf_token', CSRF_TOKEN);
         fd.append('action', 'cancel');
         fd.append('booking_id', String(bookingId));
         fd.append('reason', c.value || '');
