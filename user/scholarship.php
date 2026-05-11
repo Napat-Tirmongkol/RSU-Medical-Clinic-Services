@@ -834,12 +834,37 @@ async function loadOpenSlots() {
             return;
         }
         if (!j.rows.length) {
+            let diagHtml = '';
+            if (j._diag) {
+                const d = j._diag;
+                const statusList = Object.entries(d.status_counts || {}).map(([k,v]) => `${k}:${v}`).join(' · ') || 'ไม่มีข้อมูล';
+                let sampleHtml = '';
+                if (d.sample_in_range && d.sample_in_range.length) {
+                    sampleHtml = '<div class="mt-1.5 pt-1.5 border-t border-slate-200"><b>ตัวอย่างในช่วง:</b><br>' +
+                        d.sample_in_range.map(s => `#${s.id} ${s.slot_date} ${s.start_time.substring(0,5)}–${s.end_time.substring(0,5)} <b>status=${s.status}</b>`).join('<br>') +
+                        '</div>';
+                }
+                diagHtml = `<details class="mt-3 text-left">
+                    <summary class="text-[10px] text-slate-500 cursor-pointer">▸ ข้อมูลดีบั๊ก (ส่งให้ผู้พัฒนา)</summary>
+                    <div class="mt-1 p-2 bg-slate-50 rounded-md text-[10px] text-slate-600 font-mono">
+                        student_id: ${d.studentId}<br>
+                        ช่วง: ${d.from} → ${d.to}<br>
+                        เวลาปัจจุบัน: ${d.now}<br>
+                        สลอตทั้งหมด: ${statusList}<br>
+                        สลอตในช่วง: ${d.in_date_range}<br>
+                        นักศึกษาคนนี้จองอยู่: ${d.student_booked}<br>
+                        ก่อนกรองเวลา: ${d.before_time_filter}
+                        ${sampleHtml}
+                    </div>
+                </details>`;
+            }
             wrap.innerHTML = `<div class="text-center py-4">
                 <p class="text-xs text-slate-400 mb-2">ยังไม่มีรอบว่างในช่วง 30 วัน</p>
                 <button onclick="reloadOpenSlots()" class="text-xs font-black text-emerald-600 active:scale-95 px-3 py-1 rounded-lg border border-emerald-200 hover:bg-emerald-50">
                     <i class="fa-solid fa-rotate mr-1"></i>โหลดอีกครั้ง
                 </button>
                 <p class="text-[10px] text-slate-400 mt-2">หาก admin เพิ่งเปิดรอบ กรุณารีเฟรช</p>
+                ${diagHtml}
             </div>`;
             return;
         }
