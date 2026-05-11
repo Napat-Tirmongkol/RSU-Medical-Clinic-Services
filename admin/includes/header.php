@@ -232,6 +232,17 @@ if (!function_exists('renderPageHeader')) {
     <script src="https://js.sentry-cdn.com/<?= htmlspecialchars(SENTRY_BROWSER_KEY, ENT_QUOTES) ?>.min.js" crossorigin="anonymous" defer></script>
     <?php endif; ?>
 
+    <!-- Suppress harmless AbortError from skipped View Transitions
+         (เกิดเมื่อนำทางซ้ำเร็วๆ / ไป download / กด back ระหว่าง transition) -->
+    <script>
+        window.addEventListener('unhandledrejection', function(e) {
+            var r = e.reason;
+            if (r && r.name === 'AbortError' && /transition/i.test(r.message || '')) {
+                e.preventDefault();
+            }
+        });
+    </script>
+
     <!-- Theme Sync Support -->
     <script>
         window.addEventListener('message', function(e) {

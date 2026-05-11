@@ -81,6 +81,15 @@ $base_url = explode('/e_Borrow', $_SERVER['SCRIPT_NAME'])[0] . '/e_Borrow/';
                 }
             } catch (e) { console.error('Theme init error:', e); }
         })();
+
+        // Suppress harmless AbortError from skipped View Transitions
+        // (เกิดเมื่อนำทางซ้ำเร็วๆ / ไป download / กด back ระหว่าง transition)
+        window.addEventListener('unhandledrejection', function(e) {
+            var r = e.reason;
+            if (r && r.name === 'AbortError' && /transition/i.test(r.message || '')) {
+                e.preventDefault();
+            }
+        });
     </script>
 
     <meta name="csrf-token" content="<?= htmlspecialchars($_SESSION['csrf_token'] ?? '', ENT_QUOTES) ?>">
