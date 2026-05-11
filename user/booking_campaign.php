@@ -46,9 +46,14 @@ render_header(__('campaign.page_title'));
     <div class="mb-8">
         <div class="flex items-center gap-3 mb-1">
             <div class="w-1.5 h-6 bg-orange-500 rounded-full"></div>
-            <h1 class="text-2xl font-black text-gray-900 font-prompt tracking-tight">
+            <h1 class="text-2xl font-black text-gray-900 font-prompt tracking-tight flex-1">
                 <?= htmlspecialchars(__('campaign.heading')) ?> <span class="text-[#0052CC]"><?= htmlspecialchars(__('campaign.heading_accent')) ?></span>
             </h1>
+            <a href="../e_campaign_help.php" target="_blank" rel="noopener"
+               class="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200 flex items-center justify-center active:scale-90 transition-all"
+               title="คู่มือ">
+                <i class="fa-solid fa-book-open text-sm"></i>
+            </a>
         </div>
         <p class="text-[13px] text-gray-400 font-medium font-prompt ml-4">
             <?= htmlspecialchars(__('campaign.desc')) ?>
