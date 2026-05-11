@@ -5254,12 +5254,35 @@ try {
 
     function markCurrentApp() {
         const key = currentAppKey();
-        if (!key) return;
-        // ใส่ class current ที่การ์ดของ app นั้น
-        document.querySelectorAll('.aps-card[data-app="' + key + '"]').forEach(c => c.classList.add('current'));
-        // อัพเดต label ใน topbar
-        const lbl = document.getElementById('app-current-label');
-        if (lbl && APP_LABELS[key]) lbl.textContent = '· ' + APP_LABELS[key];
+        // เคลียร์ current ของ card ทุกใบก่อน (กรณีเปลี่ยน section)
+        document.querySelectorAll('.aps-card.current').forEach(c => c.classList.remove('current'));
+        if (key) {
+            document.querySelectorAll('.aps-card[data-app="' + key + '"]').forEach(c => c.classList.add('current'));
+        }
+        updateBreadcrumb();
+    }
+
+    function updateBreadcrumb() {
+        const active = document.querySelector('.psb-item.psb-active');
+        const bcApp = document.getElementById('bc-app');
+        const bcSection = document.getElementById('bc-section');
+        const bcSep = document.getElementById('bc-sep');
+        if (!bcApp || !bcSection) return;
+        if (!active) {
+            bcApp.textContent = '';
+            bcSection.textContent = '';
+            if (bcSep) bcSep.style.display = 'none';
+            return;
+        }
+        const sectionLabel = (active.querySelector('.psb-label')?.textContent || active.textContent || '').trim();
+        const grp = active.closest('.psb-group');
+        const key = grp?.getAttribute('data-group');
+        const appLabel = (key && APP_LABELS[key]) || '';
+        bcApp.textContent = appLabel;
+        bcSection.textContent = sectionLabel;
+        if (bcSep) bcSep.style.display = appLabel ? '' : 'none';
+        // อัปเดต document.title ด้วยให้สวยใน browser tab
+        if (sectionLabel) document.title = sectionLabel + ' · Portal';
     }
 
     window.openAppSwitcher = function() {
@@ -5306,13 +5329,22 @@ try {
 
     document.addEventListener('DOMContentLoaded', function() {
         applyAndMark();
+
         // เมื่อ user คลิก sidebar item (อาจข้าม group) — re-apply
         document.querySelectorAll('.psb-item').forEach(item => {
-            item.addEventListener('click', () => {
-                // รอ switchSection อัพเดต psb-active ก่อน
-                setTimeout(applyAndMark, 0);
-            });
+            item.addEventListener('click', () => setTimeout(applyAndMark, 0));
         });
+
+        // Wrap switchSection ให้ breadcrumb อัปเดตเมื่อ nav จาก dashboard cards หรือที่อื่น
+        if (typeof window.switchSection === 'function' && !window._switchWrapped) {
+            const _orig = window.switchSection;
+            window.switchSection = function(sectionId, btn) {
+                const r = _orig.apply(this, arguments);
+                setTimeout(applyAndMark, 0);
+                return r;
+            };
+            window._switchWrapped = true;
+        }
     });
 })();
 </script>
