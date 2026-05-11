@@ -1760,13 +1760,16 @@ $portalCsrf = get_csrf_token();
         const id = document.getElementById('slot-edit-id').value;
         const c = await Swal.fire({
             icon: 'warning', title: 'ลบรอบนี้?',
-            text: 'การจองทั้งหมดของรอบนี้จะถูกยกเลิกด้วย',
+            text: 'ลบถาวร — การจองที่ยังใช้งานอยู่จะถูกยกเลิกไปด้วย',
             showCancelButton: true, confirmButtonText: 'ลบ', confirmButtonColor: '#e11d48', cancelButtonText: 'ยกเลิก',
         });
         if (!c.isConfirmed) return;
         const j = await api('slots', 'delete', { id });
         if (!j.ok) { Swal.fire({ icon: 'error', text: j.error || 'ลบไม่สำเร็จ' }); return; }
-        Swal.fire({ icon: 'success', title: 'ลบแล้ว', text: `ยกเลิกการจอง ${j.cancelled_bookings || 0} รายการ`, timer: 1500, showConfirmButton: false });
+        const cancelledTxt = (j.cancelled_bookings || 0) > 0
+            ? `ยกเลิกการจอง ${j.cancelled_bookings} รายการ`
+            : 'รอบถูกลบเรียบร้อย';
+        Swal.fire({ icon: 'success', title: 'ลบแล้ว', text: cancelledTxt, timer: 1500, showConfirmButton: false });
         closeModal('slot-edit-modal');
         loadSlots();
     };

@@ -662,30 +662,39 @@ function handle_slots(PDO $pdo, string $action, int $adminId): void
         $id = (int)($_POST['id'] ?? 0);
         if (!$id) { echo json_encode(['ok' => false, 'error' => 'missing id']); return; }
 
-        // soft delete: status = cancelled (เก็บ booking history เพื่อ audit)
+        // Hard delete: ลบ slot + booking ทั้งหมด พร้อม cancel auto-shifts
+        // (เก็บ clock_logs ผูก shift_id ไว้เพื่อ audit ของชั่วโมงที่นักศึกษาทำไปแล้ว)
         $pdo->beginTransaction();
         try {
-            // ยกเลิกการจองทั้งหมดของ slot นี้ + ยกเลิก shift ที่ auto-สร้าง
+            // ดึง shift_id ทั้งหมด (เพื่อ cancel ไม่ลบ — เก็บ history clock-in/out)
             $bookings = $pdo->prepare("SELECT id, shift_id FROM sys_scholarship_slot_bookings
-                WHERE slot_id = :id AND status = 'booked'");
+                WHERE slot_id = :id");
             $bookings->execute([':id' => $id]);
             $bks = $bookings->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
-            $cancelBooking = $pdo->prepare("UPDATE sys_scholarship_slot_bookings
-                SET status = 'cancelled', cancelled_at = NOW(), cancel_reason = 'admin ลบรอบ'
-                WHERE id = :bid");
             $cancelShift = $pdo->prepare("UPDATE sys_scholarship_shifts
                 SET status = 'cancelled' WHERE id = :sid");
+            $activeCancelled = 0;
             foreach ($bks as $b) {
-                $cancelBooking->execute([':bid' => (int)$b['id']]);
                 if (!empty($b['shift_id'])) $cancelShift->execute([':sid' => (int)$b['shift_id']]);
+                // นับเฉพาะ active bookings สำหรับ feedback
+                // (ไม่ดึง status ออกมาด้วย — ดูจาก row ที่เคย booked)
             }
 
-            $pdo->prepare("UPDATE sys_scholarship_slots SET status = 'cancelled' WHERE id = :id")
+            // นับ booking ที่ยัง active ก่อนลบ (สำหรับ message)
+            $cntStmt = $pdo->prepare("SELECT COUNT(*) FROM sys_scholarship_slot_bookings
+                WHERE slot_id = :id AND status = 'booked'");
+            $cntStmt->execute([':id' => $id]);
+            $activeCancelled = (int)$cntStmt->fetchColumn();
+
+            // Hard delete bookings + slot
+            $pdo->prepare("DELETE FROM sys_scholarship_slot_bookings WHERE slot_id = :id")
+                ->execute([':id' => $id]);
+            $pdo->prepare("DELETE FROM sys_scholarship_slots WHERE id = :id")
                 ->execute([':id' => $id]);
 
             $pdo->commit();
-            echo json_encode(['ok' => true, 'cancelled_bookings' => count($bks)]);
+            echo json_encode(['ok' => true, 'cancelled_bookings' => $activeCancelled]);
         } catch (Throwable $e) {
             $pdo->rollBack();
             echo json_encode(['ok' => false, 'error' => 'ลบไม่สำเร็จ: ' . $e->getMessage()]);
