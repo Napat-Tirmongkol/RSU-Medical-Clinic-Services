@@ -55,7 +55,13 @@ try {
 // Determine if user can apply
 $canApply = true;
 $blockMessage = '';
-if ($existing) {
+$isStudent = (($user['status'] ?? '') === 'student');
+
+// บัตรทองเปิดเฉพาะนักศึกษา
+if (!$isStudent) {
+    $canApply = false;
+    $blockMessage = 'ระบบบัตรทองเปิดให้สมัครเฉพาะนักศึกษาเท่านั้น หากเป็นบุคลากรหรือบุคคลทั่วไป กรุณาติดต่อเจ้าหน้าที่คลินิกโดยตรง';
+} elseif ($existing) {
     $st = $existing['status'] ?? '';
     if (in_array($st, ['pending', 'submitted', 'approved', 'active'], true)) {
         $canApply = false;
@@ -144,16 +150,19 @@ $__navActive = 'services';
 
     <div class="max-w-md mx-auto px-4 -mt-12 relative z-10">
         <?php if (!$canApply): ?>
-            <!-- Already applied state -->
+            <!-- Block state — เฉพาะนักศึกษา / มีใบสมัครอยู่แล้ว -->
             <div class="bg-white rounded-3xl p-6 shadow-lg border border-amber-100">
                 <div class="text-center py-6">
-                    <div class="w-20 h-20 mx-auto mb-4 rounded-full bg-amber-100 flex items-center justify-center">
-                        <i class="fa-solid fa-circle-check text-4xl text-amber-600"></i>
+                    <div class="w-20 h-20 mx-auto mb-4 rounded-full <?= $isStudent ? 'bg-amber-100' : 'bg-slate-100' ?> flex items-center justify-center">
+                        <i class="fa-solid <?= $isStudent ? 'fa-circle-check text-amber-600' : 'fa-user-graduate text-slate-500' ?> text-4xl"></i>
                     </div>
-                    <h2 class="text-lg font-black text-slate-900 mb-2">มีใบสมัครอยู่แล้ว</h2>
+                    <h2 class="text-lg font-black text-slate-900 mb-2">
+                        <?= $isStudent ? 'มีใบสมัครอยู่แล้ว' : 'สมัครได้เฉพาะนักศึกษา' ?>
+                    </h2>
                     <p class="text-[13px] font-bold text-slate-600 leading-relaxed mb-6"><?= vh($blockMessage) ?></p>
                     <a href="profile.php" class="inline-block px-6 py-3 rounded-2xl bg-amber-500 text-white font-black text-sm shadow-lg active:scale-95 transition-all">
-                        <i class="fa-solid fa-id-card mr-2"></i> ดูสถานะที่หน้า Profile
+                        <i class="fa-solid <?= $isStudent ? 'fa-id-card' : 'fa-arrow-left' ?> mr-2"></i>
+                        <?= $isStudent ? 'ดูสถานะที่หน้า Profile' : 'กลับไปหน้า Profile' ?>
                     </a>
                 </div>
             </div>

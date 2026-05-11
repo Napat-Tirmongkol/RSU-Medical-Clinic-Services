@@ -40,11 +40,15 @@ if ($lineUserId === '') {
 $pdo = db();
 
 // Load user
-$stmt = $pdo->prepare("SELECT id, full_name, citizen_id FROM sys_users WHERE line_user_id = :lid LIMIT 1");
+$stmt = $pdo->prepare("SELECT id, full_name, citizen_id, status FROM sys_users WHERE line_user_id = :lid LIMIT 1");
 $stmt->execute([':lid' => $lineUserId]);
 $user = $stmt->fetch();
 if (!$user) {
     json_err('ไม่พบข้อมูลผู้ใช้', 404);
+}
+// บัตรทองเปิดให้สมัครเฉพาะ "นักศึกษา" เท่านั้น (sys_users.status)
+if (($user['status'] ?? '') !== 'student') {
+    json_err('ระบบบัตรทองเปิดให้สมัครเฉพาะนักศึกษาเท่านั้น', 403);
 }
 $userId = (int)$user['id'];
 
