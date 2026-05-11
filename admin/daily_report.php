@@ -550,7 +550,11 @@ const CSRF_DR = '<?= get_csrf_token() ?>';
             const checkin   = r.attended_at
                 ? (() => {
                     const dt = new Date(r.attended_at);
-                    return dt.toLocaleTimeString('th-TH', {hour:'2-digit', minute:'2-digit'}) + ' น.';
+                    const dateStr = String(dt.getDate()).padStart(2,'0') + '/' +
+                                    String(dt.getMonth()+1).padStart(2,'0') + '/' +
+                                    (dt.getFullYear()+543);
+                    const timeStr = dt.toLocaleTimeString('th-TH', {hour:'2-digit', minute:'2-digit'}) + ' น.';
+                    return `<div class="text-xs text-gray-500 font-medium leading-tight">${dateStr}</div><div class="leading-tight">${timeStr}</div>`;
                   })()
                 : '<span class="text-gray-300">—</span>';
             const dim = r.visit_type === 'cancelled' ? 'opacity-50' : '';
