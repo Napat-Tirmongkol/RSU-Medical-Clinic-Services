@@ -1063,10 +1063,15 @@ function _showSaveStatus(text, cls) {
     el.style.cssText = 'position:fixed;bottom:14px;right:14px;z-index:9999;'
       + 'padding:7px 14px;border-radius:999px;font-size:12px;font-weight:700;'
       + 'box-shadow:0 4px 12px rgba(0,0,0,0.12);transition:opacity .3s,transform .3s;'
-      + 'opacity:0;transform:translateY(8px);';
+      + 'opacity:0;transform:translateY(8px);cursor:pointer;'
+      + 'display:flex;align-items:center;gap:8px';
+    el.title = 'คลิกเพื่อบันทึกทันที';
+    el.addEventListener('click', () => saveNow());
     document.body.appendChild(el);
   }
-  el.textContent = text;
+  // ปุ่ม "บันทึกทันที" inline เมื่อ save fail
+  const showSaveBtn = (cls === 'err');
+  el.innerHTML = `<span>${text}</span>${showSaveBtn ? '<span style="background:#fff;color:#991b1b;padding:2px 8px;border-radius:999px;font-size:11px">🔄 ลองอีกครั้ง</span>' : ''}`;
   el.style.background = cls === 'err' ? '#fee2e2' : (cls === 'ok' ? '#dcfce7' : '#dbeafe');
   el.style.color      = cls === 'err' ? '#991b1b' : (cls === 'ok' ? '#166534' : '#1e40af');
   el.style.opacity = '1'; el.style.transform = 'translateY(0)';
@@ -1074,6 +1079,7 @@ function _showSaveStatus(text, cls) {
   if (cls === 'ok') {
     el._hideTimer = setTimeout(() => { el.style.opacity = '0'; el.style.transform = 'translateY(8px)'; }, 1800);
   }
+  // ถ้า error — คงไว้จนกว่า save สำเร็จ (ไม่ fade)
 }
 
 async function serverLoad(year, month) {
@@ -1089,33 +1095,45 @@ async function serverLoad(year, month) {
   }
 }
 
+// สร้าง payload สำหรับส่งขึ้น server (สร้างใหม่ทุกครั้งเพื่อ snapshot ปัจจุบัน)
+function _buildSavePayload() {
+  return {
+    nurses: state.nurses,
+    schedule: state.schedule,
+    leaves: state.leaves,
+    requirements: state.requirements,
+    otSettings: state.otSettings,
+    customHolidays: state.customHolidays || {},
+    removedHolidays: state.removedHolidays || {},
+    shiftTypes: state.shiftTypes || {},
+    customPositions: state.customPositions || {},
+  };
+}
+
 async function serverSave() {
   if (_isSaving) return;
   _isSaving = true;
   _showSaveStatus('กำลังบันทึก…', '');
   try {
-    const payload = {
-      nurses: state.nurses,
-      schedule: state.schedule,
-      leaves: state.leaves,
-      requirements: state.requirements,
-      otSettings: state.otSettings,
-      customHolidays: state.customHolidays || {},
-      removedHolidays: state.removedHolidays || {},
-      shiftTypes: state.shiftTypes || {},
-      customPositions: state.customPositions || {},
-    };
     const fd = new FormData();
     fd.append('csrf_token', NS_CSRF);
     fd.append('action', 'save');
     fd.append('year', String(state.year));
     fd.append('month', String(state.month));
-    fd.append('payload', JSON.stringify(payload));
+    fd.append('payload', JSON.stringify(_buildSavePayload()));
     const r = await fetch(NS_AJAX, { method: 'POST', body: fd, credentials: 'same-origin' });
     const j = await r.json();
-    if (j.ok) _showSaveStatus('บันทึกแล้ว ✓', 'ok');
-    else _showSaveStatus('บันทึกล้มเหลว: ' + (j.error || ''), 'err');
+    if (j.ok) {
+      // ✓ ยืนยันจาก server แล้วค่อย clear dirty flag
+      state.dirty = false;
+      _showSaveStatus('บันทึกแล้ว ✓', 'ok');
+    } else {
+      // ยังคง dirty ไว้เพื่อให้ retry / beforeunload warn / Save Now ใช้ได้
+      console.error('[nurse_schedule] save failed:', j.error);
+      _showSaveStatus('บันทึกล้มเหลว: ' + (j.error || ''), 'err');
+    }
   } catch (e) {
+    console.error('[nurse_schedule] save error:', e);
     _showSaveStatus('ออฟไลน์ · เก็บใน browser', 'err');
   } finally {
     _isSaving = false;
@@ -1126,26 +1144,66 @@ function persistAll() {
   // เก็บใน localStorage เป็น cache ก่อน (เร็ว instant)
   const data = {
     year: state.year, month: state.month,
-    nurses: state.nurses,
-    schedule: state.schedule, leaves: state.leaves,
-    requirements: state.requirements, otSettings: state.otSettings,
-    customHolidays: state.customHolidays || {},
-    removedHolidays: state.removedHolidays || {},
-    shiftTypes: state.shiftTypes || {},
-    customPositions: state.customPositions || {},
+    ..._buildSavePayload(),
     savedAt: new Date().toISOString()
   };
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-  state.dirty = false;
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch (e) { console.warn('localStorage save failed', e); }
+  // ⚠ ไม่ clear state.dirty ตรงนี้ — รอ server confirm ใน serverSave()
 
   // Debounced save to server (800ms after last edit)
   clearTimeout(_saveTimer);
   _saveTimer = setTimeout(serverSave, 800);
 }
 
+// Force save แบบ sync ตอนปิดหน้า — ใช้ sendBeacon เพื่อให้สำเร็จก่อน browser ปิด
+function _flushSaveBeacon() {
+  if (!state.dirty) return;
+  try {
+    const fd = new FormData();
+    fd.append('csrf_token', NS_CSRF);
+    fd.append('action', 'save');
+    fd.append('year', String(state.year));
+    fd.append('month', String(state.month));
+    fd.append('payload', JSON.stringify(_buildSavePayload()));
+    if (navigator.sendBeacon) navigator.sendBeacon(NS_AJAX, fd);
+  } catch (e) { /* best effort */ }
+}
+
+// บันทึกทันที (ใช้กับปุ่ม "บันทึกทันที" / Ctrl+S)
+async function saveNow() {
+  clearTimeout(_saveTimer);
+  await serverSave();
+}
+
 async function loadFromStorage() {
   // ลอง server ก่อน (ของจริง shared ทุกคน)
   const serverData = await serverLoad(state.year, state.month);
+
+  // ถ้า server ตอบ แต่ "ว่างเปล่า" (เพราะยังไม่เคยบันทึก หรือ save เคยเฟล)
+  // → ลองใช้ localStorage cache แทนเพื่อกู้ข้อมูลที่ user ทำไว้
+  const serverHasNurses = serverData && Array.isArray(serverData.nurses) && serverData.nurses.length > 0;
+  if (serverData && !serverHasNurses) {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const cache = JSON.parse(raw);
+        if (Array.isArray(cache.nurses) && cache.nurses.length > 0) {
+          console.warn('[nurse_schedule] server มี nurses ว่าง — กู้จาก localStorage cache');
+          // Merge: ใช้ nurses + shiftTypes + customPositions + requirements จาก cache
+          // แต่ schedule/leaves ใช้ของ server (เพราะอาจมีคนอื่นแก้)
+          serverData.nurses          = cache.nurses;
+          serverData.shiftTypes      = serverData.shiftTypes      || cache.shiftTypes      || {};
+          serverData.customPositions = serverData.customPositions || cache.customPositions || {};
+          serverData.requirements    = serverData.requirements    || cache.requirements    || null;
+          // ถ้า schedule/leaves ฝั่ง server ว่างด้วย ใช้ของ cache
+          if (!serverData.schedule || Object.keys(serverData.schedule).length === 0) serverData.schedule = cache.schedule || {};
+          if (!serverData.leaves   || Object.keys(serverData.leaves).length   === 0) serverData.leaves   = cache.leaves   || {};
+          state.dirty = true; // mark dirty เพื่อให้ auto-save เขียนกลับขึ้น server
+        }
+      }
+    } catch (e) { console.warn('localStorage cache read failed', e); }
+  }
+
   if (serverData) {
     state.nurses          = (Array.isArray(serverData.nurses) && serverData.nurses.length)
                              ? serverData.nurses : structuredClone(DEFAULT_NURSES);
@@ -3462,13 +3520,23 @@ window.addEventListener('DOMContentLoaded', async () => {
   updateHolidayBadge();
   lucide.createIcons();
 
-  // Warn before leaving with unsaved changes
+  // Force flush save (sendBeacon) ตอนปิด/รีเฟรช — ทำงานได้แม้ browser กำลังปิด
+  window.addEventListener('pagehide', _flushSaveBeacon);
   window.addEventListener('beforeunload', e => {
+    _flushSaveBeacon();
     if (state.dirty) { e.preventDefault(); e.returnValue = ''; }
   });
 
-  // Auto-save every 60 seconds if dirty
-  setInterval(() => { if (state.dirty) persistAll(); }, 60000);
+  // Ctrl+S / Cmd+S → บันทึกทันที (ไม่ให้ browser save HTML)
+  window.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+      e.preventDefault();
+      saveNow();
+    }
+  });
+
+  // Auto-save every 15 seconds if dirty (เดิม 60s → ลดเพื่อกันข้อมูลหายเวลาเน็ตหลุด)
+  setInterval(() => { if (state.dirty && !_isSaving) serverSave(); }, 15000);
 });
 </script>
 </body>
