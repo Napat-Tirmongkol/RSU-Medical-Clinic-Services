@@ -96,4 +96,29 @@ include __DIR__ . '/includes/header.php';
     <?php endif; ?>
 </div>
 
+<!-- ════════════ Guided Tour (Driver.js) ════════════ -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/driver.js@1.3.1/dist/driver.css">
+<script src="https://cdn.jsdelivr.net/npm/driver.js@1.3.1/dist/driver.js.iife.js"></script>
+<script src="../assets/js/rsu-tour.js"></script>
+<script>
+(function () {
+    const assetSteps = [
+        { popover: { title: 'ยินดีต้อนรับสู่ระบบครุภัณฑ์', description: 'จัดการทะเบียนทรัพย์สินของหน่วยงาน — ทัวร์สั้นๆ ดูฟีเจอร์หลักกัน' } },
+        { element: '[role="tablist"]', popover: { title: 'สลับโมดูล', description: 'แท็บบนสุดสลับไปหาวัสดุสิ้นเปลือง (ใช้ตาราง asset_locations ร่วมกัน)', side: 'bottom' } },
+        { element: '.psb-item[href*="manage_assets"]', popover: { title: 'รายการครุภัณฑ์', description: 'ทะเบียนทรัพย์สินทั้งหมด — เพิ่ม/แก้/ค้นหา', side: 'right' } },
+        { element: '.psb-item[href*="manage_locations"]', popover: { title: 'จุดใช้งาน', description: 'จัดการที่ตั้งของครุภัณฑ์ (ใช้ร่วมกับวัสดุสิ้นเปลือง)', side: 'right' } },
+        { element: '.psb-item[href*="scan.php"]', popover: { title: 'สแกน QR', description: 'สแกนบาร์โค้ดบนตัวครุภัณฑ์เพื่อดูประวัติ/ย้ายจุดใช้งาน', side: 'right' } },
+        { element: '.psb-item[href*="stock_take"]', popover: { title: 'ตรวจนับ', description: 'เปิดรอบตรวจนับประจำปี — สแกนเช็คมี/ไม่มี', side: 'right' } },
+        { popover: { title: 'เริ่มใช้งานได้เลย', description: 'กดปุ่ม <i class="fa-solid fa-question"></i> มุมซ้ายล่างเมื่อต้องการดูทัวร์ซ้ำ' } },
+    ];
+    window.RsuTour && RsuTour.maybeAutoStart('asset', assetSteps);
+    window._assetTourSteps = assetSteps;
+})();
+</script>
+<button id="rsu-tour-fab" type="button" aria-label="ดู Tour อีกครั้ง" title="ดู Tour อีกครั้ง"
+    onclick="window.RsuTour && RsuTour.start(window._assetTourSteps, 'asset')"
+    style="position:fixed;bottom:20px;left:20px;width:44px;height:44px;border-radius:50%;border:none;background:#2e9e63;color:#fff;font-size:16px;cursor:pointer;box-shadow:0 4px 12px rgba(46,158,99,.35);z-index:90">
+    <i class="fa-solid fa-question"></i>
+</button>
+
 <?php include __DIR__ . '/includes/footer.php'; ?>
