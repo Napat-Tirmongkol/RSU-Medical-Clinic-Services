@@ -677,6 +677,9 @@ $NS_CSRF_TOKEN = get_csrf_token();
           <button onclick="openTimesheetSettings()" class="btn-solid btn-info text-sm" title="ตั้งค่าใบลงเวลา (ชื่อคลินิก/ผู้ลงนาม/ภาษี)">
             <i data-lucide="settings" class="w-3.5 h-3.5"></i> ตั้งค่าใบลงเวลา
           </button>
+          <button onclick="openShiftHoursEditor()" class="btn-solid btn-info text-sm" title="ตั้งค่าเวลาเริ่ม-สิ้นสุดของแต่ละกะ (จันทร์-ศุกร์ / เสาร์-อาทิตย์)">
+            <i data-lucide="clock" class="w-3.5 h-3.5"></i> ตั้งค่าเวลาเวร
+          </button>
           <button onclick="openManagePositions()" class="btn-solid btn-warning text-sm" title="เพิ่ม/แก้ไขตำแหน่ง">
             <i data-lucide="badge-plus" class="w-3.5 h-3.5"></i> จัดการตำแหน่ง
           </button>
@@ -2930,6 +2933,112 @@ async function openTimesheetSettings() {
   } catch (e) {
     Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: String(e) });
   }
+}
+
+// ตั้งค่าเวลาเริ่ม-สิ้นสุดของแต่ละ shift code (จันทร์-ศุกร์ และ เสาร์-อาทิตย์)
+async function openShiftHoursEditor() {
+  // เฉพาะ shift ที่ทำงานจริง (ข้าม O/V/T ที่ hours=0)
+  const workingCodes = ['ช','บ','ด','ชบ','ดบ','DN'].filter(c => SHIFT_TYPES[c]);
+
+  const rows = workingCodes.map(code => {
+    const t = SHIFT_TYPES[code] || {};
+    const hasWeekend = typeof t.weekendHours === 'number';
+    const wkStart = t.weekendStartTime || t.startTime || '';
+    const wkEnd   = t.weekendEndTime   || t.endTime   || '';
+    const wkHrs   = hasWeekend ? t.weekendHours : (t.hours || 0);
+    return `
+      <div class="shift-hour-row" data-code="${code}" style="border:1px solid #e2e8f0;border-radius:10px;padding:10px;margin-bottom:8px;background:#f8fafc">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+          <span style="display:inline-block;min-width:34px;height:28px;line-height:28px;text-align:center;border-radius:6px;background:${t.bg||'#e2e8f0'};color:${t.fg||'#475569'};font-weight:700">${code}</span>
+          <span style="font-weight:600;color:#0f172a">${t.name || code}</span>
+        </div>
+        <!-- จันทร์-ศุกร์ -->
+        <div style="display:grid;grid-template-columns:120px 1fr 1fr 90px;gap:8px;align-items:center;margin-bottom:6px">
+          <div style="font-size:12px;color:#475569;font-weight:600">จันทร์-ศุกร์</div>
+          <input type="time" class="sh-wd-start" value="${t.startTime||''}" style="padding:6px 8px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px">
+          <input type="time" class="sh-wd-end"   value="${t.endTime||''}"   style="padding:6px 8px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px">
+          <input type="number" min="0" step="0.25" class="sh-wd-hrs" value="${t.hours||0}" placeholder="ชม." style="padding:6px 8px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;text-align:center">
+        </div>
+        <!-- toggle เสาร์-อาทิตย์ -->
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#475569;margin:6px 0">
+          <input type="checkbox" class="sh-we-toggle" ${hasWeekend?'checked':''}>
+          <span>เสาร์-อาทิตย์เวลาแตกต่างจากวันธรรมดา</span>
+        </label>
+        <div class="sh-we-block" style="display:${hasWeekend?'grid':'none'};grid-template-columns:120px 1fr 1fr 90px;gap:8px;align-items:center">
+          <div style="font-size:12px;color:#475569;font-weight:600">เสาร์-อาทิตย์</div>
+          <input type="time" class="sh-we-start" value="${wkStart}" style="padding:6px 8px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px">
+          <input type="time" class="sh-we-end"   value="${wkEnd}"   style="padding:6px 8px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px">
+          <input type="number" min="0" step="0.25" class="sh-we-hrs" value="${wkHrs}" placeholder="ชม." style="padding:6px 8px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;text-align:center">
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  const r = await Swal.fire({
+    title: 'ตั้งค่าเวลาเวร',
+    html: `<div class="text-left" style="text-align:left">
+      <div style="font-size:12px;color:#64748b;margin-bottom:10px">
+        ตั้งค่า "เวลาเริ่ม-สิ้นสุด" และ "จำนวนชั่วโมง" ต่อกะ — ใช้ในการแสดงผลใบลงเวลา + คิดเงินเดือนเป็นรายชั่วโมง<br>
+        ถ้าเสาร์-อาทิตย์ทำเวลาสั้นกว่าวันธรรมดา ติ๊กเลือก checkbox แล้วกรอกเวลา weekend
+      </div>
+      <div style="display:grid;grid-template-columns:120px 1fr 1fr 90px;gap:8px;margin-bottom:6px;font-size:11px;color:#94a3b8;font-weight:600;text-transform:uppercase">
+        <div></div><div>เริ่ม</div><div>ถึง</div><div>ชม.</div>
+      </div>
+      ${rows}
+    </div>`,
+    showCancelButton: true,
+    confirmButtonText: 'บันทึก',
+    cancelButtonText: 'ยกเลิก',
+    confirmButtonColor: '#0ea5e9',
+    width: 700,
+    didOpen: () => {
+      // toggle เสาร์-อาทิตย์ → show/hide weekend block
+      document.querySelectorAll('.sh-we-toggle').forEach(cb => {
+        cb.addEventListener('change', e => {
+          const block = e.target.closest('.shift-hour-row').querySelector('.sh-we-block');
+          block.style.display = e.target.checked ? 'grid' : 'none';
+        });
+      });
+    },
+    preConfirm: () => {
+      const out = {};
+      document.querySelectorAll('.shift-hour-row').forEach(row => {
+        const code = row.dataset.code;
+        const wdStart = row.querySelector('.sh-wd-start').value || '';
+        const wdEnd   = row.querySelector('.sh-wd-end').value   || '';
+        const wdHrs   = parseFloat(row.querySelector('.sh-wd-hrs').value) || 0;
+        const useWe   = row.querySelector('.sh-we-toggle').checked;
+        const entry = { startTime: wdStart, endTime: wdEnd, hours: wdHrs };
+        if (useWe) {
+          entry.weekendStartTime = row.querySelector('.sh-we-start').value || '';
+          entry.weekendEndTime   = row.querySelector('.sh-we-end').value   || '';
+          entry.weekendHours     = parseFloat(row.querySelector('.sh-we-hrs').value) || 0;
+        }
+        out[code] = entry;
+      });
+      return out;
+    }
+  });
+  if (!r.isConfirmed) return;
+
+  // merge เข้า state.shiftTypes แล้ว apply
+  state.shiftTypes = state.shiftTypes || {};
+  for (const code in r.value) {
+    state.shiftTypes[code] = { ...(state.shiftTypes[code] || {}), ...r.value[code] };
+    // ถ้า user ปิด weekend ในรอบนี้ — ลบ weekend fields ออกเพื่อให้ revert ไปใช้ค่าเดียวกับวันธรรมดา
+    if (r.value[code].weekendHours === undefined) {
+      delete state.shiftTypes[code].weekendStartTime;
+      delete state.shiftTypes[code].weekendEndTime;
+      delete state.shiftTypes[code].weekendHours;
+    }
+  }
+  applyShiftTypeOverrides();
+  state.dirty = true;
+  persistAll();
+  // refresh ส่วนที่ใช้ค่าเวลา
+  if (typeof renderOT === 'function')        { try { renderOT(); } catch (e) {} }
+  if (typeof renderDashboard === 'function') { try { renderDashboard(); } catch (e) {} }
+  Swal.fire({ icon: 'success', title: 'บันทึกแล้ว', timer: 1200, showConfirmButton: false });
 }
 
 // ========= HOLIDAY MANAGER =========
