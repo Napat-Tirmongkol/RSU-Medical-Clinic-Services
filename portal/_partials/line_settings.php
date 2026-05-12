@@ -1092,3 +1092,193 @@ function sendTestLineP() {
     });
 })();
 </script>
+
+<!-- ════════════ Rich Menu Creator (เรียก API LINE สร้างให้) ════════════ -->
+<div class="max-w-4xl mx-auto px-4 md:px-6 pb-12 mt-4">
+    <div class="bg-white rounded-3xl border border-slate-200 shadow-sm p-6">
+        <div class="flex items-center gap-3 mb-1">
+            <div class="w-10 h-10 bg-purple-50 text-purple-600 rounded-2xl border border-purple-100 flex items-center justify-center">
+                <i class="fa-solid fa-wand-magic-sparkles"></i>
+            </div>
+            <div>
+                <h3 class="text-lg font-black text-slate-800">สร้าง Rich Menu ผ่าน API</h3>
+                <p class="text-xs text-slate-500 font-medium">กรอกฟอร์ม + อัพรูป → ระบบเรียก API LINE สร้างให้ → ได้ richMenuId กลับมาวางในช่องบนทันที</p>
+            </div>
+        </div>
+
+        <div class="bg-amber-50 border border-amber-100 rounded-2xl p-3 mt-4 text-xs text-amber-800 font-medium flex gap-2 items-start">
+            <i class="fa-solid fa-triangle-exclamation text-amber-500 mt-0.5"></i>
+            <div>
+                <span class="font-black">ข้อกำหนดของ LINE:</span>
+                ขนาดภาพต้องตรงกับ size ที่เลือกเป๊ะ ๆ · PNG/JPEG · ไม่เกิน 1 MB · click areas ต้องไม่ออกนอกขอบภาพ
+            </div>
+        </div>
+
+        <form id="rmCreateForm" onsubmit="rmCreate(event)" class="mt-5 space-y-4">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div class="md:col-span-2">
+                    <label class="block text-[11px] font-black uppercase tracking-widest text-slate-500 mb-1.5">ชื่อ (ใช้ภายใน)</label>
+                    <input type="text" name="rc_name" value="Guest Menu" required
+                        class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 outline-none focus:border-purple-400">
+                </div>
+                <div>
+                    <label class="block text-[11px] font-black uppercase tracking-widest text-slate-500 mb-1.5">Chat Bar Text</label>
+                    <input type="text" name="rc_chatbar" value="เมนู" required maxlength="14"
+                        class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 outline-none focus:border-purple-400">
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div>
+                    <label class="block text-[11px] font-black uppercase tracking-widest text-slate-500 mb-1.5">ขนาด</label>
+                    <select name="rc_size" id="rcSize" onchange="rmSizeChange()" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 outline-none">
+                        <option value="2500x1686">Large 2500×1686</option>
+                        <option value="2500x843">Compact 2500×843</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[11px] font-black uppercase tracking-widest text-slate-500 mb-1.5">selected (auto-show)</label>
+                    <select name="rc_selected" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 outline-none">
+                        <option value="true">true (แสดง expanded ทันที)</option>
+                        <option value="false">false (แสดง icon ให้กดเปิด)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[11px] font-black uppercase tracking-widest text-slate-500 mb-1.5">ไฟล์ภาพ (PNG/JPEG, ≤1MB)</label>
+                    <input type="file" name="image" id="rcImage" accept="image/png,image/jpeg" required
+                        class="w-full text-xs font-bold text-slate-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-black file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100">
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-[11px] font-black uppercase tracking-widest text-slate-500 mb-1.5">
+                    Click Areas (JSON) — array ของ {bounds, action}
+                </label>
+                <textarea name="rc_areas" id="rcAreas" rows="10" required
+                    class="w-full px-3 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-[12px] font-mono text-emerald-300 outline-none focus:border-purple-400"
+                    spellcheck="false"></textarea>
+                <div class="flex flex-wrap gap-2 mt-2">
+                    <button type="button" onclick="rmTemplate('grid_3x2')" class="text-[10px] font-black px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 border border-slate-200">
+                        Template 3×2 (6 ปุ่ม)
+                    </button>
+                    <button type="button" onclick="rmTemplate('grid_2x1')" class="text-[10px] font-black px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 border border-slate-200">
+                        Template 2×1 (2 ปุ่ม)
+                    </button>
+                    <button type="button" onclick="rmTemplate('single')" class="text-[10px] font-black px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 border border-slate-200">
+                        Template 1 ปุ่มเต็มภาพ
+                    </button>
+                </div>
+                <p class="text-[10px] text-slate-400 font-medium mt-1.5">
+                    Action types: <span class="font-mono">uri</span> (เปิด URL), <span class="font-mono">message</span> (ส่ง text), <span class="font-mono">postback</span>, <span class="font-mono">richmenuswitch</span>
+                </p>
+            </div>
+
+            <div class="flex items-center justify-between pt-2 border-t border-slate-100">
+                <p class="text-[11px] text-slate-500 font-medium">เมื่อสร้างสำเร็จ ID จะปรากฏใน popup และ auto-paste ลงช่อง guest หรือ member ที่เลือก</p>
+                <div class="flex gap-2">
+                    <select id="rcTarget" class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-black text-slate-700 outline-none">
+                        <option value="guest">→ Guest ID</option>
+                        <option value="member">→ Member ID</option>
+                        <option value="none">ไม่ auto-paste</option>
+                    </select>
+                    <button type="submit" class="px-5 py-2 rounded-xl bg-purple-500 hover:bg-purple-600 text-white text-xs font-black inline-flex items-center gap-1.5 transition-colors">
+                        <i class="fa-solid fa-bolt"></i> สร้าง Rich Menu
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+(function(){
+    const CSRF = (typeof portal_CSRF !== 'undefined') ? portal_CSRF : (document.querySelector('meta[name="csrf-token"]')?.content || '');
+
+    const TEMPLATES = {
+        // 2500×1686 Large
+        grid_3x2: JSON.stringify([
+            { bounds: { x: 0,    y: 0,   width: 833,  height: 843 }, action: { type: 'uri',    uri: 'https://example.com/a' } },
+            { bounds: { x: 833,  y: 0,   width: 834,  height: 843 }, action: { type: 'uri',    uri: 'https://example.com/b' } },
+            { bounds: { x: 1667, y: 0,   width: 833,  height: 843 }, action: { type: 'uri',    uri: 'https://example.com/c' } },
+            { bounds: { x: 0,    y: 843, width: 833,  height: 843 }, action: { type: 'message',text: 'สมัครสมาชิก' } },
+            { bounds: { x: 833,  y: 843, width: 834,  height: 843 }, action: { type: 'message',text: 'ติดต่อ' } },
+            { bounds: { x: 1667, y: 843, width: 833,  height: 843 }, action: { type: 'message',text: 'ช่วยเหลือ' } },
+        ], null, 2),
+        // 2500×843 Compact
+        grid_2x1: JSON.stringify([
+            { bounds: { x: 0,    y: 0, width: 1250, height: 843 }, action: { type: 'uri',     uri: 'https://example.com/register' } },
+            { bounds: { x: 1250, y: 0, width: 1250, height: 843 }, action: { type: 'message', text: 'ข้อมูล' } },
+        ], null, 2),
+        // ทั้งภาพ
+        single: JSON.stringify([
+            { bounds: { x: 0, y: 0, width: 2500, height: 1686 }, action: { type: 'uri', uri: 'https://example.com/' } },
+        ], null, 2),
+    };
+
+    window.rmTemplate = function(key) {
+        const ta = document.getElementById('rcAreas');
+        if (!ta) return;
+        // ตั้ง size ให้ตรงกับ template
+        const sizeSel = document.getElementById('rcSize');
+        if (key === 'grid_2x1') sizeSel.value = '2500x843';
+        else sizeSel.value = '2500x1686';
+        ta.value = TEMPLATES[key] || '';
+    };
+
+    window.rmSizeChange = function(){ /* placeholder */ };
+
+    // ตั้งค่า default template ตอนโหลด
+    document.getElementById('rcAreas').value = TEMPLATES.grid_3x2;
+
+    window.rmCreate = async function(e) {
+        e.preventDefault();
+        const form = e.target;
+        const fd = new FormData(form);
+
+        // Build config JSON
+        const [w, h] = (fd.get('rc_size') || '2500x1686').split('x').map(Number);
+        let areas;
+        try {
+            areas = JSON.parse(fd.get('rc_areas') || '[]');
+            if (!Array.isArray(areas)) throw new Error('areas ต้องเป็น array');
+        } catch (err) {
+            Swal.fire({ icon: 'error', title: 'Areas JSON ไม่ถูกต้อง', text: err.message });
+            return;
+        }
+        const config = {
+            size:         { width: w, height: h },
+            selected:     fd.get('rc_selected') === 'true',
+            name:         fd.get('rc_name'),
+            chatBarText:  fd.get('rc_chatbar'),
+            areas:        areas,
+        };
+
+        const target = document.getElementById('rcTarget').value;
+
+        const payload = new FormData();
+        payload.append('action', 'create');
+        payload.append('csrf_token', CSRF);
+        payload.append('config', JSON.stringify(config));
+        payload.append('image', fd.get('image'));
+
+        Swal.fire({ title: 'กำลังสร้าง...', text: 'สร้าง config + อัพโหลดรูป', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
+        const r = await fetch('ajax_line_richmenu.php', { method: 'POST', body: payload }).then(x => x.json());
+
+        if (!r.ok) {
+            Swal.fire({ icon: 'error', title: 'สร้างไม่สำเร็จ' + (r.step ? ` (${r.step})` : ''), text: r.message || '' });
+            return;
+        }
+
+        // Auto-paste
+        if (target === 'guest') document.getElementById('rmGuestId').value = r.richMenuId;
+        if (target === 'member') document.getElementById('rmMemberId').value = r.richMenuId;
+
+        const auto = (target === 'guest' || target === 'member') ? `<br><small>วางลงช่อง <b>${target}</b> แล้ว — อย่าลืมกด "บันทึก ID" ด้านบน</small>` : '';
+        Swal.fire({
+            icon: 'success',
+            title: 'สร้างสำเร็จ',
+            html: `<code style="font-size:11px;background:#f1f5f9;padding:4px 8px;border-radius:6px;display:inline-block;margin-top:8px;word-break:break-all">${r.richMenuId}</code>${auto}`,
+        });
+    };
+})();
+</script>
