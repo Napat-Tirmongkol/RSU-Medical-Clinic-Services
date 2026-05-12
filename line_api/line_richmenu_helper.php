@@ -33,25 +33,50 @@ if (!function_exists('line_richmenu_api')) {
     /**
      * Low-level: เรียก LINE API
      *
+     * Akamai edge ของ api.line.me รับ libcurl ดีกว่าถ้าใส่ HTTP/1.1 + UA
+     * + trim token + ใช้ CURLOPT_POST=true (ไม่ใช้ CUSTOMREQUEST=POST
+     * ที่ทำให้ HTTP request line ผิดเพี้ยน)
+     *
      * @return array{http:int, body:string, error:?string}
      */
-    function line_richmenu_api(string $method, string $path): array
+    function line_richmenu_api(string $method, string $path, ?string $jsonBody = null): array
     {
         $token = line_richmenu_token();
         if ($token === '') {
             return ['http' => 0, 'body' => '', 'error' => 'LINE_MESSAGING_CHANNEL_ACCESS_TOKEN ยังไม่ได้ตั้งค่า'];
         }
+        $token = trim($token);
         $url = 'https://api.line.me' . $path;
         $ch = curl_init($url);
-        curl_setopt_array($ch, [
-            CURLOPT_CUSTOMREQUEST  => $method,
+
+        $opts = [
             CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT        => 10,
+            CURLOPT_TIMEOUT        => 15,
+            CURLOPT_HTTP_VERSION   => CURL_HTTP_VERSION_1_1,
+            CURLOPT_USERAGENT      => 'RSU-Clinic-LineRichMenu/1.0',
             CURLOPT_HTTPHEADER     => [
                 'Authorization: Bearer ' . $token,
                 'Content-Type: application/json',
             ],
-        ]);
+        ];
+
+        // Per method — ใช้ option เฉพาะแทน CUSTOMREQUEST เพื่อให้ Akamai เห็น
+        // request line ที่สะอาด (e.g. "POST /path HTTP/1.1" ไม่มี oddities)
+        $upper = strtoupper($method);
+        if ($upper === 'POST') {
+            $opts[CURLOPT_POST] = true;
+            $opts[CURLOPT_POSTFIELDS] = $jsonBody ?? ''; // ถ้าไม่มี body ใส่ empty string (ไม่ใช่ null)
+            $opts[CURLOPT_HTTPHEADER][] = 'Content-Length: ' . strlen($jsonBody ?? '');
+        } elseif ($upper === 'DELETE') {
+            $opts[CURLOPT_CUSTOMREQUEST] = 'DELETE';
+        } elseif ($upper === 'GET') {
+            $opts[CURLOPT_HTTPGET] = true;
+        } else {
+            $opts[CURLOPT_CUSTOMREQUEST] = $upper;
+            if ($jsonBody !== null) $opts[CURLOPT_POSTFIELDS] = $jsonBody;
+        }
+
+        curl_setopt_array($ch, $opts);
         $body = (string)curl_exec($ch);
         $http = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $err  = curl_error($ch) ?: null;
@@ -182,30 +207,13 @@ if (!function_exists('line_richmenu_create')) {
      */
     function line_richmenu_create(array $config): array
     {
-        $token = line_richmenu_token();
-        if ($token === '') return ['ok' => false, 'richMenuId' => null, 'http' => 0, 'error' => 'LINE token ยังไม่ได้ตั้งค่า'];
-
-        $ch = curl_init('https://api.line.me/v2/bot/richmenu');
-        curl_setopt_array($ch, [
-            CURLOPT_CUSTOMREQUEST  => 'POST',
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT        => 15,
-            CURLOPT_POSTFIELDS     => json_encode($config, JSON_UNESCAPED_UNICODE),
-            CURLOPT_HTTPHEADER     => [
-                'Authorization: Bearer ' . $token,
-                'Content-Type: application/json',
-            ],
-        ]);
-        $body = (string)curl_exec($ch);
-        $http = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $err  = curl_error($ch) ?: null;
-        curl_close($ch);
-
-        if ($http < 200 || $http >= 300) {
-            return ['ok' => false, 'richMenuId' => null, 'http' => $http, 'error' => $body ?: $err];
+        $json = json_encode($config, JSON_UNESCAPED_UNICODE);
+        $r = line_richmenu_api('POST', '/v2/bot/richmenu', $json);
+        if ($r['http'] < 200 || $r['http'] >= 300) {
+            return ['ok' => false, 'richMenuId' => null, 'http' => $r['http'], 'error' => $r['body'] ?: $r['error']];
         }
-        $data = json_decode($body, true) ?: [];
-        return ['ok' => true, 'richMenuId' => $data['richMenuId'] ?? null, 'http' => $http, 'error' => null];
+        $data = json_decode($r['body'], true) ?: [];
+        return ['ok' => true, 'richMenuId' => $data['richMenuId'] ?? null, 'http' => $r['http'], 'error' => null];
     }
 }
 
