@@ -168,6 +168,19 @@ $navGroups = [
 <!-- ════════════ Main shell ════════════ -->
 <div id="app-shell" style="flex:1;min-width:0;background:#f4f7f5;height:100vh;overflow-y:auto;display:flex;flex-direction:column;">
     <header class="asset-header" style="position:sticky;top:0;z-index:30">
+        <!-- Module switcher tabs (Asset ↔ Consumables share asset_locations) -->
+        <div role="tablist" aria-label="คลังพัสดุ" style="display:flex;background:#fafbfc;border-bottom:1px solid #e2e8f0">
+            <a href="../asset/index.php" role="tab" aria-selected="false"
+               style="display:inline-flex;align-items:center;gap:8px;padding:9px 16px;text-decoration:none;font-size:12.5px;font-weight:700;color:#64748b;border-bottom:2px solid transparent;transition:color .15s,background .15s"
+               onmouseover="this.style.color='#2e9e63';this.style.background='#f8fafc'"
+               onmouseout="this.style.color='#64748b';this.style.background='transparent'">
+                <i class="fa-solid fa-boxes-stacked"></i><span>ครุภัณฑ์</span>
+            </a>
+            <a href="../consumables/index.php" role="tab" aria-selected="true"
+               style="display:inline-flex;align-items:center;gap:8px;padding:9px 16px;text-decoration:none;font-size:12.5px;font-weight:800;color:#2e9e63;border-bottom:2px solid #2e9e63;background:#f0faf4">
+                <i class="fa-solid fa-box-open"></i><span>วัสดุสิ้นเปลือง</span>
+            </a>
+        </div>
         <div class="px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
             <div>
                 <div class="text-[11px] text-slate-500 font-bold uppercase tracking-wider">RSU Medical Clinic · วัสดุสิ้นเปลือง</div>
