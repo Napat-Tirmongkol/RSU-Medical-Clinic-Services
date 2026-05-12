@@ -109,13 +109,43 @@ try {
         $byType = $pdo->query("SELECT type, COUNT(*) c FROM sys_doctor_schedule WHERE is_active = 1 GROUP BY type")->fetchAll(PDO::FETCH_KEY_PAIR);
         $debugInventory['by_type'] = $byType ?: [];
         $samples = $pdo->query("
-            SELECT s.id, s.type, s.weekday, s.specific_date, s.start_time, s.end_time,
-                   s.is_active, s.staff_id, ms.full_name AS doc_name
+            SELECT s.id, s.type, s.weekday, s.specific_date, s.recur_end_date,
+                   s.start_time, s.end_time, s.is_active, s.staff_id,
+                   ms.full_name AS doc_name
               FROM sys_doctor_schedule s
               LEFT JOIN sys_medical_staff ms ON s.staff_id = ms.id
-              ORDER BY s.id DESC LIMIT 10
+              ORDER BY s.id DESC LIMIT 15
         ")->fetchAll(PDO::FETCH_ASSOC);
         $debugInventory['samples'] = $samples ?: [];
+
+        // ── ทดสอบ query เดียวกับ get_clinic_doctors_for_date() แบบ raw ───
+        $todayW = (int)(new DateTimeImmutable($today, $tz))->format('w');
+        $rawTest = $pdo->prepare("
+            SELECT COUNT(*) FROM sys_doctor_schedule
+             WHERE is_active = 1
+               AND (
+                   specific_date = :d
+                   OR (
+                       type = 'regular'
+                       AND weekday = :wd
+                       AND (recur_end_date IS NULL OR recur_end_date = '0000-00-00' OR recur_end_date >= :d2)
+                   )
+               )
+        ");
+        $rawTest->execute([':d' => $today, ':wd' => $todayW, ':d2' => $today]);
+        $debugInventory['raw_query_today_count'] = (int)$rawTest->fetchColumn();
+
+        // เช็คเฉพาะ regular ที่ weekday ตรง (ไม่สนใจ recur_end_date)
+        $weekdayOnly = $pdo->prepare("
+            SELECT COUNT(*) FROM sys_doctor_schedule
+             WHERE is_active = 1 AND type = 'regular' AND weekday = :wd
+        ");
+        $weekdayOnly->execute([':wd' => $todayW]);
+        $debugInventory['regular_weekday_match_count'] = (int)$weekdayOnly->fetchColumn();
+
+        // เช็ค type ของ weekday column
+        $colInfo = $pdo->query("SHOW COLUMNS FROM sys_doctor_schedule LIKE 'weekday'")->fetch(PDO::FETCH_ASSOC);
+        $debugInventory['weekday_column_type'] = $colInfo['Type'] ?? 'unknown';
     } catch (Throwable $e) {
         $debugInventory['error'] = $e->getMessage();
     }

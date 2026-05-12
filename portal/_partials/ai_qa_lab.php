@@ -1700,13 +1700,30 @@ function renderResult(question, j) {
         const byTypeStr = Object.entries(inv.by_type||{}).map(([k,v]) => `<span class="inline-block bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full mx-1">${escH(k)}: ${v}</span>`).join('') || '<span class="text-amber-600 italic">ไม่มี</span>';
             let samples = '';
         if ((inv.samples||[]).length) {
-            samples = '<details class="mt-2"><summary class="cursor-pointer font-bold text-amber-900">10 rows ล่าสุด (ดูดิบ)</summary><table class="w-full text-xs mt-1"><thead><tr class="bg-amber-100"><th class="px-1.5 py-1">id</th><th class="px-1.5 py-1">type</th><th class="px-1.5 py-1">weekday</th><th class="px-1.5 py-1">specific_date</th><th class="px-1.5 py-1">time</th><th class="px-1.5 py-1">active</th><th class="px-1.5 py-1">หมอ</th></tr></thead><tbody>' +
-                inv.samples.map(s => `<tr class="border-t border-amber-200"><td class="px-1.5 py-1">${s.id}</td><td class="px-1.5 py-1">${escH(s.type||'-')}</td><td class="px-1.5 py-1">${s.weekday!=null?escH(WEEKDAY[s.weekday]||s.weekday):'-'}</td><td class="px-1.5 py-1">${escH(s.specific_date||'-')}</td><td class="px-1.5 py-1">${escH((s.start_time||'').substring(0,5))}–${escH((s.end_time||'').substring(0,5))}</td><td class="px-1.5 py-1">${s.is_active==1?'✅':'❌'}</td><td class="px-1.5 py-1">${escH(s.doc_name||'(N/A)')}</td></tr>`).join('') +
+            samples = '<details class="mt-2" open><summary class="cursor-pointer font-bold text-amber-900">' + inv.samples.length + ' rows ล่าสุด (raw data)</summary><table class="w-full text-xs mt-1"><thead><tr class="bg-amber-100"><th class="px-1.5 py-1">id</th><th class="px-1.5 py-1">type</th><th class="px-1.5 py-1">weekday<br><span class="font-normal text-amber-600">(raw)</span></th><th class="px-1.5 py-1">specific_date</th><th class="px-1.5 py-1">recur_end_date</th><th class="px-1.5 py-1">time</th><th class="px-1.5 py-1">active</th><th class="px-1.5 py-1">หมอ</th></tr></thead><tbody>' +
+                inv.samples.map(s => {
+                    const wdLabel = s.weekday != null && s.weekday !== ''
+                        ? `${escH(WEEKDAY[s.weekday]||'?')}<span class="text-amber-500 ml-1">(${escH(s.weekday)})</span>`
+                        : '<span class="text-gray-400">null</span>';
+                    return `<tr class="border-t border-amber-200"><td class="px-1.5 py-1">${s.id}</td><td class="px-1.5 py-1">${escH(s.type||'-')}</td><td class="px-1.5 py-1">${wdLabel}</td><td class="px-1.5 py-1">${escH(s.specific_date||'-')}</td><td class="px-1.5 py-1">${escH(s.recur_end_date||'-')}</td><td class="px-1.5 py-1">${escH((s.start_time||'').substring(0,5))}–${escH((s.end_time||'').substring(0,5))}</td><td class="px-1.5 py-1">${s.is_active==1?'✅':'❌'}</td><td class="px-1.5 py-1">${escH(s.doc_name||'(N/A)')}</td></tr>`;
+                }).join('') +
                 '</tbody></table></details>';
         }
+
+        const rawCount = inv.raw_query_today_count;
+        const wdMatchCount = inv.regular_weekday_match_count;
+        let diagText = '';
+        if (rawCount === 0 && wdMatchCount > 0) {
+            diagText = `<div class="mt-2 p-2 bg-rose-50 border border-rose-200 rounded text-rose-700"><b>🔍 พบสาเหตุ:</b> มี regular shift weekday ตรง (${wdMatchCount} rows) แต่ query รวมคืน 0 → ปัญหาอยู่ที่ <code>recur_end_date</code> (อาจเป็นวันที่ผ่านไปแล้ว) หรือ specific_date filter</div>`;
+        } else if (rawCount === 0 && wdMatchCount === 0) {
+            diagText = `<div class="mt-2 p-2 bg-rose-50 border border-rose-200 rounded text-rose-700"><b>🔍 พบสาเหตุ:</b> ไม่มี regular shift ที่มี weekday = ${inv.today_weekday} เลย → ต้องเช็คว่า weekday ใน DB ถูก stored เป็น integer 0-6 หรือเปล่า (column type: <code>${escH(inv.weekday_column_type||'-')}</code>)</div>`;
+        }
+
         invBody.innerHTML = `
             <div class="mb-1"><b>ทั้งหมด:</b> ${inv.total} rows · <b>active:</b> ${inv.active} · <b>weekday วันนี้:</b> ${WEEKDAY[inv.today_weekday]||inv.today_weekday} (${inv.today_weekday})</div>
-            <div class="mb-2"><b>By type:</b> ${byTypeStr}</div>
+            <div class="mb-1"><b>By type:</b> ${byTypeStr}</div>
+            <div class="mb-2"><b>weekday column type:</b> <code class="bg-amber-100 px-1 rounded">${escH(inv.weekday_column_type||'?')}</code> · <b>raw query (วันนี้):</b> ${rawCount} rows · <b>regular+weekday match:</b> ${wdMatchCount} rows</div>
+            ${diagText}
             ${samples}
             ${inv.error ? `<div class="text-rose-600 mt-1">⚠ ${escH(inv.error)}</div>` : ''}
         `;
