@@ -5452,6 +5452,29 @@ try {
 })();
 </script>
 
+<!-- ════════════ Guided Tour (Driver.js) ════════════ -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/driver.js@1.3.1/dist/driver.css">
+<script src="https://cdn.jsdelivr.net/npm/driver.js@1.3.1/dist/driver.js.iife.js"></script>
+<script src="../assets/js/rsu-tour.js"></script>
+<script>
+(function () {
+    const portalSteps = [
+        { popover: { title: 'ยินดีต้อนรับสู่ Portal', description: 'ระบบจัดการคลินิก RSU Medical Clinic Services — ทัวร์สั้นๆ ดูเมนูหลักกัน' } },
+        { element: '#portal-sidebar', popover: { title: 'Sidebar เมนู', description: 'เมนูจัดเป็นกลุ่ม (OVERVIEW / AI Suite / สิทธิ์ / ประกัน / สื่อสาร / คลังพัสดุ / ติดตามระบบ / ข้อมูลหลัก / ตั้งค่า) — คลิกหัวกลุ่มเพื่อเปิด/ปิด', side: 'right' } },
+        { element: '.psb-section-toggle[data-group="inventory"]', popover: { title: 'คลังพัสดุ (ใหม่)', description: 'รวมทางเข้า "ครุภัณฑ์สำนักงาน" + "วัสดุสิ้นเปลือง" ไว้กลุ่มเดียว', side: 'right' } },
+        { element: '[data-section="settings"]', popover: { title: 'ตั้งค่าระบบ', description: 'ที่อยู่ของ Site Settings, Maintenance, LINE, AI ฯลฯ', side: 'right' } },
+        { popover: { title: 'เริ่มใช้งานได้เลย', description: 'กดปุ่ม <i class="fa-solid fa-question"></i> มุมซ้ายล่างเมื่อต้องการดูทัวร์ซ้ำได้ตลอด' } },
+    ];
+    window.RsuTour && RsuTour.maybeAutoStart('portal', portalSteps);
+    window._portalTourSteps = portalSteps;
+})();
+</script>
+<button id="rsu-tour-fab" type="button" aria-label="ดู Tour อีกครั้ง" title="ดู Tour อีกครั้ง"
+    onclick="window.RsuTour && RsuTour.start(window._portalTourSteps, 'portal')"
+    style="position:fixed;bottom:20px;left:20px;width:44px;height:44px;border-radius:50%;border:none;background:#2e9e63;color:#fff;font-size:16px;cursor:pointer;box-shadow:0 4px 12px rgba(46,158,99,.35);z-index:90;transition:transform .15s">
+    <i class="fa-solid fa-question"></i>
+</button>
+
 </body>
 
 </html>
