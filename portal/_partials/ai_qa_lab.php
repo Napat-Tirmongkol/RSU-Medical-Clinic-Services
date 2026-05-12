@@ -597,7 +597,7 @@ function _qa_source_badge(string $s): string {
         <?php endif; ?>
     </div>
 
-    <?php else: /* ════════════ TAB: FAQ KNOWLEDGE BASE ════════════ */ ?>
+    <?php elseif ($_qa_tab === 'faq'): /* ════════════ TAB: FAQ KNOWLEDGE BASE ════════════ */ ?>
 
     <!-- FAQ Stats -->
     <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
