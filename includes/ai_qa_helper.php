@@ -137,10 +137,11 @@ function ai_qa_load_gemini_key(): string
  *
  * ค่าที่ขาดให้แทนด้วย "(ไม่มีข้อมูล)" — AI จะรู้ตัวว่าต้อง fallback ไปเป็น placeholder
  */
-function ai_qa_build_clinic_context(PDO $pdo, ?DateTimeImmutable $asOf = null): string
+function ai_qa_build_clinic_context(PDO $pdo, ?DateTimeImmutable $asOf = null, string $query = ''): string
 {
     require_once __DIR__ . '/clinic_status_helper.php';
     require_once __DIR__ . '/ai_knowledge_helper.php';
+    require_once __DIR__ . '/ai_chunk_helper.php';
 
     $tz  = new DateTimeZone(CLINIC_TZ_NAME);
     // $asOf = "now" by default; for retrospective FAQ generation (Captured Questions),
@@ -243,6 +244,22 @@ function ai_qa_build_clinic_context(PDO $pdo, ?DateTimeImmutable $asOf = null): 
         ? "\n\n[ข้อมูลเพิ่มเติม / บริการ / ราคา / นโยบาย]\n{$notesText}"
         : '';
 
+    // ── Knowledge Chunks (RAG: semantic search ถ้ามี query) ───────────────
+    // ถ้ามี query: เลือก top-5 chunks ที่ใกล้เคียง → ฉีดเข้า context
+    // ถ้าไม่มี query: skip (กัน context ใหญ่เกินไป) — caller ทั่วไป (preview/diagnose)
+    // ไม่ต้องการ chunks เพราะจะใหญ่และไม่เกี่ยว
+    $chunksSection = '';
+    if ($query !== '') {
+        try {
+            $chunksText = render_chunks_context_block($pdo, $query, 5);
+            if ($chunksText !== '') {
+                $chunksSection = "\n\n[ข้อมูลที่เกี่ยวข้องจาก Knowledge Base]\n{$chunksText}";
+            }
+        } catch (Throwable $e) {
+            error_log('[chunks context] ' . $e->getMessage());
+        }
+    }
+
     $todayLabel = clinic_format_thai_date($days[0]);
 
     return <<<CTX
@@ -263,7 +280,7 @@ function ai_qa_build_clinic_context(PDO $pdo, ?DateTimeImmutable $asOf = null): 
 {$doctorsText}
 
 [FAQ Knowledge Base]
-{$faqText}{$notesSection}
+{$faqText}{$notesSection}{$chunksSection}
 CTX;
 }
 
@@ -281,7 +298,7 @@ function ai_qa_generate_answer(string $question, ?PDO $pdo = null, ?DateTimeImmu
 
     $categoriesList = implode(' | ', AI_QA_CATEGORIES);
     $clinicContext  = $pdo
-        ? ai_qa_build_clinic_context($pdo, $askedAt)
+        ? ai_qa_build_clinic_context($pdo, $askedAt, $question)
         : '(ไม่ได้ส่ง PDO เข้ามา — ไม่มี clinic context)';
 
     require_once __DIR__ . '/ai_prompts_helper.php';
