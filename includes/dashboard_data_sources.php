@@ -110,6 +110,131 @@ if (!function_exists('dashboard_data_sources_catalog')) {
                 'shape'   => 'timeseries',
                 'widgets' => ['line', 'area', 'bar'],
             ],
+
+            // ── การเงิน (Finance) ────────────────────────────────────────
+            'finance_income_total' => [
+                'label'   => 'การเงิน — รายรับรวม',
+                'shape'   => 'count',
+                'widgets' => ['kpi'],
+            ],
+            'finance_expense_total' => [
+                'label'   => 'การเงิน — รายจ่ายรวม',
+                'shape'   => 'count',
+                'widgets' => ['kpi'],
+            ],
+            'finance_balance' => [
+                'label'   => 'การเงิน — ยอดคงเหลือสุทธิ (รายรับ − รายจ่าย)',
+                'shape'   => 'count',
+                'widgets' => ['kpi'],
+            ],
+            'finance_by_category' => [
+                'label'   => 'การเงิน — แยกตามหมวดหมู่',
+                'shape'   => 'breakdown',
+                'widgets' => ['bar', 'donut', 'pie'],
+            ],
+            'finance_income_vs_expense_trend' => [
+                'label'   => 'การเงิน — Trend รายรับ vs รายจ่าย 12 เดือน',
+                'shape'   => 'timeseries',
+                'widgets' => ['line', 'area', 'bar'],
+            ],
+
+            // ── ครุภัณฑ์ (Assets) ───────────────────────────────────────
+            'asset_total' => [
+                'label'   => 'ครุภัณฑ์ — ทั้งหมด',
+                'shape'   => 'count',
+                'widgets' => ['kpi'],
+            ],
+            'asset_by_status' => [
+                'label'   => 'ครุภัณฑ์ — แยกตามสถานะ',
+                'shape'   => 'breakdown',
+                'widgets' => ['donut', 'pie', 'bar'],
+            ],
+            'asset_by_category' => [
+                'label'   => 'ครุภัณฑ์ — แยกตามหมวดหมู่',
+                'shape'   => 'breakdown',
+                'widgets' => ['bar', 'donut'],
+            ],
+            'asset_warranty_expiring_90d' => [
+                'label'   => 'ครุภัณฑ์ — ใกล้หมดประกัน ≤90 วัน',
+                'shape'   => 'count',
+                'widgets' => ['kpi'],
+            ],
+
+            // ── วัสดุสิ้นเปลือง (Consumables) ───────────────────────────
+            'consumable_total' => [
+                'label'   => 'วัสดุสิ้นเปลือง — รายการทั้งหมด',
+                'shape'   => 'count',
+                'widgets' => ['kpi'],
+            ],
+            'consumable_low_stock' => [
+                'label'   => 'วัสดุสิ้นเปลือง — ต่ำกว่าจุดสั่งซื้อ',
+                'shape'   => 'count',
+                'widgets' => ['kpi'],
+            ],
+            'consumable_by_category' => [
+                'label'   => 'วัสดุสิ้นเปลือง — แยกตามหมวดหมู่',
+                'shape'   => 'breakdown',
+                'widgets' => ['bar', 'donut', 'pie'],
+            ],
+            'consumable_receive_trend' => [
+                'label'   => 'วัสดุสิ้นเปลือง — Trend การรับเข้า 12 เดือน',
+                'shape'   => 'timeseries',
+                'widgets' => ['line', 'area', 'bar'],
+            ],
+
+            // ── ทุนนักศึกษา (Scholarship) ───────────────────────────────
+            'scholarship_bookings_total' => [
+                'label'   => 'ทุนนักศึกษา — จำนวนการจองรวม',
+                'shape'   => 'count',
+                'widgets' => ['kpi'],
+            ],
+            'scholarship_slots_open' => [
+                'label'   => 'ทุนนักศึกษา — รอบที่เปิดอยู่',
+                'shape'   => 'count',
+                'widgets' => ['kpi'],
+            ],
+            'scholarship_booking_trend' => [
+                'label'   => 'ทุนนักศึกษา — Trend การจอง 12 เดือน',
+                'shape'   => 'timeseries',
+                'widgets' => ['line', 'area', 'bar'],
+            ],
+
+            // ── e-Campaign & ความพึงพอใจ ────────────────────────────────
+            'campaign_bookings_total' => [
+                'label'   => 'e-Campaign — การจองทั้งหมด',
+                'shape'   => 'count',
+                'widgets' => ['kpi'],
+            ],
+            'campaign_active' => [
+                'label'   => 'e-Campaign — แคมเปญ Active',
+                'shape'   => 'count',
+                'widgets' => ['kpi'],
+            ],
+            'campaign_booking_rate' => [
+                'label'   => 'e-Campaign — อัตราการจอง (%)',
+                'shape'   => 'percentage',
+                'widgets' => ['kpi'],
+            ],
+            'campaign_booking_trend' => [
+                'label'   => 'e-Campaign — Trend การจอง 12 เดือน',
+                'shape'   => 'timeseries',
+                'widgets' => ['line', 'area', 'bar'],
+            ],
+            'satisfaction_avg_rating' => [
+                'label'   => 'ความพึงพอใจ — คะแนนเฉลี่ย (จาก 5)',
+                'shape'   => 'count',
+                'widgets' => ['kpi'],
+            ],
+            'satisfaction_distribution' => [
+                'label'   => 'ความพึงพอใจ — การกระจาย 1–5 ดาว',
+                'shape'   => 'breakdown',
+                'widgets' => ['bar', 'donut', 'pie'],
+            ],
+            'satisfaction_trend_12m' => [
+                'label'   => 'ความพึงพอใจ — Trend คะแนนเฉลี่ยรายเดือน 12 เดือน',
+                'shape'   => 'timeseries',
+                'widgets' => ['line', 'area'],
+            ],
         ];
     }
 
@@ -281,6 +406,192 @@ if (!function_exists('dashboard_data_sources_catalog')) {
                     'labels' => $mti['labels'] ?? [],
                     'series' => array_merge($mti['series'] ?? [], $gold['series'] ?? []),
                 ];
+
+            // ── การเงิน ──────────────────────────────────────────────────
+            case 'finance_income_total': {
+                $auto = (int)_safe_scalar($pdo,
+                    "SELECT COALESCE(SUM(amount),0) FROM sys_finance_transactions WHERE kind='income'" . $dateClause('txn_date'));
+                $val = $hasFilter ? $auto : kpi_with_override($pdo, $key, $auto);
+                return ['shape' => 'count', 'value' => $val, 'auto' => $auto];
+            }
+
+            case 'finance_expense_total': {
+                $auto = (int)_safe_scalar($pdo,
+                    "SELECT COALESCE(SUM(amount),0) FROM sys_finance_transactions WHERE kind='expense'" . $dateClause('txn_date'));
+                $val = $hasFilter ? $auto : kpi_with_override($pdo, $key, $auto);
+                return ['shape' => 'count', 'value' => $val, 'auto' => $auto];
+            }
+
+            case 'finance_balance': {
+                $income  = (float)_safe_scalar($pdo,
+                    "SELECT COALESCE(SUM(amount),0) FROM sys_finance_transactions WHERE kind='income'" . $dateClause('txn_date'));
+                $expense = (float)_safe_scalar($pdo,
+                    "SELECT COALESCE(SUM(amount),0) FROM sys_finance_transactions WHERE kind='expense'" . $dateClause('txn_date'));
+                $auto = (int)round($income - $expense);
+                $val  = $hasFilter ? $auto : kpi_with_override($pdo, $key, $auto);
+                return ['shape' => 'count', 'value' => $val, 'auto' => $auto];
+            }
+
+            case 'finance_by_category': {
+                $rows = _safe_rows($pdo,
+                    "SELECT COALESCE(c.name,'ไม่ระบุหมวด') AS label,
+                            COALESCE(SUM(t.amount),0) AS value
+                     FROM sys_finance_transactions t
+                     LEFT JOIN sys_finance_categories c ON c.id = t.category_id
+                     WHERE 1=1" . $dateClause('t.txn_date') .
+                    " GROUP BY t.category_id, c.name ORDER BY value DESC");
+                $labels = []; $values = [];
+                foreach ($rows as $r) { $labels[] = $r['label']; $values[] = (int)$r['value']; }
+                return ['shape' => 'breakdown', 'labels' => $labels, 'values' => $values];
+            }
+
+            case 'finance_income_vs_expense_trend': {
+                $income  = _resolve_finance_trend($pdo, 'income',  'รายรับ',  $year, $month);
+                $expense = _resolve_finance_trend($pdo, 'expense', 'รายจ่าย', $year, $month);
+                return [
+                    'shape'  => 'timeseries',
+                    'labels' => $income['labels'] ?? [],
+                    'series' => array_merge($income['series'] ?? [], $expense['series'] ?? []),
+                ];
+            }
+
+            // ── ครุภัณฑ์ ─────────────────────────────────────────────────
+            case 'asset_total': {
+                $auto = (int)_safe_scalar($pdo,
+                    "SELECT COUNT(*) FROM assets WHERE 1=1" . $dateClause('created_at'));
+                $val = $hasFilter ? $auto : kpi_with_override($pdo, $key, $auto);
+                return ['shape' => 'count', 'value' => $val, 'auto' => $auto];
+            }
+
+            case 'asset_by_status': {
+                $statusLabels = [
+                    'in_use'   => 'ใช้งาน',
+                    'repair'   => 'ซ่อม',
+                    'disposed' => 'จำหน่าย',
+                    'lost'     => 'สูญหาย',
+                    'reserve'  => 'สำรอง',
+                ];
+                $rows = _safe_rows($pdo,
+                    "SELECT status, COUNT(*) AS cnt FROM assets WHERE 1=1" . $dateClause('created_at') .
+                    " GROUP BY status ORDER BY cnt DESC");
+                $labels = []; $values = [];
+                foreach ($rows as $r) {
+                    $labels[] = $statusLabels[$r['status']] ?? $r['status'];
+                    $values[] = (int)$r['cnt'];
+                }
+                return ['shape' => 'breakdown', 'labels' => $labels, 'values' => $values];
+            }
+
+            case 'asset_by_category':
+                return _resolve_breakdown($pdo,
+                    "SELECT COALESCE(c.name,'ไม่ระบุหมวด') AS label, COUNT(*) AS value
+                     FROM assets a
+                     LEFT JOIN asset_categories c ON c.id = a.category_id
+                     WHERE 1=1" . $dateClause('a.created_at') .
+                    " GROUP BY a.category_id, c.name ORDER BY value DESC");
+
+            case 'asset_warranty_expiring_90d': {
+                $auto = (int)_safe_scalar($pdo,
+                    "SELECT COUNT(*) FROM assets
+                     WHERE warranty_until IS NOT NULL
+                       AND warranty_until BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 90 DAY)
+                       AND status NOT IN ('disposed','lost')");
+                $val = $hasFilter ? $auto : kpi_with_override($pdo, $key, $auto);
+                return ['shape' => 'count', 'value' => $val, 'auto' => $auto];
+            }
+
+            // ── วัสดุสิ้นเปลือง ──────────────────────────────────────────
+            case 'consumable_total': {
+                $auto = (int)_safe_scalar($pdo,
+                    "SELECT COUNT(*) FROM consumables WHERE status='active'" . $dateClause('created_at'));
+                $val = $hasFilter ? $auto : kpi_with_override($pdo, $key, $auto);
+                return ['shape' => 'count', 'value' => $val, 'auto' => $auto];
+            }
+
+            case 'consumable_low_stock': {
+                $auto = (int)_safe_scalar($pdo,
+                    "SELECT COUNT(*) FROM consumables WHERE status='active' AND qty_on_hand <= min_stock AND min_stock > 0");
+                $val = $hasFilter ? $auto : kpi_with_override($pdo, $key, $auto);
+                return ['shape' => 'count', 'value' => $val, 'auto' => $auto];
+            }
+
+            case 'consumable_by_category':
+                return _resolve_breakdown($pdo,
+                    "SELECT COALESCE(c.name,'ไม่ระบุหมวด') AS label, COUNT(*) AS value
+                     FROM consumables cs
+                     LEFT JOIN consumable_categories c ON c.id = cs.category_id
+                     WHERE cs.status='active'" . $dateClause('cs.created_at') .
+                    " GROUP BY cs.category_id, c.name ORDER BY value DESC");
+
+            case 'consumable_receive_trend':
+                return _resolve_consumable_trend($pdo, $year, $month);
+
+            // ── ทุนนักศึกษา ──────────────────────────────────────────────
+            case 'scholarship_bookings_total': {
+                $auto = (int)_safe_scalar($pdo,
+                    "SELECT COUNT(*) FROM sys_scholarship_slot_bookings WHERE status='booked'" . $dateClause('booked_at'));
+                $val = $hasFilter ? $auto : kpi_with_override($pdo, $key, $auto);
+                return ['shape' => 'count', 'value' => $val, 'auto' => $auto];
+            }
+
+            case 'scholarship_slots_open': {
+                $auto = (int)_safe_scalar($pdo,
+                    "SELECT COUNT(*) FROM sys_scholarship_slots WHERE status='open' AND slot_date >= CURDATE()");
+                $val = $hasFilter ? $auto : kpi_with_override($pdo, $key, $auto);
+                return ['shape' => 'count', 'value' => $val, 'auto' => $auto];
+            }
+
+            case 'scholarship_booking_trend':
+                return _resolve_monthly_trend($pdo, 'sys_scholarship_slot_bookings', 'booked_at', 'การจอง', $year, $month);
+
+            // ── e-Campaign ───────────────────────────────────────────────
+            case 'campaign_bookings_total': {
+                $auto = (int)_safe_scalar($pdo,
+                    "SELECT COUNT(*) FROM camp_bookings WHERE 1=1" . $dateClause('created_at'));
+                $val = $hasFilter ? $auto : kpi_with_override($pdo, $key, $auto);
+                return ['shape' => 'count', 'value' => $val, 'auto' => $auto];
+            }
+
+            case 'campaign_active': {
+                $auto = (int)_safe_scalar($pdo,
+                    "SELECT COUNT(*) FROM camp_list WHERE status='active'");
+                $val = $hasFilter ? $auto : kpi_with_override($pdo, $key, $auto);
+                return ['shape' => 'count', 'value' => $val, 'auto' => $auto];
+            }
+
+            case 'campaign_booking_rate': {
+                $total = (int)_safe_scalar($pdo, "SELECT COALESCE(SUM(total_capacity),0) FROM camp_list");
+                $used  = (int)_safe_scalar($pdo, "SELECT COUNT(*) FROM camp_bookings WHERE status IN ('booked','confirmed')");
+                $pct   = $total > 0 ? round($used / $total * 100, 1) : 0.0;
+                return ['shape' => 'percentage', 'value' => $pct, 'numerator' => $used, 'denominator' => $total];
+            }
+
+            case 'campaign_booking_trend':
+                return _resolve_monthly_trend($pdo, 'camp_bookings', 'created_at', 'การจอง', $year, $month);
+
+            // ── ความพึงพอใจ ──────────────────────────────────────────────
+            case 'satisfaction_avg_rating': {
+                $raw  = (float)_safe_scalar($pdo,
+                    "SELECT COALESCE(AVG(rating),0) FROM satisfaction_surveys WHERE 1=1" . $dateClause('created_at'));
+                $auto = round($raw, 2);
+                $val  = $hasFilter ? $auto : kpi_with_override($pdo, $key, (int)round($auto * 100));
+                // คืนค่าเป็น float เพื่อให้ KPI widget แสดง "4.82" แทน "482"
+                return ['shape' => 'count', 'value' => $hasFilter ? $auto : round($val / 100, 2), 'auto' => $auto];
+            }
+
+            case 'satisfaction_distribution': {
+                $labels = []; $values = [];
+                for ($s = 1; $s <= 5; $s++) {
+                    $cnt = (int)_safe_scalar($pdo,
+                        "SELECT COUNT(*) FROM satisfaction_surveys WHERE rating = $s" . $dateClause('created_at'));
+                    $labels[] = "$s ดาว";
+                    $values[] = $cnt;
+                }
+                return ['shape' => 'breakdown', 'labels' => $labels, 'values' => $values];
+            }
+
+            case 'satisfaction_trend_12m':
+                return _resolve_satisfaction_trend($pdo, $year, $month);
         }
 
         return ['shape' => 'unknown'];
@@ -428,9 +739,15 @@ if (!function_exists('dashboard_data_sources_catalog')) {
     {
         $years = [];
         $tables = [
-            ['insurance_members', 'created_at'],
-            ['gold_card_members', 'application_date'],
-            ['gold_card_members', 'created_at'],
+            ['insurance_members',              'created_at'],
+            ['gold_card_members',              'application_date'],
+            ['gold_card_members',              'created_at'],
+            ['sys_finance_transactions',       'txn_date'],
+            ['assets',                         'created_at'],
+            ['consumable_transactions',        'txn_date'],
+            ['sys_scholarship_slot_bookings',  'booked_at'],
+            ['camp_bookings',                  'created_at'],
+            ['satisfaction_surveys',           'created_at'],
         ];
         foreach ($tables as [$t, $col]) {
             try {
@@ -446,6 +763,161 @@ if (!function_exists('dashboard_data_sources_catalog')) {
         $list = array_keys($years);
         rsort($list);
         return $list;
+    }
+
+    /** Finance income/expense monthly trend */
+    function _resolve_finance_trend(PDO $pdo, string $kind, string $seriesName, ?int $year, ?int $month): array
+    {
+        $bucket = []; $labels = [];
+
+        if ($year !== null && $month !== null) {
+            $daysInMonth = (int)date('t', mktime(0, 0, 0, $month, 1, $year));
+            for ($d = 1; $d <= $daysInMonth; $d++) {
+                $key = sprintf('%04d-%02d-%02d', $year, $month, $d);
+                $bucket[$key] = 0; $labels[] = (string)$d;
+            }
+            $sql = "SELECT DATE_FORMAT(txn_date,'%Y-%m-%d') AS ymd,
+                           COALESCE(SUM(amount),0) AS total
+                    FROM sys_finance_transactions
+                    WHERE kind='$kind' AND YEAR(txn_date)=$year AND MONTH(txn_date)=$month
+                    GROUP BY ymd";
+            $bk = 'ymd';
+        } elseif ($year !== null) {
+            $thaiMonths = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+            for ($m = 1; $m <= 12; $m++) {
+                $key = sprintf('%04d-%02d', $year, $m);
+                $bucket[$key] = 0; $labels[] = $thaiMonths[$m - 1];
+            }
+            $sql = "SELECT DATE_FORMAT(txn_date,'%Y-%m') AS ym, COALESCE(SUM(amount),0) AS total
+                    FROM sys_finance_transactions WHERE kind='$kind' AND YEAR(txn_date)=$year GROUP BY ym";
+            $bk = 'ym';
+        } elseif ($month !== null) {
+            $thaiMonths = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+            $thisYear = (int)date('Y');
+            for ($y = $thisYear - 4; $y <= $thisYear; $y++) {
+                $key = sprintf('%04d-%02d', $y, $month);
+                $bucket[$key] = 0; $labels[] = $thaiMonths[$month - 1] . ' ' . substr((string)($y + 543), -2);
+            }
+            $sql = "SELECT DATE_FORMAT(txn_date,'%Y-%m') AS ym, COALESCE(SUM(amount),0) AS total
+                    FROM sys_finance_transactions WHERE kind='$kind' AND MONTH(txn_date)=$month
+                      AND YEAR(txn_date) BETWEEN " . ($thisYear - 4) . " AND $thisYear GROUP BY ym";
+            $bk = 'ym';
+        } else {
+            for ($i = 11; $i >= 0; $i--) {
+                $ts = strtotime("first day of -$i month");
+                $key = date('Y-m', $ts);
+                $bucket[$key] = 0; $labels[] = _thai_month_label($ts);
+            }
+            $sql = "SELECT DATE_FORMAT(txn_date,'%Y-%m') AS ym, COALESCE(SUM(amount),0) AS total
+                    FROM sys_finance_transactions WHERE kind='$kind'
+                      AND txn_date >= DATE_SUB(DATE_FORMAT(CURDATE(),'%Y-%m-01'), INTERVAL 11 MONTH)
+                    GROUP BY ym";
+            $bk = 'ym';
+        }
+
+        try {
+            foreach (_safe_rows($pdo, $sql) as $r) {
+                if (isset($bucket[$r[$bk]])) $bucket[$r[$bk]] = (int)$r['total'];
+            }
+        } catch (PDOException $e) {}
+
+        return ['shape' => 'timeseries', 'labels' => $labels,
+                'series' => [['name' => $seriesName, 'data' => array_values($bucket)]]];
+    }
+
+    /** Consumable รับเข้า monthly trend */
+    function _resolve_consumable_trend(PDO $pdo, ?int $year, ?int $month): array
+    {
+        $bucket = []; $labels = [];
+
+        if ($year !== null && $month !== null) {
+            $daysInMonth = (int)date('t', mktime(0, 0, 0, $month, 1, $year));
+            for ($d = 1; $d <= $daysInMonth; $d++) {
+                $key = sprintf('%04d-%02d-%02d', $year, $month, $d);
+                $bucket[$key] = 0; $labels[] = (string)$d;
+            }
+            $sql = "SELECT DATE_FORMAT(txn_date,'%Y-%m-%d') AS ymd, COUNT(*) AS cnt
+                    FROM consumable_transactions WHERE txn_type='receive'
+                      AND YEAR(txn_date)=$year AND MONTH(txn_date)=$month GROUP BY ymd";
+            $bk = 'ymd';
+        } elseif ($year !== null) {
+            $thaiMonths = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+            for ($m = 1; $m <= 12; $m++) {
+                $key = sprintf('%04d-%02d', $year, $m);
+                $bucket[$key] = 0; $labels[] = $thaiMonths[$m - 1];
+            }
+            $sql = "SELECT DATE_FORMAT(txn_date,'%Y-%m') AS ym, COUNT(*) AS cnt
+                    FROM consumable_transactions WHERE txn_type='receive' AND YEAR(txn_date)=$year GROUP BY ym";
+            $bk = 'ym';
+        } else {
+            for ($i = 11; $i >= 0; $i--) {
+                $ts = strtotime("first day of -$i month");
+                $key = date('Y-m', $ts);
+                $bucket[$key] = 0; $labels[] = _thai_month_label($ts);
+            }
+            $sql = "SELECT DATE_FORMAT(txn_date,'%Y-%m') AS ym, COUNT(*) AS cnt
+                    FROM consumable_transactions WHERE txn_type='receive'
+                      AND txn_date >= DATE_SUB(DATE_FORMAT(CURDATE(),'%Y-%m-01'), INTERVAL 11 MONTH)
+                    GROUP BY ym";
+            $bk = 'ym';
+        }
+
+        try {
+            foreach (_safe_rows($pdo, $sql) as $r) {
+                if (isset($bucket[$r[$bk]])) $bucket[$r[$bk]] = (int)$r['cnt'];
+            }
+        } catch (PDOException $e) {}
+
+        return ['shape' => 'timeseries', 'labels' => $labels,
+                'series' => [['name' => 'รับเข้า', 'data' => array_values($bucket)]]];
+    }
+
+    /** Satisfaction คะแนนเฉลี่ยรายเดือน */
+    function _resolve_satisfaction_trend(PDO $pdo, ?int $year, ?int $month): array
+    {
+        $bucket = []; $labels = [];
+
+        if ($year !== null && $month !== null) {
+            $daysInMonth = (int)date('t', mktime(0, 0, 0, $month, 1, $year));
+            for ($d = 1; $d <= $daysInMonth; $d++) {
+                $key = sprintf('%04d-%02d-%02d', $year, $month, $d);
+                $bucket[$key] = null; $labels[] = (string)$d;
+            }
+            $sql = "SELECT DATE_FORMAT(created_at,'%Y-%m-%d') AS ymd, AVG(rating) AS avg_r
+                    FROM satisfaction_surveys WHERE YEAR(created_at)=$year AND MONTH(created_at)=$month
+                    GROUP BY ymd";
+            $bk = 'ymd';
+        } elseif ($year !== null) {
+            $thaiMonths = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+            for ($m = 1; $m <= 12; $m++) {
+                $key = sprintf('%04d-%02d', $year, $m);
+                $bucket[$key] = null; $labels[] = $thaiMonths[$m - 1];
+            }
+            $sql = "SELECT DATE_FORMAT(created_at,'%Y-%m') AS ym, AVG(rating) AS avg_r
+                    FROM satisfaction_surveys WHERE YEAR(created_at)=$year GROUP BY ym";
+            $bk = 'ym';
+        } else {
+            for ($i = 11; $i >= 0; $i--) {
+                $ts = strtotime("first day of -$i month");
+                $key = date('Y-m', $ts);
+                $bucket[$key] = null; $labels[] = _thai_month_label($ts);
+            }
+            $sql = "SELECT DATE_FORMAT(created_at,'%Y-%m') AS ym, AVG(rating) AS avg_r
+                    FROM satisfaction_surveys
+                    WHERE created_at >= DATE_SUB(DATE_FORMAT(CURDATE(),'%Y-%m-01'), INTERVAL 11 MONTH)
+                    GROUP BY ym";
+            $bk = 'ym';
+        }
+
+        try {
+            foreach (_safe_rows($pdo, $sql) as $r) {
+                if (array_key_exists($r[$bk], $bucket))
+                    $bucket[$r[$bk]] = round((float)$r['avg_r'], 2);
+            }
+        } catch (PDOException $e) {}
+
+        return ['shape' => 'timeseries', 'labels' => $labels,
+                'series' => [['name' => 'คะแนนเฉลี่ย', 'data' => array_values($bucket)]]];
     }
 
     function _thai_month_label(int $ts): string
