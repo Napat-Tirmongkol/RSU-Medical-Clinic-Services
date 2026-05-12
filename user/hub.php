@@ -1864,28 +1864,6 @@ $pillTones = [
                             <p class="mt-0.5 text-[10px] font-bold text-slate-500"><?= count($booking_list) ?> ครั้ง</p>
                         </a>
 
-                        <!-- Prescriptions — COMING SOON -->
-                        <button onclick="showUpcoming('ใบสั่งยา / ยาที่ใช้อยู่')"
-                            class="relative text-left p-4 rounded-2xl bg-slate-50 border border-slate-100 active:scale-95 transition-all opacity-90">
-                            <span class="absolute top-2 right-2 px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[8px] font-black uppercase tracking-widest">Soon</span>
-                            <div class="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-rose-400 shadow-sm mb-3">
-                                <i class="fa-solid fa-pills"></i>
-                            </div>
-                            <p class="text-[13px] font-black text-slate-700 leading-tight">ใบสั่งยา</p>
-                            <p class="mt-0.5 text-[10px] font-bold text-slate-400">เร็วๆ นี้</p>
-                        </button>
-
-                        <!-- Lab results — COMING SOON -->
-                        <button onclick="showUpcoming('ผลตรวจห้องแล็บ')"
-                            class="relative text-left p-4 rounded-2xl bg-slate-50 border border-slate-100 active:scale-95 transition-all opacity-90">
-                            <span class="absolute top-2 right-2 px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[8px] font-black uppercase tracking-widest">Soon</span>
-                            <div class="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-purple-500 shadow-sm mb-3">
-                                <i class="fa-solid fa-flask"></i>
-                            </div>
-                            <p class="text-[13px] font-black text-slate-700 leading-tight">ผลตรวจแล็บ</p>
-                            <p class="mt-0.5 text-[10px] font-bold text-slate-400">เร็วๆ นี้</p>
-                        </button>
-
                         <!-- Vital signs — COMING SOON -->
                         <button onclick="showUpcoming('สัญญาณชีพและกราฟสุขภาพ')"
                             class="relative text-left p-4 rounded-2xl bg-slate-50 border border-slate-100 active:scale-95 transition-all opacity-90">
@@ -1952,15 +1930,6 @@ $pillTones = [
                                 <i class="fa-solid fa-file-medical text-sm"></i>
                             </div>
                             <p class="text-[13px] font-black leading-tight text-slate-700">ขอเอกสาร<br>ใบรับรอง</p>
-                        </button>
-
-                        <button onclick="showUpcoming('ปรึกษาแพทย์ออนไลน์ (Telemedicine)')"
-                            class="relative flex flex-col items-start p-5 rounded-2xl bg-slate-50 border border-slate-100 active:scale-95 transition-all text-left opacity-90">
-                            <span class="absolute top-3 right-3 px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[8px] font-black uppercase tracking-widest">Soon</span>
-                            <div class="w-10 h-10 rounded-2xl bg-white flex items-center justify-center mb-3 shadow-sm border border-slate-100 text-emerald-500">
-                                <i class="fa-solid fa-video text-sm"></i>
-                            </div>
-                            <p class="text-[13px] font-black leading-tight text-slate-700">ปรึกษาแพทย์<br>ออนไลน์</p>
                         </button>
 
                         <?php
