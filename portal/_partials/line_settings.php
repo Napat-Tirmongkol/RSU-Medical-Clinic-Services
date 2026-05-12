@@ -268,6 +268,7 @@ $webhookUrl = "$protocol://$host$uri";
     <script>
     (function() {
         const AJAX_GROUPS = 'ajax_line_groups.php';
+        const GROUPS_CSRF  = '<?= get_csrf_token() ?>';
 
         function renderGroups(groups, defaultId) {
             const el = document.getElementById('lineGroupsList');
@@ -333,7 +334,7 @@ $webhookUrl = "$protocol://$host$uri";
 
         window.lineGroupSetDefault = async function(groupId) {
             const fd = new FormData();
-            fd.append('csrf_token', window.portal_CSRF || '');
+            fd.append('csrf_token', GROUPS_CSRF);
             fd.append('action', 'set_default');
             fd.append('group_id', groupId);
             const r = await fetch(AJAX_GROUPS, { method: 'POST', body: fd }).then(x => x.json());
@@ -349,7 +350,7 @@ $webhookUrl = "$protocol://$host$uri";
             btn.disabled = true;
             btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="margin-right:4px"></i>กำลังส่ง...';
             const fd = new FormData();
-            fd.append('csrf_token', window.portal_CSRF || '');
+            fd.append('csrf_token', GROUPS_CSRF);
             fd.append('action', 'test_push');
             fd.append('group_id', groupId);
             const r = await fetch(AJAX_GROUPS, { method: 'POST', body: fd }).then(x => x.json());
