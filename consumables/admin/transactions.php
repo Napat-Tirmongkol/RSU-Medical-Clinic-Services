@@ -177,6 +177,10 @@ include __DIR__ . '/../includes/header.php';
 
 <div class="asset-card p-2 sm:p-4">
     <div class="overflow-x-auto">
+        <?php
+        $_role = $_SESSION['admin_role'] ?? $_SESSION['role'] ?? '';
+        $_hasFinance = in_array($_role, ['admin', 'superadmin'], true) || !empty($_SESSION['access_finance']);
+        ?>
         <table class="asset-table">
             <thead>
                 <tr>
@@ -188,11 +192,12 @@ include __DIR__ . '/../includes/header.php';
                     <th>หน่วยงาน</th>
                     <th>ผู้รับ / วัตถุประสงค์</th>
                     <th>โดย</th>
+                    <?php if ($_hasFinance): ?><th class="text-center">การเงิน</th><?php endif; ?>
                 </tr>
             </thead>
             <tbody>
                 <?php if (empty($rows)): ?>
-                    <tr><td colspan="8" class="text-center text-slate-400 py-12 text-sm">
+                    <tr><td colspan="<?= $_hasFinance ? 9 : 8 ?>" class="text-center text-slate-400 py-12 text-sm">
                         <i class="fas fa-folder-open text-3xl text-slate-300 mb-2 block"></i>
                         ไม่พบรายการตรงกับเงื่อนไข
                     </td></tr>
@@ -234,11 +239,79 @@ include __DIR__ . '/../includes/header.php';
                             <?php if (!empty($r['reference'])): ?><div class="text-[10px] text-slate-400 font-mono"><?= htmlspecialchars($r['reference']) ?></div><?php endif; ?>
                         </td>
                         <td data-label="โดย" class="text-xs text-slate-500"><?= htmlspecialchars($r['created_by_name'] ?? '-') ?></td>
+                        <?php if ($_hasFinance): ?>
+                        <td data-label="การเงิน" class="text-center">
+                            <?php if ($r['txn_type'] === 'receive'): ?>
+                                <button type="button" onclick='csmTxnToFinance(<?= json_encode([
+                                    'id' => (int)$r['id'],
+                                    'item' => $r['item_name'] ?? '',
+                                    'qty' => (int)$r['qty_input'],
+                                    'unit' => $r['unit_input'] === 'pack' ? ($r['unit_pack'] ?: 'บรรจุภัณฑ์') : ($r['unit_piece'] ?: 'ชิ้น'),
+                                    'date' => $r['txn_date'],
+                                    'ref' => $r['reference'] ?? '',
+                                ], JSON_UNESCAPED_UNICODE | JSON_HEX_APOS | JSON_HEX_QUOT) ?>)'
+                                    class="btn-asset btn-asset-secondary" style="padding:4px 10px;font-size:11px;background:#d1fae5;color:#065f46;border-color:#a7f3d0">
+                                    <i class="fa-solid fa-money-bill-trend-up"></i> บันทึก
+                                </button>
+                            <?php else: ?>
+                                <span class="text-slate-300 text-xs">-</span>
+                            <?php endif; ?>
+                        </td>
+                        <?php endif; ?>
                     </tr>
                 <?php endforeach; endif; ?>
             </tbody>
         </table>
     </div>
+
+    <?php if ($_hasFinance): ?>
+    <script>
+    async function csmTxnToFinance(data) {
+        const { value: form } = await Swal.fire({
+            title: 'บันทึกเป็นรายจ่าย',
+            html: `<div class="text-left space-y-3">
+                <div class="text-sm text-slate-600 mb-2">รับเข้า: <b>${data.item}</b><br>
+                    <span class="text-xs text-slate-500">จำนวน ${data.qty} ${data.unit} · ${data.date}</span></div>
+                <div><label class="text-xs font-bold text-slate-600 mb-1 block">จำนวนเงิน (บาท) *</label>
+                    <input type="number" id="cfAmt" class="swal2-input" style="margin:0;width:100%" step="0.01" min="0" placeholder="0.00"></div>
+                <div><label class="text-xs font-bold text-slate-600 mb-1 block">วิธีชำระ</label>
+                    <select id="cfPay" class="swal2-input" style="margin:0;width:100%">
+                        <option value="">-</option><option>เงินสด</option><option>โอน</option><option>บัตรเครดิต</option><option>QR/PromptPay</option>
+                    </select></div>
+                <div><label class="text-xs font-bold text-slate-600 mb-1 block">เลขใบเสร็จ/อ้างอิง</label>
+                    <input type="text" id="cfRef" class="swal2-input" style="margin:0;width:100%" value="${data.ref || ''}" placeholder="INV-..."></div>
+            </div>`,
+            showCancelButton: true, confirmButtonText: 'บันทึก', cancelButtonText: 'ยกเลิก', confirmButtonColor: '#059669',
+            preConfirm: () => {
+                const amt = parseFloat(document.getElementById('cfAmt').value);
+                if (!amt || amt <= 0) { Swal.showValidationMessage('กรุณากรอกจำนวนเงิน'); return false; }
+                return { amount: amt, pay: document.getElementById('cfPay').value, ref: document.getElementById('cfRef').value };
+            }
+        });
+        if (!form) return;
+        const fd = new FormData();
+        fd.append('csrf_token', '<?= htmlspecialchars($_SESSION['csrf_token'] ?? '', ENT_QUOTES) ?>');
+        fd.append('action', 'txn:upsert_from_source');
+        fd.append('source_module', 'consumables_txn');
+        fd.append('source_id', String(data.id));
+        fd.append('kind', 'expense');
+        fd.append('amount', String(form.amount));
+        fd.append('txn_date', data.date);
+        fd.append('description', `รับเข้า ${data.item} จำนวน ${data.qty} ${data.unit}`);
+        fd.append('category_name', 'จัดซื้อวัสดุการแพทย์');
+        fd.append('note', form.pay ? ('วิธีชำระ: ' + form.pay) : '');
+        if (form.ref) fd.append('reference', form.ref);
+        try {
+            const r = await fetch('../../portal/ajax_finance.php', { method: 'POST', body: fd, credentials: 'same-origin' });
+            const j = await r.json();
+            if (!j.ok) { Swal.fire({ icon: 'error', title: 'บันทึกไม่สำเร็จ', text: j.message || '' }); return; }
+            Swal.fire({ icon: 'success', title: j.mode === 'updated' ? 'อัปเดตในระบบการเงินแล้ว' : 'บันทึกในระบบการเงินแล้ว',
+                html: `<div class="text-sm"><a href="../../portal/index.php?section=finance" target="_blank" class="text-emerald-600 underline">เปิดดู Cash Book</a></div>`,
+                confirmButtonColor: '#059669' });
+        } catch (e) { Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: String(e) }); }
+    }
+    </script>
+    <?php endif; ?>
 
     <?= csm_pagination_html($page, $totalPages, $total, $extraQuery) ?>
 </div>
