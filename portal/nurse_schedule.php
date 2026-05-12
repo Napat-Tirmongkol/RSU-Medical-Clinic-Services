@@ -1001,9 +1001,11 @@ const state = {
 // ========= HELPERS =========
 const k = (nid, d) => `${nid}-${d}`;
 const getShift = (nid, d) => state.schedule[k(nid,d)] || '';
-const setShift = (nid, d, s) => { if(s){ state.schedule[k(nid,d)] = s; } else { delete state.schedule[k(nid,d)]; } state.dirty = true; };
+// _autoPersist: เรียก persistAll() ถ้ามี (function ถูก define ทีหลังในไฟล์ — ใช้ optional chain กัน undef ตอน init)
+const _autoPersist = () => { if (typeof persistAll === 'function') persistAll(); };
+const setShift = (nid, d, s) => { if(s){ state.schedule[k(nid,d)] = s; } else { delete state.schedule[k(nid,d)]; } state.dirty = true; _autoPersist(); };
 const getLeave = (nid, d) => state.leaves[k(nid,d)] || '';
-const setLeave = (nid, d, l) => { if(l){ state.leaves[k(nid,d)] = l; } else { delete state.leaves[k(nid,d)]; } state.dirty = true; };
+const setLeave = (nid, d, l) => { if(l){ state.leaves[k(nid,d)] = l; } else { delete state.leaves[k(nid,d)]; } state.dirty = true; _autoPersist(); };
 const isWorking = s => s && ['ช','บ','ด','ชบ','ดบ','DN'].includes(s);
 const isLeave = s => s === 'V' || s === 'T';
 const includesAfternoon = s => s === 'บ' || s === 'ชบ' || s === 'ดบ';
