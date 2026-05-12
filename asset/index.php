@@ -109,7 +109,7 @@ include __DIR__ . '/includes/header.php';
         { element: '.psb-item[href*="manage_locations"]', popover: { title: 'จุดใช้งาน', description: 'จัดการที่ตั้งของครุภัณฑ์ (ใช้ร่วมกับวัสดุสิ้นเปลือง)', side: 'right' } },
         { element: '.psb-item[href*="scan.php"]', popover: { title: 'สแกน QR', description: 'สแกนบาร์โค้ดบนตัวครุภัณฑ์เพื่อดูประวัติ/ย้ายจุดใช้งาน', side: 'right' } },
         { element: '.psb-item[href*="stock_take"]', popover: { title: 'ตรวจนับ', description: 'เปิดรอบตรวจนับประจำปี — สแกนเช็คมี/ไม่มี', side: 'right' } },
-        { popover: { title: 'เริ่มใช้งานได้เลย', description: 'กดปุ่ม <i class="fa-solid fa-question"></i> มุมซ้ายล่างเมื่อต้องการดูทัวร์ซ้ำ' } },
+        { popover: { title: 'เริ่มใช้งานได้เลย', description: 'กดปุ่ม <i class="fa-solid fa-question"></i> มุมขวาล่างเมื่อต้องการดูทัวร์ซ้ำ' } },
     ];
     window.RsuTour && RsuTour.maybeAutoStart('asset', assetSteps);
     window._assetTourSteps = assetSteps;
@@ -117,7 +117,7 @@ include __DIR__ . '/includes/header.php';
 </script>
 <button id="rsu-tour-fab" type="button" aria-label="ดู Tour อีกครั้ง" title="ดู Tour อีกครั้ง"
     onclick="window.RsuTour && RsuTour.start(window._assetTourSteps, 'asset')"
-    style="position:fixed;bottom:20px;left:20px;width:44px;height:44px;border-radius:50%;border:none;background:#2e9e63;color:#fff;font-size:16px;cursor:pointer;box-shadow:0 4px 12px rgba(46,158,99,.35);z-index:90">
+    style="position:fixed;bottom:20px;right:20px;width:44px;height:44px;border-radius:50%;border:none;background:#2e9e63;color:#fff;font-size:16px;cursor:pointer;box-shadow:0 4px 12px rgba(46,158,99,.35);z-index:90">
     <i class="fa-solid fa-question"></i>
 </button>
 

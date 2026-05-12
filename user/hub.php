@@ -3125,7 +3125,7 @@ document.getElementById('insDetailModal').addEventListener('click', function(e) 
         { element: '[data-tab-btn="records"]',  popover: { title: 'สุขภาพของฉัน', description: 'ประวัติการรักษา, วัคซีน, ผลตรวจ และสิทธิ์ประกันที่มี' } },
         { element: '[data-tab-btn="services"]', popover: { title: 'บริการ', description: 'จองนัด, สมัครบัตรทอง, บริการอื่นๆ ของคลินิก' } },
         { element: '[data-bottom-tab="today"]', popover: { title: 'แถบเมนูล่าง', description: 'สลับ tab ได้จากที่นี่ตลอดเวลา (มือถือ)', side: 'top' } },
-        { popover: { title: 'เริ่มใช้งานได้เลย', description: 'กดปุ่ม <i class="fa-solid fa-question"></i> มุมซ้ายล่างเมื่อต้องการดูทัวร์ซ้ำ' } },
+        { popover: { title: 'เริ่มใช้งานได้เลย', description: 'กดปุ่ม <i class="fa-solid fa-question"></i> มุมขวาล่างเมื่อต้องการดูทัวร์ซ้ำ' } },
     ];
     window.RsuTour && RsuTour.maybeAutoStart('user_hub', userSteps);
     window._userTourSteps = userSteps;
@@ -3133,7 +3133,7 @@ document.getElementById('insDetailModal').addEventListener('click', function(e) 
 </script>
 <button id="rsu-tour-fab" type="button" aria-label="ดู Tour อีกครั้ง" title="ดู Tour อีกครั้ง"
     onclick="window.RsuTour && RsuTour.start(window._userTourSteps, 'user_hub')"
-    style="position:fixed;bottom:84px;left:20px;width:44px;height:44px;border-radius:50%;border:none;background:#2e9e63;color:#fff;font-size:16px;cursor:pointer;box-shadow:0 4px 12px rgba(46,158,99,.35);z-index:90">
+    style="position:fixed;bottom:84px;right:20px;width:44px;height:44px;border-radius:50%;border:none;background:#2e9e63;color:#fff;font-size:16px;cursor:pointer;box-shadow:0 4px 12px rgba(46,158,99,.35);z-index:90">
     <i class="fa-solid fa-question"></i>
 </button>
 

@@ -5463,7 +5463,7 @@ try {
         { element: '#portal-sidebar', popover: { title: 'Sidebar เมนู', description: 'เมนูจัดเป็นกลุ่ม (OVERVIEW / AI Suite / สิทธิ์ / ประกัน / สื่อสาร / คลังพัสดุ / ติดตามระบบ / ข้อมูลหลัก / ตั้งค่า) — คลิกหัวกลุ่มเพื่อเปิด/ปิด', side: 'right' } },
         { element: '.psb-section-toggle[data-group="inventory"]', popover: { title: 'คลังพัสดุ (ใหม่)', description: 'รวมทางเข้า "ครุภัณฑ์สำนักงาน" + "วัสดุสิ้นเปลือง" ไว้กลุ่มเดียว', side: 'right' } },
         { element: '[data-section="settings"]', popover: { title: 'ตั้งค่าระบบ', description: 'ที่อยู่ของ Site Settings, Maintenance, LINE, AI ฯลฯ', side: 'right' } },
-        { popover: { title: 'เริ่มใช้งานได้เลย', description: 'กดปุ่ม <i class="fa-solid fa-question"></i> มุมซ้ายล่างเมื่อต้องการดูทัวร์ซ้ำได้ตลอด' } },
+        { popover: { title: 'เริ่มใช้งานได้เลย', description: 'กดปุ่ม <i class="fa-solid fa-question"></i> มุมขวาล่างเมื่อต้องการดูทัวร์ซ้ำได้ตลอด' } },
     ];
     window.RsuTour && RsuTour.maybeAutoStart('portal', portalSteps);
     window._portalTourSteps = portalSteps;
@@ -5471,7 +5471,7 @@ try {
 </script>
 <button id="rsu-tour-fab" type="button" aria-label="ดู Tour อีกครั้ง" title="ดู Tour อีกครั้ง"
     onclick="window.RsuTour && RsuTour.start(window._portalTourSteps, 'portal')"
-    style="position:fixed;bottom:20px;left:20px;width:44px;height:44px;border-radius:50%;border:none;background:#2e9e63;color:#fff;font-size:16px;cursor:pointer;box-shadow:0 4px 12px rgba(46,158,99,.35);z-index:90;transition:transform .15s">
+    style="position:fixed;bottom:20px;right:20px;width:44px;height:44px;border-radius:50%;border:none;background:#2e9e63;color:#fff;font-size:16px;cursor:pointer;box-shadow:0 4px 12px rgba(46,158,99,.35);z-index:90;transition:transform .15s">
     <i class="fa-solid fa-question"></i>
 </button>
 
