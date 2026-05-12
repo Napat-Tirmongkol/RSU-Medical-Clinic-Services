@@ -1554,6 +1554,33 @@ function renderLeavePalette() {
 
 
 // ========= SCHEDULE TABLE =========
+
+// Sort พยาบาลตาม subType.order → position priority → order (feature A)
+function getSortedNurses() {
+  const posPriority = Object.keys(POSITIONS).reduce((m, k, i) => (m[k] = i, m), {});
+  return state.nurses.filter(n=>n.active!==false).sort((a,b)=>{
+    const subA = getSubTypeDef(getSubType(a)).order;
+    const subB = getSubTypeDef(getSubType(b)).order;
+    if (subA !== subB) return subA - subB;
+    const pA = posPriority[a.position] ?? 999;
+    const pB = posPriority[b.position] ?? 999;
+    if (pA !== pB) return pA - pB;
+    return (a.order||999) - (b.order||999);
+  });
+}
+
+// Re-render เฉพาะ <tfoot> หลังคลิกเซลล์ (กัน flicker เมื่อเทียบ renderSchedule() เต็ม)
+function refreshFooter() {
+  const tbl = document.getElementById('scheduleTable');
+  const tfoot = tbl?.querySelector('tfoot');
+  if (!tfoot) return;
+  const days = daysInMonth(state.year, state.month);
+  const sortedNurses = getSortedNurses();
+  const statColCount = 11; // ['ช','บ','ด','ชบ','ดบ','DN','O','V','T','รวม','OT(ชม.)']
+  // renderScheduleFooter คืน '<tfoot>...</tfoot>' → outerHTML แทนได้เลย
+  tfoot.outerHTML = renderScheduleFooter(sortedNurses, days, statColCount);
+}
+
 function renderSchedule() {
   const tbl = document.getElementById('scheduleTable');
   const days = daysInMonth(state.year, state.month);
@@ -1600,16 +1627,7 @@ function renderSchedule() {
   (otReport?.rows || []).forEach(r => { otByNurse[r.id] = r.hours; });
 
   // ── Sort: subType.order → position priority → order (feature A) ──
-  const posPriority = Object.keys(POSITIONS).reduce((m, k, i) => (m[k] = i, m), {});
-  const sortedNurses = state.nurses.filter(n=>n.active!==false).sort((a,b)=>{
-    const subA = getSubTypeDef(getSubType(a)).order;
-    const subB = getSubTypeDef(getSubType(b)).order;
-    if (subA !== subB) return subA - subB;
-    const pA = posPriority[a.position] ?? 999;
-    const pB = posPriority[b.position] ?? 999;
-    if (pA !== pB) return pA - pB;
-    return (a.order||999) - (b.order||999);
-  });
+  const sortedNurses = getSortedNurses();
 
   // ── Render body: insert section header row when subType changes ──
   let lastSub = null;
@@ -1853,6 +1871,12 @@ function refreshRow(nid) {
   ];
   statValues.forEach((v, i) => { if (cells[i]) cells[i].textContent = v||''; });
   if (cells[9]) cells[9].textContent = st.total;
+  // คอลัมน์ OT(ชม.) — ต้อง recompute เพราะ shift เปลี่ยน
+  const otRow = computeOT().rows.find(r => r.id === nid);
+  const otHours = otRow ? otRow.hours : 0;
+  if (cells[10]) cells[10].textContent = otHours > 0 ? otHours.toFixed(1) : '';
+  // Re-render footer summary rows (อัตราในแต่ละวัน)
+  refreshFooter();
   state.dirty = true;
   // Update dashboard badge counts in real-time
   updateBadgeCounts();
