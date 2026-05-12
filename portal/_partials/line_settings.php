@@ -1002,7 +1002,7 @@ function sendTestLineP() {
 
 <script>
 (function(){
-    const CSRF = (typeof portal_CSRF !== 'undefined') ? portal_CSRF : (document.querySelector('meta[name="csrf-token"]')?.content || '');
+    const CSRF = '<?= get_csrf_token() ?>';
 
     async function rmPost(action, data) {
         const fd = new FormData();
@@ -1192,7 +1192,7 @@ function sendTestLineP() {
 
 <script>
 (function(){
-    const CSRF = (typeof portal_CSRF !== 'undefined') ? portal_CSRF : (document.querySelector('meta[name="csrf-token"]')?.content || '');
+    const CSRF = '<?= get_csrf_token() ?>';
 
     const TEMPLATES = {
         // 2500×1686 Large
