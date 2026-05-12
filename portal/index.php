@@ -1174,6 +1174,23 @@ try {
                 </div>
             <?php endif; ?>
 
+            <?php /* ── การเงิน ──────────────────────────────────────────── */ ?>
+            <?php
+            $hasFinance = $isSuper || $adminRole === 'admin' || !empty($_SESSION['access_finance']);
+            if (!$registryOnly && $hasFinance): ?>
+                <button type="button" class="psb-section-toggle" data-group="finance" onclick="togglePsbGroup('finance',this)">
+                    <i class="fa-solid fa-money-bill-trend-up" style="color:#059669"></i>
+                    <span>การเงิน</span>
+                    <i class="fa-solid fa-chevron-down psb-chevron"></i>
+                </button>
+                <div class="psb-group" data-group="finance">
+                    <button class="psb-item <?= $activeSection==='finance'?'psb-active':'' ?>" data-section="finance" onclick="switchSection('finance',this)">
+                        <div class="psb-icon"><i class="fa-solid fa-book" style="color:#059669"></i></div>
+                        <span class="psb-label" style="color:#047857;font-weight:900">Cash Book</span>
+                    </button>
+                </div>
+            <?php endif; ?>
+
             <?php /* ── ติดตามระบบ ──────────────────────────────────────── */ ?>
             <?php if (!$registryOnly && $hasSysLogs): ?>
                 <button type="button" class="psb-section-toggle" data-group="monitor" onclick="togglePsbGroup('monitor',this)">
@@ -3185,11 +3202,23 @@ try {
 
             <div id="section-settings" class="portal-section"
                 style="<?= $activeSection==='settings'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); background:#f1f5f9; overflow-y:auto;">
-                <?php 
+                <?php
                 if ($adminRole === 'superadmin' || !empty($_SESSION['access_site_settings'])) {
-                    include __DIR__ . '/_partials/settings.php'; 
+                    include __DIR__ . '/_partials/settings.php';
                 } else {
                     echo '<div style="padding:100px;text-align:center;font-weight:900;color:#dc2626"><i class="fa-solid fa-shield-slash mb-4" style="font-size:4rem;display:block"></i> ACCESS DENIED<br><span style="font-size:14px;color:#94a3b8;font-weight:600">You do not have permission to manage site settings.</span></div>';
+                }
+                ?>
+            </div>
+
+            <!-- ════════════ SECTION: FINANCE (Cash Book) ════════════ -->
+            <div id="section-finance" class="portal-section"
+                style="<?= $activeSection==='finance'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); background:#f1f5f9; overflow-y:auto; padding:20px;">
+                <?php
+                if ($isSuper || $adminRole === 'admin' || !empty($_SESSION['access_finance'])) {
+                    include __DIR__ . '/_partials/finance.php';
+                } else {
+                    echo '<div style="padding:100px;text-align:center;font-weight:900;color:#dc2626"><i class="fa-solid fa-shield-slash mb-4" style="font-size:4rem;display:block"></i> ACCESS DENIED<br><span style="font-size:14px;color:#94a3b8;font-weight:600">ต้องมีสิทธิ์ access_finance หรือ role: admin/superadmin</span></div>';
                 }
                 ?>
             </div>
