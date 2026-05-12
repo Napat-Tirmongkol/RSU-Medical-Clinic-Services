@@ -10,6 +10,10 @@ if (!isset($_SESSION['role']) || !in_array($_SESSION['role'], $allowed_roles)) {
     exit;
 }
 
+// Access check สำหรับปุ่ม "ส่งเข้าระบบการเงิน"
+$_eb_role = $_SESSION['admin_role'] ?? $_SESSION['role'] ?? '';
+$GLOBALS['_eb_hasFinance'] = in_array($_eb_role, ['admin', 'superadmin'], true) || !empty($_SESSION['access_finance']);
+
 // 1. ฟังก์ชัน Render แถวข้อมูล (แก้ไข SQL Join ใน Query แทนการแก้วนลูป)
 function renderOverdueRows($data) {
     if (empty($data)) return '<tr><td colspan="6" style="text-align: center; padding: 20px;" class="text-muted">ไม่มีรายการเกินกำหนดที่ต้องจัดการ</td></tr>';
@@ -40,8 +44,19 @@ function renderOverdueRows($data) {
 
 function renderHistoryRows($data) {
     if (empty($data)) return '<tr><td colspan="6" style="text-align: center; padding: 20px;" class="text-muted">ไม่พบประวัติในช่วงเวลานี้</td></tr>';
+    $hasFinance = !empty($GLOBALS['_eb_hasFinance']);
     $html = '';
     foreach ($data as $fine) {
+        $financeBtn = '';
+        if ($hasFinance) {
+            $payload = json_encode([
+                'pid'    => (int)$fine['payment_id'],
+                'amount' => (float)$fine['amount_paid'],
+                'date'   => date('Y-m-d', strtotime($fine['payment_date'])),
+                'desc'   => 'ค่าปรับยืมเกินกำหนด: ' . ($fine['student_name'] ?? '-') . ' (' . ($fine['equipment_name'] ?? '-') . ')',
+            ], JSON_UNESCAPED_UNICODE | JSON_HEX_APOS | JSON_HEX_QUOT);
+            $financeBtn = ' <button type="button" class="btn btn-success btn-sm" style="background:#059669;border:0;color:#fff;padding:4px 8px;border-radius:6px;font-size:11px;cursor:pointer" onclick=\'eborrowFineSendToFinance(' . $payload . ')\' title="บันทึกเป็นรายได้ในระบบการเงิน"><i class="fa-solid fa-money-bill-trend-up"></i></button>';
+        }
         $html .= '<tr>
             <td>'.htmlspecialchars($fine['student_name'] ?? '[N/A]').'</td>
             <td>'.htmlspecialchars($fine['equipment_name'] ?? 'N/A').'</td>
@@ -49,7 +64,7 @@ function renderHistoryRows($data) {
             <td><span class="badge status-badge borrowed-ok"><i class="fas fa-check-circle"></i> ชำระแล้ว</span></td>
             <td>'.htmlspecialchars($fine['staff_name'] ?? '[N/A]').'<br><small class="text-muted">'.date('d/m/Y H:i', strtotime($fine['payment_date'])).'</small></td>
             <td>
-                <a href="admin/print_receipt.php?payment_id='.$fine['payment_id'].'" target="_blank" class="btn btn-secondary btn-sm"><i class="fas fa-print"></i></a>
+                <a href="admin/print_receipt.php?payment_id='.$fine['payment_id'].'" target="_blank" class="btn btn-secondary btn-sm"><i class="fas fa-print"></i></a>'.$financeBtn.'
             </td>
         </tr>';
     }
@@ -153,6 +168,42 @@ include('../includes/header.php');
 
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
+// ส่งค่าปรับเข้าระบบการเงิน (Cash Book) เป็นรายได้
+async function eborrowFineSendToFinance(data) {
+    const r = await Swal.fire({
+        title: 'ส่งค่าปรับเข้าระบบการเงิน',
+        html: `<div class="text-left" style="text-align:left">
+            <div style="margin-bottom:8px"><b>${data.desc}</b></div>
+            <div>ยอดเงิน: <b style="color:#059669">${data.amount.toLocaleString('th-TH', { minimumFractionDigits: 2 })} บาท</b></div>
+            <div>วันที่ชำระ: <b>${data.date}</b></div>
+            <hr style="margin:8px 0">
+            <div style="font-size:12px;color:#64748b">บันทึกเป็น "รายได้" หมวด "รายรับอื่นๆ" — กดซ้ำจะอัปเดต ไม่สร้างซ้ำ</div>
+        </div>`,
+        showCancelButton: true,
+        confirmButtonText: 'ส่ง', cancelButtonText: 'ยกเลิก', confirmButtonColor: '#059669',
+    });
+    if (!r.isConfirmed) return;
+    const fd = new FormData();
+    fd.append('csrf_token', document.querySelector('meta[name=csrf-token]')?.content || '');
+    fd.append('action', 'txn:upsert_from_source');
+    fd.append('source_module', 'eborrow_payment');
+    fd.append('source_id', String(data.pid));
+    fd.append('kind', 'income');
+    fd.append('amount', String(data.amount));
+    fd.append('txn_date', data.date);
+    fd.append('description', data.desc);
+    fd.append('category_name', 'รายรับอื่นๆ');
+    fd.append('reference', `e-Borrow Payment #${data.pid}`);
+    try {
+        const res = await fetch('../../portal/ajax_finance.php', { method: 'POST', body: fd, credentials: 'same-origin' });
+        const j = await res.json();
+        if (!j.ok) { Swal.fire({ icon: 'error', title: 'บันทึกไม่สำเร็จ', text: j.message || '' }); return; }
+        Swal.fire({ icon: 'success', title: j.mode === 'updated' ? 'อัปเดตในระบบการเงินแล้ว' : 'บันทึกในระบบการเงินแล้ว',
+            html: `<div style="font-size:13px"><a href="../../portal/index.php?section=finance" target="_blank" style="color:#059669;text-decoration:underline">เปิดดู Cash Book</a></div>`,
+            confirmButtonColor: '#059669' });
+    } catch (e) { Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: String(e) }); }
+}
+
 function openDirectPaymentPopup(transactionId, studentId, studentName, equipName, daysOverdue, calculatedFine) {
     Swal.fire({
         title: 'บันทึกชำระเงิน',
