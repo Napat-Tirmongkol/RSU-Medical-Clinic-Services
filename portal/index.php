@@ -4833,6 +4833,7 @@ try {
 
         /* ── Maintenance Mode Logic (Merged from Admin Tool) ─────────────────────── */
         const portal_CSRF = <?= json_encode(get_csrf_token()) ?>;
+        const HAS_ACCESS_FINANCE = <?= json_encode($isSuper || $adminRole === 'admin' || !empty($_SESSION['access_finance'])) ?>;
 
         function showPortalToast(msg, type = 'success') {
             const id = 'portal-runtime-toast';

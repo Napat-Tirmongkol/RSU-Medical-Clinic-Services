@@ -175,6 +175,51 @@ try {
         echo json_encode(['ok' => true]); exit;
     }
 
+    // ── Upsert from source module (cross-module integration) ──
+    // Inputs: source_module, source_id (string), kind, amount, txn_date, description, category_name
+    // ถ้ามี record ที่ (source_module, source_id) อยู่แล้ว → UPDATE; ไม่งั้น INSERT
+    if ($action === 'txn:upsert_from_source') {
+        $srcMod = trim((string)($_POST['source_module'] ?? ''));
+        $srcId  = trim((string)($_POST['source_id'] ?? ''));
+        $kind   = ($_POST['kind'] ?? 'expense') === 'income' ? 'income' : 'expense';
+        $amount = (float)($_POST['amount'] ?? 0);
+        $txnDate = trim((string)($_POST['txn_date'] ?? date('Y-m-d')));
+        $desc   = trim((string)($_POST['description'] ?? ''));
+        $catName = trim((string)($_POST['category_name'] ?? ''));
+        $note   = trim((string)($_POST['note'] ?? ''));
+
+        if ($srcMod === '' || $srcId === '') { echo json_encode(['ok' => false, 'message' => 'ต้องระบุ source_module + source_id']); exit; }
+        if ($amount <= 0) { echo json_encode(['ok' => false, 'message' => 'จำนวนเงินต้อง > 0']); exit; }
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $txnDate)) { echo json_encode(['ok' => false, 'message' => 'รูปแบบวันที่ไม่ถูกต้อง']); exit; }
+
+        // หา category_id จากชื่อ
+        $catId = null;
+        if ($catName !== '') {
+            $cs = $pdo->prepare("SELECT id FROM sys_finance_categories WHERE name=? AND kind=? LIMIT 1");
+            $cs->execute([$catName, $kind]);
+            $catId = $cs->fetchColumn() ?: null;
+        }
+
+        // ตรวจสอบว่ามี record อยู่แล้วไหม
+        $ex = $pdo->prepare("SELECT id FROM sys_finance_transactions WHERE source_module=? AND source_id=? LIMIT 1");
+        $ex->execute([$srcMod, $srcId]);
+        $existingId = (int)$ex->fetchColumn();
+
+        if ($existingId > 0) {
+            $pdo->prepare("UPDATE sys_finance_transactions
+                SET txn_date=?, kind=?, category_id=?, amount=?, description=?, note=?, updated_by=?
+                WHERE id=?")
+                ->execute([$txnDate, $kind, $catId, $amount, $desc ?: null, $note ?: null, $adminId ?: null, $existingId]);
+            echo json_encode(['ok' => true, 'id' => $existingId, 'mode' => 'updated']); exit;
+        } else {
+            $pdo->prepare("INSERT INTO sys_finance_transactions
+                (txn_date, kind, category_id, amount, description, note, source_module, source_id, created_by, updated_by)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+                ->execute([$txnDate, $kind, $catId, $amount, $desc ?: null, $note ?: null, $srcMod, $srcId, $adminId ?: null, $adminId ?: null]);
+            echo json_encode(['ok' => true, 'id' => (int)$pdo->lastInsertId(), 'mode' => 'created']); exit;
+        }
+    }
+
     // ── Assign receipt number (atomic running number per year) ──
     if ($action === 'txn:assign_receipt') {
         $id = (int)($_POST['id'] ?? 0);

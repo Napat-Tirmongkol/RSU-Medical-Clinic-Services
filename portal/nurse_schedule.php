@@ -635,6 +635,19 @@ $NS_CSRF_TOKEN = get_csrf_token();
     <!-- OT Summary cards -->
     <div id="otSummaryCards" class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4"></div>
 
+    <!-- OT → Finance integration -->
+    <?php if ($adminRole === 'superadmin' || $adminRole === 'admin' || !empty($_SESSION['access_finance'])): ?>
+    <div class="mb-4 p-3 rounded-xl border border-emerald-200 bg-emerald-50 flex items-center justify-between gap-3 flex-wrap">
+        <div class="flex items-center gap-2 text-sm text-emerald-800">
+            <i data-lucide="link" class="w-4 h-4 text-emerald-600"></i>
+            <span>ส่งยอด OT ของเดือนนี้เข้าระบบการเงิน (Cash Book) — จะกลายเป็นรายจ่ายหมวด "เงินเดือน/ค่าจ้าง"</span>
+        </div>
+        <button onclick="sendOtToFinance()" class="btn-solid bg-emerald-600 text-white hover:bg-emerald-700 text-sm">
+            <i data-lucide="banknote" class="w-3.5 h-3.5"></i> ส่งเข้าระบบการเงิน
+        </button>
+    </div>
+    <?php endif; ?>
+
     <!-- OT Table -->
     <div class="bg-white rounded-2xl p-3 border border-slate-200 overflow-x-auto">
       <div class="flex items-center justify-between mb-3 px-2">
@@ -2180,6 +2193,57 @@ function computeOT() {
   });
   state.otReport = rows;
   return { rows, totalAmount, totalUnits: Math.round(totalUnits), nursesWithOT };
+}
+
+// ── ส่งยอด OT เดือนนี้เข้าระบบการเงิน (Cash Book) ──
+async function sendOtToFinance() {
+  const ot = computeOT();
+  if (ot.totalAmount <= 0) {
+    Swal.fire({ icon: 'info', title: 'ยังไม่มี OT', text: 'เดือนนี้ไม่มีพยาบาลที่ได้ OT — ไม่มียอดให้ส่ง' });
+    return;
+  }
+  const yearBE = state.year, month = state.month;
+  const monthName = ['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'][month];
+  const yearCE = yearBE - 543;
+  const lastDay = new Date(yearCE, month, 0).getDate();
+  const txnDate = `${yearCE}-${String(month).padStart(2,'0')}-${String(lastDay).padStart(2,'0')}`;
+  const sourceId = `${yearBE}${String(month).padStart(2,'0')}`; // e.g., 256805
+  const breakdownLines = ot.rows.filter(r => r.amount > 0)
+    .map(r => `${r.name} (${r.position}): ${r.amount.toLocaleString()} ฿`).join('\n');
+
+  const r = await Swal.fire({
+    title: 'ส่งยอด OT เข้าระบบการเงิน',
+    html: `<div class="text-left text-sm space-y-2">
+      <div>เดือน: <b>${monthName} ${yearBE}</b></div>
+      <div>จำนวนพยาบาล: <b>${ot.nursesWithOT} คน</b></div>
+      <div>ยอดรวม OT: <b class="text-emerald-600">${ot.totalAmount.toLocaleString()} บาท</b></div>
+      <hr class="my-2">
+      <div class="text-xs text-slate-500">บันทึกเป็น "รายจ่าย" หมวด "เงินเดือน/ค่าจ้าง" วันที่ ${txnDate}<br>ถ้ามีรายการของเดือนนี้อยู่แล้วจะอัปเดต (ไม่สร้างซ้ำ)</div>
+    </div>`,
+    showCancelButton: true,
+    confirmButtonText: 'ส่ง', cancelButtonText: 'ยกเลิก', confirmButtonColor: '#059669',
+  });
+  if (!r.isConfirmed) return;
+
+  const fd = new FormData();
+  fd.append('csrf_token', '<?= htmlspecialchars(get_csrf_token(), ENT_QUOTES) ?>');
+  fd.append('action', 'txn:upsert_from_source');
+  fd.append('source_module', 'nurse_schedule');
+  fd.append('source_id', sourceId);
+  fd.append('kind', 'expense');
+  fd.append('amount', String(ot.totalAmount));
+  fd.append('txn_date', txnDate);
+  fd.append('description', `OT พยาบาลประจำเดือน ${monthName} ${yearBE} (${ot.nursesWithOT} คน)`);
+  fd.append('category_name', 'เงินเดือน/ค่าจ้าง');
+  fd.append('note', breakdownLines);
+  try {
+    const res = await fetch('ajax_finance.php', { method: 'POST', body: fd, credentials: 'same-origin' });
+    const j = await res.json();
+    if (!j.ok) { Swal.fire({ icon: 'error', title: 'ส่งไม่สำเร็จ', text: j.message || '' }); return; }
+    Swal.fire({ icon: 'success', title: j.mode === 'updated' ? 'อัปเดตในระบบการเงินแล้ว' : 'ส่งเข้าระบบการเงินแล้ว',
+      html: `<div class="text-sm">บันทึก ${ot.totalAmount.toLocaleString()} บาท ใน Cash Book<br><a href="index.php?section=finance" class="text-emerald-600 underline">เปิดดู</a></div>`,
+      confirmButtonColor: '#059669' });
+  } catch (e) { Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: String(e) }); }
 }
 
 function renderOT() {
