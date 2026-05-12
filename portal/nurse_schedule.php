@@ -1089,10 +1089,16 @@ function _showSaveStatus(text, cls) {
 
 async function serverLoad(year, month) {
   try {
-    const r = await fetch(`${NS_AJAX}?action=load&year=${year}&month=${month}`,
-      { credentials: 'same-origin' });
+    // เพิ่ม timestamp กัน browser cache GET request
+    const r = await fetch(`${NS_AJAX}?action=load&year=${year}&month=${month}&_t=${Date.now()}`,
+      { credentials: 'same-origin', cache: 'no-store' });
     const j = await r.json();
-    if (!j.ok) { console.warn('serverLoad failed', j.error); return null; }
+    if (!j.ok) { console.warn('[nurse_schedule] serverLoad failed', j.error); return null; }
+    // diagnostic — แสดงว่า server ส่ง schedule/leaves ขนาดเท่าไหร่กลับมา
+    const scheduleSize = j.data && j.data.schedule ? Object.keys(j.data.schedule).length : 0;
+    const leavesSize   = j.data && j.data.leaves   ? Object.keys(j.data.leaves).length   : 0;
+    const nursesSize   = j.data && Array.isArray(j.data.nurses) ? j.data.nurses.length   : 0;
+    console.log('[nurse_schedule] serverLoad', year, month, '→', { nurses: nursesSize, schedule: scheduleSize, leaves: leavesSize, monthly_updated_at: j.monthly_updated_at });
     return j.data || null;
   } catch (e) {
     console.warn('serverLoad error', e);
@@ -1119,14 +1125,18 @@ async function serverSave() {
   if (_isSaving) return;
   _isSaving = true;
   _showSaveStatus('กำลังบันทึก…', '');
-  console.log('[nurse_schedule] serverSave START', { year: state.year, month: state.month, dirty: state.dirty });
+  const payload = _buildSavePayload();
+  const scheduleSize = Object.keys(payload.schedule || {}).length;
+  const leavesSize   = Object.keys(payload.leaves   || {}).length;
+  const nursesSize   = Array.isArray(payload.nurses) ? payload.nurses.length : 0;
+  console.log('[nurse_schedule] serverSave START', state.year, state.month, '→', { nurses: nursesSize, schedule: scheduleSize, leaves: leavesSize, dirty: state.dirty });
   try {
     const fd = new FormData();
     fd.append('csrf_token', NS_CSRF);
     fd.append('action', 'save');
     fd.append('year', String(state.year));
     fd.append('month', String(state.month));
-    fd.append('payload', JSON.stringify(_buildSavePayload()));
+    fd.append('payload', JSON.stringify(payload));
     const r = await fetch(NS_AJAX, { method: 'POST', body: fd, credentials: 'same-origin' });
     const rawText = await r.text();
     console.log('[nurse_schedule] serverSave HTTP', r.status, rawText.slice(0, 300));
