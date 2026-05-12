@@ -817,7 +817,7 @@ const DEFAULT_SHIFT_TYPES = {
   'ด':  { label: 'ด',  name: 'ดึก',        bg: '#a5f3fc', fg: '#155e75', order: 3, startTime: '00:00', endTime: '08:00', hours: 8 },
   'ชบ': { label: 'ชบ', name: 'โย้หน้า',     bg: '#fcd34d', fg: '#78350f', order: 4, startTime: '08:00', endTime: '20:00', hours: 12 },
   'ดบ': { label: 'ดบ', name: 'โย้หลัง',     bg: '#5eead4', fg: '#134e4a', order: 5, startTime: '16:00', endTime: '08:00', hours: 16 },
-  'DN': { label: 'DN', name: 'Day+Night',  bg: '#c4b5fd', fg: '#4c1d95', order: 6, startTime: '08:00', endTime: '08:00', hours: 24 },
+  'DN': { label: 'DN', name: 'เช้า-บ่าย',  bg: '#c4b5fd', fg: '#4c1d95', order: 6, startTime: '08:00', endTime: '20:00', hours: 12 },
   'O':  { label: 'O',  name: 'OFF',         bg: '#e2e8f0', fg: '#475569', order: 7, hours: 0 },
   'V':  { label: 'V',  name: 'ลาพักร้อน',   bg: '#bbf7d0', fg: '#14532d', order: 8, hours: 0 },
   'T':  { label: 'T',  name: 'ลาประชุม',    bg: '#fbcfe8', fg: '#831843', order: 9, hours: 0 }
@@ -914,7 +914,7 @@ const DEFAULT_NURSES = [
   { id:'N012', name:'นางสาววันดี ช่วยเหลือ',     position:'ผู้ช่วยพยาบาล',       subType:'ประจำการ', order:12, active:true }
 ];
 
-const DEFAULT_OT = { threshold:18, rates:{'ช':600,'บ':600,'ด':720,'ชบ':1200,'ดบ':1320,'DN':1320} };
+const DEFAULT_OT = { threshold:18, rates:{'ช':600,'บ':600,'ด':720,'ชบ':1200,'ดบ':1320,'DN':1200} };
 const DEFAULT_REQ = { weekday:{ch:3,ba:2,du:2}, weekend:{ch:2,ba:2,du:2} };
 const STORAGE_KEY = 'smnc_nurse_schedule_v271';
 
@@ -1024,7 +1024,7 @@ const setLeave = (nid, d, l) => { if(l){ state.leaves[k(nid,d)] = l; } else { de
 const isWorking = s => s && ['ช','บ','ด','ชบ','ดบ','DN'].includes(s);
 const isLeave = s => s === 'V' || s === 'T';
 const includesAfternoon = s => s === 'บ' || s === 'ชบ' || s === 'ดบ';
-const includesNight = s => s === 'ด' || s === 'ดบ' || s === 'DN';
+const includesNight = s => s === 'ด' || s === 'ดบ';
 const daysInMonth = (yBE, m) => new Date(yBE - 543, m, 0).getDate();
 const isWeekend = (yBE, m, d) => { const dow = new Date(yBE-543, m-1, d).getDay(); return dow === 0 || dow === 6; };
 const dayOfWeek = (yBE, m, d) => new Date(yBE-543, m-1, d).getDay();
@@ -1660,7 +1660,7 @@ function renderScheduleFooter(activeNurses, days, statColCount) {
       const s = getShift(n.id, d);
       if (!s) return false;
       if (shiftKey === 'ช') return s === 'ช' || s === 'ชบ' || s === 'DN';
-      if (shiftKey === 'บ') return s === 'บ' || s === 'ชบ' || s === 'ดบ';
+      if (shiftKey === 'บ') return s === 'บ' || s === 'ชบ' || s === 'ดบ' || s === 'DN';
       return false;
     }).length;
   };
@@ -1710,12 +1710,12 @@ function computeNurseStats(nid) {
       st[s] = (st[s]||0)+1;
       if (isWorking(s)) st.total++;
       // Auto-compute effective ช/บ/ด from compound shifts:
-      // ชบ = morning + afternoon → count as ช +1 AND บ +1
-      // ดบ = night + afternoon → count as ด +1 AND บ +1
-      // DN = morning + night → count as ช +1 AND ด +1
+      // ชบ = เช้า + บ่าย → count as ช +1 AND บ +1
+      // ดบ = ดึก + บ่าย → count as ด +1 AND บ +1
+      // DN = เช้า-บ่าย (12 ชม.) → count as ช +1 AND บ +1
       if (s === 'ช' || s === 'ชบ' || s === 'DN') st.chTotal++;
-      if (s === 'บ' || s === 'ชบ' || s === 'ดบ') st.baTotal++;
-      if (s === 'ด' || s === 'ดบ' || s === 'DN') st.duTotal++;
+      if (s === 'บ' || s === 'ชบ' || s === 'ดบ' || s === 'DN') st.baTotal++;
+      if (s === 'ด' || s === 'ดบ') st.duTotal++;
     }
   }
   return st;
@@ -2165,8 +2165,8 @@ function countShiftOnDay(d, target) {
   state.nurses.filter(n=>n.active!==false).forEach(n => {
     const s = getShift(n.id, d);
     if (target === 'ช' && (s==='ช' || s==='ชบ' || s==='DN')) c++;
-    else if (target === 'บ' && (s==='บ' || s==='ชบ' || s==='ดบ')) c++;
-    else if (target === 'ด' && (s==='ด' || s==='ดบ' || s==='DN')) c++;
+    else if (target === 'บ' && (s==='บ' || s==='ชบ' || s==='ดบ' || s==='DN')) c++;
+    else if (target === 'ด' && (s==='ด' || s==='ดบ')) c++;
   });
   return c;
 }
