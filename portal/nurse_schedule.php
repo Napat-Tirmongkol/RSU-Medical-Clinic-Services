@@ -782,16 +782,19 @@ const DEFAULT_SHIFT_TYPES = {
 let SHIFT_TYPES = structuredClone(DEFAULT_SHIFT_TYPES);
 function applyShiftTypeOverrides() {
   SHIFT_TYPES = structuredClone(DEFAULT_SHIFT_TYPES);
+  for (const k in SHIFT_TYPES) SHIFT_TYPES[k].enabled = true; // default: ทุกตัวเปิดใช้
   const ov = state.shiftTypes || {};
   for (const k in ov) {
     if (SHIFT_TYPES[k] && ov[k]) {
-      // override only name/bg/fg — never label (code) or order
+      // override only name/bg/fg/enabled — never label (code) or order
       if (ov[k].name) SHIFT_TYPES[k].name = ov[k].name;
       if (ov[k].bg)   SHIFT_TYPES[k].bg   = ov[k].bg;
       if (ov[k].fg)   SHIFT_TYPES[k].fg   = ov[k].fg;
+      if (ov[k].enabled === false) SHIFT_TYPES[k].enabled = false;
     }
   }
 }
+function isShiftEnabled(code) { return SHIFT_TYPES[code]?.enabled !== false; }
 
 const POSITIONS = {
   'หัวหน้าหอผู้ป่วย':    { icon: '⭐', cls: 'pos-head',   weekdayMorningOnly: true,  maxOne: true,  system: true },
@@ -1248,8 +1251,10 @@ function renderShiftTypesLegend() {
     const t = SHIFT_TYPES[code];
     if (!t) return '';
     const isDefault = !state.shiftTypes?.[code];
-    return `<div title="${isDefault ? 'ค่ามาตรฐาน' : 'ปรับแต่งแล้ว'}">
-      <span style="display:inline-block;min-width:26px;padding:1px 6px;border-radius:6px;background:${t.bg};color:${t.fg};font-weight:800;text-align:center;margin-right:4px">${t.label}</span>${t.name}
+    const disabled = t.enabled === false;
+    const title = disabled ? 'ปิดใช้งานแล้ว' : (isDefault ? 'ค่ามาตรฐาน' : 'ปรับแต่งแล้ว');
+    return `<div title="${title}" style="${disabled?'opacity:0.4;text-decoration:line-through':''}">
+      <span style="display:inline-block;min-width:26px;padding:1px 6px;border-radius:6px;background:${t.bg};color:${t.fg};font-weight:800;text-align:center;margin-right:4px">${t.label}</span>${t.name}${disabled?' <span class="text-rose-500 text-[10px]">(ปิด)</span>':''}
     </div>`;
   }).join('');
 }
@@ -1258,19 +1263,21 @@ window.openEditShiftTypes = function() {
   const order = ['ช','บ','ด','ชบ','ดบ','DN','O','V','T'];
   const rows = order.map(code => {
     const t = SHIFT_TYPES[code];
+    const enabled = t.enabled !== false;
     return `<tr>
       <td style="padding:6px 8px;text-align:center;font-weight:900;background:${t.bg};color:${t.fg};border-radius:6px;min-width:36px">${t.label}</td>
       <td style="padding:4px 6px"><input class="st-name swal2-input" data-code="${code}" value="${t.name.replace(/"/g,'&quot;')}" style="margin:0;font-size:13px;height:32px;padding:4px 8px;width:100%"></td>
       <td style="padding:4px 6px;text-align:center"><input class="st-bg" data-code="${code}" type="color" value="${t.bg}" style="width:36px;height:32px;border:1px solid #cbd5e1;border-radius:6px;cursor:pointer"></td>
       <td style="padding:4px 6px;text-align:center"><input class="st-fg" data-code="${code}" type="color" value="${t.fg}" style="width:36px;height:32px;border:1px solid #cbd5e1;border-radius:6px;cursor:pointer"></td>
+      <td style="padding:4px 6px;text-align:center"><label style="display:inline-flex;align-items:center;cursor:pointer"><input class="st-enabled" data-code="${code}" type="checkbox" ${enabled?'checked':''} style="width:18px;height:18px;cursor:pointer"></label></td>
     </tr>`;
   }).join('');
   Swal.fire({
     title: 'ปรับแต่งประเภทเวร',
-    html: `<p class="text-xs text-slate-500 text-left mb-3">รหัส (label) แก้ไม่ได้ — แก้ได้แค่ชื่อ + สีพื้น + สีอักษร · กด "คืนค่ามาตรฐาน" เพื่อ reset ทั้งหมด</p>
+    html: `<p class="text-xs text-slate-500 text-left mb-3">รหัส (label) แก้ไม่ได้ — ตั้งชื่อ/สี/เปิด-ปิดใช้งานได้ · ปิดแล้วจะไม่ขึ้นใน palette + ตัวจัดเวรอัตโนมัติจะข้าม · กด "คืนค่ามาตรฐาน" เพื่อ reset ทั้งหมด</p>
       <table style="width:100%;font-size:13px">
         <thead><tr style="font-size:11px;color:#64748b">
-          <th style="padding:4px 6px">รหัส</th><th style="padding:4px 6px;text-align:left">ชื่อ</th><th style="padding:4px 6px">พื้น</th><th style="padding:4px 6px">อักษร</th>
+          <th style="padding:4px 6px">รหัส</th><th style="padding:4px 6px;text-align:left">ชื่อ</th><th style="padding:4px 6px">พื้น</th><th style="padding:4px 6px">อักษร</th><th style="padding:4px 6px">ใช้งาน</th>
         </tr></thead>
         <tbody>${rows}</tbody>
       </table>`,
@@ -1289,12 +1296,15 @@ window.openEditShiftTypes = function() {
         const name = inp.value.trim();
         const bg = document.querySelector(`.st-bg[data-code="${code}"]`).value;
         const fg = document.querySelector(`.st-fg[data-code="${code}"]`).value;
+        const enabledEl = document.querySelector(`.st-enabled[data-code="${code}"]`);
+        const enabled = enabledEl ? enabledEl.checked : true;
         const def = DEFAULT_SHIFT_TYPES[code];
         // เก็บเฉพาะที่เปลี่ยนจาก default
         const diff = {};
         if (name && name !== def.name) diff.name = name;
         if (bg && bg.toLowerCase() !== def.bg.toLowerCase()) diff.bg = bg;
         if (fg && fg.toLowerCase() !== def.fg.toLowerCase()) diff.fg = fg;
+        if (!enabled) diff.enabled = false; // เก็บแค่กรณีปิด (default = true)
         if (Object.keys(diff).length) overrides[code] = diff;
       });
       return overrides;
@@ -1333,6 +1343,7 @@ function renderShiftPalette() {
   wrap.innerHTML = '';
   ['ช','บ','ด','ชบ','ดบ','DN','O'].forEach(s => {
     const def = SHIFT_TYPES[s];
+    if (!def || def.enabled === false) return; // ปิดใช้ → ไม่แสดงใน palette
     const btn = document.createElement('div');
     btn.className = 'shift-btn' + (state.selectedShift === s ? ' selected' : '');
     btn.style.background = def.bg; btn.style.color = def.fg;
@@ -1721,20 +1732,28 @@ function autoScheduleCore() {
   // ----- Clear schedule (keep leaves) -----
   for (const key in state.schedule) delete state.schedule[key];
 
+  // เตือนถ้าเวรหลักถูกปิดใช้งาน (ยังจัดได้แต่ผลจะไม่สมบูรณ์)
+  ['ช','บ','ด'].forEach(c => { if (!isShiftEnabled(c)) state.warnings.push(`ปิดเวร "${SHIFT_TYPES[c]?.name||c}" → ตัวจัดอัตโนมัติจะข้าม`); });
+
   // ----- Step 1: Apply leaves are already in state.leaves -----
 
   // ----- Step 2: Heads / Deputies -----
-  nurses.forEach(n => {
-    const p = POSITIONS[n.position];
-    if (!p || !p.weekdayMorningOnly) return;
-    for (let d=1; d<=days; d++) {
-      if (getLeave(n.id, d)) continue;
-      setShift(n.id, d, isRestDay(state.year, state.month, d) ? 'O' : 'ช');
-    }
-  });
+  const headRestShift = isShiftEnabled('O') ? 'O' : '';
+  const headWorkShift = isShiftEnabled('ช') ? 'ช' : '';
+  if (headWorkShift) {
+    nurses.forEach(n => {
+      const p = POSITIONS[n.position];
+      if (!p || !p.weekdayMorningOnly) return;
+      for (let d=1; d<=days; d++) {
+        if (getLeave(n.id, d)) continue;
+        const code = isRestDay(state.year, state.month, d) ? headRestShift : headWorkShift;
+        if (code) setShift(n.id, d, code);
+      }
+    });
+  }
 
-  // ----- Step 3: Main pass ด → ช → บ -----
-  const passOrder = ['ด','ช','บ'];
+  // ----- Step 3: Main pass ด → ช → บ (ข้ามตัวที่ถูกปิด) -----
+  const passOrder = ['ด','ช','บ'].filter(isShiftEnabled);
   for (const targetShift of passOrder) {
     for (let d=1; d<=days; d++) {
       const we = isRestDay(state.year, state.month, d);
@@ -1777,8 +1796,11 @@ function autoScheduleCore() {
   }
 
   // ----- Step 3.5: distributeSpecialShifts -----
-  // GOAL: Each nurse gets ≥1 "ชบ" AND ≥1 "ดบ" if possible (was just 2 ดบ before)
+  // GOAL: Each nurse gets ≥1 "ชบ" AND ≥1 "ดบ" if possible (ข้ามตัวที่ถูกปิด)
+  const chbaOn = isShiftEnabled('ชบ');
+  const dubaOn = isShiftEnabled('ดบ');
   nurses.forEach(n => {
+    if (!chbaOn && !dubaOn) return;
     if (POSITIONS[n.position]?.weekdayMorningOnly) return;
     let chbaCount = 0, dubaCount = 0;
     for (let d=1; d<=days; d++) {
@@ -1786,8 +1808,8 @@ function autoScheduleCore() {
       if (s === 'ชบ') chbaCount++;
       if (s === 'ดบ') dubaCount++;
     }
-    let needChba = Math.max(0, 1 - chbaCount);
-    let needDuba = Math.max(0, 1 - dubaCount);
+    let needChba = chbaOn ? Math.max(0, 1 - chbaCount) : 0;
+    let needDuba = dubaOn ? Math.max(0, 1 - dubaCount) : 0;
 
     // --- Phase A: upgrade ช → ชบ (each nurse should get at least 1 ชบ) ---
     // Constraints: next day must NOT include night (no บ→ด rule)
