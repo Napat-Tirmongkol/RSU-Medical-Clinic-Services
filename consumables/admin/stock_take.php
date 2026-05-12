@@ -50,7 +50,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'creat
             }
 
             $pdo->commit();
-            header('Location: admin/stock_take_view.php?id=' . $takeId);
+            header('Location: stock_take_view.php?id=' . $takeId);
             exit;
         } catch (Throwable $e) {
             if ($pdo->inTransaction()) $pdo->rollBack();

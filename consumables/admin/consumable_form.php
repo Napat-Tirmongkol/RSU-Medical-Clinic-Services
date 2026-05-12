@@ -105,7 +105,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             $pdo->commit();
-            header('Location: admin/manage_consumables.php?saved=1');
+            header('Location: manage_consumables.php?saved=1');
             exit;
         } catch (Throwable $e) {
             if ($pdo->inTransaction()) $pdo->rollBack();
