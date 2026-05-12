@@ -171,7 +171,7 @@ include __DIR__ . '/includes/header.php';
         { element: '.psb-item[href*="receive_form"]', popover: { title: 'รับเข้า', description: 'บันทึกวัสดุรับเข้าคลัง', side: 'right' } },
         { element: '.psb-item[href*="issue_form"]', popover: { title: 'เบิกออก', description: 'บันทึกวัสดุเบิกใช้', side: 'right' } },
         { element: '.psb-item[href*="stock_take"]', popover: { title: 'ตรวจนับ', description: 'เปิดรอบตรวจนับ — เทียบยอดจริงกับ snapshot', side: 'right' } },
-        { popover: { title: 'เริ่มใช้งานได้เลย', description: 'กดปุ่ม <i class="fa-solid fa-question"></i> มุมซ้ายล่างเมื่อต้องการดูทัวร์ซ้ำ' } },
+        { popover: { title: 'เริ่มใช้งานได้เลย', description: 'กดปุ่ม <i class="fa-solid fa-question"></i> มุมขวาล่างเมื่อต้องการดูทัวร์ซ้ำ' } },
     ];
     window.RsuTour && RsuTour.maybeAutoStart('consumables', csmSteps);
     window._csmTourSteps = csmSteps;
@@ -179,7 +179,7 @@ include __DIR__ . '/includes/header.php';
 </script>
 <button id="rsu-tour-fab" type="button" aria-label="ดู Tour อีกครั้ง" title="ดู Tour อีกครั้ง"
     onclick="window.RsuTour && RsuTour.start(window._csmTourSteps, 'consumables')"
-    style="position:fixed;bottom:20px;left:20px;width:44px;height:44px;border-radius:50%;border:none;background:#2e9e63;color:#fff;font-size:16px;cursor:pointer;box-shadow:0 4px 12px rgba(46,158,99,.35);z-index:90">
+    style="position:fixed;bottom:20px;right:20px;width:44px;height:44px;border-radius:50%;border:none;background:#2e9e63;color:#fff;font-size:16px;cursor:pointer;box-shadow:0 4px 12px rgba(46,158,99,.35);z-index:90">
     <i class="fa-solid fa-question"></i>
 </button>
 
