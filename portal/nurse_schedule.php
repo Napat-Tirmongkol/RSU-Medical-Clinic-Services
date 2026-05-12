@@ -413,7 +413,7 @@ $NS_CSRF_TOKEN = get_csrf_token();
       <i data-lucide="bar-chart-3" class="w-4 h-4"></i> สรุป
     </div>
     <div class="tab-btn" data-tab="ot" onclick="switchTab('ot')">
-      <i data-lucide="wallet" class="w-4 h-4"></i> OT <span class="count-bubble" id="tabCountOT">0</span>
+      <i data-lucide="wallet" class="w-4 h-4"></i> เงินเดือน <span class="count-bubble" id="tabCountOT">0</span>
     </div>
     <div class="tab-btn" data-tab="nurses" onclick="switchTab('nurses')">
       <i data-lucide="users" class="w-4 h-4"></i> พยาบาล <span class="count-bubble" id="tabCountNurses">0</span>
@@ -493,8 +493,8 @@ $NS_CSRF_TOKEN = get_csrf_token();
         </div>
         <div class="relative z-10">
           <div class="stat-value" id="dashOTAmount">0</div>
-          <div class="stat-label">OT รวม (บาท)</div>
-          <div class="stat-sub" id="dashOTCount">0 เวร</div>
+          <div class="stat-label">เงินเดือนรวม (บาท)</div>
+          <div class="stat-sub" id="dashOTCount">0 ชม.</div>
         </div>
       </div>
     </div>
@@ -588,57 +588,48 @@ $NS_CSRF_TOKEN = get_csrf_token();
     <div id="summaryGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3"></div>
   </section>
 
-  <!-- =========== TAB: OT =========== -->
+  <!-- =========== TAB: PAYROLL (เงินเดือน/ค่าตอบแทน) =========== -->
   <section id="tab-ot" class="tab-panel hidden fade-in-up">
-    <!-- OT Settings -->
+    <!-- Payroll info card -->
     <div class="bg-white rounded-2xl p-5 border border-slate-200 mb-4">
-      <div class="flex items-center justify-between mb-3">
+      <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
         <h3 class="font-semibold text-slate-700 flex items-center gap-2">
-          <i data-lucide="settings" class="w-4 h-4 text-cyan-600"></i> ตั้งค่าอัตรา OT
+          <i data-lucide="wallet" class="w-4 h-4 text-cyan-600"></i> เงินเดือน/ค่าตอบแทน
+          <span class="text-xs font-normal text-slate-500">(ชั่วโมงปฏิบัติงาน × อัตรา/ชม.)</span>
         </h3>
-        <button onclick="saveOTSettings()" class="btn-solid btn-primary text-sm">
-          <i data-lucide="save" class="w-3.5 h-3.5"></i> บันทึกการตั้งค่า
-        </button>
+        <div class="flex gap-2">
+          <button onclick="openTimesheetSettings()" class="btn-solid btn-info text-sm" title="ตั้งค่าอัตราต่อชั่วโมง default + ภาษี">
+            <i data-lucide="settings" class="w-3.5 h-3.5"></i> ตั้งค่า default
+          </button>
+          <button onclick="refreshNurseRates(true)" class="btn-solid btn-warning text-sm" title="ดึงอัตรา/ชม. รายคนจาก server ใหม่">
+            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> รีเฟรชอัตรา
+          </button>
+        </div>
       </div>
-      <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
-        <div>
-          <label class="text-xs text-slate-600" title="หน่วยงาน/เวรต่อเดือนที่ถือว่าเป็นภาระงานปกติ — เกินจะนับเป็น OT">เกณฑ์ภาระปกติ (เวร/เดือน)</label>
-          <input type="number" id="otThreshold" value="18" min="1" max="50" oninput="liveRecalcOT()" class="w-full mt-1 px-2 py-1.5 border rounded text-sm">
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+        <div class="p-3 rounded-xl bg-slate-50 border border-slate-200">
+          <div class="text-xs text-slate-500">อัตรา default (บาท/ชม.)</div>
+          <div class="font-bold text-cyan-700 text-lg" id="payrollDefaultRate">—</div>
         </div>
-        <div>
-          <label class="text-xs text-slate-600">เช้า (ช) บาท/เวร</label>
-          <input type="number" id="otRateCh" value="600" min="0" oninput="liveRecalcOT()" class="w-full mt-1 px-2 py-1.5 border rounded text-sm">
+        <div class="p-3 rounded-xl bg-slate-50 border border-slate-200">
+          <div class="text-xs text-slate-500">อัตราภาษี ณ ที่จ่าย</div>
+          <div class="font-bold text-rose-700 text-lg"><span id="payrollTaxRate">—</span>%</div>
         </div>
-        <div>
-          <label class="text-xs text-slate-600">บ่าย (บ) บาท/เวร</label>
-          <input type="number" id="otRateBa" value="600" min="0" oninput="liveRecalcOT()" class="w-full mt-1 px-2 py-1.5 border rounded text-sm">
+        <div class="p-3 rounded-xl bg-slate-50 border border-slate-200">
+          <div class="text-xs text-slate-500">ผู้ลงนาม</div>
+          <div class="font-semibold text-slate-700 truncate" id="payrollSigner">—</div>
         </div>
-        <div>
-          <label class="text-xs text-slate-600">ดึก (ด) บาท/เวร</label>
-          <input type="number" id="otRateDu" value="720" min="0" oninput="liveRecalcOT()" class="w-full mt-1 px-2 py-1.5 border rounded text-sm">
-        </div>
-        <div>
-          <label class="text-xs text-slate-600">โย้หน้า (ชบ) บาท/เวร</label>
-          <input type="number" id="otRateChBa" value="1200" min="0" oninput="liveRecalcOT()" class="w-full mt-1 px-2 py-1.5 border rounded text-sm">
-        </div>
-        <div>
-          <label class="text-xs text-slate-600">โย้หลัง (ดบ) บาท/เวร</label>
-          <input type="number" id="otRateDuBa" value="1320" min="0" oninput="liveRecalcOT()" class="w-full mt-1 px-2 py-1.5 border rounded text-sm">
-        </div>
-        <div>
-          <label class="text-xs text-slate-600">DN บาท/เวร</label>
-          <input type="number" id="otRateDN" value="1320" min="0" oninput="liveRecalcOT()" class="w-full mt-1 px-2 py-1.5 border rounded text-sm">
+        <div class="p-3 rounded-xl bg-amber-50 border border-amber-200">
+          <div class="text-xs text-amber-700">💡 อัตรารายบุคคล</div>
+          <div class="text-xs text-amber-900">ไปที่แท็บ "พยาบาล" → "ข้อมูลใบลงเวลา"</div>
         </div>
       </div>
     </div>
 
-    <!-- OT Explanation banner -->
-    <div id="otBanner" class="hidden mb-4 bg-blue-50 border-l-4 border-blue-400 rounded-r-xl p-3"></div>
+    <!-- Summary cards -->
+    <div id="otSummaryCards" class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4"></div>
 
-    <!-- OT Summary cards -->
-    <div id="otSummaryCards" class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4"></div>
-
-    <!-- OT → Finance integration -->
+    <!-- Send to Cash Book -->
     <?php
     $_ns_role = $_SESSION['admin_role'] ?? $_SESSION['role'] ?? '';
     $_ns_hasFinance = in_array($_ns_role, ['admin', 'superadmin'], true) || !empty($_SESSION['access_finance']);
@@ -647,26 +638,23 @@ $NS_CSRF_TOKEN = get_csrf_token();
     <div class="mb-4 p-3 rounded-xl border border-emerald-200 bg-emerald-50 flex items-center justify-between gap-3 flex-wrap">
         <div class="flex items-center gap-2 text-sm text-emerald-800">
             <i data-lucide="link" class="w-4 h-4 text-emerald-600"></i>
-            <span>ส่งยอด OT ของเดือนนี้เข้าระบบการเงิน (Cash Book) — จะกลายเป็นรายจ่ายหมวด "เงินเดือน/ค่าจ้าง"</span>
+            <span>ส่งเงินเดือนรวมของเดือนนี้เข้าระบบการเงิน (Cash Book) — รายจ่ายหมวด "เงินเดือน/ค่าจ้าง"</span>
         </div>
-        <button onclick="sendOtToFinance()" class="btn-solid bg-emerald-600 text-white hover:bg-emerald-700 text-sm">
-            <i data-lucide="banknote" class="w-3.5 h-3.5"></i> ส่งเข้าระบบการเงิน
+        <button onclick="sendPayrollToFinance()" class="btn-solid bg-emerald-600 text-white hover:bg-emerald-700 text-sm">
+            <i data-lucide="banknote" class="w-3.5 h-3.5"></i> ส่งเงินเดือนทั้งเดือนเข้า Cash Book
         </button>
     </div>
     <?php endif; ?>
 
-    <!-- OT Table -->
+    <!-- Payroll Table -->
     <div class="bg-white rounded-2xl p-3 border border-slate-200 overflow-x-auto">
-      <div class="flex items-center justify-between mb-3 px-2">
+      <div class="flex items-center justify-between mb-3 px-2 flex-wrap gap-2">
         <h3 class="font-semibold text-slate-700 flex items-center gap-2">
-          <i data-lucide="table" class="w-4 h-4 text-cyan-600"></i> รายงานการคำนวณ OT
+          <i data-lucide="table" class="w-4 h-4 text-cyan-600"></i> รายงานเงินเดือน/ค่าตอบแทน
         </h3>
         <div class="flex gap-2">
           <button onclick="exportOT('xlsx')" class="btn-solid btn-success text-xs">
             <i data-lucide="file-spreadsheet" class="w-3.5 h-3.5"></i> Excel
-          </button>
-          <button onclick="exportOT('pdf')" class="btn-solid btn-danger text-xs">
-            <i data-lucide="file-text" class="w-3.5 h-3.5"></i> PDF
           </button>
         </div>
       </div>
@@ -959,6 +947,7 @@ const state = {
   selectedShift: null,
   selectedLeave: 'V',
   otReport: [],
+  timesheetSettings: { default_hourly_rate: 120, tax_rate: 3, signer_name: '', signer_title: '', clinic_name: '' },
   warnings: [],
   dirty: false
 };
@@ -1212,15 +1201,8 @@ function loadReqToUI() {
   document.getElementById('reqWeDu').value = state.requirements.weekend.du;
 }
 
-function loadOTToUI() {
-  document.getElementById('otThreshold').value = state.otSettings.threshold;
-  document.getElementById('otRateCh').value   = state.otSettings.rates['ช'];
-  document.getElementById('otRateBa').value   = state.otSettings.rates['บ'];
-  document.getElementById('otRateDu').value   = state.otSettings.rates['ด'];
-  document.getElementById('otRateChBa').value = state.otSettings.rates['ชบ'];
-  document.getElementById('otRateDuBa').value = state.otSettings.rates['ดบ'];
-  document.getElementById('otRateDN').value   = state.otSettings.rates['DN'];
-}
+// (loadOTToUI ถูกแทนที่ — อัตราต่อชั่วโมงย้ายไปอยู่ใน sys_nurse_timesheet_settings + รายคน)
+function loadOTToUI() { /* no-op */ }
 
 function readReqFromUI() {
   state.requirements = {
@@ -1237,19 +1219,8 @@ function readReqFromUI() {
   };
 }
 
-function readOTFromUI() {
-  state.otSettings = {
-    threshold: +document.getElementById('otThreshold').value || 22,
-    rates: {
-      'ช':  +document.getElementById('otRateCh').value   || 600,
-      'บ':  +document.getElementById('otRateBa').value   || 600,
-      'ด':  +document.getElementById('otRateDu').value   || 720,
-      'ชบ': +document.getElementById('otRateChBa').value || 1200,
-      'ดบ': +document.getElementById('otRateDuBa').value || 1320,
-      'DN': +document.getElementById('otRateDN').value   || 1320
-    }
-  };
-}
+// (readOTFromUI removed — OT rate settings ย้ายไปเป็น hourly rate รายคน + default rate ใน timesheet settings)
+function readOTFromUI() { /* no-op: kept for backward callsite compatibility */ }
 
 // ========= TABS =========
 function switchTab(name) {
@@ -2070,11 +2041,11 @@ function renderDashboard() {
   document.getElementById('tabCountLeaves').textContent = leaveCount;
   document.getElementById('dashWarnings').textContent = state.warnings.length;
 
-  // OT
+  // Payroll
   const ot = computeOT();
   document.getElementById('dashOTAmount').textContent = ot.totalAmount.toLocaleString();
-  document.getElementById('dashOTCount').textContent = `${ot.totalUnits} เวร · ${ot.nursesWithOT} คน`;
-  document.getElementById('tabCountOT').textContent = ot.nursesWithOT;
+  document.getElementById('dashOTCount').textContent = `${ot.totalHours.toLocaleString()} ชม. · ${ot.nursesPaid} คน`;
+  document.getElementById('tabCountOT').textContent = ot.nursesPaid;
 
   // Distribution bars
   const distEl = document.getElementById('shiftDistribution');
@@ -2167,53 +2138,61 @@ function renderSummary() {
   }).join('');
 }
 
-// ========= OT =========
+// ========= PAYROLL (เงินเดือน/ค่าตอบแทน) =========
+// คำนวณ: หาชั่วโมงปฏิบัติงานต่อเดือน (จาก shift × hours) × อัตรา/ชม. (รายคน หรือ default)
+//        → ค่าตอบแทนรวม, ภาษี, คงเหลือ
 function computeOT() {
-  readOTFromUI();
   const days = daysInMonth(state.year, state.month);
   const nurses = state.nurses.filter(n=>n.active!==false);
-  const threshold = state.otSettings.threshold;
-  const rates = state.otSettings.rates;
+  const defaultRate = state.timesheetSettings?.default_hourly_rate ?? 120;
+  const taxPct      = state.timesheetSettings?.tax_rate ?? 3;
   const rows = [];
-  let totalAmount = 0, totalUnits = 0, nursesWithOT = 0;
+  let totalAmount = 0, totalHours = 0, nursesPaid = 0, totalTax = 0, totalNet = 0;
   nurses.forEach(n => {
-    const st = computeNurseStats(n.id);
-    // weight: special shifts = 2 units (each compound shift = 2 working units)
-    let units = (st['ช']||0) + (st['บ']||0) + (st['ด']||0) + 2*(st['ชบ']||0) + 2*(st['ดบ']||0) + 2*(st['DN']||0);
-    const otUnits = Math.max(0, units - threshold);
-    let amount = 0;
-    const breakdown = { 'ช':0,'บ':0,'ด':0,'ชบ':0,'ดบ':0,'DN':0 };
-    if (otUnits > 0) {
-      const total = (st['ช']||0) + (st['บ']||0) + (st['ด']||0) + (st['ชบ']||0) + (st['ดบ']||0) + (st['DN']||0);
-      if (total > 0) {
-        ['ช','บ','ด','ชบ','ดบ','DN'].forEach(t => {
-          const portion = (st[t]||0) * (otUnits / units);
-          breakdown[t] = portion;
-          amount += portion * (rates[t] || 0);
-        });
-      }
-      amount = Math.round(amount);
-      nursesWithOT++;
+    let hours = 0;
+    for (let d=1; d<=days; d++) {
+      if (getLeave(n.id, d)) continue;
+      const s = getShift(n.id, d);
+      if (!s) continue;
+      const h = SHIFT_TYPES[s]?.hours;
+      if (typeof h === 'number' && h > 0) hours += h;
     }
+    const rate   = (typeof n.hourlyRate === 'number' && n.hourlyRate >= 0) ? n.hourlyRate : defaultRate;
+    const gross  = Math.round(hours * rate * 100) / 100;
+    const tax    = Math.round(gross * taxPct) / 100;
+    const net    = Math.round((gross - tax) * 100) / 100;
+    if (gross > 0) nursesPaid++;
     rows.push({
       id: n.id, name: n.name, position: n.position,
-      // OT table shows EFFECTIVE counts (ch/ba/du rolled) so user sees true workload
-      ch: st.chTotal||0, ba: st.baTotal||0, du: st.duTotal||0,
-      chba: st['ชบ']||0, duba: st['ดบ']||0, dn: st['DN']||0,
-      totalUnits: units, otUnits, amount, breakdown
+      staffId: n.staffId || null, orgMemberId: n.orgMemberId || null,
+      hours, rate, gross, tax, net,
+      hasCustomRate: typeof n.hourlyRate === 'number' && n.hourlyRate >= 0,
     });
-    totalAmount += amount;
-    totalUnits += otUnits;
+    totalAmount += gross;
+    totalHours  += hours;
+    totalTax    += tax;
+    totalNet    += net;
   });
   state.otReport = rows;
-  return { rows, totalAmount, totalUnits: Math.round(totalUnits), nursesWithOT };
+  // Backward compat fields ที่ dashboard/export ยังเรียกใช้
+  return {
+    rows,
+    totalAmount: Math.round(totalAmount * 100) / 100,
+    totalHours:  Math.round(totalHours  * 100) / 100,
+    totalTax:    Math.round(totalTax    * 100) / 100,
+    totalNet:    Math.round(totalNet    * 100) / 100,
+    nursesPaid,
+    // legacy aliases (เผื่อจุดอื่นยังอ้างถึง)
+    totalUnits:  Math.round(totalHours * 100) / 100,
+    nursesWithOT: nursesPaid,
+  };
 }
 
-// ── ส่งยอด OT เดือนนี้เข้าระบบการเงิน (Cash Book) ──
-async function sendOtToFinance() {
+// ── ส่งเงินเดือนรวมของเดือนนี้เข้า Cash Book ──
+async function sendPayrollToFinance() {
   const ot = computeOT();
   if (ot.totalAmount <= 0) {
-    Swal.fire({ icon: 'info', title: 'ยังไม่มี OT', text: 'เดือนนี้ไม่มีพยาบาลที่ได้ OT — ไม่มียอดให้ส่ง' });
+    Swal.fire({ icon: 'info', title: 'ยังไม่มียอดเงินเดือน', text: 'เดือนนี้ยังไม่มีพยาบาลที่มีชั่วโมงปฏิบัติงาน — ไม่มียอดให้ส่ง' });
     return;
   }
   const yearBE = state.year, month = state.month;
@@ -2222,15 +2201,16 @@ async function sendOtToFinance() {
   const lastDay = new Date(yearCE, month, 0).getDate();
   const txnDate = `${yearCE}-${String(month).padStart(2,'0')}-${String(lastDay).padStart(2,'0')}`;
   const sourceId = `${yearBE}${String(month).padStart(2,'0')}`; // e.g., 256805
-  const breakdownLines = ot.rows.filter(r => r.amount > 0)
-    .map(r => `${r.name} (${r.position}): ${r.amount.toLocaleString()} ฿`).join('\n');
+  const breakdownLines = ot.rows.filter(r => r.gross > 0)
+    .map(r => `${r.name} (${r.position}): ${r.hours} ชม. × ${r.rate} = ${r.gross.toLocaleString()} ฿`).join('\n');
 
   const r = await Swal.fire({
-    title: 'ส่งยอด OT เข้าระบบการเงิน',
+    title: 'ส่งเงินเดือนเข้าระบบการเงิน',
     html: `<div class="text-left text-sm space-y-2">
       <div>เดือน: <b>${monthName} ${yearBE}</b></div>
-      <div>จำนวนพยาบาล: <b>${ot.nursesWithOT} คน</b></div>
-      <div>ยอดรวม OT: <b class="text-emerald-600">${ot.totalAmount.toLocaleString()} บาท</b></div>
+      <div>จำนวนพยาบาลที่ได้ค่าตอบแทน: <b>${ot.nursesPaid} คน</b></div>
+      <div>ชั่วโมงรวม: <b>${ot.totalHours.toLocaleString()} ชม.</b></div>
+      <div>ค่าตอบแทนรวม (ก่อนหักภาษี): <b class="text-emerald-600">${ot.totalAmount.toLocaleString()} บาท</b></div>
       <hr class="my-2">
       <div class="text-xs text-slate-500">บันทึกเป็น "รายจ่าย" หมวด "เงินเดือน/ค่าจ้าง" วันที่ ${txnDate}<br>ถ้ามีรายการของเดือนนี้อยู่แล้วจะอัปเดต (ไม่สร้างซ้ำ)</div>
     </div>`,
@@ -2247,7 +2227,7 @@ async function sendOtToFinance() {
   fd.append('kind', 'expense');
   fd.append('amount', String(ot.totalAmount));
   fd.append('txn_date', txnDate);
-  fd.append('description', `OT พยาบาลประจำเดือน ${monthName} ${yearBE} (${ot.nursesWithOT} คน)`);
+  fd.append('description', `เงินเดือนพยาบาลประจำเดือน ${monthName} ${yearBE} (${ot.nursesPaid} คน · ${ot.totalHours} ชม.)`);
   fd.append('category_name', 'เงินเดือน/ค่าจ้าง');
   fd.append('note', breakdownLines);
   try {
@@ -2259,92 +2239,86 @@ async function sendOtToFinance() {
       confirmButtonColor: '#059669' });
   } catch (e) { Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: String(e) }); }
 }
+// alias เก่า — เผื่อมีจุดอื่นยังเรียกอยู่
+const sendOtToFinance = sendPayrollToFinance;
 
 function renderOT() {
+  // refresh top-card text จาก timesheetSettings
+  const ts = state.timesheetSettings || {};
+  const defRate = Number(ts.default_hourly_rate ?? 120);
+  const taxPct  = Number(ts.tax_rate ?? 3);
+  const sn  = (ts.signer_name || '').trim();
+  const st  = (ts.signer_title || '').trim();
+  const sigEl = document.getElementById('payrollSigner');
+  if (sigEl) sigEl.textContent = sn ? `${sn}${st ? ' · ' + st : ''}` : '— ยังไม่ตั้งค่า —';
+  const drEl = document.getElementById('payrollDefaultRate'); if (drEl) drEl.textContent = defRate.toLocaleString();
+  const trEl = document.getElementById('payrollTaxRate');     if (trEl) trEl.textContent = taxPct;
+
   const ot = computeOT();
-  const threshold = state.otSettings.threshold;
 
   // summary cards
   document.getElementById('otSummaryCards').innerHTML = `
     <div class="stat-card card-cyan">
       <div class="flex items-start justify-between relative z-10"><div class="stat-icon-box"><i data-lucide="users"></i></div></div>
-      <div class="relative z-10"><div class="stat-value">${ot.nursesWithOT}</div><div class="stat-label">พยาบาลได้ OT</div></div>
+      <div class="relative z-10"><div class="stat-value">${ot.nursesPaid}</div><div class="stat-label">พยาบาลได้ค่าตอบแทน</div></div>
     </div>
     <div class="stat-card card-amber">
       <div class="flex items-start justify-between relative z-10"><div class="stat-icon-box"><i data-lucide="clock"></i></div></div>
-      <div class="relative z-10"><div class="stat-value">${ot.totalUnits}</div><div class="stat-label">หน่วย OT รวม</div></div>
+      <div class="relative z-10"><div class="stat-value">${ot.totalHours.toLocaleString()}</div><div class="stat-label">ชั่วโมงรวม</div></div>
     </div>
     <div class="stat-card card-pink">
       <div class="flex items-start justify-between relative z-10"><div class="stat-icon-box"><i data-lucide="banknote"></i></div></div>
-      <div class="relative z-10"><div class="stat-value">${ot.totalAmount.toLocaleString()}</div><div class="stat-label">บาท · OT รวม</div></div>
+      <div class="relative z-10"><div class="stat-value">${ot.totalAmount.toLocaleString()}</div><div class="stat-label">บาท · ก่อนหักภาษี</div></div>
+    </div>
+    <div class="stat-card card-emerald">
+      <div class="flex items-start justify-between relative z-10"><div class="stat-icon-box"><i data-lucide="hand-coins"></i></div></div>
+      <div class="relative z-10"><div class="stat-value">${ot.totalNet.toLocaleString()}</div><div class="stat-label">บาท · คงเหลือ (หักภาษีแล้ว)</div></div>
     </div>`;
-
-  // Explanation banner (only show if there's a meaningful explanation)
-  const banner = document.getElementById('otBanner');
-  if (banner) {
-    if (ot.nursesWithOT === 0 && ot.rows.length > 0) {
-      const maxUnits = Math.max(...ot.rows.map(r => r.totalUnits));
-      const overThreshold = ot.rows.filter(r => r.totalUnits >= threshold).length;
-      banner.classList.remove('hidden');
-      banner.innerHTML = `<div class="flex items-start gap-2">
-        <i data-lucide="info" class="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5"></i>
-        <div class="text-sm text-blue-800">
-          <b>คำนวณแล้ว ✓ ไม่มีพยาบาลที่ได้ OT</b> เพราะภาระงานไม่เกินเกณฑ์ที่ตั้งไว้
-          (<b>${threshold} หน่วย/เดือน</b>) — ภาระงานสูงสุดในเดือนนี้คือ <b>${maxUnits} หน่วย</b>
-          ${overThreshold > 0 ? `· มี ${overThreshold} คน "เท่ากับ" เกณฑ์ (ต้อง "เกิน" จึงจะได้ OT)` : ''}
-          <br><span class="text-xs opacity-80">💡 ลองลดเกณฑ์ภาระงาน (เช่น 16, 18, 20) ในกล่องด้านบน แล้วกด <b>บันทึกการตั้งค่า</b></span>
-        </div>
-      </div>`;
-    } else {
-      banner.classList.add('hidden');
-    }
-  }
 
   // table
   const tbl = document.getElementById('otTable');
   let html = '<thead><tr>';
-  ['ที่','ชื่อ-นามสกุล','ตำแหน่ง','ช (รวม)','บ (รวม)','ด (รวม)','ชบ','ดบ','DN','รวมหน่วย','OT (หน่วย)','จำนวนเงิน'].forEach(h => html += `<th>${h}</th>`);
+  ['ที่','ชื่อ-นามสกุล','ตำแหน่ง','ชั่วโมงรวม','อัตรา/ชม.','ค่าตอบแทน (บาท)','ภาษี','คงเหลือ','การกระทำ']
+    .forEach(h => html += `<th>${h}</th>`);
   html += '</tr></thead><tbody>';
   ot.rows.forEach((r,i) => {
     const cls = POSITIONS[r.position]?.cls || 'pos-rn';
-    const otCellClr = r.otUnits>0 ? 'text-orange-600 font-bold' : 'text-slate-300';
-    const amtCellClr = r.amount>0 ? 'text-emerald-700 font-bold' : 'text-slate-300';
+    const grossClr = r.gross>0 ? 'text-emerald-700 font-bold' : 'text-slate-300';
+    const netClr   = r.net>0   ? 'text-emerald-800 font-bold' : 'text-slate-300';
+    const rateTag  = r.hasCustomRate
+      ? `<span class="text-[10px] text-cyan-700 bg-cyan-100 px-1 rounded ml-1">รายคน</span>`
+      : `<span class="text-[10px] text-slate-500 bg-slate-100 px-1 rounded ml-1">default</span>`;
+    const canTimesheet = r.staffId || r.orgMemberId;
     html += `<tr>
       <td>${i+1}</td>
       <td class="text-left">${r.name}</td>
       <td><span class="pos-badge ${cls}">${r.position}</span></td>
-      <td>${r.ch||''}</td><td>${r.ba||''}</td><td>${r.du||''}</td>
-      <td>${r.chba||''}</td><td>${r.duba||''}</td><td>${r.dn||''}</td>
-      <td class="font-semibold">${r.totalUnits}</td>
-      <td class="${otCellClr}">${r.otUnits > 0 ? Math.round(r.otUnits) : '0'}</td>
-      <td class="${amtCellClr}">${r.amount > 0 ? r.amount.toLocaleString() + ' ฿' : '0 ฿'}</td>
+      <td class="font-semibold">${r.hours.toLocaleString()}</td>
+      <td>${r.rate.toLocaleString()}${rateTag}</td>
+      <td class="${grossClr}">${r.gross > 0 ? r.gross.toLocaleString() : '0'}</td>
+      <td class="text-rose-700">${r.tax > 0 ? r.tax.toLocaleString() : '—'}</td>
+      <td class="${netClr}">${r.net > 0 ? r.net.toLocaleString() : '0'}</td>
+      <td>${canTimesheet
+        ? `<button onclick="openTimesheet('${r.id}')" class="btn-solid btn-success text-xs" title="ดูใบลงเวลา"><i data-lucide=\"file-text\" class=\"w-3 h-3\"></i> ใบลงเวลา</button>`
+        : `<span class="text-xs text-slate-400" title="ต้องผูกกับ Identity ก่อน">—</span>`}</td>
     </tr>`;
   });
   html += `</tbody><tfoot><tr>
-    <td colspan="9" class="text-right">รวมทั้งหมด:</td>
-    <td>${ot.totalUnits}</td>
-    <td colspan="2" class="text-emerald-800">${ot.totalAmount.toLocaleString()} ฿</td>
+    <td colspan="3" class="text-right">รวมทั้งหมด:</td>
+    <td>${ot.totalHours.toLocaleString()}</td>
+    <td></td>
+    <td class="text-emerald-800">${ot.totalAmount.toLocaleString()}</td>
+    <td class="text-rose-800">${ot.totalTax.toLocaleString()}</td>
+    <td class="text-emerald-900">${ot.totalNet.toLocaleString()}</td>
+    <td></td>
   </tr></tfoot>`;
   tbl.innerHTML = html;
   lucide.createIcons();
 }
 
-function saveOTSettings() {
-  readOTFromUI();
-  persistAll();
-  renderOT();
-  showSuccess('บันทึกการตั้งค่า OT แล้ว');
-}
-
-// Debounced live recompute when user types in OT settings
-let _liveOTTimer = null;
-function liveRecalcOT() {
-  if (_liveOTTimer) clearTimeout(_liveOTTimer);
-  _liveOTTimer = setTimeout(() => {
-    readOTFromUI();
-    renderOT();
-  }, 250);
-}
+// legacy stubs — เผื่อ event handler หรือ caller อื่นยังเรียกอยู่
+function saveOTSettings() { renderOT(); }
+function liveRecalcOT()   { renderOT(); }
 
 // ========= NURSES =========
 function renderNursesList() {
@@ -2605,7 +2579,7 @@ async function openImportNurses() {
         position: cb.dataset.pos,
       }));
     }
-  }).then(r => {
+  }).then(async r => {
     if (!r.isConfirmed) return;
     let added = 0;
     r.value.forEach(item => {
@@ -2629,6 +2603,8 @@ async function openImportNurses() {
     persistAll();
     renderNursesList();
     renderSchedule();
+    // sync hourly_rate รายคนจาก server เพื่อให้ payroll ใช้งานได้ทันที
+    await refreshNurseRates(false);
     Swal.fire({ icon: 'success', title: `นำเข้า ${added} คนแล้ว`, timer: 1500, showConfirmButton: false });
   });
 }
@@ -2837,6 +2813,11 @@ async function editTimesheetInfo(nurseId) {
     const res = await fetch('ajax_nurse_register.php', { method: 'POST', body: fd, credentials: 'same-origin' });
     const j = await res.json();
     if (!j.ok) { Swal.fire({ icon: 'error', title: 'บันทึกไม่สำเร็จ', text: j.error || '' }); return; }
+    // อัปเดต hourlyRate local เพื่อให้ payroll tab สะท้อนทันที
+    const rateNum = r.value.rate === '' ? null : Number(r.value.rate);
+    n.hourlyRate = (rateNum === null || isNaN(rateNum)) ? null : rateNum;
+    if (typeof renderOT === 'function')        { try { renderOT(); } catch (e) {} }
+    if (typeof renderDashboard === 'function') { try { renderDashboard(); } catch (e) {} }
     Swal.fire({ icon: 'success', title: 'บันทึกแล้ว', timer: 1200, showConfirmButton: false });
   } catch (e) {
     Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: String(e) });
@@ -2914,6 +2895,16 @@ async function openTimesheetSettings() {
     const res = await fetch('ajax_nurse_register.php', { method: 'POST', body: fd, credentials: 'same-origin' });
     const j = await res.json();
     if (!j.ok) { Swal.fire({ icon: 'error', title: 'บันทึกไม่สำเร็จ', text: j.error || '' }); return; }
+    // อัปเดต state.timesheetSettings ทันที
+    state.timesheetSettings = {
+      clinic_name:         r.value.clinic,
+      signer_name:         r.value.signerN,
+      signer_title:        r.value.signerT,
+      tax_rate:            Number(r.value.tax),
+      default_hourly_rate: Number(r.value.defRate),
+    };
+    if (typeof renderOT === 'function')        { try { renderOT(); } catch (e) {} }
+    if (typeof renderDashboard === 'function') { try { renderDashboard(); } catch (e) {} }
     Swal.fire({ icon: 'success', title: 'บันทึกแล้ว', timer: 1200, showConfirmButton: false });
   } catch (e) {
     Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: String(e) });
@@ -3160,27 +3151,28 @@ function exportOT(format) {
 
 function exportOTExcel() {
   const ot = computeOT();
+  const ts = state.timesheetSettings || {};
   const aoa = [];
-  aoa.push([`รายงานการคำนวณ OT — ${THAI_MONTHS[state.month-1]} ${state.year}`]);
-  aoa.push([`RSU Medical Clinic | เกณฑ์ภาระงานปกติ: ${state.otSettings.threshold} เวร/เดือน`]);
+  aoa.push([`รายงานเงินเดือน/ค่าตอบแทน — ${THAI_MONTHS[state.month-1]} ${state.year}`]);
+  aoa.push([`อัตรา default: ${(ts.default_hourly_rate ?? 120)} บาท/ชม. | ภาษี ณ ที่จ่าย: ${(ts.tax_rate ?? 3)}%`]);
   aoa.push([]);
-  aoa.push(['ที่','ชื่อ-นามสกุล','ตำแหน่ง','ช (รวม)','บ (รวม)','ด (รวม)','ชบ','ดบ','DN','รวมหน่วย','OT (หน่วย)','จำนวนเงิน (บาท)']);
+  aoa.push(['ที่','ชื่อ-นามสกุล','ตำแหน่ง','ชั่วโมงรวม','อัตรา/ชม.','ค่าตอบแทน (บาท)','ภาษี (บาท)','คงเหลือ (บาท)']);
   ot.rows.forEach((r,i) => {
-    aoa.push([i+1, r.name, r.position, r.ch||'', r.ba||'', r.du||'', r.chba||'', r.duba||'', r.dn||'', r.totalUnits, r.otUnits>0?Math.round(r.otUnits):'', r.amount||'']);
+    aoa.push([i+1, r.name, r.position, r.hours, r.rate, r.gross, r.tax, r.net]);
   });
-  aoa.push(['','','','','','','','','รวม:', ot.totalUnits, '', ot.totalAmount]);
+  aoa.push(['','','รวม:', ot.totalHours, '', ot.totalAmount, ot.totalTax, ot.totalNet]);
 
   const ws = XLSX.utils.aoa_to_sheet(aoa);
   ws['!merges'] = [
-    { s:{r:0,c:0}, e:{r:0,c:11} },
-    { s:{r:1,c:0}, e:{r:1,c:11} }
+    { s:{r:0,c:0}, e:{r:0,c:7} },
+    { s:{r:1,c:0}, e:{r:1,c:7} }
   ];
-  ws['!cols'] = [{wch:5},{wch:28},{wch:18},{wch:6},{wch:6},{wch:6},{wch:6},{wch:6},{wch:6},{wch:10},{wch:10},{wch:14}];
+  ws['!cols'] = [{wch:5},{wch:28},{wch:18},{wch:10},{wch:10},{wch:14},{wch:10},{wch:14}];
 
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'OT Report');
-  XLSX.writeFile(wb, `OT_Report_${THAI_MONTHS[state.month-1]}_${state.year}.xlsx`);
-  showSuccess('ดาวน์โหลด OT Excel แล้ว');
+  XLSX.utils.book_append_sheet(wb, ws, 'Payroll');
+  XLSX.writeFile(wb, `Payroll_${THAI_MONTHS[state.month-1]}_${state.year}.xlsx`);
+  showSuccess('ดาวน์โหลดรายงานเงินเดือน Excel แล้ว');
 }
 
 async function exportOTPDF() {
@@ -3254,10 +3246,61 @@ async function onMonthChange() {
   updateHolidayBadge();
 }
 
+// ดึง timesheet settings (ชื่อคลินิก/ผู้ลงนาม/อัตรา default/ภาษี)
+async function loadTimesheetSettings() {
+  try {
+    const r = await fetch('ajax_nurse_register.php?action=get_timesheet_settings', { credentials: 'same-origin' });
+    const j = await r.json();
+    if (j.ok && j.settings) {
+      state.timesheetSettings = {
+        clinic_name: j.settings.clinic_name || '',
+        signer_name: j.settings.signer_name || '',
+        signer_title: j.settings.signer_title || '',
+        tax_rate: Number(j.settings.tax_rate ?? 3),
+        default_hourly_rate: Number(j.settings.default_hourly_rate ?? 120),
+      };
+    }
+  } catch (e) { console.warn('loadTimesheetSettings failed', e); }
+}
+
+// ดึง hourly_rate รายคนจาก server แล้วใส่กลับใน state.nurses[].hourlyRate
+async function refreshNurseRates(showToast) {
+  const staffIds = state.nurses.filter(n => n.staffId).map(n => n.staffId);
+  const orgIds   = state.nurses.filter(n => n.orgMemberId).map(n => n.orgMemberId);
+  if (staffIds.length === 0 && orgIds.length === 0) {
+    if (showToast) Swal.fire({ icon: 'info', title: 'ยังไม่มีพยาบาลที่ผูกกับ Identity / ผังองค์กร', timer: 2000, showConfirmButton: false });
+    return;
+  }
+  const params = new URLSearchParams();
+  staffIds.forEach(id => params.append('staff_ids[]', String(id)));
+  orgIds.forEach(id   => params.append('org_member_ids[]', String(id)));
+  try {
+    const res = await fetch('ajax_nurse_register.php?action=list_nurse_rates&' + params.toString(), { credentials: 'same-origin' });
+    const j = await res.json();
+    if (!j.ok) throw new Error(j.error || 'load failed');
+    const sMap = j.rates?.staff || {};
+    const oMap = j.rates?.org   || {};
+    state.nurses.forEach(n => {
+      let v = null;
+      if (n.staffId      && sMap[n.staffId]      !== undefined) v = sMap[n.staffId];
+      else if (n.orgMemberId && oMap[n.orgMemberId] !== undefined) v = oMap[n.orgMemberId];
+      n.hourlyRate = (v === null || v === undefined) ? null : Number(v);
+    });
+    if (typeof renderOT === 'function') { try { renderOT(); } catch (e) {} }
+    if (typeof renderDashboard === 'function') { try { renderDashboard(); } catch (e) {} }
+    if (showToast) Swal.fire({ icon: 'success', title: 'รีเฟรชอัตราแล้ว', timer: 1200, showConfirmButton: false });
+  } catch (e) {
+    console.warn('refreshNurseRates failed', e);
+    if (showToast) Swal.fire({ icon: 'error', title: 'รีเฟรชไม่สำเร็จ', text: String(e) });
+  }
+}
+
 // ========= STARTUP =========
 window.addEventListener('DOMContentLoaded', async () => {
   initSelectors();             // ต้อง init ก่อนเพื่อให้ state.year/month มีค่า
   await loadFromStorage();     // โหลดข้อมูลจาก server (async)
+  await loadTimesheetSettings();
+  await refreshNurseRates(false);
   loadReqToUI();
   loadOTToUI();
   renderShiftPalette();

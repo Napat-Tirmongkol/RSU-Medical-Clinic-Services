@@ -120,6 +120,30 @@ try {
         exit;
     }
 
+    // ── ดึง hourly_rate รายคน (bulk) สำหรับ payroll tab ──
+    // POST: staff_ids[]=… , org_member_ids[]=…
+    if ($action === 'list_nurse_rates') {
+        $staffIds = array_values(array_filter(array_map('intval', (array)($_REQUEST['staff_ids'] ?? []))));
+        $orgIds   = array_values(array_filter(array_map('intval', (array)($_REQUEST['org_member_ids'] ?? []))));
+        $out = ['staff' => new stdClass(), 'org' => new stdClass()];
+        if (!empty($staffIds)) {
+            $in = implode(',', array_map('intval', $staffIds));
+            $rows = $pdo->query("SELECT id, hourly_rate FROM sys_staff WHERE id IN ($in)")->fetchAll(PDO::FETCH_ASSOC) ?: [];
+            $map = (object)[];
+            foreach ($rows as $r) $map->{$r['id']} = $r['hourly_rate'] === null ? null : (float)$r['hourly_rate'];
+            $out['staff'] = $map;
+        }
+        if (!empty($orgIds)) {
+            $in = implode(',', array_map('intval', $orgIds));
+            $rows = $pdo->query("SELECT id, hourly_rate FROM sys_org_members WHERE id IN ($in)")->fetchAll(PDO::FETCH_ASSOC) ?: [];
+            $map = (object)[];
+            foreach ($rows as $r) $map->{$r['id']} = $r['hourly_rate'] === null ? null : (float)$r['hourly_rate'];
+            $out['org'] = $map;
+        }
+        echo json_encode(['ok' => true, 'rates' => $out], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
     // ── ดึงข้อมูลรายบุคคล (สำหรับ Editor) ──
     if ($action === 'get_nurse_info') {
         $staffId = (int)($_GET['staff_id'] ?? 0);
