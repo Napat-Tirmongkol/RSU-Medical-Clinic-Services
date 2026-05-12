@@ -13,7 +13,10 @@ ensure_ai_qa_schema($pdo);
 ensure_ai_faq_schema($pdo);
 
 $_qa_tab = (string)($_GET['qa_tab'] ?? 'captured');
-if (!in_array($_qa_tab, ['captured', 'faq'], true)) $_qa_tab = 'captured';
+if (!in_array($_qa_tab, ['captured', 'faq', 'feedback'], true)) $_qa_tab = 'captured';
+
+require_once __DIR__ . '/../../includes/ai_feedback_helper.php';
+ensure_ai_feedback_schema($pdo);
 
 // ── Filters ──────────────────────────────────────────────────────────────────
 $_qa_page     = max(1, (int)($_GET['page'] ?? 1));
@@ -258,7 +261,8 @@ function _qa_source_badge(string $s): string {
     }
     .qa-tab:hover { color: #1f2937; }
     .qa-tab.qa-tab-active--captured { color: #7c3aed; border-bottom-color: #9333ea; }
-    .qa-tab.qa-tab-active--faq { color: #047857; border-bottom-color: #059669; }
+    .qa-tab.qa-tab-active--faq      { color: #047857; border-bottom-color: #059669; }
+    .qa-tab.qa-tab-active--feedback { color: #0369a1; border-bottom-color: #0284c7; }
 
     #vchecks { max-height: 24rem; overflow-y: auto; }
 </style>
@@ -321,6 +325,10 @@ function _qa_source_badge(string $s): string {
         <a href="?section=ai_qa_lab&qa_tab=faq"
            class="qa-tab <?= $_qa_tab === 'faq' ? 'qa-tab-active--faq' : '' ?>">
             <i class="fa-solid fa-book-bookmark mr-1.5"></i> FAQ Knowledge Base
+        </a>
+        <a href="?section=ai_qa_lab&qa_tab=feedback"
+           class="qa-tab <?= $_qa_tab === 'feedback' ? 'qa-tab-active--feedback' : '' ?>">
+            <i class="fa-solid fa-thumbs-up mr-1.5"></i> Feedback Log
         </a>
     </div>
 
@@ -699,6 +707,69 @@ function _qa_source_badge(string $s): string {
         </div>
         <?php endif; ?>
     </div>
+
+    <?php elseif ($_qa_tab === 'feedback'): /* ════════════ TAB: FEEDBACK LOG ════════════ */ ?>
+
+    <!-- Summary cards -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+        <div class="bg-white border border-gray-200 rounded-xl p-4 text-center">
+            <div class="text-2xl font-black text-gray-900" id="fb-sum-total">—</div>
+            <div class="text-xs text-gray-500 mt-1">ทั้งหมด</div>
+        </div>
+        <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-center">
+            <div class="text-2xl font-black text-emerald-700" id="fb-sum-up">—</div>
+            <div class="text-xs text-emerald-600 mt-1"><i class="fa-solid fa-thumbs-up mr-1"></i>มีประโยชน์</div>
+        </div>
+        <div class="bg-rose-50 border border-rose-200 rounded-xl p-4 text-center">
+            <div class="text-2xl font-black text-rose-700" id="fb-sum-down">—</div>
+            <div class="text-xs text-rose-600 mt-1"><i class="fa-solid fa-thumbs-down mr-1"></i>ไม่มีประโยชน์</div>
+        </div>
+        <div class="bg-sky-50 border border-sky-200 rounded-xl p-4 text-center">
+            <div class="text-2xl font-black text-sky-700" id="fb-sum-pct">—</div>
+            <div class="text-xs text-sky-600 mt-1">% Positive</div>
+        </div>
+    </div>
+    <!-- Progress bar -->
+    <div class="mb-5 bg-gray-200 rounded-full h-2">
+        <div id="fb-pct-bar" class="bg-emerald-500 h-2 rounded-full transition-all duration-500" style="width:0%"></div>
+    </div>
+
+    <!-- Filters -->
+    <div class="flex items-center gap-2 mb-4 flex-wrap">
+        <span class="text-xs font-bold text-gray-500" id="fb-stats-total"></span>
+        <select id="fb-filter-rating" class="px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none">
+            <option value="">ทุก rating</option>
+            <option value="1">👍 มีประโยชน์</option>
+            <option value="-1">👎 ไม่มีประโยชน์</option>
+        </select>
+        <select id="fb-filter-source" class="px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none">
+            <option value="">ทุก source</option>
+            <option value="portal_chat">portal_chat</option>
+            <option value="line_faq">line_faq</option>
+        </select>
+    </div>
+
+    <!-- Table -->
+    <div class="bg-white border border-gray-200 rounded-xl overflow-hidden mb-3">
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead>
+                    <tr class="bg-gray-50">
+                        <th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">เวลา</th>
+                        <th class="px-4 py-3 text-center text-xs font-bold text-gray-500 uppercase">Rating</th>
+                        <th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">คำถาม</th>
+                        <th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">คำตอบ (ย่อ)</th>
+                        <th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">หมายเหตุ</th>
+                        <th class="px-4 py-3 text-center text-xs font-bold text-gray-500 uppercase">ลบ</th>
+                    </tr>
+                </thead>
+                <tbody id="fb-tbody">
+                    <tr><td colspan="6" class="text-center text-gray-400 py-8">กำลังโหลด...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <div id="fb-pagination" class="flex items-center justify-between text-sm"></div>
 
     <?php endif; /* end tab branch */ ?>
 </div>
@@ -1315,4 +1386,111 @@ function _qa_source_badge(string $s): string {
     }
     document.getElementById('faq-modal-save')?.addEventListener('click', faqSave);
 })();
+
+<?php if ($_qa_tab === 'feedback'): ?>
+(function () {
+'use strict';
+const CSRF = '<?= get_csrf_token() ?>';
+let _fbPage = 1, _fbTotal = 0, _fbPages = 1;
+const LIMIT = 20;
+
+async function fbLoad(page) {
+    _fbPage = page;
+    const rating = document.getElementById('fb-filter-rating').value;
+    const source = document.getElementById('fb-filter-source').value;
+    const tbody  = document.getElementById('fb-tbody');
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-gray-400 py-8"><i class="fa-solid fa-spinner fa-spin mr-2"></i>โหลด...</td></tr>';
+
+    const params = new URLSearchParams({ action:'list', page, limit:LIMIT, rating, source });
+    try {
+        const r = await fetch('ajax_ai_feedback.php?' + params.toString());
+        const j = await r.json();
+        if (!j.ok) { tbody.innerHTML = `<tr><td colspan="6" class="text-center text-rose-500 py-6">${j.error}</td></tr>`; return; }
+        _fbTotal = j.total; _fbPages = j.pages;
+        renderFbTable(j.rows);
+        renderFbPagination();
+        document.getElementById('fb-stats-total').textContent = j.total + ' รายการ';
+    } catch(e) { tbody.innerHTML = `<tr><td colspan="6" class="text-center text-rose-500 py-6">${e.message}</td></tr>`; }
+}
+
+async function fbLoadSummary() {
+    try {
+        const r = await fetch('ajax_ai_feedback.php?action=summary');
+        const j = await r.json();
+        if (!j.ok) return;
+        document.getElementById('fb-sum-up').textContent    = j.thumbs_up;
+        document.getElementById('fb-sum-down').textContent  = j.thumbs_down;
+        document.getElementById('fb-sum-total').textContent = j.total;
+        document.getElementById('fb-sum-pct').textContent   = j.pct_positive + '%';
+        const bar = document.getElementById('fb-pct-bar');
+        if (bar) bar.style.width = j.pct_positive + '%';
+    } catch(_) {}
+}
+
+function escH(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function renderFbTable(rows) {
+    const tbody = document.getElementById('fb-tbody');
+    if (!rows.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-gray-400 py-12">ยังไม่มี feedback</td></tr>';
+        return;
+    }
+    tbody.innerHTML = rows.map(r => {
+        const ratingHtml = r.rating == 1
+            ? '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700"><i class="fa-solid fa-thumbs-up"></i> ดี</span>'
+            : '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-rose-100 text-rose-700"><i class="fa-solid fa-thumbs-down"></i> แย่</span>';
+        return `<tr class="hover:bg-gray-50">
+            <td class="px-4 py-3 text-xs text-gray-400">${escH(r.created_at||'')}</td>
+            <td class="px-4 py-3 text-center">${ratingHtml}</td>
+            <td class="px-4 py-3">
+                <div class="text-xs font-bold text-gray-700 line-clamp-2">${escH(r.question_short)}</div>
+            </td>
+            <td class="px-4 py-3">
+                <div class="text-xs text-gray-500 line-clamp-2">${escH(r.answer_short)}</div>
+            </td>
+            <td class="px-4 py-3 text-xs text-gray-500">${escH(r.comment||'-')}</td>
+            <td class="px-4 py-3 text-center">
+                <button type="button" class="fb-del-btn px-2 py-1 bg-white text-rose-500 text-xs font-bold rounded border border-rose-200 hover:bg-rose-50" data-id="${r.id}">
+                    <i class="fa-solid fa-trash"></i>
+                </button>
+            </td>
+        </tr>`;
+    }).join('');
+
+    tbody.querySelectorAll('.fb-del-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const { isConfirmed } = await Swal.fire({ icon:'warning', title:'ลบ feedback นี้?', showCancelButton:true, confirmButtonText:'ลบ', cancelButtonText:'ยกเลิก', confirmButtonColor:'#dc2626' });
+            if (!isConfirmed) return;
+            const fd = new FormData();
+            fd.append('action','delete'); fd.append('id',btn.dataset.id); fd.append('csrf_token',CSRF);
+            const r = await fetch('ajax_ai_feedback.php',{method:'POST',body:fd});
+            const j = await r.json();
+            if (j.ok) { fbLoad(_fbPage); fbLoadSummary(); }
+            else Swal.fire({icon:'error',title:'ไม่สำเร็จ',text:j.error||''});
+        });
+    });
+}
+
+function renderFbPagination() {
+    const el = document.getElementById('fb-pagination');
+    if (_fbPages <= 1) { el.innerHTML = ''; return; }
+    const p = _fbPage;
+    let btns = '';
+    if (p > 1) btns += `<button onclick="fbPageGo(1)" class="px-2 py-1 rounded border text-xs hover:bg-gray-50">«</button><button onclick="fbPageGo(${p-1})" class="px-2 py-1 rounded border text-xs hover:bg-gray-50">‹</button>`;
+    for (let i=Math.max(1,p-2); i<=Math.min(_fbPages,p+2); i++) {
+        btns += `<button onclick="fbPageGo(${i})" class="px-2.5 py-1 rounded border text-xs ${i===p?'bg-sky-600 text-white border-sky-600':'hover:bg-gray-50'}">${i}</button>`;
+    }
+    if (p < _fbPages) btns += `<button onclick="fbPageGo(${p+1})" class="px-2 py-1 rounded border text-xs hover:bg-gray-50">›</button><button onclick="fbPageGo(${_fbPages})" class="px-2 py-1 rounded border text-xs hover:bg-gray-50">»</button>`;
+    el.innerHTML = `<span class="text-xs text-gray-400">หน้า ${p}/${_fbPages} · ${_fbTotal} รายการ</span><div class="flex gap-1">${btns}</div>`;
+}
+
+window.fbPageGo = (p) => fbLoad(p);
+
+document.getElementById('fb-filter-rating')?.addEventListener('change', () => fbLoad(1));
+document.getElementById('fb-filter-source')?.addEventListener('change', () => fbLoad(1));
+
+fbLoad(1);
+fbLoadSummary();
+})();
+<?php endif; ?>
 </script>
