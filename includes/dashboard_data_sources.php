@@ -235,6 +235,28 @@ if (!function_exists('dashboard_data_sources_catalog')) {
                 'shape'   => 'timeseries',
                 'widgets' => ['line', 'area'],
             ],
+
+            // ── แคมเปญวัคซีน × LINE ─────────────────────────────────────
+            'campaign_vaccine_via_line' => [
+                'label'   => 'แคมเปญวัคซีน — จำนวนผู้เข้าร่วมผ่าน LINE',
+                'shape'   => 'count',
+                'widgets' => ['kpi'],
+            ],
+            'campaign_vaccine_total' => [
+                'label'   => 'แคมเปญวัคซีน — ผู้เข้าร่วมทั้งหมด',
+                'shape'   => 'count',
+                'widgets' => ['kpi'],
+            ],
+            'campaign_vaccine_line_vs_other' => [
+                'label'   => 'แคมเปญวัคซีน — เปรียบเทียบ LINE vs ช่องทางอื่น',
+                'shape'   => 'breakdown',
+                'widgets' => ['donut', 'pie', 'bar'],
+            ],
+            'campaign_vaccine_via_line_trend' => [
+                'label'   => 'แคมเปญวัคซีน — Trend ผู้เข้าร่วมผ่าน LINE 12 เดือน',
+                'shape'   => 'timeseries',
+                'widgets' => ['line', 'area', 'bar'],
+            ],
         ];
     }
 
@@ -592,6 +614,56 @@ if (!function_exists('dashboard_data_sources_catalog')) {
 
             case 'satisfaction_trend_12m':
                 return _resolve_satisfaction_trend($pdo, $year, $month);
+
+            // ── แคมเปญวัคซีน × LINE ─────────────────────────────────────
+            case 'campaign_vaccine_via_line': {
+                // นับ user (DISTINCT) ที่มี line_user_id และจองแคมเปญ type='vaccine'
+                $auto = (int)_safe_scalar($pdo,
+                    "SELECT COUNT(DISTINCT u.id)
+                     FROM camp_bookings b
+                     JOIN sys_users u ON b.student_id = u.id
+                     JOIN camp_list c ON b.campaign_id = c.id
+                     WHERE c.type = 'vaccine'
+                       AND b.status IN ('booked','confirmed','completed')
+                       AND (u.line_user_id IS NOT NULL OR u.line_user_id_new IS NOT NULL)"
+                     . $dateClause('b.created_at'));
+                $val = $hasFilter ? $auto : kpi_with_override($pdo, $key, $auto);
+                return ['shape' => 'count', 'value' => $val, 'auto' => $auto];
+            }
+
+            case 'campaign_vaccine_total': {
+                $auto = (int)_safe_scalar($pdo,
+                    "SELECT COUNT(DISTINCT u.id)
+                     FROM camp_bookings b
+                     JOIN sys_users u ON b.student_id = u.id
+                     JOIN camp_list c ON b.campaign_id = c.id
+                     WHERE c.type = 'vaccine'
+                       AND b.status IN ('booked','confirmed','completed')"
+                     . $dateClause('b.created_at'));
+                $val = $hasFilter ? $auto : kpi_with_override($pdo, $key, $auto);
+                return ['shape' => 'count', 'value' => $val, 'auto' => $auto];
+            }
+
+            case 'campaign_vaccine_line_vs_other': {
+                $row = _safe_rows($pdo,
+                    "SELECT
+                        SUM(CASE WHEN u.line_user_id IS NOT NULL OR u.line_user_id_new IS NOT NULL THEN 1 ELSE 0 END) AS via_line,
+                        SUM(CASE WHEN u.line_user_id IS NULL AND u.line_user_id_new IS NULL THEN 1 ELSE 0 END) AS via_other
+                     FROM camp_bookings b
+                     JOIN sys_users u ON b.student_id = u.id
+                     JOIN camp_list c ON b.campaign_id = c.id
+                     WHERE c.type = 'vaccine'
+                       AND b.status IN ('booked','confirmed','completed')"
+                     . $dateClause('b.created_at'))[0] ?? ['via_line' => 0, 'via_other' => 0];
+                return [
+                    'shape'  => 'breakdown',
+                    'labels' => ['ผ่าน LINE', 'ช่องทางอื่น'],
+                    'values' => [(int)$row['via_line'], (int)$row['via_other']],
+                ];
+            }
+
+            case 'campaign_vaccine_via_line_trend':
+                return _resolve_vaccine_line_trend($pdo, $year, $month);
         }
 
         return ['shape' => 'unknown'];
@@ -918,6 +990,71 @@ if (!function_exists('dashboard_data_sources_catalog')) {
 
         return ['shape' => 'timeseries', 'labels' => $labels,
                 'series' => [['name' => 'คะแนนเฉลี่ย', 'data' => array_values($bucket)]]];
+    }
+
+    /** Vaccine campaign bookings via LINE — monthly trend */
+    function _resolve_vaccine_line_trend(PDO $pdo, ?int $year, ?int $month): array
+    {
+        $bucket = []; $labels = [];
+        $lineWhere = "(u.line_user_id IS NOT NULL OR u.line_user_id_new IS NOT NULL)";
+        $statusWhere = "b.status IN ('booked','confirmed','completed')";
+        $typeWhere = "c.type = 'vaccine'";
+
+        if ($year !== null && $month !== null) {
+            $daysInMonth = (int)date('t', mktime(0, 0, 0, $month, 1, $year));
+            for ($d = 1; $d <= $daysInMonth; $d++) {
+                $key = sprintf('%04d-%02d-%02d', $year, $month, $d);
+                $bucket[$key] = 0; $labels[] = (string)$d;
+            }
+            $sql = "SELECT DATE_FORMAT(b.created_at,'%Y-%m-%d') AS ymd,
+                           COUNT(DISTINCT u.id) AS cnt
+                    FROM camp_bookings b
+                    JOIN sys_users u ON b.student_id = u.id
+                    JOIN camp_list c ON b.campaign_id = c.id
+                    WHERE $typeWhere AND $statusWhere AND $lineWhere
+                      AND YEAR(b.created_at)=$year AND MONTH(b.created_at)=$month
+                    GROUP BY ymd";
+            $bk = 'ymd';
+        } elseif ($year !== null) {
+            $thaiMonths = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+            for ($m = 1; $m <= 12; $m++) {
+                $key = sprintf('%04d-%02d', $year, $m);
+                $bucket[$key] = 0; $labels[] = $thaiMonths[$m - 1];
+            }
+            $sql = "SELECT DATE_FORMAT(b.created_at,'%Y-%m') AS ym,
+                           COUNT(DISTINCT u.id) AS cnt
+                    FROM camp_bookings b
+                    JOIN sys_users u ON b.student_id = u.id
+                    JOIN camp_list c ON b.campaign_id = c.id
+                    WHERE $typeWhere AND $statusWhere AND $lineWhere
+                      AND YEAR(b.created_at)=$year
+                    GROUP BY ym";
+            $bk = 'ym';
+        } else {
+            for ($i = 11; $i >= 0; $i--) {
+                $ts = strtotime("first day of -$i month");
+                $key = date('Y-m', $ts);
+                $bucket[$key] = 0; $labels[] = _thai_month_label($ts);
+            }
+            $sql = "SELECT DATE_FORMAT(b.created_at,'%Y-%m') AS ym,
+                           COUNT(DISTINCT u.id) AS cnt
+                    FROM camp_bookings b
+                    JOIN sys_users u ON b.student_id = u.id
+                    JOIN camp_list c ON b.campaign_id = c.id
+                    WHERE $typeWhere AND $statusWhere AND $lineWhere
+                      AND b.created_at >= DATE_SUB(DATE_FORMAT(CURDATE(),'%Y-%m-01'), INTERVAL 11 MONTH)
+                    GROUP BY ym";
+            $bk = 'ym';
+        }
+
+        try {
+            foreach (_safe_rows($pdo, $sql) as $r) {
+                if (isset($bucket[$r[$bk]])) $bucket[$r[$bk]] = (int)$r['cnt'];
+            }
+        } catch (PDOException $e) {}
+
+        return ['shape' => 'timeseries', 'labels' => $labels,
+                'series' => [['name' => 'ผ่าน LINE', 'data' => array_values($bucket)]]];
     }
 
     function _thai_month_label(int $ts): string
