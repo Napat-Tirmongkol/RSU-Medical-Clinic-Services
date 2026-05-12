@@ -28,9 +28,17 @@ if (!function_exists('_asset_abs_url')) {
 // แยก context ตาม login source:
 //   - Portal admin (sys_admins) → admin_id = sys_admins.id, is_portal_admin = true
 //   - e-Campaign Staff (sys_staff) → admin_id = sys_staff.id, is_ecampaign_staff = true
-if (!isset($_SESSION['user_id'])
-    && isset($_SESSION['admin_logged_in'], $_SESSION['admin_id'])
-    && $_SESSION['admin_logged_in'] === true) {
+//
+// Trigger sync เมื่อ admin_logged_in=true และ user_id ยังไม่ตรงกับ admin_id
+// หรือ session ปนเก่าไม่มี is_portal_admin / is_ecampaign_staff flag
+$_needSso = isset($_SESSION['admin_logged_in'], $_SESSION['admin_id'])
+            && $_SESSION['admin_logged_in'] === true
+            && (
+                !isset($_SESSION['user_id'])
+                || (empty($_SESSION['is_portal_admin']) && empty($_SESSION['is_ecampaign_staff']))
+                || (int)$_SESSION['user_id'] !== (int)$_SESSION['admin_id']
+            );
+if ($_needSso) {
     try {
         require_once __DIR__ . '/db_connect.php';
         $p = db();
