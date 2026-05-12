@@ -1001,8 +1001,11 @@ const state = {
 // ========= HELPERS =========
 const k = (nid, d) => `${nid}-${d}`;
 const getShift = (nid, d) => state.schedule[k(nid,d)] || '';
+// _silentMutation: ตอน load/migration จะ set true เพื่อกัน auto-save fire ระหว่างที่ state ยังไม่นิ่ง
+// (จะมีปัญหาเขียน state เปล่า/ครึ่ง ทับ DB ถ้า save fire ตอน load ยังไม่เสร็จ)
+let _silentMutation = false;
 // _autoPersist: เรียก persistAll() ถ้ามี (function ถูก define ทีหลังในไฟล์ — ใช้ optional chain กัน undef ตอน init)
-const _autoPersist = () => { if (typeof persistAll === 'function') persistAll(); };
+const _autoPersist = () => { if (!_silentMutation && typeof persistAll === 'function') persistAll(); };
 const setShift = (nid, d, s) => { if(s){ state.schedule[k(nid,d)] = s; } else { delete state.schedule[k(nid,d)]; } state.dirty = true; _autoPersist(); };
 const getLeave = (nid, d) => state.leaves[k(nid,d)] || '';
 const setLeave = (nid, d, l) => { if(l){ state.leaves[k(nid,d)] = l; } else { delete state.leaves[k(nid,d)]; } state.dirty = true; _autoPersist(); };
@@ -1186,6 +1189,17 @@ async function saveNow() {
 }
 
 async function loadFromStorage() {
+  // ✦ enter silent mode — กัน setShift/setLeave ที่อาจถูกเรียกใน enforceHeads/migration
+  //   trigger save ระหว่างที่ state กำลังเปลี่ยนแปลง (เสี่ยงเขียนข้อมูล partial ทับ DB)
+  _silentMutation = true;
+  try {
+    return await _loadFromStorageInner();
+  } finally {
+    _silentMutation = false;
+  }
+}
+
+async function _loadFromStorageInner() {
   // ลอง server ก่อน (ของจริง shared ทุกคน)
   const serverData = await serverLoad(state.year, state.month);
 
