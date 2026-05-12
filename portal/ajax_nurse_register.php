@@ -12,10 +12,11 @@ $action = $_REQUEST['action'] ?? '';
 
 try {
     if ($action === 'list_staff_nurses') {
-        // ดึง staff ที่มี job_title คำว่า "พยาบาล" หรือเกี่ยวข้อง
-        // หรือมี org chart position เป็นพยาบาล
-        $sql = "SELECT
+        // 1) ดึง staff ที่มี job_title คำว่า "พยาบาล" หรือเชื่อมกับ org chart "พยาบาล"
+        $sqlStaff = "SELECT
+                    'staff' AS source,
                     s.id AS staff_id,
+                    NULL AS org_member_id,
                     s.full_name,
                     s.username,
                     s.job_title,
@@ -36,12 +37,33 @@ try {
                        )
                   )
                 ORDER BY s.full_name ASC";
-        try {
-            $rows = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC) ?: [];
-        } catch (PDOException $e) {
-            // เผื่อ table/column ยังไม่มี
-            $rows = [];
-        }
+
+        // 2) ดึง org_members ที่ตำแหน่งมี "พยาบาล" แต่ไม่มี staff_id (standalone)
+        //    เพื่อไม่ duplicate กับผลข้อ 1 ซึ่งดึงผ่าน staff_id อยู่แล้ว
+        $sqlOrg = "SELECT
+                    'org' AS source,
+                    NULL AS staff_id,
+                    om.id AS org_member_id,
+                    TRIM(CONCAT(COALESCE(om.prefix, ''), ' ', om.full_name)) AS full_name,
+                    NULL AS username,
+                    NULL AS job_title,
+                    'active' AS account_status,
+                    op.title AS org_position_title
+                FROM sys_org_members om
+                INNER JOIN sys_org_positions op ON op.id = om.position_id
+                WHERE om.is_active = 1 AND op.is_active = 1
+                  AND om.staff_id IS NULL
+                  AND op.title LIKE '%พยาบาล%'
+                ORDER BY om.full_name ASC";
+
+        $rows = [];
+        try { $rows = array_merge($rows, $pdo->query($sqlStaff)->fetchAll(PDO::FETCH_ASSOC) ?: []); }
+        catch (PDOException $e) { /* tables may not exist */ }
+        try { $rows = array_merge($rows, $pdo->query($sqlOrg)->fetchAll(PDO::FETCH_ASSOC) ?: []); }
+        catch (PDOException $e) { /* tables may not exist */ }
+
+        // sort รวมตามชื่อ
+        usort($rows, fn($a, $b) => strcmp($a['full_name'], $b['full_name']));
 
         echo json_encode(['ok' => true, 'staff' => $rows], JSON_UNESCAPED_UNICODE);
         exit;

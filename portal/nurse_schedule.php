@@ -675,8 +675,8 @@ $NS_CSRF_TOKEN = get_csrf_token();
           <i data-lucide="users" class="w-4 h-4 text-cyan-600"></i> ทะเบียนพยาบาล
         </h3>
         <div class="flex items-center gap-2">
-          <button onclick="openImportNurses()" class="btn-solid btn-success text-sm" title="นำเข้าจาก Identity & Governance">
-            <i data-lucide="download" class="w-3.5 h-3.5"></i> นำเข้าจากทะเบียน
+          <button onclick="openImportNurses()" class="btn-solid btn-success text-sm" title="นำเข้าจาก Identity + ผังองค์กร">
+            <i data-lucide="download" class="w-3.5 h-3.5"></i> นำเข้ารายชื่อ
           </button>
           <button onclick="openManagePositions()" class="btn-solid btn-warning text-sm" title="เพิ่ม/แก้ไขตำแหน่ง">
             <i data-lucide="badge-plus" class="w-3.5 h-3.5"></i> จัดการตำแหน่ง
@@ -2524,37 +2524,53 @@ async function openImportNurses() {
   if (!staff.length) {
     Swal.fire({
       icon: 'info', title: 'ไม่พบรายชื่อพยาบาล',
-      html: 'ใน Identity & Governance ยังไม่มี staff ที่ใส่ <b>"ตำแหน่งงาน (Job Title)"</b> เป็น "พยาบาล..."<br><br>เปิดหน้า Identity → กรอก Job Title ก่อน',
+      html: 'ไม่พบในทั้ง 2 แหล่ง:<br>• <b>Identity</b> staff ที่มี Job Title มีคำว่า "พยาบาล"<br>• <b>ผังองค์กร</b> สมาชิกที่อยู่ใต้ตำแหน่ง "พยาบาล..."<br><br>เปิดหน้า "ข้อมูลคลินิก" → "ผังองค์กร" หรือ Identity → กรอก Job Title ก่อน',
     });
     return;
   }
 
-  // เช็คว่าใครถูก import แล้ว (match by staffId)
-  const importedIds = new Set(state.nurses.filter(n => n.staffId).map(n => Number(n.staffId)));
+  // เช็คว่าใครถูก import แล้ว (match by staffId หรือ orgMemberId)
+  const importedStaffIds = new Set(state.nurses.filter(n => n.staffId).map(n => Number(n.staffId)));
+  const importedOrgIds = new Set(state.nurses.filter(n => n.orgMemberId).map(n => Number(n.orgMemberId)));
+  const importedNames = new Set(state.nurses.map(n => n.name)); // กันชื่อซ้ำ
 
-  const rows = staff.map(s => {
-    const sid = Number(s.staff_id);
-    const already = importedIds.has(sid);
+  const rows = staff.map((s, idx) => {
+    const isOrg = s.source === 'org';
+    const sid = Number(s.staff_id || 0);
+    const orgId = Number(s.org_member_id || 0);
+    const already = (sid > 0 && importedStaffIds.has(sid))
+                 || (orgId > 0 && importedOrgIds.has(orgId))
+                 || importedNames.has(s.full_name);
     const title = (s.job_title || s.org_position_title || '').trim();
     const pos = mapJobTitleToPosition(s.job_title, s.org_position_title);
+    const badge = isOrg
+      ? '<span class="text-[9px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded ml-1">ผังองค์กร</span>'
+      : '<span class="text-[9px] font-bold text-sky-700 bg-sky-100 px-1.5 py-0.5 rounded ml-1">Identity</span>';
     return `<label class="flex items-center gap-3 p-2 rounded-lg ${already ? 'bg-emerald-50' : 'bg-slate-50'} hover:bg-emerald-50 cursor-pointer mb-1">
-      <input type="checkbox" class="imp-nurse-cb" value="${sid}" data-name="${s.full_name.replace(/"/g, '&quot;')}" data-pos="${pos}" ${already ? 'checked disabled' : ''}>
+      <input type="checkbox" class="imp-nurse-cb" data-idx="${idx}" data-source="${s.source || 'staff'}" data-staff-id="${sid}" data-org-id="${orgId}" data-name="${s.full_name.replace(/"/g, '&quot;')}" data-pos="${pos}" ${already ? 'checked disabled' : ''}>
       <div class="flex-1 min-w-0">
-        <div class="font-semibold text-sm text-slate-800">${s.full_name} ${already ? '<span class=\"text-[10px] text-emerald-700 font-bold ml-1\">✓ นำเข้าแล้ว</span>' : ''}</div>
+        <div class="font-semibold text-sm text-slate-800">${s.full_name}${badge}${already ? '<span class=\"text-[10px] text-emerald-700 font-bold ml-1\">✓ นำเข้าแล้ว</span>' : ''}</div>
         <div class="text-xs text-slate-500">${title || '—'} <span class="opacity-60">→ ${pos}</span></div>
       </div>
     </label>`;
   }).join('');
 
+  // count by source สำหรับแสดงสรุป
+  const countStaff = staff.filter(s => s.source !== 'org').length;
+  const countOrg = staff.filter(s => s.source === 'org').length;
+
   Swal.fire({
-    title: 'นำเข้าจากทะเบียน Identity',
-    html: `<p class="text-xs text-slate-500 text-left mb-2">เลือกพยาบาลที่ต้องการเพิ่มเข้าระบบจัดเวร · ระบบจะเลือก "ตำแหน่งในเวร" ให้อัตโนมัติจาก Job Title</p>
+    title: 'นำเข้ารายชื่อพยาบาล',
+    html: `<p class="text-xs text-slate-500 text-left mb-2">
+        ดึงจาก 2 แหล่งรวมกัน: <b class="text-sky-700">Identity (${countStaff})</b> + <b class="text-amber-700">ผังองค์กร (${countOrg})</b><br>
+        ระบบจะแมพ "ตำแหน่งในเวร" ให้อัตโนมัติจาก Job Title/Org Title
+      </p>
       <div class="text-left max-h-[400px] overflow-y-auto pr-1">${rows}</div>`,
     showCancelButton: true,
     confirmButtonText: 'นำเข้า',
     cancelButtonText: 'ยกเลิก',
     confirmButtonColor: '#2e9e63',
-    width: 560,
+    width: 620,
     preConfirm: () => {
       const checks = Array.from(document.querySelectorAll('.imp-nurse-cb:checked:not(:disabled)'));
       if (!checks.length) {
@@ -2562,7 +2578,9 @@ async function openImportNurses() {
         return false;
       }
       return checks.map(cb => ({
-        staffId: Number(cb.value),
+        source: cb.dataset.source,
+        staffId: Number(cb.dataset.staffId) || null,
+        orgMemberId: Number(cb.dataset.orgId) || null,
         name: cb.dataset.name,
         position: cb.dataset.pos,
       }));
@@ -2578,11 +2596,13 @@ async function openImportNurses() {
         if (exists) pos = 'พยาบาลวิชาชีพ'; // fallback
       }
       const newId = 'N' + String(Date.now() + added).slice(-6);
-      state.nurses.push({
+      const newNurse = {
         id: newId, name: item.name, position: pos,
         order: state.nurses.length + 1, active: true,
-        staffId: item.staffId,
-      });
+      };
+      if (item.staffId) newNurse.staffId = item.staffId;
+      if (item.orgMemberId) newNurse.orgMemberId = item.orgMemberId;
+      state.nurses.push(newNurse);
       added++;
     });
     state.dirty = true;
