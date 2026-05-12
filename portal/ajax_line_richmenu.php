@@ -74,9 +74,21 @@ try {
     }
 
     if ($action === 'sync_user') {
-        $uid = trim((string)($_POST['line_user_id'] ?? ''));
+        $uid  = trim((string)($_POST['line_user_id'] ?? ''));
+        $mode = trim((string)($_POST['mode'] ?? 'auto'));
         if ($uid === '') { echo json_encode(['ok' => false, 'message' => 'ต้องระบุ lineUserId']); exit; }
-        $r = line_richmenu_sync_user($uid);
+
+        if ($mode === 'unlink') {
+            $r = line_richmenu_unlink_user($uid);
+            echo json_encode(['ok' => $r['ok'], 'state' => 'unlinked', 'message' => $r['ok'] ? 'ลบ link → user จะเห็น default' : ($r['error'] ?? 'ล้มเหลว')]);
+            exit;
+        }
+
+        $force = null;
+        if ($mode === 'guest')  $force = false;
+        if ($mode === 'member') $force = true;
+
+        $r = line_richmenu_sync_user($uid, $force);
         echo json_encode(['ok' => $r['ok'], 'state' => $r['state'], 'message' => $r['ok'] ? "Linked → {$r['state']}" : ($r['error'] ?? 'ล้มเหลว')]);
         exit;
     }

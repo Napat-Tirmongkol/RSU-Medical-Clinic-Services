@@ -978,13 +978,23 @@ function sendTestLineP() {
             <div class="mt-3 pt-3 border-t border-slate-100 space-y-3">
                 <div>
                     <label class="block text-[11px] font-black uppercase tracking-widest text-slate-500 mb-1.5">ทดสอบ sync เมนูให้ user คนเดียว</label>
-                    <div class="flex gap-2">
+                    <div class="flex flex-wrap gap-2">
                         <input type="text" id="rmTestUid" placeholder="lineUserId (Uxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx)"
-                            class="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono text-slate-800 outline-none">
+                            class="flex-1 min-w-[260px] px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono text-slate-800 outline-none">
+                        <select id="rmSyncMode" class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-black text-slate-700 outline-none">
+                            <option value="auto">Auto (ตรวจ DB)</option>
+                            <option value="guest">Force Guest</option>
+                            <option value="member">Force Member</option>
+                            <option value="unlink">Unlink (เห็น default)</option>
+                        </select>
                         <button onclick="rmSyncUser()" class="px-3 py-2 rounded-xl bg-sky-500 hover:bg-sky-600 text-white text-xs font-black inline-flex items-center gap-1">
-                            <i class="fa-solid fa-arrows-rotate"></i> Sync
+                            <i class="fa-solid fa-arrows-rotate"></i> ทดสอบ
                         </button>
                     </div>
+                    <p class="text-[10px] text-slate-400 font-medium mt-1">
+                        <span class="font-black">Force Guest/Member</span> = ไม่ดู DB (ทดสอบเห็นเมนูแต่ละแบบกับ user ที่อยู่ในระบบแล้ว) ·
+                        <span class="font-black">Unlink</span> = ลบ binding → fallback default
+                    </p>
                 </div>
 
                 <div class="pt-2">
@@ -1073,12 +1083,17 @@ function sendTestLineP() {
 
     window.rmSyncUser = async function() {
         const uid = document.getElementById('rmTestUid').value.trim();
+        const mode = document.getElementById('rmSyncMode')?.value || 'auto';
         if (!uid) { Swal.fire({ icon: 'warning', title: 'กรุณาใส่ lineUserId' }); return; }
-        const r = await rmPost('sync_user', { line_user_id: uid });
+        const r = await rmPost('sync_user', { line_user_id: uid, mode });
         Swal.fire({
             icon: r.ok ? 'success' : 'error',
-            title: r.ok ? `Linked → ${r.state}` : 'ล้มเหลว',
+            title: r.ok
+                ? (r.state === 'unlinked' ? 'Unlink สำเร็จ' : `Linked → ${r.state}`)
+                : 'ล้มเหลว',
             text: r.message || '',
+            timer: r.ok ? 2000 : undefined,
+            showConfirmButton: !r.ok,
         });
     };
 
