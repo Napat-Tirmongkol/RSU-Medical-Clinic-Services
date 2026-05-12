@@ -994,7 +994,33 @@ function sendTestLineP() {
                     <p class="text-[10px] text-slate-400 font-medium mt-1">ใช้กรณีเพิ่งตั้งค่า member ID ครั้งแรก หรือเปลี่ยน rich menu ใหม่</p>
                 </div>
 
-                <div id="rmListBox" class="text-[11px] text-slate-500 font-mono whitespace-pre-wrap pt-2 border-t border-slate-100"></div>
+                <!-- Lookup Console rich menu ID -->
+                <div class="pt-3 border-t border-slate-100 mt-2">
+                    <p class="text-[11px] font-black uppercase tracking-widest text-slate-500 mb-1.5">
+                        <i class="fa-solid fa-magnifying-glass text-emerald-500"></i> ดู ID ของ Console rich menu
+                    </p>
+                    <p class="text-[10px] text-slate-500 font-medium mb-2 leading-relaxed">
+                        Rich menu ที่สร้างใน LINE OA Console ก็มี ID — ใช้กับระบบนี้ได้ ถ้าหา ID เจอ
+                    </p>
+
+                    <div class="flex flex-wrap gap-2 items-center">
+                        <button onclick="rmLookupDefault()" class="px-3 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-black border border-emerald-200 inline-flex items-center gap-1.5">
+                            <i class="fa-solid fa-globe"></i> ดู ID ของ default ปัจจุบัน
+                        </button>
+                        <span class="text-[10px] text-slate-400">— ต้องตั้ง Console rich menu เป็น default ก่อน</span>
+                    </div>
+
+                    <div class="flex gap-2 mt-2">
+                        <input type="text" id="rmLookupUid" placeholder="lineUserId ของ admin (Uxxxx...) — ดู rich menu ที่ user คนนี้เห็น"
+                            class="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono text-slate-800 outline-none">
+                        <button onclick="rmLookupUser()" class="px-3 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-black border border-emerald-200 inline-flex items-center gap-1.5">
+                            <i class="fa-solid fa-user-magnifying-glass"></i> ดู ID
+                        </button>
+                    </div>
+                    <p class="text-[10px] text-slate-400 font-medium mt-1">— add bot เป็นเพื่อน + เห็น Console rich menu ในเชต → คัด userId ตัวเองมาดูได้</p>
+                </div>
+
+                <div id="rmListBox" class="text-[11px] text-slate-500 font-mono whitespace-pre-wrap pt-3 border-t border-slate-100 mt-2"></div>
             </div>
         </details>
     </div>
@@ -1071,6 +1097,38 @@ function sendTestLineP() {
             title: r.ok ? 'เสร็จสิ้น' : 'ล้มเหลว',
             html: r.ok ? `รวม ${r.total} คน · สำเร็จ <b>${r.success}</b> · ล้มเหลว <b>${r.failed}</b>` : (r.message || ''),
         });
+    };
+
+    function rmShowLookupResult(r, contextLabel) {
+        if (r.ok && r.richMenuId) {
+            Swal.fire({
+                icon: 'success',
+                title: 'พบ richMenuId',
+                html: `${contextLabel}<br>
+                    <code style="font-size:11px;background:#f1f5f9;padding:4px 8px;border-radius:6px;display:inline-block;margin-top:8px;word-break:break-all">${r.richMenuId}</code>
+                    <br><small>คัดลอกแล้วเอาไปวางในช่อง Guest / Member ID ด้านบน</small>`,
+                showCancelButton: true, showDenyButton: true,
+                confirmButtonText: 'วางใน Guest', denyButtonText: 'วางใน Member', cancelButtonText: 'ปิด',
+                confirmButtonColor: '#f59e0b', denyButtonColor: '#10b981',
+            }).then(res => {
+                if (res.isConfirmed) document.getElementById('rmGuestId').value = r.richMenuId;
+                else if (res.isDenied) document.getElementById('rmMemberId').value = r.richMenuId;
+            });
+        } else {
+            Swal.fire({ icon: 'warning', title: 'ไม่พบ', text: r.message || '' });
+        }
+    }
+
+    window.rmLookupDefault = async function() {
+        const r = await rmPost('lookup_default', {});
+        rmShowLookupResult(r, 'Default rich menu ปัจจุบัน:');
+    };
+
+    window.rmLookupUser = async function() {
+        const uid = document.getElementById('rmLookupUid').value.trim();
+        if (!uid) { Swal.fire({ icon: 'warning', title: 'กรุณาใส่ lineUserId' }); return; }
+        const r = await rmPost('lookup_user', { line_user_id: uid });
+        rmShowLookupResult(r, `Rich menu ที่ผูกกับ <code>${uid.substring(0,12)}…</code>:`);
     };
 
     // โหลด initial state

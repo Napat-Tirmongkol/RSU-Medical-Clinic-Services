@@ -267,6 +267,46 @@ if (!function_exists('line_richmenu_delete')) {
     }
 }
 
+if (!function_exists('line_richmenu_get_default')) {
+    /**
+     * ดึง richMenuId ของ default rich menu ปัจจุบัน
+     * (ใช้ดู ID ของ rich menu ที่สร้างผ่าน Console ได้ — ถ้าตั้งเป็น default แล้ว)
+     */
+    function line_richmenu_get_default(): array
+    {
+        $r = line_richmenu_api('GET', '/v2/bot/user/all/richmenu');
+        if ($r['http'] === 404) {
+            return ['ok' => false, 'richMenuId' => null, 'http' => 404, 'error' => 'ยังไม่ได้ตั้ง default rich menu'];
+        }
+        if ($r['http'] < 200 || $r['http'] >= 300) {
+            return ['ok' => false, 'richMenuId' => null, 'http' => $r['http'], 'error' => $r['body'] ?: $r['error']];
+        }
+        $data = json_decode($r['body'], true) ?: [];
+        return ['ok' => true, 'richMenuId' => $data['richMenuId'] ?? null, 'http' => $r['http'], 'error' => null];
+    }
+}
+
+if (!function_exists('line_richmenu_get_user_linked')) {
+    /**
+     * ดึง richMenuId ที่ผูกกับ user คนหนึ่ง
+     * (ใช้ดู ID ของ rich menu ที่ user เห็นจริง — ใช้ดู Console rich menu ที่
+     * เห็นในมือถือของตัวเองได้)
+     */
+    function line_richmenu_get_user_linked(string $lineUserId): array
+    {
+        if ($lineUserId === '') return ['ok' => false, 'richMenuId' => null, 'http' => 0, 'error' => 'lineUserId ว่าง'];
+        $r = line_richmenu_api('GET', "/v2/bot/user/$lineUserId/richmenu");
+        if ($r['http'] === 404) {
+            return ['ok' => false, 'richMenuId' => null, 'http' => 404, 'error' => 'user นี้ยังไม่มี rich menu ผูกอยู่ (จะใช้ default)'];
+        }
+        if ($r['http'] < 200 || $r['http'] >= 300) {
+            return ['ok' => false, 'richMenuId' => null, 'http' => $r['http'], 'error' => $r['body'] ?: $r['error']];
+        }
+        $data = json_decode($r['body'], true) ?: [];
+        return ['ok' => true, 'richMenuId' => $data['richMenuId'] ?? null, 'http' => $r['http'], 'error' => null];
+    }
+}
+
 if (!function_exists('line_richmenu_is_registered_user')) {
     /**
      * ตรวจว่า lineUserId นี้มี record ใน sys_users หรือยัง
