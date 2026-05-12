@@ -636,7 +636,11 @@ $NS_CSRF_TOKEN = get_csrf_token();
     <div id="otSummaryCards" class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4"></div>
 
     <!-- OT → Finance integration -->
-    <?php if ($adminRole === 'superadmin' || $adminRole === 'admin' || !empty($_SESSION['access_finance'])): ?>
+    <?php
+    $_ns_role = $_SESSION['admin_role'] ?? $_SESSION['role'] ?? '';
+    $_ns_hasFinance = in_array($_ns_role, ['admin', 'superadmin'], true) || !empty($_SESSION['access_finance']);
+    ?>
+    <?php if ($_ns_hasFinance): ?>
     <div class="mb-4 p-3 rounded-xl border border-emerald-200 bg-emerald-50 flex items-center justify-between gap-3 flex-wrap">
         <div class="flex items-center gap-2 text-sm text-emerald-800">
             <i data-lucide="link" class="w-4 h-4 text-emerald-600"></i>
