@@ -112,6 +112,8 @@ $NS_CSRF_TOKEN = get_csrf_token();
   .btn-danger:hover { background: #dc2626; }
   .btn-warning { background: #f59e0b; color: white; }
   .btn-warning:hover { background: #d97706; }
+  .btn-info { background: #0ea5e9; color: white; }
+  .btn-info:hover { background: #0284c7; }
 
   /* ===== FILTER DROPDOWN ===== */
   .filter-card {
@@ -683,6 +685,9 @@ $NS_CSRF_TOKEN = get_csrf_token();
           <button onclick="openImportNurses()" class="btn-solid btn-success text-sm" title="นำเข้าจาก Identity + ผังองค์กร">
             <i data-lucide="download" class="w-3.5 h-3.5"></i> นำเข้ารายชื่อ
           </button>
+          <button onclick="openTimesheetSettings()" class="btn-solid btn-info text-sm" title="ตั้งค่าใบลงเวลา (ชื่อคลินิก/ผู้ลงนาม/ภาษี)">
+            <i data-lucide="settings" class="w-3.5 h-3.5"></i> ตั้งค่าใบลงเวลา
+          </button>
           <button onclick="openManagePositions()" class="btn-solid btn-warning text-sm" title="เพิ่ม/แก้ไขตำแหน่ง">
             <i data-lucide="badge-plus" class="w-3.5 h-3.5"></i> จัดการตำแหน่ง
           </button>
@@ -786,15 +791,15 @@ $NS_CSRF_TOKEN = get_csrf_token();
 <script>
 // ========= CONSTANTS =========
 const DEFAULT_SHIFT_TYPES = {
-  'ช':  { label: 'ช',  name: 'เช้า',       bg: '#fef9c3', fg: '#854d0e', order: 1 },
-  'บ':  { label: 'บ',  name: 'บ่าย',       bg: '#bae6fd', fg: '#075985', order: 2 },
-  'ด':  { label: 'ด',  name: 'ดึก',        bg: '#a5f3fc', fg: '#155e75', order: 3 },
-  'ชบ': { label: 'ชบ', name: 'โย้หน้า',     bg: '#fcd34d', fg: '#78350f', order: 4 },
-  'ดบ': { label: 'ดบ', name: 'โย้หลัง',     bg: '#5eead4', fg: '#134e4a', order: 5 },
-  'DN': { label: 'DN', name: 'Day+Night',  bg: '#c4b5fd', fg: '#4c1d95', order: 6 },
-  'O':  { label: 'O',  name: 'OFF',         bg: '#e2e8f0', fg: '#475569', order: 7 },
-  'V':  { label: 'V',  name: 'ลาพักร้อน',   bg: '#bbf7d0', fg: '#14532d', order: 8 },
-  'T':  { label: 'T',  name: 'ลาประชุม',    bg: '#fbcfe8', fg: '#831843', order: 9 }
+  'ช':  { label: 'ช',  name: 'เช้า',       bg: '#fef9c3', fg: '#854d0e', order: 1, startTime: '08:00', endTime: '16:00', hours: 8 },
+  'บ':  { label: 'บ',  name: 'บ่าย',       bg: '#bae6fd', fg: '#075985', order: 2, startTime: '16:00', endTime: '20:00', hours: 4 },
+  'ด':  { label: 'ด',  name: 'ดึก',        bg: '#a5f3fc', fg: '#155e75', order: 3, startTime: '00:00', endTime: '08:00', hours: 8 },
+  'ชบ': { label: 'ชบ', name: 'โย้หน้า',     bg: '#fcd34d', fg: '#78350f', order: 4, startTime: '08:00', endTime: '20:00', hours: 12 },
+  'ดบ': { label: 'ดบ', name: 'โย้หลัง',     bg: '#5eead4', fg: '#134e4a', order: 5, startTime: '16:00', endTime: '08:00', hours: 16 },
+  'DN': { label: 'DN', name: 'Day+Night',  bg: '#c4b5fd', fg: '#4c1d95', order: 6, startTime: '08:00', endTime: '08:00', hours: 24 },
+  'O':  { label: 'O',  name: 'OFF',         bg: '#e2e8f0', fg: '#475569', order: 7, hours: 0 },
+  'V':  { label: 'V',  name: 'ลาพักร้อน',   bg: '#bbf7d0', fg: '#14532d', order: 8, hours: 0 },
+  'T':  { label: 'T',  name: 'ลาประชุม',    bg: '#fbcfe8', fg: '#831843', order: 9, hours: 0 }
 };
 // SHIFT_TYPES = defaults merged with state.shiftTypes (user overrides)
 let SHIFT_TYPES = structuredClone(DEFAULT_SHIFT_TYPES);
@@ -805,9 +810,12 @@ function applyShiftTypeOverrides() {
   for (const k in ov) {
     if (SHIFT_TYPES[k] && ov[k]) {
       // override only name/bg/fg/enabled — never label (code) or order
-      if (ov[k].name) SHIFT_TYPES[k].name = ov[k].name;
-      if (ov[k].bg)   SHIFT_TYPES[k].bg   = ov[k].bg;
-      if (ov[k].fg)   SHIFT_TYPES[k].fg   = ov[k].fg;
+      if (ov[k].name)      SHIFT_TYPES[k].name      = ov[k].name;
+      if (ov[k].bg)        SHIFT_TYPES[k].bg        = ov[k].bg;
+      if (ov[k].fg)        SHIFT_TYPES[k].fg        = ov[k].fg;
+      if (ov[k].startTime) SHIFT_TYPES[k].startTime = ov[k].startTime;
+      if (ov[k].endTime)   SHIFT_TYPES[k].endTime   = ov[k].endTime;
+      if (typeof ov[k].hours === 'number') SHIFT_TYPES[k].hours = ov[k].hours;
       if (ov[k].enabled === false) SHIFT_TYPES[k].enabled = false;
     }
   }
@@ -2359,6 +2367,12 @@ function renderNursesList() {
           <span class="text-xs text-slate-400">ID: ${n.id}</span>
         </div>
       </div>
+      <button onclick="openTimesheet('${n.id}')" class="btn-solid btn-success text-xs" title="พิมพ์ใบลงเวลาประจำเดือน">
+        <i data-lucide="file-text" class="w-3.5 h-3.5"></i> ใบลงเวลา
+      </button>
+      <button onclick="editTimesheetInfo('${n.id}')" class="btn-solid btn-info text-xs" title="แก้ไขเลขบัตรประชาชน/ตำแหน่งทางการ/อัตราต่อชั่วโมง">
+        <i data-lucide="id-card" class="w-3.5 h-3.5"></i> ข้อมูลใบลงเวลา
+      </button>
       <button onclick="toggleNurseActive('${n.id}')" class="btn-solid ${inactive?'btn-success':'btn-warning'} text-xs">
         <i data-lucide="${inactive?'check':'eye-off'}" class="w-3.5 h-3.5"></i> ${inactive?'เปิดใช้':'ปิดใช้'}
       </button>
@@ -2720,6 +2734,190 @@ function toggleNurseActive(id) {
   persistAll();
   renderNursesList();
   renderDashboard();
+}
+
+// ========= TIMESHEET (ใบลงเวลาปฏิบัติงาน) =========
+
+// เปิดหน้าพิมพ์ใบลงเวลาประจำเดือนของพยาบาลคนนี้
+function openTimesheet(nurseId) {
+  const n = state.nurses.find(x => x.id === nurseId);
+  if (!n) { Swal.fire({ icon: 'error', title: 'ไม่พบพยาบาล' }); return; }
+  if (!n.staffId && !n.orgMemberId) {
+    Swal.fire({
+      icon: 'warning',
+      title: 'ต้องเชื่อมกับ Identity / ผังองค์กรก่อน',
+      html: 'พยาบาลคนนี้ถูกเพิ่มแบบ manual (ไม่ได้นำเข้าจาก Identity)<br>' +
+            '→ เพิ่มผ่าน "นำเข้ารายชื่อ" หรือกรอกข้อมูลในผังองค์กรก่อน เพื่อให้สามารถบันทึก<br>เลขบัตรประชาชน/ตำแหน่งทางการ/อัตราค่าจ้างได้'
+    });
+    return;
+  }
+  const params = new URLSearchParams({
+    year: String(state.year), month: String(state.month),
+  });
+  if (n.staffId)      params.set('staff_id', String(n.staffId));
+  if (n.orgMemberId)  params.set('org_member_id', String(n.orgMemberId));
+  window.open('nurse_timesheet.php?' + params.toString(), '_blank');
+}
+
+// เปิด modal แก้ไขข้อมูลใบลงเวลาของพยาบาลคนนี้ (national_id, official_title, hourly_rate)
+async function editTimesheetInfo(nurseId) {
+  const n = state.nurses.find(x => x.id === nurseId);
+  if (!n) { Swal.fire({ icon: 'error', title: 'ไม่พบพยาบาล' }); return; }
+  if (!n.staffId && !n.orgMemberId) {
+    Swal.fire({
+      icon: 'warning',
+      title: 'ต้องเชื่อมกับ Identity / ผังองค์กรก่อน',
+      text: 'พยาบาลที่เพิ่มแบบ manual ไม่มีระเบียนที่จะเก็บข้อมูลใบลงเวลา — โปรดนำเข้าจาก Identity ก่อน'
+    });
+    return;
+  }
+  // โหลดข้อมูลปัจจุบัน
+  showLoading('กำลังโหลด…');
+  let info = {};
+  try {
+    const q = new URLSearchParams();
+    if (n.staffId)     q.set('staff_id', String(n.staffId));
+    if (n.orgMemberId) q.set('org_member_id', String(n.orgMemberId));
+    const r = await fetch('ajax_nurse_register.php?action=get_nurse_info&' + q.toString(), { credentials: 'same-origin' });
+    const j = await r.json();
+    if (!j.ok) throw new Error(j.error || 'โหลดไม่สำเร็จ');
+    info = j.info || {};
+  } catch (e) {
+    Swal.close(); Swal.fire({ icon: 'error', title: 'โหลดไม่สำเร็จ', text: e.message }); return;
+  }
+  Swal.close();
+
+  const titleSuggest = info.official_title || info.org_position_title || info.job_title || '';
+  const r = await Swal.fire({
+    title: `ข้อมูลใบลงเวลา: ${n.name}`,
+    html: `<div class="text-left space-y-3" style="font-family:inherit">
+      <div>
+        <label class="text-sm font-medium text-slate-700">เลขบัตรประชาชน (13 หลัก)</label>
+        <input id="tsNid" class="swal2-input" inputmode="numeric" maxlength="13" placeholder="1103702803723"
+               value="${(info.national_id || '').replace(/"/g,'&quot;')}" style="margin:4px 0;width:100%">
+      </div>
+      <div>
+        <label class="text-sm font-medium text-slate-700">ตำแหน่งทางการ (แสดงในใบลงเวลา)</label>
+        <input id="tsTitle" class="swal2-input" placeholder="เช่น พยาบาลวิชาชีพ ประจำการ"
+               value="${titleSuggest.replace(/"/g,'&quot;')}" style="margin:4px 0;width:100%">
+        <div class="text-xs text-slate-400 mt-0.5">เว้นว่างได้ — จะใช้ Job Title / Org Title แทน</div>
+      </div>
+      <div>
+        <label class="text-sm font-medium text-slate-700">อัตราค่าตอบแทน (บาท/ชั่วโมง)</label>
+        <input id="tsRate" type="number" min="0" step="1" class="swal2-input" placeholder="120"
+               value="${info.hourly_rate ?? ''}" style="margin:4px 0;width:100%">
+        <div class="text-xs text-slate-400 mt-0.5">เว้นว่างได้ — จะใช้ค่า default จากตั้งค่าใบลงเวลา</div>
+      </div>
+    </div>`,
+    showCancelButton: true,
+    confirmButtonText: 'บันทึก',
+    cancelButtonText: 'ยกเลิก',
+    confirmButtonColor: '#0ea5e9',
+    width: 520,
+    preConfirm: () => {
+      const nid   = document.getElementById('tsNid').value.trim();
+      const title = document.getElementById('tsTitle').value.trim();
+      const rate  = document.getElementById('tsRate').value.trim();
+      if (nid && !/^\d{13}$/.test(nid)) { Swal.showValidationMessage('เลขบัตรประชาชนต้องเป็นตัวเลข 13 หลัก'); return false; }
+      return { nid, title, rate };
+    }
+  });
+  if (!r.isConfirmed) return;
+
+  const fd = new FormData();
+  fd.append('csrf_token', '<?= htmlspecialchars(get_csrf_token(), ENT_QUOTES) ?>');
+  fd.append('action', 'save_nurse_info');
+  if (n.staffId)     fd.append('staff_id', String(n.staffId));
+  if (n.orgMemberId) fd.append('org_member_id', String(n.orgMemberId));
+  fd.append('national_id', r.value.nid);
+  fd.append('official_title', r.value.title);
+  fd.append('hourly_rate', r.value.rate);
+
+  try {
+    const res = await fetch('ajax_nurse_register.php', { method: 'POST', body: fd, credentials: 'same-origin' });
+    const j = await res.json();
+    if (!j.ok) { Swal.fire({ icon: 'error', title: 'บันทึกไม่สำเร็จ', text: j.error || '' }); return; }
+    Swal.fire({ icon: 'success', title: 'บันทึกแล้ว', timer: 1200, showConfirmButton: false });
+  } catch (e) {
+    Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: String(e) });
+  }
+}
+
+// ตั้งค่าใบลงเวลา (ชื่อคลินิก/ผู้ลงนาม/อัตราภาษี/อัตราต่อชั่วโมงเริ่มต้น)
+async function openTimesheetSettings() {
+  showLoading('กำลังโหลด…');
+  let s = {};
+  try {
+    const r = await fetch('ajax_nurse_register.php?action=get_timesheet_settings', { credentials: 'same-origin' });
+    const j = await r.json();
+    if (!j.ok) throw new Error(j.error || 'โหลดไม่สำเร็จ');
+    s = j.settings || {};
+  } catch (e) {
+    Swal.close(); Swal.fire({ icon: 'error', title: 'โหลดไม่สำเร็จ', text: e.message }); return;
+  }
+  Swal.close();
+
+  const r = await Swal.fire({
+    title: 'ตั้งค่าใบลงเวลาปฏิบัติงาน',
+    html: `<div class="text-left space-y-3">
+      <div>
+        <label class="text-sm font-medium text-slate-700">ชื่อคลินิก / หน่วยงาน</label>
+        <input id="tsClinic" class="swal2-input" value="${(s.clinic_name || 'คลินิกเวชกรรม มหาวิทยาลัยรังสิต').replace(/"/g,'&quot;')}" style="margin:4px 0;width:100%">
+      </div>
+      <div>
+        <label class="text-sm font-medium text-slate-700">ผู้ลงนาม (ชื่อ-นามสกุล)</label>
+        <input id="tsSignerN" class="swal2-input" placeholder="เช่น รศ.ดร.มนพร ชาติชำนิ" value="${(s.signer_name || '').replace(/"/g,'&quot;')}" style="margin:4px 0;width:100%">
+      </div>
+      <div>
+        <label class="text-sm font-medium text-slate-700">ตำแหน่งผู้ลงนาม</label>
+        <input id="tsSignerT" class="swal2-input" placeholder="เช่น ผู้อำนวยการสำนักงานสวัสดิการสุขภาพ" value="${(s.signer_title || '').replace(/"/g,'&quot;')}" style="margin:4px 0;width:100%">
+      </div>
+      <div class="grid grid-cols-2 gap-2">
+        <div>
+          <label class="text-sm font-medium text-slate-700">อัตราภาษี ณ ที่จ่าย (%)</label>
+          <input id="tsTax" type="number" min="0" max="30" step="0.01" class="swal2-input" value="${s.tax_rate ?? 3}" style="margin:4px 0;width:100%">
+        </div>
+        <div>
+          <label class="text-sm font-medium text-slate-700">อัตราต่อชั่วโมง (บาท)</label>
+          <input id="tsDefRate" type="number" min="0" step="1" class="swal2-input" value="${s.default_hourly_rate ?? 120}" style="margin:4px 0;width:100%">
+        </div>
+      </div>
+      <div class="text-xs text-slate-400">อัตราต่อชั่วโมง = ค่า default ที่ใช้กรณีพยาบาลไม่ได้ตั้งค่าเฉพาะของตน</div>
+    </div>`,
+    showCancelButton: true,
+    confirmButtonText: 'บันทึก',
+    cancelButtonText: 'ยกเลิก',
+    confirmButtonColor: '#0ea5e9',
+    width: 600,
+    preConfirm: () => {
+      return {
+        clinic: document.getElementById('tsClinic').value.trim(),
+        signerN: document.getElementById('tsSignerN').value.trim(),
+        signerT: document.getElementById('tsSignerT').value.trim(),
+        tax: document.getElementById('tsTax').value,
+        defRate: document.getElementById('tsDefRate').value,
+      };
+    }
+  });
+  if (!r.isConfirmed) return;
+
+  const fd = new FormData();
+  fd.append('csrf_token', '<?= htmlspecialchars(get_csrf_token(), ENT_QUOTES) ?>');
+  fd.append('action', 'save_timesheet_settings');
+  fd.append('clinic_name', r.value.clinic);
+  fd.append('signer_name', r.value.signerN);
+  fd.append('signer_title', r.value.signerT);
+  fd.append('tax_rate', r.value.tax);
+  fd.append('default_hourly_rate', r.value.defRate);
+
+  try {
+    const res = await fetch('ajax_nurse_register.php', { method: 'POST', body: fd, credentials: 'same-origin' });
+    const j = await res.json();
+    if (!j.ok) { Swal.fire({ icon: 'error', title: 'บันทึกไม่สำเร็จ', text: j.error || '' }); return; }
+    Swal.fire({ icon: 'success', title: 'บันทึกแล้ว', timer: 1200, showConfirmButton: false });
+  } catch (e) {
+    Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: String(e) });
+  }
 }
 
 // ========= HOLIDAY MANAGER =========
