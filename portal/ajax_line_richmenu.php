@@ -169,6 +169,29 @@ try {
         exit;
     }
 
+    if ($action === 'import_detail') {
+        // ดึงรายละเอียดของ rich menu ตาม id เพื่อ clone areas/size/name มา fill form
+        $rid = trim((string)($_POST['richMenuId'] ?? ''));
+        if ($rid === '') { echo json_encode(['ok' => false, 'message' => 'ต้องระบุ richMenuId']); exit; }
+        $r = line_richmenu_get_detail($rid);
+        if (!$r['ok']) {
+            // ถ้า "owned by another channel" — แจ้งผู้ใช้ชัดเจน
+            $err = (string)$r['error'];
+            if (stripos($err, 'another channel') !== false) {
+                echo json_encode([
+                    'ok' => false,
+                    'http' => $r['http'],
+                    'message' => 'Rich menu นี้เป็นของ channel อื่น (Console-managed) — API อ่าน config ไม่ได้ ต้องสร้างใหม่จาก scratch',
+                ]);
+            } else {
+                echo json_encode(['ok' => false, 'http' => $r['http'], 'message' => $r['error'] ?? 'อ่าน detail ไม่ได้']);
+            }
+            exit;
+        }
+        echo json_encode(['ok' => true, 'data' => $r['data']], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
     if ($action === 'lookup_default') {
         // ดู ID ของ default rich menu ปัจจุบัน (Console-created ก็จะปรากฏที่นี่ถ้าตั้งเป็น default)
         $r = line_richmenu_get_default();
