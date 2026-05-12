@@ -1719,10 +1719,20 @@ function renderResult(question, j) {
             diagText = `<div class="mt-2 p-2 bg-rose-50 border border-rose-200 rounded text-rose-700"><b>🔍 พบสาเหตุ:</b> ไม่มี regular shift ที่มี weekday = ${inv.today_weekday} เลย → ต้องเช็คว่า weekday ใน DB ถูก stored เป็น integer 0-6 หรือเปล่า (column type: <code>${escH(inv.weekday_column_type||'-')}</code>)</div>`;
         }
 
+        const eq = inv.exact_query_test || {};
+        let exactDiag = '';
+        if (eq.error) {
+            exactDiag = `<div class="mt-2 p-2 bg-rose-100 border-2 border-rose-400 rounded text-rose-900 font-bold"><i class="fa-solid fa-bug mr-1"></i>🎯 พบสาเหตุที่แท้จริง — function get_clinic_doctors_for_date() throw exception:<br><code class="block mt-1 bg-white px-2 py-1 rounded text-xs">${escH(eq.error)}</code></div>`;
+        } else if (eq.ok && eq.count > 0 && rawCount === eq.count) {
+            exactDiag = `<div class="mt-2 p-2 bg-yellow-50 border border-yellow-300 rounded text-yellow-800"><b>⚠ Mystery:</b> exact query คืน ${eq.count} rows แต่ debug_schedule คืน 0 → ปัญหาในการ filter ภายใน function (อาจเป็น override logic)</div>`;
+        }
+
         invBody.innerHTML = `
             <div class="mb-1"><b>ทั้งหมด:</b> ${inv.total} rows · <b>active:</b> ${inv.active} · <b>weekday วันนี้:</b> ${WEEKDAY[inv.today_weekday]||inv.today_weekday} (${inv.today_weekday})</div>
             <div class="mb-1"><b>By type:</b> ${byTypeStr}</div>
-            <div class="mb-2"><b>weekday column type:</b> <code class="bg-amber-100 px-1 rounded">${escH(inv.weekday_column_type||'?')}</code> · <b>raw query (วันนี้):</b> ${rawCount} rows · <b>regular+weekday match:</b> ${wdMatchCount} rows</div>
+            <div class="mb-1"><b>weekday column type:</b> <code class="bg-amber-100 px-1 rounded">${escH(inv.weekday_column_type||'?')}</code> · <b>raw query (วันนี้):</b> ${rawCount} rows · <b>regular+weekday match:</b> ${wdMatchCount} rows</div>
+            <div class="mb-2"><b>exact query test:</b> ${eq.ok ? '✅ ' + eq.count + ' rows' : '❌ FAILED'} · <b>has room_id col:</b> ${inv.has_room_id_col?'✅':'❌'} · <b>has sys_clinic_rooms:</b> ${inv.has_clinic_rooms_table?'✅':'❌'}</div>
+            ${exactDiag}
             ${diagText}
             ${samples}
             ${inv.error ? `<div class="text-rose-600 mt-1">⚠ ${escH(inv.error)}</div>` : ''}

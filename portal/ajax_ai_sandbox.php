@@ -146,6 +146,55 @@ try {
         // เช็ค type ของ weekday column
         $colInfo = $pdo->query("SHOW COLUMNS FROM sys_doctor_schedule LIKE 'weekday'")->fetch(PDO::FETCH_ASSOC);
         $debugInventory['weekday_column_type'] = $colInfo['Type'] ?? 'unknown';
+
+        // ── ทดสอบรัน query เดียวกับ function get_clinic_doctors_for_date เปะๆ ───
+        // ถ้า raw test ผ่านแต่ตัวจริงไม่ผ่าน → ปัญหาน่าจะอยู่ที่ JOIN
+        $debugInventory['exact_query_test'] = ['ok' => false, 'count' => 0, 'error' => null];
+        try {
+            $stmt = $pdo->prepare("
+                SELECT s.id, s.staff_id, s.type, s.specific_date, s.weekday,
+                       s.start_time, s.end_time, s.service_type, s.notes,
+                       ms.title  AS doc_title,
+                       ms.full_name AS doc_name,
+                       ms.role,
+                       cr.name   AS room_name,
+                       cr.code   AS room_code
+                FROM sys_doctor_schedule s
+                LEFT JOIN sys_medical_staff ms ON s.staff_id = ms.id
+                LEFT JOIN sys_clinic_rooms cr ON s.room_id = cr.id
+                WHERE s.is_active = 1
+                  AND (
+                      s.specific_date = :d
+                      OR (
+                          s.type = 'regular'
+                          AND s.weekday = :wd
+                          AND (s.recur_end_date IS NULL OR s.recur_end_date = '0000-00-00' OR s.recur_end_date >= :d2)
+                      )
+                  )
+            ");
+            $stmt->execute([':d' => $today, ':wd' => $todayW, ':d2' => $today]);
+            $exactRows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $debugInventory['exact_query_test'] = [
+                'ok'    => true,
+                'count' => count($exactRows),
+                'error' => null,
+            ];
+        } catch (Throwable $e) {
+            $debugInventory['exact_query_test'] = [
+                'ok'    => false,
+                'count' => 0,
+                'error' => $e->getMessage(),
+            ];
+        }
+
+        // เช็ค table sys_clinic_rooms และ column room_id
+        $debugInventory['has_room_id_col']     = (bool)$pdo->query("SHOW COLUMNS FROM sys_doctor_schedule LIKE 'room_id'")->fetch();
+        try {
+            $pdo->query("SELECT 1 FROM sys_clinic_rooms LIMIT 1");
+            $debugInventory['has_clinic_rooms_table'] = true;
+        } catch (Throwable) {
+            $debugInventory['has_clinic_rooms_table'] = false;
+        }
     } catch (Throwable $e) {
         $debugInventory['error'] = $e->getMessage();
     }
