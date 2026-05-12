@@ -388,6 +388,26 @@ $userInitials = getInitials($user['full_name']);
 $hour = (int) date('H');
 $greeting = ($hour >= 5 && $hour < 12) ? "สวัสดีตอนเช้า" : (($hour >= 12 && $hour < 17) ? "สวัสดีตอนบ่าย" : (($hour >= 17 && $hour < 21) ? "สวัสดีตอนเย็น" : "สวัสดีตอนค่ำ"));
 
+// Greeting icon/emoji + glyph by time-of-day — A) personalize hero greeting
+$greetIcon  = ($hour >= 5 && $hour < 12) ? '☀️' : (($hour >= 12 && $hour < 17) ? '🌤️' : (($hour >= 17 && $hour < 21) ? '🌆' : '🌙'));
+$firstName = trim((string)($user['first_name'] ?? ''));
+if ($firstName === '') {
+    $parts = preg_split('/\s+/', trim((string)($user['full_name'] ?? '')));
+    $firstName = $parts[0] ?? '';
+}
+$firstName = $firstName !== '' ? $firstName : 'คุณ';
+
+// Birthday detection — show HBD card when today MM-DD == DOB MM-DD
+$isBirthday = false;
+$ageThisYear = null;
+if (!empty($user['date_of_birth']) && $user['date_of_birth'] !== '0000-00-00') {
+    $dobTs = strtotime((string)$user['date_of_birth']);
+    if ($dobTs !== false && date('m-d', $dobTs) === date('m-d')) {
+        $isBirthday = true;
+        $ageThisYear = (int)date('Y') - (int)date('Y', $dobTs);
+    }
+}
+
 // ── Smart Hero card (priority-driven "today" focus) ──────────────────────
 $smartHero = null;
 if ($next_appt) {
@@ -455,6 +475,81 @@ $heroThemes = [
     'amber' => ['bg' => 'from-amber-500 to-orange-500',    'shadow' => 'shadow-[0_15px_40px_rgba(245,158,11,0.25)]', 'btn' => 'bg-white text-amber-700'],
     'rose'  => ['bg' => 'from-rose-500 to-rose-600',       'shadow' => 'shadow-[0_15px_40px_rgba(225,29,72,0.25)]',  'btn' => 'bg-white text-rose-600'],
 ];
+
+// ── D) Smart Reminder Pills — secondary actionable items below hero ────────
+// Each pill: ['icon','label','tone','action','urgency'] (urgency: 0 normal, 1 soon, 2 urgent)
+$reminderPills = [];
+$todayTs = strtotime($today);
+foreach ($healthOverview['upcoming_list'] as $up) {
+    $diff = (int) round((strtotime($up['slot_date']) - $todayTs) / 86400);
+    if ($diff < 0 || $diff > 7) continue;
+    $when = $diff === 0 ? 'วันนี้' : ($diff === 1 ? 'พรุ่งนี้' : 'อีก '.$diff.' วัน');
+    $urg = $diff <= 1 ? 2 : ($diff <= 3 ? 1 : 0);
+    $reminderPills[] = [
+        'icon'   => 'fa-calendar-check',
+        'label'  => $when . ' · ' . mb_substr((string)$up['camp_name'], 0, 22),
+        'sub'    => substr((string)$up['start_time'], 0, 5).' น.',
+        'tone'   => $urg === 2 ? 'rose' : ($urg === 1 ? 'amber' : 'emerald'),
+        'action' => "window.location.href='my_bookings.php'",
+        'urgency'=> $urg,
+    ];
+}
+if (!empty($healthOverview['vaccine_next_due'])) {
+    $vd = $healthOverview['vaccine_next_due'];
+    $diff = (int) round((strtotime($vd['next_due_date']) - $todayTs) / 86400);
+    if ($diff >= 0 && $diff <= 30) {
+        $urg = $diff <= 7 ? 2 : ($diff <= 14 ? 1 : 0);
+        $reminderPills[] = [
+            'icon'   => 'fa-syringe',
+            'label'  => 'วัคซีน '.mb_substr((string)$vd['vaccine_name'], 0, 18),
+            'sub'    => $diff === 0 ? 'ครบกำหนดวันนี้' : 'อีก '.$diff.' วัน',
+            'tone'   => $urg === 2 ? 'rose' : ($urg === 1 ? 'amber' : 'sky'),
+            'action' => 'showCampaigns()',
+            'urgency'=> $urg,
+        ];
+    }
+}
+foreach ($borrow_active as $b) {
+    if (($b['approval_status'] ?? '') !== 'approved' || empty($b['due_date'])) continue;
+    $diff = (int) round((strtotime($b['due_date']) - $todayTs) / 86400);
+    if ($diff < -1 || $diff > 3) continue;
+    if ($diff < 0) {
+        $label = 'เกินกำหนดคืน '.abs($diff).' วัน';
+        $tone = 'rose'; $urg = 2;
+    } elseif ($diff === 0) {
+        $label = 'คืนวันนี้'; $tone = 'rose'; $urg = 2;
+    } else {
+        $label = 'คืนอีก '.$diff.' วัน'; $tone = 'amber'; $urg = 1;
+    }
+    $reminderPills[] = [
+        'icon'   => 'fa-clock-rotate-left',
+        'label'  => $label,
+        'sub'    => mb_substr((string)($b['equipment_name'] ?? '—'), 0, 22),
+        'tone'   => $tone,
+        'action' => 'showBorrow()',
+        'urgency'=> $urg,
+    ];
+}
+if ($borrow_total_fine > 0) {
+    $reminderPills[] = [
+        'icon'   => 'fa-money-bill-wave',
+        'label'  => 'ค่าปรับ ฿'.number_format($borrow_total_fine, 0),
+        'sub'    => 'รอชำระ',
+        'tone'   => 'rose',
+        'action' => 'showBorrow()',
+        'urgency'=> 2,
+    ];
+}
+// Sort: most urgent first, then keep order
+usort($reminderPills, fn($a, $b) => $b['urgency'] <=> $a['urgency']);
+$reminderPills = array_slice($reminderPills, 0, 4);
+
+$pillTones = [
+    'rose'    => ['bg' => 'bg-rose-50',    'fg' => 'text-rose-700',    'ic' => 'bg-rose-100 text-rose-600',       'dot' => 'bg-rose-500'],
+    'amber'   => ['bg' => 'bg-amber-50',   'fg' => 'text-amber-700',   'ic' => 'bg-amber-100 text-amber-600',     'dot' => 'bg-amber-500'],
+    'emerald' => ['bg' => 'bg-emerald-50', 'fg' => 'text-emerald-700', 'ic' => 'bg-emerald-100 text-emerald-600', 'dot' => 'bg-emerald-500'],
+    'sky'     => ['bg' => 'bg-sky-50',     'fg' => 'text-sky-700',     'ic' => 'bg-sky-100 text-sky-600',         'dot' => 'bg-sky-500'],
+];
 ?>
 <!DOCTYPE html>
 <html lang="th">
@@ -521,6 +616,193 @@ $heroThemes = [
                 transform: translateY(-10px);
             }
         }
+
+        /* ── J) Pull-to-Refresh ────────────────────────────────────────── */
+        #ptr-indicator {
+            position: fixed;
+            top: 0;
+            left: 50%;
+            transform: translate(-50%, -100%);
+            z-index: 70;
+            transition: transform 0.18s ease-out;
+            pointer-events: none;
+        }
+        #ptr-indicator.active {
+            transform: translate(-50%, 16px);
+        }
+        #ptr-indicator .ring {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: #fff;
+            box-shadow: 0 8px 24px rgba(46, 158, 99, 0.25);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #2e9e63;
+            font-size: 16px;
+        }
+        #ptr-indicator.refreshing .ring i {
+            animation: ptr-spin 0.8s linear infinite;
+        }
+        @keyframes ptr-spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* ── J) Skeleton loader ────────────────────────────────────────── */
+        .skeleton {
+            background: linear-gradient(90deg, #f1f5f9 0%, #e2e8f0 40%, #f1f5f9 80%);
+            background-size: 200% 100%;
+            animation: skeleton-shimmer 1.4s ease-in-out infinite;
+            border-radius: 1rem;
+        }
+        @keyframes skeleton-shimmer {
+            0%   { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+        #hub-skeleton {
+            position: fixed;
+            inset: 0;
+            background: #F8FAFF;
+            z-index: 65;
+            overflow: hidden;
+            transition: opacity 0.25s ease;
+        }
+        #hub-skeleton.fading { opacity: 0; pointer-events: none; }
+        #hub-skeleton.hidden { display: none !important; }
+
+        /* ── E) Realtime toast ─────────────────────────────────────────── */
+        #rt-toast-wrap {
+            position: fixed;
+            top: 16px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 200;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            pointer-events: none;
+            width: min(420px, calc(100% - 32px));
+        }
+        .rt-toast {
+            background: #fff;
+            border-radius: 18px;
+            box-shadow: 0 14px 40px rgba(15, 23, 42, 0.16);
+            padding: 12px 14px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            transform: translateY(-12px);
+            opacity: 0;
+            transition: transform 0.28s ease, opacity 0.28s ease;
+            pointer-events: auto;
+            border: 1px solid rgba(226, 232, 240, 0.8);
+        }
+        .rt-toast.show { transform: translateY(0); opacity: 1; }
+        .rt-toast .ic {
+            width: 38px; height: 38px;
+            border-radius: 12px;
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0;
+        }
+        .rt-toast.tone-emerald .ic { background: #d1fae5; color: #047857; }
+        .rt-toast.tone-rose    .ic { background: #ffe4e6; color: #be123c; }
+        .rt-toast.tone-amber   .ic { background: #fef3c7; color: #b45309; }
+        .rt-toast.tone-sky     .ic { background: #e0f2fe; color: #0369a1; }
+        .rt-toast .ttl { font-weight: 800; font-size: 13px; color: #0f172a; line-height: 1.25; }
+        .rt-toast .sub { font-size: 11px; color: #64748b; margin-top: 2px; line-height: 1.3; }
+        .rt-toast .close-x {
+            color: #94a3b8;
+            background: transparent;
+            border: 0;
+            padding: 4px 6px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        /* Bell pulse when a new notification arrives */
+        .bell-pulse { animation: bell-shake 0.8s ease-in-out 2; }
+        @keyframes bell-shake {
+            0%, 100% { transform: rotate(0); }
+            20%      { transform: rotate(-12deg); }
+            40%      { transform: rotate(10deg); }
+            60%      { transform: rotate(-8deg); }
+            80%      { transform: rotate(6deg); }
+        }
+
+        /* ── A) Birthday card — confetti ───────────────────────────────── */
+        .hbd-card {
+            position: relative;
+            overflow: hidden;
+            background: linear-gradient(135deg, #f43f5e 0%, #f59e0b 50%, #ec4899 100%);
+            color: #fff;
+            border-radius: 2rem;
+            padding: 18px 20px;
+            box-shadow: 0 18px 40px rgba(244, 63, 94, 0.28);
+        }
+        .hbd-card::before,
+        .hbd-card::after {
+            content: '';
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(40px);
+            opacity: 0.45;
+        }
+        .hbd-card::before { width: 140px; height: 140px; background: #fde68a; top: -50px; right: -40px; }
+        .hbd-card::after  { width: 160px; height: 160px; background: #f472b6; bottom: -60px; left: -40px; }
+        .hbd-confetti {
+            position: absolute;
+            width: 8px; height: 12px;
+            top: -20px;
+            opacity: 0.85;
+            animation: hbd-fall 3.4s linear infinite;
+        }
+        @keyframes hbd-fall {
+            0%   { transform: translateY(-30px) rotate(0); opacity: 0; }
+            15%  { opacity: 0.9; }
+            100% { transform: translateY(220px) rotate(540deg); opacity: 0; }
+        }
+
+        /* Reminder pills horizontal scroller */
+        .reminder-strip {
+            display: flex;
+            gap: 10px;
+            overflow-x: auto;
+            scrollbar-width: none;
+            padding-bottom: 4px;
+            margin: 0 -4px;
+            padding-left: 4px;
+            padding-right: 4px;
+        }
+        .reminder-strip::-webkit-scrollbar { display: none; }
+        .reminder-pill {
+            flex-shrink: 0;
+            min-width: 200px;
+            max-width: 240px;
+            border-radius: 1.25rem;
+            padding: 10px 12px;
+            display: flex; align-items: center; gap: 10px;
+            border: 1px solid rgba(15, 23, 42, 0.04);
+            transition: transform 0.15s ease;
+        }
+        .reminder-pill:active { transform: scale(0.97); }
+        .reminder-pill .pill-ic {
+            width: 34px; height: 34px;
+            border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 14px;
+            flex-shrink: 0;
+        }
+        .reminder-pill.urgent .pill-ic::after {
+            content: '';
+            position: absolute;
+            width: 8px; height: 8px;
+            background: #ef4444;
+            border-radius: 50%;
+            border: 2px solid #fff;
+            transform: translate(14px, -14px);
+        }
+        .reminder-pill .pill-ic { position: relative; }
     </style>
 
     <!-- Modal Functions (defined early to prevent ReferenceError on button clicks) -->
@@ -1188,7 +1470,30 @@ $heroThemes = [
 
 <body class="text-slate-900 pb-32">
 
-    <div class="max-w-md mx-auto relative min-h-screen">
+    <!-- ── J) Pull-to-refresh indicator ── -->
+    <div id="ptr-indicator" aria-hidden="true">
+        <div class="ring"><i class="fa-solid fa-arrow-down"></i></div>
+    </div>
+
+    <!-- ── E) Realtime toast container ── -->
+    <div id="rt-toast-wrap" role="status" aria-live="polite"></div>
+
+    <!-- ── J) Skeleton overlay (shown briefly on initial load) ── -->
+    <div id="hub-skeleton" aria-hidden="true">
+        <div class="max-w-md mx-auto px-6 pt-24 space-y-6">
+            <div class="skeleton h-8 w-40"></div>
+            <div class="skeleton h-44 rounded-[3rem]"></div>
+            <div class="skeleton h-12 rounded-2xl"></div>
+            <div class="skeleton h-40 rounded-[2.5rem]"></div>
+            <div class="grid grid-cols-3 gap-3">
+                <div class="skeleton h-24"></div>
+                <div class="skeleton h-24"></div>
+                <div class="skeleton h-24"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="max-w-md mx-auto relative min-h-screen" id="hub-root">
 
         <!-- ── Clean White Header (Target Design) ── -->
         <header
@@ -1223,15 +1528,55 @@ $heroThemes = [
 
         <main class="px-6 pt-8 space-y-8">
 
-            <!-- ── Title Section ── -->
+            <!-- ── Title Section (personalized greeting) ── -->
             <div class="px-1">
                 <p class="text-slate-400 text-[10px] font-black uppercase tracking-[0.3em] mb-2 opacity-70">
                     <?= $thaiDate ?>
                 </p>
-                <div class="flex items-end justify-between">
-                    <h2 class="text-3xl font-black text-slate-900 tracking-tight">Health Hub</h2>
+                <div class="flex items-end justify-between gap-3">
+                    <div class="min-w-0">
+                        <h2 class="text-3xl font-black text-slate-900 tracking-tight leading-tight">
+                            <?= $greetIcon ?> <?= htmlspecialchars($greeting) ?>
+                        </h2>
+                        <p class="mt-1 text-slate-500 text-[13px] font-bold truncate">
+                            คุณ<?= htmlspecialchars($firstName) ?> 👋
+                        </p>
+                    </div>
                 </div>
             </div>
+
+            <?php if ($isBirthday): ?>
+            <!-- ── A) Birthday Card — appears only on user's birthday ── -->
+            <div class="hbd-card" role="region" aria-label="วันเกิด">
+                <?php for ($i = 0; $i < 14; $i++):
+                    $colors = ['#fde68a','#fca5a5','#a7f3d0','#bae6fd','#ddd6fe','#fbcfe8'];
+                    $c = $colors[$i % count($colors)];
+                    $left = (int)(($i * 7 + 5) % 100);
+                    $delay = number_format(($i * 0.27) - 0.5, 2);
+                    $dur = number_format(2.6 + (($i * 0.13) % 1.4), 2);
+                ?>
+                    <span class="hbd-confetti" style="left:<?= $left ?>%; background:<?= $c ?>; animation-delay:<?= $delay ?>s; animation-duration:<?= $dur ?>s;"></span>
+                <?php endfor; ?>
+                <div class="relative z-10 flex items-center gap-4">
+                    <div class="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center text-3xl shrink-0">
+                        🎂
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-white/80 text-[10px] font-black uppercase tracking-[0.22em]">Happy Birthday!</p>
+                        <h3 class="text-white text-xl font-black tracking-tight leading-tight mt-0.5 truncate">
+                            สุขสันต์วันเกิด คุณ<?= htmlspecialchars($firstName) ?>
+                        </h3>
+                        <p class="text-white/90 text-[12px] font-bold mt-1">
+                            <?php if ($ageThisYear !== null && $ageThisYear > 0 && $ageThisYear < 120): ?>
+                                ขอให้สุขภาพแข็งแรง · อายุครบ <?= (int)$ageThisYear ?> ปีในวันนี้ 🎉
+                            <?php else: ?>
+                                ขอให้สุขภาพแข็งแรงตลอดปีนี้ 🎉
+                            <?php endif; ?>
+                        </p>
+                    </div>
+                </div>
+            </div>
+            <?php endif; ?>
 
             <!-- ── Premium Identity Card (Wallet Style) ── -->
             <div onclick="window.location.href='profile.php'"
@@ -1377,6 +1722,31 @@ $heroThemes = [
                         </div>
                     </div>
                 </button>
+
+                <?php if (!empty($reminderPills)): ?>
+                <!-- ── D) Smart Reminder Pills ── -->
+                <div class="reminder-strip" aria-label="การแจ้งเตือนใกล้กำหนด">
+                    <?php foreach ($reminderPills as $pill):
+                        $tone = $pillTones[$pill['tone']] ?? $pillTones['emerald'];
+                        $urgClass = $pill['urgency'] === 2 ? 'urgent' : '';
+                    ?>
+                    <button type="button" onclick="<?= htmlspecialchars($pill['action'], ENT_QUOTES) ?>"
+                        class="reminder-pill <?= $urgClass ?> <?= $tone['bg'] ?>">
+                        <div class="pill-ic <?= $tone['ic'] ?>">
+                            <i class="fa-solid <?= htmlspecialchars($pill['icon']) ?>"></i>
+                        </div>
+                        <div class="min-w-0 flex-1 text-left">
+                            <p class="text-[12px] font-black <?= $tone['fg'] ?> truncate leading-tight">
+                                <?= htmlspecialchars($pill['label']) ?>
+                            </p>
+                            <p class="text-[10px] font-bold text-slate-500 truncate mt-0.5">
+                                <?= htmlspecialchars($pill['sub']) ?>
+                            </p>
+                        </div>
+                    </button>
+                    <?php endforeach; ?>
+                </div>
+                <?php endif; ?>
 
                 <!-- Quick stats: 3 compact tiles -->
                 <div class="grid grid-cols-3 gap-3">
@@ -2061,23 +2431,241 @@ document.getElementById('insDetailModal').addEventListener('click', function(e) 
             }
         }
 
+        // ── E) Realtime Toast + Notification Sync ─────────────────────
+        const HUB_USER_ID = <?= (int)($_SESSION['user_id'] ?? 0) ?>;
+        let lastNotifSnapshot = {
+            total:    <?= (int)$notif_total ?>,
+            upcoming: <?= (int)$upcoming_count ?>,
+            pending:  <?= (int)$borrow_pending_count ?>,
+            overdue:  <?= (int)$borrow_overdue_count ?>,
+            fine:     <?= (float)$borrow_total_fine ?>,
+        };
+
+        function rtToast({ title, sub = '', tone = 'emerald', icon = 'fa-bell', timeout = 4500, onClick = null }) {
+            const wrap = document.getElementById('rt-toast-wrap');
+            if (!wrap) return;
+            const el = document.createElement('div');
+            el.className = `rt-toast tone-${tone}`;
+            el.innerHTML = `
+                <div class="ic"><i class="fa-solid ${icon}"></i></div>
+                <div class="flex-1 min-w-0">
+                    <p class="ttl">${title}</p>
+                    ${sub ? `<p class="sub">${sub}</p>` : ''}
+                </div>
+                <button class="close-x" aria-label="ปิด"><i class="fa-solid fa-xmark"></i></button>
+            `;
+            if (onClick) {
+                el.style.cursor = 'pointer';
+                el.addEventListener('click', (e) => {
+                    if (e.target.closest('.close-x')) return;
+                    onClick();
+                });
+            }
+            el.querySelector('.close-x').addEventListener('click', () => dismiss());
+            wrap.appendChild(el);
+            requestAnimationFrame(() => el.classList.add('show'));
+            const dismiss = () => {
+                el.classList.remove('show');
+                setTimeout(() => el.remove(), 300);
+            };
+            if (timeout > 0) setTimeout(dismiss, timeout);
+        }
+
+        function updateBellBadge(total, overdue) {
+            const btn = document.querySelector('header button[onclick="showNotifications()"]');
+            if (!btn) return;
+            const icon = btn.querySelector('i');
+            let badge = btn.querySelector('span');
+            if (total > 0) {
+                if (!badge) {
+                    badge = document.createElement('span');
+                    badge.className = 'absolute top-1.5 right-1.5 min-w-4 h-4 px-1 text-white text-[9px] font-black rounded-full border-2 border-white flex items-center justify-center';
+                    btn.appendChild(badge);
+                }
+                badge.classList.remove('bg-rose-500', 'bg-red-500');
+                badge.classList.add(overdue > 0 ? 'bg-rose-500' : 'bg-red-500');
+                badge.textContent = total;
+            } else if (badge) {
+                badge.remove();
+            }
+            if (icon) {
+                icon.classList.remove('bell-pulse');
+                // re-trigger animation
+                void icon.offsetWidth;
+                icon.classList.add('bell-pulse');
+            }
+        }
+
+        function handleNotifSnapshot(snap) {
+            const prev = lastNotifSnapshot;
+            if (!snap || !snap.ok) return;
+            const deltas = {
+                upcoming: snap.upcoming - prev.upcoming,
+                pending:  snap.pending  - prev.pending,
+                overdue:  snap.overdue  - prev.overdue,
+            };
+            if (snap.total !== prev.total) {
+                updateBellBadge(snap.total, snap.overdue);
+            }
+            if (deltas.overdue > 0) {
+                rtToast({
+                    title: 'มีอุปกรณ์เลยกำหนดคืน',
+                    sub:   `${deltas.overdue} รายการ — แตะเพื่อจัดการ`,
+                    tone:  'rose',
+                    icon:  'fa-triangle-exclamation',
+                    onClick: () => showBorrow(),
+                });
+            } else if (deltas.pending > 0) {
+                rtToast({
+                    title: 'อัปเดตคำขอยืม',
+                    sub:   `${deltas.pending} คำขอใหม่`,
+                    tone:  'amber',
+                    icon:  'fa-hourglass-half',
+                    onClick: () => showBorrow(),
+                });
+            } else if (deltas.pending < 0) {
+                rtToast({
+                    title: 'เจ้าหน้าที่อัปเดตคำขอยืมแล้ว',
+                    sub:   'แตะเพื่อดูผล',
+                    tone:  'emerald',
+                    icon:  'fa-circle-check',
+                    onClick: () => showBorrow(),
+                });
+            } else if (deltas.upcoming > 0) {
+                rtToast({
+                    title: 'มีนัดหมายใหม่',
+                    sub:   `${deltas.upcoming} รายการ`,
+                    tone:  'sky',
+                    icon:  'fa-calendar-plus',
+                    onClick: () => window.location.href = 'my_bookings.php',
+                });
+            }
+            lastNotifSnapshot = {
+                total: snap.total, upcoming: snap.upcoming,
+                pending: snap.pending, overdue: snap.overdue, fine: snap.fine,
+            };
+        }
+
+        async function pollNotifCounts() {
+            if (document.hidden) return;
+            try {
+                const res = await fetch('ajax_notify_counts.php', { credentials: 'same-origin' });
+                if (!res.ok) return;
+                const data = await res.json();
+                handleNotifSnapshot(data);
+            } catch (e) { /* network blip — ignore */ }
+        }
+
         // Initialize Real-time (Pusher or Polling)
         document.addEventListener('DOMContentLoaded', () => {
             const PUSHER_KEY = '<?= defined('PUSHER_KEY') ? PUSHER_KEY : '' ?>';
             const PUSHER_CLUSTER = '<?= defined('PUSHER_CLUSTER') ? PUSHER_CLUSTER : 'ap1' ?>';
 
-            if (PUSHER_KEY) {
-                // Real-time via Pusher
+            if (PUSHER_KEY && typeof Pusher !== 'undefined') {
                 const pusher = new Pusher(PUSHER_KEY, { cluster: PUSHER_CLUSTER });
-                const channel = pusher.subscribe(`user-chat-${<?= (int)($_SESSION['user_id'] ?? 0) ?>}`);
-                channel.bind('new-message', (data) => {
-                    fetchMessages(); // Trigger fetch when notified
+
+                // Chat channel (existing)
+                const chatCh = pusher.subscribe(`user-chat-${HUB_USER_ID}`);
+                chatCh.bind('new-message', () => fetchMessages());
+
+                // Notify channel — backend may emit booking/borrow/announcement events
+                const notifyCh = pusher.subscribe(`user-notify-${HUB_USER_ID}`);
+                notifyCh.bind('notification', (data) => {
+                    if (data && data.title) {
+                        rtToast({
+                            title: data.title,
+                            sub: data.body || '',
+                            tone: data.tone || 'emerald',
+                            icon: data.icon || 'fa-bell',
+                            onClick: data.url ? () => window.location.href = data.url : null,
+                        });
+                    }
+                    pollNotifCounts();
                 });
+                notifyCh.bind('refresh-counts', () => pollNotifCounts());
             } else {
-                // Fallback to Long Polling (Every 3 seconds)
+                // Fallback to Long Polling (Every 3 seconds for chat)
                 setInterval(fetchMessages, 3000);
             }
+
+            // Notification counts: refresh every 30s + on tab focus (works alongside Pusher)
+            setInterval(pollNotifCounts, 30000);
+            document.addEventListener('visibilitychange', () => {
+                if (!document.hidden) pollNotifCounts();
+            });
         });
+
+        // ── J) Pull-to-Refresh ─────────────────────────────────────────
+        (function setupPullToRefresh() {
+            const indicator = document.getElementById('ptr-indicator');
+            if (!indicator) return;
+            const THRESHOLD = 70;
+            let startY = 0;
+            let pulling = false;
+            let armed = false;
+
+            function reset() {
+                indicator.classList.remove('active', 'refreshing');
+                indicator.style.transform = '';
+                pulling = false;
+                armed = false;
+            }
+
+            document.addEventListener('touchstart', (e) => {
+                if (window.scrollY > 0) { armed = false; return; }
+                armed = true;
+                startY = e.touches[0].clientY;
+            }, { passive: true });
+
+            document.addEventListener('touchmove', (e) => {
+                if (!armed) return;
+                const dy = e.touches[0].clientY - startY;
+                if (dy <= 0) return;
+                pulling = true;
+                const pulled = Math.min(dy, THRESHOLD * 1.6);
+                indicator.style.transform = `translate(-50%, ${Math.max(0, pulled - 40)}px)`;
+                if (pulled >= THRESHOLD) {
+                    indicator.classList.add('active');
+                    indicator.querySelector('i').className = 'fa-solid fa-arrow-rotate-right';
+                } else {
+                    indicator.classList.remove('active');
+                    indicator.querySelector('i').className = 'fa-solid fa-arrow-down';
+                }
+            }, { passive: true });
+
+            document.addEventListener('touchend', () => {
+                if (!pulling) { reset(); return; }
+                const isReady = indicator.classList.contains('active');
+                if (isReady) {
+                    indicator.classList.add('refreshing');
+                    indicator.querySelector('i').className = 'fa-solid fa-arrow-rotate-right';
+                    // small delay so user sees the spinner before reload
+                    setTimeout(() => window.location.reload(), 280);
+                } else {
+                    reset();
+                }
+            }, { passive: true });
+        })();
+
+        // ── J) Reveal content + hide skeleton ──────────────────────────
+        (function revealContent() {
+            let done = false;
+            const hide = () => {
+                if (done) return;
+                done = true;
+                const sk = document.getElementById('hub-skeleton');
+                if (!sk) return;
+                sk.classList.add('fading');
+                setTimeout(() => sk.classList.add('hidden'), 280);
+            };
+            if (document.readyState === 'complete') {
+                requestAnimationFrame(hide);
+            } else {
+                window.addEventListener('load', () => requestAnimationFrame(hide), { once: true });
+            }
+            // Safety: never leave skeleton up forever
+            setTimeout(hide, 1800);
+        })();
     </script>
 
     <!-- [Modal structures continue below - omitted for brevity but remain in file] -->
