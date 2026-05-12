@@ -85,6 +85,33 @@
 - `build_clinic_test_flex(pdo, state)` — override ด้วยเวลาจริงจาก DB ก่อน render preview
 - `get_clinic_hours_for_date(pdo, date)` — ดึงเวลาเปิด/ปิดจริงของวันนั้น
 
+### Finance Module (Cash Book) — `portal/_partials/finance.php`
+- **Schema**:
+  - `sys_finance_categories` (id, name, kind ENUM income/expense, icon, color, sort_order, is_active)
+  - `sys_finance_transactions` (id, txn_date, kind, category_id FK, amount DECIMAL(12,2), description, reference, payment_method, note, **receipt_no UNIQUE**, **source_module**, **source_id**, created_by, updated_by, timestamps)
+- **AJAX endpoint**: `portal/ajax_finance.php` — actions: `list` (GET, includes summary+pagination) · `txn:create/update/delete` · `txn:assign_receipt` · `txn:upsert_from_source` · `category:create/update/toggle/delete`
+- **Receipt page**: `portal/finance_receipt.php?id=NN` — A4 print-friendly + bahtText() helper (number → Thai baht text). Format: `RCP-{พ.ศ.}-{6 หลัก}` สำหรับรายได้, `PV-{พ.ศ.}-{6 หลัก}` สำหรับรายจ่าย — atomic running number
+- **Cross-module integration** (`txn:upsert_from_source`): โมดูลอื่นๆ ส่งยอดเข้า Cash Book ผ่าน POST → idempotent ด้วยคีย์ `(source_module, source_id)`
+  - `nurse_schedule` → OT รายเดือน (source_id = yearBE×100+month)
+  - `scholarship` → ค่าตอบแทนนักศึกษาทุนรายเดือน
+  - `asset` → จัดซื้อครุภัณฑ์ต่อชิ้น (source_id = asset.id)
+  - `consumables_txn` → รับเข้าวัสดุต่อ transaction
+  - `eborrow_payment` → ค่าปรับยืมเกินกำหนด (income)
+- **Default categories** seeded 11 ตัว — รายได้ 5 + รายจ่าย 6 ลบไม่ได้ถ้ามีรายการอ้างอิง
+
+### Inventory Modules (Asset + Consumables) — ใช้ตาราง `asset_locations` ร่วมกัน
+- **Sidebar group**: Portal sidebar กลุ่ม "คลังพัสดุ" (icon `fa-warehouse`) — ลิงก์ออกไป `/asset/` และ `/consumables/`
+- **Module switcher tabs**: `<header>` ของทั้ง 2 โมดูล มี tab strip "ครุภัณฑ์ ↔ วัสดุสิ้นเปลือง" (sticky บนสุด) — สลับได้ใน 1 คลิก
+- **Shared location management**: `asset/admin/manage_locations.php` ใช้ร่วมกัน → consumables sidebar มีเมนู "จุดจัดเก็บ" ลิงก์ตรงไปหน้านี้ผ่าน `<base href>` resolution
+
+### Guided Tour (Driver.js) — `assets/js/rsu-tour.js`
+- CDN: `driver.js@1.3.1` (`dist/driver.css` + `dist/driver.js.iife.js`) ผ่าน jsdelivr
+- API: `RsuTour.maybeAutoStart(areaKey, steps)` — auto-start ครั้งแรกที่เปิด · `RsuTour.start(steps, areaKey)` — บังคับเริ่ม · `RsuTour.reset(areaKey)` — ลบ flag
+- localStorage key: `tour_done_<area>` (area: `portal` / `user_hub` / `asset` / `consumables`)
+- กรอง steps ที่ selector ไม่พบอัตโนมัติ — กัน null reference
+- ใช้ใน 4 entry pages: `portal/index.php`, `user/hub.php`, `asset/index.php`, `consumables/index.php` — มีปุ่ม `?` มุมขวาล่าง (bottom:20px, right:20px; z-index:90) สำหรับเรียก tour ซ้ำ
+- user/hub.php FAB อยู่ที่ `bottom:84px` เพื่อกัน bottom nav
+
 ### Permissions / Access Flags
 - **Roles**:
   - `sys_admins.role` ENUM: `admin` / `editor` / `superadmin` (whitelist บังคับใน `portal/actions/identity_actions.php`)
@@ -92,10 +119,11 @@
   - `sys_staff.ecampaign_role` ENUM: `editor` / `admin` / `superadmin`
 - **Module access flags บน sys_staff** (TINYINT(1) DEFAULT 0):
   - `access_eborrow` · `access_ecampaign` · `access_insurance` · `access_registry` · `access_system_logs` · `access_site_settings` · `access_edms`
-  - `access_ai` · `access_consumables` · `access_asset` (ใหม่)
+  - `access_ai` · `access_consumables` · `access_asset` · `access_finance` (ใหม่)
 - **UI จัดการสิทธิ์ที่เป็นทางการ**: `portal/index.php?section=identity` (Identity & Governance) — modal มี audit log + justification ตาม ISO 27001
   - `portal/manage_admins.php` ถูก deprecate แล้ว — redirect ไปหน้า identity
 - **Section gate pattern** (portal partials): ตรวจ `$adminRole === 'superadmin' || !empty($_SESSION['access_xxx'])` ก่อน include partial; ถ้าไม่ผ่านให้ render `ACCESS DENIED` block
+  - **หมายเหตุ:** `$adminRole` มีเฉพาะใน scope ของ `portal/index.php` — สำหรับ partial ที่อาจถูกเข้าตรงๆ (เช่น `portal/nurse_schedule.php`) ให้คำนวณ local: `$_role = $_SESSION['admin_role'] ?? $_SESSION['role'] ?? ''` แล้วใช้ `$_role` แทน
 - **Sub-module gate** (consumables/asset): ตรวจใน `includes/check_session.php` หลัง SSO sync — `is_portal_admin` ผ่านเสมอ, `sys_staff` role admin/editor ผ่าน, role อื่นต้องมี flag = 1
 - **เมื่อเพิ่ม access flag ใหม่** ต้องอัปเดต 7 จุด:
   1. สร้าง migration ใน `database/migrations/`
