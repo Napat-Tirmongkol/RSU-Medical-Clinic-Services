@@ -179,8 +179,9 @@ function _chunk_estimate_tokens(string $text): int
 // ── Embedding ────────────────────────────────────────────────────────────────
 
 /**
- * สร้าง embedding ด้วย Gemini text-embedding-004
- * คืน array of float หรือ throw RuntimeException ถ้าไม่สำเร็จ
+ * สร้าง embedding ด้วย Gemini embedding model
+ * Fallback chain: gemini-embedding-001 → text-embedding-004 → embedding-001
+ * คืน array of float หรือ throw RuntimeException ถ้าทุก model ล้มเหลว
  */
 function chunk_generate_embedding(string $text): array
 {
@@ -189,35 +190,50 @@ function chunk_generate_embedding(string $text): array
         throw new RuntimeException('ยังไม่ได้ตั้งค่า GEMINI_API_KEY');
     }
 
-    $model = 'text-embedding-004';
-    $url   = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:embedContent?key={$apiKey}";
+    $models = ['gemini-embedding-001', 'text-embedding-004', 'embedding-001'];
+    $errors = [];
 
-    $payload = json_encode([
-        'model'   => "models/{$model}",
-        'content' => ['parts' => [['text' => mb_substr($text, 0, 8000)]]],
-    ]);
+    foreach ($models as $model) {
+        $url = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:embedContent?key={$apiKey}";
 
-    $ctx = stream_context_create(['http' => [
-        'method'  => 'POST',
-        'header'  => "Content-Type: application/json\r\n",
-        'content' => $payload,
-        'timeout' => 20,
-        'ignore_errors' => true,
-    ]]);
+        $payload = json_encode([
+            'model'   => "models/{$model}",
+            'content' => ['parts' => [['text' => mb_substr($text, 0, 8000)]]],
+        ]);
 
-    $raw = @file_get_contents($url, false, $ctx);
-    if ($raw === false) {
-        throw new RuntimeException('ไม่สามารถเชื่อมต่อ Gemini Embedding API');
+        $ctx = stream_context_create(['http' => [
+            'method'  => 'POST',
+            'header'  => "Content-Type: application/json\r\n",
+            'content' => $payload,
+            'timeout' => 20,
+            'ignore_errors' => true,
+        ]]);
+
+        $raw  = @file_get_contents($url, false, $ctx);
+        if ($raw === false) {
+            $errors[] = "{$model}: connection failed";
+            continue;
+        }
+
+        $data = json_decode($raw, true);
+        $values = $data['embedding']['values'] ?? null;
+        if (is_array($values) && count($values) > 0) {
+            // เก็บ model ที่ใช้สำเร็จไว้ใน static เพื่อ chunk_embed_and_save() บันทึก
+            _chunk_last_model_used($model);
+            return array_map('floatval', $values);
+        }
+        $errors[] = $model . ': ' . ($data['error']['message'] ?? 'unknown');
     }
 
-    $data = json_decode($raw, true);
-    $values = $data['embedding']['values'] ?? null;
-    if (!is_array($values) || count($values) === 0) {
-        $errMsg = $data['error']['message'] ?? $raw;
-        throw new RuntimeException('Gemini embedding error: ' . $errMsg);
-    }
+    throw new RuntimeException('Embedding ล้มเหลวทุก model: ' . implode(' | ', $errors));
+}
 
-    return array_map('floatval', $values);
+/** เก็บ/อ่าน model ล่าสุดที่ embed สำเร็จ */
+function _chunk_last_model_used(?string $set = null): string
+{
+    static $last = 'text-embedding-004';
+    if ($set !== null) $last = $set;
+    return $last;
 }
 
 /** สร้างและบันทึก embedding ของ chunk ลง DB */
@@ -229,13 +245,14 @@ function chunk_embed_and_save(PDO $pdo, int $id): void
 
     $inputText = trim($row['title']) . "\n\n" . trim($row['content']);
     $vector    = chunk_generate_embedding($inputText);
+    $usedModel = _chunk_last_model_used();
 
     $stmt = $pdo->prepare("
         UPDATE sys_ai_knowledge_chunks
-           SET embedding_json = :emb, embedding_model = 'text-embedding-004'
+           SET embedding_json = :emb, embedding_model = :model
          WHERE id = :id
     ");
-    $stmt->execute([':emb' => json_encode($vector), ':id' => $id]);
+    $stmt->execute([':emb' => json_encode($vector), ':model' => $usedModel, ':id' => $id]);
 }
 
 /** สร้าง embedding สำหรับ chunks ที่ยังไม่มี (batch) — คืนจำนวนที่ทำ */
