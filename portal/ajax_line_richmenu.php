@@ -169,6 +169,22 @@ try {
         exit;
     }
 
+    if ($action === 'lookup_default') {
+        // ดู ID ของ default rich menu ปัจจุบัน (Console-created ก็จะปรากฏที่นี่ถ้าตั้งเป็น default)
+        $r = line_richmenu_get_default();
+        echo json_encode(['ok' => $r['ok'], 'richMenuId' => $r['richMenuId'], 'http' => $r['http'], 'message' => $r['ok'] ? 'พบ default richMenuId' : ($r['error'] ?? 'ไม่พบ')]);
+        exit;
+    }
+
+    if ($action === 'lookup_user') {
+        // ดู ID ของ rich menu ที่ผูกกับ user คนหนึ่ง (Console rich menu ที่ user เห็นในมือถือ)
+        $uid = trim((string)($_POST['line_user_id'] ?? $_GET['line_user_id'] ?? ''));
+        if ($uid === '') { echo json_encode(['ok' => false, 'message' => 'ต้องระบุ lineUserId']); exit; }
+        $r = line_richmenu_get_user_linked($uid);
+        echo json_encode(['ok' => $r['ok'], 'richMenuId' => $r['richMenuId'], 'http' => $r['http'], 'message' => $r['ok'] ? 'พบ richMenuId' : ($r['error'] ?? 'ไม่พบ')]);
+        exit;
+    }
+
     echo json_encode(['ok' => false, 'message' => 'Unknown action']);
 } catch (Throwable $e) {
     error_log('[ajax_line_richmenu] ' . $e->getMessage());
