@@ -916,3 +916,179 @@ function sendTestLineP() {
         .then(function (d) { if (d.ok) applySettings(d.settings); });
 })();
 </script>
+
+<!-- ════════════ Rich Menu (per-user binding) ════════════ -->
+<div class="max-w-4xl mx-auto px-4 md:px-6 pb-12 mt-2">
+    <div class="bg-white rounded-3xl border border-slate-200 shadow-sm p-6">
+        <div class="flex items-center gap-3 mb-1">
+            <div class="w-10 h-10 bg-emerald-50 text-emerald-600 rounded-2xl border border-emerald-100 flex items-center justify-center">
+                <i class="fa-solid fa-bars-staggered"></i>
+            </div>
+            <div>
+                <h3 class="text-lg font-black text-slate-800">Rich Menu — สลับตามสถานะผู้ใช้</h3>
+                <p class="text-xs text-slate-500 font-medium">guest = ยังไม่ลงทะเบียน · member = มี record ใน sys_users + line_user_id</p>
+            </div>
+        </div>
+
+        <div class="bg-sky-50 border border-sky-100 rounded-2xl p-3 mt-4 text-xs text-sky-800 font-medium flex gap-2 items-start">
+            <i class="fa-solid fa-circle-info text-sky-500 mt-0.5"></i>
+            <div>
+                สร้าง rich menu ผ่าน LINE OA Console แล้วเอา <span class="font-mono font-black">richMenuId</span>
+                (รูปแบบ <span class="font-mono">richmenu-xxxxxxxxxxxx</span>) มาวางช่องด้านล่าง
+                · ระบบจะ link เมนูที่ถูกให้ user ทุกคนอัตโนมัติเมื่อ follow / สมัครเสร็จ
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-5">
+            <div>
+                <label class="block text-xs font-black uppercase tracking-widest text-slate-500 mb-1.5">
+                    <i class="fa-solid fa-user-plus text-amber-500 mr-1"></i> Guest Rich Menu ID
+                </label>
+                <input type="text" id="rmGuestId" placeholder="richmenu-xxxxxxxxxxxxxxxxxxxxxxxxxx"
+                    class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-mono text-slate-800 outline-none focus:border-amber-400 focus:bg-white">
+                <p class="text-[10px] text-slate-400 font-medium mt-1">สำหรับผู้ใช้ที่ยังไม่ลงทะเบียน (เมนูจะมีปุ่ม "สมัครสมาชิก")</p>
+            </div>
+            <div>
+                <label class="block text-xs font-black uppercase tracking-widest text-slate-500 mb-1.5">
+                    <i class="fa-solid fa-user-check text-emerald-500 mr-1"></i> Member Rich Menu ID
+                </label>
+                <input type="text" id="rmMemberId" placeholder="richmenu-xxxxxxxxxxxxxxxxxxxxxxxxxx"
+                    class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-mono text-slate-800 outline-none focus:border-emerald-400 focus:bg-white">
+                <p class="text-[10px] text-slate-400 font-medium mt-1">สำหรับผู้ใช้ที่ลงทะเบียนแล้ว (เมนูเต็ม)</p>
+            </div>
+        </div>
+
+        <div class="flex flex-wrap gap-2 mt-4">
+            <button onclick="rmSaveIds()" class="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-black inline-flex items-center gap-1.5 transition-colors">
+                <i class="fa-solid fa-floppy-disk"></i> บันทึก ID
+            </button>
+            <button onclick="rmSetDefault('guest')" class="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-black inline-flex items-center gap-1.5 transition-colors">
+                <i class="fa-solid fa-globe"></i> ตั้ง Guest เป็น default
+            </button>
+            <button onclick="rmSetDefault('clear')" class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-black inline-flex items-center gap-1.5 border border-slate-200 transition-colors">
+                <i class="fa-solid fa-xmark"></i> ลบ default
+            </button>
+        </div>
+
+        <details class="mt-5 group">
+            <summary class="cursor-pointer text-xs font-black text-slate-600 hover:text-slate-800 list-none inline-flex items-center gap-1.5">
+                <i class="fa-solid fa-chevron-right group-open:rotate-90 transition-transform text-[10px]"></i>
+                เครื่องมือทดสอบ / ซิงค์
+            </summary>
+            <div class="mt-3 pt-3 border-t border-slate-100 space-y-3">
+                <div>
+                    <label class="block text-[11px] font-black uppercase tracking-widest text-slate-500 mb-1.5">ทดสอบ sync เมนูให้ user คนเดียว</label>
+                    <div class="flex gap-2">
+                        <input type="text" id="rmTestUid" placeholder="lineUserId (Uxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx)"
+                            class="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono text-slate-800 outline-none">
+                        <button onclick="rmSyncUser()" class="px-3 py-2 rounded-xl bg-sky-500 hover:bg-sky-600 text-white text-xs font-black inline-flex items-center gap-1">
+                            <i class="fa-solid fa-arrows-rotate"></i> Sync
+                        </button>
+                    </div>
+                </div>
+
+                <div class="pt-2">
+                    <button onclick="rmSyncAll()" class="px-3 py-2 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 text-xs font-black border border-purple-200 inline-flex items-center gap-1.5">
+                        <i class="fa-solid fa-people-arrows"></i> Sync ทุก member ที่มี line_user_id → member menu
+                    </button>
+                    <p class="text-[10px] text-slate-400 font-medium mt-1">ใช้กรณีเพิ่งตั้งค่า member ID ครั้งแรก หรือเปลี่ยน rich menu ใหม่</p>
+                </div>
+
+                <div id="rmListBox" class="text-[11px] text-slate-500 font-mono whitespace-pre-wrap pt-2 border-t border-slate-100"></div>
+            </div>
+        </details>
+    </div>
+</div>
+
+<script>
+(function(){
+    const CSRF = (typeof portal_CSRF !== 'undefined') ? portal_CSRF : (document.querySelector('meta[name="csrf-token"]')?.content || '');
+
+    async function rmPost(action, data) {
+        const fd = new FormData();
+        fd.append('action', action);
+        fd.append('csrf_token', CSRF);
+        Object.entries(data || {}).forEach(([k, v]) => fd.append(k, v ?? ''));
+        const r = await fetch('ajax_line_richmenu.php', { method: 'POST', body: fd });
+        return r.json();
+    }
+    async function rmGet() {
+        const r = await fetch('ajax_line_richmenu.php?action=get');
+        return r.json();
+    }
+
+    window.rmSaveIds = async function() {
+        const guest  = document.getElementById('rmGuestId').value.trim();
+        const member = document.getElementById('rmMemberId').value.trim();
+        const r = await rmPost('save_ids', { guest_id: guest, member_id: member });
+        Swal.fire({
+            icon: r.ok ? 'success' : 'error',
+            title: r.ok ? 'บันทึกแล้ว' : 'บันทึกไม่สำเร็จ',
+            text: r.message || '', timer: r.ok ? 1500 : undefined,
+            showConfirmButton: !r.ok,
+        });
+    };
+
+    window.rmSetDefault = async function(target) {
+        const c = await Swal.fire({
+            title: target === 'clear' ? 'ลบ default richmenu?' : `ตั้ง ${target} เป็น default ของทุกคน?`,
+            text: target === 'clear' ? 'ผู้ใช้ใหม่จะไม่เห็น rich menu' : 'ผู้ใช้ใหม่ที่ add friend จะเห็นเมนูนี้',
+            icon: 'question', showCancelButton: true,
+            confirmButtonText: 'ตกลง', cancelButtonText: 'ยกเลิก',
+        });
+        if (!c.isConfirmed) return;
+        const r = await rmPost('set_default', { target });
+        Swal.fire({
+            icon: r.ok ? 'success' : 'error',
+            title: r.ok ? 'สำเร็จ' : 'ล้มเหลว',
+            text: r.message || '',
+        });
+    };
+
+    window.rmSyncUser = async function() {
+        const uid = document.getElementById('rmTestUid').value.trim();
+        if (!uid) { Swal.fire({ icon: 'warning', title: 'กรุณาใส่ lineUserId' }); return; }
+        const r = await rmPost('sync_user', { line_user_id: uid });
+        Swal.fire({
+            icon: r.ok ? 'success' : 'error',
+            title: r.ok ? `Linked → ${r.state}` : 'ล้มเหลว',
+            text: r.message || '',
+        });
+    };
+
+    window.rmSyncAll = async function() {
+        const c = await Swal.fire({
+            title: 'Sync ทุก member?',
+            text: 'จะ link member menu ให้ user ทุกคนที่มี line_user_id ใน DB',
+            icon: 'warning', showCancelButton: true,
+            confirmButtonText: 'เริ่ม Sync', cancelButtonText: 'ยกเลิก',
+        });
+        if (!c.isConfirmed) return;
+        Swal.fire({ title: 'กำลัง sync...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
+        const r = await rmPost('sync_all', {});
+        Swal.fire({
+            icon: r.ok ? 'success' : 'error',
+            title: r.ok ? 'เสร็จสิ้น' : 'ล้มเหลว',
+            html: r.ok ? `รวม ${r.total} คน · สำเร็จ <b>${r.success}</b> · ล้มเหลว <b>${r.failed}</b>` : (r.message || ''),
+        });
+    };
+
+    // โหลด initial state
+    rmGet().then(d => {
+        if (!d || !d.ok) return;
+        document.getElementById('rmGuestId').value  = d.ids.guest  || '';
+        document.getElementById('rmMemberId').value = d.ids.member || '';
+        const box = document.getElementById('rmListBox');
+        if (box) {
+            if (d.richmenus && d.richmenus.length) {
+                box.textContent = 'Rich menus ที่สร้างผ่าน API:\n' +
+                    d.richmenus.map(m => `  ${m.richMenuId}  →  ${m.name || '(no name)'}`).join('\n');
+            } else if (d.list_error) {
+                box.textContent = 'หมายเหตุ: ดึง list ไม่ได้ (' + d.list_error + ')';
+            } else {
+                box.textContent = 'ไม่มี rich menu ที่สร้างผ่าน API (ที่สร้างใน Console จะไม่ปรากฏที่นี่ แต่ยังใช้ได้)';
+            }
+        }
+    });
+})();
+</script>

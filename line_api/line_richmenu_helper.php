@@ -1,0 +1,221 @@
+<?php
+/**
+ * line_api/line_richmenu_helper.php
+ *
+ * LINE Rich Menu helpers — รองรับ per-user binding เพื่อสลับเมนูระหว่าง
+ *  "guest" (ยังไม่ลงทะเบียน) กับ "member" (มี record ใน sys_users + line_user_id)
+ *
+ * Settings เก็บใน sys_site_settings (keys):
+ *   - line.richmenu.guest_id
+ *   - line.richmenu.member_id
+ *
+ * API endpoints ที่ใช้:
+ *   - POST   /v2/bot/user/{userId}/richmenu/{richMenuId}   ผูกเมนูให้ user คนเดียว
+ *   - DELETE /v2/bot/user/{userId}/richmenu                ปลดเมนูจาก user
+ *   - POST   /v2/bot/user/all/richmenu/{richMenuId}        ตั้ง default ให้ทุกคน
+ *   - DELETE /v2/bot/user/all/richmenu                     ลบ default
+ *   - GET    /v2/bot/richmenu/list                         list richmenus ที่สร้างผ่าน API
+ */
+declare(strict_types=1);
+
+require_once __DIR__ . '/line_config.php';
+
+if (!function_exists('line_richmenu_token')) {
+    function line_richmenu_token(): string
+    {
+        return defined('LINE_MESSAGING_CHANNEL_ACCESS_TOKEN')
+            ? (string)LINE_MESSAGING_CHANNEL_ACCESS_TOKEN
+            : '';
+    }
+}
+
+if (!function_exists('line_richmenu_api')) {
+    /**
+     * Low-level: เรียก LINE API
+     *
+     * @return array{http:int, body:string, error:?string}
+     */
+    function line_richmenu_api(string $method, string $path): array
+    {
+        $token = line_richmenu_token();
+        if ($token === '') {
+            return ['http' => 0, 'body' => '', 'error' => 'LINE_MESSAGING_CHANNEL_ACCESS_TOKEN ยังไม่ได้ตั้งค่า'];
+        }
+        $url = 'https://api.line.me' . $path;
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_CUSTOMREQUEST  => $method,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT        => 10,
+            CURLOPT_HTTPHEADER     => [
+                'Authorization: Bearer ' . $token,
+                'Content-Type: application/json',
+            ],
+        ]);
+        $body = (string)curl_exec($ch);
+        $http = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $err  = curl_error($ch) ?: null;
+        curl_close($ch);
+        return ['http' => $http, 'body' => $body, 'error' => $err];
+    }
+}
+
+if (!function_exists('line_richmenu_get_ids')) {
+    /**
+     * ดึง richMenuId ทั้ง 2 ค่าจาก sys_site_settings
+     *
+     * @return array{guest:string, member:string}
+     */
+    function line_richmenu_get_ids(): array
+    {
+        try {
+            $pdo = db();
+            $stmt = $pdo->prepare("SELECT setting_key, setting_value FROM sys_site_settings
+                                   WHERE setting_key IN ('line.richmenu.guest_id', 'line.richmenu.member_id')");
+            $stmt->execute();
+            $rows = $stmt->fetchAll(PDO::FETCH_KEY_PAIR) ?: [];
+            return [
+                'guest'  => (string)($rows['line.richmenu.guest_id']  ?? ''),
+                'member' => (string)($rows['line.richmenu.member_id'] ?? ''),
+            ];
+        } catch (Throwable $e) {
+            error_log('[line_richmenu_get_ids] ' . $e->getMessage());
+            return ['guest' => '', 'member' => ''];
+        }
+    }
+}
+
+if (!function_exists('line_richmenu_save_ids')) {
+    /**
+     * บันทึก richMenuId ลง sys_site_settings (ผ่าน upsert)
+     */
+    function line_richmenu_save_ids(string $guestId, string $memberId): bool
+    {
+        try {
+            $pdo = db();
+            $stmt = $pdo->prepare("INSERT INTO sys_site_settings (setting_key, setting_value)
+                                   VALUES (:k, :v)
+                                   ON DUPLICATE KEY UPDATE setting_value = :v2");
+            $stmt->execute([':k' => 'line.richmenu.guest_id',  ':v' => $guestId,  ':v2' => $guestId]);
+            $stmt->execute([':k' => 'line.richmenu.member_id', ':v' => $memberId, ':v2' => $memberId]);
+            return true;
+        } catch (Throwable $e) {
+            error_log('[line_richmenu_save_ids] ' . $e->getMessage());
+            return false;
+        }
+    }
+}
+
+if (!function_exists('line_richmenu_link_user')) {
+    /**
+     * ผูก rich menu ให้ user คนเดียว
+     *
+     * @return array{ok:bool, http:int, error:?string}
+     */
+    function line_richmenu_link_user(string $lineUserId, string $richMenuId): array
+    {
+        if ($lineUserId === '' || $richMenuId === '') {
+            return ['ok' => false, 'http' => 0, 'error' => 'lineUserId/richMenuId ว่าง'];
+        }
+        $r = line_richmenu_api('POST', "/v2/bot/user/$lineUserId/richmenu/$richMenuId");
+        $ok = ($r['http'] >= 200 && $r['http'] < 300);
+        return ['ok' => $ok, 'http' => $r['http'], 'error' => $ok ? null : ($r['body'] ?: $r['error'])];
+    }
+}
+
+if (!function_exists('line_richmenu_unlink_user')) {
+    function line_richmenu_unlink_user(string $lineUserId): array
+    {
+        if ($lineUserId === '') return ['ok' => false, 'http' => 0, 'error' => 'lineUserId ว่าง'];
+        $r = line_richmenu_api('DELETE', "/v2/bot/user/$lineUserId/richmenu");
+        $ok = ($r['http'] >= 200 && $r['http'] < 300);
+        return ['ok' => $ok, 'http' => $r['http'], 'error' => $ok ? null : ($r['body'] ?: $r['error'])];
+    }
+}
+
+if (!function_exists('line_richmenu_set_default')) {
+    /**
+     * ตั้ง default rich menu สำหรับทุกคน (ผู้ที่ add friend ใหม่จะเห็นเมนูนี้)
+     */
+    function line_richmenu_set_default(string $richMenuId): array
+    {
+        if ($richMenuId === '') return ['ok' => false, 'http' => 0, 'error' => 'richMenuId ว่าง'];
+        $r = line_richmenu_api('POST', "/v2/bot/user/all/richmenu/$richMenuId");
+        $ok = ($r['http'] >= 200 && $r['http'] < 300);
+        return ['ok' => $ok, 'http' => $r['http'], 'error' => $ok ? null : ($r['body'] ?: $r['error'])];
+    }
+}
+
+if (!function_exists('line_richmenu_clear_default')) {
+    function line_richmenu_clear_default(): array
+    {
+        $r = line_richmenu_api('DELETE', '/v2/bot/user/all/richmenu');
+        $ok = ($r['http'] >= 200 && $r['http'] < 300);
+        return ['ok' => $ok, 'http' => $r['http'], 'error' => $ok ? null : ($r['body'] ?: $r['error'])];
+    }
+}
+
+if (!function_exists('line_richmenu_list')) {
+    /**
+     * ดึงรายการ rich menu ทั้งหมดที่สร้างผ่าน API (ไม่รวมที่สร้างใน Console)
+     *
+     * @return array{ok:bool, richmenus:array, error:?string}
+     */
+    function line_richmenu_list(): array
+    {
+        $r = line_richmenu_api('GET', '/v2/bot/richmenu/list');
+        if ($r['http'] < 200 || $r['http'] >= 300) {
+            return ['ok' => false, 'richmenus' => [], 'error' => $r['body'] ?: $r['error']];
+        }
+        $data = json_decode($r['body'], true) ?: [];
+        return ['ok' => true, 'richmenus' => $data['richmenus'] ?? [], 'error' => null];
+    }
+}
+
+if (!function_exists('line_richmenu_is_registered_user')) {
+    /**
+     * ตรวจว่า lineUserId นี้มี record ใน sys_users หรือยัง
+     * (รองรับทั้ง line_user_id เดิม และ line_user_id_new — เผื่อย้าย channel)
+     */
+    function line_richmenu_is_registered_user(string $lineUserId): bool
+    {
+        if ($lineUserId === '') return false;
+        try {
+            $pdo = db();
+            $stmt = $pdo->prepare("SELECT id FROM sys_users
+                                   WHERE line_user_id = :uid OR line_user_id_new = :uid2
+                                   LIMIT 1");
+            $stmt->execute([':uid' => $lineUserId, ':uid2' => $lineUserId]);
+            return (bool)$stmt->fetchColumn();
+        } catch (Throwable $e) {
+            error_log('[line_richmenu_is_registered_user] ' . $e->getMessage());
+            return false;
+        }
+    }
+}
+
+if (!function_exists('line_richmenu_sync_user')) {
+    /**
+     * Sync เมนูของ user คนเดียว: ถ้าเป็น member → link member menu, ไม่ใช่ → link guest menu
+     * (เรียกหลัง: follow event / หลัง INSERT sys_users / login callback)
+     *
+     * @param string $lineUserId
+     * @param bool|null $forceIsMember  null = auto detect จาก DB, true/false = override
+     * @return array{ok:bool, state:string, error:?string}
+     */
+    function line_richmenu_sync_user(string $lineUserId, ?bool $forceIsMember = null): array
+    {
+        if ($lineUserId === '') return ['ok' => false, 'state' => 'none', 'error' => 'lineUserId ว่าง'];
+
+        $ids = line_richmenu_get_ids();
+        $isMember = $forceIsMember ?? line_richmenu_is_registered_user($lineUserId);
+        $targetId = $isMember ? $ids['member'] : $ids['guest'];
+        $state    = $isMember ? 'member' : 'guest';
+
+        if ($targetId === '') {
+            return ['ok' => false, 'state' => $state, 'error' => "ยังไม่ได้ตั้ง richMenuId สำหรับ $state"];
+        }
+        $r = line_richmenu_link_user($lineUserId, $targetId);
+        return ['ok' => $r['ok'], 'state' => $state, 'error' => $r['error']];
+    }
+}
