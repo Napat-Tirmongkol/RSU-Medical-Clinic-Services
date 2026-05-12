@@ -73,16 +73,17 @@ try {
     $contextFull = ai_qa_build_clinic_context($pdo, $now, $question);
     $contextPreview = $contextFull;
 
-    // ── 4.5. ดึงตารางหมอวันที่ใกล้เคียง 7 วัน (raw) เพื่อ debug ───────
+    // ── 4.5. ดึงตารางหมอวันที่ใกล้เคียง (raw) เพื่อ debug ───────────────
     $today = $now->format('Y-m-d');
     $tomorrow = $now->modify('+1 day')->format('Y-m-d');
     $debugSchedule = [];
     foreach ([$today, $tomorrow] as $d) {
         $rows = get_clinic_doctors_for_date($pdo, $d);
         $debugSchedule[$d] = [
-            'date'  => $d,
-            'count' => count($rows),
-            'rows'  => array_map(fn($r) => [
+            'date'    => $d,
+            'weekday' => (int)(new DateTimeImmutable($d, $tz))->format('w'),
+            'count'   => count($rows),
+            'rows'    => array_map(fn($r) => [
                 'staff_id'   => $r['staff_id'] ?? null,
                 'doc_name'   => $r['doc_name'] ?? null,
                 'doc_title'  => $r['doc_title'] ?? null,
@@ -92,6 +93,31 @@ try {
                 'service'    => $r['service_type'] ?? null,
             ], $rows),
         ];
+    }
+
+    // ── 4.6. DB inventory เพื่อหาสาเหตุที่ count = 0 ────────────────────
+    $debugInventory = [
+        'total'        => 0,
+        'active'       => 0,
+        'by_type'      => [],
+        'samples'      => [],
+        'today_weekday'=> (int)(new DateTimeImmutable($today, $tz))->format('w'),
+    ];
+    try {
+        $debugInventory['total']  = (int)$pdo->query("SELECT COUNT(*) FROM sys_doctor_schedule")->fetchColumn();
+        $debugInventory['active'] = (int)$pdo->query("SELECT COUNT(*) FROM sys_doctor_schedule WHERE is_active = 1")->fetchColumn();
+        $byType = $pdo->query("SELECT type, COUNT(*) c FROM sys_doctor_schedule WHERE is_active = 1 GROUP BY type")->fetchAll(PDO::FETCH_KEY_PAIR);
+        $debugInventory['by_type'] = $byType ?: [];
+        $samples = $pdo->query("
+            SELECT s.id, s.type, s.weekday, s.specific_date, s.start_time, s.end_time,
+                   s.is_active, s.staff_id, ms.full_name AS doc_name
+              FROM sys_doctor_schedule s
+              LEFT JOIN sys_medical_staff ms ON s.staff_id = ms.id
+              ORDER BY s.id DESC LIMIT 10
+        ")->fetchAll(PDO::FETCH_ASSOC);
+        $debugInventory['samples'] = $samples ?: [];
+    } catch (Throwable $e) {
+        $debugInventory['error'] = $e->getMessage();
     }
 
     echo json_encode([
@@ -113,6 +139,7 @@ try {
         'context_chars'   => mb_strlen($contextFull),
         'context_preview' => $contextPreview,
         'debug_schedule'  => $debugSchedule,
+        'debug_inventory' => $debugInventory,
     ], JSON_UNESCAPED_UNICODE);
 
 } catch (Throwable $e) {

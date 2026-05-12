@@ -817,6 +817,12 @@ function _qa_source_badge(string $s): string {
                     <span class="text-xs text-amber-600 font-normal">— ใช้ debug ว่า AI เห็นข้อมูลถูกหรือเปล่า</span>
                 </div>
                 <div id="sb-debug-schedule-body" class="space-y-2"></div>
+
+                <!-- Inventory summary -->
+                <div id="sb-debug-inventory" class="mt-3 pt-3 border-t border-amber-200 hidden">
+                    <div class="text-xs font-bold text-amber-800 mb-2">📦 DB Inventory (sys_doctor_schedule)</div>
+                    <div id="sb-debug-inv-body" class="text-xs text-amber-900"></div>
+                </div>
             </div>
 
             <!-- Context preview -->
@@ -1666,6 +1672,7 @@ function renderResult(question, j) {
     // ── Doctor schedule debug ─────────────────────────────────────────────
     const dbgBox  = document.getElementById('sb-debug-schedule');
     const dbgBody = document.getElementById('sb-debug-schedule-body');
+    const WEEKDAY = ['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัส','ศุกร์','เสาร์'];
     if (j.debug_schedule) {
         dbgBox.classList.remove('hidden');
         const entries = Object.values(j.debug_schedule);
@@ -1676,12 +1683,35 @@ function renderResult(question, j) {
                   '</tbody></table>'
                 : '<div class="text-xs text-amber-600 italic">ไม่มี shift</div>';
             return `<div class="bg-white border border-amber-200 rounded-lg p-3">
-                <div class="text-xs font-bold text-amber-900 mb-2">${escH(d.date)} — <span class="font-normal">${d.count} shift</span></div>
+                <div class="text-xs font-bold text-amber-900 mb-2">${escH(d.date)} (${WEEKDAY[d.weekday]||'-'}) — <span class="font-normal">${d.count} shift</span></div>
                 ${rowsHtml}
             </div>`;
         }).join('');
     } else {
         dbgBox.classList.add('hidden');
+    }
+
+    // ── DB Inventory (sys_doctor_schedule overall) ────────────────────────
+    const invBox  = document.getElementById('sb-debug-inventory');
+    const invBody = document.getElementById('sb-debug-inv-body');
+    if (j.debug_inventory) {
+        invBox.classList.remove('hidden');
+        const inv = j.debug_inventory;
+        const byTypeStr = Object.entries(inv.by_type||{}).map(([k,v]) => `<span class="inline-block bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full mx-1">${escH(k)}: ${v}</span>`).join('') || '<span class="text-amber-600 italic">ไม่มี</span>';
+            let samples = '';
+        if ((inv.samples||[]).length) {
+            samples = '<details class="mt-2"><summary class="cursor-pointer font-bold text-amber-900">10 rows ล่าสุด (ดูดิบ)</summary><table class="w-full text-xs mt-1"><thead><tr class="bg-amber-100"><th class="px-1.5 py-1">id</th><th class="px-1.5 py-1">type</th><th class="px-1.5 py-1">weekday</th><th class="px-1.5 py-1">specific_date</th><th class="px-1.5 py-1">time</th><th class="px-1.5 py-1">active</th><th class="px-1.5 py-1">หมอ</th></tr></thead><tbody>' +
+                inv.samples.map(s => `<tr class="border-t border-amber-200"><td class="px-1.5 py-1">${s.id}</td><td class="px-1.5 py-1">${escH(s.type||'-')}</td><td class="px-1.5 py-1">${s.weekday!=null?escH(WEEKDAY[s.weekday]||s.weekday):'-'}</td><td class="px-1.5 py-1">${escH(s.specific_date||'-')}</td><td class="px-1.5 py-1">${escH((s.start_time||'').substring(0,5))}–${escH((s.end_time||'').substring(0,5))}</td><td class="px-1.5 py-1">${s.is_active==1?'✅':'❌'}</td><td class="px-1.5 py-1">${escH(s.doc_name||'(N/A)')}</td></tr>`).join('') +
+                '</tbody></table></details>';
+        }
+        invBody.innerHTML = `
+            <div class="mb-1"><b>ทั้งหมด:</b> ${inv.total} rows · <b>active:</b> ${inv.active} · <b>weekday วันนี้:</b> ${WEEKDAY[inv.today_weekday]||inv.today_weekday} (${inv.today_weekday})</div>
+            <div class="mb-2"><b>By type:</b> ${byTypeStr}</div>
+            ${samples}
+            ${inv.error ? `<div class="text-rose-600 mt-1">⚠ ${escH(inv.error)}</div>` : ''}
+        `;
+    } else {
+        invBox.classList.add('hidden');
     }
 
     // ── Context preview ───────────────────────────────────────────────────
