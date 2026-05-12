@@ -55,7 +55,8 @@ function renderHistoryRows($data) {
                 'date'   => date('Y-m-d', strtotime($fine['payment_date'])),
                 'desc'   => 'ค่าปรับยืมเกินกำหนด: ' . ($fine['student_name'] ?? '-') . ' (' . ($fine['equipment_name'] ?? '-') . ')',
             ], JSON_UNESCAPED_UNICODE | JSON_HEX_APOS | JSON_HEX_QUOT);
-            $financeBtn = ' <button type="button" class="btn btn-success btn-sm" style="background:#059669;border:0;color:#fff;padding:4px 8px;border-radius:6px;font-size:11px;cursor:pointer" onclick=\'eborrowFineSendToFinance(' . $payload . ')\' title="บันทึกเป็นรายได้ในระบบการเงิน"><i class="fa-solid fa-money-bill-trend-up"></i></button>';
+            // Auto-sync ทำงานตอนรับชำระแล้ว — ปุ่มนี้สำหรับ re-sync เผื่อกรณีพิเศษ
+            $financeBtn = ' <button type="button" class="btn btn-success btn-sm" style="background:#059669;border:0;color:#fff;padding:4px 8px;border-radius:6px;font-size:11px;cursor:pointer" onclick=\'eborrowFineSendToFinance(' . $payload . ')\' title="ซิงค์ Cash Book ใหม่ (auto-sync ตอนรับชำระแล้ว)"><i class="fa-solid fa-rotate"></i></button>';
         }
         $html .= '<tr>
             <td>'.htmlspecialchars($fine['student_name'] ?? '[N/A]').'</td>

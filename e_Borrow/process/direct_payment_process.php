@@ -4,6 +4,7 @@ include('../includes/check_session_ajax.php');
 require_once(__DIR__ . '/../includes/db_connect.php');
 require_once('../includes/log_function.php');
 require_once('../includes/line_config.php');
+require_once(__DIR__ . '/../../includes/finance_sync_helper.php');
 
 $allowed_roles = ['admin', 'editor'];
 if (!isset($_SESSION['role']) || !in_array($_SESSION['role'], $allowed_roles)) {
@@ -101,6 +102,35 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         sendLineReceipt($pdo, $transaction_id, $student_id, $new_payment_id, $amount_paid, $payment_method);
 
         $pdo->commit();
+
+        // 8. Auto-sync เข้า Cash Book (รายรับ — ค่าปรับยืมเกินกำหนด)
+        // ทำหลัง commit เพื่อกัน financial write ที่ fail ไม่ rollback การชำระจริง
+        try {
+            $infoStmt = $pdo->prepare("
+                SELECT s.full_name AS student_name, bc.name AS equipment_name
+                FROM borrow_records t
+                LEFT JOIN sys_users s ON t.borrower_student_id = s.id
+                LEFT JOIN borrow_categories bc ON t.type_id = bc.id
+                WHERE t.id = ?
+            ");
+            $infoStmt->execute([$transaction_id]);
+            $info = $infoStmt->fetch(PDO::FETCH_ASSOC) ?: [];
+            $descText = 'ค่าปรับยืมเกินกำหนด: ' . ($info['student_name'] ?? '-')
+                      . ' (' . ($info['equipment_name'] ?? '-') . ')';
+            finance_sync_upsert($pdo, [
+                'source_module' => 'eborrow_payment',
+                'source_id'     => (string)$new_payment_id,
+                'kind'          => 'income',
+                'amount'        => $amount_paid,
+                'txn_date'      => date('Y-m-d'),
+                'description'   => $descText,
+                'category_name' => 'รายรับอื่นๆ',
+                'reference'     => 'e-Borrow Payment #' . $new_payment_id,
+                'admin_id'      => $staff_id,
+            ]);
+        } catch (Throwable $e) {
+            error_log('[direct_payment finance_sync] ' . $e->getMessage());
+        }
 
         $response['status'] = 'success';
         $response['message'] = 'บันทึกการชำระเงินเรียบร้อย';
