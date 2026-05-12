@@ -1038,6 +1038,7 @@ async function serverSave() {
       customHolidays: state.customHolidays || {},
       removedHolidays: state.removedHolidays || {},
       shiftTypes: state.shiftTypes || {},
+      customPositions: state.customPositions || {},
     };
     const fd = new FormData();
     fd.append('csrf_token', NS_CSRF);
