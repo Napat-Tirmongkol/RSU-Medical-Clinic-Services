@@ -51,8 +51,8 @@ try {
 /**
  * (0d) MAINTENANCE DATA — สำหรับ Settings Section
  */
-$mFile = __DIR__ . '/../config/maintenance.json';
-$mData = (file_exists($mFile) && ($d = json_decode(file_get_contents($mFile), true))) ? $d : [];
+require_once __DIR__ . '/../includes/maintenance_helper.php';
+$mData = maint_load();
 $mProjects = [
     [
         'key' => 'e_campaign',

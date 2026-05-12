@@ -149,9 +149,8 @@ if (!function_exists('check_user_profile')) {
 if (!function_exists('is_under_maintenance')) {
     function is_under_maintenance(string $project_key): bool {
         if (isset($_SESSION['admin_id'])) return false;
-        $mFile = __DIR__ . '/config/maintenance.json';
-        if (!file_exists($mFile)) return false;
-        $mData = json_decode((string) file_get_contents($mFile), true) ?: [];
+        require_once __DIR__ . '/includes/maintenance_helper.php';
+        $mData = maint_load();
         $whitelist = $mData['whitelist'] ?? [];
         if (!empty($_SESSION['line_user_id']) && in_array($_SESSION['line_user_id'], $whitelist, true)) return false;
         if (!empty($_SESSION['student_id'])  && in_array($_SESSION['student_id'],  $whitelist, true)) return false;
@@ -172,15 +171,14 @@ if (!function_exists('check_maintenance')) {
         // ยกเว้นหน้า UX Staging สำหรับการพัฒนา
         if (strpos($_SERVER['REQUEST_URI'], '/ux_staging/') !== false) return;
 
-        $mFile = __DIR__ . '/config/maintenance.json';
-        if (file_exists($mFile)) {
-            $mData = json_decode(file_get_contents($mFile), true);
-            
+        require_once __DIR__ . '/includes/maintenance_helper.php';
+        $mData = maint_load();
+        if (!empty($mData)) {
             // ตรวจสอบ Whitelist (LINE ID หรือ Student ID)
             $whitelist = $mData['whitelist'] ?? [];
             if (!empty($_SESSION['line_user_id']) && in_array($_SESSION['line_user_id'], $whitelist)) return;
             if (!empty($_SESSION['student_id']) && in_array($_SESSION['student_id'], $whitelist)) return;
-            
+
             $isActive = $mData[$project_key] ?? true;
             
             if (!$isActive) {

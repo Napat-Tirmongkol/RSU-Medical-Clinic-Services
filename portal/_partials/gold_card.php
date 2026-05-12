@@ -15,9 +15,9 @@ $pdo = db();
 $csrfToken = get_csrf_token();
 $canEditKPI = ($_SESSION['admin_role'] ?? '') === 'superadmin' || !empty($_SESSION['access_dashboard_admin']);
 
-// Read current "Gold Card application" enabled state from maintenance.json
-$gcMaintFile = __DIR__ . '/../../config/maintenance.json';
-$gcMaintData = file_exists($gcMaintFile) ? (json_decode((string)file_get_contents($gcMaintFile), true) ?: []) : [];
+// Read current "Gold Card application" enabled state via helper (DB-first, file fallback)
+require_once __DIR__ . '/../../includes/maintenance_helper.php';
+$gcMaintData = maint_load();
 $gcApplyEnabled = ($gcMaintData['gold_card_apply'] ?? true) !== false;
 
 $stats = ['total'=>0,'approved'=>0,'auto_matched'=>0,'pending'=>0,'rejected'=>0,'expiring'=>0,'staff'=>0,'student'=>0];

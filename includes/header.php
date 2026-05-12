@@ -23,9 +23,9 @@ $isUserFolder = (strpos($_SERVER['REQUEST_URI'], '/user/') !== false);
 
 // ── Maintenance Check ────────────────────────────────────────────────────────
 if ($isUserFolder) {
-  $_mFile = __DIR__ . '/../config/maintenance.json';
-  if (file_exists($_mFile)) {
-    $_mData = json_decode(file_get_contents($_mFile), true) ?? [];
+  require_once __DIR__ . '/maintenance_helper.php';
+  $_mData = maint_load();
+  if (!empty($_mData)) {
     if (isset($_mData['e_campaign']) && $_mData['e_campaign'] === false) {
       // แสดงหน้าปรับปรุงแล้วหยุด
       http_response_code(503);
@@ -301,8 +301,8 @@ function render_header(string $title = 'E-Vax'): void
       
       <?php
       // --- Maintenance Announcement ---
-      $_mFile = __DIR__ . '/../config/maintenance.json';
-      $_mData = file_exists($_mFile) ? json_decode(file_get_contents($_mFile), true) : [];
+      require_once __DIR__ . '/maintenance_helper.php';
+      $_mData = maint_load();
       if (!empty($_mData['announcement_active']) && !empty($_mData['announcement_message'])): ?>
         <div style="background-color: #d97706 !important; color: #ffffff !important;" class="px-4 py-3 flex items-center gap-3 shadow-lg relative z-[70] border-b border-white/10">
             <div style="background-color: rgba(255,255,255,0.2) !important;" class="w-9 h-9 rounded-full flex items-center justify-center shrink-0 shadow-inner">
