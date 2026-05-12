@@ -214,6 +214,10 @@ if (!function_exists('line_richmenu_upload_image')) {
      * อัพโหลดรูปสำหรับ rich menu (ขั้นที่ 2 หลัง create)
      * ใช้ api-data.line.me (data plane) — ไม่ใช่ api.line.me ปกติ
      *
+     * NOTE: ต้องใช้ POST + raw body (CURLOPT_POSTFIELDS) ห้ามใช้
+     *   CURLOPT_UPLOAD/CURLOPT_INFILE เพราะ curl จะส่ง chunked PUT-like
+     *   ทำให้ Akamai (LINE CDN edge) ตีเป็น "Bad Request"
+     *
      * @return array{ok:bool, http:int, error:?string}
      */
     function line_richmenu_upload_image(string $richMenuId, string $imagePath, string $mimeType = 'image/png'): array
@@ -225,29 +229,26 @@ if (!function_exists('line_richmenu_upload_image')) {
             return ['ok' => false, 'http' => 0, 'error' => 'รองรับเฉพาะ image/png หรือ image/jpeg'];
         }
 
-        $fh = fopen($imagePath, 'rb');
-        if (!$fh) return ['ok' => false, 'http' => 0, 'error' => 'เปิดไฟล์ภาพไม่ได้'];
-        $size = filesize($imagePath);
+        $imgData = @file_get_contents($imagePath);
+        if ($imgData === false) return ['ok' => false, 'http' => 0, 'error' => 'อ่านไฟล์ภาพไม่ได้'];
 
         $ch = curl_init("https://api-data.line.me/v2/bot/richmenu/$richMenuId/content");
         curl_setopt_array($ch, [
-            CURLOPT_CUSTOMREQUEST  => 'POST',
+            CURLOPT_POST           => true,
             CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT        => 30,
-            CURLOPT_UPLOAD         => true,
-            CURLOPT_INFILE         => $fh,
-            CURLOPT_INFILESIZE     => $size,
+            CURLOPT_TIMEOUT        => 60,
+            CURLOPT_POSTFIELDS     => $imgData, // raw binary body
             CURLOPT_HTTPHEADER     => [
                 'Authorization: Bearer ' . $token,
                 'Content-Type: ' . $mimeType,
-                'Content-Length: ' . $size,
+                // curl คำนวณ Content-Length ให้เองจาก POSTFIELDS
+                'Expect:', // ปิด "Expect: 100-continue" ที่บางครั้ง edge ไม่รองรับ
             ],
         ]);
         $body = (string)curl_exec($ch);
         $http = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $err  = curl_error($ch) ?: null;
         curl_close($ch);
-        fclose($fh);
 
         $ok = ($http >= 200 && $http < 300);
         return ['ok' => $ok, 'http' => $http, 'error' => $ok ? null : ($body ?: $err)];
