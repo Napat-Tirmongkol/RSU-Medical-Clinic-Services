@@ -245,6 +245,22 @@ $portalCsrf = get_csrf_token();
             </div>
         </div>
 
+        <?php
+        $_role = $_SESSION['admin_role'] ?? '';
+        $_hasFinance = ($_role === 'superadmin' || $_role === 'admin' || !empty($_SESSION['access_finance']));
+        ?>
+        <?php if ($_hasFinance): ?>
+        <div class="mb-4 p-3 rounded-xl border border-emerald-200 bg-emerald-50 flex items-center justify-between gap-3 flex-wrap">
+            <div class="flex items-center gap-2 text-sm text-emerald-800">
+                <i class="fa-solid fa-link text-emerald-600"></i>
+                <span>ส่งค่าตอบแทนนักศึกษาทุนของเดือนนี้เข้าระบบการเงิน — รายจ่ายหมวด "เงินเดือน/ค่าจ้าง"</span>
+            </div>
+            <button onclick="schSendToFinance()" class="px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 text-sm font-bold flex items-center gap-1">
+                <i class="fa-solid fa-money-bill-trend-up"></i> ส่งเข้าระบบการเงิน
+            </button>
+        </div>
+        <?php endif; ?>
+
         <!-- Charts row -->
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-3 mb-5">
             <div class="sch-card lg:col-span-2">
@@ -860,6 +876,57 @@ $portalCsrf = get_csrf_token();
     // ────── DASHBOARD ──────
     let dashChartDaily = null, dashChartSplit = null;
 
+    // ── ส่งค่าตอบแทนเดือนนี้เข้าระบบการเงิน ──
+    window.schSendToFinance = async function () {
+        const k = window._schKpiCache;
+        if (!k || !k.month_pay || k.month_pay <= 0) {
+            Swal.fire({ icon: 'info', title: 'ยังไม่มียอดค่าตอบแทน', text: 'เดือนนี้ยังไม่มียอดให้ส่ง' });
+            return;
+        }
+        const now = new Date();
+        const yearCE = now.getFullYear(), month = now.getMonth() + 1, yearBE = yearCE + 543;
+        const monthName = ['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'][month];
+        const lastDay = new Date(yearCE, month, 0).getDate();
+        const txnDate = `${yearCE}-${String(month).padStart(2,'0')}-${String(lastDay).padStart(2,'0')}`;
+        const sourceId = `${yearBE}${String(month).padStart(2,'0')}`;
+        const amount = Math.round(k.month_pay * 100) / 100;
+
+        const r = await Swal.fire({
+            title: 'ส่งค่าตอบแทนนักศึกษาทุนเข้าระบบการเงิน',
+            html: `<div class="text-left text-sm space-y-2">
+                <div>เดือน: <b>${monthName} ${yearBE}</b></div>
+                <div>ชั่วโมงค่าตอบแทน: <b>${(k.month_paid || 0).toFixed(1)} ชม.</b></div>
+                <div>อัตรา: <b>${(k.pay_rate || 0).toFixed(2)} ฿/ชม.</b></div>
+                <div>ยอดรวม: <b class="text-emerald-600">${amount.toLocaleString('th-TH', { minimumFractionDigits: 2 })} บาท</b></div>
+                <hr class="my-2">
+                <div class="text-xs text-slate-500">บันทึกเป็น "รายจ่าย" หมวด "เงินเดือน/ค่าจ้าง" วันที่ ${txnDate}<br>ถ้ามีรายการของเดือนนี้อยู่แล้วจะอัปเดต (ไม่สร้างซ้ำ)</div>
+            </div>`,
+            showCancelButton: true,
+            confirmButtonText: 'ส่ง', cancelButtonText: 'ยกเลิก', confirmButtonColor: '#059669',
+        });
+        if (!r.isConfirmed) return;
+
+        const fd = new FormData();
+        fd.append('csrf_token', (typeof portal_CSRF !== 'undefined') ? portal_CSRF : '<?= htmlspecialchars(get_csrf_token(), ENT_QUOTES) ?>');
+        fd.append('action', 'txn:upsert_from_source');
+        fd.append('source_module', 'scholarship');
+        fd.append('source_id', sourceId);
+        fd.append('kind', 'expense');
+        fd.append('amount', String(amount));
+        fd.append('txn_date', txnDate);
+        fd.append('description', `ค่าตอบแทนนักศึกษาทุนประจำเดือน ${monthName} ${yearBE} (${(k.month_paid || 0).toFixed(1)} ชม.)`);
+        fd.append('category_name', 'เงินเดือน/ค่าจ้าง');
+        fd.append('note', `อัตรา ${(k.pay_rate || 0).toFixed(2)} ฿/ชม.\nจำนวนนักศึกษาที่ active: ${k.active_students || 0}`);
+        try {
+            const res = await fetch('ajax_finance.php', { method: 'POST', body: fd, credentials: 'same-origin' });
+            const j = await res.json();
+            if (!j.ok) { Swal.fire({ icon: 'error', title: 'ส่งไม่สำเร็จ', text: j.message || '' }); return; }
+            Swal.fire({ icon: 'success', title: j.mode === 'updated' ? 'อัปเดตในระบบการเงินแล้ว' : 'ส่งเข้าระบบการเงินแล้ว',
+                html: `<div class="text-sm">บันทึก ${amount.toLocaleString('th-TH')} บาท ใน Cash Book<br><a href="index.php?section=finance" class="text-emerald-600 underline">เปิดดู</a></div>`,
+                confirmButtonColor: '#059669' });
+        } catch (e) { Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: String(e) }); }
+    };
+
     async function loadDashboard() {
         const j = await api('dashboard', 'get', {});
         if (!j.ok) {
@@ -874,6 +941,8 @@ $portalCsrf = get_csrf_token();
         document.getElementById('kpi-month-paid').textContent = j.kpis.month_paid.toFixed(1);
         document.getElementById('kpi-month-pay').textContent =
             (j.kpis.month_pay || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        // เก็บค่าไว้สำหรับปุ่ม "ส่งเข้าระบบการเงิน"
+        window._schKpiCache = j.kpis;
         document.getElementById('kpi-pay-rate-foot').textContent =
             j.kpis.pay_rate > 0
                 ? `บาท · อัตรา ${j.kpis.pay_rate.toFixed(2)} ฿/ชม.`
