@@ -101,11 +101,11 @@ try {
                            OR (
                                s.type = 'regular'
                                AND s.weekday = :wd
-                               AND (s.recur_end_date IS NULL OR s.recur_end_date = '0000-00-00' OR s.recur_end_date >= :d)
+                               AND (s.recur_end_date IS NULL OR s.recur_end_date = '0000-00-00' OR s.recur_end_date >= :d2)
                            )
                        )
                 ");
-                $stmt->execute([':d' => $today, ':wd' => $weekday]);
+                $stmt->execute([':d' => $today, ':wd' => $weekday, ':d2' => $today]);
                 $diag['today_shifts_raw'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
                 // Helper output (post-processed)

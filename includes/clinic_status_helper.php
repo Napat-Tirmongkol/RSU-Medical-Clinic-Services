@@ -447,6 +447,9 @@ function get_clinic_doctors_for_date(PDO $pdo, string $date): array
         // calendar UI ที่ admin ดูอยู่ (calendar แสดง shift แม้ staff inactive)
         // ก่อนหน้านี้ AI ใช้ INNER + ms.is_active=1 → ถ้า staff inactive ตาราง
         // คาเลนดาร์มีหมอแต่ AI เห็น "(ไม่มีหมอออกตรวจ)" → ตอบผิด
+        // หมายเหตุ: ต้องใช้ placeholder คนละชื่อ (:d, :d2) เพราะ native MySQL prepares
+        // ไม่อนุญาตให้ reuse named param ตัวเดียวกัน — ถ้า PDO::ATTR_EMULATE_PREPARES=false
+        // จะ throw exception → catch return [] เงียบๆ ทำให้ AI เห็น "ไม่มีหมอ" ทั้งที่มี
         $stmt = $pdo->prepare("
             SELECT s.id, s.staff_id, s.type, s.specific_date, s.weekday,
                    s.start_time, s.end_time, s.service_type, s.notes,
@@ -464,11 +467,11 @@ function get_clinic_doctors_for_date(PDO $pdo, string $date): array
                   OR (
                       s.type = 'regular'
                       AND s.weekday = :wd
-                      AND (s.recur_end_date IS NULL OR s.recur_end_date = '0000-00-00' OR s.recur_end_date >= :d)
+                      AND (s.recur_end_date IS NULL OR s.recur_end_date = '0000-00-00' OR s.recur_end_date >= :d2)
                   )
               )
         ");
-        $stmt->execute([':d' => $date, ':wd' => $weekday]);
+        $stmt->execute([':d' => $date, ':wd' => $weekday, ':d2' => $date]);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
     } catch (PDOException $e) {
         error_log('get_clinic_doctors_for_date query failed: ' . $e->getMessage());
