@@ -2323,6 +2323,7 @@ try {
                                             $aiAccess = (int)($st['access_ai'] ?? 0);
                                             $consAccess = (int)($st['access_consumables'] ?? 0);
                                             $assetAccess = (int)($st['access_asset'] ?? 0);
+                                            $financeAccess = (int)($st['access_finance'] ?? 0);
                                             $scholarAccess = (int)($st['access_scholarship'] ?? 0);
                                             $dashAccess = (int)($st['access_dashboard_admin'] ?? 0);
                                             $aiIcon = $aiAccess ? '<i class="fa-solid fa-circle-check text-emerald-500"></i>' : '<i class="fa-solid fa-circle-minus text-slate-200"></i>';
@@ -2436,6 +2437,7 @@ try {
                                                 'access_ai'             => ['AI Suite',         '#a855f7'],
                                                 'access_consumables'    => ['Consumables',      '#f43f5e'],
                                                 'access_asset'          => ['Asset',            '#f59e0b'],
+                                                'access_finance'        => ['Finance',          '#059669'],
                                                 'access_scholarship'    => ['Scholarship',      '#10b981'],
                                                 'access_dashboard_admin'=> ['Dashboard Editor', '#3b82f6'],
                                             ];
@@ -2958,6 +2960,14 @@ try {
                                                 </div>
                                                 <input type="checkbox" name="asset_access" id="govAssetAccess" value="1" style="width:16px;height:16px" onclick="event.stopPropagation()">
                                             </div>
+                                            <!-- Finance (Cash Book) -->
+                                            <div onclick="document.getElementById('govFinanceAccess').click()" class="premium-role-card" style="border-radius:14px;border:1.5px solid #e2e8f0;background:#fff;cursor:pointer;padding:12px;transition:all 0.2s;display:flex;align-items:center;justify-content:space-between">
+                                                <div style="display:flex;align-items:center;gap:10px">
+                                                    <i class="fa-solid fa-money-bill-trend-up text-emerald-500"></i>
+                                                    <span style="font-weight:800;font-size:12px;color:#475569">การเงิน (Cash Book)</span>
+                                                </div>
+                                                <input type="checkbox" name="finance_access" id="govFinanceAccess" value="1" style="width:16px;height:16px" onclick="event.stopPropagation()">
+                                            </div>
                                             <!-- Scholarship (นักศึกษาทุน) -->
                                             <div onclick="document.getElementById('govScholarshipAccess').click()" class="premium-role-card" style="border-radius:14px;border:1.5px solid #e2e8f0;background:#fff;cursor:pointer;padding:12px;transition:all 0.2s;display:flex;align-items:center;justify-content:space-between">
                                                 <div style="display:flex;align-items:center;gap:10px">
@@ -3087,6 +3097,7 @@ try {
                                             'access_ai'             => ['AI Suite',         'fa-wand-magic-sparkles','#a855f7'],
                                             'access_consumables'    => ['Consumables',      'fa-syringe',            '#f43f5e'],
                                             'access_asset'          => ['Asset Inventory',  'fa-warehouse',          '#f59e0b'],
+                                            'access_finance'        => ['การเงิน (Cash Book)','fa-money-bill-trend-up','#059669'],
                                             'access_scholarship'    => ['Scholarship',      'fa-graduation-cap',     '#10b981'],
                                             'access_dashboard_admin'=> ['Dashboard Editor', 'fa-chart-pie',          '#3b82f6'],
                                             'access_monthly_report' => ['รายงานประจำเดือน',  'fa-clipboard-list',     '#f59e0b'],
@@ -4164,6 +4175,7 @@ try {
                         document.getElementById('govAiAccess').checked = parseInt(data.access_ai) === 1;
                         document.getElementById('govConsumablesAccess').checked = parseInt(data.access_consumables) === 1;
                         document.getElementById('govAssetAccess').checked = parseInt(data.access_asset) === 1;
+                        document.getElementById('govFinanceAccess').checked = parseInt(data.access_finance) === 1;
                         document.getElementById('govScholarshipAccess').checked = parseInt(data.access_scholarship) === 1;
                         document.getElementById('govDashboardAccess').checked = parseInt(data.access_dashboard_admin) === 1;
                         const mrEl = document.getElementById('govMonthlyReportAccess');
@@ -4206,6 +4218,7 @@ try {
                     document.getElementById('govAiAccess').checked = false;
                     document.getElementById('govConsumablesAccess').checked = false;
                     document.getElementById('govAssetAccess').checked = false;
+                    document.getElementById('govFinanceAccess').checked = false;
                     document.getElementById('govScholarshipAccess').checked = false;
                     document.getElementById('govDashboardAccess').checked = false;
                     const mrElR = document.getElementById('govMonthlyReportAccess');
@@ -4236,7 +4249,7 @@ try {
         const POS_FLAG_KEYS = [
             'access_eborrow','access_ecampaign','access_insurance','access_registry',
             'access_system_logs','access_site_settings','access_edms',
-            'access_ai','access_consumables','access_asset','access_scholarship',
+            'access_ai','access_consumables','access_asset','access_finance','access_scholarship',
             'access_dashboard_admin','access_monthly_report','access_director_view',
             'access_identity'
         ];
@@ -4439,6 +4452,7 @@ try {
             ['access_ai',            'govAiAccess'],
             ['access_consumables',   'govConsumablesAccess'],
             ['access_asset',         'govAssetAccess'],
+            ['access_finance',       'govFinanceAccess'],
             ['access_scholarship',   'govScholarshipAccess'],
             ['access_dashboard_admin','govDashboardAccess'],
             ['access_monthly_report','govMonthlyReportAccess'],

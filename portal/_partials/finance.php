@@ -107,8 +107,8 @@
                         <th>หมวด</th>
                         <th>รายละเอียด</th>
                         <th style="width:120px;text-align:right">จำนวนเงิน</th>
-                        <th style="width:120px">อ้างอิง</th>
-                        <th style="width:80px;text-align:center">จัดการ</th>
+                        <th style="width:140px">เลขที่ / อ้างอิง</th>
+                        <th style="width:110px;text-align:center">จัดการ</th>
                     </tr>
                 </thead>
                 <tbody id="finTbody"></tbody>
@@ -186,14 +186,18 @@
                     : '<span class="text-slate-400 text-xs">-</span>';
                 const amtClass = row.kind === 'income' ? 'fin-amt-income' : 'fin-amt-expense';
                 const amtPrefix = row.kind === 'income' ? '+' : '-';
+                const refDisplay = row.receipt_no
+                    ? `<span class="font-mono text-[11px] text-[#2e9e63] font-bold">${escapeHtml(row.receipt_no)}</span>` + (row.reference ? `<br><span class="text-[10px] text-slate-400 font-mono">${escapeHtml(row.reference)}</span>` : '')
+                    : (row.reference ? `<span class="font-mono text-xs text-slate-500">${escapeHtml(row.reference)}</span>` : '<span class="text-slate-300 text-xs">-</span>');
                 return `<tr>
                     <td class="text-slate-600">${fmtDate(row.txn_date)}</td>
                     <td>${kindBadge}</td>
                     <td>${catChip}</td>
                     <td class="text-slate-700">${escapeHtml(row.description || '')}${row.payment_method ? ` <span class="text-[10px] text-slate-400">· ${escapeHtml(row.payment_method)}</span>` : ''}</td>
                     <td class="${amtClass} text-right">${amtPrefix}${fmt(row.amount)}</td>
-                    <td class="text-xs text-slate-500 font-mono">${escapeHtml(row.reference || '-')}</td>
-                    <td class="text-center">
+                    <td>${refDisplay}</td>
+                    <td class="text-center whitespace-nowrap">
+                        <a href="finance_receipt.php?id=${row.id}" target="_blank" class="text-slate-500 hover:text-[#2e9e63] mr-2" title="พิมพ์ใบเสร็จ"><i class="fa-solid fa-print"></i></a>
                         <button onclick='finEditRow(${JSON.stringify(row).replace(/'/g, "&#39;")})' class="text-[#2e9e63] hover:text-[#27845a] mr-2" title="แก้ไข"><i class="fa-solid fa-pen"></i></button>
                         <button onclick="finDeleteRow(${row.id})" class="text-rose-500 hover:text-rose-700" title="ลบ"><i class="fa-solid fa-trash"></i></button>
                     </td>

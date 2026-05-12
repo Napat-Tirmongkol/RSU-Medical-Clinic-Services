@@ -46,6 +46,11 @@ function ensure_finance_schema(PDO $pdo): void {
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             KEY idx_date_kind (txn_date, kind), KEY idx_category (category_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        // Self-heal: เพิ่ม columns ใหม่สำหรับ receipt + cross-module sourcing
+        try { $pdo->exec("ALTER TABLE sys_finance_transactions ADD COLUMN receipt_no VARCHAR(30) NULL UNIQUE"); } catch (PDOException) {}
+        try { $pdo->exec("ALTER TABLE sys_finance_transactions ADD COLUMN source_module VARCHAR(50) NULL"); } catch (PDOException) {}
+        try { $pdo->exec("ALTER TABLE sys_finance_transactions ADD COLUMN source_id BIGINT UNSIGNED NULL"); } catch (PDOException) {}
+        try { $pdo->exec("ALTER TABLE sys_finance_transactions ADD INDEX idx_source (source_module, source_id)"); } catch (PDOException) {}
         // First-run seed (idempotent via INSERT IGNORE)
         $cnt = (int)$pdo->query("SELECT COUNT(*) FROM sys_finance_categories")->fetchColumn();
         if ($cnt === 0) {
@@ -96,6 +101,7 @@ try {
         $stmt = $pdo->prepare("SELECT t.*, c.name AS category_name, c.icon AS category_icon, c.color AS category_color
             FROM sys_finance_transactions t LEFT JOIN sys_finance_categories c ON c.id = t.category_id
             {$whereSql} ORDER BY t.txn_date DESC, t.id DESC LIMIT {$perPage} OFFSET {$offset}");
+        // หมายเหตุ: t.* รวม receipt_no, source_module, source_id ที่เพิ่งเพิ่มแล้ว
         $stmt->execute($params);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -167,6 +173,31 @@ try {
         if ($id <= 0) { echo json_encode(['ok' => false, 'message' => 'ไม่ระบุ id']); exit; }
         $pdo->prepare("DELETE FROM sys_finance_transactions WHERE id=?")->execute([$id]);
         echo json_encode(['ok' => true]); exit;
+    }
+
+    // ── Assign receipt number (atomic running number per year) ──
+    if ($action === 'txn:assign_receipt') {
+        $id = (int)($_POST['id'] ?? 0);
+        if ($id <= 0) { echo json_encode(['ok' => false, 'message' => 'ไม่ระบุ id']); exit; }
+        // ถ้ามี receipt_no แล้ว → คืนค่าเดิม
+        $existing = $pdo->prepare("SELECT receipt_no, kind, txn_date FROM sys_finance_transactions WHERE id=?");
+        $existing->execute([$id]);
+        $row = $existing->fetch(PDO::FETCH_ASSOC);
+        if (!$row) { echo json_encode(['ok' => false, 'message' => 'ไม่พบรายการ']); exit; }
+        if (!empty($row['receipt_no'])) { echo json_encode(['ok' => true, 'receipt_no' => $row['receipt_no']]); exit; }
+
+        $prefix = ($row['kind'] === 'income') ? 'RCP' : 'PV'; // RCP=ใบเสร็จรับ, PV=ใบสำคัญจ่าย
+        $yearBE = (int)date('Y', strtotime($row['txn_date'])) + 543;
+        // หา max running number ของ prefix+year นั้น
+        $like = $prefix . '-' . $yearBE . '-%';
+        $maxStmt = $pdo->prepare("SELECT MAX(CAST(SUBSTRING(receipt_no, " . (strlen($prefix) + 7) . ") AS UNSIGNED)) AS m
+            FROM sys_finance_transactions WHERE receipt_no LIKE ?");
+        $maxStmt->execute([$like]);
+        $next = ((int)$maxStmt->fetchColumn()) + 1;
+        $receiptNo = sprintf('%s-%d-%06d', $prefix, $yearBE, $next);
+        $pdo->prepare("UPDATE sys_finance_transactions SET receipt_no=?, updated_by=? WHERE id=?")
+            ->execute([$receiptNo, $adminId ?: null, $id]);
+        echo json_encode(['ok' => true, 'receipt_no' => $receiptNo]); exit;
     }
 
     if ($action === 'category:create' || $action === 'category:update') {

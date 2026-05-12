@@ -109,6 +109,9 @@ if ($adminRole === 'superadmin') {
         if (!in_array('access_asset', $cols)) {
             $pdo->exec("ALTER TABLE sys_staff ADD COLUMN access_asset TINYINT(1) DEFAULT 0");
         }
+        if (!in_array('access_finance', $cols)) {
+            $pdo->exec("ALTER TABLE sys_staff ADD COLUMN access_finance TINYINT(1) DEFAULT 0");
+        }
         if (!in_array('access_scholarship', $cols)) {
             $pdo->exec("ALTER TABLE sys_staff ADD COLUMN access_scholarship TINYINT(1) DEFAULT 0");
         }
@@ -171,6 +174,7 @@ if ($adminRole === 'superadmin') {
                    IFNULL(s.access_ai, 0) AS access_ai,
                    IFNULL(s.access_consumables, 0) AS access_consumables,
                    IFNULL(s.access_asset, 0) AS access_asset,
+                   IFNULL(s.access_finance, 0) AS access_finance,
                    IFNULL(s.access_scholarship, 0) AS access_scholarship,
                    IFNULL(s.access_dashboard_admin, 0) AS access_dashboard_admin,
                    IFNULL(s.access_monthly_report, 0) AS access_monthly_report,
