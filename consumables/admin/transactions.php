@@ -99,7 +99,7 @@ include __DIR__ . '/../includes/header.php';
 <!-- Summary -->
 <div class="grid grid-cols-2 gap-3 mb-4">
     <div class="asset-card p-4 flex items-center gap-3">
-        <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center"><i class="fa-solid fa-arrow-down-to-line"></i></div>
+        <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center"><i class="fa-solid fa-download"></i></div>
         <div>
             <div class="text-[11px] uppercase tracking-wider text-slate-400 font-bold">รวมรับเข้า</div>
             <div class="text-xl font-extrabold text-emerald-700"><?= number_format((int)$sumRow['total_in']) ?></div>

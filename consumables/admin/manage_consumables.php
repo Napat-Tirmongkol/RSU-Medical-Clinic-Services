@@ -94,7 +94,7 @@ include __DIR__ . '/../includes/header.php';
     </div>
     <div class="flex items-center gap-2 flex-wrap">
         <a href="admin/receive_form.php" class="btn-asset btn-asset-secondary">
-            <i class="fas fa-arrow-down-to-line"></i> รับเข้า
+            <i class="fas fa-download"></i> รับเข้า
         </a>
         <a href="admin/issue_form.php" class="btn-asset btn-asset-secondary">
             <i class="fas fa-hand-holding"></i> เบิกออก
@@ -241,7 +241,7 @@ include __DIR__ . '/../includes/header.php';
                                     <i class="fas fa-hand-holding"></i>
                                 </a>
                                 <a href="admin/receive_form.php?consumable_id=<?= (int)$r['id'] ?>" class="btn-asset btn-asset-secondary" title="รับเข้า">
-                                    <i class="fas fa-arrow-down-to-line"></i>
+                                    <i class="fas fa-download"></i>
                                 </a>
                                 <?php if ($canManage): ?>
                                     <a href="admin/consumable_form.php?id=<?= (int)$r['id'] ?>" class="btn-asset btn-asset-secondary" title="แก้ไข">

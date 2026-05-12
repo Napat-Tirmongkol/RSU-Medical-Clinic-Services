@@ -329,7 +329,7 @@ $maxMon    = max(1, ...array_map(fn($r) => max((int)$r['qty_in'], (int)$r['qty_o
     <?php
     $kpis = [
         ['label' => 'รายการ',        'value' => (int)($sum['total_txn']        ?? 0), 'icon' => 'fa-list',                'bg' => '#f0faf4', 'color' => '#2e9e63'],
-        ['label' => 'รวมรับเข้า',    'value' => (int)($sum['qty_in']           ?? 0), 'icon' => 'fa-arrow-down-to-line',  'bg' => '#f0fdf4', 'color' => '#16a34a'],
+        ['label' => 'รวมรับเข้า',    'value' => (int)($sum['qty_in']           ?? 0), 'icon' => 'fa-download',  'bg' => '#f0fdf4', 'color' => '#16a34a'],
         ['label' => 'รวมเบิกออก',    'value' => (int)($sum['qty_out']          ?? 0), 'icon' => 'fa-hand-holding',        'bg' => '#fef2f2', 'color' => '#dc2626'],
         ['label' => 'วัสดุที่เคลื่อน','value' => (int)($sum['unique_items']     ?? 0), 'icon' => 'fa-box-open',            'bg' => '#eff6ff', 'color' => '#2563eb'],
         ['label' => 'หน่วยงาน',      'value' => (int)($sum['unique_faculties'] ?? 0), 'icon' => 'fa-building',            'bg' => '#fffbeb', 'color' => '#d97706'],
