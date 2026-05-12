@@ -576,18 +576,9 @@ $NS_CSRF_TOKEN = get_csrf_token();
       <table class="schedule-table" id="scheduleTable"></table>
     </div>
 
-    <!-- Legend -->
-    <div class="mt-4 bg-white rounded-xl p-3 border border-slate-200 flex items-center gap-2 flex-wrap text-xs">
+    <!-- Legend — render เฉพาะ shift ที่ enabled (ดู renderShiftLegendInline) -->
+    <div class="mt-4 bg-white rounded-xl p-3 border border-slate-200 flex items-center gap-2 flex-wrap text-xs" id="shiftLegendInline">
       <span class="font-medium text-slate-600 mr-2">คำอธิบาย:</span>
-      <span class="px-2 py-1 rounded font-bold" style="background:#fef9c3;color:#854d0e">ช</span> เช้า
-      <span class="px-2 py-1 rounded font-bold" style="background:#bae6fd;color:#075985">บ</span> บ่าย
-      <span class="px-2 py-1 rounded font-bold" style="background:#a5f3fc;color:#155e75">ด</span> ดึก
-      <span class="px-2 py-1 rounded font-bold" style="background:#fcd34d;color:#78350f">ชบ</span> โย้หน้า
-      <span class="px-2 py-1 rounded font-bold" style="background:#5eead4;color:#134e4a">ดบ</span> โย้หลัง
-      <span class="px-2 py-1 rounded font-bold" style="background:#c4b5fd;color:#4c1d95">DN</span> Day+Night
-      <span class="px-2 py-1 rounded font-bold" style="background:#e2e8f0;color:#475569">O</span> OFF
-      <span class="px-2 py-1 rounded font-bold" style="background:#bbf7d0;color:#14532d">V</span> ลาพักร้อน
-      <span class="px-2 py-1 rounded font-bold" style="background:#fbcfe8;color:#831843">T</span> ลาประชุม
     </div>
   </section>
 
@@ -815,9 +806,9 @@ const DEFAULT_SHIFT_TYPES = {
   'บ':  { label: 'บ',  name: 'บ่าย',       bg: '#bae6fd', fg: '#075985', order: 2,
           startTime: '16:00', endTime: '20:00', hours: 4 },
   'ด':  { label: 'ด',  name: 'ดึก',        bg: '#a5f3fc', fg: '#155e75', order: 3, startTime: '00:00', endTime: '08:00', hours: 8 },
-  'ชบ': { label: 'ชบ', name: 'โย้หน้า',     bg: '#fcd34d', fg: '#78350f', order: 4, startTime: '08:00', endTime: '20:00', hours: 12 },
+  'ชบ': { label: 'ชบ', name: 'เช้า-บ่าย',   bg: '#fcd34d', fg: '#78350f', order: 4, startTime: '08:00', endTime: '20:00', hours: 12 },
   'ดบ': { label: 'ดบ', name: 'โย้หลัง',     bg: '#5eead4', fg: '#134e4a', order: 5, startTime: '16:00', endTime: '08:00', hours: 16 },
-  'DN': { label: 'DN', name: 'เช้า-บ่าย',  bg: '#c4b5fd', fg: '#4c1d95', order: 6, startTime: '08:00', endTime: '20:00', hours: 12 },
+  'DN': { label: 'DN', name: 'Day+Night',  bg: '#c4b5fd', fg: '#4c1d95', order: 6, startTime: '08:00', endTime: '08:00', hours: 24 },
   'O':  { label: 'O',  name: 'OFF',         bg: '#e2e8f0', fg: '#475569', order: 7, hours: 0 },
   'V':  { label: 'V',  name: 'ลาพักร้อน',   bg: '#bbf7d0', fg: '#14532d', order: 8, hours: 0 },
   'T':  { label: 'T',  name: 'ลาประชุม',    bg: '#fbcfe8', fg: '#831843', order: 9, hours: 0 }
@@ -834,9 +825,13 @@ function getShiftMeta(code, isWeekendDay) {
 }
 // SHIFT_TYPES = defaults merged with state.shiftTypes (user overrides)
 let SHIFT_TYPES = structuredClone(DEFAULT_SHIFT_TYPES);
+// รหัสที่ปิดใช้งานเป็นค่าเริ่มต้น (ผู้ใช้เปิดได้ในตั้งค่า)
+// DN (Day+Night 24ชม.) — รีพีตกับ ชบ ที่ใช้ทั่วไป — ปิดไว้เพื่อกัน confusing
+const DEFAULT_DISABLED_SHIFTS = ['DN'];
+
 function applyShiftTypeOverrides() {
   SHIFT_TYPES = structuredClone(DEFAULT_SHIFT_TYPES);
-  for (const k in SHIFT_TYPES) SHIFT_TYPES[k].enabled = true; // default: ทุกตัวเปิดใช้
+  for (const k in SHIFT_TYPES) SHIFT_TYPES[k].enabled = !DEFAULT_DISABLED_SHIFTS.includes(k);
   const ov = state.shiftTypes || {};
   for (const k in ov) {
     if (SHIFT_TYPES[k] && ov[k]) {
@@ -850,7 +845,8 @@ function applyShiftTypeOverrides() {
       if (ov[k].weekendEndTime)   SHIFT_TYPES[k].weekendEndTime   = ov[k].weekendEndTime;
       if (typeof ov[k].hours        === 'number') SHIFT_TYPES[k].hours        = ov[k].hours;
       if (typeof ov[k].weekendHours === 'number') SHIFT_TYPES[k].weekendHours = ov[k].weekendHours;
-      if (ov[k].enabled === false) SHIFT_TYPES[k].enabled = false;
+      // รองรับทั้งเปิด/ปิด — user เปิด DN ได้ถ้าต้องการ
+      if (typeof ov[k].enabled === 'boolean') SHIFT_TYPES[k].enabled = ov[k].enabled;
     }
   }
 }
@@ -914,7 +910,7 @@ const DEFAULT_NURSES = [
   { id:'N012', name:'นางสาววันดี ช่วยเหลือ',     position:'ผู้ช่วยพยาบาล',       subType:'ประจำการ', order:12, active:true }
 ];
 
-const DEFAULT_OT = { threshold:18, rates:{'ช':600,'บ':600,'ด':720,'ชบ':1200,'ดบ':1320,'DN':1200} };
+const DEFAULT_OT = { threshold:18, rates:{'ช':600,'บ':600,'ด':720,'ชบ':1200,'ดบ':1320,'DN':1320} };
 const DEFAULT_REQ = { weekday:{ch:3,ba:2,du:2}, weekend:{ch:2,ba:2,du:2} };
 const STORAGE_KEY = 'smnc_nurse_schedule_v271';
 
@@ -1024,7 +1020,7 @@ const setLeave = (nid, d, l) => { if(l){ state.leaves[k(nid,d)] = l; } else { de
 const isWorking = s => s && ['ช','บ','ด','ชบ','ดบ','DN'].includes(s);
 const isLeave = s => s === 'V' || s === 'T';
 const includesAfternoon = s => s === 'บ' || s === 'ชบ' || s === 'ดบ';
-const includesNight = s => s === 'ด' || s === 'ดบ';
+const includesNight = s => s === 'ด' || s === 'ดบ' || s === 'DN';
 const daysInMonth = (yBE, m) => new Date(yBE - 543, m, 0).getDate();
 const isWeekend = (yBE, m, d) => { const dow = new Date(yBE-543, m-1, d).getDay(); return dow === 0 || dow === 6; };
 const dayOfWeek = (yBE, m, d) => new Date(yBE-543, m-1, d).getDay();
@@ -1256,11 +1252,8 @@ async function _loadFromStorageInner() {
     state.customPositions = _toObj(serverData.customPositions);
     for (const [name, def] of Object.entries(state.customPositions)) POSITIONS[name] = def;
     ensureCustomPosStyles();
+    migrateShiftCodes();
     applyShiftTypeOverrides();
-    // Migration: "บด" → "ดบ"
-    for (const key in state.schedule) {
-      if (state.schedule[key] === 'บด') state.schedule[key] = 'ดบ';
-    }
     enforceHeadsWeekdayOnly();
     // อัปเดต localStorage cache
     localStorage.setItem(STORAGE_KEY, JSON.stringify({
@@ -1293,13 +1286,37 @@ async function _loadFromStorageInner() {
     state.customPositions = _toObj(data.customPositions);
     for (const [name, def] of Object.entries(state.customPositions)) POSITIONS[name] = def;
     ensureCustomPosStyles();
+    migrateShiftCodes();
     applyShiftTypeOverrides();
-    for (const key in state.schedule) {
-      if (state.schedule[key] === 'บด') state.schedule[key] = 'ดบ';
-    }
     enforceHeadsWeekdayOnly();
     return true;
   } catch(e) { console.error('Load error', e); return false; }
+}
+
+// ── Migrate legacy shift codes ในข้อมูลผู้ใช้ (one-time, idempotent) ──
+//   "บด"  → "ดบ"  (ลำดับตัวอักษรผิด)
+//   "DN"  → "ชบ"  (เลิกใช้ DN เพราะชื่อ "Day+Night" ทำสับสน — ใช้ ชบ ที่ความหมายตรงกว่า)
+// ทำงานบน state.schedule + ลบ override ใน state.shiftTypes ที่บังคับให้ ชบ ปิด หรือ DN เปิด
+function migrateShiftCodes() {
+  let mutated = false;
+  for (const key in state.schedule) {
+    if (state.schedule[key] === 'บด') { state.schedule[key] = 'ดบ'; mutated = true; }
+    if (state.schedule[key] === 'DN') { state.schedule[key] = 'ชบ'; mutated = true; }
+  }
+  // ลบ override "ชบ.enabled = false" และ "DN ใดๆ" ใน state.shiftTypes
+  // เพื่อให้ ชบ กลับมาเปิด และ DN กลับมาเป็น default disabled
+  if (state.shiftTypes && typeof state.shiftTypes === 'object') {
+    if (state.shiftTypes['ชบ'] && state.shiftTypes['ชบ'].enabled === false) {
+      delete state.shiftTypes['ชบ'].enabled;
+      if (Object.keys(state.shiftTypes['ชบ']).length === 0) delete state.shiftTypes['ชบ'];
+      mutated = true;
+    }
+    if (state.shiftTypes['DN']) {
+      delete state.shiftTypes['DN'];
+      mutated = true;
+    }
+  }
+  if (mutated) state.dirty = true;
 }
 
 // ========= SWAL HELPERS =========
@@ -1382,7 +1399,7 @@ function switchTab(name) {
 }
 
 // ========= PALETTES =========
-// แสดง legend "ประเภทเวร 9 แบบ" จาก SHIFT_TYPES (รวม override ของผู้ใช้)
+// แสดง legend จาก SHIFT_TYPES — แสดงทุกตัว (รวม disabled มี strike-through) สำหรับหน้าตั้งค่า
 function renderShiftTypesLegend() {
   const wrap = document.getElementById('shiftTypesLegend');
   if (!wrap) return;
@@ -1397,6 +1414,20 @@ function renderShiftTypesLegend() {
       <span style="display:inline-block;min-width:26px;padding:1px 6px;border-radius:6px;background:${t.bg};color:${t.fg};font-weight:800;text-align:center;margin-right:4px">${t.label}</span>${t.name}${disabled?' <span class="text-rose-500 text-[10px]">(ปิด)</span>':''}
     </div>`;
   }).join('');
+  renderShiftLegendInline();
+}
+
+// Legend ขนาดเล็กใต้ตาราง — แสดงเฉพาะ shift ที่ enabled (ที่ใช้งานจริง)
+function renderShiftLegendInline() {
+  const wrap = document.getElementById('shiftLegendInline');
+  if (!wrap) return;
+  const order = ['ช','บ','ด','ชบ','ดบ','DN','O','V','T'];
+  const items = order.map(code => {
+    const t = SHIFT_TYPES[code];
+    if (!t || t.enabled === false) return '';
+    return `<span class="px-2 py-1 rounded font-bold" style="background:${t.bg};color:${t.fg}">${t.label}</span> ${t.name}`;
+  }).filter(s => s).join('\n      ');
+  wrap.innerHTML = `<span class="font-medium text-slate-600 mr-2">คำอธิบาย:</span>\n      ${items}`;
 }
 
 window.openEditShiftTypes = function() {
@@ -1660,7 +1691,7 @@ function renderScheduleFooter(activeNurses, days, statColCount) {
       const s = getShift(n.id, d);
       if (!s) return false;
       if (shiftKey === 'ช') return s === 'ช' || s === 'ชบ' || s === 'DN';
-      if (shiftKey === 'บ') return s === 'บ' || s === 'ชบ' || s === 'ดบ' || s === 'DN';
+      if (shiftKey === 'บ') return s === 'บ' || s === 'ชบ' || s === 'ดบ';
       return false;
     }).length;
   };
@@ -1712,10 +1743,10 @@ function computeNurseStats(nid) {
       // Auto-compute effective ช/บ/ด from compound shifts:
       // ชบ = เช้า + บ่าย → count as ช +1 AND บ +1
       // ดบ = ดึก + บ่าย → count as ด +1 AND บ +1
-      // DN = เช้า-บ่าย (12 ชม.) → count as ช +1 AND บ +1
+      // DN = Day+Night (24ชม., เช้า+ดึก) → count as ช +1 AND ด +1 (legacy; default disabled)
       if (s === 'ช' || s === 'ชบ' || s === 'DN') st.chTotal++;
-      if (s === 'บ' || s === 'ชบ' || s === 'ดบ' || s === 'DN') st.baTotal++;
-      if (s === 'ด' || s === 'ดบ') st.duTotal++;
+      if (s === 'บ' || s === 'ชบ' || s === 'ดบ') st.baTotal++;
+      if (s === 'ด' || s === 'ดบ' || s === 'DN') st.duTotal++;
     }
   }
   return st;
@@ -2165,8 +2196,8 @@ function countShiftOnDay(d, target) {
   state.nurses.filter(n=>n.active!==false).forEach(n => {
     const s = getShift(n.id, d);
     if (target === 'ช' && (s==='ช' || s==='ชบ' || s==='DN')) c++;
-    else if (target === 'บ' && (s==='บ' || s==='ชบ' || s==='ดบ' || s==='DN')) c++;
-    else if (target === 'ด' && (s==='ด' || s==='ดบ')) c++;
+    else if (target === 'บ' && (s==='บ' || s==='ชบ' || s==='ดบ')) c++;
+    else if (target === 'ด' && (s==='ด' || s==='ดบ' || s==='DN')) c++;
   });
   return c;
 }
