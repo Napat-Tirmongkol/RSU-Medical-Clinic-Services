@@ -157,7 +157,8 @@ try {
                 'step' => 'upload',
                 'http' => $up['http'] ?? 0,
                 'message' => $up['error'] ?? 'upload ล้มเหลว',
-                'verbose' => $up['verbose'] ?? null, // surface curl verbose สำหรับ debug
+                'transport' => $up['transport'] ?? '-',
+                'verbose' => $up['verbose'] ?? null,
             ]);
             exit;
         }

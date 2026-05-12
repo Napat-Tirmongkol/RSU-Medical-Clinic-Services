@@ -214,34 +214,37 @@ if (!function_exists('line_richmenu_upload_image')) {
      * อัพโหลดรูปสำหรับ rich menu (ขั้นที่ 2 หลัง create)
      * ใช้ api-data.line.me (data plane) — ไม่ใช่ api.line.me ปกติ
      *
-     * NOTE: ต้องใช้ POST + raw body (CURLOPT_POSTFIELDS) ห้ามใช้
-     *   CURLOPT_UPLOAD/CURLOPT_INFILE เพราะ curl จะส่ง chunked PUT-like
-     *   ทำให้ Akamai (LINE CDN edge) ตีเป็น "Bad Request"
+     * Multi-transport: ลอง curl ก่อน → ถ้า fail (Akamai Bad Request)
+     * fallback ไป PHP stream wrapper → ถ้ายัง fail fallback ไป exec curl CLI
      *
-     * @return array{ok:bool, http:int, error:?string}
+     * @return array{ok:bool, http:int, error:?string, verbose:?string, transport:string}
      */
     function line_richmenu_upload_image(string $richMenuId, string $imagePath, string $mimeType = 'image/png'): array
     {
         $token = line_richmenu_token();
-        if ($token === '') return ['ok' => false, 'http' => 0, 'error' => 'LINE token ยังไม่ได้ตั้งค่า'];
-        if (!file_exists($imagePath)) return ['ok' => false, 'http' => 0, 'error' => "ไม่พบไฟล์ภาพ: $imagePath"];
+        if ($token === '') return ['ok' => false, 'http' => 0, 'error' => 'LINE token ยังไม่ได้ตั้งค่า', 'verbose' => null, 'transport' => 'none'];
+        if (!file_exists($imagePath)) return ['ok' => false, 'http' => 0, 'error' => "ไม่พบไฟล์ภาพ: $imagePath", 'verbose' => null, 'transport' => 'none'];
         if (!in_array($mimeType, ['image/png', 'image/jpeg'], true)) {
-            return ['ok' => false, 'http' => 0, 'error' => 'รองรับเฉพาะ image/png หรือ image/jpeg'];
+            return ['ok' => false, 'http' => 0, 'error' => 'รองรับเฉพาะ image/png หรือ image/jpeg', 'verbose' => null, 'transport' => 'none'];
         }
 
         $imgData = @file_get_contents($imagePath);
-        if ($imgData === false) return ['ok' => false, 'http' => 0, 'error' => 'อ่านไฟล์ภาพไม่ได้'];
+        if ($imgData === false) return ['ok' => false, 'http' => 0, 'error' => 'อ่านไฟล์ภาพไม่ได้', 'verbose' => null, 'transport' => 'none'];
 
-        $token = trim($token); // trim whitespace/newline ที่อาจติดจาก secrets file
+        $token = trim($token);
+        $url = "https://api-data.line.me/v2/bot/richmenu/$richMenuId/content";
+        $log = ''; // accumulated transport log
 
+        // ── Transport 1: cURL ─────────────────────────────────────────
+        $log .= "=== Transport 1: cURL (HTTP/1.1, raw POST body) ===\n";
         $verboseLog = fopen('php://temp', 'w+');
-        $ch = curl_init("https://api-data.line.me/v2/bot/richmenu/$richMenuId/content");
+        $ch = curl_init($url);
         curl_setopt_array($ch, [
             CURLOPT_POST           => true,
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT        => 60,
-            CURLOPT_POSTFIELDS     => $imgData, // raw binary body
-            CURLOPT_HTTP_VERSION   => CURL_HTTP_VERSION_1_1, // Akamai edge ของ api-data.line.me HTTP/2 มีปัญหา
+            CURLOPT_POSTFIELDS     => $imgData,
+            CURLOPT_HTTP_VERSION   => CURL_HTTP_VERSION_1_1,
             CURLOPT_USERAGENT      => 'RSU-Clinic-LineRichMenu/1.0',
             CURLOPT_HTTPHEADER     => [
                 'Authorization: Bearer ' . $token,
@@ -254,23 +257,85 @@ if (!function_exists('line_richmenu_upload_image')) {
         $body = (string)curl_exec($ch);
         $http = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $err  = curl_error($ch) ?: null;
-
-        // capture verbose log for debugging
         rewind($verboseLog);
-        $verbose = stream_get_contents($verboseLog);
+        $verbose1 = stream_get_contents($verboseLog);
         fclose($verboseLog);
         curl_close($ch);
+        $log .= "HTTP $http\n" . substr($verbose1, 0, 1500) . "\nresponse body (first 200): " . substr($body, 0, 200) . "\n\n";
 
-        $ok = ($http >= 200 && $http < 300);
-        if (!$ok) {
-            error_log('[line_richmenu_upload_image] HTTP=' . $http . ' body=' . substr($body, 0, 500));
-            error_log('[line_richmenu_upload_image] curl verbose: ' . substr($verbose, 0, 2000));
+        if ($http >= 200 && $http < 300) {
+            return ['ok' => true, 'http' => $http, 'error' => null, 'verbose' => null, 'transport' => 'curl'];
         }
+
+        // ── Transport 2: PHP stream wrapper ───────────────────────────
+        $log .= "=== Transport 2: PHP stream wrapper (file_get_contents) ===\n";
+        $ctx = stream_context_create([
+            'http' => [
+                'method'        => 'POST',
+                'header'        => "Authorization: Bearer $token\r\nContent-Type: $mimeType\r\nContent-Length: " . strlen($imgData) . "\r\nUser-Agent: RSU-Clinic-LineRichMenu/1.0\r\n",
+                'content'       => $imgData,
+                'ignore_errors' => true,
+                'timeout'       => 60,
+                'protocol_version' => 1.1,
+            ],
+            'ssl' => [
+                'verify_peer'      => true,
+                'verify_peer_name' => true,
+            ],
+        ]);
+        $body2 = @file_get_contents($url, false, $ctx);
+        $http2 = 0;
+        if (isset($http_response_header) && is_array($http_response_header)) {
+            foreach ($http_response_header as $h) {
+                if (preg_match('#^HTTP/\S+\s+(\d+)#', $h, $m)) {
+                    $http2 = (int)$m[1];
+                    break;
+                }
+            }
+            $log .= "Response headers:\n" . implode("\n", $http_response_header) . "\n";
+        }
+        $log .= "HTTP $http2\nresponse body (first 200): " . substr((string)$body2, 0, 200) . "\n\n";
+
+        if ($http2 >= 200 && $http2 < 300) {
+            return ['ok' => true, 'http' => $http2, 'error' => null, 'verbose' => null, 'transport' => 'stream'];
+        }
+
+        // ── Transport 3: exec curl CLI ─────────────────────────────────
+        $log .= "=== Transport 3: exec curl CLI ===\n";
+        if (function_exists('exec') && !ini_get('safe_mode')) {
+            $cmd = sprintf(
+                'curl -sS -X POST %s -H %s -H %s --data-binary @%s -w "\nHTTP_CODE:%%{http_code}" 2>&1',
+                escapeshellarg($url),
+                escapeshellarg('Authorization: Bearer ' . $token),
+                escapeshellarg('Content-Type: ' . $mimeType),
+                escapeshellarg($imagePath)
+            );
+            $output = [];
+            $rc = 0;
+            @exec($cmd, $output, $rc);
+            $outStr = implode("\n", $output);
+            $http3 = 0;
+            if (preg_match('/HTTP_CODE:(\d+)/', $outStr, $m)) {
+                $http3 = (int)$m[1];
+            }
+            $log .= "exec rc=$rc, HTTP $http3\noutput (first 400): " . substr($outStr, 0, 400) . "\n";
+
+            if ($http3 >= 200 && $http3 < 300) {
+                return ['ok' => true, 'http' => $http3, 'error' => null, 'verbose' => null, 'transport' => 'exec'];
+            }
+            $http = $http3 ?: $http2 ?: $http;
+        } else {
+            $log .= "exec ไม่สามารถใช้ได้ (disabled หรือ safe_mode)\n";
+        }
+
+        // ทั้ง 3 transport fail
+        error_log('[line_richmenu_upload_image] all transports failed: ' . substr($log, 0, 2000));
         return [
-            'ok' => $ok,
-            'http' => $http,
-            'error' => $ok ? null : (substr($body, 0, 300) ?: $err),
-            'verbose' => $ok ? null : substr($verbose, 0, 3000), // surface สำหรับ debug
+            'ok'        => false,
+            'http'      => $http,
+            'error'     => substr($body ?: $body2 ?: 'all transports failed', 0, 300),
+            'verbose'   => substr($log, 0, 5000),
+            'transport' => 'all-failed',
         ];
     }
 }
