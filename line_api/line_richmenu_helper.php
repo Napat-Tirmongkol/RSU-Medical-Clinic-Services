@@ -172,6 +172,101 @@ if (!function_exists('line_richmenu_list')) {
     }
 }
 
+if (!function_exists('line_richmenu_create')) {
+    /**
+     * สร้าง rich menu ใหม่ผ่าน API
+     * (ขั้นที่ 1 — ได้ richMenuId กลับมา ยังต้อง upload image ต่อด้วย line_richmenu_upload_image)
+     *
+     * @param array $config โครงสร้างของ rich menu (size, selected, name, chatBarText, areas)
+     * @return array{ok:bool, richMenuId:?string, http:int, error:?string}
+     */
+    function line_richmenu_create(array $config): array
+    {
+        $token = line_richmenu_token();
+        if ($token === '') return ['ok' => false, 'richMenuId' => null, 'http' => 0, 'error' => 'LINE token ยังไม่ได้ตั้งค่า'];
+
+        $ch = curl_init('https://api.line.me/v2/bot/richmenu');
+        curl_setopt_array($ch, [
+            CURLOPT_CUSTOMREQUEST  => 'POST',
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT        => 15,
+            CURLOPT_POSTFIELDS     => json_encode($config, JSON_UNESCAPED_UNICODE),
+            CURLOPT_HTTPHEADER     => [
+                'Authorization: Bearer ' . $token,
+                'Content-Type: application/json',
+            ],
+        ]);
+        $body = (string)curl_exec($ch);
+        $http = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $err  = curl_error($ch) ?: null;
+        curl_close($ch);
+
+        if ($http < 200 || $http >= 300) {
+            return ['ok' => false, 'richMenuId' => null, 'http' => $http, 'error' => $body ?: $err];
+        }
+        $data = json_decode($body, true) ?: [];
+        return ['ok' => true, 'richMenuId' => $data['richMenuId'] ?? null, 'http' => $http, 'error' => null];
+    }
+}
+
+if (!function_exists('line_richmenu_upload_image')) {
+    /**
+     * อัพโหลดรูปสำหรับ rich menu (ขั้นที่ 2 หลัง create)
+     * ใช้ api-data.line.me (data plane) — ไม่ใช่ api.line.me ปกติ
+     *
+     * @return array{ok:bool, http:int, error:?string}
+     */
+    function line_richmenu_upload_image(string $richMenuId, string $imagePath, string $mimeType = 'image/png'): array
+    {
+        $token = line_richmenu_token();
+        if ($token === '') return ['ok' => false, 'http' => 0, 'error' => 'LINE token ยังไม่ได้ตั้งค่า'];
+        if (!file_exists($imagePath)) return ['ok' => false, 'http' => 0, 'error' => "ไม่พบไฟล์ภาพ: $imagePath"];
+        if (!in_array($mimeType, ['image/png', 'image/jpeg'], true)) {
+            return ['ok' => false, 'http' => 0, 'error' => 'รองรับเฉพาะ image/png หรือ image/jpeg'];
+        }
+
+        $fh = fopen($imagePath, 'rb');
+        if (!$fh) return ['ok' => false, 'http' => 0, 'error' => 'เปิดไฟล์ภาพไม่ได้'];
+        $size = filesize($imagePath);
+
+        $ch = curl_init("https://api-data.line.me/v2/bot/richmenu/$richMenuId/content");
+        curl_setopt_array($ch, [
+            CURLOPT_CUSTOMREQUEST  => 'POST',
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT        => 30,
+            CURLOPT_UPLOAD         => true,
+            CURLOPT_INFILE         => $fh,
+            CURLOPT_INFILESIZE     => $size,
+            CURLOPT_HTTPHEADER     => [
+                'Authorization: Bearer ' . $token,
+                'Content-Type: ' . $mimeType,
+                'Content-Length: ' . $size,
+            ],
+        ]);
+        $body = (string)curl_exec($ch);
+        $http = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $err  = curl_error($ch) ?: null;
+        curl_close($ch);
+        fclose($fh);
+
+        $ok = ($http >= 200 && $http < 300);
+        return ['ok' => $ok, 'http' => $http, 'error' => $ok ? null : ($body ?: $err)];
+    }
+}
+
+if (!function_exists('line_richmenu_delete')) {
+    /**
+     * ลบ rich menu ตาม id
+     */
+    function line_richmenu_delete(string $richMenuId): array
+    {
+        if ($richMenuId === '') return ['ok' => false, 'http' => 0, 'error' => 'richMenuId ว่าง'];
+        $r = line_richmenu_api('DELETE', "/v2/bot/richmenu/$richMenuId");
+        $ok = ($r['http'] >= 200 && $r['http'] < 300);
+        return ['ok' => $ok, 'http' => $r['http'], 'error' => $ok ? null : ($r['body'] ?: $r['error'])];
+    }
+}
+
 if (!function_exists('line_richmenu_is_registered_user')) {
     /**
      * ตรวจว่า lineUserId นี้มี record ใน sys_users หรือยัง

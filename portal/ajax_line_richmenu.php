@@ -107,6 +107,68 @@ try {
         exit;
     }
 
+    if ($action === 'create') {
+        // 2-step: create config → upload image → คืน richMenuId
+        $config = json_decode((string)($_POST['config'] ?? ''), true);
+        if (!is_array($config)) {
+            echo json_encode(['ok' => false, 'message' => 'config ไม่ใช่ JSON ที่ถูกต้อง']);
+            exit;
+        }
+        if (empty($_FILES['image']) || ($_FILES['image']['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+            echo json_encode(['ok' => false, 'message' => 'กรุณาอัพโหลดไฟล์ภาพ']);
+            exit;
+        }
+
+        $f = $_FILES['image'];
+        $mime = mime_content_type($f['tmp_name']) ?: '';
+        if (!in_array($mime, ['image/png', 'image/jpeg'], true)) {
+            echo json_encode(['ok' => false, 'message' => 'รองรับเฉพาะ PNG / JPEG']);
+            exit;
+        }
+        if ((int)$f['size'] > 1024 * 1024) {
+            echo json_encode(['ok' => false, 'message' => 'ขนาดไฟล์ต้องไม่เกิน 1 MB']);
+            exit;
+        }
+
+        // ตรวจขนาดภาพให้ตรงกับ size ใน config (LINE บังคับ)
+        [$w, $h] = getimagesize($f['tmp_name']) ?: [0, 0];
+        $cfgW = (int)($config['size']['width'] ?? 0);
+        $cfgH = (int)($config['size']['height'] ?? 0);
+        if ($w !== $cfgW || $h !== $cfgH) {
+            echo json_encode(['ok' => false, 'message' => "ขนาดภาพ ($w×$h) ไม่ตรงกับ size ใน config ($cfgW×$cfgH)"]);
+            exit;
+        }
+
+        // Step 1: create
+        $cr = line_richmenu_create($config);
+        if (!$cr['ok'] || empty($cr['richMenuId'])) {
+            echo json_encode(['ok' => false, 'step' => 'create', 'message' => $cr['error'] ?? 'create ล้มเหลว']);
+            exit;
+        }
+        $rid = $cr['richMenuId'];
+
+        // Step 2: upload
+        $up = line_richmenu_upload_image($rid, $f['tmp_name'], $mime);
+        if (!$up['ok']) {
+            // rollback: ลบ rich menu ที่สร้างไปแล้วเพราะไม่มีภาพ
+            line_richmenu_delete($rid);
+            echo json_encode(['ok' => false, 'step' => 'upload', 'message' => $up['error'] ?? 'upload ล้มเหลว']);
+            exit;
+        }
+
+        log_activity('LINE Rich Menu', "Created richMenuId={$rid} (name=" . ($config['name'] ?? '-') . ")");
+        echo json_encode(['ok' => true, 'richMenuId' => $rid, 'message' => 'สร้างสำเร็จ']);
+        exit;
+    }
+
+    if ($action === 'delete') {
+        $rid = trim((string)($_POST['richMenuId'] ?? ''));
+        $r = line_richmenu_delete($rid);
+        if ($r['ok']) log_activity('LINE Rich Menu', "Deleted richMenuId={$rid}");
+        echo json_encode(['ok' => $r['ok'], 'message' => $r['ok'] ? 'ลบแล้ว' : ($r['error'] ?? 'ลบไม่สำเร็จ')]);
+        exit;
+    }
+
     echo json_encode(['ok' => false, 'message' => 'Unknown action']);
 } catch (Throwable $e) {
     error_log('[ajax_line_richmenu] ' . $e->getMessage());
