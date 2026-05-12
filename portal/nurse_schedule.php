@@ -665,6 +665,9 @@ $NS_CSRF_TOKEN = get_csrf_token();
           <button onclick="openImportNurses()" class="btn-solid btn-success text-sm" title="นำเข้าจาก Identity & Governance">
             <i data-lucide="download" class="w-3.5 h-3.5"></i> นำเข้าจากทะเบียน
           </button>
+          <button onclick="openManagePositions()" class="btn-solid btn-warning text-sm" title="เพิ่ม/แก้ไขตำแหน่ง">
+            <i data-lucide="badge-plus" class="w-3.5 h-3.5"></i> จัดการตำแหน่ง
+          </button>
           <button onclick="openAddNurse()" class="btn-solid btn-primary text-sm">
             <i data-lucide="user-plus" class="w-3.5 h-3.5"></i> เพิ่มพยาบาล
           </button>
@@ -791,13 +794,30 @@ function applyShiftTypeOverrides() {
 }
 
 const POSITIONS = {
-  'หัวหน้าหอผู้ป่วย':    { icon: '⭐', cls: 'pos-head',   weekdayMorningOnly: true,  maxOne: true  },
-  'รองหัวหน้าหอผู้ป่วย': { icon: '🌟', cls: 'pos-deputy', weekdayMorningOnly: true,  maxOne: false },
-  'พยาบาลหัวหน้าเวร':    { icon: '💎', cls: 'pos-shift',  weekdayMorningOnly: false, maxOne: false },
-  'พยาบาลวิชาชีพ':       { icon: '👤', cls: 'pos-rn',     weekdayMorningOnly: false, maxOne: false },
-  'พยาบาลเทคนิค':        { icon: '🔧', cls: 'pos-tech',   weekdayMorningOnly: false, maxOne: false },
-  'ผู้ช่วยพยาบาล':        { icon: '🤝', cls: 'pos-aide',   weekdayMorningOnly: false, maxOne: false }
+  'หัวหน้าหอผู้ป่วย':    { icon: '⭐', cls: 'pos-head',   weekdayMorningOnly: true,  maxOne: true,  system: true },
+  'รองหัวหน้าหอผู้ป่วย': { icon: '🌟', cls: 'pos-deputy', weekdayMorningOnly: true,  maxOne: false, system: true },
+  'พยาบาลหัวหน้าเวร':    { icon: '💎', cls: 'pos-shift',  weekdayMorningOnly: false, maxOne: false, system: true },
+  'พยาบาลวิชาชีพ':       { icon: '👤', cls: 'pos-rn',     weekdayMorningOnly: false, maxOne: false, system: true },
+  'พยาบาลเทคนิค':        { icon: '🔧', cls: 'pos-tech',   weekdayMorningOnly: false, maxOne: false, system: true },
+  'ผู้ช่วยพยาบาล':        { icon: '🤝', cls: 'pos-aide',   weekdayMorningOnly: false, maxOne: false, system: true }
 };
+
+// ── Custom positions: inject CSS rules for user-defined badges ──
+function ensureCustomPosStyles() {
+  let el = document.getElementById('custom-pos-styles');
+  if (!el) { el = document.createElement('style'); el.id = 'custom-pos-styles'; document.head.appendChild(el); }
+  let css = '';
+  for (const [, def] of Object.entries(state.customPositions || {})) {
+    if (def.cls && def.color) css += `.${def.cls}{background:${def.color};color:#fff;}\n`;
+  }
+  el.textContent = css;
+}
+
+// Generate safe CSS class name from position label (Thai → ASCII fallback)
+function makeCustomPosCls(name) {
+  const hash = Array.from(name).reduce((h, c) => ((h << 5) - h + c.charCodeAt(0)) | 0, 0);
+  return 'pos-custom-' + Math.abs(hash).toString(36);
+}
 
 const THAI_MONTHS = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน',
                      'กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
@@ -905,6 +925,7 @@ const state = {
   removedHolidays: {},  // key: 'yBE-M-D' → true (built-in holidays user removed)
   clinicHolidays: {},   // key: 'yBE-M-D' → note (จาก sys_clinic_hours — read-only)
   shiftTypes: {},       // key: 'ช'|'บ'|... → {name?, bg?, fg?} overrides ของ DEFAULT_SHIFT_TYPES
+  customPositions: {},  // key: position label → {icon, cls, color, weekdayMorningOnly, maxOne}
   selectedShift: null,
   selectedLeave: 'V',
   otReport: [],
@@ -1045,6 +1066,7 @@ function persistAll() {
     customHolidays: state.customHolidays || {},
     removedHolidays: state.removedHolidays || {},
     shiftTypes: state.shiftTypes || {},
+    customPositions: state.customPositions || {},
     savedAt: new Date().toISOString()
   };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -1069,6 +1091,9 @@ async function loadFromStorage() {
     state.removedHolidays = serverData.removedHolidays || {};
     state.clinicHolidays  = serverData.clinicHolidays || {};
     state.shiftTypes      = serverData.shiftTypes || {};
+    state.customPositions = serverData.customPositions || {};
+    for (const [name, def] of Object.entries(state.customPositions)) POSITIONS[name] = def;
+    ensureCustomPosStyles();
     applyShiftTypeOverrides();
     // Migration: "บด" → "ดบ"
     for (const key in state.schedule) {
@@ -1080,7 +1105,7 @@ async function loadFromStorage() {
       year: state.year, month: state.month,
       nurses: state.nurses, schedule: state.schedule, leaves: state.leaves,
       requirements: state.requirements, otSettings: state.otSettings,
-      shiftTypes: state.shiftTypes,
+      shiftTypes: state.shiftTypes, customPositions: state.customPositions,
       customHolidays: state.customHolidays, removedHolidays: state.removedHolidays,
       savedAt: new Date().toISOString(),
     }));
@@ -1103,6 +1128,9 @@ async function loadFromStorage() {
     state.customHolidays = data.customHolidays || {};
     state.removedHolidays = data.removedHolidays || {};
     state.shiftTypes = data.shiftTypes || {};
+    state.customPositions = data.customPositions || {};
+    for (const [name, def] of Object.entries(state.customPositions)) POSITIONS[name] = def;
+    ensureCustomPosStyles();
     applyShiftTypeOverrides();
     for (const key in state.schedule) {
       if (state.schedule[key] === 'บด') state.schedule[key] = 'ดบ';
@@ -2221,15 +2249,20 @@ function liveRecalcOT() {
 function renderNursesList() {
   const list = document.getElementById('nursesList');
   const sorted = [...state.nurses].sort((a,b) => (a.order||999)-(b.order||999));
+  const allPosNames = Object.keys(POSITIONS);
   list.innerHTML = sorted.map((n,i) => {
     const cls = POSITIONS[n.position]?.cls || 'pos-rn';
     const inactive = n.active === false;
+    const posOpts = allPosNames.map(p => `<option value="${p}" ${p===n.position?'selected':''}>${POSITIONS[p].icon} ${p}</option>`).join('');
     return `<div class="flex items-center gap-3 p-3 rounded-xl border ${inactive?'bg-slate-50 opacity-60':'bg-white'} hover:border-cyan-400 transition">
       <div class="w-8 h-8 rounded-full bg-cyan-100 flex items-center justify-center text-cyan-700 font-semibold text-sm">${i+1}</div>
       <div class="flex-1">
         <div class="font-medium text-slate-800">${n.name} ${inactive?'<span class="text-xs text-slate-400">(ปิดใช้งาน)</span>':''}</div>
         <div class="flex items-center gap-2 mt-1">
           <span class="pos-badge ${cls}">${n.position}</span>
+          <select onchange="changeNursePosition('${n.id}', this.value, this)"
+                  class="text-xs px-2 py-1 rounded border border-slate-200 bg-white text-slate-600 hover:border-cyan-400 focus:border-cyan-500 focus:outline-none cursor-pointer"
+                  title="เปลี่ยนตำแหน่ง">${posOpts}</select>
           <span class="text-xs text-slate-400">ID: ${n.id}</span>
         </div>
       </div>
@@ -2245,6 +2278,132 @@ function renderNursesList() {
     </div>`;
   }).join('');
   lucide.createIcons();
+}
+
+// เปลี่ยนตำแหน่งจาก dropdown inline
+function changeNursePosition(id, newPos, selectEl) {
+  const n = state.nurses.find(x => x.id === id);
+  if (!n || n.position === newPos) return;
+  if (POSITIONS[newPos]?.maxOne) {
+    const exists = state.nurses.find(o => o.id !== id && o.position === newPos && o.active !== false);
+    if (exists) {
+      Swal.fire({ icon: 'warning', title: `${newPos} มีอยู่แล้ว`, text: `${exists.name} เป็น ${newPos} อยู่แล้ว — ตำแหน่งนี้มีได้คนเดียวเท่านั้น` });
+      if (selectEl) selectEl.value = n.position;
+      return;
+    }
+  }
+  n.position = newPos;
+  state.dirty = true;
+  persistAll();
+  renderNursesList();
+  renderDashboard?.();
+  showSuccess(`เปลี่ยนตำแหน่ง ${n.name} → ${newPos}`);
+}
+
+// ── จัดการตำแหน่ง (เพิ่ม/ลบตำแหน่งที่ผู้ใช้สร้าง) ──
+function openManagePositions() {
+  const rows = Object.entries(POSITIONS).map(([name, def]) => {
+    const usedBy = state.nurses.filter(n => n.position === name).length;
+    const isSystem = !!def.system;
+    const delBtn = isSystem
+      ? `<span class="text-xs text-slate-400">ตำแหน่งระบบ</span>`
+      : `<button onclick="deleteCustomPosition('${name.replace(/'/g, "\\'")}')" class="text-xs text-rose-600 hover:text-rose-700 font-semibold">ลบ</button>`;
+    return `<tr class="border-b border-slate-100">
+      <td class="py-2 px-2"><span class="pos-badge ${def.cls}">${def.icon} ${name}</span></td>
+      <td class="py-2 px-2 text-xs text-slate-500">${def.maxOne ? 'มีคนเดียว' : '-'} ${def.weekdayMorningOnly ? '· จันทร์-ศุกร์ เช้าเท่านั้น' : ''}</td>
+      <td class="py-2 px-2 text-xs text-slate-500 text-center">${usedBy}</td>
+      <td class="py-2 px-2 text-right">${delBtn}</td>
+    </tr>`;
+  }).join('');
+
+  Swal.fire({
+    title: 'จัดการตำแหน่ง',
+    width: 720,
+    html: `
+      <div class="text-left space-y-4">
+        <div class="overflow-x-auto border border-slate-200 rounded-lg">
+          <table class="w-full text-sm">
+            <thead class="bg-slate-50">
+              <tr>
+                <th class="py-2 px-2 text-left font-semibold text-slate-600">ตำแหน่ง</th>
+                <th class="py-2 px-2 text-left font-semibold text-slate-600">เงื่อนไข</th>
+                <th class="py-2 px-2 text-center font-semibold text-slate-600">ใช้อยู่</th>
+                <th class="py-2 px-2 text-right font-semibold text-slate-600">จัดการ</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+        <div class="border-t pt-3">
+          <div class="text-sm font-semibold text-slate-700 mb-2">เพิ่มตำแหน่งใหม่</div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="text-xs text-slate-500">ชื่อตำแหน่ง</label>
+              <input id="npName" class="w-full text-sm px-3 py-2 border border-slate-200 rounded-lg" placeholder="เช่น พยาบาลพิเศษ">
+            </div>
+            <div>
+              <label class="text-xs text-slate-500">ไอคอน (Emoji)</label>
+              <input id="npIcon" class="w-full text-sm px-3 py-2 border border-slate-200 rounded-lg" placeholder="🎯" maxlength="2" value="🏷️">
+            </div>
+            <div>
+              <label class="text-xs text-slate-500">สี Badge</label>
+              <input id="npColor" type="color" value="#0891b2" class="w-full h-9 border border-slate-200 rounded-lg cursor-pointer">
+            </div>
+            <div class="flex flex-col gap-1 pt-4">
+              <label class="text-xs flex items-center gap-2"><input id="npMaxOne" type="checkbox"> มีได้คนเดียว (เช่น หัวหน้า)</label>
+              <label class="text-xs flex items-center gap-2"><input id="npWeekday" type="checkbox"> จันทร์-ศุกร์ เช้าเท่านั้น</label>
+            </div>
+          </div>
+          <button onclick="addCustomPosition()" class="mt-3 btn-solid btn-success text-sm">
+            <i data-lucide="plus" class="w-3.5 h-3.5"></i> เพิ่มตำแหน่ง
+          </button>
+        </div>
+      </div>`,
+    showConfirmButton: false,
+    showCloseButton: true,
+    didOpen: () => lucide.createIcons(),
+  });
+}
+
+function addCustomPosition() {
+  const name = document.getElementById('npName').value.trim();
+  const icon = document.getElementById('npIcon').value.trim() || '🏷️';
+  const color = document.getElementById('npColor').value || '#0891b2';
+  const maxOne = document.getElementById('npMaxOne').checked;
+  const weekdayMorningOnly = document.getElementById('npWeekday').checked;
+  if (!name) { Swal.showValidationMessage?.('กรุณากรอกชื่อตำแหน่ง'); return; }
+  if (POSITIONS[name]) { Swal.fire({ icon: 'warning', title: 'มีตำแหน่งนี้อยู่แล้ว' }); return; }
+  const cls = makeCustomPosCls(name);
+  const def = { icon, cls, color, weekdayMorningOnly, maxOne, system: false };
+  POSITIONS[name] = def;
+  state.customPositions = state.customPositions || {};
+  state.customPositions[name] = def;
+  state.dirty = true;
+  ensureCustomPosStyles();
+  persistAll();
+  renderNursesList();
+  Swal.close();
+  showSuccess(`เพิ่มตำแหน่ง "${name}" แล้ว`);
+}
+
+function deleteCustomPosition(name) {
+  if (POSITIONS[name]?.system) { Swal.fire({ icon: 'error', title: 'ลบตำแหน่งระบบไม่ได้' }); return; }
+  const used = state.nurses.filter(n => n.position === name);
+  if (used.length > 0) {
+    Swal.fire({ icon: 'warning', title: 'มีพยาบาลใช้ตำแหน่งนี้อยู่', html: `${used.length} คน — ย้ายไปตำแหน่งอื่นก่อนแล้วค่อยลบ:<br><br>${used.map(u => u.name).join(', ')}` });
+    return;
+  }
+  confirmAct(`ลบตำแหน่ง "${name}"?`, 'ลบแล้วเรียกคืนไม่ได้').then(r => {
+    if (!r.isConfirmed) return;
+    delete POSITIONS[name];
+    delete state.customPositions[name];
+    state.dirty = true;
+    ensureCustomPosStyles();
+    persistAll();
+    renderNursesList();
+    Swal.close();
+    showSuccess(`ลบตำแหน่ง "${name}" แล้ว`);
+  });
 }
 
 // แปลง job_title หรือ org_position_title → POSITIONS key
@@ -2407,6 +2566,10 @@ function editNurse(id) {
       const pos = document.getElementById('ePos').value;
       const order = +document.getElementById('eOrder').value || 1;
       if (!name) { Swal.showValidationMessage('กรุณากรอกชื่อ'); return false; }
+      if (pos !== n.position && POSITIONS[pos]?.maxOne) {
+        const exists = state.nurses.find(o => o.id !== n.id && o.position === pos && o.active !== false);
+        if (exists) { Swal.showValidationMessage(`${pos} มีอยู่แล้ว (${exists.name})`); return false; }
+      }
       return { name, position: pos, order };
     }
   }).then(r => {
