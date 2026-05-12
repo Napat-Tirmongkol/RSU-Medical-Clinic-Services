@@ -54,6 +54,15 @@ include __DIR__ . '/../includes/header.php';
         <button type="button" class="btn-asset btn-asset-secondary" onclick="assetQuickStatus(<?= (int)$a['id'] ?>, '<?= htmlspecialchars($a['status']) ?>')">
             <i class="fas fa-arrow-right-arrow-left"></i> เปลี่ยนสถานะ
         </button>
+        <?php
+        $_role = $_SESSION['admin_role'] ?? $_SESSION['role'] ?? '';
+        $_hasFinance = in_array($_role, ['admin', 'superadmin'], true) || !empty($_SESSION['access_finance']);
+        ?>
+        <?php if ($_hasFinance): ?>
+            <button type="button" onclick="assetSendToFinance()" class="btn-asset btn-asset-secondary" style="background:#d1fae5;color:#065f46;border-color:#a7f3d0">
+                <i class="fa-solid fa-money-bill-trend-up"></i> บันทึกเป็นรายจ่าย
+            </button>
+        <?php endif; ?>
         <?php if ($canManage): ?>
             <a href="admin/print_barcode.php?id=<?= (int)$a['id'] ?>&print=1" target="_blank" class="btn-asset btn-asset-secondary">
                 <i class="fas fa-barcode"></i> พิมพ์บาร์โค้ด
@@ -64,6 +73,62 @@ include __DIR__ . '/../includes/header.php';
         <?php endif; ?>
     </div>
 </div>
+
+<?php if ($_hasFinance): ?>
+<script>
+async function assetSendToFinance() {
+    const { value: form } = await Swal.fire({
+        title: 'บันทึกค่าจัดซื้อเป็นรายจ่าย',
+        html: `<div class="text-left space-y-3">
+            <div class="text-sm text-slate-600 mb-2">ครุภัณฑ์: <b><?= htmlspecialchars($a['name'], ENT_QUOTES) ?></b><br>
+                <span class="text-xs font-mono text-slate-500"><?= htmlspecialchars($a['asset_code'], ENT_QUOTES) ?></span></div>
+            <div><label class="text-xs font-bold text-slate-600 mb-1 block">จำนวนเงิน (บาท) *</label>
+                <input type="number" id="afAmt" class="swal2-input" style="margin:0;width:100%" step="0.01" min="0" placeholder="0.00"></div>
+            <div class="grid grid-cols-2 gap-2">
+                <div><label class="text-xs font-bold text-slate-600 mb-1 block">วันที่ *</label>
+                    <input type="date" id="afDate" class="swal2-input" style="margin:0;width:100%" value="<?= date('Y-m-d', strtotime($a['created_at'])) ?>"></div>
+                <div><label class="text-xs font-bold text-slate-600 mb-1 block">วิธีชำระ</label>
+                    <select id="afPay" class="swal2-input" style="margin:0;width:100%">
+                        <option value="">-</option><option>เงินสด</option><option>โอน</option><option>บัตรเครดิต</option><option>QR/PromptPay</option>
+                    </select></div>
+            </div>
+            <div><label class="text-xs font-bold text-slate-600 mb-1 block">เลขใบเสร็จ/อ้างอิง</label>
+                <input type="text" id="afRef" class="swal2-input" style="margin:0;width:100%" placeholder="INV-..."></div>
+        </div>`,
+        showCancelButton: true, confirmButtonText: 'บันทึก', cancelButtonText: 'ยกเลิก', confirmButtonColor: '#059669',
+        preConfirm: () => {
+            const amt = parseFloat(document.getElementById('afAmt').value);
+            if (!amt || amt <= 0) { Swal.showValidationMessage('กรุณากรอกจำนวนเงิน'); return false; }
+            return {
+                amount: amt, txn_date: document.getElementById('afDate').value,
+                pay: document.getElementById('afPay').value, ref: document.getElementById('afRef').value
+            };
+        }
+    });
+    if (!form) return;
+    const fd = new FormData();
+    fd.append('csrf_token', '<?= htmlspecialchars($_SESSION['csrf_token'] ?? '', ENT_QUOTES) ?>');
+    fd.append('action', 'txn:upsert_from_source');
+    fd.append('source_module', 'asset');
+    fd.append('source_id', '<?= (int)$a['id'] ?>');
+    fd.append('kind', 'expense');
+    fd.append('amount', String(form.amount));
+    fd.append('txn_date', form.txn_date);
+    fd.append('description', <?= json_encode('จัดซื้อ ' . $a['name'] . ' (' . $a['asset_code'] . ')', JSON_UNESCAPED_UNICODE) ?>);
+    fd.append('category_name', 'จัดซื้อครุภัณฑ์');
+    fd.append('note', form.pay ? ('วิธีชำระ: ' + form.pay) : '');
+    if (form.ref) fd.append('reference', form.ref);
+    try {
+        const r = await fetch('../../portal/ajax_finance.php', { method: 'POST', body: fd, credentials: 'same-origin' });
+        const j = await r.json();
+        if (!j.ok) { Swal.fire({ icon: 'error', title: 'บันทึกไม่สำเร็จ', text: j.message || '' }); return; }
+        Swal.fire({ icon: 'success', title: j.mode === 'updated' ? 'อัปเดตในระบบการเงินแล้ว' : 'บันทึกในระบบการเงินแล้ว',
+            html: `<div class="text-sm"><a href="../../portal/index.php?section=finance" target="_blank" class="text-emerald-600 underline">เปิดดู Cash Book</a></div>`,
+            confirmButtonColor: '#059669' });
+    } catch (e) { Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: String(e) }); }
+}
+</script>
+<?php endif; ?>
 
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
     <div class="asset-card p-5 lg:col-span-1">
