@@ -1116,6 +1116,7 @@ async function serverSave() {
   if (_isSaving) return;
   _isSaving = true;
   _showSaveStatus('กำลังบันทึก…', '');
+  console.log('[nurse_schedule] serverSave START', { year: state.year, month: state.month, dirty: state.dirty });
   try {
     const fd = new FormData();
     fd.append('csrf_token', NS_CSRF);
@@ -1124,19 +1125,26 @@ async function serverSave() {
     fd.append('month', String(state.month));
     fd.append('payload', JSON.stringify(_buildSavePayload()));
     const r = await fetch(NS_AJAX, { method: 'POST', body: fd, credentials: 'same-origin' });
-    const j = await r.json();
+    const rawText = await r.text();
+    console.log('[nurse_schedule] serverSave HTTP', r.status, rawText.slice(0, 300));
+    let j;
+    try { j = JSON.parse(rawText); }
+    catch (parseErr) {
+      console.error('[nurse_schedule] save: response not JSON. Body:', rawText.slice(0, 500));
+      _showSaveStatus('บันทึกล้มเหลว: server ตอบไม่ใช่ JSON (HTTP ' + r.status + ')', 'err');
+      return;
+    }
     if (j.ok) {
-      // ✓ ยืนยันจาก server แล้วค่อย clear dirty flag
       state.dirty = false;
-      _showSaveStatus('บันทึกแล้ว ✓', 'ok');
+      _showSaveStatus('บันทึกแล้ว ✓ ' + new Date().toLocaleTimeString('th-TH'), 'ok');
+      console.log('[nurse_schedule] save OK', j);
     } else {
-      // ยังคง dirty ไว้เพื่อให้ retry / beforeunload warn / Save Now ใช้ได้
       console.error('[nurse_schedule] save failed:', j.error);
       _showSaveStatus('บันทึกล้มเหลว: ' + (j.error || ''), 'err');
     }
   } catch (e) {
     console.error('[nurse_schedule] save error:', e);
-    _showSaveStatus('ออฟไลน์ · เก็บใน browser', 'err');
+    _showSaveStatus('บันทึกล้มเหลว (network): ' + String(e), 'err');
   } finally {
     _isSaving = false;
   }
@@ -3422,13 +3430,23 @@ async function exportOTPDF() {
 }
 
 // ========= GLOBAL ACTIONS =========
-function saveAll() {
+async function saveAll() {
   readReqFromUI();
   readOTFromUI();
-  persistAll();
+  // เขียน localStorage cache ก่อน
+  state.dirty = true;
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify({
+    year: state.year, month: state.month,
+    ..._buildSavePayload(),
+    savedAt: new Date().toISOString()
+  })); } catch (e) {}
+  // บันทึกขึ้น server ทันที (skip 800ms debounce) + รอผลจริง
+  clearTimeout(_saveTimer);
+  await serverSave();
   renderDashboard();
   renderOT();
-  showSuccess('บันทึกข้อมูลทั้งหมดแล้ว');
+  if (!state.dirty) showSuccess('บันทึกขึ้น server แล้ว ✓');
+  else              showError('บันทึกล้มเหลว — ดู indicator มุมขวาล่าง');
 }
 
 function clearAll() {
