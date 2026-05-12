@@ -25,7 +25,7 @@ $navGroups = [
     [
         'label' => 'การเคลื่อนไหว',
         'items' => [
-            ['key' => 'receive',      'href' => 'admin/receive_form.php',  'icon' => 'fa-arrow-down-to-line', 'color' => '#2e9e63', 'label' => 'รับเข้า',     'roles' => ['admin','editor','employee']],
+            ['key' => 'receive',      'href' => 'admin/receive_form.php',  'icon' => 'fa-download', 'color' => '#2e9e63', 'label' => 'รับเข้า',     'roles' => ['admin','editor','employee']],
             ['key' => 'issue',        'href' => 'admin/issue_form.php',    'icon' => 'fa-hand-holding',       'color' => '#d97706', 'label' => 'เบิกออก',     'roles' => ['admin','editor','employee']],
             ['key' => 'transactions', 'href' => 'admin/transactions.php',  'icon' => 'fa-clock-rotate-left',  'color' => '#0891b2', 'label' => 'ประวัติ',     'roles' => ['admin','editor','employee']],
         ],

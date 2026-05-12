@@ -51,7 +51,7 @@ $isOut = ((int)$item['qty_on_hand'] <= 0);
     </a>
     <div class="flex items-center gap-2 flex-wrap">
         <a href="admin/receive_form.php?consumable_id=<?= $id ?>" class="btn-asset btn-asset-secondary">
-            <i class="fas fa-arrow-down-to-line"></i> รับเข้า
+            <i class="fas fa-download"></i> รับเข้า
         </a>
         <a href="admin/issue_form.php?consumable_id=<?= $id ?>" class="btn-asset btn-asset-secondary">
             <i class="fas fa-hand-holding"></i> เบิกออก

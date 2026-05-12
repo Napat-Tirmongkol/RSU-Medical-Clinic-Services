@@ -88,7 +88,7 @@ include __DIR__ . '/../includes/header.php';
 <form method="post" class="asset-card p-5 max-w-3xl mx-auto">
     <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token'] ?? '') ?>">
 
-    <h2 class="asset-sec-title mb-5"><i class="fa-solid fa-arrow-down-to-line text-emerald-600 mr-2"></i>บันทึกการรับเข้า</h2>
+    <h2 class="asset-sec-title mb-5"><i class="fa-solid fa-download text-emerald-600 mr-2"></i>บันทึกการรับเข้า</h2>
 
     <div class="space-y-4">
         <div>
@@ -145,7 +145,7 @@ include __DIR__ . '/../includes/header.php';
     <div class="mt-6 flex items-center justify-end gap-2">
         <a href="admin/manage_consumables.php" class="btn-asset btn-asset-ghost">ยกเลิก</a>
         <button type="submit" class="btn-asset btn-asset-primary">
-            <i class="fas fa-arrow-down-to-line"></i> บันทึกรับเข้า
+            <i class="fas fa-download"></i> บันทึกรับเข้า
         </button>
     </div>
 </form>
