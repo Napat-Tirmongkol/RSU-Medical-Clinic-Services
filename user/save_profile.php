@@ -187,6 +187,16 @@ try {
         throw new Exception("ไม่พบข้อมูลผู้ใช้งานในระบบ");
     }
 
+    // Sync LINE rich menu → member (เฉพาะตอนสมัครครั้งแรก หรือ update ก็ปลอดภัย เพราะ idempotent)
+    if (!empty($lineUserId)) {
+        try {
+            require_once __DIR__ . '/../line_api/line_richmenu_helper.php';
+            line_richmenu_sync_user((string)$lineUserId, true); // force member = true
+        } catch (Throwable $e) {
+            error_log('[save_profile] richmenu sync: ' . $e->getMessage());
+        }
+    }
+
     // ── Redirect logic (whitelist redirect_back) ─────────────────────────
     $safeRedirectBack = '';
     if ($redirectBack !== '' && preg_match('/^[a-zA-Z0-9_\-\.]+\.php(\?[^\s]*)?$/', $redirectBack)) {
