@@ -18,8 +18,9 @@ $navGroups = [
     [
         'label' => 'ทะเบียน',
         'items' => [
-            ['key' => 'consumables', 'href' => 'admin/manage_consumables.php', 'icon' => 'fa-box-open', 'color' => '#2e9e63', 'label' => 'รายการวัสดุ', 'roles' => ['admin','editor','employee']],
-            ['key' => 'categories',  'href' => 'admin/manage_categories.php',  'icon' => 'fa-tags',     'color' => '#d97706', 'label' => 'หมวดหมู่',     'roles' => ['admin','editor']],
+            ['key' => 'consumables', 'href' => 'admin/manage_consumables.php',   'icon' => 'fa-box-open',      'color' => '#2e9e63', 'label' => 'รายการวัสดุ', 'roles' => ['admin','editor','employee']],
+            ['key' => 'categories',  'href' => 'admin/manage_categories.php',    'icon' => 'fa-tags',          'color' => '#d97706', 'label' => 'หมวดหมู่',     'roles' => ['admin','editor']],
+            ['key' => 'locations',   'href' => '../asset/admin/manage_locations.php', 'icon' => 'fa-location-dot', 'color' => '#dc2626', 'label' => 'จุดจัดเก็บ',  'roles' => ['admin','editor']],
         ],
     ],
     [
