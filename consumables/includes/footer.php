@@ -83,6 +83,36 @@ csmUpdateMobileLayout();
     });
 })();
 
+// ── Flash messages: อ่าน ?saved / ?deleted / ?updated / ?imported จาก URL → toast ──
+(function () {
+    const params = new URLSearchParams(window.location.search);
+    const flashMap = {
+        saved:    { icon: 'success', title: 'บันทึกสำเร็จ' },
+        updated:  { icon: 'success', title: 'อัปเดตสำเร็จ' },
+        deleted:  { icon: 'success', title: 'ลบสำเร็จ' },
+        imported: { icon: 'success', title: 'นำเข้าสำเร็จ' },
+    };
+    for (const [key, cfg] of Object.entries(flashMap)) {
+        if (params.get(key) === '1') {
+            Swal.fire({
+                ...cfg,
+                toast: true,
+                position: 'top-end',
+                showConfirmButton: false,
+                timer: 2200,
+                timerProgressBar: true,
+            });
+            // ลบ param ออกจาก URL กัน toast ขึ้นซ้ำเมื่อ refresh/back
+            params.delete(key);
+            const newUrl = window.location.pathname +
+                (params.toString() ? '?' + params.toString() : '') +
+                window.location.hash;
+            history.replaceState({}, '', newUrl);
+            break;
+        }
+    }
+})();
+
 window.csmConfirmDelete = function (url, name) {
     Swal.fire({
         title: 'ยืนยันการลบ',
