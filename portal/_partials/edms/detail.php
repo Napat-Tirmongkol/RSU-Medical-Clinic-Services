@@ -113,21 +113,30 @@ if (!$doc) {
     return;
 }
 
-$typeMap = [
-    'incoming' => ['title' => 'หนังสือรับ',     'icon' => 'fa-inbox',       'tone' => 'sky'],
-    'outgoing' => ['title' => 'หนังสือส่ง',     'icon' => 'fa-paper-plane', 'tone' => 'emerald'],
-    'internal' => ['title' => 'บันทึกข้อความ',  'icon' => 'fa-file-lines',  'tone' => 'violet'],
-    'circular' => ['title' => 'หนังสือเวียน',   'icon' => 'fa-bullhorn',    'tone' => 'amber'],
-];
+require_once __DIR__ . '/_helpers.php';
+$typeMap = [];
+foreach (edms_get_doc_type_map($pdo, false) as $code => $row) {
+    $typeMap[$code] = [
+        'title' => $row['name'],
+        'icon'  => $row['icon'] ?: 'fa-file',
+        'tone'  => $row['tone'] ?: 'slate',
+    ];
+}
 $tonePalette = [
     'sky'     => ['bg' => 'bg-sky-50',     'text' => 'text-sky-600',     'border' => 'border-sky-100',     'btn' => 'bg-sky-500 hover:bg-sky-600'],
     'emerald' => ['bg' => 'bg-emerald-50', 'text' => 'text-emerald-600', 'border' => 'border-emerald-100', 'btn' => 'bg-emerald-500 hover:bg-emerald-600'],
     'violet'  => ['bg' => 'bg-purple-50',  'text' => 'text-purple-600',  'border' => 'border-purple-100',  'btn' => 'bg-purple-500 hover:bg-purple-600'],
     'amber'   => ['bg' => 'bg-amber-50',   'text' => 'text-amber-600',   'border' => 'border-amber-100',   'btn' => 'bg-amber-500 hover:bg-amber-600'],
+    'rose'    => ['bg' => 'bg-rose-50',    'text' => 'text-rose-600',    'border' => 'border-rose-100',    'btn' => 'bg-rose-500 hover:bg-rose-600'],
+    'cyan'    => ['bg' => 'bg-cyan-50',    'text' => 'text-cyan-600',    'border' => 'border-cyan-100',    'btn' => 'bg-cyan-500 hover:bg-cyan-600'],
+    'slate'   => ['bg' => 'bg-slate-50',   'text' => 'text-slate-600',   'border' => 'border-slate-100',   'btn' => 'bg-slate-500 hover:bg-slate-600'],
+    'teal'    => ['bg' => 'bg-teal-50',    'text' => 'text-teal-600',    'border' => 'border-teal-100',    'btn' => 'bg-teal-500 hover:bg-teal-600'],
+    'indigo'  => ['bg' => 'bg-indigo-50',  'text' => 'text-indigo-600',  'border' => 'border-indigo-100',  'btn' => 'bg-indigo-500 hover:bg-indigo-600'],
+    'orange'  => ['bg' => 'bg-orange-50',  'text' => 'text-orange-600',  'border' => 'border-orange-100',  'btn' => 'bg-orange-500 hover:bg-orange-600'],
 ];
 
-$meta = $typeMap[$doc['doc_type']] ?? $typeMap['incoming'];
-$tone = $tonePalette[$meta['tone']];
+$meta = $typeMap[$doc['doc_type']] ?? ['title' => 'เอกสาร', 'icon' => 'fa-file', 'tone' => 'slate'];
+$tone = $tonePalette[$meta['tone']] ?? $tonePalette['slate'];
 
 $statusLabels = [
     'draft'       => ['label' => 'ฉบับร่าง',       'tone' => 'bg-slate-100 text-slate-600 border-slate-200'],
@@ -265,7 +274,7 @@ $routingStatusLabels = [
                 <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">ลงวันที่</p>
                 <p class="text-sm font-black text-slate-700"><?= $doc['doc_date'] ? date('d/m/Y', strtotime($doc['doc_date'])) : '-' ?></p>
             </div>
-            <?php if ($doc['doc_type'] === 'incoming'): ?>
+            <?php if (!empty($doc['received_date']) || $doc['doc_type'] === 'incoming'): ?>
                 <div>
                     <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">วันที่รับ</p>
                     <p class="text-sm font-black text-slate-700"><?= $doc['received_date'] ? date('d/m/Y', strtotime($doc['received_date'])) : '-' ?></p>

@@ -9,27 +9,41 @@
  */
 declare(strict_types=1);
 
+require_once __DIR__ . '/_helpers.php';
+
 $pdo = db();
 
-$validTypes = [
-    'incoming' => ['title' => 'หนังสือรับ',     'icon' => 'fa-inbox',       'tone' => 'sky',     'prefix' => 'รับ'],
-    'outgoing' => ['title' => 'หนังสือส่ง',     'icon' => 'fa-paper-plane', 'tone' => 'emerald', 'prefix' => 'ส่ง'],
-    'internal' => ['title' => 'บันทึกข้อความ',  'icon' => 'fa-file-lines',  'tone' => 'violet',  'prefix' => 'บันทึก'],
-    'circular' => ['title' => 'หนังสือเวียน',   'icon' => 'fa-bullhorn',    'tone' => 'amber',   'prefix' => 'เวียน'],
-];
+// โหลดประเภทเอกสารจาก DB (รวมที่ปิดใช้งานด้วย เผื่อมีเอกสารเดิมอยู่)
+$validTypes = edms_get_doc_type_map($pdo, false);
 
 $tonePalette = [
     'sky'     => ['bg' => 'bg-sky-50',     'text' => 'text-sky-600',     'border' => 'border-sky-100',     'btn' => 'bg-sky-500 hover:bg-sky-600'],
     'emerald' => ['bg' => 'bg-emerald-50', 'text' => 'text-emerald-600', 'border' => 'border-emerald-100', 'btn' => 'bg-emerald-500 hover:bg-emerald-600'],
     'violet'  => ['bg' => 'bg-purple-50',  'text' => 'text-purple-600',  'border' => 'border-purple-100',  'btn' => 'bg-purple-500 hover:bg-purple-600'],
     'amber'   => ['bg' => 'bg-amber-50',   'text' => 'text-amber-600',   'border' => 'border-amber-100',   'btn' => 'bg-amber-500 hover:bg-amber-600'],
+    'rose'    => ['bg' => 'bg-rose-50',    'text' => 'text-rose-600',    'border' => 'border-rose-100',    'btn' => 'bg-rose-500 hover:bg-rose-600'],
+    'cyan'    => ['bg' => 'bg-cyan-50',    'text' => 'text-cyan-600',    'border' => 'border-cyan-100',    'btn' => 'bg-cyan-500 hover:bg-cyan-600'],
+    'slate'   => ['bg' => 'bg-slate-50',   'text' => 'text-slate-600',   'border' => 'border-slate-100',   'btn' => 'bg-slate-500 hover:bg-slate-600'],
+    'teal'    => ['bg' => 'bg-teal-50',    'text' => 'text-teal-600',    'border' => 'border-teal-100',    'btn' => 'bg-teal-500 hover:bg-teal-600'],
+    'indigo'  => ['bg' => 'bg-indigo-50',  'text' => 'text-indigo-600',  'border' => 'border-indigo-100',  'btn' => 'bg-indigo-500 hover:bg-indigo-600'],
+    'orange'  => ['bg' => 'bg-orange-50',  'text' => 'text-orange-600',  'border' => 'border-orange-100',  'btn' => 'bg-orange-500 hover:bg-orange-600'],
 ];
 
 $type = $_GET['type'] ?? 'incoming';
-if (!isset($validTypes[$type])) $type = 'incoming';
+if (!isset($validTypes[$type])) {
+    // fallback: ใช้ตัวแรกที่ active
+    $firstActive = array_key_first(edms_get_doc_type_map($pdo, true));
+    $type = $firstActive ?: 'incoming';
+}
 
-$meta = $validTypes[$type];
-$tone = $tonePalette[$meta['tone']];
+$row = $validTypes[$type] ?? null;
+$meta = [
+    'title'  => $row['name']        ?? 'เอกสาร',
+    'icon'   => $row['icon']        ?? 'fa-file',
+    'tone'   => $row['tone']        ?? 'slate',
+    'prefix' => $row['short_label'] ?? '',
+];
+$tone = $tonePalette[$meta['tone']] ?? $tonePalette['slate'];
 
 // Filters
 $search   = trim($_GET['s'] ?? '');
@@ -239,9 +253,9 @@ $confidentialityLabels = [
                             <td class="px-4 py-3">
                                 <a href="?section=edms&edms_view=detail&id=<?= (int)$r['id'] ?>" class="block group">
                                     <div class="font-bold text-slate-800 group-hover:text-sky-600 transition-colors line-clamp-1"><?= htmlspecialchars($r['subject']) ?></div>
-                                    <?php if (!empty($r['sender']) && in_array($type, ['incoming','internal'], true)): ?>
+                                    <?php if (!empty($r['sender'])): ?>
                                         <div class="text-[11px] font-bold text-slate-400 mt-0.5"><i class="fa-solid fa-arrow-right-from-bracket text-[8px] mr-1"></i><?= htmlspecialchars($r['sender']) ?></div>
-                                    <?php elseif (!empty($r['recipient']) && in_array($type, ['outgoing','circular'], true)): ?>
+                                    <?php elseif (!empty($r['recipient'])): ?>
                                         <div class="text-[11px] font-bold text-slate-400 mt-0.5 line-clamp-1"><i class="fa-solid fa-arrow-right-to-bracket text-[8px] mr-1"></i><?= htmlspecialchars($r['recipient']) ?></div>
                                     <?php endif; ?>
                                 </a>
@@ -343,12 +357,19 @@ $confidentialityLabels = [
                     <input type="text" name="subject" id="edmsSubject" required class="edms-input" placeholder="เช่น ขอเชิญประชุม / ขออนุมัติงบประมาณ">
                 </div>
 
+                <?php
+                $_systemTypes = ['incoming','outgoing','internal','circular'];
+                $_isCustomType = !in_array($type, $_systemTypes, true);
+                $_showReceived = ($type === 'incoming' || $_isCustomType);
+                $_showSender   = (in_array($type, ['incoming','internal'], true) || $_isCustomType);
+                $_showRecip    = (in_array($type, ['outgoing','internal','circular'], true) || $_isCustomType);
+                ?>
                 <div class="grid grid-cols-2 gap-3 mb-4">
                     <div>
                         <label class="edms-label">ลงวันที่</label>
                         <input type="date" name="doc_date" id="edmsDocDate" class="edms-input" value="<?= date('Y-m-d') ?>">
                     </div>
-                    <?php if ($type === 'incoming'): ?>
+                    <?php if ($_showReceived): ?>
                         <div>
                             <label class="edms-label">วันที่รับ</label>
                             <input type="date" name="received_date" id="edmsReceivedDate" class="edms-input" value="<?= date('Y-m-d') ?>">
@@ -357,13 +378,13 @@ $confidentialityLabels = [
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
-                    <?php if (in_array($type, ['incoming','internal'], true)): ?>
+                    <?php if ($_showSender): ?>
                         <div>
                             <label class="edms-label">จาก (ผู้ส่ง/หน่วยงาน)</label>
                             <input type="text" name="sender" id="edmsSender" class="edms-input" placeholder="ชื่อหน่วยงาน/บุคคล">
                         </div>
                     <?php endif; ?>
-                    <?php if (in_array($type, ['outgoing','internal','circular'], true)): ?>
+                    <?php if ($_showRecip): ?>
                         <div class="<?= $type === 'circular' ? 'md:col-span-2' : '' ?>">
                             <label class="edms-label">เรียน (ผู้รับ)</label>
                             <input type="text" name="recipient" id="edmsRecipient" class="edms-input" placeholder="<?= $type === 'circular' ? 'หลายฝ่าย/บุคคล (คั่นด้วย ,)' : 'ชื่อหน่วยงาน/บุคคล' ?>">
