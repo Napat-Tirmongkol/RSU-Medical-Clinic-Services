@@ -76,6 +76,16 @@ try {
         $m = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
 
         $decode = fn($s, $default) => is_string($s) && $s !== '' ? (json_decode($s, true) ?? $default) : $default;
+        // สำหรับ map/object key-value (เช่น schedule, leaves) — empty array จะถูก JSON.encode เป็น "[]"
+        // ทำให้ JS รับเป็น Array แทน Object → setShift() จะเพิ่ม string property บน Array
+        // ซึ่ง JSON.stringify ไม่ serialize ออกมา → save ส่ง "[]" กลับไป → ข้อมูลหายตอน reload
+        // วิธีแก้: empty → คืน stdClass() เสมอ → encode เป็น "{}"
+        $decodeObj = function($s) {
+            if (!is_string($s) || $s === '') return new stdClass();
+            $d = json_decode($s, true);
+            if (!is_array($d) || empty($d)) return new stdClass();
+            return $d;
+        };
 
         // ดึงวันที่คลินิกปิด (จาก sys_clinic_hours) สำหรับเดือนนี้
         // คีย์รูปแบบ "YBE-M-D" (Buddhist year)
@@ -100,12 +110,12 @@ try {
                 'nurses'          => $decode($g['nurses_json'] ?? null, null),
                 'requirements'    => $decode($g['requirements_json'] ?? null, null),
                 'otSettings'      => $decode($g['ot_settings_json'] ?? null, null),
-                'customHolidays'  => $decode($g['custom_holidays_json'] ?? null, (object)[]),
-                'removedHolidays' => $decode($g['removed_holidays_json'] ?? null, (object)[]),
-                'shiftTypes'      => $decode($g['shift_types_json'] ?? null, (object)[]),
-                'customPositions' => $decode($g['custom_positions_json'] ?? null, (object)[]),
-                'schedule'        => $decode($m['schedule_json'] ?? null, (object)[]),
-                'leaves'          => $decode($m['leaves_json'] ?? null, (object)[]),
+                'customHolidays'  => $decodeObj($g['custom_holidays_json'] ?? null),
+                'removedHolidays' => $decodeObj($g['removed_holidays_json'] ?? null),
+                'shiftTypes'      => $decodeObj($g['shift_types_json'] ?? null),
+                'customPositions' => $decodeObj($g['custom_positions_json'] ?? null),
+                'schedule'        => $decodeObj($m['schedule_json'] ?? null),
+                'leaves'          => $decodeObj($m['leaves_json'] ?? null),
                 'clinicHolidays'  => $clinicHolidays,
             ],
             'global_updated_at'  => $g['updated_at'] ?? null,

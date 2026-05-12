@@ -1242,18 +1242,22 @@ async function _loadFromStorageInner() {
     } catch (e) { console.warn('localStorage cache read failed', e); }
   }
 
+  // ✦ บังคับ map/object: PHP json_decode("{}", true) → [] (empty array) → JSON encode → "[]"
+  //   ถ้า assign state.schedule = [] แล้วเพิ่ม string key → Object.keys เห็น แต่ JSON.stringify ทิ้ง
+  //   → save ส่ง "[]" ทับข้อมูล → reload ข้อมูลหาย
+  const _toObj = (v) => (v && typeof v === 'object' && !Array.isArray(v)) ? v : {};
   if (serverData) {
     state.nurses          = (Array.isArray(serverData.nurses) && serverData.nurses.length)
                              ? serverData.nurses : structuredClone(DEFAULT_NURSES);
-    state.schedule        = serverData.schedule || {};
-    state.leaves          = serverData.leaves || {};
+    state.schedule        = _toObj(serverData.schedule);
+    state.leaves          = _toObj(serverData.leaves);
     state.requirements    = serverData.requirements || structuredClone(DEFAULT_REQ);
     state.otSettings      = serverData.otSettings || structuredClone(DEFAULT_OT);
-    state.customHolidays  = serverData.customHolidays || {};
-    state.removedHolidays = serverData.removedHolidays || {};
-    state.clinicHolidays  = serverData.clinicHolidays || {};
-    state.shiftTypes      = serverData.shiftTypes || {};
-    state.customPositions = serverData.customPositions || {};
+    state.customHolidays  = _toObj(serverData.customHolidays);
+    state.removedHolidays = _toObj(serverData.removedHolidays);
+    state.clinicHolidays  = _toObj(serverData.clinicHolidays);
+    state.shiftTypes      = _toObj(serverData.shiftTypes);
+    state.customPositions = _toObj(serverData.customPositions);
     for (const [name, def] of Object.entries(state.customPositions)) POSITIONS[name] = def;
     ensureCustomPosStyles();
     applyShiftTypeOverrides();
@@ -1283,14 +1287,14 @@ async function _loadFromStorageInner() {
   try {
     const data = JSON.parse(raw);
     state.nurses = data.nurses || structuredClone(DEFAULT_NURSES);
-    state.schedule = data.schedule || {};
-    state.leaves = data.leaves || {};
+    state.schedule = _toObj(data.schedule);
+    state.leaves = _toObj(data.leaves);
     state.requirements = data.requirements || structuredClone(DEFAULT_REQ);
     state.otSettings = data.otSettings || structuredClone(DEFAULT_OT);
-    state.customHolidays = data.customHolidays || {};
-    state.removedHolidays = data.removedHolidays || {};
-    state.shiftTypes = data.shiftTypes || {};
-    state.customPositions = data.customPositions || {};
+    state.customHolidays = _toObj(data.customHolidays);
+    state.removedHolidays = _toObj(data.removedHolidays);
+    state.shiftTypes = _toObj(data.shiftTypes);
+    state.customPositions = _toObj(data.customPositions);
     for (const [name, def] of Object.entries(state.customPositions)) POSITIONS[name] = def;
     ensureCustomPosStyles();
     applyShiftTypeOverrides();
