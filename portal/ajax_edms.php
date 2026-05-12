@@ -19,6 +19,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/includes/auth.php';
+require_once __DIR__ . '/_partials/edms/_helpers.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -101,13 +102,10 @@ function edms_assign_number(PDO $pdo, string $docType, int $yearBe): array
             ->execute([$next, $yearBe, $docType]);
     }
 
-    $prefixes = [
-        'incoming' => 'รับ',
-        'outgoing' => 'ส่ง',
-        'internal' => 'บันทึก',
-        'circular' => 'เวียน',
-    ];
-    $prefix = $prefixes[$docType] ?? 'DOC';
+    // โหลด prefix (short_label) จากตาราง sys_doc_types
+    $typeMap = edms_get_doc_type_map($pdo, false);
+    $prefix = $typeMap[$docType]['short_label'] ?? 'DOC';
+    if ($prefix === '' || $prefix === null) $prefix = 'DOC';
     $number = sprintf('%s-%03d/%d', $prefix, $next, $yearBe);
 
     return ['running_no' => $next, 'doc_number' => $number, 'year_be' => $yearBe];
@@ -204,7 +202,7 @@ try {
         // ════════════ DOCUMENT: CREATE ════════════
         case 'document:create': {
             $docType = $_POST['doc_type'] ?? '';
-            if (!in_array($docType, ['incoming', 'outgoing', 'internal', 'circular'], true)) {
+            if (!edms_valid_doc_type($pdo, $docType)) {
                 throw new RuntimeException('doc_type ไม่ถูกต้อง');
             }
 
@@ -678,6 +676,124 @@ try {
                 throw new RuntimeException('หมวดนี้ถูกใช้งานในเอกสารอยู่ — ปิดสถานะแทนการลบ');
             }
             $pdo->prepare("DELETE FROM sys_doc_categories WHERE id = ?")->execute([$id]);
+            echo json_encode(['ok' => true, 'message' => 'ลบแล้ว']);
+            exit;
+        }
+
+        // ════════════ DOC TYPE: LIST ════════════
+        case 'doctype:list': {
+            edms_ensure_doc_types_schema($pdo);
+            $rows = $pdo->query("SELECT t.*, (SELECT COUNT(*) FROM sys_doc_documents d WHERE d.doc_type = t.code) AS used_count
+                                 FROM sys_doc_types t
+                                 ORDER BY t.sort_order ASC, t.id ASC")->fetchAll(PDO::FETCH_ASSOC) ?: [];
+            echo json_encode(['ok' => true, 'doc_types' => $rows], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        // ════════════ DOC TYPE: CREATE / UPDATE ════════════
+        case 'doctype:create':
+        case 'doctype:update': {
+            edms_ensure_doc_types_schema($pdo);
+            $id          = (int)($_POST['id'] ?? 0);
+            $code        = trim((string)($_POST['code'] ?? ''));
+            $name        = trim((string)($_POST['name'] ?? ''));
+            $shortLabel  = trim((string)($_POST['short_label'] ?? ''));
+            $description = trim((string)($_POST['description'] ?? '')) ?: null;
+            $icon        = trim((string)($_POST['icon'] ?? '')) ?: null;
+            $tone        = trim((string)($_POST['tone'] ?? ''));
+            $sort        = (int)($_POST['sort_order'] ?? 0);
+            $active      = (int)($_POST['is_active'] ?? 1) ? 1 : 0;
+
+            if ($code === '' || $name === '') throw new RuntimeException('กรุณากรอก code และ name');
+            if (!preg_match('/^[a-z0-9_]+$/i', $code)) {
+                throw new RuntimeException('code ต้องเป็นอักษร a-z, 0-9, _ เท่านั้น (ไม่มีช่องว่าง/ภาษาไทย)');
+            }
+            $allowedTones = ['sky','emerald','violet','amber','rose','cyan','slate','teal','indigo','orange'];
+            if ($tone !== '' && !in_array($tone, $allowedTones, true)) $tone = 'slate';
+            if ($tone === '') $tone = 'slate';
+
+            if ($action === 'doctype:create') {
+                $exists = $pdo->prepare("SELECT id FROM sys_doc_types WHERE code = ?");
+                $exists->execute([$code]);
+                if ($exists->fetchColumn()) throw new RuntimeException('code นี้มีอยู่แล้ว');
+
+                $stmt = $pdo->prepare("INSERT INTO sys_doc_types
+                    (code, name, short_label, description, icon, tone, sort_order, is_active, is_system)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)");
+                $stmt->execute([$code, $name, $shortLabel ?: null, $description, $icon, $tone, $sort, $active]);
+                $newId = (int)$pdo->lastInsertId();
+                echo json_encode(['ok' => true, 'message' => 'เพิ่มประเภทเอกสารแล้ว', 'id' => $newId]);
+            } else {
+                if ($id <= 0) throw new RuntimeException('ระบุ id ไม่ถูกต้อง');
+                $cur = $pdo->prepare("SELECT code, is_system FROM sys_doc_types WHERE id = ?");
+                $cur->execute([$id]);
+                $curRow = $cur->fetch(PDO::FETCH_ASSOC);
+                if (!$curRow) throw new RuntimeException('ไม่พบรายการ');
+
+                // ห้ามแก้ code ถ้าเป็น system type (จะกระทบ FK)
+                if ((int)$curRow['is_system'] === 1 && $curRow['code'] !== $code) {
+                    throw new RuntimeException('ประเภทมาตรฐานห้ามแก้ code (แก้ชื่อ/สี/icon ได้)');
+                }
+                // ถ้าเปลี่ยน code → ตรวจ collision และ update เอกสารด้วย
+                if ($curRow['code'] !== $code) {
+                    $col = $pdo->prepare("SELECT id FROM sys_doc_types WHERE code = ? AND id != ?");
+                    $col->execute([$code, $id]);
+                    if ($col->fetchColumn()) throw new RuntimeException('code นี้มีอยู่แล้ว');
+
+                    $pdo->beginTransaction();
+                    try {
+                        $pdo->prepare("UPDATE sys_doc_documents SET doc_type = ? WHERE doc_type = ?")->execute([$code, $curRow['code']]);
+                        $pdo->prepare("UPDATE sys_doc_counters  SET doc_type = ? WHERE doc_type = ?")->execute([$code, $curRow['code']]);
+                        $pdo->prepare("UPDATE sys_doc_types SET code=?, name=?, short_label=?, description=?, icon=?, tone=?, sort_order=?, is_active=? WHERE id=?")
+                            ->execute([$code, $name, $shortLabel ?: null, $description, $icon, $tone, $sort, $active, $id]);
+                        $pdo->commit();
+                    } catch (Throwable $e) {
+                        $pdo->rollBack();
+                        throw $e;
+                    }
+                } else {
+                    $pdo->prepare("UPDATE sys_doc_types SET name=?, short_label=?, description=?, icon=?, tone=?, sort_order=?, is_active=? WHERE id=?")
+                        ->execute([$name, $shortLabel ?: null, $description, $icon, $tone, $sort, $active, $id]);
+                }
+                echo json_encode(['ok' => true, 'message' => 'อัปเดตแล้ว']);
+            }
+            exit;
+        }
+
+        case 'doctype:toggle': {
+            $id = (int)($_POST['id'] ?? 0);
+            if ($id <= 0) throw new RuntimeException('ระบุ id ไม่ถูกต้อง');
+            $pdo->prepare("UPDATE sys_doc_types SET is_active = 1 - is_active WHERE id = ?")->execute([$id]);
+            echo json_encode(['ok' => true, 'message' => 'อัปเดตสถานะแล้ว']);
+            exit;
+        }
+
+        case 'doctype:delete': {
+            $id = (int)($_POST['id'] ?? 0);
+            if ($id <= 0) throw new RuntimeException('ระบุ id ไม่ถูกต้อง');
+
+            $cur = $pdo->prepare("SELECT code, is_system FROM sys_doc_types WHERE id = ?");
+            $cur->execute([$id]);
+            $curRow = $cur->fetch(PDO::FETCH_ASSOC);
+            if (!$curRow) throw new RuntimeException('ไม่พบรายการ');
+
+            if ((int)$curRow['is_system'] === 1) {
+                throw new RuntimeException('ประเภทมาตรฐานห้ามลบ — ปิดสถานะแทน');
+            }
+            $used = $pdo->prepare("SELECT COUNT(*) FROM sys_doc_documents WHERE doc_type = ?");
+            $used->execute([$curRow['code']]);
+            if ((int)$used->fetchColumn() > 0) {
+                throw new RuntimeException('ประเภทนี้มีเอกสารอ้างอิงอยู่ — ปิดสถานะแทนการลบ');
+            }
+            $pdo->beginTransaction();
+            try {
+                $pdo->prepare("DELETE FROM sys_doc_counters WHERE doc_type = ?")->execute([$curRow['code']]);
+                $pdo->prepare("DELETE FROM sys_doc_types WHERE id = ?")->execute([$id]);
+                $pdo->commit();
+            } catch (Throwable $e) {
+                $pdo->rollBack();
+                throw $e;
+            }
             echo json_encode(['ok' => true, 'message' => 'ลบแล้ว']);
             exit;
         }

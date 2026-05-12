@@ -67,10 +67,13 @@ try {
         ORDER BY ym ASC
     ")->fetchAll(PDO::FETCH_ASSOC);
 
-    // Initialize 12 months
+    // Initialize 12 months — เริ่มต้น 0 ทุกประเภทที่มีใน DB
+    $allTypes = array_keys(edms_get_doc_type_map($pdo, false));
+    $blank = array_fill_keys($allTypes, 0);
+    $blank['total'] = 0;
     for ($i = 11; $i >= 0; $i--) {
         $key = date('Y-m', strtotime("-{$i} months"));
-        $monthly[$key] = ['incoming' => 0, 'outgoing' => 0, 'internal' => 0, 'circular' => 0, 'total' => 0];
+        $monthly[$key] = $blank;
     }
     foreach ($rows as $r) {
         if (!isset($monthly[$r['ym']])) continue;
@@ -142,12 +145,21 @@ try {
     $topCreators = $st->fetchAll(PDO::FETCH_ASSOC);
 } catch (PDOException) {}
 
-$typeMeta = [
-    'incoming' => ['title' => 'รับ',     'tone' => 'sky',     'bg' => '#0ea5e9'],
-    'outgoing' => ['title' => 'ส่ง',     'tone' => 'emerald', 'bg' => '#10b981'],
-    'internal' => ['title' => 'ภายใน',   'tone' => 'violet',  'bg' => '#8b5cf6'],
-    'circular' => ['title' => 'เวียน',   'tone' => 'amber',   'bg' => '#f59e0b'],
+require_once __DIR__ . '/_helpers.php';
+$toneToHex = [
+    'sky' => '#0ea5e9', 'emerald' => '#10b981', 'violet' => '#8b5cf6', 'amber' => '#f59e0b',
+    'rose' => '#f43f5e', 'cyan' => '#06b6d4', 'slate' => '#64748b', 'teal' => '#14b8a6',
+    'indigo' => '#6366f1', 'orange' => '#f97316',
 ];
+$typeMeta = [];
+foreach (edms_get_doc_type_map($pdo, false) as $code => $row) {
+    $tone = $row['tone'] ?: 'slate';
+    $typeMeta[$code] = [
+        'title' => $row['short_label'] ?: $row['name'],
+        'tone'  => $tone,
+        'bg'    => $toneToHex[$tone] ?? '#64748b',
+    ];
+}
 
 $thMonths = ['', 'ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
 

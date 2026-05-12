@@ -68,12 +68,15 @@ try {
     $kpis['done']    = (int)$pdo->query("SELECT COUNT(*) FROM sys_doc_routings WHERE to_user_id = $currentUserId AND status IN ('done','returned')")->fetchColumn();
 } catch (PDOException) {}
 
-$typeMap = [
-    'incoming' => ['title' => 'รับ',     'icon' => 'fa-inbox',       'tone' => 'sky'],
-    'outgoing' => ['title' => 'ส่ง',     'icon' => 'fa-paper-plane', 'tone' => 'emerald'],
-    'internal' => ['title' => 'ภายใน',   'icon' => 'fa-file-lines',  'tone' => 'violet'],
-    'circular' => ['title' => 'เวียน',   'icon' => 'fa-bullhorn',    'tone' => 'amber'],
-];
+require_once __DIR__ . '/_helpers.php';
+$typeMap = [];
+foreach (edms_get_doc_type_map($pdo, false) as $code => $row) {
+    $typeMap[$code] = [
+        'title' => $row['short_label'] ?: $row['name'],
+        'icon'  => $row['icon']        ?: 'fa-file',
+        'tone'  => $row['tone']        ?: 'slate',
+    ];
+}
 
 $routingActionLabels = [
     'forward' => 'ส่งต่อ',
