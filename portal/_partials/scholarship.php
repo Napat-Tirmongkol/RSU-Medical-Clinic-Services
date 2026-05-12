@@ -996,7 +996,9 @@ $portalCsrf = get_csrf_token();
             });
         } else {
             const ctx = document.getElementById('chart-split');
-            ctx.parentElement.innerHTML = '<p class="text-center text-sm text-slate-400 py-20">ยังไม่มีข้อมูลเดือนนี้</p>';
+            if (ctx && ctx.parentElement) {
+                ctx.parentElement.innerHTML = '<p class="text-center text-sm text-slate-400 py-20">ยังไม่มีข้อมูลเดือนนี้</p>';
+            }
         }
 
         // Top

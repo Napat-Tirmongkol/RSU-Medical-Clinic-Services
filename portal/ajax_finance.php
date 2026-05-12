@@ -49,7 +49,11 @@ function ensure_finance_schema(PDO $pdo): void {
         // Self-heal: เพิ่ม columns ใหม่สำหรับ receipt + cross-module sourcing
         try { $pdo->exec("ALTER TABLE sys_finance_transactions ADD COLUMN receipt_no VARCHAR(30) NULL UNIQUE"); } catch (PDOException) {}
         try { $pdo->exec("ALTER TABLE sys_finance_transactions ADD COLUMN source_module VARCHAR(50) NULL"); } catch (PDOException) {}
-        try { $pdo->exec("ALTER TABLE sys_finance_transactions ADD COLUMN source_id BIGINT UNSIGNED NULL"); } catch (PDOException) {}
+        try { $pdo->exec("ALTER TABLE sys_finance_transactions ADD COLUMN source_id VARCHAR(50) NULL"); } catch (PDOException) {}
+        // Self-heal: เปลี่ยน source_id จาก BIGINT → VARCHAR(50) เพื่อรองรับ
+        // string IDs เช่น 'TS-S6-256905' จาก nurse_timesheet (ก่อนหน้าใช้ BIGINT
+        // แล้ว INSERT พังเพราะ "Incorrect integer value")
+        try { $pdo->exec("ALTER TABLE sys_finance_transactions MODIFY COLUMN source_id VARCHAR(50) NULL"); } catch (PDOException) {}
         try { $pdo->exec("ALTER TABLE sys_finance_transactions ADD INDEX idx_source (source_module, source_id)"); } catch (PDOException) {}
         // First-run seed (idempotent via INSERT IGNORE)
         $cnt = (int)$pdo->query("SELECT COUNT(*) FROM sys_finance_categories")->fetchColumn();

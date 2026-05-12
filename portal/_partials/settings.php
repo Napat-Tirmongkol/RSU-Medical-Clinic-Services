@@ -108,9 +108,11 @@ $whitelistText      = implode("\n", $whitelistArr);
                     <?= $allOnline ? 'ผู้ใช้ทุกคนสามารถเข้าใช้งานได้ตามปกติ' : 'ดูรายละเอียดที่แท็บ Maintenance เพื่อเปิดระบบที่ปิดอยู่' ?>
                 </p>
             </div>
+            <?php if (($adminRole ?? '') === 'superadmin'): ?>
             <button onclick="triggerGitPull()" class="stg-btn-ghost whitespace-nowrap">
                 <i class="fa-solid fa-rotate"></i> Git Pull Update
             </button>
+            <?php endif; ?>
         </div>
 
         <!-- Quick links to other tabs -->

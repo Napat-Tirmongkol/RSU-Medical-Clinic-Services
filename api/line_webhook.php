@@ -454,6 +454,8 @@ foreach ($data['events'] as $idx => $event) {
     $type = $event['type'] ?? '';
     $replyToken = $event['replyToken'] ?? null;
     $userId = $event['source']['userId'] ?? null;
+    $sourceType = $event['source']['type'] ?? '';
+    $groupId    = $event['source']['groupId'] ?? ($event['source']['roomId'] ?? null);
     $messageText = (($event['message']['type'] ?? '') === 'text') ? (string)($event['message']['text'] ?? '') : '';
     $postbackData = ($type === 'postback') ? (string)($event['postback']['data'] ?? '') : '';
     // LINE redelivery: ส่งซ้ำเมื่อ delivery แรก timeout — replyToken จะหายไป (ใช้แล้ว)
@@ -627,6 +629,51 @@ foreach ($data['events'] as $idx => $event) {
             break;
 
         case 'postback':
+            $pbData = (string)($event['postback']['data'] ?? '');
+
+            // ── ทุนนักศึกษา: อนุมัติ/ปฏิเสธผ่าน LINE Group ─────────────
+            if (preg_match('/^scholarship_(approve|reject):(\d+)$/', $pbData, $m)) {
+                $pbAction = $m[1]; // 'approve' | 'reject'
+                $logId    = (int)$m[2];
+
+                // หา admin จาก LINE user ID ที่กดปุ่ม (เพื่อบันทึก approved_by)
+                $approverId = null;
+                if ($userId) {
+                    try {
+                        $aRow = db()->prepare("SELECT id FROM sys_admins WHERE linked_line_user_id = :uid
+                                              OR linked_line_user_id_new = :uid2 LIMIT 1");
+                        $aRow->execute([':uid' => $userId, ':uid2' => $userId]);
+                        $aData = $aRow->fetch(PDO::FETCH_ASSOC);
+                        if ($aData) $approverId = (int)$aData['id'];
+                    } catch (Throwable $e) {}
+                }
+
+                try {
+                    $newStatus = $pbAction === 'approve' ? 'approved' : 'rejected';
+                    $reason    = $pbAction === 'reject' ? 'ปฏิเสธผ่าน LINE' : '';
+                    $upd = db()->prepare("UPDATE sys_scholarship_clock_logs
+                        SET status = :s, approved_by = :a, approved_at = NOW(), reject_reason = :r
+                        WHERE id = :id AND status = 'pending'");
+                    $upd->execute([':s' => $newStatus, ':a' => $approverId, ':r' => $reason, ':id' => $logId]);
+                    $affected = $upd->rowCount();
+
+                    if ($affected > 0) {
+                        $icon    = $pbAction === 'approve' ? '✅' : '❌';
+                        $word    = $pbAction === 'approve' ? 'อนุมัติแล้ว' : 'ปฏิเสธแล้ว';
+                        $replyMsg = [['type' => 'text', 'text' => "$icon $word Log #$logId เรียบร้อยค่ะ"]];
+                    } else {
+                        $replyMsg = [['type' => 'text', 'text' => "⚠️ ไม่พบรายการ #$logId หรืออนุมัติ/ปฏิเสธไปแล้ว"]];
+                    }
+                } catch (Throwable $e) {
+                    error_log('[webhook scholarship postback] ' . $e->getMessage());
+                    $replyMsg = [['type' => 'text', 'text' => '❌ เกิดข้อผิดพลาด กรุณาอนุมัติผ่าน Portal แทน']];
+                }
+
+                if ($replyToken) send_line_reply($replyToken, $replyMsg, $accessToken);
+                line_webhook_log("scholarship $pbAction via LINE", ['log_id' => $logId, 'approver' => $approverId]);
+                break;
+            }
+
             // Unsupported postback actions are acknowledged silently.
             break;
 
@@ -673,6 +720,50 @@ foreach ($data['events'] as $idx => $event) {
         case 'unfollow':
             // ผู้ใช้บล็อกบอท
             error_log("LINE Webhook: User $userId unfollowed");
+            break;
+
+        case 'join':
+            // OA ถูกเชิญเข้ากลุ่ม/ห้อง — auto-save groupId เข้า registry
+            if ($groupId) {
+                $saved = line_groups_upsert(db(), (string)$groupId, $sourceType ?: 'group');
+                line_webhook_log('OA joined group/room', [
+                    'group_id'    => substr((string)$groupId, 0, 8) . '…',
+                    'source_type' => $sourceType,
+                    'saved'       => $saved,
+                ]);
+                if ($replyToken) {
+                    $messages = [[
+                        'type' => 'text',
+                        'text' => "สวัสดีค่ะ ขอบคุณที่เพิ่ม " . SITE_NAME . " เข้ากลุ่มนี้ 🙏\n\nระบบจะใช้กลุ่มนี้สำหรับแจ้งเหตุ SOS / ประกาศจากคลินิก\n\nGroup ID ได้ถูกบันทึกไว้ในระบบแล้วค่ะ"
+                    ]];
+                    send_line_reply($replyToken, $messages, $accessToken);
+                }
+            }
+            break;
+
+        case 'leave':
+            // OA ถูกเตะออกจากกลุ่ม/ห้อง — ลบ groupId ออกจาก registry
+            if ($groupId) {
+                line_groups_remove(db(), (string)$groupId);
+                line_webhook_log('OA left group/room', [
+                    'group_id'    => substr((string)$groupId, 0, 8) . '…',
+                    'source_type' => $sourceType,
+                ]);
+            }
+            break;
+
+        case 'memberJoined':
+            // มีสมาชิกใหม่เข้ากลุ่ม — update last_seen (idempotent)
+            if ($groupId) {
+                line_groups_upsert(db(), (string)$groupId, $sourceType ?: 'group');
+            }
+            break;
+
+        case 'memberLeft':
+            // มีสมาชิก leave กลุ่ม — ไม่ทำอะไรนอกจาก update last_seen
+            if ($groupId) {
+                line_groups_upsert(db(), (string)$groupId, $sourceType ?: 'group');
+            }
             break;
 
         default:

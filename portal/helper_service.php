@@ -92,7 +92,7 @@ try {
         throw new Exception("AI ไม่สามารถส่งคำตอบได้ในขณะนี้ (อาจถูก Safety Filter บล็อก)");
     }
 
-    echo json_encode(['ok' => true, 'reply' => $finalText]);
+    echo json_encode(['ok' => true, 'reply' => $finalText, 'msg_id' => uniqid('pc_', true)]);
 
 } catch (Exception $e) {
     error_log("AI Service Error: " . $e->getMessage());

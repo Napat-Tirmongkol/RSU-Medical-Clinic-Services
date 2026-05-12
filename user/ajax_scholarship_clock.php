@@ -8,6 +8,7 @@ session_start();
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../includes/csrf.php';
 require_once __DIR__ . '/../includes/scholarship_helper.php';
+require_once __DIR__ . '/../includes/line_helper.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -174,7 +175,41 @@ try {
         $upd->execute([':ct' => $compType, ':id' => (int)$lastLog['id']]);
     }
 
+    $logId = (int)$pdo->lastInsertId();
     $pdo->commit();
+
+    // ── LINE Group Notification ───────────────────────────────────────────
+    // ส่งแจ้งเตือนพร้อมปุ่มอนุมัติ/ปฏิเสธไปยังกลุ่ม staff เมื่อ status = pending
+    if (!empty($settings['require_approval']) && $logId > 0) {
+        try {
+            $lineSecrets  = require __DIR__ . '/../config/secrets.php';
+            $lineToken    = $lineSecrets['LINE_MESSAGING_CHANNEL_ACCESS_TOKEN'] ?? '';
+            $defaultGroup = line_groups_get_default($pdo);
+
+            if ($lineToken !== '' && $defaultGroup !== '') {
+                // ดึงข้อมูลนักศึกษา
+                $uRow = $pdo->prepare("SELECT u.full_name FROM sys_scholarship_students ss
+                    JOIN sys_users u ON u.id = ss.user_id WHERE ss.id = :sid LIMIT 1");
+                $uRow->execute([':sid' => $studentId]);
+                $uData = $uRow->fetch(PDO::FETCH_ASSOC);
+                $fullName = (string)($uData['full_name'] ?? 'ไม่ทราบชื่อ');
+
+                $flexMsg = build_scholarship_notify_flex(
+                    $logId,
+                    $fullName,
+                    (string)($student['student_code'] ?? ''),
+                    (string)($student['faculty'] ?? ''),
+                    $action,
+                    date('H:i') . ' น.',
+                    (bool)$withinRadius,
+                    $compType
+                );
+                send_line_group_push($defaultGroup, [$flexMsg], $lineToken);
+            }
+        } catch (Throwable $e) {
+            error_log('[scholarship clock LINE notify] ' . $e->getMessage());
+        }
+    }
 
     echo json_encode([
         'ok' => true,

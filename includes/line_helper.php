@@ -39,6 +39,21 @@ function send_line_push(string $to, array $messages, string $accessToken): bool 
 }
 
 /**
+ * ส่งข้อความ Push ไปยังกลุ่ม (ใช้ groupId/roomId)
+ *
+ * Endpoint เดียวกับ send_line_push() แต่แยก helper เพื่อความชัดเจน:
+ *   - groupId  : ส่งไปยังกลุ่ม LINE (OA ต้องอยู่ในกลุ่ม)
+ *   - roomId   : ส่งไปยังห้องสนทนาแบบหลายคน (multi-person chat)
+ *
+ * Quota: 1 push call = 1 quota ไม่ว่าจะมีสมาชิกในกลุ่มกี่คน
+ *
+ * @see https://developers.line.biz/en/reference/messaging-api/#send-push-message
+ */
+function send_line_group_push(string $groupId, array $messages, string $accessToken): bool {
+    return send_line_push($groupId, $messages, $accessToken);
+}
+
+/**
  * แสดง Loading Indicator (จุด ๆ "กำลังพิมพ์...") ในแชทของ user
  *
  * ใช้ตอนกำลังประมวลผลที่อาจใช้เวลา (เช่น call Gemini) เพื่อให้ user เห็นว่าระบบกำลังทำงาน
@@ -110,6 +125,212 @@ function _send_line_curl(string $url, array $data, string $accessToken, array $o
  */
 function get_last_line_error(): string {
     return (string)($GLOBALS['LAST_LINE_ERROR'] ?? '');
+}
+
+/**
+ * สร้าง Flex Message สำหรับแจ้งเตือนกลุ่มเมื่อนักศึกษาทุน clock_in/clock_out
+ * รวมปุ่ม "อนุมัติ" / "ปฏิเสธ" เป็น postback เพื่อให้กดได้ใน LINE โดยตรง
+ *
+ * @param int    $logId       sys_scholarship_clock_logs.id
+ * @param string $studentName ชื่อ-นามสกุล
+ * @param string $studentCode รหัสนักศึกษา
+ * @param string $faculty     คณะ/สาขา
+ * @param string $action      'clock_in' | 'clock_out'
+ * @param string $eventTime   เช่น '09:15 น.'
+ * @param bool   $withinRadius อยู่ในพื้นที่หรือไม่
+ * @param string $compType    'hours' | 'paid'
+ */
+function build_scholarship_notify_flex(int $logId, string $studentName, string $studentCode,
+    string $faculty, string $action, string $eventTime, bool $withinRadius, string $compType): array
+{
+    $isIn       = $action === 'clock_in';
+    $actionThai = $isIn ? 'ขอเข้างาน' : 'ขอออกงาน';
+    $actionIcon = $isIn ? '🟢' : '🔴';
+    $gpsText    = $withinRadius ? '✅ อยู่ในพื้นที่' : '⚠️ นอกพื้นที่คลินิก';
+    $gpsColor   = $withinRadius ? '#16a34a' : '#b45309';
+    $compThai   = $compType === 'paid' ? 'ค่าตอบแทน (จ้าง)' : 'ชั่วโมงทำงาน';
+
+    return [
+        'type'       => 'flex',
+        'altText'    => "$actionIcon นักศึกษาทุน $actionThai — $studentName",
+        'contents'   => [
+            'type' => 'bubble',
+            'size' => 'kilo',
+            'header' => [
+                'type'            => 'box',
+                'layout'          => 'vertical',
+                'backgroundColor' => $isIn ? '#7c3aed' : '#0f172a',
+                'paddingAll'      => '16px',
+                'contents'        => [[
+                    'type'   => 'text',
+                    'text'   => "$actionIcon ทุนนักศึกษา — $actionThai",
+                    'color'  => '#ffffff',
+                    'weight' => 'bold',
+                    'size'   => 'md',
+                ]],
+            ],
+            'body' => [
+                'type'       => 'box',
+                'layout'     => 'vertical',
+                'spacing'    => 'sm',
+                'paddingAll' => '16px',
+                'contents'   => [
+                    ['type' => 'box', 'layout' => 'baseline', 'spacing' => 'sm', 'contents' => [
+                        ['type' => 'text', 'text' => 'ชื่อ', 'color' => '#64748b', 'size' => 'sm', 'flex' => 2],
+                        ['type' => 'text', 'text' => $studentName, 'size' => 'sm', 'weight' => 'bold', 'flex' => 5, 'wrap' => true],
+                    ]],
+                    ['type' => 'box', 'layout' => 'baseline', 'spacing' => 'sm', 'contents' => [
+                        ['type' => 'text', 'text' => 'รหัส', 'color' => '#64748b', 'size' => 'sm', 'flex' => 2],
+                        ['type' => 'text', 'text' => $studentCode ?: '—', 'size' => 'sm', 'flex' => 5],
+                    ]],
+                    ['type' => 'box', 'layout' => 'baseline', 'spacing' => 'sm', 'contents' => [
+                        ['type' => 'text', 'text' => 'คณะ', 'color' => '#64748b', 'size' => 'sm', 'flex' => 2],
+                        ['type' => 'text', 'text' => $faculty ?: '—', 'size' => 'sm', 'flex' => 5, 'wrap' => true],
+                    ]],
+                    ['type' => 'box', 'layout' => 'baseline', 'spacing' => 'sm', 'contents' => [
+                        ['type' => 'text', 'text' => 'เวลา', 'color' => '#64748b', 'size' => 'sm', 'flex' => 2],
+                        ['type' => 'text', 'text' => $eventTime, 'size' => 'sm', 'flex' => 5],
+                    ]],
+                    ['type' => 'box', 'layout' => 'baseline', 'spacing' => 'sm', 'contents' => [
+                        ['type' => 'text', 'text' => 'GPS', 'color' => '#64748b', 'size' => 'sm', 'flex' => 2],
+                        ['type' => 'text', 'text' => $gpsText, 'size' => 'sm', 'color' => $gpsColor, 'flex' => 5],
+                    ]],
+                    ['type' => 'box', 'layout' => 'baseline', 'spacing' => 'sm', 'contents' => [
+                        ['type' => 'text', 'text' => 'ประเภท', 'color' => '#64748b', 'size' => 'sm', 'flex' => 2],
+                        ['type' => 'text', 'text' => $compThai, 'size' => 'sm', 'flex' => 5],
+                    ]],
+                    ['type' => 'separator', 'margin' => 'md'],
+                    ['type' => 'text', 'text' => "Log ID: #$logId", 'size' => 'xs', 'color' => '#94a3b8', 'margin' => 'sm'],
+                ],
+            ],
+            'footer' => [
+                'type'     => 'box',
+                'layout'   => 'horizontal',
+                'spacing'  => 'md',
+                'contents' => [
+                    [
+                        'type'   => 'button',
+                        'style'  => 'primary',
+                        'color'  => '#16a34a',
+                        'height' => 'sm',
+                        'action' => [
+                            'type'        => 'postback',
+                            'label'       => '✅ อนุมัติ',
+                            'data'        => "scholarship_approve:$logId",
+                            'displayText' => "อนุมัติ #$logId",
+                        ],
+                    ],
+                    [
+                        'type'   => 'button',
+                        'style'  => 'primary',
+                        'color'  => '#dc2626',
+                        'height' => 'sm',
+                        'action' => [
+                            'type'        => 'postback',
+                            'label'       => '❌ ปฏิเสธ',
+                            'data'        => "scholarship_reject:$logId",
+                            'displayText' => "ปฏิเสธ #$logId",
+                        ],
+                    ],
+                ],
+            ],
+        ],
+    ];
+}
+
+/**
+ * LINE Group registry (เก็บใน sys_site_settings key 'line.groups.discovered')
+ *
+ * เก็บเป็น JSON array ของ { id, type, name?, joined_at, last_seen_at, member_count? }
+ *   - type: 'group' | 'room'
+ *   - ทุก group ที่ OA ถูกเชิญเข้าจะถูก auto-save ผ่าน webhook 'join' event
+ *
+ * ใช้คู่กับ key 'line.group.default_id' (admin เลือกกลุ่มหลักที่จะ push)
+ */
+function line_groups_list(PDO $pdo): array {
+    try {
+        $stmt = $pdo->prepare("SELECT setting_value FROM sys_site_settings WHERE setting_key = 'line.groups.discovered' LIMIT 1");
+        $stmt->execute();
+        $json = (string)($stmt->fetchColumn() ?: '[]');
+        $arr = json_decode($json, true);
+        return is_array($arr) ? $arr : [];
+    } catch (Throwable $e) {
+        error_log('[line_groups_list] ' . $e->getMessage());
+        return [];
+    }
+}
+
+/**
+ * บันทึก/อัปเดต group เข้า registry (idempotent — เรียกซ้ำได้)
+ *
+ * @param string $type 'group' | 'room'
+ */
+function line_groups_upsert(PDO $pdo, string $groupId, string $type = 'group', ?string $name = null, ?int $memberCount = null): bool {
+    if ($groupId === '') return false;
+    try {
+        $groups = line_groups_list($pdo);
+        $now = date('c');
+        $found = false;
+        foreach ($groups as &$g) {
+            if (($g['id'] ?? '') === $groupId) {
+                $g['last_seen_at'] = $now;
+                if ($name !== null && $name !== '')         $g['name'] = $name;
+                if ($memberCount !== null)                  $g['member_count'] = $memberCount;
+                $found = true;
+                break;
+            }
+        }
+        unset($g);
+        if (!$found) {
+            $groups[] = [
+                'id'            => $groupId,
+                'type'          => $type,
+                'name'          => $name ?? '',
+                'joined_at'     => $now,
+                'last_seen_at'  => $now,
+                'member_count'  => $memberCount,
+            ];
+        }
+        $stmt = $pdo->prepare("INSERT INTO sys_site_settings (setting_key, setting_value)
+                               VALUES ('line.groups.discovered', :v)
+                               ON DUPLICATE KEY UPDATE setting_value = :v2");
+        $payload = json_encode($groups, JSON_UNESCAPED_UNICODE);
+        return $stmt->execute([':v' => $payload, ':v2' => $payload]);
+    } catch (Throwable $e) {
+        error_log('[line_groups_upsert] ' . $e->getMessage());
+        return false;
+    }
+}
+
+/**
+ * ลบ group ออกจาก registry (เมื่อ OA โดนเตะ/leave)
+ */
+function line_groups_remove(PDO $pdo, string $groupId): bool {
+    try {
+        $groups = line_groups_list($pdo);
+        $filtered = array_values(array_filter($groups, fn($g) => ($g['id'] ?? '') !== $groupId));
+        if (count($filtered) === count($groups)) return true;
+        $stmt = $pdo->prepare("UPDATE sys_site_settings SET setting_value = :v WHERE setting_key = 'line.groups.discovered'");
+        return $stmt->execute([':v' => json_encode($filtered, JSON_UNESCAPED_UNICODE)]);
+    } catch (Throwable $e) {
+        error_log('[line_groups_remove] ' . $e->getMessage());
+        return false;
+    }
+}
+
+/**
+ * คืน groupId เริ่มต้นที่ admin เลือกไว้ (สำหรับ push อัตโนมัติ เช่น SOS)
+ * คืน '' ถ้ายังไม่ได้ตั้ง
+ */
+function line_groups_get_default(PDO $pdo): string {
+    try {
+        $stmt = $pdo->prepare("SELECT setting_value FROM sys_site_settings WHERE setting_key = 'line.group.default_id' LIMIT 1");
+        $stmt->execute();
+        return (string)($stmt->fetchColumn() ?: '');
+    } catch (Throwable $e) {
+        error_log('[line_groups_get_default] ' . $e->getMessage());
+        return '';
+    }
 }
 
 /**

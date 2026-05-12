@@ -94,6 +94,19 @@ $apiKeySet = defined('GEMINI_API_KEY') && !empty(GEMINI_API_KEY);
 </div>
 
 <style>
+/* Feedback bar */
+.ai-feedback-bar { display:flex; align-items:center; gap:6px; margin-top:4px; margin-left:4px; }
+.ai-fb-btn { display:inline-flex; align-items:center; gap:3px; padding:3px 9px; border-radius:999px; font-size:11px; font-weight:700; border:1.5px solid #e2e8f0; background:#fff; cursor:pointer; color:#64748b; transition:all .15s; }
+.ai-fb-btn:hover       { border-color:#94a3b8; background:#f8fafc; }
+.ai-fb-btn.fb-up.selected   { background:#dcfce7; border-color:#86efac; color:#16a34a; }
+.ai-fb-btn.fb-down.selected { background:#fee2e2; border-color:#fca5a5; color:#dc2626; }
+.ai-fb-label { font-size:10px; color:#94a3b8; font-weight:600; }
+.ai-fb-comment-wrap { margin-top:6px; margin-left:4px; display:none; }
+.ai-fb-comment-wrap.show { display:flex; gap:6px; align-items:center; }
+.ai-fb-comment-input { flex:1; padding:4px 10px; border:1.5px solid #e2e8f0; border-radius:8px; font-size:12px; background:#fff; outline:none; }
+.ai-fb-comment-input:focus { border-color:#9333ea; }
+.ai-fb-done { font-size:10px; color:#64748b; font-weight:600; display:flex; align-items:center; gap:4px; }
+
 /* Markdown styles within bubbles */
 .ai-bubble-content h1, .ai-bubble-content h2 { font-weight: 800; margin: 10px 0 5px; }
 .ai-bubble-content p { margin: 5px 0; }
@@ -123,32 +136,107 @@ function aiScrollToBottom() {
     aiMsgContainer.scrollTop = aiMsgContainer.scrollHeight;
 }
 
-function aiAppendMessage(role, content) {
+// pendingQuestion เก็บ question ล่าสุดเพื่อแนบกับ feedback
+let _pendingQuestion = '';
+
+function aiAppendMessage(role, content, msgId) {
     const div = document.createElement('div');
     div.className = `flex gap-4 ${role === 'user' ? 'flex-row-reverse' : ''} group animate-in slide-in-from-bottom-2 duration-300`;
-    
+
     const iconClass = role === 'user' ? 'bg-purple-100 text-purple-600' : 'bg-slate-800 text-white';
     const icon = role === 'user' ? '<i class="fa-solid fa-user text-sm"></i>' : '<i class="fa-solid fa-robot text-sm"></i>';
-    const bubbleClass = role === 'user' 
-        ? 'bg-purple-600 text-white rounded-tr-none shadow-purple-100' 
+    const bubbleClass = role === 'user'
+        ? 'bg-purple-600 text-white rounded-tr-none shadow-purple-100'
         : 'bg-white border border-slate-200 text-slate-700 rounded-tl-none';
-    
+
     const label = role === 'user' ? 'YOU' : 'AI ASSISTANT';
+    const feedbackBar = role === 'ai' ? `
+        <div class="ai-feedback-bar" data-msg-id="${msgId||''}" data-answer="">
+            <span class="ai-fb-label">คำตอบนี้เป็นประโยชน์ไหม?</span>
+            <button type="button" class="ai-fb-btn fb-up" title="มีประโยชน์">
+                <i class="fa-regular fa-thumbs-up"></i>
+            </button>
+            <button type="button" class="ai-fb-btn fb-down" title="ไม่มีประโยชน์">
+                <i class="fa-regular fa-thumbs-down"></i>
+            </button>
+        </div>
+        <div class="ai-fb-comment-wrap">
+            <input type="text" class="ai-fb-comment-input" placeholder="บอกเราได้ว่าผิดตรงไหน (ไม่บังคับ)" maxlength="200">
+            <button type="button" class="ai-fb-send px-3 py-1 bg-slate-700 text-white text-xs font-bold rounded-lg hover:bg-slate-900">ส่ง</button>
+        </div>` : '';
 
     div.innerHTML = `
         <div class="w-9 h-9 rounded-xl ${iconClass} flex items-center justify-center flex-shrink-0">
             ${icon}
         </div>
-        <div class="space-y-2 max-w-[85%] ${role === 'user' ? 'text-right' : ''}">
+        <div class="space-y-1 max-w-[85%] ${role === 'user' ? 'text-right' : ''}">
             <div class="${bubbleClass} p-4 rounded-2xl shadow-sm text-sm leading-relaxed ai-bubble-content ${role === 'user' ? 'text-left' : ''}">
                 ${role === 'user' ? content : marked.parse(content)}
             </div>
             <div class="text-[10px] text-slate-400 font-bold ml-1">${label}</div>
+            ${feedbackBar}
         </div>
     `;
-    
+
     aiMsgContainer.appendChild(div);
     aiScrollToBottom();
+
+    // bind feedback buttons
+    if (role === 'ai') {
+        const bar      = div.querySelector('.ai-feedback-bar');
+        const cmtWrap  = div.querySelector('.ai-fb-comment-wrap');
+        const cmtInput = div.querySelector('.ai-fb-comment-input');
+        const sendBtn  = div.querySelector('.ai-fb-send');
+        const upBtn    = div.querySelector('.ai-fb-btn.fb-up');
+        const downBtn  = div.querySelector('.ai-fb-btn.fb-down');
+
+        // store raw answer text for submission
+        bar.dataset.answer = content;
+
+        function setRating(rating) {
+            upBtn.classList.toggle('selected',   rating ===  1);
+            downBtn.classList.toggle('selected', rating === -1);
+            bar.dataset.rating = String(rating);
+            if (rating === -1) {
+                cmtWrap.classList.add('show');
+            } else {
+                cmtWrap.classList.remove('show');
+                // submit immediately on 👍
+                submitFeedback(rating, '');
+            }
+        }
+
+        upBtn.addEventListener('click',   () => setRating( 1));
+        downBtn.addEventListener('click', () => setRating(-1));
+
+        sendBtn.addEventListener('click', () => {
+            const r = parseInt(bar.dataset.rating || '0', 10);
+            if (!r) return;
+            submitFeedback(r, cmtInput.value.trim());
+        });
+        cmtInput.addEventListener('keydown', e => {
+            if (e.key === 'Enter') { e.preventDefault(); sendBtn.click(); }
+        });
+
+        async function submitFeedback(rating, comment) {
+            const csrf = document.getElementById('global_csrf_token')?.value || '';
+            const fd   = new FormData();
+            fd.append('action',   'save_rating');
+            fd.append('rating',   String(rating));
+            fd.append('msg_id',   bar.dataset.msgId || '');
+            fd.append('question', _pendingQuestion);
+            fd.append('answer',   bar.dataset.answer);
+            fd.append('comment',  comment);
+            fd.append('source',   'portal_chat');
+            fd.append('csrf_token', csrf);
+            try {
+                await fetch('ajax_ai_feedback.php', { method: 'POST', body: fd });
+            } catch (_) {}
+            // replace feedback bar with "ขอบคุณ" note
+            cmtWrap.classList.remove('show');
+            bar.innerHTML = `<span class="ai-fb-done"><i class="fa-solid fa-check-circle text-emerald-500"></i> ขอบคุณสำหรับ feedback ครับ</span>`;
+        }
+    }
 }
 
 function aiShowTyping() {
@@ -179,6 +267,7 @@ async function aiSendMessage() {
     const text = aiInput.value.trim();
     if (!text || aiSendBtn.disabled) return;
 
+    _pendingQuestion = text;
     aiInput.value = '';
     aiInput.style.height = '';
     aiSendBtn.disabled = true;
@@ -189,7 +278,7 @@ async function aiSendMessage() {
     try {
         const formData = new FormData();
         formData.append('m', text);
-        
+
         // Get CSRF token from global input
         const csrfToken = document.getElementById('global_csrf_token')?.value || '';
         formData.append('csrf_token', csrfToken);
@@ -203,7 +292,7 @@ async function aiSendMessage() {
         aiHideTyping();
 
         if (data.ok) {
-            aiAppendMessage('ai', data.reply);
+            aiAppendMessage('ai', data.reply, data.msg_id || '');
         } else {
             aiAppendMessage('ai', `❌ เกิดข้อผิดพลาด: ${data.error}`);
         }

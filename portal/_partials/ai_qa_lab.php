@@ -13,7 +13,27 @@ ensure_ai_qa_schema($pdo);
 ensure_ai_faq_schema($pdo);
 
 $_qa_tab = (string)($_GET['qa_tab'] ?? 'captured');
-if (!in_array($_qa_tab, ['captured', 'faq'], true)) $_qa_tab = 'captured';
+if (!in_array($_qa_tab, ['captured', 'faq', 'feedback', 'sandbox', 'autoreply'], true)) $_qa_tab = 'captured';
+
+require_once __DIR__ . '/../../includes/ai_feedback_helper.php';
+ensure_ai_feedback_schema($pdo);
+
+// ── Prefill LINE User ID สำหรับ tab "Auto-Reply" → Test Send panel ───────
+$_prefillLineId = '';
+if (!empty($_SESSION['student_id'])) {
+    try {
+        $_stmtLine = $pdo->prepare("SELECT line_user_id, line_user_id_new FROM sys_users WHERE id = :id LIMIT 1");
+        $_stmtLine->execute([':id' => (int)$_SESSION['student_id']]);
+        $_rowLine = $_stmtLine->fetch(PDO::FETCH_ASSOC);
+        if ($_rowLine) {
+            $_prefillLineId = (string)($_rowLine['line_user_id_new'] ?: $_rowLine['line_user_id'] ?: '');
+        }
+    } catch (Throwable) {
+        $_prefillLineId = (string)($_SESSION['line_user_id'] ?? '');
+    }
+} else {
+    $_prefillLineId = (string)($_SESSION['line_user_id'] ?? '');
+}
 
 // ── Filters ──────────────────────────────────────────────────────────────────
 $_qa_page     = max(1, (int)($_GET['page'] ?? 1));
@@ -258,7 +278,37 @@ function _qa_source_badge(string $s): string {
     }
     .qa-tab:hover { color: #1f2937; }
     .qa-tab.qa-tab-active--captured { color: #7c3aed; border-bottom-color: #9333ea; }
-    .qa-tab.qa-tab-active--faq { color: #047857; border-bottom-color: #059669; }
+    .qa-tab.qa-tab-active--faq      { color: #047857; border-bottom-color: #059669; }
+    .qa-tab.qa-tab-active--feedback { color: #0369a1; border-bottom-color: #0284c7; }
+    .qa-tab.qa-tab-active--sandbox  { color: #7c3aed; border-bottom-color: #7c3aed; }
+    .qa-tab.qa-tab-active--autoreply{ color: #0ea5e9; border-bottom-color: #0ea5e9; }
+    /* ── Auto-Reply tab styling (ports from line_settings) ── */
+    .line-input { background:#f8fafc; border:1.5px solid #e2e8f0; border-radius:.75rem; padding:.625rem .875rem; font-size:13px; font-weight:600; color:#1e293b; outline:none; width:100%; transition:all .15s; box-sizing:border-box; }
+    .line-input:focus { background:#fff; border-color:#06b6d4; box-shadow:0 0 0 3px rgba(6,182,212,.1); }
+    .line-label { display:block; font-size:.75rem; font-weight:800; color:#4b5563; text-transform:uppercase; letter-spacing:.05em; margin-bottom:.5rem; }
+    .line-card  { background:#fff; border-radius:1.5rem; border:1.5px solid #e5e7eb; padding:1.75rem; margin-bottom:1.25rem; }
+    .line-toggle { --toggle-on:#0ea5e9; position:relative; display:inline-block; width:44px; height:24px; flex-shrink:0; }
+    .line-toggle input { position:absolute; opacity:0; width:0; height:0; }
+    .line-toggle .line-toggle-slider { position:absolute; inset:0; background:#cbd5e1; border-radius:999px; cursor:pointer; transition:.2s; }
+    .line-toggle .line-toggle-slider::before { content:''; position:absolute; height:18px; width:18px; left:3px; top:3px; background:#fff; border-radius:50%; transition:.2s; }
+    .line-toggle input:checked + .line-toggle-slider { background:var(--toggle-on); }
+    .line-toggle input:checked + .line-toggle-slider::before { transform:translateX(20px); }
+    .line-toggle.line-toggle--purple { --toggle-on:#7c3aed; }
+    /* sandbox */
+    #sb-answer-box { font-size:14px; line-height:1.7; }
+    #sb-answer-box h1,#sb-answer-box h2 { font-weight:800; margin:10px 0 5px; }
+    #sb-answer-box p  { margin:5px 0; }
+    #sb-answer-box ul,#sb-answer-box ol { padding-left:20px; margin:5px 0; }
+    #sb-answer-box code { background:#f1f5f9; padding:2px 5px; border-radius:4px; font-family:monospace; font-size:12px; color:#ef4444; }
+    #sb-context-pre  { font-family:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace; font-size:11px; line-height:1.55; white-space:pre-wrap; word-break:break-all; max-height:400px; overflow-y:auto; }
+    .sb-chunk-row { border:1.5px solid #e2e8f0; border-radius:10px; padding:10px 14px; }
+    .sb-score-bar-bg { background:#e2e8f0; border-radius:999px; height:6px; }
+    .sb-score-bar    { background:#7c3aed; border-radius:999px; height:6px; transition:width .4s; }
+    .sb-fb-btn.selected-up   { background:#dcfce7; border-color:#86efac; }
+    .sb-fb-btn.selected-up i { color:#16a34a; }
+    .sb-fb-btn.selected-down   { background:#fee2e2; border-color:#fca5a5; }
+    .sb-fb-btn.selected-down i { color:#dc2626; }
+    .sb-fb-done { font-size:12px; color:#16a34a; font-weight:700; display:inline-flex; align-items:center; gap:6px; }
 
     #vchecks { max-height: 24rem; overflow-y: auto; }
 </style>
@@ -321,6 +371,18 @@ function _qa_source_badge(string $s): string {
         <a href="?section=ai_qa_lab&qa_tab=faq"
            class="qa-tab <?= $_qa_tab === 'faq' ? 'qa-tab-active--faq' : '' ?>">
             <i class="fa-solid fa-book-bookmark mr-1.5"></i> FAQ Knowledge Base
+        </a>
+        <a href="?section=ai_qa_lab&qa_tab=feedback"
+           class="qa-tab <?= $_qa_tab === 'feedback' ? 'qa-tab-active--feedback' : '' ?>">
+            <i class="fa-solid fa-thumbs-up mr-1.5"></i> Feedback Log
+        </a>
+        <a href="?section=ai_qa_lab&qa_tab=sandbox"
+           class="qa-tab <?= $_qa_tab === 'sandbox' ? 'qa-tab-active--sandbox' : '' ?>">
+            <i class="fa-solid fa-flask mr-1.5"></i> Sandbox
+        </a>
+        <a href="?section=ai_qa_lab&qa_tab=autoreply"
+           class="qa-tab <?= $_qa_tab === 'autoreply' ? 'qa-tab-active--autoreply' : '' ?>">
+            <i class="fa-solid fa-comments mr-1.5"></i> Auto-Reply
         </a>
     </div>
 
@@ -574,7 +636,7 @@ function _qa_source_badge(string $s): string {
         <?php endif; ?>
     </div>
 
-    <?php else: /* ════════════ TAB: FAQ KNOWLEDGE BASE ════════════ */ ?>
+    <?php elseif ($_qa_tab === 'faq'): /* ════════════ TAB: FAQ KNOWLEDGE BASE ════════════ */ ?>
 
     <!-- FAQ Stats -->
     <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
@@ -699,6 +761,394 @@ function _qa_source_badge(string $s): string {
         </div>
         <?php endif; ?>
     </div>
+
+    <?php elseif ($_qa_tab === 'autoreply'): /* ════════ TAB: AUTO-REPLY (เวลาเปิด/ปิด) ════════ */ ?>
+
+    <div class="line-card shadow-sm" style="border-top:4px solid #0ea5e9">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:18px">
+            <div>
+                <h3 style="font-weight:900;color:#0f172a;font-size:15px;margin-bottom:4px">
+                    <i class="fa-solid fa-robot" style="color:#0ea5e9;margin-right:6px"></i>FAQ ตอบอัตโนมัติ — เวลาเปิด/ปิด
+                </h3>
+                <p style="color:#64748b;font-size:12px;font-weight:500;line-height:1.5">
+                    บอท LINE จะตอบอัตโนมัติเมื่อ user ถามคำถามเกี่ยวกับเวลาเปิด-ปิด เช่น "วันนี้คลินิกเปิดไหม", "เปิดกี่โมง", "ตารางแพทย์วันนี้"
+                </p>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px">
+                <span id="faq-status-badge" style="display:none;font-size:11px;font-weight:800;padding:6px 12px;border-radius:99px"></span>
+                <button type="button" onclick="faqLoadDefaults()"
+                    style="font-size:11px;font-weight:800;color:#64748b;background:#f1f5f9;border:none;border-radius:8px;padding:7px 12px;cursor:pointer">
+                    <i class="fa-solid fa-rotate-left"></i> รีเซ็ต
+                </button>
+            </div>
+        </div>
+
+        <form id="faqForm" onsubmit="return false" style="display:grid;gap:18px">
+            <!-- Master toggle + only_when_closed + rate limit -->
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;padding:14px;background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:14px">
+                <label style="display:flex;align-items:center;gap:12px;cursor:pointer">
+                    <span class="line-toggle">
+                        <input type="checkbox" id="faq_enabled" name="enabled" value="1">
+                        <span class="line-toggle-slider"></span>
+                    </span>
+                    <div>
+                        <div style="font-size:13px;font-weight:800;color:#0f172a">เปิดใช้งาน FAQ</div>
+                        <div style="font-size:11px;color:#64748b;font-weight:500">ปิดเพื่อให้บอทไม่ตอบอัตโนมัติ</div>
+                    </div>
+                </label>
+                <label style="display:flex;align-items:center;gap:12px;cursor:pointer;border-left:1.5px solid #e2e8f0;padding-left:14px">
+                    <span class="line-toggle line-toggle--purple">
+                        <input type="checkbox" id="faq_only_when_closed" name="only_when_closed" value="1">
+                        <span class="line-toggle-slider"></span>
+                    </span>
+                    <div>
+                        <div style="font-size:13px;font-weight:800;color:#0f172a">ตอบเฉพาะตอนปิด</div>
+                        <div style="font-size:11px;color:#64748b;font-weight:500">คลินิกเปิดอยู่ → บอทไม่ตอบ FAQ</div>
+                    </div>
+                </label>
+                <div style="border-left:1.5px solid #e2e8f0;padding-left:14px">
+                    <label class="line-label" style="margin-bottom:6px">จำกัดการตอบ (ชั่วโมง / user / คำถาม)</label>
+                    <div style="display:flex;align-items:center;gap:8px">
+                        <input type="number" id="faq_rate_limit_hours" name="rate_limit_hours" min="0" max="720"
+                            class="line-input" style="padding:8px 12px;font-size:13px;font-weight:700;width:90px">
+                        <span style="font-size:11px;color:#64748b;font-weight:600">ชั่วโมง<br>(0 = ไม่จำกัด, 24 = วันละครั้ง)</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Default reply toggle -->
+            <label style="display:flex;align-items:center;gap:14px;padding:14px 16px;border:1.5px solid #e2e8f0;border-radius:12px;cursor:pointer;background:#fafafa;margin-top:12px">
+                <span class="line-toggle line-toggle--purple">
+                    <input type="checkbox" id="faq_default_reply_enabled" name="default_reply_enabled" value="1">
+                    <span class="line-toggle-slider"></span>
+                </span>
+                <div style="flex:1">
+                    <div style="font-size:13px;font-weight:800;color:#0f172a">ส่งข้อความ "เราได้รับข้อความของคุณแล้ว..."</div>
+                    <div style="font-size:11px;color:#64748b;font-weight:500">เมื่อ AI matcher ไม่ match — ปิดเพื่อกัน reply ซ้อนกับ LINE OA auto-reply</div>
+                </div>
+            </label>
+
+            <!-- Blocked keywords -->
+            <div style="background:#fff7ed;border:1.5px solid #fed7aa;border-radius:12px;padding:14px 16px;margin-top:12px">
+                <label class="line-label" style="margin-bottom:6px;display:flex;align-items:center;gap:8px;color:#9a3412">
+                    <i class="fa-solid fa-ban"></i>
+                    Keywords ที่ webhook จะไม่ตอบ
+                </label>
+                <div style="font-size:11px;color:#9a3412;font-weight:600;margin-bottom:8px;line-height:1.5">
+                    ถ้าข้อความที่ user ส่งมีคำใดคำหนึ่งในรายการนี้ ระบบจะ <b>ไม่ตอบกลับเลย</b> (ทั้ง AI และ default reply)
+                    — เหมาะสำหรับคำที่ตั้ง <b>LINE OA built-in keyword auto-reply</b> ไว้แล้ว เพื่อกันตอบซ้ำ
+                </div>
+                <textarea id="faq_blocked_keywords" name="blocked_keywords" rows="3"
+                    placeholder="วัคซีน,&#10;HPV,&#10;ฉีด"
+                    class="line-input"
+                    style="padding:10px 12px;font-size:13px;font-family:monospace;width:100%;resize:vertical;min-height:80px"></textarea>
+                <div style="font-size:11px;color:#9a3412;font-weight:500;margin-top:6px">
+                    คั่นด้วย <code>,</code> หรือขึ้นบรรทัดใหม่ · match แบบ case-insensitive substring
+                </div>
+            </div>
+
+            <!-- Placeholder hint -->
+            <div style="background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:12px;padding:12px 14px">
+                <div style="font-size:11px;font-weight:800;color:#1e40af;margin-bottom:6px">
+                    <i class="fa-solid fa-circle-info"></i> ตัวแปรที่ใช้ใน Template ได้
+                </div>
+                <div style="display:flex;flex-wrap:wrap;gap:6px">
+                    <?php foreach ([
+                        '{open_time}' => 'เวลาเปิดวันนี้',
+                        '{close_time}' => 'เวลาปิดวันนี้',
+                        '{time_left}' => 'เวลาที่เหลือก่อนเปิด/ปิด',
+                        '{next_label}' => '"พรุ่งนี้" / "วันจันทร์ที่ 12 พ.ค."',
+                        '{next_time}' => 'เวลาเปิดวันถัดไป',
+                    ] as $ph => $desc): ?>
+                    <span title="<?= htmlspecialchars($desc) ?>"
+                        style="font-family:monospace;font-size:11px;font-weight:800;background:#fff;border:1px solid #93c5fd;color:#1e3a8a;padding:3px 8px;border-radius:6px;cursor:help">
+                        <?= htmlspecialchars($ph) ?>
+                    </span>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+
+            <!-- 4 message states -->
+            <?php
+            $arStates = [
+                ['key' => 'open_now',     'label' => 'กำลังเปิดทำการ', 'color' => '#059669', 'bg' => '#ecfdf5', 'icon' => 'fa-circle-check'],
+                ['key' => 'before_open',  'label' => 'ยังไม่ถึงเวลาเปิด', 'color' => '#d97706', 'bg' => '#fffbeb', 'icon' => 'fa-clock'],
+                ['key' => 'after_close',  'label' => 'หลังเวลาปิด',     'color' => '#dc2626', 'bg' => '#fef2f2', 'icon' => 'fa-moon'],
+                ['key' => 'closed_today', 'label' => 'วันหยุด',         'color' => '#9333ea', 'bg' => '#faf5ff', 'icon' => 'fa-calendar-xmark'],
+            ];
+            ?>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:14px">
+            <?php foreach ($arStates as $s): ?>
+                <div style="border:1.5px solid #e2e8f0;border-radius:14px;overflow:hidden">
+                    <div style="background:<?= $s['bg'] ?>;padding:10px 14px;display:flex;align-items:center;gap:8px;border-bottom:1px solid #e2e8f0">
+                        <i class="fa-solid <?= $s['icon'] ?>" style="color:<?= $s['color'] ?>;font-size:13px"></i>
+                        <span style="font-size:12px;font-weight:900;color:<?= $s['color'] ?>;text-transform:uppercase;letter-spacing:.05em"><?= htmlspecialchars($s['label']) ?></span>
+                    </div>
+                    <div style="padding:14px;display:grid;gap:10px">
+                        <div>
+                            <label class="line-label" style="margin-bottom:4px;font-size:10px">หัวข้อ (Title)</label>
+                            <input type="text" id="msg_<?= $s['key'] ?>_title" name="msg_<?= $s['key'] ?>_title"
+                                class="line-input" style="padding:8px 12px;font-size:13px" maxlength="160">
+                        </div>
+                        <div>
+                            <label class="line-label" style="margin-bottom:4px;font-size:10px">ข้อความรอง (Subtitle)</label>
+                            <input type="text" id="msg_<?= $s['key'] ?>_sub" name="msg_<?= $s['key'] ?>_sub"
+                                class="line-input" style="padding:8px 12px;font-size:13px" maxlength="255">
+                        </div>
+                    </div>
+                </div>
+            <?php endforeach; ?>
+            </div>
+
+            <!-- Save button -->
+            <div style="display:flex;align-items:center;gap:12px;padding-top:6px;flex-wrap:wrap">
+                <button type="button" onclick="faqSave()" id="faqSaveBtn"
+                    style="padding:11px 22px;background:#0ea5e9;color:#fff;border:none;border-radius:12px;font-weight:900;font-size:13px;cursor:pointer;box-shadow:0 4px 12px rgba(14,165,233,.3);display:flex;align-items:center;gap:8px">
+                    <i class="fa-solid fa-floppy-disk"></i> บันทึกการตั้งค่า
+                </button>
+                <button type="button" onclick="faqPurgeLog()"
+                    style="padding:11px 16px;background:#f1f5f9;color:#475569;border:none;border-radius:12px;font-weight:800;font-size:12px;cursor:pointer">
+                    <i class="fa-solid fa-broom"></i> ลบ log เก่ากว่า 30 วัน
+                </button>
+                <span id="faqSaveStatus" style="display:none;font-size:12px;font-weight:800"></span>
+            </div>
+        </form>
+
+        <!-- Test/Preview Panel -->
+        <div style="margin-top:22px;padding:18px;background:linear-gradient(135deg,#f0f9ff,#ecfeff);border:1.5px solid #bae6fd;border-radius:16px">
+            <div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:14px;flex-wrap:wrap">
+                <div style="flex:1;min-width:220px">
+                    <h4 style="font-weight:900;color:#0c4a6e;font-size:13px;margin-bottom:4px">
+                        <i class="fa-solid fa-flask" style="color:#0ea5e9;margin-right:6px"></i>ทดสอบส่งให้ตัวเอง
+                    </h4>
+                    <p style="color:#475569;font-size:11px;font-weight:600;line-height:1.55">
+                        เลือก state แล้วกดส่ง — ระบบจะ push flex จริงไป LINE ของผู้รับเพื่อให้ดูข้อความที่ user จะเห็น
+                        (ใช้ค่าจากฟอร์มที่กำลังแก้ — ไม่ต้องบันทึกก่อน)
+                    </p>
+                </div>
+            </div>
+
+            <div style="display:grid;gap:12px">
+                <div>
+                    <label class="line-label" style="margin-bottom:6px">เลือก State</label>
+                    <div style="display:flex;flex-wrap:wrap;gap:8px">
+                        <?php foreach ([
+                            'open_now'     => ['label' => 'กำลังเปิด',     'color' => '#059669', 'bg' => '#ecfdf5', 'icon' => 'fa-circle-check'],
+                            'before_open'  => ['label' => 'ยังไม่ถึงเวลาเปิด', 'color' => '#d97706', 'bg' => '#fffbeb', 'icon' => 'fa-clock'],
+                            'after_close'  => ['label' => 'หลังเวลาปิด',   'color' => '#dc2626', 'bg' => '#fef2f2', 'icon' => 'fa-moon'],
+                            'closed_today' => ['label' => 'วันหยุด',       'color' => '#9333ea', 'bg' => '#faf5ff', 'icon' => 'fa-calendar-xmark'],
+                        ] as $key => $cfg): ?>
+                        <label style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border:1.5px solid #e2e8f0;background:<?= $cfg['bg'] ?>;border-radius:10px;cursor:pointer;font-size:12px;font-weight:800;color:<?= $cfg['color'] ?>;transition:all .15s">
+                            <input type="radio" name="faq_test_state" value="<?= $key ?>" <?= $key === 'open_now' ? 'checked' : '' ?>
+                                style="accent-color:<?= $cfg['color'] ?>">
+                            <i class="fa-solid <?= $cfg['icon'] ?>" style="font-size:11px"></i>
+                            <?= htmlspecialchars($cfg['label']) ?>
+                        </label>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+
+                <div style="display:grid;grid-template-columns:1fr auto;gap:10px;align-items:end">
+                    <div>
+                        <label class="line-label" style="margin-bottom:6px">LINE User ID ผู้รับ</label>
+                        <input type="text" id="faqTestUserId" class="line-input font-mono"
+                            style="padding:9px 14px;font-size:12px"
+                            placeholder="Uxxxxxxxxxxxxxxxx"
+                            value="<?= htmlspecialchars($_prefillLineId) ?>">
+                    </div>
+                    <button type="button" onclick="faqTestSend()" id="faqTestBtn"
+                        style="padding:11px 22px;background:#0c4a6e;color:#fff;border:none;border-radius:12px;font-weight:900;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:8px;white-space:nowrap;box-shadow:0 4px 12px rgba(12,74,110,.25)">
+                        <i class="fa-brands fa-line"></i> ส่งทดสอบ
+                    </button>
+                </div>
+                <div id="faqTestStatus" style="display:none;font-size:12px;font-weight:700;padding:8px 12px;border-radius:8px"></div>
+            </div>
+        </div>
+    </div>
+
+    <?php elseif ($_qa_tab === 'sandbox'): /* ════════════ TAB: SANDBOX ════════════ */ ?>
+
+    <div class="max-w-3xl mx-auto">
+
+        <!-- Suggestion chips -->
+        <div class="flex gap-2 flex-wrap mb-3">
+            <?php foreach (['คลินิกเปิดกี่โมง?','พรุ่งนี้มีหมอไหม?','บริการที่ให้มีอะไรบ้าง?','ราคาตรวจสุขภาพ','ติดต่อคลินิกอย่างไร?','วันเสาร์เปิดไหม?'] as $sq): ?>
+            <button type="button" class="sb-suggest px-3 py-1.5 bg-white border border-violet-200 text-violet-700 text-xs font-bold rounded-full hover:bg-violet-50" data-q="<?= htmlspecialchars($sq) ?>">
+                <?= htmlspecialchars($sq) ?>
+            </button>
+            <?php endforeach; ?>
+        </div>
+
+        <!-- Question input -->
+        <div class="bg-white border border-gray-200 rounded-2xl p-5 mb-4">
+            <label class="block text-sm font-black text-gray-800 mb-2">
+                <i class="fa-solid fa-flask text-violet-600 mr-1.5"></i>ถามคำถามทดสอบ
+            </label>
+            <textarea id="sb-question" rows="3"
+                class="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:border-violet-500 resize-none"
+                placeholder="เช่น คลินิกเปิดกี่โมง? หรือ บริการอะไรบ้าง? หรือ ราคาตรวจสุขภาพเท่าไหร่?"></textarea>
+            <div class="flex items-center justify-between mt-3">
+                <p class="text-xs text-gray-400">คำถามจะผ่าน FAQ matcher → Semantic search (chunks) → Gemini generate</p>
+                <button id="sb-ask-btn" class="px-5 py-2 bg-violet-600 text-white text-sm font-bold rounded-xl hover:bg-violet-700 flex items-center gap-2">
+                    <i class="fa-solid fa-paper-plane"></i> ถาม
+                </button>
+            </div>
+        </div>
+
+        <!-- Result panel (hidden until asked) -->
+        <div id="sb-result" class="hidden space-y-4">
+
+            <!-- Answer -->
+            <div class="bg-white border-2 border-violet-200 rounded-2xl p-5">
+                <div class="flex items-start justify-between gap-3 mb-3">
+                    <h3 class="font-black text-gray-900 flex items-center gap-2">
+                        <i class="fa-solid fa-robot text-violet-600"></i> คำตอบ
+                    </h3>
+                    <div class="flex gap-1.5 flex-wrap justify-end" id="sb-meta-chips"></div>
+                </div>
+                <div id="sb-answer-box" class="text-gray-800"></div>
+
+                <!-- Feedback bar -->
+                <div class="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between gap-3 flex-wrap">
+                    <div id="sb-fb-bar" class="flex items-center gap-2">
+                        <span class="text-xs text-gray-500 font-medium">คำตอบนี้ดีไหม?</span>
+                        <button type="button" id="sb-fb-up" class="sb-fb-btn px-3 py-1.5 border border-gray-300 rounded-full text-sm hover:bg-emerald-50 hover:border-emerald-300 transition-colors">
+                            <i class="fa-regular fa-thumbs-up text-gray-500"></i>
+                        </button>
+                        <button type="button" id="sb-fb-down" class="sb-fb-btn px-3 py-1.5 border border-gray-300 rounded-full text-sm hover:bg-rose-50 hover:border-rose-300 transition-colors">
+                            <i class="fa-regular fa-thumbs-down text-gray-500"></i>
+                        </button>
+                    </div>
+                    <button id="sb-save-faq-btn" class="hidden px-4 py-1.5 bg-emerald-600 text-white text-xs font-bold rounded-lg hover:bg-emerald-700">
+                        <i class="fa-solid fa-book-bookmark mr-1"></i> บันทึกเป็น FAQ
+                    </button>
+                </div>
+
+                <!-- Comment box (revealed on 👎) -->
+                <div id="sb-fb-comment-wrap" class="hidden mt-2 flex gap-2 items-center">
+                    <input type="text" id="sb-fb-comment" class="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-rose-400" placeholder="บอกเราหน่อยว่าผิดตรงไหน (ไม่บังคับ)" maxlength="200">
+                    <button id="sb-fb-send" class="px-4 py-1.5 bg-slate-700 text-white text-xs font-bold rounded-lg hover:bg-slate-900">ส่ง</button>
+                </div>
+            </div>
+
+            <!-- Chunks retrieved -->
+            <div id="sb-chunks-section" class="bg-white border border-indigo-200 rounded-2xl p-5 hidden">
+                <h3 class="font-black text-gray-900 flex items-center gap-2 mb-3">
+                    <i class="fa-solid fa-cubes text-indigo-600"></i> Chunks ที่ดึงมา
+                    <span class="text-xs text-indigo-500 font-normal">(semantic search top-5)</span>
+                </h3>
+                <div id="sb-chunks-list" class="space-y-2"></div>
+            </div>
+
+            <!-- FAQ match notice -->
+            <div id="sb-faq-match-box" class="hidden bg-emerald-50 border border-emerald-200 rounded-2xl p-4">
+                <div class="flex items-center gap-2 text-emerald-700 font-bold text-sm mb-1">
+                    <i class="fa-solid fa-circle-check"></i> พบคำตอบตรงจาก FAQ Knowledge Base
+                </div>
+                <div id="sb-faq-match-text" class="text-sm text-emerald-800 leading-relaxed"></div>
+            </div>
+
+            <!-- Doctor schedule debug -->
+            <div id="sb-debug-schedule" class="bg-amber-50 border border-amber-200 rounded-2xl p-4 hidden">
+                <div class="flex items-center gap-2 text-amber-800 font-bold text-sm mb-2">
+                    <i class="fa-solid fa-stethoscope"></i> Raw ตารางหมอ (DB)
+                    <span class="text-xs text-amber-600 font-normal">— ใช้ debug ว่า AI เห็นข้อมูลถูกหรือเปล่า</span>
+                </div>
+                <div id="sb-debug-schedule-body" class="space-y-2"></div>
+
+                <!-- Inventory summary -->
+                <div id="sb-debug-inventory" class="mt-3 pt-3 border-t border-amber-200 hidden">
+                    <div class="text-xs font-bold text-amber-800 mb-2">📦 DB Inventory (sys_doctor_schedule)</div>
+                    <div id="sb-debug-inv-body" class="text-xs text-amber-900"></div>
+                </div>
+            </div>
+
+            <!-- Context preview -->
+            <details class="bg-slate-900 rounded-2xl overflow-hidden">
+                <summary class="px-5 py-3 text-sm font-bold text-slate-300 cursor-pointer select-none flex items-center gap-2 hover:text-white">
+                    <i class="fa-solid fa-code text-slate-400"></i>
+                    Context ที่ส่งให้ AI
+                    <span id="sb-ctx-chars" class="ml-auto text-xs text-slate-500 font-normal"></span>
+                </summary>
+                <pre id="sb-context-pre" class="px-5 pb-5 pt-0 text-slate-300 sb-context-pre"></pre>
+            </details>
+
+        </div>
+
+        <!-- Loading state -->
+        <div id="sb-loading" class="hidden text-center py-12">
+            <i class="fa-solid fa-spinner fa-spin text-3xl text-violet-400 mb-3 block"></i>
+            <div class="text-sm font-bold text-gray-500">กำลังถาม AI...</div>
+            <div class="text-xs text-gray-400 mt-1">FAQ match → Semantic search → Generate</div>
+        </div>
+
+        <!-- Error state -->
+        <div id="sb-error" class="hidden bg-rose-50 border border-rose-200 rounded-2xl p-5 text-rose-700 text-sm font-medium"></div>
+
+    </div>
+
+    <?php elseif ($_qa_tab === 'feedback'): /* ════════════ TAB: FEEDBACK LOG ════════════ */ ?>
+
+    <!-- Summary cards -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+        <div class="bg-white border border-gray-200 rounded-xl p-4 text-center">
+            <div class="text-2xl font-black text-gray-900" id="fb-sum-total">—</div>
+            <div class="text-xs text-gray-500 mt-1">ทั้งหมด</div>
+        </div>
+        <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-center">
+            <div class="text-2xl font-black text-emerald-700" id="fb-sum-up">—</div>
+            <div class="text-xs text-emerald-600 mt-1"><i class="fa-solid fa-thumbs-up mr-1"></i>มีประโยชน์</div>
+        </div>
+        <div class="bg-rose-50 border border-rose-200 rounded-xl p-4 text-center">
+            <div class="text-2xl font-black text-rose-700" id="fb-sum-down">—</div>
+            <div class="text-xs text-rose-600 mt-1"><i class="fa-solid fa-thumbs-down mr-1"></i>ไม่มีประโยชน์</div>
+        </div>
+        <div class="bg-sky-50 border border-sky-200 rounded-xl p-4 text-center">
+            <div class="text-2xl font-black text-sky-700" id="fb-sum-pct">—</div>
+            <div class="text-xs text-sky-600 mt-1">% Positive</div>
+        </div>
+    </div>
+    <!-- Progress bar -->
+    <div class="mb-5 bg-gray-200 rounded-full h-2">
+        <div id="fb-pct-bar" class="bg-emerald-500 h-2 rounded-full transition-all duration-500" style="width:0%"></div>
+    </div>
+
+    <!-- Filters -->
+    <div class="flex items-center gap-2 mb-4 flex-wrap">
+        <span class="text-xs font-bold text-gray-500" id="fb-stats-total"></span>
+        <select id="fb-filter-rating" class="px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none">
+            <option value="">ทุก rating</option>
+            <option value="1">👍 มีประโยชน์</option>
+            <option value="-1">👎 ไม่มีประโยชน์</option>
+        </select>
+        <select id="fb-filter-source" class="px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none">
+            <option value="">ทุก source</option>
+            <option value="portal_chat">portal_chat</option>
+            <option value="line_faq">line_faq</option>
+        </select>
+    </div>
+
+    <!-- Table -->
+    <div class="bg-white border border-gray-200 rounded-xl overflow-hidden mb-3">
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead>
+                    <tr class="bg-gray-50">
+                        <th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">เวลา</th>
+                        <th class="px-4 py-3 text-center text-xs font-bold text-gray-500 uppercase">Rating</th>
+                        <th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">คำถาม</th>
+                        <th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">คำตอบ (ย่อ)</th>
+                        <th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">หมายเหตุ</th>
+                        <th class="px-4 py-3 text-center text-xs font-bold text-gray-500 uppercase">ลบ</th>
+                    </tr>
+                </thead>
+                <tbody id="fb-tbody">
+                    <tr><td colspan="6" class="text-center text-gray-400 py-8">กำลังโหลด...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <div id="fb-pagination" class="flex items-center justify-between text-sm"></div>
 
     <?php endif; /* end tab branch */ ?>
 </div>
@@ -1315,4 +1765,590 @@ function _qa_source_badge(string $s): string {
     }
     document.getElementById('faq-modal-save')?.addEventListener('click', faqSave);
 })();
+
+<?php if ($_qa_tab === 'autoreply'): ?>
+// ── FAQ Auto-reply Settings (ย้ายมาจาก line_settings) ─────────────────
+(function () {
+    'use strict';
+    var FAQ_KEYS = [
+        'msg_open_now_title','msg_open_now_sub',
+        'msg_before_open_title','msg_before_open_sub',
+        'msg_after_close_title','msg_after_close_sub',
+        'msg_closed_today_title','msg_closed_today_sub',
+    ];
+    var CSRF_AR = '<?= get_csrf_token() ?>';
+
+    function applySettings(s) {
+        document.getElementById('faq_enabled').checked = !!Number(s.enabled);
+        document.getElementById('faq_only_when_closed').checked = !!Number(s.only_when_closed);
+        document.getElementById('faq_rate_limit_hours').value = Number(s.rate_limit_hours || 0);
+        document.getElementById('faq_blocked_keywords').value = String(s.blocked_keywords || '');
+        document.getElementById('faq_default_reply_enabled').checked = !!Number(s.default_reply_enabled);
+        FAQ_KEYS.forEach(function (k) {
+            var el = document.getElementById(k);
+            if (el) el.value = s[k] || '';
+        });
+        renderEnabledBadge(!!Number(s.enabled));
+    }
+
+    function renderEnabledBadge(on) {
+        var b = document.getElementById('faq-status-badge');
+        if (!b) return;
+        b.style.display = '';
+        if (on) {
+            b.style.background = '#ecfdf5'; b.style.color = '#059669';
+            b.innerHTML = '<i class="fa-solid fa-circle-check"></i> เปิดใช้งาน';
+        } else {
+            b.style.background = '#fef2f2'; b.style.color = '#dc2626';
+            b.innerHTML = '<i class="fa-solid fa-circle-xmark"></i> ปิดใช้งาน';
+        }
+    }
+
+    function showStatus(msg, kind) {
+        var el = document.getElementById('faqSaveStatus');
+        if (!el) return;
+        el.style.display = '';
+        el.style.color = kind === 'ok' ? '#059669' : '#dc2626';
+        el.innerHTML = (kind === 'ok' ? '<i class="fa-solid fa-circle-check"></i> ' : '<i class="fa-solid fa-circle-exclamation"></i> ') + msg;
+        setTimeout(function(){ el.style.display = 'none'; }, 3500);
+    }
+
+    window.faqSave = function () {
+        var fd = new FormData(document.getElementById('faqForm'));
+        fd.append('csrf_token', CSRF_AR);
+        fd.append('action', 'save');
+        if (!document.getElementById('faq_enabled').checked) fd.set('enabled', '0');
+        if (!document.getElementById('faq_only_when_closed').checked) fd.set('only_when_closed', '0');
+        if (!document.getElementById('faq_default_reply_enabled').checked) fd.set('default_reply_enabled', '0');
+
+        var btn = document.getElementById('faqSaveBtn');
+        btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> กำลังบันทึก...';
+
+        fetch('ajax_line_faq.php', { method: 'POST', body: fd })
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+                if (d.ok) { applySettings(d.settings); showStatus(d.message || 'บันทึกแล้ว', 'ok'); }
+                else      { showStatus(d.error || d.message || 'บันทึกไม่สำเร็จ', 'err'); }
+            })
+            .catch(function (e) { showStatus('Network error: ' + e.message, 'err'); })
+            .finally(function () { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> บันทึกการตั้งค่า'; });
+    };
+
+    window.faqLoadDefaults = function () {
+        Swal.fire({
+            title: 'รีเซ็ตเป็นค่าเริ่มต้น?',
+            text: 'ข้อความและการตั้งค่าทั้งหมดจะกลับไปเป็นค่า default',
+            icon: 'warning', showCancelButton: true, confirmButtonText: 'รีเซ็ต', cancelButtonText: 'ยกเลิก',
+            confirmButtonColor: '#0ea5e9'
+        }).then(function (r) {
+            if (!r.isConfirmed) return;
+            var fd = new FormData();
+            fd.append('csrf_token', CSRF_AR);
+            fd.append('action', 'reset');
+            fetch('ajax_line_faq.php', { method: 'POST', body: fd })
+                .then(function (r) { return r.json(); })
+                .then(function (d) {
+                    if (d.ok) { applySettings(d.settings); showStatus(d.message, 'ok'); }
+                    else      { showStatus(d.error || 'รีเซ็ตไม่สำเร็จ', 'err'); }
+                });
+        });
+    };
+
+    window.faqPurgeLog = function () {
+        Swal.fire({
+            title: 'ลบ log การตอบ FAQ ที่เก่ากว่า 30 วัน?',
+            icon: 'question', showCancelButton: true, confirmButtonText: 'ลบ', cancelButtonText: 'ยกเลิก',
+            confirmButtonColor: '#dc2626'
+        }).then(function (r) {
+            if (!r.isConfirmed) return;
+            var fd = new FormData();
+            fd.append('csrf_token', CSRF_AR);
+            fd.append('action', 'purge_log');
+            fetch('ajax_line_faq.php', { method: 'POST', body: fd })
+                .then(function (r) { return r.json(); })
+                .then(function (d) { showStatus(d.message || (d.ok ? 'OK' : 'failed'), d.ok ? 'ok' : 'err'); });
+        });
+    };
+
+    document.getElementById('faq_enabled').addEventListener('change', function (e) {
+        renderEnabledBadge(e.target.checked);
+    });
+
+    // ── Test send ─────────────────────────────────────────────────────
+    function showTestStatus(msg, kind) {
+        var el = document.getElementById('faqTestStatus');
+        if (!el) return;
+        el.style.display = '';
+        if (kind === 'ok') {
+            el.style.background = '#ecfdf5'; el.style.color = '#059669'; el.style.border = '1px solid #a7f3d0';
+            el.innerHTML = '<i class="fa-solid fa-circle-check"></i> ' + msg;
+        } else {
+            el.style.background = '#fef2f2'; el.style.color = '#dc2626'; el.style.border = '1px solid #fecaca';
+            el.innerHTML = '<i class="fa-solid fa-circle-exclamation"></i> ' + msg;
+        }
+    }
+
+    window.faqTestSend = function () {
+        var stateInput = document.querySelector('input[name="faq_test_state"]:checked');
+        var state = stateInput ? stateInput.value : 'open_now';
+        var toUserId = document.getElementById('faqTestUserId').value.trim();
+        if (!toUserId) { showTestStatus('กรุณาระบุ LINE User ID ผู้รับ', 'err'); return; }
+
+        var fd = new FormData();
+        fd.append('csrf_token', CSRF_AR);
+        fd.append('action', 'test_send');
+        fd.append('state', state);
+        fd.append('to_user_id', toUserId);
+        fd.append('use_form_values', '1');
+        FAQ_KEYS.forEach(function (k) {
+            var el = document.getElementById(k);
+            if (el && el.value) fd.append(k, el.value);
+        });
+
+        var btn = document.getElementById('faqTestBtn');
+        btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> กำลังส่ง...';
+        document.getElementById('faqTestStatus').style.display = 'none';
+
+        fetch('ajax_line_faq.php', { method: 'POST', body: fd })
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+                if (d.ok) showTestStatus(d.message, 'ok');
+                else      showTestStatus(d.error || d.message || 'ส่งไม่สำเร็จ', 'err');
+            })
+            .catch(function (e) { showTestStatus('Network error: ' + e.message, 'err'); })
+            .finally(function () {
+                btn.disabled = false; btn.innerHTML = '<i class="fa-brands fa-line"></i> ส่งทดสอบ';
+            });
+    };
+
+    fetch('ajax_line_faq.php?action=get')
+        .then(function (r) { return r.json(); })
+        .then(function (d) { if (d.ok) applySettings(d.settings); });
+})();
+<?php endif; ?>
+
+<?php if ($_qa_tab === 'sandbox'): ?>
+(function () {
+'use strict';
+const CSRF = '<?= get_csrf_token() ?>';
+
+// marked.js — โหลดถ้ายังไม่มี
+if (typeof marked === 'undefined') {
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/marked@12.0.0/marked.min.js';
+    document.head.appendChild(s);
+}
+
+const qInput  = document.getElementById('sb-question');
+const askBtn  = document.getElementById('sb-ask-btn');
+const result  = document.getElementById('sb-result');
+const loading = document.getElementById('sb-loading');
+const errBox  = document.getElementById('sb-error');
+
+// state ของคำตอบล่าสุดเพื่อแนบกับ feedback
+let _lastQuestion = '';
+let _lastAnswer   = '';
+let _lastMsgId    = '';
+
+function escH(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+askBtn.addEventListener('click', doAsk);
+qInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); doAsk(); }
+});
+
+async function doAsk() {
+    const q = qInput.value.trim();
+    if (!q) return;
+
+    result.classList.add('hidden');
+    errBox.classList.add('hidden');
+    loading.classList.remove('hidden');
+    askBtn.disabled = true;
+    askBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> กำลังถาม...';
+
+    const fd = new FormData();
+    fd.append('action',   'ask');
+    fd.append('question', q);
+    fd.append('csrf_token', CSRF);
+
+    try {
+        const r = await fetch('ajax_ai_sandbox.php', { method: 'POST', body: fd });
+        const j = await r.json();
+        loading.classList.add('hidden');
+
+        if (!j.ok) {
+            errBox.textContent = j.error || 'เกิดข้อผิดพลาด';
+            errBox.classList.remove('hidden');
+            return;
+        }
+
+        renderResult(q, j);
+        result.classList.remove('hidden');
+        result.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+    } catch (e) {
+        loading.classList.add('hidden');
+        errBox.textContent = e.message;
+        errBox.classList.remove('hidden');
+    } finally {
+        askBtn.disabled = false;
+        askBtn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> ถาม';
+    }
+}
+
+function renderResult(question, j) {
+    // เก็บ state สำหรับ feedback
+    _lastQuestion = question;
+    _lastAnswer   = j.answer || '';
+    _lastMsgId    = 'sb_' + Date.now() + '_' + Math.random().toString(36).slice(2,8);
+
+    // reset feedback UI
+    document.getElementById('sb-fb-bar').style.display = 'flex';
+    document.getElementById('sb-fb-bar').innerHTML = `
+        <span class="text-xs text-gray-500 font-medium">คำตอบนี้ดีไหม?</span>
+        <button type="button" id="sb-fb-up" class="sb-fb-btn px-3 py-1.5 border border-gray-300 rounded-full text-sm hover:bg-emerald-50 hover:border-emerald-300 transition-colors">
+            <i class="fa-regular fa-thumbs-up text-gray-500"></i>
+        </button>
+        <button type="button" id="sb-fb-down" class="sb-fb-btn px-3 py-1.5 border border-gray-300 rounded-full text-sm hover:bg-rose-50 hover:border-rose-300 transition-colors">
+            <i class="fa-regular fa-thumbs-down text-gray-500"></i>
+        </button>
+    `;
+    document.getElementById('sb-fb-comment-wrap').classList.add('hidden');
+    document.getElementById('sb-fb-comment').value = '';
+    bindFeedback();
+
+    // ── Answer ────────────────────────────────────────────────────────────
+    const answerBox = document.getElementById('sb-answer-box');
+    answerBox.innerHTML = typeof marked !== 'undefined'
+        ? marked.parse(j.answer || '')
+        : escH(j.answer || '');
+
+    // ── Meta chips ────────────────────────────────────────────────────────
+    const chips = document.getElementById('sb-meta-chips');
+    chips.innerHTML = [
+        j.category   ? `<span class="px-2 py-0.5 bg-violet-100 text-violet-700 text-xs font-bold rounded-full">${escH(j.category)}</span>` : '',
+        j.confidence != null ? `<span class="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs font-bold rounded-full">${(j.confidence*100).toFixed(0)}% confident</span>` : '',
+        j.model      ? `<span class="px-2 py-0.5 bg-slate-100 text-slate-600 text-xs font-bold rounded-full">${escH(j.model)}</span>` : '',
+        j.elapsed_ms ? `<span class="px-2 py-0.5 bg-amber-50 text-amber-700 text-xs font-bold rounded-full">${j.elapsed_ms} ms</span>` : '',
+    ].join('');
+
+    // ── FAQ match ────────────────────────────────────────────────────────
+    const faqBox = document.getElementById('sb-faq-match-box');
+    if (j.matched_faq && j.faq_answer) {
+        document.getElementById('sb-faq-match-text').innerHTML = escH(j.faq_answer).replace(/\n/g,'<br>');
+        faqBox.classList.remove('hidden');
+    } else {
+        faqBox.classList.add('hidden');
+    }
+
+    // ── Chunks ────────────────────────────────────────────────────────────
+    const chunksSec  = document.getElementById('sb-chunks-section');
+    const chunksList = document.getElementById('sb-chunks-list');
+    if (j.chunks && j.chunks.length) {
+        chunksSec.classList.remove('hidden');
+        chunksList.innerHTML = j.chunks.map((c, i) => {
+            const pct = Math.round((c.score || 0) * 100);
+            const barColor = pct >= 80 ? 'bg-emerald-500' : pct >= 60 ? 'bg-amber-400' : 'bg-gray-400';
+            return `<div class="sb-chunk-row">
+                <div class="flex items-center justify-between gap-3 mb-1.5">
+                    <span class="text-sm font-bold text-gray-800">${i+1}. ${escH(c.title)}</span>
+                    <span class="text-xs font-bold text-violet-700 shrink-0">${pct}%</span>
+                </div>
+                <div class="sb-score-bar-bg mb-2">
+                    <div class="sb-score-bar ${barColor}" style="width:${pct}%"></div>
+                </div>
+                <div class="text-xs text-gray-500 line-clamp-2">${escH(c.content_preview)}...</div>
+                <div class="flex gap-2 mt-1.5">
+                    <span class="text-xs bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full font-medium">${escH(c.source_label)}</span>
+                </div>
+            </div>`;
+        }).join('');
+    } else {
+        chunksSec.classList.add('hidden');
+    }
+
+    // ── Doctor schedule debug ─────────────────────────────────────────────
+    const dbgBox  = document.getElementById('sb-debug-schedule');
+    const dbgBody = document.getElementById('sb-debug-schedule-body');
+    const WEEKDAY = ['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัส','ศุกร์','เสาร์'];
+    if (j.debug_schedule) {
+        dbgBox.classList.remove('hidden');
+        const entries = Object.values(j.debug_schedule);
+        dbgBody.innerHTML = entries.map(d => {
+            const rowsHtml = (d.rows||[]).length
+                ? '<table class="w-full text-xs"><thead><tr class="text-left bg-amber-100"><th class="px-2 py-1">staff_id</th><th class="px-2 py-1">ชื่อ</th><th class="px-2 py-1">type</th><th class="px-2 py-1">เวลา</th><th class="px-2 py-1">บริการ</th></tr></thead><tbody>' +
+                  d.rows.map(r => `<tr class="border-t border-amber-100"><td class="px-2 py-1">${r.staff_id||'-'}</td><td class="px-2 py-1">${escH((r.doc_title?r.doc_title+' ':'')+(r.doc_name||'-'))}</td><td class="px-2 py-1">${escH(r.type||'-')}</td><td class="px-2 py-1">${escH((r.start_time||'').substring(0,5))}–${escH((r.end_time||'').substring(0,5))}</td><td class="px-2 py-1">${escH(r.service||'-')}</td></tr>`).join('') +
+                  '</tbody></table>'
+                : '<div class="text-xs text-amber-600 italic">ไม่มี shift</div>';
+            return `<div class="bg-white border border-amber-200 rounded-lg p-3">
+                <div class="text-xs font-bold text-amber-900 mb-2">${escH(d.date)} (${WEEKDAY[d.weekday]||'-'}) — <span class="font-normal">${d.count} shift</span></div>
+                ${rowsHtml}
+            </div>`;
+        }).join('');
+    } else {
+        dbgBox.classList.add('hidden');
+    }
+
+    // ── DB Inventory (sys_doctor_schedule overall) ────────────────────────
+    const invBox  = document.getElementById('sb-debug-inventory');
+    const invBody = document.getElementById('sb-debug-inv-body');
+    if (j.debug_inventory) {
+        invBox.classList.remove('hidden');
+        const inv = j.debug_inventory;
+        const byTypeStr = Object.entries(inv.by_type||{}).map(([k,v]) => `<span class="inline-block bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full mx-1">${escH(k)}: ${v}</span>`).join('') || '<span class="text-amber-600 italic">ไม่มี</span>';
+            let samples = '';
+        if ((inv.samples||[]).length) {
+            samples = '<details class="mt-2" open><summary class="cursor-pointer font-bold text-amber-900">' + inv.samples.length + ' rows ล่าสุด (raw data)</summary><table class="w-full text-xs mt-1"><thead><tr class="bg-amber-100"><th class="px-1.5 py-1">id</th><th class="px-1.5 py-1">type</th><th class="px-1.5 py-1">weekday<br><span class="font-normal text-amber-600">(raw)</span></th><th class="px-1.5 py-1">specific_date</th><th class="px-1.5 py-1">recur_end_date</th><th class="px-1.5 py-1">time</th><th class="px-1.5 py-1">active</th><th class="px-1.5 py-1">หมอ</th></tr></thead><tbody>' +
+                inv.samples.map(s => {
+                    const wdLabel = s.weekday != null && s.weekday !== ''
+                        ? `${escH(WEEKDAY[s.weekday]||'?')}<span class="text-amber-500 ml-1">(${escH(s.weekday)})</span>`
+                        : '<span class="text-gray-400">null</span>';
+                    return `<tr class="border-t border-amber-200"><td class="px-1.5 py-1">${s.id}</td><td class="px-1.5 py-1">${escH(s.type||'-')}</td><td class="px-1.5 py-1">${wdLabel}</td><td class="px-1.5 py-1">${escH(s.specific_date||'-')}</td><td class="px-1.5 py-1">${escH(s.recur_end_date||'-')}</td><td class="px-1.5 py-1">${escH((s.start_time||'').substring(0,5))}–${escH((s.end_time||'').substring(0,5))}</td><td class="px-1.5 py-1">${s.is_active==1?'✅':'❌'}</td><td class="px-1.5 py-1">${escH(s.doc_name||'(N/A)')}</td></tr>`;
+                }).join('') +
+                '</tbody></table></details>';
+        }
+
+        const rawCount = inv.raw_query_today_count;
+        const wdMatchCount = inv.regular_weekday_match_count;
+        let diagText = '';
+        if (rawCount === 0 && wdMatchCount > 0) {
+            diagText = `<div class="mt-2 p-2 bg-rose-50 border border-rose-200 rounded text-rose-700"><b>🔍 พบสาเหตุ:</b> มี regular shift weekday ตรง (${wdMatchCount} rows) แต่ query รวมคืน 0 → ปัญหาอยู่ที่ <code>recur_end_date</code> (อาจเป็นวันที่ผ่านไปแล้ว) หรือ specific_date filter</div>`;
+        } else if (rawCount === 0 && wdMatchCount === 0) {
+            diagText = `<div class="mt-2 p-2 bg-rose-50 border border-rose-200 rounded text-rose-700"><b>🔍 พบสาเหตุ:</b> ไม่มี regular shift ที่มี weekday = ${inv.today_weekday} เลย → ต้องเช็คว่า weekday ใน DB ถูก stored เป็น integer 0-6 หรือเปล่า (column type: <code>${escH(inv.weekday_column_type||'-')}</code>)</div>`;
+        }
+
+        const eq = inv.exact_query_test || {};
+        let exactDiag = '';
+        if (eq.error) {
+            exactDiag = `<div class="mt-2 p-2 bg-rose-100 border-2 border-rose-400 rounded text-rose-900 font-bold"><i class="fa-solid fa-bug mr-1"></i>🎯 พบสาเหตุที่แท้จริง — function get_clinic_doctors_for_date() throw exception:<br><code class="block mt-1 bg-white px-2 py-1 rounded text-xs">${escH(eq.error)}</code></div>`;
+        } else if (eq.ok && eq.count > 0 && rawCount === eq.count) {
+            exactDiag = `<div class="mt-2 p-2 bg-yellow-50 border border-yellow-300 rounded text-yellow-800"><b>⚠ Mystery:</b> exact query คืน ${eq.count} rows แต่ debug_schedule คืน 0 → ปัญหาในการ filter ภายใน function (อาจเป็น override logic)</div>`;
+        }
+
+        invBody.innerHTML = `
+            <div class="mb-1"><b>ทั้งหมด:</b> ${inv.total} rows · <b>active:</b> ${inv.active} · <b>weekday วันนี้:</b> ${WEEKDAY[inv.today_weekday]||inv.today_weekday} (${inv.today_weekday})</div>
+            <div class="mb-1"><b>By type:</b> ${byTypeStr}</div>
+            <div class="mb-1"><b>weekday column type:</b> <code class="bg-amber-100 px-1 rounded">${escH(inv.weekday_column_type||'?')}</code> · <b>raw query (วันนี้):</b> ${rawCount} rows · <b>regular+weekday match:</b> ${wdMatchCount} rows</div>
+            <div class="mb-2"><b>exact query test:</b> ${eq.ok ? '✅ ' + eq.count + ' rows' : '❌ FAILED'} · <b>has room_id col:</b> ${inv.has_room_id_col?'✅':'❌'} · <b>has sys_clinic_rooms:</b> ${inv.has_clinic_rooms_table?'✅':'❌'}</div>
+            ${exactDiag}
+            ${diagText}
+            ${samples}
+            ${inv.error ? `<div class="text-rose-600 mt-1">⚠ ${escH(inv.error)}</div>` : ''}
+        `;
+    } else {
+        invBox.classList.add('hidden');
+    }
+
+    // ── Context preview ───────────────────────────────────────────────────
+    document.getElementById('sb-context-pre').textContent = j.context_preview || '';
+    document.getElementById('sb-ctx-chars').textContent   = `${j.context_chars || 0} chars`;
+
+    // ── Save to FAQ button ────────────────────────────────────────────────
+    const saveBtn = document.getElementById('sb-save-faq-btn');
+    if (!j.matched_faq) {
+        saveBtn.classList.remove('hidden');
+        saveBtn.onclick = async () => {
+            const { isConfirmed } = await Swal.fire({
+                icon: 'question',
+                title: 'บันทึกเป็น FAQ?',
+                html: `<div class="text-left text-sm"><b>คำถาม:</b> ${escH(question)}<br><b>หมวด:</b> ${escH(j.category)}</div>`,
+                showCancelButton: true,
+                confirmButtonText: 'บันทึก',
+                cancelButtonText: 'ยกเลิก',
+            });
+            if (!isConfirmed) return;
+            const fd2 = new FormData();
+            fd2.append('action',   'faq_create');
+            fd2.append('category', j.category || 'อื่นๆ');
+            fd2.append('question', question);
+            fd2.append('answer',   j.answer);
+            fd2.append('csrf_token', CSRF);
+            try {
+                const r2 = await fetch('ajax_ai_qa.php', { method:'POST', body:fd2 });
+                const j2 = await r2.json();
+                if (j2.ok) {
+                    Swal.fire({ icon:'success', title:'บันทึกแล้ว', timer:1500, showConfirmButton:false });
+                    saveBtn.classList.add('hidden');
+                } else {
+                    Swal.fire({ icon:'error', title:'ไม่สำเร็จ', text:j2.error||j2.message||'' });
+                }
+            } catch(e2) {
+                Swal.fire({ icon:'error', title:'เครือข่ายผิดพลาด', text:e2.message });
+            }
+        };
+    } else {
+        saveBtn.classList.add('hidden');
+    }
+}
+
+// ── Feedback handlers ─────────────────────────────────────────────────────
+function bindFeedback() {
+    const upBtn   = document.getElementById('sb-fb-up');
+    const downBtn = document.getElementById('sb-fb-down');
+    const cmtWrap = document.getElementById('sb-fb-comment-wrap');
+    const cmtIn   = document.getElementById('sb-fb-comment');
+    const sendBtn = document.getElementById('sb-fb-send');
+    if (!upBtn || !downBtn) return;
+
+    upBtn.addEventListener('click', () => {
+        upBtn.classList.add('selected-up');
+        downBtn.classList.remove('selected-down');
+        cmtWrap.classList.add('hidden');
+        submitSandboxFeedback(1, '');
+    });
+    downBtn.addEventListener('click', () => {
+        downBtn.classList.add('selected-down');
+        upBtn.classList.remove('selected-up');
+        cmtWrap.classList.remove('hidden');
+        cmtIn.focus();
+    });
+    sendBtn?.addEventListener('click', () => submitSandboxFeedback(-1, cmtIn.value.trim()));
+    cmtIn?.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); sendBtn.click(); }
+    });
+}
+
+async function submitSandboxFeedback(rating, comment) {
+    if (!_lastAnswer) return;
+    const fd = new FormData();
+    fd.append('action',   'save_rating');
+    fd.append('rating',   String(rating));
+    fd.append('msg_id',   _lastMsgId);
+    fd.append('question', _lastQuestion);
+    fd.append('answer',   _lastAnswer);
+    fd.append('comment',  comment);
+    fd.append('source',   'sandbox');
+    fd.append('csrf_token', CSRF);
+    try {
+        const r = await fetch('ajax_ai_feedback.php', { method:'POST', body:fd });
+        const j = await r.json();
+        if (j.ok) {
+            document.getElementById('sb-fb-bar').innerHTML = `<span class="sb-fb-done"><i class="fa-solid fa-check-circle"></i> ขอบคุณสำหรับ feedback — ดูทั้งหมดที่ tab Feedback Log</span>`;
+            document.getElementById('sb-fb-comment-wrap').classList.add('hidden');
+        } else {
+            Swal.fire({ icon:'error', title:'ไม่สำเร็จ', text:j.error||'' });
+        }
+    } catch(e) {
+        Swal.fire({ icon:'error', title:'เครือข่ายผิดพลาด', text:e.message });
+    }
+}
+
+// Quick-fill suggestion chips
+document.querySelectorAll('.sb-suggest').forEach(btn => {
+    btn.addEventListener('click', () => {
+        qInput.value = btn.dataset.q;
+        doAsk();
+    });
+});
+})();
+
+<?php endif; ?>
+
+<?php if ($_qa_tab === 'feedback'): ?>
+(function () {
+'use strict';
+const CSRF = '<?= get_csrf_token() ?>';
+let _fbPage = 1, _fbTotal = 0, _fbPages = 1;
+const LIMIT = 20;
+
+async function fbLoad(page) {
+    _fbPage = page;
+    const rating = document.getElementById('fb-filter-rating').value;
+    const source = document.getElementById('fb-filter-source').value;
+    const tbody  = document.getElementById('fb-tbody');
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-gray-400 py-8"><i class="fa-solid fa-spinner fa-spin mr-2"></i>โหลด...</td></tr>';
+
+    const params = new URLSearchParams({ action:'list', page, limit:LIMIT, rating, source });
+    try {
+        const r = await fetch('ajax_ai_feedback.php?' + params.toString());
+        const j = await r.json();
+        if (!j.ok) { tbody.innerHTML = `<tr><td colspan="6" class="text-center text-rose-500 py-6">${j.error}</td></tr>`; return; }
+        _fbTotal = j.total; _fbPages = j.pages;
+        renderFbTable(j.rows);
+        renderFbPagination();
+        document.getElementById('fb-stats-total').textContent = j.total + ' รายการ';
+    } catch(e) { tbody.innerHTML = `<tr><td colspan="6" class="text-center text-rose-500 py-6">${e.message}</td></tr>`; }
+}
+
+async function fbLoadSummary() {
+    try {
+        const r = await fetch('ajax_ai_feedback.php?action=summary');
+        const j = await r.json();
+        if (!j.ok) return;
+        document.getElementById('fb-sum-up').textContent    = j.thumbs_up;
+        document.getElementById('fb-sum-down').textContent  = j.thumbs_down;
+        document.getElementById('fb-sum-total').textContent = j.total;
+        document.getElementById('fb-sum-pct').textContent   = j.pct_positive + '%';
+        const bar = document.getElementById('fb-pct-bar');
+        if (bar) bar.style.width = j.pct_positive + '%';
+    } catch(_) {}
+}
+
+function escH(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function renderFbTable(rows) {
+    const tbody = document.getElementById('fb-tbody');
+    if (!rows.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-gray-400 py-12">ยังไม่มี feedback</td></tr>';
+        return;
+    }
+    tbody.innerHTML = rows.map(r => {
+        const ratingHtml = r.rating == 1
+            ? '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700"><i class="fa-solid fa-thumbs-up"></i> ดี</span>'
+            : '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-rose-100 text-rose-700"><i class="fa-solid fa-thumbs-down"></i> แย่</span>';
+        return `<tr class="hover:bg-gray-50">
+            <td class="px-4 py-3 text-xs text-gray-400">${escH(r.created_at||'')}</td>
+            <td class="px-4 py-3 text-center">${ratingHtml}</td>
+            <td class="px-4 py-3">
+                <div class="text-xs font-bold text-gray-700 line-clamp-2">${escH(r.question_short)}</div>
+            </td>
+            <td class="px-4 py-3">
+                <div class="text-xs text-gray-500 line-clamp-2">${escH(r.answer_short)}</div>
+            </td>
+            <td class="px-4 py-3 text-xs text-gray-500">${escH(r.comment||'-')}</td>
+            <td class="px-4 py-3 text-center">
+                <button type="button" class="fb-del-btn px-2 py-1 bg-white text-rose-500 text-xs font-bold rounded border border-rose-200 hover:bg-rose-50" data-id="${r.id}">
+                    <i class="fa-solid fa-trash"></i>
+                </button>
+            </td>
+        </tr>`;
+    }).join('');
+
+    tbody.querySelectorAll('.fb-del-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const { isConfirmed } = await Swal.fire({ icon:'warning', title:'ลบ feedback นี้?', showCancelButton:true, confirmButtonText:'ลบ', cancelButtonText:'ยกเลิก', confirmButtonColor:'#dc2626' });
+            if (!isConfirmed) return;
+            const fd = new FormData();
+            fd.append('action','delete'); fd.append('id',btn.dataset.id); fd.append('csrf_token',CSRF);
+            const r = await fetch('ajax_ai_feedback.php',{method:'POST',body:fd});
+            const j = await r.json();
+            if (j.ok) { fbLoad(_fbPage); fbLoadSummary(); }
+            else Swal.fire({icon:'error',title:'ไม่สำเร็จ',text:j.error||''});
+        });
+    });
+}
+
+function renderFbPagination() {
+    const el = document.getElementById('fb-pagination');
+    if (_fbPages <= 1) { el.innerHTML = ''; return; }
+    const p = _fbPage;
+    let btns = '';
+    if (p > 1) btns += `<button onclick="fbPageGo(1)" class="px-2 py-1 rounded border text-xs hover:bg-gray-50">«</button><button onclick="fbPageGo(${p-1})" class="px-2 py-1 rounded border text-xs hover:bg-gray-50">‹</button>`;
+    for (let i=Math.max(1,p-2); i<=Math.min(_fbPages,p+2); i++) {
+        btns += `<button onclick="fbPageGo(${i})" class="px-2.5 py-1 rounded border text-xs ${i===p?'bg-sky-600 text-white border-sky-600':'hover:bg-gray-50'}">${i}</button>`;
+    }
+    if (p < _fbPages) btns += `<button onclick="fbPageGo(${p+1})" class="px-2 py-1 rounded border text-xs hover:bg-gray-50">›</button><button onclick="fbPageGo(${_fbPages})" class="px-2 py-1 rounded border text-xs hover:bg-gray-50">»</button>`;
+    el.innerHTML = `<span class="text-xs text-gray-400">หน้า ${p}/${_fbPages} · ${_fbTotal} รายการ</span><div class="flex gap-1">${btns}</div>`;
+}
+
+window.fbPageGo = (p) => fbLoad(p);
+
+document.getElementById('fb-filter-rating')?.addEventListener('change', () => fbLoad(1));
+document.getElementById('fb-filter-source')?.addEventListener('change', () => fbLoad(1));
+
+fbLoad(1);
+fbLoadSummary();
+})();
+<?php endif; ?>
 </script>

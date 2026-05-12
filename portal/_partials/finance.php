@@ -133,7 +133,14 @@
         const now = new Date();
         const first = new Date(now.getFullYear(), now.getMonth(), 1);
         const last  = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-        const toIso = (d) => d.toISOString().slice(0, 10);
+        // ห้ามใช้ toISOString() เพราะเป็น UTC — ที่ GMT+7 จะเลื่อน 1 วันก่อนหน้า
+        // (วันที่ใน UI เป็น local date เสมอ)
+        const toIso = (d) => {
+            const y  = d.getFullYear();
+            const m  = String(d.getMonth() + 1).padStart(2, '0');
+            const dd = String(d.getDate()).padStart(2, '0');
+            return `${y}-${m}-${dd}`;
+        };
         document.getElementById('finFrom').value = toIso(first);
         document.getElementById('finTo').value   = toIso(last);
     }
