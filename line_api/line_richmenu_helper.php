@@ -232,26 +232,41 @@ if (!function_exists('line_richmenu_upload_image')) {
         $imgData = @file_get_contents($imagePath);
         if ($imgData === false) return ['ok' => false, 'http' => 0, 'error' => 'อ่านไฟล์ภาพไม่ได้'];
 
+        $token = trim($token); // trim whitespace/newline ที่อาจติดจาก secrets file
+
+        $verboseLog = fopen('php://temp', 'w+');
         $ch = curl_init("https://api-data.line.me/v2/bot/richmenu/$richMenuId/content");
         curl_setopt_array($ch, [
             CURLOPT_POST           => true,
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT        => 60,
             CURLOPT_POSTFIELDS     => $imgData, // raw binary body
+            CURLOPT_HTTP_VERSION   => CURL_HTTP_VERSION_1_1, // Akamai edge ของ api-data.line.me HTTP/2 มีปัญหา
+            CURLOPT_USERAGENT      => 'RSU-Clinic-LineRichMenu/1.0',
             CURLOPT_HTTPHEADER     => [
                 'Authorization: Bearer ' . $token,
                 'Content-Type: ' . $mimeType,
-                // curl คำนวณ Content-Length ให้เองจาก POSTFIELDS
-                'Expect:', // ปิด "Expect: 100-continue" ที่บางครั้ง edge ไม่รองรับ
+                'Content-Length: ' . strlen($imgData),
             ],
+            CURLOPT_VERBOSE        => true,
+            CURLOPT_STDERR         => $verboseLog,
         ]);
         $body = (string)curl_exec($ch);
         $http = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $err  = curl_error($ch) ?: null;
+
+        // capture verbose log for debugging
+        rewind($verboseLog);
+        $verbose = stream_get_contents($verboseLog);
+        fclose($verboseLog);
         curl_close($ch);
 
         $ok = ($http >= 200 && $http < 300);
-        return ['ok' => $ok, 'http' => $http, 'error' => $ok ? null : ($body ?: $err)];
+        if (!$ok) {
+            error_log('[line_richmenu_upload_image] HTTP=' . $http . ' body=' . substr($body, 0, 500));
+            error_log('[line_richmenu_upload_image] curl verbose: ' . substr($verbose, 0, 2000));
+        }
+        return ['ok' => $ok, 'http' => $http, 'error' => $ok ? null : (substr($body, 0, 300) ?: $err)];
     }
 }
 
