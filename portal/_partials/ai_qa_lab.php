@@ -13,7 +13,7 @@ ensure_ai_qa_schema($pdo);
 ensure_ai_faq_schema($pdo);
 
 $_qa_tab = (string)($_GET['qa_tab'] ?? 'captured');
-if (!in_array($_qa_tab, ['captured', 'faq', 'feedback'], true)) $_qa_tab = 'captured';
+if (!in_array($_qa_tab, ['captured', 'faq', 'feedback', 'sandbox'], true)) $_qa_tab = 'captured';
 
 require_once __DIR__ . '/../../includes/ai_feedback_helper.php';
 ensure_ai_feedback_schema($pdo);
@@ -263,6 +263,17 @@ function _qa_source_badge(string $s): string {
     .qa-tab.qa-tab-active--captured { color: #7c3aed; border-bottom-color: #9333ea; }
     .qa-tab.qa-tab-active--faq      { color: #047857; border-bottom-color: #059669; }
     .qa-tab.qa-tab-active--feedback { color: #0369a1; border-bottom-color: #0284c7; }
+    .qa-tab.qa-tab-active--sandbox  { color: #7c3aed; border-bottom-color: #7c3aed; }
+    /* sandbox */
+    #sb-answer-box { font-size:14px; line-height:1.7; }
+    #sb-answer-box h1,#sb-answer-box h2 { font-weight:800; margin:10px 0 5px; }
+    #sb-answer-box p  { margin:5px 0; }
+    #sb-answer-box ul,#sb-answer-box ol { padding-left:20px; margin:5px 0; }
+    #sb-answer-box code { background:#f1f5f9; padding:2px 5px; border-radius:4px; font-family:monospace; font-size:12px; color:#ef4444; }
+    #sb-context-pre  { font-family:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace; font-size:11px; line-height:1.55; white-space:pre-wrap; word-break:break-all; max-height:400px; overflow-y:auto; }
+    .sb-chunk-row { border:1.5px solid #e2e8f0; border-radius:10px; padding:10px 14px; }
+    .sb-score-bar-bg { background:#e2e8f0; border-radius:999px; height:6px; }
+    .sb-score-bar    { background:#7c3aed; border-radius:999px; height:6px; transition:width .4s; }
 
     #vchecks { max-height: 24rem; overflow-y: auto; }
 </style>
@@ -329,6 +340,10 @@ function _qa_source_badge(string $s): string {
         <a href="?section=ai_qa_lab&qa_tab=feedback"
            class="qa-tab <?= $_qa_tab === 'feedback' ? 'qa-tab-active--feedback' : '' ?>">
             <i class="fa-solid fa-thumbs-up mr-1.5"></i> Feedback Log
+        </a>
+        <a href="?section=ai_qa_lab&qa_tab=sandbox"
+           class="qa-tab <?= $_qa_tab === 'sandbox' ? 'qa-tab-active--sandbox' : '' ?>">
+            <i class="fa-solid fa-flask mr-1.5"></i> Sandbox
         </a>
     </div>
 
@@ -706,6 +721,96 @@ function _qa_source_badge(string $s): string {
             </div>
         </div>
         <?php endif; ?>
+    </div>
+
+    <?php elseif ($_qa_tab === 'sandbox'): /* ════════════ TAB: SANDBOX ════════════ */ ?>
+
+    <div class="max-w-3xl mx-auto">
+
+        <!-- Suggestion chips -->
+        <div class="flex gap-2 flex-wrap mb-3">
+            <?php foreach (['คลินิกเปิดกี่โมง?','พรุ่งนี้มีหมอไหม?','บริการที่ให้มีอะไรบ้าง?','ราคาตรวจสุขภาพ','ติดต่อคลินิกอย่างไร?','วันเสาร์เปิดไหม?'] as $sq): ?>
+            <button type="button" class="sb-suggest px-3 py-1.5 bg-white border border-violet-200 text-violet-700 text-xs font-bold rounded-full hover:bg-violet-50" data-q="<?= htmlspecialchars($sq) ?>">
+                <?= htmlspecialchars($sq) ?>
+            </button>
+            <?php endforeach; ?>
+        </div>
+
+        <!-- Question input -->
+        <div class="bg-white border border-gray-200 rounded-2xl p-5 mb-4">
+            <label class="block text-sm font-black text-gray-800 mb-2">
+                <i class="fa-solid fa-flask text-violet-600 mr-1.5"></i>ถามคำถามทดสอบ
+            </label>
+            <textarea id="sb-question" rows="3"
+                class="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:border-violet-500 resize-none"
+                placeholder="เช่น คลินิกเปิดกี่โมง? หรือ บริการอะไรบ้าง? หรือ ราคาตรวจสุขภาพเท่าไหร่?"></textarea>
+            <div class="flex items-center justify-between mt-3">
+                <p class="text-xs text-gray-400">คำถามจะผ่าน FAQ matcher → Semantic search (chunks) → Gemini generate</p>
+                <button id="sb-ask-btn" class="px-5 py-2 bg-violet-600 text-white text-sm font-bold rounded-xl hover:bg-violet-700 flex items-center gap-2">
+                    <i class="fa-solid fa-paper-plane"></i> ถาม
+                </button>
+            </div>
+        </div>
+
+        <!-- Result panel (hidden until asked) -->
+        <div id="sb-result" class="hidden space-y-4">
+
+            <!-- Answer -->
+            <div class="bg-white border-2 border-violet-200 rounded-2xl p-5">
+                <div class="flex items-start justify-between gap-3 mb-3">
+                    <h3 class="font-black text-gray-900 flex items-center gap-2">
+                        <i class="fa-solid fa-robot text-violet-600"></i> คำตอบ
+                    </h3>
+                    <div class="flex gap-1.5 flex-wrap justify-end" id="sb-meta-chips"></div>
+                </div>
+                <div id="sb-answer-box" class="text-gray-800"></div>
+                <!-- save to FAQ -->
+                <div class="mt-4 pt-3 border-t border-gray-100 flex justify-end">
+                    <button id="sb-save-faq-btn" class="hidden px-4 py-1.5 bg-emerald-600 text-white text-xs font-bold rounded-lg hover:bg-emerald-700">
+                        <i class="fa-solid fa-book-bookmark mr-1"></i> บันทึกเป็น FAQ
+                    </button>
+                </div>
+            </div>
+
+            <!-- Chunks retrieved -->
+            <div id="sb-chunks-section" class="bg-white border border-indigo-200 rounded-2xl p-5 hidden">
+                <h3 class="font-black text-gray-900 flex items-center gap-2 mb-3">
+                    <i class="fa-solid fa-cubes text-indigo-600"></i> Chunks ที่ดึงมา
+                    <span class="text-xs text-indigo-500 font-normal">(semantic search top-5)</span>
+                </h3>
+                <div id="sb-chunks-list" class="space-y-2"></div>
+            </div>
+
+            <!-- FAQ match notice -->
+            <div id="sb-faq-match-box" class="hidden bg-emerald-50 border border-emerald-200 rounded-2xl p-4">
+                <div class="flex items-center gap-2 text-emerald-700 font-bold text-sm mb-1">
+                    <i class="fa-solid fa-circle-check"></i> พบคำตอบตรงจาก FAQ Knowledge Base
+                </div>
+                <div id="sb-faq-match-text" class="text-sm text-emerald-800 leading-relaxed"></div>
+            </div>
+
+            <!-- Context preview -->
+            <details class="bg-slate-900 rounded-2xl overflow-hidden">
+                <summary class="px-5 py-3 text-sm font-bold text-slate-300 cursor-pointer select-none flex items-center gap-2 hover:text-white">
+                    <i class="fa-solid fa-code text-slate-400"></i>
+                    Context ที่ส่งให้ AI
+                    <span id="sb-ctx-chars" class="ml-auto text-xs text-slate-500 font-normal"></span>
+                </summary>
+                <pre id="sb-context-pre" class="px-5 pb-5 pt-0 text-slate-300 sb-context-pre"></pre>
+            </details>
+
+        </div>
+
+        <!-- Loading state -->
+        <div id="sb-loading" class="hidden text-center py-12">
+            <i class="fa-solid fa-spinner fa-spin text-3xl text-violet-400 mb-3 block"></i>
+            <div class="text-sm font-bold text-gray-500">กำลังถาม AI...</div>
+            <div class="text-xs text-gray-400 mt-1">FAQ match → Semantic search → Generate</div>
+        </div>
+
+        <!-- Error state -->
+        <div id="sb-error" class="hidden bg-rose-50 border border-rose-200 rounded-2xl p-5 text-rose-700 text-sm font-medium"></div>
+
     </div>
 
     <?php elseif ($_qa_tab === 'feedback'): /* ════════════ TAB: FEEDBACK LOG ════════════ */ ?>
@@ -1386,6 +1491,175 @@ function _qa_source_badge(string $s): string {
     }
     document.getElementById('faq-modal-save')?.addEventListener('click', faqSave);
 })();
+
+<?php if ($_qa_tab === 'sandbox'): ?>
+(function () {
+'use strict';
+const CSRF = '<?= get_csrf_token() ?>';
+
+// marked.js — โหลดถ้ายังไม่มี
+if (typeof marked === 'undefined') {
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/marked@12.0.0/marked.min.js';
+    document.head.appendChild(s);
+}
+
+const qInput  = document.getElementById('sb-question');
+const askBtn  = document.getElementById('sb-ask-btn');
+const result  = document.getElementById('sb-result');
+const loading = document.getElementById('sb-loading');
+const errBox  = document.getElementById('sb-error');
+
+function escH(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+askBtn.addEventListener('click', doAsk);
+qInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); doAsk(); }
+});
+
+async function doAsk() {
+    const q = qInput.value.trim();
+    if (!q) return;
+
+    result.classList.add('hidden');
+    errBox.classList.add('hidden');
+    loading.classList.remove('hidden');
+    askBtn.disabled = true;
+    askBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> กำลังถาม...';
+
+    const fd = new FormData();
+    fd.append('action',   'ask');
+    fd.append('question', q);
+    fd.append('csrf_token', CSRF);
+
+    try {
+        const r = await fetch('ajax_ai_sandbox.php', { method: 'POST', body: fd });
+        const j = await r.json();
+        loading.classList.add('hidden');
+
+        if (!j.ok) {
+            errBox.textContent = j.error || 'เกิดข้อผิดพลาด';
+            errBox.classList.remove('hidden');
+            return;
+        }
+
+        renderResult(q, j);
+        result.classList.remove('hidden');
+        result.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+    } catch (e) {
+        loading.classList.add('hidden');
+        errBox.textContent = e.message;
+        errBox.classList.remove('hidden');
+    } finally {
+        askBtn.disabled = false;
+        askBtn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> ถาม';
+    }
+}
+
+function renderResult(question, j) {
+    // ── Answer ────────────────────────────────────────────────────────────
+    const answerBox = document.getElementById('sb-answer-box');
+    answerBox.innerHTML = typeof marked !== 'undefined'
+        ? marked.parse(j.answer || '')
+        : escH(j.answer || '');
+
+    // ── Meta chips ────────────────────────────────────────────────────────
+    const chips = document.getElementById('sb-meta-chips');
+    chips.innerHTML = [
+        j.category   ? `<span class="px-2 py-0.5 bg-violet-100 text-violet-700 text-xs font-bold rounded-full">${escH(j.category)}</span>` : '',
+        j.confidence != null ? `<span class="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs font-bold rounded-full">${(j.confidence*100).toFixed(0)}% confident</span>` : '',
+        j.model      ? `<span class="px-2 py-0.5 bg-slate-100 text-slate-600 text-xs font-bold rounded-full">${escH(j.model)}</span>` : '',
+        j.elapsed_ms ? `<span class="px-2 py-0.5 bg-amber-50 text-amber-700 text-xs font-bold rounded-full">${j.elapsed_ms} ms</span>` : '',
+    ].join('');
+
+    // ── FAQ match ────────────────────────────────────────────────────────
+    const faqBox = document.getElementById('sb-faq-match-box');
+    if (j.matched_faq && j.faq_answer) {
+        document.getElementById('sb-faq-match-text').innerHTML = escH(j.faq_answer).replace(/\n/g,'<br>');
+        faqBox.classList.remove('hidden');
+    } else {
+        faqBox.classList.add('hidden');
+    }
+
+    // ── Chunks ────────────────────────────────────────────────────────────
+    const chunksSec  = document.getElementById('sb-chunks-section');
+    const chunksList = document.getElementById('sb-chunks-list');
+    if (j.chunks && j.chunks.length) {
+        chunksSec.classList.remove('hidden');
+        chunksList.innerHTML = j.chunks.map((c, i) => {
+            const pct = Math.round((c.score || 0) * 100);
+            const barColor = pct >= 80 ? 'bg-emerald-500' : pct >= 60 ? 'bg-amber-400' : 'bg-gray-400';
+            return `<div class="sb-chunk-row">
+                <div class="flex items-center justify-between gap-3 mb-1.5">
+                    <span class="text-sm font-bold text-gray-800">${i+1}. ${escH(c.title)}</span>
+                    <span class="text-xs font-bold text-violet-700 shrink-0">${pct}%</span>
+                </div>
+                <div class="sb-score-bar-bg mb-2">
+                    <div class="sb-score-bar ${barColor}" style="width:${pct}%"></div>
+                </div>
+                <div class="text-xs text-gray-500 line-clamp-2">${escH(c.content_preview)}...</div>
+                <div class="flex gap-2 mt-1.5">
+                    <span class="text-xs bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full font-medium">${escH(c.source_label)}</span>
+                </div>
+            </div>`;
+        }).join('');
+    } else {
+        chunksSec.classList.add('hidden');
+    }
+
+    // ── Context preview ───────────────────────────────────────────────────
+    document.getElementById('sb-context-pre').textContent = j.context_preview || '';
+    document.getElementById('sb-ctx-chars').textContent   = `${j.context_chars || 0} chars`;
+
+    // ── Save to FAQ button ────────────────────────────────────────────────
+    const saveBtn = document.getElementById('sb-save-faq-btn');
+    if (!j.matched_faq) {
+        saveBtn.classList.remove('hidden');
+        saveBtn.onclick = async () => {
+            const { isConfirmed } = await Swal.fire({
+                icon: 'question',
+                title: 'บันทึกเป็น FAQ?',
+                html: `<div class="text-left text-sm"><b>คำถาม:</b> ${escH(question)}<br><b>หมวด:</b> ${escH(j.category)}</div>`,
+                showCancelButton: true,
+                confirmButtonText: 'บันทึก',
+                cancelButtonText: 'ยกเลิก',
+            });
+            if (!isConfirmed) return;
+            const fd2 = new FormData();
+            fd2.append('action',   'faq_create');
+            fd2.append('category', j.category || 'อื่นๆ');
+            fd2.append('question', question);
+            fd2.append('answer',   j.answer);
+            fd2.append('csrf_token', CSRF);
+            try {
+                const r2 = await fetch('ajax_ai_qa.php', { method:'POST', body:fd2 });
+                const j2 = await r2.json();
+                if (j2.ok) {
+                    Swal.fire({ icon:'success', title:'บันทึกแล้ว', timer:1500, showConfirmButton:false });
+                    saveBtn.classList.add('hidden');
+                } else {
+                    Swal.fire({ icon:'error', title:'ไม่สำเร็จ', text:j2.error||j2.message||'' });
+                }
+            } catch(e2) {
+                Swal.fire({ icon:'error', title:'เครือข่ายผิดพลาด', text:e2.message });
+            }
+        };
+    } else {
+        saveBtn.classList.add('hidden');
+    }
+}
+
+// Quick-fill suggestion chips
+document.querySelectorAll('.sb-suggest').forEach(btn => {
+    btn.addEventListener('click', () => {
+        qInput.value = btn.dataset.q;
+        doAsk();
+    });
+});
+})();
+
+<?php endif; ?>
 
 <?php if ($_qa_tab === 'feedback'): ?>
 (function () {
