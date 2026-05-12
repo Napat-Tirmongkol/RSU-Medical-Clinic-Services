@@ -207,6 +207,167 @@ $webhookUrl = "$protocol://$host$uri";
     </div>
 
     <!-- ════════════════════════════════════════════════════ -->
+    <!-- LINE Groups                                          -->
+    <!-- ════════════════════════════════════════════════════ -->
+    <div style="display:flex;align-items:center;gap:14px;margin:36px 0 18px">
+        <div style="flex:1;height:1.5px;background:#f1f5f9"></div>
+        <span style="font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.18em;color:#94a3b8;white-space:nowrap">
+            <i class="fa-solid fa-users" style="color:#22c55e;margin-right:5px"></i>กลุ่ม LINE ที่ OA อยู่ด้วย
+        </span>
+        <div style="flex:1;height:1.5px;background:#f1f5f9"></div>
+    </div>
+
+    <div class="line-card shadow-sm" style="border-top:4px solid #22c55e">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:18px">
+            <div>
+                <h3 style="font-weight:900;color:#0f172a;font-size:15px;margin-bottom:4px">
+                    <i class="fa-solid fa-users" style="color:#22c55e;margin-right:6px"></i>กลุ่มที่ค้นพบ
+                </h3>
+                <p style="font-size:12px;color:#64748b;margin:0">
+                    เมื่อ OA ถูกเชิญเข้ากลุ่ม ระบบจะบันทึก Group ID ไว้อัตโนมัติ — เลือกกลุ่มหลักสำหรับ push SOS / ประกาศ
+                </p>
+            </div>
+            <button type="button" onclick="lineGroupsLoad()" class="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm rounded-xl transition-colors">
+                <i class="fa-solid fa-rotate-right"></i> รีเฟรช
+            </button>
+        </div>
+
+        <!-- Group list -->
+        <div id="lineGroupsList">
+            <div class="flex items-center justify-center gap-3 py-8 text-slate-400">
+                <i class="fa-solid fa-spinner fa-spin"></i>
+                <span class="text-sm">กำลังโหลด...</span>
+            </div>
+        </div>
+
+        <!-- How to add -->
+        <div style="margin-top:16px;padding:14px 16px;background:#f0fdf4;border-radius:12px;border:1px solid #bbf7d0">
+            <p style="font-size:11px;font-weight:700;color:#15803d;margin:0 0 6px">
+                <i class="fa-solid fa-circle-info" style="margin-right:4px"></i>วิธีเพิ่มกลุ่ม
+            </p>
+            <ol style="font-size:11px;color:#166534;margin:0;padding-left:18px;line-height:1.8">
+                <li>เปิด LINE → กลุ่มที่ต้องการ → เพิ่มสมาชิก</li>
+                <li>ค้นหา LINE OA ของคลินิก แล้วเชิญเข้ากลุ่ม</li>
+                <li>ระบบจะรับ <code style="background:#dcfce7;padding:1px 4px;border-radius:3px">join</code> event ผ่าน webhook และบันทึก Group ID ไว้อัตโนมัติ</li>
+            </ol>
+        </div>
+    </div>
+
+    <style>
+        #lineGroupsList .group-card {
+            border: 1.5px solid #e5e7eb; border-radius: 14px; padding: 14px 16px;
+            margin-bottom: 10px; background: #fff; transition: border-color .15s, box-shadow .15s;
+        }
+        #lineGroupsList .group-card.is-default {
+            border-color: #22c55e; background: #f0fdf4;
+        }
+        #lineGroupsList .group-card:hover { border-color: #94a3b8; box-shadow: 0 2px 8px rgba(0,0,0,.05); }
+        #lineGroupsList .group-id { font-family: monospace; font-size: 11px; color: #64748b; word-break: break-all; }
+    </style>
+
+    <script>
+    (function() {
+        const AJAX_GROUPS = 'ajax_line_groups.php';
+
+        function renderGroups(groups, defaultId) {
+            const el = document.getElementById('lineGroupsList');
+            if (!groups || groups.length === 0) {
+                el.innerHTML = `
+                    <div style="text-align:center;padding:40px 20px">
+                        <div style="font-size:48px;margin-bottom:12px">💬</div>
+                        <p style="font-weight:700;color:#64748b;margin-bottom:4px">ยังไม่มีกลุ่มที่ค้นพบ</p>
+                        <p style="font-size:12px;color:#94a3b8">เชิญ LINE OA เข้ากลุ่มตามวิธีด้านล่าง</p>
+                    </div>`;
+                return;
+            }
+
+            el.innerHTML = groups.map(g => {
+                const isDefault = g.id === defaultId;
+                const joinedDate = g.joined_at ? new Date(g.joined_at).toLocaleDateString('th-TH', { year:'numeric', month:'short', day:'numeric' }) : '—';
+                const lastSeenDate = g.last_seen_at ? new Date(g.last_seen_at).toLocaleDateString('th-TH', { year:'numeric', month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' }) : '—';
+                const typeLabel = g.type === 'room' ? '<span style="background:#e0f2fe;color:#0369a1;font-size:10px;font-weight:700;padding:2px 6px;border-radius:99px">Room</span>' : '<span style="background:#dcfce7;color:#15803d;font-size:10px;font-weight:700;padding:2px 6px;border-radius:99px">Group</span>';
+                const defaultBadge = isDefault ? '<span style="background:#22c55e;color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:99px;margin-left:8px"><i class="fa-solid fa-star" style="margin-right:3px"></i>กลุ่มหลัก</span>' : '';
+                const memberText = g.member_count != null ? `<span>${g.member_count} คน</span> · ` : '';
+
+                return `<div class="group-card${isDefault ? ' is-default' : ''}" id="gc-${CSS.escape(g.id)}">
+                    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">
+                        <div style="flex:1;min-width:0">
+                            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:6px">
+                                ${typeLabel}
+                                <span style="font-weight:800;font-size:14px;color:#0f172a">${g.name || '(ไม่ทราบชื่อ)'}</span>
+                                ${defaultBadge}
+                            </div>
+                            <div class="group-id">${g.id}</div>
+                            <div style="font-size:11px;color:#94a3b8;margin-top:4px">
+                                ${memberText}เข้าร่วม ${joinedDate} · พบล่าสุด ${lastSeenDate}
+                            </div>
+                        </div>
+                        <div style="display:flex;gap:8px;flex-shrink:0">
+                            ${!isDefault ? `<button type="button" onclick="lineGroupSetDefault('${g.id}')"
+                                style="padding:6px 12px;border-radius:8px;border:1.5px solid #22c55e;background:#f0fdf4;color:#15803d;font-size:12px;font-weight:700;cursor:pointer;transition:.15s"
+                                onmouseover="this.style.background='#dcfce7'" onmouseout="this.style.background='#f0fdf4'">
+                                <i class="fa-regular fa-star" style="margin-right:4px"></i>ตั้งเป็นกลุ่มหลัก
+                            </button>` : ''}
+                            <button type="button" onclick="lineGroupTestPush('${g.id}', this)"
+                                style="padding:6px 12px;border-radius:8px;border:1.5px solid #e5e7eb;background:#f8fafc;color:#374151;font-size:12px;font-weight:700;cursor:pointer;transition:.15s"
+                                onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='#f8fafc'">
+                                <i class="fa-solid fa-paper-plane" style="margin-right:4px"></i>ทดสอบส่ง
+                            </button>
+                        </div>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        window.lineGroupsLoad = async function() {
+            const el = document.getElementById('lineGroupsList');
+            el.innerHTML = `<div class="flex items-center justify-center gap-3 py-8 text-slate-400"><i class="fa-solid fa-spinner fa-spin"></i><span class="text-sm">กำลังโหลด...</span></div>`;
+            try {
+                const r = await fetch(AJAX_GROUPS + '?action=list').then(x => x.json());
+                if (r.ok) renderGroups(r.groups, r.default_id);
+                else el.innerHTML = `<p style="color:#ef4444;text-align:center;padding:20px;font-size:13px">เกิดข้อผิดพลาด: ${r.error || 'unknown'}</p>`;
+            } catch(e) {
+                el.innerHTML = `<p style="color:#ef4444;text-align:center;padding:20px;font-size:13px">โหลดไม่สำเร็จ</p>`;
+            }
+        };
+
+        window.lineGroupSetDefault = async function(groupId) {
+            const fd = new FormData();
+            fd.append('csrf_token', window.portal_CSRF || '');
+            fd.append('action', 'set_default');
+            fd.append('group_id', groupId);
+            const r = await fetch(AJAX_GROUPS, { method: 'POST', body: fd }).then(x => x.json());
+            if (r.ok) {
+                await Swal.fire({ icon: 'success', title: 'ตั้งกลุ่มหลักสำเร็จ', timer: 1800, showConfirmButton: false });
+                lineGroupsLoad();
+            } else {
+                Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: r.error || '' });
+            }
+        };
+
+        window.lineGroupTestPush = async function(groupId, btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="margin-right:4px"></i>กำลังส่ง...';
+            const fd = new FormData();
+            fd.append('csrf_token', window.portal_CSRF || '');
+            fd.append('action', 'test_push');
+            fd.append('group_id', groupId);
+            const r = await fetch(AJAX_GROUPS, { method: 'POST', body: fd }).then(x => x.json());
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-paper-plane" style="margin-right:4px"></i>ทดสอบส่ง';
+            if (r.ok) {
+                Swal.fire({ icon: 'success', title: 'ส่งสำเร็จ ✅', text: 'ตรวจสอบกลุ่ม LINE ได้เลย', timer: 2000, showConfirmButton: false });
+            } else {
+                Swal.fire({ icon: 'error', title: 'ส่งไม่สำเร็จ', text: r.line_error || r.error || 'ไม่ทราบสาเหตุ' });
+            }
+        };
+
+        // auto-load on page ready
+        lineGroupsLoad();
+    })();
+    </script>
+
+    <!-- ════════════════════════════════════════════════════ -->
     <!-- FAQ Auto-reply (เวลาเปิด/ปิด)                         -->
     <!-- ════════════════════════════════════════════════════ -->
     <div style="display:flex;align-items:center;gap:14px;margin:36px 0 18px">
