@@ -1129,14 +1129,18 @@ async function serverSave() {
   const scheduleSize = Object.keys(payload.schedule || {}).length;
   const leavesSize   = Object.keys(payload.leaves   || {}).length;
   const nursesSize   = Array.isArray(payload.nurses) ? payload.nurses.length : 0;
-  console.log('[nurse_schedule] serverSave START', state.year, state.month, '→', { nurses: nursesSize, schedule: scheduleSize, leaves: leavesSize, dirty: state.dirty });
+  const payloadJson = JSON.stringify(payload);
+  // diagnostic: ตรวจ JSON ที่จะส่งจริง — ถ้า scheduleSize=4 แต่ payloadJson มี schedule:{}
+  // แสดงว่า state.schedule มี non-enumerable / Symbol keys ที่ Object.keys เห็นแต่ JSON ไม่เห็น
+  const scheduleInJson = (payloadJson.match(/"schedule":\{[^}]*\}/) || ['<no match>'])[0].slice(0, 200);
+  console.log('[nurse_schedule] serverSave START', state.year, state.month, '→', { nurses: nursesSize, schedule: scheduleSize, leaves: leavesSize, dirty: state.dirty, jsonBytes: payloadJson.length, scheduleSnippet: scheduleInJson, scheduleSample: JSON.stringify(payload.schedule).slice(0, 200) });
   try {
     const fd = new FormData();
     fd.append('csrf_token', NS_CSRF);
     fd.append('action', 'save');
     fd.append('year', String(state.year));
     fd.append('month', String(state.month));
-    fd.append('payload', JSON.stringify(payload));
+    fd.append('payload', payloadJson);
     const r = await fetch(NS_AJAX, { method: 'POST', body: fd, credentials: 'same-origin' });
     const rawText = await r.text();
     console.log('[nurse_schedule] serverSave HTTP', r.status, rawText.slice(0, 300));
