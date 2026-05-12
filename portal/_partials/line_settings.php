@@ -1383,7 +1383,16 @@ function sendTestLineP() {
         const r = await fetch('ajax_line_richmenu.php', { method: 'POST', body: payload }).then(x => x.json());
 
         if (!r.ok) {
-            Swal.fire({ icon: 'error', title: 'สร้างไม่สำเร็จ' + (r.step ? ` (${r.step})` : ''), text: r.message || '' });
+            const verboseHtml = r.verbose
+                ? `<details style="text-align:left;margin-top:12px"><summary style="cursor:pointer;font-size:11px;color:#64748b">▸ curl verbose log (สำหรับ debug — copy ส่งมาให้ดูได้)</summary>
+                   <pre style="font-size:10px;background:#0f172a;color:#94a3b8;padding:8px;border-radius:6px;max-height:300px;overflow:auto;white-space:pre-wrap;text-align:left;margin-top:4px">${r.verbose.replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]))}</pre></details>`
+                : '';
+            Swal.fire({
+                icon: 'error',
+                title: 'สร้างไม่สำเร็จ' + (r.step ? ` (${r.step})` : '') + (r.http ? ` · HTTP ${r.http}` : ''),
+                html: `<div style="text-align:left;font-size:13px">${r.message || ''}</div>${verboseHtml}`,
+                width: 700,
+            });
             return;
         }
 
