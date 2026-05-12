@@ -266,7 +266,12 @@ if (!function_exists('line_richmenu_upload_image')) {
             error_log('[line_richmenu_upload_image] HTTP=' . $http . ' body=' . substr($body, 0, 500));
             error_log('[line_richmenu_upload_image] curl verbose: ' . substr($verbose, 0, 2000));
         }
-        return ['ok' => $ok, 'http' => $http, 'error' => $ok ? null : (substr($body, 0, 300) ?: $err)];
+        return [
+            'ok' => $ok,
+            'http' => $http,
+            'error' => $ok ? null : (substr($body, 0, 300) ?: $err),
+            'verbose' => $ok ? null : substr($verbose, 0, 3000), // surface สำหรับ debug
+        ];
     }
 }
 

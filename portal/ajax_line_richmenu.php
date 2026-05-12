@@ -152,7 +152,13 @@ try {
         if (!$up['ok']) {
             // rollback: ลบ rich menu ที่สร้างไปแล้วเพราะไม่มีภาพ
             line_richmenu_delete($rid);
-            echo json_encode(['ok' => false, 'step' => 'upload', 'message' => $up['error'] ?? 'upload ล้มเหลว']);
+            echo json_encode([
+                'ok' => false,
+                'step' => 'upload',
+                'http' => $up['http'] ?? 0,
+                'message' => $up['error'] ?? 'upload ล้มเหลว',
+                'verbose' => $up['verbose'] ?? null, // surface curl verbose สำหรับ debug
+            ]);
             exit;
         }
 
