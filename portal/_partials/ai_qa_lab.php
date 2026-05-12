@@ -274,6 +274,11 @@ function _qa_source_badge(string $s): string {
     .sb-chunk-row { border:1.5px solid #e2e8f0; border-radius:10px; padding:10px 14px; }
     .sb-score-bar-bg { background:#e2e8f0; border-radius:999px; height:6px; }
     .sb-score-bar    { background:#7c3aed; border-radius:999px; height:6px; transition:width .4s; }
+    .sb-fb-btn.selected-up   { background:#dcfce7; border-color:#86efac; }
+    .sb-fb-btn.selected-up i { color:#16a34a; }
+    .sb-fb-btn.selected-down   { background:#fee2e2; border-color:#fca5a5; }
+    .sb-fb-btn.selected-down i { color:#dc2626; }
+    .sb-fb-done { font-size:12px; color:#16a34a; font-weight:700; display:inline-flex; align-items:center; gap:6px; }
 
     #vchecks { max-height: 24rem; overflow-y: auto; }
 </style>
@@ -764,11 +769,27 @@ function _qa_source_badge(string $s): string {
                     <div class="flex gap-1.5 flex-wrap justify-end" id="sb-meta-chips"></div>
                 </div>
                 <div id="sb-answer-box" class="text-gray-800"></div>
-                <!-- save to FAQ -->
-                <div class="mt-4 pt-3 border-t border-gray-100 flex justify-end">
+
+                <!-- Feedback bar -->
+                <div class="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between gap-3 flex-wrap">
+                    <div id="sb-fb-bar" class="flex items-center gap-2">
+                        <span class="text-xs text-gray-500 font-medium">คำตอบนี้ดีไหม?</span>
+                        <button type="button" id="sb-fb-up" class="sb-fb-btn px-3 py-1.5 border border-gray-300 rounded-full text-sm hover:bg-emerald-50 hover:border-emerald-300 transition-colors">
+                            <i class="fa-regular fa-thumbs-up text-gray-500"></i>
+                        </button>
+                        <button type="button" id="sb-fb-down" class="sb-fb-btn px-3 py-1.5 border border-gray-300 rounded-full text-sm hover:bg-rose-50 hover:border-rose-300 transition-colors">
+                            <i class="fa-regular fa-thumbs-down text-gray-500"></i>
+                        </button>
+                    </div>
                     <button id="sb-save-faq-btn" class="hidden px-4 py-1.5 bg-emerald-600 text-white text-xs font-bold rounded-lg hover:bg-emerald-700">
                         <i class="fa-solid fa-book-bookmark mr-1"></i> บันทึกเป็น FAQ
                     </button>
+                </div>
+
+                <!-- Comment box (revealed on 👎) -->
+                <div id="sb-fb-comment-wrap" class="hidden mt-2 flex gap-2 items-center">
+                    <input type="text" id="sb-fb-comment" class="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-rose-400" placeholder="บอกเราหน่อยว่าผิดตรงไหน (ไม่บังคับ)" maxlength="200">
+                    <button id="sb-fb-send" class="px-4 py-1.5 bg-slate-700 text-white text-xs font-bold rounded-lg hover:bg-slate-900">ส่ง</button>
                 </div>
             </div>
 
@@ -1510,6 +1531,11 @@ const result  = document.getElementById('sb-result');
 const loading = document.getElementById('sb-loading');
 const errBox  = document.getElementById('sb-error');
 
+// state ของคำตอบล่าสุดเพื่อแนบกับ feedback
+let _lastQuestion = '';
+let _lastAnswer   = '';
+let _lastMsgId    = '';
+
 function escH(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 askBtn.addEventListener('click', doAsk);
@@ -1558,6 +1584,26 @@ async function doAsk() {
 }
 
 function renderResult(question, j) {
+    // เก็บ state สำหรับ feedback
+    _lastQuestion = question;
+    _lastAnswer   = j.answer || '';
+    _lastMsgId    = 'sb_' + Date.now() + '_' + Math.random().toString(36).slice(2,8);
+
+    // reset feedback UI
+    document.getElementById('sb-fb-bar').style.display = 'flex';
+    document.getElementById('sb-fb-bar').innerHTML = `
+        <span class="text-xs text-gray-500 font-medium">คำตอบนี้ดีไหม?</span>
+        <button type="button" id="sb-fb-up" class="sb-fb-btn px-3 py-1.5 border border-gray-300 rounded-full text-sm hover:bg-emerald-50 hover:border-emerald-300 transition-colors">
+            <i class="fa-regular fa-thumbs-up text-gray-500"></i>
+        </button>
+        <button type="button" id="sb-fb-down" class="sb-fb-btn px-3 py-1.5 border border-gray-300 rounded-full text-sm hover:bg-rose-50 hover:border-rose-300 transition-colors">
+            <i class="fa-regular fa-thumbs-down text-gray-500"></i>
+        </button>
+    `;
+    document.getElementById('sb-fb-comment-wrap').classList.add('hidden');
+    document.getElementById('sb-fb-comment').value = '';
+    bindFeedback();
+
     // ── Answer ────────────────────────────────────────────────────────────
     const answerBox = document.getElementById('sb-answer-box');
     answerBox.innerHTML = typeof marked !== 'undefined'
@@ -1647,6 +1693,58 @@ function renderResult(question, j) {
         };
     } else {
         saveBtn.classList.add('hidden');
+    }
+}
+
+// ── Feedback handlers ─────────────────────────────────────────────────────
+function bindFeedback() {
+    const upBtn   = document.getElementById('sb-fb-up');
+    const downBtn = document.getElementById('sb-fb-down');
+    const cmtWrap = document.getElementById('sb-fb-comment-wrap');
+    const cmtIn   = document.getElementById('sb-fb-comment');
+    const sendBtn = document.getElementById('sb-fb-send');
+    if (!upBtn || !downBtn) return;
+
+    upBtn.addEventListener('click', () => {
+        upBtn.classList.add('selected-up');
+        downBtn.classList.remove('selected-down');
+        cmtWrap.classList.add('hidden');
+        submitSandboxFeedback(1, '');
+    });
+    downBtn.addEventListener('click', () => {
+        downBtn.classList.add('selected-down');
+        upBtn.classList.remove('selected-up');
+        cmtWrap.classList.remove('hidden');
+        cmtIn.focus();
+    });
+    sendBtn?.addEventListener('click', () => submitSandboxFeedback(-1, cmtIn.value.trim()));
+    cmtIn?.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); sendBtn.click(); }
+    });
+}
+
+async function submitSandboxFeedback(rating, comment) {
+    if (!_lastAnswer) return;
+    const fd = new FormData();
+    fd.append('action',   'save_rating');
+    fd.append('rating',   String(rating));
+    fd.append('msg_id',   _lastMsgId);
+    fd.append('question', _lastQuestion);
+    fd.append('answer',   _lastAnswer);
+    fd.append('comment',  comment);
+    fd.append('source',   'sandbox');
+    fd.append('csrf_token', CSRF);
+    try {
+        const r = await fetch('ajax_ai_feedback.php', { method:'POST', body:fd });
+        const j = await r.json();
+        if (j.ok) {
+            document.getElementById('sb-fb-bar').innerHTML = `<span class="sb-fb-done"><i class="fa-solid fa-check-circle"></i> ขอบคุณสำหรับ feedback — ดูทั้งหมดที่ tab Feedback Log</span>`;
+            document.getElementById('sb-fb-comment-wrap').classList.add('hidden');
+        } else {
+            Swal.fire({ icon:'error', title:'ไม่สำเร็จ', text:j.error||'' });
+        }
+    } catch(e) {
+        Swal.fire({ icon:'error', title:'เครือข่ายผิดพลาด', text:e.message });
     }
 }
 
