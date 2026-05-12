@@ -128,6 +128,117 @@ function get_last_line_error(): string {
 }
 
 /**
+ * สร้าง Flex Message สำหรับแจ้งเตือนกลุ่มเมื่อนักศึกษาทุน clock_in/clock_out
+ * รวมปุ่ม "อนุมัติ" / "ปฏิเสธ" เป็น postback เพื่อให้กดได้ใน LINE โดยตรง
+ *
+ * @param int    $logId       sys_scholarship_clock_logs.id
+ * @param string $studentName ชื่อ-นามสกุล
+ * @param string $studentCode รหัสนักศึกษา
+ * @param string $faculty     คณะ/สาขา
+ * @param string $action      'clock_in' | 'clock_out'
+ * @param string $eventTime   เช่น '09:15 น.'
+ * @param bool   $withinRadius อยู่ในพื้นที่หรือไม่
+ * @param string $compType    'hours' | 'paid'
+ */
+function build_scholarship_notify_flex(int $logId, string $studentName, string $studentCode,
+    string $faculty, string $action, string $eventTime, bool $withinRadius, string $compType): array
+{
+    $isIn       = $action === 'clock_in';
+    $actionThai = $isIn ? 'ขอเข้างาน' : 'ขอออกงาน';
+    $actionIcon = $isIn ? '🟢' : '🔴';
+    $gpsText    = $withinRadius ? '✅ อยู่ในพื้นที่' : '⚠️ นอกพื้นที่คลินิก';
+    $gpsColor   = $withinRadius ? '#16a34a' : '#b45309';
+    $compThai   = $compType === 'paid' ? 'ค่าตอบแทน (จ้าง)' : 'ชั่วโมงทำงาน';
+
+    return [
+        'type'       => 'flex',
+        'altText'    => "$actionIcon นักศึกษาทุน $actionThai — $studentName",
+        'contents'   => [
+            'type' => 'bubble',
+            'size' => 'kilo',
+            'header' => [
+                'type'            => 'box',
+                'layout'          => 'vertical',
+                'backgroundColor' => $isIn ? '#7c3aed' : '#0f172a',
+                'paddingAll'      => '16px',
+                'contents'        => [[
+                    'type'   => 'text',
+                    'text'   => "$actionIcon ทุนนักศึกษา — $actionThai",
+                    'color'  => '#ffffff',
+                    'weight' => 'bold',
+                    'size'   => 'md',
+                ]],
+            ],
+            'body' => [
+                'type'       => 'box',
+                'layout'     => 'vertical',
+                'spacing'    => 'sm',
+                'paddingAll' => '16px',
+                'contents'   => [
+                    ['type' => 'box', 'layout' => 'baseline', 'spacing' => 'sm', 'contents' => [
+                        ['type' => 'text', 'text' => 'ชื่อ', 'color' => '#64748b', 'size' => 'sm', 'flex' => 2],
+                        ['type' => 'text', 'text' => $studentName, 'size' => 'sm', 'weight' => 'bold', 'flex' => 5, 'wrap' => true],
+                    ]],
+                    ['type' => 'box', 'layout' => 'baseline', 'spacing' => 'sm', 'contents' => [
+                        ['type' => 'text', 'text' => 'รหัส', 'color' => '#64748b', 'size' => 'sm', 'flex' => 2],
+                        ['type' => 'text', 'text' => $studentCode ?: '—', 'size' => 'sm', 'flex' => 5],
+                    ]],
+                    ['type' => 'box', 'layout' => 'baseline', 'spacing' => 'sm', 'contents' => [
+                        ['type' => 'text', 'text' => 'คณะ', 'color' => '#64748b', 'size' => 'sm', 'flex' => 2],
+                        ['type' => 'text', 'text' => $faculty ?: '—', 'size' => 'sm', 'flex' => 5, 'wrap' => true],
+                    ]],
+                    ['type' => 'box', 'layout' => 'baseline', 'spacing' => 'sm', 'contents' => [
+                        ['type' => 'text', 'text' => 'เวลา', 'color' => '#64748b', 'size' => 'sm', 'flex' => 2],
+                        ['type' => 'text', 'text' => $eventTime, 'size' => 'sm', 'flex' => 5],
+                    ]],
+                    ['type' => 'box', 'layout' => 'baseline', 'spacing' => 'sm', 'contents' => [
+                        ['type' => 'text', 'text' => 'GPS', 'color' => '#64748b', 'size' => 'sm', 'flex' => 2],
+                        ['type' => 'text', 'text' => $gpsText, 'size' => 'sm', 'color' => $gpsColor, 'flex' => 5],
+                    ]],
+                    ['type' => 'box', 'layout' => 'baseline', 'spacing' => 'sm', 'contents' => [
+                        ['type' => 'text', 'text' => 'ประเภท', 'color' => '#64748b', 'size' => 'sm', 'flex' => 2],
+                        ['type' => 'text', 'text' => $compThai, 'size' => 'sm', 'flex' => 5],
+                    ]],
+                    ['type' => 'separator', 'margin' => 'md'],
+                    ['type' => 'text', 'text' => "Log ID: #$logId", 'size' => 'xs', 'color' => '#94a3b8', 'margin' => 'sm'],
+                ],
+            ],
+            'footer' => [
+                'type'     => 'box',
+                'layout'   => 'horizontal',
+                'spacing'  => 'md',
+                'contents' => [
+                    [
+                        'type'   => 'button',
+                        'style'  => 'primary',
+                        'color'  => '#16a34a',
+                        'height' => 'sm',
+                        'action' => [
+                            'type'        => 'postback',
+                            'label'       => '✅ อนุมัติ',
+                            'data'        => "scholarship_approve:$logId",
+                            'displayText' => "อนุมัติ #$logId",
+                        ],
+                    ],
+                    [
+                        'type'   => 'button',
+                        'style'  => 'primary',
+                        'color'  => '#dc2626',
+                        'height' => 'sm',
+                        'action' => [
+                            'type'        => 'postback',
+                            'label'       => '❌ ปฏิเสธ',
+                            'data'        => "scholarship_reject:$logId",
+                            'displayText' => "ปฏิเสธ #$logId",
+                        ],
+                    ],
+                ],
+            ],
+        ],
+    ];
+}
+
+/**
  * LINE Group registry (เก็บใน sys_site_settings key 'line.groups.discovered')
  *
  * เก็บเป็น JSON array ของ { id, type, name?, joined_at, last_seen_at, member_count? }
