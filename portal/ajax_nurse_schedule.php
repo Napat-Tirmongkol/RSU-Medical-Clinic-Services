@@ -30,6 +30,7 @@ function ensure_nurse_schedule_schema(PDO $pdo): void
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
         // Self-heal: เพิ่ม column ถ้าโครงสร้างเดิมยังไม่มี
         try { $pdo->exec("ALTER TABLE sys_nurse_schedule_global ADD COLUMN shift_types_json LONGTEXT NULL"); } catch (PDOException) {}
+        try { $pdo->exec("ALTER TABLE sys_nurse_schedule_global ADD COLUMN custom_positions_json LONGTEXT NULL"); } catch (PDOException) {}
 
         $pdo->exec("CREATE TABLE IF NOT EXISTS sys_nurse_schedule_monthly (
             id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -99,6 +100,7 @@ try {
                 'customHolidays'  => $decode($g['custom_holidays_json'] ?? null, (object)[]),
                 'removedHolidays' => $decode($g['removed_holidays_json'] ?? null, (object)[]),
                 'shiftTypes'      => $decode($g['shift_types_json'] ?? null, (object)[]),
+                'customPositions' => $decode($g['custom_positions_json'] ?? null, (object)[]),
                 'schedule'        => $decode($m['schedule_json'] ?? null, (object)[]),
                 'leaves'          => $decode($m['leaves_json'] ?? null, (object)[]),
                 'clinicHolidays'  => $clinicHolidays,
@@ -131,8 +133,9 @@ try {
             // Upsert global
             $pdo->prepare("INSERT INTO sys_nurse_schedule_global
                 (id, nurses_json, requirements_json, ot_settings_json,
-                 custom_holidays_json, removed_holidays_json, shift_types_json, updated_by)
-                VALUES (1, :n, :r, :o, :c, :rm, :st, :by)
+                 custom_holidays_json, removed_holidays_json, shift_types_json,
+                 custom_positions_json, updated_by)
+                VALUES (1, :n, :r, :o, :c, :rm, :st, :cp, :by)
                 ON DUPLICATE KEY UPDATE
                 nurses_json = VALUES(nurses_json),
                 requirements_json = VALUES(requirements_json),
@@ -140,6 +143,7 @@ try {
                 custom_holidays_json = VALUES(custom_holidays_json),
                 removed_holidays_json = VALUES(removed_holidays_json),
                 shift_types_json = VALUES(shift_types_json),
+                custom_positions_json = VALUES(custom_positions_json),
                 updated_by = VALUES(updated_by)")
                 ->execute([
                     ':n'  => $enc($payload['nurses']          ?? []),
@@ -147,6 +151,7 @@ try {
                     ':o'  => $enc($payload['otSettings']      ?? null),
                     ':c'  => $enc($payload['customHolidays']  ?? null),
                     ':rm' => $enc($payload['removedHolidays'] ?? null),
+                    ':cp' => $enc($payload['customPositions'] ?? null),
                     ':st' => $enc($payload['shiftTypes']      ?? null),
                     ':by' => $adminId ?: null,
                 ]);
