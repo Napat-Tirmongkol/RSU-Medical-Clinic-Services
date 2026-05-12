@@ -141,12 +141,6 @@ try {
 
         $enc = fn($v) => json_encode($v ?? new stdClass(), JSON_UNESCAPED_UNICODE);
 
-        // [DIAGNOSTIC] log payload size รับเข้า
-        $_sched = $payload['schedule'] ?? null;
-        $_schedCount = is_array($_sched) ? count($_sched) : 0;
-        $_nursesCount = is_array($payload['nurses'] ?? null) ? count($payload['nurses']) : 0;
-        error_log("[nurse_schedule save] IN year=$year month=$month nurses=$_nursesCount schedule_keys=$_schedCount payload_bytes=" . strlen((string)($_POST['payload'] ?? '')));
-
         $pdo->beginTransaction();
         try {
             // Upsert global
@@ -176,26 +170,22 @@ try {
                 ]);
 
             // Upsert monthly
-            $_sJson = $enc($payload['schedule'] ?? null);
-            $_lJson = $enc($payload['leaves']   ?? null);
-            $stmtM = $pdo->prepare("INSERT INTO sys_nurse_schedule_monthly
+            $pdo->prepare("INSERT INTO sys_nurse_schedule_monthly
                 (year_be, month, schedule_json, leaves_json, updated_by)
                 VALUES (:y, :m, :s, :l, :by)
                 ON DUPLICATE KEY UPDATE
                 schedule_json = VALUES(schedule_json),
                 leaves_json   = VALUES(leaves_json),
-                updated_by    = VALUES(updated_by)");
-            $stmtM->execute([
-                ':y'  => $year, ':m' => $month,
-                ':s'  => $_sJson,
-                ':l'  => $_lJson,
-                ':by' => $adminId ?: null,
-            ]);
-            $_affected = $stmtM->rowCount();
-            error_log("[nurse_schedule save] MONTHLY upsert affected=$_affected schedule_json_bytes=" . strlen($_sJson));
+                updated_by    = VALUES(updated_by)")
+                ->execute([
+                    ':y'  => $year, ':m' => $month,
+                    ':s'  => $enc($payload['schedule'] ?? null),
+                    ':l'  => $enc($payload['leaves']   ?? null),
+                    ':by' => $adminId ?: null,
+                ]);
 
             $pdo->commit();
-            echo json_encode(['ok' => true, 'saved_at' => date('c'), 'monthly_affected' => $_affected, 'schedule_bytes' => strlen($_sJson)]);
+            echo json_encode(['ok' => true, 'saved_at' => date('c')]);
         } catch (Throwable $e) {
             $pdo->rollBack();
             error_log('[nurse_schedule save] ' . $e->getMessage());

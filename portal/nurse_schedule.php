@@ -1089,19 +1089,14 @@ function _showSaveStatus(text, cls) {
 
 async function serverLoad(year, month) {
   try {
-    // เพิ่ม timestamp กัน browser cache GET request
+    // ใส่ timestamp กัน browser cache GET request
     const r = await fetch(`${NS_AJAX}?action=load&year=${year}&month=${month}&_t=${Date.now()}`,
       { credentials: 'same-origin', cache: 'no-store' });
     const j = await r.json();
     if (!j.ok) { console.warn('[nurse_schedule] serverLoad failed', j.error); return null; }
-    // diagnostic — แสดงว่า server ส่ง schedule/leaves ขนาดเท่าไหร่กลับมา
-    const scheduleSize = j.data && j.data.schedule ? Object.keys(j.data.schedule).length : 0;
-    const leavesSize   = j.data && j.data.leaves   ? Object.keys(j.data.leaves).length   : 0;
-    const nursesSize   = j.data && Array.isArray(j.data.nurses) ? j.data.nurses.length   : 0;
-    console.log('[nurse_schedule] serverLoad', year, month, '→', { nurses: nursesSize, schedule: scheduleSize, leaves: leavesSize, monthly_updated_at: j.monthly_updated_at });
     return j.data || null;
   } catch (e) {
-    console.warn('serverLoad error', e);
+    console.warn('[nurse_schedule] serverLoad error', e);
     return null;
   }
 }
@@ -1125,36 +1120,25 @@ async function serverSave() {
   if (_isSaving) return;
   _isSaving = true;
   _showSaveStatus('กำลังบันทึก…', '');
-  const payload = _buildSavePayload();
-  const scheduleSize = Object.keys(payload.schedule || {}).length;
-  const leavesSize   = Object.keys(payload.leaves   || {}).length;
-  const nursesSize   = Array.isArray(payload.nurses) ? payload.nurses.length : 0;
-  const payloadJson = JSON.stringify(payload);
-  // diagnostic: ตรวจ JSON ที่จะส่งจริง — ถ้า scheduleSize=4 แต่ payloadJson มี schedule:{}
-  // แสดงว่า state.schedule มี non-enumerable / Symbol keys ที่ Object.keys เห็นแต่ JSON ไม่เห็น
-  const scheduleInJson = (payloadJson.match(/"schedule":\{[^}]*\}/) || ['<no match>'])[0].slice(0, 200);
-  console.log('[nurse_schedule] serverSave START', state.year, state.month, '→', { nurses: nursesSize, schedule: scheduleSize, leaves: leavesSize, dirty: state.dirty, jsonBytes: payloadJson.length, scheduleSnippet: scheduleInJson, scheduleSample: JSON.stringify(payload.schedule).slice(0, 200) });
   try {
     const fd = new FormData();
     fd.append('csrf_token', NS_CSRF);
     fd.append('action', 'save');
     fd.append('year', String(state.year));
     fd.append('month', String(state.month));
-    fd.append('payload', payloadJson);
+    fd.append('payload', JSON.stringify(_buildSavePayload()));
     const r = await fetch(NS_AJAX, { method: 'POST', body: fd, credentials: 'same-origin' });
     const rawText = await r.text();
-    console.log('[nurse_schedule] serverSave HTTP', r.status, rawText.slice(0, 300));
     let j;
     try { j = JSON.parse(rawText); }
     catch (parseErr) {
-      console.error('[nurse_schedule] save: response not JSON. Body:', rawText.slice(0, 500));
+      console.error('[nurse_schedule] save: response not JSON (HTTP ' + r.status + ')', rawText.slice(0, 500));
       _showSaveStatus('บันทึกล้มเหลว: server ตอบไม่ใช่ JSON (HTTP ' + r.status + ')', 'err');
       return;
     }
     if (j.ok) {
       state.dirty = false;
       _showSaveStatus('บันทึกแล้ว ✓ ' + new Date().toLocaleTimeString('th-TH'), 'ok');
-      console.log('[nurse_schedule] save OK', j);
     } else {
       console.error('[nurse_schedule] save failed:', j.error);
       _showSaveStatus('บันทึกล้มเหลว: ' + (j.error || ''), 'err');
