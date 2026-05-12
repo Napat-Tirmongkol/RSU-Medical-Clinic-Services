@@ -78,6 +78,7 @@ $NS_CSRF_TOKEN = get_csrf_token();
   .card-red    { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); }
   .card-cyan   { background: linear-gradient(135deg, #10b981 0%, #059669 100%); }
   .card-pink   { background: linear-gradient(135deg, #ec4899 0%, #db2777 100%); }
+  .card-emerald { background: linear-gradient(135deg, #059669 0%, #047857 100%); }
 
   /* ===== BADGES ===== */
   .badge-pill {
