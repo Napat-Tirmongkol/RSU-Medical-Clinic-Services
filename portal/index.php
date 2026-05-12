@@ -982,6 +982,9 @@ try {
             $hasScholarship = $isSuper || !empty($_SESSION['access_scholarship']);
             $hasDashboardAdmin = $isSuper || !empty($_SESSION['access_dashboard_admin']);
             $hasMonthlyReport  = $isSuper || !empty($_SESSION['access_monthly_report']) || !empty($_SESSION['access_director_view']);
+            $hasAsset          = $isSuper || in_array($_SESSION['role'] ?? '', ['admin','editor'], true) || !empty($_SESSION['access_asset']);
+            $hasConsumables    = $isSuper || in_array($_SESSION['role'] ?? '', ['admin','editor'], true) || !empty($_SESSION['access_consumables']);
+            $hasInventory      = $hasAsset || $hasConsumables;
 
             // EDMS pending count badge — count routings where current user is recipient and status is open
             $edmsInboxBadge = 0;
@@ -1144,6 +1147,29 @@ try {
                                 </span>
                             <?php endif; ?>
                         </button>
+                    <?php endif; ?>
+                </div>
+            <?php endif; ?>
+
+            <?php /* ── คลังพัสดุ (Inventory) ────────────────────────────── */ ?>
+            <?php if (!$registryOnly && $hasInventory): ?>
+                <button type="button" class="psb-section-toggle" data-group="inventory" onclick="togglePsbGroup('inventory',this)">
+                    <i class="fa-solid fa-warehouse" style="color:#2e9e63"></i>
+                    <span>คลังพัสดุ</span>
+                    <i class="fa-solid fa-chevron-down psb-chevron"></i>
+                </button>
+                <div class="psb-group" data-group="inventory">
+                    <?php if ($hasAsset): ?>
+                        <a href="../asset/index.php" class="psb-item" style="text-decoration:none">
+                            <div class="psb-icon"><i class="fa-solid fa-boxes-stacked" style="color:#0d9488"></i></div>
+                            <span class="psb-label" style="color:#0f766e;font-weight:900">ครุภัณฑ์สำนักงาน</span>
+                        </a>
+                    <?php endif; ?>
+                    <?php if ($hasConsumables): ?>
+                        <a href="../consumables/index.php" class="psb-item" style="text-decoration:none">
+                            <div class="psb-icon"><i class="fa-solid fa-box-open" style="color:#2e9e63"></i></div>
+                            <span class="psb-label" style="color:#2e7d52;font-weight:900">วัสดุสิ้นเปลือง</span>
+                        </a>
                     <?php endif; ?>
                 </div>
             <?php endif; ?>
