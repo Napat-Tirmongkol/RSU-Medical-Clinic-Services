@@ -165,12 +165,15 @@ $NS_CSRF_TOKEN = get_csrf_token();
     background: white; border-radius: 14px; padding: 18px;
     box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid #e2e8f0;
     overflow: auto; max-height: calc(100vh - 320px);
+    position: relative;          /* containing block for sticky children */
+    isolation: isolate;          /* new stacking context — กัน sticky cells ทะลุไปทับ element นอก wrapper */
   }
   .schedule-table {
     border-collapse: separate; border-spacing: 0;
     font-size: 13px; min-width: 100%;
   }
-  .schedule-table thead { position: sticky; top: 0; z-index: 5; }
+  /* thead sticky เป็นยูนิตเดียว — ทุก th ใน thead เลื่อนพร้อมกัน */
+  .schedule-table thead { position: sticky; top: 0; z-index: 10; }
   .schedule-table thead th {
     background: linear-gradient(135deg, #059669 0%, #0d8a52 100%);
     color: white; padding: 8px 6px; font-weight: 500;
@@ -194,11 +197,30 @@ $NS_CSRF_TOKEN = get_csrf_token();
   .day-cell.weekend-cell { background: rgba(252, 231, 243, 0.4); }
   .day-cell.today { box-shadow: inset 0 0 0 2px #f59e0b; }
 
-  /* Sticky columns */
-  .sticky-col { position: sticky; left: 0; background: white; z-index: 3; border-right: 2px solid #e2e8f0; }
-  .sticky-col-2 { position: sticky; left: 36px; background: white; z-index: 3; }
-  .sticky-col-3 { position: sticky; background: white; z-index: 3; border-right: 2px solid #e2e8f0; }
-  tr:hover .sticky-col, tr:hover .sticky-col-2, tr:hover .sticky-col-3 { background: #f0f9ff; }
+  /* Sticky columns — body cells (sticky-left only) */
+  .schedule-table tbody td.sticky-col,
+  .schedule-table tbody td.sticky-col-2,
+  .schedule-table tbody td.sticky-col-3 {
+    position: sticky; background: white; z-index: 4;
+  }
+  .schedule-table tbody td.sticky-col   { left: 0;    border-right: 2px solid #e2e8f0; }
+  .schedule-table tbody td.sticky-col-2 { left: 36px; }
+  .schedule-table tbody td.sticky-col-3 { left: 186px; border-right: 2px solid #e2e8f0; }
+  .schedule-table tbody tr:hover td.sticky-col,
+  .schedule-table tbody tr:hover td.sticky-col-2,
+  .schedule-table tbody tr:hover td.sticky-col-3 { background: #f0f9ff; }
+
+  /* Header sticky-col cells (top-left corner) — sticky-left ภายในยูนิต sticky-top ของ thead
+     ต้อง z-index สูงสุดเพื่อทับทั้ง sticky-col body cells และ thead cells ทั่วไป */
+  .schedule-table thead th.sticky-col,
+  .schedule-table thead th.sticky-col-2,
+  .schedule-table thead th.sticky-col-3 {
+    position: sticky; z-index: 20;
+    background: linear-gradient(135deg, #059669 0%, #0d8a52 100%);
+  }
+  .schedule-table thead th.sticky-col   { left: 0; }
+  .schedule-table thead th.sticky-col-2 { left: 36px; }
+  .schedule-table thead th.sticky-col-3 { left: 186px; }
 
   /* Position badges */
   .pos-badge {
