@@ -12,7 +12,8 @@ $action = $_REQUEST['action'] ?? '';
 
 try {
     if ($action === 'list_staff_nurses') {
-        // 1) ดึง staff ที่มี job_title คำว่า "พยาบาล" หรือเชื่อมกับ org chart "พยาบาล"
+        // 1) ดึง staff ที่อยู่ในผังองค์กร (ทุกตำแหน่ง) หรือมี job_title คำว่า "พยาบาล"
+        //    เพื่อให้ตารางเวรเห็นภาพรวมทั้งพยาบาลและเจ้าหน้าที่อื่นที่ใช้เวรร่วมกัน
         $sqlStaff = "SELECT
                     'staff' AS source,
                     s.id AS staff_id,
@@ -33,13 +34,13 @@ try {
                          SELECT 1 FROM sys_org_members om
                          INNER JOIN sys_org_positions op ON op.id = om.position_id
                          WHERE om.staff_id = s.id AND om.is_active = 1
-                           AND op.title LIKE '%พยาบาล%'
+                           AND op.is_active = 1
                        )
                   )
                 ORDER BY s.full_name ASC";
 
-        // 2) ดึง org_members ที่ตำแหน่งมี "พยาบาล" แต่ไม่มี staff_id (standalone)
-        //    เพื่อไม่ duplicate กับผลข้อ 1 ซึ่งดึงผ่าน staff_id อยู่แล้ว
+        // 2) ดึง org_members ทุกตำแหน่งที่ไม่มี staff_id (standalone)
+        //    — เพื่อไม่ duplicate กับผลข้อ 1 ซึ่งดึงผ่าน staff_id อยู่แล้ว
         $sqlOrg = "SELECT
                     'org' AS source,
                     NULL AS staff_id,
@@ -53,7 +54,6 @@ try {
                 INNER JOIN sys_org_positions op ON op.id = om.position_id
                 WHERE om.is_active = 1 AND op.is_active = 1
                   AND om.staff_id IS NULL
-                  AND op.title LIKE '%พยาบาล%'
                 ORDER BY om.full_name ASC";
 
         $rows = [];

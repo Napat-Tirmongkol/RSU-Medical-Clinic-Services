@@ -208,6 +208,7 @@ $NS_CSRF_TOKEN = get_csrf_token();
   .pos-rn      { background: linear-gradient(135deg, #14b8a6, #0d9488); color: white; }
   .pos-tech    { background: linear-gradient(135deg, #a855f7, #9333ea); color: white; }
   .pos-aide    { background: linear-gradient(135deg, #f97316, #ea580c); color: white; }
+  .pos-staff   { background: linear-gradient(135deg, #64748b, #475569); color: white; }
 
   /* Shift palette */
   .shift-palette {
@@ -819,7 +820,8 @@ const POSITIONS = {
   'พยาบาลหัวหน้าเวร':    { icon: '💎', cls: 'pos-shift',  weekdayMorningOnly: false, maxOne: false, system: true },
   'พยาบาลวิชาชีพ':       { icon: '👤', cls: 'pos-rn',     weekdayMorningOnly: false, maxOne: false, system: true },
   'พยาบาลเทคนิค':        { icon: '🔧', cls: 'pos-tech',   weekdayMorningOnly: false, maxOne: false, system: true },
-  'ผู้ช่วยพยาบาล':        { icon: '🤝', cls: 'pos-aide',   weekdayMorningOnly: false, maxOne: false, system: true }
+  'ผู้ช่วยพยาบาล':        { icon: '🤝', cls: 'pos-aide',   weekdayMorningOnly: false, maxOne: false, system: true },
+  'เจ้าหน้าที่':            { icon: '🧑‍💼', cls: 'pos-staff',  weekdayMorningOnly: false, maxOne: false, system: true }
 };
 
 // ── Custom positions: inject CSS rules for user-defined badges ──
@@ -2500,14 +2502,14 @@ function deleteCustomPosition(name) {
 // แปลง job_title หรือ org_position_title → POSITIONS key
 function mapJobTitleToPosition(jt, orgTitle) {
   const t = ((jt || '') + ' ' + (orgTitle || '')).trim();
-  if (!t) return 'พยาบาลวิชาชีพ';
+  if (!t) return 'เจ้าหน้าที่';
   if (/หัวหน้าหอ/i.test(t)) return 'หัวหน้าหอผู้ป่วย';
   if (/รองหัวหน้า/i.test(t)) return 'รองหัวหน้าหอผู้ป่วย';
-  if (/หัวหน้าเวร|หัวหน้า/i.test(t)) return 'พยาบาลหัวหน้าเวร';
+  if (/หัวหน้าเวร/i.test(t)) return 'พยาบาลหัวหน้าเวร';
   if (/ผู้ช่วยพยาบาล/i.test(t)) return 'ผู้ช่วยพยาบาล';
   if (/พยาบาลเทคนิค|เทคนิค/i.test(t)) return 'พยาบาลเทคนิค';
   if (/พยาบาลวิชาชีพ|วิชาชีพ|พยาบาล/i.test(t)) return 'พยาบาลวิชาชีพ';
-  return 'พยาบาลวิชาชีพ';
+  return 'เจ้าหน้าที่';
 }
 
 async function openImportNurses() {
@@ -2527,8 +2529,8 @@ async function openImportNurses() {
 
   if (!staff.length) {
     Swal.fire({
-      icon: 'info', title: 'ไม่พบรายชื่อพยาบาล',
-      html: 'ไม่พบในทั้ง 2 แหล่ง:<br>• <b>Identity</b> staff ที่มี Job Title มีคำว่า "พยาบาล"<br>• <b>ผังองค์กร</b> สมาชิกที่อยู่ใต้ตำแหน่ง "พยาบาล..."<br><br>เปิดหน้า "ข้อมูลคลินิก" → "ผังองค์กร" หรือ Identity → กรอก Job Title ก่อน',
+      icon: 'info', title: 'ไม่พบรายชื่อบุคลากร',
+      html: 'ไม่พบในทั้ง 2 แหล่ง:<br>• <b>Identity</b> staff ที่อยู่ในผังองค์กร หรือมี Job Title "พยาบาล"<br>• <b>ผังองค์กร</b> สมาชิกที่ยังไม่ได้ผูกกับ Identity<br><br>เปิดหน้า "ข้อมูลคลินิก" → "ผังองค์กร" เพื่อเพิ่มสมาชิกก่อน',
     });
     return;
   }
@@ -2564,10 +2566,10 @@ async function openImportNurses() {
   const countOrg = staff.filter(s => s.source === 'org').length;
 
   Swal.fire({
-    title: 'นำเข้ารายชื่อพยาบาล',
+    title: 'นำเข้ารายชื่อบุคลากร',
     html: `<p class="text-xs text-slate-500 text-left mb-2">
         ดึงจาก 2 แหล่งรวมกัน: <b class="text-sky-700">Identity (${countStaff})</b> + <b class="text-amber-700">ผังองค์กร (${countOrg})</b><br>
-        ระบบจะแมพ "ตำแหน่งในเวร" ให้อัตโนมัติจาก Job Title/Org Title
+        ระบบจะแมพ "ตำแหน่งในเวร" ให้อัตโนมัติจาก Job Title/Org Title (ผู้ที่ไม่ใช่พยาบาลจะถูกตั้งเป็น "เจ้าหน้าที่")
       </p>
       <div class="text-left max-h-[400px] overflow-y-auto pr-1">${rows}</div>`,
     showCancelButton: true,
