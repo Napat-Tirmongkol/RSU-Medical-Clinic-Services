@@ -810,6 +810,15 @@ function _qa_source_badge(string $s): string {
                 <div id="sb-faq-match-text" class="text-sm text-emerald-800 leading-relaxed"></div>
             </div>
 
+            <!-- Doctor schedule debug -->
+            <div id="sb-debug-schedule" class="bg-amber-50 border border-amber-200 rounded-2xl p-4 hidden">
+                <div class="flex items-center gap-2 text-amber-800 font-bold text-sm mb-2">
+                    <i class="fa-solid fa-stethoscope"></i> Raw ตารางหมอ (DB)
+                    <span class="text-xs text-amber-600 font-normal">— ใช้ debug ว่า AI เห็นข้อมูลถูกหรือเปล่า</span>
+                </div>
+                <div id="sb-debug-schedule-body" class="space-y-2"></div>
+            </div>
+
             <!-- Context preview -->
             <details class="bg-slate-900 rounded-2xl overflow-hidden">
                 <summary class="px-5 py-3 text-sm font-bold text-slate-300 cursor-pointer select-none flex items-center gap-2 hover:text-white">
@@ -1652,6 +1661,27 @@ function renderResult(question, j) {
         }).join('');
     } else {
         chunksSec.classList.add('hidden');
+    }
+
+    // ── Doctor schedule debug ─────────────────────────────────────────────
+    const dbgBox  = document.getElementById('sb-debug-schedule');
+    const dbgBody = document.getElementById('sb-debug-schedule-body');
+    if (j.debug_schedule) {
+        dbgBox.classList.remove('hidden');
+        const entries = Object.values(j.debug_schedule);
+        dbgBody.innerHTML = entries.map(d => {
+            const rowsHtml = (d.rows||[]).length
+                ? '<table class="w-full text-xs"><thead><tr class="text-left bg-amber-100"><th class="px-2 py-1">staff_id</th><th class="px-2 py-1">ชื่อ</th><th class="px-2 py-1">type</th><th class="px-2 py-1">เวลา</th><th class="px-2 py-1">บริการ</th></tr></thead><tbody>' +
+                  d.rows.map(r => `<tr class="border-t border-amber-100"><td class="px-2 py-1">${r.staff_id||'-'}</td><td class="px-2 py-1">${escH((r.doc_title?r.doc_title+' ':'')+(r.doc_name||'-'))}</td><td class="px-2 py-1">${escH(r.type||'-')}</td><td class="px-2 py-1">${escH((r.start_time||'').substring(0,5))}–${escH((r.end_time||'').substring(0,5))}</td><td class="px-2 py-1">${escH(r.service||'-')}</td></tr>`).join('') +
+                  '</tbody></table>'
+                : '<div class="text-xs text-amber-600 italic">ไม่มี shift</div>';
+            return `<div class="bg-white border border-amber-200 rounded-lg p-3">
+                <div class="text-xs font-bold text-amber-900 mb-2">${escH(d.date)} — <span class="font-normal">${d.count} shift</span></div>
+                ${rowsHtml}
+            </div>`;
+        }).join('');
+    } else {
+        dbgBox.classList.add('hidden');
     }
 
     // ── Context preview ───────────────────────────────────────────────────

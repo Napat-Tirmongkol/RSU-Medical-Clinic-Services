@@ -69,9 +69,30 @@ try {
     $result = ai_qa_generate_answer($question, $pdo, $now);
     $elapsed = round((microtime(true) - $t0) * 1000);
 
-    // ── 4. ดึง context preview (truncate 1500 chars) ─────────────────────
+    // ── 4. ดึง context preview (ส่งเต็มเพื่อให้ debug schedule ได้) ───
     $contextFull = ai_qa_build_clinic_context($pdo, $now, $question);
-    $contextPreview = mb_substr($contextFull, 0, 1500) . (mb_strlen($contextFull) > 1500 ? "\n…(ตัดแสดง)" : '');
+    $contextPreview = $contextFull;
+
+    // ── 4.5. ดึงตารางหมอวันที่ใกล้เคียง 7 วัน (raw) เพื่อ debug ───────
+    $today = $now->format('Y-m-d');
+    $tomorrow = $now->modify('+1 day')->format('Y-m-d');
+    $debugSchedule = [];
+    foreach ([$today, $tomorrow] as $d) {
+        $rows = get_clinic_doctors_for_date($pdo, $d);
+        $debugSchedule[$d] = [
+            'date'  => $d,
+            'count' => count($rows),
+            'rows'  => array_map(fn($r) => [
+                'staff_id'   => $r['staff_id'] ?? null,
+                'doc_name'   => $r['doc_name'] ?? null,
+                'doc_title'  => $r['doc_title'] ?? null,
+                'type'       => $r['type'] ?? null,
+                'start_time' => $r['start_time'] ?? null,
+                'end_time'   => $r['end_time']   ?? null,
+                'service'    => $r['service_type'] ?? null,
+            ], $rows),
+        ];
+    }
 
     echo json_encode([
         'ok'          => true,
@@ -91,6 +112,7 @@ try {
         ], $chunks),
         'context_chars'   => mb_strlen($contextFull),
         'context_preview' => $contextPreview,
+        'debug_schedule'  => $debugSchedule,
     ], JSON_UNESCAPED_UNICODE);
 
 } catch (Throwable $e) {
