@@ -1225,9 +1225,16 @@ function sendTestLineP() {
                     <button type="button" onclick="rmTemplate('single')" class="text-[10px] font-black px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 border border-slate-200">
                         Template 1 ปุ่มเต็มภาพ
                     </button>
+                    <span class="mx-1 text-slate-300">|</span>
+                    <button type="button" onclick="rmImportFromId()" class="text-[10px] font-black px-2.5 py-1 rounded-lg bg-cyan-50 hover:bg-cyan-100 text-cyan-700 border border-cyan-200 inline-flex items-center gap-1">
+                        <i class="fa-solid fa-file-import"></i> นำเข้า areas จาก richMenuId
+                    </button>
                 </div>
                 <p class="text-[10px] text-slate-400 font-medium mt-1.5">
                     Action types: <span class="font-mono">uri</span> (เปิด URL), <span class="font-mono">message</span> (ส่ง text), <span class="font-mono">postback</span>, <span class="font-mono">richmenuswitch</span>
+                </p>
+                <p class="text-[10px] text-cyan-600 font-medium mt-1">
+                    <i class="fa-solid fa-circle-info"></i> "นำเข้า areas" — ใส่ ID ของ rich menu ที่อยากเลียนแบบ layout → ระบบดึง size + areas มา auto-fill (ใช้กับ Console menu อาจติด channel limitation)
                 </p>
             </div>
 
@@ -1284,6 +1291,59 @@ function sendTestLineP() {
     };
 
     window.rmSizeChange = function(){ /* placeholder */ };
+
+    window.rmImportFromId = async function() {
+        const { value: rid } = await Swal.fire({
+            title: 'นำเข้า areas จาก richMenuId',
+            input: 'text',
+            inputPlaceholder: 'richmenu-xxxxxxxxxxxxxxxxxxxxxxxxxx',
+            inputAttributes: { autocapitalize: 'off', style: 'font-family:monospace;font-size:12px' },
+            showCancelButton: true,
+            confirmButtonText: 'ดึง config',
+            cancelButtonText: 'ยกเลิก',
+            inputValidator: v => !v ? 'กรุณาใส่ richMenuId' : undefined,
+        });
+        if (!rid) return;
+
+        Swal.fire({ title: 'กำลังดึง...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
+        const fd = new FormData();
+        fd.append('action', 'import_detail');
+        fd.append('csrf_token', '<?= get_csrf_token() ?>');
+        fd.append('richMenuId', rid.trim());
+        const r = await fetch('ajax_line_richmenu.php', { method: 'POST', body: fd }).then(x => x.json());
+
+        if (!r.ok) {
+            Swal.fire({ icon: 'warning', title: 'ดึงไม่ได้', html: (r.message || '').replace(/\n/g, '<br>') });
+            return;
+        }
+
+        const d = r.data || {};
+        // Fill form
+        if (d.size && d.size.width && d.size.height) {
+            document.getElementById('rcSize').value = `${d.size.width}x${d.size.height}`;
+        }
+        if (d.name) document.querySelector('input[name="rc_name"]').value = d.name;
+        if (d.chatBarText) document.querySelector('input[name="rc_chatbar"]').value = d.chatBarText.substring(0, 14);
+        if (typeof d.selected !== 'undefined') {
+            document.querySelector('select[name="rc_selected"]').value = d.selected ? 'true' : 'false';
+        }
+        if (Array.isArray(d.areas)) {
+            document.getElementById('rcAreas').value = JSON.stringify(d.areas, null, 2);
+        }
+
+        Swal.fire({
+            icon: 'success',
+            title: 'นำเข้าสำเร็จ',
+            html: `ดึง config มาเรียบร้อย:<br>
+                <ul style="text-align:left;display:inline-block;font-size:13px;margin-top:8px">
+                    <li>Size: ${d.size?.width}×${d.size?.height}</li>
+                    <li>Name: ${d.name || '-'}</li>
+                    <li>Chat bar: ${d.chatBarText || '-'}</li>
+                    <li>Areas: ${(d.areas || []).length} ปุ่ม</li>
+                </ul>
+                <small>อย่าลืมอัพรูป (ขนาดต้องตรงกับ size)</small>`,
+        });
+    };
 
     // ตั้งค่า default template ตอนโหลด
     document.getElementById('rcAreas').value = TEMPLATES.grid_3x2;

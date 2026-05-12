@@ -267,6 +267,28 @@ if (!function_exists('line_richmenu_delete')) {
     }
 }
 
+if (!function_exists('line_richmenu_get_detail')) {
+    /**
+     * ดึงรายละเอียดของ rich menu (size, areas, name, chatBarText) ตาม id
+     * ใช้ clone config มา fill ลง form สร้างใหม่ — กรณีอยากใช้ layout เดิม
+     * แต่สร้างผ่าน Messaging API channel ของเรา
+     *
+     * หมายเหตุ: ถ้า rich menu owned by another channel API อาจ block
+     *   - LINE บางครั้งอนุญาตให้ GET ดู detail ได้แม้คนละ channel
+     *   - แต่ไม่อนุญาตให้ POST link หรือ delete
+     */
+    function line_richmenu_get_detail(string $richMenuId): array
+    {
+        if ($richMenuId === '') return ['ok' => false, 'data' => null, 'http' => 0, 'error' => 'richMenuId ว่าง'];
+        $r = line_richmenu_api('GET', "/v2/bot/richmenu/$richMenuId");
+        if ($r['http'] < 200 || $r['http'] >= 300) {
+            return ['ok' => false, 'data' => null, 'http' => $r['http'], 'error' => $r['body'] ?: $r['error']];
+        }
+        $data = json_decode($r['body'], true) ?: null;
+        return ['ok' => true, 'data' => $data, 'http' => $r['http'], 'error' => null];
+    }
+}
+
 if (!function_exists('line_richmenu_get_default')) {
     /**
      * ดึง richMenuId ของ default rich menu ปัจจุบัน
