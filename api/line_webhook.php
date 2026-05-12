@@ -454,6 +454,8 @@ foreach ($data['events'] as $idx => $event) {
     $type = $event['type'] ?? '';
     $replyToken = $event['replyToken'] ?? null;
     $userId = $event['source']['userId'] ?? null;
+    $sourceType = $event['source']['type'] ?? '';
+    $groupId    = $event['source']['groupId'] ?? ($event['source']['roomId'] ?? null);
     $messageText = (($event['message']['type'] ?? '') === 'text') ? (string)($event['message']['text'] ?? '') : '';
     $postbackData = ($type === 'postback') ? (string)($event['postback']['data'] ?? '') : '';
     // LINE redelivery: ส่งซ้ำเมื่อ delivery แรก timeout — replyToken จะหายไป (ใช้แล้ว)
@@ -673,6 +675,50 @@ foreach ($data['events'] as $idx => $event) {
         case 'unfollow':
             // ผู้ใช้บล็อกบอท
             error_log("LINE Webhook: User $userId unfollowed");
+            break;
+
+        case 'join':
+            // OA ถูกเชิญเข้ากลุ่ม/ห้อง — auto-save groupId เข้า registry
+            if ($groupId) {
+                $saved = line_groups_upsert(db(), (string)$groupId, $sourceType ?: 'group');
+                line_webhook_log('OA joined group/room', [
+                    'group_id'    => substr((string)$groupId, 0, 8) . '…',
+                    'source_type' => $sourceType,
+                    'saved'       => $saved,
+                ]);
+                if ($replyToken) {
+                    $messages = [[
+                        'type' => 'text',
+                        'text' => "สวัสดีค่ะ ขอบคุณที่เพิ่ม " . SITE_NAME . " เข้ากลุ่มนี้ 🙏\n\nระบบจะใช้กลุ่มนี้สำหรับแจ้งเหตุ SOS / ประกาศจากคลินิก\n\nGroup ID ได้ถูกบันทึกไว้ในระบบแล้วค่ะ"
+                    ]];
+                    send_line_reply($replyToken, $messages, $accessToken);
+                }
+            }
+            break;
+
+        case 'leave':
+            // OA ถูกเตะออกจากกลุ่ม/ห้อง — ลบ groupId ออกจาก registry
+            if ($groupId) {
+                line_groups_remove(db(), (string)$groupId);
+                line_webhook_log('OA left group/room', [
+                    'group_id'    => substr((string)$groupId, 0, 8) . '…',
+                    'source_type' => $sourceType,
+                ]);
+            }
+            break;
+
+        case 'memberJoined':
+            // มีสมาชิกใหม่เข้ากลุ่ม — update last_seen (idempotent)
+            if ($groupId) {
+                line_groups_upsert(db(), (string)$groupId, $sourceType ?: 'group');
+            }
+            break;
+
+        case 'memberLeft':
+            // มีสมาชิก leave กลุ่ม — ไม่ทำอะไรนอกจาก update last_seen
+            if ($groupId) {
+                line_groups_upsert(db(), (string)$groupId, $sourceType ?: 'group');
+            }
             break;
 
         default:
