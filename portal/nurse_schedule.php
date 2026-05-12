@@ -779,9 +779,16 @@ $NS_CSRF_TOKEN = get_csrf_token();
 <!-- ============== JAVASCRIPT ============== -->
 <script>
 // ========= CONSTANTS =========
+// เวลาปฏิบัติงานคลินิก:
+//  - กะเช้า (ช) วันธรรมดา: 08:00-16:00 = 8 ชม. / เสาร์-อาทิตย์: 08:00-12:00 = 4 ชม.
+//  - กะบ่าย (บ): 16:00-20:00 = 4 ชม. (เหมือนกันทุกวัน)
+//  - shift อื่น ๆ ใช้ default ทุกวัน
 const DEFAULT_SHIFT_TYPES = {
-  'ช':  { label: 'ช',  name: 'เช้า',       bg: '#fef9c3', fg: '#854d0e', order: 1, startTime: '08:00', endTime: '16:00', hours: 8 },
-  'บ':  { label: 'บ',  name: 'บ่าย',       bg: '#bae6fd', fg: '#075985', order: 2, startTime: '16:00', endTime: '20:00', hours: 4 },
+  'ช':  { label: 'ช',  name: 'เช้า',       bg: '#fef9c3', fg: '#854d0e', order: 1,
+          startTime: '08:00', endTime: '16:00', hours: 8,
+          weekendStartTime: '08:00', weekendEndTime: '12:00', weekendHours: 4 },
+  'บ':  { label: 'บ',  name: 'บ่าย',       bg: '#bae6fd', fg: '#075985', order: 2,
+          startTime: '16:00', endTime: '20:00', hours: 4 },
   'ด':  { label: 'ด',  name: 'ดึก',        bg: '#a5f3fc', fg: '#155e75', order: 3, startTime: '00:00', endTime: '08:00', hours: 8 },
   'ชบ': { label: 'ชบ', name: 'โย้หน้า',     bg: '#fcd34d', fg: '#78350f', order: 4, startTime: '08:00', endTime: '20:00', hours: 12 },
   'ดบ': { label: 'ดบ', name: 'โย้หลัง',     bg: '#5eead4', fg: '#134e4a', order: 5, startTime: '16:00', endTime: '08:00', hours: 16 },
@@ -790,6 +797,16 @@ const DEFAULT_SHIFT_TYPES = {
   'V':  { label: 'V',  name: 'ลาพักร้อน',   bg: '#bbf7d0', fg: '#14532d', order: 8, hours: 0 },
   'T':  { label: 'T',  name: 'ลาประชุม',    bg: '#fbcfe8', fg: '#831843', order: 9, hours: 0 }
 };
+
+// คืนค่า {start, end, hours} ของ shift code โดยพิจารณาว่าเป็นเสาร์-อาทิตย์หรือไม่
+function getShiftMeta(code, isWeekendDay) {
+  const t = SHIFT_TYPES[code];
+  if (!t) return null;
+  if (isWeekendDay && typeof t.weekendHours === 'number') {
+    return { start: t.weekendStartTime || t.startTime || '', end: t.weekendEndTime || t.endTime || '', hours: t.weekendHours };
+  }
+  return { start: t.startTime || '', end: t.endTime || '', hours: t.hours || 0 };
+}
 // SHIFT_TYPES = defaults merged with state.shiftTypes (user overrides)
 let SHIFT_TYPES = structuredClone(DEFAULT_SHIFT_TYPES);
 function applyShiftTypeOverrides() {
@@ -799,12 +816,15 @@ function applyShiftTypeOverrides() {
   for (const k in ov) {
     if (SHIFT_TYPES[k] && ov[k]) {
       // override only name/bg/fg/enabled — never label (code) or order
-      if (ov[k].name)      SHIFT_TYPES[k].name      = ov[k].name;
-      if (ov[k].bg)        SHIFT_TYPES[k].bg        = ov[k].bg;
-      if (ov[k].fg)        SHIFT_TYPES[k].fg        = ov[k].fg;
-      if (ov[k].startTime) SHIFT_TYPES[k].startTime = ov[k].startTime;
-      if (ov[k].endTime)   SHIFT_TYPES[k].endTime   = ov[k].endTime;
-      if (typeof ov[k].hours === 'number') SHIFT_TYPES[k].hours = ov[k].hours;
+      if (ov[k].name)             SHIFT_TYPES[k].name             = ov[k].name;
+      if (ov[k].bg)               SHIFT_TYPES[k].bg               = ov[k].bg;
+      if (ov[k].fg)               SHIFT_TYPES[k].fg               = ov[k].fg;
+      if (ov[k].startTime)        SHIFT_TYPES[k].startTime        = ov[k].startTime;
+      if (ov[k].endTime)          SHIFT_TYPES[k].endTime          = ov[k].endTime;
+      if (ov[k].weekendStartTime) SHIFT_TYPES[k].weekendStartTime = ov[k].weekendStartTime;
+      if (ov[k].weekendEndTime)   SHIFT_TYPES[k].weekendEndTime   = ov[k].weekendEndTime;
+      if (typeof ov[k].hours        === 'number') SHIFT_TYPES[k].hours        = ov[k].hours;
+      if (typeof ov[k].weekendHours === 'number') SHIFT_TYPES[k].weekendHours = ov[k].weekendHours;
       if (ov[k].enabled === false) SHIFT_TYPES[k].enabled = false;
     }
   }
@@ -2155,8 +2175,8 @@ function computeOT() {
       if (getLeave(n.id, d)) continue;
       const s = getShift(n.id, d);
       if (!s) continue;
-      const h = SHIFT_TYPES[s]?.hours;
-      if (typeof h === 'number' && h > 0) hours += h;
+      const meta = getShiftMeta(s, isWeekend(state.year, state.month, d));
+      if (meta && meta.hours > 0) hours += meta.hours;
     }
     const rate   = (typeof n.hourlyRate === 'number' && n.hourlyRate >= 0) ? n.hourlyRate : defaultRate;
     const gross  = Math.round(hours * rate * 100) / 100;

@@ -97,9 +97,11 @@ foreach ($nursesJson as $n) {
     if ($orgId   > 0 && (int)($n['orgMemberId'] ?? 0) === $orgId) { $nurseRefId = $n['id']; break; }
 }
 
-// ── 5) สร้าง map ของ shift type → start/end/hours ──
+// ── 5) สร้าง map ของ shift type → start/end/hours (+ weekend variant) ──
+// เวลาปฏิบัติงานคลินิก: กะเช้าวันเสาร์-อาทิตย์ = 08:00-12:00 (4 ชม.) — สั้นกว่าวันธรรมดา
 $DEFAULT_SHIFT_TYPES = [
-    'ช'  => ['startTime' => '08:00', 'endTime' => '16:00', 'hours' => 8],
+    'ช'  => ['startTime' => '08:00', 'endTime' => '16:00', 'hours' => 8,
+             'weekendStartTime' => '08:00', 'weekendEndTime' => '12:00', 'weekendHours' => 4],
     'บ'  => ['startTime' => '16:00', 'endTime' => '20:00', 'hours' => 4],
     'ด'  => ['startTime' => '00:00', 'endTime' => '08:00', 'hours' => 8],
     'ชบ' => ['startTime' => '08:00', 'endTime' => '20:00', 'hours' => 12],
@@ -109,9 +111,30 @@ $DEFAULT_SHIFT_TYPES = [
 $shiftMap = $DEFAULT_SHIFT_TYPES;
 foreach ($shiftTypesJson as $code => $ov) {
     if (!isset($shiftMap[$code])) continue;
-    if (!empty($ov['startTime'])) $shiftMap[$code]['startTime'] = $ov['startTime'];
-    if (!empty($ov['endTime']))   $shiftMap[$code]['endTime']   = $ov['endTime'];
-    if (isset($ov['hours']) && is_numeric($ov['hours'])) $shiftMap[$code]['hours'] = (float)$ov['hours'];
+    if (!empty($ov['startTime']))        $shiftMap[$code]['startTime']        = $ov['startTime'];
+    if (!empty($ov['endTime']))          $shiftMap[$code]['endTime']          = $ov['endTime'];
+    if (!empty($ov['weekendStartTime'])) $shiftMap[$code]['weekendStartTime'] = $ov['weekendStartTime'];
+    if (!empty($ov['weekendEndTime']))   $shiftMap[$code]['weekendEndTime']   = $ov['weekendEndTime'];
+    if (isset($ov['hours'])        && is_numeric($ov['hours']))        $shiftMap[$code]['hours']        = (float)$ov['hours'];
+    if (isset($ov['weekendHours']) && is_numeric($ov['weekendHours'])) $shiftMap[$code]['weekendHours'] = (float)$ov['weekendHours'];
+}
+
+// helper: คืน start/end/hours โดยพิจารณาว่าเป็นวันเสาร์-อาทิตย์หรือไม่
+function shift_meta_for_day(array $shiftMap, string $code, bool $isWeekend): ?array {
+    if (!isset($shiftMap[$code])) return null;
+    $t = $shiftMap[$code];
+    if ($isWeekend && isset($t['weekendHours'])) {
+        return [
+            'start' => $t['weekendStartTime'] ?? $t['startTime'] ?? '',
+            'end'   => $t['weekendEndTime']   ?? $t['endTime']   ?? '',
+            'hours' => (float)$t['weekendHours'],
+        ];
+    }
+    return [
+        'start' => $t['startTime'] ?? '',
+        'end'   => $t['endTime']   ?? '',
+        'hours' => (float)($t['hours'] ?? 0),
+    ];
 }
 
 // ── 6) คำนวณรายการต่อวัน ──
@@ -127,18 +150,21 @@ if ($nurseRefId !== null) {
         $shift = $schedule[$key] ?? '';
         $leave = $leaves[$key]   ?? '';
         if ($leave) continue; // วันลาไม่นับ
-        if (!$shift || !isset($shiftMap[$shift])) continue;
-        $info = $shiftMap[$shift];
-        if (($info['hours'] ?? 0) <= 0) continue;
+        if (!$shift) continue;
+        // คำนวณว่าวันที่นี้เป็นเสาร์-อาทิตย์ไหม
+        $dow = (int)date('w', mktime(0, 0, 0, $month, $d, $yearBE - 543));
+        $isWeekendDay = ($dow === 0 || $dow === 6);
+        $meta = shift_meta_for_day($shiftMap, $shift, $isWeekendDay);
+        if (!$meta || $meta['hours'] <= 0) continue;
         $rows[] = [
             'day'   => $d,
             'date'  => $d . ' ' . $THAI_MONTHS_SHORT[$month] . ' ' . $yearBE,
-            'start' => $info['startTime'] ?? '-',
-            'end'   => $info['endTime'] ?? '-',
-            'hours' => (float)$info['hours'],
+            'start' => $meta['start'] ?: '-',
+            'end'   => $meta['end']   ?: '-',
+            'hours' => $meta['hours'],
             'shift' => $shift,
         ];
-        $totalHours += (float)$info['hours'];
+        $totalHours += $meta['hours'];
     }
 }
 
