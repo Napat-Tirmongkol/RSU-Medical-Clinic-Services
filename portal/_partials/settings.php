@@ -1,7 +1,7 @@
 <!-- ════════════ SECTION: SETTINGS (renovated — tabbed layout) ════════════ -->
 <?php
-$_mFile = __DIR__ . '/../../config/maintenance.json';
-$_mData = file_exists($_mFile) ? json_decode(file_get_contents($_mFile), true) : [];
+require_once __DIR__ . '/../../includes/maintenance_helper.php';
+$_mData = maint_load();
 $announcementActive = (bool)($_mData['announcement_active'] ?? false);
 $announcementMsg    = $_mData['announcement_message'] ?? '';
 $whitelistArr       = $_mData['whitelist'] ?? [];
