@@ -26,9 +26,21 @@ if (!function_exists('_csm_abs_url')) {
 // แยก context ตาม login source:
 //   - Portal admin (sys_admins) → admin_id = sys_admins.id, is_portal_admin = true
 //   - e-Campaign Staff (sys_staff) → admin_id = sys_staff.id, is_ecampaign_staff = true
-if (!isset($_SESSION['user_id'])
-    && isset($_SESSION['admin_logged_in'], $_SESSION['admin_id'])
-    && $_SESSION['admin_logged_in'] === true) {
+//
+// Trigger sync เมื่อ admin_logged_in=true และ:
+//   1. ไม่มี user_id เลย (login ครั้งแรก) — หรือ
+//   2. user_id อยู่แต่ is_portal_admin / is_ecampaign_staff ยังไม่ตั้ง
+//      (session ปนเก่าจาก staff login → admin login ทับ → ต้อง re-sync
+//      ไม่งั้น gate จะใช้ role ของ session เก่า)
+$_needSso = isset($_SESSION['admin_logged_in'], $_SESSION['admin_id'])
+            && $_SESSION['admin_logged_in'] === true
+            && (
+                !isset($_SESSION['user_id'])
+                || (empty($_SESSION['is_portal_admin']) && empty($_SESSION['is_ecampaign_staff']))
+                || (int)$_SESSION['user_id'] !== (int)$_SESSION['admin_id']
+            );
+
+if ($_needSso) {
     try {
         require_once __DIR__ . '/db_connect.php';
         $p = db();
