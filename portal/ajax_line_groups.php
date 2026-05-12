@@ -63,9 +63,9 @@ if ($action === 'test_push') {
     }
 
     $secrets     = require __DIR__ . '/../config/secrets.php';
-    $accessToken = $secrets['LINE_ACCESS_TOKEN'] ?? (defined('LINE_ACCESS_TOKEN') ? LINE_ACCESS_TOKEN : '');
+    $accessToken = $secrets['LINE_MESSAGING_CHANNEL_ACCESS_TOKEN'] ?? '';
     if ($accessToken === '') {
-        echo json_encode(['ok' => false, 'error' => 'LINE_ACCESS_TOKEN ไม่ได้ตั้งค่า']); exit;
+        echo json_encode(['ok' => false, 'error' => 'LINE_MESSAGING_CHANNEL_ACCESS_TOKEN ไม่ได้ตั้งค่าใน config/secrets.php']); exit;
     }
 
     $messages = [[
