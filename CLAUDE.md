@@ -59,6 +59,53 @@
 - `max-height` ของ modal box ต้องใส่ใน `<style>` block: `#my-modal-box { max-height: 90vh; }`
 - Scrollable step (flex layout ใน modal): ต้องใส่ `min-height: 0` ใน style block สำหรับ flex child ที่ต้อง overflow
 
+#### ⚠️ Bug pattern — modal "ติด" อยู่ใน content area (sidebar/topbar ไม่โดน backdrop)
+**อาการ:** เปิด modal แล้ว
+- ไม่อยู่กลางจอ (centered ที่ content area แทน viewport)
+- Sidebar / topbar ไม่ถูก darken (backdrop ครอบเฉพาะพื้นที่ทางขวา)
+- Stat badge / element ของ section ลอดออกมาเหนือ modal box
+
+**สาเหตุ:** `position:fixed` ถูก trap โดย ancestor ที่สร้าง **containing block ใหม่** — เกิดจาก property ใดก็ได้ในห่วงโซ่ ancestor:
+- `transform` (รวม `translateY(0)` ที่หลงเหลือจาก `animation-fill-mode: both`)
+- `filter`, `backdrop-filter` (เช่น `.portal-header` มี `backdrop-filter: blur(12px)`)
+- `perspective`
+- `contain: layout/paint/strict/content`
+- `will-change: transform/filter/...`
+
+นอกจากนั้น z-index ที่ต่ำเกิน (200) ก็อาจโดน sibling stacking contexts บัง (เช่น `ann-form-modal` z-index 999)
+
+**วิธีแก้ — Portal-Escape Pattern (มาตรฐานของโปรเจกต์):**
+1. **Teleport modal ไป `<body>`** ตอนเปิดครั้งแรก → anchor `position:fixed` กับ viewport แน่ๆ:
+   ```js
+   function myTeleport(id) {
+       const el = document.getElementById(id);
+       if (el && el.parentElement !== document.body) document.body.appendChild(el);
+       return el;
+   }
+   function openMyModal() {
+       const m = myTeleport('myModal');
+       m.classList.remove('hidden'); m.classList.add('flex');
+   }
+   ```
+2. **CSS selector ห้าม scope ใต้ `#section-xxx`** — หลัง teleport จะหายหมด:
+   ```css
+   /* ❌ ห้าม */
+   #section-foo .my-modal { z-index: 200; }
+   /* ✓ ใช้ */
+   .my-modal { z-index: 9000 !important; }
+   ```
+3. **z-index ขั้นต่ำ 9000** สำหรับ user-facing modal (สูงกว่า ann-form-modal 999, priv modals 500, header 40, sidebar 30)
+4. **Backdrop fallback ใน CSS ตรงๆ** กันเคส Tailwind compile หาย:
+   ```css
+   .my-modal {
+       background: rgba(15, 23, 42, 0.55) !important;
+       backdrop-filter: blur(6px);
+       -webkit-backdrop-filter: blur(6px);
+   }
+   ```
+
+**Reference implementation:** `portal/_partials/gold_card.php` (gcBulkModal + gcMemberModal) — ใช้ `gcTeleport()` helper
+
 ### Doctor Schedule (`sys_doctor_schedule`)
 - `type ENUM('regular','override','off')` — regular = ทุกสัปดาห์ (recurring), override = เฉพาะวัน, off = ลา
 - `weekday TINYINT NULL` — 0=อาทิตย์ … 6=เสาร์ (NULL สำหรับ override/off)
