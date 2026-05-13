@@ -323,14 +323,18 @@ if ($adminRole !== 'superadmin' && $adminRole !== 'admin') {
         .page-break { page-break-before: always; }
     }
     .no-print-tip {
-        position: fixed; bottom: 16px; right: 16px;
+        /* Position is set by the parent .no-print container so multiple
+           buttons stack vertically instead of overlapping. */
         background: #0f7349; color: #fff;
         padding: 10px 16px; border-radius: 8px;
         font-size: 11pt; font-weight: 700;
+        border: 0;
         box-shadow: 0 4px 16px rgba(15,115,73,0.3);
         cursor: pointer;
+        transition: transform .12s ease, opacity .12s ease;
     }
-    .no-print-tip:hover { background: #0e5d3c; }
+    .no-print-tip:hover    { transform: translateY(-1px); }
+    .no-print-tip:disabled { opacity: 0.65; cursor: wait; }
 
     /* ── Footer ───────────────────────────────────────────────────── */
     .doc-footer {
