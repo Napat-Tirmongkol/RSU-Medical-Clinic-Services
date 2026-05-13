@@ -261,7 +261,20 @@ $flex = [
 
 // ── Resolve target group + send ──────────────────────────────────────────
 $groupId = $overrideGroup !== '' ? $overrideGroup : line_groups_get_default($pdo);
-$token   = defined('LINE_MESSAGING_CHANNEL_ACCESS_TOKEN') ? (string)LINE_MESSAGING_CHANNEL_ACCESS_TOKEN : '';
+
+// Token: รองรับทั้ง constant (ถ้า line_config.php ถูก load) และอ่านตรงจาก secrets
+$token = defined('LINE_MESSAGING_CHANNEL_ACCESS_TOKEN') ? (string)LINE_MESSAGING_CHANNEL_ACCESS_TOKEN : '';
+if ($token === '') {
+    $secretsFile = __DIR__ . '/../config/secrets.php';
+    if (is_file($secretsFile)) {
+        $secrets = require $secretsFile;
+        if (is_array($secrets)) {
+            $token = (string)($secrets['EBORROW_LINE_MESSAGE_TOKEN']
+                            ?? $secrets['LINE_MESSAGING_CHANNEL_ACCESS_TOKEN']
+                            ?? '');
+        }
+    }
+}
 
 if ($groupId === '') {
     echo "ERROR: ยังไม่ได้ตั้งค่า default groupId — ตั้งผ่าน portal → ตั้งค่า LINE → กลุ่มเริ่มต้น\n";
