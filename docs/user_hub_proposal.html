@@ -740,13 +740,85 @@
 <!-- Floating action panel (hidden when printing)                    -->
 <!-- ═══════════════════════════════════════════════════════════════ -->
 <div class="no-print" style="position:fixed;bottom:16px;right:16px;display:flex;flex-direction:column;gap:8px;z-index:9999">
-    <button class="no-print-tip" onclick="window.print()" style="background:#0f7349">
-        🖨️ พิมพ์ / Save PDF
+    <button id="btn-print" class="no-print-tip" onclick="window.print()" style="background:#475569">
+        🖨️ พิมพ์ (Print)
     </button>
-    <button class="no-print-tip" onclick="exportToWord()" style="background:#2563eb">
-        📄 ดาวน์โหลด .doc (Word)
+    <button id="btn-pdf" class="no-print-tip" onclick="downloadPdf()" style="background:#dc2626">
+        📕 ดาวน์โหลด PDF
+    </button>
+    <button id="btn-doc" class="no-print-tip" onclick="exportToWord()" style="background:#2563eb">
+        📘 ดาวน์โหลด .doc (Word)
     </button>
 </div>
+
+<!-- html2pdf.js — used by the direct PDF download button -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+<script>
+/**
+ * Download proposal as a real PDF file (no print dialog).
+ * Uses html2pdf.js — html2canvas + jsPDF under the hood.
+ *
+ * Strategy:
+ *  - Clone the .page wrappers (skip floating buttons)
+ *  - Each .page becomes its own A4 page via CSS page-break
+ *  - Render via html2canvas at 2x scale for sharper text
+ *  - Embed pages into jsPDF; trigger blob download
+ */
+async function downloadPdf() {
+    const btn = document.getElementById('btn-pdf');
+    const origText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '⏳ กำลังสร้าง PDF...';
+
+    try {
+        // Build a clean container with just the document pages
+        const container = document.createElement('div');
+        container.style.background = '#fff';
+        container.style.padding = '0';
+        document.querySelectorAll('.page').forEach(p => {
+            const cloned = p.cloneNode(true);
+            // Remove floating button overlays inside the clone
+            cloned.querySelectorAll('.no-print').forEach(el => el.remove());
+            // Reset visual margins / shadow for clean PDF output
+            cloned.style.margin = '0';
+            cloned.style.boxShadow = 'none';
+            cloned.style.maxWidth = '100%';
+            cloned.style.pageBreakAfter = 'always';
+            container.appendChild(cloned);
+        });
+
+        const filename = 'RSU_User_Hub_Proposal_' + new Date().toISOString().substring(0,10) + '.pdf';
+        const opt = {
+            margin:       [10, 10, 12, 10], // mm: top, right, bottom, left
+            filename:     filename,
+            image:        { type: 'jpeg', quality: 0.95 },
+            html2canvas:  {
+                scale: 2,
+                useCORS: true,
+                logging: false,
+                letterRendering: true,
+                allowTaint: true,
+            },
+            jsPDF:        {
+                unit: 'mm',
+                format: 'a4',
+                orientation: 'portrait',
+                compress: true,
+            },
+            pagebreak:    { mode: ['css', 'legacy'], avoid: ['table', '.callout', '.kpi-grid', '.timeline'] },
+        };
+
+        await html2pdf().set(opt).from(container).save();
+    } catch (e) {
+        console.error('PDF generation failed:', e);
+        alert('สร้าง PDF ไม่สำเร็จ ลองใช้ปุ่ม "พิมพ์" แล้วเลือก Save as PDF แทนได้ครับ\n\n' + e.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = origText;
+    }
+}
+</script>
 
 <script>
 /**
