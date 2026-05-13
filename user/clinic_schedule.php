@@ -1,5 +1,5 @@
 <?php
-// user/clinic_schedule.php — ปฏิทินตารางแพทย์ออกตรวจ (read-only สำหรับ user)
+// user/clinic_schedule.php — ปฏิทินตารางแพทย์ออกตรวจ (read-only) — FullCalendar month/week/day
 declare(strict_types=1);
 session_start();
 require_once __DIR__ . '/../config.php';
@@ -13,94 +13,45 @@ if ($lineUserId === '') {
 }
 
 $pdo = db();
-$tz = new DateTimeZone('Asia/Bangkok');
-$today = (new DateTimeImmutable('today', $tz))->format('Y-m-d');
-$y = max(2020, min(2050, (int)($_GET['y'] ?? date('Y'))));
-$m = max(1, min(12, (int)($_GET['m'] ?? date('n'))));
-
-$first      = new DateTimeImmutable(sprintf('%04d-%02d-01', $y, $m), $tz);
-$daysIn     = (int)$first->format('t');
-$startDow   = (int)$first->format('w');
-$prevYM     = $first->modify('-1 month');
-$nextYM     = $first->modify('+1 month');
-$rangeStart = $first->format('Y-m-d');
-$rangeEnd   = $first->modify('+1 month -1 day')->format('Y-m-d');
 
 // Filters
 $filterStaff = (int)($_GET['staff'] ?? 0);
 $filterSvc   = trim((string)($_GET['svc'] ?? ''));
+$initialView = in_array(($_GET['view'] ?? ''), ['month','week','day'], true)
+    ? $_GET['view'] : 'week';
 
-// Load shifts (regular weekly + override/off in this month)
+// Load shifts (all active)
 $allShifts = [];
 try {
-    $params = [':s' => $rangeStart, ':e' => $rangeEnd];
+    $params = [];
     $extraWhere = '';
     if ($filterStaff > 0) { $extraWhere .= ' AND s.staff_id = :sid'; $params[':sid'] = $filterStaff; }
     if ($filterSvc !== '') { $extraWhere .= ' AND s.service_type = :svc'; $params[':svc'] = $filterSvc; }
 
     $stmt = $pdo->prepare("
-        SELECT s.*, ms.title AS doc_title, ms.full_name AS doc_name, ms.role,
+        SELECT s.id, s.type, s.weekday, s.specific_date, s.start_time, s.end_time,
+               s.staff_id, s.room_id, s.service_type, s.notes, s.recur_end_date,
+               ms.title AS doc_title, ms.full_name AS doc_name, ms.role,
                cr.name AS room_name, cr.code AS room_code
         FROM sys_doctor_schedule s
         JOIN sys_medical_staff ms ON s.staff_id = ms.id
         LEFT JOIN sys_clinic_rooms cr ON s.room_id = cr.id
         WHERE s.is_active = 1 AND ms.is_active = 1
-          AND (
-              (s.specific_date BETWEEN :s AND :e)
-              OR (s.specific_date IS NULL AND s.type = 'regular')
-          )
-          $extraWhere
+        $extraWhere
         ORDER BY s.start_time ASC
     ");
     $stmt->execute($params);
     $allShifts = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } catch (PDOException) {}
 
-// Holidays this month
-$holidaysByDate = [];
+// All clinic holidays (for background tint + label)
+$holidays = [];
 try {
-    $stmt = $pdo->prepare("SELECT specific_date, note, is_closed, open_time, close_time
+    $stmt = $pdo->query("SELECT specific_date, note, is_closed, open_time, close_time
         FROM sys_clinic_hours
-        WHERE type IN ('holiday','special') AND specific_date BETWEEN :s AND :e");
-    $stmt->execute([':s' => $rangeStart, ':e' => $rangeEnd]);
-    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
-        $holidaysByDate[$r['specific_date']][] = $r;
-    }
+        WHERE type IN ('holiday','special') AND specific_date IS NOT NULL");
+    $holidays = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } catch (PDOException) {}
-
-// Helper: shifts for date — override (specific_date=this date) wins over regular for same staff
-$shiftsFor = function (string $date, int $wd) use ($allShifts): array {
-    $overrideStaff = [];
-    foreach ($allShifts as $s) {
-        if (!empty($s['specific_date']) && $s['specific_date'] === $date) {
-            $overrideStaff[(int)$s['staff_id']] = true;
-        }
-    }
-    $out = [];
-    foreach ($allShifts as $s) {
-        if (!empty($s['specific_date'])) {
-            if ($s['specific_date'] === $date && $s['type'] !== 'off') $out[] = $s;
-        } else {
-            if ((int)$s['weekday'] === $wd && empty($overrideStaff[(int)$s['staff_id']])) $out[] = $s;
-        }
-    }
-    return $out;
-};
-
-// Build month grid (with prev/next padding)
-$cells = [];
-for ($i = 0; $i < $startDow; $i++) {
-    $d = $first->modify('-' . ($startDow - $i) . ' day');
-    $cells[] = ['date' => $d->format('Y-m-d'), 'day' => (int)$d->format('j'), 'in_month' => false];
-}
-for ($d = 1; $d <= $daysIn; $d++) {
-    $cells[] = ['date' => sprintf('%04d-%02d-%02d', $y, $m, $d), 'day' => $d, 'in_month' => true];
-}
-while (count($cells) % 7 !== 0) {
-    $last = end($cells);
-    $next = (new DateTimeImmutable($last['date'], $tz))->modify('+1 day');
-    $cells[] = ['date' => $next->format('Y-m-d'), 'day' => (int)$next->format('j'), 'in_month' => false];
-}
 
 // Filter dropdowns data
 $staffList = [];
@@ -115,17 +66,6 @@ try {
         WHERE is_active = 1 AND service_type IS NOT NULL AND service_type <> ''
         ORDER BY service_type")->fetchAll(PDO::FETCH_COLUMN);
 } catch (PDOException) {}
-
-$weekdayShort = ['อา.','จ.','อ.','พ.','พฤ.','ศ.','ส.'];
-$monthFullTh  = ['','มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
-
-$svcColors = [
-    'ตรวจทั่วไป' => 'bg-sky-100 text-sky-700',
-    'วัคซีน'      => 'bg-emerald-100 text-emerald-700',
-    'ตรวจสุขภาพ' => 'bg-purple-100 text-purple-700',
-    'ปรึกษา'     => 'bg-amber-100 text-amber-700',
-    'ทันตกรรม'   => 'bg-pink-100 text-pink-700',
-];
 ?>
 <!DOCTYPE html>
 <html lang="th">
@@ -137,27 +77,72 @@ $svcColors = [
 <link rel="stylesheet" href="../assets/css/tailwind.min.css">
 <link rel="stylesheet" href="../assets/css/rsufont.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css">
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/locales/th.global.min.js"></script>
 <style>
     body { font-family: 'Sarabun', sans-serif; background: #f8fafc; color: #0f172a; min-height: 100vh; }
-    .cs-day-cell { min-height: 84px; }
-    @media (min-width: 768px) { .cs-day-cell { min-height: 120px; } }
-    .cs-shift-pill {
-        display: inline-flex; align-items: center; gap: .25rem;
-        padding: .15rem .35rem; border-radius: .35rem;
-        font-size: .65rem; font-weight: 800; line-height: 1.15;
-        max-width: 100%; overflow: hidden;
+
+    /* ── FullCalendar event colors (match portal admin) ────────────── */
+    .fc-event { cursor: pointer; border-radius: 6px; padding: 2px 4px; font-weight: 700; }
+    .fc-event.svc-default     { background:#0ea5e9; border-color:#0284c7; }
+    .fc-event.svc-วัคซีน       { background:#10b981; border-color:#059669; }
+    .fc-event.svc-ตรวจสุขภาพ   { background:#a855f7; border-color:#9333ea; }
+    .fc-event.svc-ปรึกษา       { background:#f59e0b; border-color:#d97706; }
+    .fc-event.svc-ทันตกรรม     { background:#ec4899; border-color:#db2777; }
+    .fc-event.svc-off          { background:#94a3b8; border-color:#64748b; opacity:.85; }
+    .fc-event .fc-event-title  { white-space: normal; }
+
+    /* Holiday styling */
+    .fc-event.cs-holiday-evt {
+        background: #fecaca !important;
+        border-color: #f87171 !important;
+        color: #991b1b !important;
     }
-    .cs-shift-pill span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .fc-event.cs-holiday-evt .fc-event-title,
+    .fc-event.cs-holiday-evt .fc-event-time { color: #991b1b !important; }
+
+    /* Make toolbar buttons look softer / mobile-friendly */
+    .fc .fc-toolbar.fc-header-toolbar { margin-bottom: .75em; gap:.25em; flex-wrap: wrap; }
+    .fc .fc-button {
+        background: #fff !important;
+        border: 1px solid #e2e8f0 !important;
+        color: #475569 !important;
+        font-weight: 700;
+        box-shadow: 0 1px 2px rgba(15,23,42,.04);
+        text-transform: none;
+    }
+    .fc .fc-button:hover { background: #f1f5f9 !important; }
+    .fc .fc-button-primary:not(:disabled).fc-button-active,
+    .fc .fc-button-primary:not(:disabled):active {
+        background: #0891b2 !important;
+        border-color: #0891b2 !important;
+        color: #fff !important;
+    }
+    .fc .fc-toolbar-title { font-size: 1.1rem; font-weight: 800; color: #0f172a; }
+    .fc .fc-col-header-cell-cushion { font-weight: 800; color: #475569; padding: 6px 4px; font-size: .8rem; }
+    .fc .fc-timegrid-slot-label-cushion { font-size: .7rem; font-weight: 700; color: #94a3b8; }
+    .fc .fc-daygrid-day-number { font-weight: 700; color: #475569; }
+    .fc-day-today { background: #ecfeff !important; }
+
+    /* Compact toolbar on mobile */
     @media (max-width: 640px) {
-        .cs-day-num { font-size: .8rem; }
-        .cs-shift-pill { font-size: .58rem; padding: .1rem .3rem; }
+        .fc .fc-toolbar.fc-header-toolbar {
+            flex-direction: column;
+            align-items: stretch;
+        }
+        .fc .fc-toolbar-chunk { display: flex; justify-content: center; }
+        .fc .fc-toolbar-title { font-size: 1rem; text-align: center; }
+        .fc .fc-button { padding: .25rem .5rem; font-size: .75rem; }
+        .fc .fc-col-header-cell-cushion { font-size: .65rem; padding: 4px 2px; }
+        .fc-event { font-size: .65rem; padding: 1px 3px; }
     }
 </style>
 </head>
 <body>
 
 <header class="sticky top-0 z-10 bg-white border-b border-slate-200 shadow-sm">
-    <div class="max-w-3xl mx-auto px-4 py-3 flex items-center gap-3">
+    <div class="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
         <a href="hub.php" class="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-50 text-slate-600 hover:bg-slate-100">
             <i class="fa-solid fa-chevron-left"></i>
         </a>
@@ -171,28 +156,11 @@ $svcColors = [
     </div>
 </header>
 
-<main class="max-w-3xl mx-auto px-3 py-4 space-y-3">
-
-    <!-- Month Nav -->
-    <div class="bg-white rounded-2xl border border-slate-100 shadow-sm p-3 flex items-center justify-between gap-2">
-        <a href="?y=<?= (int)$prevYM->format('Y') ?>&m=<?= (int)$prevYM->format('n') ?><?= $filterStaff ? '&staff='.$filterStaff : '' ?><?= $filterSvc !== '' ? '&svc='.urlencode($filterSvc) : '' ?>"
-           class="w-9 h-9 flex items-center justify-center rounded-xl bg-slate-50 text-slate-600 hover:bg-slate-100">
-            <i class="fa-solid fa-chevron-left text-xs"></i>
-        </a>
-        <div class="flex-1 text-center">
-            <p class="text-base font-black text-slate-900"><?= htmlspecialchars($monthFullTh[$m]) ?> <?= $y ?></p>
-            <p class="text-[10px] font-bold text-slate-400">พ.ศ. <?= $y + 543 ?></p>
-        </div>
-        <a href="?y=<?= (int)$nextYM->format('Y') ?>&m=<?= (int)$nextYM->format('n') ?><?= $filterStaff ? '&staff='.$filterStaff : '' ?><?= $filterSvc !== '' ? '&svc='.urlencode($filterSvc) : '' ?>"
-           class="w-9 h-9 flex items-center justify-center rounded-xl bg-slate-50 text-slate-600 hover:bg-slate-100">
-            <i class="fa-solid fa-chevron-right text-xs"></i>
-        </a>
-    </div>
+<main class="max-w-5xl mx-auto px-3 py-4 space-y-3">
 
     <!-- Filters -->
     <form method="GET" class="bg-white rounded-2xl border border-slate-100 shadow-sm p-3 grid grid-cols-2 gap-2">
-        <input type="hidden" name="y" value="<?= $y ?>">
-        <input type="hidden" name="m" value="<?= $m ?>">
+        <input type="hidden" name="view" value="<?= htmlspecialchars($initialView) ?>">
         <select name="staff" onchange="this.form.submit()"
             class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-cyan-400">
             <option value="0">— ทุกบุคลากร —</option>
@@ -213,82 +181,19 @@ $svcColors = [
         </select>
     </form>
 
-    <!-- Calendar Grid -->
-    <div class="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-        <div class="grid grid-cols-7 bg-slate-50 border-b border-slate-100">
-            <?php foreach ($weekdayShort as $i => $n): ?>
-            <div class="py-2 text-center text-[10px] font-black uppercase tracking-widest <?= $i === 0 || $i === 6 ? 'text-rose-500' : 'text-slate-500' ?>">
-                <?= htmlspecialchars($n) ?>
-            </div>
-            <?php endforeach; ?>
-        </div>
-
-        <div class="grid grid-cols-7">
-        <?php foreach ($cells as $cell):
-            $date = $cell['date'];
-            $wd   = (int)(new DateTimeImmutable($date, $tz))->format('w');
-            $isToday   = $date === $today;
-            $inMonth   = $cell['in_month'];
-            $isWeekend = ($wd === 0 || $wd === 6);
-
-            $holidays = $holidaysByDate[$date] ?? [];
-            $allClosed = !empty($holidays) && array_reduce($holidays, fn($c, $h) => $c && (int)$h['is_closed'] === 1, true);
-
-            $shifts = $shiftsFor($date, $wd);
-
-            $bg = '';
-            if (!$inMonth)       $bg = 'bg-slate-50/50';
-            elseif ($allClosed)  $bg = 'bg-rose-50/40';
-
-            $textCls = $inMonth ? ($isWeekend ? 'text-rose-500' : 'text-slate-700') : 'text-slate-300';
-        ?>
-            <div class="cs-day-cell <?= $bg ?> border-r border-b border-slate-100 p-1.5 flex flex-col gap-1 <?= $isToday ? 'ring-2 ring-cyan-500 ring-inset z-10 relative' : '' ?>">
-                <div class="flex items-center justify-between">
-                    <span class="cs-day-num text-xs font-black <?= $textCls ?> <?= $isToday ? '!text-cyan-600' : '' ?>">
-                        <?= $cell['day'] ?>
-                    </span>
-                    <?php if ($inMonth && count($shifts) > 0): ?>
-                        <span class="text-[8px] font-black px-1 rounded bg-cyan-100 text-cyan-700"><?= count($shifts) ?></span>
-                    <?php endif; ?>
-                </div>
-
-                <?php if (!$inMonth): ?>
-                <?php elseif ($allClosed): ?>
-                    <?php foreach ($holidays as $h): ?>
-                    <div class="cs-shift-pill bg-rose-100 text-rose-700">
-                        <i class="fa-solid fa-calendar-xmark text-[7px] shrink-0"></i>
-                        <span><?= htmlspecialchars($h['note'] ?: 'หยุด') ?></span>
-                    </div>
-                    <?php endforeach; ?>
-                <?php else:
-                    foreach (array_slice($shifts, 0, 3) as $s):
-                        $cls  = $svcColors[$s['service_type']] ?? 'bg-cyan-100 text-cyan-700';
-                        $name = trim(($s['doc_title'] ?? '') . ' ' . ($s['doc_name'] ?? '-'));
-                ?>
-                    <button type="button"
-                            onclick='csShowShift(<?= json_encode($s, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS | JSON_HEX_QUOT) ?>)'
-                            class="cs-shift-pill <?= $cls ?> w-full text-left active:scale-95 transition-transform"
-                            title="<?= htmlspecialchars($name) ?>">
-                        <span><?= htmlspecialchars(mb_substr($name, 0, 14)) ?></span>
-                    </button>
-                    <?php endforeach; ?>
-                    <?php if (count($shifts) > 3): ?>
-                    <span class="text-[9px] font-black text-cyan-600 pl-0.5">+<?= count($shifts) - 3 ?> ท่าน</span>
-                    <?php endif; ?>
-                <?php endif; ?>
-            </div>
-        <?php endforeach; ?>
-        </div>
+    <!-- Calendar -->
+    <div class="bg-white rounded-2xl border border-slate-100 shadow-sm p-3 sm:p-4">
+        <div id="cs-calendar"></div>
     </div>
 
     <!-- Legend -->
     <div class="bg-white rounded-2xl border border-slate-100 shadow-sm p-3 flex flex-wrap gap-x-3 gap-y-1.5 text-[10px] font-black text-slate-600">
-        <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-sky-100 border border-sky-300"></span>ตรวจทั่วไป</span>
-        <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-emerald-100 border border-emerald-300"></span>วัคซีน</span>
-        <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-purple-100 border border-purple-300"></span>ตรวจสุขภาพ</span>
-        <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-amber-100 border border-amber-300"></span>ปรึกษา</span>
-        <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-pink-100 border border-pink-300"></span>ทันตกรรม</span>
-        <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-rose-100 border border-rose-300"></span>วันหยุด</span>
+        <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm" style="background:#0ea5e9"></span>ตรวจทั่วไป</span>
+        <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm" style="background:#10b981"></span>วัคซีน</span>
+        <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm" style="background:#a855f7"></span>ตรวจสุขภาพ</span>
+        <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm" style="background:#f59e0b"></span>ปรึกษา</span>
+        <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm" style="background:#ec4899"></span>ทันตกรรม</span>
+        <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-rose-200 border border-rose-400"></span>วันหยุด</span>
     </div>
 
     <p class="text-center text-[10px] font-bold text-slate-400 py-3 px-4 leading-relaxed">
@@ -309,6 +214,136 @@ $svcColors = [
 </div>
 
 <script>
+const CS_SHIFTS   = <?= json_encode($allShifts,  JSON_UNESCAPED_UNICODE) ?>;
+const CS_HOLIDAYS = <?= json_encode($holidays,   JSON_UNESCAPED_UNICODE) ?>;
+const CS_INITIAL_VIEW_MAP = { month: 'dayGridMonth', week: 'timeGridWeek', day: 'timeGridDay' };
+const CS_INITIAL_VIEW = CS_INITIAL_VIEW_MAP[<?= json_encode($initialView) ?>] || 'timeGridWeek';
+
+function csRowToEvent(row) {
+    const docName = ((row.doc_title || '') + ' ' + (row.doc_name || '')).trim() || 'แพทย์';
+    const room = row.room_name ? ' · ' + (row.room_code || '') + ' ' + row.room_name : '';
+    const svcKeyRaw = row.type === 'off' ? 'off' : (row.service_type || '');
+    const knownSvc = ['วัคซีน','ตรวจสุขภาพ','ปรึกษา','ทันตกรรม'];
+    const svcClass = row.type === 'off'
+        ? 'svc-off'
+        : (knownSvc.includes(svcKeyRaw) ? 'svc-' + svcKeyRaw : 'svc-default');
+
+    const base = {
+        id: String(row.id),
+        title: docName + (row.type === 'off' ? ' (ลา)' : '') + room,
+        classNames: [svcClass],
+        extendedProps: row,
+    };
+
+    if (row.type === 'regular') {
+        const ev = {
+            daysOfWeek: [Number(row.weekday)],
+            startTime: row.start_time,
+            endTime:   row.end_time,
+            startRecur: '2024-01-01',
+        };
+        if (row.recur_end_date) ev.endRecur = row.recur_end_date;
+        return Object.assign(base, ev);
+    }
+    if (row.type === 'off') {
+        return Object.assign(base, {
+            start: row.specific_date,
+            allDay: true,
+        });
+    }
+    // override
+    return Object.assign(base, {
+        start: row.specific_date + 'T' + row.start_time,
+        end:   row.specific_date + 'T' + row.end_time,
+    });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const el = document.getElementById('cs-calendar');
+    if (!el || !window.FullCalendar) return;
+
+    const isMobile = window.matchMedia('(max-width: 640px)').matches;
+    const view = isMobile && CS_INITIAL_VIEW === 'timeGridWeek' ? 'timeGridDay' : CS_INITIAL_VIEW;
+
+    // Build events
+    const events = [];
+    const holidaySet = new Set();
+    CS_HOLIDAYS.forEach(h => {
+        holidaySet.add(h.specific_date);
+        // Background tint (full-day pinkish)
+        events.push({
+            start: h.specific_date,
+            allDay: true,
+            display: 'background',
+            backgroundColor: '#fee2e2',
+            extendedProps: { __holiday: true },
+        });
+        // Visible label
+        events.push({
+            title: h.note || 'วันหยุดคลินิก',
+            start: h.specific_date,
+            allDay: true,
+            classNames: ['cs-holiday-evt'],
+            editable: false,
+            extendedProps: { __holiday: true, holidayInfo: h },
+        });
+    });
+    CS_SHIFTS.forEach(r => events.push(csRowToEvent(r)));
+
+    const calendar = new FullCalendar.Calendar(el, {
+        initialView: view,
+        locale: 'th',
+        firstDay: 0,
+        slotMinTime: '07:00:00',
+        slotMaxTime: '21:00:00',
+        nowIndicator: true,
+        height: isMobile ? 'auto' : 720,
+        contentHeight: isMobile ? 600 : 'auto',
+        expandRows: true,
+        editable: false,
+        selectable: false,
+        dayMaxEvents: 4,
+        headerToolbar: {
+            left:   'prev,next today',
+            center: 'title',
+            right:  'dayGridMonth,timeGridWeek,timeGridDay',
+        },
+        buttonText: {
+            today: 'วันนี้',
+            month: 'เดือน',
+            week:  'สัปดาห์',
+            day:   'วัน',
+        },
+        events,
+        eventClick: (info) => {
+            const ext = info.event.extendedProps || {};
+            if (ext.__holiday) {
+                // Show holiday info in modal
+                const h = ext.holidayInfo || {};
+                csShowHoliday(h, info.event.startStr);
+                return;
+            }
+            csShowShift(ext);
+        },
+        eventClassNames: (info) => {
+            const ext = info.event.extendedProps || {};
+            if (ext.__holiday) return [];
+            // Hide non-holiday events that fall on a holiday date (closed day)
+            const startDate = info.event.start ? cs_localDate(info.event.start) : null;
+            if (startDate && holidaySet.has(startDate)) return ['cs-hidden-on-holiday'];
+            return [];
+        },
+    });
+    calendar.render();
+});
+
+function cs_localDate(d) {
+    const yy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yy}-${mm}-${dd}`;
+}
+
 function csShowShift(s) {
     const wdNames = ['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์'];
     const escHtml = str => String(str ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -322,6 +357,9 @@ function csShowShift(s) {
         ? `เฉพาะวันที่ <strong>${escHtml(s.specific_date)}</strong>`
         : `ทุกวัน${wdNames[parseInt(s.weekday,10) || 0]}`;
     const notes = s.notes ? escHtml(s.notes) : '';
+    const offFlag = s.type === 'off'
+        ? '<span class="inline-block px-2 py-0.5 rounded-full bg-slate-200 text-slate-700 text-[10px] font-black uppercase tracking-widest">ลา</span>'
+        : '';
 
     document.getElementById('cs-shift-detail').innerHTML = `
         <div class="text-center pb-3 border-b border-slate-100">
@@ -329,7 +367,10 @@ function csShowShift(s) {
                 <i class="fa-solid fa-user-doctor"></i>
             </div>
             <p class="text-base font-black text-slate-900">${docName}</p>
-            <span class="inline-block mt-1.5 px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-black uppercase tracking-widest">${svc}</span>
+            <div class="mt-1.5 flex items-center justify-center gap-2">
+                <span class="inline-block px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-black uppercase tracking-widest">${svc}</span>
+                ${offFlag}
+            </div>
         </div>
         <div class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 text-sm">
             <span class="text-slate-400 font-bold"><i class="fa-regular fa-clock mr-1"></i>เวลา</span>
@@ -347,6 +388,31 @@ function csShowShift(s) {
     document.getElementById('cs-shift-modal').classList.remove('hidden');
     document.body.style.overflow = 'hidden';
 }
+
+function csShowHoliday(h, dateStr) {
+    const escHtml = str => String(str ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    const closed  = parseInt(h.is_closed || 0) === 1;
+    const hours   = (!closed && h.open_time && h.close_time)
+        ? `<span class="font-black text-slate-700">${escHtml(h.open_time.substring(0,5))}–${escHtml(h.close_time.substring(0,5))}</span>`
+        : '<span class="font-black text-rose-600">ปิดทำการ</span>';
+
+    document.getElementById('cs-shift-detail').innerHTML = `
+        <div class="text-center pb-3 border-b border-slate-100">
+            <div class="w-14 h-14 mx-auto mb-2 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center text-xl">
+                <i class="fa-solid fa-calendar-xmark"></i>
+            </div>
+            <p class="text-base font-black text-slate-900">${escHtml(h.note || 'วันหยุดคลินิก')}</p>
+            <p class="mt-1 text-[11px] font-bold text-slate-400">${escHtml(h.specific_date || dateStr || '')}</p>
+        </div>
+        <div class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 text-sm">
+            <span class="text-slate-400 font-bold"><i class="fa-regular fa-clock mr-1"></i>สถานะ</span>
+            <span>${hours}</span>
+        </div>
+    `;
+    document.getElementById('cs-shift-modal').classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+}
+
 function csCloseShift() {
     document.getElementById('cs-shift-modal').classList.add('hidden');
     document.body.style.overflow = '';
