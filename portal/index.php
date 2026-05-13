@@ -931,6 +931,10 @@ try {
             if (sectionId === 'batch_status' && typeof window.bsLoad === 'function') {
                 window.bsLoad(1);
             }
+            // Activity Dashboard: start polling + Pusher subscription
+            if (sectionId === 'activity_dashboard' && typeof window.adActivate === 'function') {
+                window.adActivate();
+            }
 
             var url = new URL(window.location.href);
             url.searchParams.set('section', sectionId);
@@ -1199,6 +1203,12 @@ try {
                     <i class="fa-solid fa-chevron-down psb-chevron"></i>
                 </button>
                 <div class="psb-group" data-group="monitor">
+                    <?php if (($_SESSION['admin_role'] ?? '') === 'superadmin'): ?>
+                    <button class="psb-item" data-section="activity_dashboard" onclick="switchSection('activity_dashboard',this)">
+                        <div class="psb-icon"><i class="fa-solid fa-chart-line" style="color:#8b5cf6"></i></div>
+                        <span class="psb-label" style="color:#6d28d9;font-weight:900">Activity Dashboard</span>
+                    </button>
+                    <?php endif; ?>
                     <button class="psb-item" data-section="activity_logs" onclick="switchSection('activity_logs',this)">
                         <div class="psb-icon"><i class="fa-solid fa-file-lines" style="color:#64748b"></i></div>
                         <span class="psb-label" style="color:#475569;font-weight:900">Activity Logs</span>
@@ -3404,6 +3414,18 @@ try {
                     include __DIR__ . '/_partials/profile.php';
                 } else {
                     echo '<div style="padding:100px;text-align:center;font-weight:900;color:#dc2626"><i class="fa-solid fa-shield-slash mb-4" style="font-size:4rem;display:block"></i> ACCESS DENIED<br><span style="font-size:14px;color:#94a3b8;font-weight:600">หน้าโปรไฟล์ใช้ได้เฉพาะบัญชีเจ้าหน้าที่ (e-Campaign Staff)</span></div>';
+                }
+                ?>
+            </div>
+
+            <!-- ════════════ SECTION: ACTIVITY DASHBOARD (superadmin only) ════════════ -->
+            <div id="section-activity_dashboard" class="portal-section"
+                style="<?= $activeSection==='activity_dashboard'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); background:#f8fafc; overflow-y:auto;">
+                <?php
+                if ($adminRole === 'superadmin') {
+                    include __DIR__ . '/_partials/activity_dashboard.php';
+                } else {
+                    echo '<div style="padding:100px;text-align:center;font-weight:900;color:#dc2626"><i class="fa-solid fa-shield-slash mb-4" style="font-size:4rem;display:block"></i> ACCESS DENIED<br><span style="font-size:14px;color:#94a3b8;font-weight:600">Activity Dashboard available to superadmin only.</span></div>';
                 }
                 ?>
             </div>
