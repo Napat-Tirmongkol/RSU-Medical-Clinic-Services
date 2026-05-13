@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<title>โครงการพัฒนาระบบบริการสุขภาพออนไลน์สำหรับผู้รับบริการ (RSU Medical Clinic — User Hub)</title>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+    /* ── Base / Print-friendly A4 ─────────────────────────────────── */
+    @page {
+        size: A4;
+        margin: 18mm 16mm 20mm 16mm;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+        font-family: 'Sarabun', 'TH Sarabun New', Arial, sans-serif;
+        color: #1f2937;
+        line-height: 1.55;
+        margin: 0;
+        padding: 0;
+        background: #f1f5f9;
+        font-size: 13pt;
+    }
+    .page {
+        background: #fff;
+        max-width: 800px;
+        margin: 20px auto;
+        padding: 32px 40px 40px 40px;
+        box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+        border-radius: 4px;
+    }
+
+    /* ── Cover page ───────────────────────────────────────────────── */
+    .cover {
+        min-height: 920px;
+        background: linear-gradient(135deg, #e6f9ee 0%, #d1f7df 60%, #fef3c7 100%);
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        padding: 60px 40px;
+        border-radius: 4px;
+        page-break-after: always;
+    }
+    .cover .top {
+        text-align: center;
+    }
+    .cover-brand {
+        font-size: 12pt;
+        font-weight: 800;
+        color: #0f7349;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        margin-bottom: 12px;
+    }
+    .cover h1 {
+        font-size: 26pt;
+        font-weight: 800;
+        color: #0f172a;
+        margin: 18px 0 12px 0;
+        line-height: 1.3;
+        letter-spacing: -0.01em;
+    }
+    .cover .subtitle {
+        font-size: 14pt;
+        color: #334155;
+        font-weight: 600;
+        margin-top: 8px;
+    }
+    .cover .en-title {
+        font-size: 11pt;
+        color: #64748b;
+        margin-top: 18px;
+        font-style: italic;
+    }
+    .cover .badge-row {
+        display: flex;
+        gap: 12px;
+        justify-content: center;
+        margin-top: 32px;
+        flex-wrap: wrap;
+    }
+    .cover .badge {
+        background: rgba(15, 115, 73, 0.1);
+        border: 1px solid rgba(15, 115, 73, 0.3);
+        color: #0f7349;
+        padding: 6px 14px;
+        border-radius: 99px;
+        font-size: 10pt;
+        font-weight: 700;
+    }
+    .cover .meta-box {
+        background: rgba(255,255,255,0.7);
+        backdrop-filter: blur(8px);
+        border: 1px solid rgba(15, 115, 73, 0.2);
+        border-radius: 12px;
+        padding: 20px 24px;
+        font-size: 11pt;
+    }
+    .cover .meta-box .row {
+        display: flex;
+        margin: 4px 0;
+    }
+    .cover .meta-box .row .lbl {
+        width: 130px;
+        font-weight: 700;
+        color: #475569;
+    }
+    .cover .meta-box .row .val {
+        flex: 1;
+        font-weight: 600;
+        color: #0f172a;
+    }
+
+    /* ── Section styles ───────────────────────────────────────────── */
+    .page h2 {
+        font-size: 18pt;
+        color: #0f7349;
+        font-weight: 800;
+        margin: 0 0 14px 0;
+        padding-bottom: 8px;
+        border-bottom: 2px solid #d1f7df;
+        letter-spacing: -0.01em;
+    }
+    .page h2 .num {
+        display: inline-block;
+        background: #0f7349;
+        color: #fff;
+        width: 28px;
+        height: 28px;
+        line-height: 28px;
+        border-radius: 50%;
+        text-align: center;
+        font-size: 13pt;
+        margin-right: 10px;
+        vertical-align: middle;
+    }
+    .page h3 {
+        font-size: 14pt;
+        color: #0f172a;
+        font-weight: 800;
+        margin: 18px 0 8px 0;
+    }
+    .page h4 {
+        font-size: 12pt;
+        color: #334155;
+        font-weight: 700;
+        margin: 12px 0 6px 0;
+    }
+    .page p { margin: 6px 0 10px 0; }
+    .page ul, .page ol { margin: 6px 0 10px 0; padding-left: 22px; }
+    .page li { margin: 4px 0; }
+    .page strong { color: #0f172a; }
+
+    /* ── Tables ───────────────────────────────────────────────────── */
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 10px 0 14px 0;
+        font-size: 11pt;
+    }
+    th, td {
+        text-align: left;
+        padding: 8px 10px;
+        border: 1px solid #e2e8f0;
+        vertical-align: top;
+    }
+    th {
+        background: #ecfdf5;
+        font-weight: 800;
+        color: #064e3b;
+        font-size: 11pt;
+    }
+    tr:nth-child(even) td { background: #f8fafc; }
+
+    /* ── Callout boxes ────────────────────────────────────────────── */
+    .callout {
+        background: #f0fdf4;
+        border-left: 4px solid #0f7349;
+        padding: 12px 16px;
+        margin: 12px 0;
+        border-radius: 4px;
+        font-size: 11.5pt;
+    }
+    .callout.warn { background: #fef3c7; border-left-color: #d97706; }
+    .callout.info { background: #eff6ff; border-left-color: #2563eb; }
+
+    /* ── KPI grid ─────────────────────────────────────────────────── */
+    .kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+        margin: 12px 0;
+    }
+    .kpi-card {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 12px 14px;
+    }
+    .kpi-card .kpi-label {
+        font-size: 10pt;
+        color: #64748b;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 4px;
+    }
+    .kpi-card .kpi-target {
+        font-size: 13pt;
+        color: #0f7349;
+        font-weight: 800;
+    }
+
+    /* ── Feature pill row ─────────────────────────────────────────── */
+    .pill-row { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0; }
+    .pill {
+        background: #ecfdf5;
+        color: #064e3b;
+        font-size: 10pt;
+        font-weight: 700;
+        padding: 3px 10px;
+        border-radius: 99px;
+        border: 1px solid #a7f3d0;
+    }
+    .pill.amber  { background: #fffbeb; color: #92400e; border-color: #fde68a; }
+    .pill.rose   { background: #fff1f2; color: #9f1239; border-color: #fecdd3; }
+    .pill.sky    { background: #f0f9ff; color: #075985; border-color: #bae6fd; }
+    .pill.violet { background: #faf5ff; color: #6b21a8; border-color: #e9d5ff; }
+
+    /* ── Status badge ─────────────────────────────────────────────── */
+    .status-done   { background: #dcfce7; color: #166534; padding: 1px 8px; border-radius: 4px; font-size: 10pt; font-weight: 800; }
+    .status-progress { background: #fef3c7; color: #92400e; padding: 1px 8px; border-radius: 4px; font-size: 10pt; font-weight: 800; }
+    .status-plan   { background: #e0e7ff; color: #3730a3; padding: 1px 8px; border-radius: 4px; font-size: 10pt; font-weight: 800; }
+
+    /* ── Timeline ─────────────────────────────────────────────────── */
+    .timeline {
+        position: relative;
+        padding-left: 28px;
+        margin: 12px 0;
+    }
+    .timeline::before {
+        content: '';
+        position: absolute;
+        left: 10px;
+        top: 8px;
+        bottom: 8px;
+        width: 2px;
+        background: #d1f7df;
+    }
+    .tl-item {
+        position: relative;
+        margin-bottom: 14px;
+    }
+    .tl-item::before {
+        content: '';
+        position: absolute;
+        left: -22px;
+        top: 6px;
+        width: 10px;
+        height: 10px;
+        background: #0f7349;
+        border-radius: 50%;
+        border: 2px solid #fff;
+        box-shadow: 0 0 0 2px #0f7349;
+    }
+    .tl-item .tl-title {
+        font-weight: 800;
+        color: #0f172a;
+        font-size: 12pt;
+        margin-bottom: 2px;
+    }
+    .tl-item .tl-meta {
+        font-size: 10pt;
+        color: #64748b;
+        font-weight: 600;
+    }
+
+    /* ── Print-only adjustments ───────────────────────────────────── */
+    @media print {
+        body { background: #fff; font-size: 12pt; }
+        .page { box-shadow: none; margin: 0; max-width: 100%; padding: 0; }
+        .cover { min-height: 100vh; page-break-after: always; }
+        h2 { page-break-after: avoid; }
+        h3 { page-break-after: avoid; }
+        table, .callout, .kpi-grid, .timeline { page-break-inside: avoid; }
+        .no-print { display: none !important; }
+        .page-break { page-break-before: always; }
+    }
+    .no-print-tip {
+        position: fixed; bottom: 16px; right: 16px;
+        background: #0f7349; color: #fff;
+        padding: 10px 16px; border-radius: 8px;
+        font-size: 11pt; font-weight: 700;
+        box-shadow: 0 4px 16px rgba(15,115,73,0.3);
+        cursor: pointer;
+    }
+    .no-print-tip:hover { background: #0e5d3c; }
+
+    /* ── Footer ───────────────────────────────────────────────────── */
+    .doc-footer {
+        text-align: center;
+        font-size: 9pt;
+        color: #94a3b8;
+        margin-top: 24px;
+        padding-top: 12px;
+        border-top: 1px solid #e2e8f0;
+    }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- COVER PAGE                                                      -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="page cover">
+    <div class="top">
+        <div class="cover-brand">RSU Medical Clinic Services</div>
+        <div style="font-size:36pt; margin: 24px 0 8px 0;">🏥</div>
+        <h1>โครงการพัฒนาระบบบริการสุขภาพออนไลน์<br>สำหรับผู้รับบริการ</h1>
+        <div class="subtitle">User Hub — แพลตฟอร์มเข้าถึงบริการสุขภาพในจุดเดียว</div>
+        <div class="en-title">Development of an Integrated Online Healthcare Service Platform for End-Users</div>
+
+        <div class="badge-row">
+            <span class="badge">📱 LINE LIFF</span>
+            <span class="badge">⚡ Real-time</span>
+            <span class="badge">🩺 Health-First UX</span>
+            <span class="badge">🔒 PDPA Compliant</span>
+        </div>
+    </div>
+
+    <div class="meta-box">
+        <div class="row"><span class="lbl">ผู้เสนอโครงการ</span><span class="val">ศูนย์บริการสุขภาพ มหาวิทยาลัยรังสิต</span></div>
+        <div class="row"><span class="lbl">หน่วยงานรับผิดชอบ</span><span class="val">งานเทคโนโลยีสารสนเทศ คลินิก RSU Medical</span></div>
+        <div class="row"><span class="lbl">ระยะเวลาดำเนินการ</span><span class="val">ปีงบประมาณ 2569 (พฤษภาคม 2569 — เมษายน 2570)</span></div>
+        <div class="row"><span class="lbl">URL ระบบ</span><span class="val">https://healthycampus.rsu.ac.th/e-campaignv2/user/</span></div>
+        <div class="row"><span class="lbl">เวอร์ชันเอกสาร</span><span class="val">v1.0 — พฤษภาคม 2569</span></div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- 1. บทสรุปผู้บริหาร                                              -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="page">
+    <h2><span class="num">1</span>บทสรุปผู้บริหาร <small style="font-size:11pt;color:#64748b;font-weight:500">(Executive Summary)</small></h2>
+
+    <p>
+        ระบบ <strong>RSU Medical Clinic — User Hub</strong> เป็นแพลตฟอร์มบริการสุขภาพออนไลน์
+        ผ่าน LINE Official Account และ Web Application สำหรับ <strong>นักศึกษา · บุคลากร · ผู้รับบริการทั่วไป</strong>
+        ของศูนย์บริการสุขภาพ มหาวิทยาลัยรังสิต ครอบคลุมการ <strong>จองนัดออนไลน์ · ตรวจสอบประวัติวัคซีน
+        · ยืมอุปกรณ์การแพทย์ · ลงเวลานักศึกษาทุน · สมัครสิทธิบัตรทอง · รับประกาศจากคลินิก</strong>
+        แบบ Real-time ในจุดเดียว
+    </p>
+
+    <h3>เป้าหมายของโครงการ</h3>
+    <ul>
+        <li>ลด <strong>อัตราการขาดนัด (No-show rate)</strong> จาก ≈20% เหลือ &lt;10% ภายใน 12 เดือน ด้วยระบบแจ้งเตือนล่วงหน้า</li>
+        <li>เพิ่ม <strong>Throughput ของคลินิก</strong> โดยลดเวลาลงทะเบียนหน้างานจาก 5 นาที เหลือ &lt;1 นาที ผ่าน QR Identity</li>
+        <li>ยกระดับ <strong>ความปลอดภัยของผู้ป่วย</strong> ด้วยการแสดงข้อมูลกรุ๊ปเลือด/แพ้ยา/โรคประจำตัวบนหน้าจอแรก</li>
+        <li>ลด <strong>ภาระงานเจ้าหน้าที่</strong> ในการตอบคำถามทั่วไป ด้วย AI Chat Support และ FAQ ในตัว</li>
+        <li>สอดคล้องกับ <strong>มาตรฐาน PDPA และ ISO 27001</strong> ในการจัดการข้อมูลสุขภาพ</li>
+    </ul>
+
+    <h3>สถานะปัจจุบัน</h3>
+    <p>
+        ระบบฝั่งผู้ใช้พัฒนาแล้ว <strong>~85%</strong> เปิดใช้งานจริง พร้อมฟีเจอร์หลักครบ — Booking, Vaccination Records, Gold Card,
+        e-Borrow, Scholarship Clock-in, LINE Integration พร้อมระบบ Real-time Notifications ผ่าน Pusher และ Cron Daily Report
+    </p>
+
+    <div class="callout">
+        <strong>💡 จุดแข็งของระบบ:</strong> ผู้ใช้ไม่ต้องติดตั้งแอปใหม่ — เข้าผ่าน LINE ที่มีอยู่แล้วได้ทันที
+        ลดต้นทุนการตลาด/onboarding และเข้าถึงกลุ่มเป้าหมาย 95%+ ของประชากรในมหาวิทยาลัย
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- 2. หลักการและเหตุผล                                             -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="page">
+    <h2><span class="num">2</span>หลักการและเหตุผล <small style="font-size:11pt;color:#64748b;font-weight:500">(Rationale)</small></h2>
+
+    <h3>2.1 ปัญหาที่พบในปัจจุบัน</h3>
+    <ul>
+        <li><strong>การจองนัดผ่านโทรศัพท์/เดินไปคลินิก</strong> สร้างภาระให้ทั้งผู้ใช้และเจ้าหน้าที่
+            — เจ้าหน้าที่รับสายซ้ำซ้อน ผู้ใช้ต้องโทรในเวลาทำการ</li>
+        <li><strong>อัตรา No-show สูง</strong> (≈20% จากสถิติเดิม) ทำให้สูญเสียทรัพยากรแพทย์
+            และผู้ป่วยรายอื่นต้องรอนานขึ้น</li>
+        <li><strong>ผู้ใช้ไม่ทราบสิทธิประกัน</strong> ของตนเอง ทำให้ต้องสอบถามทุกครั้งที่มาใช้บริการ</li>
+        <li><strong>การยืมอุปกรณ์การแพทย์</strong> ใช้กระดาษ ลายเซ็นต์มือ
+            ตรวจสอบประวัติย้อนหลังยาก คำนวณค่าปรับเลยกำหนดผิดบ่อย</li>
+        <li><strong>ประกาศจากคลินิก</strong> ส่งทาง LINE OA แบบ broadcast คนเปิดอ่านน้อย ไม่ทราบใครรับทราบแล้ว</li>
+        <li><strong>นักศึกษาทุนลงเวลาทำงาน</strong> ใช้สมุดบันทึก ตรวจสอบล่าช้า เกิดข้อพิพาทเรื่องชั่วโมงสะสม</li>
+    </ul>
+
+    <h3>2.2 บริบทเชิงนโยบาย</h3>
+    <ul>
+        <li><strong>นโยบาย Digital Health</strong> ของกระทรวงสาธารณสุขและ สปสช.
+            สนับสนุนการเข้าถึงข้อมูลสุขภาพออนไลน์ของประชาชน</li>
+        <li><strong>พ.ร.บ. คุ้มครองข้อมูลส่วนบุคคล (PDPA)</strong> กำหนดให้คลินิกต้องมีระบบจัดการ
+            consent / audit trail สำหรับข้อมูลสุขภาพ</li>
+        <li><strong>มาตรฐาน ISO 27001</strong> ที่มหาวิทยาลัยกำลังขับเคลื่อน
+            ต้องการระบบ access control + activity logging ที่ตรวจสอบได้</li>
+        <li><strong>นโยบายมหาวิทยาลัยรังสิต</strong> ในการเป็นผู้นำด้าน HealthyCampus</li>
+    </ul>
+
+    <h3>2.3 เหตุผลที่เลือกพัฒนาบน LINE Platform</h3>
+    <table>
+        <tr><th>ปัจจัย</th><th>LINE LIFF</th><th>Native App</th><th>Web เปล่า</th></tr>
+        <tr><td>Adoption rate ของกลุ่มเป้าหมาย</td><td>95%+</td><td>20-30%</td><td>50-60%</td></tr>
+        <tr><td>ต้นทุนพัฒนา/ดูแล</td><td>ต่ำ</td><td>สูง (2 platforms)</td><td>ปานกลาง</td></tr>
+        <tr><td>การแจ้งเตือน Push</td><td>ผ่าน LINE OA ฟรี</td><td>FCM/APNS ต้อง opt-in</td><td>Web Push (opt-in ยาก)</td></tr>
+        <tr><td>การ Onboarding</td><td>เพิ่มเพื่อน 1 คลิก</td><td>ดาวน์โหลด+ติดตั้ง</td><td>จำ URL</td></tr>
+        <tr><td>ค่าใช้จ่ายต่อเดือน</td><td>~0-1,500 บาท</td><td>~5,000+ บาท</td><td>~500 บาท</td></tr>
+    </table>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- 3. วัตถุประสงค์ + กลุ่มเป้าหมาย                                 -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="page">
+    <h2><span class="num">3</span>วัตถุประสงค์และกลุ่มเป้าหมาย</h2>
+
+    <h3>3.1 วัตถุประสงค์</h3>
+    <ol>
+        <li><strong>เพื่อพัฒนาระบบบริการสุขภาพออนไลน์</strong> ที่ผู้ใช้เข้าถึงได้ทุกที่ทุกเวลา
+            ผ่านอุปกรณ์มือถือที่มีอยู่แล้ว</li>
+        <li><strong>เพื่อลดอัตราการขาดนัด</strong> ด้วยระบบแจ้งเตือนล่วงหน้าและ smart reminders</li>
+        <li><strong>เพื่อยกระดับความปลอดภัยของผู้ป่วย</strong> ผ่านการเข้าถึงข้อมูลสุขภาพสำคัญ
+            (กรุ๊ปเลือด, แพ้ยา, โรคประจำตัว) ในกรณีฉุกเฉิน</li>
+        <li><strong>เพื่อลดภาระงานธุรการของเจ้าหน้าที่คลินิก</strong> ในงานที่สามารถ self-service ได้</li>
+        <li><strong>เพื่อสร้างฐานข้อมูลกลาง</strong> สำหรับการวิเคราะห์เชิงสุขภาพและการวางแผนเชิงนโยบาย</li>
+    </ol>
+
+    <h3>3.2 กลุ่มเป้าหมาย</h3>
+    <div class="kpi-grid">
+        <div class="kpi-card">
+            <div class="kpi-label">👨‍🎓 นักศึกษา RSU</div>
+            <div class="kpi-target">~28,000 คน</div>
+            <p style="font-size:10pt;color:#475569;margin:4px 0 0 0">ทุกชั้นปี ทุกคณะ</p>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">👩‍🏫 บุคลากร / อาจารย์</div>
+            <div class="kpi-target">~3,500 คน</div>
+            <p style="font-size:10pt;color:#475569;margin:4px 0 0 0">รวมเจ้าหน้าที่สนับสนุน</p>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">🎓 นักศึกษาทุน</div>
+            <div class="kpi-target">~200 คน</div>
+            <p style="font-size:10pt;color:#475569;margin:4px 0 0 0">ลงเวลาทำงานในคลินิก</p>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">👥 บุคคลทั่วไป</div>
+            <div class="kpi-target">~5,000 คน/ปี</div>
+            <p style="font-size:10pt;color:#475569;margin:4px 0 0 0">ครอบครัว/ชุมชนรอบ</p>
+        </div>
+    </div>
+
+    <div class="callout info">
+        <strong>รวมกลุ่มเป้าหมายโดยตรง: ~36,700 คน/ปี</strong> ครอบคลุมการใช้งานทั้งแบบ <em>active user</em>
+        (จองนัด, ตรวจสุขภาพ) และ <em>passive user</em> (รับประกาศ, ตรวจสิทธิ)
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- 4. ขอบเขตและฟังก์ชันของระบบ                                     -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="page">
+    <h2><span class="num">4</span>ขอบเขตและฟังก์ชันของระบบ <small style="font-size:11pt;color:#64748b;font-weight:500">(Scope &amp; Features)</small></h2>
+
+    <p>ระบบ User Hub ประกอบด้วยฟังก์ชันหลัก <strong>6 หมวด</strong> รวม <strong>23 ฟีเจอร์</strong> ดังนี้</p>
+
+    <h3>4.1 หมวด Identity &amp; Profile (อัตลักษณ์ผู้ใช้)</h3>
+    <table>
+        <tr><th style="width:35%">ฟีเจอร์</th><th style="width:50%">รายละเอียด</th><th style="width:15%">สถานะ</th></tr>
+        <tr><td>เข้าสู่ระบบด้วย LINE</td><td>OAuth 2.0 ผ่าน LINE LIFF — ไม่ต้องจำรหัสผ่าน</td><td><span class="status-done">เปิดใช้</span></td></tr>
+        <tr><td>ลงทะเบียนข้อมูลส่วนตัว</td><td>ชื่อ-สกุล, เลขประจำตัว, เบอร์โทร, อีเมล, คณะ/หน่วยงาน</td><td><span class="status-done">เปิดใช้</span></td></tr>
+        <tr><td>บันทึกข้อมูลสุขภาพ</td><td>กรุ๊ปเลือด · ส่วนสูง/น้ำหนัก · แพ้ยา/อาหาร · โรคประจำตัว · ผู้ติดต่อฉุกเฉิน</td><td><span class="status-done">เปิดใช้</span></td></tr>
+        <tr><td>QR Code Member Card</td><td>แสดงให้สแกนหน้างานเพื่อลงทะเบียน ลดเวลาจาก 5 นาที → 30 วินาที</td><td><span class="status-done">เปิดใช้</span></td></tr>
+        <tr><td>Identity Card บนหน้าหลัก</td><td>แสดงข้อมูลสำคัญ (กรุ๊ปเลือด, แพ้ยา, โรคประจำตัว) แบบ chips กรณีฉุกเฉิน</td><td><span class="status-done">เปิดใช้</span></td></tr>
+    </table>
+
+    <h3>4.2 หมวด Booking System (จองนัดออนไลน์)</h3>
+    <table>
+        <tr><th>ฟีเจอร์</th><th>รายละเอียด</th><th>สถานะ</th></tr>
+        <tr><td>เรียกดูแคมเปญสุขภาพ</td><td>วัคซีน, ตรวจสุขภาพ, อบรม, ฯลฯ</td><td><span class="status-done">เปิดใช้</span></td></tr>
+        <tr><td>จองนัดออนไลน์</td><td>เลือกแคมเปญ → วัน → เวลา → ยืนยัน (4 ขั้นตอน)</td><td><span class="status-done">เปิดใช้</span></td></tr>
+        <tr><td>นัดหมายของฉัน</td><td>ดูทั้งที่จะมาถึง + ประวัติ + ยกเลิกได้</td><td><span class="status-done">เปิดใช้</span></td></tr>
+        <tr><td>Check-in ด้วย QR</td><td>สแกน QR หน้าคลินิก → ลงทะเบียนอัตโนมัติ</td><td><span class="status-done">เปิดใช้</span></td></tr>
+        <tr><td>ส่งเข้าปฏิทินส่วนตัว</td><td>Export .ics สำหรับ Google/Apple Calendar</td><td><span class="status-done">เปิดใช้</span></td></tr>
+        <tr><td>แจ้งเตือนล่วงหน้า</td><td>Push noti 1 วัน + 1 ชั่วโมง (Smart Reminders)</td><td><span class="status-done">เปิดใช้</span></td></tr>
+    </table>
+
+    <h3>4.3 หมวด Health Records (ประวัติสุขภาพ)</h3>
+    <table>
+        <tr><th>ฟีเจอร์</th><th>รายละเอียด</th><th>สถานะ</th></tr>
+        <tr><td>ประวัติวัคซีน</td><td>รายการวัคซีนที่เคยฉีด + วัน next due + ดาวน์โหลดใบรับรอง</td><td><span class="status-done">เปิดใช้</span></td></tr>
+        <tr><td>ประวัติการเข้ารับบริการ</td><td>แสดงรายการ booking ที่ check-in แล้ว + สถานะ</td><td><span class="status-done">เปิดใช้</span></td></tr>
+        <tr><td>แผนภูมิสัญญาณชีพ</td><td>BP, น้ำหนัก, อุณหภูมิ ตามช่วงเวลา</td><td><span class="status-plan">แผนระยะ 2</span></td></tr>
+    </table>
+
+    <h3>4.4 หมวด Clinic Services (บริการคลินิก)</h3>
+    <table>
+        <tr><th>ฟีเจอร์</th><th>รายละเอียด</th><th>สถานะ</th></tr>
+        <tr><td>สมัครบัตรทอง (UC)</td><td>กรอกฟอร์ม + ลายเซ็นต์ดิจิทัล → ส่งให้คลินิกอนุมัติ</td><td><span class="status-done">เปิดใช้</span></td></tr>
+        <tr><td>ยืมอุปกรณ์การแพทย์ (e-Borrow)</td><td>เลือกอุปกรณ์ → กรอกเหตุผล → ส่งคำขอ → ติดตามสถานะ + คำนวณค่าปรับอัตโนมัติ</td><td><span class="status-done">เปิดใช้</span></td></tr>
+        <tr><td>ลงเวลานักศึกษาทุน</td><td>Clock-in/out + GPS verify + รออนุมัติเจ้าหน้าที่</td><td><span class="status-done">เปิดใช้</span></td></tr>
+        <tr><td>ข้อมูลสิทธิประกัน</td><td>แสดงประกันอุบัติเหตุ ฿250K + ค่ารักษา ฿40K (UC ผ่าน สปสช. ในแผนระยะ 2)</td><td><span class="status-done">เปิดใช้</span></td></tr>
+        <tr><td>ตารางแพทย์ออกตรวจ</td><td>FullCalendar view: เดือน/สัปดาห์/วัน — มีข้อมูลห้องและบริการ</td><td><span class="status-done">เปิดใช้</span></td></tr>
+        <tr><td>ขอใบรับรองแพทย์</td><td>กรอกแบบฟอร์ม → admin อนุมัติ → ดาวน์โหลด PDF</td><td><span class="status-plan">แผนระยะ 2</span></td></tr>
+    </table>
+
+    <h3>4.5 หมวด Communication (สื่อสาร)</h3>
+    <table>
+        <tr><th>ฟีเจอร์</th><th>รายละเอียด</th><th>สถานะ</th></tr>
+        <tr><td>ประกาศจากคลินิก</td><td>Pop-up carousel แสดงข่าวสาร + เก็บ read-tracking + รองรับ TH/EN</td><td><span class="status-done">เปิดใช้</span></td></tr>
+        <tr><td>Live Chat กับเจ้าหน้าที่</td><td>แชทแบบ Real-time + Typing indicator + AI fallback</td><td><span class="status-done">เปิดใช้</span></td></tr>
+        <tr><td>Real-time Notifications</td><td>การแจ้งเตือนเด้งทันที (Pusher) + Polling fallback</td><td><span class="status-done">เปิดใช้</span></td></tr>
+        <tr><td>FAQ / ความช่วยเหลือ</td><td>ฐานความรู้คำถามที่พบบ่อย</td><td><span class="status-plan">แผนระยะ 2</span></td></tr>
+    </table>
+
+    <h3>4.6 หมวด User Experience (ประสบการณ์ใช้งาน)</h3>
+    <div class="pill-row">
+        <span class="pill">✨ ทักทายตามเวลา + Birthday Card</span>
+        <span class="pill">🩺 Smart Reminders</span>
+        <span class="pill">📡 Real-time Tick</span>
+        <span class="pill">🔄 Pull-to-Refresh</span>
+        <span class="pill">💀 Skeleton Loader</span>
+        <span class="pill">♿ Keyboard A11y</span>
+        <span class="pill">👆 Swipe Gestures</span>
+        <span class="pill">📱 iOS Safe-Area</span>
+        <span class="pill">🌗 Dark Mode Ready</span>
+        <span class="pill">🇹🇭 Thai-First Design</span>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- 5. ผลที่คาดว่าจะได้รับ + ตัวชี้วัด                              -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="page">
+    <h2><span class="num">5</span>ผลที่คาดว่าจะได้รับและตัวชี้วัดความสำเร็จ</h2>
+
+    <h3>5.1 ผลที่คาดว่าจะได้รับ</h3>
+    <ul>
+        <li><strong>ผู้ใช้ได้รับบริการสะดวกขึ้น</strong> — ไม่ต้องโทร ไม่ต้องเดิน ไม่ต้องจำเวลาทำการ</li>
+        <li><strong>คลินิกบริหารจัดการทรัพยากรได้ดีขึ้น</strong> — ดูสถิติแบบ Real-time, วางแผนกำลังคนล่วงหน้า</li>
+        <li><strong>เจ้าหน้าที่ลดภาระงานธุรการ</strong> ~30% ในช่วงเปิดเทอม</li>
+        <li><strong>มหาวิทยาลัยมีฐานข้อมูลสุขภาพรวม</strong> สำหรับวางแผนสุขภาวะ (Healthy Campus)</li>
+        <li><strong>สอดคล้องกับ PDPA และ ISO 27001</strong> ในการจัดการข้อมูลสุขภาพ</li>
+    </ul>
+
+    <h3>5.2 ตัวชี้วัด (KPIs)</h3>
+    <table>
+        <tr><th>ตัวชี้วัด</th><th>เป้าหมายปีแรก</th><th>วิธีวัด</th></tr>
+        <tr><td>จำนวนผู้ลงทะเบียน Active</td><td>≥ 12,000 คน (33% ของกลุ่มเป้าหมาย)</td><td>นับจาก sys_users.line_user_id</td></tr>
+        <tr><td>อัตรา No-show</td><td>&lt; 10% (จากเดิม ~20%)</td><td>booking ที่ไม่ check-in / booking ทั้งหมด</td></tr>
+        <tr><td>จำนวนการจองนัดต่อเดือน</td><td>≥ 1,500 รายการ</td><td>camp_bookings ที่ status='booked'</td></tr>
+        <tr><td>เวลาเฉลี่ยในการจองนัด</td><td>&lt; 60 วินาที</td><td>วัดจาก booking flow analytics</td></tr>
+        <tr><td>Average Response Time (Chat)</td><td>&lt; 15 นาที (เวลาทำการ)</td><td>เวลา staff reply เฉลี่ย</td></tr>
+        <tr><td>Real-time delivery rate (Pusher)</td><td>≥ 95%</td><td>Pusher event success rate</td></tr>
+        <tr><td>คะแนนความพึงพอใจ (CSAT)</td><td>≥ 4.2/5.0</td><td>post-checkin survey</td></tr>
+        <tr><td>Uptime ของระบบ</td><td>≥ 99%</td><td>Sentry/cron health check</td></tr>
+    </table>
+
+    <h3>5.3 ประโยชน์เชิงปริมาณ</h3>
+    <div class="kpi-grid">
+        <div class="kpi-card">
+            <div class="kpi-label">ลดเวลาลงทะเบียน</div>
+            <div class="kpi-target">~4 นาที/คน</div>
+            <p style="font-size:10pt;color:#475569;margin:4px 0 0 0">× 1,500 ราย/เดือน = 100 ชม.</p>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">ลด No-show</div>
+            <div class="kpi-target">~10% → ประหยัด</div>
+            <p style="font-size:10pt;color:#475569;margin:4px 0 0 0">~150 slot/เดือน คืนสู่ผู้ใช้อื่น</p>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">ลดการโทรหาคลินิก</div>
+            <div class="kpi-target">~50%</div>
+            <p style="font-size:10pt;color:#475569;margin:4px 0 0 0">คำถามทั่วไป self-service</p>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">เพิ่ม Engagement</div>
+            <div class="kpi-target">×3 เท่า</div>
+            <p style="font-size:10pt;color:#475569;margin:4px 0 0 0">ประกาศมี read-tracking</p>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- 6. แผนการดำเนินงาน                                              -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="page">
+    <h2><span class="num">6</span>แผนการดำเนินงาน <small style="font-size:11pt;color:#64748b;font-weight:500">(Implementation Roadmap)</small></h2>
+
+    <h3>6.1 ระยะที่ 1 — Core Platform (เสร็จสมบูรณ์)</h3>
+    <div class="timeline">
+        <div class="tl-item">
+            <div class="tl-title">Q3-Q4 2568: ระบบจองนัด + Identity</div>
+            <div class="tl-meta"><span class="status-done">เสร็จแล้ว</span> · Booking flow, QR check-in, profile, LINE login</div>
+        </div>
+        <div class="tl-item">
+            <div class="tl-title">Q1 2569: e-Borrow + Scholarship + Gold Card</div>
+            <div class="tl-meta"><span class="status-done">เสร็จแล้ว</span> · ยืมอุปกรณ์, ลงเวลานักศึกษาทุน, สมัคร UC</div>
+        </div>
+        <div class="tl-item">
+            <div class="tl-title">Q2 2569: UX Polish + Real-time + Activity Dashboard</div>
+            <div class="tl-meta"><span class="status-done">เสร็จแล้ว</span> · Smart reminders, Pusher, FullCalendar schedule view</div>
+        </div>
+    </div>
+
+    <h3>6.2 ระยะที่ 2 — Expansion (Q3-Q4 2569)</h3>
+    <div class="timeline">
+        <div class="tl-item">
+            <div class="tl-title">ใบรับรองแพทย์ดิจิทัล</div>
+            <div class="tl-meta"><span class="status-progress">กำลังพัฒนา</span> · กรอกฟอร์ม → admin อนุมัติ → ดาวน์โหลด PDF พร้อมลายเซ็นต์ดิจิทัล</div>
+        </div>
+        <div class="tl-item">
+            <div class="tl-title">FAQ / Knowledge Base</div>
+            <div class="tl-meta"><span class="status-plan">แผน</span> · ฐานความรู้คำถามที่พบบ่อย + AI Search</div>
+        </div>
+        <div class="tl-item">
+            <div class="tl-title">แผนภูมิสัญญาณชีพ (Vital Signs)</div>
+            <div class="tl-meta"><span class="status-plan">แผน</span> · BP, น้ำหนัก, อุณหภูมิ ตามช่วงเวลา</div>
+        </div>
+        <div class="tl-item">
+            <div class="tl-title">เชื่อมต่อ API สปสช. ตรวจสิทธิรักษา</div>
+            <div class="tl-meta"><span class="status-plan">รอพิจารณา</span> · ต้องขึ้นทะเบียนหน่วยบริการก่อน</div>
+        </div>
+    </div>
+
+    <h3>6.3 ระยะที่ 3 — Advanced (2570)</h3>
+    <ul>
+        <li><strong>Telemedicine</strong> — ปรึกษาแพทย์ออนไลน์ผ่าน video</li>
+        <li><strong>Health Tracking</strong> — เชื่อมต่อ smartwatch/wearables</li>
+        <li><strong>AI Symptom Checker</strong> — ประเมินอาการเบื้องต้นก่อนพบแพทย์</li>
+        <li><strong>Multi-language</strong> — รองรับภาษาจีน/อังกฤษเต็มรูปแบบ (สำหรับนักศึกษาต่างชาติ)</li>
+    </ul>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- 7. งบประมาณและทรัพยากร                                          -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="page">
+    <h2><span class="num">7</span>งบประมาณและทรัพยากร <small style="font-size:11pt;color:#64748b;font-weight:500">(Budget &amp; Resources)</small></h2>
+
+    <h3>7.1 ต้นทุนค่าใช้จ่ายต่อปี (Operating Cost)</h3>
+    <table>
+        <tr><th>หมวด</th><th>รายละเอียด</th><th style="text-align:right">งบประมาณ (บาท/ปี)</th></tr>
+        <tr><td>Hosting / VPS</td><td>Server + Database + Backup</td><td style="text-align:right">~25,000</td></tr>
+        <tr><td>Domain + SSL</td><td>healthycampus.rsu.ac.th</td><td style="text-align:right">~3,000</td></tr>
+        <tr><td>LINE Messaging API</td><td>200K push/เดือน (Light Plan)</td><td style="text-align:right">~12,000</td></tr>
+        <tr><td>Pusher Real-time</td><td>Sandbox plan ใช้ฟรี → Startup plan</td><td style="text-align:right">~18,000</td></tr>
+        <tr><td>Gemini AI API</td><td>Chat + ประมวลผลภาพ schedule</td><td style="text-align:right">~24,000</td></tr>
+        <tr><td>Sentry (Error Monitoring)</td><td>Developer plan</td><td style="text-align:right">~12,000</td></tr>
+        <tr><td>Cron Service (cron-job.org)</td><td>Daily report + sync</td><td style="text-align:right">ฟรี</td></tr>
+        <tr><td colspan="2" style="text-align:right;font-weight:800">รวมต้นทุนดำเนินงานต่อปี</td><td style="text-align:right;font-weight:800;background:#ecfdf5">~94,000 บาท</td></tr>
+    </table>
+
+    <h3>7.2 ต้นทุนการพัฒนาเพิ่มเติม (Phase 2)</h3>
+    <table>
+        <tr><th>รายการ</th><th>รายละเอียด</th><th style="text-align:right">งบประมาณ</th></tr>
+        <tr><td>ใบรับรองแพทย์ดิจิทัล</td><td>UI + PDF template + admin approval (3-5 วัน)</td><td style="text-align:right">~25,000</td></tr>
+        <tr><td>FAQ / Knowledge Base</td><td>CMS + AI search (5-7 วัน)</td><td style="text-align:right">~35,000</td></tr>
+        <tr><td>แผนที่มหาวิทยาลัย + Wayfinding</td><td>Leaflet + indoor SVG (3-5 วัน)</td><td style="text-align:right">~30,000</td></tr>
+        <tr><td>แผนภูมิสัญญาณชีพ</td><td>Data model + Chart.js viz (5-7 วัน)</td><td style="text-align:right">~30,000</td></tr>
+        <tr><td>เชื่อม API สปสช.</td><td>ขึ้นกับการอนุมัติของ สปสช.</td><td style="text-align:right">~40,000</td></tr>
+        <tr><td colspan="2" style="text-align:right;font-weight:800">รวมต้นทุน Phase 2</td><td style="text-align:right;font-weight:800;background:#fef3c7">~160,000 บาท</td></tr>
+    </table>
+
+    <h3>7.3 ทรัพยากรบุคคล</h3>
+    <ul>
+        <li><strong>นักพัฒนาระบบ (Full-stack)</strong> 1 คน — พัฒนาและดูแลระบบ</li>
+        <li><strong>ผู้ดูแลระบบ (DevOps)</strong> 1 คน — server, backup, security</li>
+        <li><strong>เจ้าหน้าที่คลินิก (Admin)</strong> 2-3 คน — ตอบ chat, อนุมัติคำขอ, ดูแลเนื้อหา</li>
+        <li><strong>ที่ปรึกษาด้าน PDPA</strong> ตามวาระ — review consent flow และ data retention policy</li>
+    </ul>
+
+    <div class="callout">
+        <strong>ROI ที่คาดหวัง:</strong> ต้นทุนดำเนินงาน ~94,000 บาท/ปี เทียบกับการประหยัดเวลาเจ้าหน้าที่
+        ~100 ชม./เดือน (ค่าจ้างเฉลี่ย 200 บ./ชม. × 12 เดือน) = <strong>~240,000 บาท/ปี</strong>
+        + ผลประโยชน์ทางอ้อม (ลด no-show, เพิ่มความพึงพอใจ) = <strong>ROI &gt; 250%</strong>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- 8. สถาปัตยกรรมระบบและการรักษาความปลอดภัย                       -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="page">
+    <h2><span class="num">8</span>สถาปัตยกรรมระบบและความปลอดภัย <small style="font-size:11pt;color:#64748b;font-weight:500">(Architecture &amp; Security)</small></h2>
+
+    <h3>8.1 Technology Stack</h3>
+    <table>
+        <tr><th>Layer</th><th>เทคโนโลยี</th></tr>
+        <tr><td>Frontend (User)</td><td>HTML5, Tailwind CSS, Vanilla JS, FullCalendar, Chart.js, Pusher Client</td></tr>
+        <tr><td>Backend</td><td>PHP 8.x, MySQL 8.x (InnoDB), PDO</td></tr>
+        <tr><td>Authentication</td><td>LINE LIFF + LINE OAuth 2.0 + Session</td></tr>
+        <tr><td>Real-time</td><td>Pusher Channels (+ polling fallback)</td></tr>
+        <tr><td>AI / NLP</td><td>Google Gemini 2.5 Flash (chat + schedule image parsing)</td></tr>
+        <tr><td>Notifications</td><td>LINE Messaging API (Push, Flex Messages)</td></tr>
+        <tr><td>Monitoring</td><td>Sentry (errors), sys_activity_logs (audit), sys_error_logs</td></tr>
+        <tr><td>Scheduling</td><td>cron-job.org (daily report, rich menu sync, expired bookings)</td></tr>
+    </table>
+
+    <h3>8.2 การรักษาความปลอดภัย (PDPA + ISO 27001)</h3>
+    <ul>
+        <li><strong>การเข้ารหัส:</strong> HTTPS/TLS 1.3 ทุก endpoint · Password hashing (bcrypt)</li>
+        <li><strong>การควบคุมการเข้าถึง:</strong> Role-based access control (RBAC) · Session timeout</li>
+        <li><strong>CSRF Protection:</strong> ทุก POST endpoint validate token</li>
+        <li><strong>Mask ข้อมูลอ่อนไหว:</strong> เลขประจำตัวประชาชนแสดงเป็น <code>3xx****xx89</code></li>
+        <li><strong>Audit Trail:</strong> sys_activity_logs บันทึก action ทั้งหมด (พร้อม IP + UA)</li>
+        <li><strong>PDPA Consent:</strong> หน้า consent.php ก่อนใช้บริการครั้งแรก</li>
+        <li><strong>Data Retention:</strong> Activity logs 90 วัน · Error logs 30 วัน (ตาม retention policy)</li>
+        <li><strong>Backup:</strong> Daily backup ลง encrypted storage + offsite copy</li>
+    </ul>
+
+    <h3>8.3 ข้อมูลที่จัดเก็บ (Privacy Scope)</h3>
+    <table>
+        <tr><th>หมวด</th><th>ประเภทข้อมูล</th><th>Retention</th></tr>
+        <tr><td>Identity</td><td>ชื่อ-สกุล, citizen_id, line_user_id, รูปโปรไฟล์</td><td>ตลอดอายุการใช้บริการ + 5 ปี</td></tr>
+        <tr><td>Medical</td><td>กรุ๊ปเลือด, แพ้ยา, โรคประจำตัว, ประวัติวัคซีน</td><td>10 ปี (ตามมาตรฐานการแพทย์)</td></tr>
+        <tr><td>Behavioral</td><td>Activity log, IP address, user agent</td><td>90 วัน</td></tr>
+        <tr><td>Booking</td><td>นัดหมาย, check-in time, survey result</td><td>5 ปี</td></tr>
+        <tr><td>Chat</td><td>ข้อความสนทนากับเจ้าหน้าที่</td><td>1 ปี</td></tr>
+    </table>
+
+    <h3>8.4 การประกันคุณภาพ</h3>
+    <ul>
+        <li><strong>Code Review:</strong> ทุก commit ผ่านการ review ก่อน merge เข้า main</li>
+        <li><strong>Type Safety:</strong> ใช้ <code>declare(strict_types=1)</code> ใน PHP ทุกไฟล์</li>
+        <li><strong>Error Monitoring:</strong> Sentry แจ้งเตือนทันทีเมื่อพบ error production</li>
+        <li><strong>Health Check:</strong> Cron monitor uptime ทุก 5 นาที</li>
+        <li><strong>Documentation:</strong> CLAUDE.md (developer guide) · AI_GUIDE.md · E_CAMPAIGN_GUIDE.md</li>
+    </ul>
+
+    <div class="doc-footer">
+        เอกสารนี้จัดทำขึ้นเพื่อเสนอต่อผู้บริหารมหาวิทยาลัยรังสิตและศูนย์บริการสุขภาพ<br>
+        © 2569 RSU Medical Clinic Services · เวอร์ชัน 1.0 · พฤษภาคม 2569
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- Print button (hidden when printing)                             -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<button class="no-print-tip no-print" onclick="window.print()">
+    🖨️ พิมพ์เอกสาร (Ctrl+P)
+</button>
+
+</body>
+</html>
