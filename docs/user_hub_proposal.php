@@ -1,3 +1,40 @@
+<?php
+// docs/user_hub_proposal.php
+// ─────────────────────────────────────────────────────────────────────────────
+// Project proposal document — User-side scope of RSU Medical Clinic.
+// Restricted to portal admins (superadmin / admin role) because it contains
+// budget figures and asset valuation.
+//
+// Direct URL access by anyone is denied; admin must be logged in via
+// portal/auth before this page renders.
+// ─────────────────────────────────────────────────────────────────────────────
+declare(strict_types=1);
+session_start();
+
+$adminRole = $_SESSION['admin_role'] ?? '';
+if ($adminRole !== 'superadmin' && $adminRole !== 'admin') {
+    http_response_code(403);
+    header('Content-Type: text/html; charset=utf-8');
+    ?>
+    <!DOCTYPE html>
+    <html lang="th"><head><meta charset="UTF-8"><title>Access Denied</title>
+    <style>body{font-family:sans-serif;background:#f8fafc;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;color:#0f172a;text-align:center}
+    .box{background:#fff;padding:40px 56px;border-radius:16px;box-shadow:0 4px 24px rgba(0,0,0,.08);max-width:480px}
+    h1{color:#dc2626;margin:0 0 8px 0;font-size:24px}
+    p{color:#64748b;margin:8px 0;font-size:14px}
+    a{color:#0f7349;text-decoration:none;font-weight:700;display:inline-block;margin-top:16px}</style>
+    </head><body>
+    <div class="box">
+        <h1>🛡️ Access Denied</h1>
+        <p>เอกสารนี้สำหรับผู้บริหารระบบ (Admin) เท่านั้น</p>
+        <p>กรุณาเข้าสู่ระบบผ่านหน้า Portal Admin ก่อน</p>
+        <a href="/e-campaignv2/admin/auth/login.php">→ เข้าสู่ระบบ</a>
+    </div>
+    </body></html>
+    <?php
+    exit;
+}
+?>
 <!DOCTYPE html>
 <html lang="th">
 <head>

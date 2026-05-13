@@ -1235,6 +1235,21 @@ try {
                 </div>
             <?php endif; ?>
 
+            <?php /* ── เอกสาร / รายงาน (Document Library) ─────────────────── */ ?>
+            <?php if (!$registryOnly && ($adminRole === 'superadmin' || $adminRole === 'admin')): ?>
+                <button type="button" class="psb-section-toggle" data-group="docs" onclick="togglePsbGroup('docs',this)">
+                    <i class="fa-solid fa-folder-tree" style="color:#0f7349"></i>
+                    <span>เอกสาร</span>
+                    <i class="fa-solid fa-chevron-down psb-chevron"></i>
+                </button>
+                <div class="psb-group" data-group="docs">
+                    <button class="psb-item <?= $activeSection==='documents'?'psb-active':'' ?>" data-section="documents" onclick="switchSection('documents',this)">
+                        <div class="psb-icon"><i class="fa-solid fa-file-lines" style="color:#0f7349"></i></div>
+                        <span class="psb-label" style="color:#064e3b;font-weight:900">คลังเอกสาร</span>
+                    </button>
+                </div>
+            <?php endif; ?>
+
             <div style="flex:1"></div> <!-- Spacer to push settings to bottom -->
 
             <?php /* ── ข้อมูลหลัก (Master Data) ─────────────────────────── */ ?>
@@ -3462,6 +3477,18 @@ try {
                     include __DIR__ . '/_partials/monthly_report.php';
                 } else {
                     echo '<div style="padding:100px;text-align:center;font-weight:900;color:#dc2626"><i class="fa-solid fa-shield-slash mb-4" style="font-size:4rem;display:block"></i> ACCESS DENIED<br><span style="font-size:14px;color:#94a3b8;font-weight:600">ต้องมีสิทธิ์ access_monthly_report หรือ access_director_view</span></div>';
+                }
+                ?>
+            </div>
+
+            <!-- ════════════ SECTION: DOCUMENTS (Document Library) ════════════ -->
+            <div id="section-documents" class="portal-section"
+                style="<?= $activeSection==='documents'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); background:#f8fafc; overflow-y:auto;">
+                <?php
+                if ($adminRole === 'superadmin' || $adminRole === 'admin') {
+                    include __DIR__ . '/_partials/documents.php';
+                } else {
+                    echo '<div style="padding:100px;text-align:center;font-weight:900;color:#dc2626"><i class="fa-solid fa-shield-slash mb-4" style="font-size:4rem;display:block"></i> ACCESS DENIED<br><span style="font-size:14px;color:#94a3b8;font-weight:600">คลังเอกสารใช้ได้เฉพาะ superadmin / admin</span></div>';
                 }
                 ?>
             </div>
