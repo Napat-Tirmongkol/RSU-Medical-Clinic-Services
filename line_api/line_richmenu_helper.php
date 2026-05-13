@@ -85,6 +85,87 @@ if (!function_exists('line_richmenu_api')) {
     }
 }
 
+if (!function_exists('line_richmenu_validate_id_format')) {
+    /**
+     * ตรวจรูปแบบ richMenuId ตามที่ LINE กำหนด: "richmenu-" + 32 hex chars
+     * คืนค่า true ถ้าผ่าน หรือ string ว่าง (ใช้แทน "ลบค่าตั้งเดิม" ได้)
+     */
+    function line_richmenu_validate_id_format(string $id): bool
+    {
+        if ($id === '') return true; // อนุญาตค่าว่าง = clear
+        return (bool)preg_match('/^richmenu-[a-f0-9]{32}$/', $id);
+    }
+}
+
+if (!function_exists('line_richmenu_verify_id_exists')) {
+    /**
+     * เรียก LINE API ดู detail ของ richMenuId เพื่อยืนยันว่าใช้ได้จริง
+     * (ใช้ตรวจก่อน save เพื่อกัน admin พิมพ์ผิดหรือใส่ ID ของ channel อื่น)
+     *
+     * @return array{ok:bool, http:int, error:?string, name:?string}
+     */
+    function line_richmenu_verify_id_exists(string $id): array
+    {
+        if ($id === '') return ['ok' => true, 'http' => 0, 'error' => null, 'name' => null];
+        $r = line_richmenu_get_detail($id);
+        if (!$r['ok']) {
+            $err = (string)($r['error'] ?? '');
+            // "owned by another channel" = LINE บอกว่า ID มีอยู่จริงแต่อยู่คนละ channel
+            // เราถือว่า "ใช้ link ไม่ได้" — ต้องเตือน
+            $reason = stripos($err, 'another channel') !== false
+                ? 'rich menu นี้อยู่ภายใต้ channel อื่น — link ให้ user ไม่ได้'
+                : ($r['http'] === 404 ? 'ไม่พบ richMenuId นี้บน LINE' : $err);
+            return ['ok' => false, 'http' => $r['http'], 'error' => $reason, 'name' => null];
+        }
+        return [
+            'ok'    => true,
+            'http'  => $r['http'],
+            'error' => null,
+            'name'  => $r['data']['name'] ?? null,
+        ];
+    }
+}
+
+if (!function_exists('line_richmenu_audit_log')) {
+    /**
+     * เก็บประวัติการ link/unlink rich menu ต่อ user
+     * - ทำ table ขึ้นเองถ้ายังไม่มี (lazy migration)
+     * - ใส่ try/catch silent — log fail ไม่ควรทำให้ business flow fail
+     */
+    function line_richmenu_audit_log(string $lineUserId, string $action, string $state = '', string $richMenuId = '', ?string $error = null, string $source = ''): void
+    {
+        try {
+            $pdo = db();
+            $pdo->exec("CREATE TABLE IF NOT EXISTS sys_line_richmenu_audit (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                line_user_id VARCHAR(64) NOT NULL,
+                action VARCHAR(20) NOT NULL,
+                state VARCHAR(20) NOT NULL DEFAULT '',
+                rich_menu_id VARCHAR(80) NOT NULL DEFAULT '',
+                source VARCHAR(40) NOT NULL DEFAULT '',
+                error_message TEXT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_line_user (line_user_id),
+                INDEX idx_created (created_at)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+            $stmt = $pdo->prepare("INSERT INTO sys_line_richmenu_audit
+                (line_user_id, action, state, rich_menu_id, source, error_message)
+                VALUES (:uid, :act, :state, :rid, :src, :err)");
+            $stmt->execute([
+                ':uid'   => $lineUserId,
+                ':act'   => $action,
+                ':state' => $state,
+                ':rid'   => $richMenuId,
+                ':src'   => $source,
+                ':err'   => $error,
+            ]);
+        } catch (Throwable $e) {
+            error_log('[line_richmenu_audit_log] ' . $e->getMessage());
+        }
+    }
+}
+
 if (!function_exists('line_richmenu_get_ids')) {
     /**
      * ดึง richMenuId ทั้ง 2 ค่าจาก sys_site_settings
@@ -149,12 +230,21 @@ if (!function_exists('line_richmenu_link_user')) {
 }
 
 if (!function_exists('line_richmenu_unlink_user')) {
-    function line_richmenu_unlink_user(string $lineUserId): array
+    function line_richmenu_unlink_user(string $lineUserId, string $source = ''): array
     {
         if ($lineUserId === '') return ['ok' => false, 'http' => 0, 'error' => 'lineUserId ว่าง'];
         $r = line_richmenu_api('DELETE', "/v2/bot/user/$lineUserId/richmenu");
         $ok = ($r['http'] >= 200 && $r['http'] < 300);
-        return ['ok' => $ok, 'http' => $r['http'], 'error' => $ok ? null : ($r['body'] ?: $r['error'])];
+        $err = $ok ? null : ($r['body'] ?: $r['error']);
+        line_richmenu_audit_log(
+            $lineUserId,
+            $ok ? 'unlink_ok' : 'unlink_failed',
+            'unlinked',
+            '',
+            $err,
+            $source
+        );
+        return ['ok' => $ok, 'http' => $r['http'], 'error' => $err];
     }
 }
 
@@ -425,8 +515,11 @@ if (!function_exists('line_richmenu_get_user_linked')) {
 
 if (!function_exists('line_richmenu_is_registered_user')) {
     /**
-     * ตรวจว่า lineUserId นี้มี record ใน sys_users หรือยัง
+     * ตรวจว่า lineUserId นี้มี record ใน sys_users **และกรอก profile ครบ** หรือยัง
      * (รองรับทั้ง line_user_id เดิม และ line_user_id_new — เผื่อย้าย channel)
+     *
+     * "Registered" = มี record + full_name ไม่ว่าง (กันเคส partial row ที่
+     * บางครั้งถูกสร้างก่อน save_profile.php — ไม่ควรถือว่าเป็น member)
      */
     function line_richmenu_is_registered_user(string $lineUserId): bool
     {
@@ -434,7 +527,9 @@ if (!function_exists('line_richmenu_is_registered_user')) {
         try {
             $pdo = db();
             $stmt = $pdo->prepare("SELECT id FROM sys_users
-                                   WHERE line_user_id = :uid OR line_user_id_new = :uid2
+                                   WHERE (line_user_id = :uid OR line_user_id_new = :uid2)
+                                     AND full_name IS NOT NULL
+                                     AND TRIM(full_name) <> ''
                                    LIMIT 1");
             $stmt->execute([':uid' => $lineUserId, ':uid2' => $lineUserId]);
             return (bool)$stmt->fetchColumn();
@@ -454,7 +549,7 @@ if (!function_exists('line_richmenu_sync_user')) {
      * @param bool|null $forceIsMember  null = auto detect จาก DB, true/false = override
      * @return array{ok:bool, state:string, error:?string}
      */
-    function line_richmenu_sync_user(string $lineUserId, ?bool $forceIsMember = null): array
+    function line_richmenu_sync_user(string $lineUserId, ?bool $forceIsMember = null, string $source = ''): array
     {
         if ($lineUserId === '') return ['ok' => false, 'state' => 'none', 'error' => 'lineUserId ว่าง'];
 
@@ -464,9 +559,19 @@ if (!function_exists('line_richmenu_sync_user')) {
         $state    = $isMember ? 'member' : 'guest';
 
         if ($targetId === '') {
-            return ['ok' => false, 'state' => $state, 'error' => "ยังไม่ได้ตั้ง richMenuId สำหรับ $state"];
+            $err = "ยังไม่ได้ตั้ง richMenuId สำหรับ $state";
+            line_richmenu_audit_log($lineUserId, 'sync_failed', $state, '', $err, $source);
+            return ['ok' => false, 'state' => $state, 'error' => $err];
         }
         $r = line_richmenu_link_user($lineUserId, $targetId);
+        line_richmenu_audit_log(
+            $lineUserId,
+            $r['ok'] ? 'sync_ok' : 'sync_failed',
+            $state,
+            $targetId,
+            $r['ok'] ? null : $r['error'],
+            $source
+        );
         return ['ok' => $r['ok'], 'state' => $state, 'error' => $r['error']];
     }
 }

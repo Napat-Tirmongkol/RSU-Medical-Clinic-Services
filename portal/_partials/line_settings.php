@@ -744,7 +744,7 @@ function sendTestLineP() {
             </div>
         </div>
 
-        <div class="flex flex-wrap gap-2 mt-4">
+        <div class="flex flex-wrap gap-2 mt-4 items-center">
             <button onclick="rmSaveIds()" class="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-black inline-flex items-center gap-1.5 transition-colors">
                 <i class="fa-solid fa-floppy-disk"></i> บันทึก ID
             </button>
@@ -754,6 +754,10 @@ function sendTestLineP() {
             <button onclick="rmSetDefault('clear')" class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-black inline-flex items-center gap-1.5 border border-slate-200 transition-colors">
                 <i class="fa-solid fa-xmark"></i> ลบ default
             </button>
+            <label class="inline-flex items-center gap-1.5 text-[11px] font-bold text-slate-500 ml-auto cursor-pointer select-none" title="ข้ามการเรียก LINE API ตรวจว่า ID มีอยู่จริง (เร็วขึ้น แต่ใส่ ID ผิดแล้วจะไม่รู้)">
+                <input type="checkbox" id="rmSkipVerify" class="accent-emerald-500">
+                ข้าม verify กับ LINE
+            </label>
         </div>
 
         <details class="mt-5 group">
@@ -783,12 +787,15 @@ function sendTestLineP() {
                     </p>
                 </div>
 
-                <div class="pt-2">
+                <div class="pt-2 flex flex-wrap gap-2">
                     <button onclick="rmSyncAll()" class="px-3 py-2 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 text-xs font-black border border-purple-200 inline-flex items-center gap-1.5">
                         <i class="fa-solid fa-people-arrows"></i> Sync ทุก member ที่มี line_user_id → member menu
                     </button>
-                    <p class="text-[10px] text-slate-400 font-medium mt-1">ใช้กรณีเพิ่งตั้งค่า member ID ครั้งแรก หรือเปลี่ยน rich menu ใหม่</p>
+                    <button onclick="rmShowAudit()" class="px-3 py-2 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-black border border-slate-200 inline-flex items-center gap-1.5">
+                        <i class="fa-solid fa-clock-rotate-left"></i> ดู Audit log
+                    </button>
                 </div>
+                <p class="text-[10px] text-slate-400 font-medium mt-1">Sync ทำเป็น batch 50/รอบ พร้อมแถบ progress · Audit log เก็บประวัติ sync/unlink ต่อ user (50 รายการล่าสุด)</p>
 
                 <!-- Lookup Console rich menu ID -->
                 <div class="pt-3 border-t border-slate-100 mt-2">
@@ -842,13 +849,34 @@ function sendTestLineP() {
     window.rmSaveIds = async function() {
         const guest  = document.getElementById('rmGuestId').value.trim();
         const member = document.getElementById('rmMemberId').value.trim();
-        const r = await rmPost('save_ids', { guest_id: guest, member_id: member });
+        const skip   = document.getElementById('rmSkipVerify')?.checked ? '1' : '';
+
+        if (!guest && !member) {
+            const c = await Swal.fire({
+                icon: 'warning',
+                title: 'ทั้งสองช่องว่าง',
+                text: 'จะบันทึกเป็นค่าว่างทั้งคู่ — user ทุกคนจะไม่เห็น rich menu (ระบบจะ fallback ไป default ถ้ามี). ยืนยัน?',
+                showCancelButton: true,
+                confirmButtonText: 'บันทึกค่าว่าง',
+                cancelButtonText: 'ยกเลิก',
+            });
+            if (!c.isConfirmed) return;
+        }
+
+        Swal.fire({ title: 'กำลังบันทึก...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
+        const r = await rmPost('save_ids', { guest_id: guest, member_id: member, skip_verify: skip });
         Swal.fire({
             icon: r.ok ? 'success' : 'error',
             title: r.ok ? 'บันทึกแล้ว' : 'บันทึกไม่สำเร็จ',
-            text: r.message || '', timer: r.ok ? 1500 : undefined,
+            text: r.message || '',
+            timer: r.ok ? 1800 : undefined,
             showConfirmButton: !r.ok,
         });
+        // Focus ช่องที่ผิดถ้ามี field hint
+        if (!r.ok && r.field) {
+            const id = r.field === 'guest' ? 'rmGuestId' : 'rmMemberId';
+            document.getElementById(id)?.focus();
+        }
     };
 
     window.rmSetDefault = async function(target) {
@@ -886,17 +914,109 @@ function sendTestLineP() {
     window.rmSyncAll = async function() {
         const c = await Swal.fire({
             title: 'Sync ทุก member?',
-            text: 'จะ link member menu ให้ user ทุกคนที่มี line_user_id ใน DB',
+            text: 'จะ link member menu ให้ user ทุกคนที่มี line_user_id ใน DB (ทำเป็น batch 50/รอบ)',
             icon: 'warning', showCancelButton: true,
             confirmButtonText: 'เริ่ม Sync', cancelButtonText: 'ยกเลิก',
         });
         if (!c.isConfirmed) return;
-        Swal.fire({ title: 'กำลัง sync...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
-        const r = await rmPost('sync_all', {});
+
+        let offset = 0, totalOK = 0, totalFail = 0, total = 0, done = false;
         Swal.fire({
-            icon: r.ok ? 'success' : 'error',
-            title: r.ok ? 'เสร็จสิ้น' : 'ล้มเหลว',
-            html: r.ok ? `รวม ${r.total} คน · สำเร็จ <b>${r.success}</b> · ล้มเหลว <b>${r.failed}</b>` : (r.message || ''),
+            title: 'กำลัง sync...',
+            html: '<div id="rmSyncProg" style="font-size:13px;color:#475569">เริ่มต้น…</div>',
+            allowOutsideClick: false,
+            showConfirmButton: false,
+        });
+        const setProg = (msg) => {
+            const el = document.getElementById('rmSyncProg');
+            if (el) el.innerHTML = msg;
+        };
+
+        try {
+            while (!done) {
+                const r = await rmPost('sync_all', { offset });
+                if (!r.ok) {
+                    Swal.fire({ icon: 'error', title: 'ล้มเหลว', text: r.message || '' });
+                    return;
+                }
+                total     = r.total;
+                totalOK   += r.batch_ok;
+                totalFail += r.batch_fail;
+                offset    = r.processed;
+                done      = r.done;
+
+                const pct = total ? Math.min(100, Math.round((offset / total) * 100)) : 100;
+                setProg(`
+                    <div style="margin-bottom:8px"><b>${offset.toLocaleString()}</b> / ${total.toLocaleString()} (${pct}%)</div>
+                    <div style="background:#e2e8f0;border-radius:6px;height:8px;overflow:hidden;margin-bottom:8px">
+                        <div style="width:${pct}%;height:100%;background:#8b5cf6;transition:width .2s"></div>
+                    </div>
+                    <div style="font-size:11px;color:#64748b">สำเร็จ <b style="color:#16a34a">${totalOK}</b> · ล้มเหลว <b style="color:#dc2626">${totalFail}</b></div>
+                `);
+                // เล็กน้อยกัน rate limit
+                if (!done) await new Promise(res => setTimeout(res, 250));
+            }
+
+            Swal.fire({
+                icon: totalFail > 0 ? 'warning' : 'success',
+                title: 'เสร็จสิ้น',
+                html: `รวม ${total} คน · สำเร็จ <b>${totalOK}</b> · ล้มเหลว <b>${totalFail}</b>`,
+            });
+        } catch (e) {
+            Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: e.message || String(e) });
+        }
+    };
+
+    window.rmShowAudit = async function() {
+        Swal.fire({ title: 'กำลังโหลด audit log...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
+        const r = await rmPost('audit_recent', {});
+        if (!r.ok) {
+            Swal.fire({ icon: 'error', title: 'โหลดไม่สำเร็จ', text: r.message || '' });
+            return;
+        }
+        const rows = r.rows || [];
+        const fmtTime = (s) => (s || '').substring(0, 19).replace('T', ' ');
+        const actBadge = (a, state) => {
+            const color = {
+                'sync_ok': 'bg-emerald-100 text-emerald-700',
+                'sync_failed': 'bg-rose-100 text-rose-700',
+                'unlink_ok': 'bg-slate-100 text-slate-600',
+                'unlink_failed': 'bg-amber-100 text-amber-700',
+            }[a] || 'bg-slate-100 text-slate-700';
+            return `<span class="${color}" style="padding:1px 6px;border-radius:6px;font-size:9px;font-weight:800">${a}</span>`;
+        };
+        const html = rows.length === 0
+            ? '<p style="text-align:center;color:#94a3b8;padding:24px 0;font-size:12px">ยังไม่มี audit record</p>'
+            : `<div style="max-height:60vh;overflow-y:auto;text-align:left">
+                <table style="width:100%;font-size:11px;border-collapse:collapse">
+                    <thead style="position:sticky;top:0;background:#f8fafc;border-bottom:1px solid #e2e8f0">
+                        <tr style="text-align:left;color:#64748b">
+                            <th style="padding:6px 4px">เวลา</th>
+                            <th style="padding:6px 4px">User</th>
+                            <th style="padding:6px 4px">Action</th>
+                            <th style="padding:6px 4px">State</th>
+                            <th style="padding:6px 4px">Source</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${rows.map(r => `
+                            <tr style="border-bottom:1px solid #f1f5f9">
+                                <td style="padding:5px 4px;font-family:monospace;color:#64748b;white-space:nowrap">${fmtTime(r.created_at)}</td>
+                                <td style="padding:5px 4px;font-family:monospace;color:#0f172a">${(r.line_user_id || '').substring(0,8)}…</td>
+                                <td style="padding:5px 4px">${actBadge(r.action, r.state)}</td>
+                                <td style="padding:5px 4px;color:#475569">${r.state || '-'}</td>
+                                <td style="padding:5px 4px;color:#64748b;font-size:10px">${r.source || '-'}</td>
+                            </tr>
+                            ${r.error_message ? `<tr><td colspan="5" style="padding:0 4px 6px 4px;color:#dc2626;font-size:10px;font-family:monospace">└─ ${r.error_message.substring(0,180)}</td></tr>` : ''}
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>`;
+        Swal.fire({
+            title: `Audit Log (${rows.length} ล่าสุด)`,
+            html,
+            width: 720,
+            confirmButtonText: 'ปิด',
         });
     };
 

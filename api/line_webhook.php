@@ -617,7 +617,7 @@ foreach ($data['events'] as $idx => $event) {
             // Sync rich menu ตามสถานะของ user (ใหม่ → guest menu, เคยสมัครแล้ว → member menu)
             if ($userId) {
                 require_once __DIR__ . '/../line_api/line_richmenu_helper.php';
-                $rmResult = line_richmenu_sync_user((string)$userId);
+                $rmResult = line_richmenu_sync_user((string)$userId, null, 'webhook:follow');
                 if (!$rmResult['ok']) {
                     line_webhook_log('richmenu sync failed on follow', [
                         'line_user_id' => line_mask_uid($userId),
