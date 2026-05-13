@@ -737,11 +737,175 @@
 </div>
 
 <!-- ═══════════════════════════════════════════════════════════════ -->
-<!-- Print button (hidden when printing)                             -->
+<!-- Floating action panel (hidden when printing)                    -->
 <!-- ═══════════════════════════════════════════════════════════════ -->
-<button class="no-print-tip no-print" onclick="window.print()">
-    🖨️ พิมพ์เอกสาร (Ctrl+P)
-</button>
+<div class="no-print" style="position:fixed;bottom:16px;right:16px;display:flex;flex-direction:column;gap:8px;z-index:9999">
+    <button class="no-print-tip" onclick="window.print()" style="background:#0f7349">
+        🖨️ พิมพ์ / Save PDF
+    </button>
+    <button class="no-print-tip" onclick="exportToWord()" style="background:#2563eb">
+        📄 ดาวน์โหลด .doc (Word)
+    </button>
+</div>
+
+<script>
+/**
+ * Export the current proposal page as a .doc file that opens cleanly in
+ * Microsoft Word / LibreOffice / Google Docs.
+ *
+ * Technique: wrap the document body in a Word-namespaced HTML container,
+ * inline a Word-friendly stylesheet (replaces complex CSS like gradients
+ * and CSS variables that Word ignores), then trigger a Blob download with
+ * application/msword MIME + .doc extension.
+ */
+function exportToWord() {
+    // Clone the current document body, then strip elements that won't
+    // render in Word (floating buttons, scripts)
+    const clone = document.body.cloneNode(true);
+    clone.querySelectorAll('.no-print, script').forEach(el => el.remove());
+
+    // Strip the cover gradient background — Word renders gradients poorly
+    clone.querySelectorAll('.cover').forEach(el => {
+        el.style.background = '#fff';
+        el.style.padding = '40px';
+        el.style.minHeight = 'auto';
+    });
+
+    // Replace shadow on .page with simple border (Word doesn't render box-shadow)
+    clone.querySelectorAll('.page').forEach(el => {
+        el.style.boxShadow = 'none';
+        el.style.margin = '0 auto 28px auto';
+        el.style.padding = '24px 32px';
+        el.style.border = '1px solid #d1d5db';
+    });
+
+    // Word-friendly stylesheet — most browser CSS still works, but
+    // we override what doesn't render properly
+    const wordCss = `
+        @page {
+            size: A4;
+            margin: 2.5cm 2cm 2.5cm 2cm;
+            mso-page-orientation: portrait;
+        }
+        body {
+            font-family: 'Sarabun', 'TH Sarabun New', 'Cordia New', Arial, sans-serif;
+            font-size: 13pt;
+            color: #1f2937;
+            line-height: 1.55;
+        }
+        h1 { font-size: 22pt; color: #0f172a; }
+        h2 {
+            font-size: 17pt;
+            color: #0f7349;
+            border-bottom: 2px solid #0f7349;
+            padding-bottom: 6px;
+            margin-top: 18pt;
+            page-break-after: avoid;
+        }
+        h3 { font-size: 13pt; color: #0f172a; page-break-after: avoid; }
+        h4 { font-size: 12pt; color: #334155; }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 8pt 0;
+        }
+        table, th, td { border: 1px solid #94a3b8; }
+        th { background: #ecfdf5; padding: 6pt 8pt; text-align: left; font-weight: bold; }
+        td { padding: 6pt 8pt; vertical-align: top; }
+        .callout {
+            background: #f0fdf4;
+            border-left: 4px solid #0f7349;
+            padding: 8pt 12pt;
+            margin: 8pt 0;
+        }
+        .pill, .status-done, .status-progress, .status-plan {
+            display: inline-block;
+            padding: 1pt 6pt;
+            border: 1px solid #94a3b8;
+            border-radius: 4pt;
+            font-size: 10pt;
+            background: #f1f5f9;
+        }
+        .status-done { background: #dcfce7; color: #166534; border-color: #86efac; }
+        .status-progress { background: #fef3c7; color: #92400e; border-color: #fcd34d; }
+        .status-plan { background: #e0e7ff; color: #3730a3; border-color: #a5b4fc; }
+        .kpi-grid {
+            display: table;
+            width: 100%;
+            margin: 8pt 0;
+        }
+        .kpi-card {
+            display: table-cell;
+            width: 50%;
+            border: 1px solid #cbd5e1;
+            padding: 8pt 12pt;
+            vertical-align: top;
+        }
+        .kpi-card .kpi-target { font-size: 14pt; color: #0f7349; font-weight: bold; }
+        .timeline { padding-left: 16pt; }
+        .tl-item { margin-bottom: 8pt; }
+        .tl-item .tl-title { font-weight: bold; color: #0f172a; }
+        .tl-item .tl-meta { font-size: 10pt; color: #64748b; }
+        .doc-footer {
+            text-align: center;
+            font-size: 9pt;
+            color: #64748b;
+            margin-top: 24pt;
+            padding-top: 8pt;
+            border-top: 1px solid #cbd5e1;
+        }
+        .page { page-break-after: always; }
+        .page:last-child { page-break-after: avoid; }
+    `;
+
+    // Build the final HTML — note the Office namespaces are critical for Word
+    const header = `<!DOCTYPE html>
+<html xmlns:o='urn:schemas-microsoft-com:office:office'
+      xmlns:w='urn:schemas-microsoft-com:office:word'
+      xmlns='http://www.w3.org/TR/REC-html40'>
+<head>
+<meta charset='utf-8'>
+<title>โครงการพัฒนาระบบบริการสุขภาพออนไลน์สำหรับผู้รับบริการ — User Hub</title>
+<!--[if gte mso 9]>
+<xml>
+    <w:WordDocument>
+        <w:View>Print</w:View>
+        <w:Zoom>100</w:Zoom>
+        <w:DoNotPromptForConvert/>
+        <w:DoNotShowRevisions/>
+        <w:DoNotPrintRevisions/>
+        <w:DoNotShowMarkup/>
+        <w:DoNotShowComments/>
+        <w:DoNotShowInsertionsAndDeletions/>
+        <w:DoNotShowPropertyChanges/>
+    </w:WordDocument>
+</xml>
+<![endif]-->
+<style>${wordCss}</style>
+</head>
+<body>`;
+    const footer = `</body></html>`;
+
+    const html = header + clone.innerHTML + footer;
+
+    // UTF-8 BOM + msword MIME triggers .doc handler
+    const blob = new Blob(['﻿', html], {
+        type: 'application/msword;charset=utf-8',
+    });
+
+    const filename = 'RSU_User_Hub_Proposal_' + new Date().toISOString().substring(0,10) + '.doc';
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }, 100);
+}
+</script>
 
 </body>
 </html>
