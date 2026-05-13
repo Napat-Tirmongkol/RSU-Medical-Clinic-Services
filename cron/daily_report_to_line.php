@@ -12,7 +12,12 @@
  *  Optional query params:
  *    ?date=2026-05-13    ทดสอบกับวันที่ระบุ (default: วันนี้)
  *    ?dryrun=1           แสดงข้อความที่จะส่งโดยไม่ยิงเข้า LINE
+ *    ?force=1            บังคับส่งแม้วันที่นั้นไม่มีนัด/แคมเปญเลย (default: skip)
  *    ?group=Cxxxx        override groupId เฉพาะรอบนี้ (default: ค่าจาก sys_site_settings)
+ *
+ *  Default behavior:
+ *    - ถ้าวันนั้นไม่มี booking/check-in/cancel เลย → SKIP (ไม่ส่ง, ไม่กิน LINE quota)
+ *    - ใช้ ?force=1 ถ้าอยากบังคับส่งทุกครั้ง (เช่น admin กดทดสอบ)
  *
  *  Response: text/plain log — HTTP 200 ตลอด เว้นแต่ token ผิด
  *
@@ -46,6 +51,7 @@ if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
     exit;
 }
 $dryrun = !empty($_GET['dryrun']);
+$force  = !empty($_GET['force']);
 $overrideGroup = trim((string)($_GET['group'] ?? ''));
 
 $yesterday = date('Y-m-d', strtotime($date . ' -1 day'));
@@ -127,6 +133,22 @@ $no_show_rate = $today_stats['total_scheduled'] > 0
 echo "stats: on={$today_stats['on_schedule']} early={$today_stats['early_arrival']} "
    . "no_show={$today_stats['no_show']} cancel={$today_stats['cancelled_count']} "
    . "total={$today_stats['total_scheduled']} no_show_rate={$no_show_rate}%\n";
+
+// ── Skip when there's no activity at all (use ?force=1 to override) ──────
+$activity_sum = $today_stats['on_schedule']
+              + $today_stats['early_arrival']
+              + $today_stats['no_show']
+              + $today_stats['cancelled_count']
+              + $today_stats['total_scheduled'];
+if ($activity_sum === 0 && !$force) {
+    echo "SKIPPED: ไม่มีแคมเปญ/นัดหมายในวันนี้ — ไม่ส่งเข้ากลุ่ม (ใช้ ?force=1 เพื่อบังคับส่ง)\n";
+    if (function_exists('log_activity')) {
+        @log_activity('Daily Report Push', "Skipped (no activity) date=$date");
+    }
+    $elapsed = round(microtime(true) - $startedAt, 2);
+    echo "DONE in {$elapsed}s\n";
+    exit;
+}
 
 // ── Top 3 campaigns of the day (สำหรับใส่ใน body) ────────────────────────
 $topCampaigns = [];
