@@ -763,6 +763,88 @@ $pillTones = [
             100% { transform: translateY(220px) rotate(540deg); opacity: 0; }
         }
 
+        /* ── e-Borrow modal — mobile polish ─────────────────────────── */
+        /* iOS auto-zoom prevention: inputs MUST be ≥16px on iOS Safari */
+        #borrow-flow-modal input[type="date"],
+        #borrow-flow-modal input[type="text"],
+        #borrow-flow-modal input[type="file"],
+        #borrow-flow-modal textarea,
+        #borrow-flow-modal select {
+            font-size: 16px;
+        }
+        /* Safe-area: iPhone home indicator (notch devices) */
+        #borrow-flow-modal > div:last-child > div:last-child {
+            padding-bottom: max(1rem, env(safe-area-inset-bottom));
+        }
+        /* Better focus visibility for form fields inside flow */
+        #borrow-flow-modal textarea:focus,
+        #borrow-flow-modal input:focus,
+        #borrow-flow-modal select:focus {
+            scroll-margin-block: 24vh;
+        }
+        /* Step body fade-hint — show user there's more to scroll */
+        #borrow-flow-modal .flex-1.overflow-auto {
+            -webkit-overflow-scrolling: touch;
+            scroll-behavior: smooth;
+        }
+        /* Ensure category cards have adequate tap target on small screens */
+        #bf-step-1 button[data-cat-id],
+        #bf-categories button {
+            min-height: 56px;
+        }
+
+        /* ── Chat — typing indicator + unread badge ─────────────────── */
+        .chat-typing {
+            display: flex; align-items: center; gap: 4px;
+            padding: 12px 16px;
+            background: #fff;
+            border: 1px solid #f1f5f9;
+            border-radius: 1.8rem 1.8rem 1.8rem 0.4rem;
+            width: fit-content;
+        }
+        .chat-typing span {
+            width: 7px; height: 7px;
+            border-radius: 50%;
+            background: #cbd5e1;
+            animation: chatTypingBounce 1.2s infinite ease-in-out;
+        }
+        .chat-typing span:nth-child(2) { animation-delay: 0.15s; }
+        .chat-typing span:nth-child(3) { animation-delay: 0.3s; }
+        @keyframes chatTypingBounce {
+            0%, 80%, 100% { transform: scale(0.7); opacity: 0.5; }
+            40%           { transform: scale(1);   opacity: 1; }
+        }
+        .chat-day-sep {
+            display: flex; align-items: center; gap: 8px;
+            margin: 12px 0;
+        }
+        .chat-day-sep::before,
+        .chat-day-sep::after {
+            content: ''; flex: 1; height: 1px; background: #e2e8f0;
+        }
+        .chat-day-sep span {
+            font-size: 9px; font-weight: 900; color: #94a3b8;
+            text-transform: uppercase; letter-spacing: 0.15em;
+            background: rgba(255,255,255,0.7); padding: 2px 8px; border-radius: 99px;
+        }
+        /* Unread badge on Help button */
+        #chat-unread-badge {
+            position: absolute; top: -4px; right: -4px;
+            min-width: 18px; height: 18px; padding: 0 5px;
+            border-radius: 9px;
+            background: #ef4444;
+            color: #fff; font-size: 10px; font-weight: 900;
+            display: none; align-items: center; justify-content: center;
+            border: 2px solid #fff;
+            animation: chatBadgePop 0.3s ease-out;
+        }
+        #chat-unread-badge.show { display: flex; }
+        @keyframes chatBadgePop {
+            0% { transform: scale(0); }
+            70% { transform: scale(1.15); }
+            100% { transform: scale(1); }
+        }
+
         /* Reminder pills horizontal scroller */
         .reminder-strip {
             display: flex;
@@ -836,7 +918,17 @@ $pillTones = [
 
         function showContact() { document.getElementById('contact-modal').classList.remove('hidden'); document.getElementById('contact-modal').classList.add('flex'); }
         function hideContact() { document.getElementById('contact-modal').classList.add('hidden'); }
-        function showChat() { document.getElementById('chat-modal').classList.remove('hidden'); document.getElementById('chat-modal').classList.add('flex'); const content = document.getElementById('chat-content'); content.scrollTop = content.scrollHeight; if (typeof initChat === 'function') initChat(); }
+        function showChat() {
+            document.getElementById('chat-modal').classList.remove('hidden');
+            document.getElementById('chat-modal').classList.add('flex');
+            const content = document.getElementById('chat-content');
+            content.scrollTop = content.scrollHeight;
+            if (typeof initChat === 'function') initChat();
+            // Clear unread badge on open
+            window._chatUnread = 0;
+            const b = document.getElementById('chat-unread-badge');
+            if (b) b.classList.remove('show');
+        }
         function hideChat() { document.getElementById('chat-modal').classList.add('hidden'); }
         function showUpcoming(name) { document.getElementById('upcoming-name').innerText = name; document.getElementById('upcoming-modal').classList.remove('hidden'); document.getElementById('upcoming-modal').classList.add('flex'); }
         function hideUpcoming() { document.getElementById('upcoming-modal').classList.add('hidden'); }
@@ -981,6 +1073,10 @@ $pillTones = [
             document.getElementById('bf-back-btn').classList.toggle('hidden', step === 1);
             document.getElementById('bf-next-btn').classList.toggle('hidden', step !== 2);
             document.getElementById('bf-submit-btn').classList.toggle('hidden', step !== 3);
+
+            // Mobile UX: scroll body to top on step change so user sees the new content
+            const body = document.querySelector('#borrow-flow-modal .flex-1.overflow-auto');
+            if (body) body.scrollTop = 0;
         }
 
         function bfBack() {
@@ -1639,6 +1735,49 @@ $pillTones = [
                         </div>
                     </div>
 
+                    <?php
+                    // ── Medical chips — critical info visible at a glance (emergency-ready) ─
+                    $bloodType = trim((string)($user['blood_type'] ?? ''));
+                    $allergies = trim((string)($user['allergies'] ?? ''));
+                    $chronic   = trim((string)($user['chronic_conditions'] ?? ''));
+                    $hasMedicalInfo = $bloodType !== '' || $allergies !== '' || $chronic !== '';
+                    ?>
+                    <?php if ($hasMedicalInfo): ?>
+                    <div class="relative mt-4 flex flex-wrap gap-1.5" aria-label="ข้อมูลสุขภาพ">
+                        <?php if ($bloodType !== ''): ?>
+                        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-rose-400/20 border border-rose-300/40 backdrop-blur-md"
+                              title="กรุ๊ปเลือด">
+                            <i class="fa-solid fa-droplet text-rose-200 text-[9px]"></i>
+                            <span class="text-white text-[10px] font-black uppercase tracking-wider"><?= htmlspecialchars($bloodType) ?></span>
+                        </span>
+                        <?php endif; ?>
+                        <?php if ($allergies !== ''): ?>
+                        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-400/20 border border-amber-300/40 backdrop-blur-md max-w-[180px]"
+                              title="<?= htmlspecialchars('แพ้: ' . $allergies) ?>">
+                            <i class="fa-solid fa-triangle-exclamation text-amber-200 text-[9px] shrink-0"></i>
+                            <span class="text-white text-[10px] font-black uppercase tracking-wider truncate">แพ้ <?= htmlspecialchars(mb_substr($allergies, 0, 18)) ?></span>
+                        </span>
+                        <?php endif; ?>
+                        <?php if ($chronic !== ''): ?>
+                        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-purple-400/20 border border-purple-300/40 backdrop-blur-md max-w-[180px]"
+                              title="<?= htmlspecialchars('โรคประจำตัว: ' . $chronic) ?>">
+                            <i class="fa-solid fa-heart-pulse text-purple-200 text-[9px] shrink-0"></i>
+                            <span class="text-white text-[10px] font-black uppercase tracking-wider truncate"><?= htmlspecialchars(mb_substr($chronic, 0, 18)) ?></span>
+                        </span>
+                        <?php endif; ?>
+                    </div>
+                    <?php else: ?>
+                    <button type="button" onclick="event.stopPropagation(); window.location.href='profile.php'"
+                        class="relative mt-4 w-full flex items-center justify-between gap-2 rounded-2xl bg-white/10 border border-white/15 backdrop-blur-md px-3 py-2 text-left active:scale-[0.98] transition-all"
+                        title="เพิ่มข้อมูลสุขภาพ">
+                        <span class="text-white/75 text-[10px] font-bold flex items-center gap-1.5">
+                            <i class="fa-solid fa-plus-circle text-[10px]"></i>
+                            เพิ่มกรุ๊ปเลือด · แพ้ยา · โรคประจำตัว
+                        </span>
+                        <i class="fa-solid fa-chevron-right text-white/40 text-[9px]"></i>
+                    </button>
+                    <?php endif; ?>
+
                     <?php if (defined('SITE_SHOW_INSURANCE') && SITE_SHOW_INSURANCE && $insurance !== null):
                         $insActive = ($insurance['insurance_status'] ?? '') === 'Active';
                         $coverEnd  = $insurance['coverage_end'] ?? '';
@@ -1986,8 +2125,9 @@ $pillTones = [
                             </button>
                             <button onclick="showChat()"
                                 class="flex flex-col items-center gap-2 active:scale-90 transition-all">
-                                <div class="w-12 h-12 bg-orange-50 rounded-2xl flex items-center justify-center text-orange-600 shadow-sm">
+                                <div class="relative w-12 h-12 bg-orange-50 rounded-2xl flex items-center justify-center text-orange-600 shadow-sm">
                                     <i class="fa-solid fa-circle-question text-lg"></i>
+                                    <span id="chat-unread-badge" aria-label="ข้อความที่ยังไม่ได้อ่าน">0</span>
                                 </div>
                                 <span class="text-slate-500 text-[8px] font-black text-center leading-tight uppercase tracking-widest">Help</span>
                             </button>
@@ -2336,6 +2476,29 @@ document.getElementById('insDetailModal').addEventListener('click', function(e) 
             }
         }
 
+        function chatNearBottom(el) {
+            return (el.scrollHeight - el.scrollTop - el.clientHeight) < 80;
+        }
+        function chatShowTyping() {
+            const c = document.getElementById('chat-content');
+            if (!c || c.querySelector('#chat-typing-indicator')) return;
+            const el = document.createElement('div');
+            el.id = 'chat-typing-indicator';
+            el.className = 'flex items-start gap-4 max-w-[90%]';
+            el.innerHTML = `
+                <div class="w-9 h-9 bg-orange-100 rounded-xl flex items-center justify-center text-orange-600 text-sm shrink-0 shadow-sm border border-orange-50 mt-1">
+                    <i class="fa-solid fa-headset"></i>
+                </div>
+                <div class="chat-typing" aria-label="กำลังพิมพ์">
+                    <span></span><span></span><span></span>
+                </div>`;
+            c.appendChild(el);
+            c.scrollTop = c.scrollHeight;
+        }
+        function chatHideTyping() {
+            document.getElementById('chat-typing-indicator')?.remove();
+        }
+
         async function fetchMessages(isInitialLoad = false) {
             if (isPolling) return;
             isPolling = true;
@@ -2349,11 +2512,34 @@ document.getElementById('insDetailModal').addEventListener('click', function(e) 
                 }
                 if (result.success && result.messages.length > 0) {
                     const chatContent = document.getElementById('chat-content');
+                    const wasNearBottom = chatNearBottom(chatContent);
+                    const chatOpen = !document.getElementById('chat-modal').classList.contains('hidden');
+
+                    // Brief typing indicator before showing new staff messages
+                    // (only on live updates, not initial history load)
+                    const hasNewStaffMsg = result.messages.some(m =>
+                        m.id > lastChatId && m.sender_type === 'staff'
+                    );
+                    if (!isInitialLoad && chatOpen && hasNewStaffMsg) {
+                        chatShowTyping();
+                        await new Promise(r => setTimeout(r, 450));
+                        chatHideTyping();
+                    }
+
                     result.messages.forEach(msg => {
                         if (msg.id <= lastChatId) return;
                         lastChatId = msg.id;
 
                         if (msg.sender_type === 'staff') {
+                            // Track unread when chat is closed
+                            if (!chatOpen && !isInitialLoad) {
+                                window._chatUnread = (window._chatUnread || 0) + 1;
+                                const badge = document.getElementById('chat-unread-badge');
+                                if (badge) {
+                                    badge.textContent = window._chatUnread > 9 ? '9+' : window._chatUnread;
+                                    badge.classList.add('show');
+                                }
+                            }
                             // Staff message — always show
                             const staffBubble = `
                                 <div class="flex items-start gap-4 max-w-[90%] animate-in slide-in-from-left duration-500">
@@ -2383,7 +2569,10 @@ document.getElementById('insDetailModal').addEventListener('click', function(e) 
                             chatContent.insertAdjacentHTML('beforeend', userBubble);
                         }
                     });
-                    chatContent.scrollTop = chatContent.scrollHeight;
+                    // Auto-scroll only if user was already near bottom (don't disturb reading)
+                    if (wasNearBottom || isInitialLoad) {
+                        chatContent.scrollTop = chatContent.scrollHeight;
+                    }
                 }
             } finally {
                 isPolling = false;
@@ -3432,243 +3621,14 @@ document.getElementById('insDetailModal').addEventListener('click', function(e) 
         </div>
     </div>
 
-<?php if (!empty($announcements)): ?>
-<!-- ── Announcement Popup ─────────────────────────────────────────────────── -->
-<style>
-    #ann-overlay {
-        position: fixed; inset: 0; z-index: 9000;
-        background: rgba(15,23,42,0.55);
-        backdrop-filter: blur(6px);
-        display: flex; align-items: center; justify-content: center;
-        padding: 20px;
-        animation: annFadeIn .3s ease;
-    }
-    @keyframes annFadeIn { from { opacity:0 } to { opacity:1 } }
-    #ann-box {
-        background: #fff;
-        border-radius: 2.25rem;
-        width: 100%; max-width: 360px;
-        overflow: hidden;
-        box-shadow: 0 30px 60px -10px rgba(0,0,0,.2);
-        animation: annSlideUp .35s cubic-bezier(.16,1,.3,1);
-    }
-    @keyframes annSlideUp { from { transform:translateY(30px);opacity:0 } to { transform:none;opacity:1 } }
-    .ann-header-info   { background: linear-gradient(135deg,#0052CC,#0066ff); }
-    .ann-header-warning{ background: linear-gradient(135deg,#d97706,#f59e0b); }
-    .ann-header-success{ background: linear-gradient(135deg,#059669,#10b981); }
-    .ann-header-urgent { background: linear-gradient(135deg,#dc2626,#ef4444); }
-    .ann-urgent-pulse  { animation: urgentPulse 1.4s ease-in-out infinite; }
-    @keyframes urgentPulse { 0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,.4)} 60%{box-shadow:0 0 0 12px rgba(239,68,68,0)} }
-    #ann-img { width:100%; max-height:200px; object-fit:cover; display:block; }
-    .ann-dot { width:7px; height:7px; border-radius:50%; background:#e2e8f0; transition:all .2s; cursor:pointer; }
-    .ann-dot.active { background:#0052CC; transform:scale(1.3); }
-    #ann-btn-dismiss { transition: transform .1s; }
-    #ann-btn-dismiss:active { transform: scale(.95); }
-</style>
-
-<div id="ann-overlay">
-    <div id="ann-box">
-
-        <!-- ── Dynamic Header ── -->
-        <div id="ann-header" class="ann-header-info relative overflow-hidden">
-            <div class="absolute -right-6 -top-6 w-32 h-32 bg-white/10 rounded-full"></div>
-            <div class="absolute -left-4 -bottom-4 w-24 h-24 bg-white/5 rounded-full"></div>
-            <div class="relative z-10 px-7 pt-8 pb-6 flex items-center justify-between">
-                <div class="flex items-center gap-3">
-                    <div id="ann-icon-wrap" class="w-11 h-11 bg-white/20 rounded-2xl flex items-center justify-center">
-                        <i id="ann-icon" class="fa-solid fa-bullhorn text-white text-xl"></i>
-                    </div>
-                    <div>
-                        <p class="text-white/60 text-[10px] font-black uppercase tracking-[.2em]">ประกาศจากคลินิก</p>
-                        <p id="ann-type-label" class="text-white text-[11px] font-black">ข้อมูลทั่วไป</p>
-                    </div>
-                </div>
-                <div class="flex items-center gap-2">
-                    <button id="ann-lang-toggle" onclick="toggleLang()" class="hidden px-2.5 py-1 rounded-lg bg-white/20 hover:bg-white/30 text-white text-[10px] font-black transition-all">
-                        EN
-                    </button>
-                    <button onclick="annClose()" class="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center text-white transition-colors" aria-label="ปิด">
-                        <i class="fa-solid fa-xmark text-sm"></i>
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <!-- ── Image (conditional) ── -->
-        <div id="ann-img-wrap" class="hidden">
-            <img id="ann-img" src="" alt="ภาพประกอบ">
-        </div>
-
-        <!-- ── Body ── -->
-        <div class="px-7 pt-6 pb-4">
-            <h3 id="ann-title" class="text-slate-900 font-black text-xl leading-tight mb-3"></h3>
-            <p id="ann-content" class="text-slate-500 text-[14px] leading-relaxed font-medium"></p>
-        </div>
-
-        <!-- ── Dots ── -->
-        <div id="ann-dots" class="flex justify-center gap-2 px-7 pb-4"></div>
-
-        <!-- ── Footer Buttons ── -->
-        <div class="px-7 pb-8 flex items-center gap-3">
-            <button onclick="annSkipAll()"
-                class="flex-none text-slate-400 text-[12px] font-black hover:text-slate-600 transition-colors py-2 px-3">
-                ข้ามทั้งหมด
-            </button>
-            <button id="ann-btn-dismiss" onclick="annDismiss()"
-                class="flex-1 bg-[#0052CC] hover:bg-blue-700 text-white font-black text-[14px] py-4 rounded-2xl shadow-lg shadow-blue-200 flex items-center justify-center gap-2">
-                รับทราบ <i class="fa-solid fa-arrow-right text-[11px]"></i>
-            </button>
-        </div>
-
-        <!-- ── Counter ── -->
-        <p id="ann-counter" class="text-center text-[11px] text-slate-300 font-bold pb-4 -mt-2"></p>
-
-    </div>
-</div>
-
-<script>
-(function() {
-    // ── ข้อมูลประกาศ (PHP → JS) ─────────────────────────────────────────────
-    const announcements = <?= json_encode(array_values($announcements), JSON_UNESCAPED_UNICODE) ?>;
-    const csrfToken     = '<?= get_csrf_token() ?>';
-    const baseUrl       = '<?= rtrim(dirname($_SERVER['SCRIPT_NAME']), '/') ?>';
-
-    let currentIndex = 0;
-    let isDismissing = false;
-    let currentLang  = 'th';
-
-    const typeConfig = {
-        info:    { cls: 'ann-header-info',    icon: 'fa-bullhorn',         label: 'ข้อมูลทั่วไป',    btn: '#0052CC' },
-        warning: { cls: 'ann-header-warning',  icon: 'fa-triangle-exclamation', label: 'แจ้งเตือน',  btn: '#d97706' },
-        success: { cls: 'ann-header-success',  icon: 'fa-circle-check',    label: 'ข่าวดี',           btn: '#059669' },
-        urgent:  { cls: 'ann-header-urgent',   icon: 'fa-siren-on',        label: 'ด่วน!',            btn: '#dc2626' },
-    };
-
-    // ── render ประกาศ ─────────────────────────────────────────────────────────
-    function render(idx) {
-        const ann = announcements[idx];
-        const cfg = typeConfig[ann.type] || typeConfig.info;
-
-        // Header
-        const header = document.getElementById('ann-header');
-        header.className = cfg.cls + ' relative overflow-hidden';
-        if (ann.type === 'urgent') header.classList.add('ann-urgent-pulse');
-
-        document.getElementById('ann-icon').className = 'fa-solid ' + cfg.icon + ' text-white text-xl';
-        document.getElementById('ann-type-label').textContent = cfg.label;
-
-        // Language Toggle
-        const langToggle = document.getElementById('ann-lang-toggle');
-        if (ann.title_en || ann.content_en) {
-            langToggle.classList.remove('hidden');
-            langToggle.textContent = currentLang === 'th' ? 'EN' : 'TH';
-        } else {
-            langToggle.classList.add('hidden');
-            currentLang = 'th';
-        }
-
-        // Image
-        const imgWrap = document.getElementById('ann-img-wrap');
-        const img     = document.getElementById('ann-img');
-        if (ann.image_url) {
-            img.src = ann.image_url;
-            imgWrap.classList.remove('hidden');
-        } else {
-            imgWrap.classList.add('hidden');
-        }
-
-        // Body
-        if (currentLang === 'en' && (ann.title_en || ann.content_en)) {
-            document.getElementById('ann-title').textContent   = ann.title_en || ann.title;
-            document.getElementById('ann-content').textContent = ann.content_en || ann.content;
-        } else {
-            document.getElementById('ann-title').textContent   = ann.title;
-            document.getElementById('ann-content').textContent = ann.content;
-        }
-
-        // Dismiss button color
-        const btn = document.getElementById('ann-btn-dismiss');
-        btn.style.background  = cfg.btn;
-        btn.style.boxShadow   = '';
-
-        // Counter + dots
-        updateDots(idx);
-        document.getElementById('ann-counter').textContent =
-            announcements.length > 1 ? (idx + 1) + ' / ' + announcements.length : '';
-    }
-
-    window.toggleLang = function() {
-        currentLang = currentLang === 'th' ? 'en' : 'th';
-        render(currentIndex);
-    };
-
-    function updateDots(activeIdx) {
-        const container = document.getElementById('ann-dots');
-        container.innerHTML = '';
-        if (announcements.length <= 1) return;
-        announcements.forEach((_, i) => {
-            const d = document.createElement('button');
-            d.className = 'ann-dot' + (i === activeIdx ? ' active' : '');
-            d.onclick = () => jumpTo(i);
-            container.appendChild(d);
-        });
-    }
-
-    function jumpTo(idx) {
-        currentIndex = idx;
-        render(currentIndex);
-    }
-
-    // ── กด รับทราบ ─────────────────────────────────────────────────────────────
-    window.annDismiss = function() {
-        if (isDismissing) return;
-        isDismissing = true;
-
-        const ann = announcements[currentIndex];
-        const fd  = new FormData();
-        fd.append('action', 'mark_read');
-        fd.append('ann_id', ann.id);
-
-        fetch('../portal/ajax_announcements.php', { method: 'POST', body: fd })
-            .then(r => r.json())
-            .catch(() => ({ status: 'ok' })) // ถ้า fail ก็ปิดต่อไป
-            .then(() => {
-                // ตัดประกาศนี้ออก แล้วไปอันถัดไป
-                announcements.splice(currentIndex, 1);
-                isDismissing = false;
-
-                if (announcements.length === 0) {
-                    annClose();
-                } else {
-                    currentIndex = Math.min(currentIndex, announcements.length - 1);
-                    render(currentIndex);
-                }
-            });
-    };
-
-    // ── ข้ามทั้งหมด (ไม่ mark-read — จะแสดงอีกครั้งครั้งหน้า) ───────────────
-    window.annSkipAll = function() { annClose(); };
-
-    // ── ปิด overlay ──────────────────────────────────────────────────────────
-    window.annClose = function() {
-        const overlay = document.getElementById('ann-overlay');
-        if (overlay) {
-            overlay.style.transition = 'opacity .25s';
-            overlay.style.opacity = '0';
-            setTimeout(() => overlay.remove(), 260);
-        }
-    };
-
-    // ── ปิดด้วย backdrop click ────────────────────────────────────────────────
-    document.getElementById('ann-overlay').addEventListener('click', function(e) {
-        if (e.target === this) annClose();
-    });
-
-    // ── เริ่มต้น ──────────────────────────────────────────────────────────────
-    render(0);
-})();
-</script>
-<?php endif; ?>
+<?php
+// Announcement overlay extracted to includes/user_modals/announcement_carousel.php
+// to keep hub.php under the 4000-line maintainability threshold.
+// The partial expects $announcements (array) in scope.
+if (!empty($announcements)) {
+    include __DIR__ . '/../includes/user_modals/announcement_carousel.php';
+}
+?>
 
 <!-- ════════════ Guided Tour (Driver.js) ════════════ -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/driver.js@1.3.1/dist/driver.css">
