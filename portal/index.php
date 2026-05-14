@@ -3621,8 +3621,15 @@ try {
                                             </td>
                                             <td style="padding:14px 20px">
                                                 <div style="font-size:12px;font-weight:700;color:#475569"><?= htmlspecialchars($row['approved_by'] ?? '—') ?></div>
-                                                <?php if ($row['document_path']): ?>
-                                                    <a href="<?= htmlspecialchars($row['document_path']) ?>" target="_blank" style="font-size:10px;color:#2563eb;text-decoration:none">
+                                                <?php if ($row['document_path']):
+                                                    // document_path stored as 'storage/access_requests/...' (project-root relative).
+                                                    // Page rendered from /portal/index.php — needs '../' prefix.
+                                                    $_docRaw  = (string)$row['document_path'];
+                                                    $_docHref = (str_starts_with($_docRaw, '/') || str_starts_with($_docRaw, '../'))
+                                                        ? $_docRaw
+                                                        : '../' . ltrim($_docRaw, './');
+                                                ?>
+                                                    <a href="<?= htmlspecialchars($_docHref) ?>" target="_blank" style="font-size:10px;color:#2563eb;text-decoration:none">
                                                         <i class="fa-solid fa-file-pdf mr-1"></i> ดูเอกสารประกอบ
                                                     </a>
                                                 <?php else: ?>
