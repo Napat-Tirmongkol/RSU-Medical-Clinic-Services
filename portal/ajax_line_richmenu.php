@@ -46,11 +46,47 @@ try {
     validate_csrf_or_die();
 
     if ($action === 'save_ids') {
-        $guest  = trim((string)($_POST['guest_id']  ?? ''));
-        $member = trim((string)($_POST['member_id'] ?? ''));
+        $guest    = trim((string)($_POST['guest_id']  ?? ''));
+        $member   = trim((string)($_POST['member_id'] ?? ''));
+        $skipVerify = !empty($_POST['skip_verify']);
+
+        // 1) Format check — ทั้งคู่ต้องตรงรูปแบบ "richmenu-" + 32 hex (หรือเว้นไว้ก็ได้)
+        if (!line_richmenu_validate_id_format($guest)) {
+            echo json_encode(['ok' => false, 'field' => 'guest', 'message' => 'รูปแบบ guest richMenuId ไม่ถูกต้อง — ต้องขึ้นต้นด้วย "richmenu-" แล้วตามด้วย 32 hex characters']);
+            exit;
+        }
+        if (!line_richmenu_validate_id_format($member)) {
+            echo json_encode(['ok' => false, 'field' => 'member', 'message' => 'รูปแบบ member richMenuId ไม่ถูกต้อง — ต้องขึ้นต้นด้วย "richmenu-" แล้วตามด้วย 32 hex characters']);
+            exit;
+        }
+
+        // 2) Verify ID มีอยู่จริงบน LINE (ข้ามได้ถ้า admin ติ๊ก skip_verify)
+        $warnings = [];
+        if (!$skipVerify) {
+            if ($guest !== '') {
+                $vg = line_richmenu_verify_id_exists($guest);
+                if (!$vg['ok']) {
+                    echo json_encode(['ok' => false, 'field' => 'guest', 'message' => 'guest: '.$vg['error']]);
+                    exit;
+                }
+                $warnings[] = "guest=$guest (" . ($vg['name'] ?: '-') . ")";
+            }
+            if ($member !== '') {
+                $vm = line_richmenu_verify_id_exists($member);
+                if (!$vm['ok']) {
+                    echo json_encode(['ok' => false, 'field' => 'member', 'message' => 'member: '.$vm['error']]);
+                    exit;
+                }
+                $warnings[] = "member=$member (" . ($vm['name'] ?: '-') . ")";
+            }
+        }
+
         $ok = line_richmenu_save_ids($guest, $member);
-        if ($ok) log_activity('LINE Rich Menu', "อัปเดต IDs: guest=$guest, member=$member");
-        echo json_encode(['ok' => $ok, 'message' => $ok ? 'บันทึกแล้ว' : 'บันทึกไม่สำเร็จ']);
+        if ($ok) log_activity('LINE Rich Menu', 'อัปเดต IDs: ' . implode(' · ', $warnings ?: ["guest=$guest", "member=$member"]));
+        echo json_encode([
+            'ok'      => $ok,
+            'message' => $ok ? 'บันทึกแล้ว' . ($warnings ? ' · ตรวจกับ LINE แล้ว' : '') : 'บันทึกไม่สำเร็จ',
+        ]);
         exit;
     }
 
@@ -79,7 +115,7 @@ try {
         if ($uid === '') { echo json_encode(['ok' => false, 'message' => 'ต้องระบุ lineUserId']); exit; }
 
         if ($mode === 'unlink') {
-            $r = line_richmenu_unlink_user($uid);
+            $r = line_richmenu_unlink_user($uid, 'admin:test_unlink');
             echo json_encode(['ok' => $r['ok'], 'state' => 'unlinked', 'message' => $r['ok'] ? 'ลบ link → user จะเห็น default' : ($r['error'] ?? 'ล้มเหลว')]);
             exit;
         }
@@ -88,34 +124,96 @@ try {
         if ($mode === 'guest')  $force = false;
         if ($mode === 'member') $force = true;
 
-        $r = line_richmenu_sync_user($uid, $force);
+        $r = line_richmenu_sync_user($uid, $force, 'admin:test_sync');
         echo json_encode(['ok' => $r['ok'], 'state' => $r['state'], 'message' => $r['ok'] ? "Linked → {$r['state']}" : ($r['error'] ?? 'ล้มเหลว')]);
         exit;
     }
 
     if ($action === 'sync_all') {
-        // sync ทุก user ที่มี line_user_id — link เมนู member ให้ทั้งหมด (เพราะถือว่าเป็น member แล้ว)
+        // Chunked sync — UI calls repeatedly with ?offset=N until done=true
+        // Avoids long-running request + lets UI show progress %
         $ids = line_richmenu_get_ids();
         if ($ids['member'] === '') {
             echo json_encode(['ok' => false, 'message' => 'ยังไม่ได้ตั้ง member richMenuId']);
             exit;
         }
         $pdo = db();
-        $rows = $pdo->query("SELECT DISTINCT COALESCE(line_user_id_new, line_user_id) AS uid
-                             FROM sys_users
-                             WHERE (line_user_id IS NOT NULL AND line_user_id != '')
-                                OR (line_user_id_new IS NOT NULL AND line_user_id_new != '')")
-                    ->fetchAll(PDO::FETCH_COLUMN) ?: [];
+        $offset = max(0, (int)($_POST['offset'] ?? 0));
+        $batch  = 50; // sync 50 users per call
+
+        $totalRow = $pdo->query("SELECT COUNT(DISTINCT COALESCE(line_user_id_new, line_user_id))
+                                 FROM sys_users
+                                 WHERE (line_user_id IS NOT NULL AND line_user_id != '')
+                                    OR (line_user_id_new IS NOT NULL AND line_user_id_new != '')");
+        $total = (int)($totalRow->fetchColumn() ?: 0);
+
+        $stmt = $pdo->prepare("SELECT DISTINCT COALESCE(line_user_id_new, line_user_id) AS uid
+                               FROM sys_users
+                               WHERE (line_user_id IS NOT NULL AND line_user_id != '')
+                                  OR (line_user_id_new IS NOT NULL AND line_user_id_new != '')
+                               ORDER BY id ASC
+                               LIMIT $batch OFFSET $offset");
+        $stmt->execute();
+        $rows = $stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
+
         $ok = 0; $fail = 0;
         foreach ($rows as $uid) {
             if (!$uid) continue;
             $r = line_richmenu_link_user((string)$uid, $ids['member']);
             $r['ok'] ? $ok++ : $fail++;
-            // กัน rate limit เผื่อ user เยอะ
-            if (($ok + $fail) % 50 === 0) usleep(200000); // 0.2s pause every 50
+            line_richmenu_audit_log(
+                (string)$uid,
+                $r['ok'] ? 'sync_ok' : 'sync_failed',
+                'member',
+                $ids['member'],
+                $r['ok'] ? null : $r['error'],
+                'admin:sync_all'
+            );
         }
-        log_activity('LINE Rich Menu', "Sync all → member: ok=$ok, fail=$fail");
-        echo json_encode(['ok' => true, 'total' => count($rows), 'success' => $ok, 'failed' => $fail]);
+
+        $processedAfter = $offset + count($rows);
+        $done = $processedAfter >= $total || count($rows) < $batch;
+        if ($done) {
+            log_activity('LINE Rich Menu', "Sync all → member (chunked done): total=$total");
+        }
+        echo json_encode([
+            'ok'        => true,
+            'total'     => $total,
+            'processed' => $processedAfter,
+            'batch_ok'  => $ok,
+            'batch_fail'=> $fail,
+            'done'      => $done,
+            'next_offset' => $done ? null : $processedAfter,
+        ]);
+        exit;
+    }
+
+    if ($action === 'audit_recent') {
+        // ดู log การ link/unlink 50 รายการล่าสุด — เปิด details ใน UI
+        try {
+            $pdo = db();
+            // Try to create table (idempotent — same definition as helper)
+            $pdo->exec("CREATE TABLE IF NOT EXISTS sys_line_richmenu_audit (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                line_user_id VARCHAR(64) NOT NULL,
+                action VARCHAR(20) NOT NULL,
+                state VARCHAR(20) NOT NULL DEFAULT '',
+                rich_menu_id VARCHAR(80) NOT NULL DEFAULT '',
+                source VARCHAR(40) NOT NULL DEFAULT '',
+                error_message TEXT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_line_user (line_user_id),
+                INDEX idx_created (created_at)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+            $rows = $pdo->query("SELECT line_user_id, action, state, rich_menu_id, source, error_message, created_at
+                                 FROM sys_line_richmenu_audit
+                                 ORDER BY id DESC
+                                 LIMIT 50")->fetchAll(PDO::FETCH_ASSOC) ?: [];
+            echo json_encode(['ok' => true, 'rows' => $rows], JSON_UNESCAPED_UNICODE);
+        } catch (Throwable $e) {
+            echo json_encode(['ok' => false, 'message' => 'อ่าน audit log ไม่ได้: ' . $e->getMessage()]);
+        }
         exit;
     }
 

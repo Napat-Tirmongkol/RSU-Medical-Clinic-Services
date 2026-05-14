@@ -191,7 +191,7 @@ try {
     if (!empty($lineUserId)) {
         try {
             require_once __DIR__ . '/../line_api/line_richmenu_helper.php';
-            line_richmenu_sync_user((string)$lineUserId, true); // force member = true
+            line_richmenu_sync_user((string)$lineUserId, true, 'save_profile'); // force member = true
         } catch (Throwable $e) {
             error_log('[save_profile] richmenu sync: ' . $e->getMessage());
         }

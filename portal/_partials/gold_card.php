@@ -82,8 +82,16 @@ $gcOver = kpi_override_status($pdo);
     #section-gold_card .gc-pager-btn:hover:not(:disabled) { background:#f1f5f9; }
     #section-gold_card .gc-pager-btn:disabled { opacity:.4; cursor:not-allowed; }
     #section-gold_card .gc-pager-btn.gc-active { background:#f59e0b; color:#fff; border-color:#f59e0b; }
-    #section-gold_card .gc-modal { z-index:200; }
-    #section-gold_card .gc-modal-box { max-height: 90vh; }
+    /* Modal selectors are NOT scoped under #section-gold_card so they keep
+       working after we teleport the modal to <body> on open (escape any
+       transformed/filtered ancestor that would trap position:fixed). */
+    .gc-modal {
+        z-index: 9000 !important;
+        background: rgba(15, 23, 42, 0.55) !important;
+        backdrop-filter: blur(6px);
+        -webkit-backdrop-filter: blur(6px);
+    }
+    .gc-modal-box { max-height: 90vh; }
     #section-gold_card .gc-tab {
         padding:8px 16px; border-radius:10px; font-size:12px; font-weight:800;
         color:#64748b; cursor:pointer; transition:all .15s; background:transparent; border:none;
@@ -1489,7 +1497,9 @@ window.gcToggleApplyEnabled = async function() {
 
     // ── modal ────────────────────────────────────────────────────────
     window.gcOpenMemberModal = function(id) {
-        const modal = document.getElementById('gcMemberModal');
+        const modal = (typeof gcTeleport === 'function')
+            ? gcTeleport('gcMemberModal')
+            : document.getElementById('gcMemberModal');
         document.getElementById('gcMemberId').value = id || 0;
         document.getElementById('gcMemberError').classList.add('hidden');
         gcSwitchTab('info');
@@ -1805,8 +1815,16 @@ window.gcToggleApplyEnabled = async function() {
         document.getElementById('gcBulkFileList').classList.add('hidden');
     };
 
+    // Portal-escape: move modal to <body> so position:fixed is anchored to
+    // the viewport (avoids any transform/filter/contain ancestor trapping it).
+    function gcTeleport(id) {
+        const el = document.getElementById(id);
+        if (el && el.parentElement !== document.body) document.body.appendChild(el);
+        return el;
+    }
+
     window.gcOpenBulkModal = function() {
-        const modal = document.getElementById('gcBulkModal');
+        const modal = gcTeleport('gcBulkModal');
         modal.classList.remove('hidden'); modal.classList.add('flex');
         gcBulkBackToStep1();
         gcSwitchMode('files');

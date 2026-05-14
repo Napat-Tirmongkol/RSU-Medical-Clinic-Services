@@ -388,6 +388,26 @@ $userInitials = getInitials($user['full_name']);
 $hour = (int) date('H');
 $greeting = ($hour >= 5 && $hour < 12) ? "สวัสดีตอนเช้า" : (($hour >= 12 && $hour < 17) ? "สวัสดีตอนบ่าย" : (($hour >= 17 && $hour < 21) ? "สวัสดีตอนเย็น" : "สวัสดีตอนค่ำ"));
 
+// Greeting icon/emoji + glyph by time-of-day — A) personalize hero greeting
+$greetIcon  = ($hour >= 5 && $hour < 12) ? '☀️' : (($hour >= 12 && $hour < 17) ? '🌤️' : (($hour >= 17 && $hour < 21) ? '🌆' : '🌙'));
+$firstName = trim((string)($user['first_name'] ?? ''));
+if ($firstName === '') {
+    $parts = preg_split('/\s+/', trim((string)($user['full_name'] ?? '')));
+    $firstName = $parts[0] ?? '';
+}
+$firstName = $firstName !== '' ? $firstName : 'คุณ';
+
+// Birthday detection — show HBD card when today MM-DD == DOB MM-DD
+$isBirthday = false;
+$ageThisYear = null;
+if (!empty($user['date_of_birth']) && $user['date_of_birth'] !== '0000-00-00') {
+    $dobTs = strtotime((string)$user['date_of_birth']);
+    if ($dobTs !== false && date('m-d', $dobTs) === date('m-d')) {
+        $isBirthday = true;
+        $ageThisYear = (int)date('Y') - (int)date('Y', $dobTs);
+    }
+}
+
 // ── Smart Hero card (priority-driven "today" focus) ──────────────────────
 $smartHero = null;
 if ($next_appt) {
@@ -455,6 +475,81 @@ $heroThemes = [
     'amber' => ['bg' => 'from-amber-500 to-orange-500',    'shadow' => 'shadow-[0_15px_40px_rgba(245,158,11,0.25)]', 'btn' => 'bg-white text-amber-700'],
     'rose'  => ['bg' => 'from-rose-500 to-rose-600',       'shadow' => 'shadow-[0_15px_40px_rgba(225,29,72,0.25)]',  'btn' => 'bg-white text-rose-600'],
 ];
+
+// ── D) Smart Reminder Pills — secondary actionable items below hero ────────
+// Each pill: ['icon','label','tone','action','urgency'] (urgency: 0 normal, 1 soon, 2 urgent)
+$reminderPills = [];
+$todayTs = strtotime($today);
+foreach ($healthOverview['upcoming_list'] as $up) {
+    $diff = (int) round((strtotime($up['slot_date']) - $todayTs) / 86400);
+    if ($diff < 0 || $diff > 7) continue;
+    $when = $diff === 0 ? 'วันนี้' : ($diff === 1 ? 'พรุ่งนี้' : 'อีก '.$diff.' วัน');
+    $urg = $diff <= 1 ? 2 : ($diff <= 3 ? 1 : 0);
+    $reminderPills[] = [
+        'icon'   => 'fa-calendar-check',
+        'label'  => $when . ' · ' . mb_substr((string)$up['camp_name'], 0, 22),
+        'sub'    => substr((string)$up['start_time'], 0, 5).' น.',
+        'tone'   => $urg === 2 ? 'rose' : ($urg === 1 ? 'amber' : 'emerald'),
+        'action' => "window.location.href='my_bookings.php'",
+        'urgency'=> $urg,
+    ];
+}
+if (!empty($healthOverview['vaccine_next_due'])) {
+    $vd = $healthOverview['vaccine_next_due'];
+    $diff = (int) round((strtotime($vd['next_due_date']) - $todayTs) / 86400);
+    if ($diff >= 0 && $diff <= 30) {
+        $urg = $diff <= 7 ? 2 : ($diff <= 14 ? 1 : 0);
+        $reminderPills[] = [
+            'icon'   => 'fa-syringe',
+            'label'  => 'วัคซีน '.mb_substr((string)$vd['vaccine_name'], 0, 18),
+            'sub'    => $diff === 0 ? 'ครบกำหนดวันนี้' : 'อีก '.$diff.' วัน',
+            'tone'   => $urg === 2 ? 'rose' : ($urg === 1 ? 'amber' : 'sky'),
+            'action' => 'showCampaigns()',
+            'urgency'=> $urg,
+        ];
+    }
+}
+foreach ($borrow_active as $b) {
+    if (($b['approval_status'] ?? '') !== 'approved' || empty($b['due_date'])) continue;
+    $diff = (int) round((strtotime($b['due_date']) - $todayTs) / 86400);
+    if ($diff < -1 || $diff > 3) continue;
+    if ($diff < 0) {
+        $label = 'เกินกำหนดคืน '.abs($diff).' วัน';
+        $tone = 'rose'; $urg = 2;
+    } elseif ($diff === 0) {
+        $label = 'คืนวันนี้'; $tone = 'rose'; $urg = 2;
+    } else {
+        $label = 'คืนอีก '.$diff.' วัน'; $tone = 'amber'; $urg = 1;
+    }
+    $reminderPills[] = [
+        'icon'   => 'fa-clock-rotate-left',
+        'label'  => $label,
+        'sub'    => mb_substr((string)($b['equipment_name'] ?? '—'), 0, 22),
+        'tone'   => $tone,
+        'action' => 'showBorrow()',
+        'urgency'=> $urg,
+    ];
+}
+if ($borrow_total_fine > 0) {
+    $reminderPills[] = [
+        'icon'   => 'fa-money-bill-wave',
+        'label'  => 'ค่าปรับ ฿'.number_format($borrow_total_fine, 0),
+        'sub'    => 'รอชำระ',
+        'tone'   => 'rose',
+        'action' => 'showBorrow()',
+        'urgency'=> 2,
+    ];
+}
+// Sort: most urgent first, then keep order
+usort($reminderPills, fn($a, $b) => $b['urgency'] <=> $a['urgency']);
+$reminderPills = array_slice($reminderPills, 0, 4);
+
+$pillTones = [
+    'rose'    => ['bg' => 'bg-rose-50',    'fg' => 'text-rose-700',    'ic' => 'bg-rose-100 text-rose-600',       'dot' => 'bg-rose-500'],
+    'amber'   => ['bg' => 'bg-amber-50',   'fg' => 'text-amber-700',   'ic' => 'bg-amber-100 text-amber-600',     'dot' => 'bg-amber-500'],
+    'emerald' => ['bg' => 'bg-emerald-50', 'fg' => 'text-emerald-700', 'ic' => 'bg-emerald-100 text-emerald-600', 'dot' => 'bg-emerald-500'],
+    'sky'     => ['bg' => 'bg-sky-50',     'fg' => 'text-sky-700',     'ic' => 'bg-sky-100 text-sky-600',         'dot' => 'bg-sky-500'],
+];
 ?>
 <!DOCTYPE html>
 <html lang="th">
@@ -521,6 +616,275 @@ $heroThemes = [
                 transform: translateY(-10px);
             }
         }
+
+        /* ── J) Pull-to-Refresh ────────────────────────────────────────── */
+        #ptr-indicator {
+            position: fixed;
+            top: 0;
+            left: 50%;
+            transform: translate(-50%, -100%);
+            z-index: 70;
+            transition: transform 0.18s ease-out;
+            pointer-events: none;
+        }
+        #ptr-indicator.active {
+            transform: translate(-50%, 16px);
+        }
+        #ptr-indicator .ring {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: #fff;
+            box-shadow: 0 8px 24px rgba(46, 158, 99, 0.25);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #2e9e63;
+            font-size: 16px;
+        }
+        #ptr-indicator.refreshing .ring i {
+            animation: ptr-spin 0.8s linear infinite;
+        }
+        @keyframes ptr-spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* ── J) Skeleton loader ────────────────────────────────────────── */
+        .skeleton {
+            background: linear-gradient(90deg, #f1f5f9 0%, #e2e8f0 40%, #f1f5f9 80%);
+            background-size: 200% 100%;
+            animation: skeleton-shimmer 1.4s ease-in-out infinite;
+            border-radius: 1rem;
+        }
+        @keyframes skeleton-shimmer {
+            0%   { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+        #hub-skeleton {
+            position: fixed;
+            inset: 0;
+            background: #F8FAFF;
+            z-index: 65;
+            overflow: hidden;
+            transition: opacity 0.25s ease;
+        }
+        #hub-skeleton.fading { opacity: 0; pointer-events: none; }
+        #hub-skeleton.hidden { display: none !important; }
+
+        /* ── E) Realtime toast ─────────────────────────────────────────── */
+        #rt-toast-wrap {
+            position: fixed;
+            top: 16px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 200;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            pointer-events: none;
+            width: min(420px, calc(100% - 32px));
+        }
+        .rt-toast {
+            background: #fff;
+            border-radius: 18px;
+            box-shadow: 0 14px 40px rgba(15, 23, 42, 0.16);
+            padding: 12px 14px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            transform: translateY(-12px);
+            opacity: 0;
+            transition: transform 0.28s ease, opacity 0.28s ease;
+            pointer-events: auto;
+            border: 1px solid rgba(226, 232, 240, 0.8);
+        }
+        .rt-toast.show { transform: translateY(0); opacity: 1; }
+        .rt-toast .ic {
+            width: 38px; height: 38px;
+            border-radius: 12px;
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0;
+        }
+        .rt-toast.tone-emerald .ic { background: #d1fae5; color: #047857; }
+        .rt-toast.tone-rose    .ic { background: #ffe4e6; color: #be123c; }
+        .rt-toast.tone-amber   .ic { background: #fef3c7; color: #b45309; }
+        .rt-toast.tone-sky     .ic { background: #e0f2fe; color: #0369a1; }
+        .rt-toast .ttl { font-weight: 800; font-size: 13px; color: #0f172a; line-height: 1.25; }
+        .rt-toast .sub { font-size: 11px; color: #64748b; margin-top: 2px; line-height: 1.3; }
+        .rt-toast .close-x {
+            color: #94a3b8;
+            background: transparent;
+            border: 0;
+            padding: 4px 6px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        /* Bell pulse when a new notification arrives */
+        .bell-pulse { animation: bell-shake 0.8s ease-in-out 2; }
+        @keyframes bell-shake {
+            0%, 100% { transform: rotate(0); }
+            20%      { transform: rotate(-12deg); }
+            40%      { transform: rotate(10deg); }
+            60%      { transform: rotate(-8deg); }
+            80%      { transform: rotate(6deg); }
+        }
+
+        /* ── A) Birthday card — confetti ───────────────────────────────── */
+        .hbd-card {
+            position: relative;
+            overflow: hidden;
+            background: linear-gradient(135deg, #f43f5e 0%, #f59e0b 50%, #ec4899 100%);
+            color: #fff;
+            border-radius: 2rem;
+            padding: 18px 20px;
+            box-shadow: 0 18px 40px rgba(244, 63, 94, 0.28);
+        }
+        .hbd-card::before,
+        .hbd-card::after {
+            content: '';
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(40px);
+            opacity: 0.45;
+        }
+        .hbd-card::before { width: 140px; height: 140px; background: #fde68a; top: -50px; right: -40px; }
+        .hbd-card::after  { width: 160px; height: 160px; background: #f472b6; bottom: -60px; left: -40px; }
+        .hbd-confetti {
+            position: absolute;
+            width: 8px; height: 12px;
+            top: -20px;
+            opacity: 0.85;
+            animation: hbd-fall 3.4s linear infinite;
+        }
+        @keyframes hbd-fall {
+            0%   { transform: translateY(-30px) rotate(0); opacity: 0; }
+            15%  { opacity: 0.9; }
+            100% { transform: translateY(220px) rotate(540deg); opacity: 0; }
+        }
+
+        /* ── e-Borrow modal — mobile polish ─────────────────────────── */
+        /* iOS auto-zoom prevention: inputs MUST be ≥16px on iOS Safari */
+        #borrow-flow-modal input[type="date"],
+        #borrow-flow-modal input[type="text"],
+        #borrow-flow-modal input[type="file"],
+        #borrow-flow-modal textarea,
+        #borrow-flow-modal select {
+            font-size: 16px;
+        }
+        /* Safe-area: iPhone home indicator (notch devices) */
+        #borrow-flow-modal > div:last-child > div:last-child {
+            padding-bottom: max(1rem, env(safe-area-inset-bottom));
+        }
+        /* Better focus visibility for form fields inside flow */
+        #borrow-flow-modal textarea:focus,
+        #borrow-flow-modal input:focus,
+        #borrow-flow-modal select:focus {
+            scroll-margin-block: 24vh;
+        }
+        /* Step body fade-hint — show user there's more to scroll */
+        #borrow-flow-modal .flex-1.overflow-auto {
+            -webkit-overflow-scrolling: touch;
+            scroll-behavior: smooth;
+        }
+        /* Ensure category cards have adequate tap target on small screens */
+        #bf-step-1 button[data-cat-id],
+        #bf-categories button {
+            min-height: 56px;
+        }
+
+        /* ── Chat — typing indicator + unread badge ─────────────────── */
+        .chat-typing {
+            display: flex; align-items: center; gap: 4px;
+            padding: 12px 16px;
+            background: #fff;
+            border: 1px solid #f1f5f9;
+            border-radius: 1.8rem 1.8rem 1.8rem 0.4rem;
+            width: fit-content;
+        }
+        .chat-typing span {
+            width: 7px; height: 7px;
+            border-radius: 50%;
+            background: #cbd5e1;
+            animation: chatTypingBounce 1.2s infinite ease-in-out;
+        }
+        .chat-typing span:nth-child(2) { animation-delay: 0.15s; }
+        .chat-typing span:nth-child(3) { animation-delay: 0.3s; }
+        @keyframes chatTypingBounce {
+            0%, 80%, 100% { transform: scale(0.7); opacity: 0.5; }
+            40%           { transform: scale(1);   opacity: 1; }
+        }
+        .chat-day-sep {
+            display: flex; align-items: center; gap: 8px;
+            margin: 12px 0;
+        }
+        .chat-day-sep::before,
+        .chat-day-sep::after {
+            content: ''; flex: 1; height: 1px; background: #e2e8f0;
+        }
+        .chat-day-sep span {
+            font-size: 9px; font-weight: 900; color: #94a3b8;
+            text-transform: uppercase; letter-spacing: 0.15em;
+            background: rgba(255,255,255,0.7); padding: 2px 8px; border-radius: 99px;
+        }
+        /* Unread badge on Help button */
+        #chat-unread-badge {
+            position: absolute; top: -4px; right: -4px;
+            min-width: 18px; height: 18px; padding: 0 5px;
+            border-radius: 9px;
+            background: #ef4444;
+            color: #fff; font-size: 10px; font-weight: 900;
+            display: none; align-items: center; justify-content: center;
+            border: 2px solid #fff;
+            animation: chatBadgePop 0.3s ease-out;
+        }
+        #chat-unread-badge.show { display: flex; }
+        @keyframes chatBadgePop {
+            0% { transform: scale(0); }
+            70% { transform: scale(1.15); }
+            100% { transform: scale(1); }
+        }
+
+        /* Reminder pills horizontal scroller */
+        .reminder-strip {
+            display: flex;
+            gap: 10px;
+            overflow-x: auto;
+            scrollbar-width: none;
+            padding-bottom: 4px;
+            margin: 0 -4px;
+            padding-left: 4px;
+            padding-right: 4px;
+        }
+        .reminder-strip::-webkit-scrollbar { display: none; }
+        .reminder-pill {
+            flex-shrink: 0;
+            min-width: 200px;
+            max-width: 240px;
+            border-radius: 1.25rem;
+            padding: 10px 12px;
+            display: flex; align-items: center; gap: 10px;
+            border: 1px solid rgba(15, 23, 42, 0.04);
+            transition: transform 0.15s ease;
+        }
+        .reminder-pill:active { transform: scale(0.97); }
+        .reminder-pill .pill-ic {
+            width: 34px; height: 34px;
+            border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 14px;
+            flex-shrink: 0;
+        }
+        .reminder-pill.urgent .pill-ic::after {
+            content: '';
+            position: absolute;
+            width: 8px; height: 8px;
+            background: #ef4444;
+            border-radius: 50%;
+            border: 2px solid #fff;
+            transform: translate(14px, -14px);
+        }
+        .reminder-pill .pill-ic { position: relative; }
     </style>
 
     <!-- Modal Functions (defined early to prevent ReferenceError on button clicks) -->
@@ -554,7 +918,17 @@ $heroThemes = [
 
         function showContact() { document.getElementById('contact-modal').classList.remove('hidden'); document.getElementById('contact-modal').classList.add('flex'); }
         function hideContact() { document.getElementById('contact-modal').classList.add('hidden'); }
-        function showChat() { document.getElementById('chat-modal').classList.remove('hidden'); document.getElementById('chat-modal').classList.add('flex'); const content = document.getElementById('chat-content'); content.scrollTop = content.scrollHeight; if (typeof initChat === 'function') initChat(); }
+        function showChat() {
+            document.getElementById('chat-modal').classList.remove('hidden');
+            document.getElementById('chat-modal').classList.add('flex');
+            const content = document.getElementById('chat-content');
+            content.scrollTop = content.scrollHeight;
+            if (typeof initChat === 'function') initChat();
+            // Clear unread badge on open
+            window._chatUnread = 0;
+            const b = document.getElementById('chat-unread-badge');
+            if (b) b.classList.remove('show');
+        }
         function hideChat() { document.getElementById('chat-modal').classList.add('hidden'); }
         function showUpcoming(name) { document.getElementById('upcoming-name').innerText = name; document.getElementById('upcoming-modal').classList.remove('hidden'); document.getElementById('upcoming-modal').classList.add('flex'); }
         function hideUpcoming() { document.getElementById('upcoming-modal').classList.add('hidden'); }
@@ -699,6 +1073,10 @@ $heroThemes = [
             document.getElementById('bf-back-btn').classList.toggle('hidden', step === 1);
             document.getElementById('bf-next-btn').classList.toggle('hidden', step !== 2);
             document.getElementById('bf-submit-btn').classList.toggle('hidden', step !== 3);
+
+            // Mobile UX: scroll body to top on step change so user sees the new content
+            const body = document.querySelector('#borrow-flow-modal .flex-1.overflow-auto');
+            if (body) body.scrollTop = 0;
         }
 
         function bfBack() {
@@ -1188,7 +1566,30 @@ $heroThemes = [
 
 <body class="text-slate-900 pb-32">
 
-    <div class="max-w-md mx-auto relative min-h-screen">
+    <!-- ── J) Pull-to-refresh indicator ── -->
+    <div id="ptr-indicator" aria-hidden="true">
+        <div class="ring"><i class="fa-solid fa-arrow-down"></i></div>
+    </div>
+
+    <!-- ── E) Realtime toast container ── -->
+    <div id="rt-toast-wrap" role="status" aria-live="polite"></div>
+
+    <!-- ── J) Skeleton overlay (shown briefly on initial load) ── -->
+    <div id="hub-skeleton" aria-hidden="true">
+        <div class="max-w-md mx-auto px-6 pt-24 space-y-6">
+            <div class="skeleton h-8 w-40"></div>
+            <div class="skeleton h-44 rounded-[3rem]"></div>
+            <div class="skeleton h-12 rounded-2xl"></div>
+            <div class="skeleton h-40 rounded-[2.5rem]"></div>
+            <div class="grid grid-cols-3 gap-3">
+                <div class="skeleton h-24"></div>
+                <div class="skeleton h-24"></div>
+                <div class="skeleton h-24"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="max-w-md mx-auto relative min-h-screen" id="hub-root">
 
         <!-- ── Clean White Header (Target Design) ── -->
         <header
@@ -1223,15 +1624,55 @@ $heroThemes = [
 
         <main class="px-6 pt-8 space-y-8">
 
-            <!-- ── Title Section ── -->
+            <!-- ── Title Section (personalized greeting) ── -->
             <div class="px-1">
                 <p class="text-slate-400 text-[10px] font-black uppercase tracking-[0.3em] mb-2 opacity-70">
                     <?= $thaiDate ?>
                 </p>
-                <div class="flex items-end justify-between">
-                    <h2 class="text-3xl font-black text-slate-900 tracking-tight">Health Hub</h2>
+                <div class="flex items-end justify-between gap-3">
+                    <div class="min-w-0">
+                        <h2 class="text-3xl font-black text-slate-900 tracking-tight leading-tight">
+                            <?= $greetIcon ?> <?= htmlspecialchars($greeting) ?>
+                        </h2>
+                        <p class="mt-1 text-slate-500 text-[13px] font-bold truncate">
+                            คุณ<?= htmlspecialchars($firstName) ?> 👋
+                        </p>
+                    </div>
                 </div>
             </div>
+
+            <?php if ($isBirthday): ?>
+            <!-- ── A) Birthday Card — appears only on user's birthday ── -->
+            <div class="hbd-card" role="region" aria-label="วันเกิด">
+                <?php for ($i = 0; $i < 14; $i++):
+                    $colors = ['#fde68a','#fca5a5','#a7f3d0','#bae6fd','#ddd6fe','#fbcfe8'];
+                    $c = $colors[$i % count($colors)];
+                    $left = (int)(($i * 7 + 5) % 100);
+                    $delay = number_format(($i * 0.27) - 0.5, 2);
+                    $dur = number_format(2.6 + (($i * 0.13) % 1.4), 2);
+                ?>
+                    <span class="hbd-confetti" style="left:<?= $left ?>%; background:<?= $c ?>; animation-delay:<?= $delay ?>s; animation-duration:<?= $dur ?>s;"></span>
+                <?php endfor; ?>
+                <div class="relative z-10 flex items-center gap-4">
+                    <div class="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center text-3xl shrink-0">
+                        🎂
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-white/80 text-[10px] font-black uppercase tracking-[0.22em]">Happy Birthday!</p>
+                        <h3 class="text-white text-xl font-black tracking-tight leading-tight mt-0.5 truncate">
+                            สุขสันต์วันเกิด คุณ<?= htmlspecialchars($firstName) ?>
+                        </h3>
+                        <p class="text-white/90 text-[12px] font-bold mt-1">
+                            <?php if ($ageThisYear !== null && $ageThisYear > 0 && $ageThisYear < 120): ?>
+                                ขอให้สุขภาพแข็งแรง · อายุครบ <?= (int)$ageThisYear ?> ปีในวันนี้ 🎉
+                            <?php else: ?>
+                                ขอให้สุขภาพแข็งแรงตลอดปีนี้ 🎉
+                            <?php endif; ?>
+                        </p>
+                    </div>
+                </div>
+            </div>
+            <?php endif; ?>
 
             <!-- ── Premium Identity Card (Wallet Style) ── -->
             <div onclick="window.location.href='profile.php'"
@@ -1293,6 +1734,49 @@ $heroThemes = [
                                 class="text-emerald-200 text-[9px] font-black uppercase tracking-[0.15em]">Verified</span>
                         </div>
                     </div>
+
+                    <?php
+                    // ── Medical chips — critical info visible at a glance (emergency-ready) ─
+                    $bloodType = trim((string)($user['blood_type'] ?? ''));
+                    $allergies = trim((string)($user['allergies'] ?? ''));
+                    $chronic   = trim((string)($user['chronic_conditions'] ?? ''));
+                    $hasMedicalInfo = $bloodType !== '' || $allergies !== '' || $chronic !== '';
+                    ?>
+                    <?php if ($hasMedicalInfo): ?>
+                    <div class="relative mt-4 flex flex-wrap gap-1.5" aria-label="ข้อมูลสุขภาพ">
+                        <?php if ($bloodType !== ''): ?>
+                        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-rose-400/20 border border-rose-300/40 backdrop-blur-md"
+                              title="กรุ๊ปเลือด">
+                            <i class="fa-solid fa-droplet text-rose-200 text-[9px]"></i>
+                            <span class="text-white text-[10px] font-black uppercase tracking-wider"><?= htmlspecialchars($bloodType) ?></span>
+                        </span>
+                        <?php endif; ?>
+                        <?php if ($allergies !== ''): ?>
+                        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-400/20 border border-amber-300/40 backdrop-blur-md max-w-[180px]"
+                              title="<?= htmlspecialchars('แพ้: ' . $allergies) ?>">
+                            <i class="fa-solid fa-triangle-exclamation text-amber-200 text-[9px] shrink-0"></i>
+                            <span class="text-white text-[10px] font-black uppercase tracking-wider truncate">แพ้ <?= htmlspecialchars(mb_substr($allergies, 0, 18)) ?></span>
+                        </span>
+                        <?php endif; ?>
+                        <?php if ($chronic !== ''): ?>
+                        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-purple-400/20 border border-purple-300/40 backdrop-blur-md max-w-[180px]"
+                              title="<?= htmlspecialchars('โรคประจำตัว: ' . $chronic) ?>">
+                            <i class="fa-solid fa-heart-pulse text-purple-200 text-[9px] shrink-0"></i>
+                            <span class="text-white text-[10px] font-black uppercase tracking-wider truncate"><?= htmlspecialchars(mb_substr($chronic, 0, 18)) ?></span>
+                        </span>
+                        <?php endif; ?>
+                    </div>
+                    <?php else: ?>
+                    <button type="button" onclick="event.stopPropagation(); window.location.href='profile.php'"
+                        class="relative mt-4 w-full flex items-center justify-between gap-2 rounded-2xl bg-white/10 border border-white/15 backdrop-blur-md px-3 py-2 text-left active:scale-[0.98] transition-all"
+                        title="เพิ่มข้อมูลสุขภาพ">
+                        <span class="text-white/75 text-[10px] font-bold flex items-center gap-1.5">
+                            <i class="fa-solid fa-plus-circle text-[10px]"></i>
+                            เพิ่มกรุ๊ปเลือด · แพ้ยา · โรคประจำตัว
+                        </span>
+                        <i class="fa-solid fa-chevron-right text-white/40 text-[9px]"></i>
+                    </button>
+                    <?php endif; ?>
 
                     <?php if (defined('SITE_SHOW_INSURANCE') && SITE_SHOW_INSURANCE && $insurance !== null):
                         $insActive = ($insurance['insurance_status'] ?? '') === 'Active';
@@ -1377,6 +1861,31 @@ $heroThemes = [
                         </div>
                     </div>
                 </button>
+
+                <?php if (!empty($reminderPills)): ?>
+                <!-- ── D) Smart Reminder Pills ── -->
+                <div class="reminder-strip" aria-label="การแจ้งเตือนใกล้กำหนด">
+                    <?php foreach ($reminderPills as $pill):
+                        $tone = $pillTones[$pill['tone']] ?? $pillTones['emerald'];
+                        $urgClass = $pill['urgency'] === 2 ? 'urgent' : '';
+                    ?>
+                    <button type="button" onclick="<?= htmlspecialchars($pill['action'], ENT_QUOTES) ?>"
+                        class="reminder-pill <?= $urgClass ?> <?= $tone['bg'] ?>">
+                        <div class="pill-ic <?= $tone['ic'] ?>">
+                            <i class="fa-solid <?= htmlspecialchars($pill['icon']) ?>"></i>
+                        </div>
+                        <div class="min-w-0 flex-1 text-left">
+                            <p class="text-[12px] font-black <?= $tone['fg'] ?> truncate leading-tight">
+                                <?= htmlspecialchars($pill['label']) ?>
+                            </p>
+                            <p class="text-[10px] font-bold text-slate-500 truncate mt-0.5">
+                                <?= htmlspecialchars($pill['sub']) ?>
+                            </p>
+                        </div>
+                    </button>
+                    <?php endforeach; ?>
+                </div>
+                <?php endif; ?>
 
                 <!-- Quick stats: 3 compact tiles -->
                 <div class="grid grid-cols-3 gap-3">
@@ -1494,28 +2003,6 @@ $heroThemes = [
                             <p class="mt-0.5 text-[10px] font-bold text-slate-500"><?= count($booking_list) ?> ครั้ง</p>
                         </a>
 
-                        <!-- Prescriptions — COMING SOON -->
-                        <button onclick="showUpcoming('ใบสั่งยา / ยาที่ใช้อยู่')"
-                            class="relative text-left p-4 rounded-2xl bg-slate-50 border border-slate-100 active:scale-95 transition-all opacity-90">
-                            <span class="absolute top-2 right-2 px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[8px] font-black uppercase tracking-widest">Soon</span>
-                            <div class="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-rose-400 shadow-sm mb-3">
-                                <i class="fa-solid fa-pills"></i>
-                            </div>
-                            <p class="text-[13px] font-black text-slate-700 leading-tight">ใบสั่งยา</p>
-                            <p class="mt-0.5 text-[10px] font-bold text-slate-400">เร็วๆ นี้</p>
-                        </button>
-
-                        <!-- Lab results — COMING SOON -->
-                        <button onclick="showUpcoming('ผลตรวจห้องแล็บ')"
-                            class="relative text-left p-4 rounded-2xl bg-slate-50 border border-slate-100 active:scale-95 transition-all opacity-90">
-                            <span class="absolute top-2 right-2 px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[8px] font-black uppercase tracking-widest">Soon</span>
-                            <div class="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-purple-500 shadow-sm mb-3">
-                                <i class="fa-solid fa-flask"></i>
-                            </div>
-                            <p class="text-[13px] font-black text-slate-700 leading-tight">ผลตรวจแล็บ</p>
-                            <p class="mt-0.5 text-[10px] font-bold text-slate-400">เร็วๆ นี้</p>
-                        </button>
-
                         <!-- Vital signs — COMING SOON -->
                         <button onclick="showUpcoming('สัญญาณชีพและกราฟสุขภาพ')"
                             class="relative text-left p-4 rounded-2xl bg-slate-50 border border-slate-100 active:scale-95 transition-all opacity-90">
@@ -1584,15 +2071,6 @@ $heroThemes = [
                             <p class="text-[13px] font-black leading-tight text-slate-700">ขอเอกสาร<br>ใบรับรอง</p>
                         </button>
 
-                        <button onclick="showUpcoming('ปรึกษาแพทย์ออนไลน์ (Telemedicine)')"
-                            class="relative flex flex-col items-start p-5 rounded-2xl bg-slate-50 border border-slate-100 active:scale-95 transition-all text-left opacity-90">
-                            <span class="absolute top-3 right-3 px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[8px] font-black uppercase tracking-widest">Soon</span>
-                            <div class="w-10 h-10 rounded-2xl bg-white flex items-center justify-center mb-3 shadow-sm border border-slate-100 text-emerald-500">
-                                <i class="fa-solid fa-video text-sm"></i>
-                            </div>
-                            <p class="text-[13px] font-black leading-tight text-slate-700">ปรึกษาแพทย์<br>ออนไลน์</p>
-                        </button>
-
                         <?php
                         // บัตรทองเปิดให้สมัครเฉพาะนักศึกษา (sys_users.status === 'student')
                         $gcShowApply = !is_under_maintenance('gold_card_apply')
@@ -1647,8 +2125,9 @@ $heroThemes = [
                             </button>
                             <button onclick="showChat()"
                                 class="flex flex-col items-center gap-2 active:scale-90 transition-all">
-                                <div class="w-12 h-12 bg-orange-50 rounded-2xl flex items-center justify-center text-orange-600 shadow-sm">
+                                <div class="relative w-12 h-12 bg-orange-50 rounded-2xl flex items-center justify-center text-orange-600 shadow-sm">
                                     <i class="fa-solid fa-circle-question text-lg"></i>
+                                    <span id="chat-unread-badge" aria-label="ข้อความที่ยังไม่ได้อ่าน">0</span>
                                 </div>
                                 <span class="text-slate-500 text-[8px] font-black text-center leading-tight uppercase tracking-widest">Help</span>
                             </button>
@@ -1997,6 +2476,29 @@ document.getElementById('insDetailModal').addEventListener('click', function(e) 
             }
         }
 
+        function chatNearBottom(el) {
+            return (el.scrollHeight - el.scrollTop - el.clientHeight) < 80;
+        }
+        function chatShowTyping() {
+            const c = document.getElementById('chat-content');
+            if (!c || c.querySelector('#chat-typing-indicator')) return;
+            const el = document.createElement('div');
+            el.id = 'chat-typing-indicator';
+            el.className = 'flex items-start gap-4 max-w-[90%]';
+            el.innerHTML = `
+                <div class="w-9 h-9 bg-orange-100 rounded-xl flex items-center justify-center text-orange-600 text-sm shrink-0 shadow-sm border border-orange-50 mt-1">
+                    <i class="fa-solid fa-headset"></i>
+                </div>
+                <div class="chat-typing" aria-label="กำลังพิมพ์">
+                    <span></span><span></span><span></span>
+                </div>`;
+            c.appendChild(el);
+            c.scrollTop = c.scrollHeight;
+        }
+        function chatHideTyping() {
+            document.getElementById('chat-typing-indicator')?.remove();
+        }
+
         async function fetchMessages(isInitialLoad = false) {
             if (isPolling) return;
             isPolling = true;
@@ -2010,11 +2512,34 @@ document.getElementById('insDetailModal').addEventListener('click', function(e) 
                 }
                 if (result.success && result.messages.length > 0) {
                     const chatContent = document.getElementById('chat-content');
+                    const wasNearBottom = chatNearBottom(chatContent);
+                    const chatOpen = !document.getElementById('chat-modal').classList.contains('hidden');
+
+                    // Brief typing indicator before showing new staff messages
+                    // (only on live updates, not initial history load)
+                    const hasNewStaffMsg = result.messages.some(m =>
+                        m.id > lastChatId && m.sender_type === 'staff'
+                    );
+                    if (!isInitialLoad && chatOpen && hasNewStaffMsg) {
+                        chatShowTyping();
+                        await new Promise(r => setTimeout(r, 450));
+                        chatHideTyping();
+                    }
+
                     result.messages.forEach(msg => {
                         if (msg.id <= lastChatId) return;
                         lastChatId = msg.id;
 
                         if (msg.sender_type === 'staff') {
+                            // Track unread when chat is closed
+                            if (!chatOpen && !isInitialLoad) {
+                                window._chatUnread = (window._chatUnread || 0) + 1;
+                                const badge = document.getElementById('chat-unread-badge');
+                                if (badge) {
+                                    badge.textContent = window._chatUnread > 9 ? '9+' : window._chatUnread;
+                                    badge.classList.add('show');
+                                }
+                            }
                             // Staff message — always show
                             const staffBubble = `
                                 <div class="flex items-start gap-4 max-w-[90%] animate-in slide-in-from-left duration-500">
@@ -2044,7 +2569,10 @@ document.getElementById('insDetailModal').addEventListener('click', function(e) 
                             chatContent.insertAdjacentHTML('beforeend', userBubble);
                         }
                     });
-                    chatContent.scrollTop = chatContent.scrollHeight;
+                    // Auto-scroll only if user was already near bottom (don't disturb reading)
+                    if (wasNearBottom || isInitialLoad) {
+                        chatContent.scrollTop = chatContent.scrollHeight;
+                    }
                 }
             } finally {
                 isPolling = false;
@@ -2061,23 +2589,241 @@ document.getElementById('insDetailModal').addEventListener('click', function(e) 
             }
         }
 
+        // ── E) Realtime Toast + Notification Sync ─────────────────────
+        const HUB_USER_ID = <?= (int)($_SESSION['user_id'] ?? 0) ?>;
+        let lastNotifSnapshot = {
+            total:    <?= (int)$notif_total ?>,
+            upcoming: <?= (int)$upcoming_count ?>,
+            pending:  <?= (int)$borrow_pending_count ?>,
+            overdue:  <?= (int)$borrow_overdue_count ?>,
+            fine:     <?= (float)$borrow_total_fine ?>,
+        };
+
+        function rtToast({ title, sub = '', tone = 'emerald', icon = 'fa-bell', timeout = 4500, onClick = null }) {
+            const wrap = document.getElementById('rt-toast-wrap');
+            if (!wrap) return;
+            const el = document.createElement('div');
+            el.className = `rt-toast tone-${tone}`;
+            el.innerHTML = `
+                <div class="ic"><i class="fa-solid ${icon}"></i></div>
+                <div class="flex-1 min-w-0">
+                    <p class="ttl">${title}</p>
+                    ${sub ? `<p class="sub">${sub}</p>` : ''}
+                </div>
+                <button class="close-x" aria-label="ปิด"><i class="fa-solid fa-xmark"></i></button>
+            `;
+            if (onClick) {
+                el.style.cursor = 'pointer';
+                el.addEventListener('click', (e) => {
+                    if (e.target.closest('.close-x')) return;
+                    onClick();
+                });
+            }
+            el.querySelector('.close-x').addEventListener('click', () => dismiss());
+            wrap.appendChild(el);
+            requestAnimationFrame(() => el.classList.add('show'));
+            const dismiss = () => {
+                el.classList.remove('show');
+                setTimeout(() => el.remove(), 300);
+            };
+            if (timeout > 0) setTimeout(dismiss, timeout);
+        }
+
+        function updateBellBadge(total, overdue) {
+            const btn = document.querySelector('header button[onclick="showNotifications()"]');
+            if (!btn) return;
+            const icon = btn.querySelector('i');
+            let badge = btn.querySelector('span');
+            if (total > 0) {
+                if (!badge) {
+                    badge = document.createElement('span');
+                    badge.className = 'absolute top-1.5 right-1.5 min-w-4 h-4 px-1 text-white text-[9px] font-black rounded-full border-2 border-white flex items-center justify-center';
+                    btn.appendChild(badge);
+                }
+                badge.classList.remove('bg-rose-500', 'bg-red-500');
+                badge.classList.add(overdue > 0 ? 'bg-rose-500' : 'bg-red-500');
+                badge.textContent = total;
+            } else if (badge) {
+                badge.remove();
+            }
+            if (icon) {
+                icon.classList.remove('bell-pulse');
+                // re-trigger animation
+                void icon.offsetWidth;
+                icon.classList.add('bell-pulse');
+            }
+        }
+
+        function handleNotifSnapshot(snap) {
+            const prev = lastNotifSnapshot;
+            if (!snap || !snap.ok) return;
+            const deltas = {
+                upcoming: snap.upcoming - prev.upcoming,
+                pending:  snap.pending  - prev.pending,
+                overdue:  snap.overdue  - prev.overdue,
+            };
+            if (snap.total !== prev.total) {
+                updateBellBadge(snap.total, snap.overdue);
+            }
+            if (deltas.overdue > 0) {
+                rtToast({
+                    title: 'มีอุปกรณ์เลยกำหนดคืน',
+                    sub:   `${deltas.overdue} รายการ — แตะเพื่อจัดการ`,
+                    tone:  'rose',
+                    icon:  'fa-triangle-exclamation',
+                    onClick: () => showBorrow(),
+                });
+            } else if (deltas.pending > 0) {
+                rtToast({
+                    title: 'อัปเดตคำขอยืม',
+                    sub:   `${deltas.pending} คำขอใหม่`,
+                    tone:  'amber',
+                    icon:  'fa-hourglass-half',
+                    onClick: () => showBorrow(),
+                });
+            } else if (deltas.pending < 0) {
+                rtToast({
+                    title: 'เจ้าหน้าที่อัปเดตคำขอยืมแล้ว',
+                    sub:   'แตะเพื่อดูผล',
+                    tone:  'emerald',
+                    icon:  'fa-circle-check',
+                    onClick: () => showBorrow(),
+                });
+            } else if (deltas.upcoming > 0) {
+                rtToast({
+                    title: 'มีนัดหมายใหม่',
+                    sub:   `${deltas.upcoming} รายการ`,
+                    tone:  'sky',
+                    icon:  'fa-calendar-plus',
+                    onClick: () => window.location.href = 'my_bookings.php',
+                });
+            }
+            lastNotifSnapshot = {
+                total: snap.total, upcoming: snap.upcoming,
+                pending: snap.pending, overdue: snap.overdue, fine: snap.fine,
+            };
+        }
+
+        async function pollNotifCounts() {
+            if (document.hidden) return;
+            try {
+                const res = await fetch('ajax_notify_counts.php', { credentials: 'same-origin' });
+                if (!res.ok) return;
+                const data = await res.json();
+                handleNotifSnapshot(data);
+            } catch (e) { /* network blip — ignore */ }
+        }
+
         // Initialize Real-time (Pusher or Polling)
         document.addEventListener('DOMContentLoaded', () => {
             const PUSHER_KEY = '<?= defined('PUSHER_KEY') ? PUSHER_KEY : '' ?>';
             const PUSHER_CLUSTER = '<?= defined('PUSHER_CLUSTER') ? PUSHER_CLUSTER : 'ap1' ?>';
 
-            if (PUSHER_KEY) {
-                // Real-time via Pusher
+            if (PUSHER_KEY && typeof Pusher !== 'undefined') {
                 const pusher = new Pusher(PUSHER_KEY, { cluster: PUSHER_CLUSTER });
-                const channel = pusher.subscribe(`user-chat-${<?= (int)($_SESSION['user_id'] ?? 0) ?>}`);
-                channel.bind('new-message', (data) => {
-                    fetchMessages(); // Trigger fetch when notified
+
+                // Chat channel (existing)
+                const chatCh = pusher.subscribe(`user-chat-${HUB_USER_ID}`);
+                chatCh.bind('new-message', () => fetchMessages());
+
+                // Notify channel — backend may emit booking/borrow/announcement events
+                const notifyCh = pusher.subscribe(`user-notify-${HUB_USER_ID}`);
+                notifyCh.bind('notification', (data) => {
+                    if (data && data.title) {
+                        rtToast({
+                            title: data.title,
+                            sub: data.body || '',
+                            tone: data.tone || 'emerald',
+                            icon: data.icon || 'fa-bell',
+                            onClick: data.url ? () => window.location.href = data.url : null,
+                        });
+                    }
+                    pollNotifCounts();
                 });
+                notifyCh.bind('refresh-counts', () => pollNotifCounts());
             } else {
-                // Fallback to Long Polling (Every 3 seconds)
+                // Fallback to Long Polling (Every 3 seconds for chat)
                 setInterval(fetchMessages, 3000);
             }
+
+            // Notification counts: refresh every 30s + on tab focus (works alongside Pusher)
+            setInterval(pollNotifCounts, 30000);
+            document.addEventListener('visibilitychange', () => {
+                if (!document.hidden) pollNotifCounts();
+            });
         });
+
+        // ── J) Pull-to-Refresh ─────────────────────────────────────────
+        (function setupPullToRefresh() {
+            const indicator = document.getElementById('ptr-indicator');
+            if (!indicator) return;
+            const THRESHOLD = 70;
+            let startY = 0;
+            let pulling = false;
+            let armed = false;
+
+            function reset() {
+                indicator.classList.remove('active', 'refreshing');
+                indicator.style.transform = '';
+                pulling = false;
+                armed = false;
+            }
+
+            document.addEventListener('touchstart', (e) => {
+                if (window.scrollY > 0) { armed = false; return; }
+                armed = true;
+                startY = e.touches[0].clientY;
+            }, { passive: true });
+
+            document.addEventListener('touchmove', (e) => {
+                if (!armed) return;
+                const dy = e.touches[0].clientY - startY;
+                if (dy <= 0) return;
+                pulling = true;
+                const pulled = Math.min(dy, THRESHOLD * 1.6);
+                indicator.style.transform = `translate(-50%, ${Math.max(0, pulled - 40)}px)`;
+                if (pulled >= THRESHOLD) {
+                    indicator.classList.add('active');
+                    indicator.querySelector('i').className = 'fa-solid fa-arrow-rotate-right';
+                } else {
+                    indicator.classList.remove('active');
+                    indicator.querySelector('i').className = 'fa-solid fa-arrow-down';
+                }
+            }, { passive: true });
+
+            document.addEventListener('touchend', () => {
+                if (!pulling) { reset(); return; }
+                const isReady = indicator.classList.contains('active');
+                if (isReady) {
+                    indicator.classList.add('refreshing');
+                    indicator.querySelector('i').className = 'fa-solid fa-arrow-rotate-right';
+                    // small delay so user sees the spinner before reload
+                    setTimeout(() => window.location.reload(), 280);
+                } else {
+                    reset();
+                }
+            }, { passive: true });
+        })();
+
+        // ── J) Reveal content + hide skeleton ──────────────────────────
+        (function revealContent() {
+            let done = false;
+            const hide = () => {
+                if (done) return;
+                done = true;
+                const sk = document.getElementById('hub-skeleton');
+                if (!sk) return;
+                sk.classList.add('fading');
+                setTimeout(() => sk.classList.add('hidden'), 280);
+            };
+            if (document.readyState === 'complete') {
+                requestAnimationFrame(hide);
+            } else {
+                window.addEventListener('load', () => requestAnimationFrame(hide), { once: true });
+            }
+            // Safety: never leave skeleton up forever
+            setTimeout(hide, 1800);
+        })();
     </script>
 
     <!-- [Modal structures continue below - omitted for brevity but remain in file] -->
@@ -2875,243 +3621,14 @@ document.getElementById('insDetailModal').addEventListener('click', function(e) 
         </div>
     </div>
 
-<?php if (!empty($announcements)): ?>
-<!-- ── Announcement Popup ─────────────────────────────────────────────────── -->
-<style>
-    #ann-overlay {
-        position: fixed; inset: 0; z-index: 9000;
-        background: rgba(15,23,42,0.55);
-        backdrop-filter: blur(6px);
-        display: flex; align-items: center; justify-content: center;
-        padding: 20px;
-        animation: annFadeIn .3s ease;
-    }
-    @keyframes annFadeIn { from { opacity:0 } to { opacity:1 } }
-    #ann-box {
-        background: #fff;
-        border-radius: 2.25rem;
-        width: 100%; max-width: 360px;
-        overflow: hidden;
-        box-shadow: 0 30px 60px -10px rgba(0,0,0,.2);
-        animation: annSlideUp .35s cubic-bezier(.16,1,.3,1);
-    }
-    @keyframes annSlideUp { from { transform:translateY(30px);opacity:0 } to { transform:none;opacity:1 } }
-    .ann-header-info   { background: linear-gradient(135deg,#0052CC,#0066ff); }
-    .ann-header-warning{ background: linear-gradient(135deg,#d97706,#f59e0b); }
-    .ann-header-success{ background: linear-gradient(135deg,#059669,#10b981); }
-    .ann-header-urgent { background: linear-gradient(135deg,#dc2626,#ef4444); }
-    .ann-urgent-pulse  { animation: urgentPulse 1.4s ease-in-out infinite; }
-    @keyframes urgentPulse { 0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,.4)} 60%{box-shadow:0 0 0 12px rgba(239,68,68,0)} }
-    #ann-img { width:100%; max-height:200px; object-fit:cover; display:block; }
-    .ann-dot { width:7px; height:7px; border-radius:50%; background:#e2e8f0; transition:all .2s; cursor:pointer; }
-    .ann-dot.active { background:#0052CC; transform:scale(1.3); }
-    #ann-btn-dismiss { transition: transform .1s; }
-    #ann-btn-dismiss:active { transform: scale(.95); }
-</style>
-
-<div id="ann-overlay">
-    <div id="ann-box">
-
-        <!-- ── Dynamic Header ── -->
-        <div id="ann-header" class="ann-header-info relative overflow-hidden">
-            <div class="absolute -right-6 -top-6 w-32 h-32 bg-white/10 rounded-full"></div>
-            <div class="absolute -left-4 -bottom-4 w-24 h-24 bg-white/5 rounded-full"></div>
-            <div class="relative z-10 px-7 pt-8 pb-6 flex items-center justify-between">
-                <div class="flex items-center gap-3">
-                    <div id="ann-icon-wrap" class="w-11 h-11 bg-white/20 rounded-2xl flex items-center justify-center">
-                        <i id="ann-icon" class="fa-solid fa-bullhorn text-white text-xl"></i>
-                    </div>
-                    <div>
-                        <p class="text-white/60 text-[10px] font-black uppercase tracking-[.2em]">ประกาศจากคลินิก</p>
-                        <p id="ann-type-label" class="text-white text-[11px] font-black">ข้อมูลทั่วไป</p>
-                    </div>
-                </div>
-                <div class="flex items-center gap-2">
-                    <button id="ann-lang-toggle" onclick="toggleLang()" class="hidden px-2.5 py-1 rounded-lg bg-white/20 hover:bg-white/30 text-white text-[10px] font-black transition-all">
-                        EN
-                    </button>
-                    <button onclick="annClose()" class="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center text-white transition-colors" aria-label="ปิด">
-                        <i class="fa-solid fa-xmark text-sm"></i>
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <!-- ── Image (conditional) ── -->
-        <div id="ann-img-wrap" class="hidden">
-            <img id="ann-img" src="" alt="ภาพประกอบ">
-        </div>
-
-        <!-- ── Body ── -->
-        <div class="px-7 pt-6 pb-4">
-            <h3 id="ann-title" class="text-slate-900 font-black text-xl leading-tight mb-3"></h3>
-            <p id="ann-content" class="text-slate-500 text-[14px] leading-relaxed font-medium"></p>
-        </div>
-
-        <!-- ── Dots ── -->
-        <div id="ann-dots" class="flex justify-center gap-2 px-7 pb-4"></div>
-
-        <!-- ── Footer Buttons ── -->
-        <div class="px-7 pb-8 flex items-center gap-3">
-            <button onclick="annSkipAll()"
-                class="flex-none text-slate-400 text-[12px] font-black hover:text-slate-600 transition-colors py-2 px-3">
-                ข้ามทั้งหมด
-            </button>
-            <button id="ann-btn-dismiss" onclick="annDismiss()"
-                class="flex-1 bg-[#0052CC] hover:bg-blue-700 text-white font-black text-[14px] py-4 rounded-2xl shadow-lg shadow-blue-200 flex items-center justify-center gap-2">
-                รับทราบ <i class="fa-solid fa-arrow-right text-[11px]"></i>
-            </button>
-        </div>
-
-        <!-- ── Counter ── -->
-        <p id="ann-counter" class="text-center text-[11px] text-slate-300 font-bold pb-4 -mt-2"></p>
-
-    </div>
-</div>
-
-<script>
-(function() {
-    // ── ข้อมูลประกาศ (PHP → JS) ─────────────────────────────────────────────
-    const announcements = <?= json_encode(array_values($announcements), JSON_UNESCAPED_UNICODE) ?>;
-    const csrfToken     = '<?= get_csrf_token() ?>';
-    const baseUrl       = '<?= rtrim(dirname($_SERVER['SCRIPT_NAME']), '/') ?>';
-
-    let currentIndex = 0;
-    let isDismissing = false;
-    let currentLang  = 'th';
-
-    const typeConfig = {
-        info:    { cls: 'ann-header-info',    icon: 'fa-bullhorn',         label: 'ข้อมูลทั่วไป',    btn: '#0052CC' },
-        warning: { cls: 'ann-header-warning',  icon: 'fa-triangle-exclamation', label: 'แจ้งเตือน',  btn: '#d97706' },
-        success: { cls: 'ann-header-success',  icon: 'fa-circle-check',    label: 'ข่าวดี',           btn: '#059669' },
-        urgent:  { cls: 'ann-header-urgent',   icon: 'fa-siren-on',        label: 'ด่วน!',            btn: '#dc2626' },
-    };
-
-    // ── render ประกาศ ─────────────────────────────────────────────────────────
-    function render(idx) {
-        const ann = announcements[idx];
-        const cfg = typeConfig[ann.type] || typeConfig.info;
-
-        // Header
-        const header = document.getElementById('ann-header');
-        header.className = cfg.cls + ' relative overflow-hidden';
-        if (ann.type === 'urgent') header.classList.add('ann-urgent-pulse');
-
-        document.getElementById('ann-icon').className = 'fa-solid ' + cfg.icon + ' text-white text-xl';
-        document.getElementById('ann-type-label').textContent = cfg.label;
-
-        // Language Toggle
-        const langToggle = document.getElementById('ann-lang-toggle');
-        if (ann.title_en || ann.content_en) {
-            langToggle.classList.remove('hidden');
-            langToggle.textContent = currentLang === 'th' ? 'EN' : 'TH';
-        } else {
-            langToggle.classList.add('hidden');
-            currentLang = 'th';
-        }
-
-        // Image
-        const imgWrap = document.getElementById('ann-img-wrap');
-        const img     = document.getElementById('ann-img');
-        if (ann.image_url) {
-            img.src = ann.image_url;
-            imgWrap.classList.remove('hidden');
-        } else {
-            imgWrap.classList.add('hidden');
-        }
-
-        // Body
-        if (currentLang === 'en' && (ann.title_en || ann.content_en)) {
-            document.getElementById('ann-title').textContent   = ann.title_en || ann.title;
-            document.getElementById('ann-content').textContent = ann.content_en || ann.content;
-        } else {
-            document.getElementById('ann-title').textContent   = ann.title;
-            document.getElementById('ann-content').textContent = ann.content;
-        }
-
-        // Dismiss button color
-        const btn = document.getElementById('ann-btn-dismiss');
-        btn.style.background  = cfg.btn;
-        btn.style.boxShadow   = '';
-
-        // Counter + dots
-        updateDots(idx);
-        document.getElementById('ann-counter').textContent =
-            announcements.length > 1 ? (idx + 1) + ' / ' + announcements.length : '';
-    }
-
-    window.toggleLang = function() {
-        currentLang = currentLang === 'th' ? 'en' : 'th';
-        render(currentIndex);
-    };
-
-    function updateDots(activeIdx) {
-        const container = document.getElementById('ann-dots');
-        container.innerHTML = '';
-        if (announcements.length <= 1) return;
-        announcements.forEach((_, i) => {
-            const d = document.createElement('button');
-            d.className = 'ann-dot' + (i === activeIdx ? ' active' : '');
-            d.onclick = () => jumpTo(i);
-            container.appendChild(d);
-        });
-    }
-
-    function jumpTo(idx) {
-        currentIndex = idx;
-        render(currentIndex);
-    }
-
-    // ── กด รับทราบ ─────────────────────────────────────────────────────────────
-    window.annDismiss = function() {
-        if (isDismissing) return;
-        isDismissing = true;
-
-        const ann = announcements[currentIndex];
-        const fd  = new FormData();
-        fd.append('action', 'mark_read');
-        fd.append('ann_id', ann.id);
-
-        fetch('../portal/ajax_announcements.php', { method: 'POST', body: fd })
-            .then(r => r.json())
-            .catch(() => ({ status: 'ok' })) // ถ้า fail ก็ปิดต่อไป
-            .then(() => {
-                // ตัดประกาศนี้ออก แล้วไปอันถัดไป
-                announcements.splice(currentIndex, 1);
-                isDismissing = false;
-
-                if (announcements.length === 0) {
-                    annClose();
-                } else {
-                    currentIndex = Math.min(currentIndex, announcements.length - 1);
-                    render(currentIndex);
-                }
-            });
-    };
-
-    // ── ข้ามทั้งหมด (ไม่ mark-read — จะแสดงอีกครั้งครั้งหน้า) ───────────────
-    window.annSkipAll = function() { annClose(); };
-
-    // ── ปิด overlay ──────────────────────────────────────────────────────────
-    window.annClose = function() {
-        const overlay = document.getElementById('ann-overlay');
-        if (overlay) {
-            overlay.style.transition = 'opacity .25s';
-            overlay.style.opacity = '0';
-            setTimeout(() => overlay.remove(), 260);
-        }
-    };
-
-    // ── ปิดด้วย backdrop click ────────────────────────────────────────────────
-    document.getElementById('ann-overlay').addEventListener('click', function(e) {
-        if (e.target === this) annClose();
-    });
-
-    // ── เริ่มต้น ──────────────────────────────────────────────────────────────
-    render(0);
-})();
-</script>
-<?php endif; ?>
+<?php
+// Announcement overlay extracted to includes/user_modals/announcement_carousel.php
+// to keep hub.php under the 4000-line maintainability threshold.
+// The partial expects $announcements (array) in scope.
+if (!empty($announcements)) {
+    include __DIR__ . '/../includes/user_modals/announcement_carousel.php';
+}
+?>
 
 <!-- ════════════ Guided Tour (Driver.js) ════════════ -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/driver.js@1.3.1/dist/driver.css">

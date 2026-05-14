@@ -931,6 +931,10 @@ try {
             if (sectionId === 'batch_status' && typeof window.bsLoad === 'function') {
                 window.bsLoad(1);
             }
+            // Activity Dashboard: start polling + Pusher subscription
+            if (sectionId === 'activity_dashboard' && typeof window.adActivate === 'function') {
+                window.adActivate();
+            }
 
             var url = new URL(window.location.href);
             url.searchParams.set('section', sectionId);
@@ -1199,6 +1203,12 @@ try {
                     <i class="fa-solid fa-chevron-down psb-chevron"></i>
                 </button>
                 <div class="psb-group" data-group="monitor">
+                    <?php if (($_SESSION['admin_role'] ?? '') === 'superadmin'): ?>
+                    <button class="psb-item" data-section="activity_dashboard" onclick="switchSection('activity_dashboard',this)">
+                        <div class="psb-icon"><i class="fa-solid fa-chart-line" style="color:#8b5cf6"></i></div>
+                        <span class="psb-label" style="color:#6d28d9;font-weight:900">Activity Dashboard</span>
+                    </button>
+                    <?php endif; ?>
                     <button class="psb-item" data-section="activity_logs" onclick="switchSection('activity_logs',this)">
                         <div class="psb-icon"><i class="fa-solid fa-file-lines" style="color:#64748b"></i></div>
                         <span class="psb-label" style="color:#475569;font-weight:900">Activity Logs</span>
@@ -1221,6 +1231,21 @@ try {
                     <button class="psb-item <?= $activeSection==='monthly_report'?'psb-active':'' ?>" data-section="monthly_report" onclick="switchSection('monthly_report',this)">
                         <div class="psb-icon"><i class="fa-solid fa-calendar-days" style="color:#f59e0b"></i></div>
                         <span class="psb-label" style="color:#b45309;font-weight:900">รายงานประจำเดือน</span>
+                    </button>
+                </div>
+            <?php endif; ?>
+
+            <?php /* ── เอกสาร / รายงาน (Document Library) ─────────────────── */ ?>
+            <?php if (!$registryOnly && ($adminRole === 'superadmin' || $adminRole === 'admin')): ?>
+                <button type="button" class="psb-section-toggle" data-group="docs" onclick="togglePsbGroup('docs',this)">
+                    <i class="fa-solid fa-folder-tree" style="color:#0f7349"></i>
+                    <span>เอกสาร</span>
+                    <i class="fa-solid fa-chevron-down psb-chevron"></i>
+                </button>
+                <div class="psb-group" data-group="docs">
+                    <button class="psb-item <?= $activeSection==='documents'?'psb-active':'' ?>" data-section="documents" onclick="switchSection('documents',this)">
+                        <div class="psb-icon"><i class="fa-solid fa-file-lines" style="color:#0f7349"></i></div>
+                        <span class="psb-label" style="color:#064e3b;font-weight:900">คลังเอกสาร</span>
                     </button>
                 </div>
             <?php endif; ?>
@@ -3408,6 +3433,18 @@ try {
                 ?>
             </div>
 
+            <!-- ════════════ SECTION: ACTIVITY DASHBOARD (superadmin only) ════════════ -->
+            <div id="section-activity_dashboard" class="portal-section"
+                style="<?= $activeSection==='activity_dashboard'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); background:#f8fafc; overflow-y:auto;">
+                <?php
+                if ($adminRole === 'superadmin') {
+                    include __DIR__ . '/_partials/activity_dashboard.php';
+                } else {
+                    echo '<div style="padding:100px;text-align:center;font-weight:900;color:#dc2626"><i class="fa-solid fa-shield-slash mb-4" style="font-size:4rem;display:block"></i> ACCESS DENIED<br><span style="font-size:14px;color:#94a3b8;font-weight:600">Activity Dashboard available to superadmin only.</span></div>';
+                }
+                ?>
+            </div>
+
             <!-- ════════════ SECTION: ACTIVITY LOGS ════════════ -->
             <div id="section-activity_logs" class="portal-section"
                 style="<?= $activeSection==='activity_logs'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); background:#f8fafc; overflow-y:auto;">
@@ -3440,6 +3477,18 @@ try {
                     include __DIR__ . '/_partials/monthly_report.php';
                 } else {
                     echo '<div style="padding:100px;text-align:center;font-weight:900;color:#dc2626"><i class="fa-solid fa-shield-slash mb-4" style="font-size:4rem;display:block"></i> ACCESS DENIED<br><span style="font-size:14px;color:#94a3b8;font-weight:600">ต้องมีสิทธิ์ access_monthly_report หรือ access_director_view</span></div>';
+                }
+                ?>
+            </div>
+
+            <!-- ════════════ SECTION: DOCUMENTS (Document Library) ════════════ -->
+            <div id="section-documents" class="portal-section"
+                style="<?= $activeSection==='documents'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); background:#f8fafc; overflow-y:auto;">
+                <?php
+                if ($adminRole === 'superadmin' || $adminRole === 'admin') {
+                    include __DIR__ . '/_partials/documents.php';
+                } else {
+                    echo '<div style="padding:100px;text-align:center;font-weight:900;color:#dc2626"><i class="fa-solid fa-shield-slash mb-4" style="font-size:4rem;display:block"></i> ACCESS DENIED<br><span style="font-size:14px;color:#94a3b8;font-weight:600">คลังเอกสารใช้ได้เฉพาะ superadmin / admin</span></div>';
                 }
                 ?>
             </div>
@@ -3572,8 +3621,15 @@ try {
                                             </td>
                                             <td style="padding:14px 20px">
                                                 <div style="font-size:12px;font-weight:700;color:#475569"><?= htmlspecialchars($row['approved_by'] ?? '—') ?></div>
-                                                <?php if ($row['document_path']): ?>
-                                                    <a href="<?= htmlspecialchars($row['document_path']) ?>" target="_blank" style="font-size:10px;color:#2563eb;text-decoration:none">
+                                                <?php if ($row['document_path']):
+                                                    // document_path stored as 'storage/access_requests/...' (project-root relative).
+                                                    // Page rendered from /portal/index.php — needs '../' prefix.
+                                                    $_docRaw  = (string)$row['document_path'];
+                                                    $_docHref = (str_starts_with($_docRaw, '/') || str_starts_with($_docRaw, '../'))
+                                                        ? $_docRaw
+                                                        : '../' . ltrim($_docRaw, './');
+                                                ?>
+                                                    <a href="<?= htmlspecialchars($_docHref) ?>" target="_blank" style="font-size:10px;color:#2563eb;text-decoration:none">
                                                         <i class="fa-solid fa-file-pdf mr-1"></i> ดูเอกสารประกอบ
                                                     </a>
                                                 <?php else: ?>

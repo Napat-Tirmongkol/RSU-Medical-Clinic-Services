@@ -55,13 +55,25 @@ try {
 
     // 7. ตรวจสอบ
     if ($stmt_delete->rowCount() > 0) {
-        
+
         // ◀️ --- (ใหม่: บันทึก Log) --- ◀️
         $admin_user_id = $_SESSION['user_id'] ?? null;
         $admin_user_name = $_SESSION['full_name'] ?? 'System';
         $log_desc = "Admin '{$admin_user_name}' (ID: {$admin_user_id}) ได้ลบผู้ใช้งาน: '{$student_name_for_log}' (SID: {$student_id})";
         log_action($pdo, $admin_user_id, $log_action_type, $log_desc);
         // ◀️ --- (จบส่วน Log) --- ◀️
+
+        // ── Rich Menu demote ──────────────────────────────────────────
+        // หลังลบ sys_users → user คนนี้ไม่ใช่ member อีกต่อไป
+        // ถ้าเคยมี LINE binding ให้ sync เป็น guest menu (silent on failure)
+        if (!empty($student_info['line_user_id'])) {
+            try {
+                require_once __DIR__ . '/../../line_api/line_richmenu_helper.php';
+                line_richmenu_sync_user((string)$student_info['line_user_id'], false, 'admin:delete_user');
+            } catch (Throwable $e) {
+                error_log('[delete_student] richmenu demote: ' . $e->getMessage());
+            }
+        }
 
         echo json_encode(['status' => 'success', 'message' => 'ลบผู้ใช้งานสำเร็จ']);
         exit;
