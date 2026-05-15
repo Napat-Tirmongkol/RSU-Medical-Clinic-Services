@@ -585,6 +585,7 @@ try {
     <link rel="stylesheet" href="../assets/css/portal.css?v=<?= @filemtime(__DIR__ . '/../assets/css/portal.css') ?: (defined('APP_BUILD') ? APP_BUILD : time()) ?>">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="../assets/js/safe-fetch.js?v=<?= @filemtime(__DIR__ . '/../assets/js/safe-fetch.js') ?: (defined('APP_BUILD') ? APP_BUILD : time()) ?>"></script>
+    <script defer src="../assets/js/rsu-fx.js?v=<?= @filemtime(__DIR__ . '/../assets/js/rsu-fx.js') ?: (defined('APP_BUILD') ? APP_BUILD : time()) ?>"></script>
     <!-- Suppress harmless AbortError from skipped View Transitions
          (เกิดเมื่อนำทางมาจากหน้า admin/e_Borrow ที่เปิด @view-transition แล้วถูกข้าม) -->
     <script>
@@ -1433,11 +1434,11 @@ try {
                             </div>
                             <div class="dash-hero-kpis">
                                 <?php foreach ($heroKpis as $i => $k): ?>
-                                <div class="dash-kpi" data-tone="<?= $k['tone'] ?>" style="animation-delay:<?= 0.1 + $i * 0.08 ?>s">
+                                <div class="dash-kpi fx-tilt fx-tilt-dark" data-tone="<?= $k['tone'] ?>" data-tilt="5" style="animation-delay:<?= 0.1 + $i * 0.08 ?>s">
                                     <div class="dash-kpi-ic"><i class="fa-solid <?= $k['icon'] ?>"></i></div>
                                     <div class="dash-kpi-body">
-                                        <div class="dash-kpi-num"<?= !empty($k['counter']) ? ' id="kpi-users" data-counter="'.(int)$k['num'].'"' : '' ?>>
-                                            <?= number_format((int)$k['num']) ?><?php if (!empty($k['sub'])): ?><span class="dash-kpi-sub"><?= $k['sub'] ?></span><?php endif; ?>
+                                        <div class="dash-kpi-num">
+                                            <span<?= !empty($k['counter']) ? ' id="kpi-users"' : '' ?> data-counter="<?= (int)$k['num'] ?>">0</span><?php if (!empty($k['sub'])): ?><span class="dash-kpi-sub"><?= $k['sub'] ?></span><?php endif; ?>
                                         </div>
                                         <div class="dash-kpi-label"><?= htmlspecialchars($k['label']) ?></div>
                                     </div>
@@ -1470,10 +1471,10 @@ try {
                             <?php else: ?>
                                 <div class="priority-grid">
                                     <?php foreach ($today_items as $it): ?>
-                                        <a href="<?= htmlspecialchars($it['href']) ?>" class="priority-item priority-item--<?= $it['tone'] ?>">
+                                        <a href="<?= htmlspecialchars($it['href']) ?>" class="priority-item priority-item--<?= $it['tone'] ?> fx-tilt fx-tilt-light" data-tilt="4">
                                             <div class="priority-item-icon"><i class="fa-solid <?= $it['icon'] ?>"></i></div>
                                             <div class="priority-item-body">
-                                                <div class="priority-item-num"><?= number_format($it['value']) ?></div>
+                                                <div class="priority-item-num"><span data-counter="<?= (int)$it['value'] ?>">0</span></div>
                                                 <div class="priority-item-label"><?= htmlspecialchars($it['label']) ?></div>
                                             </div>
                                             <i class="fa-solid fa-arrow-right priority-item-arrow"></i>
@@ -3662,24 +3663,9 @@ try {
         });
     </script>
 
+    <!-- ── KPI counter is now handled by assets/js/rsu-fx.js (IntersectionObserver-based) ── -->
     <script>
-        /* ── 1. KPI Number Counter ──────────────────────────────── */
-        document.querySelectorAll('[data-counter]').forEach(el => {
-            const target = parseInt(el.dataset.counter, 10) || 0;
-            if (target === 0) { el.textContent = '0'; return; }
-            const duration = 1200;
-            const start = performance.now();
-            const easeOut = t => 1 - Math.pow(1 - t, 3);
-            function tick(now) {
-                const p = Math.min((now - start) / duration, 1);
-                el.textContent = Math.floor(easeOut(p) * target).toLocaleString();
-                if (p < 1) requestAnimationFrame(tick);
-                else el.textContent = target.toLocaleString();
-            }
-            requestAnimationFrame(tick);
-        });
-
-        /* ── 2. Ripple on buttons ──────────────────────────────── */
+        /* ── Ripple on buttons ──────────────────────────────────── */
         document.querySelectorAll('.proj-action').forEach(btn => {
             btn.addEventListener('click', function (e) {
                 const r = this.getBoundingClientRect();

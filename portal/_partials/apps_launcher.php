@@ -108,10 +108,11 @@ $projectFlagMap = $projectFlagMap ?? [
             $keywords = strtolower(implode(' ', $proj['badges']) . ' ' . $proj['title']);
             $isPinned = in_array($proj['id'], $userPins);
         ?>
-            <div class="proj-card" id="proj-<?= $proj['id'] ?>" data-category="<?= $cat ?>"
+            <div class="proj-card fx-tilt fx-tilt-light" id="proj-<?= $proj['id'] ?>" data-category="<?= $cat ?>"
                  data-name="<?= htmlspecialchars(strtolower($proj['title'])) ?>"
                  data-keywords="<?= htmlspecialchars($keywords) ?>"
                  data-pinned="<?= $isPinned ? '1' : '0' ?>"
+                 data-tilt="5"
                  style="animation-delay:<?= $cardDelay ?>s">
 
                 <button class="pin-btn <?= $isPinned ? 'active' : '' ?>" onclick="togglePin('<?= $proj['id'] ?>', this)" title="ปักหมุด">
