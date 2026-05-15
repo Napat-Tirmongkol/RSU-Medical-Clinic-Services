@@ -677,6 +677,11 @@ body {
 @media (prefers-reduced-motion: reduce) {
     .skel { animation: none; background: #eef2f6; }
 }
+body[data-theme='dark'] .skel {
+    background: linear-gradient(100deg, #1e293b 30%, #334155 50%, #1e293b 70%);
+    background-size: 200% 100%;
+}
+body[data-theme='dark'] .skel-card { background: #0f172a; border-color: #334155; }
 
 /* ═══════════════════════════════════════════════════════
    DASHBOARD — HERO + KPI TILES + PANELS
@@ -1348,11 +1353,81 @@ body[data-theme='dark'] .kpi-strip,
 body[data-theme='dark'] .feed-card,
 body[data-theme='dark'] .id-panel > div,
 body[data-theme='dark'] .glass-table-container,
-body[data-theme='dark'] .modal-glass {
+body[data-theme='dark'] .modal-glass,
+body[data-theme='dark'] .dash-panel,
+body[data-theme='dark'] .priority-panel,
+body[data-theme='dark'] .quick-list {
     background: #1e293b !important;
     border-color: #334155 !important;
     box-shadow: 0 4px 15px rgba(0,0,0,0.2) !important;
 }
+
+/* Dashboard panel sub-elements */
+body[data-theme='dark'] .dash-panel-count {
+    background: #334155 !important;
+    color: #cbd5e1 !important;
+}
+body[data-theme='dark'] .dash-panel-link {
+    color: #94a3b8 !important;
+}
+body[data-theme='dark'] .dash-panel-link:hover {
+    background: #334155 !important;
+    color: #6ee7b7 !important;
+}
+
+/* Pinned list rows + empty hint */
+body[data-theme='dark'] .pinned-row {
+    background: #0f172a !important;
+    border-color: #334155 !important;
+    color: #f1f5f9 !important;
+}
+body[data-theme='dark'] .pinned-row:hover {
+    background: #1e293b !important;
+    border-color: #3bba7a !important;
+}
+body[data-theme='dark'] .pinned-row-arrow { color: #64748b !important; }
+body[data-theme='dark'] .pinned-row:hover .pinned-row-arrow { color: #3bba7a !important; }
+body[data-theme='dark'] .pinned-mini-empty {
+    background: #0f172a !important;
+    border-color: #334155 !important;
+    color: #94a3b8 !important;
+}
+body[data-theme='dark'] .pinned-mini-empty i { color: #475569 !important; }
+body[data-theme='dark'] .pinned-mini-empty a { color: #6ee7b7 !important; }
+
+/* Priority panel slim head divider */
+body[data-theme='dark'] .priority-panel--slim .priority-panel-head {
+    border-bottom-color: #334155 !important;
+}
+
+/* Priority items (cards inside priority-grid) */
+body[data-theme='dark'] .priority-item {
+    background: #0f172a !important;
+    border-color: #334155 !important;
+    color: #e2e8f0 !important;
+}
+body[data-theme='dark'] .priority-item-num { color: #f8fafc !important; }
+body[data-theme='dark'] .priority-item-label { color: #94a3b8 !important; }
+body[data-theme='dark'] .priority-item-arrow { color: #64748b !important; }
+
+/* Quick shortcuts list items */
+body[data-theme='dark'] .quick-items a {
+    background: #0f172a !important;
+    border-color: #334155 !important;
+    color: #e2e8f0 !important;
+}
+body[data-theme='dark'] .quick-items a:hover {
+    background: #1e293b !important;
+    border-color: #3bba7a !important;
+    color: #6ee7b7 !important;
+}
+
+/* Activity view-all link */
+body[data-theme='dark'] .activity-view-all {
+    color: #94a3b8 !important;
+    border-top-color: #334155 !important;
+}
+body[data-theme='dark'] .activity-view-all:hover { color: #6ee7b7 !important; }
 
 /* Gray sections -> Darker */
 body[data-theme='dark'] .bg-gray-50,
