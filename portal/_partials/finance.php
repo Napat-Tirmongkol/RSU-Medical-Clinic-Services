@@ -40,7 +40,7 @@
             <button id="finBtnCategories" class="btn-solid bg-amber-500 text-white hover:bg-amber-600 text-sm">
                 <i class="fa-solid fa-tags"></i> จัดการหมวดหมู่
             </button>
-            <button id="finBtnAdd" class="btn-solid bg-[#2e9e63] text-white hover:bg-[#27845a] text-sm">
+            <button id="finBtnAdd" class="btn-solid bg-brand-500 text-white hover:bg-brand-600 text-sm">
                 <i class="fa-solid fa-plus"></i> เพิ่มรายการ
             </button>
         </div>

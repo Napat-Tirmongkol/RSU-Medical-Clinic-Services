@@ -66,6 +66,13 @@
     /* Inputs */
     .ds-input       { @apply w-full h-14 px-4 bg-slate-50 border-2 border-slate-100 rounded-2xl outline-none font-bold text-slate-700 transition-all focus:ring-4 focus:ring-brand-100 focus:border-brand-500 focus:bg-white; }
 
+    /* Generic toolbar button — wraps any colour utility chain */
+    .btn-solid {
+        @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl font-bold whitespace-nowrap shadow-sm transition-all duration-150 active:scale-95;
+    }
+    .btn-solid:hover { @apply -translate-y-0.5 shadow-md; }
+    .btn-solid i { @apply text-[12px]; }
+
     /* Pills / badges — bolder, slightly larger */
     .ds-pill        { @apply inline-flex items-center gap-1 px-2.5 py-1 rounded-pill border text-[10px] font-black uppercase tracking-wider; }
     .ds-pill-brand  { @apply ds-pill bg-brand-50 text-brand-700 border-brand-200; }
