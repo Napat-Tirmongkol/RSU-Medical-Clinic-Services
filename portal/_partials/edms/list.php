@@ -147,14 +147,16 @@ $confidentialityLabels = [
     <!-- Tabs (4 types) -->
     <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-2 mb-5 inline-flex gap-1 flex-wrap">
         <?php foreach ($validTypes as $k => $m):
-            $tt = $tonePalette[$m['tone']];
+            $tt = $tonePalette[$m['tone'] ?? 'slate'] ?? $tonePalette['slate'];
             $isActive = ($k === $type);
+            $mTitle   = (string)($m['name'] ?? $m['short_label'] ?? $k);
+            $mIcon    = (string)($m['icon'] ?? 'fa-file');
         ?>
             <a href="?section=edms&edms_view=list&type=<?= urlencode($k) ?>"
                class="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all
                       <?= $isActive ? "{$tt['bg']} {$tt['text']} {$tt['border']} border" : 'text-slate-500 hover:bg-slate-50' ?>">
-                <i class="fa-solid <?= $m['icon'] ?>"></i>
-                <?= htmlspecialchars($m['title']) ?>
+                <i class="fa-solid <?= htmlspecialchars($mIcon) ?>"></i>
+                <?= htmlspecialchars($mTitle) ?>
             </a>
         <?php endforeach; ?>
     </div>
