@@ -276,6 +276,100 @@ $gcOver = kpi_override_status($pdo);
     #section-gold_card .gc-month-empty {
         color: #cbd5e1; font-size: 16px; font-weight: 400; line-height: 1;
     }
+
+    /* ── Bold & Colorful — tilt-aware lift + icon micro-interaction ── */
+    #section-gold_card .gc-stat-card { isolation: isolate; position: relative; }
+    #section-gold_card .gc-stat-card:hover:not(.fx-tilt) { transform: translateY(-3px); box-shadow: 0 18px 36px -18px rgba(15,23,42,.20); }
+    #section-gold_card .gc-stat-card.fx-tilt:hover { --lift: -3px; box-shadow: 0 18px 36px -18px rgba(245,158,11,.30); }
+    #section-gold_card .gc-stat-card .gc-icon-tile { transition: transform .25s cubic-bezier(.16,1,.3,1); }
+    #section-gold_card .gc-stat-card:hover .gc-icon-tile { transform: scale(1.08) rotate(-4deg); }
+
+    /* ── DARK MODE ──────────────────────────────────────────────── */
+    body[data-theme='dark'] #section-gold_card .gc-stat-card {
+        background: #0f172a; border-color: #1e293b;
+        box-shadow: 0 1px 0 rgba(255,255,255,.04), 0 8px 22px rgba(0,0,0,.35);
+    }
+    body[data-theme='dark'] #section-gold_card .gc-stat-card:hover { border-color: #334155; }
+    body[data-theme='dark'] #section-gold_card .gc-doc-card,
+    body[data-theme='dark'] #section-gold_card .gc-member-tile {
+        background: #0f172a; border-color: #1e293b;
+    }
+    body[data-theme='dark'] #section-gold_card .gc-member-tile:hover { border-color: #f59e0b; box-shadow: 0 8px 20px -6px rgba(245,158,11,.30); }
+    body[data-theme='dark'] #section-gold_card .gc-file-icon {
+        background: linear-gradient(135deg, rgba(59,130,246,.18), rgba(29,78,216,.22));
+        color: #93c5fd;
+    }
+
+    body[data-theme='dark'] #section-gold_card .gc-badge-pending    { background:rgba(234,179,8,.18); color:#fbbf24; border-color:rgba(234,179,8,.35); }
+    body[data-theme='dark'] #section-gold_card .gc-badge-submitted  { background:rgba(59,130,246,.18); color:#93c5fd; border-color:rgba(59,130,246,.35); }
+    body[data-theme='dark'] #section-gold_card .gc-badge-processing { background:rgba(168,85,247,.18); color:#d8b4fe; border-color:rgba(168,85,247,.35); }
+    body[data-theme='dark'] #section-gold_card .gc-badge-approved   { background:rgba(34,197,94,.18); color:#86efac; border-color:rgba(34,197,94,.35); }
+    body[data-theme='dark'] #section-gold_card .gc-badge-active     { background:rgba(16,185,129,.18); color:#6ee7b7; border-color:rgba(16,185,129,.35); }
+    body[data-theme='dark'] #section-gold_card .gc-badge-rejected   { background:rgba(244,63,94,.18); color:#fb7185; border-color:rgba(244,63,94,.35); }
+    body[data-theme='dark'] #section-gold_card .gc-badge-expired    { background:rgba(148,163,184,.14); color:#94a3b8; border-color:rgba(148,163,184,.25); }
+
+    body[data-theme='dark'] #section-gold_card .gc-pager-btn { background:#0f172a; border-color:#1e293b; color:#cbd5e1; }
+    body[data-theme='dark'] #section-gold_card .gc-pager-btn:hover:not(:disabled) { background:rgba(245,158,11,.12); border-color:#f59e0b; color:#fbbf24; }
+    body[data-theme='dark'] #section-gold_card .gc-pager-btn.gc-active { background:#f59e0b; border-color:#f59e0b; color:#0f172a; }
+
+    body[data-theme='dark'] #section-gold_card .gc-tab { color:#94a3b8; }
+    body[data-theme='dark'] #section-gold_card .gc-tab:hover { background:#1e293b; color:#e2e8f0; }
+    body[data-theme='dark'] #section-gold_card .gc-view-tab { color:#94a3b8; }
+    body[data-theme='dark'] #section-gold_card .gc-view-tab:hover { background:#1e293b; color:#f1f5f9; }
+    body[data-theme='dark'] #section-gold_card .gc-view-tab.gc-view-active { background:#f59e0b; color:#0f172a; }
+
+    body[data-theme='dark'] #section-gold_card .gc-folder-tile {
+        background: linear-gradient(135deg, rgba(245,158,11,.10), rgba(245,158,11,.20));
+        border-color: rgba(245,158,11,.30);
+    }
+    body[data-theme='dark'] #section-gold_card .gc-folder-tile:hover { border-color: #f59e0b; box-shadow: 0 16px 30px -10px rgba(245,158,11,.40); }
+    body[data-theme='dark'] #section-gold_card .gc-folder-name { color:#fbbf24; }
+    body[data-theme='dark'] #section-gold_card .gc-folder-count { background: rgba(15,23,42,.55); color:#fbbf24; }
+    body[data-theme='dark'] #section-gold_card .gc-folder-bar { background: rgba(245,158,11,.18); }
+
+    body[data-theme='dark'] #section-gold_card .gc-dropzone { background:rgba(245,158,11,.10); border-color:#f59e0b; color:#fbbf24; }
+    body[data-theme='dark'] #section-gold_card .gc-dropzone:hover,
+    body[data-theme='dark'] #section-gold_card .gc-dropzone.gc-drag-over { background:rgba(245,158,11,.18); }
+
+    body[data-theme='dark'] #section-gold_card .gc-breadcrumb { color:#94a3b8; }
+    body[data-theme='dark'] #section-gold_card .gc-breadcrumb a { color:#fbbf24; }
+    body[data-theme='dark'] #section-gold_card .gc-breadcrumb a:hover { color:#fde68a; }
+
+    /* tone backgrounds inside KPI icon tiles + page surfaces */
+    body[data-theme='dark'] #section-gold_card .bg-white { background:#0f172a !important; }
+    body[data-theme='dark'] #section-gold_card .bg-slate-50 { background: rgba(148,163,184,.08) !important; }
+    body[data-theme='dark'] #section-gold_card .bg-slate-100 { background: rgba(148,163,184,.14) !important; }
+    body[data-theme='dark'] #section-gold_card .bg-amber-50 { background: rgba(245,158,11,.18) !important; }
+    body[data-theme='dark'] #section-gold_card .bg-amber-100 { background: rgba(245,158,11,.22) !important; }
+    body[data-theme='dark'] #section-gold_card .bg-emerald-50 { background: rgba(16,185,129,.18) !important; }
+    body[data-theme='dark'] #section-gold_card .bg-teal-50 { background: rgba(20,184,166,.18) !important; }
+    body[data-theme='dark'] #section-gold_card .bg-blue-50 { background: rgba(59,130,246,.18) !important; }
+    body[data-theme='dark'] #section-gold_card .bg-rose-50 { background: rgba(244,63,94,.18) !important; }
+    body[data-theme='dark'] #section-gold_card .bg-purple-50 { background: rgba(168,85,247,.18) !important; }
+    body[data-theme='dark'] #section-gold_card .bg-emerald-100 { background: rgba(16,185,129,.22) !important; }
+
+    body[data-theme='dark'] #section-gold_card .text-slate-800 { color:#f1f5f9 !important; }
+    body[data-theme='dark'] #section-gold_card .text-slate-700 { color:#e2e8f0 !important; }
+    body[data-theme='dark'] #section-gold_card .text-slate-600 { color:#cbd5e1 !important; }
+    body[data-theme='dark'] #section-gold_card .text-slate-500 { color:#94a3b8 !important; }
+    body[data-theme='dark'] #section-gold_card .text-slate-400 { color:#64748b !important; }
+    body[data-theme='dark'] #section-gold_card .text-slate-300 { color:#475569 !important; }
+    body[data-theme='dark'] #section-gold_card .text-slate-200 { color:#334155 !important; }
+    body[data-theme='dark'] #section-gold_card .border-slate-200 { border-color:#1e293b !important; }
+    body[data-theme='dark'] #section-gold_card .border-slate-100 { border-color:#1e293b !important; }
+    body[data-theme='dark'] #section-gold_card .border-amber-100 { border-color: rgba(245,158,11,.30) !important; }
+    body[data-theme='dark'] #section-gold_card .border-amber-200 { border-color: rgba(245,158,11,.30) !important; }
+    body[data-theme='dark'] #section-gold_card .border-amber-300 { border-color: rgba(245,158,11,.40) !important; }
+
+    /* gradient bulk-import card header + amber emphasis */
+    body[data-theme='dark'] #section-gold_card .bg-gradient-to-br.from-amber-50 {
+        background: linear-gradient(135deg, rgba(245,158,11,.10), #0f172a 55%, rgba(249,115,22,.10));
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        #section-gold_card .gc-stat-card,
+        #section-gold_card .gc-stat-card .gc-icon-tile { transition: none !important; transform: none !important; }
+    }
 </style>
 
 <div id="section-gold_card-content" class="px-5 md:px-8 py-8 space-y-7">
@@ -319,51 +413,51 @@ $gcOver = kpi_override_status($pdo);
 
     <!-- ── KPI Cards (6 ใบ — overrideable) ─────────────────────────────── -->
     <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
-        <div class="gc-stat-card km-card" data-kpi-key="gold_total" data-kpi-label="บัตรทอง — ทั้งหมด">
+        <div class="gc-stat-card km-card fx-tilt fx-tilt-light" data-tilt="4" data-kpi-key="gold_total" data-kpi-label="บัตรทอง — ทั้งหมด">
             <div class="gc-icon-tile bg-amber-50 text-amber-500"><i class="fa-solid fa-id-card"></i></div>
             <div class="km-body">
                 <p class="km-label text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">ทั้งหมด</p>
-                <p class="km-value text-2xl font-black text-slate-800 leading-none" data-value="<?= (int)$stats['total'] ?>"><?= number_format($stats['total']) ?></p>
+                <p class="km-value text-2xl font-black text-slate-800 leading-none" data-value="<?= (int)$stats['total'] ?>"><span data-counter="<?= (int)$stats['total'] ?>">0</span></p>
             </div>
             <?php if (!empty($gcOver['gold_total'])): ?><span class="km-override-badge">OVERRIDE</span><?php endif; ?>
         </div>
-        <div class="gc-stat-card km-card cursor-pointer hover:ring-2 hover:ring-emerald-300 transition-all" data-kpi-key="gold_approved" data-kpi-label="บัตรทอง — Admin อนุมัติ" onclick="gcQuickFilter('approved')" title="คลิกดู — admin กดอนุมัติเอง">
+        <div class="gc-stat-card km-card fx-tilt fx-tilt-light cursor-pointer hover:ring-2 hover:ring-emerald-300 transition-all" data-tilt="4" data-kpi-key="gold_approved" data-kpi-label="บัตรทอง — Admin อนุมัติ" onclick="gcQuickFilter('approved')" title="คลิกดู — admin กดอนุมัติเอง">
             <div class="gc-icon-tile bg-emerald-50 text-emerald-500"><i class="fa-solid fa-user-check"></i></div>
             <div class="km-body">
                 <p class="km-label text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Admin อนุมัติ <i class="fa-solid fa-arrow-down ml-1 text-emerald-400 text-[8px]"></i></p>
-                <p class="km-value text-2xl font-black text-slate-800 leading-none" data-value="<?= (int)$stats['approved'] ?>"><?= number_format($stats['approved']) ?></p>
+                <p class="km-value text-2xl font-black text-slate-800 leading-none" data-value="<?= (int)$stats['approved'] ?>"><span data-counter="<?= (int)$stats['approved'] ?>">0</span></p>
             </div>
             <?php if (!empty($gcOver['gold_approved'])): ?><span class="km-override-badge">OVERRIDE</span><?php endif; ?>
         </div>
-        <div class="gc-stat-card km-card cursor-pointer hover:ring-2 hover:ring-teal-300 transition-all" data-kpi-key="gold_auto_matched" data-kpi-label="บัตรทอง — Auto-matched (Bulk)" onclick="gcQuickFilter('active')" title="คลิกดู — bulk import auto-match user สำเร็จ">
+        <div class="gc-stat-card km-card fx-tilt fx-tilt-light cursor-pointer hover:ring-2 hover:ring-teal-300 transition-all" data-tilt="4" data-kpi-key="gold_auto_matched" data-kpi-label="บัตรทอง — Auto-matched (Bulk)" onclick="gcQuickFilter('active')" title="คลิกดู — bulk import auto-match user สำเร็จ">
             <div class="gc-icon-tile bg-teal-50 text-teal-500"><i class="fa-solid fa-link"></i></div>
             <div class="km-body">
                 <p class="km-label text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Auto-matched <i class="fa-solid fa-arrow-down ml-1 text-teal-400 text-[8px]"></i></p>
-                <p class="km-value text-2xl font-black text-slate-800 leading-none" data-value="<?= (int)$stats['auto_matched'] ?>"><?= number_format($stats['auto_matched']) ?></p>
+                <p class="km-value text-2xl font-black text-slate-800 leading-none" data-value="<?= (int)$stats['auto_matched'] ?>"><span data-counter="<?= (int)$stats['auto_matched'] ?>">0</span></p>
             </div>
             <?php if (!empty($gcOver['gold_auto_matched'])): ?><span class="km-override-badge">OVERRIDE</span><?php endif; ?>
         </div>
-        <div class="gc-stat-card km-card cursor-pointer hover:ring-2 hover:ring-blue-300 transition-all" data-kpi-key="gold_pending_docs" data-kpi-label="บัตรทอง — รอเอกสาร" onclick="gcQuickFilter('pending')" title="คลิกเพื่อดูเฉพาะคนที่รอเอกสาร (จาก bulk import)">
+        <div class="gc-stat-card km-card fx-tilt fx-tilt-light cursor-pointer hover:ring-2 hover:ring-blue-300 transition-all" data-tilt="4" data-kpi-key="gold_pending_docs" data-kpi-label="บัตรทอง — รอเอกสาร" onclick="gcQuickFilter('pending')" title="คลิกเพื่อดูเฉพาะคนที่รอเอกสาร (จาก bulk import)">
             <div class="gc-icon-tile bg-blue-50 text-blue-500"><i class="fa-solid fa-hourglass-half"></i></div>
             <div class="km-body">
                 <p class="km-label text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">รอเอกสาร <i class="fa-solid fa-arrow-down ml-1 text-blue-400 text-[8px]"></i></p>
-                <p class="km-value text-2xl font-black text-slate-800 leading-none" data-value="<?= (int)$stats['pending'] ?>"><?= number_format($stats['pending']) ?></p>
+                <p class="km-value text-2xl font-black text-slate-800 leading-none" data-value="<?= (int)$stats['pending'] ?>"><span data-counter="<?= (int)$stats['pending'] ?>">0</span></p>
             </div>
             <?php if (!empty($gcOver['gold_pending_docs'])): ?><span class="km-override-badge">OVERRIDE</span><?php endif; ?>
         </div>
-        <div class="gc-stat-card km-card" data-kpi-key="gold_rejected" data-kpi-label="บัตรทอง — ไม่ผ่าน">
+        <div class="gc-stat-card km-card fx-tilt fx-tilt-light" data-tilt="4" data-kpi-key="gold_rejected" data-kpi-label="บัตรทอง — ไม่ผ่าน">
             <div class="gc-icon-tile bg-rose-50 text-rose-500"><i class="fa-solid fa-circle-xmark"></i></div>
             <div class="km-body">
                 <p class="km-label text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">ไม่ผ่าน</p>
-                <p class="km-value text-2xl font-black text-slate-800 leading-none" data-value="<?= (int)$stats['rejected'] ?>"><?= number_format($stats['rejected']) ?></p>
+                <p class="km-value text-2xl font-black text-slate-800 leading-none" data-value="<?= (int)$stats['rejected'] ?>"><span data-counter="<?= (int)$stats['rejected'] ?>">0</span></p>
             </div>
             <?php if (!empty($gcOver['gold_rejected'])): ?><span class="km-override-badge">OVERRIDE</span><?php endif; ?>
         </div>
-        <div class="gc-stat-card km-card <?= $stats['expiring'] > 0 ? 'border-amber-300 bg-amber-50/50' : '' ?>" data-kpi-key="gold_expiring_30d" data-kpi-label="บัตรทอง — ใกล้หมด ≤30 วัน">
+        <div class="gc-stat-card km-card fx-tilt fx-tilt-light <?= $stats['expiring'] > 0 ? 'border-amber-300 bg-amber-50/50' : '' ?>" data-tilt="4" data-kpi-key="gold_expiring_30d" data-kpi-label="บัตรทอง — ใกล้หมด ≤30 วัน">
             <div class="gc-icon-tile <?= $stats['expiring'] > 0 ? 'bg-amber-100 text-amber-600' : 'bg-slate-50 text-slate-300' ?>"><i class="fa-solid fa-clock"></i></div>
             <div class="km-body">
                 <p class="km-label text-[10px] font-black <?= $stats['expiring'] > 0 ? 'text-amber-600' : 'text-slate-400' ?> uppercase tracking-widest leading-none mb-1">ใกล้หมด ≤30วัน</p>
-                <p class="km-value text-2xl font-black leading-none <?= $stats['expiring'] > 0 ? 'text-amber-700' : 'text-slate-800' ?>" data-value="<?= (int)$stats['expiring'] ?>"><?= number_format($stats['expiring']) ?></p>
+                <p class="km-value text-2xl font-black leading-none <?= $stats['expiring'] > 0 ? 'text-amber-700' : 'text-slate-800' ?>" data-value="<?= (int)$stats['expiring'] ?>"><span data-counter="<?= (int)$stats['expiring'] ?>">0</span></p>
             </div>
             <?php if (!empty($gcOver['gold_expiring_30d'])): ?><span class="km-override-badge">OVERRIDE</span><?php endif; ?>
         </div>
@@ -1732,6 +1826,14 @@ window.gcToggleApplyEnabled = async function() {
 
     // ── Charts (use dedicated endpoint, not public widget API) ──────
     let trendChart = null;
+    function gcChartTheme() {
+        const dark = document.body.getAttribute('data-theme') === 'dark';
+        return {
+            tick: dark ? '#cbd5e1' : '#64748b',
+            grid: dark ? 'rgba(241,245,249,.08)' : 'rgba(15,23,42,.06)',
+            legend: dark ? '#e2e8f0' : '#334155',
+        };
+    }
     window.gcReloadCharts = function() {
         if (typeof Chart === 'undefined') { setTimeout(gcReloadCharts, 200); return; }
 
@@ -1741,6 +1843,7 @@ window.gcToggleApplyEnabled = async function() {
             const trend = d.trend || {};
             if (trend.labels && trend.series && trend.series[0]) {
                 if (trendChart) trendChart.destroy();
+                const th = gcChartTheme();
                 trendChart = new Chart(document.getElementById('gcTrendChart'), {
                     type: 'line',
                     data: {
@@ -1756,7 +1859,10 @@ window.gcToggleApplyEnabled = async function() {
                     options: {
                         responsive: true, maintainAspectRatio: false,
                         plugins: { legend: { display: false } },
-                        scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+                        scales: {
+                            x: { ticks: { color: th.tick }, grid: { color: th.grid } },
+                            y: { beginAtZero: true, ticks: { precision: 0, color: th.tick }, grid: { color: th.grid } },
+                        }
                     }
                 });
             }
@@ -1764,6 +1870,11 @@ window.gcToggleApplyEnabled = async function() {
         });
     };
     function loadCharts() { gcReloadCharts(); }
+
+    // Theme-toggle: rebuild chart axis/legend colors
+    new MutationObserver(muts => {
+        for (const m of muts) if (m.attributeName === 'data-theme') { gcReloadCharts(); break; }
+    }).observe(document.body, { attributes: true, attributeFilter: ['data-theme'] });
 
     // ── Utils ───────────────────────────────────────────────────────
     function escapeHtml(s) {

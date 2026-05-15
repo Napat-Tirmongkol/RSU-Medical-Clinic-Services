@@ -138,6 +138,80 @@ $portalCsrf = get_csrf_token();
     }
     .cal-slot-row.full { background:#fef3c7; color:#92400e; }
     .cal-slot-row.empty-slot { background:#dcfce7; color:#166534; }
+
+    /* ── Bold & Colorful — tilt-aware lift + icon micro-interaction ── */
+    #section-scholarship .sch-kpi { isolation: isolate; transition: transform .25s cubic-bezier(.16,1,.3,1), box-shadow .25s ease, border-color .25s ease; }
+    #section-scholarship .sch-kpi:hover:not(.fx-tilt) { transform: translateY(-3px); box-shadow: 0 18px 36px -18px rgba(16,185,129,.18); }
+    #section-scholarship .sch-kpi.fx-tilt:hover { --lift: -3px; box-shadow: 0 18px 36px -18px rgba(16,185,129,.30); border-color: rgba(16,185,129,.30); }
+    #section-scholarship .sch-kpi .sch-kpi-icon { transition: transform .25s cubic-bezier(.16,1,.3,1); }
+    #section-scholarship .sch-kpi:hover .sch-kpi-icon { transform: scale(1.08) rotate(-4deg); }
+
+    /* ── DARK MODE ──────────────────────────────────────────────── */
+    body[data-theme='dark'] #section-scholarship .sch-card,
+    body[data-theme='dark'] #section-scholarship .sch-kpi {
+        background:#0f172a; border-color:#1e293b;
+        box-shadow: 0 1px 0 rgba(255,255,255,.04), 0 8px 22px rgba(0,0,0,.35);
+    }
+    body[data-theme='dark'] #section-scholarship .sch-kpi-label { color:#94a3b8; }
+    body[data-theme='dark'] #section-scholarship .sch-kpi-value { color:#f1f5f9; }
+    body[data-theme='dark'] #section-scholarship .sch-kpi-foot  { color:#64748b; }
+    body[data-theme='dark'] #section-scholarship .sch-tab { color:#94a3b8; }
+    body[data-theme='dark'] #section-scholarship .sch-tab:hover { background:#1e293b; color:#f1f5f9; }
+    body[data-theme='dark'] #section-scholarship .sch-input { background:#0b1220; border-color:#1e293b; color:#e2e8f0; }
+    body[data-theme='dark'] #section-scholarship .sch-input:focus { background:#0f172a; border-color:#10b981; }
+    body[data-theme='dark'] #section-scholarship .sch-label { color:#94a3b8; }
+    body[data-theme='dark'] #section-scholarship .sch-table th { background:#1e293b; color:#cbd5e1; border-color:#334155; }
+    body[data-theme='dark'] #section-scholarship .sch-table td { border-color:#1e293b; color:#e2e8f0; }
+    body[data-theme='dark'] #section-scholarship .sch-table tbody tr:hover { background:#0b1220; }
+    body[data-theme='dark'] #section-scholarship .sch-btn--ghost { background:#1e293b; color:#cbd5e1; }
+    body[data-theme='dark'] #section-scholarship .sch-btn--ghost:hover { background:#334155; color:#f1f5f9; }
+    body[data-theme='dark'] #section-scholarship .sch-modal-box { background:#0f172a; color:#e2e8f0; }
+    body[data-theme='dark'] #section-scholarship .pg-btn { background:#0f172a; border-color:#1e293b; color:#cbd5e1; }
+    body[data-theme='dark'] #section-scholarship .pg-btn:hover:not(:disabled) { background:rgba(16,185,129,.16); border-color:#10b981; color:#6ee7b7; }
+    body[data-theme='dark'] #section-scholarship .pg-btn.active { background:#10b981; border-color:#10b981; color:#0f172a; }
+
+    /* calendar grid */
+    body[data-theme='dark'] #section-scholarship .cal-head { color:#94a3b8; }
+    body[data-theme='dark'] #section-scholarship .cal-cell { background:#0f172a; border-color:#1e293b; }
+    body[data-theme='dark'] #section-scholarship .cal-cell:hover { border-color:#10b981; box-shadow:0 4px 12px rgba(16,185,129,.20); }
+    body[data-theme='dark'] #section-scholarship .cal-cell.empty { background:rgba(148,163,184,.06); border-color:#1e293b; }
+    body[data-theme='dark'] #section-scholarship .cal-cell.closed { background:rgba(244,63,94,.10); border-color:rgba(244,63,94,.30); }
+    body[data-theme='dark'] #section-scholarship .cal-cell.has-slots { background:linear-gradient(180deg, rgba(16,185,129,.12) 0%, #0f172a 60%); }
+    body[data-theme='dark'] #section-scholarship .cal-cell.full { background:rgba(245,158,11,.10); border-color:rgba(245,158,11,.30); }
+    body[data-theme='dark'] #section-scholarship .cal-num { color:#f1f5f9; }
+    body[data-theme='dark'] #section-scholarship .cal-num.dim { color:#64748b; }
+    body[data-theme='dark'] #section-scholarship .cal-slot-row { background:#1e293b; color:#cbd5e1; }
+    body[data-theme='dark'] #section-scholarship .cal-slot-row.full { background:rgba(245,158,11,.18); color:#fbbf24; }
+    body[data-theme='dark'] #section-scholarship .cal-slot-row.empty-slot { background:rgba(16,185,129,.18); color:#6ee7b7; }
+
+    /* Page-level utility class overrides */
+    body[data-theme='dark'] #section-scholarship .text-slate-900 { color:#f1f5f9 !important; }
+    body[data-theme='dark'] #section-scholarship .text-slate-700 { color:#e2e8f0 !important; }
+    body[data-theme='dark'] #section-scholarship .text-slate-600 { color:#cbd5e1 !important; }
+    body[data-theme='dark'] #section-scholarship .text-slate-500 { color:#94a3b8 !important; }
+    body[data-theme='dark'] #section-scholarship .text-slate-400 { color:#64748b !important; }
+    body[data-theme='dark'] #section-scholarship .text-slate-300 { color:#475569 !important; }
+    body[data-theme='dark'] #section-scholarship .text-slate-200 { color:#334155 !important; }
+    body[data-theme='dark'] #section-scholarship .bg-white { background:#0f172a !important; }
+    body[data-theme='dark'] #section-scholarship .bg-slate-50 { background: rgba(148,163,184,.08) !important; }
+    body[data-theme='dark'] #section-scholarship .bg-slate-100 { background: rgba(148,163,184,.14) !important; }
+    body[data-theme='dark'] #section-scholarship .bg-slate-200 { background-color:#334155 !important; }
+    body[data-theme='dark'] #section-scholarship .border-slate-200 { border-color:#1e293b !important; }
+    body[data-theme='dark'] #section-scholarship .border-slate-100 { border-color:#1e293b !important; }
+    body[data-theme='dark'] #section-scholarship .bg-emerald-50 { background: rgba(16,185,129,.18) !important; }
+    body[data-theme='dark'] #section-scholarship .bg-amber-50 { background: rgba(245,158,11,.18) !important; }
+    body[data-theme='dark'] #section-scholarship .bg-rose-50 { background: rgba(244,63,94,.18) !important; }
+    body[data-theme='dark'] #section-scholarship .bg-blue-50 { background: rgba(59,130,246,.18) !important; }
+    body[data-theme='dark'] #section-scholarship .bg-cyan-50 { background: rgba(6,182,212,.18) !important; }
+    body[data-theme='dark'] #section-scholarship .border-emerald-200 { border-color: rgba(16,185,129,.30) !important; }
+    body[data-theme='dark'] #section-scholarship .border-amber-200 { border-color: rgba(245,158,11,.30) !important; }
+    body[data-theme='dark'] #section-scholarship .border-rose-200 { border-color: rgba(244,63,94,.30) !important; }
+    body[data-theme='dark'] #section-scholarship .border-blue-200 { border-color: rgba(59,130,246,.30) !important; }
+
+    @media (prefers-reduced-motion: reduce) {
+        #section-scholarship .sch-kpi,
+        #section-scholarship .sch-kpi .sch-kpi-icon { transition: none !important; transform: none !important; }
+    }
 </style>
 
 <div class="max-w-[1400px] mx-auto px-5 md:px-8 py-8">
@@ -205,19 +279,19 @@ $portalCsrf = get_csrf_token();
 
         <!-- KPI cards -->
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mb-3">
-            <div class="sch-kpi">
+            <div class="sch-kpi fx-tilt fx-tilt-light" data-tilt="4">
                 <div class="sch-kpi-icon" style="background:#dbeafe;color:#2563eb"><i class="fa-solid fa-graduation-cap"></i></div>
                 <p class="sch-kpi-label">นักศึกษา Active</p>
                 <p class="sch-kpi-value" id="kpi-students">–</p>
                 <p class="sch-kpi-foot">คน</p>
             </div>
-            <div class="sch-kpi">
+            <div class="sch-kpi fx-tilt fx-tilt-light" data-tilt="4">
                 <div class="sch-kpi-icon" style="background:#fee2e2;color:#dc2626"><i class="fa-solid fa-bell"></i></div>
                 <p class="sch-kpi-label">รออนุมัติ</p>
                 <p class="sch-kpi-value text-rose-600" id="kpi-pending">–</p>
                 <p class="sch-kpi-foot">รายการ</p>
             </div>
-            <div class="sch-kpi">
+            <div class="sch-kpi fx-tilt fx-tilt-light" data-tilt="4">
                 <div class="sch-kpi-icon" style="background:#cffafe;color:#0891b2"><i class="fa-solid fa-calendar-day"></i></div>
                 <p class="sch-kpi-label">กะวันนี้</p>
                 <p class="sch-kpi-value text-cyan-600" id="kpi-today">–</p>
@@ -225,19 +299,19 @@ $portalCsrf = get_csrf_token();
             </div>
         </div>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-5">
-            <div class="sch-kpi">
+            <div class="sch-kpi fx-tilt fx-tilt-light" data-tilt="4">
                 <div class="sch-kpi-icon" style="background:#d1fae5;color:#059669"><i class="fa-solid fa-graduation-cap"></i></div>
                 <p class="sch-kpi-label">ชม.ทุน เดือนนี้</p>
                 <p class="sch-kpi-value text-emerald-600" id="kpi-month-hours">–</p>
                 <p class="sch-kpi-foot">ชั่วโมง</p>
             </div>
-            <div class="sch-kpi">
+            <div class="sch-kpi fx-tilt fx-tilt-light" data-tilt="4">
                 <div class="sch-kpi-icon" style="background:#fef3c7;color:#d97706"><i class="fa-solid fa-coins"></i></div>
                 <p class="sch-kpi-label">ชม.ค่าตอบแทน เดือนนี้</p>
                 <p class="sch-kpi-value text-amber-600" id="kpi-month-paid">–</p>
                 <p class="sch-kpi-foot">ชั่วโมง</p>
             </div>
-            <div class="sch-kpi">
+            <div class="sch-kpi fx-tilt fx-tilt-light" data-tilt="4">
                 <div class="sch-kpi-icon" style="background:#fef3c7;color:#d97706"><i class="fa-solid fa-money-bill-wave"></i></div>
                 <p class="sch-kpi-label">เงินค่าตอบแทนเดือนนี้</p>
                 <p class="sch-kpi-value text-amber-700" id="kpi-month-pay">–</p>
@@ -875,6 +949,21 @@ $portalCsrf = get_csrf_token();
 
     // ────── DASHBOARD ──────
     let dashChartDaily = null, dashChartSplit = null;
+    function schChartTheme() {
+        const dark = document.body.getAttribute('data-theme') === 'dark';
+        return {
+            tick:   dark ? '#cbd5e1' : '#64748b',
+            grid:   dark ? 'rgba(241,245,249,.08)' : 'rgba(15,23,42,.06)',
+            legend: dark ? '#e2e8f0' : '#334155',
+            border: dark ? '#0f172a' : '#fff',
+        };
+    }
+    new MutationObserver(muts => {
+        for (const m of muts) if (m.attributeName === 'data-theme') {
+            if (typeof loadDashboard === 'function' && document.body.contains(document.getElementById('chart-daily'))) loadDashboard();
+            break;
+        }
+    }).observe(document.body, { attributes: true, attributeFilter: ['data-theme'] });
 
     // ── ส่งค่าตอบแทนเดือนนี้เข้าระบบการเงิน ──
     window.schSendToFinance = async function () {
@@ -952,6 +1041,7 @@ $portalCsrf = get_csrf_token();
         const labels = j.daily.map(d => d.label);
         const dataHours = j.daily.map(d => d.hours);
         const dataPaid = j.daily.map(d => d.paid);
+        const th = schChartTheme();
         if (dashChartDaily) dashChartDaily.destroy();
         dashChartDaily = new Chart(document.getElementById('chart-daily'), {
             type: 'bar',
@@ -964,10 +1054,10 @@ $portalCsrf = get_csrf_token();
             },
             options: {
                 responsive: true, maintainAspectRatio: false,
-                plugins: { legend: { position: 'bottom', labels: { font: { weight: 'bold' } } } },
+                plugins: { legend: { position: 'bottom', labels: { color: th.legend, font: { weight: 'bold' } } } },
                 scales: {
-                    x: { stacked: true, ticks: { font: { size: 10 } } },
-                    y: { stacked: true, beginAtZero: true, ticks: { precision: 0 } },
+                    x: { stacked: true, ticks: { font: { size: 10 }, color: th.tick }, grid: { color: th.grid } },
+                    y: { stacked: true, beginAtZero: true, ticks: { precision: 0, color: th.tick }, grid: { color: th.grid } },
                 },
             },
         });
@@ -983,13 +1073,13 @@ $portalCsrf = get_csrf_token();
                     datasets: [{
                         data: [j.kpis.month_hours, j.kpis.month_paid],
                         backgroundColor: ['#10b981', '#f59e0b'],
-                        borderWidth: 0,
+                        borderColor: th.border, borderWidth: 2,
                     }],
                 },
                 options: {
                     responsive: true, maintainAspectRatio: false, cutout: '65%',
                     plugins: {
-                        legend: { position: 'bottom', labels: { font: { weight: 'bold' } } },
+                        legend: { position: 'bottom', labels: { color: th.legend, font: { weight: 'bold' } } },
                         tooltip: { callbacks: { label: c => `${c.label}: ${c.parsed.toFixed(1)} ชม.` } },
                     },
                 },
