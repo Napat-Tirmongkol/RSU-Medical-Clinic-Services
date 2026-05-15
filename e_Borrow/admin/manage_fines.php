@@ -201,7 +201,7 @@ async function eborrowFineSendToFinance(data) {
         const j = await res.json();
         if (!j.ok) { Swal.fire({ icon: 'error', title: 'บันทึกไม่สำเร็จ', text: j.message || '' }); return; }
         Swal.fire({ icon: 'success', title: j.mode === 'updated' ? 'อัปเดตในระบบการเงินแล้ว' : 'บันทึกในระบบการเงินแล้ว',
-            html: `<div style="font-size:13px"><a href="../../portal/index.php?section=finance" target="_blank" style="color:#059669;text-decoration:underline">เปิดดู Cash Book</a></div>`,
+            html: `<div style="font-size:13px"><a href="../portal/index.php?section=finance" target="_blank" style="color:#059669;text-decoration:underline">เปิดดู Cash Book</a></div>`,
             confirmButtonColor: '#059669' });
     } catch (e) { Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: String(e) }); }
 }
