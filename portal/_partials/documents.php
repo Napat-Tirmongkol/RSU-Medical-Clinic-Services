@@ -192,6 +192,44 @@ $catLabels = [
         padding: 2px 6px; border-radius: 4px;
         border: 1px solid #fecaca;
     }
+
+    /* ── Bold & Colorful — tilt-aware lift on doc cards ── */
+    #section-documents .doc-card { isolation: isolate; transition: transform .25s cubic-bezier(.16,1,.3,1), box-shadow .25s ease, border-color .25s ease; }
+    #section-documents .doc-card.fx-tilt:hover { --lift: -3px; box-shadow:0 18px 36px -18px rgba(15,115,73,.30); border-color:rgba(15,115,73,.30); }
+
+    /* ── DARK MODE ──────────────────────────────────────────────── */
+    body[data-theme='dark'] #section-documents .doc-card { background:#0f172a; border-color:#1e293b; box-shadow: 0 1px 0 rgba(255,255,255,.04), 0 8px 22px rgba(0,0,0,.35); }
+    body[data-theme='dark'] #section-documents .doc-card .head h3 { color:#f1f5f9; }
+    body[data-theme='dark'] #section-documents .doc-card .head .subtitle { color:#94a3b8; }
+    body[data-theme='dark'] #section-documents .doc-card .description { color:#cbd5e1; }
+    body[data-theme='dark'] #section-documents .doc-card .actions { border-color:#1e293b; }
+    body[data-theme='dark'] #section-documents .doc-card .btn { background:#0f172a; border-color:#1e293b; color:#cbd5e1; }
+    body[data-theme='dark'] #section-documents .doc-card .btn:hover { background:#1e293b; }
+    body[data-theme='dark'] #section-documents .doc-card .btn.primary { background:#10b981; border-color:#10b981; color:#0f172a; }
+    body[data-theme='dark'] #section-documents .doc-card .btn.primary:hover { background:#059669; }
+    body[data-theme='dark'] #section-documents .doc-meta-pill { background:#1e293b; color:#cbd5e1; }
+    body[data-theme='dark'] #section-documents .doc-meta-pill.v { background:rgba(245,158,11,.18); color:#fbbf24; }
+    body[data-theme='dark'] #section-documents .docs-empty { background:#0f172a; border-color:#334155; color:#94a3b8; }
+    body[data-theme='dark'] #section-documents .docs-empty .ic { color:#475569; }
+    body[data-theme='dark'] #section-documents .docs-category-header { color:#94a3b8; }
+    body[data-theme='dark'] #section-documents .docs-category-header .line { background:#1e293b; }
+    body[data-theme='dark'] #section-documents .doc-confidential { background:rgba(244,63,94,.18); color:#fb7185; border-color:rgba(244,63,94,.40); }
+
+    body[data-theme='dark'] #section-documents .bg-white { background:#0f172a !important; }
+    body[data-theme='dark'] #section-documents .bg-slate-50 { background: rgba(148,163,184,.08) !important; }
+    body[data-theme='dark'] #section-documents .bg-slate-100 { background: rgba(148,163,184,.14) !important; }
+    body[data-theme='dark'] #section-documents .text-slate-900 { color:#f1f5f9 !important; }
+    body[data-theme='dark'] #section-documents .text-slate-800 { color:#f1f5f9 !important; }
+    body[data-theme='dark'] #section-documents .text-slate-700 { color:#e2e8f0 !important; }
+    body[data-theme='dark'] #section-documents .text-slate-600 { color:#cbd5e1 !important; }
+    body[data-theme='dark'] #section-documents .text-slate-500 { color:#94a3b8 !important; }
+    body[data-theme='dark'] #section-documents .text-slate-400 { color:#64748b !important; }
+    body[data-theme='dark'] #section-documents .border-slate-200 { border-color:#1e293b !important; }
+    body[data-theme='dark'] #section-documents .border-slate-100 { border-color:#1e293b !important; }
+
+    @media (prefers-reduced-motion: reduce) {
+        #section-documents .doc-card { transition: none !important; transform: none !important; }
+    }
 </style>
 
 <div class="docs-wrap">
@@ -235,7 +273,7 @@ $catLabels = [
                 $color  = $d['color'] ?? '#0f7349';
                 $icon   = $d['icon']  ?? 'fa-file-lines';
             ?>
-                <div class="doc-card">
+                <div class="doc-card fx-tilt fx-tilt-light" data-tilt="3">
                     <div class="head">
                         <div class="ic" style="background:<?= htmlspecialchars($color) ?>">
                             <i class="fa-solid <?= htmlspecialchars($icon) ?>"></i>

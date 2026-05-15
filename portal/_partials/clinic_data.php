@@ -6,6 +6,48 @@
 $_view = $_GET['cd_view'] ?? '';
 $_validViews = ['profile','faculty','staff','rooms','hours','schedule','calendar','survey','org_chart'];
 
+// Shared dark-mode style for landing + all sub-views
+?>
+<style id="clinic-data-shared-style">
+body[data-theme='dark'] #section-clinic_data .bg-white { background:#0f172a !important; }
+body[data-theme='dark'] #section-clinic_data .bg-slate-50 { background: rgba(148,163,184,.08) !important; }
+body[data-theme='dark'] #section-clinic_data .bg-slate-100 { background: rgba(148,163,184,.14) !important; }
+body[data-theme='dark'] #section-clinic_data .bg-gray-50 { background: rgba(148,163,184,.08) !important; }
+body[data-theme='dark'] #section-clinic_data .bg-gray-100 { background: rgba(148,163,184,.14) !important; }
+body[data-theme='dark'] #section-clinic_data .bg-emerald-50 { background: rgba(16,185,129,.18) !important; }
+body[data-theme='dark'] #section-clinic_data .bg-amber-50 { background: rgba(245,158,11,.18) !important; }
+body[data-theme='dark'] #section-clinic_data .bg-amber-100 { background: rgba(245,158,11,.22) !important; }
+body[data-theme='dark'] #section-clinic_data .bg-blue-50 { background: rgba(59,130,246,.18) !important; }
+body[data-theme='dark'] #section-clinic_data .bg-sky-50 { background: rgba(14,165,233,.18) !important; }
+body[data-theme='dark'] #section-clinic_data .bg-cyan-50 { background: rgba(6,182,212,.18) !important; }
+body[data-theme='dark'] #section-clinic_data .bg-rose-50 { background: rgba(244,63,94,.18) !important; }
+body[data-theme='dark'] #section-clinic_data .bg-purple-50 { background: rgba(168,85,247,.18) !important; }
+body[data-theme='dark'] #section-clinic_data .bg-indigo-50 { background: rgba(99,102,241,.18) !important; }
+body[data-theme='dark'] #section-clinic_data .bg-orange-50 { background: rgba(249,115,22,.18) !important; }
+body[data-theme='dark'] #section-clinic_data .bg-teal-50 { background: rgba(20,184,166,.18) !important; }
+body[data-theme='dark'] #section-clinic_data .text-slate-900 { color:#f1f5f9 !important; }
+body[data-theme='dark'] #section-clinic_data .text-slate-800 { color:#f1f5f9 !important; }
+body[data-theme='dark'] #section-clinic_data .text-slate-700 { color:#e2e8f0 !important; }
+body[data-theme='dark'] #section-clinic_data .text-slate-600 { color:#cbd5e1 !important; }
+body[data-theme='dark'] #section-clinic_data .text-slate-500 { color:#94a3b8 !important; }
+body[data-theme='dark'] #section-clinic_data .text-slate-400 { color:#64748b !important; }
+body[data-theme='dark'] #section-clinic_data .text-slate-300 { color:#475569 !important; }
+body[data-theme='dark'] #section-clinic_data .text-gray-900 { color:#f1f5f9 !important; }
+body[data-theme='dark'] #section-clinic_data .text-gray-700 { color:#e2e8f0 !important; }
+body[data-theme='dark'] #section-clinic_data .text-gray-500 { color:#94a3b8 !important; }
+body[data-theme='dark'] #section-clinic_data .border-slate-200 { border-color:#1e293b !important; }
+body[data-theme='dark'] #section-clinic_data .border-slate-100 { border-color:#1e293b !important; }
+body[data-theme='dark'] #section-clinic_data .border-gray-200 { border-color:#1e293b !important; }
+body[data-theme='dark'] #section-clinic_data input,
+body[data-theme='dark'] #section-clinic_data select,
+body[data-theme='dark'] #section-clinic_data textarea {
+    background:#0b1220 !important; border-color:#1e293b !important; color:#e2e8f0 !important;
+}
+body[data-theme='dark'] #section-clinic_data table th { background:#1e293b !important; color:#cbd5e1 !important; }
+body[data-theme='dark'] #section-clinic_data table td { border-color:#1e293b !important; }
+</style>
+<?php
+
 if (in_array($_view, $_validViews, true)) {
     include __DIR__ . '/clinic_data/' . $_view . '.php';
     return;

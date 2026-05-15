@@ -76,6 +76,49 @@ $webhookUrl = "$protocol://$host$uri";
     .line-toggle.line-toggle--purple input:focus-visible + .line-toggle-slider {
         box-shadow: 0 0 0 3px rgba(124,58,237,.25);
     }
+
+    /* ── Bold & Colorful — tilt-aware lift on line-card panels ── */
+    #section-line_settings .line-card { isolation: isolate; transition: transform .25s cubic-bezier(.16,1,.3,1), box-shadow .25s ease, border-color .25s ease; }
+    #section-line_settings .line-card.fx-tilt:hover { --lift: -3px; box-shadow:0 18px 36px -18px rgba(6,182,212,.30); border-color:rgba(6,182,212,.30); }
+
+    /* ── DARK MODE ──────────────────────────────────────────────── */
+    body[data-theme='dark'] #section-line_settings .line-input { background:#0b1220; border-color:#1e293b; color:#e2e8f0; }
+    body[data-theme='dark'] #section-line_settings .line-input:focus { background:#0f172a; }
+    body[data-theme='dark'] #section-line_settings .line-label { color:#cbd5e1; }
+    body[data-theme='dark'] #section-line_settings .line-card { background:#0f172a; border-color:#1e293b; box-shadow: 0 1px 0 rgba(255,255,255,.04), 0 8px 22px rgba(0,0,0,.35); }
+    body[data-theme='dark'] #section-line_settings .line-toggle .line-toggle-slider { background:#334155; }
+
+    body[data-theme='dark'] #section-line_settings .bg-white { background:#0f172a !important; }
+    body[data-theme='dark'] #section-line_settings .bg-slate-50 { background: rgba(148,163,184,.08) !important; }
+    body[data-theme='dark'] #section-line_settings .bg-slate-100 { background: rgba(148,163,184,.14) !important; }
+    body[data-theme='dark'] #section-line_settings .bg-gray-50 { background: rgba(148,163,184,.08) !important; }
+    body[data-theme='dark'] #section-line_settings .bg-gray-100 { background: rgba(148,163,184,.14) !important; }
+    body[data-theme='dark'] #section-line_settings .bg-cyan-50 { background: rgba(6,182,212,.18) !important; }
+    body[data-theme='dark'] #section-line_settings .bg-sky-50 { background: rgba(14,165,233,.18) !important; }
+    body[data-theme='dark'] #section-line_settings .bg-emerald-50 { background: rgba(16,185,129,.18) !important; }
+    body[data-theme='dark'] #section-line_settings .bg-amber-50 { background: rgba(245,158,11,.18) !important; }
+    body[data-theme='dark'] #section-line_settings .bg-rose-50 { background: rgba(244,63,94,.18) !important; }
+    body[data-theme='dark'] #section-line_settings .bg-purple-50 { background: rgba(168,85,247,.18) !important; }
+    body[data-theme='dark'] #section-line_settings .bg-green-50 { background: rgba(16,185,129,.18) !important; }
+    body[data-theme='dark'] #section-line_settings .text-gray-900 { color:#f1f5f9 !important; }
+    body[data-theme='dark'] #section-line_settings .text-gray-700 { color:#e2e8f0 !important; }
+    body[data-theme='dark'] #section-line_settings .text-gray-600 { color:#cbd5e1 !important; }
+    body[data-theme='dark'] #section-line_settings .text-gray-500 { color:#94a3b8 !important; }
+    body[data-theme='dark'] #section-line_settings .text-gray-400 { color:#64748b !important; }
+    body[data-theme='dark'] #section-line_settings .text-slate-900 { color:#f1f5f9 !important; }
+    body[data-theme='dark'] #section-line_settings .text-slate-700 { color:#e2e8f0 !important; }
+    body[data-theme='dark'] #section-line_settings .text-slate-500 { color:#94a3b8 !important; }
+    body[data-theme='dark'] #section-line_settings .border-gray-200 { border-color:#1e293b !important; }
+    body[data-theme='dark'] #section-line_settings .border-gray-100 { border-color:#1e293b !important; }
+    body[data-theme='dark'] #section-line_settings .border-slate-200 { border-color:#1e293b !important; }
+    body[data-theme='dark'] #section-line_settings .border-slate-100 { border-color:#1e293b !important; }
+    body[data-theme='dark'] #section-line_settings .border-cyan-200 { border-color: rgba(6,182,212,.30) !important; }
+    body[data-theme='dark'] #section-line_settings .border-green-500 { border-color: #10b981 !important; }
+    body[data-theme='dark'] #section-line_settings .border-t-green-500 { border-top-color: #10b981 !important; }
+
+    @media (prefers-reduced-motion: reduce) {
+        #section-line_settings .line-card { transition: none !important; transform: none !important; }
+    }
 </style>
 
 <div class="px-4 py-8">
@@ -126,7 +169,7 @@ $webhookUrl = "$protocol://$host$uri";
             </div>
 
             <!-- API Config Form -->
-            <div class="line-card shadow-sm">
+            <div class="line-card fx-tilt fx-tilt-light shadow-sm" data-tilt="3">
                 <h2 class="font-black text-gray-900 mb-5 flex items-center gap-2">
                     <span class="w-8 h-8 bg-cyan-100 text-cyan-600 rounded-xl flex items-center justify-center">
                         <i class="fa-solid fa-key text-sm"></i>
@@ -169,7 +212,7 @@ $webhookUrl = "$protocol://$host$uri";
 
         <!-- Right Column: Testing -->
         <div class="space-y-6">
-            <div class="line-card shadow-sm border-t-4 border-t-green-500">
+            <div class="line-card fx-tilt fx-tilt-light shadow-sm border-t-4 border-t-green-500" data-tilt="3">
                 <h2 class="font-black text-gray-900 mb-5 flex items-center gap-2">
                     <span class="w-8 h-8 bg-green-100 text-green-600 rounded-xl flex items-center justify-center">
                         <i class="fa-solid fa-paper-plane text-sm"></i>
@@ -217,7 +260,7 @@ $webhookUrl = "$protocol://$host$uri";
         <div style="flex:1;height:1.5px;background:#f1f5f9"></div>
     </div>
 
-    <div class="line-card shadow-sm" style="border-top:4px solid #22c55e">
+    <div class="line-card fx-tilt fx-tilt-light shadow-sm" data-tilt="3" style="border-top:4px solid #22c55e">
         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:18px">
             <div>
                 <h3 style="font-weight:900;color:#0f172a;font-size:15px;margin-bottom:4px">

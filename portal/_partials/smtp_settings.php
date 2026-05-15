@@ -14,6 +14,28 @@ $_smtp_fileWritable = file_exists($_smtp_secretsPath) ? is_writable($_smtp_secre
 .smtp-input:focus{background:#fff;border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,.1)}
 .smtp-label{display:block;font-size:.7rem;font-weight:900;color:#9ca3af;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.4rem}
 .smtp-card{background:#fff;border-radius:1.5rem;border:1.5px solid #e5e7eb;padding:1.75rem;margin-bottom:1.25rem}
+
+/* ── Bold & Colorful + DARK MODE ─────────────────────────────── */
+#section-smtp_settings .smtp-card { isolation: isolate; transition: transform .25s cubic-bezier(.16,1,.3,1), box-shadow .25s ease, border-color .25s ease; }
+#section-smtp_settings .smtp-card.fx-tilt:hover { --lift: -3px; box-shadow:0 18px 36px -18px rgba(59,130,246,.30); border-color:rgba(59,130,246,.30); }
+
+body[data-theme='dark'] #section-smtp_settings .smtp-card { background:#0f172a; border-color:#1e293b; box-shadow: 0 1px 0 rgba(255,255,255,.04), 0 8px 22px rgba(0,0,0,.35); }
+body[data-theme='dark'] #section-smtp_settings .smtp-input { background:#0b1220; border-color:#1e293b; color:#e2e8f0; }
+body[data-theme='dark'] #section-smtp_settings .smtp-input:focus { background:#0f172a; }
+body[data-theme='dark'] #section-smtp_settings .smtp-label { color:#94a3b8; }
+body[data-theme='dark'] #section-smtp_settings .bg-white { background:#0f172a !important; }
+body[data-theme='dark'] #section-smtp_settings .bg-gray-50 { background: rgba(148,163,184,.08) !important; }
+body[data-theme='dark'] #section-smtp_settings .bg-gray-100 { background: rgba(148,163,184,.14) !important; }
+body[data-theme='dark'] #section-smtp_settings .bg-blue-50 { background: rgba(59,130,246,.18) !important; }
+body[data-theme='dark'] #section-smtp_settings .bg-emerald-50 { background: rgba(16,185,129,.18) !important; }
+body[data-theme='dark'] #section-smtp_settings .bg-amber-50 { background: rgba(245,158,11,.18) !important; }
+body[data-theme='dark'] #section-smtp_settings .text-gray-900 { color:#f1f5f9 !important; }
+body[data-theme='dark'] #section-smtp_settings .text-gray-700 { color:#e2e8f0 !important; }
+body[data-theme='dark'] #section-smtp_settings .text-gray-600 { color:#cbd5e1 !important; }
+body[data-theme='dark'] #section-smtp_settings .text-gray-500 { color:#94a3b8 !important; }
+body[data-theme='dark'] #section-smtp_settings .text-gray-400 { color:#64748b !important; }
+body[data-theme='dark'] #section-smtp_settings .border-gray-200 { border-color:#1e293b !important; }
+body[data-theme='dark'] #section-smtp_settings .border-gray-100 { border-color:#1e293b !important; }
 </style>
 
 <div class="p-6 max-w-3xl">
@@ -50,7 +72,7 @@ $_smtp_fileWritable = file_exists($_smtp_secretsPath) ? is_writable($_smtp_secre
     </div>
 
     <!-- SMTP Config Form -->
-    <div class="smtp-card shadow-sm">
+    <div class="smtp-card fx-tilt fx-tilt-light shadow-sm" data-tilt="3">
         <h3 class="font-black text-gray-900 mb-5 flex items-center gap-2">
             <span class="w-8 h-8 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center"><i class="fa-solid fa-server text-sm"></i></span>
             ตั้งค่า SMTP
@@ -114,7 +136,7 @@ $_smtp_fileWritable = file_exists($_smtp_secretsPath) ? is_writable($_smtp_secre
     </div>
 
     <!-- Test Email -->
-    <div class="smtp-card shadow-sm">
+    <div class="smtp-card fx-tilt fx-tilt-light shadow-sm" data-tilt="3">
         <h3 class="font-black text-gray-900 mb-5 flex items-center gap-2">
             <span class="w-8 h-8 bg-green-100 text-green-600 rounded-xl flex items-center justify-center"><i class="fa-solid fa-flask text-sm"></i></span>
             ทดสอบส่งอีเมล

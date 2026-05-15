@@ -17,6 +17,63 @@ require_once __DIR__ . '/edms/_helpers.php';
 $_view = $_GET['edms_view'] ?? '';
 $_validViews = ['list', 'detail', 'myinbox', 'reports', 'categories', 'doctypes'];
 
+// Shared style block — emit before any early return so sub-views inherit it
+?>
+<style id="edms-shared-style">
+/* ── EDMS — Bold & Colorful + DARK MODE (applies to landing + sub-views) ─── */
+body[data-theme='dark'] #section-edms .bg-white { background:#0f172a !important; }
+body[data-theme='dark'] #section-edms .bg-slate-50 { background: rgba(148,163,184,.08) !important; }
+body[data-theme='dark'] #section-edms .bg-slate-100 { background: rgba(148,163,184,.14) !important; }
+body[data-theme='dark'] #section-edms .bg-gray-50 { background: rgba(148,163,184,.08) !important; }
+body[data-theme='dark'] #section-edms .bg-gray-100 { background: rgba(148,163,184,.14) !important; }
+body[data-theme='dark'] #section-edms .bg-sky-50    { background: rgba(14,165,233,.18) !important; }
+body[data-theme='dark'] #section-edms .bg-emerald-50 { background: rgba(16,185,129,.18) !important; }
+body[data-theme='dark'] #section-edms .bg-purple-50 { background: rgba(168,85,247,.18) !important; }
+body[data-theme='dark'] #section-edms .bg-amber-50  { background: rgba(245,158,11,.18) !important; }
+body[data-theme='dark'] #section-edms .bg-amber-100 { background: rgba(245,158,11,.22) !important; }
+body[data-theme='dark'] #section-edms .bg-amber-500 { background: #f59e0b !important; }
+body[data-theme='dark'] #section-edms .bg-rose-50   { background: rgba(244,63,94,.18) !important; }
+body[data-theme='dark'] #section-edms .bg-rose-100  { background: rgba(244,63,94,.22) !important; }
+body[data-theme='dark'] #section-edms .bg-cyan-50   { background: rgba(6,182,212,.18) !important; }
+body[data-theme='dark'] #section-edms .bg-teal-50   { background: rgba(20,184,166,.18) !important; }
+body[data-theme='dark'] #section-edms .bg-indigo-50 { background: rgba(99,102,241,.18) !important; }
+body[data-theme='dark'] #section-edms .bg-orange-50 { background: rgba(249,115,22,.18) !important; }
+body[data-theme='dark'] #section-edms .bg-blue-50   { background: rgba(59,130,246,.18) !important; }
+body[data-theme='dark'] #section-edms .text-slate-900 { color:#f1f5f9 !important; }
+body[data-theme='dark'] #section-edms .text-slate-800 { color:#f1f5f9 !important; }
+body[data-theme='dark'] #section-edms .text-slate-700 { color:#e2e8f0 !important; }
+body[data-theme='dark'] #section-edms .text-slate-600 { color:#cbd5e1 !important; }
+body[data-theme='dark'] #section-edms .text-slate-500 { color:#94a3b8 !important; }
+body[data-theme='dark'] #section-edms .text-slate-400 { color:#64748b !important; }
+body[data-theme='dark'] #section-edms .text-slate-300 { color:#475569 !important; }
+body[data-theme='dark'] #section-edms .border-slate-200 { border-color:#1e293b !important; }
+body[data-theme='dark'] #section-edms .border-slate-100 { border-color:#1e293b !important; }
+body[data-theme='dark'] #section-edms .border-sky-100 { border-color: rgba(14,165,233,.30) !important; }
+body[data-theme='dark'] #section-edms .border-sky-200 { border-color: rgba(14,165,233,.30) !important; }
+body[data-theme='dark'] #section-edms .border-amber-100 { border-color: rgba(245,158,11,.30) !important; }
+body[data-theme='dark'] #section-edms .border-amber-200 { border-color: rgba(245,158,11,.30) !important; }
+body[data-theme='dark'] #section-edms .border-rose-100 { border-color: rgba(244,63,94,.30) !important; }
+body[data-theme='dark'] #section-edms .border-rose-200 { border-color: rgba(244,63,94,.30) !important; }
+body[data-theme='dark'] #section-edms .border-emerald-100 { border-color: rgba(16,185,129,.30) !important; }
+body[data-theme='dark'] #section-edms .border-purple-100 { border-color: rgba(168,85,247,.30) !important; }
+body[data-theme='dark'] #section-edms .border-cyan-100 { border-color: rgba(6,182,212,.30) !important; }
+body[data-theme='dark'] #section-edms .border-teal-100 { border-color: rgba(20,184,166,.30) !important; }
+body[data-theme='dark'] #section-edms .border-indigo-100 { border-color: rgba(99,102,241,.30) !important; }
+body[data-theme='dark'] #section-edms .border-orange-100 { border-color: rgba(249,115,22,.30) !important; }
+body[data-theme='dark'] #section-edms .bg-gradient-to-br.from-amber-50 {
+    background: linear-gradient(135deg, rgba(245,158,11,.10), rgba(249,115,22,.10), rgba(244,63,94,.10)) !important;
+}
+body[data-theme='dark'] #section-edms input,
+body[data-theme='dark'] #section-edms select,
+body[data-theme='dark'] #section-edms textarea {
+    background:#0b1220 !important; border-color:#1e293b !important; color:#e2e8f0 !important;
+}
+
+/* tilt-aware lift on type cards */
+#section-edms a.group { transition: transform .25s cubic-bezier(.16,1,.3,1), box-shadow .25s ease, border-color .25s ease; }
+</style>
+<?php
+
 if (in_array($_view, $_validViews, true)) {
     include __DIR__ . '/edms/' . $_view . '.php';
     return;
