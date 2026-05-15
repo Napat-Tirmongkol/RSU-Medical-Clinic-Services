@@ -1016,6 +1016,11 @@ try {
                         <div class="psb-icon"><i class="fa-solid fa-chart-pie" style="color:#059669"></i></div>
                         <span class="psb-label" style="color:#059669;font-weight:900">Dashboard</span>
                     </button>
+                    <button class="psb-item <?= $activeSection==='apps'?'psb-active':'' ?>" data-section="apps" onclick="switchSection('apps',this)" id="psb-apps-launcher">
+                        <div class="psb-icon"><i class="fa-solid fa-grip" style="color:#2e9e63"></i></div>
+                        <span class="psb-label" style="color:#15803d;font-weight:900">App Launcher</span>
+                        <span class="psb-new-badge" id="psb-apps-new-badge">NEW</span>
+                    </button>
                     <?php if ($isStaff): ?>
                         <button class="psb-item <?= $activeSection==='profile'?'psb-active':'' ?>" data-section="profile" onclick="switchSection('profile',this)">
                             <div class="psb-icon"><i class="fa-solid fa-user-pen" style="color:#0891b2"></i></div>
@@ -1455,151 +1460,90 @@ try {
                     <!-- MAIN GRID -->
                     <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
-                        <!-- PROJECT CARDS (8/12) -->
-                        <section class="lg:col-span-8 au d2">
+                        <!-- LEFT: App Launcher migration card + pinned shortcuts (8/12) -->
+                        <section class="lg:col-span-8 au d2 flex flex-col gap-5">
 
-                            <!-- Control Bar -->
-                            <div style="margin-bottom:20px">
-                                <div
-                                    style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px">
-                                    <div class="sec-title">Systems</div>
-
-                                    <div style="display:flex;align-items:center;gap:10px">
-                                        <!-- Search + Command Palette trigger -->
-                                        <button onclick="window.cmdkOpen && window.cmdkOpen()" type="button" class="cmdk-trigger" title="กด ⌘K เพื่อเปิด">
-                                            <i class="fa-solid fa-magnifying-glass cmdk-trigger-icon"></i>
-                                            <span>ค้นหาระบบ / คำสั่ง</span>
-                                            <kbd>⌘K</kbd>
+                            <!-- 🚀 Migration banner — points users to the new App Launcher -->
+                            <div id="apps-migration-banner" class="apps-migration">
+                                <div class="apps-migration-glow"></div>
+                                <div class="apps-migration-body">
+                                    <div class="apps-migration-eyebrow">
+                                        <i class="fa-solid fa-sparkles"></i>
+                                        ใหม่! · ปรับโครงสร้างเมนู
+                                    </div>
+                                    <h2 class="apps-migration-title">
+                                        เราย้ายเมนูเปิดระบบไปไว้ที่ <span>App Launcher</span> แล้ว
+                                    </h2>
+                                    <p class="apps-migration-desc">
+                                        Dashboard จะโฟกัสที่ภาพรวม KPI และกิจกรรมล่าสุด —
+                                        ส่วนการ์ดเปิดระบบทุกตัว (e-Borrow, ครุภัณฑ์, วัสดุ, Insurance Sync, ISO, LINE ฯลฯ)
+                                        ย้ายไปอยู่หน้า App Launcher แล้ว เปิดได้จาก sidebar กลุ่ม <b>OVERVIEW</b>
+                                    </p>
+                                    <div class="apps-migration-actions">
+                                        <a href="javascript:switchSection('apps', document.querySelector('[data-section=apps]'))"
+                                            class="apps-migration-cta" id="apps-migration-cta">
+                                            <i class="fa-solid fa-grip"></i>
+                                            เปิด App Launcher
+                                            <i class="fa-solid fa-arrow-right" style="font-size:11px;margin-left:4px"></i>
+                                        </a>
+                                        <button type="button" id="apps-migration-tour-btn" class="apps-migration-ghost">
+                                            <i class="fa-solid fa-route"></i> ดูตำแหน่งใหม่
                                         </button>
-                                        <input type="text" id="search-project" placeholder="กรอง..."
-                                            class="proj-search-inline" aria-label="กรองรายการระบบในหน้านี้">
-                                        <!-- View toggle -->
-                                        <div
-                                            style="display:flex;background:#f1f5f9;border-radius:10px;padding:3px;gap:2px">
-                                            <button id="btn-grid" onclick="projSetView('grid')" title="มุมมองการ์ด"
-                                                style="padding:5px 10px;border-radius:8px;border:none;cursor:pointer;background:#fff;color:#2e9e63;box-shadow:0 1px 4px rgba(0,0,0,.08);transition:all .2s">
-                                                <i class="fa-solid fa-border-all" style="font-size:12px"></i>
-                                            </button>
-                                            <button id="btn-list" onclick="projSetView('list')" title="มุมมองรายการ"
-                                                style="padding:5px 10px;border-radius:8px;border:none;cursor:pointer;background:transparent;color:#94a3b8;transition:all .2s">
-                                                <i class="fa-solid fa-list" style="font-size:12px"></i>
-                                            </button>
-                                        </div>
+                                        <button type="button" id="apps-migration-dismiss" class="apps-migration-dismiss" title="ซ่อนข้อความนี้">
+                                            <i class="fa-solid fa-xmark"></i>
+                                        </button>
                                     </div>
-                                </div>
-
-                                <!-- Filter tabs -->
-                                <div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:2px">
-                                    <button class="proj-tab active" data-filter="all"
-                                        onclick="projSetFilter(this)">ทั้งหมด</button>
-                                    <button class="proj-tab" data-filter="core" onclick="projSetFilter(this)">ระบบหลัก
-                                        (Core)</button>
-                                    <button class="proj-tab" data-filter="tools"
-                                        onclick="projSetFilter(this)">เครื่องมือ (Tools)</button>
-                                    <button class="proj-tab" data-filter="dev" onclick="projSetFilter(this)">กำลังพัฒนา
-                                        (Dev Stage)</button>
                                 </div>
                             </div>
 
-                            <!-- Cards -->
-                            <div id="project-container" class="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                                <?php $cardIdx = 0;
-                                // Map project → required access flag (strict: ต้องมี flag จริงๆ ถึงเห็นการ์ด)
-                                // null = superadmin only, '' = ใครก็ได้ที่เป็น admin role
-                                $projectFlagMap = [
-                                    'e_campaign'         => 'access_ecampaign',
-                                    'staff_checkin'      => 'access_ecampaign',
-                                    'e_borrow'           => 'access_eborrow',
-                                    'asset_management'   => 'access_asset',
-                                    'consumables'        => 'access_consumables',
-                                    'system_logs'        => 'access_system_logs',
-                                    'insurance_sync'     => 'access_insurance',
-                                    'live_support_chat'  => 'access_ecampaign',
-                                    'line_messaging'     => null, // superadmin only
-                                    'privilege_inventory'=> null, // superadmin only
-                                    'identity_governance'=> 'access_identity',
-                                ];
-                                foreach ($projects as $proj):
-                                    $hasAccess = false;
-                                    if ($adminRole === 'superadmin') {
-                                        $hasAccess = true;
-                                    } else {
-                                        $reqFlag = $projectFlagMap[$proj['id']] ?? '__unknown__';
-                                        if ($reqFlag === null) {
-                                            $hasAccess = false; // superadmin only
-                                        } elseif ($reqFlag === '') {
-                                            $hasAccess = in_array($adminRole, ['admin', 'superadmin'], true);
-                                        } elseif ($reqFlag === '__unknown__') {
-                                            // Project ใหม่ที่ยังไม่ map — fallback ไป role-based เดิม (ไม่ปลอดภัย)
-                                            if (in_array($adminRole, $proj['allowed_roles'])) $hasAccess = true;
-                                            if ($isStaff && ($proj['staff_visible'] ?? false)) $hasAccess = true;
-                                        } else {
-                                            $hasAccess = !empty($_SESSION[$reqFlag]);
-                                        }
-                                    }
-
-                                    if (!$hasAccess) continue;
-                                    $cardDelay = round(0.1 + $cardIdx * 0.12, 2);
-                                    $cardIdx++;
-                                    $cat = $categoryMap[$proj['id']] ?? 'core';
-                                    $keywords = strtolower(implode(' ', $proj['badges']) . ' ' . $proj['title']);
-                                    $isPinned = in_array($proj['id'], $userPins);
+                            <!-- Pinned apps — quick access for power users -->
+                            <?php
+                            $pinnedProjects = [];
+                            if (!empty($userPins)) {
+                                foreach ($projects as $p) {
+                                    if (in_array($p['id'], $userPins, true)) $pinnedProjects[] = $p;
+                                }
+                            }
+                            if (!empty($pinnedProjects)):
+                            ?>
+                            <div>
+                                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+                                    <div class="sec-title" style="font-size:.95rem">
+                                        <i class="fa-solid fa-thumbtack" style="color:#f59e0b;font-size:.8rem"></i>
+                                        ปักหมุดของฉัน
+                                    </div>
+                                    <a href="javascript:switchSection('apps', document.querySelector('[data-section=apps]'))"
+                                        style="font-size:11px;font-weight:800;color:#64748b;text-decoration:none;display:inline-flex;align-items:center;gap:4px">
+                                        ดูทั้งหมด <i class="fa-solid fa-arrow-right" style="font-size:9px"></i>
+                                    </a>
+                                </div>
+                                <div class="pinned-strip">
+                                    <?php foreach ($pinnedProjects as $pp):
+                                        $primaryAction = $pp['actions'][0] ?? null;
+                                        if (!$primaryAction) continue;
                                     ?>
-                                    <div class="proj-card" id="proj-<?= $proj['id'] ?>" data-category="<?= $cat ?>"
-                                         data-name="<?= htmlspecialchars(strtolower($proj['title'])) ?>"
-                                         data-keywords="<?= htmlspecialchars($keywords) ?>"
-                                         data-pinned="<?= $isPinned ? '1' : '0' ?>"
-                                         style="animation-delay:<?= $cardDelay ?>s">
-                                         
-                                         <button class="pin-btn <?= $isPinned ? 'active' : '' ?>" onclick="togglePin('<?= $proj['id'] ?>', this)" title="ปักหมุด">
-                                             <i class="fa-solid fa-thumbtack text-[10px]"></i>
-                                         </button>
-
-                                        <div class="proj-card-header">
-                                            <div
-                                                class="proj-card-icon <?= $proj['bg_color'] ?> <?= $proj['icon_color'] ?> <?= $proj['border_color'] ?>">
-                                                <i class="fa-solid <?= $proj['icon'] ?>"></i>
-                                            </div>
-                                            <div class="proj-card-badges">
-                                                <?php foreach ($proj['badges'] as $b): ?>
-                                                    <span class="proj-badge"><?= $b ?></span>
-                                                <?php endforeach; ?>
-                                            </div>
-                                        </div>
-
-                                        <div class="proj-card-body">
-                                            <h3 class="text-[15px] font-black text-gray-900 mb-1.5 leading-tight">
-                                                <?= $proj['title'] ?>
-                                            </h3>
-                                            <p class="text-[12px] text-gray-500 leading-relaxed"><?= $proj['description'] ?>
-                                            </p>
-                                        </div>
-
-                                        <div class="proj-card-actions">
-                                            <?php foreach ($proj['actions'] as $act): ?>
-                                                <a href="<?= $act['url'] ?>"
-                                                    class="proj-action <?= $act['primary'] ? 'primary' : 'secondary' ?>">
-                                                    <?php if ($act['primary']): ?><i
-                                                            class="fa-solid fa-arrow-up-right-from-square mr-1.5 text-[10px]"></i><?php endif; ?>
-                                                    <?= $act['label'] ?>
-                                                </a>
-                                            <?php endforeach; ?>
-                                        </div>
-                                    </div>
-                                <?php endforeach; ?>
-
-                                <!-- Empty state -->
-                                <div id="proj-empty"
-                                    style="display:none;grid-column:1/-1;padding:48px 24px;text-align:center">
-                                    <i class="fa-solid fa-magnifying-glass"
-                                        style="font-size:2rem;color:#cbd5e1;margin-bottom:12px;display:block"></i>
-                                    <p style="font-size:13px;font-weight:700;color:#94a3b8">ไม่พบระบบที่ค้นหา</p>
-                                    <p style="font-size:11px;color:#cbd5e1;margin-top:4px">
-                                        ลองเปลี่ยนคำค้นหาหรือล้างตัวกรอง</p>
+                                    <a href="<?= htmlspecialchars($primaryAction['url']) ?>" class="pinned-chip">
+                                        <span class="pinned-chip-ic <?= $pp['bg_color'] ?> <?= $pp['icon_color'] ?>">
+                                            <i class="fa-solid <?= $pp['icon'] ?>"></i>
+                                        </span>
+                                        <span class="pinned-chip-label"><?= htmlspecialchars($pp['title']) ?></span>
+                                    </a>
+                                    <?php endforeach; ?>
                                 </div>
                             </div>
+                            <?php else: ?>
+                            <!-- Helpful hint when no pins yet -->
+                            <div class="pinned-empty">
+                                <i class="fa-solid fa-thumbtack" style="color:#cbd5e1"></i>
+                                <div>
+                                    <strong>ปักหมุดระบบที่ใช้บ่อย</strong>
+                                    <p>ใน App Launcher คลิกไอคอนหมุดมุมขวาบนของการ์ด แล้วระบบนั้นจะมาโผล่ที่นี่ในคลิกเดียว</p>
+                                </div>
+                            </div>
+                            <?php endif; ?>
 
                         </section>
+
 
                         <!-- SIDEBAR (4/12) -->
                         <aside class="lg:col-span-4 flex flex-col gap-5 au d3">
@@ -1725,6 +1669,12 @@ try {
                 </div><!-- /section-dashboard inner -->
 
             </div><!-- /section-dashboard -->
+
+            <!-- ════════════ SECTION: APP LAUNCHER ════════════ -->
+            <div id="section-apps" class="portal-section"
+                style="<?= $activeSection==='apps'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); overflow-y:auto;">
+                <?php include __DIR__ . '/_partials/apps_launcher.php'; ?>
+            </div><!-- /section-apps -->
 
             <!-- ════════════ SECTION: ANNOUNCEMENTS ════════════ -->
             <div id="section-announcements" class="portal-section" 
@@ -5561,16 +5511,79 @@ try {
     const portalSteps = [
         { popover: { title: 'ยินดีต้อนรับสู่ Portal', description: 'ระบบจัดการคลินิก RSU Medical Clinic Services — ทัวร์สั้นๆ ดูเมนูหลักกัน' } },
         { element: '#portal-sidebar', popover: { title: 'Sidebar เมนู', description: 'เมนูจัดเป็นกลุ่ม (OVERVIEW / AI Suite / สิทธิ์ / ประกัน / สื่อสาร / คลังพัสดุ / ติดตามระบบ / ข้อมูลหลัก / ตั้งค่า) — คลิกหัวกลุ่มเพื่อเปิด/ปิด', side: 'right' } },
-        { element: '.psb-section-toggle[data-group="inventory"]', popover: { title: 'คลังพัสดุ (ใหม่)', description: 'รวมทางเข้า "ครุภัณฑ์สำนักงาน" + "วัสดุสิ้นเปลือง" ไว้กลุ่มเดียว', side: 'right' } },
+        { element: '#psb-apps-launcher', popover: { title: 'App Launcher (ใหม่!)', description: 'เมนูเปิดทุกระบบ (e-Borrow, ครุภัณฑ์, วัสดุ, Insurance Sync, ISO, LINE ฯลฯ) ย้ายมาอยู่ที่นี่แล้ว — Dashboard เลยโล่งขึ้น', side: 'right' } },
+        { element: '.psb-section-toggle[data-group="inventory"]', popover: { title: 'คลังพัสดุ', description: 'รวมทางเข้า "ครุภัณฑ์สำนักงาน" + "วัสดุสิ้นเปลือง" ไว้กลุ่มเดียว', side: 'right' } },
         { element: '[data-section="settings"]', popover: { title: 'ตั้งค่าระบบ', description: 'ที่อยู่ของ Site Settings, Maintenance, LINE, AI ฯลฯ', side: 'right' } },
         { popover: { title: 'เริ่มใช้งานได้เลย', description: 'กดปุ่ม <i class="fa-solid fa-question"></i> มุมขวาล่างเมื่อต้องการดูทัวร์ซ้ำได้ตลอด' } },
     ];
-    window.RsuTour && RsuTour.maybeAutoStart('portal', portalSteps);
+    window.RsuTour && RsuTour.maybeAutoStart('portal_v2', portalSteps);
     window._portalTourSteps = portalSteps;
+
+    // ── App Launcher migration banner: dismiss + mini-tour ─────────
+    const APPS_MIGR_KEY  = 'apps_migration_dismissed_v1';
+    const APPS_NEW_KEY   = 'apps_launcher_new_seen_v1';
+
+    document.addEventListener('DOMContentLoaded', function () {
+        const banner   = document.getElementById('apps-migration-banner');
+        const newBadge = document.getElementById('psb-apps-new-badge');
+        const dismissBtn = document.getElementById('apps-migration-dismiss');
+        const tourBtn  = document.getElementById('apps-migration-tour-btn');
+        const ctaBtn   = document.getElementById('apps-migration-cta');
+
+        // Hide banner if user previously dismissed it
+        try {
+            if (banner && localStorage.getItem(APPS_MIGR_KEY) === '1') {
+                banner.classList.add('is-dismissed');
+            }
+            if (newBadge && localStorage.getItem(APPS_NEW_KEY) === '1') {
+                newBadge.classList.add('is-dismissed');
+            }
+        } catch (e) { /* silent */ }
+
+        // Dismiss banner (does NOT hide the sidebar item or NEW badge)
+        if (dismissBtn && banner) {
+            dismissBtn.addEventListener('click', function () {
+                banner.classList.add('is-dismissed');
+                try { localStorage.setItem(APPS_MIGR_KEY, '1'); } catch (e) {}
+            });
+        }
+
+        // Mark NEW badge as seen once user clicks the sidebar item or CTA
+        function markSeen() {
+            try { localStorage.setItem(APPS_NEW_KEY, '1'); } catch (e) {}
+            if (newBadge) newBadge.classList.add('is-dismissed');
+        }
+        const sidebarApps = document.getElementById('psb-apps-launcher');
+        if (sidebarApps) sidebarApps.addEventListener('click', markSeen);
+        if (ctaBtn)      ctaBtn.addEventListener('click', markSeen);
+
+        // "ดูตำแหน่งใหม่" — mini-tour that highlights the new sidebar location
+        if (tourBtn && window.RsuTour) {
+            const miniSteps = [
+                { element: '#psb-apps-launcher', popover: {
+                    title: 'นี่คือทางเข้าใหม่ของ App Launcher',
+                    description: 'อยู่ใน sidebar กลุ่ม OVERVIEW · คลิกปุ่มนี้เมื่อใดก็ได้เพื่อเปิดหน้ารวมระบบทั้งหมด',
+                    side: 'right'
+                }},
+                { element: '#apps-migration-cta', popover: {
+                    title: 'หรือกดที่นี่ตอนนี้เลย',
+                    description: 'ไปยังหน้า App Launcher ทันที — ที่นั่นสามารถปักหมุดระบบที่ใช้บ่อย แล้วจะมาโผล่ที่ Dashboard ใต้แบนเนอร์นี้',
+                    side: 'top'
+                }},
+            ];
+            tourBtn.addEventListener('click', function () {
+                window.RsuTour.start(miniSteps, 'apps_migration');
+            });
+        }
+
+        // First-visit nudge: if user has never seen the new badge AND never dismissed,
+        // gently pulse the sidebar item so it draws the eye (animation already wired via CSS).
+        // (No popover here — popover only shows on portal tour or user-triggered mini-tour.)
+    });
 })();
 </script>
 <button id="rsu-tour-fab" type="button" aria-label="ดู Tour อีกครั้ง" title="ดู Tour อีกครั้ง"
-    onclick="window.RsuTour && RsuTour.start(window._portalTourSteps, 'portal')"
+    onclick="window.RsuTour && RsuTour.start(window._portalTourSteps, 'portal_v2')"
     style="position:fixed;bottom:20px;right:20px;width:44px;height:44px;border-radius:50%;border:none;background:#2e9e63;color:#fff;font-size:16px;cursor:pointer;box-shadow:0 4px 12px rgba(46,158,99,.35);z-index:90;transition:transform .15s">
     <i class="fa-solid fa-question"></i>
 </button>

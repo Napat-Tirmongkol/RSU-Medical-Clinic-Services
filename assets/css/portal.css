@@ -565,6 +565,212 @@ body {
 /* When sidebar is icon-collapsed: hide labels but keep items always visible */
 #portal-sidebar.collapsed .psb-section-toggle { opacity: 0; pointer-events: none; height: 0; padding: 0; margin: 0; }
 #portal-sidebar.collapsed .psb-group { max-height: none !important; opacity: 1 !important; pointer-events: auto !important; }
+#portal-sidebar.collapsed .psb-new-badge { display: none; }
+
+/* "NEW" badge inside sidebar items */
+.psb-new-badge {
+    margin-left: auto;
+    font-size: 8.5px;
+    font-weight: 900;
+    letter-spacing: .12em;
+    padding: 2px 7px;
+    border-radius: 99px;
+    color: #fff;
+    background: linear-gradient(135deg, #f59e0b, #f43f5e);
+    box-shadow: 0 4px 10px -3px rgba(245, 158, 11, .55);
+    animation: badgePulse 2.4s ease-in-out infinite;
+}
+.psb-new-badge.is-dismissed { display: none; }
+@keyframes badgePulse {
+    0%, 100% { transform: scale(1); box-shadow: 0 4px 10px -3px rgba(245,158,11,.55); }
+    50%      { transform: scale(1.06); box-shadow: 0 6px 16px -3px rgba(244,63,94,.6); }
+}
+
+/* ── App Launcher migration banner ────────────────────── */
+.apps-migration {
+    position: relative;
+    border-radius: 24px;
+    padding: 28px 26px;
+    color: #fff;
+    overflow: hidden;
+    background:
+        radial-gradient(at 90% 0%, rgba(110,231,183,.45), transparent 55%),
+        radial-gradient(at 10% 100%, rgba(217,70,239,.35), transparent 55%),
+        linear-gradient(135deg, #0f172a 0%, #1e3a3a 50%, #0f766e 100%);
+    box-shadow: 0 22px 50px -16px rgba(15,118,110,.45), inset 0 1px 0 rgba(255,255,255,.12);
+    animation: migrIn .6s cubic-bezier(.16,1,.3,1) both;
+}
+.apps-migration.is-dismissed { display: none; }
+@keyframes migrIn {
+    from { opacity: 0; transform: translateY(14px) scale(.98); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.apps-migration-glow {
+    position: absolute;
+    top: -40%; right: -10%;
+    width: 380px; height: 380px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(217,70,239,.35), transparent 65%);
+    filter: blur(20px);
+    pointer-events: none;
+    animation: migrGlow 8s ease-in-out infinite;
+}
+@keyframes migrGlow {
+    0%, 100% { transform: translate(0,0) scale(1); }
+    50%      { transform: translate(-20px, 14px) scale(1.08); }
+}
+.apps-migration-body { position: relative; z-index: 1; max-width: 720px; }
+.apps-migration-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 10.5px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: .18em;
+    padding: 6px 12px;
+    border-radius: 99px;
+    background: rgba(255,255,255,.16);
+    border: 1px solid rgba(255,255,255,.24);
+    color: #fef3c7;
+    margin-bottom: 14px;
+}
+.apps-migration-eyebrow i { color: #fbbf24; }
+.apps-migration-title {
+    font-size: clamp(1.35rem, 1rem + 1.2vw, 1.7rem);
+    font-weight: 900;
+    line-height: 1.25;
+    margin: 0 0 10px;
+    letter-spacing: -.015em;
+}
+.apps-migration-title span {
+    background: linear-gradient(90deg, #fbbf24, #f0abfc, #6ee7b7);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+    font-weight: 900;
+}
+.apps-migration-desc {
+    font-size: 13.5px;
+    line-height: 1.65;
+    color: rgba(255,255,255,.85);
+    margin-bottom: 18px;
+}
+.apps-migration-desc b { color: #fef3c7; font-weight: 800; }
+.apps-migration-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+}
+.apps-migration-cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 11px 20px;
+    border-radius: 14px;
+    background: #fff;
+    color: #0f766e;
+    font-size: 13px;
+    font-weight: 900;
+    letter-spacing: .01em;
+    text-decoration: none;
+    box-shadow: 0 12px 28px -6px rgba(255,255,255,.35);
+    transition: transform .2s, box-shadow .2s;
+}
+.apps-migration-cta:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 18px 36px -6px rgba(255,255,255,.55);
+}
+.apps-migration-ghost {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 11px 16px;
+    border-radius: 14px;
+    background: rgba(255,255,255,.08);
+    color: #fff;
+    border: 1px solid rgba(255,255,255,.22);
+    font-size: 12.5px;
+    font-weight: 800;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background .2s, border-color .2s;
+}
+.apps-migration-ghost:hover { background: rgba(255,255,255,.18); border-color: rgba(255,255,255,.4); }
+.apps-migration-dismiss {
+    margin-left: auto;
+    width: 32px; height: 32px;
+    border-radius: 10px;
+    background: rgba(255,255,255,.06);
+    color: #fff;
+    border: 1px solid rgba(255,255,255,.18);
+    cursor: pointer;
+    font-size: 11px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background .15s, transform .15s;
+}
+.apps-migration-dismiss:hover { background: rgba(244,63,94,.3); transform: rotate(90deg); }
+
+/* ── Pinned apps strip on dashboard ───────────────────── */
+.pinned-strip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+.pinned-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px 10px 10px;
+    background: #fff;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 14px;
+    color: #0f172a;
+    text-decoration: none;
+    font-size: 12.5px;
+    font-weight: 800;
+    transition: transform .18s, box-shadow .18s, border-color .18s;
+    box-shadow: 0 2px 8px rgba(15,23,42,.04);
+}
+.pinned-chip:hover {
+    transform: translateY(-2px);
+    border-color: #c7e8d5;
+    box-shadow: 0 10px 22px -8px rgba(46,158,99,.30);
+}
+.pinned-chip-ic {
+    width: 30px; height: 30px;
+    border-radius: 9px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    border: 1px solid currentColor;
+    flex-shrink: 0;
+    opacity: .9;
+}
+.pinned-chip-label {
+    max-width: 200px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.pinned-empty {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 16px 18px;
+    background: #fff;
+    border: 1.5px dashed #cbd5e1;
+    border-radius: 16px;
+    color: #475569;
+}
+.pinned-empty i { font-size: 20px; margin-top: 2px; }
+.pinned-empty strong { display: block; font-size: 13px; font-weight: 800; color: #0f172a; }
+.pinned-empty p { font-size: 12px; color: #64748b; margin-top: 3px; line-height: 1.55; }
 
 @media (max-width: 767px) {
     #portal-sidebar { display: none; }
