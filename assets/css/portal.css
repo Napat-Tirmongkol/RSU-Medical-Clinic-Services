@@ -1350,15 +1350,11 @@ body[data-theme='dark'] .pin-btn.active {
     color: var(--c-ink-4); font-size: 11px;
 }
 
-/* ── Asymmetric Project Grid ───────────────────────────── */
-@media (min-width: 1024px) {
-    #project-container.grid {
-        grid-template-columns: 1.4fr 1fr 1fr;
-    }
-    #project-container.grid > .proj-card:first-of-type {
-        grid-column: span 2;
-    }
-}
+/* ── Asymmetric Project Grid (deprecated) ──────────────
+   เคยใช้กับ dashboard เพื่อให้การ์ดแรกเป็น hero (span 2)
+   ตอนนี้ project-container ย้ายไปอยู่ App Launcher ที่ทุกการ์ดเท่ากัน
+   จึงปล่อยให้ Tailwind `lg:grid-cols-3` ทำงานตามปกติ
+   ──────────────────────────────────────────────────── */
 
 /* ── Refined sec-title to use new tokens ───────────────── */
 .sec-title {
