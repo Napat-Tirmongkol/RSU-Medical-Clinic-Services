@@ -75,6 +75,28 @@ $_eml_typeLabels = [
 .eml-search-input{width:100%;padding:.6rem 1rem;background:#f9fafb;border:1.5px solid #e5e7eb;border-radius:.875rem;font-size:.85rem;font-weight:500;outline:none;transition:.2s}
 .eml-search-input:focus{background:#fff;border-color:#6366f1;box-shadow:0 0 0 3px rgba(99,102,241,.1)}
 @media(max-width:900px){.eml-row{grid-template-columns:1fr 1fr;row-gap:4px}.eml-col-id{display:none}}
+
+/* ── Email Logs — DARK MODE ─────────────────────────────── */
+body[data-theme='dark'] #section-email_logs .eml-status-sent { background:rgba(16,185,129,.18); color:#6ee7b7; }
+body[data-theme='dark'] #section-email_logs .eml-status-failed { background:rgba(244,63,94,.18); color:#fb7185; }
+body[data-theme='dark'] #section-email_logs .eml-search-input { background:#0b1220; border-color:#1e293b; color:#e2e8f0; }
+body[data-theme='dark'] #section-email_logs .eml-search-input:focus { background:#0f172a; border-color:#6366f1; }
+body[data-theme='dark'] #section-email_logs .bg-white { background:#0f172a !important; }
+body[data-theme='dark'] #section-email_logs .bg-gray-50 { background: rgba(148,163,184,.08) !important; }
+body[data-theme='dark'] #section-email_logs .bg-gray-100 { background: rgba(148,163,184,.14) !important; }
+body[data-theme='dark'] #section-email_logs .bg-slate-50 { background: rgba(148,163,184,.08) !important; }
+body[data-theme='dark'] #section-email_logs .text-gray-900 { color:#f1f5f9 !important; }
+body[data-theme='dark'] #section-email_logs .text-gray-700 { color:#e2e8f0 !important; }
+body[data-theme='dark'] #section-email_logs .text-gray-500 { color:#94a3b8 !important; }
+body[data-theme='dark'] #section-email_logs .text-gray-400 { color:#64748b !important; }
+body[data-theme='dark'] #section-email_logs .text-slate-700 { color:#e2e8f0 !important; }
+body[data-theme='dark'] #section-email_logs .text-slate-500 { color:#94a3b8 !important; }
+body[data-theme='dark'] #section-email_logs .border-gray-200 { border-color:#1e293b !important; }
+body[data-theme='dark'] #section-email_logs .border-gray-100 { border-color:#1e293b !important; }
+body[data-theme='dark'] #section-email_logs .border-slate-200 { border-color:#1e293b !important; }
+body[data-theme='dark'] #section-email_logs table th { background:#1e293b !important; color:#cbd5e1 !important; }
+body[data-theme='dark'] #section-email_logs table td { border-color:#1e293b !important; color:#e2e8f0; }
+body[data-theme='dark'] #section-email_logs table tbody tr:hover { background:#0b1220 !important; }
 </style>
 
 <div class="p-6">

@@ -364,6 +364,12 @@
   border-radius: 50%;
   animation: smSpin .7s linear infinite;
 }
+
+/* ── Satisfaction Modal — DARK MODE ─────────────────────────────── */
+body[data-theme='dark'] .sm-modal { background:#0f172a; color:#e2e8f0; }
+body[data-theme='dark'] .sm-textarea { background:#0b1220; border-color:#1e293b; color:#e2e8f0; }
+body[data-theme='dark'] .sm-textarea::placeholder { color:#475569; }
+body[data-theme='dark'] .sm-textarea:focus { background:#0f172a; }
 </style>
 
 <!-- ══ Script ══ -->

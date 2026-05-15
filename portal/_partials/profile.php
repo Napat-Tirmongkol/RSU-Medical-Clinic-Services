@@ -166,6 +166,38 @@ $accessLabels = [
         display: flex; align-items: center; justify-content: center;
         font-size: 14px; flex-shrink: 0;
     }
+
+    /* ── Bold & Colorful + DARK MODE ─────────────────────────────── */
+    #section-profile .pf-card { isolation: isolate; transition: transform .25s cubic-bezier(.16,1,.3,1), box-shadow .25s ease, border-color .25s ease; }
+    #section-profile .pf-card.fx-tilt:hover { --lift: -3px; box-shadow:0 18px 36px -18px rgba(16,185,129,.30); border-color:rgba(16,185,129,.30); }
+
+    body[data-theme='dark'] #section-profile .pf-card { background:#0f172a; border-color:#1e293b; box-shadow: 0 1px 0 rgba(255,255,255,.04), 0 8px 22px rgba(0,0,0,.35); }
+    body[data-theme='dark'] #section-profile .pf-card-head { background:#1e293b; border-color:#334155; }
+    body[data-theme='dark'] #section-profile .pf-card-head h3 { color:#f1f5f9; }
+    body[data-theme='dark'] #section-profile .pf-input { background:#0b1220; border-color:#1e293b; color:#e2e8f0; }
+    body[data-theme='dark'] #section-profile .pf-input:focus { background:#0f172a; }
+    body[data-theme='dark'] #section-profile .pf-input:disabled { background:rgba(148,163,184,.08); color:#64748b; }
+    body[data-theme='dark'] #section-profile .pf-label { color:#cbd5e1; }
+    body[data-theme='dark'] #section-profile .pf-access-row { background:#1e293b; border-color:#334155; }
+    body[data-theme='dark'] #section-profile .pf-access-row.is-on { background:rgba(16,185,129,.18); border-color:rgba(16,185,129,.30); }
+
+    body[data-theme='dark'] #section-profile .bg-white { background:#0f172a !important; }
+    body[data-theme='dark'] #section-profile .bg-slate-50 { background: rgba(148,163,184,.08) !important; }
+    body[data-theme='dark'] #section-profile .bg-slate-100 { background: rgba(148,163,184,.14) !important; }
+    body[data-theme='dark'] #section-profile .bg-emerald-50 { background: rgba(16,185,129,.18) !important; }
+    body[data-theme='dark'] #section-profile .bg-amber-50 { background: rgba(245,158,11,.18) !important; }
+    body[data-theme='dark'] #section-profile .bg-blue-50 { background: rgba(59,130,246,.18) !important; }
+    body[data-theme='dark'] #section-profile .text-slate-900 { color:#f1f5f9 !important; }
+    body[data-theme='dark'] #section-profile .text-slate-800 { color:#f1f5f9 !important; }
+    body[data-theme='dark'] #section-profile .text-slate-700 { color:#e2e8f0 !important; }
+    body[data-theme='dark'] #section-profile .text-slate-500 { color:#94a3b8 !important; }
+    body[data-theme='dark'] #section-profile .text-slate-400 { color:#64748b !important; }
+    body[data-theme='dark'] #section-profile .border-slate-200 { border-color:#1e293b !important; }
+    body[data-theme='dark'] #section-profile .border-slate-100 { border-color:#1e293b !important; }
+
+    @media (prefers-reduced-motion: reduce) {
+        #section-profile .pf-card { transition: none !important; transform: none !important; }
+    }
 </style>
 
 <div class="max-w-[900px] mx-auto px-4 md:px-8 py-6 space-y-6">
@@ -196,7 +228,7 @@ $accessLabels = [
     <?php endif; ?>
 
     <?php if (!$me): ?>
-        <div class="pf-card">
+        <div class="pf-card fx-tilt fx-tilt-light" data-tilt="3">
             <div class="pf-card-body text-center text-rose-600 font-bold py-12">
                 <i class="fa-solid fa-user-slash text-3xl mb-3 block"></i>
                 ไม่พบข้อมูลผู้ใช้ในระบบ
@@ -269,7 +301,7 @@ $accessLabels = [
         </form>
 
         <!-- สิทธิ์การเข้าถึงระบบ -->
-        <div class="pf-card">
+        <div class="pf-card fx-tilt fx-tilt-light" data-tilt="3">
             <div class="pf-card-head">
                 <i class="fa-solid fa-key text-emerald-600"></i>
                 <h3>สิทธิ์การเข้าถึงระบบ</h3>

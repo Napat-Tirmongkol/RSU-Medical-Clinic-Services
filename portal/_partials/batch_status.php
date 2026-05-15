@@ -38,7 +38,7 @@ $stages = ins_batch_stepper_stages();
     <!-- ─── Stats cards by status ─── -->
     <div id="bsStatsGrid" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:.85rem; margin-bottom:1.25rem;">
         <?php foreach ($labels as $st => [$label, $color, $icon]): ?>
-        <div class="bs-stat" data-status="<?= htmlspecialchars($st) ?>" onclick="bsFilterByStatus('<?= htmlspecialchars($st) ?>')">
+        <div class="bs-stat fx-tilt fx-tilt-light" data-tilt="4" data-status="<?= htmlspecialchars($st) ?>" onclick="bsFilterByStatus('<?= htmlspecialchars($st) ?>')">
             <div style="font-size:1.5rem; color:<?= $color ?>;"><i class="fa-solid fa-<?= $icon ?>"></i></div>
             <div style="font-size:1.6rem; font-weight:900; color:#0f172a; line-height:1;" data-count="0">0</div>
             <div style="font-size:.72rem; color:#64748b; font-weight:700; text-transform:uppercase; letter-spacing:.05em;">
@@ -206,6 +206,37 @@ $stages = ins_batch_stepper_stages();
 
 /* SweetAlert2 must sit above the detail drawer (z-index:9999) */
 .swal2-container { z-index: 100000 !important; }
+
+/* ── Bold & Colorful + DARK MODE ─────────────────────────────── */
+#section-batch_status .bs-stat { isolation: isolate; transition: transform .25s cubic-bezier(.16,1,.3,1), box-shadow .25s ease, border-color .25s ease; }
+#section-batch_status .bs-stat.fx-tilt:hover { --lift: -3px; box-shadow:0 18px 36px -18px rgba(6,182,212,.30); border-color:rgba(6,182,212,.30); }
+
+body[data-theme='dark'] #section-batch_status .bs-stat { background:#0f172a !important; border-color:#1e293b !important; }
+body[data-theme='dark'] #section-batch_status .bs-stat:hover { border-color:#06b6d4 !important; }
+body[data-theme='dark'] #section-batch_status .bs-table th { background:rgba(8,145,178,.18) !important; color:#67e8f9 !important; }
+body[data-theme='dark'] #section-batch_status .bs-table td { border-color:#1e293b !important; color:#e2e8f0; }
+body[data-theme='dark'] #section-batch_status .bs-table tbody tr:hover { background:#0b1220 !important; }
+body[data-theme='dark'] #section-batch_status .bs-event-icon { background:rgba(8,145,178,.18); color:#67e8f9; }
+body[data-theme='dark'] #section-batch_status .bs-btn-secondary { background:#334155; color:#e2e8f0; }
+body[data-theme='dark'] #section-batch_status .bs-btn-secondary:hover { background:#475569; }
+body[data-theme='dark'] #section-batch_status .bs-step-dot { background:#1e293b; color:#94a3b8; }
+body[data-theme='dark'] #section-batch_status .bs-step-dot.done { background:#10b981; color:#0f172a; }
+
+body[data-theme='dark'] #section-batch_status .bg-white { background:#0f172a !important; }
+body[data-theme='dark'] #section-batch_status .bg-slate-50 { background: rgba(148,163,184,.08) !important; }
+body[data-theme='dark'] #section-batch_status .bg-slate-100 { background: rgba(148,163,184,.14) !important; }
+body[data-theme='dark'] #section-batch_status .text-slate-900 { color:#f1f5f9 !important; }
+body[data-theme='dark'] #section-batch_status .text-slate-800 { color:#f1f5f9 !important; }
+body[data-theme='dark'] #section-batch_status .text-slate-700 { color:#e2e8f0 !important; }
+body[data-theme='dark'] #section-batch_status .text-slate-500 { color:#94a3b8 !important; }
+body[data-theme='dark'] #section-batch_status .text-slate-400 { color:#64748b !important; }
+body[data-theme='dark'] #section-batch_status .border-slate-200 { border-color:#1e293b !important; }
+body[data-theme='dark'] #section-batch_status .border-slate-100 { border-color:#1e293b !important; }
+body[data-theme='dark'] #section-batch_status input,
+body[data-theme='dark'] #section-batch_status select,
+body[data-theme='dark'] #section-batch_status textarea {
+    background:#0b1220 !important; border-color:#1e293b !important; color:#e2e8f0 !important;
+}
 </style>
 
 <script>

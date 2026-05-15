@@ -57,6 +57,17 @@ $_st_overallPass = $_st_hasDsn && $_st_vendorExists && $_st_sdkLoaded && $_st_hu
 .st-row-pass{background:#f0fdf4;border-color:#bbf7d0}
 .st-row-fail{background:#fef2f2;border-color:#fecaca}
 .st-row-skip{background:#f9fafb;border-color:#e5e7eb}
+
+/* ── Sentry Test — DARK MODE ─────────────────────────────── */
+body[data-theme='dark'] #section-sentry_test .st-row-pass { background: rgba(16,185,129,.18); border-color: rgba(16,185,129,.30); }
+body[data-theme='dark'] #section-sentry_test .st-row-fail { background: rgba(244,63,94,.18); border-color: rgba(244,63,94,.30); }
+body[data-theme='dark'] #section-sentry_test .st-row-skip { background: rgba(148,163,184,.10); border-color:#1e293b; }
+body[data-theme='dark'] #section-sentry_test .bg-white { background:#0f172a !important; }
+body[data-theme='dark'] #section-sentry_test .text-gray-900 { color:#f1f5f9 !important; }
+body[data-theme='dark'] #section-sentry_test .text-gray-700 { color:#e2e8f0 !important; }
+body[data-theme='dark'] #section-sentry_test .text-gray-500 { color:#94a3b8 !important; }
+body[data-theme='dark'] #section-sentry_test .border-gray-200 { border-color:#1e293b !important; }
+body[data-theme='dark'] #section-sentry_test .border-gray-100 { border-color:#1e293b !important; }
 </style>
 
 <div class="p-6">
