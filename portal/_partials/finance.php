@@ -222,7 +222,7 @@ body[data-theme='dark'] .fin-leg-row .pct  { color:#94a3b8; }
             <button class="fin-chip is-active" data-range="this_month">เดือนนี้</button>
             <button class="fin-chip" data-range="last_month">เดือนก่อน</button>
             <button class="fin-chip" data-range="last_3">3 เดือนล่าสุด</button>
-            <button class="fin-chip" data-range="ytd">ตั้งแต่ต้นปี (YTD)</button>
+            <button class="fin-chip" data-range="ytd">ปีนี้</button>
             <button class="fin-chip" data-range="last_year">ปีที่แล้ว</button>
             <button class="fin-chip" data-range="all">ทั้งหมด</button>
         </div>
@@ -900,8 +900,12 @@ body[data-theme='dark'] .fin-leg-row .pct  { color:#94a3b8; }
                 to   = new Date(now.getFullYear(), now.getMonth() + 1, 0);
                 break;
             case 'ytd':
+                // "ปีนี้" = ครอบทั้งปี (ม.ค. → ธ.ค.) เพื่อให้รายการในอนาคต
+                // เช่น เงินเดือนสิ้นเดือน หรือ recurring ที่ตั้งไว้ ติดมาด้วย
+                // (มาตรฐาน finance YTD จะถึงแค่วันนี้ แต่ผู้ใช้ส่วนใหญ่
+                //  คาดหวังให้เห็น "ทั้งปี" สอดคล้องกับ "ปีที่แล้ว")
                 from = new Date(now.getFullYear(), 0, 1);
-                to   = new Date(now);
+                to   = new Date(now.getFullYear(), 11, 31);
                 break;
             case 'last_year':
                 from = new Date(now.getFullYear() - 1, 0, 1);
