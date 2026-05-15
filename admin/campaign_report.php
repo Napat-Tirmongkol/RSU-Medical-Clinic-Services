@@ -157,6 +157,20 @@ if ($campaign) {
     } catch (PDOException) {}
 }
 
+// ── Aggregate slot utilization by day (รายงานสรุปย่อยุบจากรายรอบ → รายวัน) ──
+$dailySlotAgg = [];
+foreach ($slotUtil as $sl) {
+    $d = $sl['slot_date'];
+    if (!isset($dailySlotAgg[$d])) {
+        $dailySlotAgg[$d] = ['date' => $d, 'slots' => 0, 'capacity' => 0, 'booked' => 0, 'attended' => 0];
+    }
+    $dailySlotAgg[$d]['slots']++;
+    $dailySlotAgg[$d]['capacity'] += (int)$sl['max_capacity'];
+    $dailySlotAgg[$d]['booked']   += (int)$sl['booked'];
+    $dailySlotAgg[$d]['attended'] += (int)$sl['attended'];
+}
+$dailySlotAgg = array_values($dailySlotAgg);
+
 // ─────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────
@@ -639,34 +653,34 @@ $today = date('Y-m-d');
     </div>
     <?php endif; ?>
 
-    <!-- Slot utilization -->
-    <?php if (!empty($slotUtil)): ?>
-    <div class="cr-h"><i class="fa-regular fa-calendar-check text-[#2e9e63]"></i> การใช้งานรายรอบ (Slot Utilization)</div>
+    <!-- Slot utilization (รายวัน — ยุบจากรายรอบ) -->
+    <?php if (!empty($dailySlotAgg)): ?>
+    <div class="cr-h"><i class="fa-regular fa-calendar-check text-[#2e9e63]"></i> สรุปการใช้งานรายวัน (Daily Utilization)</div>
     <table class="cr-table">
         <thead>
             <tr>
-                <th>วันที่</th>
-                <th>รอบเวลา</th>
+                <th>วันที่จัดงาน</th>
+                <th style="text-align:center;">จำนวนรอบ</th>
+                <th style="text-align:center;">ความจุรวม</th>
                 <th style="text-align:center;">จอง</th>
                 <th style="text-align:center;">เข้าร่วม</th>
-                <th style="text-align:center;">ความจุ</th>
                 <th>การใช้งาน</th>
             </tr>
         </thead>
         <tbody>
-            <?php foreach ($slotUtil as $sl):
-                $maxCap = (int)$sl['max_capacity'];
-                $booked = (int)$sl['booked'];
-                $att    = (int)$sl['attended'];
+            <?php foreach ($dailySlotAgg as $d):
+                $maxCap = (int)$d['capacity'];
+                $booked = (int)$d['booked'];
+                $att    = (int)$d['attended'];
                 $pct    = $maxCap > 0 ? round($booked / $maxCap * 100) : 0;
                 $color  = $pct >= 90 ? '#dc2626' : ($pct >= 60 ? '#f59e0b' : '#22c55e');
             ?>
             <tr>
-                <td><?= thDate($sl['slot_date']) ?></td>
-                <td><?= substr($sl['start_time'], 0, 5) ?>–<?= substr($sl['end_time'], 0, 5) ?></td>
-                <td style="text-align:center;font-weight:700;"><?= $booked ?></td>
-                <td style="text-align:center;color:#15803d;font-weight:700;"><?= $att ?></td>
-                <td style="text-align:center;"><?= $maxCap ?></td>
+                <td><?= thDate($d['date']) ?></td>
+                <td style="text-align:center;"><?= number_format((int)$d['slots']) ?> รอบ</td>
+                <td style="text-align:center;"><?= number_format($maxCap) ?></td>
+                <td style="text-align:center;font-weight:700;"><?= number_format($booked) ?></td>
+                <td style="text-align:center;color:#15803d;font-weight:700;"><?= number_format($att) ?></td>
                 <td>
                     <div style="display:flex;align-items:center;gap:8px;">
                         <div style="flex:1;height:10px;background:#f1f5f9;border-radius:5px;overflow:hidden;">
@@ -679,52 +693,30 @@ $today = date('Y-m-d');
             <?php endforeach; ?>
         </tbody>
     </table>
+    <p style="font-size:9.5pt;color:#94a3b8;margin-top:-4px;">
+        <i class="fa-solid fa-circle-info"></i>
+        รวมจาก <?= count($slotUtil) ?> รอบ ใน <?= count($dailySlotAgg) ?> วัน · ดูรายละเอียดรายรอบใน CSV
+    </p>
     <?php endif; ?>
 
-    <!-- Participants -->
+    <!-- Participants summary callout (ยุบตารางรายชื่อ → callout ดาวน์โหลด) -->
     <?php if (!empty($participants)): ?>
-    <div class="cr-h"><i class="fa-solid fa-users text-[#2e9e63]"></i> รายชื่อผู้เข้าร่วม (Participants — <?= number_format(count($participants)) ?> รายการ)</div>
-    <table class="cr-table">
-        <thead>
-            <tr>
-                <th style="width:38px;">#</th>
-                <th>ชื่อ-นามสกุล / รหัส</th>
-                <th>เบอร์โทร</th>
-                <th>วันที่ / รอบเวลา</th>
-                <th>เช็คอิน</th>
-                <th>สถานะ</th>
-            </tr>
-        </thead>
-        <tbody>
-            <?php $i = 0; foreach ($participants as $p): $i++;
-                $cs = calcStatus($p, $today);
-                $pillClass = 'cr-status-' . $cs;
-                $pillLabel = match($cs) {
-                    'attended'  => '<i class="fa-solid fa-check-double"></i> มาเข้าร่วม',
-                    'absent'    => '<i class="fa-solid fa-xmark"></i> ขาด',
-                    'upcoming'  => '<i class="fa-solid fa-hourglass-half"></i> รอเข้าร่วม',
-                    'cancelled' => '<i class="fa-solid fa-ban"></i> ' . statusLabel($p['status']),
-                };
-            ?>
-            <tr>
-                <td style="color:#94a3b8;font-weight:700;"><?= $i ?></td>
-                <td>
-                    <div style="font-weight:700;color:#0f172a;"><?= htmlspecialchars($p['full_name']) ?></div>
-                    <div style="font-size:9pt;color:#0052CC;font-weight:600;"><?= htmlspecialchars($p['student_personnel_id'] ?? '—') ?></div>
-                </td>
-                <td><?= htmlspecialchars($p['phone_number'] ?? '—') ?></td>
-                <td>
-                    <div><?= thDate($p['slot_date']) ?></div>
-                    <div style="font-size:9pt;color:#64748b;"><?= substr($p['start_time'], 0, 5) ?>–<?= substr($p['end_time'], 0, 5) ?></div>
-                </td>
-                <td style="font-size:9.5pt;color:#0052CC;font-weight:600;">
-                    <?= $p['attended_at'] ? date('d/m/y H:i', strtotime($p['attended_at'])) : '—' ?>
-                </td>
-                <td><span class="cr-status-pill <?= $pillClass ?>"><?= $pillLabel ?></span></td>
-            </tr>
-            <?php endforeach; ?>
-        </tbody>
-    </table>
+    <div class="cr-h"><i class="fa-solid fa-users text-[#2e9e63]"></i> รายชื่อผู้เข้าร่วม</div>
+    <div style="background:linear-gradient(135deg,#f0fdf4,#ecfdf5);border:1.5px solid #bbf7d0;border-radius:14px;padding:18px 22px;display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:240px;">
+            <div style="font-size:11pt;font-weight:800;color:#15803d;letter-spacing:.04em;text-transform:uppercase;margin-bottom:4px;">
+                <i class="fa-solid fa-database"></i> ผู้ลงทะเบียนทั้งหมด <?= number_format(count($participants)) ?> รายการ
+            </div>
+            <p style="font-size:10.5pt;color:#475569;margin:0;line-height:1.5;">
+                ตารางรายชื่อทั้งหมดมีจำนวนมากเกินกว่าจะใส่ในรายงานสรุป
+                <strong>กรุณาดาวน์โหลด CSV</strong> เพื่อดูรายละเอียด รหัส ชื่อ-นามสกุล เบอร์โทร รอบที่จอง สถานะ และเวลาเช็คอินครบทุกรายการ
+            </p>
+        </div>
+        <a href="?id=<?= (int)$campaignId ?>&export=csv" class="no-print"
+            style="display:inline-flex;align-items:center;gap:8px;padding:12px 20px;border-radius:12px;background:#15803d;color:#fff;font-weight:800;font-size:13px;text-decoration:none;box-shadow:0 4px 14px rgba(21,128,61,.3);white-space:nowrap;">
+            <i class="fa-solid fa-file-csv"></i> ดาวน์โหลด CSV
+        </a>
+    </div>
     <?php endif; ?>
 
     <!-- Footer -->
