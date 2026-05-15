@@ -144,6 +144,9 @@ body[data-theme='dark'] .fin-leg-row .pct  { color:#94a3b8; }
             <button id="finBtnExport" class="btn-solid bg-slate-100 text-slate-700 hover:bg-slate-200 text-sm" title="ดาวน์โหลด CSV ตามตัวกรองที่เลือก">
                 <i class="fa-solid fa-file-csv"></i> CSV
             </button>
+            <button id="finBtnRecurring" class="btn-solid bg-indigo-500 text-white hover:bg-indigo-600 text-sm" title="ค่าใช้จ่ายประจำ — สร้างให้อัตโนมัติทุกเดือน">
+                <i class="fa-solid fa-rotate"></i> รายการประจำ
+            </button>
             <button id="finBtnCategories" class="btn-solid bg-amber-500 text-white hover:bg-amber-600 text-sm">
                 <i class="fa-solid fa-tags"></i> จัดการหมวดหมู่
             </button>
@@ -398,6 +401,9 @@ body[data-theme='dark'] .fin-leg-row .pct  { color:#94a3b8; }
                     <td>${refDisplay}</td>
                     <td class="text-center whitespace-nowrap">
                         <a href="finance_receipt.php?id=${row.id}" target="_blank" class="text-slate-500 hover:text-[#2e9e63] mr-2" title="พิมพ์ใบเสร็จ"><i class="fa-solid fa-print"></i></a>
+                        <button onclick="finOpenDetails(${row.id})" class="text-slate-500 hover:text-indigo-600 mr-2" title="ไฟล์แนบ + ประวัติ">
+                            <i class="fa-solid fa-paperclip"></i>${row.attachment_count > 0 ? `<span class="text-[10px] font-bold text-indigo-600 align-super">${row.attachment_count}</span>` : ''}
+                        </button>
                         <button onclick='finEditRow(${JSON.stringify(row).replace(/'/g, "&#39;")})' class="text-[#2e9e63] hover:text-[#27845a] mr-2" title="แก้ไข"><i class="fa-solid fa-pen"></i></button>
                         <button onclick="finDeleteRow(${row.id})" class="text-rose-500 hover:text-rose-700" title="ลบ"><i class="fa-solid fa-trash"></i></button>
                     </td>
@@ -1008,8 +1014,286 @@ body[data-theme='dark'] .fin-leg-row .pct  { color:#94a3b8; }
         load(currentPage);
     };
 
+    // ── Recurring rules modal ──────────────────────────────
+    async function openRecurringModal() {
+        const r = await fetch(AJAX + '?action=recurring:list', { credentials: 'same-origin' });
+        const j = await r.json();
+        if (!j.ok) { Swal.fire({ icon: 'error', title: 'โหลดไม่สำเร็จ' }); return; }
+        const rows = j.rows || [];
+        const ym = new Date().toISOString().slice(0, 7);
+        const rowsHtml = rows.length === 0
+            ? '<div class="text-center py-8 text-slate-400 text-sm">ยังไม่มีรายการประจำ — กด "+ เพิ่ม" เพื่อสร้างใหม่</div>'
+            : `<table class="fin-table"><thead><tr>
+                  <th>สถานะ</th><th>ชื่อรายการ</th><th>ประเภท</th><th>ทุกวันที่</th>
+                  <th style="text-align:right">จำนวน</th><th>เดือนล่าสุด</th><th></th>
+               </tr></thead><tbody>${rows.map(r => `
+                  <tr>
+                    <td><label class="inline-flex items-center cursor-pointer">
+                        <input type="checkbox" ${r.active == 1 ? 'checked' : ''} onchange="finRecToggle(${r.id})" class="mr-1" style="accent-color:#2e9e63">
+                        <span class="text-[10px] font-bold ${r.active == 1 ? 'text-emerald-600' : 'text-slate-400'}">${r.active == 1 ? 'ON' : 'OFF'}</span>
+                    </label></td>
+                    <td><b>${escapeHtml(r.name)}</b>${r.description ? `<br><span class="text-[10px] text-slate-400">${escapeHtml(r.description)}</span>` : ''}</td>
+                    <td>${r.kind === 'income' ? '<span class="text-emerald-600 text-xs font-bold">⬆ รายได้</span>' : '<span class="text-rose-600 text-xs font-bold">⬇ รายจ่าย</span>'}<br><span class="text-[10px] text-slate-500">${escapeHtml(r.category_name || '-')}</span></td>
+                    <td class="text-center"><span class="px-2 py-0.5 bg-slate-100 rounded text-xs font-bold">${r.day_of_month}</span></td>
+                    <td class="text-right font-bold">${fmt(r.amount)}</td>
+                    <td class="text-[11px] text-slate-500">${r.last_generated_ym === ym ? '<span class="text-emerald-600 font-bold">✓ ' + ym + '</span>' : (r.last_generated_ym || '-')}</td>
+                    <td class="text-right whitespace-nowrap">
+                        <button onclick='finRecEdit(${JSON.stringify(r).replace(/'/g, "&#39;")})' class="text-[#2e9e63] hover:text-[#27845a] mr-2" title="แก้ไข"><i class="fa-solid fa-pen"></i></button>
+                        <button onclick="finRecRun(${r.id})" class="text-indigo-500 hover:text-indigo-700 mr-2" title="สร้างทันที"><i class="fa-solid fa-bolt"></i></button>
+                        <button onclick="finRecDelete(${r.id})" class="text-rose-500 hover:text-rose-700" title="ลบ"><i class="fa-solid fa-trash"></i></button>
+                    </td>
+                  </tr>`).join('')}</tbody></table>`;
+
+        Swal.fire({
+            title: 'รายการประจำ (ค่าใช้จ่ายเดือนละครั้ง)',
+            width: 880,
+            html: `<div class="text-left space-y-3">
+                <p class="text-xs text-slate-500">ระบบจะสร้างรายการเหล่านี้อัตโนมัติเมื่อถึงวันที่กำหนด หรือกด <i class="fa-solid fa-bolt"></i> เพื่อสร้างทันที</p>
+                ${rowsHtml}
+                <button onclick="finRecEdit(null)" class="btn-solid bg-brand-500 text-white hover:bg-brand-600 text-sm">
+                    <i class="fa-solid fa-plus"></i> เพิ่มรายการประจำ
+                </button>
+            </div>`,
+            showCloseButton: true, showConfirmButton: false,
+        });
+    }
+    window.finRecEdit = async function (rec) {
+        const isEdit = !!rec;
+        const cats = cachedCategories;
+        const kind = rec?.kind || 'expense';
+        const buildCatOpts = (k, sel) => cats.filter(c => c.kind === k).map(c =>
+            `<option value="${c.id}" ${String(c.id) === String(sel) ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('');
+
+        const { value } = await Swal.fire({
+            title: isEdit ? 'แก้ไขรายการประจำ' : 'เพิ่มรายการประจำ',
+            width: 540,
+            html: `<div class="text-left space-y-3">
+                <div><label class="text-xs font-bold text-slate-600 mb-1 block">ชื่อรายการ *</label>
+                    <input type="text" id="frcName" class="swal2-input" style="margin:0;width:100%" value="${escapeHtml(rec?.name || '')}" placeholder="เช่น ค่าเช่าออฟฟิศ"></div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div><label class="text-xs font-bold text-slate-600 mb-1 block">ประเภท *</label>
+                        <select id="frcKind" class="swal2-input" style="margin:0;width:100%" onchange="document.getElementById('frcCat').innerHTML = window._finBuildRecCatOpts(this.value, '')">
+                            <option value="expense" ${kind === 'expense' ? 'selected' : ''}>รายจ่าย</option>
+                            <option value="income"  ${kind === 'income'  ? 'selected' : ''}>รายได้</option>
+                        </select></div>
+                    <div><label class="text-xs font-bold text-slate-600 mb-1 block">หมวด</label>
+                        <select id="frcCat" class="swal2-input" style="margin:0;width:100%">${buildCatOpts(kind, rec?.category_id)}</select></div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div><label class="text-xs font-bold text-slate-600 mb-1 block">จำนวนเงิน (บาท) *</label>
+                        <input type="number" id="frcAmount" class="swal2-input" style="margin:0;width:100%" step="0.01" min="0" value="${rec?.amount || ''}"></div>
+                    <div><label class="text-xs font-bold text-slate-600 mb-1 block">สร้างทุกวันที่ * (1-28)</label>
+                        <input type="number" id="frcDay" class="swal2-input" style="margin:0;width:100%" min="1" max="28" value="${rec?.day_of_month || 1}"></div>
+                </div>
+                <div><label class="text-xs font-bold text-slate-600 mb-1 block">คำอธิบาย</label>
+                    <input type="text" id="frcDesc" class="swal2-input" style="margin:0;width:100%" value="${escapeHtml(rec?.description || '')}" placeholder="เช่น ค่าเช่าอาคารสำนักงาน — เดือน"></div>
+                <div><label class="text-xs font-bold text-slate-600 mb-1 block">วิธีชำระ</label>
+                    <select id="frcPay" class="swal2-input" style="margin:0;width:100%">
+                        <option value="">- ไม่ระบุ -</option>
+                        ${['เงินสด','โอน','บัตรเครดิต','QR/PromptPay','เช็ค'].map(o =>
+                            `<option value="${o}" ${rec?.payment_method === o ? 'selected' : ''}>${o}</option>`).join('')}
+                    </select></div>
+                <p class="text-[11px] text-slate-500">หมายเหตุ: จำกัด 1-28 เพื่อป้องกันเดือนกุมภาพันธ์ที่มีแค่ 28 วัน</p>
+            </div>`,
+            showCancelButton: true, confirmButtonText: 'บันทึก', cancelButtonText: 'ยกเลิก', confirmButtonColor: '#2e9e63',
+            didOpen: () => { window._finBuildRecCatOpts = buildCatOpts; },
+            preConfirm: () => {
+                const v = {
+                    name: document.getElementById('frcName').value.trim(),
+                    kind: document.getElementById('frcKind').value,
+                    category_id: document.getElementById('frcCat').value,
+                    amount: document.getElementById('frcAmount').value,
+                    day_of_month: document.getElementById('frcDay').value,
+                    description: document.getElementById('frcDesc').value,
+                    payment_method: document.getElementById('frcPay').value,
+                };
+                if (!v.name) { Swal.showValidationMessage('กรอกชื่อรายการ'); return false; }
+                if (!v.amount || parseFloat(v.amount) <= 0) { Swal.showValidationMessage('จำนวนเงินต้อง > 0'); return false; }
+                return v;
+            }
+        });
+        if (!value) return;
+        const fd = new FormData();
+        fd.append('csrf_token', CSRF);
+        fd.append('action', isEdit ? 'recurring:update' : 'recurring:create');
+        if (isEdit) fd.append('id', String(rec.id));
+        Object.entries(value).forEach(([k, v]) => fd.append(k, v));
+        const res = await fetch(AJAX, { method: 'POST', body: fd, credentials: 'same-origin' });
+        const j = await res.json();
+        if (!j.ok) { Swal.fire({ icon: 'error', title: 'บันทึกไม่สำเร็จ', text: j.message || '' }); return; }
+        await openRecurringModal();
+    };
+    window.finRecToggle = async function (id) {
+        const fd = new FormData();
+        fd.append('csrf_token', CSRF); fd.append('action', 'recurring:toggle'); fd.append('id', String(id));
+        await fetch(AJAX, { method: 'POST', body: fd, credentials: 'same-origin' });
+        openRecurringModal();
+    };
+    window.finRecRun = async function (id) {
+        const fd = new FormData();
+        fd.append('csrf_token', CSRF); fd.append('action', 'recurring:run'); fd.append('id', String(id));
+        const res = await fetch(AJAX, { method: 'POST', body: fd, credentials: 'same-origin' });
+        const j = await res.json();
+        if (!j.ok) { Swal.fire({ icon: 'error', title: 'สร้างไม่สำเร็จ', text: j.message || '' }); return; }
+        Swal.fire({ icon: 'success', title: `สร้าง ${j.generated} รายการแล้ว`, timer: 1400, showConfirmButton: false, toast: true, position: 'top-end' });
+        openRecurringModal();
+        load(currentPage);
+    };
+    window.finRecDelete = async function (id) {
+        const r = await Swal.fire({ title: 'ลบรายการประจำนี้?', text: 'รายการเก่าที่สร้างไปแล้วยังอยู่', icon: 'warning', showCancelButton: true, confirmButtonText: 'ลบ', cancelButtonText: 'ยกเลิก', confirmButtonColor: '#dc2626' });
+        if (!r.isConfirmed) return;
+        const fd = new FormData();
+        fd.append('csrf_token', CSRF); fd.append('action', 'recurring:delete'); fd.append('id', String(id));
+        await fetch(AJAX, { method: 'POST', body: fd, credentials: 'same-origin' });
+        openRecurringModal();
+    };
+
+    // ── Details modal: attachments + audit timeline ────────
+    window.finOpenDetails = async function (txnId) {
+        const [attR, audR] = await Promise.all([
+            fetch(AJAX + '?action=attachment:list&txn_id=' + txnId, { credentials: 'same-origin' }).then(r => r.json()),
+            fetch(AJAX + '?action=audit:list&txn_id=' + txnId,      { credentials: 'same-origin' }).then(r => r.json()),
+        ]);
+        const atts  = (attR.ok ? attR.rows : []) || [];
+        const audit = (audR.ok ? audR.rows : []) || [];
+
+        const attHtml = atts.length === 0
+            ? '<div class="text-center text-slate-400 text-xs py-3">ยังไม่มีไฟล์แนบ</div>'
+            : atts.map(a => {
+                const isImg = (a.mime_type || '').startsWith('image/');
+                const sizeKB = Math.round((a.size_bytes || 0) / 1024);
+                const thumb = isImg
+                    ? `<img src="finance_attachment.php?id=${a.id}" class="w-12 h-12 object-cover rounded border border-slate-200" alt="">`
+                    : `<div class="w-12 h-12 flex items-center justify-center rounded bg-slate-100 text-slate-500"><i class="fa-solid fa-file-pdf text-xl"></i></div>`;
+                return `<div class="flex items-center gap-3 p-2 border border-slate-100 rounded-lg">
+                    ${thumb}
+                    <div class="flex-1 min-w-0">
+                        <div class="font-bold text-xs text-slate-700 truncate">${escapeHtml(a.original_name || a.stored_name)}</div>
+                        <div class="text-[10px] text-slate-400">${sizeKB} KB · ${a.mime_type || ''} · ${a.uploaded_at}</div>
+                    </div>
+                    <a href="finance_attachment.php?id=${a.id}" target="_blank" class="text-emerald-600 hover:text-emerald-700 text-xs" title="ดู"><i class="fa-solid fa-eye"></i></a>
+                    <a href="finance_attachment.php?id=${a.id}&download=1" class="text-slate-500 hover:text-slate-700 text-xs" title="ดาวน์โหลด"><i class="fa-solid fa-download"></i></a>
+                    <button onclick="finAttDelete(${a.id}, ${txnId})" class="text-rose-500 hover:text-rose-700 text-xs" title="ลบ"><i class="fa-solid fa-trash"></i></button>
+                </div>`;
+            }).join('');
+
+        const auditHtml = audit.length === 0
+            ? '<div class="text-center text-slate-400 text-xs py-3">ยังไม่มีประวัติ</div>'
+            : audit.map(a => {
+                const actionMap = {
+                    create: ['เพิ่ม', 'fa-plus', 'emerald'],
+                    update: ['แก้ไข', 'fa-pen', 'amber'],
+                    delete: ['ลบ', 'fa-trash', 'rose'],
+                    bulk_delete: ['ลบรวม', 'fa-trash', 'rose'],
+                    attach_add: ['แนบไฟล์', 'fa-paperclip', 'indigo'],
+                    attach_remove: ['ลบไฟล์แนบ', 'fa-paperclip', 'rose'],
+                    recurring_generate: ['สร้างจาก template', 'fa-rotate', 'indigo'],
+                };
+                const [label, icon, tone] = actionMap[a.action] || [a.action, 'fa-circle-dot', 'slate'];
+                let body = '';
+                if (a.changes_json) {
+                    try {
+                        const ch = JSON.parse(a.changes_json);
+                        body = '<div class="text-[11px] text-slate-500 mt-1">' +
+                            Object.entries(ch).map(([k, v]) => {
+                                if (v && typeof v === 'object' && 'from' in v) {
+                                    return `<div><b>${escapeHtml(k)}:</b> <span class="line-through text-slate-400">${escapeHtml(String(v.from ?? '-'))}</span> → <span class="text-slate-700">${escapeHtml(String(v.to ?? '-'))}</span></div>`;
+                                }
+                                return `<div><b>${escapeHtml(k)}:</b> ${escapeHtml(String(v))}</div>`;
+                            }).join('') + '</div>';
+                    } catch (e) { /* ignore */ }
+                }
+                return `<div class="flex gap-3 p-2 border-l-2 border-${tone}-300 bg-${tone}-50 rounded-r">
+                    <div class="w-7 h-7 rounded-full bg-${tone}-100 text-${tone}-600 flex items-center justify-center text-xs flex-shrink-0">
+                        <i class="fa-solid ${icon}"></i>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="text-xs"><b class="text-${tone}-700">${label}</b> โดย <b>${escapeHtml(a.performed_by_name || 'system')}</b></div>
+                        <div class="text-[10px] text-slate-500">${a.performed_at}${a.ip_addr ? ' · ' + escapeHtml(a.ip_addr) : ''}</div>
+                        ${body}
+                    </div>
+                </div>`;
+            }).join('');
+
+        Swal.fire({
+            title: `รายการ #${txnId}`,
+            width: 720,
+            html: `<div class="text-left">
+                <div class="flex gap-2 mb-3" id="finDetailsTabs">
+                    <button class="btn-solid bg-brand-500 text-white text-xs is-tab-active" data-tab="att">
+                        <i class="fa-solid fa-paperclip"></i> ไฟล์แนบ <span class="opacity-80">(${atts.length})</span>
+                    </button>
+                    <button class="btn-solid bg-slate-100 text-slate-700 text-xs" data-tab="aud">
+                        <i class="fa-solid fa-clock-rotate-left"></i> ประวัติ <span class="opacity-80">(${audit.length})</span>
+                    </button>
+                </div>
+                <div id="finTabAtt" class="space-y-2">
+                    <div class="border-2 border-dashed border-slate-200 rounded-lg p-4 text-center cursor-pointer hover:border-emerald-400 hover:bg-emerald-50 transition" id="finAttDrop">
+                        <i class="fa-solid fa-cloud-arrow-up text-2xl text-slate-300"></i>
+                        <div class="text-xs font-bold text-slate-600 mt-1">คลิกหรือลากไฟล์มาวาง — JPG/PNG/PDF (≤ 8MB)</div>
+                        <input type="file" id="finAttFile" class="hidden" accept="image/*,application/pdf">
+                    </div>
+                    <div id="finAttList" class="space-y-2 max-h-80 overflow-y-auto">${attHtml}</div>
+                </div>
+                <div id="finTabAud" class="space-y-2 max-h-96 overflow-y-auto" style="display:none">${auditHtml}</div>
+            </div>`,
+            showCloseButton: true, showConfirmButton: false, width: 720,
+            didOpen: () => {
+                // Tab switching
+                document.querySelectorAll('#finDetailsTabs button').forEach(b => {
+                    b.addEventListener('click', () => {
+                        const tab = b.dataset.tab;
+                        document.querySelectorAll('#finDetailsTabs button').forEach(x => {
+                            x.classList.remove('bg-brand-500','text-white','is-tab-active');
+                            x.classList.add('bg-slate-100','text-slate-700');
+                        });
+                        b.classList.remove('bg-slate-100','text-slate-700');
+                        b.classList.add('bg-brand-500','text-white','is-tab-active');
+                        document.getElementById('finTabAtt').style.display = tab === 'att' ? '' : 'none';
+                        document.getElementById('finTabAud').style.display = tab === 'aud' ? '' : 'none';
+                    });
+                });
+                // Upload — click + drag-and-drop
+                const drop = document.getElementById('finAttDrop');
+                const fileInput = document.getElementById('finAttFile');
+                drop.addEventListener('click', () => fileInput.click());
+                fileInput.addEventListener('change', e => finAttUpload(txnId, e.target.files[0]));
+                ['dragover','dragenter'].forEach(evt => drop.addEventListener(evt, e => { e.preventDefault(); drop.classList.add('border-emerald-500','bg-emerald-50'); }));
+                ['dragleave','drop'].forEach(evt => drop.addEventListener(evt, e => { e.preventDefault(); drop.classList.remove('border-emerald-500','bg-emerald-50'); }));
+                drop.addEventListener('drop', e => { if (e.dataTransfer.files[0]) finAttUpload(txnId, e.dataTransfer.files[0]); });
+            }
+        });
+    };
+    async function finAttUpload(txnId, file) {
+        if (!file) return;
+        if (file.size > 8 * 1024 * 1024) { Swal.fire({ icon:'error', title:'ไฟล์ใหญ่เกิน 8MB' }); return; }
+        const fd = new FormData();
+        fd.append('csrf_token', CSRF);
+        fd.append('action', 'attachment:upload');
+        fd.append('txn_id', String(txnId));
+        fd.append('file', file);
+        const res = await fetch(AJAX, { method: 'POST', body: fd, credentials: 'same-origin' });
+        const j = await res.json();
+        if (!j.ok) { Swal.fire({ icon: 'error', title: 'อัปโหลดไม่สำเร็จ', text: j.message || '' }); return; }
+        Swal.fire({ icon: 'success', title: 'อัปโหลดแล้ว', timer: 900, showConfirmButton: false, toast: true, position: 'top-end' });
+        Swal.close();
+        load(currentPage);
+        setTimeout(() => finOpenDetails(txnId), 100);
+    }
+    window.finAttDelete = async function (attId, txnId) {
+        const r = await Swal.fire({ title: 'ลบไฟล์แนบนี้?', icon: 'warning', showCancelButton: true, confirmButtonText: 'ลบ', cancelButtonText: 'ยกเลิก', confirmButtonColor: '#dc2626' });
+        if (!r.isConfirmed) return;
+        const fd = new FormData();
+        fd.append('csrf_token', CSRF); fd.append('action', 'attachment:delete'); fd.append('id', String(attId));
+        await fetch(AJAX, { method: 'POST', body: fd, credentials: 'same-origin' });
+        Swal.close();
+        load(currentPage);
+        setTimeout(() => finOpenDetails(txnId), 100);
+    };
+
     // ── Bind ──
     document.getElementById('finBtnApply').onclick = () => load(1);
+    document.getElementById('finBtnRecurring').onclick = openRecurringModal;
     document.getElementById('finBtnReset').onclick = () => {
         setDefaultDates(); setDateRange('this_month');
         document.getElementById('finKind').value = '';
