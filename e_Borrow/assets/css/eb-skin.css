@@ -1,0 +1,273 @@
+/* ══════════════════════════════════════════════════════════════
+   eb-skin.css — Portal-matching skin for e_Borrow
+   Loaded AFTER assets/css/style.css so these rules win.
+   Keeps existing markup; only re-skins the shell + buttons.
+
+   Targets the body.dark-mode class (e_Borrow's convention),
+   not body[data-theme="dark"] like portal.
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── Body canvas — ambient gradients like portal ─────────── */
+body {
+    background: #f4f7f5 !important;
+    background-image:
+        radial-gradient(at 15% 0%, rgba(46,158,99,0.08) 0px, transparent 50%),
+        radial-gradient(at 85% 0%, rgba(139,92,246,0.06) 0px, transparent 45%),
+        radial-gradient(at 50% 100%, rgba(14,165,233,0.05) 0px, transparent 50%) !important;
+    background-attachment: fixed !important;
+    font-family: 'Sarabun', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+}
+body.dark-mode {
+    background: #0b1121 !important;
+    background-image:
+        radial-gradient(at 15% 0%, rgba(46,158,99,0.10) 0px, transparent 50%),
+        radial-gradient(at 85% 0%, rgba(139,92,246,0.08) 0px, transparent 45%) !important;
+    background-attachment: fixed !important;
+    color: #cbd5e1;
+}
+
+/* ── Header — match portal-header ─────────────────────────── */
+.header {
+    background: rgba(255,255,255,0.82) !important;
+    color: #0f172a !important;
+    backdrop-filter: blur(14px) saturate(140%);
+    -webkit-backdrop-filter: blur(14px) saturate(140%);
+    border-bottom: 1.5px solid rgba(199,232,213,0.6);
+    box-shadow: 0 4px 18px rgba(46,158,99,.06) !important;
+    padding: 12px 24px !important;
+    height: 64px !important;
+    position: fixed !important;
+    width: 100% !important;
+    top: 0; left: 0;
+    z-index: 1000;
+    display: flex; align-items: center; justify-content: space-between;
+}
+/* Rainbow accent strip on top */
+.header::before {
+    content: '';
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 3px;
+    background: linear-gradient(90deg,
+        #2e9e63 0%, #14b8a6 22%, #0ea5e9 42%,
+        #6366f1 60%, #d946ef 78%, #f59e0b 100%);
+    background-size: 200% 100%;
+    animation: ebHdrShimmer 14s linear infinite;
+    z-index: 1;
+}
+@keyframes ebHdrShimmer {
+    from { background-position: 0% 0%; }
+    to   { background-position: 200% 0%; }
+}
+
+/* Dark mode header */
+body.dark-mode .header {
+    background: rgba(15, 23, 42, 0.85) !important;
+    border-bottom: 1.5px solid rgba(255,255,255,.08) !important;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.4) !important;
+}
+body.dark-mode .header .eb-brand-text { color: #f1f5f9 !important; }
+
+/* ── Brand icon + title ──────────────────────────────────── */
+.eb-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+.eb-brand-icon {
+    width: 40px; height: 40px;
+    background: linear-gradient(135deg, #2e9e63 0%, #3bba7a 55%, #6ee7b7 100%);
+    border-radius: 13px;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 1.05rem;
+    box-shadow:
+        0 8px 20px rgba(46,158,99,.40),
+        inset 0 -2px 0 rgba(0,0,0,.08),
+        inset 0 1px 0 rgba(255,255,255,.35);
+    flex-shrink: 0;
+    transition: transform .25s cubic-bezier(.16,1,.3,1);
+}
+.eb-brand-icon:hover { transform: rotate(-6deg) scale(1.06); }
+.eb-brand-text {
+    font-size: 1.05rem;
+    font-weight: 900;
+    color: #0f172a;
+    letter-spacing: -.015em;
+    line-height: 1.1;
+}
+.eb-brand-text small {
+    display: block;
+    font-size: 9.5px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: .18em;
+    color: #64748b;
+    margin-top: 1px;
+}
+body.dark-mode .eb-brand-text small { color: #94a3b8 !important; }
+
+/* Hide the old <h1>E-Borrow</h1> when our new brand block is present */
+.header > .flex > h1 { display: none !important; }
+
+/* ── Portal-home link in header ──────────────────────────── */
+.eb-portal-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 12px;
+    border-radius: 10px;
+    background: #f0faf4;
+    border: 1.5px solid #c7e8d5;
+    color: #1f7a4d !important;
+    font-size: 12.5px;
+    font-weight: 800;
+    text-decoration: none;
+    transition: transform .18s, box-shadow .18s, background .15s;
+}
+.eb-portal-link:hover {
+    background: #d6f0e2;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 14px -4px rgba(46,158,99,.25);
+}
+.eb-portal-link i { font-size: 12px; }
+body.dark-mode .eb-portal-link {
+    background: rgba(46,158,99,.12) !important;
+    border-color: rgba(46,158,99,.30) !important;
+    color: #6ee7b7 !important;
+}
+body.dark-mode .eb-portal-link:hover { background: rgba(46,158,99,.22) !important; }
+
+/* ── User pill — portal style ────────────────────────────── */
+.user-info {
+    gap: 10px !important;
+    color: #0f172a !important;
+}
+.eb-user-pill {
+    display: flex; align-items: center; gap: 10px;
+    background: linear-gradient(135deg, #f0faf4, #ffffff);
+    border: 1.5px solid #c7e8d5;
+    border-radius: 99px;
+    padding: 5px 14px 5px 6px;
+    box-shadow: 0 2px 8px rgba(46,158,99,.08);
+    transition: box-shadow .2s, border-color .2s;
+}
+.eb-user-pill:hover {
+    box-shadow: 0 6px 18px rgba(46,158,99,.18);
+    border-color: #3bba7a;
+}
+.eb-user-avatar {
+    width: 28px; height: 28px;
+    background: linear-gradient(135deg, #2e9e63, #3bba7a);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: .68rem;
+    font-weight: 900;
+    box-shadow: 0 4px 10px rgba(46,158,99,.35), inset 0 1px 0 rgba(255,255,255,.3);
+    flex-shrink: 0;
+}
+.eb-user-text {
+    font-size: 12.5px;
+    color: #0f172a;
+    white-space: nowrap;
+    line-height: 1.2;
+    font-weight: 800;
+}
+.eb-user-text .eb-user-role {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 9px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: .1em;
+    padding: 2px 7px;
+    border-radius: 99px;
+    margin-left: 6px;
+    vertical-align: middle;
+}
+.eb-user-role--admin { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+.eb-user-role--employee { background: #ecfdf5; color: #15803d; border: 1px solid #bbf7d0; }
+body.dark-mode .eb-user-pill {
+    background: linear-gradient(135deg, rgba(46,158,99,.12), rgba(15,23,42,.50)) !important;
+    border-color: rgba(46,158,99,.30) !important;
+    color: #f1f5f9 !important;
+}
+body.dark-mode .eb-user-text { color: #f1f5f9; }
+body.dark-mode .eb-user-role--admin { background: rgba(245,158,11,.15); color: #fbbf24; border-color: rgba(245,158,11,.30); }
+body.dark-mode .eb-user-role--employee { background: rgba(46,158,99,.15); color: #6ee7b7; border-color: rgba(46,158,99,.30); }
+
+/* ── Theme toggle — portal style ─────────────────────────── */
+.theme-toggle-btn {
+    width: 36px !important; height: 36px !important;
+    border-radius: 11px !important;
+    background: #f0faf4 !important;
+    border: 1.5px solid #c7e8d5 !important;
+    color: #15803d !important;
+    transition: transform .15s, background .2s, border-color .2s !important;
+}
+.theme-toggle-btn:hover {
+    transform: rotate(20deg) scale(1.05);
+    background: #d6f0e2 !important;
+    border-color: #3bba7a !important;
+}
+body.dark-mode .theme-toggle-btn {
+    background: rgba(245,158,11,.12) !important;
+    border-color: rgba(245,158,11,.30) !important;
+    color: #fbbf24 !important;
+}
+
+/* Theme toggle icon swap (e_Borrow displays both icons; we hide one) */
+.theme-toggle-btn .fa-moon { display: inline-block; }
+.theme-toggle-btn .fa-sun  { display: none; }
+body.dark-mode .theme-toggle-btn .fa-moon { display: none; }
+body.dark-mode .theme-toggle-btn .fa-sun  { display: inline-block; }
+
+/* ── Logout button — match danger pill ───────────────────── */
+.btn-logout {
+    background-color: #fff1f2 !important;
+    color: #be123c !important;
+    border: 1.5px solid #fecdd3 !important;
+    padding: 7px 14px !important;
+    border-radius: 11px !important;
+    font-size: 12.5px !important;
+    font-weight: 800 !important;
+    display: inline-flex !important;
+    align-items: center;
+    gap: 6px;
+    text-decoration: none;
+    transition: transform .15s, background .2s, border-color .2s !important;
+}
+.btn-logout:hover {
+    background-color: #fee2e2 !important;
+    border-color: #fb7185 !important;
+    color: #9f1239 !important;
+    transform: translateY(-1px);
+}
+body.dark-mode .btn-logout {
+    background-color: rgba(244,63,94,.12) !important;
+    border-color: rgba(244,63,94,.30) !important;
+    color: #fb7185 !important;
+}
+body.dark-mode .btn-logout:hover {
+    background-color: rgba(244,63,94,.22) !important;
+    color: #fda4af !important;
+}
+
+/* ── Content area shift to match the new fixed-header height ─ */
+.content { margin-top: 64px !important; }
+@media (max-width: 640px) {
+    .header { padding: 10px 14px !important; height: 60px !important; }
+    .content { margin-top: 60px !important; }
+    .eb-brand-text { font-size: .95rem; }
+    .eb-brand-text small { display: none; }
+    .eb-user-text { font-size: 11.5px; }
+    .eb-portal-link span { display: none; }
+}
+
+/* ── Subtle FAB-style nothing — kill old bootstrap focus ring ─ */
+.btn-logout:focus, .theme-toggle-btn:focus, .eb-portal-link:focus {
+    outline: 2px solid rgba(46,158,99,.4);
+    outline-offset: 2px;
+}
