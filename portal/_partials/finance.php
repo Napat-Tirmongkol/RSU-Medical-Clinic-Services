@@ -96,6 +96,38 @@
 body[data-theme='dark'] .fin-chip { background:#1e293b; color:#cbd5e1; border-color:#334155; }
 body[data-theme='dark'] .fin-chip:hover { background:rgba(46,158,99,.15); color:#6ee7b7; border-color:rgba(46,158,99,.30); }
 body[data-theme='dark'] .fin-dup-hint { background:rgba(245,158,11,.10); color:#fbbf24; border-color:rgba(245,158,11,.30); }
+
+/* Period-over-period delta badge on KPI tiles */
+.fin-delta {
+    display:inline-flex; align-items:center; gap:3px;
+    padding:1px 7px; border-radius:99px;
+    font-size:10px; font-weight:800;
+    margin-left:4px; vertical-align:middle;
+    transition:opacity .2s;
+}
+.fin-delta.up   { background:#dcfce7; color:#15803d; }
+.fin-delta.down { background:#fee2e2; color:#b91c1c; }
+.fin-delta.flat { background:#f1f5f9; color:#64748b; }
+.fin-delta.up.is-expense   { background:#fee2e2; color:#b91c1c; }   /* expense going up is bad */
+.fin-delta.down.is-expense { background:#dcfce7; color:#15803d; }   /* expense going down is good */
+.fin-delta.hidden { display:none; }
+body[data-theme='dark'] .fin-delta.up   { background:rgba(46,158,99,.15); color:#6ee7b7; }
+body[data-theme='dark'] .fin-delta.down { background:rgba(244,63,94,.15); color:#fb7185; }
+body[data-theme='dark'] .fin-delta.flat { background:rgba(255,255,255,.05); color:#94a3b8; }
+
+/* Category legend rows inside donut card */
+.fin-leg-row {
+    display:flex; align-items:center; gap:8px;
+    padding:3px 6px; border-radius:6px;
+    cursor:pointer; transition:background .15s;
+}
+.fin-leg-row:hover { background:#f1f5f9; }
+.fin-leg-row .dot { width:10px; height:10px; border-radius:3px; flex-shrink:0; }
+.fin-leg-row .name { flex:1; color:#334155; font-weight:700; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.fin-leg-row .pct  { color:#64748b; font-variant-numeric:tabular-nums; font-weight:800; font-size:10px; }
+body[data-theme='dark'] .fin-leg-row:hover { background:#1e293b; }
+body[data-theme='dark'] .fin-leg-row .name { color:#e2e8f0; }
+body[data-theme='dark'] .fin-leg-row .pct  { color:#94a3b8; }
 </style>
 
 <div class="space-y-4">
@@ -121,23 +153,61 @@ body[data-theme='dark'] .fin-dup-hint { background:rgba(245,158,11,.10); color:#
         </div>
     </div>
 
-    <!-- KPI Summary -->
+    <!-- KPI Summary (with period-over-period delta) -->
     <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div class="fin-kpi" style="background:#f0fdf4">
             <div class="ic" style="background:#dcfce7;color:#15803d"><i class="fa-solid fa-arrow-trend-up"></i></div>
-            <div><div class="num" id="finKpiIncome">฿0</div><div class="lbl">รายได้</div></div>
+            <div style="min-width:0;flex:1">
+                <div class="num" id="finKpiIncome">฿0</div>
+                <div class="lbl">รายได้ <span class="fin-delta" id="finDeltaIncome"></span></div>
+            </div>
         </div>
         <div class="fin-kpi" style="background:#fef2f2">
             <div class="ic" style="background:#fee2e2;color:#b91c1c"><i class="fa-solid fa-arrow-trend-down"></i></div>
-            <div><div class="num" id="finKpiExpense">฿0</div><div class="lbl">รายจ่าย</div></div>
+            <div style="min-width:0;flex:1">
+                <div class="num" id="finKpiExpense">฿0</div>
+                <div class="lbl">รายจ่าย <span class="fin-delta" id="finDeltaExpense"></span></div>
+            </div>
         </div>
         <div class="fin-kpi" style="background:#eff6ff">
             <div class="ic" style="background:#dbeafe;color:#1e40af"><i class="fa-solid fa-scale-balanced"></i></div>
-            <div><div class="num" id="finKpiNet">฿0</div><div class="lbl">สุทธิ</div></div>
+            <div style="min-width:0;flex:1">
+                <div class="num" id="finKpiNet">฿0</div>
+                <div class="lbl">สุทธิ <span class="fin-delta" id="finDeltaNet"></span></div>
+            </div>
         </div>
         <div class="fin-kpi" style="background:#fafafa">
             <div class="ic" style="background:#e2e8f0;color:#475569"><i class="fa-solid fa-list-check"></i></div>
-            <div><div class="num" id="finKpiCount">0</div><div class="lbl">จำนวนรายการ</div></div>
+            <div style="min-width:0;flex:1">
+                <div class="num" id="finKpiCount">0</div>
+                <div class="lbl">จำนวนรายการ</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts: monthly trend (bar) + category breakdown (donut) -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-3">
+        <div class="fin-card lg:col-span-2">
+            <div class="flex items-center justify-between mb-2">
+                <div class="font-bold text-slate-700 text-sm">
+                    <i class="fa-solid fa-chart-column text-emerald-600"></i> แนวโน้ม 12 เดือนล่าสุด
+                </div>
+                <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">รายเดือน</div>
+            </div>
+            <div style="position:relative;height:240px"><canvas id="finChartMonthly"></canvas></div>
+        </div>
+        <div class="fin-card">
+            <div class="flex items-center justify-between mb-2">
+                <div class="font-bold text-slate-700 text-sm">
+                    <i class="fa-solid fa-chart-pie text-amber-600"></i> หมวดหมู่
+                </div>
+                <select id="finDonutKind" class="text-xs font-bold text-slate-600 bg-slate-100 border border-slate-200 rounded-md px-2 py-1 outline-none cursor-pointer">
+                    <option value="expense">รายจ่าย</option>
+                    <option value="income">รายได้</option>
+                </select>
+            </div>
+            <div style="position:relative;height:200px"><canvas id="finChartCategory"></canvas></div>
+            <div id="finCatLegend" class="mt-2 space-y-1 text-[11px]"></div>
         </div>
     </div>
 
@@ -218,17 +288,27 @@ body[data-theme='dark'] .fin-dup-hint { background:rgba(245,158,11,.10); color:#
     </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script>
 (function () {
     const CSRF = '<?= htmlspecialchars(get_csrf_token(), ENT_QUOTES) ?>';
     const AJAX = 'ajax_finance.php';
     const fmt = (n) => '฿' + Number(n || 0).toLocaleString('th-TH', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+    const fmtCompact = (n) => {
+        const abs = Math.abs(n);
+        if (abs >= 1e6) return '฿' + (n / 1e6).toFixed(1) + 'M';
+        if (abs >= 1e3) return '฿' + (n / 1e3).toFixed(1) + 'k';
+        return '฿' + Math.round(n);
+    };
     const fmtDate = (d) => { if (!d) return '-'; const x = new Date(d); return x.toLocaleDateString('th-TH', { year: '2-digit', month: '2-digit', day: '2-digit' }); };
 
     let cachedCategories = [];
     let currentPage = 1;
     let selectedIds = new Set();   // ids of rows currently bulk-selected
     let lastRows = [];             // cache of last page render — used to compute selected sum
+    let chartMonthly = null;       // Chart.js instances (kept around for .update())
+    let chartCategory = null;
+    let lastAnalytics = null;      // cached analytics payload
 
     // ── Defaults: this month ──
     function setDefaultDates() {
@@ -266,6 +346,11 @@ body[data-theme='dark'] .fin-dup-hint { background:rgba(245,158,11,.10); color:#
         const j = await r.json();
         if (!j.ok) { Swal.fire({ icon: 'error', title: 'โหลดไม่สำเร็จ', text: j.message || '' }); return; }
         lastRows = j.rows || [];
+
+        // Fire analytics in parallel — independent of the table render,
+        // so don't await it here (it'll patch KPI deltas + chart data
+        // when it lands).
+        loadAnalytics(f).catch(() => { /* silent */ });
 
         // KPI
         document.getElementById('finKpiIncome').textContent  = fmt(j.summary.income);
@@ -619,6 +704,173 @@ body[data-theme='dark'] .fin-dup-hint { background:rgba(245,158,11,.10); color:#
         await load(currentPage);
         openCategoriesModal();
     };
+
+    // ── Analytics + charts ──────────────────────────────────
+    async function loadAnalytics(filterParams) {
+        const f = filterParams || currentFilterParams();
+        const params = new URLSearchParams({ action: 'analytics', ...f });
+        const r = await fetch(AJAX + '?' + params.toString(), { credentials: 'same-origin' });
+        const j = await r.json();
+        if (!j.ok) return;
+        lastAnalytics = j;
+        renderMonthlyChart(j.monthly);
+        renderCategoryChart(j.categories);
+        renderDeltas(j.delta);
+    }
+
+    function setDelta(elId, current, prev, isExpense) {
+        const el = document.getElementById(elId);
+        if (!el) return;
+        if (prev === 0 && current === 0) { el.classList.add('hidden'); return; }
+        el.classList.remove('hidden', 'up', 'down', 'flat', 'is-expense');
+        let pct, dir;
+        if (prev === 0) { pct = 100; dir = 'up'; }
+        else if (current === 0) { pct = -100; dir = 'down'; }
+        else {
+            pct = ((current - prev) / Math.abs(prev)) * 100;
+            dir = pct > 0.5 ? 'up' : pct < -0.5 ? 'down' : 'flat';
+        }
+        el.classList.add(dir);
+        if (isExpense) el.classList.add('is-expense');
+        const arrow = dir === 'up' ? '▲' : dir === 'down' ? '▼' : '＝';
+        el.innerHTML = `${arrow} ${Math.abs(pct).toFixed(0)}%`;
+        el.title = `เทียบช่วงก่อนหน้า (${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%)`;
+    }
+    function renderDeltas(d) {
+        // We need current values, read from KPI tile text (set by load())
+        // Parse '฿X,XXX' back to number — small hack but avoids a second source of truth.
+        const parseKpi = (id) => {
+            const s = (document.getElementById(id).textContent || '0').replace(/[฿,\s]/g, '').replace(/[^\d.-]/g, '');
+            return parseFloat(s) || 0;
+        };
+        setDelta('finDeltaIncome',  parseKpi('finKpiIncome'),  d.income_prev,  false);
+        setDelta('finDeltaExpense', parseKpi('finKpiExpense'), d.expense_prev, true);
+        setDelta('finDeltaNet',     parseKpi('finKpiNet'),     d.net_prev,     false);
+    }
+
+    function renderMonthlyChart(monthly) {
+        const ctx = document.getElementById('finChartMonthly');
+        if (!ctx || typeof Chart === 'undefined') return;
+        const labels = monthly.map(m => {
+            const [y, mo] = m.month.split('-');
+            const months = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+            return months[parseInt(mo,10)-1] + ' ' + String(parseInt(y,10)+543).slice(-2);
+        });
+        const incomes  = monthly.map(m => m.income);
+        const expenses = monthly.map(m => m.expense);
+        const data = {
+            labels,
+            datasets: [
+                { label: 'รายได้',  data: incomes,  backgroundColor: 'rgba(46,158,99,.85)',  borderRadius: 6, maxBarThickness: 28 },
+                { label: 'รายจ่าย', data: expenses, backgroundColor: 'rgba(244,63,94,.85)',  borderRadius: 6, maxBarThickness: 28 },
+            ],
+        };
+        const options = {
+            responsive: true, maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'top', align: 'end', labels: { font: { size: 11, weight: 'bold' }, boxWidth: 12, boxHeight: 12, padding: 12 } },
+                tooltip: {
+                    callbacks: {
+                        label: (c) => `${c.dataset.label}: ${fmt(c.parsed.y)}`,
+                        footer: (items) => {
+                            if (items.length < 2) return '';
+                            const net = items[0].parsed.y - items[1].parsed.y;
+                            return 'สุทธิ: ' + (net >= 0 ? '+' : '') + fmt(net);
+                        },
+                    },
+                },
+            },
+            scales: {
+                x: { grid: { display: false }, ticks: { font: { size: 10 } } },
+                y: { grid: { color: 'rgba(15,23,42,.06)' }, ticks: { font: { size: 10 }, callback: (v) => fmtCompact(v) } },
+            },
+        };
+        if (chartMonthly) {
+            chartMonthly.data = data;
+            chartMonthly.update();
+        } else {
+            chartMonthly = new Chart(ctx, { type: 'bar', data, options });
+        }
+    }
+
+    function renderCategoryChart(allCategories) {
+        const ctx = document.getElementById('finChartCategory');
+        if (!ctx || typeof Chart === 'undefined') return;
+        const kind = document.getElementById('finDonutKind').value;
+        const rows = allCategories.filter(c => c.kind === kind).slice(0, 10); // top 10
+        const labels = rows.map(c => c.name);
+        const colors = rows.map(c => c.color);
+        const values = rows.map(c => c.total);
+        const total = values.reduce((a, b) => a + b, 0);
+
+        // Legend
+        const legend = document.getElementById('finCatLegend');
+        if (rows.length === 0) {
+            legend.innerHTML = '<div class="text-slate-400 text-center py-2 text-[11px]">ไม่มีข้อมูลในช่วงนี้</div>';
+        } else {
+            legend.innerHTML = rows.map(r => {
+                const pct = total > 0 ? (r.total / total * 100) : 0;
+                return `<div class="fin-leg-row" data-cat="${r.category_id || 0}" title="คลิกเพื่อกรองเฉพาะหมวดนี้">
+                    <span class="dot" style="background:${r.color}"></span>
+                    <span class="name">${escapeHtml(r.name)}</span>
+                    <span class="pct">${pct.toFixed(1)}%</span>
+                </div>`;
+            }).join('');
+            legend.querySelectorAll('.fin-leg-row').forEach(el => {
+                el.addEventListener('click', () => {
+                    const cid = el.dataset.cat;
+                    if (cid && cid !== '0') {
+                        document.getElementById('finCategoryFilter').value = cid;
+                        document.getElementById('finKind').value = kind;
+                        load(1);
+                    }
+                });
+            });
+        }
+
+        const data = {
+            labels,
+            datasets: [{
+                data: values,
+                backgroundColor: colors,
+                borderColor: '#fff', borderWidth: 2,
+            }],
+        };
+        const options = {
+            responsive: true, maintainAspectRatio: false, cutout: '62%',
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: (c) => {
+                            const pct = total > 0 ? (c.parsed / total * 100).toFixed(1) : '0.0';
+                            return `${c.label}: ${fmt(c.parsed)} (${pct}%)`;
+                        },
+                    },
+                },
+            },
+            onClick: (evt, els) => {
+                if (!els.length) return;
+                const cid = rows[els[0].index]?.category_id;
+                if (cid) {
+                    document.getElementById('finCategoryFilter').value = cid;
+                    document.getElementById('finKind').value = kind;
+                    load(1);
+                }
+            },
+        };
+        if (chartCategory) {
+            chartCategory.data = data;
+            chartCategory.options = options;
+            chartCategory.update();
+        } else {
+            chartCategory = new Chart(ctx, { type: 'doughnut', data, options });
+        }
+    }
+    // Donut kind toggle re-renders from cached data (no extra request)
+    document.getElementById('finDonutKind').addEventListener('change', () => {
+        if (lastAnalytics) renderCategoryChart(lastAnalytics.categories);
+    });
 
     // ── Quick-date chips ────────────────────────────────────
     function setDateRange(range) {

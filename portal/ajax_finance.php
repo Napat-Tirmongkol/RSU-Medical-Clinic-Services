@@ -82,6 +82,111 @@ ensure_finance_schema($pdo);
 $action = $_REQUEST['action'] ?? '';
 
 try {
+    // ── Analytics: monthly trend + category breakdown + period delta ──────
+    // GET allowed. Inputs: from, to, kind, category_id, q (current filter)
+    // Returns:
+    //   monthly:    last 12 months trailing today {month, income, expense, net, count}
+    //   categories: aggregate by category within the current filter range, split by kind
+    //   delta:      {income, expense, net} prior period (same length immediately before "from")
+    if ($action === 'analytics') {
+        $from = $_GET['from'] ?? date('Y-m-01');
+        $to   = $_GET['to']   ?? date('Y-m-t');
+        $kind = $_GET['kind'] ?? '';
+        $catId = (int)($_GET['category_id'] ?? 0);
+        $q    = trim((string)($_GET['q'] ?? ''));
+
+        // 1) Monthly trend — fixed 12 months trailing today (independent of filter
+        //    so users always see the long-term trend)
+        $monthStart = date('Y-m-01', strtotime('-11 months'));
+        $monthEnd   = date('Y-m-t');
+        $mStmt = $pdo->prepare("
+            SELECT DATE_FORMAT(txn_date, '%Y-%m') AS ym,
+                   SUM(CASE WHEN kind='income'  THEN amount ELSE 0 END) AS income,
+                   SUM(CASE WHEN kind='expense' THEN amount ELSE 0 END) AS expense,
+                   COUNT(*) AS count
+            FROM sys_finance_transactions
+            WHERE txn_date BETWEEN ? AND ?
+            GROUP BY DATE_FORMAT(txn_date, '%Y-%m')
+            ORDER BY ym ASC");
+        $mStmt->execute([$monthStart, $monthEnd]);
+        $byMonth = [];
+        foreach ($mStmt->fetchAll(PDO::FETCH_ASSOC) as $r) $byMonth[$r['ym']] = $r;
+        // Fill every month, even empty ones, so the chart has 12 evenly-spaced bars
+        $monthly = [];
+        for ($i = 11; $i >= 0; $i--) {
+            $ym = date('Y-m', strtotime("-{$i} months"));
+            $r = $byMonth[$ym] ?? null;
+            $monthly[] = [
+                'month'   => $ym,
+                'income'  => (float)($r['income']  ?? 0),
+                'expense' => (float)($r['expense'] ?? 0),
+                'net'     => (float)($r['income']  ?? 0) - (float)($r['expense'] ?? 0),
+                'count'   => (int)  ($r['count']   ?? 0),
+            ];
+        }
+
+        // 2) Category breakdown — within the user's current filter
+        $where  = ['t.txn_date BETWEEN :from AND :to'];
+        $params = [':from' => $from, ':to' => $to];
+        if ($kind === 'income' || $kind === 'expense') { $where[] = 't.kind = :k'; $params[':k'] = $kind; }
+        if ($catId > 0) { $where[] = 't.category_id = :cid'; $params[':cid'] = $catId; }
+        if ($q !== '') {
+            $where[] = '(t.description LIKE :q OR t.reference LIKE :q OR t.receipt_no LIKE :q)';
+            $params[':q'] = '%' . $q . '%';
+        }
+        $whereSql = 'WHERE ' . implode(' AND ', $where);
+        $cStmt = $pdo->prepare("
+            SELECT t.category_id, t.kind, COALESCE(c.name, '(ไม่ระบุหมวด)') AS name,
+                   c.icon, c.color,
+                   SUM(t.amount) AS total, COUNT(*) AS count
+            FROM sys_finance_transactions t
+            LEFT JOIN sys_finance_categories c ON c.id = t.category_id
+            {$whereSql}
+            GROUP BY t.category_id, t.kind, c.name, c.icon, c.color
+            ORDER BY total DESC");
+        $cStmt->execute($params);
+        $categories = [];
+        foreach ($cStmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+            $categories[] = [
+                'category_id' => $r['category_id'] ? (int)$r['category_id'] : null,
+                'kind'  => $r['kind'],
+                'name'  => $r['name'],
+                'icon'  => $r['icon']  ?: 'fa-circle',
+                'color' => $r['color'] ?: '#64748b',
+                'total' => (float)$r['total'],
+                'count' => (int)$r['count'],
+            ];
+        }
+
+        // 3) Period delta — compare current (from..to) to the same length immediately
+        //    before. e.g. May 1-31 → April 1-30.
+        $fromTs = strtotime($from); $toTs = strtotime($to);
+        $lenSec = $toTs - $fromTs;                 // seconds in current window
+        $prevTo = date('Y-m-d', $fromTs - 86400);  // day before current "from"
+        $prevFrom = date('Y-m-d', $fromTs - 86400 - $lenSec);
+        $dStmt = $pdo->prepare("
+            SELECT SUM(CASE WHEN kind='income'  THEN amount ELSE 0 END) AS income,
+                   SUM(CASE WHEN kind='expense' THEN amount ELSE 0 END) AS expense
+            FROM sys_finance_transactions
+            WHERE txn_date BETWEEN ? AND ?");
+        $dStmt->execute([$prevFrom, $prevTo]);
+        $prev = $dStmt->fetch(PDO::FETCH_ASSOC) ?: ['income' => 0, 'expense' => 0];
+
+        echo json_encode([
+            'ok' => true,
+            'monthly'    => $monthly,
+            'categories' => $categories,
+            'delta'      => [
+                'prev_from'    => $prevFrom,
+                'prev_to'      => $prevTo,
+                'income_prev'  => (float)$prev['income'],
+                'expense_prev' => (float)$prev['expense'],
+                'net_prev'     => (float)$prev['income'] - (float)$prev['expense'],
+            ],
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
     // ── List + summary (GET allowed) ───────────────────────────────────────
     if ($action === 'list') {
         $from = $_GET['from'] ?? date('Y-m-01');
