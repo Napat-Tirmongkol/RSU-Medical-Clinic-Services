@@ -594,6 +594,7 @@ body {
 /* ── Tilt + cursor-following glow ─────────────────────── */
 .fx-tilt {
     position: relative;
+    isolation: isolate;          /* keep ::after under content without rewriting child positions */
     transform-style: preserve-3d;
     will-change: transform;
     transform:
@@ -606,7 +607,6 @@ body {
 .fx-tilt.is-hovering {
     transition: transform .08s linear;
 }
-.fx-tilt > * { transform: translateZ(0); }
 .fx-tilt::after {
     content: '';
     position: absolute;
@@ -620,11 +620,9 @@ body {
     opacity: 0;
     pointer-events: none;
     transition: opacity .35s ease;
-    z-index: 1;
+    z-index: 0;
 }
 .fx-tilt.is-hovering::after { opacity: 1; }
-/* Ensure child content sits above the glow overlay */
-.fx-tilt > *:not(.fx-glow-bg) { position: relative; z-index: 2; }
 
 /* Tone presets — match the card's surface tone */
 .fx-tilt-light { --glow-color: rgba(46,158,99,.18); }
