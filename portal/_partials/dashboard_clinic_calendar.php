@@ -419,10 +419,11 @@ body[data-theme='dark'] .dash-clinic-cal__doctor-extra { color: #94a3b8; }
 body[data-theme='dark'] .dash-clinic-cal__doctors-empty { color: #64748b; }
 
 body[data-theme='dark'] .dash-clinic-cal__list {
-    background: #1e293b;
+    background: #334155;
     border-color: #334155;
 }
 body[data-theme='dark'] .dash-clinic-cal__row {
+    background: #1e293b;
     border-bottom-color: #334155;
     color: #e2e8f0;
 }
@@ -430,7 +431,7 @@ body[data-theme='dark'] .dash-clinic-cal__row:hover { background: #0f172a; }
 body[data-theme='dark'] .dash-clinic-cal__row--holiday { background: #2a0e1a; }
 body[data-theme='dark'] .dash-clinic-cal__row--holiday:hover { background: #3a1426; }
 body[data-theme='dark'] .dash-clinic-cal__row--closed { background: #0f172a; }
-body[data-theme='dark'] .dash-clinic-cal__row-wd { color: #94a3b8; }
+body[data-theme='dark'] .dash-clinic-cal__row-wd { color: #cbd5e1; }
 body[data-theme='dark'] .dash-clinic-cal__row-wd:first-letter { color: #64748b; }
 body[data-theme='dark'] .dash-clinic-cal__row-day { color: #f1f5f9; }
 body[data-theme='dark'] .dash-clinic-cal__row-mon { color: #94a3b8; }
