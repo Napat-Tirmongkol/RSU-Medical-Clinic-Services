@@ -83,6 +83,63 @@ declare(strict_types=1);
     @keyframes adSkel { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
 
     .ad-empty { padding:32px 20px; text-align:center; color:#94a3b8; font-weight:700; font-size:13px; }
+
+    /* ── Bold & Colorful — tilt-aware lift + icon micro-interaction ── */
+    .ad-kpi { isolation: isolate; }
+    .ad-kpi:hover:not(.fx-tilt) { transform: translateY(-3px); box-shadow: 0 18px 36px -18px rgba(15,23,42,.18); }
+    .ad-kpi.fx-tilt:hover { --lift: -3px; box-shadow: 0 18px 36px -18px rgba(15,23,42,.18); }
+    .ad-kpi .lbl i { transition: transform .25s cubic-bezier(.16,1,.3,1); }
+    .ad-kpi:hover .lbl i { transform: scale(1.18) rotate(-6deg); }
+
+    /* ── DARK MODE ──────────────────────────────────────────────── */
+    body[data-theme='dark'] .ad-h1 { color:#f1f5f9; }
+    body[data-theme='dark'] .ad-sub { color:#64748b; }
+    body[data-theme='dark'] .ad-pulse { background:rgba(34,197,94,.16); color:#6ee7b7; }
+    body[data-theme='dark'] .ad-pulse .dot { background:#22c55e; }
+    body[data-theme='dark'] .ad-kpi,
+    body[data-theme='dark'] .ad-card {
+        background:#0f172a; border-color:#1e293b;
+        box-shadow: 0 1px 0 rgba(255,255,255,.04), 0 8px 22px rgba(0,0,0,.35);
+    }
+    body[data-theme='dark'] .ad-kpi:hover,
+    body[data-theme='dark'] .ad-card:hover { border-color:#334155; }
+    body[data-theme='dark'] .ad-kpi .lbl { color:#94a3b8; }
+    body[data-theme='dark'] .ad-kpi .val { color:#f1f5f9; }
+    body[data-theme='dark'] .ad-kpi .sub { color:#64748b; }
+    body[data-theme='dark'] .ad-delta-up   { color:#6ee7b7; }
+    body[data-theme='dark'] .ad-delta-down { color:#fb7185; }
+    body[data-theme='dark'] .ad-card-title h3 { color:#f1f5f9; }
+    body[data-theme='dark'] .ad-card-title .meta { color:#64748b; }
+    body[data-theme='dark'] .ad-top-row { border-color:#1e293b; }
+    body[data-theme='dark'] .ad-top-name { color:#e2e8f0; }
+    body[data-theme='dark'] .ad-top-count { color:#cbd5e1; }
+    body[data-theme='dark'] .ad-top-bar { background:#1e293b; }
+    body[data-theme='dark'] .ad-rank { background:#1e293b; color:#cbd5e1; }
+    body[data-theme='dark'] .ad-rank.gold   { background:rgba(245,158,11,.18); color:#fbbf24; }
+    body[data-theme='dark'] .ad-rank.silver { background:rgba(148,163,184,.18); color:#cbd5e1; }
+    body[data-theme='dark'] .ad-rank.bronze { background:rgba(244,63,94,.18); color:#fb7185; }
+    body[data-theme='dark'] .ad-cat-name { color:#e2e8f0; }
+    body[data-theme='dark'] .ad-cat-count { color:#cbd5e1; }
+    body[data-theme='dark'] .ad-cat-bar { background:#1e293b; }
+    body[data-theme='dark'] .ad-heat-cell { background:#1e293b; }
+    body[data-theme='dark'] .ad-heat-lbl { color:#64748b; }
+    body[data-theme='dark'] .ad-heat-hr { color:#475569; }
+    body[data-theme='dark'] .ad-feed::-webkit-scrollbar-thumb { background:#334155; }
+    body[data-theme='dark'] .ad-feed-row { border-color:#1e293b; }
+    body[data-theme='dark'] .ad-feed-actor { color:#f1f5f9; }
+    body[data-theme='dark'] .ad-feed-desc { color:#94a3b8; }
+    body[data-theme='dark'] .ad-feed-time { color:#64748b; }
+    body[data-theme='dark'] .ad-feed-meta { color:#475569; }
+    body[data-theme='dark'] .ad-empty { color:#64748b; }
+    body[data-theme='dark'] #adRefreshBtn { background:#0f172a !important; border-color:#1e293b !important; color:#cbd5e1 !important; }
+    body[data-theme='dark'] .ad-skel {
+        background: linear-gradient(90deg,#1e293b 0%,#334155 40%,#1e293b 80%);
+        background-size:200% 100%;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .ad-kpi, .ad-kpi .lbl i { transition:none !important; transform:none !important; }
+    }
 </style>
 
 <div class="ad-wrap">
@@ -102,22 +159,22 @@ declare(strict_types=1);
 
     <!-- KPI Cards -->
     <div class="ad-grid-kpi">
-        <div class="ad-kpi">
+        <div class="ad-kpi fx-tilt fx-tilt-light" data-tilt="4">
             <div class="lbl"><i class="fa-solid fa-bolt" style="color:#f59e0b;margin-right:4px"></i>Actions วันนี้</div>
             <div class="val" id="adKpiToday">—</div>
             <div class="sub" id="adKpiTodayDelta">เทียบเมื่อวาน · กำลังโหลด…</div>
         </div>
-        <div class="ad-kpi">
+        <div class="ad-kpi fx-tilt fx-tilt-light" data-tilt="4">
             <div class="lbl"><i class="fa-solid fa-users" style="color:#8b5cf6;margin-right:4px"></i>Active Admins (24h)</div>
             <div class="val" id="adKpiActive">—</div>
             <div class="sub" id="adKpiActiveSub">distinct user_id</div>
         </div>
-        <div class="ad-kpi">
+        <div class="ad-kpi fx-tilt fx-tilt-light" data-tilt="4">
             <div class="lbl"><i class="fa-solid fa-chart-line" style="color:#10b981;margin-right:4px"></i>Peak Hour วันนี้</div>
             <div class="val" id="adKpiPeak">—</div>
             <div class="sub" id="adKpiPeakSub">—</div>
         </div>
-        <div class="ad-kpi">
+        <div class="ad-kpi fx-tilt fx-tilt-light" data-tilt="4">
             <div class="lbl"><i class="fa-solid fa-database" style="color:#06b6d4;margin-right:4px"></i>รวมตั้งแต่เริ่มระบบ</div>
             <div class="val" id="adKpiTotal">—</div>
             <div class="sub">all-time records</div>
@@ -238,14 +295,27 @@ declare(strict_types=1);
         document.getElementById('adKpiTotal').textContent = (k.total || 0).toLocaleString();
     }
 
+    function adChartTheme() {
+        const dark = document.body.getAttribute('data-theme') === 'dark';
+        return {
+            tick: dark ? '#94a3b8' : '#94a3b8',
+            grid: dark ? 'rgba(241,245,249,.08)' : '#f1f5f9',
+        };
+    }
+    let adLastHourly = null;
     function adRenderTimeline(hourly) {
+        adLastHourly = hourly;
         const ctx = document.getElementById('adTimelineChart');
         if (!ctx) return;
         const labels = hourly.map(h => h.label);
         const data   = hourly.map(h => h.count);
+        const th = adChartTheme();
         if (adTimelineChart) {
             adTimelineChart.data.labels = labels;
             adTimelineChart.data.datasets[0].data = data;
+            adTimelineChart.options.scales.x.ticks.color = th.tick;
+            adTimelineChart.options.scales.y.ticks.color = th.tick;
+            adTimelineChart.options.scales.y.grid.color  = th.grid;
             adTimelineChart.update('none');
             return;
         }
@@ -266,12 +336,18 @@ declare(strict_types=1);
                 responsive: true, maintainAspectRatio: false, animation: { duration: 400 },
                 plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false } },
                 scales: {
-                    x: { grid: { display: false }, ticks: { font: { size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 8, color: '#94a3b8' } },
-                    y: { beginAtZero: true, grid: { color: '#f1f5f9' }, ticks: { font: { size: 10 }, color: '#94a3b8', precision: 0 } },
+                    x: { grid: { display: false }, ticks: { font: { size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 8, color: th.tick } },
+                    y: { beginAtZero: true, grid: { color: th.grid }, ticks: { font: { size: 10 }, color: th.tick, precision: 0 } },
                 },
             },
         });
     }
+    new MutationObserver(muts => {
+        for (const m of muts) if (m.attributeName === 'data-theme') {
+            if (adLastHourly && adTimelineChart) adRenderTimeline(adLastHourly);
+            break;
+        }
+    }).observe(document.body, { attributes: true, attributeFilter: ['data-theme'] });
 
     function adRenderTopAdmins(rows) {
         const box = document.getElementById('adTopAdmins');

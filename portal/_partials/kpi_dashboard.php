@@ -50,7 +50,60 @@ function _kpi_pager(string $param, int $p): string {
 }
 ?>
 
-<div class="p-6">
+<style>
+/* ── Bold & Colorful — KPI Dashboard ─────────────────────────── */
+#kpiDashRoot .kpi-card {
+    position: relative;
+    transition: transform .25s cubic-bezier(.16,1,.3,1),
+                box-shadow .25s ease,
+                border-color .25s ease;
+    isolation: isolate;
+}
+#kpiDashRoot .kpi-card:hover:not(.fx-tilt) { transform: translateY(-3px); box-shadow: 0 18px 32px -18px rgba(15,23,42,.18); }
+#kpiDashRoot .kpi-card.fx-tilt:hover { --lift: -3px; box-shadow: 0 18px 32px -18px rgba(15,23,42,.18); }
+#kpiDashRoot .kpi-card .kpi-icon { transition: transform .25s cubic-bezier(.16,1,.3,1); }
+#kpiDashRoot .kpi-card:hover .kpi-icon { transform: scale(1.08) rotate(-4deg); }
+#kpiDashRoot .kpi-stripe { position:absolute; right:0; top:0; width:4px; height:100%; border-radius: 0 1rem 1rem 0; }
+
+#kpiDashRoot .kpi-section-dot {
+    width: 10px; height: 10px; border-radius: 999px;
+    box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 18%, transparent);
+}
+
+/* progress bar polish */
+#kpiDashRoot .kpi-bar { background: linear-gradient(90deg, var(--bar-from, #3B82F6), var(--bar-to, #1D4ED8)); }
+
+/* ── DARK MODE ──────────────────────────────────────────────── */
+body[data-theme='dark'] #kpiDashRoot .kpi-card {
+    background: #0f172a !important;
+    border-color: #1e293b !important;
+    box-shadow: 0 1px 0 rgba(255,255,255,.04), 0 8px 22px rgba(0,0,0,.35);
+}
+body[data-theme='dark'] #kpiDashRoot .kpi-card:hover { border-color: #334155 !important; }
+body[data-theme='dark'] #kpiDashRoot .text-gray-900 { color: #f1f5f9 !important; }
+body[data-theme='dark'] #kpiDashRoot .text-gray-700 { color: #e2e8f0 !important; }
+body[data-theme='dark'] #kpiDashRoot .text-gray-600 { color: #cbd5e1 !important; }
+body[data-theme='dark'] #kpiDashRoot .text-gray-500 { color: #94a3b8 !important; }
+body[data-theme='dark'] #kpiDashRoot .text-gray-400 { color: #64748b !important; }
+body[data-theme='dark'] #kpiDashRoot .text-gray-300 { color: #475569 !important; }
+body[data-theme='dark'] #kpiDashRoot .bg-gray-100 { background: #1e293b !important; }
+body[data-theme='dark'] #kpiDashRoot .bg-gray-50  { background: rgba(148,163,184,.08) !important; }
+body[data-theme='dark'] #kpiDashRoot .border-gray-100 { border-color: #1e293b !important; }
+body[data-theme='dark'] #kpiDashRoot .divide-gray-50 > * + * { border-color: #1e293b !important; }
+body[data-theme='dark'] #kpiDashRoot tbody tr.hover\:bg-gray-50:hover { background:#0b1220 !important; }
+body[data-theme='dark'] #kpiDashRoot .bg-emerald-50 { background: rgba(46,158,99,.18) !important; }
+body[data-theme='dark'] #kpiDashRoot .text-emerald-700 { color: #6ee7b7 !important; }
+body[data-theme='dark'] #kpiDashRoot .bg-red-50 { background: rgba(244,63,94,.15) !important; }
+body[data-theme='dark'] #kpiDashRoot .text-red-600 { color: #fb7185 !important; }
+body[data-theme='dark'] #kpiDashRoot .text-red-500 { color: #fb7185 !important; }
+
+@media (prefers-reduced-motion: reduce) {
+    #kpiDashRoot .kpi-card,
+    #kpiDashRoot .kpi-card .kpi-icon { transition: none !important; transform: none !important; }
+}
+</style>
+
+<div id="kpiDashRoot" class="p-6">
 
     <!-- Header -->
     <div class="mb-8 flex items-center gap-4">
@@ -76,11 +129,13 @@ function _kpi_pager(string $param, int $p): string {
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
 
         <!-- Avg Rating -->
-        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 relative overflow-hidden hover:-translate-y-0.5 transition-transform">
-            <div class="absolute right-0 top-0 w-1 h-full rounded-r-2xl" style="background:linear-gradient(180deg,#F59E0B,#D97706)"></div>
+        <div class="kpi-card fx-tilt fx-tilt-light bg-white rounded-2xl border border-gray-100 shadow-sm p-4 overflow-hidden" data-tilt="4">
+            <div class="kpi-stripe" style="background:linear-gradient(180deg,#F59E0B,#D97706)"></div>
             <p class="text-[10px] font-black uppercase tracking-wider text-gray-400 mb-2">คะแนนเฉลี่ย</p>
             <div class="text-3xl font-black text-gray-900 mb-1.5">
-                <?= $sv_kpi['avg'] !== null ? number_format($sv_kpi['avg'], 1) : '—' ?>
+                <?php if ($sv_kpi['avg'] !== null): ?>
+                    <span data-counter="<?= $sv_kpi['avg'] ?>" data-counter-decimals="1">0.0</span>
+                <?php else: ?>—<?php endif; ?>
                 <span class="text-sm font-semibold text-gray-400">/ 5</span>
             </div>
             <div class="flex gap-0.5">
@@ -93,10 +148,10 @@ function _kpi_pager(string $param, int $p): string {
         </div>
 
         <!-- Total -->
-        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 relative overflow-hidden hover:-translate-y-0.5 transition-transform">
-            <div class="absolute right-0 top-0 w-1 h-full rounded-r-2xl" style="background:linear-gradient(180deg,#8B5CF6,#6D28D9)"></div>
+        <div class="kpi-card fx-tilt fx-tilt-light bg-white rounded-2xl border border-gray-100 shadow-sm p-4 overflow-hidden" data-tilt="4">
+            <div class="kpi-stripe" style="background:linear-gradient(180deg,#8B5CF6,#6D28D9)"></div>
             <p class="text-[10px] font-black uppercase tracking-wider text-gray-400 mb-2">ผลประเมินทั้งหมด</p>
-            <div class="text-3xl font-black text-gray-900 mb-1.5"><?= number_format($sv_kpi['total']) ?></div>
+            <div class="text-3xl font-black text-gray-900 mb-1.5"><span data-counter="<?= (int)$sv_kpi['total'] ?>">0</span></div>
             <span class="text-[10px] text-gray-400">
                 <i class="fa-solid fa-comment-dots mr-1" style="color:#8B5CF6"></i>
                 มีความคิดเห็น <?= number_format($sv_total_rows) ?> รายการ
@@ -104,10 +159,10 @@ function _kpi_pager(string $param, int $p): string {
         </div>
 
         <!-- This Week -->
-        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 relative overflow-hidden hover:-translate-y-0.5 transition-transform">
-            <div class="absolute right-0 top-0 w-1 h-full rounded-r-2xl" style="background:linear-gradient(180deg,#2563EB,#1D4ED8)"></div>
+        <div class="kpi-card fx-tilt fx-tilt-light bg-white rounded-2xl border border-gray-100 shadow-sm p-4 overflow-hidden" data-tilt="4">
+            <div class="kpi-stripe" style="background:linear-gradient(180deg,#2563EB,#1D4ED8)"></div>
             <p class="text-[10px] font-black uppercase tracking-wider text-gray-400 mb-2">สัปดาห์นี้</p>
-            <div class="text-3xl font-black text-gray-900 mb-1.5"><?= number_format($sv_kpi['this_week']) ?></div>
+            <div class="text-3xl font-black text-gray-900 mb-1.5"><span data-counter="<?= (int)$sv_kpi['this_week'] ?>">0</span></div>
             <?php
             $tw = $sv_kpi['this_week']; $lw = $sv_kpi['last_week'];
             if ($lw > 0):
@@ -117,16 +172,16 @@ function _kpi_pager(string $param, int $p): string {
                 <i class="fa-solid <?= $up?'fa-arrow-trend-up':'fa-arrow-trend-down' ?> mr-0.5"></i>
                 <?= ($up?'+':'').$pct ?>% vs สัปดาห์ก่อน
             </span>
-            <?php elseif ($sw_kpi['last_week'] ?? 0 === 0): ?>
+            <?php elseif (($sv_kpi['last_week'] ?? 0) === 0): ?>
             <span class="text-[10px] text-gray-300">ไม่มีข้อมูลสัปดาห์ก่อน</span>
             <?php endif; ?>
         </div>
 
         <!-- Satisfaction Rate -->
-        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 relative overflow-hidden hover:-translate-y-0.5 transition-transform">
-            <div class="absolute right-0 top-0 w-1 h-full rounded-r-2xl" style="background:linear-gradient(180deg,#2e9e63,#16a34a)"></div>
+        <div class="kpi-card fx-tilt fx-tilt-light bg-white rounded-2xl border border-gray-100 shadow-sm p-4 overflow-hidden" data-tilt="4">
+            <div class="kpi-stripe" style="background:linear-gradient(180deg,#2e9e63,#16a34a)"></div>
             <p class="text-[10px] font-black uppercase tracking-wider text-gray-400 mb-2">Satisfaction Rate</p>
-            <div class="text-3xl font-black mb-1.5" style="color:#2e9e63"><?= $sv_kpi['sat_rate'] ?>%</div>
+            <div class="text-3xl font-black mb-1.5" style="color:#2e9e63"><span data-counter="<?= (int)$sv_kpi['sat_rate'] ?>">0</span>%</div>
             <span class="text-[10px] text-gray-400">
                 <i class="fa-solid fa-face-smile mr-1 text-amber-400"></i>
                 ให้คะแนน 4–5 ดาว
@@ -139,7 +194,7 @@ function _kpi_pager(string $param, int $p): string {
     <div class="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-10">
 
         <!-- Star Bars (2/5) -->
-        <div class="lg:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+        <div class="kpi-card lg:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
             <p class="text-xs font-black uppercase tracking-wider text-gray-400 mb-4">การกระจายคะแนน</p>
             <?php for ($s = 5; $s >= 1; $s--):
                 $cnt  = $sv_kpi['dist'][$s];
@@ -168,7 +223,7 @@ function _kpi_pager(string $param, int $p): string {
         </div>
 
         <!-- Comments Table (3/5) -->
-        <div class="lg:col-span-3 bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex flex-col">
+        <div class="kpi-card lg:col-span-3 bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex flex-col">
             <div class="flex items-center justify-between mb-4">
                 <p class="text-xs font-black uppercase tracking-wider text-gray-400">ความคิดเห็นล่าสุด</p>
                 <?php if ($sv_total_rows > 0): ?>
@@ -244,38 +299,38 @@ function _kpi_pager(string $param, int $p): string {
 
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-10">
 
-        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 relative overflow-hidden hover:-translate-y-0.5 transition-transform">
-            <div class="absolute right-0 top-0 w-1 h-full rounded-r-2xl" style="background:linear-gradient(180deg,#2e9e63,#16a34a)"></div>
+        <div class="kpi-card fx-tilt fx-tilt-light bg-white rounded-2xl border border-gray-100 shadow-sm p-4 overflow-hidden" data-tilt="4">
+            <div class="kpi-stripe" style="background:linear-gradient(180deg,#2e9e63,#16a34a)"></div>
             <p class="text-[10px] font-black uppercase tracking-wider text-gray-400 mb-2">แคมเปญเปิดอยู่</p>
-            <div class="text-3xl font-black mb-2" style="color:#2e9e63"><?= number_format($kpis['camps']) ?></div>
+            <div class="text-3xl font-black mb-2" style="color:#2e9e63"><span data-counter="<?= (int)$kpis['camps'] ?>">0</span></div>
             <span class="text-[10px] font-black px-2 py-0.5 rounded-full text-emerald-700 bg-emerald-50">
                 <i class="fa-solid fa-circle-check mr-0.5"></i> Active
             </span>
         </div>
 
-        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 relative overflow-hidden hover:-translate-y-0.5 transition-transform">
-            <div class="absolute right-0 top-0 w-1 h-full rounded-r-2xl" style="background:linear-gradient(180deg,#3B82F6,#1D4ED8)"></div>
+        <div class="kpi-card fx-tilt fx-tilt-light bg-white rounded-2xl border border-gray-100 shadow-sm p-4 overflow-hidden" data-tilt="4">
+            <div class="kpi-stripe" style="background:linear-gradient(180deg,#3B82F6,#1D4ED8)"></div>
             <p class="text-[10px] font-black uppercase tracking-wider text-gray-400 mb-2">อัตราการจอง</p>
-            <div class="text-3xl font-black text-gray-900 mb-2"><?= $kpis['booking_rate'] ?>%</div>
+            <div class="text-3xl font-black text-gray-900 mb-2"><span data-counter="<?= (int)$kpis['booking_rate'] ?>">0</span>%</div>
             <div class="w-full bg-gray-100 rounded-full h-1.5">
-                <div class="h-full rounded-full" style="width:<?= $kpis['booking_rate'] ?>%;background:#3B82F6"></div>
+                <div class="h-full rounded-full kpi-bar" style="width:<?= $kpis['booking_rate'] ?>%;--bar-from:#60A5FA;--bar-to:#1D4ED8"></div>
             </div>
         </div>
 
-        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 relative overflow-hidden hover:-translate-y-0.5 transition-transform">
-            <div class="absolute right-0 top-0 w-1 h-full rounded-r-2xl" style="background:linear-gradient(180deg,#10B981,#059669)"></div>
+        <div class="kpi-card fx-tilt fx-tilt-light bg-white rounded-2xl border border-gray-100 shadow-sm p-4 overflow-hidden" data-tilt="4">
+            <div class="kpi-stripe" style="background:linear-gradient(180deg,#10B981,#059669)"></div>
             <p class="text-[10px] font-black uppercase tracking-wider text-gray-400 mb-2">Completion Rate</p>
-            <div class="text-3xl font-black text-gray-900 mb-2"><?= $_ca_comp_rate ?>%</div>
+            <div class="text-3xl font-black text-gray-900 mb-2"><span data-counter="<?= (int)$_ca_comp_rate ?>">0</span>%</div>
             <div class="w-full bg-gray-100 rounded-full h-1.5">
-                <div class="h-full rounded-full" style="width:<?= $_ca_comp_rate ?>%;background:#10B981"></div>
+                <div class="h-full rounded-full kpi-bar" style="width:<?= $_ca_comp_rate ?>%;--bar-from:#34D399;--bar-to:#059669"></div>
             </div>
         </div>
 
-        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 relative overflow-hidden hover:-translate-y-0.5 transition-transform">
-            <div class="absolute right-0 top-0 w-1 h-full rounded-r-2xl" style="background:linear-gradient(180deg,#F97316,#EA580C)"></div>
+        <div class="kpi-card fx-tilt fx-tilt-light bg-white rounded-2xl border border-gray-100 shadow-sm p-4 overflow-hidden" data-tilt="4">
+            <div class="kpi-stripe" style="background:linear-gradient(180deg,#F97316,#EA580C)"></div>
             <p class="text-[10px] font-black uppercase tracking-wider text-gray-400 mb-2">ที่นั่งทั้งหมด</p>
             <div class="text-3xl font-black text-gray-900 mb-2">
-                <?= number_format($kpis['used_quota']) ?>
+                <span data-counter="<?= (int)$kpis['used_quota'] ?>">0</span>
                 <span class="text-sm font-semibold text-gray-400">/ <?= number_format($kpis['total_quota']) ?></span>
             </div>
             <span class="text-[10px] text-gray-400">ที่นั่งถูกใช้งาน</span>
@@ -293,15 +348,15 @@ function _kpi_pager(string $param, int $p): string {
                 <span class="text-[10px] font-black uppercase tracking-[.18em] text-slate-400">ผู้ใช้งาน</span>
             </div>
             <div class="grid grid-cols-3 gap-3">
-                <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 relative overflow-hidden col-span-1">
-                    <div class="absolute right-0 top-0 w-1 h-full rounded-r-2xl" style="background:linear-gradient(180deg,#8B5CF6,#6D28D9)"></div>
+                <div class="kpi-card fx-tilt fx-tilt-light bg-white rounded-2xl border border-gray-100 shadow-sm p-4 overflow-hidden col-span-1" data-tilt="4">
+                    <div class="kpi-stripe" style="background:linear-gradient(180deg,#8B5CF6,#6D28D9)"></div>
                     <p class="text-[9px] font-black uppercase tracking-wider text-gray-400 mb-1.5">ทั้งหมด</p>
-                    <div class="text-2xl font-black text-gray-900"><?= number_format($kpis['users']) ?></div>
+                    <div class="text-2xl font-black text-gray-900"><span data-counter="<?= (int)$kpis['users'] ?>">0</span></div>
                 </div>
-                <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 relative overflow-hidden col-span-1">
-                    <div class="absolute right-0 top-0 w-1 h-full rounded-r-2xl" style="background:linear-gradient(180deg,#EC4899,#BE185D)"></div>
+                <div class="kpi-card fx-tilt fx-tilt-light bg-white rounded-2xl border border-gray-100 shadow-sm p-4 overflow-hidden col-span-1" data-tilt="4">
+                    <div class="kpi-stripe" style="background:linear-gradient(180deg,#EC4899,#BE185D)"></div>
                     <p class="text-[9px] font-black uppercase tracking-wider text-gray-400 mb-1.5">เดือนนี้</p>
-                    <div class="text-2xl font-black text-gray-900"><?= number_format($_us_month) ?></div>
+                    <div class="text-2xl font-black text-gray-900"><span data-counter="<?= (int)$_us_month ?>">0</span></div>
                     <?php if ($_us_last > 0):
                         $g = round(($_us_month-$_us_last)/$_us_last*100); ?>
                     <span class="text-[9px] font-black <?= $g>=0?'text-emerald-600':'text-red-500' ?>">
@@ -309,10 +364,10 @@ function _kpi_pager(string $param, int $p): string {
                     </span>
                     <?php endif; ?>
                 </div>
-                <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 relative overflow-hidden col-span-1">
-                    <div class="absolute right-0 top-0 w-1 h-full rounded-r-2xl" style="background:linear-gradient(180deg,#06B6D4,#0891B2)"></div>
+                <div class="kpi-card fx-tilt fx-tilt-light bg-white rounded-2xl border border-gray-100 shadow-sm p-4 overflow-hidden col-span-1" data-tilt="4">
+                    <div class="kpi-stripe" style="background:linear-gradient(180deg,#06B6D4,#0891B2)"></div>
                     <p class="text-[9px] font-black uppercase tracking-wider text-gray-400 mb-1.5">เดือนก่อน</p>
-                    <div class="text-2xl font-black text-gray-900"><?= number_format($_us_last) ?></div>
+                    <div class="text-2xl font-black text-gray-900"><span data-counter="<?= (int)$_us_last ?>">0</span></div>
                 </div>
             </div>
         </div>
@@ -324,21 +379,21 @@ function _kpi_pager(string $param, int $p): string {
                 <span class="text-[10px] font-black uppercase tracking-[.18em] text-slate-400">ระบบยืมอุปกรณ์ (e_Borrow)</span>
             </div>
             <div class="grid grid-cols-3 gap-3">
-                <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 relative overflow-hidden">
-                    <div class="absolute right-0 top-0 w-1 h-full rounded-r-2xl" style="background:linear-gradient(180deg,#F97316,#EA580C)"></div>
+                <div class="kpi-card fx-tilt fx-tilt-light bg-white rounded-2xl border border-gray-100 shadow-sm p-4 overflow-hidden" data-tilt="4">
+                    <div class="kpi-stripe" style="background:linear-gradient(180deg,#F97316,#EA580C)"></div>
                     <p class="text-[9px] font-black uppercase tracking-wider text-gray-400 mb-1.5">ทั้งหมด</p>
-                    <div class="text-2xl font-black text-gray-900"><?= number_format($_br['total']) ?></div>
+                    <div class="text-2xl font-black text-gray-900"><span data-counter="<?= (int)$_br['total'] ?>">0</span></div>
                 </div>
-                <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 relative overflow-hidden">
-                    <div class="absolute right-0 top-0 w-1 h-full rounded-r-2xl" style="background:linear-gradient(180deg,#2e9e63,#16a34a)"></div>
+                <div class="kpi-card fx-tilt fx-tilt-light bg-white rounded-2xl border border-gray-100 shadow-sm p-4 overflow-hidden" data-tilt="4">
+                    <div class="kpi-stripe" style="background:linear-gradient(180deg,#2e9e63,#16a34a)"></div>
                     <p class="text-[9px] font-black uppercase tracking-wider text-gray-400 mb-1.5">กำลังยืม</p>
-                    <div class="text-2xl font-black" style="color:#2e9e63"><?= number_format($_br['active']) ?></div>
+                    <div class="text-2xl font-black" style="color:#2e9e63"><span data-counter="<?= (int)$_br['active'] ?>">0</span></div>
                 </div>
-                <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 relative overflow-hidden">
-                    <div class="absolute right-0 top-0 w-1 h-full rounded-r-2xl" style="background:linear-gradient(180deg,#EF4444,#B91C1C)"></div>
+                <div class="kpi-card fx-tilt fx-tilt-light bg-white rounded-2xl border border-gray-100 shadow-sm p-4 overflow-hidden" data-tilt="4">
+                    <div class="kpi-stripe" style="background:linear-gradient(180deg,#EF4444,#B91C1C)"></div>
                     <p class="text-[9px] font-black uppercase tracking-wider text-gray-400 mb-1.5">เกินกำหนด</p>
                     <div class="text-2xl font-black <?= $_br['overdue']>0?'text-red-500':'text-gray-900' ?>">
-                        <?= number_format($_br['overdue']) ?>
+                        <span data-counter="<?= (int)$_br['overdue'] ?>">0</span>
                     </div>
                     <?php if ($_br['overdue'] > 0): ?>
                     <span class="text-[9px] font-black text-red-500">⚠ ต้องติดตาม</span>

@@ -48,6 +48,66 @@ $nowMonth = (int)date('n');
 #mrEditModal .mr-edit-flex { display:flex; flex-direction:column; min-height:0; }
 #mrEditModal .mr-edit-scroll { overflow-y:auto; min-height:0; flex:1; }
 
+/* ── Bold & Colorful — tilt-aware lift ── */
+#section-monthly_report .mr-card { isolation: isolate; position: relative; }
+#section-monthly_report .mr-card:hover:not(.fx-tilt) { transform: translateY(-3px); }
+#section-monthly_report .mr-card.fx-tilt:hover { --lift: -3px; }
+#section-monthly_report .mr-card .w-14.h-14 { transition: transform .25s cubic-bezier(.16,1,.3,1); }
+#section-monthly_report .mr-card:hover .w-14.h-14 { transform: scale(1.08) rotate(-4deg); }
+
+/* ── DARK MODE ──────────────────────────────────────────────── */
+body[data-theme='dark'] #section-monthly_report .mr-card {
+    background: #0f172a; border-color: #1e293b;
+    box-shadow: 0 1px 0 rgba(255,255,255,.04), 0 8px 22px rgba(0,0,0,.35);
+}
+body[data-theme='dark'] #section-monthly_report .mr-card:hover { border-color: #f59e0b; box-shadow: 0 18px 36px -18px rgba(245,158,11,.30); }
+body[data-theme='dark'] #section-monthly_report .mr-status-draft     { background: rgba(245,158,11,.18); color:#fbbf24; }
+body[data-theme='dark'] #section-monthly_report .mr-status-submitted { background: rgba(59,130,246,.18); color:#93c5fd; }
+body[data-theme='dark'] #section-monthly_report .mr-status-approved  { background: rgba(16,185,129,.18); color:#6ee7b7; }
+body[data-theme='dark'] #section-monthly_report .mr-pager-btn { background:#0f172a; border-color:#1e293b; color:#cbd5e1; }
+body[data-theme='dark'] #section-monthly_report .mr-pager-btn:hover:not(:disabled) { background:rgba(245,158,11,.16); border-color:#f59e0b; color:#fbbf24; }
+body[data-theme='dark'] #section-monthly_report .mr-pager-btn.mr-active { background:#f59e0b; border-color:#f59e0b; color:#0f172a; }
+body[data-theme='dark'] #section-monthly_report .mr-empty { color:#64748b; }
+
+/* header gradient + filter bar dark variants */
+body[data-theme='dark'] #section-monthly_report .bg-gradient-to-br.from-amber-50 {
+    background: linear-gradient(135deg, rgba(245,158,11,.10), #0f172a 55%, rgba(244,63,94,.10));
+    border-color: rgba(245,158,11,.30) !important;
+}
+body[data-theme='dark'] #section-monthly_report .bg-white { background:#0f172a !important; }
+body[data-theme='dark'] #section-monthly_report .bg-slate-50 { background: rgba(148,163,184,.08) !important; }
+body[data-theme='dark'] #section-monthly_report .bg-amber-50 { background: rgba(245,158,11,.16) !important; }
+body[data-theme='dark'] #section-monthly_report .bg-amber-100 { background: rgba(245,158,11,.22) !important; }
+body[data-theme='dark'] #section-monthly_report .text-amber-700 { color:#fbbf24 !important; }
+body[data-theme='dark'] #section-monthly_report .text-slate-800 { color:#f1f5f9 !important; }
+body[data-theme='dark'] #section-monthly_report .text-slate-700 { color:#e2e8f0 !important; }
+body[data-theme='dark'] #section-monthly_report .text-slate-600 { color:#cbd5e1 !important; }
+body[data-theme='dark'] #section-monthly_report .text-slate-500 { color:#94a3b8 !important; }
+body[data-theme='dark'] #section-monthly_report .text-slate-400 { color:#64748b !important; }
+body[data-theme='dark'] #section-monthly_report .text-slate-300 { color:#475569 !important; }
+body[data-theme='dark'] #section-monthly_report .text-slate-200 { color:#334155 !important; }
+body[data-theme='dark'] #section-monthly_report .border-slate-200 { border-color:#1e293b !important; }
+body[data-theme='dark'] #section-monthly_report .border-amber-100 { border-color: rgba(245,158,11,.30) !important; }
+body[data-theme='dark'] #section-monthly_report .border-amber-200 { border-color: rgba(245,158,11,.30) !important; }
+body[data-theme='dark'] #section-monthly_report .border-rose-200  { border-color: rgba(244,63,94,.30) !important; }
+
+/* edit modal */
+body[data-theme='dark'] #mrEditBox { background:#0f172a; }
+body[data-theme='dark'] #mrEditModal .bg-slate-50 { background:#1e293b !important; }
+body[data-theme='dark'] #mrEditModal .text-slate-900 { color:#f1f5f9 !important; }
+body[data-theme='dark'] #mrEditModal .border-slate-200 { border-color:#1e293b !important; }
+body[data-theme='dark'] #mrEditModal .mr-edit-table th,
+body[data-theme='dark'] #mrEditModal .mr-edit-table td { border-color:#1e293b; }
+body[data-theme='dark'] #mrEditModal .mr-edit-table th { background:#1e293b; color:#cbd5e1; }
+body[data-theme='dark'] #mrEditModal .mr-edit-table textarea { color:#e2e8f0; }
+body[data-theme='dark'] #mrEditModal .mr-edit-table textarea:focus { background: rgba(245,158,11,.10); }
+body[data-theme='dark'] #mrEditModal .mr-cat-row td { background: rgba(245,158,11,.16); color:#fbbf24; }
+
+@media (prefers-reduced-motion: reduce) {
+    #section-monthly_report .mr-card,
+    #section-monthly_report .mr-card .w-14.h-14 { transition: none !important; transform: none !important; }
+}
+
 /* Print stylesheet */
 @media print {
     body * { visibility: hidden !important; }
@@ -261,7 +321,7 @@ $nowMonth = (int)date('n');
             const statusCls = `mr-status-${r.status}`;
             const statusLabel = { draft:'ฉบับร่าง', submitted:'ส่งแล้ว · รอ ผอ.', approved:'อนุมัติแล้ว' }[r.status] || r.status;
             return `
-            <div class="mr-card flex flex-wrap items-center justify-between gap-4">
+            <div class="mr-card fx-tilt fx-tilt-light flex flex-wrap items-center justify-between gap-4" data-tilt="3">
                 <div class="flex items-center gap-4 flex-1">
                     <div class="w-14 h-14 bg-amber-100 rounded-2xl flex flex-col items-center justify-center shrink-0">
                         <div class="text-[10px] font-black text-amber-700 uppercase">${THAI_MONTHS[r.report_month - 1]}</div>
@@ -279,6 +339,7 @@ $nowMonth = (int)date('n');
             </div>`;
         }).join('');
 
+        if (window.RsuFx && typeof RsuFx.refresh === 'function') RsuFx.refresh(wrap);
         renderPager(res.pages || 1);
     };
 

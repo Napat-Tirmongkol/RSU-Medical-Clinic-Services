@@ -147,6 +147,65 @@ $publicUrl = $publicUrlBase . ($activeWorkbook ? ('?wb=' . urlencode($activeWork
     #section-insurance_dashboard .wb-pill.wb-selected {
         border-color: #0f172a; transform: scale(1.08);
     }
+
+    /* ── Bold & Colorful: tilt-aware lift + icon micro-interaction ── */
+    #section-insurance_dashboard .id-card { isolation: isolate; }
+    #section-insurance_dashboard .id-card:hover:not(.fx-tilt) { transform: translateY(-3px); box-shadow: 0 22px 42px -20px rgba(15,23,42,.20); }
+    #section-insurance_dashboard .id-card.fx-tilt:hover { --lift: -3px; box-shadow: 0 22px 42px -20px rgba(15,23,42,.20); }
+    #section-insurance_dashboard .id-card .w-12.h-12.rounded-2xl { transition: transform .25s cubic-bezier(.16,1,.3,1); }
+    #section-insurance_dashboard .id-card:hover .w-12.h-12.rounded-2xl { transform: scale(1.08) rotate(-4deg); }
+
+    /* ── DARK MODE ─────────────────────────────────────────────────── */
+    body[data-theme='dark'] #section-insurance_dashboard-content { background: transparent; }
+    body[data-theme='dark'] #section-insurance_dashboard .id-page { background: transparent; }
+    body[data-theme='dark'] #section-insurance_dashboard .id-card {
+        background: #0f172a; border-color: #1e293b;
+        box-shadow: 0 1px 0 rgba(255,255,255,.04), 0 8px 22px rgba(0,0,0,.35);
+    }
+    body[data-theme='dark'] #section-insurance_dashboard .id-card:hover { border-color: #334155; }
+    body[data-theme='dark'] #section-insurance_dashboard .id-card.id-edit-mode { border-color:#475569; }
+    body[data-theme='dark'] #section-insurance_dashboard .id-card.id-edit-mode:hover { border-color:#38bdf8; box-shadow: 0 0 0 4px rgba(56,189,248,.12); }
+    body[data-theme='dark'] #section-insurance_dashboard .id-kpi-value { color: #f1f5f9; }
+    body[data-theme='dark'] #section-insurance_dashboard .id-kpi-label { color: #94a3b8; }
+    body[data-theme='dark'] #section-insurance_dashboard .id-private-badge { background:#1e293b; color:#94a3b8; }
+
+    body[data-theme='dark'] #section-insurance_dashboard .wb-tab { color:#94a3b8; }
+    body[data-theme='dark'] #section-insurance_dashboard .wb-tab:hover { background:#1e293b; color:#f1f5f9; }
+    body[data-theme='dark'] #section-insurance_dashboard .wb-tab:not(.wb-tab-active) .wb-tab-count { background:#1e293b; color:#64748b; }
+    body[data-theme='dark'] #section-insurance_dashboard .wb-tab-add { border-color:#334155; background:transparent; color:#94a3b8; }
+    body[data-theme='dark'] #section-insurance_dashboard .wb-tab-add:hover { border-color:#3b82f6; background:rgba(59,130,246,.10); color:#93c5fd; }
+    body[data-theme='dark'] #section-insurance_dashboard .wb-pill { background:#1e293b; color:#cbd5e1; }
+    body[data-theme='dark'] #section-insurance_dashboard .wb-pill.wb-selected { border-color:#f1f5f9; }
+
+    /* workbook tab strip surface + header buttons */
+    body[data-theme='dark'] #section-insurance_dashboard .bg-white { background: #0f172a !important; }
+    body[data-theme='dark'] #section-insurance_dashboard .bg-white.border-slate-200 { border-color: #1e293b !important; }
+    body[data-theme='dark'] #section-insurance_dashboard .bg-white.hover\:bg-slate-50:hover { background: #1e293b !important; }
+    body[data-theme='dark'] #section-insurance_dashboard h1.text-slate-800,
+    body[data-theme='dark'] #section-insurance_dashboard .text-slate-800 { color:#f1f5f9 !important; }
+    body[data-theme='dark'] #section-insurance_dashboard .text-slate-700 { color:#e2e8f0 !important; }
+    body[data-theme='dark'] #section-insurance_dashboard .text-slate-600 { color:#cbd5e1 !important; }
+    body[data-theme='dark'] #section-insurance_dashboard .text-slate-500 { color:#94a3b8 !important; }
+    body[data-theme='dark'] #section-insurance_dashboard .text-slate-400 { color:#64748b !important; }
+    body[data-theme='dark'] #section-insurance_dashboard .text-slate-300 { color:#475569 !important; }
+
+    /* tone backgrounds inside KPI icon — keep contrast */
+    body[data-theme='dark'] #section-insurance_dashboard .bg-blue-50    { background: rgba(59,130,246,.18) !important; }
+    body[data-theme='dark'] #section-insurance_dashboard .bg-emerald-50 { background: rgba(16,185,129,.18) !important; }
+    body[data-theme='dark'] #section-insurance_dashboard .bg-amber-50   { background: rgba(245,158,11,.18) !important; }
+    body[data-theme='dark'] #section-insurance_dashboard .bg-rose-50    { background: rgba(244,63,94,.18) !important; }
+    body[data-theme='dark'] #section-insurance_dashboard .bg-purple-50  { background: rgba(168,85,247,.18) !important; }
+    body[data-theme='dark'] #section-insurance_dashboard .bg-cyan-50    { background: rgba(6,182,212,.18) !important; }
+    body[data-theme='dark'] #section-insurance_dashboard .bg-indigo-50  { background: rgba(99,102,241,.18) !important; }
+    body[data-theme='dark'] #section-insurance_dashboard .bg-slate-50   { background: rgba(148,163,184,.10) !important; }
+    body[data-theme='dark'] #section-insurance_dashboard .bg-slate-100  { background: rgba(148,163,184,.14) !important; }
+    body[data-theme='dark'] #section-insurance_dashboard .border-slate-200 { border-color:#1e293b !important; }
+    body[data-theme='dark'] #section-insurance_dashboard .border-slate-100 { border-color:#1e293b !important; }
+
+    @media (prefers-reduced-motion: reduce) {
+        #section-insurance_dashboard .id-card,
+        #section-insurance_dashboard .id-card .w-12.h-12.rounded-2xl { transition: none !important; transform: none !important; }
+    }
 </style>
 
 <div id="section-insurance_dashboard-content" class="px-5 md:px-8 py-8 space-y-7 id-page">
@@ -248,7 +307,7 @@ $publicUrl = $publicUrlBase . ($activeWorkbook ? ('?wb=' . urlencode($activeWork
             $isPrivate = (int)$w['is_public'] === 0;
             $isHidden  = (int)$w['is_visible'] === 0;
         ?>
-        <div class="<?= $sizeClass ?> id-card" data-widget-id="<?= (int)$w['id'] ?>" data-widget-type="<?= htmlspecialchars($w['widget_type']) ?>" style="<?= $isHidden ? 'opacity:.5' : '' ?>">
+        <div class="<?= $sizeClass ?> id-card <?= $w['widget_type'] === 'kpi' ? 'fx-tilt fx-tilt-light' : '' ?>" data-widget-id="<?= (int)$w['id'] ?>" data-widget-type="<?= htmlspecialchars($w['widget_type']) ?>" data-tilt="4" style="<?= $isHidden ? 'opacity:.5' : '' ?>">
             <?php if ($isPrivate): ?>
                 <span class="id-private-badge"><i class="fa-solid fa-lock"></i> Internal</span>
             <?php endif; ?>
@@ -278,7 +337,7 @@ $publicUrl = $publicUrlBase . ($activeWorkbook ? ('?wb=' . urlencode($activeWork
                     </div>
                     <div class="flex-1 min-w-0 km-body">
                         <p class="km-label id-kpi-label mb-1 truncate"><?= htmlspecialchars($w['title']) ?></p>
-                        <p class="km-value id-kpi-value" data-value="<?= $val ?>"><?= number_format($val) ?></p>
+                        <p class="km-value id-kpi-value" data-value="<?= $val ?>"><span data-counter="<?= $val ?>">0</span></p>
                         <?php if (!empty($w['subtitle'])): ?>
                             <p class="text-xs text-slate-400 font-bold mt-2"><?= htmlspecialchars($w['subtitle']) ?></p>
                         <?php endif; ?>
@@ -599,6 +658,17 @@ $publicUrl = $publicUrlBase . ($activeWorkbook ? ('?wb=' . urlencode($activeWork
     }
 
     // ── Render charts ────────────────────────────────────────────────
+    function chartTheme() {
+        const dark = document.body.getAttribute('data-theme') === 'dark';
+        return {
+            tick:   dark ? '#cbd5e1' : '#64748b',
+            grid:   dark ? 'rgba(241,245,249,.08)' : 'rgba(15,23,42,.06)',
+            legend: dark ? '#e2e8f0' : '#334155',
+            border: dark ? '#0f172a' : '#fff',
+        };
+    }
+    const chartInstances = {};
+
     function renderAllCharts() {
         if (typeof Chart === 'undefined') { setTimeout(renderAllCharts, 200); return; }
         widgetData.forEach(w => {
@@ -613,9 +683,13 @@ $publicUrl = $publicUrlBase . ($activeWorkbook ? ('?wb=' . urlencode($activeWork
         const c = COLOR_HEX[w.color] || COLOR_HEX.blue;
         const cAlpha = c + '20';
         const data = w.data || {};
+        const th = chartTheme();
+        const axisOpt = { ticks: { color: th.tick, font: { weight: 700 }}, grid: { color: th.grid }};
+
+        if (chartInstances[w.id]) { chartInstances[w.id].destroy(); delete chartInstances[w.id]; }
 
         if (['line', 'area'].includes(w.type) && data.shape === 'timeseries') {
-            new Chart(canvas, {
+            chartInstances[w.id] = new Chart(canvas, {
                 type: 'line',
                 data: {
                     labels: data.labels || [],
@@ -626,33 +700,38 @@ $publicUrl = $publicUrlBase . ($activeWorkbook ? ('?wb=' . urlencode($activeWork
                         tension: 0.3, fill: w.type === 'area', borderWidth: 2.5, pointRadius: 3,
                     }))
                 },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { font: { weight: 700 }}}}}
+                options: { responsive: true, maintainAspectRatio: false, scales: { x: axisOpt, y: axisOpt }, plugins: { legend: { position: 'bottom', labels: { color: th.legend, font: { weight: 700 }}}}}
             });
         } else if (w.type === 'bar' && data.shape === 'breakdown') {
-            new Chart(canvas, {
+            chartInstances[w.id] = new Chart(canvas, {
                 type: 'bar',
                 data: { labels: data.labels || [], datasets: [{ data: data.values || [], backgroundColor: c, borderRadius: 6 }] },
-                options: { indexAxis: (data.labels || []).length > 5 ? 'y' : 'x', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }}}
+                options: { indexAxis: (data.labels || []).length > 5 ? 'y' : 'x', responsive: true, maintainAspectRatio: false, scales: { x: axisOpt, y: axisOpt }, plugins: { legend: { display: false }}}
             });
         } else if (w.type === 'bar' && data.shape === 'timeseries') {
-            new Chart(canvas, {
+            chartInstances[w.id] = new Chart(canvas, {
                 type: 'bar',
                 data: { labels: data.labels || [], datasets: (data.series || []).map((s, i) => ({ label: s.name, data: s.data, backgroundColor: i === 0 ? c : '#94a3b8', borderRadius: 4 })) },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { font: { weight: 700 }}}}}
+                options: { responsive: true, maintainAspectRatio: false, scales: { x: axisOpt, y: axisOpt }, plugins: { legend: { position: 'bottom', labels: { color: th.legend, font: { weight: 700 }}}}}
             });
         } else if (['donut', 'pie'].includes(w.type) && data.shape === 'breakdown') {
             const palette = [c, '#f59e0b', '#10b981', '#a855f7', '#ef4444', '#06b6d4', '#6366f1', '#94a3b8'];
-            new Chart(canvas, {
+            chartInstances[w.id] = new Chart(canvas, {
                 type: w.type === 'donut' ? 'doughnut' : 'pie',
-                data: { labels: data.labels || [], datasets: [{ data: data.values || [], backgroundColor: palette, borderWidth: 2, borderColor: '#fff' }] },
-                options: { responsive: true, maintainAspectRatio: false, cutout: w.type === 'donut' ? '60%' : 0, plugins: { legend: { position: 'bottom', labels: { font: { weight: 700 }, boxWidth: 12 }}}}
+                data: { labels: data.labels || [], datasets: [{ data: data.values || [], backgroundColor: palette, borderWidth: 2, borderColor: th.border }] },
+                options: { responsive: true, maintainAspectRatio: false, cutout: w.type === 'donut' ? '60%' : 0, plugins: { legend: { position: 'bottom', labels: { color: th.legend, font: { weight: 700 }, boxWidth: 12 }}}}
             });
         } else {
             const ctx = canvas.getContext('2d');
-            ctx.font = '14px sans-serif'; ctx.fillStyle = '#94a3b8'; ctx.textAlign = 'center';
+            ctx.font = '14px sans-serif'; ctx.fillStyle = th.tick; ctx.textAlign = 'center';
             ctx.fillText('ไม่รองรับชนิดข้อมูลนี้', canvas.width / 2, canvas.height / 2);
         }
     }
+
+    // Theme-toggle: re-render charts so axes/legend colors flip live
+    new MutationObserver(muts => {
+        for (const m of muts) if (m.attributeName === 'data-theme') { renderAllCharts(); break; }
+    }).observe(document.body, { attributes: true, attributeFilter: ['data-theme'] });
 
     // ── Edit mode toggle ─────────────────────────────────────────────
     let editMode = false;
