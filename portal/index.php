@@ -501,13 +501,65 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ann_action'])) {
         $annAudience  = in_array($_POST['ann_audience'] ?? '', ['all','student','staff','other']) ? $_POST['ann_audience'] : 'all';
         $annActive    = isset($_POST['ann_active']) ? 1 : 0;
         $annShowOnce  = isset($_POST['ann_show_once']) ? 1 : 0;
-        $annImageUrl  = trim($_POST['ann_image_url'] ?? '');
+
+        // ── Image handling: file upload > existing URL > clear flag ──────
+        // - ถ้ามีไฟล์ใหม่ใน $_FILES['ann_image_file'] → upload + ใช้ path ใหม่
+        // - ถ้ามี $_POST['ann_image_clear'] = '1' → ล้างค่า (NULL)
+        // - มิฉะนั้น → คงค่าเดิม ($_POST['ann_image_existing'])
+        $annImageUrl  = trim($_POST['ann_image_existing'] ?? '');
+        if (!empty($_POST['ann_image_clear'])) {
+            $annImageUrl = '';
+        }
+        $ann_image_err = null;
+        if (isset($_FILES['ann_image_file']) && is_array($_FILES['ann_image_file'])
+            && $_FILES['ann_image_file']['error'] === UPLOAD_ERR_OK
+            && (int)$_FILES['ann_image_file']['size'] > 0) {
+            $f = $_FILES['ann_image_file'];
+            $maxBytes = 5 * 1024 * 1024; // 5 MB
+            if ($f['size'] > $maxBytes) {
+                $ann_image_err = 'ไฟล์ใหญ่เกิน 5 MB';
+            } else {
+                $mime = function_exists('mime_content_type') ? mime_content_type($f['tmp_name']) : ($f['type'] ?? '');
+                $allowed = [
+                    'image/jpeg' => 'jpg',
+                    'image/png'  => 'png',
+                    'image/webp' => 'webp',
+                    'image/gif'  => 'gif',
+                ];
+                if (!isset($allowed[$mime])) {
+                    $ann_image_err = 'รองรับเฉพาะ JPG / PNG / WebP / GIF';
+                } else {
+                    $ext       = $allowed[$mime];
+                    $uploadDir = __DIR__ . '/../assets/uploads/announcements/';
+                    if (!is_dir($uploadDir)) @mkdir($uploadDir, 0755, true);
+                    // Defense-in-depth: block any script execution under upload dir
+                    $htaccess = $uploadDir . '.htaccess';
+                    if (!file_exists($htaccess)) {
+                        @file_put_contents($htaccess, "# Auto-generated — block any script execution\n"
+                            . "<FilesMatch \"\\.(php|php3|php4|php5|php7|phtml|phar|pl|py|cgi|sh)$\">\n"
+                            . "    Require all denied\n"
+                            . "</FilesMatch>\n"
+                            . "Options -ExecCGI -Indexes\n"
+                            . "AddType text/plain .php .phtml .phar .pl .py\n");
+                    }
+                    $newName = 'ann_' . date('Ymd_His') . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
+                    if (move_uploaded_file($f['tmp_name'], $uploadDir . $newName)) {
+                        $annImageUrl = '../assets/uploads/announcements/' . $newName;
+                    } else {
+                        $ann_image_err = 'อัปโหลดไม่สำเร็จ';
+                    }
+                }
+            }
+        }
+
         $annStart     = $_POST['ann_start'] ?? null;
         $annEnd       = $_POST['ann_end'] ?? null;
         $annStart     = $annStart ?: null;
         $annEnd       = $annEnd ?: null;
 
-        if ($annTitle && $annContent) {
+        if ($ann_image_err) {
+            $ann_error = $ann_image_err;
+        } elseif ($annTitle && $annContent) {
             try {
                 if ($annAction === 'create') {
                     $pdo->prepare("
@@ -1821,7 +1873,7 @@ try {
                             <i class="fa-solid fa-xmark"></i>
                         </button>
                     </div>
-                    <form method="POST" id="ann-form" style="padding:24px 28px;display:flex;flex-direction:column;gap:16px">
+                    <form method="POST" id="ann-form" enctype="multipart/form-data" style="padding:24px 28px;display:flex;flex-direction:column;gap:16px">
                         <?php csrf_field(); ?>
                         <input type="hidden" id="ann-form-action" name="ann_action" value="create">
                         <input type="hidden" id="ann-form-id" name="ann_id" value="0">
@@ -1849,9 +1901,31 @@ try {
                         </div>
 
                         <div>
-                            <label style="font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px">URL รูปภาพประกอบ (ถ้ามี)</label>
-                            <input type="url" id="ann-f-image" name="ann_image_url" class="premium-input" placeholder="https://example.com/image.jpg">
-                            <p style="font-size:11px;color:#94a3b8;margin-top:4px">ใส่ URL ของรูปภาพ (JPG, PNG, WebP)</p>
+                            <label style="font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px">รูปภาพประกอบ (ถ้ามี)</label>
+                            <input type="hidden" id="ann-f-image-existing" name="ann_image_existing" value="">
+                            <input type="hidden" id="ann-f-image-clear"    name="ann_image_clear"    value="">
+
+                            <!-- Drop zone / clickable -->
+                            <label for="ann-f-image-file" id="ann-image-drop"
+                                style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:18px;border:1.5px dashed #cbd5e1;border-radius:14px;background:#f8fafc;cursor:pointer;transition:all .2s;text-align:center">
+                                <i class="fa-solid fa-cloud-arrow-up" style="font-size:22px;color:#7c3aed"></i>
+                                <span style="font-size:13px;font-weight:700;color:#0f172a">คลิกเพื่อแนบไฟล์ภาพ</span>
+                                <span style="font-size:11px;color:#94a3b8">JPG / PNG / WebP / GIF — สูงสุด 5 MB</span>
+                            </label>
+                            <input type="file" id="ann-f-image-file" name="ann_image_file" accept="image/jpeg,image/png,image/webp,image/gif" style="display:none">
+
+                            <!-- Preview -->
+                            <div id="ann-image-preview-wrap" style="display:none;margin-top:10px;position:relative;border-radius:14px;overflow:hidden;border:1px solid #e2e8f0;background:#f8fafc">
+                                <img id="ann-image-preview" src="" alt="preview"
+                                    style="display:block;width:100%;max-height:220px;object-fit:contain;background:#fff">
+                                <div id="ann-image-preview-meta" style="padding:8px 12px;font-size:11px;color:#64748b;background:#fff;border-top:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center;gap:8px">
+                                    <span id="ann-image-preview-name" style="font-weight:700;color:#0f172a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+                                    <button type="button" onclick="annClearImage()"
+                                        style="flex-shrink:0;padding:5px 10px;border-radius:8px;border:1px solid #fecaca;background:#fee2e2;color:#b91c1c;font-size:11px;font-weight:700;cursor:pointer">
+                                        <i class="fa-solid fa-trash mr-1"></i> ลบรูป
+                                    </button>
+                                </div>
+                            </div>
                         </div>
 
                         <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
@@ -4962,7 +5036,6 @@ try {
             document.getElementById('ann-f-title-en').value       = data ? (data.title_en || '') : '';
             document.getElementById('ann-f-content').value        = data ? (data.content  || '') : '';
             document.getElementById('ann-f-content-en').value      = data ? (data.content_en|| '') : '';
-            document.getElementById('ann-f-image').value          = data ? (data.image_url|| '') : '';
             document.getElementById('ann-f-type').value           = data ? (data.type || 'info') : 'info';
             document.getElementById('ann-f-audience').value       = data ? (data.target_audience || 'all') : 'all';
             document.getElementById('ann-f-start').value          = data ? (data.start_date || '') : '';
@@ -4970,8 +5043,89 @@ try {
             document.getElementById('ann-f-priority').value       = data ? (data.priority || 0) : 0;
             document.getElementById('ann-f-active').checked       = data ? (parseInt(data.is_active) === 1) : true;
             document.getElementById('ann-f-show-once').checked    = data ? (parseInt(data.show_once) === 1) : true;
+
+            // ── Image preview / state ───────────────────────────────────
+            const existingUrl = data ? (data.image_url || '') : '';
+            document.getElementById('ann-f-image-existing').value = existingUrl;
+            document.getElementById('ann-f-image-clear').value    = '';
+            document.getElementById('ann-f-image-file').value     = '';
+            const wrap = document.getElementById('ann-image-preview-wrap');
+            const img  = document.getElementById('ann-image-preview');
+            const name = document.getElementById('ann-image-preview-name');
+            if (existingUrl) {
+                img.src = existingUrl;
+                name.textContent = existingUrl.split('/').pop();
+                wrap.style.display = 'block';
+            } else {
+                img.src = '';
+                name.textContent = '';
+                wrap.style.display = 'none';
+            }
             modal.style.display = 'flex';
         };
+
+        // เคลียร์รูป (ทั้งของเดิมและที่เพิ่งเลือก) — ติด flag ให้ฝั่ง server รู้ว่าต้อง NULL
+        window.annClearImage = function() {
+            document.getElementById('ann-f-image-file').value     = '';
+            document.getElementById('ann-f-image-existing').value = '';
+            document.getElementById('ann-f-image-clear').value    = '1';
+            const wrap = document.getElementById('ann-image-preview-wrap');
+            document.getElementById('ann-image-preview').src = '';
+            document.getElementById('ann-image-preview-name').textContent = '';
+            wrap.style.display = 'none';
+        };
+
+        // เมื่อเลือกไฟล์ใหม่ → แสดง preview + ตรวจขนาด
+        document.getElementById('ann-f-image-file')?.addEventListener('change', function(e) {
+            const file = e.target.files && e.target.files[0];
+            if (!file) return;
+            const maxBytes = 5 * 1024 * 1024;
+            if (file.size > maxBytes) {
+                Swal.fire({ icon: 'warning', title: 'ไฟล์ใหญ่เกินไป', text: 'รองรับสูงสุด 5 MB' });
+                e.target.value = '';
+                return;
+            }
+            const allowed = ['image/jpeg','image/png','image/webp','image/gif'];
+            if (!allowed.includes(file.type)) {
+                Swal.fire({ icon: 'warning', title: 'ชนิดไฟล์ไม่รองรับ', text: 'รองรับเฉพาะ JPG / PNG / WebP / GIF' });
+                e.target.value = '';
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = function(ev) {
+                document.getElementById('ann-image-preview').src = ev.target.result;
+                document.getElementById('ann-image-preview-name').textContent = file.name;
+                document.getElementById('ann-image-preview-wrap').style.display = 'block';
+                // เลือกไฟล์ใหม่ = ไม่ต้อง clear (server จะใช้ไฟล์ใหม่แทน existing เอง)
+                document.getElementById('ann-f-image-clear').value = '';
+            };
+            reader.readAsDataURL(file);
+        });
+
+        // Drag & drop
+        (function() {
+            const dz = document.getElementById('ann-image-drop');
+            if (!dz) return;
+            ['dragenter','dragover'].forEach(ev => dz.addEventListener(ev, e => {
+                e.preventDefault(); e.stopPropagation();
+                dz.style.borderColor = '#7c3aed';
+                dz.style.background = '#f5f3ff';
+            }));
+            ['dragleave','drop'].forEach(ev => dz.addEventListener(ev, e => {
+                e.preventDefault(); e.stopPropagation();
+                dz.style.borderColor = '#cbd5e1';
+                dz.style.background = '#f8fafc';
+            }));
+            dz.addEventListener('drop', e => {
+                const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+                if (!file) return;
+                const input = document.getElementById('ann-f-image-file');
+                const dt = new DataTransfer();
+                dt.items.add(file);
+                input.files = dt.files;
+                input.dispatchEvent(new Event('change'));
+            });
+        })();
 
         window.annCloseForm = function() {
             document.getElementById('ann-form-modal').style.display = 'none';
