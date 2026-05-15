@@ -196,7 +196,8 @@ async function eborrowFineSendToFinance(data) {
     fd.append('category_name', 'รายรับอื่นๆ');
     fd.append('reference', `e-Borrow Payment #${data.pid}`);
     try {
-        const res = await fetch('../../portal/ajax_finance.php', { method: 'POST', body: fd, credentials: 'same-origin' });
+        // Path resolves against <base href="/.../e_Borrow/"> so we need the admin/ prefix
+        const res = await fetch('admin/ajax_finance_sync.php', { method: 'POST', body: fd, credentials: 'same-origin' });
         const j = await res.json();
         if (!j.ok) { Swal.fire({ icon: 'error', title: 'บันทึกไม่สำเร็จ', text: j.message || '' }); return; }
         Swal.fire({ icon: 'success', title: j.mode === 'updated' ? 'อัปเดตในระบบการเงินแล้ว' : 'บันทึกในระบบการเงินแล้ว',
