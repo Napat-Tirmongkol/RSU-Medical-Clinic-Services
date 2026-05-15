@@ -11,10 +11,12 @@
 .fin-filter-bar { display:flex; flex-wrap:wrap; gap:8px; align-items:end; }
 .fin-filter-bar label { font-size:11px; font-weight:700; color:#475569; display:block; margin-bottom:3px; }
 .fin-filter-bar input, .fin-filter-bar select { font-size:13px; padding:7px 10px; border:1px solid #cbd5e1; border-radius:8px; background:#fff; }
+.fin-filter-bar input[type="search"] { min-width: 220px; }
 .fin-table { width:100%; border-collapse:collapse; font-size:13px; }
 .fin-table th { background:#f8fafc; padding:9px 10px; text-align:left; font-size:11px; font-weight:800; color:#475569; text-transform:uppercase; border-bottom:1px solid #e2e8f0; }
 .fin-table td { padding:10px; border-bottom:1px solid #f1f5f9; vertical-align:middle; }
 .fin-table tbody tr:hover { background:#fafbfc; }
+.fin-table tbody tr.is-selected { background:#f0faf4; }
 .fin-cat-chip { display:inline-flex; align-items:center; gap:5px; padding:3px 9px; border-radius:999px; font-size:11px; font-weight:700; }
 .fin-amt-income { color:#059669; font-weight:800; }
 .fin-amt-expense { color:#dc2626; font-weight:800; }
@@ -24,6 +26,76 @@
 .fin-pagi button:disabled { opacity:0.4; cursor:not-allowed; }
 .fin-pagi button.active { background:#2e9e63; color:#fff; border-color:#2e9e63; }
 .fin-empty { text-align:center; padding:48px 16px; color:#94a3b8; font-size:13px; }
+
+/* Quick-date chips */
+.fin-quick-dates { display:flex; flex-wrap:wrap; gap:6px; padding:4px 0 0; }
+.fin-chip {
+    padding:5px 12px; border-radius:99px; border:1.5px solid #e2e8f0;
+    background:#fff; color:#475569; font-size:12px; font-weight:700;
+    cursor:pointer; transition:all .15s; white-space:nowrap;
+}
+.fin-chip:hover { border-color:#2e9e63; color:#2e9e63; background:#f0faf4; }
+.fin-chip.is-active {
+    background:linear-gradient(135deg,#2e9e63,#3bba7a); color:#fff;
+    border-color:transparent; box-shadow:0 4px 10px -3px rgba(46,158,99,.45);
+}
+
+/* Bulk selection bottom bar (sticky, slides up when items selected) */
+.fin-bulk-bar {
+    position:sticky; bottom:12px;
+    margin:14px auto 0; max-width:680px;
+    background:linear-gradient(135deg,#0f172a 0%,#14532d 100%);
+    color:#fff; border-radius:14px;
+    padding:12px 16px;
+    display:flex; align-items:center; gap:14px;
+    box-shadow:0 20px 40px -10px rgba(15,23,42,.45), inset 0 1px 0 rgba(255,255,255,.10);
+    z-index:10;
+    transform:translateY(120%); opacity:0; pointer-events:none;
+    transition:transform .25s cubic-bezier(.16,1,.3,1), opacity .25s;
+}
+.fin-bulk-bar.is-visible { transform:translateY(0); opacity:1; pointer-events:auto; }
+.fin-bulk-count {
+    display:inline-flex; align-items:center; gap:8px;
+    font-size:13px; font-weight:800;
+}
+.fin-bulk-count b { font-size:18px; color:#fbbf24; }
+.fin-bulk-sum {
+    font-size:12px; color:rgba(255,255,255,.75);
+    padding-left:14px; border-left:1px solid rgba(255,255,255,.20);
+    font-variant-numeric: tabular-nums;
+}
+.fin-bulk-bar .spacer { flex:1; }
+.fin-bulk-bar button {
+    padding:8px 14px; border-radius:10px; font-size:12px; font-weight:800;
+    border:none; cursor:pointer; display:inline-flex; align-items:center; gap:6px;
+    transition: background .15s, transform .15s;
+}
+.fin-bulk-bar .btn-cancel { background:rgba(255,255,255,.10); color:#fff; border:1px solid rgba(255,255,255,.22); }
+.fin-bulk-bar .btn-cancel:hover { background:rgba(255,255,255,.18); }
+.fin-bulk-bar .btn-del { background:linear-gradient(135deg,#f43f5e,#dc2626); color:#fff; box-shadow:0 6px 14px -3px rgba(244,63,94,.5); }
+.fin-bulk-bar .btn-del:hover { transform:translateY(-1px); }
+
+/* Checkbox column */
+.fin-chk { width:34px; text-align:center; }
+.fin-chk input[type="checkbox"] {
+    width:15px; height:15px; cursor:pointer; accent-color:#2e9e63;
+}
+
+/* Duplicate hint inside the modal */
+.fin-dup-hint {
+    margin-top:8px;
+    background:#fffbeb; border:1px solid #fde68a; color:#92400e;
+    border-radius:10px; padding:8px 12px;
+    font-size:12px; line-height:1.55;
+}
+.fin-dup-hint b { color:#78350f; }
+.fin-dup-hint ul { margin:6px 0 0; padding-left:18px; }
+.fin-dup-hint li { margin:2px 0; }
+
+/* Dark mode for the bulk bar inner text (already gradient-dark) — leave as is */
+body[data-theme='dark'] .fin-chip { background:#1e293b; color:#cbd5e1; border-color:#334155; }
+body[data-theme='dark'] .fin-chip:hover { background:rgba(46,158,99,.15); color:#6ee7b7; border-color:rgba(46,158,99,.30); }
+body[data-theme='dark'] .fin-dup-hint { background:rgba(245,158,11,.10); color:#fbbf24; border-color:rgba(245,158,11,.30); }
 </style>
 
 <div class="space-y-4">
@@ -36,7 +108,10 @@
             </h2>
             <p class="text-xs text-slate-500 mt-1">บันทึกรายรับ-รายจ่ายของคลินิก ดูสรุปตามช่วงเวลา + หมวดหมู่</p>
         </div>
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2 flex-wrap">
+            <button id="finBtnExport" class="btn-solid bg-slate-100 text-slate-700 hover:bg-slate-200 text-sm" title="ดาวน์โหลด CSV ตามตัวกรองที่เลือก">
+                <i class="fa-solid fa-file-csv"></i> CSV
+            </button>
             <button id="finBtnCategories" class="btn-solid bg-amber-500 text-white hover:bg-amber-600 text-sm">
                 <i class="fa-solid fa-tags"></i> จัดการหมวดหมู่
             </button>
@@ -68,7 +143,22 @@
 
     <!-- Filter bar -->
     <div class="fin-card">
+        <!-- Quick-date chips -->
+        <div class="fin-quick-dates" id="finQuickDates" style="margin-bottom:12px">
+            <button class="fin-chip" data-range="today">วันนี้</button>
+            <button class="fin-chip is-active" data-range="this_month">เดือนนี้</button>
+            <button class="fin-chip" data-range="last_month">เดือนก่อน</button>
+            <button class="fin-chip" data-range="last_3">3 เดือนล่าสุด</button>
+            <button class="fin-chip" data-range="ytd">ตั้งแต่ต้นปี (YTD)</button>
+            <button class="fin-chip" data-range="last_year">ปีที่แล้ว</button>
+            <button class="fin-chip" data-range="all">ทั้งหมด</button>
+        </div>
+
         <div class="fin-filter-bar">
+            <div style="flex:1;min-width:220px">
+                <label>ค้นหา</label>
+                <input type="search" id="finSearch" placeholder="รายละเอียด / เลขที่ใบเสร็จ / อ้างอิง..." style="width:100%">
+            </div>
             <div><label>จาก</label><input type="date" id="finFrom"></div>
             <div><label>ถึง</label><input type="date" id="finTo"></div>
             <div>
@@ -102,6 +192,7 @@
             <table class="fin-table">
                 <thead>
                     <tr>
+                        <th class="fin-chk"><input type="checkbox" id="finChkAll" title="เลือก/ยกเลิกทั้งหน้า"></th>
                         <th style="width:110px">วันที่</th>
                         <th style="width:90px">ประเภท</th>
                         <th>หมวด</th>
@@ -116,6 +207,15 @@
         </div>
         <div id="finPagi" class="fin-pagi"></div>
     </div>
+
+    <!-- Bulk action bar (sticky bottom, shows when items are selected) -->
+    <div id="finBulkBar" class="fin-bulk-bar" role="region" aria-label="การจัดการรายการที่เลือก">
+        <span class="fin-bulk-count"><i class="fa-solid fa-square-check"></i> เลือก <b id="finBulkCount">0</b> รายการ</span>
+        <span class="fin-bulk-sum" id="finBulkSum">รวม ฿0</span>
+        <span class="spacer"></span>
+        <button class="btn-cancel" id="finBulkCancel"><i class="fa-solid fa-xmark"></i> ยกเลิก</button>
+        <button class="btn-del" id="finBulkDelete"><i class="fa-solid fa-trash"></i> ลบที่เลือก</button>
+    </div>
 </div>
 
 <script>
@@ -127,6 +227,8 @@
 
     let cachedCategories = [];
     let currentPage = 1;
+    let selectedIds = new Set();   // ids of rows currently bulk-selected
+    let lastRows = [];             // cache of last page render — used to compute selected sum
 
     // ── Defaults: this month ──
     function setDefaultDates() {
@@ -147,19 +249,23 @@
     setDefaultDates();
 
     // ── Load & render ──
-    async function load(page = 1) {
-        currentPage = page;
-        const params = new URLSearchParams({
-            action: 'list',
+    function currentFilterParams() {
+        return {
             from: document.getElementById('finFrom').value,
             to:   document.getElementById('finTo').value,
             kind: document.getElementById('finKind').value || '',
             category_id: document.getElementById('finCategoryFilter').value || '0',
-            page: String(page),
-        });
+            q:    document.getElementById('finSearch').value.trim(),
+        };
+    }
+    async function load(page = 1) {
+        currentPage = page;
+        const f = currentFilterParams();
+        const params = new URLSearchParams({ action: 'list', page: String(page), ...f });
         const r = await fetch(AJAX + '?' + params.toString(), { credentials: 'same-origin' });
         const j = await r.json();
         if (!j.ok) { Swal.fire({ icon: 'error', title: 'โหลดไม่สำเร็จ', text: j.message || '' }); return; }
+        lastRows = j.rows || [];
 
         // KPI
         document.getElementById('finKpiIncome').textContent  = fmt(j.summary.income);
@@ -178,7 +284,7 @@
         // Table
         const tbody = document.getElementById('finTbody');
         if (!j.rows || j.rows.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="7" class="fin-empty">
+            tbody.innerHTML = `<tr><td colspan="8" class="fin-empty">
                 <i class="fa-solid fa-folder-open text-3xl text-slate-300 mb-2 block"></i>
                 ไม่พบรายการในช่วงที่เลือก</td></tr>`;
         } else {
@@ -196,7 +302,9 @@
                 const refDisplay = row.receipt_no
                     ? `<span class="font-mono text-[11px] text-[#2e9e63] font-bold">${escapeHtml(row.receipt_no)}</span>` + (row.reference ? `<br><span class="text-[10px] text-slate-400 font-mono">${escapeHtml(row.reference)}</span>` : '')
                     : (row.reference ? `<span class="font-mono text-xs text-slate-500">${escapeHtml(row.reference)}</span>` : '<span class="text-slate-300 text-xs">-</span>');
-                return `<tr>
+                const isSel = selectedIds.has(row.id);
+                return `<tr data-id="${row.id}" data-amount="${row.amount}" data-kind="${row.kind}" class="${isSel ? 'is-selected' : ''}">
+                    <td class="fin-chk"><input type="checkbox" class="fin-row-chk" data-id="${row.id}" ${isSel ? 'checked' : ''}></td>
                     <td class="text-slate-600">${fmtDate(row.txn_date)}</td>
                     <td>${kindBadge}</td>
                     <td>${catChip}</td>
@@ -210,7 +318,14 @@
                     </td>
                 </tr>`;
             }).join('');
+
+            // Bind row checkboxes
+            tbody.querySelectorAll('.fin-row-chk').forEach(cb => {
+                cb.addEventListener('change', (e) => toggleRowSelection(parseInt(e.target.dataset.id, 10), e.target.checked));
+            });
+            syncSelectAllState();
         }
+        updateBulkBar();
 
         // Pagination (window ±2 + first/prev/next/last)
         const totalPages = Math.max(1, Math.ceil(j.total / j.per_page));
@@ -302,6 +417,45 @@
             confirmButtonColor: '#2e9e63',
             didOpen: () => {
                 window._finBuildCatOpts = (kind, selId) => buildCatOptions(kind, selId);
+
+                // Duplicate-detection probe on the "อ้างอิง" field —
+                // debounced check after the user pauses typing.
+                const refInput = document.getElementById('ftxRef');
+                if (refInput) {
+                    let dupTimer = null;
+                    const showHint = (rows) => {
+                        const slot = document.getElementById('ftxDupSlot');
+                        if (!slot) return;
+                        if (!rows || rows.length === 0) { slot.innerHTML = ''; return; }
+                        slot.innerHTML = `<div class="fin-dup-hint">
+                            <i class="fa-solid fa-triangle-exclamation"></i>
+                            <b>อาจซ้ำ</b> — พบ ${rows.length} รายการที่มีเลขอ้างอิงเดียวกัน:
+                            <ul>${rows.map(d => `<li>#${d.id} · ${d.txn_date} · ${d.kind === 'income' ? 'รายได้' : 'รายจ่าย'} · ฿${Number(d.amount).toLocaleString('th-TH', {minimumFractionDigits:2})} <span style="color:#a16207">— ${escapeHtml(d.description || '-')}</span></li>`).join('')}</ul>
+                            <span style="color:#78350f;font-size:11px">บันทึกได้ตามปกติถ้าตั้งใจซ้ำ</span>
+                        </div>`;
+                    };
+                    refInput.insertAdjacentHTML('afterend', '<div id="ftxDupSlot"></div>');
+                    refInput.addEventListener('input', () => {
+                        clearTimeout(dupTimer);
+                        const v = refInput.value.trim();
+                        if (!v) { document.getElementById('ftxDupSlot').innerHTML = ''; return; }
+                        dupTimer = setTimeout(async () => {
+                            const fd = new FormData();
+                            fd.append('csrf_token', CSRF);
+                            fd.append('action', 'txn:check_duplicate');
+                            fd.append('reference', v);
+                            fd.append('kind', document.getElementById('ftxKind').value);
+                            if (isEdit) fd.append('exclude_id', String(row.id));
+                            try {
+                                const res = await fetch(AJAX, { method: 'POST', body: fd, credentials: 'same-origin' });
+                                const j = await res.json();
+                                if (j.ok) showHint(j.duplicates);
+                            } catch (e) { /* silent */ }
+                        }, 450);
+                    });
+                    // Run once on open if there's a pre-filled reference (edit mode)
+                    if (refInput.value.trim()) refInput.dispatchEvent(new Event('input'));
+                }
             },
             preConfirm: () => {
                 const v = {
@@ -466,9 +620,152 @@
         openCategoriesModal();
     };
 
+    // ── Quick-date chips ────────────────────────────────────
+    function setDateRange(range) {
+        const now = new Date();
+        const toIso = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+        let from, to;
+        switch (range) {
+            case 'today':
+                from = to = new Date(now);
+                break;
+            case 'this_month':
+                from = new Date(now.getFullYear(), now.getMonth(), 1);
+                to   = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+                break;
+            case 'last_month':
+                from = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+                to   = new Date(now.getFullYear(), now.getMonth(), 0);
+                break;
+            case 'last_3':
+                from = new Date(now.getFullYear(), now.getMonth() - 2, 1);
+                to   = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+                break;
+            case 'ytd':
+                from = new Date(now.getFullYear(), 0, 1);
+                to   = new Date(now);
+                break;
+            case 'last_year':
+                from = new Date(now.getFullYear() - 1, 0, 1);
+                to   = new Date(now.getFullYear() - 1, 11, 31);
+                break;
+            case 'all':
+                from = new Date(2000, 0, 1);
+                to   = new Date(now.getFullYear() + 1, 11, 31);
+                break;
+        }
+        document.getElementById('finFrom').value = toIso(from);
+        document.getElementById('finTo').value   = toIso(to);
+        document.querySelectorAll('#finQuickDates .fin-chip').forEach(c => c.classList.toggle('is-active', c.dataset.range === range));
+    }
+    document.querySelectorAll('#finQuickDates .fin-chip').forEach(c => {
+        c.addEventListener('click', () => { setDateRange(c.dataset.range); load(1); });
+    });
+    // When user manually edits a date, unselect chips
+    ['finFrom', 'finTo'].forEach(id => {
+        document.getElementById(id).addEventListener('input', () => {
+            document.querySelectorAll('#finQuickDates .fin-chip.is-active').forEach(c => c.classList.remove('is-active'));
+        });
+    });
+
+    // ── Search box (debounced) ─────────────────────────────
+    let searchTimer = null;
+    document.getElementById('finSearch').addEventListener('input', () => {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(() => load(1), 350);
+    });
+
+    // ── CSV export ─────────────────────────────────────────
+    document.getElementById('finBtnExport').onclick = () => {
+        const f = currentFilterParams();
+        const params = new URLSearchParams(f);
+        // Open in same tab so the browser triggers the download dialog from
+        // the Content-Disposition header; portal session cookie travels along.
+        window.location.href = 'finance_export.php?' + params.toString();
+    };
+
+    // ── Bulk selection ─────────────────────────────────────
+    function toggleRowSelection(id, checked) {
+        if (checked) selectedIds.add(id); else selectedIds.delete(id);
+        const tr = document.querySelector(`#finTbody tr[data-id="${id}"]`);
+        if (tr) tr.classList.toggle('is-selected', checked);
+        syncSelectAllState();
+        updateBulkBar();
+    }
+    function syncSelectAllState() {
+        const allChk = document.getElementById('finChkAll');
+        const rows = lastRows.map(r => r.id);
+        if (rows.length === 0) { allChk.checked = false; allChk.indeterminate = false; return; }
+        const selectedOnPage = rows.filter(id => selectedIds.has(id)).length;
+        allChk.checked = selectedOnPage === rows.length;
+        allChk.indeterminate = selectedOnPage > 0 && selectedOnPage < rows.length;
+    }
+    document.getElementById('finChkAll').addEventListener('change', (e) => {
+        const checked = e.target.checked;
+        lastRows.forEach(r => {
+            if (checked) selectedIds.add(r.id); else selectedIds.delete(r.id);
+        });
+        // re-paint row chk + class without full reload
+        document.querySelectorAll('#finTbody .fin-row-chk').forEach(cb => { cb.checked = checked; });
+        document.querySelectorAll('#finTbody tr[data-id]').forEach(tr => tr.classList.toggle('is-selected', checked));
+        updateBulkBar();
+    });
+    function updateBulkBar() {
+        const bar = document.getElementById('finBulkBar');
+        const count = selectedIds.size;
+        document.getElementById('finBulkCount').textContent = count;
+        // Compute sum across all currently-visible rows that are selected
+        // (we only know amount/kind of rows currently in lastRows — Phase A scope)
+        let sum = 0;
+        lastRows.forEach(r => {
+            if (selectedIds.has(r.id)) {
+                sum += (r.kind === 'income' ? 1 : -1) * Number(r.amount || 0);
+            }
+        });
+        const sumStr = (sum >= 0 ? '+' : '') + fmt(Math.abs(sum));
+        document.getElementById('finBulkSum').textContent = 'รวม ' + sumStr;
+        bar.classList.toggle('is-visible', count > 0);
+    }
+    document.getElementById('finBulkCancel').onclick = () => {
+        selectedIds.clear();
+        document.querySelectorAll('#finTbody .fin-row-chk').forEach(cb => { cb.checked = false; });
+        document.querySelectorAll('#finTbody tr.is-selected').forEach(tr => tr.classList.remove('is-selected'));
+        syncSelectAllState();
+        updateBulkBar();
+    };
+    document.getElementById('finBulkDelete').onclick = async () => {
+        if (selectedIds.size === 0) return;
+        const r = await Swal.fire({
+            icon: 'warning',
+            title: `ลบ ${selectedIds.size} รายการที่เลือก?`,
+            text: 'การลบไม่สามารถยกเลิกได้',
+            showCancelButton: true,
+            confirmButtonText: 'ลบทั้งหมด', cancelButtonText: 'ยกเลิก',
+            confirmButtonColor: '#dc2626',
+        });
+        if (!r.isConfirmed) return;
+        const fd = new FormData();
+        fd.append('csrf_token', CSRF);
+        fd.append('action', 'txn:bulk_delete');
+        [...selectedIds].forEach(id => fd.append('ids[]', String(id)));
+        const res = await fetch(AJAX, { method: 'POST', body: fd, credentials: 'same-origin' });
+        const j = await res.json();
+        if (!j.ok) { Swal.fire({ icon: 'error', title: 'ลบไม่สำเร็จ', text: j.message || '' }); return; }
+        Swal.fire({ icon: 'success', title: `ลบ ${j.deleted} รายการแล้ว`, timer: 1400, showConfirmButton: false, toast: true, position: 'top-end' });
+        selectedIds.clear();
+        load(currentPage);
+    };
+
     // ── Bind ──
     document.getElementById('finBtnApply').onclick = () => load(1);
-    document.getElementById('finBtnReset').onclick = () => { setDefaultDates(); document.getElementById('finKind').value = ''; document.getElementById('finCategoryFilter').value = '0'; load(1); };
+    document.getElementById('finBtnReset').onclick = () => {
+        setDefaultDates(); setDateRange('this_month');
+        document.getElementById('finKind').value = '';
+        document.getElementById('finCategoryFilter').value = '0';
+        document.getElementById('finSearch').value = '';
+        selectedIds.clear();
+        load(1);
+    };
     document.getElementById('finBtnAdd').onclick = () => openTxnModal(null);
     document.getElementById('finBtnCategories').onclick = openCategoriesModal;
 

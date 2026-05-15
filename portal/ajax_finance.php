@@ -92,10 +92,17 @@ try {
         $perPage = 20;
         $offset = ($page - 1) * $perPage;
 
+        $q   = trim((string)($_GET['q'] ?? ''));
+
         $where = ['t.txn_date BETWEEN :from AND :to'];
         $params = [':from' => $from, ':to' => $to];
         if ($kind === 'income' || $kind === 'expense') { $where[] = 't.kind = :k'; $params[':k'] = $kind; }
         if ($catId > 0) { $where[] = 't.category_id = :cid'; $params[':cid'] = $catId; }
+        if ($q !== '') {
+            // ค้นใน description / reference / receipt_no — ใช้ LIKE บน 3 column แต่ bind ค่าเดียวกัน
+            $where[] = '(t.description LIKE :q OR t.reference LIKE :q OR t.receipt_no LIKE :q)';
+            $params[':q'] = '%' . $q . '%';
+        }
         $whereSql = 'WHERE ' . implode(' AND ', $where);
 
         $countStmt = $pdo->prepare("SELECT COUNT(*) FROM sys_finance_transactions t {$whereSql}");
@@ -177,6 +184,50 @@ try {
         if ($id <= 0) { echo json_encode(['ok' => false, 'message' => 'ไม่ระบุ id']); exit; }
         $pdo->prepare("DELETE FROM sys_finance_transactions WHERE id=?")->execute([$id]);
         echo json_encode(['ok' => true]); exit;
+    }
+
+    // Bulk delete — accepts ids[] array
+    if ($action === 'txn:bulk_delete') {
+        $rawIds = $_POST['ids'] ?? [];
+        if (!is_array($rawIds) || empty($rawIds)) {
+            echo json_encode(['ok' => false, 'message' => 'ไม่มี id ที่จะลบ']); exit;
+        }
+        $ids = array_values(array_unique(array_filter(array_map('intval', $rawIds), fn($v) => $v > 0)));
+        if (empty($ids)) { echo json_encode(['ok' => false, 'message' => 'id ไม่ถูกต้อง']); exit; }
+        if (count($ids) > 500) { echo json_encode(['ok' => false, 'message' => 'ลบครั้งละไม่เกิน 500 รายการ']); exit; }
+
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        $stmt = $pdo->prepare("DELETE FROM sys_finance_transactions WHERE id IN ({$placeholders})");
+        $stmt->execute($ids);
+        echo json_encode(['ok' => true, 'deleted' => $stmt->rowCount()]); exit;
+    }
+
+    // Duplicate-detection probe — non-destructive lookup before user confirms create
+    // Inputs: reference, txn_date (optional, narrows match), kind (optional), exclude_id (for edit)
+    if ($action === 'txn:check_duplicate') {
+        $ref     = trim((string)($_POST['reference'] ?? ''));
+        $txnDate = trim((string)($_POST['txn_date']  ?? ''));
+        $kindIn  = (string)($_POST['kind']           ?? '');
+        $exclude = (int)($_POST['exclude_id']        ?? 0);
+        if ($ref === '') { echo json_encode(['ok' => true, 'duplicates' => []]); exit; }
+
+        $where  = ['LOWER(reference) = LOWER(?)'];
+        $params = [$ref];
+        if ($kindIn === 'income' || $kindIn === 'expense') {
+            $where[] = 'kind = ?';
+            $params[] = $kindIn;
+        }
+        if ($exclude > 0) {
+            $where[] = 'id <> ?';
+            $params[] = $exclude;
+        }
+        $whereSql = 'WHERE ' . implode(' AND ', $where);
+        $stmt = $pdo->prepare("SELECT id, txn_date, kind, amount, description, reference
+            FROM sys_finance_transactions {$whereSql}
+            ORDER BY txn_date DESC, id DESC LIMIT 5");
+        $stmt->execute($params);
+        $dups = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        echo json_encode(['ok' => true, 'duplicates' => $dups], JSON_UNESCAPED_UNICODE); exit;
     }
 
     // ── Upsert from source module (cross-module integration) ──
