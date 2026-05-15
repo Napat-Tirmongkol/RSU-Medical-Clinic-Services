@@ -378,4 +378,66 @@ $_upcoming  = array_slice($_days, 1);
 
 /* Sundays + Saturdays in the upcoming list — gentle weekend tint on weekday label */
 .dash-clinic-cal__row[data-weekend="1"] .dash-clinic-cal__row-wd { color: #fb7185; }
+
+/* ── Dark mode ──────────────────────────────────────────── */
+body[data-theme='dark'] .dash-clinic-cal__more { color: #6ee7b7; }
+body[data-theme='dark'] .dash-clinic-cal__more:hover { color: #a7f3d0; }
+
+body[data-theme='dark'] .dash-clinic-cal__today {
+    background: linear-gradient(135deg, #0f2a1e 0%, #14302b 100%);
+    border-color: #1f4d3a;
+}
+body[data-theme='dark'] .dash-clinic-cal__today--holiday {
+    background: linear-gradient(135deg, #2a0e1a 0%, #3a1426 100%);
+    border-color: #6b1e3a;
+}
+body[data-theme='dark'] .dash-clinic-cal__today--closed {
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    border-color: #334155;
+}
+body[data-theme='dark'] .dash-clinic-cal__today--special {
+    background: linear-gradient(135deg, #2a200c 0%, #3a2a14 100%);
+    border-color: #6b4e1a;
+}
+body[data-theme='dark'] .dash-clinic-cal__today-eyebrow {
+    color: #cbd5e1;
+    background: rgba(255,255,255,.08);
+    border-color: rgba(255,255,255,.10);
+}
+body[data-theme='dark'] .dash-clinic-cal__today-date { color: #f1f5f9; }
+body[data-theme='dark'] .dash-clinic-cal__today-status { color: #6ee7b7; }
+body[data-theme='dark'] .dash-clinic-cal__today--holiday .dash-clinic-cal__today-status { color: #fb7185; }
+body[data-theme='dark'] .dash-clinic-cal__today--closed  .dash-clinic-cal__today-status { color: #94a3b8; }
+body[data-theme='dark'] .dash-clinic-cal__today--special .dash-clinic-cal__today-status { color: #fbbf24; }
+
+body[data-theme='dark'] .dash-clinic-cal__doctors { border-top-color: rgba(255,255,255,.12); }
+body[data-theme='dark'] .dash-clinic-cal__doctor { color: #e2e8f0; }
+body[data-theme='dark'] .dash-clinic-cal__doctor i { color: #60a5fa; }
+body[data-theme='dark'] .dash-clinic-cal__doctor-name { color: #f1f5f9; }
+body[data-theme='dark'] .dash-clinic-cal__doctor-time { color: #94a3b8; }
+body[data-theme='dark'] .dash-clinic-cal__doctor-extra { color: #94a3b8; }
+body[data-theme='dark'] .dash-clinic-cal__doctors-empty { color: #64748b; }
+
+body[data-theme='dark'] .dash-clinic-cal__list {
+    background: #334155;
+    border-color: #334155;
+}
+body[data-theme='dark'] .dash-clinic-cal__row {
+    background: #1e293b;
+    border-bottom-color: #334155;
+    color: #e2e8f0;
+}
+body[data-theme='dark'] .dash-clinic-cal__row:hover { background: #0f172a; }
+body[data-theme='dark'] .dash-clinic-cal__row--holiday { background: #2a0e1a; }
+body[data-theme='dark'] .dash-clinic-cal__row--holiday:hover { background: #3a1426; }
+body[data-theme='dark'] .dash-clinic-cal__row--closed { background: #0f172a; }
+body[data-theme='dark'] .dash-clinic-cal__row-wd { color: #cbd5e1; }
+body[data-theme='dark'] .dash-clinic-cal__row-wd:first-letter { color: #64748b; }
+body[data-theme='dark'] .dash-clinic-cal__row-day { color: #f1f5f9; }
+body[data-theme='dark'] .dash-clinic-cal__row-mon { color: #94a3b8; }
+body[data-theme='dark'] .dash-clinic-cal__row-hours { color: #6ee7b7; }
+body[data-theme='dark'] .dash-clinic-cal__row-docs { color: #94a3b8; }
+body[data-theme='dark'] .dash-clinic-cal__row-label--holiday { color: #fb7185; }
+body[data-theme='dark'] .dash-clinic-cal__row-label--closed  { color: #64748b; }
+body[data-theme='dark'] .dash-clinic-cal__row[data-weekend="1"] .dash-clinic-cal__row-wd { color: #fb7185; }
 </style>

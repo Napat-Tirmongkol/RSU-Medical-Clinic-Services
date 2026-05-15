@@ -196,12 +196,34 @@ async function eborrowFineSendToFinance(data) {
     fd.append('category_name', 'รายรับอื่นๆ');
     fd.append('reference', `e-Borrow Payment #${data.pid}`);
     try {
-        const res = await fetch('../../portal/ajax_finance.php', { method: 'POST', body: fd, credentials: 'same-origin' });
+        // Path resolves against <base href="/.../e_Borrow/"> so we need the admin/ prefix
+        const res = await fetch('admin/ajax_finance_sync.php', { method: 'POST', body: fd, credentials: 'same-origin' });
         const j = await res.json();
         if (!j.ok) { Swal.fire({ icon: 'error', title: 'บันทึกไม่สำเร็จ', text: j.message || '' }); return; }
-        Swal.fire({ icon: 'success', title: j.mode === 'updated' ? 'อัปเดตในระบบการเงินแล้ว' : 'บันทึกในระบบการเงินแล้ว',
-            html: `<div style="font-size:13px"><a href="../../portal/index.php?section=finance" target="_blank" style="color:#059669;text-decoration:underline">เปิดดู Cash Book</a></div>`,
-            confirmButtonColor: '#059669' });
+
+        // If the payment date is outside the current month, the record won't appear
+        // in Cash Book's default view — surface that so user doesn't think it failed.
+        const txnDate = j.txn_date || data.date;
+        const txnYM = txnDate.slice(0, 7);
+        const nowYM = new Date().toISOString().slice(0, 7);
+        const monthHint = (txnYM === nowYM)
+            ? ''
+            : `<div style="font-size:11px;color:#b45309;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:6px 10px;margin-top:8px">
+                   <i class="fa-solid fa-circle-info"></i> วันชำระอยู่นอกเดือนปัจจุบัน — ใน Cash Book ต้องเลือกช่วงวันที่ครอบคลุม <b>${txnDate}</b>
+               </div>`;
+
+        Swal.fire({
+            icon: 'success',
+            title: j.mode === 'updated' ? 'อัปเดตในระบบการเงินแล้ว' : 'บันทึกในระบบการเงินแล้ว',
+            html: `<div style="font-size:13px;text-align:left;display:inline-block">
+                       <div>Transaction ID: <b>#${j.id}</b></div>
+                       <div>วันที่: <b>${txnDate}</b></div>
+                       <div>ยอด: <b>${Number(j.amount).toLocaleString('th-TH', {minimumFractionDigits: 2})} บาท</b></div>
+                       ${monthHint}
+                       <div style="margin-top:10px"><a href="../portal/index.php?section=finance" target="_blank" style="color:#059669;text-decoration:underline">เปิดดู Cash Book →</a></div>
+                   </div>`,
+            confirmButtonColor: '#059669'
+        });
     } catch (e) { Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: String(e) }); }
 }
 

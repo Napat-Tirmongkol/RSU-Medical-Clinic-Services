@@ -36,27 +36,75 @@
    Use these instead of repeating long utility chains.
    ────────────────────────────────────────────────────────────────────── */
 @layer components {
-    /* Card surfaces */
-    .ds-card        { @apply bg-white rounded-card border border-slate-100 shadow-card; }
+    /* Card surfaces — bolder borders, deeper shadows, hover lift */
+    .ds-card        { @apply bg-white rounded-card border border-slate-100 shadow-card transition-all duration-300; }
+    .ds-card:hover  { @apply shadow-lift -translate-y-0.5 border-slate-200; }
     .ds-card-lg     { @apply bg-white rounded-card-lg border border-slate-100 shadow-card-lg; }
     .ds-card-soft   { @apply bg-white rounded-2xl border border-slate-100 shadow-sm; }
 
-    /* Buttons */
-    .ds-btn         { @apply inline-flex items-center justify-center gap-2 h-12 px-5 rounded-2xl font-black text-sm transition-all active:scale-95; }
-    .ds-btn-primary { @apply ds-btn bg-brand-500 text-white shadow-glow-brand hover:bg-brand-600; }
-    .ds-btn-ghost   { @apply ds-btn bg-white border border-slate-200 text-slate-500 hover:border-brand-500 hover:text-brand-500; }
-    .ds-btn-danger  { @apply ds-btn bg-rose-50 text-rose-600 border border-rose-100; }
-    .ds-btn-info    { @apply ds-btn bg-info-500 text-white shadow-glow-info hover:bg-info-600; }
+    /* Accent card — colored top stripe for personality */
+    .ds-card-accent {
+        @apply ds-card relative overflow-hidden;
+    }
+    .ds-card-accent::before {
+        content: '';
+        @apply absolute inset-x-0 top-0 h-1 bg-brand-gradient;
+    }
+
+    /* Buttons — bolder gradients, deeper glows, lift on hover */
+    .ds-btn         { @apply inline-flex items-center justify-center gap-2 h-12 px-5 rounded-2xl font-black text-sm tracking-wide transition-all duration-200 active:scale-95; }
+    .ds-btn-primary {
+        @apply ds-btn text-white shadow-glow-brand bg-brand-gradient;
+    }
+    .ds-btn-primary:hover { @apply -translate-y-0.5 brightness-110; box-shadow: 0 22px 45px -8px rgba(46,158,99,.55); }
+    .ds-btn-ghost   { @apply ds-btn bg-white border-2 border-slate-200 text-slate-600 hover:border-brand-500 hover:text-brand-600 hover:bg-brand-50; }
+    .ds-btn-danger  { @apply ds-btn bg-rose-50 text-rose-600 border-2 border-rose-100 hover:bg-rose-100 hover:border-rose-200; }
+    .ds-btn-info    { @apply ds-btn bg-info-500 text-white shadow-glow-info hover:bg-info-600 hover:-translate-y-0.5; }
+    .ds-btn-accent  { @apply ds-btn text-white shadow-glow-accent bg-royal-gradient hover:-translate-y-0.5 hover:brightness-110; }
+    .ds-btn-sunset  { @apply ds-btn text-white shadow-glow-amber bg-sunset-gradient hover:-translate-y-0.5 hover:brightness-110; }
 
     /* Inputs */
-    .ds-input       { @apply w-full h-14 px-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none font-bold text-slate-700 transition-all focus:ring-4 focus:ring-brand-50 focus:border-brand-500; }
+    .ds-input       { @apply w-full h-14 px-4 bg-slate-50 border-2 border-slate-100 rounded-2xl outline-none font-bold text-slate-700 transition-all focus:ring-4 focus:ring-brand-100 focus:border-brand-500 focus:bg-white; }
 
-    /* Pills / badges */
-    .ds-pill        { @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-pill border text-[10px] font-black; }
-    .ds-pill-brand  { @apply ds-pill bg-brand-50 text-brand-700 border-brand-100; }
-    .ds-pill-amber  { @apply ds-pill bg-amber-50 text-amber-700 border-amber-100; }
-    .ds-pill-rose   { @apply ds-pill bg-rose-50 text-rose-700 border-rose-100; }
+    /* Generic toolbar button — wraps any colour utility chain */
+    .btn-solid {
+        @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl font-bold whitespace-nowrap shadow-sm transition-all duration-150 active:scale-95;
+    }
+    .btn-solid:hover { @apply -translate-y-0.5 shadow-md; }
+    .btn-solid i { @apply text-[12px]; }
+
+    /* Pills / badges — bolder, slightly larger */
+    .ds-pill        { @apply inline-flex items-center gap-1 px-2.5 py-1 rounded-pill border text-[10px] font-black uppercase tracking-wider; }
+    .ds-pill-brand  { @apply ds-pill bg-brand-50 text-brand-700 border-brand-200; }
+    .ds-pill-amber  { @apply ds-pill bg-amber-50 text-amber-700 border-amber-200; }
+    .ds-pill-rose   { @apply ds-pill bg-rose-50 text-rose-700 border-rose-200; }
     .ds-pill-slate  { @apply ds-pill bg-slate-100 text-slate-600 border-slate-200; }
+    .ds-pill-info   { @apply ds-pill bg-info-50 text-info-700 border-blue-200; }
+    .ds-pill-accent { @apply ds-pill bg-accent-50 text-accent-700 border-accent-100; }
+
+    /* Section title with bold gradient bar */
+    .ds-section-title {
+        @apply flex items-center gap-3 text-slate-900 font-black tracking-tight text-lg;
+    }
+    .ds-section-title::before {
+        content: '';
+        @apply block w-1.5 h-6 rounded-full bg-brand-gradient;
+    }
+
+    /* KPI tile — colored top stripe */
+    .ds-kpi-tile {
+        @apply relative bg-white rounded-2xl border border-slate-100 p-5 transition-all duration-300 overflow-hidden;
+    }
+    .ds-kpi-tile:hover { @apply shadow-lift -translate-y-1; }
+    .ds-kpi-tile::before {
+        content: '';
+        @apply absolute inset-x-0 top-0 h-1 bg-brand-gradient;
+    }
+    .ds-kpi-tile[data-tone="info"]::before    { background: linear-gradient(90deg, #0ea5e9, #6366f1); }
+    .ds-kpi-tile[data-tone="amber"]::before   { background: linear-gradient(90deg, #f59e0b, #f43f5e); }
+    .ds-kpi-tile[data-tone="rose"]::before    { background: linear-gradient(90deg, #f43f5e, #d946ef); }
+    .ds-kpi-tile[data-tone="accent"]::before  { background: linear-gradient(90deg, #6366f1, #d946ef); }
+    .ds-kpi-tile[data-tone="ocean"]::before   { background: linear-gradient(90deg, #0ea5e9, #14b8a6); }
 
     /* Glass header (used by hub + module shells) */
     .ds-glass-header {

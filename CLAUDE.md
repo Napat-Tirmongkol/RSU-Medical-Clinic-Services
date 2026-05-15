@@ -23,6 +23,27 @@
 - Bottom nav ของ user เป็น shared include — ใช้ `includes/user_bottom_nav.php` ทุกครั้ง อย่า copy markup
 - หน้า reference: `user/profile.php`
 
+#### Tokens ที่ extend แล้วใน `tailwind.config.js` (ใช้ได้ทันทีหลัง build)
+- **Colors**:
+  - `brand-{50..900}` — primary clinic green (`brand-500 = #2e9e63` คือ canonical)
+  - `info-{50,100,500,600,700}` — admin blue
+  - `accent-{50,100,400,500,600,700}` — fuchsia (สำหรับ "bold & colorful" accents)
+  - `canvas` (#F8FAFF) — page bg
+- **Shadows**:
+  - `shadow-glow-brand` / `glow-info` / `glow-accent` / `glow-amber` / `glow-rose` — colored glows สำหรับ primary CTA
+  - `shadow-lift` — generic deep hover shadow
+  - `shadow-card` / `card-lg` — card surface shadows
+- **Background gradients**:
+  - `bg-brand-gradient` (เขียว) / `bg-sunset-gradient` (ส้ม-ชมพู) / `bg-royal-gradient` (ม่วง-ชมพู) / `bg-ocean-gradient` (ฟ้า-เทอร์คอยซ์)
+- **Components** (component layer ใน `tailwind.src.css`):
+  - `.ds-btn` + `.ds-btn-primary` / `-ghost` / `-danger` / `-info` / `-accent` / `-sunset` — buttons พร้อม hover lift
+  - `.ds-card` / `.ds-card-lg` / `.ds-card-soft` / `.ds-card-accent` (มี top accent stripe)
+  - `.ds-input` — form input
+  - `.ds-pill-brand/amber/rose/slate/info/accent` — badges
+  - `.ds-section-title` — heading พร้อม gradient bar ด้านหน้า
+  - `.ds-kpi-tile` (มี `data-tone="info|amber|rose|accent|ocean"` ปรับ accent stripe)
+  - `.btn-solid` — generic toolbar button (combine กับ utility color เช่น `bg-amber-500 text-white`)
+
 ### Tailwind CSS — Compiled Class Pitfalls
 `assets/css/tailwind.min.css` เป็นไฟล์ที่ build ไว้ล่วงหน้า **ไม่รองรับ JIT** — class ที่ไม่ได้ scan จะไม่มีใน output
 
@@ -42,6 +63,118 @@
 - Flex: `flex-1`, `flex-col`, `flex-row`, `shrink-0`
 - Overflow: `overflow-y-auto`, `overflow-x-auto`
 - Max-width: `max-w-2xl`, `max-w-3xl`, `max-w-4xl`
+
+---
+
+## Visual System — "Bold & Colorful" (current direction)
+
+หน้าใหม่/redesign ทุกครั้งให้ตามแนวทางนี้ — เก็บ brand-green เป็นแกนหลัก ปล่อยให้ section / KPI / ปุ่มหลัก มีสีสันเด่นกว่าเดิม
+
+### Portal Sidebar — section accent colors
+แต่ละกลุ่มใน sidebar มีสีประจำตัว (กำหนดที่ `.psb-group[data-group="X"]` ใน `portal.css`):
+- `overview` เขียว · `ai` ม่วง · `security` ชมพู-แดง · `insurance` ฟ้า · `comm` ส้ม
+- `inventory` เทอร์คอยซ์ · `finance` ฟูเชีย · `monitor` cyan · `reports` indigo · `docs` slate
+- `masterdata` cyan-dark · `settings` slate-dark
+- เมนูใหม่ใน group → ใช้สีของ group นั้นเป็น icon color (ไอคอน FA inline `style="color:#XXX"` ให้ตรง accent)
+
+### Portal Header — rainbow accent
+`.portal-header::before` มีแถบ gradient 6 สีเลื่อนช้าๆ ตลอด (animation `hdrShimmer 14s`). ถ้าทำ shell ใหม่ของ sub-module ให้ตามแนวนี้ (ตัวอย่าง: `e_Borrow/assets/css/eb-skin.css` → `.header::before`)
+
+### Hover micro-interactions (มาตรฐาน)
+- การ์ดที่ interactive: ยกลอย `-2/-3px` + colored glow shadow + border-color เปลี่ยนเป็น accent
+- **ใช้ `--lift` CSS variable** บน `:hover` แทนการเขียน `transform: translateY` ตรงๆ — เพื่อให้ compose กับ `.fx-tilt` ได้:
+  ```css
+  .my-card:hover:not(.fx-tilt) { transform: translateY(-3px); }
+  .my-card.fx-tilt:hover { --lift: -3px; }
+  ```
+- ปุ่มหลัก (CTA): `.ds-btn-primary` มี gradient + glow-brand + hover lift 0.5
+- Icon ใน card ทำ `transform: scale(1.08) rotate(-4deg)` ตอน parent hover
+
+### Animation timing
+- **Easing curves**:
+  - `cubic-bezier(.16,1,.3,1)` — entrance / card lift (snappy + overshoot-feel)
+  - `cubic-bezier(.4,0,.2,1)` — sidebar collapse / material-style
+- **Durations**: hover 0.15-0.25s · entrance 0.35-0.55s · stagger delay 0.08-0.16s ต่อ item
+- **เคารพ `prefers-reduced-motion: reduce`** ทุกครั้ง — disable transform/animation/glow follow
+
+---
+
+## FX Library — `assets/js/rsu-fx.js`
+
+โหลดที่ portal/e_Borrow shell (เป็น `<script defer>` ใน header). `window.RsuFx` มี API พร้อมใช้:
+
+### 1. Number CountUp (IntersectionObserver-driven)
+```html
+<span data-counter="12345">0</span>
+<!-- options ผ่าน data-attrs: -->
+<span data-counter="3.14" data-counter-decimals="2" data-counter-duration="800">0</span>
+```
+- เริ่มนับเมื่อ scroll เข้า viewport เท่านั้น (threshold 35%)
+- ใส่ใน wrap span ของตัวเลขถ้ามี suffix เช่น `<span data-counter="..."></span><span>/200</span>` — counter จะไม่ทำลาย sub element
+- Auto-init บน DOMContentLoaded + รันซ้ำด้วย `RsuFx.refresh(rootEl)` หลัง insert markup ใหม่
+
+### 2. Tilt + Cursor-Following Glow
+```html
+<div class="fx-tilt fx-tilt-light" data-tilt="5"> ... </div>
+<!-- variants: fx-tilt-dark | fx-tilt-light | fx-tilt-accent | fx-tilt-info -->
+```
+- `data-tilt="N"` คือ max rotation degree (default 6)
+- ใช้กับ `.dash-kpi`, `.proj-card`, `.priority-item`, `.pinned-row` แล้ว
+- **CSS ภายในใช้ `isolation: isolate` กัน ::after glow ไปทับ position absolute ของลูก** (เช่น `.pin-btn`)
+- Auto-disabled บน touch (`@media (hover: none)`) และ reduced-motion
+
+### 3. Skeleton Loading
+```js
+RsuFx.skeleton('#my-table', { variant: 'table', rows: 5 });
+// fetch...
+RsuFx.unskeleton('#my-table', newHtml);   // หรือ unskeleton(el) เพื่อ restore เดิม
+```
+- 3 variants: `rows` (เส้นยาวๆ) · `cards` (กริด) · `table` (แถวพร้อม avatar+col)
+- หรือใช้ class ตรงๆ: `<div class="skel skel-line w-60"></div>` (width helpers: `w-20/30/40/60/80`)
+- Shimmer keyframe หยุดเองตอน `prefers-reduced-motion`
+
+---
+
+## Dark Mode Patterns
+
+ระบบใช้ 2 selector แยกตามฝั่ง:
+- **Portal**: `body[data-theme='dark']` (เปลี่ยนผ่าน data-attribute)
+- **e_Borrow**: `body.dark-mode` (legacy class — ยังเก็บไว้)
+
+### กฎสำคัญที่ทำพังบ่อย
+1. **ห้ามใช้ inline `style="background:#fff"` หรือ raw `background:#fff` ใน CSS** — global dark override จับเฉพาะ `.bg-white` (Tailwind utility class) เท่านั้น พอเขียน raw bg surface จะติดขาวค้างในธีมมืด
+2. **ถ้าจำเป็นต้องใช้ raw bg** ให้ใช้ `data-tone` attribute แทน inline style:
+   ```html
+   <div class="my-tile" data-tone="income"> ... </div>
+   ```
+   ```css
+   .my-tile[data-tone="income"] { background:#f0fdf4; }
+   body[data-theme='dark'] .my-tile[data-tone="income"] { background:rgba(46,158,99,.15); }
+   ```
+3. **เมื่อสร้าง class ใหม่ที่มี surface ขาว** (`.fin-card`, `.dash-panel` ฯลฯ) ต้องเพิ่ม `body[data-theme='dark'] .my-class` override ที่ portal.css หรือใน `<style>` ของ partial เอง
+4. **Text colors ที่ใช้ `text-slate-*` utility** มี global dark override แล้ว — แต่ถ้าเขียน raw `color: #0f172a` ต้อง override เอง
+5. **Reference implementation** — ดูที่ `portal/_partials/finance.php` (section "DARK MODE" ใน `<style>`) ครอบคลุม card / kpi tones / filter inputs / table / pagination
+
+### Charts (Chart.js) — theme-aware pattern
+```js
+function chartTheme() {
+    const dark = document.body.getAttribute('data-theme') === 'dark';
+    return {
+        tick:   dark ? '#cbd5e1' : '#64748b',
+        grid:   dark ? 'rgba(241,245,249,.08)' : 'rgba(15,23,42,.06)',
+        legend: dark ? '#e2e8f0' : '#334155',
+        border: dark ? '#1e293b' : '#fff',   // donut slice borders
+    };
+}
+// ใน options pass: scales.x.ticks.color, scales.y.ticks.color/grid.color, plugins.legend.labels.color
+
+// ฟัง theme toggle แล้ว re-render ทั้ง chart ทันที (ไม่ต้องโหลด data ใหม่):
+new MutationObserver(muts => {
+    for (const m of muts) {
+        if (m.attributeName === 'data-theme') { renderMonthlyChart(cached); renderCategoryChart(cached); break; }
+    }
+}).observe(document.body, { attributes: true, attributeFilter: ['data-theme'] });
+```
 
 ---
 
@@ -147,18 +280,48 @@
 - `get_clinic_hours_for_date(pdo, date)` — ดึงเวลาเปิด/ปิดจริงของวันนั้น
 
 ### Finance Module (Cash Book) — `portal/_partials/finance.php`
-- **Schema**:
+- **Schema** (auto-migrated ใน `ensure_finance_schema()`):
   - `sys_finance_categories` (id, name, kind ENUM income/expense, icon, color, sort_order, is_active)
   - `sys_finance_transactions` (id, txn_date, kind, category_id FK, amount DECIMAL(12,2), description, reference, payment_method, note, **receipt_no UNIQUE**, **source_module**, **source_id**, created_by, updated_by, timestamps)
-- **AJAX endpoint**: `portal/ajax_finance.php` — actions: `list` (GET, includes summary+pagination) · `txn:create/update/delete` · `txn:assign_receipt` · `txn:upsert_from_source` · `category:create/update/toggle/delete`
-- **Receipt page**: `portal/finance_receipt.php?id=NN` — A4 print-friendly + bahtText() helper (number → Thai baht text). Format: `RCP-{พ.ศ.}-{6 หลัก}` สำหรับรายได้, `PV-{พ.ศ.}-{6 หลัก}` สำหรับรายจ่าย — atomic running number
-- **Cross-module integration** (`txn:upsert_from_source`): โมดูลอื่นๆ ส่งยอดเข้า Cash Book ผ่าน POST → idempotent ด้วยคีย์ `(source_module, source_id)`
+  - `sys_finance_recurring` — template ค่าใช้จ่ายประจำเดือน (name, kind, category_id, amount, day_of_month 1-28, active, **last_generated_ym**)
+  - `sys_finance_attachments` — ไฟล์แนบต่อ txn (stored_name, original_name, mime_type, size_bytes)
+  - `sys_finance_audit` — append-only history (action, changes_json, performed_by_name, ip_addr)
+- **AJAX endpoint**: `portal/ajax_finance.php`
+  - List/CRUD: `list` (GET, รวม summary + attachment_count) · `analytics` (monthly trend + category breakdown + period delta) · `txn:create/update/delete/bulk_delete` · `txn:assign_receipt` · `txn:upsert_from_source` · `txn:check_duplicate` · `category:create/update/toggle/delete`
+  - Phase C actions: `recurring:list/create/update/delete/toggle/run` · `audit:list?txn_id=NN` · `attachment:list/upload/delete`
+- **Helper endpoints**:
+  - `portal/finance_receipt.php?id=NN` — A4 print-friendly + bahtText() helper. Format: `RCP-{พ.ศ.}-{6 หลัก}` รายได้, `PV-{พ.ศ.}-{6 หลัก}` รายจ่าย — atomic running number
+  - `portal/finance_export.php?from=...&to=...&kind=...&category_id=...&q=...` — CSV download (UTF-8 BOM สำหรับ Excel) + summary footer
+  - `portal/finance_attachment.php?id=NN[&download=1]` — auth-gated proxy stream ไฟล์แนบ (validation: realpath ต้องอยู่ใต้ `uploads/finance/`)
+- **Cross-module integration** (`txn:upsert_from_source`): โมดูลอื่นๆ ส่งยอดเข้า Cash Book → idempotent ด้วยคีย์ `(source_module, source_id)`
   - `nurse_schedule` → OT รายเดือน (source_id = yearBE×100+month)
   - `scholarship` → ค่าตอบแทนนักศึกษาทุนรายเดือน
   - `asset` → จัดซื้อครุภัณฑ์ต่อชิ้น (source_id = asset.id)
   - `consumables_txn` → รับเข้าวัสดุต่อ transaction
-  - `eborrow_payment` → ค่าปรับยืมเกินกำหนด (income)
+  - `eborrow_payment` → ค่าปรับยืมเกินกำหนด (income) — มี e_Borrow-side bridge `e_Borrow/admin/ajax_finance_sync.php` สำหรับ user ที่ไม่มี portal admin session
+  - `finance_recurring` → auto-generate รายเดือนตอน `list` (idempotent ด้วย last_generated_ym)
+- **Recurring auto-generation**: `fin_run_recurring()` รันทุกครั้งที่กด list — สร้าง txn สำหรับ rule ที่ active + ถึงวัน + ยังไม่ generate เดือนนี้ → INSERT แล้ว stamp `last_generated_ym='YYYY-MM'` (day_of_month cap 1-28 กัน Feb)
+- **Attachment storage**:
+  - ไฟล์เก็บที่ `uploads/finance/{YYYY}/{MM}/{hashedname}.{ext}` — stored_name เป็น random hex 12 ไบต์
+  - อัปโหลดครั้งแรกจะ drop `.htaccess` deny-all ที่ `uploads/finance/` root กัน direct URL access
+  - รองรับ JPG/PNG/WEBP/GIF/PDF ≤ 8MB · mime check ด้วย `mime_content_type()` ไม่ใช่ trust `$_FILES['type']`
+- **Audit log**: `fin_audit_log()` ถูก hook ลง `txn:create/update/delete/bulk_delete` + `attach_add/remove` + `recurring_generate` — capture before-state ก่อน destroy / field-diff สำหรับ update
+- **UI patterns** ที่ใช้บ่อย:
+  - Quick-date chips: `วันนี้ · เดือนนี้ · เดือนก่อน · 3 เดือนล่าสุด · ปีนี้ · ปีที่แล้ว · ทั้งหมด` (chip class `.fin-chip`, `.is-active` เป็น gradient)
+  - Search box — debounce 350ms ใน description / reference / receipt_no
+  - Bulk select + sticky bottom action bar (`.fin-bulk-bar` slide-up เมื่อ selectedIds.size > 0)
+  - Duplicate detection — debounce probe ใน "อ้างอิง" field ของ create/edit modal
+  - Period delta บน KPI tiles — เทียบ same-length prior period (`▲/▼ NN%`)
+  - Charts (Chart.js): bar 12 เดือน + donut top-10 categories (theme-aware ผ่าน `chartTheme()`)
+  - Per-row details modal: tabs ไฟล์แนบ (drag-drop upload) + ประวัติ audit timeline
 - **Default categories** seeded 11 ตัว — รายได้ 5 + รายจ่าย 6 ลบไม่ได้ถ้ามีรายการอ้างอิง
+
+### e_Borrow Module — portal-matching skin + cross-module bridges
+- **Shell skin**: `e_Borrow/assets/css/eb-skin.css` โหลดหลัง `style.css` ใน `e_Borrow/includes/header.php` — re-paint `.header` เป็น brand-green glassmorphism + rainbow strip ด้านบน, ปรับ `.btn-logout` / `.theme-toggle-btn` / `.user-info` ให้แมตช์ portal (icon + user pill + danger pill style)
+- **Dark mode**: ใช้ `body.dark-mode` (legacy class) — เขียน override ใน `eb-skin.css` ด้วย selector นี้ ไม่ใช่ `body[data-theme]`
+- **FX library**: `rsu-fx.js` โหลดผ่าน `<script defer>` ใน `header.php` ของ e_Borrow → ทุกหน้าใช้ `data-counter` / `.fx-tilt` / `RsuFx.skeleton` ได้ทันที
+- **Cross-module bridge**: `e_Borrow/admin/ajax_finance_sync.php` — endpoint ฝั่ง e_Borrow สำหรับส่งค่าปรับเข้า Cash Book โดยใช้ e_Borrow session check (ไม่ต้อง portal admin login) แล้ว delegate ไป `includes/finance_sync_helper.php::finance_sync_upsert()`. **ใช้ pattern นี้ทุกครั้งเมื่อ sub-module ต้องเขียนข้อมูลข้ามไป portal** — อย่าเรียก `portal/ajax_finance.php` ตรง (จะโดน `check_admin_session` redirect เป็น HTML)
+- **Path gotcha**: `<base href="/.../e_Borrow/">` ใน header.php → relative path ต้องนับจาก `e_Borrow/` ไม่ใช่จากไฟล์ปัจจุบัน. เช่นจาก `e_Borrow/admin/manage_fines.php` → `../portal/index.php` (ไม่ใช่ `../../portal/index.php` ที่ resolve นอก deploy root)
 
 ### Inventory Modules (Asset + Consumables) — ใช้ตาราง `asset_locations` ร่วมกัน
 - **Sidebar group**: Portal sidebar กลุ่ม "คลังพัสดุ" (icon `fa-warehouse`) — ลิงก์ออกไป `/asset/` และ `/consumables/`
