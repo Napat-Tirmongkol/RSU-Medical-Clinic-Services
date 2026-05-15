@@ -4,10 +4,20 @@
 ?>
 <style>
 .fin-card { background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:16px; }
-.fin-kpi { display:flex; align-items:center; gap:12px; padding:14px 16px; border-radius:12px; }
+.fin-kpi { display:flex; align-items:center; gap:12px; padding:14px 16px; border-radius:12px; border:1px solid transparent; }
 .fin-kpi .ic { width:40px; height:40px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0; }
 .fin-kpi .num { font-size:20px; font-weight:900; color:#0f172a; }
 .fin-kpi .lbl { font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.5px; }
+
+/* KPI tones — light mode */
+.fin-kpi[data-tone="income"]  { background:#f0fdf4; }
+.fin-kpi[data-tone="income"] .ic  { background:#dcfce7; color:#15803d; }
+.fin-kpi[data-tone="expense"] { background:#fef2f2; }
+.fin-kpi[data-tone="expense"] .ic { background:#fee2e2; color:#b91c1c; }
+.fin-kpi[data-tone="net"]     { background:#eff6ff; }
+.fin-kpi[data-tone="net"] .ic     { background:#dbeafe; color:#1e40af; }
+.fin-kpi[data-tone="count"]   { background:#fafafa; }
+.fin-kpi[data-tone="count"] .ic   { background:#e2e8f0; color:#475569; }
 .fin-filter-bar { display:flex; flex-wrap:wrap; gap:8px; align-items:end; }
 .fin-filter-bar label { font-size:11px; font-weight:700; color:#475569; display:block; margin-bottom:3px; }
 .fin-filter-bar input, .fin-filter-bar select { font-size:13px; padding:7px 10px; border:1px solid #cbd5e1; border-radius:8px; background:#fff; }
@@ -128,6 +138,107 @@ body[data-theme='dark'] .fin-delta.flat { background:rgba(255,255,255,.05); colo
 body[data-theme='dark'] .fin-leg-row:hover { background:#1e293b; }
 body[data-theme='dark'] .fin-leg-row .name { color:#e2e8f0; }
 body[data-theme='dark'] .fin-leg-row .pct  { color:#94a3b8; }
+
+/* ── DARK MODE ──────────────────────────────────────────
+   Comprehensive overrides for the Cash Book module. All
+   .fin-* surfaces use raw 'background:#fff' (not Tailwind
+   .bg-white utility), so the global dark-theme block in
+   portal.css doesn't catch them — we re-tone them here.
+   ─────────────────────────────────────────────────────── */
+
+/* Cards */
+body[data-theme='dark'] .fin-card {
+    background:#1e293b !important;
+    border-color:#334155 !important;
+    box-shadow:0 4px 15px rgba(0,0,0,.25);
+}
+
+/* KPI tile tones — darker pastels keyed to each tone */
+body[data-theme='dark'] .fin-kpi[data-tone="income"]   { background:rgba(46,158,99,.15); border-color:rgba(46,158,99,.30); }
+body[data-theme='dark'] .fin-kpi[data-tone="income"] .ic   { background:rgba(46,158,99,.25); color:#6ee7b7; }
+body[data-theme='dark'] .fin-kpi[data-tone="expense"]  { background:rgba(244,63,94,.15); border-color:rgba(244,63,94,.30); }
+body[data-theme='dark'] .fin-kpi[data-tone="expense"] .ic  { background:rgba(244,63,94,.25); color:#fb7185; }
+body[data-theme='dark'] .fin-kpi[data-tone="net"]      { background:rgba(59,130,246,.15); border-color:rgba(59,130,246,.30); }
+body[data-theme='dark'] .fin-kpi[data-tone="net"] .ic      { background:rgba(59,130,246,.25); color:#93c5fd; }
+body[data-theme='dark'] .fin-kpi[data-tone="count"]    { background:rgba(148,163,184,.10); border-color:#334155; }
+body[data-theme='dark'] .fin-kpi[data-tone="count"] .ic    { background:#334155; color:#cbd5e1; }
+body[data-theme='dark'] .fin-kpi .num { color:#f8fafc; }
+body[data-theme='dark'] .fin-kpi .lbl { color:#94a3b8; }
+
+/* Filter bar inputs */
+body[data-theme='dark'] .fin-filter-bar label { color:#cbd5e1; }
+body[data-theme='dark'] .fin-filter-bar input,
+body[data-theme='dark'] .fin-filter-bar select {
+    background:#0f172a;
+    border-color:#334155;
+    color:#f1f5f9;
+}
+body[data-theme='dark'] .fin-filter-bar input::placeholder { color:#64748b; }
+/* Browser-specific tweak: date pickers' calendar icon → light on dark */
+body[data-theme='dark'] .fin-filter-bar input[type="date"]::-webkit-calendar-picker-indicator { filter:invert(.85); }
+
+/* Table */
+body[data-theme='dark'] .fin-table th {
+    background:#0f172a;
+    color:#94a3b8;
+    border-bottom-color:#334155;
+}
+body[data-theme='dark'] .fin-table td {
+    border-bottom-color:#334155;
+    color:#e2e8f0;
+}
+body[data-theme='dark'] .fin-table tbody tr:hover { background:#0f172a; }
+body[data-theme='dark'] .fin-table tbody tr.is-selected { background:rgba(46,158,99,.12); }
+body[data-theme='dark'] .fin-empty { color:#64748b; }
+/* Table-row text colour utility overrides (rows use .text-slate-600/700) */
+body[data-theme='dark'] .fin-table td.text-slate-600 { color:#cbd5e1 !important; }
+body[data-theme='dark'] .fin-table td.text-slate-700 { color:#e2e8f0 !important; }
+body[data-theme='dark'] .fin-table td .text-slate-400 { color:#64748b !important; }
+body[data-theme='dark'] .fin-table td .text-slate-300 { color:#475569 !important; }
+body[data-theme='dark'] .fin-table td .text-slate-500 { color:#94a3b8 !important; }
+
+/* Category chip — lift the alpha so the pastel reads on dark */
+body[data-theme='dark'] .fin-cat-chip { filter:brightness(1.25) saturate(1.2); }
+
+/* Pagination */
+body[data-theme='dark'] .fin-pagi button {
+    background:#1e293b;
+    border-color:#334155;
+    color:#cbd5e1;
+}
+body[data-theme='dark'] .fin-pagi button:hover:not(:disabled) {
+    background:rgba(46,158,99,.15);
+    border-color:#3bba7a;
+    color:#6ee7b7;
+}
+body[data-theme='dark'] .fin-pagi button.active {
+    background:#2e9e63;
+    border-color:#2e9e63;
+    color:#fff;
+}
+
+/* Card section title "รายการรายรับ-รายจ่าย" + the page-info eyebrow.
+   These use Tailwind text-slate-700 / text-slate-500 — portal.css already
+   overrides those, but only inside .text-slate-700.text-sm utility chain
+   on white surfaces. Make sure they're readable here. */
+body[data-theme='dark'] .fin-card .text-slate-700 { color:#f1f5f9 !important; }
+body[data-theme='dark'] .fin-card .text-slate-500 { color:#94a3b8 !important; }
+body[data-theme='dark'] .fin-card .text-slate-400 { color:#64748b !important; }
+body[data-theme='dark'] .fin-card .border-slate-200 { border-color:#334155 !important; }
+body[data-theme='dark'] .fin-card .border-slate-100 { border-color:#334155 !important; }
+
+/* Donut card's kind selector */
+body[data-theme='dark'] #finDonutKind {
+    background:#0f172a !important;
+    border-color:#334155 !important;
+    color:#cbd5e1 !important;
+}
+
+/* "Select all" checkbox header — same row uses .fin-chk th */
+body[data-theme='dark'] .fin-chk input[type="checkbox"] { accent-color:#3bba7a; }
+
+/* Bulk-bar is gradient-dark already; only ensure spacer/text legible. */
+body[data-theme='dark'] .fin-bulk-bar { box-shadow:0 20px 40px -10px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.10); }
 </style>
 
 <div class="space-y-4">
@@ -158,29 +269,29 @@ body[data-theme='dark'] .fin-leg-row .pct  { color:#94a3b8; }
 
     <!-- KPI Summary (with period-over-period delta) -->
     <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div class="fin-kpi" style="background:#f0fdf4">
-            <div class="ic" style="background:#dcfce7;color:#15803d"><i class="fa-solid fa-arrow-trend-up"></i></div>
+        <div class="fin-kpi" data-tone="income">
+            <div class="ic"><i class="fa-solid fa-arrow-trend-up"></i></div>
             <div style="min-width:0;flex:1">
                 <div class="num" id="finKpiIncome">฿0</div>
                 <div class="lbl">รายได้ <span class="fin-delta" id="finDeltaIncome"></span></div>
             </div>
         </div>
-        <div class="fin-kpi" style="background:#fef2f2">
-            <div class="ic" style="background:#fee2e2;color:#b91c1c"><i class="fa-solid fa-arrow-trend-down"></i></div>
+        <div class="fin-kpi" data-tone="expense">
+            <div class="ic"><i class="fa-solid fa-arrow-trend-down"></i></div>
             <div style="min-width:0;flex:1">
                 <div class="num" id="finKpiExpense">฿0</div>
                 <div class="lbl">รายจ่าย <span class="fin-delta" id="finDeltaExpense"></span></div>
             </div>
         </div>
-        <div class="fin-kpi" style="background:#eff6ff">
-            <div class="ic" style="background:#dbeafe;color:#1e40af"><i class="fa-solid fa-scale-balanced"></i></div>
+        <div class="fin-kpi" data-tone="net">
+            <div class="ic"><i class="fa-solid fa-scale-balanced"></i></div>
             <div style="min-width:0;flex:1">
                 <div class="num" id="finKpiNet">฿0</div>
                 <div class="lbl">สุทธิ <span class="fin-delta" id="finDeltaNet"></span></div>
             </div>
         </div>
-        <div class="fin-kpi" style="background:#fafafa">
-            <div class="ic" style="background:#e2e8f0;color:#475569"><i class="fa-solid fa-list-check"></i></div>
+        <div class="fin-kpi" data-tone="count">
+            <div class="ic"><i class="fa-solid fa-list-check"></i></div>
             <div style="min-width:0;flex:1">
                 <div class="num" id="finKpiCount">0</div>
                 <div class="lbl">จำนวนรายการ</div>
@@ -754,6 +865,19 @@ body[data-theme='dark'] .fin-leg-row .pct  { color:#94a3b8; }
         setDelta('finDeltaNet',     parseKpi('finKpiNet'),     d.net_prev,     false);
     }
 
+    // Theme-aware chart palette (re-resolved each render so toggling
+    // light/dark while the chart is on screen picks up the new colours)
+    function chartTheme() {
+        const dark = document.body.getAttribute('data-theme') === 'dark';
+        return {
+            dark,
+            tick:      dark ? '#cbd5e1' : '#64748b',
+            grid:      dark ? 'rgba(241,245,249,.08)' : 'rgba(15,23,42,.06)',
+            legend:    dark ? '#e2e8f0' : '#334155',
+            border:    dark ? '#1e293b' : '#fff',
+        };
+    }
+
     function renderMonthlyChart(monthly) {
         const ctx = document.getElementById('finChartMonthly');
         if (!ctx || typeof Chart === 'undefined') return;
@@ -771,10 +895,11 @@ body[data-theme='dark'] .fin-leg-row .pct  { color:#94a3b8; }
                 { label: 'รายจ่าย', data: expenses, backgroundColor: 'rgba(244,63,94,.85)',  borderRadius: 6, maxBarThickness: 28 },
             ],
         };
+        const th = chartTheme();
         const options = {
             responsive: true, maintainAspectRatio: false,
             plugins: {
-                legend: { position: 'top', align: 'end', labels: { font: { size: 11, weight: 'bold' }, boxWidth: 12, boxHeight: 12, padding: 12 } },
+                legend: { position: 'top', align: 'end', labels: { color: th.legend, font: { size: 11, weight: 'bold' }, boxWidth: 12, boxHeight: 12, padding: 12 } },
                 tooltip: {
                     callbacks: {
                         label: (c) => `${c.dataset.label}: ${fmt(c.parsed.y)}`,
@@ -787,12 +912,13 @@ body[data-theme='dark'] .fin-leg-row .pct  { color:#94a3b8; }
                 },
             },
             scales: {
-                x: { grid: { display: false }, ticks: { font: { size: 10 } } },
-                y: { grid: { color: 'rgba(15,23,42,.06)' }, ticks: { font: { size: 10 }, callback: (v) => fmtCompact(v) } },
+                x: { grid: { display: false }, ticks: { color: th.tick, font: { size: 10 } } },
+                y: { grid: { color: th.grid }, ticks: { color: th.tick, font: { size: 10 }, callback: (v) => fmtCompact(v) } },
             },
         };
         if (chartMonthly) {
             chartMonthly.data = data;
+            chartMonthly.options = options;
             chartMonthly.update();
         } else {
             chartMonthly = new Chart(ctx, { type: 'bar', data, options });
@@ -834,12 +960,13 @@ body[data-theme='dark'] .fin-leg-row .pct  { color:#94a3b8; }
             });
         }
 
+        const th = chartTheme();
         const data = {
             labels,
             datasets: [{
                 data: values,
                 backgroundColor: colors,
-                borderColor: '#fff', borderWidth: 2,
+                borderColor: th.border, borderWidth: 2,
             }],
         };
         const options = {
@@ -877,6 +1004,18 @@ body[data-theme='dark'] .fin-leg-row .pct  { color:#94a3b8; }
     document.getElementById('finDonutKind').addEventListener('change', () => {
         if (lastAnalytics) renderCategoryChart(lastAnalytics.categories);
     });
+
+    // Watch body[data-theme] flips so the charts pick up the new
+    // tick/grid/border colours without waiting for the next load().
+    new MutationObserver((muts) => {
+        for (const m of muts) {
+            if (m.attributeName === 'data-theme' && lastAnalytics) {
+                renderMonthlyChart(lastAnalytics.monthly);
+                renderCategoryChart(lastAnalytics.categories);
+                break;
+            }
+        }
+    }).observe(document.body, { attributes: true, attributeFilter: ['data-theme'] });
 
     // ── Quick-date chips ────────────────────────────────────
     function setDateRange(range) {
