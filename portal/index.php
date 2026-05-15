@@ -1396,41 +1396,68 @@ try {
                     }
                     ?>
                     <section class="au d1">
-                        <div class="priority-panel">
+                        <?php
+                        // Build 4 hero KPI tiles role-aware
+                        $heroKpis = [];
+                        if ($isStaff && $canEcampaign) {
+                            $heroKpis[] = ['tone'=>'brand', 'icon'=>'fa-circle-check', 'num'=>$kpis['checkins_today'], 'sub'=>'/ '.number_format($kpis['appts_today']), 'label'=>'เช็คอินวันนี้ · จากนัดหมาย'];
+                            $heroKpis[] = ['tone'=>'info',  'icon'=>'fa-calendar-day', 'num'=>$kpis['slots_today'],    'label'=>'Slot วันนี้'];
+                            $heroKpis[] = ['tone'=>'amber', 'icon'=>'fa-clock',        'num'=>$kpis['pending_today'],  'label'=>'รอเช็คอิน'];
+                            $heroKpis[] = ['tone'=>'accent','icon'=>'fa-bullhorn',     'num'=>$kpis['bookings_today'], 'label'=>'จองใหม่ใน 24 ชม.'];
+                        } else {
+                            $heroKpis[] = ['tone'=>'brand', 'icon'=>'fa-users',     'num'=>$kpis['users'],      'label'=>'บุคลากรและนักศึกษา', 'counter'=>true];
+                            $heroKpis[] = ['tone'=>'info',  'icon'=>'fa-bullhorn',  'num'=>$kpis['camps'],      'label'=>'แคมเปญ active'];
+                            $heroKpis[] = ['tone'=>'amber', 'icon'=>'fa-gauge-high','num'=>$kpis['used_quota'], 'sub'=>'/ '.number_format($kpis['total_quota']), 'label'=>'ใช้ไปแล้ว · จาก quota'];
+                            $heroKpis[] = ['tone'=>'rose',  'icon'=>'fa-bug',       'num'=>$kpis['errors_today'],'label'=>'Error ใน 24 ชม.'];
+                        }
+                        $firstName = !empty($_SESSION['admin_username']) ? explode(' ', $_SESSION['admin_username'])[0] : '';
+                        $hour = (int)date('G');
+                        $greet = $hour < 12 ? 'อรุณสวัสดิ์' : ($hour < 17 ? 'สวัสดี' : ($hour < 21 ? 'สวัสดีตอนเย็น' : 'สวัสดีค่ำคืนนี้'));
+                        $thaiMonths = ['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+                        $thaiDays   = ['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์'];
+                        $todayStr   = $thaiDays[(int)date('w')] . ' ' . (int)date('j') . ' ' . $thaiMonths[(int)date('n')] . ' ' . (date('Y')+543);
+                        ?>
+                        <div class="dash-hero">
+                            <div class="dash-hero-glow"></div>
+                            <div class="dash-hero-greet">
+                                <div class="dash-hero-eyebrow">
+                                    <i class="fa-solid fa-calendar-day"></i> <?= $todayStr ?>
+                                    <?php if ($isStaff): ?><span class="dash-hero-role-pill"><i class="fa-solid fa-id-badge"></i> เจ้าหน้าที่</span><?php endif; ?>
+                                </div>
+                                <h1 class="dash-hero-title">
+                                    <?= $greet ?><?= $firstName ? ' <span class="dash-hero-name">' . htmlspecialchars($firstName) . '</span>' : '' ?>
+                                </h1>
+                                <p class="dash-hero-sub">
+                                    ภาพรวมระบบและงานวันนี้ของคุณ — เปิด App Launcher ที่ sidebar เพื่อเข้าระบบอื่นๆ
+                                </p>
+                            </div>
+                            <div class="dash-hero-kpis">
+                                <?php foreach ($heroKpis as $i => $k): ?>
+                                <div class="dash-kpi" data-tone="<?= $k['tone'] ?>" style="animation-delay:<?= 0.1 + $i * 0.08 ?>s">
+                                    <div class="dash-kpi-ic"><i class="fa-solid <?= $k['icon'] ?>"></i></div>
+                                    <div class="dash-kpi-body">
+                                        <div class="dash-kpi-num"<?= !empty($k['counter']) ? ' id="kpi-users" data-counter="'.(int)$k['num'].'"' : '' ?>>
+                                            <?= number_format((int)$k['num']) ?><?php if (!empty($k['sub'])): ?><span class="dash-kpi-sub"><?= $k['sub'] ?></span><?php endif; ?>
+                                        </div>
+                                        <div class="dash-kpi-label"><?= htmlspecialchars($k['label']) ?></div>
+                                    </div>
+                                </div>
+                                <?php endforeach; ?>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- ── PRIORITY: งานต้องทำวันนี้ (clean, no greeting now) ───── -->
+                    <section class="au d2">
+                        <div class="priority-panel priority-panel--slim">
                             <div class="priority-panel-head">
                                 <div>
-                                    <div class="eyebrow">งานวันนี้ · <?= date('j M Y') ?><?= $isStaff ? ' · เจ้าหน้าที่' : '' ?></div>
-                                    <h2 class="display-h2">สวัสดี<?= !empty($_SESSION['admin_username']) ? ' ' . htmlspecialchars(explode(' ', $_SESSION['admin_username'])[0]) : '' ?></h2>
+                                    <div class="eyebrow">งานวันนี้ · ที่ต้องดำเนินการ</div>
+                                    <div class="sec-title" style="margin-top:4px;font-size:1.05rem">Priorities</div>
                                 </div>
-                                <div class="kpi-mini-row">
-                                    <?php if ($isStaff && $canEcampaign): ?>
-                                        <!-- Staff view: เน้น check-in workload วันนี้ -->
-                                        <div class="kpi-mini">
-                                            <div class="kpi-mini-num">
-                                                <span><?= number_format($kpis['checkins_today']) ?></span>
-                                                <span class="kpi-mini-num--sub">/ <?= number_format($kpis['appts_today']) ?></span>
-                                            </div>
-                                            <div class="kpi-mini-label">เช็คอินวันนี้ · จากนัดหมายทั้งหมด</div>
-                                        </div>
-                                        <div class="kpi-mini">
-                                            <div class="kpi-mini-num"><?= number_format($kpis['slots_today']) ?></div>
-                                            <div class="kpi-mini-label">Slot วันนี้ · <?= number_format($kpis['camps']) ?> แคมเปญ active</div>
-                                        </div>
-                                    <?php else: ?>
-                                        <!-- Admin / non-staff view: ภาพรวมระบบ -->
-                                        <div class="kpi-mini">
-                                            <div class="kpi-mini-num" id="kpi-users" data-counter="<?= $kpis['users'] ?>"><?= number_format($kpis['users']) ?></div>
-                                            <div class="kpi-mini-label">บุคลากรและนักศึกษา</div>
-                                        </div>
-                                        <div class="kpi-mini">
-                                            <div class="kpi-mini-num">
-                                                <span id="kpi-used"><?= number_format($kpis['used_quota']) ?></span>
-                                                <span class="kpi-mini-num--sub">/ <?= number_format($kpis['total_quota']) ?></span>
-                                            </div>
-                                            <div class="kpi-mini-label">ใช้ไปแล้ว · <?= number_format($kpis['camps']) ?> แคมเปญ active</div>
-                                        </div>
-                                    <?php endif; ?>
-                                </div>
+                                <?php if (!empty($today_items)): ?>
+                                <span class="priority-count-pill"><?= count($today_items) ?> รายการ</span>
+                                <?php endif; ?>
                             </div>
                             <?php if (empty($today_items)): ?>
                                 <div class="priority-empty">
@@ -1457,106 +1484,23 @@ try {
                         </div>
                     </section>
 
-                    <!-- MAIN GRID -->
+                    <!-- ── MAIN GRID: 3-column dashboard body (4 / 5 / 3) ──────── -->
                     <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
-                        <!-- LEFT: App Launcher migration card + pinned shortcuts (8/12) -->
-                        <section class="lg:col-span-8 au d2 flex flex-col gap-5">
-
-                            <!-- 🚀 Migration banner — points users to the new App Launcher -->
-                            <div id="apps-migration-banner" class="apps-migration">
-                                <div class="apps-migration-glow"></div>
-                                <div class="apps-migration-body">
-                                    <div class="apps-migration-eyebrow">
-                                        <i class="fa-solid fa-sparkles"></i>
-                                        ใหม่! · ปรับโครงสร้างเมนู
-                                    </div>
-                                    <h2 class="apps-migration-title">
-                                        เราย้ายเมนูเปิดระบบไปไว้ที่ <span>App Launcher</span> แล้ว
-                                    </h2>
-                                    <p class="apps-migration-desc">
-                                        Dashboard จะโฟกัสที่ภาพรวม KPI และกิจกรรมล่าสุด —
-                                        ส่วนการ์ดเปิดระบบทุกตัว (e-Borrow, ครุภัณฑ์, วัสดุ, Insurance Sync, ISO, LINE ฯลฯ)
-                                        ย้ายไปอยู่หน้า App Launcher แล้ว เปิดได้จาก sidebar กลุ่ม <b>OVERVIEW</b>
-                                    </p>
-                                    <div class="apps-migration-actions">
-                                        <a href="javascript:switchSection('apps', document.querySelector('[data-section=apps]'))"
-                                            class="apps-migration-cta" id="apps-migration-cta">
-                                            <i class="fa-solid fa-grip"></i>
-                                            เปิด App Launcher
-                                            <i class="fa-solid fa-arrow-right" style="font-size:11px;margin-left:4px"></i>
-                                        </a>
-                                        <button type="button" id="apps-migration-tour-btn" class="apps-migration-ghost">
-                                            <i class="fa-solid fa-route"></i> ดูตำแหน่งใหม่
-                                        </button>
-                                        <button type="button" id="apps-migration-dismiss" class="apps-migration-dismiss" title="ซ่อนข้อความนี้">
-                                            <i class="fa-solid fa-xmark"></i>
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Pinned apps — quick access for power users -->
-                            <?php
-                            $pinnedProjects = [];
-                            if (!empty($userPins)) {
-                                foreach ($projects as $p) {
-                                    if (in_array($p['id'], $userPins, true)) $pinnedProjects[] = $p;
-                                }
-                            }
-                            if (!empty($pinnedProjects)):
-                            ?>
-                            <div>
-                                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-                                    <div class="sec-title" style="font-size:.95rem">
-                                        <i class="fa-solid fa-thumbtack" style="color:#f59e0b;font-size:.8rem"></i>
-                                        ปักหมุดของฉัน
-                                    </div>
-                                    <a href="javascript:switchSection('apps', document.querySelector('[data-section=apps]'))"
-                                        style="font-size:11px;font-weight:800;color:#64748b;text-decoration:none;display:inline-flex;align-items:center;gap:4px">
-                                        ดูทั้งหมด <i class="fa-solid fa-arrow-right" style="font-size:9px"></i>
-                                    </a>
-                                </div>
-                                <div class="pinned-strip">
-                                    <?php foreach ($pinnedProjects as $pp):
-                                        $primaryAction = $pp['actions'][0] ?? null;
-                                        if (!$primaryAction) continue;
-                                    ?>
-                                    <a href="<?= htmlspecialchars($primaryAction['url']) ?>" class="pinned-chip">
-                                        <span class="pinned-chip-ic <?= $pp['bg_color'] ?> <?= $pp['icon_color'] ?>">
-                                            <i class="fa-solid <?= $pp['icon'] ?>"></i>
-                                        </span>
-                                        <span class="pinned-chip-label"><?= htmlspecialchars($pp['title']) ?></span>
-                                    </a>
-                                    <?php endforeach; ?>
-                                </div>
-                            </div>
-                            <?php else: ?>
-                            <!-- Helpful hint when no pins yet -->
-                            <div class="pinned-empty">
-                                <i class="fa-solid fa-thumbtack" style="color:#cbd5e1"></i>
-                                <div>
-                                    <strong>ปักหมุดระบบที่ใช้บ่อย</strong>
-                                    <p>ใน App Launcher คลิกไอคอนหมุดมุมขวาบนของการ์ด แล้วระบบนั้นจะมาโผล่ที่นี่ในคลิกเดียว</p>
-                                </div>
-                            </div>
-                            <?php endif; ?>
-
+                        <!-- COL 1: Clinic calendar widget (4/12) -->
+                        <section class="lg:col-span-4 au d3">
+                            <?php include __DIR__ . '/_partials/dashboard_clinic_calendar.php'; ?>
                         </section>
 
-
-                        <!-- SIDEBAR (4/12) -->
-                        <aside class="lg:col-span-4 flex flex-col gap-5 au d3">
-
-                            <!-- Clinic Calendar widget (today + next 6 days) -->
-                            <?php include __DIR__ . '/_partials/dashboard_clinic_calendar.php'; ?>
-
-                            <!-- Activity Feed (flat list, color-coded by event) — ของฉันเท่านั้น -->
-                            <div>
-                                <div class="sec-title mb-4">
-                                    กิจกรรมของฉันล่าสุด
+                        <!-- COL 2: Activity feed (5/12) -->
+                        <section class="lg:col-span-5 au d3">
+                            <div class="dash-panel">
+                                <div class="dash-panel-head">
+                                    <div class="sec-title">
+                                        กิจกรรมของฉันล่าสุด
+                                    </div>
                                     <?php if (!empty($recentActivity)): ?>
-                                        <span class="ml-auto eyebrow"><?= count($recentActivity) ?> รายการ</span>
+                                        <span class="dash-panel-count"><?= count($recentActivity) ?></span>
                                     <?php endif; ?>
                                 </div>
                                 <ul class="activity-list" id="activity-feed" role="log" aria-live="polite" aria-label="ความเคลื่อนไหวล่าสุด">
@@ -1609,14 +1553,59 @@ try {
                                 </a>
                                 <?php endif; ?>
                             </div>
+                        </section>
+
+                        <!-- COL 3: Pinned apps + Quick shortcuts + Slim migration banner (3/12) -->
+                        <aside class="lg:col-span-3 flex flex-col gap-5 au d4">
+
+                            <!-- Pinned apps mini-list -->
+                            <?php
+                            $pinnedProjects = [];
+                            if (!empty($userPins)) {
+                                foreach ($projects as $p) {
+                                    if (in_array($p['id'], $userPins, true)) $pinnedProjects[] = $p;
+                                }
+                            }
+                            ?>
+                            <div class="dash-panel">
+                                <div class="dash-panel-head">
+                                    <div class="sec-title" style="font-size:.95rem">
+                                        <i class="fa-solid fa-thumbtack" style="color:#f59e0b;font-size:.78rem;margin-right:2px"></i>
+                                        ปักหมุด
+                                    </div>
+                                    <a href="javascript:switchSection('apps', document.querySelector('[data-section=apps]'))"
+                                        class="dash-panel-link">
+                                        ทั้งหมด <i class="fa-solid fa-arrow-right"></i>
+                                    </a>
+                                </div>
+                                <?php if (!empty($pinnedProjects)): ?>
+                                <ul class="pinned-list">
+                                    <?php foreach ($pinnedProjects as $pp):
+                                        $primaryAction = $pp['actions'][0] ?? null;
+                                        if (!$primaryAction) continue;
+                                    ?>
+                                    <li>
+                                        <a href="<?= htmlspecialchars($primaryAction['url']) ?>" class="pinned-row">
+                                            <span class="pinned-row-ic <?= $pp['bg_color'] ?> <?= $pp['icon_color'] ?>">
+                                                <i class="fa-solid <?= $pp['icon'] ?>"></i>
+                                            </span>
+                                            <span class="pinned-row-label"><?= htmlspecialchars($pp['title']) ?></span>
+                                            <i class="fa-solid fa-arrow-right pinned-row-arrow"></i>
+                                        </a>
+                                    </li>
+                                    <?php endforeach; ?>
+                                </ul>
+                                <?php else: ?>
+                                <div class="pinned-mini-empty">
+                                    <i class="fa-solid fa-thumbtack"></i>
+                                    <span>ปักหมุดระบบที่ใช้บ่อยใน <a href="javascript:switchSection('apps', document.querySelector('[data-section=apps]'))">App Launcher</a></span>
+                                </div>
+                                <?php endif; ?>
+                            </div>
 
                             <!-- Quick Shortcuts (flat, role-aware) -->
                             <?php
-                            // Build shortcuts ตามสิทธิ์ของ user
-                            // Staff (is_ecampaign_staff) → จำกัดตาม access_* flag
-                            // Non-staff portal admin → เห็นทุกอย่าง
                             $quickShortcuts = [];
-
                             if ($isStaff && $canEcampaign) {
                                 $quickShortcuts[] = ['url' => '../staff/index.php',        'icon' => 'fa-qrcode',         'label' => 'เปิดสแกน QR เช็คอิน'];
                                 $quickShortcuts[] = ['url' => '../admin/daily_report.php', 'icon' => 'fa-clipboard-list', 'label' => 'รายงานเช็คอินวันนี้'];
@@ -1625,7 +1614,6 @@ try {
                                 $quickShortcuts[] = ['url' => '../admin/campaigns.php', 'icon' => 'fa-bullhorn',     'label' => 'Campaign Manager'];
                                 $quickShortcuts[] = ['url' => '../admin/bookings.php',  'icon' => 'fa-calendar-check', 'label' => 'รายการนัดหมาย'];
                             }
-                            // Users Center — เฉพาะ portal admin หรือ staff role admin/superadmin
                             if (!$isStaff || in_array($adminRole, ['admin', 'superadmin'], true)) {
                                 $quickShortcuts[] = ['url' => 'users.php', 'icon' => 'fa-users', 'label' => 'Users Center'];
                             }
@@ -1639,8 +1627,13 @@ try {
                                 ];
                             }
                             ?>
-                            <div class="quick-list au d4">
-                                <div class="sec-title mb-3">ทางลัด</div>
+                            <div class="dash-panel quick-list">
+                                <div class="dash-panel-head">
+                                    <div class="sec-title" style="font-size:.95rem">
+                                        <i class="fa-solid fa-bolt" style="color:#0ea5e9;font-size:.78rem;margin-right:2px"></i>
+                                        ทางลัด
+                                    </div>
+                                </div>
                                 <ul class="quick-items">
                                     <?php foreach ($quickShortcuts as $sc): ?>
                                         <li>
@@ -1652,6 +1645,34 @@ try {
                                         </li>
                                     <?php endforeach; ?>
                                 </ul>
+                            </div>
+
+                            <!-- 🚀 Slim migration banner (dismissable) -->
+                            <div id="apps-migration-banner" class="apps-migration apps-migration--slim">
+                                <div class="apps-migration-glow"></div>
+                                <div class="apps-migration-body">
+                                    <div class="apps-migration-eyebrow">
+                                        <i class="fa-solid fa-sparkles"></i> ใหม่
+                                    </div>
+                                    <h2 class="apps-migration-title">
+                                        เปิดระบบทั้งหมดที่ <span>App Launcher</span>
+                                    </h2>
+                                    <p class="apps-migration-desc">
+                                        เมนูเปิดทุกระบบย้ายไปอยู่หน้าใหม่แล้ว — เปิดได้จาก sidebar กลุ่ม OVERVIEW
+                                    </p>
+                                    <div class="apps-migration-actions">
+                                        <a href="javascript:switchSection('apps', document.querySelector('[data-section=apps]'))"
+                                            class="apps-migration-cta" id="apps-migration-cta">
+                                            <i class="fa-solid fa-grip"></i> เปิด
+                                        </a>
+                                        <button type="button" id="apps-migration-tour-btn" class="apps-migration-ghost">
+                                            <i class="fa-solid fa-route"></i>
+                                        </button>
+                                        <button type="button" id="apps-migration-dismiss" class="apps-migration-dismiss" title="ซ่อน">
+                                            <i class="fa-solid fa-xmark"></i>
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
 
                         </aside>

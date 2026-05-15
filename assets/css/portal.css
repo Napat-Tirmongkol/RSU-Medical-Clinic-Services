@@ -586,6 +586,307 @@ body {
     50%      { transform: scale(1.06); box-shadow: 0 6px 16px -3px rgba(244,63,94,.6); }
 }
 
+/* ═══════════════════════════════════════════════════════
+   DASHBOARD — HERO + KPI TILES + PANELS
+   ═══════════════════════════════════════════════════════ */
+
+/* Hero greeting + KPI strip in one card */
+.dash-hero {
+    position: relative;
+    overflow: hidden;
+    border-radius: 24px;
+    padding: 28px 28px;
+    color: #f8fafc;
+    background:
+        radial-gradient(at 100% 0%, rgba(110,231,183,.30), transparent 55%),
+        radial-gradient(at 0% 100%, rgba(99,102,241,.30), transparent 55%),
+        linear-gradient(135deg, #0f172a 0%, #14532d 55%, #0f766e 100%);
+    box-shadow: 0 24px 50px -16px rgba(15,118,110,.45), inset 0 1px 0 rgba(255,255,255,.10);
+    display: grid;
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 1.6fr);
+    gap: 24px;
+    align-items: stretch;
+}
+@media (max-width: 1023px) {
+    .dash-hero { grid-template-columns: 1fr; gap: 18px; }
+}
+.dash-hero-glow {
+    position: absolute;
+    top: -50%;
+    right: -10%;
+    width: 420px;
+    height: 420px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(217,70,239,.30), transparent 65%);
+    filter: blur(20px);
+    pointer-events: none;
+    animation: heroGlow 9s ease-in-out infinite;
+}
+@keyframes heroGlow {
+    0%, 100% { transform: translate(0,0) scale(1); }
+    50%      { transform: translate(-30px,18px) scale(1.08); }
+}
+.dash-hero-greet { position: relative; z-index: 1; display: flex; flex-direction: column; justify-content: center; }
+.dash-hero-eyebrow {
+    display: inline-flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    font-size: 11.5px; font-weight: 800;
+    color: rgba(255,255,255,.78);
+    text-transform: uppercase; letter-spacing: .12em;
+    margin-bottom: 10px;
+}
+.dash-hero-eyebrow i { color: #fbbf24; }
+.dash-hero-role-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 3px 10px;
+    border-radius: 99px;
+    background: rgba(255,255,255,.12);
+    border: 1px solid rgba(255,255,255,.22);
+    font-size: 10px;
+    color: #fef3c7;
+    text-transform: uppercase;
+    letter-spacing: .1em;
+}
+.dash-hero-role-pill i { color: #fef3c7 !important; }
+.dash-hero-title {
+    font-size: clamp(1.5rem, 1.1rem + 1.4vw, 2rem);
+    font-weight: 900;
+    line-height: 1.15;
+    letter-spacing: -.025em;
+    margin: 0 0 10px;
+    color: #fff;
+}
+.dash-hero-name {
+    background: linear-gradient(90deg, #fbbf24, #f0abfc, #6ee7b7);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+}
+.dash-hero-sub {
+    font-size: 13px;
+    color: rgba(255,255,255,.78);
+    line-height: 1.6;
+    max-width: 460px;
+    margin: 0;
+}
+
+/* KPI tiles inside hero */
+.dash-hero-kpis {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    align-content: center;
+}
+@media (min-width: 1280px) {
+    .dash-hero-kpis { grid-template-columns: repeat(4, 1fr); }
+}
+.dash-kpi {
+    --tone-1: #34d399;
+    --tone-2: #10b981;
+    position: relative;
+    overflow: hidden;
+    background: rgba(255,255,255,.06);
+    border: 1px solid rgba(255,255,255,.14);
+    border-radius: 16px;
+    padding: 14px 14px 12px;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    transition: transform .25s, background .25s, border-color .25s;
+    opacity: 0;
+    animation: kpiIn .55s cubic-bezier(.16,1,.3,1) both;
+}
+@keyframes kpiIn {
+    from { opacity: 0; transform: translateY(14px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+.dash-kpi::before {
+    content: '';
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--tone-1), var(--tone-2));
+}
+.dash-kpi:hover {
+    background: rgba(255,255,255,.12);
+    border-color: rgba(255,255,255,.28);
+    transform: translateY(-2px);
+}
+.dash-kpi[data-tone="brand"]  { --tone-1: #6ee7b7; --tone-2: #14b8a6; }
+.dash-kpi[data-tone="info"]   { --tone-1: #38bdf8; --tone-2: #6366f1; }
+.dash-kpi[data-tone="amber"]  { --tone-1: #fde68a; --tone-2: #f59e0b; }
+.dash-kpi[data-tone="rose"]   { --tone-1: #fda4af; --tone-2: #f43f5e; }
+.dash-kpi[data-tone="accent"] { --tone-1: #f0abfc; --tone-2: #d946ef; }
+.dash-kpi-ic {
+    width: 36px; height: 36px;
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px;
+    color: #fff;
+    background: linear-gradient(135deg, var(--tone-1), var(--tone-2));
+    box-shadow: 0 6px 14px -4px var(--tone-2), inset 0 1px 0 rgba(255,255,255,.3);
+    flex-shrink: 0;
+}
+.dash-kpi-body { min-width: 0; }
+.dash-kpi-num {
+    font-size: 1.45rem;
+    font-weight: 900;
+    color: #fff;
+    line-height: 1;
+    letter-spacing: -.02em;
+    font-variant-numeric: tabular-nums;
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+}
+.dash-kpi-sub {
+    font-size: .7rem;
+    font-weight: 700;
+    color: rgba(255,255,255,.55);
+    margin-left: 2px;
+}
+.dash-kpi-label {
+    font-size: 10.5px;
+    font-weight: 700;
+    color: rgba(255,255,255,.7);
+    margin-top: 5px;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    line-height: 1.35;
+}
+
+/* ── Generic dashboard panel (white card with head + body) ─ */
+.dash-panel {
+    background: #fff;
+    border: 1px solid #e7eae8;
+    border-radius: 18px;
+    padding: 18px 18px 4px;
+    box-shadow: 0 8px 24px -12px rgba(15,23,42,.10);
+    display: flex;
+    flex-direction: column;
+}
+.dash-panel-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+.dash-panel-head .sec-title { flex: 1; }
+.dash-panel-count {
+    font-size: 10px;
+    font-weight: 900;
+    color: #475569;
+    background: #f1f5f9;
+    padding: 3px 9px;
+    border-radius: 99px;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+}
+.dash-panel-link {
+    font-size: 11px;
+    font-weight: 800;
+    color: #64748b;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 9px;
+    border-radius: 99px;
+    transition: background .15s, color .15s;
+}
+.dash-panel-link:hover { background: #f0faf4; color: #2e9e63; }
+.dash-panel-link i { font-size: 9px; }
+
+/* ── Priority panel slim variant (no greeting inside) ─────── */
+.priority-panel--slim .priority-panel-head {
+    margin-bottom: 14px;
+    padding-bottom: 12px;
+    border-bottom: 1px dashed #e2e8f0;
+}
+.priority-count-pill {
+    margin-left: auto;
+    font-size: 10px;
+    font-weight: 900;
+    color: #fff;
+    background: linear-gradient(135deg, #f59e0b, #f43f5e);
+    padding: 4px 11px;
+    border-radius: 99px;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    box-shadow: 0 4px 10px -3px rgba(245,158,11,.5);
+}
+
+/* ── Pinned list (vertical, inside col 3 panel) ───────────── */
+.pinned-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding-bottom: 14px;
+}
+.pinned-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border-radius: 12px;
+    background: #fafdfb;
+    border: 1px solid #f1f5f3;
+    color: #0f172a;
+    font-size: 12.5px;
+    font-weight: 800;
+    text-decoration: none;
+    transition: transform .15s, box-shadow .15s, border-color .15s, background .15s;
+}
+.pinned-row:hover {
+    background: #fff;
+    border-color: #c7e8d5;
+    transform: translateX(2px);
+    box-shadow: 0 6px 14px -6px rgba(46,158,99,.25);
+}
+.pinned-row-ic {
+    width: 28px; height: 28px;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11.5px;
+    border: 1px solid currentColor;
+    flex-shrink: 0;
+    opacity: .9;
+}
+.pinned-row-label {
+    flex: 1;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.pinned-row-arrow { color: #cbd5e1; font-size: 9px; transition: transform .2s, color .2s; }
+.pinned-row:hover .pinned-row-arrow { color: #2e9e63; transform: translateX(2px); }
+.pinned-mini-empty {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px 14px;
+    background: #fafdfb;
+    border: 1px dashed #cbd5e1;
+    border-radius: 12px;
+    color: #64748b;
+    font-size: 11.5px;
+    line-height: 1.55;
+    margin-bottom: 14px;
+}
+.pinned-mini-empty i { color: #cbd5e1; margin-top: 2px; }
+.pinned-mini-empty a { color: #2e9e63; font-weight: 800; text-decoration: none; }
+.pinned-mini-empty a:hover { text-decoration: underline; }
+
 /* ── App Launcher migration banner ────────────────────── */
 .apps-migration {
     position: relative;
@@ -714,6 +1015,48 @@ body {
     transition: background .15s, transform .15s;
 }
 .apps-migration-dismiss:hover { background: rgba(244,63,94,.3); transform: rotate(90deg); }
+
+/* ── Slim variant (used in 3-col dashboard sidebar) ──────── */
+.apps-migration--slim {
+    padding: 18px 16px;
+    border-radius: 18px;
+}
+.apps-migration--slim .apps-migration-eyebrow {
+    font-size: 9.5px;
+    padding: 4px 9px;
+    margin-bottom: 10px;
+}
+.apps-migration--slim .apps-migration-title {
+    font-size: 1rem;
+    line-height: 1.3;
+    margin-bottom: 6px;
+}
+.apps-migration--slim .apps-migration-desc {
+    font-size: 12px;
+    line-height: 1.55;
+    margin-bottom: 12px;
+}
+.apps-migration--slim .apps-migration-cta {
+    padding: 8px 14px;
+    font-size: 12px;
+    border-radius: 10px;
+}
+.apps-migration--slim .apps-migration-ghost {
+    padding: 8px 12px;
+    font-size: 11.5px;
+    border-radius: 10px;
+}
+.apps-migration--slim .apps-migration-dismiss {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+}
+.apps-migration--slim .apps-migration-glow {
+    width: 220px;
+    height: 220px;
+    top: -40%;
+    right: -25%;
+}
 
 /* ── Pinned apps strip on dashboard ───────────────────── */
 .pinned-strip {
