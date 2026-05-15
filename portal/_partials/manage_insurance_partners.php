@@ -290,6 +290,46 @@ declare(strict_types=1);
     width:100%; max-width:480px; max-height:90vh; overflow-y:auto;
     box-shadow: 0 25px 80px rgba(0,0,0,.25);
 }
+
+/* ── DARK MODE ──────────────────────────────────────────────── */
+body[data-theme='dark'] #section-manage_insurance_partners .ipt-tab { color:#94a3b8; }
+body[data-theme='dark'] #section-manage_insurance_partners .ipt-tab:hover { color:#6ee7b7; }
+body[data-theme='dark'] #section-manage_insurance_partners .ipt-tab.active { color:#6ee7b7; }
+body[data-theme='dark'] #section-manage_insurance_partners .ipt-table th { background: rgba(16,185,129,.16); color:#6ee7b7; }
+body[data-theme='dark'] #section-manage_insurance_partners .ipt-table td { border-color:#1e293b; color:#e2e8f0; }
+body[data-theme='dark'] #section-manage_insurance_partners .ipt-table tbody tr:hover { background:#0b1220; }
+body[data-theme='dark'] #section-manage_insurance_partners .ipt-btn-secondary { background:#334155; color:#e2e8f0; }
+body[data-theme='dark'] #section-manage_insurance_partners .ipt-btn-secondary:hover { background:#475569; }
+body[data-theme='dark'] #section-manage_insurance_partners .ipt-badge-active { background: rgba(16,185,129,.18); color:#6ee7b7; }
+body[data-theme='dark'] #section-manage_insurance_partners .ipt-badge-suspended,
+body[data-theme='dark'] #section-manage_insurance_partners .ipt-badge-inactive { background: rgba(244,63,94,.18); color:#fb7185; }
+body[data-theme='dark'] #section-manage_insurance_partners .ipt-badge-locked { background: rgba(245,158,11,.18); color:#fbbf24; }
+body[data-theme='dark'] #section-manage_insurance_partners .ipt-pagination { border-color:#1e293b; }
+body[data-theme='dark'] #section-manage_insurance_partners .ipt-page-btn { background:#0f172a; border-color:#1e293b; color:#cbd5e1; }
+body[data-theme='dark'] #section-manage_insurance_partners .ipt-page-btn:hover:not(.disabled):not(.active) { background: rgba(16,185,129,.16); border-color:#10b981; color:#6ee7b7; }
+body[data-theme='dark'] #section-manage_insurance_partners .ipt-page-btn.active { background:#10b981; color:#0f172a; border-color:#10b981; }
+body[data-theme='dark'] #section-manage_insurance_partners .ipt-form-row label { color:#e2e8f0; }
+body[data-theme='dark'] #section-manage_insurance_partners .ipt-form-row input,
+body[data-theme='dark'] #section-manage_insurance_partners .ipt-form-row select {
+    background:#0b1220; border-color:#1e293b; color:#e2e8f0;
+}
+body[data-theme='dark'] #section-manage_insurance_partners .ipt-form-row input:focus,
+body[data-theme='dark'] #section-manage_insurance_partners .ipt-form-row select:focus { background:#0f172a; }
+body[data-theme='dark'] #section-manage_insurance_partners .ipt-modal-card { background:#0f172a; color:#e2e8f0; }
+body[data-theme='dark'] #section-manage_insurance_partners .bg-white { background:#0f172a !important; }
+body[data-theme='dark'] #section-manage_insurance_partners .bg-slate-50 { background: rgba(148,163,184,.08) !important; }
+body[data-theme='dark'] #section-manage_insurance_partners .bg-slate-100 { background: rgba(148,163,184,.14) !important; }
+body[data-theme='dark'] #section-manage_insurance_partners .bg-emerald-50 { background: rgba(16,185,129,.18) !important; }
+body[data-theme='dark'] #section-manage_insurance_partners .bg-amber-50 { background: rgba(245,158,11,.18) !important; }
+body[data-theme='dark'] #section-manage_insurance_partners .bg-rose-50 { background: rgba(244,63,94,.18) !important; }
+body[data-theme='dark'] #section-manage_insurance_partners .text-slate-900 { color:#f1f5f9 !important; }
+body[data-theme='dark'] #section-manage_insurance_partners .text-slate-800 { color:#f1f5f9 !important; }
+body[data-theme='dark'] #section-manage_insurance_partners .text-slate-700 { color:#e2e8f0 !important; }
+body[data-theme='dark'] #section-manage_insurance_partners .text-slate-600 { color:#cbd5e1 !important; }
+body[data-theme='dark'] #section-manage_insurance_partners .text-slate-500 { color:#94a3b8 !important; }
+body[data-theme='dark'] #section-manage_insurance_partners .text-slate-400 { color:#64748b !important; }
+body[data-theme='dark'] #section-manage_insurance_partners .border-slate-200 { border-color:#1e293b !important; }
+body[data-theme='dark'] #section-manage_insurance_partners .border-slate-100 { border-color:#1e293b !important; }
 </style>
 
 <script>

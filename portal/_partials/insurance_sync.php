@@ -55,6 +55,58 @@ $insOver = kpi_override_status($pdo);
     .badge-staff    { background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; }
     .badge-student  { background: #fef9c3; color: #ca8a04; border: 1px solid #fde68a; }
     .ins-stat-card  { background:#fff; border:1px solid #f1f5f9; border-radius:20px; padding:20px 24px; display:flex; align-items:center; gap:16px; box-shadow:0 1px 3px rgba(0,0,0,.04); }
+
+    /* ── Bold & Colorful — tilt-aware lift + icon micro-interaction ── */
+    #section-insurance_sync .ins-stat-card { isolation: isolate; position: relative; transition: transform .25s cubic-bezier(.16,1,.3,1), box-shadow .25s ease, border-color .25s ease; }
+    #section-insurance_sync .ins-stat-card:hover:not(.fx-tilt) { transform: translateY(-3px); box-shadow: 0 22px 42px -22px rgba(15,23,42,.20); }
+    #section-insurance_sync .ins-stat-card.fx-tilt:hover { --lift: -3px; box-shadow: 0 22px 42px -22px rgba(8,145,178,.30); }
+    #section-insurance_sync .ins-stat-card > .w-11 { transition: transform .25s cubic-bezier(.16,1,.3,1); }
+    #section-insurance_sync .ins-stat-card:hover > .w-11 { transform: scale(1.08) rotate(-4deg); }
+
+    /* ── DARK MODE ──────────────────────────────────────────────── */
+    body[data-theme='dark'] #section-insurance_sync .ins-stat-card {
+        background:#0f172a; border-color:#1e293b;
+        box-shadow: 0 1px 0 rgba(255,255,255,.04), 0 8px 22px rgba(0,0,0,.35);
+    }
+    body[data-theme='dark'] #section-insurance_sync .ins-stat-card:hover { border-color:#334155; }
+    body[data-theme='dark'] #section-insurance_sync .ins-upload-area { background: rgba(59,130,246,.10); border-color:#3b82f6; color:#93c5fd; }
+    body[data-theme='dark'] #section-insurance_sync .ins-upload-area:hover,
+    body[data-theme='dark'] #section-insurance_sync .ins-upload-area.drag-over { background: rgba(59,130,246,.20); border-color:#60a5fa; }
+
+    body[data-theme='dark'] #section-insurance_sync .badge-active   { background: rgba(34,197,94,.18); color:#86efac; border-color: rgba(34,197,94,.35); }
+    body[data-theme='dark'] #section-insurance_sync .badge-inactive { background: rgba(244,63,94,.18); color:#fb7185; border-color: rgba(244,63,94,.35); }
+    body[data-theme='dark'] #section-insurance_sync .badge-staff    { background: rgba(59,130,246,.18); color:#93c5fd; border-color: rgba(59,130,246,.35); }
+    body[data-theme='dark'] #section-insurance_sync .badge-student  { background: rgba(202,138,4,.18); color:#fcd34d; border-color: rgba(202,138,4,.35); }
+
+    body[data-theme='dark'] #section-insurance_sync .bg-white { background:#0f172a !important; }
+    body[data-theme='dark'] #section-insurance_sync .bg-slate-50 { background: rgba(148,163,184,.08) !important; }
+    body[data-theme='dark'] #section-insurance_sync .bg-slate-100 { background: rgba(148,163,184,.14) !important; }
+    body[data-theme='dark'] #section-insurance_sync .bg-emerald-50 { background: rgba(16,185,129,.18) !important; }
+    body[data-theme='dark'] #section-insurance_sync .bg-amber-50 { background: rgba(245,158,11,.18) !important; }
+    body[data-theme='dark'] #section-insurance_sync .bg-amber-100 { background: rgba(245,158,11,.22) !important; }
+    body[data-theme='dark'] #section-insurance_sync .bg-blue-50 { background: rgba(59,130,246,.18) !important; }
+    body[data-theme='dark'] #section-insurance_sync .bg-rose-50 { background: rgba(244,63,94,.18) !important; }
+    body[data-theme='dark'] #section-insurance_sync .bg-cyan-50 { background: rgba(6,182,212,.18) !important; }
+
+    body[data-theme='dark'] #section-insurance_sync .text-slate-800 { color:#f1f5f9 !important; }
+    body[data-theme='dark'] #section-insurance_sync .text-slate-700 { color:#e2e8f0 !important; }
+    body[data-theme='dark'] #section-insurance_sync .text-slate-600 { color:#cbd5e1 !important; }
+    body[data-theme='dark'] #section-insurance_sync .text-slate-500 { color:#94a3b8 !important; }
+    body[data-theme='dark'] #section-insurance_sync .text-slate-400 { color:#64748b !important; }
+    body[data-theme='dark'] #section-insurance_sync .text-slate-300 { color:#475569 !important; }
+    body[data-theme='dark'] #section-insurance_sync .border-slate-200 { border-color:#1e293b !important; }
+    body[data-theme='dark'] #section-insurance_sync .border-slate-100 { border-color:#1e293b !important; }
+    body[data-theme='dark'] #section-insurance_sync .border-cyan-200 { border-color: rgba(6,182,212,.30) !important; }
+    body[data-theme='dark'] #section-insurance_sync .border-amber-200 { border-color: rgba(245,158,11,.30) !important; }
+    body[data-theme='dark'] #section-insurance_sync .bg-gradient-to-br.from-cyan-50 {
+        background: linear-gradient(135deg, rgba(6,182,212,.10), rgba(59,130,246,.10)) !important;
+    }
+    body[data-theme='dark'] #section-insurance_sync .bg-white\/60 { background: rgba(15,23,42,.55) !important; }
+
+    @media (prefers-reduced-motion: reduce) {
+        #section-insurance_sync .ins-stat-card,
+        #section-insurance_sync .ins-stat-card > .w-11 { transition: none !important; transform: none !important; }
+    }
 </style>
 
 <div class="px-5 md:px-8 py-8 space-y-8">
@@ -91,53 +143,53 @@ $insOver = kpi_override_status($pdo);
 
     <!-- ── KPI Stat Cards ── -->
     <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
-        <div class="ins-stat-card km-card" data-kpi-key="mti_total_active" data-kpi-label="ประกัน MTI — Active">
+        <div class="ins-stat-card km-card fx-tilt fx-tilt-light" data-tilt="4" data-kpi-key="mti_total_active" data-kpi-label="ประกัน MTI — Active">
             <div class="w-11 h-11 rounded-2xl bg-emerald-50 text-emerald-500 flex items-center justify-center text-lg shrink-0">
                 <i class="fa-solid fa-shield-check"></i>
             </div>
             <div class="km-body">
                 <p class="km-label text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">มีสิทธิ์ (Active)</p>
-                <p class="km-value text-2xl font-black text-slate-800 leading-none" data-value="<?= (int)$stats['total_active'] ?>"><?= number_format($stats['total_active']) ?></p>
+                <p class="km-value text-2xl font-black text-slate-800 leading-none" data-value="<?= (int)$stats['total_active'] ?>"><span data-counter="<?= (int)$stats['total_active'] ?>">0</span></p>
             </div>
             <?php if (!empty($insOver['mti_total_active'])): ?><span class="km-override-badge">OVERRIDE</span><?php endif; ?>
         </div>
-        <div class="ins-stat-card km-card" data-kpi-key="mti_staff" data-kpi-label="ประกัน MTI — บุคลากร">
+        <div class="ins-stat-card km-card fx-tilt fx-tilt-light" data-tilt="4" data-kpi-key="mti_staff" data-kpi-label="ประกัน MTI — บุคลากร">
             <div class="w-11 h-11 rounded-2xl bg-blue-50 text-blue-500 flex items-center justify-center text-lg shrink-0">
                 <i class="fa-solid fa-user-tie"></i>
             </div>
             <div class="km-body">
                 <p class="km-label text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">บุคลากร</p>
-                <p class="km-value text-2xl font-black text-slate-800 leading-none" data-value="<?= (int)$stats['staff'] ?>"><?= number_format($stats['staff']) ?></p>
+                <p class="km-value text-2xl font-black text-slate-800 leading-none" data-value="<?= (int)$stats['staff'] ?>"><span data-counter="<?= (int)$stats['staff'] ?>">0</span></p>
             </div>
             <?php if (!empty($insOver['mti_staff'])): ?><span class="km-override-badge">OVERRIDE</span><?php endif; ?>
         </div>
-        <div class="ins-stat-card km-card" data-kpi-key="mti_student" data-kpi-label="ประกัน MTI — นักศึกษา">
+        <div class="ins-stat-card km-card fx-tilt fx-tilt-light" data-tilt="4" data-kpi-key="mti_student" data-kpi-label="ประกัน MTI — นักศึกษา">
             <div class="w-11 h-11 rounded-2xl bg-amber-50 text-amber-500 flex items-center justify-center text-lg shrink-0">
                 <i class="fa-solid fa-user-graduate"></i>
             </div>
             <div class="km-body">
                 <p class="km-label text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">นักศึกษา</p>
-                <p class="km-value text-2xl font-black text-slate-800 leading-none" data-value="<?= (int)$stats['student'] ?>"><?= number_format($stats['student']) ?></p>
+                <p class="km-value text-2xl font-black text-slate-800 leading-none" data-value="<?= (int)$stats['student'] ?>"><span data-counter="<?= (int)$stats['student'] ?>">0</span></p>
             </div>
             <?php if (!empty($insOver['mti_student'])): ?><span class="km-override-badge">OVERRIDE</span><?php endif; ?>
         </div>
-        <div class="ins-stat-card km-card" data-kpi-key="mti_manual_override" data-kpi-label="ประกัน MTI — Manual Override">
+        <div class="ins-stat-card km-card fx-tilt fx-tilt-light" data-tilt="4" data-kpi-key="mti_manual_override" data-kpi-label="ประกัน MTI — Manual Override">
             <div class="w-11 h-11 rounded-2xl bg-rose-50 text-rose-400 flex items-center justify-center text-lg shrink-0">
                 <i class="fa-solid fa-pen-to-square"></i>
             </div>
             <div class="km-body">
                 <p class="km-label text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Manual Override</p>
-                <p class="km-value text-2xl font-black text-slate-800 leading-none" data-value="<?= (int)$stats['manual_override'] ?>"><?= number_format($stats['manual_override']) ?></p>
+                <p class="km-value text-2xl font-black text-slate-800 leading-none" data-value="<?= (int)$stats['manual_override'] ?>"><span data-counter="<?= (int)$stats['manual_override'] ?>">0</span></p>
             </div>
             <?php if (!empty($insOver['mti_manual_override'])): ?><span class="km-override-badge">OVERRIDE</span><?php endif; ?>
         </div>
-        <div class="ins-stat-card km-card <?= ($stats['expiring_soon'] ?? 0) > 0 ? 'border-amber-200 bg-amber-50/50' : '' ?>" data-kpi-key="mti_expiring_30d" data-kpi-label="ประกัน MTI — ใกล้หมดอายุ">
+        <div class="ins-stat-card km-card fx-tilt fx-tilt-light <?= ($stats['expiring_soon'] ?? 0) > 0 ? 'border-amber-200 bg-amber-50/50' : '' ?>" data-tilt="4" data-kpi-key="mti_expiring_30d" data-kpi-label="ประกัน MTI — ใกล้หมดอายุ">
             <div class="w-11 h-11 rounded-2xl <?= ($stats['expiring_soon'] ?? 0) > 0 ? 'bg-amber-100 text-amber-500' : 'bg-slate-50 text-slate-300' ?> flex items-center justify-center text-lg shrink-0">
                 <i class="fa-solid fa-clock"></i>
             </div>
             <div class="km-body">
                 <p class="km-label text-[10px] font-black <?= ($stats['expiring_soon'] ?? 0) > 0 ? 'text-amber-500' : 'text-slate-400' ?> uppercase tracking-widest leading-none mb-1">ใกล้หมดอายุ ≤30 วัน</p>
-                <p class="km-value text-2xl font-black <?= ($stats['expiring_soon'] ?? 0) > 0 ? 'text-amber-600' : 'text-slate-800' ?> leading-none" data-value="<?= (int)($stats['expiring_soon'] ?? 0) ?>"><?= number_format($stats['expiring_soon'] ?? 0) ?></p>
+                <p class="km-value text-2xl font-black <?= ($stats['expiring_soon'] ?? 0) > 0 ? 'text-amber-600' : 'text-slate-800' ?> leading-none" data-value="<?= (int)($stats['expiring_soon'] ?? 0) ?>"><span data-counter="<?= (int)($stats['expiring_soon'] ?? 0) ?>">0</span></p>
             </div>
             <?php if (!empty($insOver['mti_expiring_30d'])): ?><span class="km-override-badge">OVERRIDE</span><?php endif; ?>
         </div>

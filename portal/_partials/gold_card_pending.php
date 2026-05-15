@@ -48,6 +48,45 @@ $gcpCsrfToken = function_exists('get_csrf_token') ? get_csrf_token() : ($_SESSIO
         #section-gold_card_pending .gcp-card-inner { flex-direction:column; gap:14px; }
         #section-gold_card_pending .gcp-thumb-stack { flex-direction:row; }
     }
+
+    /* ── Bold & Colorful — tilt-aware lift on pending request cards ── */
+    #section-gold_card_pending .gcp-card { isolation: isolate; }
+    #section-gold_card_pending .gcp-card:hover:not(.fx-tilt) { transform: translateY(-3px); box-shadow:0 18px 36px -18px rgba(245,158,11,.25); }
+    #section-gold_card_pending .gcp-card.fx-tilt:hover { --lift: -3px; box-shadow:0 18px 36px -18px rgba(245,158,11,.30); }
+
+    /* ── DARK MODE ──────────────────────────────────────────────── */
+    body[data-theme='dark'] #section-gold_card_pending .gcp-card { background:#0f172a; border-color:#1e293b; box-shadow: 0 1px 0 rgba(255,255,255,.04), 0 8px 22px rgba(0,0,0,.35); }
+    body[data-theme='dark'] #section-gold_card_pending .gcp-card:hover { border-color:#f59e0b; }
+    body[data-theme='dark'] #section-gold_card_pending .gcp-thumb { background:#1e293b; border-color:#334155; }
+    body[data-theme='dark'] #section-gold_card_pending .gcp-thumb:hover { border-color:#f59e0b; }
+    body[data-theme='dark'] #section-gold_card_pending .gcp-thumb-empty { background: rgba(148,163,184,.08); border-color:#334155; color:#475569; }
+    body[data-theme='dark'] #section-gold_card_pending .gcp-meta-row dt { color:#94a3b8; }
+    body[data-theme='dark'] #section-gold_card_pending .gcp-meta-row dd { color:#f1f5f9; }
+    body[data-theme='dark'] #section-gold_card_pending .gcp-pager-btn { background:#0f172a; border-color:#1e293b; color:#cbd5e1; }
+    body[data-theme='dark'] #section-gold_card_pending .gcp-pager-btn:hover:not(:disabled) { background: rgba(245,158,11,.16); border-color:#f59e0b; color:#fbbf24; }
+    body[data-theme='dark'] #section-gold_card_pending .gcp-pager-btn.gcp-active { background:#f59e0b; border-color:#f59e0b; color:#0f172a; }
+    body[data-theme='dark'] #section-gold_card_pending .gcp-empty { color:#64748b; }
+
+    body[data-theme='dark'] #section-gold_card_pending .bg-white { background:#0f172a !important; }
+    body[data-theme='dark'] #section-gold_card_pending .bg-slate-50 { background: rgba(148,163,184,.08) !important; }
+    body[data-theme='dark'] #section-gold_card_pending .bg-gradient-to-br.from-blue-50 {
+        background: linear-gradient(135deg, rgba(59,130,246,.12), #0f172a 55%, rgba(99,102,241,.12)) !important;
+    }
+    body[data-theme='dark'] #section-gold_card_pending .text-slate-800 { color:#f1f5f9 !important; }
+    body[data-theme='dark'] #section-gold_card_pending .text-slate-700 { color:#e2e8f0 !important; }
+    body[data-theme='dark'] #section-gold_card_pending .text-slate-600 { color:#cbd5e1 !important; }
+    body[data-theme='dark'] #section-gold_card_pending .text-slate-500 { color:#94a3b8 !important; }
+    body[data-theme='dark'] #section-gold_card_pending .text-slate-400 { color:#64748b !important; }
+    body[data-theme='dark'] #section-gold_card_pending .text-slate-300 { color:#475569 !important; }
+    body[data-theme='dark'] #section-gold_card_pending .text-blue-600 { color:#93c5fd !important; }
+    body[data-theme='dark'] #section-gold_card_pending .text-blue-500 { color:#60a5fa !important; }
+    body[data-theme='dark'] #section-gold_card_pending .border-slate-200 { border-color:#1e293b !important; }
+    body[data-theme='dark'] #section-gold_card_pending .border-slate-100 { border-color:#1e293b !important; }
+    body[data-theme='dark'] #section-gold_card_pending .border-blue-200 { border-color: rgba(59,130,246,.30) !important; }
+
+    @media (prefers-reduced-motion: reduce) {
+        #section-gold_card_pending .gcp-card { transition: none !important; transform: none !important; }
+    }
 </style>
 
 <div class="space-y-6 px-4 sm:px-6 py-6 max-w-6xl mx-auto">
@@ -200,7 +239,7 @@ $gcpCsrfToken = function_exists('get_csrf_token') ? get_csrf_token() : ($_SESSIO
             const photoFileJs = escapeHtml(photoFile).replace(/'/g, "\\'");
             const sigFileJs   = escapeHtml(sigFile).replace(/'/g, "\\'");
 
-            return `<div class="gcp-card">
+            return `<div class="gcp-card fx-tilt fx-tilt-light" data-tilt="3">
                 <div class="gcp-card-inner flex gap-4 items-start">
                     <div class="gcp-thumb-stack flex flex-col gap-2 shrink-0">
                         ${photoUrl
@@ -250,6 +289,7 @@ $gcpCsrfToken = function_exists('get_csrf_token') ? get_csrf_token() : ($_SESSIO
                 </div>
             </div>`;
         }).join('');
+        if (window.RsuFx && typeof RsuFx.refresh === 'function') RsuFx.refresh(wrap);
         renderPager(page, pages, total);
     }
 
