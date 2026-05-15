@@ -350,8 +350,9 @@ if (!function_exists('renderPageHeader')) {
         <!-- รายงาน -->
         <div class="nav-section-label">รายงาน</div>
         <div class="space-y-0.5 mb-1">
-            <?php navLink('../admin/reports.php',      'fa-file-lines',   'รายงานรวม',     $cur); ?>
-            <?php navLink('../admin/daily_report.php', 'fa-calendar-day', 'รายงานรายวัน',  $cur); ?>
+            <?php navLink('../admin/reports.php',         'fa-file-lines',    'รายงานรวม',         $cur); ?>
+            <?php navLink('../admin/campaign_report.php', 'fa-file-invoice',  'สรุปรายแคมเปญ',     $cur); ?>
+            <?php navLink('../admin/daily_report.php',    'fa-calendar-day',  'รายงานรายวัน',      $cur); ?>
         </div>
 
         <!-- เครื่องมือ -->
