@@ -99,6 +99,41 @@ $_aip_prompts = list_ai_prompts($pdo);
         padding: 2px 8px;
         border-radius: 999px;
     }
+
+    /* ── Bold & Colorful — tilt-aware lift on prompt cards ── */
+    #ai-prompts-section .ap-card { isolation: isolate; transition: transform .25s cubic-bezier(.16,1,.3,1), box-shadow .25s ease, border-color .25s ease; }
+    #ai-prompts-section .ap-card:hover:not(.fx-tilt) { transform: translateY(-3px); box-shadow:0 18px 36px -18px rgba(99,102,241,.20); border-color:#a5b4fc; }
+    #ai-prompts-section .ap-card.fx-tilt:hover { --lift: -3px; box-shadow:0 18px 36px -18px rgba(99,102,241,.30); border-color:#a5b4fc; }
+
+    /* ── DARK MODE ──────────────────────────────────────────────── */
+    body[data-theme='dark'] #ai-prompts-section .ap-card { background:#0f172a; border-color:#1e293b; box-shadow: 0 1px 0 rgba(255,255,255,.04), 0 8px 22px rgba(0,0,0,.35); }
+    body[data-theme='dark'] #ai-prompts-section .ap-card:hover { border-color:#6366f1; }
+    body[data-theme='dark'] #ai-prompts-section .ap-flow-card { background: rgba(168,85,247,.10); border-color: rgba(168,85,247,.30); }
+    body[data-theme='dark'] #ai-prompts-section pre.ap-textarea { background:#0b1220; border-color:#1e293b; color:#e2e8f0; }
+    body[data-theme='dark'] #ai-prompts-section textarea.ap-textarea-edit { background:#0b1220; border-color:#1e293b; color:#e2e8f0; }
+    body[data-theme='dark'] #ai-prompts-section textarea.ap-textarea-edit:focus { background:#0f172a; border-color:#3b82f6; }
+    body[data-theme='dark'] #ai-prompts-section .ap-pill { background: rgba(59,130,246,.18); color:#93c5fd; border-color: rgba(59,130,246,.35); }
+    body[data-theme='dark'] #ai-prompts-section .bg-white { background:#0f172a !important; }
+    body[data-theme='dark'] #ai-prompts-section .bg-slate-50 { background: rgba(148,163,184,.08) !important; }
+    body[data-theme='dark'] #ai-prompts-section .bg-purple-50 { background: rgba(168,85,247,.18) !important; }
+    body[data-theme='dark'] #ai-prompts-section .bg-indigo-50 { background: rgba(99,102,241,.18) !important; }
+    body[data-theme='dark'] #ai-prompts-section .bg-blue-50 { background: rgba(59,130,246,.18) !important; }
+    body[data-theme='dark'] #ai-prompts-section .bg-emerald-50 { background: rgba(16,185,129,.18) !important; }
+    body[data-theme='dark'] #ai-prompts-section .bg-amber-50 { background: rgba(245,158,11,.18) !important; }
+    body[data-theme='dark'] #ai-prompts-section .text-slate-900 { color:#f1f5f9 !important; }
+    body[data-theme='dark'] #ai-prompts-section .text-slate-800 { color:#f1f5f9 !important; }
+    body[data-theme='dark'] #ai-prompts-section .text-slate-700 { color:#e2e8f0 !important; }
+    body[data-theme='dark'] #ai-prompts-section .text-slate-600 { color:#cbd5e1 !important; }
+    body[data-theme='dark'] #ai-prompts-section .text-slate-500 { color:#94a3b8 !important; }
+    body[data-theme='dark'] #ai-prompts-section .text-slate-400 { color:#64748b !important; }
+    body[data-theme='dark'] #ai-prompts-section .border-slate-200 { border-color:#1e293b !important; }
+    body[data-theme='dark'] #ai-prompts-section .border-slate-100 { border-color:#1e293b !important; }
+    body[data-theme='dark'] #ai-prompts-section .border-purple-200 { border-color: rgba(168,85,247,.30) !important; }
+    body[data-theme='dark'] #ai-prompts-section .border-indigo-200 { border-color: rgba(99,102,241,.30) !important; }
+
+    @media (prefers-reduced-motion: reduce) {
+        #ai-prompts-section .ap-card { transition: none !important; transform: none !important; }
+    }
 </style>
 
 <div id="ai-prompts-section" class="p-5 md:p-6 max-w-5xl mx-auto">
@@ -168,7 +203,7 @@ $_aip_prompts = list_ai_prompts($pdo);
 
     <!-- Each prompt -->
     <?php foreach ($_aip_prompts as $p): ?>
-    <div class="ap-card" data-key="<?= htmlspecialchars($p['key']) ?>">
+    <div class="ap-card fx-tilt fx-tilt-light" data-tilt="3" data-key="<?= htmlspecialchars($p['key']) ?>">
         <div class="flex items-start justify-between gap-3 mb-2">
             <div class="flex-1">
                 <div class="flex items-center gap-2 mb-1">

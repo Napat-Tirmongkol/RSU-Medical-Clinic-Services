@@ -84,6 +84,47 @@ $_aik_sources = [
     #aik-diag-modal   { z-index:220; }
     #aik-modal        { z-index:200; }
     #aik-chunk-modal .aik-modal-box { max-height:92vh; }
+
+    /* ── Bold & Colorful — tilt-aware lift on source cards ── */
+    #ai-knowledge-section .aik-source-card { isolation: isolate; }
+    #ai-knowledge-section .aik-source-card.fx-tilt:hover { --lift: -3px; box-shadow:0 18px 36px -18px rgba(16,185,129,.30); }
+
+    /* ── DARK MODE ──────────────────────────────────────────────── */
+    body[data-theme='dark'] #ai-knowledge-section .aik-card { background:#0f172a; border-color:#1e293b; box-shadow: 0 1px 0 rgba(255,255,255,.04), 0 8px 22px rgba(0,0,0,.35); }
+    body[data-theme='dark'] #ai-knowledge-section .aik-source-card { background:#0f172a; border-color:#1e293b; }
+    body[data-theme='dark'] #ai-knowledge-section .aik-source-card:hover { border-color:#3b82f6; background:#0b1220; }
+    body[data-theme='dark'] #ai-knowledge-section pre.aik-preview { background:#020617; color:#e2e8f0; border-color:#1e293b; }
+    body[data-theme='dark'] #ai-knowledge-section textarea.aik-textarea { background:#0b1220; border-color:#1e293b; color:#e2e8f0; }
+    body[data-theme='dark'] #ai-knowledge-section textarea.aik-textarea:focus { background:#0f172a; border-color:#3b82f6; }
+    body[data-theme='dark'] #ai-knowledge-section .aik-toggle-slider { background:#334155; }
+    body[data-theme='dark'] #ai-knowledge-section #aik-chunks-table th { background:#1e293b; color:#cbd5e1; border-color:#334155; }
+    body[data-theme='dark'] #ai-knowledge-section #aik-chunks-table td { border-color:#1e293b; color:#e2e8f0; }
+    body[data-theme='dark'] #ai-knowledge-section #aik-chunks-table tr:hover td { background:#0b1220; }
+    body[data-theme='dark'] #ai-knowledge-section .aik-emb-yes { background:rgba(16,185,129,.18); color:#6ee7b7; }
+    body[data-theme='dark'] #ai-knowledge-section .aik-emb-no  { background:rgba(245,158,11,.18); color:#fbbf24; }
+    body[data-theme='dark'] #ai-knowledge-section .aik-src-badge { background:rgba(99,102,241,.18); color:#c7d2fe; }
+    body[data-theme='dark'] #ai-knowledge-section #aik-search-panel { background: rgba(99,102,241,.10); border-color: rgba(99,102,241,.30); }
+    body[data-theme='dark'] #ai-knowledge-section #aik-search-panel .result-row { background:#0f172a; border-color:#1e293b; }
+    body[data-theme='dark'] #ai-knowledge-section #aik-search-panel .result-score { background: rgba(168,85,247,.20); color:#d8b4fe; }
+
+    body[data-theme='dark'] #ai-knowledge-section .bg-white { background:#0f172a !important; }
+    body[data-theme='dark'] #ai-knowledge-section .bg-slate-50 { background: rgba(148,163,184,.08) !important; }
+    body[data-theme='dark'] #ai-knowledge-section .bg-gray-50 { background: rgba(148,163,184,.08) !important; }
+    body[data-theme='dark'] #ai-knowledge-section .bg-gray-100 { background: rgba(148,163,184,.14) !important; }
+    body[data-theme='dark'] #ai-knowledge-section .bg-emerald-50 { background: rgba(16,185,129,.18) !important; }
+    body[data-theme='dark'] #ai-knowledge-section .bg-indigo-100 { background: rgba(99,102,241,.20) !important; }
+    body[data-theme='dark'] #ai-knowledge-section .text-indigo-700 { color:#c7d2fe !important; }
+    body[data-theme='dark'] #ai-knowledge-section .text-gray-900 { color:#f1f5f9 !important; }
+    body[data-theme='dark'] #ai-knowledge-section .text-gray-700 { color:#e2e8f0 !important; }
+    body[data-theme='dark'] #ai-knowledge-section .text-gray-600 { color:#cbd5e1 !important; }
+    body[data-theme='dark'] #ai-knowledge-section .text-gray-500 { color:#94a3b8 !important; }
+    body[data-theme='dark'] #ai-knowledge-section .text-gray-400 { color:#64748b !important; }
+    body[data-theme='dark'] #ai-knowledge-section .text-slate-700 { color:#e2e8f0 !important; }
+    body[data-theme='dark'] #ai-knowledge-section .text-slate-500 { color:#94a3b8 !important; }
+    body[data-theme='dark'] #ai-knowledge-section .border-slate-200 { border-color:#1e293b !important; }
+    body[data-theme='dark'] #ai-knowledge-section .border-gray-200 { border-color:#1e293b !important; }
+    body[data-theme='dark'] #ai-knowledge-section .border-indigo-200 { border-color: rgba(99,102,241,.30) !important; }
+    body[data-theme='dark'] #ai-knowledge-section .border-emerald-500 { border-color: #10b981 !important; }
 </style>
 
 <div id="ai-knowledge-section" class="p-5 md:p-6 max-w-5xl mx-auto">

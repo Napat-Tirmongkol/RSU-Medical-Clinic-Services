@@ -311,6 +311,63 @@ function _qa_source_badge(string $s): string {
     .sb-fb-done { font-size:12px; color:#16a34a; font-weight:700; display:inline-flex; align-items:center; gap:6px; }
 
     #vchecks { max-height: 24rem; overflow-y: auto; }
+
+    /* ── Bold & Colorful — tilt-aware lift on line-card panels ── */
+    #section-ai_qa_lab .line-card { isolation: isolate; transition: transform .25s cubic-bezier(.16,1,.3,1), box-shadow .25s ease, border-color .25s ease; }
+    #section-ai_qa_lab .line-card.fx-tilt:hover { --lift: -3px; box-shadow:0 18px 36px -18px rgba(139,92,246,.30); border-color:rgba(139,92,246,.30); }
+
+    /* ── DARK MODE ──────────────────────────────────────────────── */
+    body[data-theme='dark'] #section-ai_qa_lab .qa-input { background:#0b1220; border-color:#1e293b; color:#e2e8f0; }
+    body[data-theme='dark'] #section-ai_qa_lab .qa-input:focus { background:#0f172a; border-color:#8b5cf6; }
+    body[data-theme='dark'] #section-ai_qa_lab .qa-row:hover { background:#0b1220; }
+    body[data-theme='dark'] #section-ai_qa_lab .qa-confidence-bar { background:#1e293b; }
+    body[data-theme='dark'] #section-ai_qa_lab .qa-tab { color:#94a3b8; }
+    body[data-theme='dark'] #section-ai_qa_lab .qa-tab:hover { color:#f1f5f9; }
+    body[data-theme='dark'] #section-ai_qa_lab .line-card { background:#0f172a; border-color:#1e293b; box-shadow: 0 1px 0 rgba(255,255,255,.04), 0 8px 22px rgba(0,0,0,.35); }
+    body[data-theme='dark'] #section-ai_qa_lab .line-input { background:#0b1220; border-color:#1e293b; color:#e2e8f0; }
+    body[data-theme='dark'] #section-ai_qa_lab .line-input:focus { background:#0f172a; }
+    body[data-theme='dark'] #section-ai_qa_lab .line-label { color:#cbd5e1; }
+    body[data-theme='dark'] #section-ai_qa_lab .line-toggle .line-toggle-slider { background:#334155; }
+    body[data-theme='dark'] #section-ai_qa_lab #sb-answer-box code { background:#1e293b; color:#fca5a5; }
+    body[data-theme='dark'] #section-ai_qa_lab #sb-context-pre { color:#cbd5e1; }
+    body[data-theme='dark'] #section-ai_qa_lab .sb-chunk-row { background:#0f172a; border-color:#1e293b; }
+    body[data-theme='dark'] #section-ai_qa_lab .sb-score-bar-bg { background:#1e293b; }
+    body[data-theme='dark'] #section-ai_qa_lab .sb-fb-btn.selected-up { background:rgba(16,185,129,.18); border-color:rgba(16,185,129,.40); }
+    body[data-theme='dark'] #section-ai_qa_lab .sb-fb-btn.selected-up i { color:#6ee7b7; }
+    body[data-theme='dark'] #section-ai_qa_lab .sb-fb-btn.selected-down { background:rgba(244,63,94,.18); border-color:rgba(244,63,94,.40); }
+    body[data-theme='dark'] #section-ai_qa_lab .sb-fb-btn.selected-down i { color:#fb7185; }
+    body[data-theme='dark'] #section-ai_qa_lab .sb-fb-done { color:#6ee7b7; }
+
+    body[data-theme='dark'] #section-ai_qa_lab .bg-white { background:#0f172a !important; }
+    body[data-theme='dark'] #section-ai_qa_lab .bg-slate-50 { background: rgba(148,163,184,.08) !important; }
+    body[data-theme='dark'] #section-ai_qa_lab .bg-slate-100 { background: rgba(148,163,184,.14) !important; }
+    body[data-theme='dark'] #section-ai_qa_lab .bg-gray-50 { background: rgba(148,163,184,.08) !important; }
+    body[data-theme='dark'] #section-ai_qa_lab .bg-gray-100 { background: rgba(148,163,184,.14) !important; }
+    body[data-theme='dark'] #section-ai_qa_lab .bg-purple-50 { background: rgba(168,85,247,.18) !important; }
+    body[data-theme='dark'] #section-ai_qa_lab .bg-purple-100 { background: rgba(168,85,247,.22) !important; }
+    body[data-theme='dark'] #section-ai_qa_lab .bg-emerald-50 { background: rgba(16,185,129,.18) !important; }
+    body[data-theme='dark'] #section-ai_qa_lab .bg-amber-50 { background: rgba(245,158,11,.18) !important; }
+    body[data-theme='dark'] #section-ai_qa_lab .bg-rose-50 { background: rgba(244,63,94,.18) !important; }
+    body[data-theme='dark'] #section-ai_qa_lab .bg-sky-50 { background: rgba(14,165,233,.18) !important; }
+    body[data-theme='dark'] #section-ai_qa_lab .bg-cyan-50 { background: rgba(6,182,212,.18) !important; }
+    body[data-theme='dark'] #section-ai_qa_lab .text-gray-900 { color:#f1f5f9 !important; }
+    body[data-theme='dark'] #section-ai_qa_lab .text-gray-700 { color:#e2e8f0 !important; }
+    body[data-theme='dark'] #section-ai_qa_lab .text-gray-600 { color:#cbd5e1 !important; }
+    body[data-theme='dark'] #section-ai_qa_lab .text-gray-500 { color:#94a3b8 !important; }
+    body[data-theme='dark'] #section-ai_qa_lab .text-gray-400 { color:#64748b !important; }
+    body[data-theme='dark'] #section-ai_qa_lab .text-slate-900 { color:#f1f5f9 !important; }
+    body[data-theme='dark'] #section-ai_qa_lab .text-slate-700 { color:#e2e8f0 !important; }
+    body[data-theme='dark'] #section-ai_qa_lab .text-slate-500 { color:#94a3b8 !important; }
+    body[data-theme='dark'] #section-ai_qa_lab .border-slate-200 { border-color:#1e293b !important; }
+    body[data-theme='dark'] #section-ai_qa_lab .border-slate-100 { border-color:#1e293b !important; }
+    body[data-theme='dark'] #section-ai_qa_lab .border-gray-200 { border-color:#1e293b !important; }
+    body[data-theme='dark'] #section-ai_qa_lab .border-gray-100 { border-color:#1e293b !important; }
+    body[data-theme='dark'] #section-ai_qa_lab .border-purple-200 { border-color: rgba(168,85,247,.30) !important; }
+    body[data-theme='dark'] #section-ai_qa_lab .border-emerald-200 { border-color: rgba(16,185,129,.30) !important; }
+
+    @media (prefers-reduced-motion: reduce) {
+        #section-ai_qa_lab .line-card { transition: none !important; transform: none !important; }
+    }
 </style>
 
 <div class="p-6 max-w-7xl mx-auto">
@@ -764,7 +821,7 @@ function _qa_source_badge(string $s): string {
 
     <?php elseif ($_qa_tab === 'autoreply'): /* ════════ TAB: AUTO-REPLY (เวลาเปิด/ปิด) ════════ */ ?>
 
-    <div class="line-card shadow-sm" style="border-top:4px solid #0ea5e9">
+    <div class="line-card fx-tilt fx-tilt-light shadow-sm" data-tilt="3" style="border-top:4px solid #0ea5e9">
         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:18px">
             <div>
                 <h3 style="font-weight:900;color:#0f172a;font-size:15px;margin-bottom:4px">

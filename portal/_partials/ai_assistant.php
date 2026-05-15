@@ -123,6 +123,46 @@ $apiKeySet = defined('GEMINI_API_KEY') && !empty(GEMINI_API_KEY);
 .typing-dot:nth-child(2) { animation-delay: 0.1s; }
 .typing-dot:nth-child(3) { animation-delay: 0.2s; }
 @keyframes bounce { from { transform: translateY(0); opacity: 0.4; } to { transform: translateY(-5px); opacity: 1; } }
+
+/* ── DARK MODE ──────────────────────────────────────────────── */
+body[data-theme='dark'] #section-ai_assistant .ai-assistant-container { background: rgba(15,23,42,.55); }
+body[data-theme='dark'] #section-ai_assistant .bg-white\/80 { background: rgba(15,23,42,.65) !important; }
+body[data-theme='dark'] #section-ai_assistant .bg-white { background:#0f172a !important; }
+body[data-theme='dark'] #section-ai_assistant .bg-slate-50 { background: rgba(148,163,184,.08) !important; }
+body[data-theme='dark'] #section-ai_assistant .bg-slate-50\/50 { background: rgba(148,163,184,.04) !important; }
+body[data-theme='dark'] #section-ai_assistant .bg-slate-100 { background: rgba(148,163,184,.14) !important; }
+body[data-theme='dark'] #section-ai_assistant .bg-purple-100 { background: rgba(168,85,247,.20) !important; }
+body[data-theme='dark'] #section-ai_assistant .bg-purple-600 { background: #8b5cf6 !important; }
+body[data-theme='dark'] #section-ai_assistant .bg-purple-700,
+body[data-theme='dark'] #section-ai_assistant .hover\:bg-purple-700:hover { background: #7c3aed !important; }
+body[data-theme='dark'] #section-ai_assistant .bg-emerald-50 { background: rgba(16,185,129,.18) !important; }
+body[data-theme='dark'] #section-ai_assistant .bg-amber-50 { background: rgba(245,158,11,.18) !important; }
+body[data-theme='dark'] #section-ai_assistant .bg-amber-100 { background: rgba(245,158,11,.22) !important; }
+body[data-theme='dark'] #section-ai_assistant .border-slate-200 { border-color:#1e293b !important; }
+body[data-theme='dark'] #section-ai_assistant .border-slate-100 { border-color:#1e293b !important; }
+body[data-theme='dark'] #section-ai_assistant .border-amber-200 { border-color: rgba(245,158,11,.30) !important; }
+body[data-theme='dark'] #section-ai_assistant .border-emerald-100 { border-color: rgba(16,185,129,.30) !important; }
+body[data-theme='dark'] #section-ai_assistant .text-slate-700 { color:#e2e8f0 !important; }
+body[data-theme='dark'] #section-ai_assistant .text-slate-600 { color:#cbd5e1 !important; }
+body[data-theme='dark'] #section-ai_assistant .text-slate-500 { color:#94a3b8 !important; }
+body[data-theme='dark'] #section-ai_assistant .text-slate-400 { color:#64748b !important; }
+body[data-theme='dark'] #section-ai_assistant .text-amber-900 { color:#fcd34d !important; }
+body[data-theme='dark'] #section-ai_assistant .text-amber-700 { color:#fbbf24 !important; }
+body[data-theme='dark'] #section-ai_assistant .text-emerald-600 { color:#6ee7b7 !important; }
+body[data-theme='dark'] #section-ai_assistant textarea#aiChatInput { background:#0b1220 !important; color:#e2e8f0 !important; border-color:#1e293b !important; }
+body[data-theme='dark'] #section-ai_assistant textarea#aiChatInput:focus { background:#0f172a !important; }
+
+/* Chat bubbles + markdown content */
+body[data-theme='dark'] #section-ai_assistant .ai-bubble-content code { background:#1e293b; color:#fca5a5; }
+body[data-theme='dark'] #section-ai_assistant .ai-bubble-content table th { background:#1e293b; color:#cbd5e1; }
+body[data-theme='dark'] #section-ai_assistant .ai-bubble-content table th,
+body[data-theme='dark'] #section-ai_assistant .ai-bubble-content table td { border-color:#1e293b; }
+body[data-theme='dark'] #section-ai_assistant .ai-fb-btn { background:#0f172a; border-color:#1e293b; color:#94a3b8; }
+body[data-theme='dark'] #section-ai_assistant .ai-fb-btn:hover { background:#1e293b; border-color:#334155; }
+body[data-theme='dark'] #section-ai_assistant .ai-fb-btn.fb-up.selected { background:rgba(16,185,129,.18); border-color:rgba(16,185,129,.40); color:#6ee7b7; }
+body[data-theme='dark'] #section-ai_assistant .ai-fb-btn.fb-down.selected { background:rgba(244,63,94,.18); border-color:rgba(244,63,94,.40); color:#fb7185; }
+body[data-theme='dark'] #section-ai_assistant .ai-fb-comment-input { background:#0b1220; border-color:#1e293b; color:#e2e8f0; }
+body[data-theme='dark'] #section-ai_assistant .ai-fb-comment-input:focus { border-color:#a855f7; }
 </style>
 
 <script>
