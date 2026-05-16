@@ -20,7 +20,9 @@ $adminName = (string)($_SESSION['admin_username'] ?? $_SESSION['full_name'] ?? '
 
 /**
  * Append an audit row. Cheap append-only; never throws to caller —
- * audit failure should never block the finance write.
+ * audit failure should never block the finance write. When the audit
+ * INSERT fails we re-log with an ALERT prefix + the lost payload so
+ * ops can still reconstruct what happened from the server error log.
  */
 function fin_audit_log(PDO $pdo, int $txnId, string $action, ?array $changes, ?int $adminId, string $adminName): void
 {
@@ -37,8 +39,32 @@ function fin_audit_log(PDO $pdo, int $txnId, string $action, ?array $changes, ?i
             $_SERVER['REMOTE_ADDR'] ?? null,
         ]);
     } catch (Throwable $e) {
-        error_log('[fin_audit_log] ' . $e->getMessage());
+        // Compliance-critical: capture the full audit payload in the server
+        // log so a DBA can still reconstruct who-did-what after the fact.
+        $payload = json_encode([
+            'txn_id' => $txnId, 'action' => $action, 'changes' => $changes,
+            'by_id'  => $adminId, 'by_name' => $adminName,
+            'ip'     => $_SERVER['REMOTE_ADDR'] ?? null,
+            'ts'     => date('c'),
+        ], JSON_UNESCAPED_UNICODE);
+        error_log('[fin_audit_log][ALERT][AUDIT_LOST] ' . $e->getMessage() . ' payload=' . $payload);
     }
+}
+
+/**
+ * Validate a money amount string the way MySQL DECIMAL(12,2) expects it.
+ * Returns the string for direct binding (avoids (float) precision loss
+ * on values like 0.1 + 0.2). Returns null when the input is malformed.
+ *
+ * Accepts: 1234, 1234.5, 1234.56  (max 10 digits before decimal, 0-2 after)
+ * Rejects: -10, 1e3, scientific notation, blanks, anything with a comma.
+ */
+function fin_parse_amount(mixed $raw): ?string
+{
+    $s = is_string($raw) ? trim($raw) : (string)$raw;
+    if ($s === '' || !preg_match('/^\d{1,10}(\.\d{1,2})?$/', $s)) return null;
+    if ((float)$s <= 0) return null;
+    return $s;
 }
 
 /**
@@ -250,7 +276,11 @@ function ensure_finance_schema(PDO $pdo): void {
 }
 ensure_finance_schema($pdo);
 
-$action = $_REQUEST['action'] ?? '';
+// Resolve action from method-specific superglobals (avoid $_REQUEST so
+// cookies and unexpected param sources can't influence routing)
+$action = ($_SERVER['REQUEST_METHOD'] === 'POST')
+    ? (string)($_POST['action'] ?? '')
+    : (string)($_GET['action'] ?? '');
 
 try {
     // ── Analytics: monthly trend + category breakdown + period delta ──────
@@ -438,47 +468,59 @@ try {
         $isCreate = $action === 'txn:create';
         $id = (int)($_POST['id'] ?? 0);
         $txnDate = trim((string)($_POST['txn_date'] ?? ''));
-        $kind = ($_POST['kind'] ?? '') === 'expense' ? 'expense' : 'income';
+        $kindIn = (string)($_POST['kind'] ?? '');
+        if ($kindIn !== 'income' && $kindIn !== 'expense') {
+            echo json_encode(['ok' => false, 'message' => 'ต้องระบุประเภท (รายรับ/รายจ่าย)']); exit;
+        }
+        $kind = $kindIn;
         $catId = (int)($_POST['category_id'] ?? 0) ?: null;
-        $amount = (float)($_POST['amount'] ?? 0);
+        $amount = fin_parse_amount($_POST['amount'] ?? '');
+        if ($amount === null) { echo json_encode(['ok' => false, 'message' => 'จำนวนเงินไม่ถูกต้อง (ต้องเป็นตัวเลข > 0, ทศนิยมไม่เกิน 2)']); exit; }
         $desc = trim((string)($_POST['description'] ?? ''));
         $ref = trim((string)($_POST['reference'] ?? ''));
         $pay = trim((string)($_POST['payment_method'] ?? ''));
         $note = trim((string)($_POST['note'] ?? ''));
 
         if (!$txnDate || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $txnDate)) { echo json_encode(['ok' => false, 'message' => 'รูปแบบวันที่ไม่ถูกต้อง']); exit; }
-        if ($amount <= 0) { echo json_encode(['ok' => false, 'message' => 'จำนวนเงินต้อง > 0']); exit; }
 
         if ($isCreate) {
-            $stmt = $pdo->prepare("INSERT INTO sys_finance_transactions
-                (txn_date, kind, category_id, amount, description, reference, payment_method, note, created_by, updated_by)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-            $stmt->execute([$txnDate, $kind, $catId, $amount, $desc ?: null, $ref ?: null, $pay ?: null, $note ?: null, $adminId ?: null, $adminId ?: null]);
-            $newId = (int)$pdo->lastInsertId();
-            fin_audit_log($pdo, $newId, 'create', [
-                'txn_date' => $txnDate, 'kind' => $kind, 'category_id' => $catId,
-                'amount' => $amount, 'description' => $desc, 'reference' => $ref,
-            ], $adminId, $adminName);
+            $pdo->beginTransaction();
+            try {
+                $stmt = $pdo->prepare("INSERT INTO sys_finance_transactions
+                    (txn_date, kind, category_id, amount, description, reference, payment_method, note, created_by, updated_by)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                $stmt->execute([$txnDate, $kind, $catId, $amount, $desc ?: null, $ref ?: null, $pay ?: null, $note ?: null, $adminId ?: null, $adminId ?: null]);
+                $newId = (int)$pdo->lastInsertId();
+                fin_audit_log($pdo, $newId, 'create', [
+                    'txn_date' => $txnDate, 'kind' => $kind, 'category_id' => $catId,
+                    'amount' => $amount, 'description' => $desc, 'reference' => $ref,
+                ], $adminId, $adminName);
+                $pdo->commit();
+            } catch (Throwable $e) { $pdo->rollBack(); throw $e; }
             echo json_encode(['ok' => true, 'id' => $newId]); exit;
         } else {
             if ($id <= 0) { echo json_encode(['ok' => false, 'message' => 'ไม่ระบุ id']); exit; }
-            // Capture before-state so the audit can diff later
-            $beforeStmt = $pdo->prepare("SELECT txn_date, kind, category_id, amount, description, reference, payment_method, note FROM sys_finance_transactions WHERE id=?");
-            $beforeStmt->execute([$id]);
-            $before = $beforeStmt->fetch(PDO::FETCH_ASSOC) ?: [];
+            $pdo->beginTransaction();
+            try {
+                // Capture before-state so the audit can diff later
+                $beforeStmt = $pdo->prepare("SELECT txn_date, kind, category_id, amount, description, reference, payment_method, note FROM sys_finance_transactions WHERE id=? FOR UPDATE");
+                $beforeStmt->execute([$id]);
+                $before = $beforeStmt->fetch(PDO::FETCH_ASSOC) ?: [];
 
-            $stmt = $pdo->prepare("UPDATE sys_finance_transactions SET txn_date=?, kind=?, category_id=?, amount=?, description=?, reference=?, payment_method=?, note=?, updated_by=? WHERE id=?");
-            $stmt->execute([$txnDate, $kind, $catId, $amount, $desc ?: null, $ref ?: null, $pay ?: null, $note ?: null, $adminId ?: null, $id]);
+                $stmt = $pdo->prepare("UPDATE sys_finance_transactions SET txn_date=?, kind=?, category_id=?, amount=?, description=?, reference=?, payment_method=?, note=?, updated_by=? WHERE id=?");
+                $stmt->execute([$txnDate, $kind, $catId, $amount, $desc ?: null, $ref ?: null, $pay ?: null, $note ?: null, $adminId ?: null, $id]);
 
-            $after = ['txn_date' => $txnDate, 'kind' => $kind, 'category_id' => $catId,
-                      'amount' => $amount, 'description' => $desc, 'reference' => $ref,
-                      'payment_method' => $pay, 'note' => $note];
-            $changes = [];
-            foreach ($after as $k => $v) {
-                $oldV = $before[$k] ?? null;
-                if ((string)$oldV !== (string)$v) $changes[$k] = ['from' => $oldV, 'to' => $v];
-            }
-            if (!empty($changes)) fin_audit_log($pdo, $id, 'update', $changes, $adminId, $adminName);
+                $after = ['txn_date' => $txnDate, 'kind' => $kind, 'category_id' => $catId,
+                          'amount' => $amount, 'description' => $desc, 'reference' => $ref,
+                          'payment_method' => $pay, 'note' => $note];
+                $changes = [];
+                foreach ($after as $k => $v) {
+                    $oldV = $before[$k] ?? null;
+                    if ((string)$oldV !== (string)$v) $changes[$k] = ['from' => $oldV, 'to' => $v];
+                }
+                if (!empty($changes)) fin_audit_log($pdo, $id, 'update', $changes, $adminId, $adminName);
+                $pdo->commit();
+            } catch (Throwable $e) { $pdo->rollBack(); throw $e; }
             echo json_encode(['ok' => true]); exit;
         }
     }
@@ -486,12 +528,16 @@ try {
     if ($action === 'txn:delete') {
         $id = (int)($_POST['id'] ?? 0);
         if ($id <= 0) { echo json_encode(['ok' => false, 'message' => 'ไม่ระบุ id']); exit; }
-        // Snapshot before destroy so the audit row keeps a permanent record
-        $snap = $pdo->prepare("SELECT txn_date, kind, amount, description, reference FROM sys_finance_transactions WHERE id=?");
-        $snap->execute([$id]);
-        $row = $snap->fetch(PDO::FETCH_ASSOC) ?: [];
-        $pdo->prepare("DELETE FROM sys_finance_transactions WHERE id=?")->execute([$id]);
-        fin_audit_log($pdo, $id, 'delete', $row, $adminId, $adminName);
+        $pdo->beginTransaction();
+        try {
+            // Snapshot before destroy so the audit row keeps a permanent record
+            $snap = $pdo->prepare("SELECT txn_date, kind, amount, description, reference FROM sys_finance_transactions WHERE id=? FOR UPDATE");
+            $snap->execute([$id]);
+            $row = $snap->fetch(PDO::FETCH_ASSOC) ?: [];
+            $pdo->prepare("DELETE FROM sys_finance_transactions WHERE id=?")->execute([$id]);
+            fin_audit_log($pdo, $id, 'delete', $row, $adminId, $adminName);
+            $pdo->commit();
+        } catch (Throwable $e) { $pdo->rollBack(); throw $e; }
         echo json_encode(['ok' => true]); exit;
     }
 
@@ -506,18 +552,23 @@ try {
         if (count($ids) > 500) { echo json_encode(['ok' => false, 'message' => 'ลบครั้งละไม่เกิน 500 รายการ']); exit; }
 
         $placeholders = implode(',', array_fill(0, count($ids), '?'));
-        // Snapshot each row before delete so audit retains a record
-        $snapStmt = $pdo->prepare("SELECT id, txn_date, kind, amount, description, reference FROM sys_finance_transactions WHERE id IN ({$placeholders})");
-        $snapStmt->execute($ids);
-        $snaps = [];
-        foreach ($snapStmt->fetchAll(PDO::FETCH_ASSOC) as $r) $snaps[(int)$r['id']] = $r;
+        $pdo->beginTransaction();
+        try {
+            // Snapshot each row before delete so audit retains a record
+            $snapStmt = $pdo->prepare("SELECT id, txn_date, kind, amount, description, reference FROM sys_finance_transactions WHERE id IN ({$placeholders}) FOR UPDATE");
+            $snapStmt->execute($ids);
+            $snaps = [];
+            foreach ($snapStmt->fetchAll(PDO::FETCH_ASSOC) as $r) $snaps[(int)$r['id']] = $r;
 
-        $stmt = $pdo->prepare("DELETE FROM sys_finance_transactions WHERE id IN ({$placeholders})");
-        $stmt->execute($ids);
-        foreach ($ids as $delId) {
-            fin_audit_log($pdo, $delId, 'bulk_delete', $snaps[$delId] ?? null, $adminId, $adminName);
-        }
-        echo json_encode(['ok' => true, 'deleted' => $stmt->rowCount()]); exit;
+            $stmt = $pdo->prepare("DELETE FROM sys_finance_transactions WHERE id IN ({$placeholders})");
+            $stmt->execute($ids);
+            $deleted = $stmt->rowCount();
+            foreach ($ids as $delId) {
+                fin_audit_log($pdo, $delId, 'bulk_delete', $snaps[$delId] ?? null, $adminId, $adminName);
+            }
+            $pdo->commit();
+        } catch (Throwable $e) { $pdo->rollBack(); throw $e; }
+        echo json_encode(['ok' => true, 'deleted' => $deleted]); exit;
     }
 
     // Duplicate-detection probe — non-destructive lookup before user confirms create
@@ -563,15 +614,19 @@ try {
         if (!in_array($srcMod, $ALLOWED_SOURCES, true)) {
             echo json_encode(['ok' => false, 'message' => 'source_module ไม่ได้รับอนุญาต']); exit;
         }
-        $kind   = ($_POST['kind'] ?? 'expense') === 'income' ? 'income' : 'expense';
-        $amount = (float)($_POST['amount'] ?? 0);
+        $kindIn = (string)($_POST['kind'] ?? '');
+        if ($kindIn !== 'income' && $kindIn !== 'expense') {
+            echo json_encode(['ok' => false, 'message' => 'ต้องระบุ kind = income หรือ expense']); exit;
+        }
+        $kind = $kindIn;
+        $amount = fin_parse_amount($_POST['amount'] ?? '');
         $txnDate = trim((string)($_POST['txn_date'] ?? date('Y-m-d')));
         $desc   = trim((string)($_POST['description'] ?? ''));
         $catName = trim((string)($_POST['category_name'] ?? ''));
         $note   = trim((string)($_POST['note'] ?? ''));
 
         if ($srcMod === '' || $srcId === '') { echo json_encode(['ok' => false, 'message' => 'ต้องระบุ source_module + source_id']); exit; }
-        if ($amount <= 0) { echo json_encode(['ok' => false, 'message' => 'จำนวนเงินต้อง > 0']); exit; }
+        if ($amount === null) { echo json_encode(['ok' => false, 'message' => 'จำนวนเงินไม่ถูกต้อง']); exit; }
         if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $txnDate)) { echo json_encode(['ok' => false, 'message' => 'รูปแบบวันที่ไม่ถูกต้อง']); exit; }
 
         // หา category_id จากชื่อ
@@ -673,14 +728,18 @@ try {
         $isCreate = $action === 'recurring:create';
         $id     = (int)($_POST['id'] ?? 0);
         $name   = trim((string)($_POST['name'] ?? ''));
-        $kind   = ($_POST['kind'] ?? 'expense') === 'income' ? 'income' : 'expense';
+        $kindIn = (string)($_POST['kind'] ?? '');
+        if ($kindIn !== 'income' && $kindIn !== 'expense') {
+            echo json_encode(['ok'=>false,'message'=>'ต้องระบุประเภท (รายรับ/รายจ่าย)']); exit;
+        }
+        $kind = $kindIn;
         $catId  = (int)($_POST['category_id'] ?? 0) ?: null;
-        $amount = (float)($_POST['amount'] ?? 0);
+        $amount = fin_parse_amount($_POST['amount'] ?? '');
         $desc   = trim((string)($_POST['description'] ?? ''));
         $pay    = trim((string)($_POST['payment_method'] ?? ''));
         $day    = max(1, min(28, (int)($_POST['day_of_month'] ?? 1))); // cap at 28 to dodge Feb edge cases
         if ($name === '') { echo json_encode(['ok'=>false,'message'=>'ระบุชื่อรายการ']); exit; }
-        if ($amount <= 0) { echo json_encode(['ok'=>false,'message'=>'จำนวนเงินต้อง > 0']); exit; }
+        if ($amount === null) { echo json_encode(['ok'=>false,'message'=>'จำนวนเงินไม่ถูกต้อง']); exit; }
 
         if ($isCreate) {
             $stmt = $pdo->prepare("INSERT INTO sys_finance_recurring
@@ -747,7 +806,7 @@ try {
 
     // ── Audit log (read-only) ─────────────────────────────────────
     if ($action === 'audit:list') {
-        $txnId = (int)($_REQUEST['txn_id'] ?? 0);
+        $txnId = (int)($_GET['txn_id'] ?? $_POST['txn_id'] ?? 0);
         if ($txnId <= 0) { echo json_encode(['ok'=>false,'message'=>'ไม่ระบุ txn_id']); exit; }
         $stmt = $pdo->prepare("SELECT id, action, changes_json, performed_by, performed_by_name, performed_at, ip_addr
             FROM sys_finance_audit WHERE txn_id=? ORDER BY performed_at DESC, id DESC LIMIT 100");
@@ -757,7 +816,7 @@ try {
 
     // ── Attachments ───────────────────────────────────────────────
     if ($action === 'attachment:list') {
-        $txnId = (int)($_REQUEST['txn_id'] ?? 0);
+        $txnId = (int)($_GET['txn_id'] ?? $_POST['txn_id'] ?? 0);
         if ($txnId <= 0) { echo json_encode(['ok'=>false,'message'=>'ไม่ระบุ txn_id']); exit; }
         $stmt = $pdo->prepare("SELECT id, stored_name, original_name, mime_type, size_bytes, uploaded_at
             FROM sys_finance_attachments WHERE txn_id=? ORDER BY uploaded_at DESC");
@@ -819,14 +878,26 @@ try {
             echo json_encode(['ok'=>false,'message'=>'ย้ายไฟล์ไม่สำเร็จ']); exit;
         }
 
+        // DB row + audit in a single transaction. If anything fails after
+        // the file has been moved into place we unlink to avoid orphans.
         $relStored = $rel . '/' . $stored;
-        $pdo->prepare("INSERT INTO sys_finance_attachments
-            (txn_id, stored_name, original_name, mime_type, size_bytes, uploaded_by)
-            VALUES (?, ?, ?, ?, ?, ?)")
-            ->execute([$txnId, $relStored, $orig, $mime, (int)$f['size'], $adminId ?: null]);
-
-        fin_audit_log($pdo, $txnId, 'attach_add', ['file' => $orig, 'size' => (int)$f['size']], $adminId, $adminName);
-        echo json_encode(['ok' => true, 'id' => (int)$pdo->lastInsertId(), 'stored_name' => $relStored, 'original_name' => $orig]); exit;
+        $pdo->beginTransaction();
+        try {
+            $pdo->prepare("INSERT INTO sys_finance_attachments
+                (txn_id, stored_name, original_name, mime_type, size_bytes, uploaded_by)
+                VALUES (?, ?, ?, ?, ?, ?)")
+                ->execute([$txnId, $relStored, $orig, $mime, (int)$f['size'], $adminId ?: null]);
+            $attachId = (int)$pdo->lastInsertId();
+            fin_audit_log($pdo, $txnId, 'attach_add', [
+                'attachment_id' => $attachId, 'file' => $orig, 'size' => (int)$f['size'],
+            ], $adminId, $adminName);
+            $pdo->commit();
+        } catch (Throwable $e) {
+            $pdo->rollBack();
+            @unlink($dest);
+            throw $e;
+        }
+        echo json_encode(['ok' => true, 'id' => $attachId, 'stored_name' => $relStored, 'original_name' => $orig]); exit;
     }
 
     if ($action === 'attachment:delete') {
@@ -847,13 +918,19 @@ try {
         // tampering (defense-in-depth — stored_name is server-generated)
         $financeRoot = realpath(__DIR__ . '/../uploads/finance');
         $abs = realpath(__DIR__ . '/../' . $att['stored_name']);
+        $pdo->beginTransaction();
+        try {
+            $pdo->prepare("DELETE FROM sys_finance_attachments WHERE id=?")->execute([$id]);
+            fin_audit_log($pdo, (int)$att['txn_id'], 'attach_remove', [
+                'attachment_id' => $id, 'file' => $att['original_name'],
+            ], $adminId, $adminName);
+            $pdo->commit();
+        } catch (Throwable $e) { $pdo->rollBack(); throw $e; }
+        // Unlink only after DB commit succeeds — otherwise a rollback would
+        // leave the row pointing at a deleted file.
         if ($financeRoot && $abs && str_starts_with($abs, $financeRoot . DIRECTORY_SEPARATOR) && is_file($abs)) {
             @unlink($abs);
         }
-        $pdo->prepare("DELETE FROM sys_finance_attachments WHERE id=?")->execute([$id]);
-        fin_audit_log($pdo, (int)$att['txn_id'], 'attach_remove', [
-            'attachment_id' => $id, 'file' => $att['original_name'],
-        ], $adminId, $adminName);
         echo json_encode(['ok' => true]); exit;
     }
 
@@ -861,7 +938,11 @@ try {
         $isCreate = $action === 'category:create';
         $id = (int)($_POST['id'] ?? 0);
         $name = trim((string)($_POST['name'] ?? ''));
-        $kind = ($_POST['kind'] ?? '') === 'expense' ? 'expense' : 'income';
+        $kindIn = (string)($_POST['kind'] ?? '');
+        if ($kindIn !== 'income' && $kindIn !== 'expense') {
+            echo json_encode(['ok' => false, 'message' => 'ต้องระบุประเภทหมวด (รายรับ/รายจ่าย)']); exit;
+        }
+        $kind = $kindIn;
         $icon = trim((string)($_POST['icon'] ?? 'fa-circle'));
         $color = trim((string)($_POST['color'] ?? '#64748b'));
         $sortOrder = (int)($_POST['sort_order'] ?? 0);
