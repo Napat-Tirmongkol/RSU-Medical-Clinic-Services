@@ -19,15 +19,18 @@ Stack: PHP 8 + MySQL (PDO singleton) · Tailwind compiled CSS (no JIT) · vanill
 ## สถานะปัจจุบัน (พฤษภาคม 2026)
 
 ### Phase ที่จบล่าสุด
+- **Nurse Productivity (OPD)** — multi-tenant per `sys_departments` · 3-tab UI (Dashboard/Entry/Settings) · daily/monthly/yearly views · period delta · cross-dept comparison · Excel I/O (PhpSpreadsheet) · A4 print · auto-derive RN/หัวหน้า จาก `sys_nurse_schedule_monthly` เมื่อช่องว่าง · 7-spot access flag `access_nurse_productivity` ครบ
+- **Context Persistence** — `hot.md` + `AI/` folder (logs/knowledge/scratch)
 - **Finance / Cash Book** ครบ 3 phase (A: search/quick-dates/CSV/bulk · B: chart/donut/period delta · C: recurring/attachments/audit log) + dark mode pass สมบูรณ์
 - **Bold & Colorful redesign** — sidebar section accents, rainbow header strip, hover micro-interactions (`--lift` var pattern), `RsuFx` library (counters/tilt/skeleton)
 - **e_Borrow shell skin** — portal-matching glassmorphism + finance bridge สำหรับค่าปรับ → Cash Book
 - **Inventory shared locations** — `asset/admin/manage_locations.php` ใช้ร่วมกันระหว่าง asset + consumables
 
 ### กำลังทำอยู่
-- *(เติมเมื่อเริ่ม task ใหม่ — เช่น "กำลังรอ user test Finance Phase C")*
+- รอ migration `database/migrations/migrate_nurse_productivity.php` รันใน production · user test Nurse Productivity module · ผูก position พยาบาลใน sys_staff_positions ให้ติด flag `access_nurse_productivity` อัตโนมัติ
 
 ### Decision ล่าสุดที่ต้องจำ
+- **Nurse Productivity → Schedule integration**: ตอน save daily ถ้าช่อง RN/หัวหน้าว่าง → derive จาก `sys_nurse_schedule_monthly` + `sys_nurse_schedule_global.nurses_json` แล้ว stamp `rn_source='schedule'`/`head_source='schedule'`. Position mapping: `พยาบาลวิชาชีพ` → RN, `หัวหน้าหอผู้ป่วย`/`รองหัวหน้าหอผู้ป่วย`/`พยาบาลหัวหน้าเวร` → head. Schedule เป็น singleton ใช้ร่วมทุก dept (ตามการตัดสินใจ)
 - **Gemini model** ใช้ `gemini-2.5-flash` (primary) เท่านั้น — 1.5/2.0 ใกล้ deprecate
 - **Modal pattern** ใช้ Portal-Escape (teleport ไป `<body>` + z-index ≥ 9000) ทุกครั้งที่ modal อาจติด ancestor stacking context — reference: `portal/_partials/gold_card.php`
 - **Cross-module finance sync** ห้ามเรียก `portal/ajax_finance.php` ตรงจาก sub-module → ใช้ bridge `e_Borrow/admin/ajax_finance_sync.php` pattern เสมอ
