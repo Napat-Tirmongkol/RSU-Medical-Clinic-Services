@@ -582,7 +582,7 @@ try {
     if ($action === 'txn:assign_receipt') {
         $id = (int)($_POST['id'] ?? 0);
         if ($id <= 0) { echo json_encode(['ok' => false, 'message' => 'ไม่ระบุ id']); exit; }
-        // ถ้ามี receipt_no แล้ว → คืนค่าเดิม
+        // ถ้ามี receipt_no แล้ว → คืนค่าเดิม (อ่านนอก transaction ก่อน — เร็วกว่า)
         $existing = $pdo->prepare("SELECT receipt_no, kind, txn_date FROM sys_finance_transactions WHERE id=?");
         $existing->execute([$id]);
         $row = $existing->fetch(PDO::FETCH_ASSOC);
@@ -591,15 +591,25 @@ try {
 
         $prefix = ($row['kind'] === 'income') ? 'RCP' : 'PV'; // RCP=ใบเสร็จรับ, PV=ใบสำคัญจ่าย
         $yearBE = (int)date('Y', strtotime($row['txn_date'])) + 543;
-        // หา max running number ของ prefix+year นั้น
         $like = $prefix . '-' . $yearBE . '-%';
-        $maxStmt = $pdo->prepare("SELECT MAX(CAST(SUBSTRING(receipt_no, " . (strlen($prefix) + 7) . ") AS UNSIGNED)) AS m
-            FROM sys_finance_transactions WHERE receipt_no LIKE ?");
-        $maxStmt->execute([$like]);
-        $next = ((int)$maxStmt->fetchColumn()) + 1;
-        $receiptNo = sprintf('%s-%d-%06d', $prefix, $yearBE, $next);
-        $pdo->prepare("UPDATE sys_finance_transactions SET receipt_no=?, updated_by=? WHERE id=?")
-            ->execute([$receiptNo, $adminId ?: null, $id]);
+
+        // Atomic running-number: lock the rows that match the prefix+year
+        // with FOR UPDATE so concurrent assigns can't read the same MAX.
+        $pdo->beginTransaction();
+        try {
+            $maxStmt = $pdo->prepare("SELECT MAX(CAST(SUBSTRING(receipt_no, " . (strlen($prefix) + 7) . ") AS UNSIGNED)) AS m
+                FROM sys_finance_transactions WHERE receipt_no LIKE ? FOR UPDATE");
+            $maxStmt->execute([$like]);
+            $next = ((int)$maxStmt->fetchColumn()) + 1;
+            $receiptNo = sprintf('%s-%d-%06d', $prefix, $yearBE, $next);
+            $pdo->prepare("UPDATE sys_finance_transactions SET receipt_no=?, updated_by=? WHERE id=? AND (receipt_no IS NULL OR receipt_no='')")
+                ->execute([$receiptNo, $adminId ?: null, $id]);
+            $pdo->commit();
+        } catch (Throwable $e) {
+            $pdo->rollBack();
+            throw $e;
+        }
+        fin_audit_log($pdo, $id, 'assign_receipt', ['receipt_no' => $receiptNo], $adminId, $adminName);
         echo json_encode(['ok' => true, 'receipt_no' => $receiptNo]); exit;
     }
 
@@ -631,11 +641,28 @@ try {
                 (name, kind, category_id, amount, description, payment_method, day_of_month, active, created_by)
                 VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)");
             $stmt->execute([$name, $kind, $catId, $amount, $desc ?: null, $pay ?: null, $day, $adminId ?: null]);
-            echo json_encode(['ok' => true, 'id' => (int)$pdo->lastInsertId()]); exit;
+            $newId = (int)$pdo->lastInsertId();
+            fin_audit_log($pdo, 0, 'recurring:create', [
+                'recurring_id' => $newId, 'name' => $name, 'kind' => $kind,
+                'category_id' => $catId, 'amount' => $amount, 'day_of_month' => $day,
+            ], $adminId, $adminName);
+            echo json_encode(['ok' => true, 'id' => $newId]); exit;
         }
         if ($id <= 0) { echo json_encode(['ok'=>false,'message'=>'ไม่ระบุ id']); exit; }
+        // Snapshot before-state for audit diff
+        $beforeStmt = $pdo->prepare("SELECT name, kind, category_id, amount, description, payment_method, day_of_month FROM sys_finance_recurring WHERE id=?");
+        $beforeStmt->execute([$id]);
+        $before = $beforeStmt->fetch(PDO::FETCH_ASSOC) ?: [];
         $stmt = $pdo->prepare("UPDATE sys_finance_recurring SET name=?, kind=?, category_id=?, amount=?, description=?, payment_method=?, day_of_month=? WHERE id=?");
         $stmt->execute([$name, $kind, $catId, $amount, $desc ?: null, $pay ?: null, $day, $id]);
+        $after = ['name'=>$name,'kind'=>$kind,'category_id'=>$catId,'amount'=>$amount,
+                  'description'=>$desc,'payment_method'=>$pay,'day_of_month'=>$day];
+        $changes = ['recurring_id' => $id];
+        foreach ($after as $k => $v) {
+            $oldV = $before[$k] ?? null;
+            if ((string)$oldV !== (string)$v) $changes[$k] = ['from' => $oldV, 'to' => $v];
+        }
+        fin_audit_log($pdo, 0, 'recurring:update', $changes, $adminId, $adminName);
         echo json_encode(['ok' => true]); exit;
     }
 
@@ -643,13 +670,21 @@ try {
         $id = (int)($_POST['id'] ?? 0);
         if ($id <= 0) { echo json_encode(['ok'=>false,'message'=>'ไม่ระบุ id']); exit; }
         $pdo->prepare("UPDATE sys_finance_recurring SET active = 1 - active WHERE id=?")->execute([$id]);
+        $newState = $pdo->prepare("SELECT active FROM sys_finance_recurring WHERE id=?");
+        $newState->execute([$id]);
+        $isActive = (int)$newState->fetchColumn();
+        fin_audit_log($pdo, 0, 'recurring:toggle', ['recurring_id' => $id, 'active' => $isActive], $adminId, $adminName);
         echo json_encode(['ok' => true]); exit;
     }
 
     if ($action === 'recurring:delete') {
         $id = (int)($_POST['id'] ?? 0);
         if ($id <= 0) { echo json_encode(['ok'=>false,'message'=>'ไม่ระบุ id']); exit; }
+        $snap = $pdo->prepare("SELECT name, kind, category_id, amount, day_of_month FROM sys_finance_recurring WHERE id=?");
+        $snap->execute([$id]);
+        $row = $snap->fetch(PDO::FETCH_ASSOC) ?: [];
         $pdo->prepare("DELETE FROM sys_finance_recurring WHERE id=?")->execute([$id]);
+        fin_audit_log($pdo, 0, 'recurring:delete', ['recurring_id' => $id] + $row, $adminId, $adminName);
         echo json_encode(['ok' => true]); exit;
     }
 
@@ -660,6 +695,7 @@ try {
         if ($id <= 0) { echo json_encode(['ok'=>false,'message'=>'ไม่ระบุ id']); exit; }
         $pdo->prepare("UPDATE sys_finance_recurring SET last_generated_ym=NULL WHERE id=?")->execute([$id]);
         $n = fin_run_recurring($pdo, $adminId, $adminName);
+        fin_audit_log($pdo, 0, 'recurring:run', ['recurring_id' => $id, 'generated' => $n], $adminId, $adminName);
         echo json_encode(['ok' => true, 'generated' => $n]); exit;
     }
 
@@ -686,20 +722,38 @@ try {
     if ($action === 'attachment:upload') {
         $txnId = (int)($_POST['txn_id'] ?? 0);
         if ($txnId <= 0) { echo json_encode(['ok'=>false,'message'=>'ไม่ระบุ txn_id']); exit; }
+        // Validate txn_id exists — prevents orphan attachments
+        $txnEx = $pdo->prepare("SELECT 1 FROM sys_finance_transactions WHERE id=?");
+        $txnEx->execute([$txnId]);
+        if (!$txnEx->fetchColumn()) { echo json_encode(['ok'=>false,'message'=>'ไม่พบรายการ']); exit; }
         if (empty($_FILES['file']) || $_FILES['file']['error'] !== UPLOAD_ERR_OK) {
             echo json_encode(['ok'=>false,'message'=>'อัปโหลดไฟล์ไม่สำเร็จ']); exit;
         }
         $f = $_FILES['file'];
         if ($f['size'] > 8 * 1024 * 1024) { echo json_encode(['ok'=>false,'message'=>'ไฟล์ใหญ่เกิน 8MB']); exit; }
-        $allowedMimes = ['image/jpeg','image/png','image/webp','image/gif','application/pdf'];
+        // Verify MIME + lock extension to canonical form from MIME (defeats
+        // polyglot uploads like shell.php.jpg even if Apache handler misconfig)
+        $mimeExtMap = [
+            'image/jpeg'      => 'jpg',
+            'image/png'       => 'png',
+            'image/webp'      => 'webp',
+            'image/gif'       => 'gif',
+            'application/pdf' => 'pdf',
+        ];
         $mime = mime_content_type($f['tmp_name']) ?: $f['type'];
-        if (!in_array($mime, $allowedMimes, true)) {
+        if (!isset($mimeExtMap[$mime])) {
             echo json_encode(['ok'=>false,'message'=>'รองรับเฉพาะ JPG/PNG/WEBP/GIF/PDF']); exit;
         }
-        // Sanitize original name; store with hashed filename for safety
+        $userExt = strtolower(pathinfo($f['name'], PATHINFO_EXTENSION));
+        $canonicalExt = $mimeExtMap[$mime];
+        // Allow common alias (jpeg ↔ jpg); otherwise extension must match MIME
+        $aliases = ['jpg' => ['jpg','jpeg'], 'png' => ['png'], 'webp' => ['webp'], 'gif' => ['gif'], 'pdf' => ['pdf']];
+        if (!in_array($userExt, $aliases[$canonicalExt], true)) {
+            echo json_encode(['ok'=>false,'message'=>'นามสกุลไฟล์ไม่ตรงกับชนิดไฟล์']); exit;
+        }
+        // Sanitize original name; store with hashed filename + canonical ext
         $orig = preg_replace('/[^\w.\-\x{0E00}-\x{0E7F}]+/u', '_', $f['name']);
-        $ext  = strtolower(pathinfo($orig, PATHINFO_EXTENSION));
-        $stored = bin2hex(random_bytes(12)) . ($ext ? ".{$ext}" : '');
+        $stored = bin2hex(random_bytes(12)) . '.' . $canonicalExt;
 
         // Storage path: uploads/finance/{YYYY}/{MM}/
         $rel = sprintf('uploads/finance/%s/%s', date('Y'), date('m'));
@@ -733,14 +787,28 @@ try {
     if ($action === 'attachment:delete') {
         $id = (int)($_POST['id'] ?? 0);
         if ($id <= 0) { echo json_encode(['ok'=>false,'message'=>'ไม่ระบุ id']); exit; }
-        $sel = $pdo->prepare("SELECT txn_id, stored_name, original_name FROM sys_finance_attachments WHERE id=?");
+        $sel = $pdo->prepare("SELECT txn_id, stored_name, original_name, uploaded_by FROM sys_finance_attachments WHERE id=?");
         $sel->execute([$id]);
         $att = $sel->fetch(PDO::FETCH_ASSOC);
         if (!$att) { echo json_encode(['ok'=>false,'message'=>'ไม่พบไฟล์']); exit; }
-        $abs = __DIR__ . '/../' . $att['stored_name'];
-        if (is_file($abs)) @unlink($abs);
+        // Only the uploader, admin, or superadmin can delete an attachment —
+        // an editor with access_finance cannot remove someone else's evidence.
+        $isAdminRole = $isSuper || ($adminRole === 'admin');
+        $isUploader  = ((int)$att['uploaded_by'] > 0) && ((int)$att['uploaded_by'] === $adminId);
+        if (!$isAdminRole && !$isUploader) {
+            echo json_encode(['ok'=>false,'message'=>'ไม่มีสิทธิ์ลบไฟล์แนบของผู้อื่น']); exit;
+        }
+        // Constrain unlink path to uploads/finance/ to defeat any stored-name
+        // tampering (defense-in-depth — stored_name is server-generated)
+        $financeRoot = realpath(__DIR__ . '/../uploads/finance');
+        $abs = realpath(__DIR__ . '/../' . $att['stored_name']);
+        if ($financeRoot && $abs && str_starts_with($abs, $financeRoot . DIRECTORY_SEPARATOR) && is_file($abs)) {
+            @unlink($abs);
+        }
         $pdo->prepare("DELETE FROM sys_finance_attachments WHERE id=?")->execute([$id]);
-        fin_audit_log($pdo, (int)$att['txn_id'], 'attach_remove', ['file' => $att['original_name']], $adminId, $adminName);
+        fin_audit_log($pdo, (int)$att['txn_id'], 'attach_remove', [
+            'attachment_id' => $id, 'file' => $att['original_name'],
+        ], $adminId, $adminName);
         echo json_encode(['ok' => true]); exit;
     }
 
@@ -762,11 +830,26 @@ try {
                 if ((int)$e->errorInfo[1] === 1062) { echo json_encode(['ok' => false, 'message' => 'ชื่อหมวดซ้ำในประเภทเดียวกัน']); exit; }
                 throw $e;
             }
-            echo json_encode(['ok' => true, 'id' => (int)$pdo->lastInsertId()]); exit;
+            $newId = (int)$pdo->lastInsertId();
+            fin_audit_log($pdo, 0, 'category:create', [
+                'category_id' => $newId, 'name' => $name, 'kind' => $kind,
+                'icon' => $icon, 'color' => $color, 'sort_order' => $sortOrder,
+            ], $adminId, $adminName);
+            echo json_encode(['ok' => true, 'id' => $newId]); exit;
         } else {
             if ($id <= 0) { echo json_encode(['ok' => false, 'message' => 'ไม่ระบุ id']); exit; }
+            $beforeStmt = $pdo->prepare("SELECT name, kind, icon, color, sort_order FROM sys_finance_categories WHERE id=?");
+            $beforeStmt->execute([$id]);
+            $before = $beforeStmt->fetch(PDO::FETCH_ASSOC) ?: [];
             $pdo->prepare("UPDATE sys_finance_categories SET name=?, kind=?, icon=?, color=?, sort_order=? WHERE id=?")
                 ->execute([$name, $kind, $icon, $color, $sortOrder, $id]);
+            $after = ['name'=>$name,'kind'=>$kind,'icon'=>$icon,'color'=>$color,'sort_order'=>$sortOrder];
+            $changes = ['category_id' => $id];
+            foreach ($after as $k => $v) {
+                $oldV = $before[$k] ?? null;
+                if ((string)$oldV !== (string)$v) $changes[$k] = ['from' => $oldV, 'to' => $v];
+            }
+            fin_audit_log($pdo, 0, 'category:update', $changes, $adminId, $adminName);
             echo json_encode(['ok' => true]); exit;
         }
     }
@@ -775,6 +858,10 @@ try {
         $id = (int)($_POST['id'] ?? 0);
         if ($id <= 0) { echo json_encode(['ok' => false, 'message' => 'ไม่ระบุ id']); exit; }
         $pdo->prepare("UPDATE sys_finance_categories SET is_active = 1 - is_active WHERE id=?")->execute([$id]);
+        $newState = $pdo->prepare("SELECT is_active FROM sys_finance_categories WHERE id=?");
+        $newState->execute([$id]);
+        $isActive = (int)$newState->fetchColumn();
+        fin_audit_log($pdo, 0, 'category:toggle', ['category_id' => $id, 'is_active' => $isActive], $adminId, $adminName);
         echo json_encode(['ok' => true]); exit;
     }
 
@@ -785,7 +872,11 @@ try {
         $usedStmt->execute([$id]);
         $used = (int)$usedStmt->fetchColumn();
         if ($used > 0) { echo json_encode(['ok' => false, 'message' => "มีรายการใช้หมวดนี้อยู่ {$used} รายการ — ลบไม่ได้"]); exit; }
+        $snap = $pdo->prepare("SELECT name, kind FROM sys_finance_categories WHERE id=?");
+        $snap->execute([$id]);
+        $row = $snap->fetch(PDO::FETCH_ASSOC) ?: [];
         $pdo->prepare("DELETE FROM sys_finance_categories WHERE id=?")->execute([$id]);
+        fin_audit_log($pdo, 0, 'category:delete', ['category_id' => $id] + $row, $adminId, $adminName);
         echo json_encode(['ok' => true]); exit;
     }
 
