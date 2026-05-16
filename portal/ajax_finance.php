@@ -5,6 +5,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/includes/auth.php';
+require_once __DIR__ . '/includes/finance_link.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -38,6 +39,39 @@ function fin_audit_log(PDO $pdo, int $txnId, string $action, ?array $changes, ?i
     } catch (Throwable $e) {
         error_log('[fin_audit_log] ' . $e->getMessage());
     }
+}
+
+/**
+ * Drop a deny-all .htaccess and an empty index.html into the given dir.
+ * Idempotent — skips files that already exist. Belt-and-braces against:
+ *  - direct URL access to a receipt (Apache should refuse)
+ *  - Apache misconfig that would otherwise execute uploaded .php
+ *  - directory listing of the uploads tree
+ * Note: .htaccess is a no-op under Nginx. The real defense for Nginx is
+ * to keep all attachment access behind finance_attachment.php; the deny
+ * file is still useful on Apache and as a defense-in-depth marker.
+ */
+function fin_harden_upload_dir(string $absDir): void
+{
+    if (!is_dir($absDir)) return;
+    $ht = $absDir . '/.htaccess';
+    if (!file_exists($ht)) {
+        @file_put_contents($ht,
+            "# Deny direct access — finance attachments are sensitive.\n" .
+            "# All access must go through finance_attachment.php (auth-gated).\n" .
+            "Order deny,allow\nDeny from all\n# Apache 2.4+\nRequire all denied\n\n" .
+            "# Defence-in-depth: block any kind of script execution even if\n" .
+            "# Apache is misconfigured to hand uploaded files to a PHP handler.\n" .
+            "RemoveHandler .php .php3 .php4 .php5 .php7 .phtml .phps\n" .
+            "RemoveType .php .php3 .php4 .php5 .php7 .phtml .phps\n" .
+            "AddType text/plain .php .php3 .php4 .php5 .php7 .phtml .phps\n" .
+            "<IfModule mod_php.c>\nphp_flag engine off\n</IfModule>\n" .
+            "<IfModule mod_php7.c>\nphp_flag engine off\n</IfModule>\n" .
+            "Options -Indexes -ExecCGI\n"
+        );
+    }
+    $idx = $absDir . '/index.html';
+    if (!file_exists($idx)) @file_put_contents($idx, '');
 }
 
 /**
@@ -204,6 +238,14 @@ function ensure_finance_schema(PDO $pdo): void {
             KEY idx_time (performed_at)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
     } catch (PDOException $e) { error_log('[finance] schema: ' . $e->getMessage()); }
+
+    // Proactively harden the upload root so direct URL access is blocked
+    // even before any file has been uploaded (used to be lazy on first
+    // upload — that left a window where the dir was world-readable).
+    $financeRoot = __DIR__ . '/../uploads/finance';
+    if (!is_dir($financeRoot)) @mkdir($financeRoot, 0775, true);
+    fin_harden_upload_dir($financeRoot);
+
     $done = true;
 }
 ensure_finance_schema($pdo);
@@ -353,6 +395,10 @@ try {
         // หมายเหตุ: t.* รวม receipt_no, source_module, source_id ที่เพิ่งเพิ่มแล้ว
         $stmt->execute($params);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        // Sign each row's id so the print link in the partial cannot be
+        // enumerated by editing ?id=N in the address bar.
+        foreach ($rows as &$r) { $r['receipt_sig'] = fin_receipt_sig((int)$r['id']); }
+        unset($r);
 
         // Summary in same date range (ignore kind/category filter for summary totals)
         $sumStmt = $pdo->prepare("SELECT
@@ -761,14 +807,13 @@ try {
         if (!is_dir($abs) && !mkdir($abs, 0775, true) && !is_dir($abs)) {
             echo json_encode(['ok'=>false,'message'=>'สร้างโฟลเดอร์อัปโหลดไม่ได้']); exit;
         }
-        // Drop a deny-all .htaccess at the finance root so even if the path
-        // is guessed, Apache won't serve the file directly — all access has
-        // to go through finance_attachment.php (which enforces auth).
-        $financeRoot = __DIR__ . '/../uploads/finance';
-        $htaccess = $financeRoot . '/.htaccess';
-        if (!file_exists($htaccess) && is_dir($financeRoot)) {
-            @file_put_contents($htaccess, "Order deny,allow\nDeny from all\n# Apache 2.4+\nRequire all denied\n");
-        }
+        // Harden every directory along the path — root + year + month — so
+        // every level has its own deny-all .htaccess and empty index.html.
+        // Re-running is cheap (idempotent) and survives a manual `rmdir`.
+        $rootDir = __DIR__ . '/../uploads/finance';
+        fin_harden_upload_dir($rootDir);
+        fin_harden_upload_dir($rootDir . '/' . date('Y'));
+        fin_harden_upload_dir($abs);
         $dest = $abs . '/' . $stored;
         if (!move_uploaded_file($f['tmp_name'], $dest)) {
             echo json_encode(['ok'=>false,'message'=>'ย้ายไฟล์ไม่สำเร็จ']); exit;

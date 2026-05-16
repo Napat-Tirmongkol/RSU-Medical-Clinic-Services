@@ -1,10 +1,13 @@
 <?php
 // portal/finance_receipt.php — print-friendly receipt page
-// Usage: portal/finance_receipt.php?id=NN
+// Usage: portal/finance_receipt.php?id=NN&sig=HMAC
+//   sig is generated server-side in the list response (fin_receipt_sig).
+//   Editor-role users must present a matching sig; admin/superadmin bypass.
 declare(strict_types=1);
 
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/includes/auth.php';
+require_once __DIR__ . '/includes/finance_link.php';
 
 $adminRole = $_SESSION['admin_role'] ?? 'editor';
 $isSuper = ($adminRole === 'superadmin');
@@ -15,8 +18,17 @@ if (!$canFinance) {
 }
 
 $pdo = db();
-$id = (int)($_GET['id'] ?? 0);
+$id  = (int)($_GET['id'] ?? 0);
+$sig = (string)($_GET['sig'] ?? '');
 if ($id <= 0) { http_response_code(400); exit('ไม่ระบุ id'); }
+// Signature required for editor-level users to defeat id enumeration.
+// Admin/superadmin can still hit the URL without sig (back-office tooling
+// and admin-built links that pre-date signed URLs).
+$isAdminRole = $isSuper || ($adminRole === 'admin');
+if (!fin_receipt_verify($id, $sig) && !$isAdminRole) {
+    http_response_code(403);
+    exit('ลิงก์ไม่ถูกต้องหรือหมดอายุ');
+}
 
 $stmt = $pdo->prepare("SELECT t.*, c.name AS category_name, c.icon AS category_icon, c.color AS category_color
     FROM sys_finance_transactions t LEFT JOIN sys_finance_categories c ON c.id = t.category_id
@@ -25,18 +37,30 @@ $stmt->execute([$id]);
 $row = $stmt->fetch(PDO::FETCH_ASSOC);
 if (!$row) { http_response_code(404); exit('ไม่พบรายการ'); }
 
-// Auto-assign receipt no ถ้ายังไม่มี (atomic)
+// Auto-assign receipt no ถ้ายังไม่มี (atomic — FOR UPDATE locks the
+// matching prefix+year rows so concurrent receipt pages can't allocate
+// the same running number)
 if (empty($row['receipt_no'])) {
     $prefix = ($row['kind'] === 'income') ? 'RCP' : 'PV';
     $yearBE = (int)date('Y', strtotime($row['txn_date'])) + 543;
     $like = $prefix . '-' . $yearBE . '-%';
-    $maxStmt = $pdo->prepare("SELECT MAX(CAST(SUBSTRING(receipt_no, " . (strlen($prefix) + 7) . ") AS UNSIGNED)) FROM sys_finance_transactions WHERE receipt_no LIKE ?");
-    $maxStmt->execute([$like]);
-    $next = ((int)$maxStmt->fetchColumn()) + 1;
-    $receiptNo = sprintf('%s-%d-%06d', $prefix, $yearBE, $next);
-    $pdo->prepare("UPDATE sys_finance_transactions SET receipt_no=?, updated_by=? WHERE id=?")
-        ->execute([$receiptNo, (int)($_SESSION['admin_id'] ?? 0) ?: null, $id]);
-    $row['receipt_no'] = $receiptNo;
+    $pdo->beginTransaction();
+    try {
+        $maxStmt = $pdo->prepare("SELECT MAX(CAST(SUBSTRING(receipt_no, " . (strlen($prefix) + 7) . ") AS UNSIGNED)) FROM sys_finance_transactions WHERE receipt_no LIKE ? FOR UPDATE");
+        $maxStmt->execute([$like]);
+        $next = ((int)$maxStmt->fetchColumn()) + 1;
+        $receiptNo = sprintf('%s-%d-%06d', $prefix, $yearBE, $next);
+        $pdo->prepare("UPDATE sys_finance_transactions SET receipt_no=?, updated_by=? WHERE id=? AND (receipt_no IS NULL OR receipt_no='')")
+            ->execute([$receiptNo, (int)($_SESSION['admin_id'] ?? 0) ?: null, $id]);
+        $pdo->commit();
+    } catch (Throwable $e) {
+        $pdo->rollBack();
+        throw $e;
+    }
+    // Re-read in case another request beat us to the update
+    $reread = $pdo->prepare("SELECT receipt_no FROM sys_finance_transactions WHERE id=?");
+    $reread->execute([$id]);
+    $row['receipt_no'] = (string)$reread->fetchColumn();
 }
 
 // Get clinic profile

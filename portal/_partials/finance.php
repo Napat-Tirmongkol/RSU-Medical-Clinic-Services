@@ -511,7 +511,7 @@ body[data-theme='dark'] .fin-bulk-bar { box-shadow:0 20px 40px -10px rgba(0,0,0,
                     <td class="${amtClass} text-right">${amtPrefix}${fmt(row.amount)}</td>
                     <td>${refDisplay}</td>
                     <td class="text-center whitespace-nowrap">
-                        <a href="finance_receipt.php?id=${row.id}" target="_blank" class="text-slate-500 hover:text-[#2e9e63] mr-2" title="พิมพ์ใบเสร็จ"><i class="fa-solid fa-print"></i></a>
+                        <a href="finance_receipt.php?id=${row.id}&sig=${encodeURIComponent(row.receipt_sig || '')}" target="_blank" class="text-slate-500 hover:text-[#2e9e63] mr-2" title="พิมพ์ใบเสร็จ"><i class="fa-solid fa-print"></i></a>
                         <button onclick="finOpenDetails(${row.id})" class="text-slate-500 hover:text-indigo-600 mr-2" title="ไฟล์แนบ + ประวัติ">
                             <i class="fa-solid fa-paperclip"></i>${row.attachment_count > 0 ? `<span class="text-[10px] font-bold text-indigo-600 align-super">${row.attachment_count}</span>` : ''}
                         </button>
