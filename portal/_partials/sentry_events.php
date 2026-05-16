@@ -53,6 +53,18 @@
 .se-pager-btn:disabled { opacity:.4; cursor:not-allowed; }
 
 /* Modal */
+/* Bulk selection bar */
+.se-row-checkbox { width:16px; height:16px; cursor:pointer; }
+.se-bulk-bar { position:fixed; bottom:20px; left:50%; transform:translateX(-50%) translateY(150%); background:linear-gradient(135deg,#1e293b,#0f172a); color:#fff; border-radius:14px; padding:14px 22px; box-shadow:0 16px 40px rgba(0,0,0,.35), 0 0 0 1px rgba(255,255,255,.08); display:flex; align-items:center; gap:14px; z-index:80; transition:transform .35s cubic-bezier(.16,1,.3,1); }
+.se-bulk-bar.is-visible { transform:translateX(-50%) translateY(0); }
+.se-bulk-bar .count { font-size:14px; font-weight:900; color:#fff; }
+.se-bulk-bar .count b { color:#a78bfa; }
+.se-bulk-btn { display:inline-flex; align-items:center; gap:6px; padding:8px 16px; border-radius:8px; font-size:12px; font-weight:800; border:0; cursor:pointer; transition:all .15s; }
+.se-bulk-btn-danger { background:#ef4444; color:#fff; }
+.se-bulk-btn-danger:hover { background:#dc2626; transform:translateY(-1px); }
+.se-bulk-btn-ghost  { background:rgba(255,255,255,.10); color:#cbd5e1; }
+.se-bulk-btn-ghost:hover { background:rgba(255,255,255,.18); color:#fff; }
+
 #se-modal { position:fixed; inset:0; background:rgba(15,23,42,.6); z-index:9000; display:none; align-items:flex-start; justify-content:center; padding:40px 20px; overflow-y:auto; backdrop-filter:blur(6px); }
 #se-modal.is-open { display:flex; }
 .se-modal-box { background:#fff; border-radius:14px; max-width:960px; width:100%; padding:24px; box-shadow:0 24px 60px rgba(0,0,0,.4); }
@@ -94,6 +106,9 @@ body[data-theme='dark'] .se-meta dd { color:#e2e8f0; }
             </p>
         </div>
         <div class="flex items-center gap-2">
+            <button class="btn-solid bg-amber-500 text-white hover:bg-amber-600 text-sm" onclick="sePurgeNoise()" title="ลบ events รบกวน (info-level, [TEST], ฯลฯ)">
+                <i class="fa-solid fa-broom"></i> ลบ noise
+            </button>
             <button class="btn-solid bg-slate-700 text-white hover:bg-slate-800 text-sm" onclick="seRefresh()">
                 <i class="fa-solid fa-rotate"></i> รีเฟรช
             </button>
@@ -135,7 +150,8 @@ body[data-theme='dark'] .se-meta dd { color:#e2e8f0; }
             <table class="se-table">
                 <thead>
                     <tr>
-                        <th style="width:60px">#</th>
+                        <th style="width:36px;text-align:center"><input type="checkbox" id="se-check-all" class="se-row-checkbox" onclick="seToggleAll(this)" title="เลือกทั้งหน้า"></th>
+                        <th style="width:50px">#</th>
                         <th>Title / Culprit</th>
                         <th style="width:90px">Level</th>
                         <th style="width:90px">Resource</th>
@@ -146,7 +162,7 @@ body[data-theme='dark'] .se-meta dd { color:#e2e8f0; }
                     </tr>
                 </thead>
                 <tbody id="se-tbody">
-                    <tr><td colspan="8" style="padding:30px;text-align:center;color:#94a3b8;font-style:italic">กำลังโหลด…</td></tr>
+                    <tr><td colspan="9" style="padding:30px;text-align:center;color:#94a3b8;font-style:italic">กำลังโหลด…</td></tr>
                 </tbody>
             </table>
         </div>
@@ -157,6 +173,17 @@ body[data-theme='dark'] .se-meta dd { color:#e2e8f0; }
             <div class="flex items-center gap-1" id="se-pager-btns"></div>
         </div>
     </div>
+</div>
+
+<!-- Bulk action bar (appears when selectedIds.size > 0) -->
+<div id="se-bulk-bar" class="se-bulk-bar">
+    <span class="count">เลือก <b id="se-bulk-count">0</b> รายการ</span>
+    <button class="se-bulk-btn se-bulk-btn-danger" onclick="seBulkDelete()">
+        <i class="fa-solid fa-trash-can"></i> ลบที่เลือก
+    </button>
+    <button class="se-bulk-btn se-bulk-btn-ghost" onclick="seClearSelection()">
+        <i class="fa-solid fa-xmark"></i> ยกเลิก
+    </button>
 </div>
 
 <!-- Modal -->
@@ -189,6 +216,7 @@ body[data-theme='dark'] .se-meta dd { color:#e2e8f0; }
   const CSRF = '<?= htmlspecialchars(get_csrf_token(), ENT_QUOTES) ?>';
 
   const state = { page: 1, period: 'all', resource: '', level: '', github: '', q: '' };
+  const selectedIds = new Set();
   let searchTimer = null;
 
   const $ = id => document.getElementById(id);
@@ -238,10 +266,13 @@ body[data-theme='dark'] .se-meta dd { color:#e2e8f0; }
 
     // Rows
     if (!json.rows.length) {
-      $('se-tbody').innerHTML = `<tr><td colspan="8" style="padding:36px;text-align:center;color:#94a3b8;font-style:italic">ไม่พบ event ที่ตรงเงื่อนไข</td></tr>`;
+      $('se-tbody').innerHTML = `<tr><td colspan="9" style="padding:36px;text-align:center;color:#94a3b8;font-style:italic">ไม่พบ event ที่ตรงเงื่อนไข</td></tr>`;
     } else {
-      $('se-tbody').innerHTML = json.rows.map(r => `
+      $('se-tbody').innerHTML = json.rows.map(r => {
+        const isSel = selectedIds.has(r.id);
+        return `
         <tr>
+          <td style="text-align:center"><input type="checkbox" class="se-row-checkbox" data-id="${r.id}" ${isSel ? 'checked' : ''} onclick="seToggleRow(${r.id}, this)"></td>
           <td class="id-cell">${r.id}</td>
           <td>
             <div class="title">${esc((r.title || '').slice(0, 100))}</div>
@@ -254,8 +285,10 @@ body[data-theme='dark'] .se-meta dd { color:#e2e8f0; }
           <td class="text-[11px]">${esc(r.received_at)}</td>
           <td>${actionsCell(r)}</td>
         </tr>
-      `).join('');
+      `;
+      }).join('');
     }
+    syncCheckAll();
 
     // Pager
     $('se-pager-info').textContent = `หน้า ${json.page} / ${json.pages} · รวม ${num(json.total)} รายการ`;
@@ -279,6 +312,94 @@ body[data-theme='dark'] .se-meta dd { color:#e2e8f0; }
     html += btn('›', page + 1, page === pages) + btn('»', pages, page === pages);
     c.innerHTML = html;
   }
+
+  // ── Selection ───────────────────────────────────────────────────────────
+  function updateBulkBar() {
+    const bar = $('se-bulk-bar');
+    $('se-bulk-count').textContent = selectedIds.size;
+    if (selectedIds.size > 0) bar.classList.add('is-visible');
+    else bar.classList.remove('is-visible');
+  }
+
+  function syncCheckAll() {
+    const boxes = document.querySelectorAll('.se-row-checkbox[data-id]');
+    const all = $('se-check-all');
+    if (!boxes.length) { all.checked = false; all.indeterminate = false; return; }
+    let checkedCount = 0;
+    boxes.forEach(b => { if (b.checked) checkedCount++; });
+    all.checked = (checkedCount === boxes.length);
+    all.indeterminate = (checkedCount > 0 && checkedCount < boxes.length);
+  }
+
+  window.seToggleRow = function (id, el) {
+    if (el.checked) selectedIds.add(id); else selectedIds.delete(id);
+    updateBulkBar(); syncCheckAll();
+  };
+  window.seToggleAll = function (el) {
+    document.querySelectorAll('.se-row-checkbox[data-id]').forEach(b => {
+      const id = +b.dataset.id;
+      b.checked = el.checked;
+      if (el.checked) selectedIds.add(id); else selectedIds.delete(id);
+    });
+    updateBulkBar();
+  };
+  window.seClearSelection = function () {
+    selectedIds.clear();
+    document.querySelectorAll('.se-row-checkbox').forEach(b => { b.checked = false; b.indeterminate = false; });
+    updateBulkBar();
+  };
+
+  window.seBulkDelete = async function () {
+    if (!selectedIds.size) return;
+    const { isConfirmed } = await Swal.fire({
+      icon: 'warning',
+      title: `ลบ ${selectedIds.size} event?`,
+      text: 'การกระทำนี้ย้อนกลับไม่ได้',
+      showCancelButton: true,
+      confirmButtonText: 'ลบเลย', cancelButtonText: 'ยกเลิก',
+      confirmButtonColor: '#ef4444',
+    });
+    if (!isConfirmed) return;
+
+    const fd = new FormData();
+    fd.set('ids', Array.from(selectedIds).join(','));
+    fd.set('csrf_token', CSRF);
+    try {
+      const r = await fetch(`${AJAX}?action=bulk_delete`, { method: 'POST', body: fd });
+      const j = await r.json();
+      if (!j.ok) throw new Error(j.message);
+      Swal.fire({ icon: 'success', title: `ลบแล้ว ${j.deleted} รายการ`, timer: 1400, showConfirmButton: false });
+      seClearSelection();
+      fetchList();
+    } catch (e) {
+      Swal.fire({ icon: 'error', title: 'ลบไม่สำเร็จ', text: e.message });
+    }
+  };
+
+  window.sePurgeNoise = async function () {
+    const { isConfirmed } = await Swal.fire({
+      icon: 'question',
+      title: 'ลบ noise events?',
+      html: 'ลบทุกแถวที่ตรงกับ:<br><code style="font-size:11px">level=info · "AI QA*" · "Webhook events decoded*" · "Default reply*" · "GitHub issue create failed*" · "[TEST]*"</code>',
+      showCancelButton: true,
+      confirmButtonText: 'ลบเลย', cancelButtonText: 'ยกเลิก',
+      confirmButtonColor: '#f59e0b',
+    });
+    if (!isConfirmed) return;
+
+    const fd = new FormData();
+    fd.set('csrf_token', CSRF);
+    try {
+      const r = await fetch(`${AJAX}?action=purge_noise`, { method: 'POST', body: fd });
+      const j = await r.json();
+      if (!j.ok) throw new Error(j.message);
+      Swal.fire({ icon: 'success', title: `ลบ noise แล้ว ${j.deleted} รายการ`, timer: 1400, showConfirmButton: false });
+      seClearSelection();
+      fetchList();
+    } catch (e) {
+      Swal.fire({ icon: 'error', title: 'ลบไม่สำเร็จ', text: e.message });
+    }
+  };
 
   window.seGoto = function (p) { state.page = p; fetchList(); };
 

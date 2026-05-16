@@ -176,6 +176,42 @@ try {
             break;
         }
 
+        case 'bulk_delete': {
+            require_method_post();
+            validate_csrf_or_die();
+
+            $raw = $_POST['ids'] ?? '';
+            $ids = array_values(array_filter(array_map('intval', is_array($raw) ? $raw : explode(',', (string)$raw)), fn($v) => $v > 0));
+            if (!$ids) { echo json_encode(['ok' => false, 'message' => 'no ids']); break; }
+            if (count($ids) > 500) { echo json_encode(['ok' => false, 'message' => 'too many (max 500)']); break; }
+
+            $placeholders = implode(',', array_fill(0, count($ids), '?'));
+            $st = $pdo->prepare("DELETE FROM sys_sentry_events WHERE id IN ($placeholders)");
+            $st->execute($ids);
+            $deleted = $st->rowCount();
+
+            echo json_encode(['ok' => true, 'deleted' => $deleted], JSON_UNESCAPED_UNICODE);
+            break;
+        }
+
+        case 'purge_noise': {
+            require_method_post();
+            validate_csrf_or_die();
+
+            // Delete info-level + known operational log titles that were mistakenly
+            // mirrored to Sentry before the level=info filter was added.
+            $st = $pdo->prepare("DELETE FROM sys_sentry_events WHERE
+                level = 'info'
+                OR title LIKE 'AI QA%'
+                OR title LIKE 'Webhook events decoded%'
+                OR title LIKE 'Default reply%'
+                OR title LIKE 'GitHub issue create failed%'
+                OR title LIKE '[TEST]%'");
+            $st->execute();
+            echo json_encode(['ok' => true, 'deleted' => $st->rowCount()], JSON_UNESCAPED_UNICODE);
+            break;
+        }
+
         default:
             echo json_encode(['ok' => false, 'message' => 'unknown action']);
     }
