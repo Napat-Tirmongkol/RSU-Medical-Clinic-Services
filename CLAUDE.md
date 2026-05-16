@@ -1,5 +1,37 @@
 # RSU Medical Clinic Services — Claude Guidelines
 
+## Context Persistence (AI Memory) — อ่านก่อนเสมอ
+
+ทุก session ของ AI agent (Claude Code / Codex / Cursor) **ต้องอ่าน 2 ไฟล์เป็นอันดับแรก**:
+
+1. **`hot.md`** (root) — project snapshot ปัจจุบัน · phase ที่กำลังทำ · decision ล่าสุด · ของกำลังค้าง
+   อัพเดตคู่กับ commit สำคัญทุกครั้ง (เปลี่ยน phase / ปิด task ใหญ่ / decision ใหม่)
+2. **`CLAUDE.md`** (ไฟล์นี้) — กฎและ convention ถาวรของโปรเจกต์
+
+### โครงสร้าง `AI/` folder (long-term memory)
+```
+AI/
+├── README.md      ← convention เต็ม
+├── logs/          ← episodic memory — append-only decision records (YYYY-MM-DD-<topic>.md)
+├── knowledge/     ← semantic memory — distilled pattern/recipe/schema (curated, แก้ได้)
+└── scratch/       ← ephemeral workspace — clean ได้เป็นระยะ
+```
+
+### Workflow
+1. **เริ่ม session** → อ่าน `hot.md` + `CLAUDE.md` → search `AI/knowledge/` ถ้าทำ topic เฉพาะ
+2. **ระหว่างทำงาน** → reference `AI/logs/` ถ้าต้องเข้าใจ decision เก่า
+3. **จบ task ใหญ่** → อัพเดต `hot.md` (Phase / Decision) + drop `AI/logs/YYYY-MM-DD-<topic>.md` ถ้ามี decision สำคัญ
+4. **เจอ pattern ที่ใช้ซ้ำ ≥ 2 ครั้ง** → เขียน `AI/knowledge/<topic>.md` (ถ้ากลายเป็น "ห้ามลืม" สำหรับทุก agent → promote ขึ้น CLAUDE.md)
+5. **Draft / exploration ชั่วคราว** → `AI/scratch/` (อย่าเก็บของสำคัญที่นี่)
+
+### กติกาสำคัญ
+- **`AI/logs/` append-only** — ห้ามแก้ไฟล์เก่า เขียนไฟล์ใหม่ reference ของเก่าแทน (audit trail)
+- **CLAUDE.md = กฎถาวร** (โปรเจกต์ทั้งโปรเจกต์); **hot.md = สถานะปัจจุบัน** (เปลี่ยนบ่อย)
+- ห้าม commit secrets / personal data ใน `AI/`
+- ดูรายละเอียดเต็มที่ `AI/README.md`
+
+---
+
 ## Coding Conventions
 
 ### Tables / Data Grids
