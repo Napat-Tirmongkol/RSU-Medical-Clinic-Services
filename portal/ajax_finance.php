@@ -506,8 +506,17 @@ try {
     // Inputs: source_module, source_id (string), kind, amount, txn_date, description, category_name
     // ถ้ามี record ที่ (source_module, source_id) อยู่แล้ว → UPDATE; ไม่งั้น INSERT
     if ($action === 'txn:upsert_from_source') {
+        // Whitelist source_module — ห้าม spoof จาก client เพื่อ overwrite record
+        // ของโมดูลอื่น (เช่น เปลี่ยน OT พยาบาลเป็น 1 บาท)
+        $ALLOWED_SOURCES = [
+            'nurse_schedule', 'scholarship', 'asset',
+            'consumables_txn', 'eborrow_payment', 'finance_recurring',
+        ];
         $srcMod = trim((string)($_POST['source_module'] ?? ''));
         $srcId  = trim((string)($_POST['source_id'] ?? ''));
+        if (!in_array($srcMod, $ALLOWED_SOURCES, true)) {
+            echo json_encode(['ok' => false, 'message' => 'source_module ไม่ได้รับอนุญาต']); exit;
+        }
         $kind   = ($_POST['kind'] ?? 'expense') === 'income' ? 'income' : 'expense';
         $amount = (float)($_POST['amount'] ?? 0);
         $txnDate = trim((string)($_POST['txn_date'] ?? date('Y-m-d')));
@@ -528,22 +537,44 @@ try {
         }
 
         // ตรวจสอบว่ามี record อยู่แล้วไหม
-        $ex = $pdo->prepare("SELECT id FROM sys_finance_transactions WHERE source_module=? AND source_id=? LIMIT 1");
+        $ex = $pdo->prepare("SELECT id, txn_date, kind, category_id, amount, description, note
+            FROM sys_finance_transactions WHERE source_module=? AND source_id=? LIMIT 1");
         $ex->execute([$srcMod, $srcId]);
-        $existingId = (int)$ex->fetchColumn();
+        $existing = $ex->fetch(PDO::FETCH_ASSOC);
+        $existingId = $existing ? (int)$existing['id'] : 0;
 
         if ($existingId > 0) {
+            // ห้ามเปลี่ยน kind ของ record ที่มีอยู่ — กัน flip income↔expense
+            // ผ่าน upsert (อยากเปลี่ยนต้องลบแล้วสร้างใหม่)
+            if ((string)$existing['kind'] !== $kind) {
+                echo json_encode(['ok' => false, 'message' => 'ห้ามเปลี่ยนประเภท (income/expense) ผ่าน upsert_from_source']); exit;
+            }
             $pdo->prepare("UPDATE sys_finance_transactions
                 SET txn_date=?, kind=?, category_id=?, amount=?, description=?, note=?, updated_by=?
                 WHERE id=?")
                 ->execute([$txnDate, $kind, $catId, $amount, $desc ?: null, $note ?: null, $adminId ?: null, $existingId]);
+
+            $after = ['txn_date' => $txnDate, 'kind' => $kind, 'category_id' => $catId,
+                      'amount' => $amount, 'description' => $desc, 'note' => $note];
+            $changes = ['source_module' => $srcMod, 'source_id' => $srcId];
+            foreach ($after as $k => $v) {
+                $oldV = $existing[$k] ?? null;
+                if ((string)$oldV !== (string)$v) $changes[$k] = ['from' => $oldV, 'to' => $v];
+            }
+            fin_audit_log($pdo, $existingId, 'upsert_from_source:update', $changes, $adminId, $adminName);
             echo json_encode(['ok' => true, 'id' => $existingId, 'mode' => 'updated']); exit;
         } else {
             $pdo->prepare("INSERT INTO sys_finance_transactions
                 (txn_date, kind, category_id, amount, description, note, source_module, source_id, created_by, updated_by)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
                 ->execute([$txnDate, $kind, $catId, $amount, $desc ?: null, $note ?: null, $srcMod, $srcId, $adminId ?: null, $adminId ?: null]);
-            echo json_encode(['ok' => true, 'id' => (int)$pdo->lastInsertId(), 'mode' => 'created']); exit;
+            $newId = (int)$pdo->lastInsertId();
+            fin_audit_log($pdo, $newId, 'upsert_from_source:create', [
+                'source_module' => $srcMod, 'source_id' => $srcId,
+                'txn_date' => $txnDate, 'kind' => $kind, 'category_id' => $catId,
+                'amount' => $amount, 'description' => $desc,
+            ], $adminId, $adminName);
+            echo json_encode(['ok' => true, 'id' => $newId, 'mode' => 'created']); exit;
         }
     }
 
@@ -750,7 +781,9 @@ try {
     if ($action === 'category:delete') {
         $id = (int)($_POST['id'] ?? 0);
         if ($id <= 0) { echo json_encode(['ok' => false, 'message' => 'ไม่ระบุ id']); exit; }
-        $used = (int)$pdo->query("SELECT COUNT(*) FROM sys_finance_transactions WHERE category_id={$id}")->fetchColumn();
+        $usedStmt = $pdo->prepare("SELECT COUNT(*) FROM sys_finance_transactions WHERE category_id=?");
+        $usedStmt->execute([$id]);
+        $used = (int)$usedStmt->fetchColumn();
         if ($used > 0) { echo json_encode(['ok' => false, 'message' => "มีรายการใช้หมวดนี้อยู่ {$used} รายการ — ลบไม่ได้"]); exit; }
         $pdo->prepare("DELETE FROM sys_finance_categories WHERE id=?")->execute([$id]);
         echo json_encode(['ok' => true]); exit;
@@ -758,6 +791,6 @@ try {
 
     echo json_encode(['ok' => false, 'message' => 'unknown action: ' . $action]);
 } catch (Throwable $e) {
-    error_log('[finance] ' . $e->getMessage());
-    echo json_encode(['ok' => false, 'message' => 'เกิดข้อผิดพลาด: ' . $e->getMessage()]);
+    error_log('[finance] ' . $e->getMessage() . ' @ ' . $e->getFile() . ':' . $e->getLine());
+    echo json_encode(['ok' => false, 'message' => 'เกิดข้อผิดพลาดภายในระบบ กรุณาลองอีกครั้งหรือติดต่อผู้ดูแล']);
 }
