@@ -3548,7 +3548,7 @@ try {
 
             <!-- ════════════ SECTION: NURSE PRODUCTIVITY ════════════ -->
             <div id="section-nurse_productivity" class="portal-section"
-                style="<?= $activeSection==='nurse_productivity'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); background:#f8fafc; overflow-y:auto; padding:18px;">
+                style="<?= $activeSection==='nurse_productivity'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); background:#f1f5f9; overflow-y:auto; padding:20px;">
                 <?php
                 if ($hasNurseProductivity) {
                     include __DIR__ . '/_partials/nurse_productivity.php';
