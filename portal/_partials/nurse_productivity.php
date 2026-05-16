@@ -518,7 +518,7 @@ body[data-theme='dark'] .np-bulk-bar { box-shadow:0 20px 40px -10px rgba(0,0,0,.
    ======================================================================== */
 (function(){
   const AJAX = 'ajax_nurse_productivity.php';
-  const CSRF = (typeof portal_CSRF !== 'undefined') ? portal_CSRF : '';
+  const CSRF = '<?= htmlspecialchars(get_csrf_token(), ENT_QUOTES) ?>';
   const PAGE_SIZE = 20;
 
   const state = {
