@@ -859,8 +859,8 @@ function _qa_source_badge(string $s): string {
                         <span class="line-toggle-slider"></span>
                     </span>
                     <div>
-                        <div style="font-size:13px;font-weight:800;color:#0f172a">ตอบเฉพาะนอกเวลาทำการ</div>
-                        <div style="font-size:11px;color:#64748b;font-weight:500">อยู่ในเวลาทำการปกติของวันนั้น (regular) → บอทเงียบ ปล่อยคนรับ chat แม้คลินิกปิดบริการ (เทอมเบรค)</div>
+                        <div style="font-size:13px;font-weight:800;color:#0f172a">ตอบเฉพาะตอนปิด</div>
+                        <div style="font-size:11px;color:#64748b;font-weight:500">คลินิกเปิดอยู่ → บอทไม่ตอบ FAQ</div>
                     </div>
                 </label>
                 <div style="border-left:1.5px solid #e2e8f0;padding-left:14px">
