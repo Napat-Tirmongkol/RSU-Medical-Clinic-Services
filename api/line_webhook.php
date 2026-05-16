@@ -528,10 +528,13 @@ foreach ($data['events'] as $idx => $event) {
             line_webhook_log('AI QA Lab disabled (FAQ enabled=0)', [
                 'line_user_id' => line_mask_uid($userId),
             ]);
-        } elseif ((int)$faqSettings['only_when_closed'] && get_clinic_current_status($pdo)['is_open_now']) {
-            // admin ตั้ง only_when_closed=1 และคลินิกเปิดอยู่ → ข้าม AI reply
-            // (ตกไป default reply — เพื่อบีบให้ user คุยกับเจ้าหน้าที่ตอนเปิดทำการ)
-            line_webhook_log('AI QA Lab skipped (clinic is open, only_when_closed=1)', [
+        } elseif ((int)$faqSettings['only_when_closed'] && clinic_is_within_regular_office_hours($pdo)) {
+            // admin ตั้ง only_when_closed=1 และตอนนี้อยู่ในเวลาทำการของเจ้าหน้าที่
+            // (regular weekly hours ของ weekday นี้) → ข้าม AI reply
+            // เจตนา: เทอมเบรค/วันปิดบริการ ที่ตั้ง special=closed แต่ staff ยังนั่งอยู่ในออฟฟิศ
+            // เวลาราชการปกติ → บอทไม่ควรตอบทับ ปล่อยให้คนรับ chat
+            // (ตกไป default reply — บีบให้ user คุยกับเจ้าหน้าที่ตอนเปิดทำการ)
+            line_webhook_log('AI QA Lab skipped (within regular office hours, only_when_closed=1)', [
                 'line_user_id' => line_mask_uid($userId),
             ]);
         } else {

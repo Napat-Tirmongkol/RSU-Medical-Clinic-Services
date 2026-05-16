@@ -629,6 +629,49 @@ function get_clinic_current_status(PDO $pdo, ?DateTimeImmutable $now = null): ar
 }
 
 /**
+ * เช็คว่าตอนนี้อยู่ในช่วง "เวลาทำการปกติของเจ้าหน้าที่" (regular weekly hours) หรือไม่
+ *
+ * ต่างจาก get_clinic_current_status() ตรงที่ helper นี้ "ไม่สนใจ" holiday/special override
+ * — ใช้สำหรับ guard ของ LINE FAQ auto-reply (only_when_closed) เพื่อให้ในช่วงเทอมเบรค
+ * ที่คลินิกหยุดบริการแต่เจ้าหน้าที่ยังอยู่ในเวลาราชการ บอทจะไม่ตอบทับขณะที่มีคนรับ chat
+ *
+ * Logic:
+ *   - ดึง sys_clinic_hours type='regular' weekday=วันนี้
+ *   - ถ้าไม่มี row หรือ is_closed=1 หรือไม่มีเวลา → return false (ไม่อยู่ในเวลาทำการ)
+ *   - ถ้า open_time ≤ ตอนนี้ < close_time → return true
+ *   - case อื่น → false
+ */
+function clinic_is_within_regular_office_hours(PDO $pdo, ?DateTimeImmutable $now = null): bool
+{
+    $tz  = new DateTimeZone(CLINIC_TZ_NAME);
+    $now = $now ?? new DateTimeImmutable('now', $tz);
+    $weekday = (int)$now->format('w');
+    $nowHm   = $now->format('H:i');
+
+    try {
+        $stmt = $pdo->prepare(
+            "SELECT open_time, close_time, is_closed
+             FROM sys_clinic_hours
+             WHERE type='regular' AND weekday = :wd
+             ORDER BY open_time ASC
+             LIMIT 1"
+        );
+        $stmt->execute([':wd' => $weekday]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    } catch (PDOException) {
+        return false;
+    }
+
+    if (!$row || (int)($row['is_closed'] ?? 0) === 1) return false;
+
+    $openHm  = $row['open_time']  ? substr((string)$row['open_time'], 0, 5)  : null;
+    $closeHm = $row['close_time'] ? substr((string)$row['close_time'], 0, 5) : null;
+    if (!$openHm || !$closeHm) return false;
+
+    return ($nowHm >= $openHm && $nowHm < $closeHm);
+}
+
+/**
  * หาวันเปิดทำการถัดไป (เริ่มหาจาก $startFrom 00:00 — มองไปข้างหน้า max 14 วัน)
  *
  * @return array{date: ?string, open_time: ?string, label: ?string}
