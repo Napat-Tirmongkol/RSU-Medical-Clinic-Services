@@ -397,6 +397,7 @@ $categoryMap = [
     'nurse_productivity' => 'core',
     'daily_summary' => 'core',
     'system_logs' => 'tools',
+    'sentry_events' => 'tools',
     'privilege_inventory' => 'tools',
     'admin_tool' => 'tools',
     'future_app' => 'dev',
@@ -1279,6 +1280,12 @@ try {
                         <div class="psb-icon"><i class="fa-solid fa-bug" style="color:#ef4444"></i></div>
                         <span class="psb-label" style="color:#dc2626;font-weight:900">Error Logs</span>
                     </button>
+                    <?php if ($adminRole === 'superadmin'): ?>
+                    <button class="psb-item <?= $activeSection==='sentry_events'?'psb-active':'' ?>" data-section="sentry_events" onclick="switchSection('sentry_events',this)">
+                        <div class="psb-icon"><i class="fa-solid fa-radiation" style="color:#8b5cf6"></i></div>
+                        <span class="psb-label" style="color:#6d28d9;font-weight:900">Sentry Events</span>
+                    </button>
+                    <?php endif; ?>
                 </div>
             <?php endif; ?>
 
@@ -3547,6 +3554,18 @@ try {
                     include __DIR__ . '/_partials/error_logs.php';
                 } else {
                     echo '<div style="padding:100px;text-align:center;font-weight:900;color:#dc2626"><i class="fa-solid fa-shield-slash mb-4" style="font-size:4rem;display:block"></i> ACCESS DENIED<br><span style="font-size:14px;color:#94a3b8;font-weight:600">You do not have permission to view system error logs.</span></div>';
+                }
+                ?>
+            </div>
+
+            <!-- ════════════ SECTION: SENTRY EVENTS ════════════ -->
+            <div id="section-sentry_events" class="portal-section"
+                style="<?= $activeSection==='sentry_events'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); background:#f1f5f9; overflow-y:auto; padding:20px;">
+                <?php
+                if ($adminRole === 'superadmin') {
+                    include __DIR__ . '/_partials/sentry_events.php';
+                } else {
+                    echo '<div style="padding:100px;text-align:center;font-weight:900;color:#dc2626"><i class="fa-solid fa-shield-slash mb-4" style="font-size:4rem;display:block"></i> ACCESS DENIED<br><span style="font-size:14px;color:#94a3b8;font-weight:600">Sentry Events เปิดเฉพาะ superadmin (อาจมีข้อมูล PII / stack trace)</span></div>';
                 }
                 ?>
             </div>

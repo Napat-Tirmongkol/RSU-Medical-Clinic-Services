@@ -79,25 +79,34 @@ $environment = (string)($issue['environment'] ?? ($issue['contexts']['runtime'][
 $url         = (string)($issue['web_url'] ?? $issue['permalink'] ?? $issue['url'] ?? '');
 
 // ── 5. Persist to sys_sentry_events ──────────────────────────────────────────
+$eventRowId = 0;
 try {
     $pdo = db();
     $pdo->exec("CREATE TABLE IF NOT EXISTS sys_sentry_events (
-        id           INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-        sentry_id    VARCHAR(64)  NOT NULL DEFAULT '',
-        resource     VARCHAR(40)  NOT NULL DEFAULT '',
-        action       VARCHAR(40)  NOT NULL DEFAULT '',
-        level        VARCHAR(20)  NOT NULL DEFAULT '',
-        title        VARCHAR(500) NOT NULL DEFAULT '',
-        culprit      VARCHAR(500) NOT NULL DEFAULT '',
-        environment  VARCHAR(60)  NOT NULL DEFAULT '',
-        url          TEXT         NULL,
-        raw_payload  MEDIUMTEXT   NULL,
-        received_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        id                   INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        sentry_id            VARCHAR(64)  NOT NULL DEFAULT '',
+        resource             VARCHAR(40)  NOT NULL DEFAULT '',
+        action               VARCHAR(40)  NOT NULL DEFAULT '',
+        level                VARCHAR(20)  NOT NULL DEFAULT '',
+        title                VARCHAR(500) NOT NULL DEFAULT '',
+        culprit              VARCHAR(500) NOT NULL DEFAULT '',
+        environment          VARCHAR(60)  NOT NULL DEFAULT '',
+        url                  TEXT         NULL,
+        raw_payload          MEDIUMTEXT   NULL,
+        github_issue_url     VARCHAR(255) NULL,
+        github_issue_number  INT UNSIGNED NULL,
+        github_error         VARCHAR(500) NULL,
+        received_at          TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
         INDEX idx_sentry_id   (sentry_id),
         INDEX idx_resource    (resource),
         INDEX idx_action      (action),
         INDEX idx_received_at (received_at)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+    // Auto-migrate older installs that predate the github_* columns
+    try { $pdo->exec("ALTER TABLE sys_sentry_events ADD COLUMN github_issue_url VARCHAR(255) NULL"); } catch (PDOException) {}
+    try { $pdo->exec("ALTER TABLE sys_sentry_events ADD COLUMN github_issue_number INT UNSIGNED NULL"); } catch (PDOException) {}
+    try { $pdo->exec("ALTER TABLE sys_sentry_events ADD COLUMN github_error VARCHAR(500) NULL"); } catch (PDOException) {}
 
     $pdo->prepare("INSERT INTO sys_sentry_events
             (sentry_id, resource, action, level, title, culprit, environment, url, raw_payload)
@@ -113,6 +122,7 @@ try {
             $url,
             mb_substr($body, 0, 1000000), // 1MB cap
         ]);
+    $eventRowId = (int)$pdo->lastInsertId();
 
     // Probabilistic purge — keep 90 days
     if (mt_rand(1, 100) === 1) {
@@ -125,7 +135,54 @@ try {
     return;
 }
 
-// ── 6. ACK ──────────────────────────────────────────────────────────────────
+// ── 6. GitHub Issue bridge — fire-and-mark, only on new issue events ─────────
+// Trigger: resource=issue + action=created (new issue first seen)
+// Skip silently if GITHUB_TOKEN / GITHUB_REPO empty so we can stage rollout
+// Idempotency: skip if any prior row with the same sentry_id already has a github_issue_url
+$githubResult = null;
+if ($eventRowId > 0 && $sentryId !== '' && $resource === 'issue' && $action === 'created') {
+    $secrets = is_array($s ?? null) ? $s : (file_exists($secretsPath) ? require $secretsPath : []);
+    $tokenSet = is_array($secrets) && trim((string)($secrets['GITHUB_TOKEN'] ?? '')) !== '';
+
+    if ($tokenSet) {
+        try {
+            $dup = $pdo->prepare("SELECT github_issue_url FROM sys_sentry_events
+                WHERE sentry_id = ? AND github_issue_url IS NOT NULL AND id <> ?
+                ORDER BY id DESC LIMIT 1");
+            $dup->execute([$sentryId, $eventRowId]);
+            $existing = (string)($dup->fetchColumn() ?: '');
+        } catch (Throwable) { $existing = ''; }
+
+        if ($existing !== '') {
+            $pdo->prepare("UPDATE sys_sentry_events SET github_issue_url = ? WHERE id = ?")
+                ->execute([$existing, $eventRowId]);
+            $githubResult = ['ok' => true, 'url' => $existing, 'dedup' => true];
+        } else {
+            require_once __DIR__ . '/../includes/github_issue_helper.php';
+            $eventRow = $pdo->prepare("SELECT * FROM sys_sentry_events WHERE id = ?");
+            $eventRow->execute([$eventRowId]);
+            $row = $eventRow->fetch(PDO::FETCH_ASSOC) ?: [];
+
+            $gh = github_issue_create_from_sentry($row, $secrets);
+            if ($gh['ok']) {
+                $pdo->prepare("UPDATE sys_sentry_events
+                    SET github_issue_url = ?, github_issue_number = ?, github_error = NULL
+                    WHERE id = ?")->execute([$gh['url'] ?? '', $gh['number'] ?? null, $eventRowId]);
+            } else {
+                $pdo->prepare("UPDATE sys_sentry_events SET github_error = ? WHERE id = ?")
+                    ->execute([mb_substr((string)$gh['message'], 0, 500), $eventRowId]);
+                log_error_to_db('GitHub issue create failed: ' . $gh['message'], 'warning', 'sentry_webhook.php');
+            }
+            $githubResult = $gh;
+        }
+    }
+}
+
+// ── 7. ACK ──────────────────────────────────────────────────────────────────
 http_response_code(202);
 header('Content-Type: application/json');
-echo json_encode(['ok' => true, 'received' => true]);
+echo json_encode([
+    'ok'       => true,
+    'received' => true,
+    'github'   => $githubResult,
+], JSON_UNESCAPED_UNICODE);

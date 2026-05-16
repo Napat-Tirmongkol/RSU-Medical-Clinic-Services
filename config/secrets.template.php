@@ -45,6 +45,13 @@ return [
     // Client Secret ของ Internal Integration — ใช้ verify signature ของ webhook ที่ Sentry ส่งเข้ามา
     'SENTRY_WEBHOOK_SECRET'               => '',
 
+    // --- GitHub bridge (auto-create issue from Sentry webhook) ---
+    // Fine-grained PAT with "Issues: Read and write" scope on the target repo
+    // https://github.com/settings/tokens?type=beta
+    // Leave empty to disable GitHub issue auto-creation (events still log to DB)
+    'GITHUB_TOKEN'                        => '',
+    'GITHUB_REPO'                         => '', // e.g., 'napat-tirmongkol/rsu-medical-clinic-services'
+
     // --- Email System (SMTP) ---
     'SMTP_HOST'                           => '', // e.g., smtp.gmail.com
     'SMTP_PORT'                           => 587,
