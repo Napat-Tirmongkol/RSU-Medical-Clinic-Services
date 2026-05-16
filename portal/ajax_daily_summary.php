@@ -63,7 +63,6 @@ try {
         $prodN++;
     }
     // Previous-day visits for delta
-    $prevVisits = (int)$pdo->prepare("SELECT COALESCE(SUM(patients), 0) FROM sys_nurse_productivity_daily WHERE entry_date = ?");
     $st = $pdo->prepare("SELECT COALESCE(SUM(patients), 0) FROM sys_nurse_productivity_daily WHERE entry_date = ?");
     $st->execute([$prevDate]);
     $prevVisits = (int)$st->fetchColumn();
