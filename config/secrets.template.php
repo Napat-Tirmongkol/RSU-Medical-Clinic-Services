@@ -41,6 +41,10 @@ return [
     // --- Sentry error monitoring (get DSN: sentry.io → Project → Settings → Client Keys) ---
     'SENTRY_DSN'                          => '', // e.g. https://abc123@o0.ingest.sentry.io/456
 
+    // --- Sentry Internal Integration webhook (Settings → Developer Settings → Internal Integration) ---
+    // Client Secret ของ Internal Integration — ใช้ verify signature ของ webhook ที่ Sentry ส่งเข้ามา
+    'SENTRY_WEBHOOK_SECRET'               => '',
+
     // --- Email System (SMTP) ---
     'SMTP_HOST'                           => '', // e.g., smtp.gmail.com
     'SMTP_PORT'                           => 587,
