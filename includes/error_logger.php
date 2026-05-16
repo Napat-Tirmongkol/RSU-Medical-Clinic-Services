@@ -12,7 +12,8 @@ function log_error_to_db(
     string $message,
     string $level   = 'error',
     string $source  = '',
-    string $context = ''
+    string $context = '',
+    bool   $skipSentry = false
 ): void {
     static $tableReady = false;
     static $logPdo     = null;
@@ -90,6 +91,30 @@ function log_error_to_db(
     } catch (Throwable) {
         // ไม่ทำอะไร — ป้องกัน infinite loop ถ้า DB เองมีปัญหา
     }
+
+    // ── Mirror ไป Sentry — เฉพาะ manual report จาก catch block ──────────────
+    // Auto error handler ส่ง $skipSentry=true เพราะ Sentry's built-in handler
+    // capture เองอยู่แล้วผ่าน chain ของ set_error_handler — กัน double-capture
+    // ข้าม level=info เพราะเป็น operational log ปกติ (เช่น "AI QA matcher start")
+    // ไม่ใช่ error ที่ต้อง alert
+    if (!$skipSentry && $level !== 'info' && class_exists('\\Sentry\\SentrySdk', false)) {
+        try {
+            $hub = \Sentry\SentrySdk::getCurrentHub();
+            if ($hub->getClient() !== null) {
+                $sev = match ($level) {
+                    'error'   => \Sentry\Severity::error(),
+                    'warning' => \Sentry\Severity::warning(),
+                    default   => \Sentry\Severity::info(),
+                };
+                \Sentry\withScope(function (\Sentry\State\Scope $scope) use ($message, $sev, $source, $context) {
+                    $scope->setLevel($sev);
+                    if ($source !== '')  $scope->setTag('error_source', $source);
+                    if ($context !== '') $scope->setExtra('context', $context);
+                    \Sentry\captureMessage($message);
+                });
+            }
+        } catch (Throwable) { /* never crash on Sentry failure */ }
+    }
 }
 
 // ─── ติดตั้ง handlers เพียงครั้งเดียว ────────────────────────────────────────
@@ -117,17 +142,30 @@ if (!defined('_ERROR_LOGGER_HANDLERS_SET')) {
             $errstr,
             $level,
             basename($errfile) . ':' . $errline,
-            $errfile . ':' . $errline
+            $errfile . ':' . $errline,
+            true   // Sentry's chained error handler already captured this
         );
         return false;
     });
 
     set_exception_handler(function (Throwable $e): void {
+        // Sentry's exception handler was overwritten by this one (set_exception_handler
+        // ไม่ chain — ทับ handler เดิม) — capture ตรงๆ ก่อน เพื่อให้ uncaught exception
+        // ถึง Sentry ก่อนทำต่อ
+        if (class_exists('\\Sentry\\SentrySdk', false)) {
+            try {
+                $hub = \Sentry\SentrySdk::getCurrentHub();
+                if ($hub->getClient() !== null) {
+                    \Sentry\captureException($e);
+                }
+            } catch (Throwable) { /* swallow */ }
+        }
         log_error_to_db(
             get_class($e) . ': ' . $e->getMessage(),
             'error',
             basename($e->getFile()) . ':' . $e->getLine(),
-            $e->getFile() . ':' . $e->getLine() . "\n" . $e->getTraceAsString()
+            $e->getFile() . ':' . $e->getLine() . "\n" . $e->getTraceAsString(),
+            true   // already captured to Sentry above
         );
         if (!headers_sent()) http_response_code(500);
         echo '<p style="font-family:sans-serif;color:#c00;padding:2rem">เกิดข้อผิดพลาดภายในระบบ กรุณาลองใหม่อีกครั้ง</p>';
@@ -139,7 +177,8 @@ if (!defined('_ERROR_LOGGER_HANDLERS_SET')) {
             log_error_to_db(
                 $err['message'], 'error',
                 basename($err['file']) . ':' . $err['line'],
-                $err['file'] . ':' . $err['line']
+                $err['file'] . ':' . $err['line'],
+                true   // Sentry registered its own shutdown via init() — already captured
             );
         }
     });

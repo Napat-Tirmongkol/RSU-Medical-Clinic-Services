@@ -121,6 +121,12 @@ if ($adminRole === 'superadmin') {
         if (!in_array('access_monthly_report', $cols)) {
             $pdo->exec("ALTER TABLE sys_staff ADD COLUMN access_monthly_report TINYINT(1) DEFAULT 0");
         }
+        if (!in_array('access_nurse_productivity', $cols)) {
+            $pdo->exec("ALTER TABLE sys_staff ADD COLUMN access_nurse_productivity TINYINT(1) DEFAULT 0");
+        }
+        if (!in_array('access_daily_summary', $cols)) {
+            $pdo->exec("ALTER TABLE sys_staff ADD COLUMN access_daily_summary TINYINT(1) DEFAULT 0");
+        }
         if (!in_array('access_director_view', $cols)) {
             $pdo->exec("ALTER TABLE sys_staff ADD COLUMN access_director_view TINYINT(1) DEFAULT 0");
         }
@@ -178,6 +184,8 @@ if ($adminRole === 'superadmin') {
                    IFNULL(s.access_scholarship, 0) AS access_scholarship,
                    IFNULL(s.access_dashboard_admin, 0) AS access_dashboard_admin,
                    IFNULL(s.access_monthly_report, 0) AS access_monthly_report,
+                   IFNULL(s.access_nurse_productivity, 0) AS access_nurse_productivity,
+                   IFNULL(s.access_daily_summary, 0) AS access_daily_summary,
                    IFNULL(s.access_director_view, 0) AS access_director_view,
                    IFNULL(s.access_identity, 0) AS access_identity,
                    s.department_id
