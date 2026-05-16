@@ -95,7 +95,9 @@ function log_error_to_db(
     // ── Mirror ไป Sentry — เฉพาะ manual report จาก catch block ──────────────
     // Auto error handler ส่ง $skipSentry=true เพราะ Sentry's built-in handler
     // capture เองอยู่แล้วผ่าน chain ของ set_error_handler — กัน double-capture
-    if (!$skipSentry && class_exists('\\Sentry\\SentrySdk', false)) {
+    // ข้าม level=info เพราะเป็น operational log ปกติ (เช่น "AI QA matcher start")
+    // ไม่ใช่ error ที่ต้อง alert
+    if (!$skipSentry && $level !== 'info' && class_exists('\\Sentry\\SentrySdk', false)) {
         try {
             $hub = \Sentry\SentrySdk::getCurrentHub();
             if ($hub->getClient() !== null) {
