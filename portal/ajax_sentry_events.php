@@ -20,6 +20,35 @@ if (($_SESSION['admin_role'] ?? '') !== 'superadmin') {
 $pdo    = db();
 $action = $_REQUEST['action'] ?? 'list';
 
+// Self-heal schema — receiver does the same on first webhook hit, but if the
+// admin opens this page before any new event arrives (or before the receiver
+// is redeployed) the github_* columns might still be missing.
+try {
+    $pdo->exec("CREATE TABLE IF NOT EXISTS sys_sentry_events (
+        id                   INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        sentry_id            VARCHAR(64)  NOT NULL DEFAULT '',
+        resource             VARCHAR(40)  NOT NULL DEFAULT '',
+        action               VARCHAR(40)  NOT NULL DEFAULT '',
+        level                VARCHAR(20)  NOT NULL DEFAULT '',
+        title                VARCHAR(500) NOT NULL DEFAULT '',
+        culprit              VARCHAR(500) NOT NULL DEFAULT '',
+        environment          VARCHAR(60)  NOT NULL DEFAULT '',
+        url                  TEXT         NULL,
+        raw_payload          MEDIUMTEXT   NULL,
+        github_issue_url     VARCHAR(255) NULL,
+        github_issue_number  INT UNSIGNED NULL,
+        github_error         VARCHAR(500) NULL,
+        received_at          TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_sentry_id   (sentry_id),
+        INDEX idx_resource    (resource),
+        INDEX idx_action      (action),
+        INDEX idx_received_at (received_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    try { $pdo->exec("ALTER TABLE sys_sentry_events ADD COLUMN github_issue_url VARCHAR(255) NULL"); } catch (PDOException) {}
+    try { $pdo->exec("ALTER TABLE sys_sentry_events ADD COLUMN github_issue_number INT UNSIGNED NULL"); } catch (PDOException) {}
+    try { $pdo->exec("ALTER TABLE sys_sentry_events ADD COLUMN github_error VARCHAR(500) NULL"); } catch (PDOException) {}
+} catch (Throwable) { /* table will be created on first webhook anyway */ }
+
 try {
     switch ($action) {
 
