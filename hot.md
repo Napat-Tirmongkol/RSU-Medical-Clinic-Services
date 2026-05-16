@@ -19,6 +19,7 @@ Stack: PHP 8 + MySQL (PDO singleton) · Tailwind compiled CSS (no JIT) · vanill
 ## สถานะปัจจุบัน (พฤษภาคม 2026)
 
 ### Phase ที่จบล่าสุด
+- **Daily Summary (สรุปงานประจำวัน)** — single-page read-only dashboard รวมข้อมูลจาก 4 module ใน 1 หน้า (Productivity ต่อ dept · Cash Book income/expense + top categories · Stock movement + low-stock alerts · Other: gold card / insurance / asset / docs / schedule วันนี้) · date navigator (‹ › วันนี้) · period delta vs เมื่อวาน · A4 print · 7-spot flag `access_daily_summary` ครบ
 - **Nurse Productivity (OPD)** — multi-tenant per `sys_departments` · 3-tab UI (Dashboard/Entry/Settings) · daily/monthly/yearly views · period delta · cross-dept comparison · Excel I/O (PhpSpreadsheet) · A4 print · auto-derive RN/หัวหน้า จาก `sys_nurse_schedule_monthly` เมื่อช่องว่าง · 7-spot access flag `access_nurse_productivity` ครบ
 - **Context Persistence** — `hot.md` + `AI/` folder (logs/knowledge/scratch)
 - **Finance / Cash Book** ครบ 3 phase (A: search/quick-dates/CSV/bulk · B: chart/donut/period delta · C: recurring/attachments/audit log) + dark mode pass สมบูรณ์

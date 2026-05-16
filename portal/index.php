@@ -395,6 +395,7 @@ $categoryMap = [
     'gold_card_pending' => 'core',
     'monthly_report' => 'core',
     'nurse_productivity' => 'core',
+    'daily_summary' => 'core',
     'system_logs' => 'tools',
     'privilege_inventory' => 'tools',
     'admin_tool' => 'tools',
@@ -1041,6 +1042,7 @@ try {
             $hasDashboardAdmin = $isSuper || !empty($_SESSION['access_dashboard_admin']);
             $hasMonthlyReport  = $isSuper || !empty($_SESSION['access_monthly_report']) || !empty($_SESSION['access_director_view']);
             $hasNurseProductivity = $isSuper || ($adminRole === 'admin') || !empty($_SESSION['access_nurse_productivity']);
+            $hasDailySummary      = $isSuper || ($adminRole === 'admin') || !empty($_SESSION['access_daily_summary']);
             $hasAsset          = $isSuper || in_array($_SESSION['role'] ?? '', ['admin','editor'], true) || !empty($_SESSION['access_asset']);
             $hasConsumables    = $isSuper || in_array($_SESSION['role'] ?? '', ['admin','editor'], true) || !empty($_SESSION['access_consumables']);
             $hasInventory      = $hasAsset || $hasConsumables;
@@ -1281,13 +1283,19 @@ try {
             <?php endif; ?>
 
             <?php /* ── รายงาน ─────────────────────────────────────────────── */ ?>
-            <?php if (!$registryOnly && ($hasMonthlyReport || $hasNurseProductivity)): ?>
+            <?php if (!$registryOnly && ($hasMonthlyReport || $hasNurseProductivity || $hasDailySummary)): ?>
                 <button type="button" class="psb-section-toggle" data-group="reports" onclick="togglePsbGroup('reports',this)">
                     <i class="fa-solid fa-clipboard-list" style="color:#f59e0b"></i>
                     <span>รายงาน</span>
                     <i class="fa-solid fa-chevron-down psb-chevron"></i>
                 </button>
                 <div class="psb-group" data-group="reports">
+                    <?php if ($hasDailySummary): ?>
+                    <button class="psb-item <?= $activeSection==='daily_summary'?'psb-active':'' ?>" data-section="daily_summary" onclick="switchSection('daily_summary',this)">
+                        <div class="psb-icon"><i class="fa-solid fa-clipboard-check" style="color:#f59e0b"></i></div>
+                        <span class="psb-label" style="color:#b45309;font-weight:900">สรุปงานประจำวัน</span>
+                    </button>
+                    <?php endif; ?>
                     <?php if ($hasMonthlyReport): ?>
                     <button class="psb-item <?= $activeSection==='monthly_report'?'psb-active':'' ?>" data-section="monthly_report" onclick="switchSection('monthly_report',this)">
                         <div class="psb-icon"><i class="fa-solid fa-calendar-days" style="color:#f59e0b"></i></div>
@@ -3081,6 +3089,14 @@ try {
                                                 </div>
                                                 <input type="checkbox" name="nurse_productivity_access" id="govNurseProductivityAccess" value="1" style="width:16px;height:16px" onclick="event.stopPropagation()">
                                             </div>
+                                            <!-- Daily Summary -->
+                                            <div onclick="document.getElementById('govDailySummaryAccess').click()" class="premium-role-card" style="border-radius:14px;border:1.5px solid #e2e8f0;background:#fff;cursor:pointer;padding:12px;transition:all 0.2s;display:flex;align-items:center;justify-content:space-between">
+                                                <div style="display:flex;align-items:center;gap:10px">
+                                                    <i class="fa-solid fa-clipboard-check text-amber-500"></i>
+                                                    <span style="font-weight:800;font-size:12px;color:#475569">สรุปงานประจำวัน (Daily Summary dashboard)</span>
+                                                </div>
+                                                <input type="checkbox" name="daily_summary_access" id="govDailySummaryAccess" value="1" style="width:16px;height:16px" onclick="event.stopPropagation()">
+                                            </div>
                                             <!-- Director View (ผู้อำนวยการ) -->
                                             <div onclick="document.getElementById('govDirectorViewAccess').click()" class="premium-role-card" style="border-radius:14px;border:1.5px solid #e2e8f0;background:#fff;cursor:pointer;padding:12px;transition:all 0.2s;display:flex;align-items:center;justify-content:space-between">
                                                 <div style="display:flex;align-items:center;gap:10px">
@@ -3191,6 +3207,7 @@ try {
                                             'access_dashboard_admin'=> ['Dashboard Editor', 'fa-chart-pie',          '#3b82f6'],
                                             'access_monthly_report' => ['รายงานประจำเดือน',  'fa-clipboard-list',     '#f59e0b'],
                                             'access_nurse_productivity'=>['Productivity พยาบาล','fa-user-nurse',         '#f59e0b'],
+                                            'access_daily_summary'  => ['สรุปงานประจำวัน',     'fa-clipboard-check',    '#f59e0b'],
                                             'access_director_view'  => ['ผู้อำนวยการ',       'fa-user-tie',           '#f43f5e'],
                                             'access_identity'       => ['Identity & Gov',     'fa-id-card-clip',       '#2563eb'],
                                         ];
@@ -3542,6 +3559,18 @@ try {
                     include __DIR__ . '/_partials/monthly_report.php';
                 } else {
                     echo '<div style="padding:100px;text-align:center;font-weight:900;color:#dc2626"><i class="fa-solid fa-shield-slash mb-4" style="font-size:4rem;display:block"></i> ACCESS DENIED<br><span style="font-size:14px;color:#94a3b8;font-weight:600">ต้องมีสิทธิ์ access_monthly_report หรือ access_director_view</span></div>';
+                }
+                ?>
+            </div>
+
+            <!-- ════════════ SECTION: DAILY SUMMARY ════════════ -->
+            <div id="section-daily_summary" class="portal-section"
+                style="<?= $activeSection==='daily_summary'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); background:#f1f5f9; overflow-y:auto; padding:20px;">
+                <?php
+                if ($hasDailySummary) {
+                    include __DIR__ . '/_partials/daily_summary.php';
+                } else {
+                    echo '<div style="padding:100px;text-align:center;font-weight:900;color:#dc2626"><i class="fa-solid fa-shield-slash mb-4" style="font-size:4rem;display:block"></i> ACCESS DENIED<br><span style="font-size:14px;color:#94a3b8;font-weight:600">ต้องมีสิทธิ์ access_daily_summary</span></div>';
                 }
                 ?>
             </div>
@@ -4300,6 +4329,8 @@ try {
                         if (mrEl) mrEl.checked = parseInt(data.access_monthly_report) === 1;
                         const npEl = document.getElementById('govNurseProductivityAccess');
                         if (npEl) npEl.checked = parseInt(data.access_nurse_productivity) === 1;
+                        const dsEl = document.getElementById('govDailySummaryAccess');
+                        if (dsEl) dsEl.checked = parseInt(data.access_daily_summary) === 1;
                         const dvEl = document.getElementById('govDirectorViewAccess');
                         if (dvEl) dvEl.checked = parseInt(data.access_director_view) === 1;
                         const idEl = document.getElementById('govIdentityAccess');
@@ -4345,6 +4376,8 @@ try {
                     if (mrElR) mrElR.checked = false;
                     const npElR = document.getElementById('govNurseProductivityAccess');
                     if (npElR) npElR.checked = false;
+                    const dsElR = document.getElementById('govDailySummaryAccess');
+                    if (dsElR) dsElR.checked = false;
                     const dvElR = document.getElementById('govDirectorViewAccess');
                     if (dvElR) dvElR.checked = false;
                     const idElR = document.getElementById('govIdentityAccess');
@@ -4372,7 +4405,7 @@ try {
             'access_eborrow','access_ecampaign','access_insurance','access_registry',
             'access_system_logs','access_site_settings','access_edms',
             'access_ai','access_consumables','access_asset','access_finance','access_scholarship',
-            'access_dashboard_admin','access_monthly_report','access_nurse_productivity','access_director_view',
+            'access_dashboard_admin','access_monthly_report','access_nurse_productivity','access_daily_summary','access_director_view',
             'access_identity'
         ];
 
@@ -4579,6 +4612,7 @@ try {
             ['access_dashboard_admin','govDashboardAccess'],
             ['access_monthly_report','govMonthlyReportAccess'],
             ['access_nurse_productivity','govNurseProductivityAccess'],
+            ['access_daily_summary',     'govDailySummaryAccess'],
             ['access_director_view', 'govDirectorViewAccess'],
             ['access_identity',      'govIdentityAccess'],
         ];

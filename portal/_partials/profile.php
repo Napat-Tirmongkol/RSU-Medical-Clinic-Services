@@ -30,6 +30,7 @@ if ($staffId > 0) {
                                   IFNULL(access_dashboard_admin,0) AS access_dashboard_admin,
                                   IFNULL(access_monthly_report,0) AS access_monthly_report,
                                   IFNULL(access_nurse_productivity,0) AS access_nurse_productivity,
+                                  IFNULL(access_daily_summary,0) AS access_daily_summary,
                                   IFNULL(access_director_view,0)  AS access_director_view,
                                   IFNULL(access_identity,0)       AS access_identity
                            FROM sys_staff WHERE id = :id LIMIT 1");
@@ -58,6 +59,7 @@ $accessLabels = [
     'access_dashboard_admin'=> ['Dashboard Editor',    'fa-chart-pie',          'blue'],
     'access_monthly_report' => ['รายงานประจำเดือน',     'fa-clipboard-list',     'amber'],
     'access_nurse_productivity' => ['Productivity พยาบาล','fa-user-nurse',         'amber'],
+    'access_daily_summary'  => ['สรุปงานประจำวัน',      'fa-clipboard-check',    'amber'],
     'access_director_view'  => ['ผู้อำนวยการ',          'fa-user-tie',           'rose'],
     'access_identity'       => ['Identity & Governance', 'fa-id-card-clip',       'blue'],
 ];
