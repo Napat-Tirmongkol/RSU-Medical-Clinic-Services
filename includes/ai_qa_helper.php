@@ -685,6 +685,65 @@ PROMPT;
  *        ใช้สำหรับ side effects เช่น แสดง loading indicator ใน LINE
  * @return array{answer:string, matched_via:string, source_id:int, confidence?:float}|null
  */
+/**
+ * Detect time-relative phrases that age out of a stored FAQ answer.
+ * Triggers a re-generate so we don't ship a "พรุ่งนี้ = อาทิตย์ที่ 17 พ.ค."
+ * answer to users who ask the same question weeks later.
+ */
+function ai_qa_answer_has_stale_dates(string $answer): bool
+{
+    $patterns = [
+        // Thai relative-day words
+        '/(วันนี้|พรุ่งนี้|มะรืน|เมื่อวาน)/u',
+        // English relative-day words (word-bounded so e.g. "todayish" doesn't match)
+        '/\b(today|tomorrow|yesterday)\b/i',
+        // "วันอาทิตย์ที่ 17" — weekday + "ที่" + specific date
+        '/วัน(อาทิตย์|จันทร์|อังคาร|พุธ|พฤหัสบดี|พฤหัส|ศุกร์|เสาร์)ที่/u',
+        // Buddhist/Christian year that pins answer to a specific calendar year
+        '/(พ\.ศ\.|ค\.ศ\.)\s*2\d{3}/u',
+        // Full Thai month names — generic answers should describe weekly
+        // patterns, not month-specific events
+        '/(มกราคม|กุมภาพันธ์|มีนาคม|เมษายน|พฤษภาคม|มิถุนายน|กรกฎาคม|สิงหาคม|กันยายน|ตุลาคม|พฤศจิกายน|ธันวาคม)/u',
+    ];
+    foreach ($patterns as $p) {
+        if (preg_match($p, $answer)) return true;
+    }
+    return false;
+}
+
+/**
+ * If a matched FAQ answer contains time-relative phrasing, re-generate
+ * the answer against the current clinic context via Gemini so users
+ * never see a stale "พรุ่งนี้" pinned to last week's date. Falls back
+ * to the original match silently when the refresh fails or also
+ * comes back stale.
+ */
+function ai_qa_refresh_if_stale(array $match, PDO $pdo, string $question): array
+{
+    if (!ai_qa_answer_has_stale_dates($match['answer'])) return $match;
+    try {
+        $fresh = ai_qa_generate_answer($question, $pdo);
+        if (!empty($fresh['answer']) && !ai_qa_answer_has_stale_dates($fresh['answer'])) {
+            ai_qa_debug_log('AI QA stale FAQ refreshed', [
+                'orig_via' => $match['matched_via'] ?? '',
+                'orig_id'  => $match['source_id'] ?? null,
+                'model'    => $fresh['model'] ?? '',
+            ]);
+            $match['answer']      = $fresh['answer'];
+            $match['matched_via'] = ($match['matched_via'] ?? 'unknown') . '+refreshed';
+            return $match;
+        }
+        ai_qa_debug_log('AI QA stale refresh dropped (regenerated answer also stale)', [
+            'orig_via' => $match['matched_via'] ?? '',
+        ], 'warning');
+    } catch (Throwable $e) {
+        ai_qa_debug_log('AI QA stale refresh failed — falling back to original', [
+            'error' => $e->getMessage(),
+        ], 'warning');
+    }
+    return $match;
+}
+
 function ai_qa_match_faq(PDO $pdo, string $question, ?callable $onSemanticPhase = null): ?array
 {
     $q = trim($question);
@@ -714,12 +773,12 @@ function ai_qa_match_faq(PDO $pdo, string $question, ?callable $onSemanticPhase 
     $stmt->execute([':q' => $q]);
     if ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
         ai_qa_debug_log('AI QA Phase 1a HIT (canonical)', ['faq_id' => (int)$row['id']]);
-        return [
+        return ai_qa_refresh_if_stale([
             'answer'      => (string)$row['answer'],
             'category'    => (string)($row['category'] ?? 'อื่นๆ'),
             'matched_via' => 'exact_canonical',
             'source_id'   => (int)$row['id'],
-        ];
+        ], $pdo, $q);
     }
 
     // ── Phase 1b: FAQ variants ────────────────────────────────────────────
@@ -733,12 +792,12 @@ function ai_qa_match_faq(PDO $pdo, string $question, ?callable $onSemanticPhase 
     $stmt->execute([':q' => $q]);
     if ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
         ai_qa_debug_log('AI QA Phase 1b HIT (variant)', ['faq_id' => (int)$row['id']]);
-        return [
+        return ai_qa_refresh_if_stale([
             'answer'      => (string)$row['answer'],
             'category'    => (string)($row['category'] ?? 'อื่นๆ'),
             'matched_via' => 'exact_variant',
             'source_id'   => (int)$row['id'],
-        ];
+        ], $pdo, $q);
     }
 
     // ── Phase 1c: approved Captured ───────────────────────────────────────
@@ -753,12 +812,12 @@ function ai_qa_match_faq(PDO $pdo, string $question, ?callable $onSemanticPhase 
     $stmt->execute([':q' => $q]);
     if ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
         ai_qa_debug_log('AI QA Phase 1c HIT (approved)', ['qa_log_id' => (int)$row['id']]);
-        return [
+        return ai_qa_refresh_if_stale([
             'answer'      => (string)$row['ai_answer'],
             'category'    => (string)($row['category'] ?? 'อื่นๆ'),
             'matched_via' => 'exact_approved',
             'source_id'   => (int)$row['id'],
-        ];
+        ], $pdo, $q);
     }
 
     ai_qa_debug_log('AI QA Phase 1 MISS — proceed to Gemini', ['question_snippet' => $qSnippet]);
@@ -962,13 +1021,13 @@ function ai_qa_match_via_gemini(PDO $pdo, string $question): ?array
             'confidence' => $conf,
             'elapsed_ms' => $elapsedMs,
         ]);
-        return [
+        return ai_qa_refresh_if_stale([
             'answer'      => (string)$matched['answer'],
             'category'    => (string)($matched['category'] ?? 'อื่นๆ'),
             'matched_via' => 'gemini_' . $matched['src'],
             'source_id'   => (int)$matched['id'],
             'confidence'  => $conf,
-        ];
+        ], $pdo, $question);
     }
     ai_qa_debug_log('AI QA Gemini exhausted all models — no match', [], 'warning');
 
