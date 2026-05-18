@@ -1691,7 +1691,7 @@ $pillTones = [
 
             <?php if ($isBirthday): ?>
             <!-- ── A) Birthday Card — appears only on user's birthday ── -->
-            <div class="hbd-card" role="region" aria-label="วันเกิด">
+            <div class="hbd-card" role="region" aria-label="<?= htmlspecialchars(__('hub.birthday.aria')) ?>">
                 <?php for ($i = 0; $i < 14; $i++):
                     $colors = ['#fde68a','#fca5a5','#a7f3d0','#bae6fd','#ddd6fe','#fbcfe8'];
                     $c = $colors[$i % count($colors)];
@@ -1708,13 +1708,13 @@ $pillTones = [
                     <div class="flex-1 min-w-0">
                         <p class="text-white/80 text-[10px] font-black uppercase tracking-[0.22em]">Happy Birthday!</p>
                         <h3 class="text-white text-xl font-black tracking-tight leading-tight mt-0.5 truncate">
-                            สุขสันต์วันเกิด คุณ<?= htmlspecialchars($firstName) ?>
+                            <?= htmlspecialchars(__('hub.birthday.title', $firstName)) ?>
                         </h3>
                         <p class="text-white/90 text-[12px] font-bold mt-1">
                             <?php if ($ageThisYear !== null && $ageThisYear > 0 && $ageThisYear < 120): ?>
-                                ขอให้สุขภาพแข็งแรง · อายุครบ <?= (int)$ageThisYear ?> ปีในวันนี้ 🎉
+                                <?= htmlspecialchars(__('hub.birthday.wish_age', (int)$ageThisYear)) ?>
                             <?php else: ?>
-                                ขอให้สุขภาพแข็งแรงตลอดปีนี้ 🎉
+                                <?= htmlspecialchars(__('hub.birthday.wish_no_age')) ?>
                             <?php endif; ?>
                         </p>
                     </div>
@@ -1743,7 +1743,7 @@ $pillTones = [
                             </div>
                         </div>
                         <div class="flex-1 min-w-0">
-                            <p class="text-emerald-50 text-sm font-bold mb-1">สวัสดี 👋</p>
+                            <p class="text-emerald-50 text-sm font-bold mb-1"><?= htmlspecialchars(__('hub.identity.hello')) ?></p>
                             <h3 class="text-white text-2xl font-black tracking-tight leading-tight mb-1 truncate">
                                 <?= $user['full_name'] ?>
                             </h3>
@@ -1765,10 +1765,10 @@ $pillTones = [
                             <?php
                             $dept = !empty($user['department']) ? $user['department'] : 'วิทยาลัยนวัตกรรมดิจิทัลเทคโนโลยี';
                             $status_label = [
-                                'student' => 'นักศึกษา',
-                                'staff'   => 'บุคลากร',
-                                'other'   => 'บุคคลทั่วไป',
-                            ][$user['status'] ?? 'other'] ?? 'ทั่วไป';
+                                'student' => __('hub.identity.role.student'),
+                                'staff'   => __('hub.identity.role.staff'),
+                                'other'   => __('hub.identity.role.other'),
+                            ][$user['status'] ?? 'other'] ?? __('hub.identity.role.default');
                             ?>
                             <div class="min-w-0 leading-tight">
                                 <p class="text-emerald-50 text-[11px] font-bold tracking-wide truncate max-w-[200px]"><?= htmlspecialchars($dept) ?></p>
@@ -1791,7 +1791,7 @@ $pillTones = [
                     $hasMedicalInfo = $bloodType !== '' || $allergies !== '' || $chronic !== '';
                     ?>
                     <?php if ($hasMedicalInfo): ?>
-                    <div class="relative mt-4 flex flex-wrap gap-1.5" aria-label="ข้อมูลสุขภาพ">
+                    <div class="relative mt-4 flex flex-wrap gap-1.5" aria-label="<?= htmlspecialchars(__('hub.section.health_data')) ?>">
                         <?php if ($bloodType !== ''): ?>
                         <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-rose-400/20 border border-rose-300/40 backdrop-blur-md"
                               title="กรุ๊ปเลือด">
@@ -1859,22 +1859,22 @@ $pillTones = [
             <div class="bg-white rounded-2xl border border-slate-100 shadow-sm p-1.5 flex gap-1" role="tablist">
                 <button type="button" role="tab" data-tab-btn="today" onclick="switchTab('today')"
                     class="tab-btn flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[12px] font-black transition-all">
-                    <i class="fa-solid fa-house-chimney text-[11px]"></i>วันนี้
+                    <i class="fa-solid fa-house-chimney text-[11px]"></i><?= htmlspecialchars(__('hub.nav.today')) ?>
                 </button>
                 <button type="button" role="tab" data-tab-btn="records" onclick="switchTab('records')"
                     class="tab-btn flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[12px] font-black transition-all">
-                    <i class="fa-solid fa-folder-open text-[11px]"></i>สุขภาพ
+                    <i class="fa-solid fa-folder-open text-[11px]"></i><?= htmlspecialchars(__('hub.nav.health')) ?>
                 </button>
                 <button type="button" role="tab" data-tab-btn="services" onclick="switchTab('services')"
                     class="tab-btn flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[12px] font-black transition-all">
-                    <i class="fa-solid fa-grip text-[11px]"></i>บริการ
+                    <i class="fa-solid fa-grip text-[11px]"></i><?= htmlspecialchars(__('hub.nav.services')) ?>
                 </button>
             </div>
 
             <!-- ── Group A: วันนี้ของคุณ (Smart Hero + Quick Stats) ── -->
-            <section id="today-section" data-tab-pane="today" aria-label="วันนี้ของคุณ" class="tab-pane space-y-4">
+            <section id="today-section" data-tab-pane="today" aria-label="<?= htmlspecialchars(__('hub.section.today_yours')) ?>" class="tab-pane space-y-4">
                 <div class="flex items-center justify-between px-1">
-                    <h3 class="text-slate-900 font-black text-sm uppercase tracking-widest">วันนี้ของคุณ</h3>
+                    <h3 class="text-slate-900 font-black text-sm uppercase tracking-widest"><?= htmlspecialchars(__('hub.section.today_yours')) ?></h3>
                     <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Today</p>
                 </div>
 
@@ -1897,7 +1897,7 @@ $pillTones = [
                                 <?php if (isset($smartHero['days_until'])): ?>
                                     <p class="mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 backdrop-blur-sm text-[11px] font-black">
                                         <i class="fa-regular fa-clock text-[9px]"></i>
-                                        <?= $smartHero['days_until'] === 0 ? 'วันนี้' : ($smartHero['days_until'] === 1 ? 'พรุ่งนี้' : 'อีก ' . (int)$smartHero['days_until'] . ' วัน') ?>
+                                        <?= htmlspecialchars($smartHero['days_until'] === 0 ? __('hub.pill.today') : ($smartHero['days_until'] === 1 ? __('hub.pill.tomorrow') : __('hub.pill.in_days', (int)$smartHero['days_until']))) ?>
                                     </p>
                                 <?php endif; ?>
                             </div>
@@ -1912,7 +1912,7 @@ $pillTones = [
 
                 <?php if (!empty($reminderPills)): ?>
                 <!-- ── D) Smart Reminder Pills ── -->
-                <div class="reminder-strip" aria-label="การแจ้งเตือนใกล้กำหนด">
+                <div class="reminder-strip" aria-label="<?= htmlspecialchars(__('hub.section.reminder_strip')) ?>">
                     <?php foreach ($reminderPills as $pill):
                         $tone = $pillTones[$pill['tone']] ?? $pillTones['emerald'];
                         $urgClass = $pill['urgency'] === 2 ? 'urgent' : '';
@@ -2076,7 +2076,7 @@ $pillTones = [
             </section>
 
             <!-- ── Group C: บริการ (Services) ── -->
-            <section id="services-section" data-tab-pane="services" aria-label="บริการ" class="tab-pane hidden space-y-4">
+            <section id="services-section" data-tab-pane="services" aria-label="<?= htmlspecialchars(__('hub.section.services')) ?>" class="tab-pane hidden space-y-4">
                 <div class="flex items-center justify-between px-1">
                     <h3 class="text-slate-900 font-black text-sm uppercase tracking-widest">บริการ</h3>
                     <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Services</p>
@@ -2158,7 +2158,7 @@ $pillTones = [
 
                     <!-- Quick contacts -->
                     <div class="pt-5 border-t border-slate-50">
-                        <p class="text-slate-400 text-[9px] font-black uppercase tracking-[0.3em] mb-4 text-center">ติดต่อด่วน</p>
+                        <p class="text-slate-400 text-[9px] font-black uppercase tracking-[0.3em] mb-4 text-center"><?= htmlspecialchars(__('hub.section.quick_contacts')) ?></p>
                         <div class="grid grid-cols-4 gap-4">
                             <a href="https://lin.ee/C3CJ2A9" target="_blank"
                                 class="flex flex-col items-center gap-2 active:scale-90 transition-all">
@@ -2185,7 +2185,7 @@ $pillTones = [
                                 class="flex flex-col items-center gap-2 active:scale-90 transition-all">
                                 <div class="relative w-12 h-12 bg-orange-50 rounded-2xl flex items-center justify-center text-orange-600 shadow-sm">
                                     <i class="fa-solid fa-circle-question text-lg"></i>
-                                    <span id="chat-unread-badge" aria-label="ข้อความที่ยังไม่ได้อ่าน">0</span>
+                                    <span id="chat-unread-badge" aria-label="<?= htmlspecialchars(__('hub.chat.unread_aria')) ?>">0</span>
                                 </div>
                                 <span class="text-slate-500 text-[8px] font-black text-center leading-tight uppercase tracking-widest">Help</span>
                             </button>
@@ -2208,7 +2208,7 @@ $pillTones = [
                     </div>
                     <div class="p-6 space-y-4">
                         <?php if (empty($booking_list)): ?>
-                            <div class="py-12 text-center text-slate-300 font-bold text-sm italic">ไม่มีนัดหมายในเร็วๆ นี้
+                            <div class="py-12 text-center text-slate-300 font-bold text-sm italic"><?= htmlspecialchars(__('hub.appts.empty')) ?>
                             </div>
                         <?php else: ?>
                             <?php foreach ($booking_list as $b):

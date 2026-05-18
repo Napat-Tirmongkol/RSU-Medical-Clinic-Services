@@ -331,4 +331,38 @@ return [
     // %s = number formatted with comma
     'hub.pill.fine_label'        => 'Fine ฿%s',
     'hub.pill.fine_sub'          => 'Awaiting payment',
+
+    // ── User Hub Phase 3a — birthday / identity / nav / sections ────────────
+    // Birthday card
+    'hub.birthday.aria'          => 'Birthday',
+    // %s = first name
+    'hub.birthday.title'         => 'Happy Birthday, %s',
+    // %d = age
+    'hub.birthday.wish_age'      => 'Stay healthy · %d years old today 🎉',
+    'hub.birthday.wish_no_age'   => 'Stay healthy all year 🎉',
+
+    // Identity card
+    'hub.identity.hello'         => 'Hello 👋',
+    'hub.identity.role.student'  => 'Student',
+    'hub.identity.role.staff'    => 'Staff',
+    'hub.identity.role.other'    => 'General',
+    'hub.identity.role.default'  => 'General',
+
+    // Bottom-nav tabs (also used in inline tab switcher)
+    'hub.nav.today'              => 'Today',
+    'hub.nav.health'             => 'Health',
+    'hub.nav.services'           => 'Services',
+
+    // Section headings + aria-labels
+    'hub.section.today_yours'    => 'Your day',
+    'hub.section.health_data'    => 'Health data',
+    'hub.section.services'       => 'Services',
+    'hub.section.reminder_strip' => 'Upcoming reminders',
+    'hub.section.quick_contacts' => 'Quick contacts',
+
+    // Upcoming-appointments card
+    'hub.appts.empty'            => 'No upcoming appointments',
+
+    // Chat
+    'hub.chat.unread_aria'       => 'Unread messages',
 ];

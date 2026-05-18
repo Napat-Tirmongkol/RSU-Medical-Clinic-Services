@@ -331,4 +331,38 @@ return [
     // %s = number formatted with comma
     'hub.pill.fine_label'        => 'ค่าปรับ ฿%s',
     'hub.pill.fine_sub'          => 'รอชำระ',
+
+    // ── User Hub Phase 3a — birthday / identity / nav / sections ────────────
+    // Birthday card
+    'hub.birthday.aria'          => 'วันเกิด',
+    // %s = first name
+    'hub.birthday.title'         => 'สุขสันต์วันเกิด คุณ%s',
+    // %d = age
+    'hub.birthday.wish_age'      => 'ขอให้สุขภาพแข็งแรง · อายุครบ %d ปีในวันนี้ 🎉',
+    'hub.birthday.wish_no_age'   => 'ขอให้สุขภาพแข็งแรงตลอดปีนี้ 🎉',
+
+    // Identity card
+    'hub.identity.hello'         => 'สวัสดี 👋',
+    'hub.identity.role.student'  => 'นักศึกษา',
+    'hub.identity.role.staff'    => 'บุคลากร',
+    'hub.identity.role.other'    => 'บุคคลทั่วไป',
+    'hub.identity.role.default'  => 'ทั่วไป',
+
+    // Bottom-nav tabs (also used in inline tab switcher)
+    'hub.nav.today'              => 'วันนี้',
+    'hub.nav.health'             => 'สุขภาพ',
+    'hub.nav.services'           => 'บริการ',
+
+    // Section headings + aria-labels
+    'hub.section.today_yours'    => 'วันนี้ของคุณ',
+    'hub.section.health_data'    => 'ข้อมูลสุขภาพ',
+    'hub.section.services'       => 'บริการ',
+    'hub.section.reminder_strip' => 'การแจ้งเตือนใกล้กำหนด',
+    'hub.section.quick_contacts' => 'ติดต่อด่วน',
+
+    // Upcoming-appointments card
+    'hub.appts.empty'            => 'ไม่มีนัดหมายในเร็วๆ นี้',
+
+    // Chat
+    'hub.chat.unread_aria'       => 'ข้อความที่ยังไม่ได้อ่าน',
 ];
