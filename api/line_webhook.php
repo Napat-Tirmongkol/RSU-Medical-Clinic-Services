@@ -548,6 +548,25 @@ foreach ($data['events'] as $idx => $event) {
                     'rate_limit_hours' => $faqSettings['rate_limit_hours'],
                 ]);
             } else {
+                // Phase 0 — deterministic intents that must NEVER come from cache
+                // (date-sensitive answers). Resolve fresh from DB, skip matcher.
+                $detTodayDoctors = ai_qa_try_doctors_today($pdo, $messageText);
+                if ($detTodayDoctors !== null) {
+                    $messages = [build_ai_reply_flex($detTodayDoctors)];
+                    $replyOk = $replyToken
+                        ? send_line_reply($replyToken, $messages, $accessToken)
+                        : ($userId ? send_line_push($userId, $messages, $accessToken) : false);
+                    if ($replyOk && $userId) {
+                        log_clinic_faq_reply($pdo, (string)$userId, 'ai_qa');
+                    }
+                    line_webhook_log('AI QA deterministic (doctors today) sent', [
+                        'line_user_id' => line_mask_uid($userId),
+                        'ok'           => $replyOk,
+                        'method'       => $replyToken ? 'reply' : 'push',
+                    ], $replyOk ? 'info' : 'warning');
+                    continue;
+                }
+
                 try {
                     $match = ai_qa_match_faq(
                         $pdo,
