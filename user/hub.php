@@ -361,29 +361,42 @@ function getInitials($name)
 function getCampStyle($type): array
 {
     return match ($type) {
-        'vaccine' => ['label' => 'วัคซีน', 'class' => 'bg-emerald-50 text-emerald-600 border-emerald-100', 'icon' => 'fa-syringe'],
-        'health_check' => ['label' => 'ตรวจสุขภาพ', 'class' => 'bg-green-50 text-green-600 border-green-100', 'icon' => 'fa-stethoscope'],
-        default => ['label' => 'ทั่วไป', 'class' => 'bg-gray-50 text-gray-600 border-gray-100', 'icon' => 'fa-star'],
+        'vaccine'      => ['label' => __('hub.camp.vaccine'),      'class' => 'bg-emerald-50 text-emerald-600 border-emerald-100', 'icon' => 'fa-syringe'],
+        'health_check' => ['label' => __('hub.camp.health_check'), 'class' => 'bg-green-50 text-green-600 border-green-100',       'icon' => 'fa-stethoscope'],
+        default        => ['label' => __('hub.camp.general'),      'class' => 'bg-gray-50 text-gray-600 border-gray-100',          'icon' => 'fa-star'],
     };
 }
 
 function getStatusStyle($status): array
 {
     return match ($status) {
-        'confirmed', 'booked'                  => ['label' => 'ยืนยันแล้ว',     'class' => 'bg-emerald-50 text-emerald-600'],
-        'completed'                            => ['label' => 'สำเร็จแล้ว',     'class' => 'bg-green-50 text-green-600'],
-        'cancelled', 'cancelled_by_admin'      => ['label' => 'ยกเลิกแล้ว',     'class' => 'bg-red-50 text-red-600'],
-        'expired'                              => ['label' => 'หมดอายุ',         'class' => 'bg-slate-100 text-slate-500'],
-        default                                => ['label' => 'รอดำเนินการ',     'class' => 'bg-gray-50 text-gray-600'],
+        'confirmed', 'booked'                  => ['label' => __('hub.status.confirmed'), 'class' => 'bg-emerald-50 text-emerald-600'],
+        'completed'                            => ['label' => __('hub.status.completed'), 'class' => 'bg-green-50 text-green-600'],
+        'cancelled', 'cancelled_by_admin'      => ['label' => __('hub.status.cancelled'), 'class' => 'bg-red-50 text-red-600'],
+        'expired'                              => ['label' => __('hub.status.expired'),   'class' => 'bg-slate-100 text-slate-500'],
+        default                                => ['label' => __('hub.status.pending'),   'class' => 'bg-gray-50 text-gray-600'],
     };
 }
 
+/**
+ * Format a Y-m-d date as a localized long-form string.
+ *   TH: "อาทิตย์, 18 พฤษภาคม 2569"  (Buddhist year)
+ *   EN: "Sunday, 18 May 2026"
+ * Reads dow + months from the translation file so adding a new locale
+ * needs no code changes (Phase 2 i18n migration — function name kept
+ * for backwards compatibility with its 6+ call sites).
+ */
 function formatThaiDate($date)
 {
-    $days = ["อาทิตย์", "จันทร์", "อังคาร", "พุธ", "พฤหัสบดี", "ศุกร์", "เสาร์"];
-    $months = ["", "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"];
     $ts = strtotime($date);
-    return $days[date('w', $ts)] . ", " . date('j', $ts) . " " . $months[date('n', $ts)] . " " . (date('Y', $ts) + 543);
+    if ($ts === false) return (string)$date;
+    $tr        = $GLOBALS['_tr'] ?? [];
+    $days      = $tr['bookings.dow_full']    ?? ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    $months    = $tr['bookings.months_full'] ?? ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    $buddhist  = $tr['bookings.date_buddhist'] ?? false;
+    $year      = $buddhist ? ((int)date('Y', $ts) + 543) : (int)date('Y', $ts);
+    return ($days[(int)date('w', $ts)] ?? '') . ', ' . (int)date('j', $ts) . ' '
+         . ($months[(int)date('n', $ts)] ?? '') . ' ' . $year;
 }
 
 function maskCitizenId(?string $citizenId): string
@@ -420,7 +433,7 @@ if ($firstName === '') {
     $parts = preg_split('/\s+/', trim((string)($user['full_name'] ?? '')));
     $firstName = $parts[0] ?? '';
 }
-$firstName = $firstName !== '' ? $firstName : 'คุณ';
+$firstName = $firstName !== '' ? $firstName : __('hub.greet.fallback_name');
 
 // Birthday detection — show HBD card when today MM-DD == DOB MM-DD
 $isBirthday = false;
@@ -439,59 +452,61 @@ if ($next_appt) {
     $daysUntil = (int) ((strtotime($next_appt['slot_date']) - strtotime($today)) / 86400);
     $smartHero = [
         'kind'       => 'appointment',
-        'eyebrow'    => 'นัดหมายถัดไป',
+        'eyebrow'    => __('hub.hero.eyebrow.appt'),
         'title'      => $next_appt['camp_name'],
-        'detail'     => formatThaiDate($next_appt['slot_date']) . ' · ' . substr((string)$next_appt['start_time'], 0, 5) . ' น.',
+        'detail'     => __('hub.hero.detail.appt',
+                          formatThaiDate($next_appt['slot_date']),
+                          substr((string)$next_appt['start_time'], 0, 5)),
         'days_until' => $daysUntil,
         'icon'       => 'fa-calendar-check',
         'theme'      => 'brand',
         'action'     => "window.location.href='my_bookings.php'",
-        'cta_label'  => 'ดูรายละเอียด',
+        'cta_label'  => __('hub.hero.cta.detail'),
     ];
 } elseif (!empty($borrow_overdue_count)) {
     $smartHero = [
         'kind'      => 'overdue',
-        'eyebrow'   => 'เกินกำหนดคืน',
-        'title'     => "อุปกรณ์ {$borrow_overdue_count} รายการเลยกำหนดคืน",
-        'detail'    => 'ติดต่อเจ้าหน้าที่เพื่อคืนของและชำระค่าปรับ',
+        'eyebrow'   => __('hub.hero.eyebrow.overdue'),
+        'title'     => __('hub.hero.title.overdue', $borrow_overdue_count),
+        'detail'    => __('hub.hero.detail.overdue'),
         'icon'      => 'fa-triangle-exclamation',
         'theme'     => 'rose',
         'action'    => 'showBorrow()',
-        'cta_label' => 'จัดการตอนนี้',
+        'cta_label' => __('hub.hero.cta.manage'),
     ];
 } elseif (!empty($healthOverview['vaccine_next_due'])) {
     $vd = $healthOverview['vaccine_next_due'];
     $smartHero = [
         'kind'      => 'vaccine',
-        'eyebrow'   => 'วัคซีนครบกำหนด',
+        'eyebrow'   => __('hub.hero.eyebrow.vaccine'),
         'title'     => $vd['vaccine_name'],
-        'detail'    => 'ครบกำหนด ' . formatThaiDate($vd['next_due_date']),
+        'detail'    => __('hub.hero.detail.vaccine_due', formatThaiDate($vd['next_due_date'])),
         'icon'      => 'fa-syringe',
         'theme'     => 'amber',
         'action'    => 'showCampaigns()',
-        'cta_label' => 'จองนัด',
+        'cta_label' => __('hub.hero.cta.book'),
     ];
 } elseif (!empty($borrow_pending_count)) {
     $smartHero = [
         'kind'      => 'pending',
-        'eyebrow'   => 'คำขอรออนุมัติ',
-        'title'     => "{$borrow_pending_count} รายการรอเจ้าหน้าที่อนุมัติ",
-        'detail'    => 'แตะดูสถานะคำขอ',
+        'eyebrow'   => __('hub.hero.eyebrow.pending'),
+        'title'     => __('hub.hero.title.pending', $borrow_pending_count),
+        'detail'    => __('hub.hero.detail.pending'),
         'icon'      => 'fa-hourglass-half',
         'theme'     => 'amber',
         'action'    => 'showBorrow()',
-        'cta_label' => 'ดูคำขอ',
+        'cta_label' => __('hub.hero.cta.view_requests'),
     ];
 } else {
     $smartHero = [
         'kind'      => 'empty',
-        'eyebrow'   => 'วันนี้ของคุณ',
-        'title'     => 'ไม่มีรายการเร่งด่วน',
-        'detail'    => 'ดูแลสุขภาพของคุณ — ฉีดวัคซีนตามกำหนดหรือดูแคมเปญที่เปิดรับ',
+        'eyebrow'   => __('hub.hero.eyebrow.today'),
+        'title'     => __('hub.hero.title.empty'),
+        'detail'    => __('hub.hero.detail.empty'),
         'icon'      => 'fa-heart-pulse',
         'theme'     => 'brand',
         'action'    => 'showCampaigns()',
-        'cta_label' => 'ดูแคมเปญ',
+        'cta_label' => __('hub.hero.cta.view_camps'),
     ];
 }
 
@@ -508,7 +523,9 @@ $todayTs = strtotime($today);
 foreach ($healthOverview['upcoming_list'] as $up) {
     $diff = (int) round((strtotime($up['slot_date']) - $todayTs) / 86400);
     if ($diff < 0 || $diff > 7) continue;
-    $when = $diff === 0 ? 'วันนี้' : ($diff === 1 ? 'พรุ่งนี้' : 'อีก '.$diff.' วัน');
+    $when = $diff === 0 ? __('hub.pill.today')
+          : ($diff === 1 ? __('hub.pill.tomorrow')
+          : __('hub.pill.in_days', $diff));
     $urg = $diff <= 1 ? 2 : ($diff <= 3 ? 1 : 0);
     $reminderPills[] = [
         'icon'   => 'fa-calendar-check',
@@ -526,8 +543,8 @@ if (!empty($healthOverview['vaccine_next_due'])) {
         $urg = $diff <= 7 ? 2 : ($diff <= 14 ? 1 : 0);
         $reminderPills[] = [
             'icon'   => 'fa-syringe',
-            'label'  => 'วัคซีน '.mb_substr((string)$vd['vaccine_name'], 0, 18),
-            'sub'    => $diff === 0 ? 'ครบกำหนดวันนี้' : 'อีก '.$diff.' วัน',
+            'label'  => __('hub.pill.vaccine_label', mb_substr((string)$vd['vaccine_name'], 0, 18)),
+            'sub'    => $diff === 0 ? __('hub.pill.due_today') : __('hub.pill.in_days', $diff),
             'tone'   => $urg === 2 ? 'rose' : ($urg === 1 ? 'amber' : 'sky'),
             'action' => 'showCampaigns()',
             'urgency'=> $urg,
@@ -539,12 +556,12 @@ foreach ($borrow_active as $b) {
     $diff = (int) round((strtotime($b['due_date']) - $todayTs) / 86400);
     if ($diff < -1 || $diff > 3) continue;
     if ($diff < 0) {
-        $label = 'เกินกำหนดคืน '.abs($diff).' วัน';
+        $label = __('hub.pill.overdue_days', abs($diff));
         $tone = 'rose'; $urg = 2;
     } elseif ($diff === 0) {
-        $label = 'คืนวันนี้'; $tone = 'rose'; $urg = 2;
+        $label = __('hub.pill.return_today'); $tone = 'rose'; $urg = 2;
     } else {
-        $label = 'คืนอีก '.$diff.' วัน'; $tone = 'amber'; $urg = 1;
+        $label = __('hub.pill.return_in_days', $diff); $tone = 'amber'; $urg = 1;
     }
     $reminderPills[] = [
         'icon'   => 'fa-clock-rotate-left',
@@ -558,8 +575,8 @@ foreach ($borrow_active as $b) {
 if ($borrow_total_fine > 0) {
     $reminderPills[] = [
         'icon'   => 'fa-money-bill-wave',
-        'label'  => 'ค่าปรับ ฿'.number_format($borrow_total_fine, 0),
-        'sub'    => 'รอชำระ',
+        'label'  => __('hub.pill.fine_label', number_format($borrow_total_fine, 0)),
+        'sub'    => __('hub.pill.fine_sub'),
         'tone'   => 'rose',
         'action' => 'showBorrow()',
         'urgency'=> 2,
