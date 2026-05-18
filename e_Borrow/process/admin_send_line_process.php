@@ -72,6 +72,6 @@ try {
     }
 
 } catch (Throwable $e) {
-    echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+    echo json_encode(['status' => 'error', 'message' => 'ระบบขัดข้อง กรุณาลองอีกครั้ง']);
 }
 ?>

@@ -206,11 +206,29 @@ try {
         case 'delete_user': {
             validate_csrf_or_die();
             $id = (int)($_POST['id'] ?? 0);
+            $reason = trim((string)($_POST['reason'] ?? ''));
             if ($id <= 0) jout(['ok' => false, 'error' => 'invalid id']);
-            $pdo->prepare("DELETE FROM insurance_partner_users WHERE id = :id")
-                ->execute([':id' => $id]);
-            log_activity('insurance_partner_user_delete', "user_id={$id}");
-            jout(['ok' => true]);
+            if ($reason === '') jout(['ok' => false, 'error' => 'กรุณาระบุเหตุผล (PDPA)']);
+
+            // Tier 1 audit C15: replace hard DELETE with soft-disable. Keeping
+            // the row preserves insurance_partner_activity_log FK references
+            // (closes orphan-FK audit-trail gap from Phase 6).
+            // Self-heal: ensure disabled_at column exists.
+            try {
+                $cols = $pdo->query("SHOW COLUMNS FROM insurance_partner_users")->fetchAll(PDO::FETCH_COLUMN);
+                if (!in_array('disabled_at', $cols, true)) {
+                    $pdo->exec("ALTER TABLE insurance_partner_users ADD COLUMN disabled_at TIMESTAMP NULL DEFAULT NULL, ADD COLUMN disabled_reason VARCHAR(500) NULL");
+                }
+            } catch (PDOException $e) { error_log('[partner_users alter] ' . $e->getMessage()); }
+
+            $pdo->prepare("UPDATE insurance_partner_users
+                           SET account_status = 'Suspended',
+                               disabled_at    = NOW(),
+                               disabled_reason = :r
+                           WHERE id = :id")
+                ->execute([':id' => $id, ':r' => mb_substr($reason, 0, 500)]);
+            log_activity('insurance_partner_user_disable', "user_id={$id} reason=" . mb_substr($reason, 0, 100));
+            jout(['ok' => true, 'message' => 'ปิดใช้งานบัญชีแล้ว (soft-disable) — เก็บข้อมูล activity log ไว้']);
         }
 
         // ─────── Activity Log ───────

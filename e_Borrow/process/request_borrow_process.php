@@ -135,19 +135,21 @@ try {
     if (isset($pdo) && $pdo->inTransaction()) {
         $pdo->rollBack();
     }
+    error_log('[request_borrow_process] PDO: ' . $e->getMessage());
     http_response_code(500);
     echo json_encode([
         'status' => 'error',
-        'message' => 'Database Error: ' . $e->getMessage()
+        'message' => 'Database Error'
     ]);
 } catch (Throwable $e) {
     if (isset($pdo) && $pdo->inTransaction()) {
         $pdo->rollBack();
     }
+    error_log('[request_borrow_process] ' . $e->getMessage());
     http_response_code(500);
     echo json_encode([
         'status' => 'error',
-        'message' => 'Error: ' . $e->getMessage()
+        'message' => 'Error'
     ]);
 }
 exit;

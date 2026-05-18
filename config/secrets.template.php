@@ -4,6 +4,12 @@
 // คัดลอกไฟล์นี้ไปเป็น config/secrets.php และเติมค่าจริงให้ครบถ้วน
 
 return [
+    // --- Application Base URL (REQUIRED for password-reset emails, OAuth) ---
+    // Absolute URL of the deployed app, e.g. 'https://clinic.rsu.ac.th/e-campaignv2'
+    // Leave empty in dev = password-reset emails will refuse to send (fail-closed
+    // anti-host-header-injection). Always set this for production.
+    'APP_BASE_URL' => '',
+
     // --- Main Database ---
     'DB_HOST' => '127.0.0.1',
     'DB_PORT' => 3306,
@@ -67,4 +73,11 @@ return [
     // ตั้งค่าเป็น random string ยาวๆ ตอนต้องรัน แล้วเคลียร์เป็น '' หลังเสร็จ
     // สร้าง token: bin2hex(random_bytes(32)) หรือ openssl rand -hex 32
     'MIGRATION_TOKEN'                     => '',
+
+    // --- e-Borrow cron secret (sent in X-Cron-Secret header by scheduler) ---
+    // ใช้กับ e_Borrow/process/send_reminders.php — ตั้งเป็น random hex 32+ chars
+    // ห้ามใส่ใน URL query string เพราะจะ leak ไปยัง access log.
+    // ตัวอย่าง cron entry:
+    //   curl -fsS -H "X-Cron-Secret: <secret>" https://.../e_Borrow/process/send_reminders.php
+    'EBORROW_CRON_SECRET'                 => '',
 ];

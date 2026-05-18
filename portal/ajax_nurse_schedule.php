@@ -189,7 +189,7 @@ try {
         } catch (Throwable $e) {
             $pdo->rollBack();
             error_log('[nurse_schedule save] ' . $e->getMessage());
-            echo json_encode(['ok' => false, 'error' => 'Save failed: ' . $e->getMessage()]);
+            echo json_encode(['ok' => false, 'error' => 'Save failed']);
         }
         exit;
     }

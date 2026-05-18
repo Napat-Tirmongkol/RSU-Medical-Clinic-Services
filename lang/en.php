@@ -273,4 +273,5 @@ return [
     'hub.doctors_today.title'    => "Today's doctors",
     'hub.doctors_today.see_all'  => 'See all',
     'hub.doctors_today.empty'    => 'No doctors scheduled today',
+    'hub.doctors_today.closed'   => 'Clinic closed today',
 ];

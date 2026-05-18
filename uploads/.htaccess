@@ -1,0 +1,23 @@
+# Block script execution under uploads/ (umbrella rule).
+# Files are served either directly (images for legacy paths) or through
+# PHP proxies (portal/finance_attachment.php, ajax_edms.php, ajax_gold_card.php
+# document:download). Either way, NO user-uploaded file should ever execute.
+<FilesMatch "\.(php|phtml|phar|pl|py|jsp|asp|aspx|sh|cgi|js\.php)$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order Deny,Allow
+        Deny from all
+    </IfModule>
+</FilesMatch>
+
+# Disable directory listing
+Options -Indexes
+
+# Disable any handlers that might run files based on extension
+<IfModule mod_php.c>
+    php_flag engine off
+</IfModule>
+RemoveHandler .php .phtml .phar .pl .py
+RemoveType .php .phtml .phar .pl .py

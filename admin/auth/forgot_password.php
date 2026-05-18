@@ -6,19 +6,29 @@
 session_start();
 require_once __DIR__ . '/../../config.php';
 require_once __DIR__ . '/../../includes/auth_helper.php';
+require_once __DIR__ . '/../../includes/rate_limit.php';
 
 $message = '';
 $error = '';
-$type = $_GET['type'] ?? 'admin'; // 'admin' or 'staff'
+// Whitelist $type — only 'admin' or 'staff' allowed downstream.
+$type = ($_GET['type'] ?? 'admin') === 'staff' ? 'staff' : 'admin';
 $title = ($type === 'staff') ? 'Staff Password Recovery' : 'Admin Password Recovery';
 $themeColor = ($type === 'staff') ? '#4f46e5' : '#2e9e63';
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // CSRF Check
-    if (function_exists('validate_csrf_or_die')) validate_csrf_or_die();
-    
+// IP-based rate limit — 5 requests per 15 minutes per IP, regardless of session.
+rate_limit_ip_check_or_redirect('forgot_pw', 5, 900);
+
+if (($_GET['error'] ?? '') === 'too_many_attempts') {
+    $error = 'คำขอรีเซ็ตหลายครั้งเกินไป กรุณารอ 15 นาทีแล้วลองใหม่';
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
+    validate_csrf_or_die();
+
     $email = trim($_POST['email'] ?? '');
     if (filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        // Hit the bucket BEFORE calling reset (so even valid-format emails count).
+        rate_limit_ip_hit('forgot_pw', 5, 900);
         $result = requestPasswordReset($email, $type);
         if ($result['ok']) {
             $message = $result['message'];
@@ -35,7 +45,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?= $title ?> — <?= htmlspecialchars(SITE_NAME) ?></title>
+    <title><?= htmlspecialchars($title) ?> — <?= htmlspecialchars(SITE_NAME) ?></title>
     <link rel="stylesheet" href="../../assets/css/tailwind.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="stylesheet" href="../../assets/css/rsufont.css">

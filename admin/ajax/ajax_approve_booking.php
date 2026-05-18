@@ -55,7 +55,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 echo json_encode(['status' => 'error', 'message' => 'ไม่สามารถอัปเดตได้ คิวอาจถูกอนุมัติหรือถูกยกเลิกไปแล้ว']);
             }
         } catch (PDOException $e) {
-            echo json_encode(['status' => 'error', 'message' => 'Database error: ' . $e->getMessage()]);
+            echo json_encode(['status' => 'error', 'message' => 'Database error']);
         }
     } else {
         echo json_encode(['status' => 'error', 'message' => 'Invalid ID']);

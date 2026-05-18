@@ -51,7 +51,7 @@ if ($action === 'set_default') {
         $stmt->execute([':v' => $groupId, ':v2' => $groupId]);
         echo json_encode(['ok' => true]);
     } catch (Throwable $e) {
-        echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
+        echo json_encode(['ok' => false, 'error' => 'Server error']);
     }
     exit;
 }

@@ -49,19 +49,20 @@ try {
     ]);
 
 } catch (PDOException $e) {
-    // 7. จัดการข้อผิดพลาด (Exception Handling)
+    error_log('[get_staff_list] PDO: ' . $e->getMessage());
     http_response_code(500);
     echo json_encode([
         'status'  => 'error',
         'success' => false,
-        'message' => 'Database Error: ' . $e->getMessage()
+        'message' => 'Database Error'
     ]);
 } catch (Exception $e) {
+    error_log('[get_staff_list] ' . $e->getMessage());
     http_response_code(500);
     echo json_encode([
         'status'  => 'error',
         'success' => false,
-        'message' => 'System Error: ' . $e->getMessage()
+        'message' => 'System Error'
     ]);
 }
 exit;

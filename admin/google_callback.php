@@ -44,12 +44,21 @@ curl_setopt($ch, CURLOPT_URL, $tokenUrl);
 curl_setopt($ch, CURLOPT_POST, true);
 curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($postFields));
 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-$response = curl_exec($ch);
+curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
+curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+$response   = curl_exec($ch);
+$tokenHttp  = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+$tokenErr   = curl_errno($ch) ? curl_error($ch) : '';
 curl_close($ch);
 
+if ($response === false || $tokenHttp !== 200) {
+    error_log("[google_callback] token exchange failed http={$tokenHttp} err={$tokenErr}");
+    die('Google Login Error: ไม่สามารถยืนยันตัวตนกับ Google ได้ในขณะนี้ กรุณาลองใหม่');
+}
+
 $tokenData = json_decode($response, true);
-if (!isset($tokenData['access_token'])) {
-    die("Error: Unable to get access token. " . ($tokenData['error_description'] ?? ''));
+if (!is_array($tokenData) || !isset($tokenData['access_token'])) {
+    die('Google Login Error: ไม่สามารถยืนยันตัวตนกับ Google ได้ในขณะนี้ กรุณาลองใหม่');
 }
 
 // 3. ใช้ Access Token ดึงข้อมูลโปรไฟล์
@@ -57,8 +66,16 @@ $profileUrl = "https://www.googleapis.com/oauth2/v2/userinfo";
 $ch = curl_init($profileUrl);
 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 curl_setopt($ch, CURLOPT_HTTPHEADER, ['Authorization: Bearer ' . $tokenData['access_token']]);
+curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
+curl_setopt($ch, CURLOPT_TIMEOUT, 10);
 $profileResponse = curl_exec($ch);
+$profileHttp     = curl_getinfo($ch, CURLINFO_HTTP_CODE);
 curl_close($ch);
+
+if ($profileResponse === false || $profileHttp !== 200) {
+    error_log("[google_callback] profile fetch failed http={$profileHttp}");
+    die('Google Login Error: ดึงข้อมูลโปรไฟล์จาก Google ไม่สำเร็จ กรุณาลองใหม่');
+}
 
 $profile = json_decode($profileResponse, true);
 $email = $profile['email'] ?? null;
@@ -74,12 +91,16 @@ $stmt->execute([':email' => $email]);
 $admin = $stmt->fetch();
 
 if ($admin) {
+    // Whitelist role — don't trust whatever lives in sys_admins.role unmodified.
+    $allowedRoles = ['admin', 'editor', 'superadmin'];
+    $role = in_array($admin['role'] ?? '', $allowedRoles, true) ? $admin['role'] : 'admin';
+
     // พบแอดมินในระบบ -> ล็อกอินสำเร็จ
     $_SESSION['admin_logged_in'] = true;
     $_SESSION['admin_id'] = $admin['id'];
     $_SESSION['admin_username'] = $admin['full_name'] ?: $name;
     $_SESSION['admin_email'] = $email;
-    $_SESSION['admin_role'] = $admin['role'];
+    $_SESSION['admin_role'] = $role;
 
     session_regenerate_id(true);
 

@@ -69,7 +69,7 @@ function collectStats(): array {
         ];
 
     } catch (PDOException $e) {
-        return ['ok' => false, 'error' => $e->getMessage(), 'ts' => time()];
+        return ['ok' => false, 'error' => 'Server error', 'ts' => time()];
     }
 }
 

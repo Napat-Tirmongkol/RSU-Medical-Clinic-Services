@@ -273,4 +273,5 @@ return [
     'hub.doctors_today.title'    => 'แพทย์ออกตรวจวันนี้',
     'hub.doctors_today.see_all'  => 'ดูทั้งหมด',
     'hub.doctors_today.empty'    => 'ไม่มีแพทย์ออกตรวจในวันนี้',
+    'hub.doctors_today.closed'   => 'วันนี้คลินิกปิดทำการ',
 ];

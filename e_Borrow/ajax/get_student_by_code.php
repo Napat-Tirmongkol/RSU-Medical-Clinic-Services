@@ -50,6 +50,6 @@ try {
         echo json_encode(['status' => 'error', 'message' => 'ไม่พบข้อมูลนักศึกษา']);
     }
 } catch (PDOException $e) {
-    echo json_encode(['status' => 'error', 'message' => 'Database Error: ' . $e->getMessage()]);
+    echo json_encode(['status' => 'error', 'message' => 'Database Error']);
 }
 ?>

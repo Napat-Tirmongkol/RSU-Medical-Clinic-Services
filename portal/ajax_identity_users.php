@@ -9,7 +9,21 @@ declare(strict_types=1);
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/includes/auth.php'; // Ensure security and starts session
 
-header('Content-Type: application/json');
+header('Content-Type: application/json; charset=utf-8');
+
+// Role gate — this endpoint returns PHI (citizen_id, phone, email) so an
+// "editor" admin must not reach it. Restrict to superadmin/admin or staff
+// holding access_registry / access_identity flag.
+$adminRole = $_SESSION['admin_role'] ?? '';
+$hasAccess = ($adminRole === 'superadmin')
+          || ($adminRole === 'admin')
+          || !empty($_SESSION['access_registry'])
+          || !empty($_SESSION['access_identity']);
+if (!$hasAccess) {
+    http_response_code(403);
+    echo json_encode(['status' => 'error', 'message' => 'Permission denied']);
+    exit;
+}
 
 $pdo = db();
 $search   = trim($_GET['search'] ?? '');
@@ -65,6 +79,25 @@ try {
     $stmt->execute();
     $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+    // Mask citizen_id to last-4 digits — only superadmin sees the full value.
+    // Reduces PHI exposure surface in list responses (PDPA Art. 32 data minimization).
+    if ($adminRole !== 'superadmin') {
+        foreach ($users as &$u) {
+            if (!empty($u['citizen_id']) && strlen((string)$u['citizen_id']) >= 4) {
+                $u['citizen_id'] = str_repeat('•', max(0, strlen((string)$u['citizen_id']) - 4))
+                                 . substr((string)$u['citizen_id'], -4);
+            }
+        }
+        unset($u);
+    }
+
+    // Audit log — PHI read access (PDPA Art. 39 record-of-processing).
+    if (function_exists('log_activity')) {
+        log_activity('identity_users_search',
+            "search=" . ($search !== '' ? mb_substr($search, 0, 64) : '(all)')
+            . " page={$page} size={$pageSize} rows=" . count($users));
+    }
+
     // 3. Format response
     echo json_encode([
         'status' => 'success',
@@ -78,9 +111,10 @@ try {
     ]);
 
 } catch (Exception $e) {
+    error_log('[ajax_identity_users] ' . $e->getMessage());
     http_response_code(500);
     echo json_encode([
         'status' => 'error',
-        'message' => $e->getMessage()
+        'message' => 'ระบบขัดข้อง กรุณาลองใหม่'
     ]);
 }

@@ -46,6 +46,31 @@ function finance_sync_ensure_schema(PDO $pdo): void
         try { $pdo->exec("ALTER TABLE sys_finance_transactions ADD COLUMN source_id VARCHAR(50) NULL"); } catch (PDOException) {}
         try { $pdo->exec("ALTER TABLE sys_finance_transactions MODIFY COLUMN source_id VARCHAR(50) NULL"); } catch (PDOException) {}
         try { $pdo->exec("ALTER TABLE sys_finance_transactions ADD INDEX idx_source (source_module, source_id)"); } catch (PDOException) {}
+
+        // Atomicity: enforce UNIQUE constraint on (source_module, source_id) so
+        // that INSERT…ON DUPLICATE KEY UPDATE in finance_sync_upsert() becomes
+        // truly atomic — closes the double-credit race observed in Phase 4.
+        // Dedup first (keep oldest row per source tuple) so the ALTER won't fail.
+        try {
+            $pdo->exec("DELETE t1 FROM sys_finance_transactions t1
+                INNER JOIN sys_finance_transactions t2
+                  ON t1.source_module = t2.source_module
+                 AND t1.source_id     = t2.source_id
+                WHERE t1.source_module IS NOT NULL
+                  AND t1.source_id     IS NOT NULL
+                  AND t1.id > t2.id");
+        } catch (PDOException $e) {
+            error_log('[finance_sync_ensure_schema] dedupe failed: ' . $e->getMessage());
+        }
+        try {
+            $pdo->exec("ALTER TABLE sys_finance_transactions ADD UNIQUE KEY uniq_source (source_module, source_id)");
+        } catch (PDOException $e) {
+            // Most likely "Duplicate key name" if already added — that's fine.
+            // Anything else means dedup didn't finish; log loudly.
+            if (!str_contains($e->getMessage(), 'Duplicate key name')) {
+                error_log('[finance_sync_ensure_schema] add uniq_source failed: ' . $e->getMessage());
+            }
+        }
         $done = true;
     } catch (PDOException $e) {
         error_log('[finance_sync_ensure_schema] ' . $e->getMessage());
@@ -104,28 +129,38 @@ function finance_sync_upsert(PDO $pdo, array $p): array
             $catId = $cs->fetchColumn() ?: null;
         }
 
-        // ตรวจสอบว่ามี record อยู่แล้วไหม
-        $ex = $pdo->prepare("SELECT id FROM sys_finance_transactions WHERE source_module=? AND source_id=? LIMIT 1");
-        $ex->execute([$srcMod, $srcId]);
-        $existingId = (int)$ex->fetchColumn();
-
-        if ($existingId > 0) {
-            $pdo->prepare("UPDATE sys_finance_transactions
-                SET txn_date=?, kind=?, category_id=?, amount=?, description=?,
-                    reference=?, note=?, updated_by=?
-                WHERE id=?")
-                ->execute([$txnDate, $kind, $catId, $amount, $desc ?: null, $ref ?: null, $note ?: null, $adminId, $existingId]);
-            return ['ok' => true, 'id' => $existingId, 'mode' => 'updated'];
-        }
-        $pdo->prepare("INSERT INTO sys_finance_transactions
+        // Atomic upsert — relies on UNIQUE KEY uniq_source (source_module, source_id)
+        // added in finance_sync_ensure_schema(). Two concurrent callers with the
+        // same (source_module, source_id) will both reach INSERT; the second one
+        // hits the unique-key path and UPDATEs the existing row instead of
+        // creating a duplicate Cash Book entry (the double-credit bug fixed here).
+        $stmt = $pdo->prepare("INSERT INTO sys_finance_transactions
             (txn_date, kind, category_id, amount, description, reference, note,
              source_module, source_id, created_by, updated_by)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
-            ->execute([$txnDate, $kind, $catId, $amount, $desc ?: null, $ref ?: null, $note ?: null,
-                       $srcMod, $srcId, $adminId, $adminId]);
-        return ['ok' => true, 'id' => (int)$pdo->lastInsertId(), 'mode' => 'created'];
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON DUPLICATE KEY UPDATE
+                txn_date    = VALUES(txn_date),
+                kind        = VALUES(kind),
+                category_id = VALUES(category_id),
+                amount      = VALUES(amount),
+                description = VALUES(description),
+                reference   = VALUES(reference),
+                note        = VALUES(note),
+                updated_by  = VALUES(updated_by)");
+        $stmt->execute([$txnDate, $kind, $catId, $amount, $desc ?: null, $ref ?: null, $note ?: null,
+                        $srcMod, $srcId, $adminId, $adminId]);
+
+        // rowCount(): 1 = inserted, 2 = updated (MySQL convention for ON DUPLICATE KEY UPDATE).
+        $mode = ($stmt->rowCount() === 1) ? 'created' : 'updated';
+        $insertedId = (int)$pdo->lastInsertId();
+        if ($insertedId === 0 || $mode === 'updated') {
+            $find = $pdo->prepare("SELECT id FROM sys_finance_transactions WHERE source_module=? AND source_id=? LIMIT 1");
+            $find->execute([$srcMod, $srcId]);
+            $insertedId = (int)$find->fetchColumn();
+        }
+        return ['ok' => true, 'id' => $insertedId, 'mode' => $mode];
     } catch (Throwable $e) {
         error_log('[finance_sync_upsert] ' . $e->getMessage());
-        return ['ok' => false, 'error' => $e->getMessage()];
+        return ['ok' => false, 'error' => 'ระบบ Cash Book ขัดข้อง'];
     }
 }

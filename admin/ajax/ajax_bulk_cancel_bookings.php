@@ -131,10 +131,10 @@ try {
 
 } catch (Exception $e) {
     if ($pdo->inTransaction()) $pdo->rollBack();
-    echo json_encode(['ok' => false, 'error' => 'Internal Server Error: ' . $e->getMessage()]);
+    echo json_encode(['ok' => false, 'error' => 'Internal Server Error']);
 } catch (Error $e) {
     if (isset($pdo) && $pdo->inTransaction()) $pdo->rollBack();
-    echo json_encode(['ok' => false, 'error' => 'PHP Fatal Error: ' . $e->getMessage()]);
+    echo json_encode(['ok' => false, 'error' => 'PHP Fatal Error']);
 }
 
 // ── Helper: Send LINE cancellation message ─────────────────────────────────

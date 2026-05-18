@@ -697,7 +697,7 @@ function handle_slots(PDO $pdo, string $action, int $adminId): void
             echo json_encode(['ok' => true, 'cancelled_bookings' => $activeCancelled]);
         } catch (Throwable $e) {
             $pdo->rollBack();
-            echo json_encode(['ok' => false, 'error' => 'ลบไม่สำเร็จ: ' . $e->getMessage()]);
+            echo json_encode(['ok' => false, 'error' => 'ลบไม่สำเร็จ']);
         }
         return;
     }

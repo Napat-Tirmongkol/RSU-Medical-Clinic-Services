@@ -7,6 +7,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/includes/auth.php';
+require_once __DIR__ . '/../includes/finance_receipt_helper.php';
 require_once __DIR__ . '/includes/finance_link.php';
 
 $adminRole = $_SESSION['admin_role'] ?? 'editor';
@@ -37,30 +38,16 @@ $stmt->execute([$id]);
 $row = $stmt->fetch(PDO::FETCH_ASSOC);
 if (!$row) { http_response_code(404); exit('ไม่พบรายการ'); }
 
-// Auto-assign receipt no ถ้ายังไม่มี (atomic — FOR UPDATE locks the
-// matching prefix+year rows so concurrent receipt pages can't allocate
-// the same running number)
+// Auto-assign receipt no ถ้ายังไม่มี — race-free via finance_assign_receipt_no()
+// (uses sys_finance_receipt_counter + SELECT FOR UPDATE; see
+// includes/finance_receipt_helper.php). The helper already re-reads the
+// transaction row after the UPDATE so concurrent callers get a consistent
+// receipt_no even if a sibling request beat them to the assignment.
 if (empty($row['receipt_no'])) {
-    $prefix = ($row['kind'] === 'income') ? 'RCP' : 'PV';
-    $yearBE = (int)date('Y', strtotime($row['txn_date'])) + 543;
-    $like = $prefix . '-' . $yearBE . '-%';
-    $pdo->beginTransaction();
-    try {
-        $maxStmt = $pdo->prepare("SELECT MAX(CAST(SUBSTRING(receipt_no, " . (strlen($prefix) + 7) . ") AS UNSIGNED)) FROM sys_finance_transactions WHERE receipt_no LIKE ? FOR UPDATE");
-        $maxStmt->execute([$like]);
-        $next = ((int)$maxStmt->fetchColumn()) + 1;
-        $receiptNo = sprintf('%s-%d-%06d', $prefix, $yearBE, $next);
-        $pdo->prepare("UPDATE sys_finance_transactions SET receipt_no=?, updated_by=? WHERE id=? AND (receipt_no IS NULL OR receipt_no='')")
-            ->execute([$receiptNo, (int)($_SESSION['admin_id'] ?? 0) ?: null, $id]);
-        $pdo->commit();
-    } catch (Throwable $e) {
-        $pdo->rollBack();
-        throw $e;
+    $assigned = finance_assign_receipt_no($pdo, $id, (int)($_SESSION['admin_id'] ?? 0) ?: null);
+    if ($assigned !== '') {
+        $row['receipt_no'] = $assigned;
     }
-    // Re-read in case another request beat us to the update
-    $reread = $pdo->prepare("SELECT receipt_no FROM sys_finance_transactions WHERE id=?");
-    $reread->execute([$id]);
-    $row['receipt_no'] = (string)$reread->fetchColumn();
 }
 
 // Get clinic profile

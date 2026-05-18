@@ -83,7 +83,7 @@ try {
     }
 
 } catch (PDOException $e) {
-    echo json_encode(['status' => 'error', 'message' => 'เกิดข้อผิดพลาด: ' . $e->getMessage()]);
+    echo json_encode(['status' => 'error', 'message' => 'เกิดข้อผิดพลาด']);
     exit;
 }
 ?>

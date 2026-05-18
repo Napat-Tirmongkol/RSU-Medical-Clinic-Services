@@ -96,5 +96,5 @@ try {
 
 } catch (Exception $e) {
     error_log("AI Service Error: " . $e->getMessage());
-    echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
+    echo json_encode(['ok' => false, 'error' => 'Server error']);
 }

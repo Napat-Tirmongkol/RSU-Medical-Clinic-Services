@@ -199,8 +199,28 @@ try {
 }
 
 // ── Today's doctor shifts (for "แพทย์ออกตรวจวันนี้" widget) ───────────────
+// LEFT JOIN ms + no ms.is_active filter — matches admin schedule:list
+// semantics + clinic_status_helper.php. Previously INNER + ms.is_active=1
+// silently dropped schedules of staff flagged inactive.
+//
+// Also gate on clinic-closed status: if today is a holiday (เทอมเบรค) or
+// special-closure day in sys_clinic_hours, skip the widget entirely.
+// The calendar view at user/clinic_schedule.php hides shift events on
+// holiday days; the hub widget needs the same treatment so it doesn't say
+// "doctor X is on duty today" when the clinic isn't actually open.
 $todayShifts = [];
+$todayClinicClosed = false;
+$todayClinicCloseNote = '';
 try {
+    require_once __DIR__ . '/../includes/clinic_status_helper.php';
+    $todayHours = get_clinic_hours_for_date($pdo, $today);
+    if (!empty($todayHours['closed'])) {
+        // Clinic closed — skip the query entirely, widget renders empty state.
+        $todayClinicClosed   = true;
+        $todayClinicCloseNote = (string)($todayHours['note'] ?? '');
+        throw new RuntimeException('clinic-closed-today');
+    }
+
     $todayWd = (int)date('w');
     $stmt = $pdo->prepare("
         SELECT s.id, s.type, s.weekday, s.specific_date, s.start_time, s.end_time,
@@ -208,9 +228,9 @@ try {
                ms.title AS doc_title, ms.full_name AS doc_name,
                cr.name AS room_name, cr.code AS room_code
         FROM sys_doctor_schedule s
-        JOIN sys_medical_staff ms ON s.staff_id = ms.id
+        LEFT JOIN sys_medical_staff ms ON s.staff_id = ms.id
         LEFT JOIN sys_clinic_rooms cr ON s.room_id = cr.id
-        WHERE s.is_active = 1 AND ms.is_active = 1
+        WHERE s.is_active = 1
           AND s.type <> 'off'
           AND (
               (s.specific_date = :today)
@@ -1944,10 +1964,20 @@ $pillTones = [
                     </div>
                     <?php if (empty($todayShifts)): ?>
                         <div class="text-center py-5">
-                            <div class="w-10 h-10 mx-auto mb-2 rounded-full bg-slate-50 text-slate-300 flex items-center justify-center">
-                                <i class="fa-solid fa-calendar-xmark"></i>
-                            </div>
-                            <p class="text-xs font-bold text-slate-400"><?= htmlspecialchars(__('hub.doctors_today.empty')) ?></p>
+                            <?php if ($todayClinicClosed): ?>
+                                <div class="w-10 h-10 mx-auto mb-2 rounded-full bg-rose-50 text-rose-500 flex items-center justify-center">
+                                    <i class="fa-solid fa-door-closed"></i>
+                                </div>
+                                <p class="text-xs font-black text-rose-600"><?= htmlspecialchars(__('hub.doctors_today.closed')) ?></p>
+                                <?php if ($todayClinicCloseNote !== ''): ?>
+                                    <p class="mt-1 text-[11px] font-bold text-slate-400"><?= htmlspecialchars($todayClinicCloseNote) ?></p>
+                                <?php endif; ?>
+                            <?php else: ?>
+                                <div class="w-10 h-10 mx-auto mb-2 rounded-full bg-slate-50 text-slate-300 flex items-center justify-center">
+                                    <i class="fa-solid fa-calendar-xmark"></i>
+                                </div>
+                                <p class="text-xs font-bold text-slate-400"><?= htmlspecialchars(__('hub.doctors_today.empty')) ?></p>
+                            <?php endif; ?>
                         </div>
                     <?php else: ?>
                         <div class="space-y-1.5">

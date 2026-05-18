@@ -5,6 +5,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/includes/auth.php';
+require_once __DIR__ . '/../includes/finance_receipt_helper.php';
 require_once __DIR__ . '/includes/finance_link.php';
 
 header('Content-Type: application/json; charset=utf-8');
@@ -679,37 +680,19 @@ try {
         }
     }
 
-    // ── Assign receipt number (atomic running number per year) ──
+    // ── Assign receipt number (atomic running number per year+kind) ──
+    // Delegates to finance_assign_receipt_no() — uses sys_finance_receipt_counter
+    // + SELECT FOR UPDATE so two concurrent assigns can't collide.
     if ($action === 'txn:assign_receipt') {
         $id = (int)($_POST['id'] ?? 0);
         if ($id <= 0) { echo json_encode(['ok' => false, 'message' => 'ไม่ระบุ id']); exit; }
-        // ถ้ามี receipt_no แล้ว → คืนค่าเดิม (อ่านนอก transaction ก่อน — เร็วกว่า)
-        $existing = $pdo->prepare("SELECT receipt_no, kind, txn_date FROM sys_finance_transactions WHERE id=?");
-        $existing->execute([$id]);
-        $row = $existing->fetch(PDO::FETCH_ASSOC);
-        if (!$row) { echo json_encode(['ok' => false, 'message' => 'ไม่พบรายการ']); exit; }
-        if (!empty($row['receipt_no'])) { echo json_encode(['ok' => true, 'receipt_no' => $row['receipt_no']]); exit; }
-
-        $prefix = ($row['kind'] === 'income') ? 'RCP' : 'PV'; // RCP=ใบเสร็จรับ, PV=ใบสำคัญจ่าย
-        $yearBE = (int)date('Y', strtotime($row['txn_date'])) + 543;
-        $like = $prefix . '-' . $yearBE . '-%';
-
-        // Atomic running-number: lock the rows that match the prefix+year
-        // with FOR UPDATE so concurrent assigns can't read the same MAX.
-        $pdo->beginTransaction();
-        try {
-            $maxStmt = $pdo->prepare("SELECT MAX(CAST(SUBSTRING(receipt_no, " . (strlen($prefix) + 7) . ") AS UNSIGNED)) AS m
-                FROM sys_finance_transactions WHERE receipt_no LIKE ? FOR UPDATE");
-            $maxStmt->execute([$like]);
-            $next = ((int)$maxStmt->fetchColumn()) + 1;
-            $receiptNo = sprintf('%s-%d-%06d', $prefix, $yearBE, $next);
-            $pdo->prepare("UPDATE sys_finance_transactions SET receipt_no=?, updated_by=? WHERE id=? AND (receipt_no IS NULL OR receipt_no='')")
-                ->execute([$receiptNo, $adminId ?: null, $id]);
-            $pdo->commit();
-        } catch (Throwable $e) {
-            $pdo->rollBack();
-            throw $e;
+        // Delegate to the canonical counter-table helper (race-free via
+        // sys_finance_receipt_counter + SELECT FOR UPDATE).
+        $receiptNo = finance_assign_receipt_no($pdo, $id, $adminId ?: null);
+        if ($receiptNo === '') {
+            echo json_encode(['ok' => false, 'message' => 'ไม่สามารถออกเลขที่ใบเสร็จได้']); exit;
         }
+        // Keep main's audit trail for receipt issuance.
         fin_audit_log($pdo, $id, 'assign_receipt', ['receipt_no' => $receiptNo], $adminId, $adminName);
         echo json_encode(['ok' => true, 'receipt_no' => $receiptNo]); exit;
     }
@@ -909,15 +892,17 @@ try {
         if (!$att) { echo json_encode(['ok'=>false,'message'=>'ไม่พบไฟล์']); exit; }
         // Only the uploader, admin, or superadmin can delete an attachment —
         // an editor with access_finance cannot remove someone else's evidence.
+        // (Role gate from main's H1-H5 fixes; combined with the realpath
+        // confinement from PR #162 Patch 3b C9.)
         $isAdminRole = $isSuper || ($adminRole === 'admin');
         $isUploader  = ((int)$att['uploaded_by'] > 0) && ((int)$att['uploaded_by'] === $adminId);
         if (!$isAdminRole && !$isUploader) {
             echo json_encode(['ok'=>false,'message'=>'ไม่มีสิทธิ์ลบไฟล์แนบของผู้อื่น']); exit;
         }
         // Constrain unlink path to uploads/finance/ to defeat any stored-name
-        // tampering (defense-in-depth — stored_name is server-generated)
+        // tampering (defense-in-depth — stored_name is server-generated).
         $financeRoot = realpath(__DIR__ . '/../uploads/finance');
-        $abs = realpath(__DIR__ . '/../' . $att['stored_name']);
+        $abs = realpath(__DIR__ . '/../' . ltrim((string)$att['stored_name'], '/'));
         $pdo->beginTransaction();
         try {
             $pdo->prepare("DELETE FROM sys_finance_attachments WHERE id=?")->execute([$id]);
