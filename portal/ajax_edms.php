@@ -838,8 +838,17 @@ try {
 
             $pdo->prepare("DELETE FROM sys_doc_attachments WHERE id = ?")->execute([$id]);
 
-            $path = edms_uploads_dir() . '/' . $row['stored_path'];
-            if (is_file($path)) @unlink($path);
+            // Realpath confinement — never unlink anything outside uploads/edms/
+            // even if stored_path has been corrupted (DB tampering, legacy rows).
+            $base      = edms_uploads_dir();
+            $baseReal  = realpath($base) ?: '';
+            $candidate = $base . '/' . ltrim((string)$row['stored_path'], '/');
+            $pathReal  = realpath($candidate) ?: '';
+            if ($pathReal !== '' && $baseReal !== ''
+                && str_starts_with($pathReal, $baseReal . DIRECTORY_SEPARATOR)
+                && is_file($pathReal)) {
+                @unlink($pathReal);
+            }
 
             edms_log($pdo, (int)$row['doc_id'], $userId, 'detach',
                 ['attachment_id' => $id, 'promoted_previous' => $promotedTo]);

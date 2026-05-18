@@ -984,25 +984,59 @@ try {
         }
 
         case 'document:download': {
-            // ส่งไฟล์ออก (ไม่ใช่ JSON) — handle separately
+            // ส่งไฟล์ออก (ไม่ใช่ JSON) — handle separately.
+            // Tier 1 audit C19: every download must (a) realpath-confine to
+            // uploads/gold_card/, (b) write an audit row, (c) restrict GET
+            // (CSRF-less inline preview) to image MIMEs only — PDF/DOC must
+            // come through POST+CSRF.
             $id = (int)($_POST['id'] ?? $_GET['id'] ?? 0);
             if ($id <= 0) json_err('ระบุ id ไม่ถูกต้อง');
 
-            $stmt = $pdo->prepare("SELECT file_name, stored_path, mime_type FROM gold_card_documents WHERE id = ?");
+            $stmt = $pdo->prepare("SELECT id, member_id, file_name, stored_path, mime_type
+                                   FROM gold_card_documents WHERE id = ?");
             $stmt->execute([$id]);
             $row = $stmt->fetch(PDO::FETCH_ASSOC);
             if (!$row) json_err('ไม่พบไฟล์');
 
-            $path = gold_card_uploads_dir() . '/' . $row['stored_path'];
-            if (!is_file($path)) json_err('ไฟล์หายไปจาก storage');
+            $mimeType = (string)($row['mime_type'] ?: 'application/octet-stream');
+            $isImage  = str_starts_with($mimeType, 'image/');
 
-            // Override JSON header
-            $disposition = (($_GET['disposition'] ?? $_POST['disposition'] ?? 'inline') === 'attachment') ? 'attachment' : 'inline';
+            // GET path is CSRF-less (inline preview). Only allow image MIMEs;
+            // everything else must come through POST+CSRF (already enforced at
+            // the file-level top guard for non-inline-preview requests).
+            if ($_SERVER['REQUEST_METHOD'] === 'GET' && !$isImage) {
+                json_err('ดาวน์โหลดเอกสารต้องผ่านการยืนยัน (POST + CSRF)', 405);
+            }
+
+            // Realpath confinement — never read anything outside uploads/gold_card/
+            // regardless of what stored_path may contain.
+            $base       = gold_card_uploads_dir();
+            $baseReal   = realpath($base) ?: '';
+            $candidate  = $base . '/' . ltrim((string)$row['stored_path'], '/');
+            $pathReal   = realpath($candidate) ?: '';
+            if ($pathReal === '' || $baseReal === ''
+                || !str_starts_with($pathReal, $baseReal . DIRECTORY_SEPARATOR)
+                || !is_file($pathReal)) {
+                json_err('ไฟล์หายไปจาก storage');
+            }
+
+            // Audit row — every doc view leaves a trace.
+            if (function_exists('gold_card_log_history')) {
+                @gold_card_log_history($pdo, (int)$row['member_id'], 'document_viewed', [
+                    'doc_id'    => (int)$row['id'],
+                    'file_name' => $row['file_name'],
+                    'via'       => $_SERVER['REQUEST_METHOD'],
+                ], null, $adminId);
+            }
+
+            $disposition = (($_GET['disposition'] ?? $_POST['disposition'] ?? 'inline') === 'attachment')
+                ? 'attachment' : 'inline';
             header_remove('Content-Type');
-            header('Content-Type: ' . ($row['mime_type'] ?: 'application/octet-stream'));
+            header('Content-Type: ' . $mimeType);
+            header('X-Content-Type-Options: nosniff');
             header('Content-Disposition: ' . $disposition . '; filename="' . rawurlencode($row['file_name']) . '"');
-            header('Content-Length: ' . filesize($path));
-            readfile($path);
+            header('Content-Length: ' . filesize($pathReal));
+            readfile($pathReal);
             exit;
         }
 

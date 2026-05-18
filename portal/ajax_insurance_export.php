@@ -6,16 +6,22 @@ require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/includes/auth.php';
 
 $adminRole = $_SESSION['admin_role'] ?? '';
+$adminId   = (int)($_SESSION['admin_id'] ?? 0);
+$adminName = (string)($_SESSION['admin_username'] ?? '');
 $isStaff   = !empty($_SESSION['is_ecampaign_staff']);
 if ($isStaff && $adminRole === '') {
     http_response_code(403);
     exit('ไม่มีสิทธิ์');
 }
 
-$allowedRoles = ['admin', 'superadmin', 'editor'];
-if (!in_array($adminRole, $allowedRoles, true)) {
+// PHI export — require explicit access_insurance flag (or superadmin). The previous
+// rule that allowed plain 'editor' has been dropped (Phase 6 audit C17).
+$isSuper        = ($adminRole === 'superadmin');
+$hasInsurance   = !empty($_SESSION['access_insurance']);
+$canExport      = $isSuper || $hasInsurance;
+if (!$canExport) {
     http_response_code(403);
-    exit('ไม่มีสิทธิ์');
+    exit('ไม่มีสิทธิ์ — ต้องมี access_insurance flag เพื่อ export PHI');
 }
 
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
@@ -96,6 +102,7 @@ header('Cache-Control: no-cache, must-revalidate');
 echo "\xEF\xBB\xBF";
 echo csv_row($headers);
 
+$rowCount = 0;
 while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
     echo csv_row([
         $row['member_id'],
@@ -111,4 +118,27 @@ while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
         $row['remarks'] ?? '',
         $row['updated_at'],
     ]);
+    $rowCount++;
+}
+
+// Watermark / provenance row — survives Excel paste, helps trace leaks back to
+// the exporter (PDPA Art. 39: record of processing).
+echo csv_row([
+    '--- EXPORTED ---',
+    'by: ' . $adminName . ' (admin_id=' . $adminId . ')',
+    'at: ' . date('Y-m-d H:i:s'),
+    'ip: ' . ($_SERVER['REMOTE_ADDR'] ?? 'unknown'),
+    'rows: ' . $rowCount,
+    'type: ' . $type,
+    'sync_id: ' . ($syncId ?: '-'),
+    '', '', '', '', '',
+]);
+
+// Audit log — every PHI export must leave a trace.
+if (function_exists('log_activity')) {
+    log_activity(
+        'insurance_export',
+        "type={$type} sync_id={$syncId} rows={$rowCount} filename={$filename}",
+        $adminId
+    );
 }

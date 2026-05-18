@@ -1108,17 +1108,36 @@ if ($action === 'ai_review') {
     if (is_string($sample))  $sample  = json_decode($sample, true);
     if (!is_array($summary) || !is_array($sample)) json_err('ข้อมูลไม่ครบ');
 
-    // Defensive — strip any field that looks like full citizen_id (13 digits)
+    // Defensive PHI stripping before cross-border transfer to Gemini.
+    // The client UI is supposed to anonymize, but we do not trust client output —
+    // strip again server-side to enforce the data-protection contract.
+    // PDPA Art. 32 + 27: minimize personal data leaving the controller.
+    $sensitiveFieldNames = ['date_of_birth', 'dob', 'phone', 'phone_number',
+                            'email', 'address', 'line_user_id', 'line_id'];
+    $maskFieldNames      = ['full_name', 'first_name', 'last_name', 'name'];
     foreach ($sample as &$row) {
-        if (is_array($row)) {
-            foreach ($row as $k => $v) {
-                if (is_string($v) && preg_match('/^\d{13}$/', $v)) {
-                    $row[$k] = substr($v, 0, 1) . str_repeat('X', 11) . substr($v, -1);
-                }
+        if (!is_array($row)) continue;
+        foreach (array_keys($row) as $k) {
+            $kl = strtolower((string)$k);
+            // Drop high-sensitivity fields outright.
+            if (in_array($kl, $sensitiveFieldNames, true)) {
+                $row[$k] = '[REDACTED]';
+                continue;
+            }
+            // Reduce name-ish fields to initials (first char of each word).
+            if (in_array($kl, $maskFieldNames, true) && is_string($row[$k]) && $row[$k] !== '') {
+                $parts = preg_split('/\s+/u', trim((string)$row[$k])) ?: [];
+                $row[$k] = implode('.', array_map(fn($p) => mb_substr($p, 0, 1, 'UTF-8'), $parts)) . '.';
+                continue;
+            }
+            // Mask any string that LOOKS like a 13-digit citizen_id.
+            if (is_string($row[$k]) && preg_match('/^\d{13}$/', $row[$k])) {
+                $row[$k] = substr($row[$k], 0, 1) . str_repeat('X', 11) . substr($row[$k], -1);
             }
         }
     }
     unset($row);
+    $maskVersion = 'phi_mask_v2';
 
     $prompt = "คุณคือผู้ช่วยตรวจคุณภาพข้อมูลรายชื่อสำหรับส่งให้บริษัทประกันสุขภาพ\n";
     $prompt .= "ของศูนย์การแพทย์มหาวิทยาลัยรังสิต\n";
@@ -1184,7 +1203,16 @@ if ($action === 'ai_review') {
         $text .= "\n\n> ⚠️ *คำตอบอาจไม่สมบูรณ์ (เกิน token limit) — กดปุ่ม \"ขอ AI ช่วยตรวจ\" อีกครั้งหากต้องการ*";
     }
 
-    log_activity('insurance_ai_review', 'sample=' . count($sample) . ', tokens~' . (int)($data['usageMetadata']['totalTokenCount'] ?? 0) . ($truncated ? ', TRUNCATED' : ''));
+    // Audit — capture mask version + payload size so future leak investigations
+    // can pin down which mask rules were active at the time of the AI call.
+    $payloadBytes = strlen((string)json_encode($payload, JSON_UNESCAPED_UNICODE));
+    log_activity('insurance_ai_review',
+        'sample=' . count($sample)
+        . ', mask=' . $maskVersion
+        . ', payload_bytes=' . $payloadBytes
+        . ', tokens~' . (int)($data['usageMetadata']['totalTokenCount'] ?? 0)
+        . ($truncated ? ', TRUNCATED' : '')
+    );
     json_ok([
         'review'    => $text,
         'tokens'    => (int)($data['usageMetadata']['totalTokenCount'] ?? 0),
