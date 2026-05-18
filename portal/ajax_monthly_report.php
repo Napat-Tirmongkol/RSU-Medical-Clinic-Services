@@ -297,7 +297,7 @@ try {
                 json_ok(['id' => $reportId, 'created' => true]);
             } catch (Throwable $e) {
                 $pdo->rollBack();
-                json_err('สร้างรายงานไม่สำเร็จ: ' . $e->getMessage());
+                json_err('สร้างรายงานไม่สำเร็จ');
             }
         }
 
@@ -425,5 +425,5 @@ try {
             json_err("ไม่รู้จัก action: $key");
     }
 } catch (Throwable $e) {
-    json_err('เกิดข้อผิดพลาด: ' . $e->getMessage());
+    json_err('เกิดข้อผิดพลาด');
 }

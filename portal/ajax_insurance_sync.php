@@ -389,7 +389,7 @@ if ($action === 'upload') {
         $pdo->commit();
     } catch (Exception $e) {
         $pdo->rollBack();
-        json_err('เกิดข้อผิดพลาด: ' . $e->getMessage());
+        json_err('เกิดข้อผิดพลาด');
     }
 
     log_activity('insurance_upload', "mode={$uploadMode}, total={$totalCsv}, new={$cntNew}, updated={$cntUpdated}, protected={$cntProtected}, inactivated={$cntInactivated}");
@@ -587,7 +587,7 @@ if ($action === 'add_single') {
     } catch (Exception $e) {
         $pdo->rollBack();
         error_log('add_single: ' . $e->getMessage());
-        json_err('บันทึกไม่สำเร็จ: ' . $e->getMessage());
+        json_err('บันทึกไม่สำเร็จ');
     }
 
     try {
@@ -1013,7 +1013,7 @@ if ($action === 'upload_combined') {
         $pdo->commit();
     } catch (Exception $e) {
         $pdo->rollBack();
-        json_err('เกิดข้อผิดพลาด: ' . $e->getMessage());
+        json_err('เกิดข้อผิดพลาด');
     }
 
     log_activity('insurance_upload_combined',
@@ -1395,7 +1395,7 @@ if ($action === 'rollback_sync') {
         $pdo->commit();
     } catch (Exception $e) {
         $pdo->rollBack();
-        json_err('ย้อนกลับไม่สำเร็จ: ' . $e->getMessage());
+        json_err('ย้อนกลับไม่สำเร็จ');
     }
 
     log_activity('insurance_rollback', "ย้อน sync #{$syncId}: deleted={$cntDeleted}, restored={$cntRestored}, reverted={$cntReverted}");
@@ -1583,7 +1583,7 @@ if ($action === 'set_visibility') {
             ON DUPLICATE KEY UPDATE setting_value = :val2
         ")->execute([':val' => $activeVal, ':val2' => $activeVal]);
     } catch (Exception $e) {
-        json_err('ไม่สามารถบันทึกข้อมูลได้: ' . $e->getMessage());
+        json_err('ไม่สามารถบันทึกข้อมูลได้');
     }
 
     log_activity('update_site_settings', 'Toggle Insurance Card: ' . ($active ? 'ON' : 'OFF'));

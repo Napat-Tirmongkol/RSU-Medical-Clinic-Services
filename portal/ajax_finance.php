@@ -759,5 +759,5 @@ try {
     echo json_encode(['ok' => false, 'message' => 'unknown action: ' . $action]);
 } catch (Throwable $e) {
     error_log('[finance] ' . $e->getMessage());
-    echo json_encode(['ok' => false, 'message' => 'เกิดข้อผิดพลาด: ' . $e->getMessage()]);
+    echo json_encode(['ok' => false, 'message' => 'เกิดข้อผิดพลาด']);
 }

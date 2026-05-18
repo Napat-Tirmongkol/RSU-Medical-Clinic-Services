@@ -308,7 +308,7 @@ function book_slot(PDO $pdo, int $studentId): void
     } catch (Throwable $e) {
         if ($pdo->inTransaction()) $pdo->rollBack();
         error_log('[book_slot] ' . $e->getMessage());
-        echo json_encode(['ok' => false, 'error' => 'จองไม่สำเร็จ: ' . $e->getMessage()]);
+        echo json_encode(['ok' => false, 'error' => 'จองไม่สำเร็จ']);
     }
 }
 

@@ -183,7 +183,7 @@ try {
             $debugInventory['exact_query_test'] = [
                 'ok'    => false,
                 'count' => 0,
-                'error' => $e->getMessage(),
+                'error' => 'Server error',
             ];
         }
 
@@ -223,5 +223,5 @@ try {
 
 } catch (Throwable $e) {
     error_log('[ajax_ai_sandbox] ' . $e->getMessage());
-    echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
+    echo json_encode(['ok' => false, 'error' => 'Server error']);
 }

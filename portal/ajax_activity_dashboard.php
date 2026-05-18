@@ -253,5 +253,5 @@ try {
     ], JSON_UNESCAPED_UNICODE);
 } catch (Throwable $e) {
     error_log('[ajax_activity_dashboard] ' . $e->getMessage());
-    echo json_encode(['ok' => false, 'message' => 'Server error: ' . $e->getMessage()]);
+    echo json_encode(['ok' => false, 'message' => 'Server error']);
 }

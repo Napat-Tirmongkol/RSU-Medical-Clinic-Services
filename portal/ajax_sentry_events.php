@@ -216,7 +216,7 @@ try {
             echo json_encode(['ok' => false, 'message' => 'unknown action']);
     }
 } catch (Throwable $e) {
-    echo json_encode(['ok' => false, 'message' => $e->getMessage()]);
+    echo json_encode(['ok' => false, 'message' => 'ระบบขัดข้อง กรุณาลองอีกครั้ง']);
 }
 
 function require_method_post(): void {

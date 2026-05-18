@@ -123,5 +123,5 @@ try {
 
     echo json_encode(['ok' => true, 'inserted' => $inserted, 'updated' => $updated, 'skipped' => $skipped]);
 } catch (Throwable $e) {
-    echo json_encode(['ok' => false, 'message' => $e->getMessage()]);
+    echo json_encode(['ok' => false, 'message' => 'ระบบขัดข้อง กรุณาลองอีกครั้ง']);
 }

@@ -374,7 +374,7 @@ function gc_ocr_extract(string $filePath, string $origExt): array
         ];
     } catch (Throwable $e) {
         $cleanup();
-        return ['ok' => false, 'error' => $e->getMessage()];
+        return ['ok' => false, 'error' => 'Server error'];
     }
 }
 
@@ -1384,5 +1384,5 @@ try {
     }
 } catch (Throwable $e) {
     error_log('[ajax_gold_card] ' . $e->getMessage());
-    json_err('ระบบขัดข้อง: ' . $e->getMessage(), 500);
+    json_err('ระบบขัดข้อง', 500);
 }

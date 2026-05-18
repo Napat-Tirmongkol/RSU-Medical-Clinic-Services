@@ -1025,6 +1025,6 @@ try {
     }
 } catch (Throwable $e) {
     if ($pdo->inTransaction()) $pdo->rollBack();
-    echo json_encode(['ok' => false, 'message' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    echo json_encode(['ok' => false, 'message' => 'ระบบขัดข้อง กรุณาลองอีกครั้ง'], JSON_UNESCAPED_UNICODE);
     exit;
 }
