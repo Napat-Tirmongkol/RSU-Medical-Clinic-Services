@@ -332,14 +332,13 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             csShowShift(ext);
         },
-        eventClassNames: (info) => {
-            const ext = info.event.extendedProps || {};
-            if (ext.__holiday) return [];
-            // Hide non-holiday events that fall on a holiday date (closed day)
-            const startDate = info.event.start ? cs_localDate(info.event.start) : null;
-            if (startDate && holidaySet.has(startDate)) return ['cs-hidden-on-holiday'];
-            return [];
-        },
+        // Note: previously eventClassNames returned ['cs-hidden-on-holiday']
+        // for events falling on a clinic-closed day — but the class had no CSS
+        // backing (dead code) AND it caused doctor schedules + ลา markers to
+        // silently disappear from days marked เทอมเบรค (semester break),
+        // even though admin's schedule:list view still shows them. The pink
+        // background tint already conveys "clinic closed" to users without
+        // hiding the underlying data. Match admin behavior — show everything.
     });
     calendar.render();
 });
