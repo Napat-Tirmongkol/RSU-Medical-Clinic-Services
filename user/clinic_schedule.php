@@ -109,6 +109,15 @@ try {
     .fc-event.cs-holiday-evt .fc-event-title,
     .fc-event.cs-holiday-evt .fc-event-time { color: #991b1b !important; }
 
+    /* Hide doctor shifts + ลา markers on days the clinic is closed (holiday) —
+       eventClassNames in JS tags these with .cs-hidden-on-holiday. Mirrors the
+       admin schedule:list rule (portal/_partials/clinic_data/schedule.php
+       .ds-hidden-on-holiday). The pink background tint from the holiday
+       event already signals "clinic closed" to the user. */
+    .fc-event.cs-hidden-on-holiday,
+    .fc-bg-event.cs-hidden-on-holiday,
+    .fc-daygrid-event.cs-hidden-on-holiday { display: none !important; }
+
     /* Make toolbar buttons look softer / mobile-friendly */
     .fc .fc-toolbar.fc-header-toolbar { margin-bottom: .75em; gap:.25em; flex-wrap: wrap; }
     .fc .fc-button {
@@ -332,13 +341,17 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             csShowShift(ext);
         },
-        // Note: previously eventClassNames returned ['cs-hidden-on-holiday']
-        // for events falling on a clinic-closed day — but the class had no CSS
-        // backing (dead code) AND it caused doctor schedules + ลา markers to
-        // silently disappear from days marked เทอมเบรค (semester break),
-        // even though admin's schedule:list view still shows them. The pink
-        // background tint already conveys "clinic closed" to users without
-        // hiding the underlying data. Match admin behavior — show everything.
+        eventClassNames: (info) => {
+            const ext = info.event.extendedProps || {};
+            if (ext.__holiday) return [];
+            // Hide doctor shifts + ลา markers on days the clinic is closed —
+            // matches admin schedule:list behavior (see portal/_partials/
+            // clinic_data/schedule.php where ds-hidden-on-holiday is defined).
+            // The cs-hidden-on-holiday CSS rule is in the <style> block above.
+            const startDate = info.event.start ? cs_localDate(info.event.start) : null;
+            if (startDate && holidaySet.has(startDate)) return ['cs-hidden-on-holiday'];
+            return [];
+        },
     });
     calendar.render();
 });
