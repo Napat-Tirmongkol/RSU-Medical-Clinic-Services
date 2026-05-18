@@ -5,6 +5,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/includes/auth.php';
+require_once __DIR__ . '/../includes/finance_receipt_helper.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -547,28 +548,16 @@ try {
         }
     }
 
-    // ── Assign receipt number (atomic running number per year) ──
+    // ── Assign receipt number (atomic running number per year+kind) ──
+    // Delegates to finance_assign_receipt_no() — uses sys_finance_receipt_counter
+    // + SELECT FOR UPDATE so two concurrent assigns can't collide.
     if ($action === 'txn:assign_receipt') {
         $id = (int)($_POST['id'] ?? 0);
         if ($id <= 0) { echo json_encode(['ok' => false, 'message' => 'ไม่ระบุ id']); exit; }
-        // ถ้ามี receipt_no แล้ว → คืนค่าเดิม
-        $existing = $pdo->prepare("SELECT receipt_no, kind, txn_date FROM sys_finance_transactions WHERE id=?");
-        $existing->execute([$id]);
-        $row = $existing->fetch(PDO::FETCH_ASSOC);
-        if (!$row) { echo json_encode(['ok' => false, 'message' => 'ไม่พบรายการ']); exit; }
-        if (!empty($row['receipt_no'])) { echo json_encode(['ok' => true, 'receipt_no' => $row['receipt_no']]); exit; }
-
-        $prefix = ($row['kind'] === 'income') ? 'RCP' : 'PV'; // RCP=ใบเสร็จรับ, PV=ใบสำคัญจ่าย
-        $yearBE = (int)date('Y', strtotime($row['txn_date'])) + 543;
-        // หา max running number ของ prefix+year นั้น
-        $like = $prefix . '-' . $yearBE . '-%';
-        $maxStmt = $pdo->prepare("SELECT MAX(CAST(SUBSTRING(receipt_no, " . (strlen($prefix) + 7) . ") AS UNSIGNED)) AS m
-            FROM sys_finance_transactions WHERE receipt_no LIKE ?");
-        $maxStmt->execute([$like]);
-        $next = ((int)$maxStmt->fetchColumn()) + 1;
-        $receiptNo = sprintf('%s-%d-%06d', $prefix, $yearBE, $next);
-        $pdo->prepare("UPDATE sys_finance_transactions SET receipt_no=?, updated_by=? WHERE id=?")
-            ->execute([$receiptNo, $adminId ?: null, $id]);
+        $receiptNo = finance_assign_receipt_no($pdo, $id, $adminId ?: null);
+        if ($receiptNo === '') {
+            echo json_encode(['ok' => false, 'message' => 'ไม่สามารถออกเลขที่ใบเสร็จได้']); exit;
+        }
         echo json_encode(['ok' => true, 'receipt_no' => $receiptNo]); exit;
     }
 
@@ -706,8 +695,19 @@ try {
         $sel->execute([$id]);
         $att = $sel->fetch(PDO::FETCH_ASSOC);
         if (!$att) { echo json_encode(['ok'=>false,'message'=>'ไม่พบไฟล์']); exit; }
-        $abs = __DIR__ . '/../' . $att['stored_name'];
-        if (is_file($abs)) @unlink($abs);
+
+        // Realpath confinement — never unlink anything outside uploads/finance/
+        // regardless of how stored_name got into the DB (DB tampering, legacy
+        // rows). Closes C9 in AI/logs/2026-05-18-security-audit-main.md.
+        $candidate    = __DIR__ . '/../' . ltrim((string)$att['stored_name'], '/');
+        $absResolved  = realpath($candidate) ?: '';
+        $financeRoot  = realpath(__DIR__ . '/../uploads/finance') ?: '';
+        if ($absResolved !== '' && $financeRoot !== ''
+            && str_starts_with($absResolved, $financeRoot . DIRECTORY_SEPARATOR)
+            && is_file($absResolved)) {
+            @unlink($absResolved);
+        }
+
         $pdo->prepare("DELETE FROM sys_finance_attachments WHERE id=?")->execute([$id]);
         fin_audit_log($pdo, (int)$att['txn_id'], 'attach_remove', ['file' => $att['original_name']], $adminId, $adminName);
         echo json_encode(['ok' => true]); exit;

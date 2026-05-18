@@ -1,16 +1,23 @@
 <?php
-// [แก้ไขไฟล์: napat-tirmongkol/e-borrow/E-Borrow-c4df732f98db10bf52a8e9d7299e212b6f2abd37/process/send_reminders.php]
 // สคริปต์สำหรับส่ง LINE แจ้งเตือน (v3 - แจ้งเตือน 2 รอบ)
+// เรียกผ่าน cron / scheduler เท่านั้น
 
-// (เราได้ลบโค้ด Debug 3 บรรทัดบนสุดออกแล้ว)
+// 1. Load secret from config/secrets.php (NEVER hardcode)
+$__secrets = @include(__DIR__ . '/../../config/secrets.php');
+if (!is_array($__secrets)) $__secrets = [];
+$EXPECTED_SECRET = (string)($__secrets['EBORROW_CRON_SECRET'] ?? '');
 
-// 1. ตั้งค่า Secret Key
-$MY_SECRET_KEY = "E-Borrow-Cron-Key-987654321"; 
-
-// 2. ตรวจสอบ Key
-if (!isset($_GET['secret']) || $_GET['secret'] !== $MY_SECRET_KEY) {
-    http_response_code(403); // Forbidden
-    die("Access Denied."); // หยุดทำงานทันที
+// 2. ตรวจสอบ key — รับเฉพาะ HTTP header X-Cron-Secret (ไม่ใช่ $_GET เพราะ
+//    secret ใน URL จะ leak ไปยัง access log / browser history / referrer)
+if ($EXPECTED_SECRET === '') {
+    http_response_code(503);
+    die('Cron secret not configured. Set EBORROW_CRON_SECRET in config/secrets.php.');
+}
+$providedSecret = $_SERVER['HTTP_X_CRON_SECRET'] ?? '';
+if (!hash_equals($EXPECTED_SECRET, (string)$providedSecret)) {
+    error_log('[send_reminders] unauthorized access attempt from ' . ($_SERVER['REMOTE_ADDR'] ?? 'unknown'));
+    http_response_code(403);
+    die("Access Denied.");
 }
 
 // 3. ถ้า Key ถูกต้อง สคริปต์จะทำงานต่อ...

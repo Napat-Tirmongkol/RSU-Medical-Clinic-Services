@@ -5,6 +5,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/includes/auth.php';
+require_once __DIR__ . '/../includes/finance_receipt_helper.php';
 
 $adminRole = $_SESSION['admin_role'] ?? 'editor';
 $isSuper = ($adminRole === 'superadmin');
@@ -25,18 +26,12 @@ $stmt->execute([$id]);
 $row = $stmt->fetch(PDO::FETCH_ASSOC);
 if (!$row) { http_response_code(404); exit('ไม่พบรายการ'); }
 
-// Auto-assign receipt no ถ้ายังไม่มี (atomic)
+// Auto-assign receipt no ถ้ายังไม่มี — race-free via finance_assign_receipt_no()
 if (empty($row['receipt_no'])) {
-    $prefix = ($row['kind'] === 'income') ? 'RCP' : 'PV';
-    $yearBE = (int)date('Y', strtotime($row['txn_date'])) + 543;
-    $like = $prefix . '-' . $yearBE . '-%';
-    $maxStmt = $pdo->prepare("SELECT MAX(CAST(SUBSTRING(receipt_no, " . (strlen($prefix) + 7) . ") AS UNSIGNED)) FROM sys_finance_transactions WHERE receipt_no LIKE ?");
-    $maxStmt->execute([$like]);
-    $next = ((int)$maxStmt->fetchColumn()) + 1;
-    $receiptNo = sprintf('%s-%d-%06d', $prefix, $yearBE, $next);
-    $pdo->prepare("UPDATE sys_finance_transactions SET receipt_no=?, updated_by=? WHERE id=?")
-        ->execute([$receiptNo, (int)($_SESSION['admin_id'] ?? 0) ?: null, $id]);
-    $row['receipt_no'] = $receiptNo;
+    $assigned = finance_assign_receipt_no($pdo, $id, (int)($_SESSION['admin_id'] ?? 0) ?: null);
+    if ($assigned !== '') {
+        $row['receipt_no'] = $assigned;
+    }
 }
 
 // Get clinic profile
