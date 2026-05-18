@@ -26,7 +26,14 @@ function rate_limit_check(string $key, int $maxTries = 5, int $window = 300, str
     $data = $_SESSION['_rl'][$key] ?? ['count' => 0, 'until' => 0];
 
     if ($data['until'] > time()) {
-        // Still in lockout window
+        // Already on the lockout-notice URL? Don't redirect again — caller will
+        // render the wait message from $_GET['error']/$_GET['wait'] inline.
+        // Prevents infinite redirect loop (browser ends up at chrome-error://
+        // after MAX_REDIRECTS).
+        if (($_GET['error'] ?? '') === 'too_many_attempts') {
+            return;
+        }
+        // Still in lockout window — bounce caller to the lockout-notice URL.
         $wait = $data['until'] - time();
         $back = $redirect ?: (strtok($_SERVER['REQUEST_URI'], '?'));
         header("Location: {$back}?error=too_many_attempts&wait={$wait}");
@@ -107,6 +114,11 @@ function rate_limit_ip_check_or_429(string $key, int $maxTries = 5, int $window 
 /** HTML-form guard: redirect to ?error=too_many_attempts if locked out. */
 function rate_limit_ip_check_or_redirect(string $key, int $maxTries = 5, int $window = 300, string $redirect = ''): void {
     if (!rate_limit_ip_check($key, $maxTries, $window)) {
+        // Already on the lockout-notice URL? Don't redirect again — caller
+        // renders the wait message inline. Prevents infinite redirect loop.
+        if (($_GET['error'] ?? '') === 'too_many_attempts') {
+            return;
+        }
         $back = $redirect ?: strtok($_SERVER['REQUEST_URI'] ?? '/', '?');
         header("Location: {$back}?error=too_many_attempts&wait={$window}");
         exit;
