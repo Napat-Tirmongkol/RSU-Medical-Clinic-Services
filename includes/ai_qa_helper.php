@@ -756,6 +756,41 @@ function ai_qa_try_doctors_today(PDO $pdo, string $question): ?string
  * @return array{answer:string, matched_via:string, source_id:int, confidence?:float}|null
  */
 /**
+ * Phase A — Time-sensitive question detector.
+ *
+ * Questions about hours / which doctor is in / appointments / specific
+ * dates change every day; serving an admin-approved static FAQ answer
+ * for these inevitably ages out. When this returns true the matcher
+ * short-circuits to a fresh Gemini generate against the current clinic
+ * context instead of going through Phase 1 (exact match) or Phase 2
+ * (semantic match over the stale FAQ pool).
+ *
+ * Stable questions (price, address, phone, policy, what is X) still
+ * benefit from the FAQ cache — those return false here.
+ */
+function ai_qa_is_time_sensitive_question(string $question): bool
+{
+    $patterns = [
+        // เปิด / ปิด / กี่โมง / เวลาทำการ
+        '/(เปิด|ปิด|กี่โมง|เวลา\s*ทำการ|ทำการ|กี่ทุ่ม|กี่นาฬิกา)/u',
+        // เกี่ยวกับหมอที่ออกตรวจ — ตัวระบุหมอ + ตารางออกตรวจ
+        '/(หมอ.*ออก|ออก\s*ตรวจ|ตาราง.*หมอ|แพทย์.*ออก|หมอ.*เวร|เวร.*หมอ)/u',
+        // วัน relative + วันที่เฉพาะ
+        '/(วันนี้|พรุ่งนี้|มะรืน|เมื่อวาน|today|tomorrow|yesterday)/iu',
+        '/วัน(อาทิตย์|จันทร์|อังคาร|พุธ|พฤหัส|ศุกร์|เสาร์)/u',
+        '/วันที่\s*\d/u',
+        // นัด / คิว — เวลานัดเปลี่ยนทุกวัน
+        '/(นัด\s*หมาย|จอง\s*คิว|คิว.*ว่าง|ว่าง\s*ไหม|มี\s*คิว)/u',
+        // เดือนไทยเต็ม (ระบุเดือนใดเดือนหนึ่ง = time-bound)
+        '/(มกราคม|กุมภาพันธ์|มีนาคม|เมษายน|พฤษภาคม|มิถุนายน|กรกฎาคม|สิงหาคม|กันยายน|ตุลาคม|พฤศจิกายน|ธันวาคม)/u',
+    ];
+    foreach ($patterns as $p) {
+        if (preg_match($p, $question)) return true;
+    }
+    return false;
+}
+
+/**
  * Detect time-relative phrases that age out of a stored FAQ answer.
  * Triggers a re-generate so we don't ship a "พรุ่งนี้ = อาทิตย์ที่ 17 พ.ค."
  * answer to users who ask the same question weeks later.
@@ -832,6 +867,43 @@ function ai_qa_match_faq(PDO $pdo, string $question, ?callable $onSemanticPhase 
 
     ensure_ai_faq_schema($pdo);
     ensure_ai_qa_schema($pdo);
+
+    // ── Phase A short-circuit: time-sensitive questions ───────────────────
+    // Hours, doctor schedule, "พรุ่งนี้", appointment availability — these
+    // age out the moment they're cached. Skip every static-FAQ phase and
+    // go straight to a Gemini generate against the live 31-day context.
+    // On Gemini failure we *do* fall through to the FAQ phases (graceful
+    // degrade — a slightly stale answer beats no answer at all).
+    if (ai_qa_is_time_sensitive_question($q)) {
+        ai_qa_debug_log('AI QA matcher — time-sensitive intent, bypassing FAQ cache', [
+            'question_snippet' => $qSnippet,
+        ]);
+        if ($onSemanticPhase !== null) {
+            try { $onSemanticPhase(); } catch (Throwable $e) {
+                ai_qa_debug_log('AI QA onSemanticPhase callback failed', ['error' => $e->getMessage()], 'warning');
+            }
+        }
+        try {
+            $fresh = ai_qa_generate_answer($q, $pdo);
+            if (!empty($fresh['answer'])) {
+                ai_qa_debug_log('AI QA time-sensitive generate OK', [
+                    'model' => $fresh['model'] ?? '',
+                ]);
+                return [
+                    'answer'      => (string)$fresh['answer'],
+                    'category'    => (string)($fresh['category'] ?? 'อื่นๆ'),
+                    'matched_via' => 'generate_fresh',
+                    'source_id'   => 0,
+                    'confidence'  => (float)($fresh['confidence'] ?? 0.8),
+                ];
+            }
+        } catch (Throwable $e) {
+            ai_qa_debug_log('AI QA time-sensitive generate failed — falling back to FAQ phases', [
+                'error' => $e->getMessage(),
+            ], 'warning');
+            // fall through to Phase 1 so the user still gets something useful
+        }
+    }
 
     // ── Phase 1a: canonical question ──────────────────────────────────────
     $stmt = $pdo->prepare("
