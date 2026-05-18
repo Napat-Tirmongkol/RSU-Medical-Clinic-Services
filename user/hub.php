@@ -198,6 +198,9 @@ try {
 }
 
 // ── Today's doctor shifts (for "แพทย์ออกตรวจวันนี้" widget) ───────────────
+// LEFT JOIN ms + no ms.is_active filter — matches admin schedule:list
+// semantics + clinic_status_helper.php. Previously INNER + ms.is_active=1
+// silently dropped schedules of staff flagged inactive.
 $todayShifts = [];
 try {
     $todayWd = (int)date('w');
@@ -207,9 +210,9 @@ try {
                ms.title AS doc_title, ms.full_name AS doc_name,
                cr.name AS room_name, cr.code AS room_code
         FROM sys_doctor_schedule s
-        JOIN sys_medical_staff ms ON s.staff_id = ms.id
+        LEFT JOIN sys_medical_staff ms ON s.staff_id = ms.id
         LEFT JOIN sys_clinic_rooms cr ON s.room_id = cr.id
-        WHERE s.is_active = 1 AND ms.is_active = 1
+        WHERE s.is_active = 1
           AND s.type <> 'off'
           AND (
               (s.specific_date = :today)

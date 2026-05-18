@@ -20,7 +20,11 @@ $filterSvc   = trim((string)($_GET['svc'] ?? ''));
 $initialView = in_array(($_GET['view'] ?? ''), ['month','week','day'], true)
     ? $_GET['view'] : 'week';
 
-// Load shifts (all active)
+// Load shifts (all active schedules — match admin schedule:list semantics
+// + clinic_status_helper.php pattern: LEFT JOIN ms WITHOUT filtering on
+// ms.is_active. Previously INNER JOIN + ms.is_active=1 caused schedules of
+// staff flagged inactive to silently disappear from the user view while
+// remaining visible in the admin view → reported as "ข้อมูลไม่ตรงกับ admin").
 $allShifts = [];
 try {
     $params = [];
@@ -31,12 +35,12 @@ try {
     $stmt = $pdo->prepare("
         SELECT s.id, s.type, s.weekday, s.specific_date, s.start_time, s.end_time,
                s.staff_id, s.room_id, s.service_type, s.notes, s.recur_end_date,
-               ms.title AS doc_title, ms.full_name AS doc_name, ms.role,
+               ms.title AS doc_title, ms.full_name AS doc_name, ms.role, ms.is_active AS doc_active,
                cr.name AS room_name, cr.code AS room_code
         FROM sys_doctor_schedule s
-        JOIN sys_medical_staff ms ON s.staff_id = ms.id
+        LEFT JOIN sys_medical_staff ms ON s.staff_id = ms.id
         LEFT JOIN sys_clinic_rooms cr ON s.room_id = cr.id
-        WHERE s.is_active = 1 AND ms.is_active = 1
+        WHERE s.is_active = 1
         $extraWhere
         ORDER BY s.start_time ASC
     ");
@@ -53,14 +57,17 @@ try {
     $holidays = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } catch (PDOException) {}
 
-// Filter dropdowns data
+// Filter dropdowns data — list every staff who currently has an active
+// schedule, regardless of ms.is_active. Keeps the filter aligned with the
+// calendar contents (otherwise a doctor visible in the calendar would not
+// be selectable in the filter).
 $staffList = [];
 $svcTypes  = [];
 try {
     $staffList = $pdo->query("SELECT DISTINCT ms.id, ms.title, ms.full_name
         FROM sys_medical_staff ms
-        JOIN sys_doctor_schedule s ON s.staff_id = ms.id
-        WHERE ms.is_active = 1 AND s.is_active = 1
+        INNER JOIN sys_doctor_schedule s ON s.staff_id = ms.id
+        WHERE s.is_active = 1
         ORDER BY ms.full_name")->fetchAll(PDO::FETCH_ASSOC);
     $svcTypes = $pdo->query("SELECT DISTINCT service_type FROM sys_doctor_schedule
         WHERE is_active = 1 AND service_type IS NOT NULL AND service_type <> ''
