@@ -6,7 +6,10 @@ e_borrow.sql
 
 
 # ซ่อนทั้งโฟลเดอร์ (ใส่เครื่องหมาย / ต่อท้าย)
-e_Borrow/uploads/
+# Note: ใช้ /* แทน / เพื่อให้ negate `!.../.htaccess` ทำงาน
+# (git ไม่ recurse เข้า dir ที่ ignore ทั้งก้อน)
+e_Borrow/uploads/*
+!e_Borrow/uploads/.htaccess
 node_modules/
 # vendor/ ไม่ได้ ignore — commit เข้า repo เพราะ server ไม่มี Composer
 
@@ -27,3 +30,7 @@ ux_staging/
 # Tailwind CLI binary (compile locally, do not commit)
 tailwindcss
 tailwindcss-*
+
+# Runtime storage (rate-limit buckets etc.) — keep dir, ignore contents
+storage/rl/*
+!storage/rl/.gitkeep

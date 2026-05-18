@@ -92,5 +92,5 @@ try {
     }
 } catch (Throwable $e) {
     error_log('[ajax_ai_feedback] ' . $e->getMessage());
-    echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
+    echo json_encode(['ok' => false, 'error' => 'Server error']);
 }

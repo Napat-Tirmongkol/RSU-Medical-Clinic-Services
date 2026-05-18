@@ -1,0 +1,2 @@
+# Rate-limit bucket storage (runtime, gitignored content).
+# See includes/rate_limit.php → rate_limit_ip_* functions.

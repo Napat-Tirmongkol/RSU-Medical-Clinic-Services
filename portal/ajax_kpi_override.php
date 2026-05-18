@@ -179,5 +179,5 @@ try {
     }
 } catch (Throwable $e) {
     error_log('[ajax_kpi_override] ' . $e->getMessage());
-    json_err('ระบบขัดข้อง: ' . $e->getMessage(), 500);
+    json_err('ระบบขัดข้อง กรุณาลองอีกครั้ง', 500);
 }

@@ -5,11 +5,16 @@ require_once __DIR__ . '/includes/auth.php';
 header('Content-Type: application/json; charset=utf-8');
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    http_response_code(405);
     echo json_encode(['status' => 'error', 'message' => 'Invalid request method']);
     exit;
 }
 
-if ($_SESSION['admin_role'] !== 'superadmin' && $_SESSION['admin_role'] !== 'admin') {
+// CSRF required — this endpoint writes Gemini API key + uploads logo.
+validate_csrf_or_die();
+
+if (($_SESSION['admin_role'] ?? '') !== 'superadmin' && ($_SESSION['admin_role'] ?? '') !== 'admin') {
+    http_response_code(403);
     echo json_encode(['status' => 'error', 'message' => 'Permission denied']);
     exit;
 }
@@ -28,36 +33,53 @@ $settings['gemini_api_key'] = $geminiKey;
 
 $settings['show_insurance'] = isset($_POST['show_insurance']) && $_POST['show_insurance'] === '1';
 
-// Handle Logo Upload
+// Handle Logo Upload — SVG rejected (stored-XSS risk); MIME verified via finfo
+// (NOT $_FILES['type'] which is client-controlled); extension forced from
+// server-determined MIME (drops attacker-supplied filename extension entirely).
 if (isset($_FILES['site_logo']) && $_FILES['site_logo']['error'] === UPLOAD_ERR_OK) {
-    $allowedTypes = ['image/jpeg', 'image/png', 'image/svg+xml'];
     $maxSize = 2 * 1024 * 1024; // 2MB
-
     $file = $_FILES['site_logo'];
-    
-    if (!in_array($file['type'], $allowedTypes)) {
-        echo json_encode(['status' => 'error', 'message' => 'รองรับเฉพาะไฟล์ PNG, JPG, SVG เท่านั้น']);
-        exit;
-    }
 
     if ($file['size'] > $maxSize) {
         echo json_encode(['status' => 'error', 'message' => 'ขนาดไฟล์ต้องไม่เกิน 2MB']);
         exit;
     }
 
-    $uploadDir = __DIR__ . '/../assets/images/';
-    if (!is_dir($uploadDir)) {
-        mkdir($uploadDir, 0777, true);
+    if (!is_uploaded_file($file['tmp_name'])) {
+        echo json_encode(['status' => 'error', 'message' => 'ไฟล์อัปโหลดไม่ถูกต้อง']);
+        exit;
     }
 
-    $ext = pathinfo($file['name'], PATHINFO_EXTENSION);
-    $filename = 'site_logo_' . time() . '.' . $ext;
+    $mimeToExt = [
+        'image/jpeg' => 'jpg',
+        'image/png'  => 'png',
+        'image/webp' => 'webp',
+    ];
+
+    $finfo = new finfo(FILEINFO_MIME_TYPE);
+    $detectedMime = $finfo->file($file['tmp_name']) ?: '';
+
+    if (!isset($mimeToExt[$detectedMime])) {
+        echo json_encode(['status' => 'error', 'message' => 'รองรับเฉพาะไฟล์ PNG, JPG, WEBP เท่านั้น (ไม่รองรับ SVG)']);
+        exit;
+    }
+
+    $uploadDir = __DIR__ . '/../assets/images/';
+    if (!is_dir($uploadDir)) {
+        mkdir($uploadDir, 0755, true);
+    }
+
+    $filename = 'site_logo_' . bin2hex(random_bytes(8)) . '.' . $mimeToExt[$detectedMime];
     $targetPath = $uploadDir . $filename;
 
     if (move_uploaded_file($file['tmp_name'], $targetPath)) {
-        // Delete old logo if exists
-        if (!empty($settings['site_logo']) && file_exists(__DIR__ . '/../' . $settings['site_logo'])) {
-            @unlink(__DIR__ . '/../' . $settings['site_logo']);
+        // Delete old logo if exists — confine to assets/images/ via realpath.
+        if (!empty($settings['site_logo'])) {
+            $oldAbs = realpath(__DIR__ . '/../' . $settings['site_logo']);
+            $assetsRoot = realpath(__DIR__ . '/../assets/images') ?: '';
+            if ($oldAbs && $assetsRoot && str_starts_with($oldAbs, $assetsRoot . DIRECTORY_SEPARATOR)) {
+                @unlink($oldAbs);
+            }
         }
         $settings['site_logo'] = 'assets/images/' . $filename;
     } else {

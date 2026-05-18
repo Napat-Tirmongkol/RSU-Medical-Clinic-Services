@@ -258,4 +258,77 @@ return [
     'profile.completeness_done'  => 'ข้อมูลครบถ้วน',
     'profile.completeness_more'  => 'กรอกข้อมูลเพิ่มเพื่อรับบริการที่ดีขึ้น',
     'profile.view_mode_hint'     => 'แตะปุ่ม "แก้ไข" เพื่อปรับปรุงข้อมูล',
+
+    // ── User Hub (user/hub.php) — Phase 1: visible top viewport ─────────────
+    'hub.lang.switch_aria'       => 'เปลี่ยนภาษา',
+    'hub.brand.subtitle'         => 'User Hub',
+    'hub.greet.morning'          => 'สวัสดีตอนเช้า',
+    'hub.greet.afternoon'        => 'สวัสดีตอนบ่าย',
+    'hub.greet.evening'          => 'สวัสดีตอนเย็น',
+    'hub.greet.night'            => 'สวัสดีตอนค่ำ',
+    'hub.greet.name_prefix'      => 'คุณ',
+    'hub.stat.appointments'      => 'นัดหมาย',
+    'hub.stat.vaccines'          => 'วัคซีน',
+    'hub.stat.borrowed'          => 'ยืมอยู่',
+    'hub.doctors_today.title'    => 'แพทย์ออกตรวจวันนี้',
+    'hub.doctors_today.see_all'  => 'ดูทั้งหมด',
+    'hub.doctors_today.empty'    => 'ไม่มีแพทย์ออกตรวจในวันนี้',
+    'hub.doctors_today.closed'   => 'วันนี้คลินิกปิดทำการ',
+
+    // Full month names for formatThaiDate (Phase 2)
+    'bookings.months_full' => ['', 'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'],
+    'bookings.dow_full'    => ['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์'],
+
+    // ── User Hub Phase 2: hero card / status badges / camp / pills ──────────
+    'hub.greet.fallback_name'    => 'คุณ',
+    // Hero priority card
+    'hub.hero.eyebrow.appt'      => 'นัดหมายถัดไป',
+    'hub.hero.eyebrow.overdue'   => 'เกินกำหนดคืน',
+    'hub.hero.eyebrow.vaccine'   => 'วัคซีนครบกำหนด',
+    'hub.hero.eyebrow.pending'   => 'คำขอรออนุมัติ',
+    'hub.hero.eyebrow.today'     => 'วันนี้ของคุณ',
+    'hub.hero.cta.detail'        => 'ดูรายละเอียด',
+    'hub.hero.cta.manage'        => 'จัดการตอนนี้',
+    'hub.hero.cta.book'          => 'จองนัด',
+    'hub.hero.cta.view_requests' => 'ดูคำขอ',
+    'hub.hero.cta.view_camps'    => 'ดูแคมเปญ',
+    'hub.hero.title.empty'       => 'ไม่มีรายการเร่งด่วน',
+    'hub.hero.detail.empty'      => 'ดูแลสุขภาพของคุณ — ฉีดวัคซีนตามกำหนดหรือดูแคมเปญที่เปิดรับ',
+    'hub.hero.detail.overdue'    => 'ติดต่อเจ้าหน้าที่เพื่อคืนของและชำระค่าปรับ',
+    'hub.hero.detail.pending'    => 'แตะดูสถานะคำขอ',
+    // %d = number of items
+    'hub.hero.title.overdue'     => 'อุปกรณ์ %d รายการเลยกำหนดคืน',
+    'hub.hero.title.pending'     => '%d รายการรอเจ้าหน้าที่อนุมัติ',
+    // %s = thai-formatted date
+    'hub.hero.detail.vaccine_due'=> 'ครบกำหนด %s',
+    // %s = thai-formatted date, %s = HH:MM
+    'hub.hero.detail.appt'       => '%s · %s น.',
+
+    // Status badges (booking status)
+    'hub.status.confirmed'       => 'ยืนยันแล้ว',
+    'hub.status.completed'       => 'สำเร็จแล้ว',
+    'hub.status.cancelled'       => 'ยกเลิกแล้ว',
+    'hub.status.expired'         => 'หมดอายุ',
+    'hub.status.pending'         => 'รอดำเนินการ',
+
+    // Campaign type labels
+    'hub.camp.vaccine'           => 'วัคซีน',
+    'hub.camp.health_check'      => 'ตรวจสุขภาพ',
+    'hub.camp.general'           => 'ทั่วไป',
+
+    // Reminder pills — relative time words
+    'hub.pill.today'             => 'วันนี้',
+    'hub.pill.tomorrow'          => 'พรุ่งนี้',
+    // %d = number of days
+    'hub.pill.in_days'           => 'อีก %d วัน',
+    'hub.pill.due_today'         => 'ครบกำหนดวันนี้',
+    'hub.pill.return_today'      => 'คืนวันนี้',
+    // %d = number of days
+    'hub.pill.return_in_days'    => 'คืนอีก %d วัน',
+    'hub.pill.overdue_days'      => 'เกินกำหนดคืน %d วัน',
+    // %s = vaccine name
+    'hub.pill.vaccine_label'     => 'วัคซีน %s',
+    // %s = number formatted with comma
+    'hub.pill.fine_label'        => 'ค่าปรับ ฿%s',
+    'hub.pill.fine_sub'          => 'รอชำระ',
 ];

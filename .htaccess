@@ -11,6 +11,7 @@ Options -Indexes
     Header always set X-Content-Type-Options "nosniff"
 
     # บังคับ HTTPS (HSTS) — 1 ปี
+    # NOTE: เมื่อโดเมนพร้อม submit https://hstspreload.org ให้เพิ่ม "; preload"
     Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
 
     # XSS Protection (browsers เก่า)
@@ -19,7 +20,24 @@ Options -Indexes
     # Referrer Policy
     Header always set Referrer-Policy "strict-origin-when-cross-origin"
 
+    # Permissions-Policy — disable browser features ที่ระบบไม่ได้ใช้
+    # (Phase 7 audit High: ลด attack surface ของ Feature APIs)
+    Header always set Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=(), accelerometer=(), gyroscope=(), magnetometer=(), interest-cohort=()"
+
+    # Cross-Origin Opener/Resource Policy — กัน Spectre-class attacks ระหว่าง origin
+    Header always set Cross-Origin-Opener-Policy "same-origin"
+    Header always set Cross-Origin-Resource-Policy "same-site"
+
+    # Remove server/PHP version fingerprints (defense-in-depth).
+    # expose_php=Off ใน .user.ini จัดการที่ฝั่ง PHP-FPM แล้ว; ตรงนี้กันชั้นเพิ่ม
+    # สำหรับ mod_php / reverse proxy ที่อาจไม่อ่าน .user.ini
+    Header always unset X-Powered-By
+    Header unset X-Powered-By
+    Header always unset Server
+    Header unset Server
+
     # Content Security Policy — อนุญาต CDN ที่ระบบใช้อยู่
+    # TODO: ลบ 'unsafe-inline' จาก script-src ผ่าน CSP nonce migration (tracked epic)
     Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://cdn.onesignal.com https://cdn.tailwindcss.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://fonts.googleapis.com https://cdn.tailwindcss.com; font-src 'self' https://cdnjs.cloudflare.com https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://onesignal.com; frame-src 'self';"
 </IfModule>
 

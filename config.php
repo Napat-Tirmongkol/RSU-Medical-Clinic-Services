@@ -29,6 +29,13 @@ defined('FINE_RATE_PER_DAY') || define('FINE_RATE_PER_DAY', 10); // ค่าป
 defined('APP_VERSION') || define('APP_VERSION', '2.2.0'); // เวอร์ชันหลัก
 defined('APP_BUILD')   || define('APP_BUILD',   '20260423.01'); // วันที่และลำดับการอัปเดต
 
+// ── Application Base URL (REQUIRED for outgoing links) ───────────────────────
+// Full base URL e.g. 'https://clinic.rsu.ac.th/e-campaignv2'. Set in secrets.php.
+// If empty, password-reset email sending will fail-closed (refuse to send) so
+// that $_SERVER['HTTP_HOST'] — which is attacker-controlled — never ends up in
+// outgoing reset links. See AI/logs/2026-05-18-security-audit-main.md C20.
+defined('APP_BASE_URL') || define('APP_BASE_URL', rtrim((string)($__secrets['APP_BASE_URL'] ?? ''), '/'));
+
 // ── Site Settings (Persistent Storage) ────────────────────────────────────────
 $__siteSettingsFile = __DIR__ . '/config/site_settings.json';
 $__siteSettings = file_exists($__siteSettingsFile) ? json_decode(file_get_contents($__siteSettingsFile), true) : [];

@@ -7,8 +7,10 @@ session_start();
 require_once __DIR__ . '/../../config.php';
 require_once __DIR__ . '/../../includes/auth_helper.php';
 
-$token = $_GET['token'] ?? '';
-$type = $_GET['type'] ?? 'admin';
+$token = (string)($_GET['token'] ?? '');
+// Whitelist $type — reject anything else (prevents cross-table token confusion
+// and reflected XSS via ?type=<script>...).
+$type = (($_GET['type'] ?? 'admin') === 'staff') ? 'staff' : 'admin';
 $user = verifyResetToken($token, $type);
 
 $message = '';
@@ -110,7 +112,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $user) {
             <i class="fa-solid fa-circle-exclamation mr-2"></i><?= htmlspecialchars($error) ?>
         </div>
         <?php if (!$user): ?>
-            <a href="forgot_password.php?type=<?= $type ?>" class="back-link">ขอลิงก์รีเซ็ตรหัสผ่านใหม่</a>
+            <a href="forgot_password.php?type=<?= htmlspecialchars($type, ENT_QUOTES, 'UTF-8') ?>" class="back-link">ขอลิงก์รีเซ็ตรหัสผ่านใหม่</a>
         <?php endif; ?>
     <?php endif; ?>
 

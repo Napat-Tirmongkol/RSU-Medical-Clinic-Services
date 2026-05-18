@@ -103,5 +103,5 @@ try {
     }
 } catch (Throwable $e) {
     error_log('[eborrow finance_sync] throw: ' . $e->getMessage());
-    echo json_encode(['ok' => false, 'message' => 'เกิดข้อผิดพลาดในระบบ: ' . $e->getMessage()]);
+    echo json_encode(['ok' => false, 'message' => 'เกิดข้อผิดพลาดในระบบ']);
 }

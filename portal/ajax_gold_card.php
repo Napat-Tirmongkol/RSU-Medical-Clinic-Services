@@ -114,6 +114,17 @@ try {
     if (!in_array('source_filename', $cols, true)) {
         $pdo->exec("ALTER TABLE gold_card_members ADD COLUMN source_filename VARCHAR(500) NULL AFTER remarks");
     }
+    // Soft-delete columns (Tier 1 audit C15). Replaces hard DELETE that broke
+    // audit trail + violated PDPA right-to-erasure controls.
+    if (!in_array('deleted_at', $cols, true)) {
+        $pdo->exec("ALTER TABLE gold_card_members ADD COLUMN deleted_at TIMESTAMP NULL DEFAULT NULL, ADD INDEX idx_deleted_at (deleted_at)");
+    }
+    if (!in_array('deleted_by', $cols, true)) {
+        $pdo->exec("ALTER TABLE gold_card_members ADD COLUMN deleted_by INT UNSIGNED NULL");
+    }
+    if (!in_array('deletion_reason', $cols, true)) {
+        $pdo->exec("ALTER TABLE gold_card_members ADD COLUMN deletion_reason VARCHAR(500) NULL");
+    }
 } catch (PDOException $e) { /* silent */ }
 
 // ── Helper: ดึงชื่อจาก filename + match กับ sys_users ─────────────────────────
@@ -363,7 +374,7 @@ function gc_ocr_extract(string $filePath, string $origExt): array
         ];
     } catch (Throwable $e) {
         $cleanup();
-        return ['ok' => false, 'error' => $e->getMessage()];
+        return ['ok' => false, 'error' => 'Server error'];
     }
 }
 
@@ -542,16 +553,19 @@ try {
         }
 
         case 'folder:delete': {
-            // ลบสมาชิกทั้งหมดในโฟลเดอร์ year+month (หรือ no_date)
+            // Soft-delete ทั้งโฟลเดอร์ year+month (หรือ no_date) — keep data
+            // for retention window, mark deleted_at. Tier 1 audit C15.
             $year   = (int)($_POST['year'] ?? 0);
             $month  = (int)($_POST['month'] ?? 0);
             $noDate = !empty($_POST['no_date']);
+            $reason = trim((string)($_POST['reason'] ?? ''));
+            if ($reason === '') json_err('กรุณาระบุเหตุผลการลบโฟลเดอร์ (PDPA)');
 
             $where = ''; $params = [];
             if ($noDate) {
-                $where = 'WHERE application_date IS NULL';
+                $where = 'WHERE application_date IS NULL AND deleted_at IS NULL';
             } elseif ($year > 1900 && $month >= 1 && $month <= 12) {
-                $where = 'WHERE YEAR(application_date) = ? AND MONTH(application_date) = ?';
+                $where = 'WHERE YEAR(application_date) = ? AND MONTH(application_date) = ? AND deleted_at IS NULL';
                 $params = [$year, $month];
             } else {
                 json_err('ระบุ year/month หรือ no_date ไม่ถูกต้อง');
@@ -563,29 +577,28 @@ try {
             $ids = $sel->fetchAll(PDO::FETCH_COLUMN);
             if (empty($ids)) json_err('โฟลเดอร์ว่าง — ไม่มีอะไรให้ลบ');
 
-            // ลบไฟล์เอกสารออกจาก disk ก่อน (FK CASCADE จะลบ rows ใน DB)
+            // Soft-delete batch — UPDATE deleted_at, do NOT unlink files
+            // (retention policy: clinical records ≥10y TH).
             $placeholders = implode(',', array_fill(0, count($ids), '?'));
-            $docs = $pdo->prepare("SELECT stored_path FROM gold_card_documents WHERE member_id IN ($placeholders)");
-            $docs->execute($ids);
-            $base = gold_card_uploads_dir();
-            foreach ($docs->fetchAll(PDO::FETCH_COLUMN) as $sp) {
-                $p = $base . '/' . $sp;
-                if (is_file($p)) @unlink($p);
-            }
-
-            // ลบสมาชิก
-            $del = $pdo->prepare("DELETE FROM gold_card_members $where");
-            $del->execute($params);
-            $deleted = $del->rowCount();
+            $upd = $pdo->prepare("UPDATE gold_card_members
+                                  SET deleted_at = NOW(), deleted_by = ?, deletion_reason = ?
+                                  WHERE id IN ($placeholders)");
+            $upd->execute(array_merge([$adminId ?: null, mb_substr($reason, 0, 500)], $ids));
+            $deleted = $upd->rowCount();
 
             gold_card_log_history($pdo, null, 'folder_deleted', null, [
-                'year' => $year, 'month' => $month, 'no_date' => $noDate,
-                'deleted_count' => $deleted, 'member_ids' => array_slice($ids, 0, 50),
+                'year'          => $year,
+                'month'         => $month,
+                'no_date'       => $noDate,
+                'deleted_count' => $deleted,
+                'member_ids'    => array_slice($ids, 0, 200),
+                'reason'        => $reason,
+                'mode'          => 'soft_delete',
             ], $adminId);
 
             json_ok([
                 'deleted' => $deleted,
-                'message' => "ลบโฟลเดอร์เรียบร้อย — $deleted รายการ",
+                'message' => "ทำเครื่องหมายว่าลบโฟลเดอร์เรียบร้อย (soft-delete) — $deleted รายการ ข้อมูลและไฟล์ยังเก็บไว้",
             ]);
         }
 
@@ -599,7 +612,7 @@ try {
                     SUM(status IN ('approved','active'))            AS approved,
                     SUM(status IN ('pending','submitted'))          AS pending
                 FROM gold_card_members
-                WHERE application_date IS NOT NULL
+                WHERE application_date IS NOT NULL AND deleted_at IS NULL
                 GROUP BY y, m
                 ORDER BY y DESC, m ASC
             ")->fetchAll(PDO::FETCH_ASSOC) ?: [];
@@ -619,7 +632,7 @@ try {
                     'pending'   => (int)$r['pending'],
                 ];
             }
-            $noDate = (int)_safe_count($pdo, "SELECT COUNT(*) FROM gold_card_members WHERE application_date IS NULL");
+            $noDate = (int)_safe_count($pdo, "SELECT COUNT(*) FROM gold_card_members WHERE application_date IS NULL AND deleted_at IS NULL");
             json_ok(['folders' => $folders, 'no_date_count' => $noDate]);
         }
 
@@ -653,6 +666,11 @@ try {
 
             $where = [];
             $params = [];
+            // Hide soft-deleted by default; admin UI can opt-in with show_deleted=1
+            $showDeleted = !empty($_GET['show_deleted']) || !empty($_POST['show_deleted']);
+            if (!$showDeleted) {
+                $where[] = "deleted_at IS NULL";
+            }
             if ($search !== '') {
                 $where[] = "(full_name LIKE :s1 OR citizen_id LIKE :s2 OR phone LIKE :s3)";
                 $params[':s1'] = "%$search%";
@@ -904,26 +922,40 @@ try {
         }
 
         case 'member:delete': {
-            $id = (int)($_POST['id'] ?? 0);
+            $id     = (int)($_POST['id'] ?? 0);
+            $reason = trim((string)($_POST['reason'] ?? ''));
             if ($id <= 0) json_err('ระบุ id ไม่ถูกต้อง');
+            if ($reason === '') json_err('กรุณาระบุเหตุผลการลบ (PDPA Art. 32 ต้องการ record-of-processing)');
 
-            $row = $pdo->prepare("SELECT full_name, citizen_id FROM gold_card_members WHERE id = ?");
-            $row->execute([$id]);
-            $info = $row->fetch(PDO::FETCH_ASSOC);
-            if (!$info) json_err('ไม่พบสมาชิก');
+            // Snapshot full row + document metadata BEFORE soft-delete.
+            // Preserves PDPA Art. 39 record-of-processing (member_id stays valid).
+            $sel = $pdo->prepare("SELECT * FROM gold_card_members WHERE id = ? AND deleted_at IS NULL");
+            $sel->execute([$id]);
+            $full = $sel->fetch(PDO::FETCH_ASSOC);
+            if (!$full) json_err('ไม่พบสมาชิก (หรือถูกลบไปแล้ว)');
 
-            $docs = $pdo->prepare("SELECT stored_path FROM gold_card_documents WHERE member_id = ?");
-            $docs->execute([$id]);
-            $base = gold_card_uploads_dir();
-            foreach ($docs->fetchAll(PDO::FETCH_COLUMN) as $sp) {
-                $p = $base . '/' . $sp;
-                if (is_file($p)) @unlink($p);
-            }
+            $docStmt = $pdo->prepare("SELECT id, doc_type, file_name, stored_path, mime_type, file_size, uploaded_at
+                                      FROM gold_card_documents WHERE member_id = ?");
+            $docStmt->execute([$id]);
+            $docs = $docStmt->fetchAll(PDO::FETCH_ASSOC);
 
-            $pdo->prepare("DELETE FROM gold_card_members WHERE id = ?")->execute([$id]);
-            gold_card_log_history($pdo, null, 'deleted', $info, null, $adminId);
+            // Soft-delete the row — keep all data + files for the statutory
+            // retention window (clinical records ≥10 years TH). Physical purge
+            // is a separate scheduled job, not driven by user clicks.
+            $pdo->prepare("UPDATE gold_card_members
+                           SET deleted_at = NOW(), deleted_by = ?, deletion_reason = ?
+                           WHERE id = ?")
+                ->execute([$adminId ?: null, mb_substr($reason, 0, 500), $id]);
 
-            json_ok(['message' => 'ลบสมาชิกและเอกสารทั้งหมดเรียบร้อย']);
+            // Full snapshot in history — closes the "member_id NULL → audit trail
+            // broken" finding from Phase 6.
+            gold_card_log_history($pdo, $id, 'deleted', [
+                'member'    => $full,
+                'documents' => $docs,
+                'reason'    => $reason,
+            ], null, $adminId);
+
+            json_ok(['message' => 'ทำเครื่องหมายว่าลบเรียบร้อย (soft-delete) — ข้อมูลและไฟล์ยังเก็บไว้ตาม retention policy']);
         }
 
         case 'document:upload': {
@@ -984,25 +1016,59 @@ try {
         }
 
         case 'document:download': {
-            // ส่งไฟล์ออก (ไม่ใช่ JSON) — handle separately
+            // ส่งไฟล์ออก (ไม่ใช่ JSON) — handle separately.
+            // Tier 1 audit C19: every download must (a) realpath-confine to
+            // uploads/gold_card/, (b) write an audit row, (c) restrict GET
+            // (CSRF-less inline preview) to image MIMEs only — PDF/DOC must
+            // come through POST+CSRF.
             $id = (int)($_POST['id'] ?? $_GET['id'] ?? 0);
             if ($id <= 0) json_err('ระบุ id ไม่ถูกต้อง');
 
-            $stmt = $pdo->prepare("SELECT file_name, stored_path, mime_type FROM gold_card_documents WHERE id = ?");
+            $stmt = $pdo->prepare("SELECT id, member_id, file_name, stored_path, mime_type
+                                   FROM gold_card_documents WHERE id = ?");
             $stmt->execute([$id]);
             $row = $stmt->fetch(PDO::FETCH_ASSOC);
             if (!$row) json_err('ไม่พบไฟล์');
 
-            $path = gold_card_uploads_dir() . '/' . $row['stored_path'];
-            if (!is_file($path)) json_err('ไฟล์หายไปจาก storage');
+            $mimeType = (string)($row['mime_type'] ?: 'application/octet-stream');
+            $isImage  = str_starts_with($mimeType, 'image/');
 
-            // Override JSON header
-            $disposition = (($_GET['disposition'] ?? $_POST['disposition'] ?? 'inline') === 'attachment') ? 'attachment' : 'inline';
+            // GET path is CSRF-less (inline preview). Only allow image MIMEs;
+            // everything else must come through POST+CSRF (already enforced at
+            // the file-level top guard for non-inline-preview requests).
+            if ($_SERVER['REQUEST_METHOD'] === 'GET' && !$isImage) {
+                json_err('ดาวน์โหลดเอกสารต้องผ่านการยืนยัน (POST + CSRF)', 405);
+            }
+
+            // Realpath confinement — never read anything outside uploads/gold_card/
+            // regardless of what stored_path may contain.
+            $base       = gold_card_uploads_dir();
+            $baseReal   = realpath($base) ?: '';
+            $candidate  = $base . '/' . ltrim((string)$row['stored_path'], '/');
+            $pathReal   = realpath($candidate) ?: '';
+            if ($pathReal === '' || $baseReal === ''
+                || !str_starts_with($pathReal, $baseReal . DIRECTORY_SEPARATOR)
+                || !is_file($pathReal)) {
+                json_err('ไฟล์หายไปจาก storage');
+            }
+
+            // Audit row — every doc view leaves a trace.
+            if (function_exists('gold_card_log_history')) {
+                @gold_card_log_history($pdo, (int)$row['member_id'], 'document_viewed', [
+                    'doc_id'    => (int)$row['id'],
+                    'file_name' => $row['file_name'],
+                    'via'       => $_SERVER['REQUEST_METHOD'],
+                ], null, $adminId);
+            }
+
+            $disposition = (($_GET['disposition'] ?? $_POST['disposition'] ?? 'inline') === 'attachment')
+                ? 'attachment' : 'inline';
             header_remove('Content-Type');
-            header('Content-Type: ' . ($row['mime_type'] ?: 'application/octet-stream'));
+            header('Content-Type: ' . $mimeType);
+            header('X-Content-Type-Options: nosniff');
             header('Content-Disposition: ' . $disposition . '; filename="' . rawurlencode($row['file_name']) . '"');
-            header('Content-Length: ' . filesize($path));
-            readfile($path);
+            header('Content-Length: ' . filesize($pathReal));
+            readfile($pathReal);
             exit;
         }
 
@@ -1318,5 +1384,5 @@ try {
     }
 } catch (Throwable $e) {
     error_log('[ajax_gold_card] ' . $e->getMessage());
-    json_err('ระบบขัดข้อง: ' . $e->getMessage(), 500);
+    json_err('ระบบขัดข้อง', 500);
 }

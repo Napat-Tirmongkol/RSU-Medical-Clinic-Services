@@ -3,6 +3,7 @@
 declare(strict_types=1);
 session_start();
 require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../includes/lang.php';
 check_maintenance('e_campaign');
 
 $lineUserId = $_SESSION['line_user_id'] ?? '';
@@ -198,8 +199,28 @@ try {
 }
 
 // ── Today's doctor shifts (for "แพทย์ออกตรวจวันนี้" widget) ───────────────
+// LEFT JOIN ms + no ms.is_active filter — matches admin schedule:list
+// semantics + clinic_status_helper.php. Previously INNER + ms.is_active=1
+// silently dropped schedules of staff flagged inactive.
+//
+// Also gate on clinic-closed status: if today is a holiday (เทอมเบรค) or
+// special-closure day in sys_clinic_hours, skip the widget entirely.
+// The calendar view at user/clinic_schedule.php hides shift events on
+// holiday days; the hub widget needs the same treatment so it doesn't say
+// "doctor X is on duty today" when the clinic isn't actually open.
 $todayShifts = [];
+$todayClinicClosed = false;
+$todayClinicCloseNote = '';
 try {
+    require_once __DIR__ . '/../includes/clinic_status_helper.php';
+    $todayHours = get_clinic_hours_for_date($pdo, $today);
+    if (!empty($todayHours['closed'])) {
+        // Clinic closed — skip the query entirely, widget renders empty state.
+        $todayClinicClosed   = true;
+        $todayClinicCloseNote = (string)($todayHours['note'] ?? '');
+        throw new RuntimeException('clinic-closed-today');
+    }
+
     $todayWd = (int)date('w');
     $stmt = $pdo->prepare("
         SELECT s.id, s.type, s.weekday, s.specific_date, s.start_time, s.end_time,
@@ -207,9 +228,9 @@ try {
                ms.title AS doc_title, ms.full_name AS doc_name,
                cr.name AS room_name, cr.code AS room_code
         FROM sys_doctor_schedule s
-        JOIN sys_medical_staff ms ON s.staff_id = ms.id
+        LEFT JOIN sys_medical_staff ms ON s.staff_id = ms.id
         LEFT JOIN sys_clinic_rooms cr ON s.room_id = cr.id
-        WHERE s.is_active = 1 AND ms.is_active = 1
+        WHERE s.is_active = 1
           AND s.type <> 'off'
           AND (
               (s.specific_date = :today)
@@ -340,29 +361,42 @@ function getInitials($name)
 function getCampStyle($type): array
 {
     return match ($type) {
-        'vaccine' => ['label' => 'วัคซีน', 'class' => 'bg-emerald-50 text-emerald-600 border-emerald-100', 'icon' => 'fa-syringe'],
-        'health_check' => ['label' => 'ตรวจสุขภาพ', 'class' => 'bg-green-50 text-green-600 border-green-100', 'icon' => 'fa-stethoscope'],
-        default => ['label' => 'ทั่วไป', 'class' => 'bg-gray-50 text-gray-600 border-gray-100', 'icon' => 'fa-star'],
+        'vaccine'      => ['label' => __('hub.camp.vaccine'),      'class' => 'bg-emerald-50 text-emerald-600 border-emerald-100', 'icon' => 'fa-syringe'],
+        'health_check' => ['label' => __('hub.camp.health_check'), 'class' => 'bg-green-50 text-green-600 border-green-100',       'icon' => 'fa-stethoscope'],
+        default        => ['label' => __('hub.camp.general'),      'class' => 'bg-gray-50 text-gray-600 border-gray-100',          'icon' => 'fa-star'],
     };
 }
 
 function getStatusStyle($status): array
 {
     return match ($status) {
-        'confirmed', 'booked'                  => ['label' => 'ยืนยันแล้ว',     'class' => 'bg-emerald-50 text-emerald-600'],
-        'completed'                            => ['label' => 'สำเร็จแล้ว',     'class' => 'bg-green-50 text-green-600'],
-        'cancelled', 'cancelled_by_admin'      => ['label' => 'ยกเลิกแล้ว',     'class' => 'bg-red-50 text-red-600'],
-        'expired'                              => ['label' => 'หมดอายุ',         'class' => 'bg-slate-100 text-slate-500'],
-        default                                => ['label' => 'รอดำเนินการ',     'class' => 'bg-gray-50 text-gray-600'],
+        'confirmed', 'booked'                  => ['label' => __('hub.status.confirmed'), 'class' => 'bg-emerald-50 text-emerald-600'],
+        'completed'                            => ['label' => __('hub.status.completed'), 'class' => 'bg-green-50 text-green-600'],
+        'cancelled', 'cancelled_by_admin'      => ['label' => __('hub.status.cancelled'), 'class' => 'bg-red-50 text-red-600'],
+        'expired'                              => ['label' => __('hub.status.expired'),   'class' => 'bg-slate-100 text-slate-500'],
+        default                                => ['label' => __('hub.status.pending'),   'class' => 'bg-gray-50 text-gray-600'],
     };
 }
 
+/**
+ * Format a Y-m-d date as a localized long-form string.
+ *   TH: "อาทิตย์, 18 พฤษภาคม 2569"  (Buddhist year)
+ *   EN: "Sunday, 18 May 2026"
+ * Reads dow + months from the translation file so adding a new locale
+ * needs no code changes (Phase 2 i18n migration — function name kept
+ * for backwards compatibility with its 6+ call sites).
+ */
 function formatThaiDate($date)
 {
-    $days = ["อาทิตย์", "จันทร์", "อังคาร", "พุธ", "พฤหัสบดี", "ศุกร์", "เสาร์"];
-    $months = ["", "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"];
     $ts = strtotime($date);
-    return $days[date('w', $ts)] . ", " . date('j', $ts) . " " . $months[date('n', $ts)] . " " . (date('Y', $ts) + 543);
+    if ($ts === false) return (string)$date;
+    $tr        = $GLOBALS['_tr'] ?? [];
+    $days      = $tr['bookings.dow_full']    ?? ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    $months    = $tr['bookings.months_full'] ?? ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    $buddhist  = $tr['bookings.date_buddhist'] ?? false;
+    $year      = $buddhist ? ((int)date('Y', $ts) + 543) : (int)date('Y', $ts);
+    return ($days[(int)date('w', $ts)] ?? '') . ', ' . (int)date('j', $ts) . ' '
+         . ($months[(int)date('n', $ts)] ?? '') . ' ' . $year;
 }
 
 function maskCitizenId(?string $citizenId): string
@@ -386,7 +420,11 @@ function campIcon($type)
 $thaiDate = formatThaiDate($today);
 $userInitials = getInitials($user['full_name']);
 $hour = (int) date('H');
-$greeting = ($hour >= 5 && $hour < 12) ? "สวัสดีตอนเช้า" : (($hour >= 12 && $hour < 17) ? "สวัสดีตอนบ่าย" : (($hour >= 17 && $hour < 21) ? "สวัสดีตอนเย็น" : "สวัสดีตอนค่ำ"));
+$greeting = __(
+    ($hour >= 5 && $hour < 12) ? 'hub.greet.morning'
+    : (($hour >= 12 && $hour < 17) ? 'hub.greet.afternoon'
+    : (($hour >= 17 && $hour < 21) ? 'hub.greet.evening' : 'hub.greet.night'))
+);
 
 // Greeting icon/emoji + glyph by time-of-day — A) personalize hero greeting
 $greetIcon  = ($hour >= 5 && $hour < 12) ? '☀️' : (($hour >= 12 && $hour < 17) ? '🌤️' : (($hour >= 17 && $hour < 21) ? '🌆' : '🌙'));
@@ -395,7 +433,7 @@ if ($firstName === '') {
     $parts = preg_split('/\s+/', trim((string)($user['full_name'] ?? '')));
     $firstName = $parts[0] ?? '';
 }
-$firstName = $firstName !== '' ? $firstName : 'คุณ';
+$firstName = $firstName !== '' ? $firstName : __('hub.greet.fallback_name');
 
 // Birthday detection — show HBD card when today MM-DD == DOB MM-DD
 $isBirthday = false;
@@ -414,59 +452,61 @@ if ($next_appt) {
     $daysUntil = (int) ((strtotime($next_appt['slot_date']) - strtotime($today)) / 86400);
     $smartHero = [
         'kind'       => 'appointment',
-        'eyebrow'    => 'นัดหมายถัดไป',
+        'eyebrow'    => __('hub.hero.eyebrow.appt'),
         'title'      => $next_appt['camp_name'],
-        'detail'     => formatThaiDate($next_appt['slot_date']) . ' · ' . substr((string)$next_appt['start_time'], 0, 5) . ' น.',
+        'detail'     => __('hub.hero.detail.appt',
+                          formatThaiDate($next_appt['slot_date']),
+                          substr((string)$next_appt['start_time'], 0, 5)),
         'days_until' => $daysUntil,
         'icon'       => 'fa-calendar-check',
         'theme'      => 'brand',
         'action'     => "window.location.href='my_bookings.php'",
-        'cta_label'  => 'ดูรายละเอียด',
+        'cta_label'  => __('hub.hero.cta.detail'),
     ];
 } elseif (!empty($borrow_overdue_count)) {
     $smartHero = [
         'kind'      => 'overdue',
-        'eyebrow'   => 'เกินกำหนดคืน',
-        'title'     => "อุปกรณ์ {$borrow_overdue_count} รายการเลยกำหนดคืน",
-        'detail'    => 'ติดต่อเจ้าหน้าที่เพื่อคืนของและชำระค่าปรับ',
+        'eyebrow'   => __('hub.hero.eyebrow.overdue'),
+        'title'     => __('hub.hero.title.overdue', $borrow_overdue_count),
+        'detail'    => __('hub.hero.detail.overdue'),
         'icon'      => 'fa-triangle-exclamation',
         'theme'     => 'rose',
         'action'    => 'showBorrow()',
-        'cta_label' => 'จัดการตอนนี้',
+        'cta_label' => __('hub.hero.cta.manage'),
     ];
 } elseif (!empty($healthOverview['vaccine_next_due'])) {
     $vd = $healthOverview['vaccine_next_due'];
     $smartHero = [
         'kind'      => 'vaccine',
-        'eyebrow'   => 'วัคซีนครบกำหนด',
+        'eyebrow'   => __('hub.hero.eyebrow.vaccine'),
         'title'     => $vd['vaccine_name'],
-        'detail'    => 'ครบกำหนด ' . formatThaiDate($vd['next_due_date']),
+        'detail'    => __('hub.hero.detail.vaccine_due', formatThaiDate($vd['next_due_date'])),
         'icon'      => 'fa-syringe',
         'theme'     => 'amber',
         'action'    => 'showCampaigns()',
-        'cta_label' => 'จองนัด',
+        'cta_label' => __('hub.hero.cta.book'),
     ];
 } elseif (!empty($borrow_pending_count)) {
     $smartHero = [
         'kind'      => 'pending',
-        'eyebrow'   => 'คำขอรออนุมัติ',
-        'title'     => "{$borrow_pending_count} รายการรอเจ้าหน้าที่อนุมัติ",
-        'detail'    => 'แตะดูสถานะคำขอ',
+        'eyebrow'   => __('hub.hero.eyebrow.pending'),
+        'title'     => __('hub.hero.title.pending', $borrow_pending_count),
+        'detail'    => __('hub.hero.detail.pending'),
         'icon'      => 'fa-hourglass-half',
         'theme'     => 'amber',
         'action'    => 'showBorrow()',
-        'cta_label' => 'ดูคำขอ',
+        'cta_label' => __('hub.hero.cta.view_requests'),
     ];
 } else {
     $smartHero = [
         'kind'      => 'empty',
-        'eyebrow'   => 'วันนี้ของคุณ',
-        'title'     => 'ไม่มีรายการเร่งด่วน',
-        'detail'    => 'ดูแลสุขภาพของคุณ — ฉีดวัคซีนตามกำหนดหรือดูแคมเปญที่เปิดรับ',
+        'eyebrow'   => __('hub.hero.eyebrow.today'),
+        'title'     => __('hub.hero.title.empty'),
+        'detail'    => __('hub.hero.detail.empty'),
         'icon'      => 'fa-heart-pulse',
         'theme'     => 'brand',
         'action'    => 'showCampaigns()',
-        'cta_label' => 'ดูแคมเปญ',
+        'cta_label' => __('hub.hero.cta.view_camps'),
     ];
 }
 
@@ -483,7 +523,9 @@ $todayTs = strtotime($today);
 foreach ($healthOverview['upcoming_list'] as $up) {
     $diff = (int) round((strtotime($up['slot_date']) - $todayTs) / 86400);
     if ($diff < 0 || $diff > 7) continue;
-    $when = $diff === 0 ? 'วันนี้' : ($diff === 1 ? 'พรุ่งนี้' : 'อีก '.$diff.' วัน');
+    $when = $diff === 0 ? __('hub.pill.today')
+          : ($diff === 1 ? __('hub.pill.tomorrow')
+          : __('hub.pill.in_days', $diff));
     $urg = $diff <= 1 ? 2 : ($diff <= 3 ? 1 : 0);
     $reminderPills[] = [
         'icon'   => 'fa-calendar-check',
@@ -501,8 +543,8 @@ if (!empty($healthOverview['vaccine_next_due'])) {
         $urg = $diff <= 7 ? 2 : ($diff <= 14 ? 1 : 0);
         $reminderPills[] = [
             'icon'   => 'fa-syringe',
-            'label'  => 'วัคซีน '.mb_substr((string)$vd['vaccine_name'], 0, 18),
-            'sub'    => $diff === 0 ? 'ครบกำหนดวันนี้' : 'อีก '.$diff.' วัน',
+            'label'  => __('hub.pill.vaccine_label', mb_substr((string)$vd['vaccine_name'], 0, 18)),
+            'sub'    => $diff === 0 ? __('hub.pill.due_today') : __('hub.pill.in_days', $diff),
             'tone'   => $urg === 2 ? 'rose' : ($urg === 1 ? 'amber' : 'sky'),
             'action' => 'showCampaigns()',
             'urgency'=> $urg,
@@ -514,12 +556,12 @@ foreach ($borrow_active as $b) {
     $diff = (int) round((strtotime($b['due_date']) - $todayTs) / 86400);
     if ($diff < -1 || $diff > 3) continue;
     if ($diff < 0) {
-        $label = 'เกินกำหนดคืน '.abs($diff).' วัน';
+        $label = __('hub.pill.overdue_days', abs($diff));
         $tone = 'rose'; $urg = 2;
     } elseif ($diff === 0) {
-        $label = 'คืนวันนี้'; $tone = 'rose'; $urg = 2;
+        $label = __('hub.pill.return_today'); $tone = 'rose'; $urg = 2;
     } else {
-        $label = 'คืนอีก '.$diff.' วัน'; $tone = 'amber'; $urg = 1;
+        $label = __('hub.pill.return_in_days', $diff); $tone = 'amber'; $urg = 1;
     }
     $reminderPills[] = [
         'icon'   => 'fa-clock-rotate-left',
@@ -533,8 +575,8 @@ foreach ($borrow_active as $b) {
 if ($borrow_total_fine > 0) {
     $reminderPills[] = [
         'icon'   => 'fa-money-bill-wave',
-        'label'  => 'ค่าปรับ ฿'.number_format($borrow_total_fine, 0),
-        'sub'    => 'รอชำระ',
+        'label'  => __('hub.pill.fine_label', number_format($borrow_total_fine, 0)),
+        'sub'    => __('hub.pill.fine_sub'),
         'tone'   => 'rose',
         'action' => 'showBorrow()',
         'urgency'=> 2,
@@ -1601,11 +1643,17 @@ $pillTones = [
                 </button>
                 <div class="flex flex-col">
                     <h1 class="text-slate-900 font-black text-lg leading-none mb-1 tracking-tight">RSU Medical Clinic</h1>
-                    <p class="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em] leading-none">User Hub
+                    <p class="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em] leading-none"><?= htmlspecialchars(__('hub.brand.subtitle')) ?>
                     </p>
                 </div>
             </div>
             <div class="flex items-center gap-3">
+                <a href="<?= htmlspecialchars(lang_switch_url()) ?>"
+                    class="w-10 h-10 flex items-center justify-center text-slate-500 hover:text-green-600 transition-colors font-black text-[11px] tracking-wider"
+                    aria-label="<?= htmlspecialchars(__('hub.lang.switch_aria')) ?>"
+                    title="<?= htmlspecialchars(__('hub.lang.switch_aria')) ?>">
+                    <span class="px-2 py-1 rounded-lg border border-slate-200 hover:border-green-300 hover:bg-green-50 transition-all"><?= current_lang() === 'th' ? 'EN' : 'ไทย' ?></span>
+                </a>
                 <button onclick="showQR()"
                     class="w-10 h-10 flex items-center justify-center text-slate-600 hover:text-green-600 transition-colors">
                     <i class="fa-solid fa-qrcode text-lg"></i>
@@ -1635,7 +1683,7 @@ $pillTones = [
                             <?= $greetIcon ?> <?= htmlspecialchars($greeting) ?>
                         </h2>
                         <p class="mt-1 text-slate-500 text-[13px] font-bold truncate">
-                            คุณ<?= htmlspecialchars($firstName) ?> 👋
+                            <?= htmlspecialchars(__('hub.greet.name_prefix') . $firstName) ?> 👋
                         </p>
                     </div>
                 </div>
@@ -1895,7 +1943,7 @@ $pillTones = [
                             <i class="fa-solid fa-calendar-check text-sm"></i>
                         </div>
                         <p class="text-lg font-black text-slate-900"><?= $upcoming_count ?></p>
-                        <p class="text-[9px] font-black uppercase tracking-widest text-slate-400">นัดหมาย</p>
+                        <p class="text-[9px] font-black uppercase tracking-widest text-slate-400"><?= htmlspecialchars(__('hub.stat.appointments')) ?></p>
                     </button>
                     <button onclick="showVaccinationHistory()"
                         class="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm text-center active:scale-95 transition-all">
@@ -1903,7 +1951,7 @@ $pillTones = [
                             <i class="fa-solid fa-syringe text-sm"></i>
                         </div>
                         <p class="text-lg font-black text-slate-900"><?= (int) ($healthOverview['vaccine_total'] ?? 0) ?></p>
-                        <p class="text-[9px] font-black uppercase tracking-widest text-slate-400">วัคซีน</p>
+                        <p class="text-[9px] font-black uppercase tracking-widest text-slate-400"><?= htmlspecialchars(__('hub.stat.vaccines')) ?></p>
                     </button>
                     <button onclick="showBorrow()"
                         class="relative bg-white rounded-2xl p-4 border border-slate-100 shadow-sm text-center active:scale-95 transition-all">
@@ -1914,7 +1962,7 @@ $pillTones = [
                             <i class="fa-solid fa-box-archive text-sm"></i>
                         </div>
                         <p class="text-lg font-black text-slate-900"><?= $borrow_count ?></p>
-                        <p class="text-[9px] font-black uppercase tracking-widest text-slate-400">ยืมอยู่</p>
+                        <p class="text-[9px] font-black uppercase tracking-widest text-slate-400"><?= htmlspecialchars(__('hub.stat.borrowed')) ?></p>
                     </button>
                 </div>
 
@@ -1925,18 +1973,28 @@ $pillTones = [
                             <span class="w-7 h-7 rounded-lg bg-cyan-50 text-cyan-600 flex items-center justify-center">
                                 <i class="fa-solid fa-user-doctor text-xs"></i>
                             </span>
-                            แพทย์ออกตรวจวันนี้
+                            <?= htmlspecialchars(__('hub.doctors_today.title')) ?>
                         </h4>
                         <a href="clinic_schedule.php" class="text-[10px] font-black text-cyan-600 uppercase tracking-widest hover:text-cyan-700 active:scale-95 transition-all">
-                            ดูทั้งหมด <i class="fa-solid fa-arrow-right text-[8px] ml-0.5"></i>
+                            <?= htmlspecialchars(__('hub.doctors_today.see_all')) ?> <i class="fa-solid fa-arrow-right text-[8px] ml-0.5"></i>
                         </a>
                     </div>
                     <?php if (empty($todayShifts)): ?>
                         <div class="text-center py-5">
-                            <div class="w-10 h-10 mx-auto mb-2 rounded-full bg-slate-50 text-slate-300 flex items-center justify-center">
-                                <i class="fa-solid fa-calendar-xmark"></i>
-                            </div>
-                            <p class="text-xs font-bold text-slate-400">ไม่มีแพทย์ออกตรวจในวันนี้</p>
+                            <?php if ($todayClinicClosed): ?>
+                                <div class="w-10 h-10 mx-auto mb-2 rounded-full bg-rose-50 text-rose-500 flex items-center justify-center">
+                                    <i class="fa-solid fa-door-closed"></i>
+                                </div>
+                                <p class="text-xs font-black text-rose-600"><?= htmlspecialchars(__('hub.doctors_today.closed')) ?></p>
+                                <?php if ($todayClinicCloseNote !== ''): ?>
+                                    <p class="mt-1 text-[11px] font-bold text-slate-400"><?= htmlspecialchars($todayClinicCloseNote) ?></p>
+                                <?php endif; ?>
+                            <?php else: ?>
+                                <div class="w-10 h-10 mx-auto mb-2 rounded-full bg-slate-50 text-slate-300 flex items-center justify-center">
+                                    <i class="fa-solid fa-calendar-xmark"></i>
+                                </div>
+                                <p class="text-xs font-bold text-slate-400"><?= htmlspecialchars(__('hub.doctors_today.empty')) ?></p>
+                            <?php endif; ?>
                         </div>
                     <?php else: ?>
                         <div class="space-y-1.5">

@@ -170,6 +170,6 @@ try {
     if ($pdo->inTransaction()) {
         $pdo->rollBack();
     }
-    echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+    echo json_encode(['status' => 'error', 'message' => 'ระบบขัดข้อง กรุณาลองอีกครั้ง']);
 }
 

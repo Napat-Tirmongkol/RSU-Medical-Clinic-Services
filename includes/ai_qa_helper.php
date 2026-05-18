@@ -681,6 +681,76 @@ PROMPT;
  *   ส่งคำถาม + list ของ candidate ให้ Gemini เลือก best match
  *   threshold confidence >= 0.7 (ถ้าต่ำกว่า return null)
  *
+/**
+ * Deterministic answer for "หมอวันนี้" / "แพทย์วันนี้" style questions.
+ *
+ * Bypasses the AI matcher because cached answers in sys_ai_faq / sys_ai_qa_log
+ * bake the date into the response text (e.g. "วันนี้ พุธที่ 13 พ.ค."). After
+ * 5 days of caching, the matcher returns that stale text as-is.
+ *
+ * Builds a fresh answer from get_clinic_hours_for_date + get_clinic_doctors_
+ * for_date on each call — always current.
+ *
+ * @return string|null Fresh answer text, or null if question doesn't match
+ *                    the "doctors today" intent.
+ */
+function ai_qa_try_doctors_today(PDO $pdo, string $question): ?string
+{
+    require_once __DIR__ . '/clinic_status_helper.php';
+
+    // Detect "doctors today" intent. Patterns:
+    //   "หมอวันนี้", "แพทย์วันนี้", "วันนี้หมอใคร", "วันนี้มีหมอไหม",
+    //   "หมอออกตรวจวันนี้", "ใครออกตรวจวันนี้", "วันนี้แพทย์คนไหน"
+    // Stay narrow — don't catch "พรุ่งนี้" (tomorrow) or "วันที่ X" (specific date).
+    $matched = preg_match('/(หมอ|แพทย์|ใคร)[^\n]{0,20}(วันนี้|ตอนนี้)/u', $question)
+            || preg_match('/(วันนี้|ตอนนี้)[^\n]{0,20}(หมอ|แพทย์|ใคร)/u', $question)
+            || preg_match('/(หมอ|แพทย์)\s*ออกตรวจ.{0,10}(วันนี้)?/u', $question)
+            || preg_match('/ออกตรวจ[^\n]{0,15}วันนี้/u', $question);
+    if (!$matched) return null;
+
+    $tz    = new DateTimeZone(CLINIC_TZ_NAME);
+    $now   = new DateTimeImmutable('now', $tz);
+    $today = $now->format('Y-m-d');
+    $label = clinic_format_thai_date($today);
+
+    // Clinic closed today?
+    $hours = get_clinic_hours_for_date($pdo, $today);
+    if (!empty($hours['closed'])) {
+        $note = !empty($hours['note']) ? " ({$hours['note']})" : '';
+        return "วันนี้ {$label} คลินิกปิดทำการ{$note} ค่ะ — ขออภัยในความไม่สะดวก";
+    }
+
+    $openText = '';
+    if (!empty($hours['open_time']) && !empty($hours['close_time'])) {
+        $openText = " · เวลาทำการ {$hours['open_time']}–{$hours['close_time']} น.";
+    }
+
+    $shifts = get_clinic_doctors_for_date($pdo, $today);
+    if (empty($shifts)) {
+        return "วันนี้ {$label} ยังไม่มีตารางแพทย์ออกตรวจ{$openText} ค่ะ — กรุณาติดต่อคลินิกเพื่อตรวจสอบ";
+    }
+
+    $lines = [];
+    foreach ($shifts as $s) {
+        $title = trim((string)($s['doc_title'] ?? ''));
+        $dname = trim((string)($s['doc_name']  ?? ''));
+        $start = substr((string)($s['start_time'] ?? ''), 0, 5);
+        $end   = substr((string)($s['end_time']   ?? ''), 0, 5);
+        $svc   = trim((string)($s['service_type'] ?? ''));
+        $room  = trim((string)($s['room_name']    ?? ''));
+        $time  = ($start && $end) ? " เวลา {$start}–{$end} น." : '';
+        $extras = array_filter([$svc, $room ? "ห้อง {$room}" : '']);
+        $tail = !empty($extras) ? ' · ' . implode(', ', $extras) : '';
+        $name = trim("{$title} {$dname}");
+        if ($name === '') $name = 'แพทย์';
+        $lines[] = "• {$name}{$time}{$tail}";
+    }
+
+    $body = implode("\n", $lines);
+    return "วันนี้ {$label}{$openText}\nมีแพทย์ออกตรวจดังนี้ค่ะ:\n{$body}";
+}
+
+/**
  * @param callable|null $onSemanticPhase callback ก่อนเข้า Phase 2 (Gemini)
  *        ใช้สำหรับ side effects เช่น แสดง loading indicator ใน LINE
  * @return array{answer:string, matched_via:string, source_id:int, confidence?:float}|null

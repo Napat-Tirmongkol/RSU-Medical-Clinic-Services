@@ -165,5 +165,5 @@ try {
     }
 } catch (Throwable $e) {
     error_log('[ajax_ai_chunks] ' . $e->getMessage());
-    echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
+    echo json_encode(['ok' => false, 'error' => 'Server error']);
 }

@@ -115,7 +115,8 @@ try {
         INDEX idx_staff (staff_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 } catch (PDOException $e) {
-    echo json_encode(['ok' => false, 'message' => 'Migration failed: ' . $e->getMessage()]);
+    error_log('[ajax_clinic_master migration] ' . $e->getMessage());
+    echo json_encode(['ok' => false, 'message' => 'Migration failed']);
     exit;
 }
 

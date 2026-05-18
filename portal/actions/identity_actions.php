@@ -263,8 +263,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Keep old delete handlers for now
     if ($action === 'delete_admin' && $adminRole === 'superadmin') {
         if (function_exists('validate_csrf_or_die')) validate_csrf_or_die();
-        $adminId = $_POST['admin_id'] ?? null;
-        if ($adminId != $_SESSION['admin_id']) {
+        // Strict int cast + identity comparison — prevents the loose-compare
+        // bug where $adminId="1abc" matched $_SESSION['admin_id']=1.
+        $adminId = (int)($_POST['admin_id'] ?? 0);
+        $selfId  = (int)($_SESSION['admin_id'] ?? 0);
+        if ($adminId > 0 && $adminId !== $selfId) {
             $pdo->prepare("DELETE FROM sys_admins WHERE id = ?")->execute([$adminId]);
             log_activity("Deleted Admin", "ลบเจ้าหน้าที่ ID: $adminId");
             header('Location: index.php?section=identity&tab=admins&saved=1'); exit;

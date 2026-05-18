@@ -258,4 +258,77 @@ return [
     'profile.completeness_done'  => 'Profile complete',
     'profile.completeness_more'  => 'Add more info for better service',
     'profile.view_mode_hint'     => 'Tap "Edit" to update your information',
+
+    // ── User Hub (user/hub.php) — Phase 1: visible top viewport ─────────────
+    'hub.lang.switch_aria'       => 'Switch language',
+    'hub.brand.subtitle'         => 'User Hub',
+    'hub.greet.morning'          => 'Good morning',
+    'hub.greet.afternoon'        => 'Good afternoon',
+    'hub.greet.evening'          => 'Good evening',
+    'hub.greet.night'            => 'Good night',
+    'hub.greet.name_prefix'      => '',
+    'hub.stat.appointments'      => 'Bookings',
+    'hub.stat.vaccines'          => 'Vaccines',
+    'hub.stat.borrowed'          => 'Borrowed',
+    'hub.doctors_today.title'    => "Today's doctors",
+    'hub.doctors_today.see_all'  => 'See all',
+    'hub.doctors_today.empty'    => 'No doctors scheduled today',
+    'hub.doctors_today.closed'   => 'Clinic closed today',
+
+    // Full month names for formatThaiDate (Phase 2)
+    'bookings.months_full' => ['', 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'],
+    'bookings.dow_full'    => ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
+
+    // ── User Hub Phase 2: hero card / status badges / camp / pills ──────────
+    'hub.greet.fallback_name'    => 'there',
+    // Hero priority card
+    'hub.hero.eyebrow.appt'      => 'Next appointment',
+    'hub.hero.eyebrow.overdue'   => 'Overdue return',
+    'hub.hero.eyebrow.vaccine'   => 'Vaccine due',
+    'hub.hero.eyebrow.pending'   => 'Pending approval',
+    'hub.hero.eyebrow.today'     => 'Your day',
+    'hub.hero.cta.detail'        => 'See details',
+    'hub.hero.cta.manage'        => 'Manage now',
+    'hub.hero.cta.book'          => 'Book',
+    'hub.hero.cta.view_requests' => 'View requests',
+    'hub.hero.cta.view_camps'    => 'View campaigns',
+    'hub.hero.title.empty'       => 'No urgent items',
+    'hub.hero.detail.empty'      => 'Take care of your health — get vaccines on schedule or check open campaigns',
+    'hub.hero.detail.overdue'    => 'Contact staff to return equipment and pay fines',
+    'hub.hero.detail.pending'    => 'Tap to check request status',
+    // %d = number of items
+    'hub.hero.title.overdue'     => '%d items overdue',
+    'hub.hero.title.pending'     => '%d requests awaiting approval',
+    // %s = formatted date
+    'hub.hero.detail.vaccine_due'=> 'Due on %s',
+    // %s = formatted date, %s = HH:MM
+    'hub.hero.detail.appt'       => '%s · %s',
+
+    // Status badges (booking status)
+    'hub.status.confirmed'       => 'Confirmed',
+    'hub.status.completed'       => 'Completed',
+    'hub.status.cancelled'       => 'Cancelled',
+    'hub.status.expired'         => 'Expired',
+    'hub.status.pending'         => 'Pending',
+
+    // Campaign type labels
+    'hub.camp.vaccine'           => 'Vaccine',
+    'hub.camp.health_check'      => 'Health check',
+    'hub.camp.general'           => 'General',
+
+    // Reminder pills — relative time words
+    'hub.pill.today'             => 'Today',
+    'hub.pill.tomorrow'          => 'Tomorrow',
+    // %d = number of days
+    'hub.pill.in_days'           => 'In %d days',
+    'hub.pill.due_today'         => 'Due today',
+    'hub.pill.return_today'      => 'Return today',
+    // %d = number of days
+    'hub.pill.return_in_days'    => 'Return in %d days',
+    'hub.pill.overdue_days'      => 'Overdue by %d days',
+    // %s = vaccine name
+    'hub.pill.vaccine_label'     => 'Vaccine %s',
+    // %s = number formatted with comma
+    'hub.pill.fine_label'        => 'Fine ฿%s',
+    'hub.pill.fine_sub'          => 'Awaiting payment',
 ];

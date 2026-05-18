@@ -1,0 +1,10 @@
+# Deny all direct web access to config/
+# Files here (secrets.php, db_connect.php, site_settings.json) must never
+# be served — code includes them via PHP only.
+<IfModule mod_authz_core.c>
+    Require all denied
+</IfModule>
+<IfModule !mod_authz_core.c>
+    Order Deny,Allow
+    Deny from all
+</IfModule>
