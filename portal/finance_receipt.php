@@ -1,11 +1,14 @@
 <?php
 // portal/finance_receipt.php — print-friendly receipt page
-// Usage: portal/finance_receipt.php?id=NN
+// Usage: portal/finance_receipt.php?id=NN&sig=HMAC
+//   sig is generated server-side in the list response (fin_receipt_sig).
+//   Editor-role users must present a matching sig; admin/superadmin bypass.
 declare(strict_types=1);
 
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/../includes/finance_receipt_helper.php';
+require_once __DIR__ . '/includes/finance_link.php';
 
 $adminRole = $_SESSION['admin_role'] ?? 'editor';
 $isSuper = ($adminRole === 'superadmin');
@@ -16,8 +19,17 @@ if (!$canFinance) {
 }
 
 $pdo = db();
-$id = (int)($_GET['id'] ?? 0);
+$id  = (int)($_GET['id'] ?? 0);
+$sig = (string)($_GET['sig'] ?? '');
 if ($id <= 0) { http_response_code(400); exit('ไม่ระบุ id'); }
+// Signature required for editor-level users to defeat id enumeration.
+// Admin/superadmin can still hit the URL without sig (back-office tooling
+// and admin-built links that pre-date signed URLs).
+$isAdminRole = $isSuper || ($adminRole === 'admin');
+if (!fin_receipt_verify($id, $sig) && !$isAdminRole) {
+    http_response_code(403);
+    exit('ลิงก์ไม่ถูกต้องหรือหมดอายุ');
+}
 
 $stmt = $pdo->prepare("SELECT t.*, c.name AS category_name, c.icon AS category_icon, c.color AS category_color
     FROM sys_finance_transactions t LEFT JOIN sys_finance_categories c ON c.id = t.category_id
@@ -27,6 +39,10 @@ $row = $stmt->fetch(PDO::FETCH_ASSOC);
 if (!$row) { http_response_code(404); exit('ไม่พบรายการ'); }
 
 // Auto-assign receipt no ถ้ายังไม่มี — race-free via finance_assign_receipt_no()
+// (uses sys_finance_receipt_counter + SELECT FOR UPDATE; see
+// includes/finance_receipt_helper.php). The helper already re-reads the
+// transaction row after the UPDATE so concurrent callers get a consistent
+// receipt_no even if a sibling request beat them to the assignment.
 if (empty($row['receipt_no'])) {
     $assigned = finance_assign_receipt_no($pdo, $id, (int)($_SESSION['admin_id'] ?? 0) ?: null);
     if ($assigned !== '') {

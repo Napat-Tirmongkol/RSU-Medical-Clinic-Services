@@ -258,4 +258,20 @@ return [
     'profile.completeness_done'  => 'Profile complete',
     'profile.completeness_more'  => 'Add more info for better service',
     'profile.view_mode_hint'     => 'Tap "Edit" to update your information',
+
+    // ── User Hub (user/hub.php) — Phase 1: visible top viewport ─────────────
+    'hub.lang.switch_aria'       => 'Switch language',
+    'hub.brand.subtitle'         => 'User Hub',
+    'hub.greet.morning'          => 'Good morning',
+    'hub.greet.afternoon'        => 'Good afternoon',
+    'hub.greet.evening'          => 'Good evening',
+    'hub.greet.night'            => 'Good night',
+    'hub.greet.name_prefix'      => '',
+    'hub.stat.appointments'      => 'Bookings',
+    'hub.stat.vaccines'          => 'Vaccines',
+    'hub.stat.borrowed'          => 'Borrowed',
+    'hub.doctors_today.title'    => "Today's doctors",
+    'hub.doctors_today.see_all'  => 'See all',
+    'hub.doctors_today.empty'    => 'No doctors scheduled today',
+    'hub.doctors_today.closed'   => 'Clinic closed today',
 ];
