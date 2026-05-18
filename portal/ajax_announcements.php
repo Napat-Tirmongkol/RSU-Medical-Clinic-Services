@@ -1,30 +1,43 @@
 <?php
 // portal/ajax_announcements.php
-header('Content-Type: application/json');
+declare(strict_types=1);
+
 require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../includes/session_guard.php';
 
-session_start();
+start_secure_session();
+header('Content-Type: application/json; charset=utf-8');
 
-$action = $_GET['action'] ?? $_POST['action'] ?? '';
+// Mutations must be POST + CSRF-protected.
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    http_response_code(405);
+    echo json_encode(['status' => 'error', 'message' => 'Method not allowed']);
+    exit;
+}
+validate_csrf_or_die();
+
+$userId = (int)($_SESSION['user_id'] ?? 0);
+if ($userId <= 0) {
+    http_response_code(401);
+    echo json_encode(['status' => 'error', 'message' => 'Unauthorized']);
+    exit;
+}
+
+$action = $_POST['action'] ?? '';
 
 try {
     $pdo = db();
 
-    // Mark as read
     if ($action === 'mark_read') {
         $annId = (int)($_POST['ann_id'] ?? 0);
-        $userId = (int)($_SESSION['user_id'] ?? 0);
-
-        if ($annId <= 0 || $userId <= 0) {
+        if ($annId <= 0) {
             echo json_encode(['status' => 'error', 'message' => 'Invalid parameters']);
             exit;
         }
 
-        // Insert record
         $stmt = $pdo->prepare("INSERT IGNORE INTO sys_announcement_reads (announcement_id, user_id) VALUES (?, ?)");
         $stmt->execute([$annId, $userId]);
 
-        // Increment read count
         if ($stmt->rowCount() > 0) {
             $pdo->prepare("UPDATE sys_announcements SET read_count = read_count + 1 WHERE id = ?")->execute([$annId]);
         }
@@ -35,6 +48,8 @@ try {
 
     echo json_encode(['status' => 'error', 'message' => 'Invalid action']);
 
-} catch (Exception $e) {
-    echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+} catch (Throwable $e) {
+    error_log('[ajax_announcements] ' . $e->getMessage());
+    http_response_code(500);
+    echo json_encode(['status' => 'error', 'message' => 'ระบบขัดข้อง กรุณาลองใหม่']);
 }

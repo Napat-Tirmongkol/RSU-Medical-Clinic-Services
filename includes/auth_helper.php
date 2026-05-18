@@ -16,31 +16,46 @@ require_once __DIR__ . '/mail_helper.php';
  * @return array ['ok' => bool, 'message' => string]
  */
 function requestPasswordReset(string $email, string $type): array {
+    // Whitelist $type — anything else routes to sys_staff via the old ternary,
+    // which created cross-table token confusion. Reject explicitly.
+    if (!in_array($type, ['admin', 'staff'], true)) {
+        return ['ok' => true, 'message' => 'หากอีเมลของคุณอยู่ในระบบ ระบบได้ส่งลิงก์รีเซ็ตให้แล้ว กรุณาตรวจสอบ Inbox'];
+    }
+
+    // Fail-closed if APP_BASE_URL is not configured — avoids host header injection
+    // via $_SERVER['HTTP_HOST'] in outgoing reset links.
+    if (!defined('APP_BASE_URL') || APP_BASE_URL === '') {
+        error_log('requestPasswordReset: APP_BASE_URL is not configured — refusing to send reset email');
+        return ['ok' => false, 'message' => 'ระบบยังไม่ได้ตั้งค่า Base URL กรุณาติดต่อผู้ดูแลระบบ'];
+    }
+
     $pdo = db();
     $table = ($type === 'admin') ? 'sys_admins' : 'sys_staff';
-    
+
+    // Neutral message returned regardless of whether the email exists — prevents
+    // account enumeration. Actual mail delivery is conditional on user existing.
+    $neutral = ['ok' => true, 'message' => 'หากอีเมลของคุณอยู่ในระบบ ระบบได้ส่งลิงก์รีเซ็ตให้แล้ว กรุณาตรวจสอบ Inbox'];
+
     try {
-        // 1. Check if email exists
         $stmt = $pdo->prepare("SELECT id, full_name, email FROM $table WHERE email = ? LIMIT 1");
         $stmt->execute([$email]);
         $user = $stmt->fetch();
 
         if (!$user) {
-            return ['ok' => false, 'message' => 'ไม่พบอีเมลนี้ในระบบ'];
+            // Pretend we sent the email. Log internally for audit.
+            error_log("Password reset requested for unknown email ({$type}): {$email}");
+            return $neutral;
         }
 
-        // 2. Generate Token
+        // Generate token
         $token = bin2hex(random_bytes(32));
         $expiry = date('Y-m-d H:i:s', strtotime('+1 hour'));
 
-        // 3. Save to DB
         $stmt = $pdo->prepare("UPDATE $table SET reset_token = ?, reset_expiry = ? WHERE id = ?");
         $stmt->execute([$token, $expiry, $user['id']]);
 
-        // 4. Send Email
-        $baseUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http") . "://$_SERVER[HTTP_HOST]";
-        // Ensure path is correct for production
-        $resetLink = $baseUrl . "/e-campaignv2/admin/auth/reset_password.php?token=$token&type=$type";
+        // Build reset link from server-controlled APP_BASE_URL constant only.
+        $resetLink = APP_BASE_URL . "/admin/auth/reset_password.php?token=" . urlencode($token) . "&type=" . urlencode($type);
 
         $subject = "รีเซ็ตรหัสผ่าน — " . SITE_NAME;
         $details = [
@@ -64,14 +79,16 @@ function requestPasswordReset(string $email, string $type): array {
 
         if ($sent) {
             log_activity("Password Reset Requested", "ส่งลิงก์รีเซ็ตรหัสผ่านไปที่ $email ($type)", (int)$user['id']);
-            return ['ok' => true, 'message' => 'ระบบได้ส่งลิงก์สำหรับตั้งรหัสผ่านใหม่ไปที่อีเมลของคุณแล้ว โปรดตรวจสอบ Inbox'];
         } else {
-            return ['ok' => false, 'message' => 'ไม่สามารถส่งอีเมลได้ในขณะนี้ (SMTP Error) กรุณาติดต่อผู้ดูแลระบบ'];
+            error_log("Password reset SMTP send failed for {$email} ({$type})");
         }
+        // Always return the neutral message — do not leak SMTP status to the caller.
+        return $neutral;
 
     } catch (Exception $e) {
         error_log("Password reset request error: " . $e->getMessage());
-        return ['ok' => false, 'message' => 'เกิดข้อผิดพลาดภายในระบบ: ' . $e->getMessage()];
+        // Generic message; never leak exception details.
+        return ['ok' => false, 'message' => 'เกิดข้อผิดพลาดภายในระบบ กรุณาลองอีกครั้งภายหลัง'];
     }
 }
 
@@ -79,6 +96,7 @@ function requestPasswordReset(string $email, string $type): array {
  * Verify if a reset token is valid.
  */
 function verifyResetToken(string $token, string $type): ?array {
+    if (!in_array($type, ['admin', 'staff'], true)) return null;
     if (empty($token)) return null;
     $pdo = db();
     $table = ($type === 'admin') ? 'sys_admins' : 'sys_staff';
@@ -98,6 +116,9 @@ function verifyResetToken(string $token, string $type): ?array {
  * Reset the password using a token.
  */
 function resetPasswordWithToken(string $token, string $type, string $newPassword): array {
+    if (!in_array($type, ['admin', 'staff'], true)) {
+        return ['ok' => false, 'message' => 'ลิงก์รีเซ็ตรหัสผ่านไม่ถูกต้องหรือหมดอายุแล้ว'];
+    }
     $user = verifyResetToken($token, $type);
     if (!$user) {
         return ['ok' => false, 'message' => 'ลิงก์รีเซ็ตรหัสผ่านไม่ถูกต้องหรือหมดอายุแล้ว'];

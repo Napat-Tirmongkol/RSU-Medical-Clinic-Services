@@ -4,6 +4,12 @@
 // คัดลอกไฟล์นี้ไปเป็น config/secrets.php และเติมค่าจริงให้ครบถ้วน
 
 return [
+    // --- Application Base URL (REQUIRED for password-reset emails, OAuth) ---
+    // Absolute URL of the deployed app, e.g. 'https://clinic.rsu.ac.th/e-campaignv2'
+    // Leave empty in dev = password-reset emails will refuse to send (fail-closed
+    // anti-host-header-injection). Always set this for production.
+    'APP_BASE_URL' => '',
+
     // --- Main Database ---
     'DB_HOST' => '127.0.0.1',
     'DB_PORT' => 3306,

@@ -2,24 +2,23 @@
 // api/log_js_error.php — รับ JavaScript frontend errors แล้ว log ลง sys_error_logs
 declare(strict_types=1);
 
+require_once __DIR__ . '/../includes/rate_limit.php';
+
 // เฉพาะ POST เท่านั้น
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
     exit;
 }
 
-// Rate limit: max 20 JS errors ต่อ session ต่อนาที ป้องกัน spam
-if (session_status() === PHP_SESSION_NONE) session_start();
-$now = time();
-$_SESSION['_js_err_bucket'] = array_filter(
-    $_SESSION['_js_err_bucket'] ?? [],
-    fn($t) => $t > $now - 60
-);
-if (count($_SESSION['_js_err_bucket']) >= 20) {
+// IP-based rate limit (max 20 JS error reports per IP per minute). Replaces
+// session-based bucket which an unauthenticated attacker could bypass by simply
+// rotating cookies. No session_start() needed for this public endpoint.
+if (!rate_limit_ip_check('js_err', 20, 60)) {
     http_response_code(429);
+    header('Retry-After: 60');
     exit;
 }
-$_SESSION['_js_err_bucket'][] = $now;
+rate_limit_ip_hit('js_err', 20, 60);
 
 // รับ JSON body
 $raw  = file_get_contents('php://input');
