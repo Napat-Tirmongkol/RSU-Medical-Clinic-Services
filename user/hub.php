@@ -3,6 +3,7 @@
 declare(strict_types=1);
 session_start();
 require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../includes/lang.php';
 check_maintenance('e_campaign');
 
 $lineUserId = $_SESSION['line_user_id'] ?? '';
@@ -386,7 +387,11 @@ function campIcon($type)
 $thaiDate = formatThaiDate($today);
 $userInitials = getInitials($user['full_name']);
 $hour = (int) date('H');
-$greeting = ($hour >= 5 && $hour < 12) ? "สวัสดีตอนเช้า" : (($hour >= 12 && $hour < 17) ? "สวัสดีตอนบ่าย" : (($hour >= 17 && $hour < 21) ? "สวัสดีตอนเย็น" : "สวัสดีตอนค่ำ"));
+$greeting = __(
+    ($hour >= 5 && $hour < 12) ? 'hub.greet.morning'
+    : (($hour >= 12 && $hour < 17) ? 'hub.greet.afternoon'
+    : (($hour >= 17 && $hour < 21) ? 'hub.greet.evening' : 'hub.greet.night'))
+);
 
 // Greeting icon/emoji + glyph by time-of-day — A) personalize hero greeting
 $greetIcon  = ($hour >= 5 && $hour < 12) ? '☀️' : (($hour >= 12 && $hour < 17) ? '🌤️' : (($hour >= 17 && $hour < 21) ? '🌆' : '🌙'));
@@ -1601,11 +1606,17 @@ $pillTones = [
                 </button>
                 <div class="flex flex-col">
                     <h1 class="text-slate-900 font-black text-lg leading-none mb-1 tracking-tight">RSU Medical Clinic</h1>
-                    <p class="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em] leading-none">User Hub
+                    <p class="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em] leading-none"><?= htmlspecialchars(__('hub.brand.subtitle')) ?>
                     </p>
                 </div>
             </div>
             <div class="flex items-center gap-3">
+                <a href="<?= htmlspecialchars(lang_switch_url()) ?>"
+                    class="w-10 h-10 flex items-center justify-center text-slate-500 hover:text-green-600 transition-colors font-black text-[11px] tracking-wider"
+                    aria-label="<?= htmlspecialchars(__('hub.lang.switch_aria')) ?>"
+                    title="<?= htmlspecialchars(__('hub.lang.switch_aria')) ?>">
+                    <span class="px-2 py-1 rounded-lg border border-slate-200 hover:border-green-300 hover:bg-green-50 transition-all"><?= current_lang() === 'th' ? 'EN' : 'ไทย' ?></span>
+                </a>
                 <button onclick="showQR()"
                     class="w-10 h-10 flex items-center justify-center text-slate-600 hover:text-green-600 transition-colors">
                     <i class="fa-solid fa-qrcode text-lg"></i>
@@ -1635,7 +1646,7 @@ $pillTones = [
                             <?= $greetIcon ?> <?= htmlspecialchars($greeting) ?>
                         </h2>
                         <p class="mt-1 text-slate-500 text-[13px] font-bold truncate">
-                            คุณ<?= htmlspecialchars($firstName) ?> 👋
+                            <?= htmlspecialchars(__('hub.greet.name_prefix') . $firstName) ?> 👋
                         </p>
                     </div>
                 </div>
@@ -1895,7 +1906,7 @@ $pillTones = [
                             <i class="fa-solid fa-calendar-check text-sm"></i>
                         </div>
                         <p class="text-lg font-black text-slate-900"><?= $upcoming_count ?></p>
-                        <p class="text-[9px] font-black uppercase tracking-widest text-slate-400">นัดหมาย</p>
+                        <p class="text-[9px] font-black uppercase tracking-widest text-slate-400"><?= htmlspecialchars(__('hub.stat.appointments')) ?></p>
                     </button>
                     <button onclick="showVaccinationHistory()"
                         class="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm text-center active:scale-95 transition-all">
@@ -1903,7 +1914,7 @@ $pillTones = [
                             <i class="fa-solid fa-syringe text-sm"></i>
                         </div>
                         <p class="text-lg font-black text-slate-900"><?= (int) ($healthOverview['vaccine_total'] ?? 0) ?></p>
-                        <p class="text-[9px] font-black uppercase tracking-widest text-slate-400">วัคซีน</p>
+                        <p class="text-[9px] font-black uppercase tracking-widest text-slate-400"><?= htmlspecialchars(__('hub.stat.vaccines')) ?></p>
                     </button>
                     <button onclick="showBorrow()"
                         class="relative bg-white rounded-2xl p-4 border border-slate-100 shadow-sm text-center active:scale-95 transition-all">
@@ -1914,7 +1925,7 @@ $pillTones = [
                             <i class="fa-solid fa-box-archive text-sm"></i>
                         </div>
                         <p class="text-lg font-black text-slate-900"><?= $borrow_count ?></p>
-                        <p class="text-[9px] font-black uppercase tracking-widest text-slate-400">ยืมอยู่</p>
+                        <p class="text-[9px] font-black uppercase tracking-widest text-slate-400"><?= htmlspecialchars(__('hub.stat.borrowed')) ?></p>
                     </button>
                 </div>
 
@@ -1925,10 +1936,10 @@ $pillTones = [
                             <span class="w-7 h-7 rounded-lg bg-cyan-50 text-cyan-600 flex items-center justify-center">
                                 <i class="fa-solid fa-user-doctor text-xs"></i>
                             </span>
-                            แพทย์ออกตรวจวันนี้
+                            <?= htmlspecialchars(__('hub.doctors_today.title')) ?>
                         </h4>
                         <a href="clinic_schedule.php" class="text-[10px] font-black text-cyan-600 uppercase tracking-widest hover:text-cyan-700 active:scale-95 transition-all">
-                            ดูทั้งหมด <i class="fa-solid fa-arrow-right text-[8px] ml-0.5"></i>
+                            <?= htmlspecialchars(__('hub.doctors_today.see_all')) ?> <i class="fa-solid fa-arrow-right text-[8px] ml-0.5"></i>
                         </a>
                     </div>
                     <?php if (empty($todayShifts)): ?>
@@ -1936,7 +1947,7 @@ $pillTones = [
                             <div class="w-10 h-10 mx-auto mb-2 rounded-full bg-slate-50 text-slate-300 flex items-center justify-center">
                                 <i class="fa-solid fa-calendar-xmark"></i>
                             </div>
-                            <p class="text-xs font-bold text-slate-400">ไม่มีแพทย์ออกตรวจในวันนี้</p>
+                            <p class="text-xs font-bold text-slate-400"><?= htmlspecialchars(__('hub.doctors_today.empty')) ?></p>
                         </div>
                     <?php else: ?>
                         <div class="space-y-1.5">

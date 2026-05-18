@@ -258,4 +258,19 @@ return [
     'profile.completeness_done'  => 'ข้อมูลครบถ้วน',
     'profile.completeness_more'  => 'กรอกข้อมูลเพิ่มเพื่อรับบริการที่ดีขึ้น',
     'profile.view_mode_hint'     => 'แตะปุ่ม "แก้ไข" เพื่อปรับปรุงข้อมูล',
+
+    // ── User Hub (user/hub.php) — Phase 1: visible top viewport ─────────────
+    'hub.lang.switch_aria'       => 'เปลี่ยนภาษา',
+    'hub.brand.subtitle'         => 'User Hub',
+    'hub.greet.morning'          => 'สวัสดีตอนเช้า',
+    'hub.greet.afternoon'        => 'สวัสดีตอนบ่าย',
+    'hub.greet.evening'          => 'สวัสดีตอนเย็น',
+    'hub.greet.night'            => 'สวัสดีตอนค่ำ',
+    'hub.greet.name_prefix'      => 'คุณ',
+    'hub.stat.appointments'      => 'นัดหมาย',
+    'hub.stat.vaccines'          => 'วัคซีน',
+    'hub.stat.borrowed'          => 'ยืมอยู่',
+    'hub.doctors_today.title'    => 'แพทย์ออกตรวจวันนี้',
+    'hub.doctors_today.see_all'  => 'ดูทั้งหมด',
+    'hub.doctors_today.empty'    => 'ไม่มีแพทย์ออกตรวจในวันนี้',
 ];
