@@ -1,8 +1,34 @@
 <?php
 http_response_code(404);
 
-// Best-effort log to sys_error_logs (silently ignored if DB/config unavailable)
+// IP-based rate limit BEFORE loading config.php — closes the 404-amplification
+// DoS vector flagged in Phase 7 audit. An attacker spamming missing-resource
+// URLs would otherwise trigger DB connect + log INSERT on every request.
+// File-based bucket (independent of session) so blocked IPs can't bypass.
+$__rl_dir = sys_get_temp_dir() . '/rsu_404_rl';
+if (!is_dir($__rl_dir)) @mkdir($__rl_dir, 0755, true);
+$__rl_ip  = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
+$__rl_key = $__rl_dir . '/' . date('YmdHi') . '_' . md5($__rl_ip);
+$__rl_cnt = is_file($__rl_key) ? (int)@file_get_contents($__rl_key) : 0;
+$__rl_blocked = ($__rl_cnt >= 20); // 20 404s per minute per IP → stop logging
+@file_put_contents($__rl_key, (string)($__rl_cnt + 1));
+
+// Occasional cleanup of stale buckets
+if (random_int(1, 100) === 1) {
+    $cutoff = (int)date('YmdHi', time() - 3600);
+    foreach (glob($__rl_dir . '/*') ?: [] as $f) {
+        $base = (int)substr(basename($f), 0, 12);
+        if ($base < $cutoff) @unlink($f);
+    }
+}
+
+// Best-effort log to sys_error_logs (silently ignored if DB/config unavailable
+// or if we're inside the rate-limit lockout).
 try {
+    if ($__rl_blocked) {
+        // Skip DB connect entirely once IP is blacklisted for this minute.
+        throw new RuntimeException('rate-limit-skip');
+    }
     $configPath = __DIR__ . '/../config.php';
     if (is_readable($configPath)) {
         require_once __DIR__ . '/../includes/session_guard.php';
@@ -60,7 +86,10 @@ try {
         }
     }
 } catch (Throwable $e) {
-    error_log('404 log: ' . $e->getMessage());
+    // Suppress the rate-limit-skip sentinel from logs; log real errors only.
+    if ($e->getMessage() !== 'rate-limit-skip') {
+        error_log('404 log: ' . $e->getMessage());
+    }
 }
 ?>
 <!DOCTYPE html>

@@ -35,7 +35,8 @@ try {
         $pdo->exec("ALTER TABLE sys_faculties ADD COLUMN type ENUM('faculty','department') NOT NULL DEFAULT 'faculty'");
     } catch (PDOException) {}
 } catch (PDOException $e) {
-    echo json_encode(['status' => 'error', 'message' => 'ไม่สามารถสร้างตารางได้: ' . $e->getMessage()]);
+    error_log('[ajax_clinic_data schema] ' . $e->getMessage());
+    echo json_encode(['status' => 'error', 'message' => 'ไม่สามารถสร้างตารางได้']);
     exit;
 }
 
@@ -143,7 +144,8 @@ if ($action === 'search') {
             'total' => number_format($total)
         ]);
     } catch (PDOException $e) {
-        echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        error_log('[ajax_clinic_data search] ' . $e->getMessage());
+        echo json_encode(['status' => 'error', 'message' => 'ค้นหาไม่สำเร็จ']);
     }
     exit;
 }
@@ -176,7 +178,8 @@ if ($action === 'add') {
         if ((int)$e->errorInfo[1] === 1062) {
             echo json_encode(['status' => 'error', 'message' => 'มีชื่อนี้อยู่ในระบบแล้ว']);
         } else {
-            echo json_encode(['status' => 'error', 'message' => 'เพิ่มไม่สำเร็จ: ' . $e->getMessage()]);
+            error_log('[ajax_clinic_data add] ' . $e->getMessage());
+            echo json_encode(['status' => 'error', 'message' => 'เพิ่มไม่สำเร็จ']);
         }
     }
     exit;
@@ -210,7 +213,8 @@ if ($action === 'update') {
         if ((int)$e->errorInfo[1] === 1062) {
             echo json_encode(['status' => 'error', 'message' => 'มีชื่อนี้อยู่ในระบบแล้ว']);
         } else {
-            echo json_encode(['status' => 'error', 'message' => 'บันทึกไม่สำเร็จ: ' . $e->getMessage()]);
+            error_log('[ajax_clinic_data update] ' . $e->getMessage());
+            echo json_encode(['status' => 'error', 'message' => 'บันทึกไม่สำเร็จ']);
         }
     }
     exit;
@@ -231,7 +235,8 @@ if ($action === 'delete') {
         log_activity('clinic_data', "ลบคณะ/หน่วยงาน #{$id}");
         echo json_encode(['status' => 'ok', 'message' => 'ลบเรียบร้อย']);
     } catch (PDOException $e) {
-        echo json_encode(['status' => 'error', 'message' => 'ลบไม่สำเร็จ: ' . $e->getMessage()]);
+        error_log('[ajax_clinic_data delete] ' . $e->getMessage());
+        echo json_encode(['status' => 'error', 'message' => 'ลบไม่สำเร็จ']);
     }
     exit;
 }
@@ -245,7 +250,8 @@ if ($action === 'clear_all') {
         log_activity('clinic_data', 'ลบข้อมูลคณะ/หน่วยงานทั้งหมด');
         echo json_encode(['status' => 'ok', 'message' => 'ลบข้อมูลทั้งหมดเรียบร้อย']);
     } catch (PDOException $e) {
-        echo json_encode(['status' => 'error', 'message' => 'เกิดข้อผิดพลาด: ' . $e->getMessage()]);
+        error_log('[ajax_clinic_data clear] ' . $e->getMessage());
+        echo json_encode(['status' => 'error', 'message' => 'เกิดข้อผิดพลาด']);
     }
     exit;
 }

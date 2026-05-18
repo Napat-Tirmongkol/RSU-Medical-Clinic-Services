@@ -212,7 +212,8 @@ try {
                                  LIMIT 50")->fetchAll(PDO::FETCH_ASSOC) ?: [];
             echo json_encode(['ok' => true, 'rows' => $rows], JSON_UNESCAPED_UNICODE);
         } catch (Throwable $e) {
-            echo json_encode(['ok' => false, 'message' => 'อ่าน audit log ไม่ได้: ' . $e->getMessage()]);
+            error_log('[ajax_line_richmenu audit] ' . $e->getMessage());
+            echo json_encode(['ok' => false, 'message' => 'อ่าน audit log ไม่ได้']);
         }
         exit;
     }
@@ -328,5 +329,5 @@ try {
     echo json_encode(['ok' => false, 'message' => 'Unknown action']);
 } catch (Throwable $e) {
     error_log('[ajax_line_richmenu] ' . $e->getMessage());
-    echo json_encode(['ok' => false, 'message' => 'Server error: ' . $e->getMessage()]);
+    echo json_encode(['ok' => false, 'message' => 'Server error']);
 }
