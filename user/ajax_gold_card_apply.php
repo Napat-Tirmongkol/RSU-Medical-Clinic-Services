@@ -77,6 +77,29 @@ $gender    = trim((string)($_POST['gender']     ?? ''));
 $phone     = preg_replace('/\D/', '', (string)($_POST['phone'] ?? '')) ?? '';
 $signatureB64 = (string)($_POST['signature_base64'] ?? '');
 
+// ── PDPA consent capture (Tier 1 audit C16) ──────────────────────────────────
+// Submission collects PHI (citizen_id, dob, photo of person+ID, biometric
+// signature) — PDPA Art. 24 requires a lawful basis. Persist consent record
+// with timestamp, IP, UA, and a hash of the notice text shown to the user.
+$consentAccepted = !empty($_POST['consent_accepted']) && in_array(
+    (string)$_POST['consent_accepted'], ['1', 'true', 'yes', 'on'], true
+);
+$consentVersion  = trim((string)($_POST['consent_version'] ?? ''));
+$consentHash     = trim((string)($_POST['consent_text_hash'] ?? ''));
+
+if (!$consentAccepted) {
+    json_err('กรุณายอมรับนโยบายความเป็นส่วนตัว (PDPA) ก่อนส่งใบสมัคร');
+}
+// Frontend may not yet send version/hash — accept legacy defaults but log a
+// warning so PII reviewer can spot pre-migration submissions.
+if ($consentVersion === '') {
+    $consentVersion = 'legacy_pre_capture_v0';
+    error_log('[gold_card_apply] missing consent_version — using legacy default for user_id=' . $userId);
+}
+if ($consentHash === '' || !preg_match('/^[a-f0-9]{40,128}$/i', $consentHash)) {
+    $consentHash = str_repeat('0', 64);
+}
+
 if (!citizen_mod11($citizenId)) json_err('รหัสบัตรประชาชนไม่ถูกต้อง');
 if ($fullName === '' || mb_strlen($fullName) > 200) json_err('กรุณากรอกชื่อ-นามสกุล');
 if (!valid_date($dob)) json_err('วันเกิดไม่ถูกต้อง');
@@ -109,16 +132,19 @@ if ($sigBin === false || strlen($sigBin) < 200) {
 try {
     $stmt = $pdo->prepare("
         SELECT id, status FROM gold_card_members
-        WHERE linked_user_id = :uid OR citizen_id = :cid
+        WHERE (linked_user_id = :uid OR citizen_id = :cid)
+          AND (deleted_at IS NULL OR deleted_at IS NULL)
         ORDER BY id DESC LIMIT 1
     ");
     $stmt->execute([':uid' => $userId, ':cid' => $citizenId]);
     $exist = $stmt->fetch();
     if ($exist && in_array($exist['status'] ?? '', ['pending', 'submitted', 'approved', 'active'], true)) {
-        json_err('คุณมีใบสมัครอยู่ในระบบแล้ว (สถานะ: ' . $exist['status'] . ')');
+        // Don't echo status — prevents account enumeration via probe.
+        json_err('คุณมีใบสมัครอยู่ในระบบแล้ว กรุณาตรวจสอบสถานะที่หน้าโปรไฟล์');
     }
 } catch (PDOException $e) {
-    json_err('ระบบไม่พร้อมใช้งาน: ' . $e->getMessage(), 500);
+    error_log('[ajax_gold_card_apply duplicate-check] ' . $e->getMessage());
+    json_err('ระบบไม่พร้อมใช้งาน กรุณาลองอีกครั้งภายหลัง', 500);
 }
 
 // ── Self-healing: ensure 'signature' is in doc_type ENUM ────────────────────
@@ -131,6 +157,23 @@ try {
                     NOT NULL DEFAULT 'other'");
     }
 } catch (PDOException $e) { /* silent */ }
+
+// ── Self-healing: gold_card_consents table ──────────────────────────────────
+try {
+    $pdo->exec("CREATE TABLE IF NOT EXISTS gold_card_consents (
+        id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        member_id INT UNSIGNED NULL,
+        user_id INT UNSIGNED NOT NULL,
+        consent_version VARCHAR(50) NOT NULL,
+        consent_text_hash VARCHAR(128) NOT NULL,
+        accepted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        ip_address VARCHAR(45) NULL,
+        user_agent VARCHAR(500) NULL,
+        KEY idx_member  (member_id),
+        KEY idx_user    (user_id),
+        KEY idx_version (consent_version)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+} catch (PDOException $e) { error_log('[gold_card_consents schema] ' . $e->getMessage()); }
 
 // ── Begin transaction ────────────────────────────────────────────────────────
 $pdo->beginTransaction();
@@ -223,15 +266,36 @@ try {
         $stmt->execute([
             $memberId,
             json_encode([
-                'submitted_by' => $userId,
-                'full_name'    => $fullName,
-                'citizen_id'   => $citizenId,
-                'channel'      => 'liff',
+                'submitted_by'    => $userId,
+                'full_name'       => $fullName,
+                'citizen_id'      => $citizenId,
+                'channel'         => 'liff',
+                'consent_version' => $consentVersion,
             ], JSON_UNESCAPED_UNICODE),
             $userId,
             $_SERVER['REMOTE_ADDR'] ?? null,
         ]);
     } catch (PDOException $e) { /* silent */ }
+
+    // PDPA consent capture row — lawful basis of processing.
+    try {
+        $pdo->prepare("INSERT INTO gold_card_consents
+            (member_id, user_id, consent_version, consent_text_hash, ip_address, user_agent)
+            VALUES (?, ?, ?, ?, ?, ?)")
+            ->execute([
+                $memberId,
+                $userId,
+                $consentVersion,
+                $consentHash,
+                $_SERVER['REMOTE_ADDR'] ?? null,
+                mb_substr((string)($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 500),
+            ]);
+    } catch (PDOException $e) {
+        // Don't fail the whole submission if consent table write fails — but
+        // emit a loud audit signal so this can be investigated.
+        error_log('[gold_card_consents] failed to record consent for member_id=' . $memberId
+                  . ' user_id=' . $userId . ': ' . $e->getMessage());
+    }
 
     $pdo->commit();
 
@@ -247,5 +311,6 @@ try {
     // Cleanup partial files
     if (isset($photoAbs) && is_file($photoAbs)) @unlink($photoAbs);
     if (isset($sigAbs) && is_file($sigAbs)) @unlink($sigAbs);
-    json_err('ส่งใบสมัครไม่สำเร็จ: ' . $e->getMessage(), 500);
+    error_log('[ajax_gold_card_apply] ' . $e->getMessage());
+    json_err('ส่งใบสมัครไม่สำเร็จ กรุณาลองอีกครั้ง', 500);
 }
