@@ -66,11 +66,35 @@ try {
     }
 
     // ── 3. Generate คำตอบ ────────────────────────────────────────────────
-    $result = ai_qa_generate_answer($question, $pdo, $now);
+    // Don't blow up the whole sandbox response if Gemini errors — if we
+    // matched an FAQ above, surface that so the dev still sees a useful
+    // result. Generator errors are captured in `generator_error` for the UI.
+    $result = ['answer' => '', 'category' => 'อื่นๆ', 'confidence' => null, 'model' => ''];
+    $generatorError = null;
+    try {
+        $result = ai_qa_generate_answer($question, $pdo, $now);
+    } catch (Throwable $e) {
+        $generatorError = $e->getMessage();
+        error_log('[sandbox generate] ' . $e->getMessage());
+        if ($faqMatch !== null) {
+            $result = [
+                'answer'     => (string)($faqMatch['answer'] ?? ''),
+                'category'   => (string)($faqMatch['category'] ?? 'อื่นๆ'),
+                'confidence' => (float)($faqMatch['confidence'] ?? 0.8),
+                'model'      => 'faq_fallback',
+            ];
+        }
+    }
     $elapsed = round((microtime(true) - $t0) * 1000);
 
     // ── 4. ดึง context preview (ส่งเต็มเพื่อให้ debug schedule ได้) ───
-    $contextFull = ai_qa_build_clinic_context($pdo, $now, $question);
+    $contextFull = '';
+    try {
+        $contextFull = ai_qa_build_clinic_context($pdo, $now, $question);
+    } catch (Throwable $e) {
+        error_log('[sandbox build_context] ' . $e->getMessage());
+        $contextFull = '(build_clinic_context error: ' . $e->getMessage() . ')';
+    }
     $contextPreview = $contextFull;
 
     // ── 4.5. ดึงตารางหมอวันที่ใกล้เคียง (raw) เพื่อ debug ───────────────
@@ -200,16 +224,17 @@ try {
     }
 
     echo json_encode([
-        'ok'          => true,
-        'answer'      => $result['answer'],
-        'category'    => $result['category']   ?? 'อื่นๆ',
-        'confidence'  => $result['confidence'] ?? null,
-        'model'       => $result['model']       ?? '',
-        'elapsed_ms'  => $elapsed,
-        'matched_faq' => $faqMatch !== null,
-        'matched_via' => $matchedVia,
-        'faq_answer'  => $faqMatch ? ($faqMatch['answer'] ?? null) : null,
-        'chunks'      => array_map(fn($c) => [
+        'ok'              => true,
+        'answer'          => $result['answer'],
+        'category'        => $result['category']   ?? 'อื่นๆ',
+        'confidence'      => $result['confidence'] ?? null,
+        'model'           => $result['model']       ?? '',
+        'elapsed_ms'      => $elapsed,
+        'matched_faq'     => $faqMatch !== null,
+        'matched_via'     => $matchedVia,
+        'faq_answer'      => $faqMatch ? ($faqMatch['answer'] ?? null) : null,
+        'generator_error' => $generatorError,
+        'chunks'          => array_map(fn($c) => [
             'title'           => $c['title'],
             'score'           => $c['score'],
             'content_preview' => mb_substr($c['content_preview'] ?? '', 0, 200),
@@ -222,6 +247,13 @@ try {
     ], JSON_UNESCAPED_UNICODE);
 
 } catch (Throwable $e) {
-    error_log('[ajax_ai_sandbox] ' . $e->getMessage());
-    echo json_encode(['ok' => false, 'error' => 'Server error']);
+    error_log('[ajax_ai_sandbox] ' . $e->getMessage() . ' @ ' . $e->getFile() . ':' . $e->getLine());
+    // Sandbox is admin-only (access_ai gate above) — surface the real
+    // exception message so the dev can actually debug. Falling back to a
+    // bare "Server error" makes the playground useless.
+    echo json_encode([
+        'ok'    => false,
+        'error' => 'Server error: ' . $e->getMessage(),
+        'where' => basename($e->getFile()) . ':' . $e->getLine(),
+    ], JSON_UNESCAPED_UNICODE);
 }
