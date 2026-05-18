@@ -449,6 +449,57 @@ try {
         exit;
     }
 
+    // ─── Stale FAQ scanner ────────────────────────────────────────────────
+    // Scan sys_ai_faq + sys_ai_qa_log (approved) for answers that trip the
+    // stale-date regex (วันนี้ / พรุ่งนี้ / Thai month / พ.ศ. NNNN / etc).
+    // Returns a list the admin can act on; per-row delete uses the existing
+    // faq_delete / delete actions so we don't duplicate destroy logic.
+    if ($action === 'faq_scan_stale') {
+        $items = [];
+
+        // sys_ai_faq (active)
+        $rows = $pdo->query("SELECT id, category, canonical_question, answer, updated_at
+            FROM sys_ai_faq WHERE is_active = 1 ORDER BY id DESC")->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($rows as $r) {
+            $ans = (string)($r['answer'] ?? '');
+            if ($ans === '' || !ai_qa_answer_has_stale_dates($ans)) continue;
+            $items[] = [
+                'source'     => 'faq',
+                'id'         => (int)$r['id'],
+                'category'   => (string)($r['category'] ?? ''),
+                'question'   => (string)($r['canonical_question'] ?? ''),
+                'answer'     => $ans,
+                'updated_at' => (string)($r['updated_at'] ?? ''),
+            ];
+        }
+
+        // sys_ai_qa_log (approved captures — matcher Phase 1c reads these)
+        try {
+            $rows = $pdo->query("SELECT id, category, question, ai_answer, reviewed_at
+                FROM sys_ai_qa_log
+                WHERE status = 'approved' AND ai_answer IS NOT NULL
+                ORDER BY id DESC")->fetchAll(PDO::FETCH_ASSOC);
+            foreach ($rows as $r) {
+                $ans = (string)($r['ai_answer'] ?? '');
+                if ($ans === '' || !ai_qa_answer_has_stale_dates($ans)) continue;
+                $items[] = [
+                    'source'     => 'qa_log',
+                    'id'         => (int)$r['id'],
+                    'group_key'  => (string)($r['question'] ?? ''),
+                    'category'   => (string)($r['category'] ?? ''),
+                    'question'   => (string)($r['question'] ?? ''),
+                    'answer'     => $ans,
+                    'updated_at' => (string)($r['reviewed_at'] ?? ''),
+                ];
+            }
+        } catch (Throwable $e) {
+            // sys_ai_qa_log may not exist on a fresh install — skip silently
+        }
+
+        echo json_encode(['ok' => true, 'count' => count($items), 'items' => $items], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
     echo json_encode(['ok' => false, 'message' => 'unknown action']);
 } catch (Throwable $e) {
     error_log('ajax_ai_qa error (' . $action . '): ' . $e->getMessage());

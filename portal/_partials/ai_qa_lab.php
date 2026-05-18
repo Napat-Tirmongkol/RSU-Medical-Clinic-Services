@@ -734,7 +734,12 @@ function _qa_source_badge(string $s): string {
                     </option>
                 <?php endforeach; ?>
             </select>
-            <div class="flex gap-2 justify-end items-center">
+            <div class="flex gap-2 justify-end items-center flex-wrap">
+                <button type="button" id="faq-scan-stale-btn"
+                    class="px-4 py-2 bg-amber-500 text-white text-sm font-bold rounded-xl hover:bg-amber-600"
+                    title="หา FAQ ที่มีคำว่า 'วันนี้/พรุ่งนี้/วันที่เฉพาะ' หรือชื่อเดือน — มักล้าสมัยเร็ว">
+                    <i class="fa-solid fa-clock-rotate-left mr-1"></i> สแกน FAQ ล้าสมัย
+                </button>
                 <a href="?section=ai_qa_lab&qa_tab=faq" class="px-4 py-2 text-sm font-bold text-gray-600 hover:bg-gray-100 rounded-xl">ล้าง</a>
                 <button type="submit" class="px-5 py-2 bg-gray-900 text-white text-sm font-bold rounded-xl hover:bg-gray-800">
                     <i class="fa-solid fa-filter mr-1"></i> กรอง
@@ -1635,6 +1640,103 @@ function _qa_source_badge(string $s): string {
             else Swal.fire({ icon: 'error', title: 'ลบไม่สำเร็จ', text: res.message || '' });
         });
     });
+
+    // ─── Stale FAQ scanner ──────────────────────────────────────────────
+    // Finds FAQ rows whose answer contains time-relative phrasing
+    // (วันนี้/พรุ่งนี้/Thai month/พ.ศ. NNNN/วันXที่N). Lists them in a
+    // modal with per-row delete + a "delete all" bulk action.
+    const scanBtn = document.getElementById('faq-scan-stale-btn');
+    if (scanBtn) {
+        scanBtn.addEventListener('click', async () => {
+            const origHtml = scanBtn.innerHTML;
+            scanBtn.disabled = true;
+            scanBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> กำลังสแกน...';
+            try {
+                const res = await api('faq_scan_stale', {});
+                if (!res.ok) {
+                    await Swal.fire({ icon: 'error', title: 'สแกนไม่สำเร็จ', text: res.message || '' });
+                    return;
+                }
+                await showStaleScanResults(res.items || []);
+            } finally {
+                scanBtn.disabled = false;
+                scanBtn.innerHTML = origHtml;
+            }
+        });
+    }
+
+    async function showStaleScanResults(items) {
+        if (items.length === 0) {
+            await Swal.fire({
+                icon: 'success', title: 'ไม่พบ FAQ ล้าสมัย',
+                text: 'ทุกคำตอบใช้รูปแบบ generic ที่ไม่ผูกกับวันที่เฉพาะ',
+                confirmButtonColor: '#2e9e63',
+            });
+            return;
+        }
+        const rowsHtml = items.map((it, i) => {
+            const srcBadge = it.source === 'faq'
+                ? '<span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-violet-100 text-violet-700">FAQ</span>'
+                : '<span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700">QA Log</span>';
+            return `
+                <div class="border border-amber-200 rounded-lg p-3 bg-amber-50 mb-2" data-stale-idx="${i}">
+                    <div class="flex items-start gap-2 mb-1">
+                        ${srcBadge}
+                        <span class="text-[11px] text-gray-500">${escapeHtml(it.category || '')}</span>
+                        <span class="text-[11px] text-gray-400 ml-auto">${escapeHtml(it.updated_at || '')}</span>
+                    </div>
+                    <div class="text-sm font-bold text-gray-800 mb-1">${escapeHtml(it.question || '(ไม่มีคำถาม)')}</div>
+                    <div class="text-xs text-gray-600 mb-2" style="white-space:pre-wrap">${escapeHtml(it.answer || '').slice(0, 280)}</div>
+                    <button type="button"
+                        class="stale-delete-btn text-xs font-bold px-3 py-1 rounded bg-rose-500 hover:bg-rose-600 text-white"
+                        data-src="${it.source}" data-id="${it.id}"
+                        data-group-key="${escapeHtml(it.group_key || '')}">
+                        <i class="fa-solid fa-trash mr-1"></i> ลบ
+                    </button>
+                </div>
+            `;
+        }).join('');
+        await Swal.fire({
+            title: `พบ ${items.length} รายการที่อาจล้าสมัย`,
+            html: `
+                <div class="text-left text-xs text-gray-600 mb-3">
+                    คำตอบเหล่านี้มีคำที่ผูกกับเวลา (วันนี้/พรุ่งนี้/ชื่อเดือน/พ.ศ.) — ควรลบให้ระบบ generate ใหม่ตาม current context หรือแก้ให้เป็น generic phrasing
+                </div>
+                <div style="max-height: 50vh; overflow-y: auto">${rowsHtml}</div>
+            `,
+            width: 720,
+            showCloseButton: true,
+            showConfirmButton: false,
+            didOpen: () => {
+                document.querySelectorAll('.stale-delete-btn').forEach(btn => {
+                    btn.addEventListener('click', async () => {
+                        const src = btn.dataset.src;
+                        const id  = btn.dataset.id;
+                        const gk  = btn.dataset.groupKey;
+                        btn.disabled = true;
+                        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+                        let res;
+                        if (src === 'faq') {
+                            res = await api('faq_delete', { id });
+                        } else {
+                            res = await api('delete', { group_key: gk });
+                        }
+                        if (res.ok) {
+                            const card = btn.closest('[data-stale-idx]');
+                            if (card) { card.style.opacity = '0.4'; card.style.pointerEvents = 'none'; }
+                            btn.innerHTML = '<i class="fa-solid fa-check"></i> ลบแล้ว';
+                        } else {
+                            btn.disabled = false;
+                            btn.innerHTML = '<i class="fa-solid fa-trash mr-1"></i> ลบ';
+                            Swal.showValidationMessage('ลบไม่สำเร็จ: ' + (res.message || ''));
+                        }
+                    });
+                });
+            },
+        });
+        // Reload the page after the modal closes so the FAQ table reflects deletes
+        location.reload();
+    }
 
     // ─── FAQ Modal logic ─────────────────────────────────────────────────
     function faqOpenModal(opts) {
