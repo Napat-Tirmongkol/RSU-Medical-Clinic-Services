@@ -892,7 +892,7 @@ function _qa_source_badge(string $s): string {
         <div class="text-xs text-gray-500 font-bold uppercase tracking-wider mb-3">หมวดหมู่ยอดนิยม</div>
         <div class="flex flex-wrap gap-2">
             <?php foreach ($_qa_statCategory as $cat => $cnt): ?>
-                <a href="?section=ai_qa_lab&qa_category=<?= urlencode((string)$cat) ?>"
+                <a href="?section=ai_qa_lab&qa_tab=captured&qa_category=<?= urlencode((string)$cat) ?>"
                    class="qa-chip bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100">
                     <span><?= htmlspecialchars((string)$cat) ?></span>
                     <span class="bg-purple-500 text-white px-2 py-0.5 rounded-full text-xs font-bold"><?= number_format((int)$cnt) ?></span>
@@ -905,6 +905,10 @@ function _qa_source_badge(string $s): string {
     <!-- Filter bar -->
     <form method="get" class="bg-white rounded-2xl border border-gray-200 p-4 mb-4">
         <input type="hidden" name="section" value="ai_qa_lab">
+        <!-- Pin the tab so submitting the filter doesn't bounce the
+             admin to the new default (overview) tab. Same fix on the
+             FAQ form below. -->
+        <input type="hidden" name="qa_tab" value="captured">
         <div class="grid grid-cols-1 md:grid-cols-6 gap-3">
             <div class="md:col-span-2">
                 <input type="text" name="qa_search" value="<?= htmlspecialchars($_qa_search) ?>"
@@ -960,7 +964,7 @@ function _qa_source_badge(string $s): string {
         </div>
 
         <div class="mt-3 flex gap-2 justify-end">
-            <a href="?section=ai_qa_lab" class="px-4 py-2 text-sm font-bold text-gray-600 hover:bg-gray-100 rounded-xl">ล้าง</a>
+            <a href="?section=ai_qa_lab&qa_tab=captured" class="px-4 py-2 text-sm font-bold text-gray-600 hover:bg-gray-100 rounded-xl">ล้าง</a>
             <button type="submit" class="px-5 py-2 bg-gray-900 text-white text-sm font-bold rounded-xl hover:bg-gray-800">
                 <i class="fa-solid fa-filter mr-1"></i> กรอง
             </button>
@@ -1104,7 +1108,10 @@ function _qa_source_badge(string $s): string {
             </div>
             <div class="flex items-center gap-1">
                 <?php
-                $base = '?section=ai_qa_lab' . $_qa_pgQs;
+                // Pin qa_tab so pagination keeps the admin on Captured
+                // — without it the link drops to the default (overview)
+                // tab and the filter looks broken.
+                $base = '?section=ai_qa_lab&qa_tab=captured' . $_qa_pgQs;
                 $disabledFirst = $_qa_page <= 1 ? 'pointer-events:none;opacity:.4' : '';
                 $disabledLast  = $_qa_page >= $_qa_totalPages ? 'pointer-events:none;opacity:.4' : '';
                 ?>
