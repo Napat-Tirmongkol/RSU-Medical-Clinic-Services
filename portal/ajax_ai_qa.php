@@ -414,9 +414,108 @@ try {
             echo json_encode(['ok' => false, 'message' => 'invalid id']);
             exit;
         }
-        // FK ON DELETE CASCADE จัดการ variants ให้
+        // Two-step delete: the first call (confirm != "1") only counts
+        // collateral approved rows in sys_ai_qa_log so the JS layer can
+        // warn the admin before they nuke a FAQ that has approved
+        // captured replies riding on top of it. Step two (confirm = "1")
+        // does the actual delete + cascade.
+        $confirm = (string)($_POST['confirm'] ?? '0') === '1';
+
+        // Build the cascade target list. matched_faq_id only covers
+        // captures recorded after the trail was added — to cascade old
+        // approvals too we also match by question text against the
+        // FAQ's canonical_question + every variant_question.
+        $qStrings = [];
+        $cq = $pdo->prepare("SELECT TRIM(canonical_question) FROM sys_ai_faq WHERE id = :id");
+        $cq->execute([':id' => $id]);
+        $canon = (string)($cq->fetchColumn() ?: '');
+        if ($canon !== '') $qStrings[] = $canon;
+        $vq = $pdo->prepare("SELECT TRIM(variant_question) FROM sys_ai_faq_variants WHERE faq_id = :id");
+        $vq->execute([':id' => $id]);
+        foreach ($vq->fetchAll(PDO::FETCH_COLUMN) as $v) {
+            $v = (string)$v;
+            if ($v !== '') $qStrings[] = $v;
+        }
+        $qStrings = array_values(array_unique($qStrings));
+
+        $cascadeWhere = "(matched_faq_id = :id";
+        $cascadeBind  = [':id' => $id];
+        if (!empty($qStrings)) {
+            $place = [];
+            foreach ($qStrings as $i => $qs) {
+                $k = ":q$i";
+                $place[] = $k;
+                $cascadeBind[$k] = $qs;
+            }
+            $cascadeWhere .= " OR TRIM(question) IN (" . implode(',', $place) . ")";
+        }
+        $cascadeWhere .= ")";
+
+        $cntStmt = $pdo->prepare("
+            SELECT COUNT(*) FROM sys_ai_qa_log
+             WHERE $cascadeWhere AND status = 'approved'
+        ");
+        $cntStmt->execute($cascadeBind);
+        $cascadeCount = (int)$cntStmt->fetchColumn();
+
+        if (!$confirm) {
+            echo json_encode([
+                'ok' => true,
+                'preview' => true,
+                'cascade_approved' => $cascadeCount,
+            ]);
+            exit;
+        }
+
+        // Collect questions we're about to orphan so we can purge their
+        // cache entries — otherwise the next ask hits the cached gemini
+        // answer instead of regenerating against the now-deleted FAQ.
+        $orphanedQuestions = [];
+        $qStmt = $pdo->prepare("
+            SELECT DISTINCT TRIM(question) AS q
+              FROM sys_ai_qa_log
+             WHERE $cascadeWhere
+        ");
+        $qStmt->execute($cascadeBind);
+        $orphanedQuestions = $qStmt->fetchAll(PDO::FETCH_COLUMN);
+        // Also seed the canonical / variant strings themselves — those
+        // questions may have been answered through cache without ever
+        // landing in qa_log (e.g. served from sys_ai_answer_cache before
+        // the row was approved).
+        foreach ($qStrings as $qs) $orphanedQuestions[] = $qs;
+        $orphanedQuestions = array_values(array_unique(array_filter($orphanedQuestions)));
+
+        // FK ON DELETE CASCADE handles sys_ai_faq_variants for us.
         $pdo->prepare("DELETE FROM sys_ai_faq WHERE id = :id")->execute([':id' => $id]);
-        echo json_encode(['ok' => true]);
+
+        // Flip any approved captured replies that referenced this FAQ
+        // back to 'rejected' so Phase 1c won't keep serving the answer.
+        $rejected = 0;
+        if ($cascadeCount > 0) {
+            $upd = $pdo->prepare("
+                UPDATE sys_ai_qa_log
+                   SET status = 'rejected',
+                       reviewed_at = NOW(),
+                       reviewed_by = :rb
+                 WHERE $cascadeWhere AND status = 'approved'
+            ");
+            $upd->execute(array_merge($cascadeBind, [':rb' => $reviewerId ?: null]));
+            $rejected = $upd->rowCount();
+        }
+
+        require_once __DIR__ . '/../includes/ai_cache_helper.php';
+        $cacheCleared = 0;
+        foreach ($orphanedQuestions as $q) {
+            $q = (string)$q;
+            if ($q === '') continue;
+            $cacheCleared += ai_cache_invalidate_question($pdo, $q);
+        }
+
+        echo json_encode([
+            'ok'            => true,
+            'rejected'      => $rejected,
+            'cache_cleared' => $cacheCleared,
+        ]);
         exit;
     }
 

@@ -2164,19 +2164,48 @@ function _qa_source_badge(string $s): string {
 
     document.querySelectorAll('.faq-delete').forEach(btn => {
         btn.addEventListener('click', async () => {
+            // Two-step delete so we can warn about approved replies in
+            // sys_ai_qa_log that ride on this FAQ. First call is a count
+            // preview; second call (confirm=1) does the actual delete.
+            const preview = await api('faq_delete', { id: btn.dataset.id });
+            if (!preview.ok) {
+                Swal.fire({ icon: 'error', title: 'ตรวจไม่สำเร็จ', text: preview.message || '' });
+                return;
+            }
+            const cascade = preview.cascade_approved || 0;
+            const extra = cascade > 0
+                ? `<div class="mt-3 p-2 bg-amber-50 border border-amber-200 rounded text-amber-800 text-xs">
+                       <i class="fa-solid fa-triangle-exclamation mr-1"></i>
+                       มีคำตอบที่ <b>approved</b> อ้างอิง FAQ นี้อยู่ <b>${cascade}</b> รายการ —
+                       จะถูก mark เป็น rejected และล้างจาก answer cache ด้วย
+                       เพื่อไม่ให้ระบบยังตอบคำตอบเก่าหลังลบ
+                   </div>`
+                : '';
             const { isConfirmed } = await Swal.fire({
                 icon: 'warning',
                 title: 'ลบ FAQ นี้?',
-                text: 'จะลบทั้ง FAQ และ variants ทั้งหมด',
+                html: `<div class="text-left text-sm">จะลบทั้ง FAQ และ variants ทั้งหมด</div>${extra}`,
                 showCancelButton: true,
                 confirmButtonText: 'ลบ',
                 cancelButtonText: 'ยกเลิก',
                 confirmButtonColor: '#e11d48',
             });
             if (!isConfirmed) return;
-            const res = await api('faq_delete', { id: btn.dataset.id });
-            if (res.ok) location.reload();
-            else Swal.fire({ icon: 'error', title: 'ลบไม่สำเร็จ', text: res.message || '' });
+            const res = await api('faq_delete', { id: btn.dataset.id, confirm: '1' });
+            if (res.ok) {
+                if ((res.rejected || 0) + (res.cache_cleared || 0) > 0) {
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'ลบเรียบร้อย',
+                        html: `<div class="text-xs text-gray-500">reject ${res.rejected || 0} · ล้าง cache ${res.cache_cleared || 0}</div>`,
+                        timer: 1400, showConfirmButton: false,
+                    }).then(() => location.reload());
+                } else {
+                    location.reload();
+                }
+            } else {
+                Swal.fire({ icon: 'error', title: 'ลบไม่สำเร็จ', text: res.message || '' });
+            }
         });
     });
 
