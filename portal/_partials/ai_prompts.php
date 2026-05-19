@@ -203,7 +203,8 @@ $_aip_prompts = list_ai_prompts($pdo);
 
     <!-- Each prompt -->
     <?php foreach ($_aip_prompts as $p): ?>
-    <div class="ap-card fx-tilt fx-tilt-light" data-tilt="3" data-key="<?= htmlspecialchars($p['key']) ?>">
+    <div id="prompt-<?= htmlspecialchars($p['key']) ?>"
+         class="ap-card fx-tilt fx-tilt-light" data-tilt="3" data-key="<?= htmlspecialchars($p['key']) ?>">
         <div class="flex items-start justify-between gap-3 mb-2">
             <div class="flex-1">
                 <div class="flex items-center gap-2 mb-1">
@@ -719,5 +720,28 @@ $_aip_prompts = list_ai_prompts($pdo);
             Swal.fire({ icon: 'error', title: 'เครือข่ายผิดพลาด', text: e.message });
         }
     });
+
+    // Deep-link from Sandbox / other tabs: ?section=ai_prompts#prompt-generator
+    // — scroll the matching prompt card into view + flash a violet ring
+    // so the admin spots the target without scanning the page.
+    function flashPromptCard() {
+        const hash = window.location.hash;
+        if (!hash || !hash.startsWith('#prompt-')) return;
+        const el = document.querySelector(hash);
+        if (!el) return;
+        // Wait a beat for the section switch animation to settle, then
+        // scroll + highlight.
+        setTimeout(() => {
+            el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            el.style.transition = 'box-shadow .6s ease';
+            el.style.boxShadow = '0 0 0 4px rgba(139,92,246,.45)';
+            setTimeout(() => { el.style.boxShadow = ''; }, 1800);
+        }, 250);
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', flashPromptCard);
+    } else {
+        flashPromptCard();
+    }
 })();
 </script>

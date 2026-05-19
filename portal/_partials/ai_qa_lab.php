@@ -1499,7 +1499,12 @@ function _qa_source_badge(string $s): string {
                 class="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:border-violet-500 resize-none"
                 placeholder="เช่น คลินิกเปิดกี่โมง? หรือ บริการอะไรบ้าง? หรือ ราคาตรวจสุขภาพเท่าไหร่?"></textarea>
             <div class="flex items-center justify-between mt-3">
-                <p class="text-xs text-gray-400">คำถามจะผ่าน FAQ matcher → Semantic search (chunks) → Gemini generate</p>
+                <p class="text-xs text-gray-400">
+                    คำถามจะผ่าน FAQ matcher → Semantic search (chunks) → Gemini generate
+                    · <a href="?section=ai_prompts#prompt-generator" class="text-violet-600 hover:text-violet-800 font-bold">
+                        <i class="fa-solid fa-scroll mr-0.5"></i>ดู/แก้ Generator prompt
+                    </a>
+                </p>
                 <button id="sb-ask-btn" class="px-5 py-2 bg-violet-600 text-white text-sm font-bold rounded-xl hover:bg-violet-700 flex items-center gap-2">
                     <i class="fa-solid fa-paper-plane"></i> ถาม
                 </button>
