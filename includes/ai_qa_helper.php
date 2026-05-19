@@ -244,16 +244,19 @@ function ai_qa_build_clinic_context(PDO $pdo, ?DateTimeImmutable $asOf = null, s
         ? "\n\n[ข้อมูลเพิ่มเติม / บริการ / ราคา / นโยบาย]\n{$notesText}"
         : '';
 
-    // ── Knowledge Chunks (RAG: semantic search ถ้ามี query) ───────────────
-    // ถ้ามี query: เลือก top-5 chunks ที่ใกล้เคียง → ฉีดเข้า context
-    // ถ้าไม่มี query: skip (กัน context ใหญ่เกินไป) — caller ทั่วไป (preview/diagnose)
-    // ไม่ต้องการ chunks เพราะจะใหญ่และไม่เกี่ยว
+    // ── Knowledge Chunks (RAG — primary source for non-time-sensitive Q) ──
+    // Pulled via embedding similarity when we have a question. topK=8 is a
+    // balance between context bloat and recall — previously we used 5 but
+    // that left common questions (services, prices, policies) under-served
+    // when the relevant chunk was outside the top-5. The chunk section now
+    // sits *above* FAQ KB and Custom Notes in the prompt so the model
+    // treats curated chunks as primary and the FAQ as fallback.
     $chunksSection = '';
     if ($query !== '') {
         try {
-            $chunksText = render_chunks_context_block($pdo, $query, 5);
+            $chunksText = render_chunks_context_block($pdo, $query, 8);
             if ($chunksText !== '') {
-                $chunksSection = "\n\n[ข้อมูลที่เกี่ยวข้องจาก Knowledge Base]\n{$chunksText}";
+                $chunksSection = "\n\n[Knowledge Base — แหล่งข้อมูลหลัก (curated facts)]\nใช้ block นี้เป็น primary source สำหรับคำถามที่ไม่ใช่เวลา/ตารางหมอ — facts ที่นี่ตรวจสอบและ curate แล้วโดย admin\n\n{$chunksText}";
             }
         } catch (Throwable $e) {
             error_log('[chunks context] ' . $e->getMessage());
@@ -277,10 +280,10 @@ function ai_qa_build_clinic_context(PDO $pdo, ?DateTimeImmutable $asOf = null, s
 {$hoursText}
 
 [หมอออกตรวจ — 31 วันข้างหน้า]
-{$doctorsText}
+{$doctorsText}{$chunksSection}
 
-[FAQ Knowledge Base]
-{$faqText}{$notesSection}{$chunksSection}
+[FAQ Knowledge Base — fallback templates (ใช้เฉพาะถ้า Knowledge Base ด้านบนไม่ครอบคลุม)]
+{$faqText}{$notesSection}
 CTX;
 }
 

@@ -462,6 +462,49 @@ try {
         exit;
     }
 
+    // ─── Bulk mark FAQ rows as time-sensitive ────────────────────────────
+    // Pair to the stale scanner: instead of *deleting* stale rows, the
+    // admin can flip is_time_sensitive=1 on them so the matcher ignores
+    // the cached answer and goes through ai_qa_generate_answer() (which
+    // produces a fresh reply against the live clinic context).
+    //
+    // Accepts either:
+    //   id=<single faq id>
+    //   ids=<JSON array of faq ids>
+    // Only applies to sys_ai_faq rows — sys_ai_qa_log has no such column.
+    if ($action === 'faq_mark_time_sensitive') {
+        $ids = [];
+        if (isset($_POST['ids'])) {
+            $decoded = json_decode((string)$_POST['ids'], true);
+            if (is_array($decoded)) {
+                foreach ($decoded as $v) {
+                    $iv = (int)$v;
+                    if ($iv > 0) $ids[] = $iv;
+                }
+            }
+        } elseif (isset($_POST['id'])) {
+            $iv = (int)$_POST['id'];
+            if ($iv > 0) $ids[] = $iv;
+        }
+        $ids = array_values(array_unique($ids));
+        if (empty($ids)) {
+            echo json_encode(['ok' => false, 'message' => 'no valid ids']);
+            exit;
+        }
+        // Cap to defend against accidental "mark literally everything"
+        if (count($ids) > 500) {
+            echo json_encode(['ok' => false, 'message' => 'มาก์ครั้งละไม่เกิน 500 รายการ']);
+            exit;
+        }
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        $upd = $pdo->prepare("UPDATE sys_ai_faq
+            SET is_time_sensitive = 1, updated_by = ?
+            WHERE id IN ({$placeholders})");
+        $upd->execute(array_merge([$reviewerId ?: null], $ids));
+        echo json_encode(['ok' => true, 'updated' => $upd->rowCount()]);
+        exit;
+    }
+
     // ─── Stale FAQ scanner ────────────────────────────────────────────────
     // Scan sys_ai_faq + sys_ai_qa_log (approved) for answers that trip the
     // stale-date regex (วันนี้ / พรุ่งนี้ / Thai month / พ.ศ. NNNN / etc).

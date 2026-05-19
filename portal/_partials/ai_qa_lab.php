@@ -1706,10 +1706,23 @@ function _qa_source_badge(string $s): string {
             });
             return;
         }
+        // Pre-compute which FAQ rows can be flipped to time-sensitive
+        // (sys_ai_qa_log captures don't have that column — they can only
+        // be deleted)
+        const faqIds = items.filter(it => it.source === 'faq').map(it => it.id);
+
         const rowsHtml = items.map((it, i) => {
             const srcBadge = it.source === 'faq'
                 ? '<span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-violet-100 text-violet-700">FAQ</span>'
                 : '<span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700">QA Log</span>';
+            const markBtn = it.source === 'faq'
+                ? `<button type="button"
+                       class="stale-mark-btn text-xs font-bold px-3 py-1 rounded bg-amber-500 hover:bg-amber-600 text-white"
+                       data-id="${it.id}"
+                       title="ไม่ลบ แต่ทำให้ระบบข้าม row นี้ตอน match — generate ใหม่ทุกครั้งแทน">
+                       <i class="fa-solid fa-clock-rotate-left mr-1"></i> ทำเป็น time-sensitive
+                   </button>`
+                : '';
             return `
                 <div class="border border-amber-200 rounded-lg p-3 bg-amber-50 mb-2" data-stale-idx="${i}">
                     <div class="flex items-start gap-2 mb-1">
@@ -1719,27 +1732,66 @@ function _qa_source_badge(string $s): string {
                     </div>
                     <div class="text-sm font-bold text-gray-800 mb-1">${escapeHtml(it.question || '(ไม่มีคำถาม)')}</div>
                     <div class="text-xs text-gray-600 mb-2" style="white-space:pre-wrap">${escapeHtml(it.answer || '').slice(0, 280)}</div>
-                    <button type="button"
-                        class="stale-delete-btn text-xs font-bold px-3 py-1 rounded bg-rose-500 hover:bg-rose-600 text-white"
-                        data-src="${it.source}" data-id="${it.id}"
-                        data-group-key="${escapeHtml(it.group_key || '')}">
-                        <i class="fa-solid fa-trash mr-1"></i> ลบ
-                    </button>
+                    <div class="flex flex-wrap gap-2">
+                        ${markBtn}
+                        <button type="button"
+                            class="stale-delete-btn text-xs font-bold px-3 py-1 rounded bg-rose-500 hover:bg-rose-600 text-white"
+                            data-src="${it.source}" data-id="${it.id}"
+                            data-group-key="${escapeHtml(it.group_key || '')}">
+                            <i class="fa-solid fa-trash mr-1"></i> ลบ
+                        </button>
+                    </div>
                 </div>
             `;
         }).join('');
+
+        const bulkBar = faqIds.length > 0
+            ? `<div class="mb-3 p-3 rounded-lg bg-amber-100 border border-amber-300 flex items-center justify-between gap-3 flex-wrap">
+                   <div class="text-xs text-amber-900">
+                       <b>${faqIds.length}</b> FAQ row สามารถถูกทำเป็น <b>time-sensitive</b> แทนการลบ — ระบบจะข้าม row เหล่านี้ตอน match แต่ admin ยังเห็น/แก้ไขได้
+                   </div>
+                   <button type="button" id="stale-bulk-mark-btn"
+                       class="text-xs font-bold px-4 py-2 rounded bg-amber-600 hover:bg-amber-700 text-white whitespace-nowrap">
+                       <i class="fa-solid fa-shield-halved mr-1"></i> Mark ทั้งหมด (${faqIds.length})
+                   </button>
+               </div>`
+            : '';
+
         await Swal.fire({
             title: `พบ ${items.length} รายการที่อาจล้าสมัย`,
             html: `
                 <div class="text-left text-xs text-gray-600 mb-3">
-                    คำตอบเหล่านี้มีคำที่ผูกกับเวลา (วันนี้/พรุ่งนี้/ชื่อเดือน/พ.ศ.) — ควรลบให้ระบบ generate ใหม่ตาม current context หรือแก้ให้เป็น generic phrasing
+                    คำตอบเหล่านี้มีคำที่ผูกกับเวลา (วันนี้/พรุ่งนี้/ชื่อเดือน/พ.ศ.) — เลือกได้ว่าจะ
+                    <b class="text-amber-700">ทำเป็น time-sensitive</b> (เก็บ row ไว้ แต่ระบบ generate ใหม่ทุกครั้ง)
+                    หรือ <b class="text-rose-600">ลบทิ้ง</b> ทั้ง row
                 </div>
+                ${bulkBar}
                 <div style="max-height: 50vh; overflow-y: auto">${rowsHtml}</div>
             `,
-            width: 720,
+            width: 760,
             showCloseButton: true,
             showConfirmButton: false,
             didOpen: () => {
+                // ── Per-row "mark time-sensitive" ──────────────────────
+                document.querySelectorAll('.stale-mark-btn').forEach(btn => {
+                    btn.addEventListener('click', async () => {
+                        const id = btn.dataset.id;
+                        btn.disabled = true;
+                        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+                        const res = await api('faq_mark_time_sensitive', { id });
+                        if (res.ok) {
+                            const card = btn.closest('[data-stale-idx]');
+                            if (card) { card.style.opacity = '0.5'; card.style.pointerEvents = 'none'; }
+                            btn.innerHTML = '<i class="fa-solid fa-check"></i> มาร์กแล้ว';
+                        } else {
+                            btn.disabled = false;
+                            btn.innerHTML = '<i class="fa-solid fa-clock-rotate-left mr-1"></i> ทำเป็น time-sensitive';
+                            Swal.showValidationMessage('มาร์กไม่สำเร็จ: ' + (res.message || ''));
+                        }
+                    });
+                });
+
+                // ── Per-row delete (sys_ai_faq via faq_delete; sys_ai_qa_log via delete) ─
                 document.querySelectorAll('.stale-delete-btn').forEach(btn => {
                     btn.addEventListener('click', async () => {
                         const src = btn.dataset.src;
@@ -1764,9 +1816,33 @@ function _qa_source_badge(string $s): string {
                         }
                     });
                 });
+
+                // ── Bulk "mark all FAQ rows time-sensitive" ─────────────
+                const bulkBtn = document.getElementById('stale-bulk-mark-btn');
+                if (bulkBtn) {
+                    bulkBtn.addEventListener('click', async () => {
+                        bulkBtn.disabled = true;
+                        bulkBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> กำลังมาร์ก...';
+                        const res = await api('faq_mark_time_sensitive', { ids: JSON.stringify(faqIds) });
+                        if (res.ok) {
+                            // Visually fade every per-row card that just got marked
+                            document.querySelectorAll('.stale-mark-btn').forEach(b => {
+                                const card = b.closest('[data-stale-idx]');
+                                if (card) { card.style.opacity = '0.5'; card.style.pointerEvents = 'none'; }
+                                b.innerHTML = '<i class="fa-solid fa-check"></i> มาร์กแล้ว';
+                                b.disabled = true;
+                            });
+                            bulkBtn.innerHTML = `<i class="fa-solid fa-check"></i> มาร์ก ${res.updated} รายการแล้ว`;
+                        } else {
+                            bulkBtn.disabled = false;
+                            bulkBtn.innerHTML = `<i class="fa-solid fa-shield-halved mr-1"></i> Mark ทั้งหมด (${faqIds.length})`;
+                            Swal.showValidationMessage('มาร์กไม่สำเร็จ: ' + (res.message || ''));
+                        }
+                    });
+                }
             },
         });
-        // Reload the page after the modal closes so the FAQ table reflects deletes
+        // Reload so the FAQ table reflects deletes + new time-sensitive chips
         location.reload();
     }
 
