@@ -949,6 +949,20 @@ function ai_qa_answer_has_stale_dates(string $answer): bool
         // Full Thai month names — generic answers should describe weekly
         // patterns, not month-specific events
         '/(มกราคม|กุมภาพันธ์|มีนาคม|เมษายน|พฤษภาคม|มิถุนายน|กรกฎาคม|สิงหาคม|กันยายน|ตุลาคม|พฤศจิกายน|ธันวาคม)/u',
+        // English weekday names — same intent as the Thai weekday rule:
+        // a generic answer about clinic hours shouldn't pin itself to
+        // "Saturday" specifically (the user may ask again on Wednesday).
+        '/\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i',
+        // English month name + day-of-month (e.g. "May 9", "May 9, 2026",
+        // "May 9th"). Anchored by "<month> <number>" so the modal verb
+        // "may" in "may I help you" doesn't false-positive.
+        '/\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\s+\d{1,2}(?:st|nd|rd|th)?\b/i',
+        // Bare 4-digit year 2020-2039 as a likely calendar pin (covers
+        // "2026" without พ.ศ. / ค.ศ. prefix that the Thai rule above misses)
+        '/\b20[2-3]\d\b/',
+        // Numeric dates in common formats: 9/5/2026, 09-05-2026, 2026-05-09
+        '/\b\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}\b/',
+        '/\b\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2}\b/',
     ];
     foreach ($patterns as $p) {
         if (preg_match($p, $answer)) return true;
