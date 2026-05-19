@@ -462,6 +462,39 @@ try {
         exit;
     }
 
+    // ─── Phase C health endpoints ─────────────────────────────────────────
+    // GET-friendly read-only summaries (Lab "AI health" widget) +
+    // POST-gated cache bust (after admin pushes a knowledge update).
+
+    if ($action === 'health_summary') {
+        require_once __DIR__ . '/../includes/ai_telemetry_helper.php';
+        require_once __DIR__ . '/../includes/ai_cache_helper.php';
+        $windowHours = max(1, min(168, (int)($_REQUEST['window_hours'] ?? 24)));
+        echo json_encode([
+            'ok'        => true,
+            'telemetry' => ai_telemetry_summary($pdo, $windowHours),
+            'cache'     => ai_cache_stats($pdo, 10),
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    if ($action === 'telemetry_recent') {
+        require_once __DIR__ . '/../includes/ai_telemetry_helper.php';
+        $limit = max(1, min(200, (int)($_REQUEST['limit'] ?? 50)));
+        echo json_encode([
+            'ok'   => true,
+            'rows' => ai_telemetry_recent($pdo, $limit),
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    if ($action === 'cache_purge') {
+        require_once __DIR__ . '/../includes/ai_cache_helper.php';
+        $n = ai_cache_purge_all($pdo);
+        echo json_encode(['ok' => true, 'purged' => $n]);
+        exit;
+    }
+
     // ─── Bulk mark FAQ rows as time-sensitive ────────────────────────────
     // Pair to the stale scanner: instead of *deleting* stale rows, the
     // admin can flip is_time_sensitive=1 on them so the matcher ignores

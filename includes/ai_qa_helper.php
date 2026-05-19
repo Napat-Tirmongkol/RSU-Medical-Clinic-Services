@@ -12,6 +12,11 @@
  */
 declare(strict_types=1);
 
+// Phase C — answer cache + telemetry helpers (always safe to require;
+// each one is self-contained and never blocks the matcher on failure).
+require_once __DIR__ . '/ai_cache_helper.php';
+require_once __DIR__ . '/ai_telemetry_helper.php';
+
 /**
  * Helper สำหรับ log debug ของ AI QA matcher → ไปที่ sys_error_logs ที่ portal viewer อ่านได้
  * เปิด/ปิดที่นี่จุดเดียว — ใช้ source 'ai_qa_helper.php' เพื่อให้กรองง่าย
@@ -290,12 +295,49 @@ CTX;
 /**
  * เรียก Gemini เพื่อจัดหมวด + ร่างคำตอบ — คืน array หรือ throw
  *
+ * Phase C wraps this with:
+ *  - day-bounded answer cache (sys_ai_answer_cache) — cache hit avoids
+ *    the Gemini round-trip entirely; on miss the fresh answer is stored
+ *  - telemetry (sys_ai_telemetry) — every call logs cache_hit / cache_miss
+ *    + gemini_success / gemini_fail with elapsed_ms so the Lab can show
+ *    health metrics and an admin can see quota burn at a glance
+ *
  * @return array{category:string, answer:string, confidence:float, model:string}
  */
 function ai_qa_generate_answer(string $question, ?PDO $pdo = null, ?DateTimeImmutable $askedAt = null): array
 {
+    // Day-bounded cache lookup — skip the Gemini round-trip entirely if
+    // an equivalent question was answered today. Cached entries expire
+    // at 23:59:59 Asia/Bangkok, so a stale answer can never live longer
+    // than one calendar day before it's regenerated.
+    if ($pdo !== null) {
+        $cached = ai_cache_get($pdo, $question);
+        if ($cached !== null) {
+            ai_telemetry_log($pdo, 'cache_hit', [
+                'source' => 'generate_answer',
+                'model'  => $cached['model'] ?? '',
+                'meta'   => ['hits' => $cached['cache_hits'] ?? 1],
+            ]);
+            return [
+                'category'   => $cached['category'],
+                'answer'     => $cached['answer'],
+                'confidence' => $cached['confidence'],
+                'model'      => $cached['model'],
+            ];
+        }
+        ai_telemetry_log($pdo, 'cache_miss', ['source' => 'generate_answer']);
+    }
+
+    $genStart = microtime(true);
+
     $apiKey = ai_qa_load_gemini_key();
     if (!$apiKey) {
+        if ($pdo !== null) {
+            ai_telemetry_log($pdo, 'gemini_fail', [
+                'source'    => 'generate_answer',
+                'error_msg' => 'GEMINI_API_KEY not configured',
+            ]);
+        }
         throw new RuntimeException('ยังไม่ได้ตั้งค่า GEMINI_API_KEY');
     }
 
@@ -327,72 +369,108 @@ function ai_qa_generate_answer(string $question, ?PDO $pdo = null, ?DateTimeImmu
     $usedModel = '';
     $rawText   = '';
 
-    foreach ($models as $model) {
-        $url = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$apiKey}";
-        $ch  = curl_init($url);
-        curl_setopt_array($ch, [
-            CURLOPT_POST           => true,
-            CURLOPT_POSTFIELDS     => $body,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
-            CURLOPT_TIMEOUT        => 45,
-            CURLOPT_CONNECTTIMEOUT => 15,
-            CURLOPT_SSL_VERIFYPEER => true,
+    if ($pdo !== null) {
+        ai_telemetry_log($pdo, 'gemini_call', [
+            'source' => 'generate_answer',
+            'meta'   => ['question_len' => mb_strlen($question)],
         ]);
-        $raw      = (string)curl_exec($ch);
-        $httpCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $curlErr  = curl_error($ch);
-        curl_close($ch);
+    }
 
-        if ($curlErr) {
-            throw new RuntimeException('Gemini connection error: ' . $curlErr);
+    // Wrap the network + parse path so any thrown RuntimeException emits
+    // a gemini_fail telemetry event before bubbling up to the caller.
+    try {
+        foreach ($models as $model) {
+            $url = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$apiKey}";
+            $ch  = curl_init($url);
+            curl_setopt_array($ch, [
+                CURLOPT_POST           => true,
+                CURLOPT_POSTFIELDS     => $body,
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
+                CURLOPT_TIMEOUT        => 45,
+                CURLOPT_CONNECTTIMEOUT => 15,
+                CURLOPT_SSL_VERIFYPEER => true,
+            ]);
+            $raw      = (string)curl_exec($ch);
+            $httpCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $curlErr  = curl_error($ch);
+            curl_close($ch);
+
+            if ($curlErr) {
+                throw new RuntimeException('Gemini connection error: ' . $curlErr);
+            }
+            if ($httpCode === 200) {
+                $usedModel = $model;
+                $rawText   = $raw;
+                break;
+            }
+            // 404 = model not found, ลอง fallback; อย่างอื่น throw ทันที
+            if ($httpCode !== 404) {
+                $errMsg = json_decode($raw, true)['error']['message'] ?? "HTTP {$httpCode}";
+                throw new RuntimeException('Gemini error: ' . $errMsg);
+            }
         }
-        if ($httpCode === 200) {
-            $usedModel = $model;
-            $rawText   = $raw;
-            break;
+
+        if ($usedModel === '') {
+            throw new RuntimeException('ไม่พบ model ที่ใช้งานได้');
         }
-        // 404 = model not found, ลอง fallback; อย่างอื่น throw ทันที
-        if ($httpCode !== 404) {
-            $errMsg = json_decode($raw, true)['error']['message'] ?? "HTTP {$httpCode}";
-            throw new RuntimeException('Gemini error: ' . $errMsg);
+
+        $resp = json_decode($rawText, true);
+        $text = (string)($resp['candidates'][0]['content']['parts'][0]['text'] ?? '');
+        $text = preg_replace('/^```(?:json)?\s*/m', '', $text);
+        $text = preg_replace('/```\s*$/m', '', $text);
+        $text = trim($text);
+
+        $parsed = json_decode($text, true);
+        if (!is_array($parsed)) {
+            throw new RuntimeException('AI ตอบกลับในรูปแบบที่ไม่ถูกต้อง');
         }
+
+        $category = (string)($parsed['category'] ?? 'อื่นๆ');
+        if (!in_array($category, AI_QA_CATEGORIES, true)) {
+            $category = 'อื่นๆ';
+        }
+        $answer     = trim((string)($parsed['answer'] ?? ''));
+        $confidence = (float)($parsed['confidence'] ?? 0);
+        if ($confidence < 0) $confidence = 0.0;
+        if ($confidence > 1) $confidence = 1.0;
+
+        if ($answer === '') {
+            throw new RuntimeException('AI ไม่ได้ส่งคำตอบกลับมา');
+        }
+    } catch (Throwable $e) {
+        if ($pdo !== null) {
+            ai_telemetry_log($pdo, 'gemini_fail', [
+                'source'     => 'generate_answer',
+                'model'      => $usedModel,
+                'elapsed_ms' => (int)round((microtime(true) - $genStart) * 1000),
+                'error_msg'  => $e->getMessage(),
+            ]);
+        }
+        throw $e;
     }
 
-    if ($usedModel === '') {
-        throw new RuntimeException('ไม่พบ model ที่ใช้งานได้');
-    }
-
-    $resp = json_decode($rawText, true);
-    $text = (string)($resp['candidates'][0]['content']['parts'][0]['text'] ?? '');
-    $text = preg_replace('/^```(?:json)?\s*/m', '', $text);
-    $text = preg_replace('/```\s*$/m', '', $text);
-    $text = trim($text);
-
-    $parsed = json_decode($text, true);
-    if (!is_array($parsed)) {
-        throw new RuntimeException('AI ตอบกลับในรูปแบบที่ไม่ถูกต้อง');
-    }
-
-    $category = (string)($parsed['category'] ?? 'อื่นๆ');
-    if (!in_array($category, AI_QA_CATEGORIES, true)) {
-        $category = 'อื่นๆ';
-    }
-    $answer     = trim((string)($parsed['answer'] ?? ''));
-    $confidence = (float)($parsed['confidence'] ?? 0);
-    if ($confidence < 0) $confidence = 0.0;
-    if ($confidence > 1) $confidence = 1.0;
-
-    if ($answer === '') {
-        throw new RuntimeException('AI ไม่ได้ส่งคำตอบกลับมา');
-    }
-
-    return [
+    $result = [
         'category'   => $category,
         'answer'     => $answer,
         'confidence' => $confidence,
         'model'      => $usedModel,
     ];
+
+    if ($pdo !== null) {
+        $elapsedMs = (int)round((microtime(true) - $genStart) * 1000);
+        ai_telemetry_log($pdo, 'gemini_success', [
+            'source'     => 'generate_answer',
+            'model'      => $usedModel,
+            'elapsed_ms' => $elapsedMs,
+            'meta'       => ['confidence' => $confidence, 'category' => $category],
+        ]);
+        // Cache the fresh answer so the next identical question today
+        // skips the round-trip entirely.
+        ai_cache_put($pdo, $question, $result);
+    }
+
+    return $result;
 }
 
 /**
@@ -832,6 +910,12 @@ function ai_qa_answer_has_stale_dates(string $answer): bool
  */
 function ai_qa_refresh_if_stale(array $match, PDO $pdo, string $question): array
 {
+    // Every call to this wrapper means the matcher just hit an FAQ row —
+    // record it so the Lab dashboard shows cache utilization.
+    ai_telemetry_log($pdo, 'faq_hit', [
+        'source' => 'match_faq',
+        'meta'   => ['matched_via' => $match['matched_via'] ?? ''],
+    ]);
     if (!ai_qa_answer_has_stale_dates($match['answer'])) return $match;
     try {
         $fresh = ai_qa_generate_answer($question, $pdo);
@@ -885,6 +969,7 @@ function ai_qa_match_faq(PDO $pdo, string $question, ?callable $onSemanticPhase 
         ai_qa_debug_log('AI QA matcher — time-sensitive intent, bypassing FAQ cache', [
             'question_snippet' => $qSnippet,
         ]);
+        ai_telemetry_log($pdo, 'bypass_time_sensitive', ['source' => 'match_faq']);
         if ($onSemanticPhase !== null) {
             try { $onSemanticPhase(); } catch (Throwable $e) {
                 ai_qa_debug_log('AI QA onSemanticPhase callback failed', ['error' => $e->getMessage()], 'warning');
@@ -908,6 +993,12 @@ function ai_qa_match_faq(PDO $pdo, string $question, ?callable $onSemanticPhase 
             ai_qa_debug_log('AI QA time-sensitive generate failed — falling back to FAQ phases', [
                 'error' => $e->getMessage(),
             ], 'warning');
+            // Generator failed but we still owe the user a reply — record
+            // the fallback so the Lab dashboard can show degraded mode.
+            ai_telemetry_log($pdo, 'fallback_used', [
+                'source'    => 'time_sensitive_to_faq',
+                'error_msg' => $e->getMessage(),
+            ]);
             // fall through to Phase 1 so the user still gets something useful
         }
     }

@@ -46,6 +46,17 @@ try {
             }
 
             $id = feedback_save($pdo, $source, $msgId, $question, $answer, $rating, $comment, $adminId);
+
+            // Phase C telemetry — feed the Lab "AI health" widget so we
+            // can chart thumbs-down rate alongside Gemini failures.
+            if (file_exists(__DIR__ . '/../includes/ai_telemetry_helper.php')) {
+                require_once __DIR__ . '/../includes/ai_telemetry_helper.php';
+                ai_telemetry_log($pdo, $rating === 1 ? 'thumbs_up' : 'thumbs_down', [
+                    'source' => $source ?: 'feedback',
+                    'meta'   => ['feedback_id' => $id, 'has_comment' => $comment !== ''],
+                ]);
+            }
+
             echo json_encode(['ok' => true, 'id' => $id], JSON_UNESCAPED_UNICODE);
             return;
         }
