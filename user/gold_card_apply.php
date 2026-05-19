@@ -646,18 +646,27 @@ $__navActive = 'services';
         if (typeof faceapi === 'undefined') return null;
         if (faceApiReady) return 'faceapi';
         if (faceApiLoading) return faceApiLoading;
+        // The npm dist of face-api.js doesn't ship the /weights/ folder, so
+        // the jsdelivr /npm/ route 404s. Pull straight from the GitHub tag
+        // instead, with a couple of backup mirrors in case one CDN is down.
+        const MODEL_URLS = [
+            'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@0.22.2/weights',
+            'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights',
+            'https://unpkg.com/face-api.js@0.22.2/weights',
+        ];
         faceApiLoading = (async () => {
-            try {
-                await faceapi.nets.tinyFaceDetector.loadFromUri('https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights');
-                faceApiReady = true;
-                return 'faceapi';
-            } catch (e) {
-                console.warn('[face-api] model load failed', e);
-                return null;
-            } finally {
-                faceApiLoading = null;
+            for (const url of MODEL_URLS) {
+                try {
+                    await faceapi.nets.tinyFaceDetector.loadFromUri(url);
+                    faceApiReady = true;
+                    return 'faceapi';
+                } catch (e) {
+                    console.warn('[face-api] model load failed from', url, e?.message || e);
+                }
             }
-        })();
+            console.warn('[face-api] all CDN mirrors failed — falling back to Gemini-only');
+            return null;
+        })().finally(() => { faceApiLoading = null; });
         return faceApiLoading;
     }
 
