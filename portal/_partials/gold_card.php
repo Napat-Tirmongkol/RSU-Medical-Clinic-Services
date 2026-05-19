@@ -1242,26 +1242,54 @@ window.gcToggleApplyEnabled = async function() {
     };
 
     window.gcDeleteFolder = async function(year, month, noDate, label, count) {
-        const { isConfirmed } = await Swal.fire({
+        const { value: result, isConfirmed } = await Swal.fire({
             icon: 'warning',
             title: 'ลบทั้งโฟลเดอร์?',
-            html: `<div class="text-left">
+            html: `<div class="text-left text-sm space-y-3">
                 <p>โฟลเดอร์: <b>${escapeHtml(label)}</b></p>
                 <p>จะลบ <b class="text-rose-700">${count.toLocaleString()} รายการ</b> + เอกสารทั้งหมด</p>
-                <p class="mt-2 text-xs text-slate-500">การลบนี้ไม่สามารถย้อนกลับได้</p>
+                <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-900 leading-relaxed">
+                    <i class="fa-solid fa-shield-halved mr-1"></i>
+                    <b>PDPA Art. 32:</b> ต้องบันทึกเหตุผลการลบเพื่อ record-of-processing
+                </div>
+                <label class="block text-xs font-black text-slate-700 mb-1 mt-2">เหตุผลการลบ <span class="text-rose-500">*</span></label>
+                <select id="gcDelFolderReasonSelect" class="swal2-input !m-0 !w-full !text-sm !h-10">
+                    <option value="">-- เลือกเหตุผล --</option>
+                    <option value="หมดอายุการเก็บข้อมูล (Retention expired)">หมดอายุการเก็บข้อมูล</option>
+                    <option value="ข้อมูลซ้ำหรือผิดพลาด">ข้อมูลซ้ำหรือผิดพลาด</option>
+                    <option value="ยกเลิกการสมัครทั้งรอบ">ยกเลิกการสมัครทั้งรอบ</option>
+                    <option value="ทดสอบระบบ">ทดสอบระบบ</option>
+                    <option value="__custom">อื่นๆ (ระบุเอง)</option>
+                </select>
+                <label class="block text-xs font-black text-slate-700 mt-2 mb-1">รายละเอียดเพิ่มเติม</label>
+                <textarea id="gcDelFolderReasonText" class="swal2-textarea !m-0 !w-full !text-sm" rows="2" placeholder="ระบุรายละเอียดเพิ่มเติม (ถ้ามี)"></textarea>
+                <label class="block text-xs font-black text-slate-700 mt-2 mb-1">พิมพ์ "ลบ" เพื่อยืนยัน <span class="text-rose-500">*</span></label>
+                <input id="gcDelFolderConfirm" type="text" class="swal2-input !m-0 !w-full !text-sm !h-10" placeholder='พิมพ์ "ลบ"' />
             </div>`,
             showCancelButton: true,
-            confirmButtonText: 'ลบทั้งหมด',
+            confirmButtonText: '<i class="fa-solid fa-trash"></i> ลบทั้งหมด',
             cancelButtonText: 'ยกเลิก',
             confirmButtonColor: '#dc2626',
             reverseButtons: true,
-            input: 'text',
-            inputPlaceholder: 'พิมพ์ "ลบ" เพื่อยืนยัน',
-            inputValidator: v => v !== 'ลบ' ? 'พิมพ์คำว่า "ลบ" ให้ตรง' : null,
+            focusConfirm: false,
+            preConfirm: () => {
+                const sel = document.getElementById('gcDelFolderReasonSelect').value;
+                const txt = document.getElementById('gcDelFolderReasonText').value.trim();
+                const conf = document.getElementById('gcDelFolderConfirm').value.trim();
+                let r = '';
+                if (sel === '__custom') r = txt;
+                else if (sel) r = txt ? `${sel} — ${txt}` : sel;
+                else r = txt;
+                if (!r) { Swal.showValidationMessage('กรุณาเลือกหรือระบุเหตุผลการลบ'); return false; }
+                if (r.length > 500) { Swal.showValidationMessage('เหตุผลยาวเกิน 500 ตัวอักษร'); return false; }
+                if (conf !== 'ลบ') { Swal.showValidationMessage('พิมพ์คำว่า "ลบ" ให้ตรงเพื่อยืนยัน'); return false; }
+                return r;
+            },
         });
         if (!isConfirmed) return;
+        const reason = result;
 
-        const params = noDate ? { no_date: 1 } : { year: year, month: month };
+        const params = noDate ? { no_date: 1, reason } : { year: year, month: month, reason };
         gcPost('folder', 'delete', params).then(r => {
             if (r.status === 'ok') {
                 Swal.fire({ icon: 'success', title: 'ลบโฟลเดอร์แล้ว', text: r.message, timer: 1500, showConfirmButton: false });
@@ -1736,13 +1764,50 @@ window.gcToggleApplyEnabled = async function() {
     window.gcDeleteMember = async function() {
         const id = document.getElementById('gcMemberId').value;
         if (!id || id == 0) return;
-        const { isConfirmed } = await Swal.fire({
-            icon: 'warning', title: 'ยืนยันการลบ?', text: 'จะลบสมาชิกและเอกสารทั้งหมดออกจากระบบ',
-            showCancelButton: true, confirmButtonText: 'ลบ', cancelButtonText: 'ยกเลิก',
-            confirmButtonColor: '#dc2626', reverseButtons: true
+        const memberName = document.getElementById('gcFullName')?.value || '';
+        const { value: reason, isConfirmed } = await Swal.fire({
+            icon: 'warning',
+            title: 'ยืนยันการลบสมาชิก?',
+            html: `<div class="text-left text-sm space-y-3">
+                <p>จะลบสมาชิก <b>${escapeHtml(memberName)}</b> และเอกสารทั้งหมด</p>
+                <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-900 leading-relaxed">
+                    <i class="fa-solid fa-shield-halved mr-1"></i>
+                    <b>PDPA Art. 32:</b> ต้องบันทึกเหตุผลการลบเพื่อ record-of-processing
+                </div>
+                <label class="block text-xs font-black text-slate-700 mb-1 mt-2">เหตุผลที่ใช้บ่อย <span class="text-rose-500">*</span></label>
+                <select id="gcDelReasonSelect" class="swal2-input !m-0 !w-full !text-sm !h-10">
+                    <option value="">-- เลือกเหตุผล --</option>
+                    <option value="ข้อมูลซ้ำ (Duplicate record)">ข้อมูลซ้ำ (Duplicate)</option>
+                    <option value="ผู้สมัครยกเลิก">ผู้สมัครยกเลิก</option>
+                    <option value="ข้อมูลผิดพลาด (Data entry error)">ข้อมูลผิดพลาด</option>
+                    <option value="เจ้าของข้อมูลขอลบ (PDPA Art. 30)">เจ้าของข้อมูลขอลบ (PDPA Art. 30)</option>
+                    <option value="หมดอายุการเก็บข้อมูล (Retention expired)">หมดอายุการเก็บ</option>
+                    <option value="ทดสอบระบบ">ทดสอบระบบ</option>
+                    <option value="__custom">อื่นๆ (ระบุเอง)</option>
+                </select>
+                <label class="block text-xs font-black text-slate-700 mt-2 mb-1">รายละเอียดเพิ่มเติม</label>
+                <textarea id="gcDelReasonText" class="swal2-textarea !m-0 !w-full !text-sm" rows="2" placeholder="ระบุรายละเอียดเพิ่มเติม (ถ้ามี)"></textarea>
+            </div>`,
+            showCancelButton: true,
+            confirmButtonText: '<i class="fa-solid fa-trash"></i> ยืนยันลบ',
+            cancelButtonText: 'ยกเลิก',
+            confirmButtonColor: '#dc2626',
+            reverseButtons: true,
+            focusConfirm: false,
+            preConfirm: () => {
+                const sel = document.getElementById('gcDelReasonSelect').value;
+                const txt = document.getElementById('gcDelReasonText').value.trim();
+                let r = '';
+                if (sel === '__custom') r = txt;
+                else if (sel) r = txt ? `${sel} — ${txt}` : sel;
+                else r = txt;
+                if (!r) { Swal.showValidationMessage('กรุณาเลือกหรือระบุเหตุผลการลบ'); return false; }
+                if (r.length > 500) { Swal.showValidationMessage('เหตุผลยาวเกิน 500 ตัวอักษร'); return false; }
+                return r;
+            },
         });
         if (!isConfirmed) return;
-        gcPost('member', 'delete', { id }).then(r => {
+        gcPost('member', 'delete', { id, reason }).then(r => {
             if (r.status === 'ok') {
                 Swal.fire({ icon: 'success', title: 'ลบแล้ว', timer: 1500, showConfirmButton: false });
                 gcCloseMemberModal();
