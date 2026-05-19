@@ -3084,13 +3084,31 @@ function renderResult(question, j) {
     if (!j.matched_faq) {
         saveBtn.classList.remove('hidden');
         saveBtn.onclick = async () => {
+            // Preview whether the backend will auto-set is_time_sensitive=1
+            // based on the question text. Both the JS regex helper and the
+            // PHP one mirror the same rule, so this is a safe predictor.
+            const willBeTimeSensitive = faqIsTimeSensitiveQuestion(question);
+            const tsBadge = willBeTimeSensitive
+                ? `<div class="mt-3 p-2 bg-amber-50 border border-amber-200 rounded text-amber-800 text-xs leading-relaxed">
+                       <i class="fa-solid fa-clock-rotate-left mr-1"></i>
+                       <b>ระบบตรวจพบว่าเป็นคำถามที่ขึ้นอยู่กับเวลา</b><br>
+                       FAQ นี้จะถูก mark เป็น <b>time-sensitive</b> โดยอัตโนมัติ —
+                       ทุกครั้งที่มีคนถาม ระบบจะ generate คำตอบใหม่จาก context ปัจจุบัน
+                       (รวมวันหยุด/เทอมเบรค) แทนการตอบคำตอบนี้ตรงๆ
+                   </div>`
+                : '';
             const { isConfirmed } = await Swal.fire({
                 icon: 'question',
                 title: 'บันทึกเป็น FAQ?',
-                html: `<div class="text-left text-sm"><b>คำถาม:</b> ${escH(question)}<br><b>หมวด:</b> ${escH(j.category)}</div>`,
+                html: `<div class="text-left text-sm">
+                    <b>คำถาม:</b> ${escH(question)}<br>
+                    <b>หมวด:</b> ${escH(j.category)}
+                    ${tsBadge}
+                </div>`,
                 showCancelButton: true,
                 confirmButtonText: 'บันทึก',
                 cancelButtonText: 'ยกเลิก',
+                width: 520,
             });
             if (!isConfirmed) return;
             const fd2 = new FormData();
@@ -3098,6 +3116,9 @@ function renderResult(question, j) {
             fd2.append('category', j.category || 'อื่นๆ');
             fd2.append('question', question);
             fd2.append('answer',   j.answer);
+            // Explicitly send the flag — backend will still auto-detect
+            // if we don't, but sending it makes the data flow obvious.
+            fd2.append('is_time_sensitive', willBeTimeSensitive ? '1' : '0');
             fd2.append('csrf_token', CSRF);
             try {
                 const r2 = await fetch('ajax_ai_qa.php', { method:'POST', body:fd2 });
