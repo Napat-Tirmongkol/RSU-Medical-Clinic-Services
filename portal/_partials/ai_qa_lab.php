@@ -285,6 +285,42 @@ function _qa_source_badge(string $s): string {
     .qa-tab.qa-tab-active--sandbox  { color: #7c3aed; border-bottom-color: #7c3aed; }
     .qa-tab.qa-tab-active--autoreply{ color: #0ea5e9; border-bottom-color: #0ea5e9; }
 
+    /* Sandbox redesign — insight chips + collapsible details */
+    .sb-insight { background:#fff; border:1.5px solid #e5e7eb; border-radius:14px; padding:12px 14px; cursor:pointer; transition:transform .15s, box-shadow .15s, border-color .15s; }
+    .sb-insight:hover { transform: translateY(-2px); box-shadow:0 6px 18px rgba(0,0,0,.06); }
+    .sb-insight[data-tone="emerald"]:hover { border-color:#34d399; }
+    .sb-insight[data-tone="indigo"]:hover  { border-color:#818cf8; }
+    .sb-insight[data-tone="amber"]:hover   { border-color:#fbbf24; }
+    .sb-insight[data-tone="slate"]:hover   { border-color:#94a3b8; }
+    .sb-insight-label { font-size:10px; font-weight:800; color:#64748b; text-transform:uppercase; letter-spacing:.06em; }
+    .sb-insight-value { font-size:18px; font-weight:900; color:#0f172a; margin-top:2px; line-height:1.2; }
+    .sb-insight.is-empty .sb-insight-value { color:#cbd5e1; }
+
+    .sb-det { background:#fff; border:1.5px solid #e5e7eb; border-radius:14px; overflow:hidden; transition:border-color .15s; }
+    .sb-det[open] { border-color:#c7d2fe; }
+    .sb-det > summary { padding:12px 16px; font-size:13px; font-weight:800; color:#1f2937; cursor:pointer; display:flex; align-items:center; gap:8px; list-style:none; }
+    .sb-det > summary::-webkit-details-marker { display:none; }
+    .sb-det > summary::after { content:'\f078'; font-family:'Font Awesome 6 Free'; font-weight:900; margin-left:auto; color:#9ca3af; font-size:11px; transition: transform .2s; }
+    .sb-det[open] > summary::after { transform: rotate(180deg); }
+    .sb-det > summary:hover { background:#f9fafb; }
+    .sb-det-body { padding:14px 16px; border-top:1.5px solid #f1f5f9; }
+    .sb-det-hint { font-size:11px; font-weight:500; color:#9ca3af; }
+
+    .sb-det--emerald[open] { border-color:#34d399; }
+    .sb-det--emerald > summary { color:#065f46; background:#ecfdf5; }
+    .sb-det--indigo[open]  { border-color:#818cf8; }
+    .sb-det--indigo > summary { color:#3730a3; background:#eef2ff; }
+    .sb-det--amber[open]   { border-color:#fbbf24; }
+    .sb-det--amber > summary { color:#92400e; background:#fffbeb; }
+    .sb-det--slate[open]   { border-color:#475569; }
+    .sb-det--slate > summary { color:#1e293b; background:#f8fafc; }
+
+    body[data-theme='dark'] #section-ai_qa_lab .sb-insight,
+    body[data-theme='dark'] #section-ai_qa_lab .sb-det { background:#0f172a; border-color:#1e293b; }
+    body[data-theme='dark'] #section-ai_qa_lab .sb-insight-value { color:#e2e8f0; }
+    body[data-theme='dark'] #section-ai_qa_lab .sb-det > summary { background:transparent; color:#e2e8f0; }
+    body[data-theme='dark'] #section-ai_qa_lab .sb-det-body { border-top-color:#1e293b; }
+
     /* Overview dashboard tiles */
     .qaov-kpi { background:#fff; border:1.5px solid #e5e7eb; border-radius:18px; padding:18px 20px; position:relative; overflow:hidden; transition:transform .2s, box-shadow .2s, border-color .2s; }
     .qaov-kpi:hover { transform: translateY(-2px); box-shadow:0 8px 24px rgba(0,0,0,.06); }
@@ -1384,7 +1420,7 @@ function _qa_source_badge(string $s): string {
         <!-- Result panel (hidden until asked) -->
         <div id="sb-result" class="hidden space-y-4">
 
-            <!-- Answer -->
+            <!-- ── PRIMARY: Answer + Meta + Feedback ───────────────────── -->
             <div class="bg-white border-2 border-violet-200 rounded-2xl p-5">
                 <div class="flex items-start justify-between gap-3 mb-3">
                     <h3 class="font-black text-gray-900 flex items-center gap-2">
@@ -1417,46 +1453,77 @@ function _qa_source_badge(string $s): string {
                 </div>
             </div>
 
-            <!-- Chunks retrieved -->
-            <div id="sb-chunks-section" class="bg-white border border-indigo-200 rounded-2xl p-5 hidden">
-                <h3 class="font-black text-gray-900 flex items-center gap-2 mb-3">
-                    <i class="fa-solid fa-cubes text-indigo-600"></i> Chunks ที่ดึงมา
-                    <span class="text-xs text-indigo-500 font-normal">(semantic search top-5)</span>
-                </h3>
-                <div id="sb-chunks-list" class="space-y-2"></div>
-            </div>
-
-            <!-- FAQ match notice -->
-            <div id="sb-faq-match-box" class="hidden bg-emerald-50 border border-emerald-200 rounded-2xl p-4">
-                <div class="flex items-center gap-2 text-emerald-700 font-bold text-sm mb-1">
-                    <i class="fa-solid fa-circle-check"></i> พบคำตอบตรงจาก FAQ Knowledge Base
+            <!-- ── INSIGHTS: at-a-glance summary of how the answer was built ─ -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-2" id="sb-insight-row">
+                <div class="sb-insight" data-target="sb-det-faq" data-tone="emerald">
+                    <div class="sb-insight-label">FAQ match</div>
+                    <div class="sb-insight-value" id="sb-i-faq">—</div>
                 </div>
-                <div id="sb-faq-match-text" class="text-sm text-emerald-800 leading-relaxed"></div>
-            </div>
-
-            <!-- Doctor schedule debug -->
-            <div id="sb-debug-schedule" class="bg-amber-50 border border-amber-200 rounded-2xl p-4 hidden">
-                <div class="flex items-center gap-2 text-amber-800 font-bold text-sm mb-2">
-                    <i class="fa-solid fa-stethoscope"></i> Raw ตารางหมอ (DB)
-                    <span class="text-xs text-amber-600 font-normal">— ใช้ debug ว่า AI เห็นข้อมูลถูกหรือเปล่า</span>
+                <div class="sb-insight" data-target="sb-det-chunks" data-tone="indigo">
+                    <div class="sb-insight-label">Chunks (RAG)</div>
+                    <div class="sb-insight-value" id="sb-i-chunks">—</div>
                 </div>
-                <div id="sb-debug-schedule-body" class="space-y-2"></div>
-
-                <!-- Inventory summary -->
-                <div id="sb-debug-inventory" class="mt-3 pt-3 border-t border-amber-200 hidden">
-                    <div class="text-xs font-bold text-amber-800 mb-2">📦 DB Inventory (sys_doctor_schedule)</div>
-                    <div id="sb-debug-inv-body" class="text-xs text-amber-900"></div>
+                <div class="sb-insight" data-target="sb-det-schedule" data-tone="amber">
+                    <div class="sb-insight-label">Schedule debug</div>
+                    <div class="sb-insight-value" id="sb-i-schedule">—</div>
+                </div>
+                <div class="sb-insight" data-target="sb-det-context" data-tone="slate">
+                    <div class="sb-insight-label">Context size</div>
+                    <div class="sb-insight-value" id="sb-i-context">—</div>
                 </div>
             </div>
 
-            <!-- Context preview -->
-            <details class="bg-slate-900 rounded-2xl overflow-hidden">
-                <summary class="px-5 py-3 text-sm font-bold text-slate-300 cursor-pointer select-none flex items-center gap-2 hover:text-white">
-                    <i class="fa-solid fa-code text-slate-400"></i>
-                    Context ที่ส่งให้ AI
-                    <span id="sb-ctx-chars" class="ml-auto text-xs text-slate-500 font-normal"></span>
+            <!-- ── COLLAPSED DETAILS (open when user clicks the chip above or the summary itself) ── -->
+
+            <!-- FAQ match details -->
+            <details id="sb-det-faq" class="sb-det sb-det--emerald hidden">
+                <summary>
+                    <i class="fa-solid fa-circle-check"></i>
+                    <span>พบคำตอบตรงจาก FAQ Knowledge Base</span>
                 </summary>
-                <pre id="sb-context-pre" class="px-5 pb-5 pt-0 text-slate-300 sb-context-pre"></pre>
+                <div class="sb-det-body">
+                    <div id="sb-faq-match-text" class="text-sm leading-relaxed"></div>
+                </div>
+            </details>
+
+            <!-- Chunks retrieved -->
+            <details id="sb-det-chunks" class="sb-det sb-det--indigo hidden">
+                <summary>
+                    <i class="fa-solid fa-cubes"></i>
+                    <span>Chunks ที่ดึงมา</span>
+                    <span class="sb-det-hint">(semantic search top-K)</span>
+                </summary>
+                <div class="sb-det-body">
+                    <div id="sb-chunks-list" class="space-y-2"></div>
+                </div>
+            </details>
+
+            <!-- Doctor schedule + DB inventory (merged into one debug section) -->
+            <details id="sb-det-schedule" class="sb-det sb-det--amber hidden">
+                <summary>
+                    <i class="fa-solid fa-stethoscope"></i>
+                    <span>Raw ตารางหมอ + DB Inventory</span>
+                    <span class="sb-det-hint">— ตรวจว่า AI เห็นข้อมูลถูก</span>
+                </summary>
+                <div class="sb-det-body">
+                    <div id="sb-debug-schedule-body" class="space-y-2"></div>
+                    <div id="sb-debug-inventory" class="mt-3 pt-3 border-t border-amber-200 hidden">
+                        <div class="text-xs font-bold text-amber-800 mb-2">📦 DB Inventory (sys_doctor_schedule)</div>
+                        <div id="sb-debug-inv-body" class="text-xs text-amber-900"></div>
+                    </div>
+                </div>
+            </details>
+
+            <!-- Full context preview -->
+            <details id="sb-det-context" class="sb-det sb-det--slate hidden">
+                <summary>
+                    <i class="fa-solid fa-code"></i>
+                    <span>Context ที่ส่งให้ AI</span>
+                    <span id="sb-ctx-chars" class="sb-det-hint"></span>
+                </summary>
+                <div class="sb-det-body" style="padding:0">
+                    <pre id="sb-context-pre" class="sb-context-pre"></pre>
+                </div>
             </details>
 
         </div>
@@ -2661,20 +2728,45 @@ function renderResult(question, j) {
         j.elapsed_ms ? `<span class="px-2 py-0.5 bg-amber-50 text-amber-700 text-xs font-bold rounded-full">${j.elapsed_ms} ms</span>` : '',
     ].join('');
 
-    // ── FAQ match ────────────────────────────────────────────────────────
-    const faqBox = document.getElementById('sb-faq-match-box');
+    // ── Insight chips — at-a-glance summary ──────────────────────────────
+    const matchedVia = j.matched_via || (j.matched_faq ? 'faq' : null);
+    document.getElementById('sb-i-faq').textContent = j.matched_faq
+        ? (matchedVia || 'matched')
+        : 'no match';
+    document.getElementById('sb-i-chunks').textContent = (j.chunks && j.chunks.length) ? `${j.chunks.length} chunks` : '0 chunks';
+    const schedEntries = j.debug_schedule ? Object.values(j.debug_schedule) : [];
+    const totalShifts = schedEntries.reduce((s, d) => s + (d.count || 0), 0);
+    document.getElementById('sb-i-schedule').textContent = schedEntries.length ? `${totalShifts} shifts` : '—';
+    document.getElementById('sb-i-context').textContent = (j.context_chars || 0).toLocaleString('th-TH') + ' chars';
+
+    // Mark empty chips dim
+    document.getElementById('sb-i-faq').parentElement.classList.toggle('is-empty', !j.matched_faq);
+    document.getElementById('sb-i-chunks').parentElement.classList.toggle('is-empty', !(j.chunks && j.chunks.length));
+    document.getElementById('sb-i-schedule').parentElement.classList.toggle('is-empty', !schedEntries.length);
+
+    // Make insight chips toggle their corresponding <details> on click
+    document.querySelectorAll('.sb-insight').forEach(chip => {
+        chip.onclick = () => {
+            const det = document.getElementById(chip.dataset.target);
+            if (det && !det.classList.contains('hidden')) det.open = !det.open;
+        };
+    });
+
+    // ── FAQ match details ────────────────────────────────────────────────
+    const faqDet = document.getElementById('sb-det-faq');
     if (j.matched_faq && j.faq_answer) {
         document.getElementById('sb-faq-match-text').innerHTML = escH(j.faq_answer).replace(/\n/g,'<br>');
-        faqBox.classList.remove('hidden');
+        faqDet.classList.remove('hidden');
     } else {
-        faqBox.classList.add('hidden');
+        faqDet.classList.add('hidden');
+        faqDet.open = false;
     }
 
-    // ── Chunks ────────────────────────────────────────────────────────────
-    const chunksSec  = document.getElementById('sb-chunks-section');
+    // ── Chunks details ───────────────────────────────────────────────────
+    const chunksDet = document.getElementById('sb-det-chunks');
     const chunksList = document.getElementById('sb-chunks-list');
     if (j.chunks && j.chunks.length) {
-        chunksSec.classList.remove('hidden');
+        chunksDet.classList.remove('hidden');
         chunksList.innerHTML = j.chunks.map((c, i) => {
             const pct = Math.round((c.score || 0) * 100);
             const barColor = pct >= 80 ? 'bg-emerald-500' : pct >= 60 ? 'bg-amber-400' : 'bg-gray-400';
@@ -2693,11 +2785,12 @@ function renderResult(question, j) {
             </div>`;
         }).join('');
     } else {
-        chunksSec.classList.add('hidden');
+        chunksDet.classList.add('hidden');
+        chunksDet.open = false;
     }
 
     // ── Doctor schedule debug ─────────────────────────────────────────────
-    const dbgBox  = document.getElementById('sb-debug-schedule');
+    const dbgBox  = document.getElementById('sb-det-schedule');
     const dbgBody = document.getElementById('sb-debug-schedule-body');
     const WEEKDAY = ['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัส','ศุกร์','เสาร์'];
     if (j.debug_schedule) {
