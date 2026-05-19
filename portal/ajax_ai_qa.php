@@ -320,20 +320,28 @@ try {
             echo json_encode(['ok' => false, 'message' => 'กรอกคำถามและคำตอบ']);
             exit;
         }
+        // Admin override wins, but if they didn't tick the box and the
+        // question pattern looks time-sensitive, default to on so we
+        // don't accept a brand new stale-prone row by mistake.
+        $isTimeSensitive = isset($_POST['is_time_sensitive']) && $_POST['is_time_sensitive'] === '1';
+        if (!$isTimeSensitive && ai_qa_is_time_sensitive_question($q)) {
+            $isTimeSensitive = true;
+        }
 
         $ins = $pdo->prepare("
-            INSERT INTO sys_ai_faq (category, canonical_question, answer, source_qa_id, created_by, updated_by)
-            VALUES (:cat, :q, :a, :src, :created_by, :updated_by)
+            INSERT INTO sys_ai_faq (category, canonical_question, answer, source_qa_id, is_time_sensitive, created_by, updated_by)
+            VALUES (:cat, :q, :a, :src, :ts, :created_by, :updated_by)
         ");
         $ins->execute([
             ':cat'        => $cat,
             ':q'          => $q,
             ':a'          => $a,
             ':src'        => $src,
+            ':ts'         => $isTimeSensitive ? 1 : 0,
             ':created_by' => $reviewerId ?: null,
             ':updated_by' => $reviewerId ?: null,
         ]);
-        echo json_encode(['ok' => true, 'id' => (int)$pdo->lastInsertId()]);
+        echo json_encode(['ok' => true, 'id' => (int)$pdo->lastInsertId(), 'is_time_sensitive' => $isTimeSensitive]);
         exit;
     }
 
@@ -347,11 +355,15 @@ try {
             echo json_encode(['ok' => false, 'message' => 'invalid input']);
             exit;
         }
+        // On update we respect whatever the admin ticked — they can turn
+        // the flag off explicitly to opt a row back into the FAQ cache.
+        $isTimeSensitive = isset($_POST['is_time_sensitive']) && $_POST['is_time_sensitive'] === '1';
         $upd = $pdo->prepare("
             UPDATE sys_ai_faq
                SET category = :cat,
                    canonical_question = :q,
                    answer = :a,
+                   is_time_sensitive = :ts,
                    updated_by = :uid
              WHERE id = :id
         ");
@@ -359,6 +371,7 @@ try {
             ':cat' => $cat,
             ':q'   => $q,
             ':a'   => $a,
+            ':ts'  => $isTimeSensitive ? 1 : 0,
             ':uid' => $reviewerId ?: null,
             ':id'  => $id,
         ]);

@@ -520,6 +520,7 @@ function ensure_ai_faq_schema(PDO $pdo): void
             answer MEDIUMTEXT NOT NULL,
             source_qa_id INT UNSIGNED NULL,
             is_active TINYINT(1) NOT NULL DEFAULT 1,
+            is_time_sensitive TINYINT(1) NOT NULL DEFAULT 0,
             created_by INT UNSIGNED NULL,
             updated_by INT UNSIGNED NULL,
             created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -528,6 +529,9 @@ function ensure_ai_faq_schema(PDO $pdo): void
             INDEX idx_active (is_active)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
     } catch (PDOException) {}
+
+    // Self-heal: rows that pre-date the is_time_sensitive column
+    try { $pdo->exec("ALTER TABLE sys_ai_faq ADD COLUMN is_time_sensitive TINYINT(1) NOT NULL DEFAULT 0 AFTER is_active"); } catch (PDOException) {}
 
     try {
         $pdo->exec("CREATE TABLE IF NOT EXISTS sys_ai_faq_variants (
@@ -906,10 +910,12 @@ function ai_qa_match_faq(PDO $pdo, string $question, ?callable $onSemanticPhase 
     }
 
     // ── Phase 1a: canonical question ──────────────────────────────────────
+    // is_time_sensitive=1 rows are skipped here — admin marked them as
+    // "answer depends on current date", so they always go through generate.
     $stmt = $pdo->prepare("
         SELECT id, answer, category
           FROM sys_ai_faq
-         WHERE is_active = 1 AND TRIM(canonical_question) = :q
+         WHERE is_active = 1 AND is_time_sensitive = 0 AND TRIM(canonical_question) = :q
          LIMIT 1
     ");
     $stmt->execute([':q' => $q]);
@@ -928,7 +934,7 @@ function ai_qa_match_faq(PDO $pdo, string $question, ?callable $onSemanticPhase 
         SELECT f.id, f.answer, f.category
           FROM sys_ai_faq f
           JOIN sys_ai_faq_variants v ON v.faq_id = f.id
-         WHERE f.is_active = 1 AND TRIM(v.variant_question) = :q
+         WHERE f.is_active = 1 AND f.is_time_sensitive = 0 AND TRIM(v.variant_question) = :q
          LIMIT 1
     ");
     $stmt->execute([':q' => $q]);
@@ -992,10 +998,13 @@ function ai_qa_match_via_gemini(PDO $pdo, string $question): ?array
     $candidates = [];
 
     try {
+        // Same is_time_sensitive=0 filter as Phase 1 — semantic match
+        // shouldn't surface a time-bound FAQ either; those answers are
+        // always served fresh via generate.
         $rs = $pdo->query("
             SELECT 'faq' AS src, id, canonical_question AS q, answer, category
               FROM sys_ai_faq
-             WHERE is_active = 1
+             WHERE is_active = 1 AND is_time_sensitive = 0
              ORDER BY updated_at DESC
              LIMIT 50
         ")->fetchAll(PDO::FETCH_ASSOC);

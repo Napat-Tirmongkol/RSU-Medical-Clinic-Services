@@ -201,6 +201,7 @@ if ($_qa_tab === 'faq') {
 
         $sr = $pdo->prepare("
             SELECT f.id, f.category, f.canonical_question, f.answer,
+                   f.is_time_sensitive,
                    f.created_at, f.updated_at,
                    (SELECT COUNT(*) FROM sys_ai_faq_variants v WHERE v.faq_id = f.id) AS variant_count
               FROM sys_ai_faq f
@@ -770,7 +771,14 @@ function _qa_source_badge(string $s): string {
                         </td></tr>
                     <?php else: foreach ($_faq_list as $f): ?>
                         <tr class="qa-row border-b border-gray-100">
-                            <td class="px-4 py-3"><span class="qa-chip bg-emerald-50 text-emerald-700 border border-emerald-200"><?= htmlspecialchars((string)$f['category']) ?></span></td>
+                            <td class="px-4 py-3">
+                                <span class="qa-chip bg-emerald-50 text-emerald-700 border border-emerald-200"><?= htmlspecialchars((string)$f['category']) ?></span>
+                                <?php if ((int)($f['is_time_sensitive'] ?? 0) === 1): ?>
+                                    <span class="qa-chip bg-amber-50 text-amber-800 border border-amber-200 mt-1 inline-flex items-center gap-1" title="ระบบจะข้าม FAQ row นี้ แล้วให้ AI generate ใหม่ทุกครั้ง">
+                                        <i class="fa-solid fa-clock-rotate-left text-[10px]"></i> time-sensitive
+                                    </span>
+                                <?php endif; ?>
+                            </td>
                             <td class="px-4 py-3 max-w-md">
                                 <div class="text-gray-900 font-bold line-clamp-2"><?= htmlspecialchars(mb_substr((string)$f['canonical_question'], 0, 200)) ?></div>
                                 <div class="text-xs text-gray-500 mt-1 line-clamp-2"><?= htmlspecialchars(mb_substr((string)$f['answer'], 0, 200)) ?></div>
@@ -1293,6 +1301,29 @@ function _qa_source_badge(string $s): string {
                 <textarea id="faq-mod-answer" rows="5" class="qa-input" placeholder="คำตอบที่จะใช้ตอบเมื่อ user ถามคำถามนี้"></textarea>
             </div>
 
+            <!-- Time-sensitive flag — when on, the matcher skips this row
+                 and always asks Gemini to generate a fresh answer against
+                 the live clinic context. Use for questions about hours,
+                 schedules, "พรุ่งนี้", etc. -->
+            <div class="bg-amber-50 border border-amber-200 rounded-xl p-3">
+                <label class="flex items-start gap-3 cursor-pointer">
+                    <input type="checkbox" id="faq-mod-time-sensitive" class="mt-1 w-4 h-4 accent-amber-500">
+                    <div class="flex-1">
+                        <div class="text-sm font-bold text-amber-800 flex items-center gap-2">
+                            <i class="fa-solid fa-clock-rotate-left"></i>
+                            คำถามนี้ขึ้นอยู่กับเวลา (เปิด/ปิด/หมอ/พรุ่งนี้)
+                        </div>
+                        <div class="text-xs text-amber-700 mt-1">
+                            เปิดถ้าคำตอบต้อง "ตอบสด" ทุกครั้ง (เช่น เวลาทำการ ตารางหมอ)
+                            ระบบจะข้าม FAQ cache แล้วให้ AI generate ใหม่ทุกครั้งที่มีคนถาม
+                        </div>
+                        <div id="faq-mod-ts-autohint" class="hidden mt-2 text-[11px] font-bold text-amber-900 bg-amber-100 rounded px-2 py-1">
+                            💡 ตรวจพบคำที่เกี่ยวกับเวลาในคำถาม — แนะนำให้เปิดสวิตช์นี้
+                        </div>
+                    </div>
+                </label>
+            </div>
+
             <!-- Variants section (only when editing existing FAQ) -->
             <div id="faq-variants-section" class="hidden border-t border-gray-200 pt-4">
                 <div class="flex items-center justify-between mb-3">
@@ -1617,6 +1648,7 @@ function _qa_source_badge(string $s): string {
                 question: res.faq.canonical_question,
                 answer: res.faq.answer,
                 category: res.faq.category,
+                is_time_sensitive: Number(res.faq.is_time_sensitive) === 1,
                 variants: res.variants || [],
                 isNew: false,
             });
@@ -1739,12 +1771,46 @@ function _qa_source_badge(string $s): string {
     }
 
     // ─── FAQ Modal logic ─────────────────────────────────────────────────
+    // Mirror of PHP ai_qa_is_time_sensitive_question() — keeps the
+    // admin-side hint in sync with the server-side bypass rule. Update
+    // both whenever the pattern set changes.
+    function faqIsTimeSensitiveQuestion(q) {
+        if (!q) return false;
+        const patterns = [
+            /(เปิด|ปิด|กี่โมง|เวลา\s*ทำการ|ทำการ|กี่ทุ่ม|กี่นาฬิกา)/u,
+            /(หมอ.*ออก|ออก\s*ตรวจ|ตาราง.*หมอ|แพทย์.*ออก|หมอ.*เวร|เวร.*หมอ)/u,
+            /(วันนี้|พรุ่งนี้|มะรืน|เมื่อวาน|today|tomorrow|yesterday)/iu,
+            /วัน(อาทิตย์|จันทร์|อังคาร|พุธ|พฤหัส|ศุกร์|เสาร์)/u,
+            /วันที่\s*\d/u,
+            /(นัด\s*หมาย|จอง\s*คิว|คิว.*ว่าง|ว่าง\s*ไหม|มี\s*คิว)/u,
+            /(มกราคม|กุมภาพันธ์|มีนาคม|เมษายน|พฤษภาคม|มิถุนายน|กรกฎาคม|สิงหาคม|กันยายน|ตุลาคม|พฤศจิกายน|ธันวาคม)/u,
+        ];
+        return patterns.some(p => p.test(q));
+    }
+
     function faqOpenModal(opts) {
         document.getElementById('faq-mod-id').value = opts.id || '';
         document.getElementById('faq-mod-source-qa-id').value = opts.source_qa_id || '';
         document.getElementById('faq-mod-category').value = opts.category || 'อื่นๆ';
         document.getElementById('faq-mod-question').value = opts.question || '';
         document.getElementById('faq-mod-answer').value = opts.answer || '';
+        const tsBox = document.getElementById('faq-mod-time-sensitive');
+        const tsHint = document.getElementById('faq-mod-ts-autohint');
+        // Existing flag from DB (edit mode) wins over auto-detection
+        tsBox.checked = !!opts.is_time_sensitive;
+        if (tsHint) tsHint.classList.add('hidden');
+        // Live re-evaluate the hint whenever the admin retypes the question
+        const qEl = document.getElementById('faq-mod-question');
+        qEl.oninput = () => {
+            const looksTimey = faqIsTimeSensitiveQuestion(qEl.value);
+            if (looksTimey && !tsBox.checked) {
+                tsHint?.classList.remove('hidden');
+            } else {
+                tsHint?.classList.add('hidden');
+            }
+        };
+        // Run once on open in case we loaded a pre-existing question
+        qEl.oninput();
         document.getElementById('faq-mod-title').innerHTML =
             (opts.isNew
                 ? '<i class="fa-solid fa-plus text-emerald-500"></i> สร้าง FAQ ใหม่'
@@ -1885,6 +1951,7 @@ function _qa_source_badge(string $s): string {
                 question: document.getElementById('faq-mod-question').value,
                 answer: document.getElementById('faq-mod-answer').value,
                 category: document.getElementById('faq-mod-category').value,
+                is_time_sensitive: document.getElementById('faq-mod-time-sensitive').checked ? '1' : '0',
             };
             if (!payload.question.trim() || !payload.answer.trim()) {
                 Swal.fire({ icon: 'warning', title: 'กรอกคำถามและคำตอบให้ครบ' });
