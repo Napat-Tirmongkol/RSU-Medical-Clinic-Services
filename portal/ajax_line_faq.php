@@ -39,21 +39,30 @@ try {
         }
 
         case 'save': {
-            $data = [
-                'enabled'                => (int)!empty($_POST['enabled']) && $_POST['enabled'] !== '0' ? 1 : 0,
-                'only_when_closed'       => !empty($_POST['only_when_closed']) && $_POST['only_when_closed'] !== '0' ? 1 : 0,
-                'rate_limit_hours'       => (int)($_POST['rate_limit_hours'] ?? 0),
-                'default_reply_enabled'  => !empty($_POST['default_reply_enabled']) && $_POST['default_reply_enabled'] !== '0' ? 1 : 0,
-                'blocked_keywords'       => (string)($_POST['blocked_keywords'] ?? ''),
-                'msg_open_now_title'     => (string)($_POST['msg_open_now_title']     ?? ''),
-                'msg_open_now_sub'       => (string)($_POST['msg_open_now_sub']       ?? ''),
-                'msg_before_open_title'  => (string)($_POST['msg_before_open_title']  ?? ''),
-                'msg_before_open_sub'    => (string)($_POST['msg_before_open_sub']    ?? ''),
-                'msg_after_close_title'  => (string)($_POST['msg_after_close_title']  ?? ''),
-                'msg_after_close_sub'    => (string)($_POST['msg_after_close_sub']    ?? ''),
-                'msg_closed_today_title' => (string)($_POST['msg_closed_today_title'] ?? ''),
-                'msg_closed_today_sub'   => (string)($_POST['msg_closed_today_sub']   ?? ''),
-            ];
+            // Treat "1" / "on" / "true" as on; everything else (including
+            // missing, "0", and empty string) is off. The frontend already
+            // sets enabled='0' when the toggle is off, so anything else
+            // here is paranoia.
+            $boolish = static fn(string $key): bool =>
+                isset($_POST[$key]) && in_array((string)$_POST[$key], ['1', 'on', 'true'], true);
+
+            // Only put a key into $data if the form actually submitted it
+            // — save_clinic_faq_settings() now patch-merges, so omitted
+            // keys keep their previous value instead of resetting.
+            $data = [];
+            foreach (['enabled', 'only_when_closed', 'default_reply_enabled'] as $k) {
+                if (isset($_POST[$k])) $data[$k] = $boolish($k) ? 1 : 0;
+            }
+            if (isset($_POST['rate_limit_hours']))  $data['rate_limit_hours']  = (int)$_POST['rate_limit_hours'];
+            if (isset($_POST['blocked_keywords']))  $data['blocked_keywords']  = (string)$_POST['blocked_keywords'];
+            foreach ([
+                'msg_open_now_title','msg_open_now_sub',
+                'msg_before_open_title','msg_before_open_sub',
+                'msg_after_close_title','msg_after_close_sub',
+                'msg_closed_today_title','msg_closed_today_sub',
+            ] as $msgKey) {
+                if (isset($_POST[$msgKey])) $data[$msgKey] = (string)$_POST[$msgKey];
+            }
             $ok = save_clinic_faq_settings($pdo, $data);
             echo json_encode([
                 'ok'       => $ok,

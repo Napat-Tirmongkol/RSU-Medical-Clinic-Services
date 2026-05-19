@@ -119,20 +119,33 @@ function get_clinic_faq_settings(PDO $pdo): array
 /**
  * บันทึก settings (singleton row id=1) — เฉพาะ key ใน CLINIC_FAQ_DEFAULTS
  *
+ * **Patch-merge semantics**: keys that the caller does NOT supply are
+ * left untouched (we read the current row and only overwrite supplied
+ * keys). Earlier versions silently overwrote missing keys with the
+ * built-in default, which made partial-update callers wipe unrelated
+ * settings — a likely cause of "my toggle reset itself" reports.
+ *
  * @param array<string,mixed> $data
  */
 function save_clinic_faq_settings(PDO $pdo, array $data): bool
 {
     ensure_clinic_faq_tables($pdo);
 
+    // Read current row first so we can patch onto it instead of resetting
+    // unsupplied keys to CLINIC_FAQ_DEFAULTS.
+    $current = get_clinic_faq_settings($pdo);
+
     $values = [];
     foreach (CLINIC_FAQ_DEFAULTS as $k => $default) {
         if (!array_key_exists($k, $data)) {
-            $values[$k] = $default;
+            // Caller didn't touch this key — keep whatever was already
+            // stored. Falls back to the built-in default only when the
+            // row doesn't exist yet (current still holds defaults).
+            $values[$k] = $current[$k] ?? $default;
             continue;
         }
         if ($k === 'enabled' || $k === 'only_when_closed' || $k === 'default_reply_enabled') {
-            $values[$k] = !empty($data[$k]) ? 1 : 0;
+            $values[$k] = !empty($data[$k]) && $data[$k] !== '0' ? 1 : 0;
         } elseif ($k === 'rate_limit_hours') {
             $values[$k] = max(0, min(720, (int)$data[$k]));   // 0..720 ชั่วโมง (30 วัน)
         } elseif ($k === 'blocked_keywords') {
@@ -177,10 +190,64 @@ function save_clinic_faq_settings(PDO $pdo, array $data): bool
         foreach ($values as $k => $v) {
             $params[':' . $k] = $v;
         }
-        return $stmt->execute($params);
-    } catch (PDOException) {
+        $ok = $stmt->execute($params);
+        if ($ok) {
+            // Audit trail — every successful save snapshots the resulting
+            // row so "my toggle reset itself" reports can be traced back
+            // to a real write (vs. a phantom one). Cheap append-only.
+            try {
+                _faq_settings_audit($pdo, 'save', $values, $current);
+            } catch (Throwable) { /* never block on audit */ }
+        }
+        return $ok;
+    } catch (PDOException $e) {
+        // Used to swallow the exception silently — admins then thought
+        // the save had worked. Log it so the next "reset itself" report
+        // shows up in the server log.
+        error_log('[clinic_faq][save] PDO error: ' . $e->getMessage());
         return false;
     }
+}
+
+/**
+ * Append-only audit of FAQ settings writes. Stores the action label
+ * (save / reset / seed), the JSON snapshot of the resulting values,
+ * who did it (best-effort from $_SESSION), and the request IP.
+ *
+ * Internal helper; never call directly from request code.
+ */
+function _faq_settings_audit(PDO $pdo, string $action, array $values, array $previous = []): void
+{
+    static $tableReady = false;
+    if (!$tableReady) {
+        try {
+            $pdo->exec("CREATE TABLE IF NOT EXISTS sys_line_faq_settings_audit (
+                id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                action VARCHAR(20) NOT NULL,
+                values_json TEXT NULL,
+                previous_json TEXT NULL,
+                actor_id INT UNSIGNED NULL,
+                actor_name VARCHAR(120) NULL,
+                ip_addr VARCHAR(45) NULL,
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_action_time (action, created_at)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        } catch (PDOException) { return; }
+        $tableReady = true;
+    }
+    $actorId   = (int)($_SESSION['admin_id'] ?? 0) ?: null;
+    $actorName = (string)($_SESSION['admin_username'] ?? $_SESSION['full_name'] ?? '');
+    $stmt = $pdo->prepare("INSERT INTO sys_line_faq_settings_audit
+        (action, values_json, previous_json, actor_id, actor_name, ip_addr)
+        VALUES (?, ?, ?, ?, ?, ?)");
+    $stmt->execute([
+        $action,
+        json_encode($values,   JSON_UNESCAPED_UNICODE),
+        json_encode($previous, JSON_UNESCAPED_UNICODE),
+        $actorId,
+        $actorName ?: null,
+        $_SERVER['REMOTE_ADDR'] ?? null,
+    ]);
 }
 
 /**
