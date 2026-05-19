@@ -101,6 +101,11 @@ $__navActive = 'services';
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.all.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.1.7/dist/signature_pad.umd.min.js"></script>
+    <!-- face-api.js — loaded with defer so parser isn't blocked; only used as a
+         fallback when the browser doesn't expose the native FaceDetector API
+         (e.g. iOS Safari / Firefox / desktop Chrome). Model weights load lazily
+         on first camera open, not on page load. -->
+    <script defer src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
     <style>
         body { font-family: 'RSU_Regular', 'Sarabun', -apple-system, sans-serif; background: #f8fafc; }
         .field-label { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; color: #64748b; }
@@ -144,8 +149,14 @@ $__navActive = 'services';
             margin: 0;
         }
         #cam-snap-btn:active { transform: translate(-50%, -50%) scale(0.92); }
-        #cam-snap-btn::after { content: ''; position: absolute; inset: 6px; border-radius: 9999px; background: #f59e0b; }
+        #cam-snap-btn::after { content: ''; position: absolute; inset: 6px; border-radius: 9999px; background: #f59e0b; transition: background 0.2s; }
+        #cam-snap-btn.snap-warn::after { background: #94a3b8; }
+        #cam-snap-btn.snap-warn { box-shadow: 0 0 0 4px rgba(244, 63, 94, 0.35), 0 8px 18px rgba(0,0,0,0.45); }
         #cam-stage button { -webkit-tap-highlight-color: transparent; }
+        /* Real-time face detection status pill */
+        #cam-status-pill { transition: background 0.25s, color 0.25s; max-width: calc(100% - 90px); }
+        #cam-status-pill.is-loading i { opacity: 0.9; }
+        #cam-stage .cam-frame { transition: border-color 0.25s; }
     </style>
 </head>
 <body class="pb-32">
@@ -343,8 +354,9 @@ $__navActive = 'services';
             <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
                 <div class="cam-frame"></div>
             </div>
-            <div class="absolute top-5 left-5 px-3 py-1.5 rounded-full bg-black/60 text-white text-[11px] font-black tracking-wide">
-                <i class="fa-solid fa-id-card mr-1"></i> ถ่ายให้เห็นหน้า + บัตรประชาชน
+            <div id="cam-status-pill" class="absolute top-5 left-5 px-3 py-1.5 rounded-full bg-black/60 text-white text-[11px] font-black tracking-wide flex items-center gap-1.5">
+                <i id="cam-status-icon" class="fa-solid fa-id-card"></i>
+                <span id="cam-status-text">ถ่ายให้เห็นหน้า + บัตรประชาชน</span>
             </div>
             <button type="button" onclick="closeCamera()" class="absolute top-5 right-5 w-11 h-11 rounded-full bg-black/60 text-white flex items-center justify-center text-lg">
                 <i class="fa-solid fa-xmark"></i>
@@ -504,6 +516,8 @@ $__navActive = 'services';
         }
         camVideo.srcObject = cameraStream;
         updateMirror();
+        // Wait for the first video frame so the detector has actual pixels
+        camVideo.addEventListener('loadeddata', () => startFaceDetection(), { once: true });
     }
 
     function cameraFailed(err) {
@@ -516,6 +530,7 @@ $__navActive = 'services';
     }
 
     function closeCamera() {
+        stopFaceDetection();
         if (cameraStream) {
             cameraStream.getTracks().forEach(t => t.stop());
             cameraStream = null;
@@ -527,6 +542,7 @@ $__navActive = 'services';
 
     async function swapCamera() {
         cameraFacing = cameraFacing === 'user' ? 'environment' : 'user';
+        stopFaceDetection();
         if (cameraStream) {
             cameraStream.getTracks().forEach(t => t.stop());
             cameraStream = null;
@@ -538,6 +554,7 @@ $__navActive = 'services';
             });
             camVideo.srcObject = cameraStream;
             updateMirror();
+            camVideo.addEventListener('loadeddata', () => startFaceDetection(), { once: true });
         } catch (err) {
             camError.textContent = 'สลับกล้องไม่สำเร็จ — อุปกรณ์อาจมีกล้องเดียว';
             camError.classList.remove('hidden');
@@ -556,8 +573,38 @@ $__navActive = 'services';
         else camVideo.classList.add('no-mirror');
     }
 
-    function snapPhoto() {
+    async function snapPhoto() {
         if (!cameraStream || !camVideo.videoWidth) return;
+
+        // Soft pre-snap gate based on the live detector. AI can false-negative,
+        // so we warn instead of disabling — user can still force the snap if
+        // they're confident the photo is fine.
+        if (lastFaceCount === 0) {
+            const { isConfirmed } = await Swal.fire({
+                icon: 'warning',
+                title: 'ไม่พบใบหน้าในกรอบ',
+                text: 'ระบบยังไม่เห็นใบหน้าของคุณ — ขยับเข้ากรอบก่อนถ่าย หรือกด "ถ่ายเลย" ถ้าแน่ใจว่ารูปใช้ได้',
+                showCancelButton: true,
+                confirmButtonText: 'ถ่ายเลย',
+                cancelButtonText: 'ขยับใหม่',
+                reverseButtons: true,
+                confirmButtonColor: '#f59e0b',
+            });
+            if (!isConfirmed) return;
+        } else if (lastFaceCount > 1) {
+            const { isConfirmed } = await Swal.fire({
+                icon: 'warning',
+                title: `พบ ${lastFaceCount} ใบหน้าในกรอบ`,
+                text: 'ใบสมัครควรมีเฉพาะใบหน้าของผู้สมัครเท่านั้น — กดถ่ายต่อ?',
+                showCancelButton: true,
+                confirmButtonText: 'ถ่ายเลย',
+                cancelButtonText: 'จัดใหม่',
+                reverseButtons: true,
+                confirmButtonColor: '#f59e0b',
+            });
+            if (!isConfirmed) return;
+        }
+
         const canvas = document.createElement('canvas');
         canvas.width  = camVideo.videoWidth;
         canvas.height = camVideo.videoHeight;
@@ -573,6 +620,128 @@ $__navActive = 'services';
         closeCamera();
         photoGallery.click();
     }
+
+    // ─── Client-side face pre-check ────────────────────────────────────────────
+    // Tier 1 (this block): live face presence + framing feedback while the
+    //   user is still composing the shot. Native FaceDetector when available,
+    //   face-api.js TinyFaceDetector otherwise. ~0KB cost on Chrome Android,
+    //   ~290KB lazy-load on Safari/Firefox.
+    // Tier 2 (ajax_check_photo.php): full Gemini Vision check after snap
+    //   (glasses / mask / hat / ID card visible / quality).
+    let nativeFaceDetector = null;
+    let faceApiReady = false;
+    let faceApiLoading = null;
+    let faceDetectInterval = null;
+    let faceDetectRunning = false;
+    let lastFaceCount = -1;
+
+    async function ensureFaceDetection() {
+        if ('FaceDetector' in window) {
+            if (!nativeFaceDetector) {
+                try { nativeFaceDetector = new FaceDetector({ fastMode: true, maxDetectedFaces: 3 }); }
+                catch (e) { nativeFaceDetector = null; }
+            }
+            if (nativeFaceDetector) return 'native';
+        }
+        if (typeof faceapi === 'undefined') return null;
+        if (faceApiReady) return 'faceapi';
+        if (faceApiLoading) return faceApiLoading;
+        faceApiLoading = (async () => {
+            try {
+                await faceapi.nets.tinyFaceDetector.loadFromUri('https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights');
+                faceApiReady = true;
+                return 'faceapi';
+            } catch (e) {
+                console.warn('[face-api] model load failed', e);
+                return null;
+            } finally {
+                faceApiLoading = null;
+            }
+        })();
+        return faceApiLoading;
+    }
+
+    async function detectFaceCountOnce() {
+        if (!cameraStream || !camVideo.videoWidth) return -1;
+        if (nativeFaceDetector) {
+            try { return (await nativeFaceDetector.detect(camVideo)).length; }
+            catch (e) { return -1; }
+        }
+        if (faceApiReady && typeof faceapi !== 'undefined') {
+            try {
+                const opts = new faceapi.TinyFaceDetectorOptions({ inputSize: 160, scoreThreshold: 0.5 });
+                return (await faceapi.detectAllFaces(camVideo, opts)).length;
+            } catch (e) { return -1; }
+        }
+        return -1;
+    }
+
+    async function startFaceDetection() {
+        // Possible race: loadeddata can fire after the user already closed the
+        // camera. If the stream is gone, don't start anything.
+        if (!cameraStream) return;
+        setCamStatus('loading');
+        const detector = await ensureFaceDetection();
+        if (!cameraStream) return; // user closed camera while model was loading
+        if (!detector) {
+            // No detector available — graceful fallback to neutral status
+            setCamStatus('default');
+            return;
+        }
+        // Take an immediate reading so the pill updates without waiting 600ms
+        const initialCount = await detectFaceCountOnce();
+        if (!cameraStream) return;
+        if (initialCount >= 0) updateFaceStatus(initialCount);
+        else setCamStatus('default');
+
+        faceDetectInterval = setInterval(async () => {
+            if (!cameraStream) { stopFaceDetection(); return; }   // camera closed mid-loop
+            if (faceDetectRunning) return;                          // previous tick still in flight
+            faceDetectRunning = true;
+            const count = await detectFaceCountOnce();
+            if (count >= 0) updateFaceStatus(count);
+            faceDetectRunning = false;
+        }, 600);
+    }
+
+    function stopFaceDetection() {
+        if (faceDetectInterval) { clearInterval(faceDetectInterval); faceDetectInterval = null; }
+        lastFaceCount = -1;
+        setCamStatus('default');
+    }
+
+    function updateFaceStatus(count) {
+        if (count === lastFaceCount) return;
+        lastFaceCount = count;
+        if (count === 0)      setCamStatus('no-face');
+        else if (count === 1) setCamStatus('ok');
+        else                  setCamStatus('multi', count);
+    }
+
+    const CAM_STATUS_STYLES = {
+        default:   { bg: 'rgba(0,0,0,0.6)',      icon: 'fa-id-card',       text: 'ถ่ายให้เห็นหน้า + บัตรประชาชน', frame: 'rgba(255,255,255,0.55)', warn: false, loading: false },
+        loading:   { bg: 'rgba(0,0,0,0.6)',      icon: 'fa-spinner fa-spin', text: 'กำลังเตรียมตัวตรวจจับใบหน้า…',    frame: 'rgba(255,255,255,0.55)', warn: false, loading: true  },
+        'no-face': { bg: 'rgba(244,63,94,0.85)', icon: 'fa-user-slash',    text: 'ขยับให้ใบหน้าเข้ากรอบ',          frame: 'rgba(244,63,94,0.65)',  warn: true,  loading: false },
+        ok:        { bg: 'rgba(16,185,129,0.9)', icon: 'fa-circle-check',  text: 'พบใบหน้า — กดถ่ายได้',          frame: 'rgba(16,185,129,0.75)', warn: false, loading: false },
+        multi:     { bg: 'rgba(245,158,11,0.9)', icon: 'fa-users',         text: 'พบหลายใบหน้า — เน้นเฉพาะคุณ',     frame: 'rgba(245,158,11,0.75)', warn: true,  loading: false },
+    };
+    function setCamStatus(state, count) {
+        const s = CAM_STATUS_STYLES[state] || CAM_STATUS_STYLES.default;
+        const pill = document.getElementById('cam-status-pill');
+        const icon = document.getElementById('cam-status-icon');
+        const text = document.getElementById('cam-status-text');
+        const frame = document.querySelector('#cam-stage .cam-frame');
+        const snap = document.getElementById('cam-snap-btn');
+        if (pill) {
+            pill.style.background = s.bg;
+            pill.classList.toggle('is-loading', !!s.loading);
+        }
+        if (icon) icon.className = `fa-solid ${s.icon}`;
+        if (text) text.textContent = state === 'multi' ? `พบ ${count} ใบหน้า — เน้นเฉพาะคุณ` : s.text;
+        if (frame) frame.style.borderColor = s.frame;
+        if (snap) snap.classList.toggle('snap-warn', !!s.warn);
+    }
+
     // Expose camera fns globally so inline onclick handlers can reach them
     window.openCamera = openCamera;
     window.closeCamera = closeCamera;
