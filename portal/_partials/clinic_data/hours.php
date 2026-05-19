@@ -227,10 +227,56 @@ async function hrPost(action, data) {
     const r = await fetch('ajax_clinic_master.php', {method:'POST',body:fd});
     return r.json();
 }
+// Soft-warning helper shared by single + bulk add — when backend
+// reports preview:true + conflicts, surface the list of doctors whose
+// recurring shifts will get hidden by the new closure(s).
+async function hrConfirmConflicts(conflicts, kind) {
+    const escH = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    let body;
+    if (kind === 'closure_vs_schedule') {
+        const rows = conflicts.map(c =>
+            `<li class="flex justify-between text-sm"><span>${escH(c.doc)}</span><span class="text-amber-700 font-bold">${c.days} วัน</span></li>`
+        ).join('');
+        body = `
+            <div class="text-left">
+                <p class="text-sm text-slate-600 mb-2">วันหยุดที่จะเพิ่ม ทับตารางแพทย์ออกตรวจประจำสัปดาห์ดังนี้:</p>
+                <ul class="space-y-1 bg-amber-50 border border-amber-200 rounded p-3 max-h-60 overflow-y-auto">${rows}</ul>
+                <p class="text-xs text-slate-500 mt-2">ระบบจะซ่อน shift เหล่านี้จากปฎิทินและ AI โดยอัตโนมัติในวันที่ปิด — ยืนยันเพิ่ม?</p>
+            </div>`;
+    } else {
+        const rows = conflicts.map(c =>
+            `<li class="text-sm"><b>${escH(c.date)}</b>${c.note ? ' — ' + escH(c.note) : ''}</li>`
+        ).join('');
+        body = `
+            <div class="text-left">
+                <p class="text-sm text-slate-600 mb-2">มี <b>${conflicts.length}</b> วันหยุดในอีก 90 วันที่ wd ตรงกัน — shift ใหม่จะไม่แสดงในวันเหล่านี้:</p>
+                <ul class="space-y-1 bg-amber-50 border border-amber-200 rounded p-3 max-h-60 overflow-y-auto">${rows}</ul>
+                <p class="text-xs text-slate-500 mt-2">ยืนยันเพิ่ม regular shift นี้?</p>
+            </div>`;
+    }
+    const r = await Swal.fire({
+        icon: 'warning',
+        title: 'พบ schedule ทับกัน',
+        html: body,
+        showCancelButton: true,
+        confirmButtonText: 'ยืนยันเพิ่ม',
+        cancelButtonText: 'ยกเลิก',
+        confirmButtonColor: '#d97706',
+        width: 520,
+    });
+    return r.isConfirmed;
+}
+
 async function hrAdd(e, type) {
     e.preventDefault();
     const fd = new FormData(e.target);
-    const res = await hrPost('add', Object.fromEntries(fd.entries()));
+    const data = Object.fromEntries(fd.entries());
+    let res = await hrPost('add', data);
+    if (res.ok && res.preview && Array.isArray(res.conflicts)) {
+        const go = await hrConfirmConflicts(res.conflicts, 'closure_vs_schedule');
+        if (!go) return;
+        res = await hrPost('add', { ...data, confirm: '1' });
+    }
     if (res.ok) { showPortalToast(res.message, 'success'); setTimeout(()=>cdReload('hours'),500); }
     else Swal.fire('Error', res.message, 'error');
 }
@@ -524,8 +570,17 @@ async function hrCalAdd() {
     if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>'; }
 
     try {
-        const res  = await fetch('ajax_clinic_master.php', { method: 'POST', body: fd });
-        const data = await res.json();
+        let res  = await fetch('ajax_clinic_master.php', { method: 'POST', body: fd });
+        let data = await res.json();
+        // Preview round: backend returned conflict list before inserting.
+        // Show the warning, and if admin confirms, repost with confirm=1.
+        if (data.ok && data.preview && Array.isArray(data.conflicts)) {
+            const go = await hrConfirmConflicts(data.conflicts, 'closure_vs_schedule');
+            if (!go) return;
+            fd.append('confirm', '1');
+            res = await fetch('ajax_clinic_master.php', { method: 'POST', body: fd });
+            data = await res.json();
+        }
         if (data.ok) {
             showPortalToast(data.message, 'success');
             // Add to local existing set and clear selection

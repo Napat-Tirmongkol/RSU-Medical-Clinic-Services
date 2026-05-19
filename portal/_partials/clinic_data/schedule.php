@@ -574,7 +574,33 @@ async function dsSave(e) {
         }
     }
     const action = data.id ? 'update' : 'add';
-    const res = await dsPost(action, data);
+    let res = await dsPost(action, data);
+    // Soft warning: adding a regular shift on a weekday that already
+    // has upcoming closures. Backend reports preview:true + a list of
+    // dates so admin can decide to proceed (recurring intent allowed
+    // to overlap) or back off.
+    if (res.ok && res.preview && Array.isArray(res.conflicts)) {
+        const escH = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+        const rows = res.conflicts.map(c =>
+            `<li class="text-sm"><b>${escH(c.date)}</b>${c.note ? ' — ' + escH(c.note) : ''}</li>`
+        ).join('');
+        const r = await Swal.fire({
+            icon: 'warning',
+            title: 'พบ schedule ทับวันหยุด',
+            html: `<div class="text-left">
+                <p class="text-sm text-slate-600 mb-2">มี <b>${res.conflicts.length}</b> วันหยุดในอีก 90 วันที่ wd ตรงกัน — shift นี้จะไม่แสดงในวันเหล่านี้:</p>
+                <ul class="space-y-1 bg-amber-50 border border-amber-200 rounded p-3 max-h-60 overflow-y-auto">${rows}</ul>
+                <p class="text-xs text-slate-500 mt-2">ยืนยันเพิ่ม regular shift นี้?</p>
+            </div>`,
+            showCancelButton: true,
+            confirmButtonText: 'ยืนยันเพิ่ม',
+            cancelButtonText: 'ยกเลิก',
+            confirmButtonColor: '#d97706',
+            width: 520,
+        });
+        if (!r.isConfirmed) return;
+        res = await dsPost(action, { ...data, confirm: '1' });
+    }
     if (res.ok) {
         showPortalToast(res.message, 'success');
         dsCloseModal();

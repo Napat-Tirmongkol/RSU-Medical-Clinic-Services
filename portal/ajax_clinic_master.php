@@ -17,6 +17,109 @@ validate_csrf_or_die();
 
 $pdo = db();
 
+/**
+ * Returns conflicts when a proposed change overlaps the other layer
+ * (doctor schedule vs clinic closure). Used to drive the soft-warning
+ * preview flow on hours:add / hours:add_bulk / schedule:add — admin
+ * still proceeds, but with eyes open instead of finding out later
+ * that a recurring Wednesday shift sat under a "เทอมเบรค" block.
+ *
+ * direction:
+ *  'closure_vs_schedule'
+ *    Adding closure days. Counts regular shifts that fall on those
+ *    weekdays. Returns [['doc'=>'...', 'days'=>N], ...].
+ *
+ *  'schedule_vs_closure'
+ *    Adding a regular shift on weekday $wd. Lists upcoming closures
+ *    (next 90 days) on the same weekday. Returns
+ *    [['date'=>'YYYY-MM-DD', 'note'=>'...'], ...].
+ */
+function clinic_schedule_conflicts(PDO $pdo, string $direction, array $params): array
+{
+    if ($direction === 'closure_vs_schedule') {
+        $dates = array_values(array_filter((array)($params['dates'] ?? [])));
+        if (empty($dates)) return [];
+
+        $tz = defined('CLINIC_TZ_NAME') ? new DateTimeZone(CLINIC_TZ_NAME) : new DateTimeZone('Asia/Bangkok');
+        $byWd = [];
+        foreach ($dates as $d) {
+            $d = trim((string)$d);
+            if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $d)) continue;
+            try {
+                $wd = (int)(new DateTimeImmutable($d, $tz))->format('w');
+            } catch (Throwable) {
+                continue;
+            }
+            $byWd[$wd][] = $d;
+        }
+        if (empty($byWd)) return [];
+
+        $wdList = array_keys($byWd);
+        $place  = implode(',', array_fill(0, count($wdList), '?'));
+        $stmt = $pdo->prepare("
+            SELECT s.weekday,
+                   COALESCE(ms.title, '') AS doc_title,
+                   COALESCE(ms.full_name, '') AS doc_name
+              FROM sys_doctor_schedule s
+              LEFT JOIN sys_medical_staff ms ON ms.id = s.staff_id
+             WHERE s.is_active = 1
+               AND s.type = 'regular'
+               AND s.weekday IN ($place)
+        ");
+        $stmt->execute($wdList);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+        // Roll up per doctor: name → total occluded days across the
+        // selected closure window (one shift on Wed × 3 Wednesdays = 3).
+        $byDoc = [];
+        foreach ($rows as $r) {
+            $wd = (int)$r['weekday'];
+            $name = trim((string)$r['doc_title'] . ' ' . (string)$r['doc_name']);
+            if ($name === '') $name = '(ไม่ระบุ)';
+            $byDoc[$name] = ($byDoc[$name] ?? 0) + count($byWd[$wd] ?? []);
+        }
+        $conflicts = [];
+        foreach ($byDoc as $doc => $days) {
+            $conflicts[] = ['doc' => $doc, 'days' => $days];
+        }
+        usort($conflicts, fn($a, $b) => $b['days'] <=> $a['days']);
+        return $conflicts;
+    }
+
+    if ($direction === 'schedule_vs_closure') {
+        if (!isset($params['weekday']) || $params['weekday'] === '') return [];
+        $wd = (int)$params['weekday'];
+        if ($wd < 0 || $wd > 6) return [];
+
+        $start = (string)($params['start'] ?? date('Y-m-d'));
+        $end   = (string)($params['end']   ?? date('Y-m-d', strtotime('+90 days')));
+
+        // DAYOFWEEK returns 1=Sunday..7=Saturday — normalize to our
+        // 0=Sunday..6=Saturday by subtracting 1.
+        $stmt = $pdo->prepare("
+            SELECT specific_date, note
+              FROM sys_clinic_hours
+             WHERE type IN ('holiday','special') AND is_closed = 1
+               AND specific_date BETWEEN :s AND :e
+               AND (DAYOFWEEK(specific_date) - 1) = :wd
+             ORDER BY specific_date
+        ");
+        $stmt->execute([':s' => $start, ':e' => $end, ':wd' => $wd]);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+        $conflicts = [];
+        foreach ($rows as $r) {
+            $conflicts[] = [
+                'date' => (string)$r['specific_date'],
+                'note' => trim((string)$r['note']),
+            ];
+        }
+        return $conflicts;
+    }
+
+    return [];
+}
+
 // ── Auto-migrate all clinic master tables ────────────────────────────────
 try {
     $pdo->exec("CREATE TABLE IF NOT EXISTS sys_clinic_profile (
@@ -308,15 +411,32 @@ try {
         // ── Hours / Holidays ─────────────────────────────────────────────
         case 'hours:add':
             $type = $_POST['type'] ?? 'regular';
+            // Soft-warning when adding a closed-day single closure on a
+            // date whose weekday has recurring doctor shifts. Same
+            // confirm flag as the bulk path.
+            $isClosed = ($_POST['is_closed'] ?? '0') === '1';
+            $specDate = $type !== 'regular' ? trim((string)($_POST['specific_date'] ?? '')) : '';
+            $confirmed = (string)($_POST['confirm'] ?? '0') === '1';
+            if (!$confirmed && $isClosed && $specDate !== '') {
+                $conflicts = clinic_schedule_conflicts($pdo, 'closure_vs_schedule', ['dates' => [$specDate]]);
+                if (!empty($conflicts)) {
+                    echo json_encode([
+                        'ok' => true,
+                        'preview' => true,
+                        'conflicts' => $conflicts,
+                    ]);
+                    return;
+                }
+            }
             $stmt = $pdo->prepare("INSERT INTO sys_clinic_hours (type, weekday, specific_date, open_time, close_time, is_closed, note)
                 VALUES (?, ?, ?, ?, ?, ?, ?)");
             $stmt->execute([
                 $type,
                 $type === 'regular' ? (int)($_POST['weekday'] ?? 0) : null,
                 $type !== 'regular' ? ($_POST['specific_date'] ?? null) : null,
-                ($_POST['is_closed'] ?? '0') === '1' ? null : ($_POST['open_time'] ?? null),
-                ($_POST['is_closed'] ?? '0') === '1' ? null : ($_POST['close_time'] ?? null),
-                ($_POST['is_closed'] ?? '0') === '1' ? 1 : 0,
+                $isClosed ? null : ($_POST['open_time'] ?? null),
+                $isClosed ? null : ($_POST['close_time'] ?? null),
+                $isClosed ? 1 : 0,
                 trim((string)($_POST['note'] ?? '')) ?: null,
             ]);
             echo json_encode(['ok' => true, 'message' => 'เพิ่มแล้ว']);
@@ -328,6 +448,21 @@ try {
             if (empty($dates)) {
                 echo json_encode(['ok' => false, 'message' => 'ไม่มีวันที่ที่เลือก']);
                 return;
+            }
+            // Soft-warning preview: list which doctor shifts these new
+            // closures will hide. Only fires on the first call — the JS
+            // resubmits with confirm=1 once the admin acknowledges.
+            $confirmed = (string)($_POST['confirm'] ?? '0') === '1';
+            if (!$confirmed) {
+                $conflicts = clinic_schedule_conflicts($pdo, 'closure_vs_schedule', ['dates' => $dates]);
+                if (!empty($conflicts)) {
+                    echo json_encode([
+                        'ok' => true,
+                        'preview' => true,
+                        'conflicts' => $conflicts,
+                    ]);
+                    return;
+                }
             }
             $check  = $pdo->prepare("SELECT 1 FROM sys_clinic_hours WHERE type IN ('holiday','special') AND specific_date = :d LIMIT 1");
             $insert = $pdo->prepare("INSERT INTO sys_clinic_hours (type, specific_date, is_closed, note) VALUES ('holiday', :d, 1, :n)");
@@ -635,6 +770,28 @@ try {
                             'message' => 'ไม่สามารถลงตารางแพทย์ในวันหยุด: ' . ($holRow['note'] ?: 'วันหยุด'),
                         ]);
                         return;
+                    }
+                }
+            }
+            // Soft warning when a *regular* recurring shift will land
+            // on weekdays that already have closures booked (next 90d).
+            // Unlike 'override' (hard block above) we still let admin
+            // proceed — recurring intent is allowed to overlap closures,
+            // we just want them to see it first.
+            if ($type === 'regular') {
+                $confirmed = (string)($_POST['confirm'] ?? '0') === '1';
+                if (!$confirmed) {
+                    $wd = (int)($_POST['weekday'] ?? -1);
+                    if ($wd >= 0 && $wd <= 6) {
+                        $conflicts = clinic_schedule_conflicts($pdo, 'schedule_vs_closure', ['weekday' => $wd]);
+                        if (!empty($conflicts)) {
+                            echo json_encode([
+                                'ok' => true,
+                                'preview' => true,
+                                'conflicts' => $conflicts,
+                            ]);
+                            return;
+                        }
                     }
                 }
             }
