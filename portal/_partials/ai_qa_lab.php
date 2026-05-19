@@ -2805,6 +2805,25 @@ function _qa_source_badge(string $s): string {
 'use strict';
 const CSRF = '<?= get_csrf_token() ?>';
 
+// Mirror of PHP ai_qa_is_time_sensitive_question() — duplicated here
+// because the original lives inside the FAQ tab's script block and
+// each tab's <script> is conditionally emitted. Update both copies
+// (search "faqIsTimeSensitiveQuestion") whenever the pattern set
+// changes server-side.
+function faqIsTimeSensitiveQuestion(q) {
+    if (!q) return false;
+    const patterns = [
+        /(เปิด|ปิด|กี่โมง|เวลา\s*ทำการ|ทำการ|กี่ทุ่ม|กี่นาฬิกา)/u,
+        /(หมอ.*ออก|ออก\s*ตรวจ|ตาราง.*หมอ|แพทย์.*ออก|หมอ.*เวร|เวร.*หมอ)/u,
+        /(วันนี้|พรุ่งนี้|มะรืน|เมื่อวาน|today|tomorrow|yesterday)/iu,
+        /วัน(อาทิตย์|จันทร์|อังคาร|พุธ|พฤหัส|ศุกร์|เสาร์)/u,
+        /วันที่\s*\d/u,
+        /(นัด\s*หมาย|จอง\s*คิว|คิว.*ว่าง|ว่าง\s*ไหม|มี\s*คิว)/u,
+        /(มกราคม|กุมภาพันธ์|มีนาคม|เมษายน|พฤษภาคม|มิถุนายน|กรกฎาคม|สิงหาคม|กันยายน|ตุลาคม|พฤศจิกายน|ธันวาคม)/u,
+    ];
+    return patterns.some(p => p.test(q));
+}
+
 // marked.js — โหลดถ้ายังไม่มี
 if (typeof marked === 'undefined') {
     const s = document.createElement('script');
