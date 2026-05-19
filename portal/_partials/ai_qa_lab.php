@@ -285,6 +285,28 @@ function _qa_source_badge(string $s): string {
     .qa-tab.qa-tab-active--sandbox  { color: #7c3aed; border-bottom-color: #7c3aed; }
     .qa-tab.qa-tab-active--autoreply{ color: #0ea5e9; border-bottom-color: #0ea5e9; }
 
+    /* Captured workflow strip — 4 step cards (Classify → Generate → Approve → FAQ) */
+    .qa-step-card { display:block; background:#fff; border:1.5px solid #e5e7eb; border-radius:14px; padding:10px 12px; text-decoration:none; transition:transform .15s, border-color .15s, box-shadow .15s; position:relative; }
+    .qa-step-card:hover { transform: translateY(-2px); box-shadow:0 6px 18px rgba(0,0,0,.06); }
+    .qa-step-card.is-hot { animation: qaPulse 2s ease-in-out infinite; }
+    @keyframes qaPulse { 0%, 100% { box-shadow:0 0 0 0 rgba(139,92,246,.4); } 50% { box-shadow:0 0 0 4px rgba(139,92,246,.08); } }
+    .qa-step-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; }
+    .qa-step-num { display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:50%; font-size:11px; font-weight:900; color:#fff; background:#9ca3af; }
+    .qa-step-icon { color:#9ca3af; font-size:13px; }
+    .qa-step-label { font-size:11px; font-weight:800; color:#6b7280; text-transform:uppercase; letter-spacing:.04em; }
+    .qa-step-count { font-size:22px; font-weight:900; color:#0f172a; margin-top:4px; line-height:1.1; display:flex; align-items:baseline; gap:6px; }
+    .qa-step-hot { font-size:9px; font-weight:800; background:#fef2f2; color:#b91c1c; padding:1px 6px; border-radius:99px; border:1px solid #fecaca; }
+    .qa-step-card[data-tone="cyan"]    .qa-step-num { background:#06b6d4; }
+    .qa-step-card[data-tone="cyan"]    .qa-step-icon { color:#06b6d4; }
+    .qa-step-card[data-tone="slate"]   .qa-step-num { background:#64748b; }
+    .qa-step-card[data-tone="slate"]   .qa-step-icon { color:#64748b; }
+    .qa-step-card[data-tone="blue"]    .qa-step-num { background:#2563eb; }
+    .qa-step-card[data-tone="blue"]    .qa-step-icon { color:#2563eb; }
+    .qa-step-card[data-tone="emerald"] .qa-step-num { background:#059669; }
+    .qa-step-card[data-tone="emerald"] .qa-step-icon { color:#059669; }
+    body[data-theme='dark'] #section-ai_qa_lab .qa-step-card { background:#0f172a; border-color:#1e293b; }
+    body[data-theme='dark'] #section-ai_qa_lab .qa-step-count { color:#e2e8f0; }
+
     /* Sandbox redesign — insight chips + collapsible details */
     .sb-insight { background:#fff; border:1.5px solid #e5e7eb; border-radius:14px; padding:12px 14px; cursor:pointer; transition:transform .15s, box-shadow .15s, border-color .15s; }
     .sb-insight:hover { transform: translateY(-2px); box-shadow:0 6px 18px rgba(0,0,0,.06); }
@@ -799,31 +821,61 @@ function _qa_source_badge(string $s): string {
     <?php elseif ($_qa_tab === 'captured'): ?>
     <!-- ════════════ TAB: CAPTURED QUESTIONS ════════════ -->
 
-    <!-- Stats cards -->
-    <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
-        <div class="bg-white rounded-2xl border border-gray-200 p-4">
-            <div class="text-xs text-gray-500 font-bold uppercase tracking-wider">ที่แสดง</div>
-            <div class="text-2xl font-black text-gray-900 mt-1"><?= number_format($_qa_total) ?></div>
-            <?php if ($_qa_qview === 'all' && $_qa_statQuestion['no'] > 0): ?>
-                <div class="text-[10px] text-gray-400 mt-0.5">ซ่อนไม่ใช่คำถาม <?= number_format($_qa_statQuestion['no']) ?> กลุ่ม</div>
-            <?php endif; ?>
+    <?php
+    // Build the workflow strip so the admin sees the path top-to-bottom:
+    // Classify → Generate → Approve → FAQ. Counts come from the existing
+    // $_qa_statQuestion / $_qa_statStatus arrays so no extra queries.
+    $_qa_unclassified = (int)($_qa_statQuestion['unknown'] ?? 0);
+    $_qa_pending      = (int)($_qa_statStatus['pending']   ?? 0);
+    $_qa_generated    = (int)($_qa_statStatus['generated'] ?? 0);
+    $_qa_approved     = (int)($_qa_statStatus['approved']  ?? 0);
+    $_qa_steps = [
+        ['classify', '1', 'คัดกรอง',   $_qa_unclassified, 'cyan',    'fa-filter',          ['qa_qview' => 'all']],
+        ['generate', '2', 'Generate', $_qa_pending,      'slate',   'fa-wand-magic-sparkles', ['qa_status' => 'pending']],
+        ['approve',  '3', 'อนุมัติ',   $_qa_generated,    'blue',    'fa-circle-check',    ['qa_status' => 'generated']],
+        ['done',     '✓', 'เป็น FAQ',  $_qa_approved,     'emerald', 'fa-book-bookmark',   ['qa_status' => 'approved']],
+    ];
+    ?>
+
+    <!-- Workflow strip — Classify → Generate → Approve → FAQ -->
+    <div class="bg-gradient-to-r from-violet-50 to-purple-50 border border-violet-200 rounded-2xl p-4 mb-5">
+        <div class="flex items-center justify-between mb-3">
+            <h3 class="text-sm font-black text-violet-900 flex items-center gap-2">
+                <i class="fa-solid fa-list-check"></i> ขั้นตอนรีวิวคำถาม
+            </h3>
+            <span class="text-[11px] text-violet-600 font-medium">คลิกแต่ละขั้นเพื่อกรอง</span>
         </div>
-        <div class="bg-white rounded-2xl border border-gray-200 p-4">
-            <div class="text-xs text-gray-500 font-bold uppercase tracking-wider">ยังไม่คัดกรอง</div>
-            <div class="text-2xl font-black text-cyan-600 mt-1"><?= number_format((int)$_qa_statQuestion['unknown']) ?></div>
+        <div class="grid grid-cols-4 gap-2 md:gap-3">
+            <?php foreach ($_qa_steps as $i => [$key, $num, $label, $count, $tone, $icon, $filter]):
+                $q = http_build_query(array_merge(['section' => 'ai_qa_lab', 'qa_tab' => 'captured'], $filter));
+                $hot = $count > 0 && $key !== 'done';
+            ?>
+                <a href="?<?= $q ?>"
+                   class="qa-step-card <?= $hot ? 'is-hot' : '' ?>"
+                   data-tone="<?= $tone ?>">
+                    <div class="qa-step-head">
+                        <span class="qa-step-num"><?= $num ?></span>
+                        <i class="fa-solid <?= $icon ?> qa-step-icon"></i>
+                    </div>
+                    <div class="qa-step-label"><?= $label ?></div>
+                    <div class="qa-step-count">
+                        <?= number_format($count) ?>
+                        <?php if ($hot): ?>
+                            <span class="qa-step-hot">รอ</span>
+                        <?php endif; ?>
+                    </div>
+                </a>
+                <?php if ($i < count($_qa_steps) - 1): ?>
+                <?php endif; ?>
+            <?php endforeach; ?>
         </div>
-        <div class="bg-white rounded-2xl border border-gray-200 p-4">
-            <div class="text-xs text-gray-500 font-bold uppercase tracking-wider">รอประมวลผล</div>
-            <div class="text-2xl font-black text-slate-600 mt-1"><?= number_format((int)($_qa_statStatus['pending'] ?? 0)) ?></div>
-        </div>
-        <div class="bg-white rounded-2xl border border-gray-200 p-4">
-            <div class="text-xs text-gray-500 font-bold uppercase tracking-wider">AI ร่างแล้ว</div>
-            <div class="text-2xl font-black text-blue-600 mt-1"><?= number_format((int)($_qa_statStatus['generated'] ?? 0)) ?></div>
-        </div>
-        <div class="bg-white rounded-2xl border border-gray-200 p-4">
-            <div class="text-xs text-gray-500 font-bold uppercase tracking-wider">อนุมัติแล้ว</div>
-            <div class="text-2xl font-black text-emerald-600 mt-1"><?= number_format((int)($_qa_statStatus['approved'] ?? 0)) ?></div>
-        </div>
+        <?php if ($_qa_qview === 'all' && $_qa_statQuestion['no'] > 0): ?>
+            <div class="text-[11px] text-violet-600 mt-3 italic">
+                <i class="fa-solid fa-info-circle mr-1"></i>
+                ซ่อนข้อความที่ไม่ใช่คำถาม <?= number_format($_qa_statQuestion['no']) ?> กลุ่ม
+                — เปลี่ยน "มุมมอง" ด้านล่างเพื่อแสดง
+            </div>
+        <?php endif; ?>
     </div>
 
     <!-- Top categories -->
