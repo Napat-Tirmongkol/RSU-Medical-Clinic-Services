@@ -98,16 +98,29 @@ try {
     $contextPreview = $contextFull;
 
     // ── 4.5. ดึงตารางหมอวันที่ใกล้เคียง (raw) เพื่อ debug ───────────────
+    // Two views per day:
+    //   raw      — ignore clinic closures, surface every regular shift in
+    //              sys_doctor_schedule (useful when admin needs to see why
+    //              a shift exists at all).
+    //   effective— the value AI actually sees: zero rows on a closed day
+    //              even if the recurring schedule says otherwise.
+    // Surfacing both lets the operator spot "schedule says X but clinic is
+    // closed Y" mismatches without us having to guess intent.
     $today = $now->format('Y-m-d');
     $tomorrow = $now->modify('+1 day')->format('Y-m-d');
     $debugSchedule = [];
     foreach ([$today, $tomorrow] as $d) {
-        $rows = get_clinic_doctors_for_date($pdo, $d);
+        $effective = get_clinic_doctors_for_date($pdo, $d);                // honours closures
+        $raw       = get_clinic_doctors_for_date($pdo, $d, false);          // ignores closures
+        $hours     = get_clinic_hours_for_date($pdo, $d);
         $debugSchedule[$d] = [
             'date'    => $d,
             'weekday' => (int)(new DateTimeImmutable($d, $tz))->format('w'),
-            'count'   => count($rows),
-            'rows'    => array_map(fn($r) => [
+            'count'   => count($effective),
+            'closed'  => !empty($hours['closed']),
+            'closure_note' => !empty($hours['closed']) ? trim((string)($hours['note'] ?? '')) : '',
+            'raw_count'    => count($raw),
+            'rows'         => array_map(fn($r) => [
                 'staff_id'   => $r['staff_id'] ?? null,
                 'doc_name'   => $r['doc_name'] ?? null,
                 'doc_title'  => $r['doc_title'] ?? null,
@@ -115,7 +128,7 @@ try {
                 'start_time' => $r['start_time'] ?? null,
                 'end_time'   => $r['end_time']   ?? null,
                 'service'    => $r['service_type'] ?? null,
-            ], $rows),
+            ], $raw),
         ];
     }
 

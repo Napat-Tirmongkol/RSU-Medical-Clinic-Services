@@ -491,9 +491,28 @@ function get_clinic_hours_for_date(PDO $pdo, string $date): array
  *
  * @return list<array<string,mixed>>
  */
-function get_clinic_doctors_for_date(PDO $pdo, string $date): array
+function get_clinic_doctors_for_date(PDO $pdo, string $date, bool $respectClosure = true): array
 {
     $weekday = (int)(new DateTimeImmutable($date, new DateTimeZone(CLINIC_TZ_NAME)))->format('w');
+
+    // Honour clinic closures (holidays / "เทอมเบรค" / Thai public holidays
+    // imported from myhora). Without this, regular recurring shifts in
+    // sys_doctor_schedule still surface on days the clinic is closed, so
+    // AI tells the user "พรุ่งนี้มีหมอ X, Y" on a break day. The override
+    // is opt-out so admin-side debug surfaces (Sandbox raw inventory)
+    // can still see the underlying schedule.
+    if ($respectClosure) {
+        try {
+            $hours = get_clinic_hours_for_date($pdo, $date);
+            if (!empty($hours['closed'])) {
+                return [];
+            }
+        } catch (Throwable) {
+            // Fall through — never let a hours-lookup failure blank out
+            // the schedule entirely. Better to show the regular roster
+            // and let the operator notice than to return empty silently.
+        }
+    }
 
     // Self-heal corrupted regular shifts that have specific_date = '' or '0000-00-00'
     // (The migration in schedule:list only runs when an admin opens that page.)

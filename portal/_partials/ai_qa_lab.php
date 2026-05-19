@@ -2975,8 +2975,24 @@ function renderResult(question, j) {
                   d.rows.map(r => `<tr class="border-t border-amber-100"><td class="px-2 py-1">${r.staff_id||'-'}</td><td class="px-2 py-1">${escH((r.doc_title?r.doc_title+' ':'')+(r.doc_name||'-'))}</td><td class="px-2 py-1">${escH(r.type||'-')}</td><td class="px-2 py-1">${escH((r.start_time||'').substring(0,5))}–${escH((r.end_time||'').substring(0,5))}</td><td class="px-2 py-1">${escH(r.service||'-')}</td></tr>`).join('') +
                   '</tbody></table>'
                 : '<div class="text-xs text-amber-600 italic">ไม่มี shift</div>';
+            // Closure banner: when the clinic is closed, what AI sees
+            // (effective count) drops to 0 even though the underlying
+            // recurring schedule may still list doctors. Show both so
+            // the operator notices the mismatch instead of being
+            // confused by why AI says "no doctors" on a day the calendar
+            // shows shifts.
+            const closedBanner = d.closed
+                ? `<div class="mb-2 text-[11px] bg-rose-100 border border-rose-200 text-rose-800 px-2 py-1 rounded">
+                       <i class="fa-solid fa-circle-xmark mr-1"></i>
+                       <b>คลินิกปิด</b>${d.closure_note ? ' — ' + escH(d.closure_note) : ''}
+                       · AI จะตอบ "ไม่มีหมอ" (effective 0) ถึงแม้ตารางจะมี ${d.raw_count} shift
+                   </div>`
+                : (d.raw_count && d.raw_count !== d.count
+                    ? `<div class="mb-2 text-[11px] text-amber-700">raw ${d.raw_count} shift · effective ${d.count}</div>`
+                    : '');
             return `<div class="bg-white border border-amber-200 rounded-lg p-3">
                 <div class="text-xs font-bold text-amber-900 mb-2">${escH(d.date)} (${WEEKDAY[d.weekday]||'-'}) — <span class="font-normal">${d.count} shift</span></div>
+                ${closedBanner}
                 ${rowsHtml}
             </div>`;
         }).join('');
