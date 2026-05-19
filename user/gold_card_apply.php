@@ -353,7 +353,7 @@ $__navActive = 'services';
                     <label class="flex items-start gap-3 cursor-pointer">
                         <input type="checkbox" id="consent" required class="mt-1 w-5 h-5 accent-amber-500">
                         <span class="text-[12px] font-bold text-slate-700 leading-relaxed">
-                            ข้าพเจ้ายืนยันว่าข้อมูลและเอกสารทั้งหมดเป็นความจริง และยินยอมให้คลินิกใช้ข้อมูลเพื่อตรวจสอบและออกบัตรทอง
+                            ข้าพเจ้าขอรับรองว่าข้อมูลจำเพาะบุคคลตามที่ระบุในแบบฟอร์มนี้เป็นความจริง ข้าพเจ้าตกลงยินยอมให้คลินิกเก็บรวบรวมและใช้ข้อมูลส่วนบุคคล รวมถึงเอกสารระบุตัวตน เพื่อวัตถุประสงค์ในการตรวจสอบและดำเนินการออกบัตรทอง
                         </span>
                     </label>
 
