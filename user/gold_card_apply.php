@@ -228,11 +228,15 @@ $__navActive = 'services';
                     <p class="text-[11px] font-bold text-slate-500 leading-relaxed mb-3">
                         ถ่ายรูปตัวเองคู่กับบัตรประชาชนให้เห็นใบหน้าและข้อมูลในบัตรชัดเจน
                     </p>
-                    <ul class="text-[11px] font-semibold text-slate-600 space-y-1 mb-4 pl-4 list-disc">
+                    <ul class="text-[11px] font-semibold text-slate-600 space-y-1 mb-3 pl-4 list-disc">
                         <li>หน้าตรง ไม่ใส่หมวก/แว่นตาดำ/ที่คาดผม</li>
                         <li>แสงสว่างเพียงพอ ไม่เบลอ</li>
                         <li>เห็นข้อมูลในบัตรประชาชนชัดเจน</li>
                     </ul>
+                    <div class="bg-blue-50 border border-blue-100 rounded-xl px-3 py-2 mb-4 flex items-start gap-2 text-[10px] font-bold text-blue-700 leading-relaxed">
+                        <i class="fa-solid fa-shield-halved mt-0.5"></i>
+                        <span>รูปจะถูกส่งให้ Google Gemini AI ตรวจสอบคุณภาพอัตโนมัติ (ใส่แว่น/แมส/หมวก) ก่อนส่งใบสมัคร — ข้อมูล meta เช่น GPS จะถูกลบก่อนส่งทุกครั้ง</span>
+                    </div>
 
                     <input type="file" id="photo-input" name="photo" accept="image/*" capture="environment" class="hidden">
                     <label for="photo-input" id="photo-zone" class="upload-zone block">
@@ -248,6 +252,15 @@ $__navActive = 'services';
                             </button>
                         </div>
                     </label>
+
+                    <!-- AI vision check result card (hidden until photo is checked) -->
+                    <div id="photo-check" class="hidden mt-4 rounded-2xl border p-4 text-[12px] leading-relaxed">
+                        <div id="photo-check-loading" class="hidden flex items-center gap-2 text-slate-600 font-bold">
+                            <i class="fa-solid fa-spinner fa-spin text-amber-500"></i>
+                            <span>กำลังตรวจสอบรูปด้วย AI…</span>
+                        </div>
+                        <div id="photo-check-result" class="hidden"></div>
+                    </div>
                 </div>
 
                 <!-- Signature card -->
@@ -324,7 +337,14 @@ $__navActive = 'services';
     const photoEmpty = document.getElementById('photo-empty');
     const photoPreviewWrap = document.getElementById('photo-preview-wrap');
     const photoPreview = document.getElementById('photo-preview');
+    const photoCheckBox = document.getElementById('photo-check');
+    const photoCheckLoading = document.getElementById('photo-check-loading');
+    const photoCheckResult = document.getElementById('photo-check-result');
     let compressedPhotoBlob = null;
+    // Vision-check state: null = not yet checked, false = checking,
+    // {passed, blockers, check} once finished, 'skipped' if AI not configured,
+    // 'error' if check call failed (treat as advisory).
+    let photoCheckState = null;
 
     if (photoInput) {
         photoInput.addEventListener('change', async (e) => {
@@ -352,6 +372,7 @@ $__navActive = 'services';
                     photoEmpty.classList.add('hidden');
                     photoPreviewWrap.classList.remove('hidden');
                     photoZone.classList.add('has-file');
+                    runPhotoCheck(blob);
                 }, 'image/jpeg', 0.85);
             };
             reader.readAsDataURL(file);
@@ -360,10 +381,94 @@ $__navActive = 'services';
 
     function clearPhoto() {
         compressedPhotoBlob = null;
+        photoCheckState = null;
         photoInput.value = '';
         photoEmpty.classList.remove('hidden');
         photoPreviewWrap.classList.add('hidden');
         photoZone.classList.remove('has-file');
+        photoCheckBox.classList.add('hidden');
+        photoCheckResult.classList.add('hidden');
+        photoCheckLoading.classList.add('hidden');
+    }
+
+    async function runPhotoCheck(blob) {
+        photoCheckState = false; // checking
+        photoCheckBox.classList.remove('hidden');
+        photoCheckBox.className = 'mt-4 rounded-2xl border p-4 text-[12px] leading-relaxed bg-slate-50 border-slate-200';
+        photoCheckLoading.classList.remove('hidden');
+        photoCheckLoading.classList.add('flex');
+        photoCheckResult.classList.add('hidden');
+
+        const fd = new FormData();
+        fd.append('csrf_token', document.querySelector('input[name="csrf_token"]').value);
+        fd.append('photo', blob, 'check.jpg');
+
+        try {
+            const res = await fetch('ajax_check_photo.php', {
+                method: 'POST', body: fd, credentials: 'same-origin',
+            });
+            const json = await res.json();
+            photoCheckLoading.classList.add('hidden');
+            photoCheckLoading.classList.remove('flex');
+            photoCheckResult.classList.remove('hidden');
+
+            if (json.skipped) {
+                photoCheckState = 'skipped';
+                photoCheckBox.className = 'mt-4 rounded-2xl border p-4 text-[12px] leading-relaxed bg-slate-50 border-slate-200';
+                photoCheckResult.innerHTML = `<div class="flex items-start gap-2 text-slate-600"><i class="fa-solid fa-circle-info mt-0.5"></i><div><b>ตรวจสอบด้วยตนเอง</b> — ระบบ AI ยังไม่พร้อม กรุณาตรวจรูปก่อนส่ง</div></div>`;
+                return;
+            }
+            if (json.status === 'error' || json.ok === false) {
+                photoCheckState = 'error';
+                photoCheckBox.className = 'mt-4 rounded-2xl border p-4 text-[12px] leading-relaxed bg-slate-50 border-slate-200';
+                photoCheckResult.innerHTML = `<div class="flex items-start gap-2 text-slate-600"><i class="fa-solid fa-triangle-exclamation mt-0.5 text-amber-500"></i><div><b>ตรวจสอบไม่สำเร็จ</b> — ${escapeHtml(json.message || 'ลองอีกครั้งภายหลัง')} (สามารถส่งต่อไปได้)</div></div>`;
+                return;
+            }
+
+            photoCheckState = json;
+            if (json.passed) {
+                photoCheckBox.className = 'mt-4 rounded-2xl border p-4 text-[12px] leading-relaxed bg-emerald-50 border-emerald-200';
+                photoCheckResult.innerHTML = `
+                    <div class="flex items-start gap-2 text-emerald-800">
+                        <i class="fa-solid fa-circle-check mt-0.5 text-emerald-600 text-base"></i>
+                        <div>
+                            <p class="font-black">รูปผ่านการตรวจสอบ</p>
+                            <p class="text-emerald-700 mt-0.5">${escapeHtml(json.check?.summary || 'เห็นใบหน้าและบัตรประชาชนชัดเจน')}</p>
+                            ${json.check?.wearing_glasses && !json.check?.dark_glasses
+                                ? '<p class="text-[11px] text-slate-500 mt-1.5"><i class="fa-solid fa-glasses mr-1"></i> ตรวจพบว่าใส่แว่น (เลนส์ใส) — ส่งได้ปกติ</p>'
+                                : ''}
+                        </div>
+                    </div>`;
+            } else {
+                photoCheckBox.className = 'mt-4 rounded-2xl border p-4 text-[12px] leading-relaxed bg-rose-50 border-rose-200';
+                const issuesHtml = (json.blockers || []).map(b =>
+                    `<li class="flex items-start gap-1.5"><i class="fa-solid fa-circle-xmark text-rose-500 text-[10px] mt-1"></i><span>${escapeHtml(b)}</span></li>`
+                ).join('');
+                photoCheckResult.innerHTML = `
+                    <div class="flex items-start gap-2 text-rose-800">
+                        <i class="fa-solid fa-triangle-exclamation mt-0.5 text-rose-600 text-base"></i>
+                        <div class="flex-1">
+                            <p class="font-black">พบปัญหาในรูป (${(json.blockers || []).length})</p>
+                            <ul class="mt-2 space-y-1 text-rose-700">${issuesHtml}</ul>
+                            <button type="button" onclick="document.getElementById('photo-input').click()"
+                                class="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-rose-200 text-rose-700 font-black text-[11px] hover:bg-rose-100 transition">
+                                <i class="fa-solid fa-camera-rotate"></i> ถ่ายใหม่
+                            </button>
+                        </div>
+                    </div>`;
+            }
+        } catch (err) {
+            photoCheckLoading.classList.add('hidden');
+            photoCheckLoading.classList.remove('flex');
+            photoCheckResult.classList.remove('hidden');
+            photoCheckState = 'error';
+            photoCheckBox.className = 'mt-4 rounded-2xl border p-4 text-[12px] leading-relaxed bg-slate-50 border-slate-200';
+            photoCheckResult.innerHTML = `<div class="flex items-start gap-2 text-slate-600"><i class="fa-solid fa-wifi mt-0.5 text-amber-500"></i><div><b>ตรวจสอบไม่สำเร็จ</b> — เน็ตขัดข้อง สามารถส่งใบสมัครต่อไปได้</div></div>`;
+        }
+    }
+
+    function escapeHtml(s) {
+        return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     }
 
     // Signature canvas
@@ -418,6 +523,31 @@ $__navActive = 'services';
             }
             if (!compressedPhotoBlob) {
                 return Swal.fire({icon:'warning', title:'กรุณาแนบรูปถ่าย', text:'ถ่ายรูปคู่กับบัตรประชาชนเพื่อยืนยันตัวตน'});
+            }
+            if (photoCheckState === false) {
+                return Swal.fire({icon:'info', title:'กำลังตรวจสอบรูป', text:'กรุณารอ AI ตรวจสอบรูปสักครู่ แล้วลองส่งอีกครั้ง'});
+            }
+            // If AI flagged issues, require explicit confirmation before submitting
+            if (photoCheckState && typeof photoCheckState === 'object' && photoCheckState.passed === false) {
+                const blockerList = (photoCheckState.blockers || []).map(b => `<li>• ${b}</li>`).join('');
+                const { isConfirmed } = await Swal.fire({
+                    icon: 'warning',
+                    title: 'รูปยังไม่ผ่าน AI',
+                    html: `<div class="text-left text-sm">
+                        <p class="mb-2">ระบบตรวจพบ:</p>
+                        <ul class="text-rose-600 font-bold space-y-1 mb-3">${blockerList}</ul>
+                        <p class="text-xs text-slate-500">ถ้ายืนยันว่ารูปใช้ได้ ส่งต่อไปได้ — แต่เจ้าหน้าที่อาจขอให้ถ่ายใหม่</p>
+                    </div>`,
+                    showCancelButton: true,
+                    confirmButtonText: 'ส่งต่อไป',
+                    cancelButtonText: 'ถ่ายใหม่',
+                    reverseButtons: true,
+                    confirmButtonColor: '#f59e0b',
+                });
+                if (!isConfirmed) {
+                    photoInput.click();
+                    return;
+                }
             }
             if (!signaturePad || signaturePad.isEmpty()) {
                 return Swal.fire({icon:'warning', title:'กรุณาเซ็นชื่อ', text:'เซ็นลายมือชื่อในกรอบสี่เหลี่ยม'});
