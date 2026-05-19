@@ -2433,6 +2433,18 @@ function _qa_source_badge(string $s): string {
         const tsHint = document.getElementById('faq-mod-ts-autohint');
         // Existing flag from DB (edit mode) wins over auto-detection
         tsBox.checked = !!opts.is_time_sensitive;
+        // Auto-tick when CREATING a new FAQ from a question that matches
+        // the time-sensitive regex (e.g. "บันทึกเป็น FAQ" pressed from
+        // the Sandbox on "วันเสาร์เปิดไหม?"). Without this the admin has
+        // to remember to tick the hint themselves — and forgetting it
+        // means a slightly-rephrased question can hit Phase 1 and serve
+        // the cached static answer days later when closures have shifted.
+        // Edit mode (opts.id set) intentionally skipped: the existing
+        // DB value already reflects the admin's earlier decision.
+        if (opts.isNew && !tsBox.checked
+            && faqIsTimeSensitiveQuestion(opts.question || '')) {
+            tsBox.checked = true;
+        }
         if (tsHint) tsHint.classList.add('hidden');
         // Live re-evaluate the hint whenever the admin retypes the question
         const qEl = document.getElementById('faq-mod-question');
