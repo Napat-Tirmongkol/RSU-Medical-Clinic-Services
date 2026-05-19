@@ -567,6 +567,38 @@ function _qa_source_badge(string $s): string {
         </div>
     </div>
 
+    <!-- Maintenance card — operations that fix data drift, separated
+         from the navigation card so admin doesn't confuse navigation
+         (just jumping) with action (mutating something). -->
+    <div class="qaov-card mb-4">
+        <h4 style="display:flex;justify-content:space-between;align-items:center">
+            <span><i class="fa-solid fa-screwdriver-wrench text-amber-600"></i> การบำรุงรักษา</span>
+            <span class="text-[10px] font-normal text-gray-400">รันเป็นระยะหรือหลังอัปเดต knowledge</span>
+        </h4>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div class="border border-amber-200 bg-amber-50 rounded-xl p-3">
+                <div class="font-bold text-sm text-amber-900 mb-1">
+                    <i class="fa-solid fa-clock-rotate-left mr-1"></i> สแกน FAQ ล้าสมัย
+                </div>
+                <p class="text-xs text-amber-800 mb-2">หาคำตอบที่ติดวันที่/ชื่อเดือนเฉพาะ — เลือก mark เป็น time-sensitive (ระบบ generate ใหม่ทุกครั้ง) หรือลบทิ้ง</p>
+                <button id="qaov-launch-scanner"
+                    class="text-xs font-bold px-3 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white">
+                    เริ่มสแกน
+                </button>
+            </div>
+            <div class="border border-rose-200 bg-rose-50 rounded-xl p-3">
+                <div class="font-bold text-sm text-rose-900 mb-1">
+                    <i class="fa-solid fa-broom mr-1"></i> ล้างคำตอบที่แคชไว้
+                </div>
+                <p class="text-xs text-rose-800 mb-2">บังคับให้คำถามรอบถัดไป generate ใหม่ทั้งหมด — ใช้เมื่อแก้ knowledge แล้วต้องการให้สะท้อนทันที</p>
+                <button id="qaov-bust-cache-2"
+                    class="text-xs font-bold px-3 py-2 rounded-lg bg-rose-500 hover:bg-rose-600 text-white">
+                    ล้างแคช
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Quick action shortcuts to other tabs -->
     <div class="qaov-card">
         <h4><i class="fa-solid fa-bolt-lightning text-violet-500"></i> ทางลัด</h4>
@@ -686,23 +718,40 @@ function _qa_source_badge(string $s): string {
         }
 
         document.getElementById('qaov-refresh-timeline')?.addEventListener('click', () => { loadHealth(); loadTimeline(); });
-        document.getElementById('qaov-bust-cache')?.addEventListener('click', async () => {
+
+        // Maintenance card — launch the FAQ-tab stale scanner via redirect
+        // (scanner code lives in the FAQ tab section so we don't duplicate
+        // ~150 lines of modal logic here; auto_scan=1 tells that tab to
+        // click its scan button after mount).
+        document.getElementById('qaov-launch-scanner')?.addEventListener('click', () => {
+            window.location.href = '?section=ai_qa_lab&qa_tab=faq&auto_scan=1';
+        });
+
+        // Second cache-bust button in the Maintenance card — same handler
+        // as the inline one above (both fire the same action), kept as
+        // separate IDs so styling can differ.
+        async function bustCache(btn) {
             const { isConfirmed } = await Swal.fire({
                 title: 'ล้างแคชทั้งหมด?', text: 'คำตอบที่เก็บไว้วันนี้จะถูกลบ — คำถามครั้งถัดไปจะ generate ใหม่',
                 icon: 'warning', showCancelButton: true,
                 confirmButtonText: 'ล้าง', cancelButtonText: 'ยกเลิก', confirmButtonColor: '#e11d48',
             });
             if (!isConfirmed) return;
+            const orig = btn.innerHTML;
+            btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
             const fd = new FormData(); fd.append('action', 'cache_purge'); fd.append('csrf_token', CSRF_OV);
             const r = await fetch('ajax_ai_qa.php', { method: 'POST', body: fd, credentials: 'same-origin' });
             const j = await r.json();
+            btn.disabled = false; btn.innerHTML = orig;
             if (j.ok) {
                 Swal.fire({ icon: 'success', title: `ล้างแคชแล้ว (${j.purged} รายการ)`, timer: 1500, showConfirmButton: false });
                 loadHealth();
             } else {
                 Swal.fire({ icon: 'error', title: 'ล้างไม่สำเร็จ', text: j.message || '' });
             }
-        });
+        }
+        document.getElementById('qaov-bust-cache-2')?.addEventListener('click', e => bustCache(e.currentTarget));
+        document.getElementById('qaov-bust-cache')?.addEventListener('click', e => bustCache(e.currentTarget));
 
         loadHealth();
         loadTimeline();
@@ -1962,6 +2011,16 @@ function _qa_source_badge(string $s): string {
                 scanBtn.innerHTML = origHtml;
             }
         });
+        // Auto-trigger when arriving from Overview "Maintenance → เริ่มสแกน".
+        // Strip the query param off the URL after firing so a page reload
+        // doesn't re-open the modal.
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('auto_scan') === '1') {
+            params.delete('auto_scan');
+            const newUrl = window.location.pathname + '?' + params.toString();
+            window.history.replaceState({}, '', newUrl);
+            setTimeout(() => scanBtn.click(), 100);
+        }
     }
 
     async function showStaleScanResults(items) {
