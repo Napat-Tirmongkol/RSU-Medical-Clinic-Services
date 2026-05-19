@@ -152,6 +152,25 @@ function ai_cache_purge_all(PDO $pdo): int
 }
 
 /**
+ * Drop a single question's cache entry — keyed by the same hash used at write
+ * time. Called when admin promotes a captured question into a FAQ variant so
+ * the very next ask resolves through the new Phase-1 exact match instead of
+ * serving the stale gemini-derived answer.
+ */
+function ai_cache_invalidate_question(PDO $pdo, string $question): int
+{
+    ensure_ai_cache_schema($pdo);
+    try {
+        $stmt = $pdo->prepare("DELETE FROM sys_ai_answer_cache WHERE question_hash = :h");
+        $stmt->execute([':h' => ai_cache_key($question)]);
+        return $stmt->rowCount();
+    } catch (PDOException $e) {
+        error_log('[ai_cache invalidate] ' . $e->getMessage());
+        return 0;
+    }
+}
+
+/**
  * Housekeeping — drop entries past their expires_at. Cheap, safe to
  * call on every cache hit / cache put, but cron is fine too.
  */

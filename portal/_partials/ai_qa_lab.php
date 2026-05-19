@@ -124,7 +124,15 @@ try {
                 ELSE 'unknown'
             END AS is_question,
             GROUP_CONCAT(DISTINCT source ORDER BY source) AS sources,
-            MIN(id) AS sample_id
+            MIN(id) AS sample_id,
+            -- Phase-2 promotion trail (matched_via/matched_faq_id): surface
+            -- the most recent Gemini match so the admin UI can offer promote
+            -- to variant on the row. MAX keeps the informative value when
+            -- a group has mixed history (rows captured before the columns
+            -- existed alongside newer ones).
+            MAX(matched_via) AS matched_via,
+            MAX(matched_faq_id) AS matched_faq_id,
+            GROUP_CONCAT(id ORDER BY id) AS all_ids
           FROM sys_ai_qa_log
           $_qa_where
           GROUP BY TRIM(question)
@@ -985,14 +993,23 @@ function _qa_source_badge(string $s): string {
                     $sources = array_filter(explode(',', (string)($r['sources'] ?? '')));
                     $isQ     = (string)($r['is_question'] ?? 'unknown');
                 ?>
+                    <?php
+                        $matchedVia = (string)($r['matched_via'] ?? '');
+                        $matchedFaqId = (int)($r['matched_faq_id'] ?? 0);
+                        $canPromote = $matchedFaqId > 0 && str_starts_with($matchedVia, 'gemini_');
+                    ?>
                     <tr class="qa-row border-b border-gray-100"
                         data-group-key="<?= htmlspecialchars((string)$r['group_key'], ENT_QUOTES) ?>"
                         data-sample-id="<?= (int)($r['sample_id'] ?? 0) ?>"
+                        data-all-ids="<?= htmlspecialchars((string)($r['all_ids'] ?? ''), ENT_QUOTES) ?>"
                         data-question="<?= htmlspecialchars((string)$r['question'], ENT_QUOTES) ?>"
                         data-answer="<?= htmlspecialchars((string)($r['ai_answer'] ?? ''), ENT_QUOTES) ?>"
                         data-category="<?= htmlspecialchars((string)($r['category'] ?? ''), ENT_QUOTES) ?>"
                         data-status="<?= htmlspecialchars((string)$r['status'], ENT_QUOTES) ?>"
                         data-is-question="<?= htmlspecialchars($isQ, ENT_QUOTES) ?>"
+                        data-matched-via="<?= htmlspecialchars($matchedVia, ENT_QUOTES) ?>"
+                        data-matched-faq-id="<?= $matchedFaqId ?>"
+                        data-can-promote="<?= $canPromote ? '1' : '0' ?>"
                         data-note="<?= htmlspecialchars((string)($r['reviewer_note'] ?? ''), ENT_QUOTES) ?>">
                         <td class="px-4 py-3 text-xs text-gray-500 whitespace-nowrap"><?= date('d/m H:i', strtotime((string)$r['latest_at'])) ?></td>
                         <td class="px-4 py-3">
@@ -1015,6 +1032,12 @@ function _qa_source_badge(string $s): string {
                                 <?php if ($occ > 1): ?>
                                     <span class="qa-chip shrink-0 bg-amber-50 text-amber-700 border border-amber-200" title="ถูกถาม <?= $occ ?> ครั้ง">
                                         <i class="fa-solid fa-layer-group"></i> ×<?= $occ ?>
+                                    </span>
+                                <?php endif; ?>
+                                <?php if ($canPromote): ?>
+                                    <span class="qa-chip shrink-0 bg-violet-50 text-violet-700 border border-violet-200"
+                                          title="Gemini match กับ FAQ #<?= $matchedFaqId ?> — กดปุ่ม promote เพื่อลด latency ครั้งถัดไป">
+                                        <i class="fa-solid fa-arrow-up-from-bracket"></i> promote ได้
                                     </span>
                                 <?php endif; ?>
                             </div>
@@ -1048,6 +1071,12 @@ function _qa_source_badge(string $s): string {
                             <button class="qa-act qa-promote p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg" title="ทำเป็น FAQ">
                                 <i class="fa-solid fa-bookmark text-xs"></i>
                             </button>
+                            <?php if ($canPromote): ?>
+                                <button class="qa-act qa-variant p-1.5 text-violet-600 hover:bg-violet-50 rounded-lg"
+                                        title="เพิ่มเป็น variant ของ FAQ #<?= $matchedFaqId ?> — คำถามถัดไปจะตอบเร็วขึ้น">
+                                    <i class="fa-solid fa-arrow-up-from-bracket text-xs"></i>
+                                </button>
+                            <?php endif; ?>
                             <?php if ($isQ === 'no'): ?>
                                 <button class="qa-act qa-mark-yes p-1.5 text-cyan-600 hover:bg-cyan-50 rounded-lg" title="กลับเป็นคำถาม (AI ตัดสินผิด)">
                                     <i class="fa-solid fa-rotate-left text-xs"></i>
@@ -2062,6 +2091,49 @@ function _qa_source_badge(string $s): string {
                 category: tr.dataset.category || 'อื่นๆ',
                 isNew: true,
             });
+        });
+    });
+
+    // ─── Promote captured row → FAQ variant ──────────────────────────────
+    // For rows that Gemini matched to a FAQ (matched_via=gemini_*). Bulk-
+    // promotes every qa_log id behind the group so future identical
+    // phrasings hit Phase 1 exact-match instead of Phase 2 Gemini call.
+    document.querySelectorAll('.qa-variant').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const tr = btn.closest('tr');
+            const faqId = parseInt(tr.dataset.matchedFaqId || '0', 10);
+            const question = tr.dataset.question || '';
+            const allIds = (tr.dataset.allIds || '').split(',').filter(Boolean).map(s => parseInt(s, 10));
+            if (!faqId || allIds.length === 0) {
+                Swal.fire({ icon: 'error', title: 'ข้อมูลไม่พอ', text: 'matched_faq_id หรือ qa_log_id หาย' });
+                return;
+            }
+            const { isConfirmed } = await Swal.fire({
+                icon: 'question',
+                title: 'เพิ่มเป็น variant ของ FAQ?',
+                html: `
+                    <div class="text-left text-sm leading-relaxed">
+                        <div class="mb-2"><b>คำถามที่จะเพิ่ม:</b><br><span class="text-violet-700">"${question.replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]))}"</span></div>
+                        <div class="mb-2"><b>FAQ ปลายทาง:</b> #${faqId} <span class="text-gray-400">(Gemini เป็นคน match)</span></div>
+                        <div class="text-xs text-gray-500">หลัง promote ครั้งถัดไปคำถามนี้จะถูก match แบบ exact (50ms) แทน Gemini (~2s) และ row นี้จะถูก mark เป็น approved</div>
+                    </div>`,
+                showCancelButton: true,
+                confirmButtonText: 'Promote',
+                cancelButtonText: 'ยกเลิก',
+                confirmButtonColor: '#7c3aed',
+            });
+            if (!isConfirmed) return;
+            const res = await api('variant:promote', { ids: JSON.stringify(allIds) });
+            if (res.ok) {
+                Swal.fire({
+                    icon: 'success',
+                    title: `Promote เรียบร้อย (${res.promoted} แถว)`,
+                    timer: 1500,
+                    showConfirmButton: false,
+                }).then(() => location.reload());
+            } else {
+                Swal.fire({ icon: 'error', title: 'ไม่สำเร็จ', text: res.message || '' });
+            }
         });
     });
 

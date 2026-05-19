@@ -501,6 +501,92 @@ try {
         exit;
     }
 
+    // ─── Promote a captured question → FAQ variant ────────────────────────
+    // The "B→A migration" path: a user asked something Phase 2 (Gemini
+    // semantic match) handled, the captured row now carries matched_faq_id,
+    // and the admin wants subsequent identical phrasings to hit Phase 1
+    // exact-match (50ms) instead of paying for Gemini every time (~2s + quota).
+    //
+    // Accepts either a single qa_log_id or a JSON array (bulk promote).
+    // faq_id is optional — if omitted, uses the matched_faq_id stamped at
+    // capture time. Pass faq_id explicitly to redirect to a different FAQ
+    // (e.g. when Gemini matched the wrong one).
+    if ($action === 'variant:promote') {
+        $ids = [];
+        if (!empty($_POST['ids'])) {
+            $decoded = json_decode((string)$_POST['ids'], true);
+            if (is_array($decoded)) $ids = array_map('intval', $decoded);
+        } elseif (!empty($_POST['qa_log_id'])) {
+            $ids = [(int)$_POST['qa_log_id']];
+        }
+        $ids = array_values(array_filter($ids, fn($n) => $n > 0));
+        if (empty($ids)) {
+            echo json_encode(['ok' => false, 'message' => 'no qa_log_id supplied']);
+            exit;
+        }
+        $faqIdOverride = (int)($_POST['faq_id'] ?? 0);
+
+        // Fetch the captured rows we're about to promote, in one query
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        $rows = $pdo->prepare("
+            SELECT id, question, matched_faq_id, status
+              FROM sys_ai_qa_log
+             WHERE id IN ($placeholders)
+        ");
+        $rows->execute($ids);
+        $captured = $rows->fetchAll(PDO::FETCH_ASSOC);
+        if (empty($captured)) {
+            echo json_encode(['ok' => false, 'message' => 'rows not found']);
+            exit;
+        }
+
+        require_once __DIR__ . '/../includes/ai_cache_helper.php';
+        $insVariant = $pdo->prepare("
+            INSERT INTO sys_ai_faq_variants (faq_id, variant_question, source)
+            VALUES (:fid, :q, 'ai_generated')
+        ");
+        $updLog = $pdo->prepare("
+            UPDATE sys_ai_qa_log
+               SET status = 'approved',
+                   reviewed_at = NOW(),
+                   reviewed_by = :rb
+             WHERE id = :id
+        ");
+
+        $promoted = 0;
+        $skipped  = [];
+        foreach ($captured as $r) {
+            $targetFaqId = $faqIdOverride > 0 ? $faqIdOverride : (int)($r['matched_faq_id'] ?? 0);
+            if ($targetFaqId <= 0) {
+                $skipped[] = ['id' => (int)$r['id'], 'reason' => 'no_matched_faq'];
+                continue;
+            }
+            $q = trim((string)$r['question']);
+            if ($q === '' || mb_strlen($q) > 500) {
+                $skipped[] = ['id' => (int)$r['id'], 'reason' => 'bad_question_length'];
+                continue;
+            }
+            try {
+                $insVariant->execute([':fid' => $targetFaqId, ':q' => $q]);
+                $updLog->execute([':rb' => $reviewerId ?: null, ':id' => (int)$r['id']]);
+                // Invalidate any cached answer for this exact question so
+                // the next user sees the new exact-match path immediately.
+                ai_cache_invalidate_question($pdo, $q);
+                $promoted++;
+            } catch (Throwable $e) {
+                $skipped[] = ['id' => (int)$r['id'], 'reason' => 'db_error'];
+                error_log('variant:promote failed for qa_log#' . $r['id'] . ': ' . $e->getMessage());
+            }
+        }
+
+        echo json_encode([
+            'ok'       => true,
+            'promoted' => $promoted,
+            'skipped'  => $skipped,
+        ]);
+        exit;
+    }
+
     // ─── Bulk mark FAQ rows as time-sensitive ────────────────────────────
     // Pair to the stale scanner: instead of *deleting* stale rows, the
     // admin can flip is_time_sensitive=1 on them so the matcher ignores

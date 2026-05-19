@@ -75,6 +75,12 @@ function ensure_ai_qa_schema(PDO $pdo): void
     try { $pdo->exec("ALTER TABLE sys_ai_qa_log ADD COLUMN is_question ENUM('unknown','yes','no') NOT NULL DEFAULT 'unknown' AFTER status"); } catch (PDOException) {}
     try { $pdo->exec("ALTER TABLE sys_ai_qa_log ADD COLUMN question_check_at DATETIME NULL AFTER is_question"); } catch (PDOException) {}
     try { $pdo->exec("ALTER TABLE sys_ai_qa_log ADD INDEX idx_is_question (is_question)"); } catch (PDOException) {}
+    // Phase-2 promotion trail: when Gemini semantic-matches a captured
+    // question to a FAQ, we record which FAQ matched so admin can
+    // 1-click promote the captured question into a variant of that FAQ.
+    try { $pdo->exec("ALTER TABLE sys_ai_qa_log ADD COLUMN matched_via VARCHAR(40) NULL AFTER ai_answer"); } catch (PDOException) {}
+    try { $pdo->exec("ALTER TABLE sys_ai_qa_log ADD COLUMN matched_faq_id INT UNSIGNED NULL AFTER matched_via"); } catch (PDOException) {}
+    try { $pdo->exec("ALTER TABLE sys_ai_qa_log ADD INDEX idx_matched_faq (matched_faq_id)"); } catch (PDOException) {}
 }
 
 /**
@@ -93,19 +99,22 @@ function capture_ai_qa(
     string $question,
     ?int $userId = null,
     ?string $lineUserId = null,
-    ?string $sourceRefId = null
-): void {
+    ?string $sourceRefId = null,
+    ?string $matchedVia = null,
+    ?int $matchedFaqId = null
+): ?int {
     $question = trim($question);
-    if ($question === '' || mb_strlen($question) > 4000) return;
-    if (!in_array($source, ['chat', 'line'], true)) return;
+    if ($question === '' || mb_strlen($question) > 4000) return null;
+    if (!in_array($source, ['chat', 'line'], true)) return null;
 
     try {
         ensure_ai_qa_schema($pdo);
         $stmt = $pdo->prepare("
             INSERT INTO sys_ai_qa_log
-                (source, source_ref_id, user_id, line_user_id, question, status)
+                (source, source_ref_id, user_id, line_user_id, question, status,
+                 matched_via, matched_faq_id)
             VALUES
-                (:source, :ref, :uid, :lid, :q, 'pending')
+                (:source, :ref, :uid, :lid, :q, 'pending', :mv, :mfid)
         ");
         $stmt->execute([
             ':source' => $source,
@@ -113,9 +122,55 @@ function capture_ai_qa(
             ':uid'    => $userId,
             ':lid'    => $lineUserId,
             ':q'      => $question,
+            ':mv'     => $matchedVia,
+            ':mfid'   => $matchedFaqId,
         ]);
+        return (int)$pdo->lastInsertId();
     } catch (Throwable $e) {
         error_log('capture_ai_qa failed: ' . $e->getMessage());
+        return null;
+    }
+}
+
+/**
+ * Stamp the match outcome onto a captured row after Phase 2 resolves.
+ *
+ * Callers capture_ai_qa() before running the matcher (so we never lose
+ * a question even if Gemini falls over), then call this once they know
+ * which FAQ — if any — matched. That trail is what powers the "promote
+ * captured → variant" button in the Captured Questions tab.
+ *
+ * source_id is only stored as matched_faq_id when matched_via points at
+ * a FAQ row (exact_canonical / exact_variant / gemini_faq); for
+ * gemini_qa / exact_approved we keep matched_via but leave faq_id NULL.
+ */
+function update_ai_qa_match(PDO $pdo, int $qaLogId, string $matchedVia, ?int $sourceId): void
+{
+    if ($qaLogId <= 0 || $matchedVia === '') return;
+
+    $faqId = null;
+    if ($sourceId !== null && $sourceId > 0) {
+        if ($matchedVia === 'exact_canonical'
+            || $matchedVia === 'exact_variant'
+            || $matchedVia === 'gemini_faq') {
+            $faqId = $sourceId;
+        }
+    }
+
+    try {
+        $stmt = $pdo->prepare("
+            UPDATE sys_ai_qa_log
+               SET matched_via = :mv,
+                   matched_faq_id = :mfid
+             WHERE id = :id
+        ");
+        $stmt->execute([
+            ':mv'   => $matchedVia,
+            ':mfid' => $faqId,
+            ':id'   => $qaLogId,
+        ]);
+    } catch (Throwable $e) {
+        error_log('update_ai_qa_match failed: ' . $e->getMessage());
     }
 }
 
