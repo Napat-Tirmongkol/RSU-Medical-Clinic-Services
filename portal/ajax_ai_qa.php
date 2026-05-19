@@ -27,18 +27,47 @@ if ($_role !== 'superadmin' && empty($_SESSION['access_ai'])) {
     exit;
 }
 
+$pdo = db();
+ensure_ai_qa_schema($pdo);
+
+// Method-aware action lookup: read-only actions can come in via GET so
+// the Overview dashboard can fetch them without CSRF. Mutating actions
+// (everything else) still require POST + a valid CSRF token below.
+$action     = (string)($_POST['action'] ?? $_GET['action'] ?? '');
+$reviewerId = (int)($_SESSION['admin_id'] ?? $_SESSION['user_id'] ?? 0);
+
+// Read-only Phase C endpoints — return-and-exit before the POST/CSRF gate
+if ($action === 'health_summary' || $action === 'telemetry_recent') {
+    try {
+        require_once __DIR__ . '/../includes/ai_telemetry_helper.php';
+        require_once __DIR__ . '/../includes/ai_cache_helper.php';
+        if ($action === 'health_summary') {
+            $windowHours = max(1, min(168, (int)($_REQUEST['window_hours'] ?? 24)));
+            echo json_encode([
+                'ok'        => true,
+                'telemetry' => ai_telemetry_summary($pdo, $windowHours),
+                'cache'     => ai_cache_stats($pdo, 10),
+            ], JSON_UNESCAPED_UNICODE);
+        } else {
+            $limit = max(1, min(200, (int)($_REQUEST['limit'] ?? 50)));
+            echo json_encode([
+                'ok'   => true,
+                'rows' => ai_telemetry_recent($pdo, $limit),
+            ], JSON_UNESCAPED_UNICODE);
+        }
+    } catch (Throwable $e) {
+        error_log('ajax_ai_qa (read) ' . $action . ': ' . $e->getMessage());
+        echo json_encode(['ok' => false, 'message' => 'Server error']);
+    }
+    exit;
+}
+
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     echo json_encode(['ok' => false, 'message' => 'POST only']);
     exit;
 }
 
 validate_csrf_or_die();
-
-$pdo = db();
-ensure_ai_qa_schema($pdo);
-
-$action     = (string)($_POST['action'] ?? '');
-$reviewerId = (int)($_SESSION['admin_id'] ?? $_SESSION['user_id'] ?? 0);
 
 try {
     if ($action === 'generate') {
@@ -462,32 +491,9 @@ try {
         exit;
     }
 
-    // ─── Phase C health endpoints ─────────────────────────────────────────
-    // GET-friendly read-only summaries (Lab "AI health" widget) +
-    // POST-gated cache bust (after admin pushes a knowledge update).
-
-    if ($action === 'health_summary') {
-        require_once __DIR__ . '/../includes/ai_telemetry_helper.php';
-        require_once __DIR__ . '/../includes/ai_cache_helper.php';
-        $windowHours = max(1, min(168, (int)($_REQUEST['window_hours'] ?? 24)));
-        echo json_encode([
-            'ok'        => true,
-            'telemetry' => ai_telemetry_summary($pdo, $windowHours),
-            'cache'     => ai_cache_stats($pdo, 10),
-        ], JSON_UNESCAPED_UNICODE);
-        exit;
-    }
-
-    if ($action === 'telemetry_recent') {
-        require_once __DIR__ . '/../includes/ai_telemetry_helper.php';
-        $limit = max(1, min(200, (int)($_REQUEST['limit'] ?? 50)));
-        echo json_encode([
-            'ok'   => true,
-            'rows' => ai_telemetry_recent($pdo, $limit),
-        ], JSON_UNESCAPED_UNICODE);
-        exit;
-    }
-
+    // ─── Phase C: cache purge (POST + CSRF protected) ────────────────────
+    // health_summary / telemetry_recent are read-only and handled above
+    // before the POST/CSRF gate so the Overview dashboard can poll them.
     if ($action === 'cache_purge') {
         require_once __DIR__ . '/../includes/ai_cache_helper.php';
         $n = ai_cache_purge_all($pdo);

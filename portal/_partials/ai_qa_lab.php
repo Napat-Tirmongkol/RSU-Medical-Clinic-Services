@@ -12,8 +12,8 @@ require_once __DIR__ . '/../../includes/ai_qa_helper.php';
 ensure_ai_qa_schema($pdo);
 ensure_ai_faq_schema($pdo);
 
-$_qa_tab = (string)($_GET['qa_tab'] ?? 'captured');
-if (!in_array($_qa_tab, ['captured', 'faq', 'feedback', 'sandbox', 'autoreply'], true)) $_qa_tab = 'captured';
+$_qa_tab = (string)($_GET['qa_tab'] ?? 'overview');
+if (!in_array($_qa_tab, ['overview', 'captured', 'faq', 'feedback', 'sandbox', 'autoreply'], true)) $_qa_tab = 'overview';
 
 require_once __DIR__ . '/../../includes/ai_feedback_helper.php';
 ensure_ai_feedback_schema($pdo);
@@ -278,11 +278,49 @@ function _qa_source_badge(string $s): string {
         transition: color .15s, border-color .15s;
     }
     .qa-tab:hover { color: #1f2937; }
+    .qa-tab.qa-tab-active--overview { color: #be185d; border-bottom-color: #db2777; }
     .qa-tab.qa-tab-active--captured { color: #7c3aed; border-bottom-color: #9333ea; }
     .qa-tab.qa-tab-active--faq      { color: #047857; border-bottom-color: #059669; }
     .qa-tab.qa-tab-active--feedback { color: #0369a1; border-bottom-color: #0284c7; }
     .qa-tab.qa-tab-active--sandbox  { color: #7c3aed; border-bottom-color: #7c3aed; }
     .qa-tab.qa-tab-active--autoreply{ color: #0ea5e9; border-bottom-color: #0ea5e9; }
+
+    /* Overview dashboard tiles */
+    .qaov-kpi { background:#fff; border:1.5px solid #e5e7eb; border-radius:18px; padding:18px 20px; position:relative; overflow:hidden; transition:transform .2s, box-shadow .2s, border-color .2s; }
+    .qaov-kpi:hover { transform: translateY(-2px); box-shadow:0 8px 24px rgba(0,0,0,.06); }
+    .qaov-kpi .lbl { font-size:11px; font-weight:800; color:#64748b; text-transform:uppercase; letter-spacing:.06em; }
+    .qaov-kpi .val { font-size:28px; font-weight:900; color:#0f172a; margin-top:4px; line-height:1.1; }
+    .qaov-kpi .sub { font-size:11px; color:#94a3b8; margin-top:4px; }
+    .qaov-kpi[data-tone="good"]   { border-color:#a7f3d0; }
+    .qaov-kpi[data-tone="good"]   .val { color:#047857; }
+    .qaov-kpi[data-tone="warn"]   { border-color:#fde68a; }
+    .qaov-kpi[data-tone="warn"]   .val { color:#b45309; }
+    .qaov-kpi[data-tone="bad"]    { border-color:#fecaca; }
+    .qaov-kpi[data-tone="bad"]    .val { color:#b91c1c; }
+    .qaov-kpi[data-tone="neutral"]{ border-color:#e0e7ff; }
+    .qaov-kpi[data-tone="neutral"].val, .qaov-kpi[data-tone="neutral"] .val { color:#3730a3; }
+
+    .qaov-card { background:#fff; border:1.5px solid #e5e7eb; border-radius:18px; padding:20px; }
+    .qaov-card h4 { font-size:13px; font-weight:900; color:#0f172a; margin-bottom:12px; display:flex; align-items:center; gap:8px; }
+    .qaov-event { display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:10px; font-size:12px; }
+    .qaov-event:hover { background:#f8fafc; }
+    .qaov-event .ev-time { color:#94a3b8; min-width:90px; font-variant-numeric: tabular-nums; }
+    .qaov-event .ev-badge { font-size:10px; font-weight:800; padding:2px 8px; border-radius:99px; }
+    .qaov-event .ev-meta { color:#64748b; flex:1; }
+
+    .qaov-onboard { background:linear-gradient(135deg,#fef3c7 0%,#fde68a 100%); border:1.5px solid #fcd34d; border-radius:18px; padding:18px 22px; display:flex; align-items:center; gap:16px; }
+    .qaov-onboard .icon { font-size:32px; color:#b45309; }
+    .qaov-onboard h4 { margin:0; font-size:15px; font-weight:900; color:#78350f; }
+    .qaov-onboard p { margin:4px 0 0; font-size:12px; color:#92400e; line-height:1.5; }
+
+    body[data-theme='dark'] #section-ai_qa_lab .qaov-kpi,
+    body[data-theme='dark'] #section-ai_qa_lab .qaov-card { background:#0f172a; border-color:#1e293b; }
+    body[data-theme='dark'] #section-ai_qa_lab .qaov-kpi .val { color:#e2e8f0; }
+    body[data-theme='dark'] #section-ai_qa_lab .qaov-card h4 { color:#e2e8f0; }
+    body[data-theme='dark'] #section-ai_qa_lab .qaov-event:hover { background:#1e293b; }
+    body[data-theme='dark'] #section-ai_qa_lab .qaov-onboard { background:linear-gradient(135deg,#451a03 0%,#78350f 100%); border-color:#92400e; }
+    body[data-theme='dark'] #section-ai_qa_lab .qaov-onboard h4,
+    body[data-theme='dark'] #section-ai_qa_lab .qaov-onboard p { color:#fde68a; }
     /* ── Auto-Reply tab styling (ports from line_settings) ── */
     .line-input { background:#f8fafc; border:1.5px solid #e2e8f0; border-radius:.75rem; padding:.625rem .875rem; font-size:13px; font-weight:600; color:#1e293b; outline:none; width:100%; transition:all .15s; box-sizing:border-box; }
     .line-input:focus { background:#fff; border-color:#06b6d4; box-shadow:0 0 0 3px rgba(6,182,212,.1); }
@@ -420,23 +458,29 @@ function _qa_source_badge(string $s): string {
         <?php endif; ?>
     </div>
 
-    <!-- Tab switcher -->
-    <div class="mb-6 border-b border-gray-200 flex gap-1">
-        <a href="?section=ai_qa_lab&qa_tab=captured"
-           class="qa-tab <?= $_qa_tab === 'captured' ? 'qa-tab-active--captured' : '' ?>">
-            <i class="fa-solid fa-inbox mr-1.5"></i> Captured Questions
-        </a>
-        <a href="?section=ai_qa_lab&qa_tab=faq"
-           class="qa-tab <?= $_qa_tab === 'faq' ? 'qa-tab-active--faq' : '' ?>">
-            <i class="fa-solid fa-book-bookmark mr-1.5"></i> FAQ Knowledge Base
-        </a>
-        <a href="?section=ai_qa_lab&qa_tab=feedback"
-           class="qa-tab <?= $_qa_tab === 'feedback' ? 'qa-tab-active--feedback' : '' ?>">
-            <i class="fa-solid fa-thumbs-up mr-1.5"></i> Feedback Log
+    <!-- Tab switcher — reordered around the operator's workflow:
+         Overview (health) → Sandbox (test) → Captured (review) →
+         FAQ (curate) → Feedback (analyze) → Auto-Reply (configure) -->
+    <div class="mb-6 border-b border-gray-200 flex gap-1 flex-wrap">
+        <a href="?section=ai_qa_lab&qa_tab=overview"
+           class="qa-tab <?= $_qa_tab === 'overview' ? 'qa-tab-active--overview' : '' ?>">
+            <i class="fa-solid fa-gauge-high mr-1.5"></i> ภาพรวม
         </a>
         <a href="?section=ai_qa_lab&qa_tab=sandbox"
            class="qa-tab <?= $_qa_tab === 'sandbox' ? 'qa-tab-active--sandbox' : '' ?>">
-            <i class="fa-solid fa-flask mr-1.5"></i> Sandbox
+            <i class="fa-solid fa-flask mr-1.5"></i> ทดสอบ (Sandbox)
+        </a>
+        <a href="?section=ai_qa_lab&qa_tab=captured"
+           class="qa-tab <?= $_qa_tab === 'captured' ? 'qa-tab-active--captured' : '' ?>">
+            <i class="fa-solid fa-inbox mr-1.5"></i> คำถามที่เก็บมา
+        </a>
+        <a href="?section=ai_qa_lab&qa_tab=faq"
+           class="qa-tab <?= $_qa_tab === 'faq' ? 'qa-tab-active--faq' : '' ?>">
+            <i class="fa-solid fa-book-bookmark mr-1.5"></i> คลัง FAQ
+        </a>
+        <a href="?section=ai_qa_lab&qa_tab=feedback"
+           class="qa-tab <?= $_qa_tab === 'feedback' ? 'qa-tab-active--feedback' : '' ?>">
+            <i class="fa-solid fa-thumbs-up mr-1.5"></i> ผลตอบรับ
         </a>
         <a href="?section=ai_qa_lab&qa_tab=autoreply"
            class="qa-tab <?= $_qa_tab === 'autoreply' ? 'qa-tab-active--autoreply' : '' ?>">
@@ -444,7 +488,230 @@ function _qa_source_badge(string $s): string {
         </a>
     </div>
 
-    <?php if ($_qa_tab === 'captured'): ?>
+    <?php if ($_qa_tab === 'overview'): /* ═══════ TAB: OVERVIEW / HEALTH ═══════ */ ?>
+
+    <!-- Onboarding card — admin ที่เพิ่งเข้าใช้ครั้งแรกอ่านเป็นแผนที่ -->
+    <div class="qaov-onboard mb-5">
+        <i class="fa-solid fa-route icon"></i>
+        <div class="flex-1">
+            <h4>เริ่มต้นใช้งาน AI QA Lab</h4>
+            <p>
+                1) เปิด <b>Auto-Reply</b> ให้บอท LINE ตอบอัตโนมัติ ·
+                2) ดูคำถามจริงใน <b>คำถามที่เก็บมา</b> แล้ว approve คำตอบ ·
+                3) สร้าง <b>FAQ</b> ที่ stable เพื่อตอบเร็ว ·
+                4) <b>ทดสอบ</b> ก่อนเปิดใช้จริง ·
+                5) ติดตามสุขภาพระบบในหน้านี้
+            </p>
+        </div>
+    </div>
+
+    <!-- KPI grid — ข้อมูล realtime จาก Phase C telemetry (last 24h) -->
+    <div id="qaov-kpis" class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
+        <div class="qaov-kpi" data-tone="neutral">
+            <div class="lbl">Gemini calls (24h)</div>
+            <div class="val" data-k="gemini_calls">—</div>
+            <div class="sub" data-k="gemini_calls_sub">รวมทุก source</div>
+        </div>
+        <div class="qaov-kpi" data-tone="good" data-k-tone="gemini_fail">
+            <div class="lbl">Gemini fail rate</div>
+            <div class="val" data-k="gemini_fail_rate">—</div>
+            <div class="sub" data-k="gemini_fail_sub">เป้าหมาย &lt; 5%</div>
+        </div>
+        <div class="qaov-kpi" data-tone="neutral" data-k-tone="cache_hit">
+            <div class="lbl">Cache hit rate</div>
+            <div class="val" data-k="cache_hit_rate">—</div>
+            <div class="sub" data-k="cache_hit_sub">ยิ่งสูงยิ่งประหยัด quota</div>
+        </div>
+        <div class="qaov-kpi" data-tone="neutral" data-k-tone="satisfaction">
+            <div class="lbl">User satisfaction</div>
+            <div class="val" data-k="satisfaction">—</div>
+            <div class="sub" data-k="satisfaction_sub">👍 / (👍 + 👎)</div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-5">
+        <!-- Cache stats + bust button -->
+        <div class="qaov-card lg:col-span-1">
+            <h4><i class="fa-solid fa-bolt text-amber-500"></i> Answer cache</h4>
+            <div class="space-y-2 text-sm">
+                <div class="flex justify-between">
+                    <span class="text-gray-500">รายการในแคช</span>
+                    <span class="font-bold" id="qaov-cache-total">—</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-500">cache hits (วันนี้)</span>
+                    <span class="font-bold text-emerald-600" id="qaov-cache-hits">—</span>
+                </div>
+                <div class="flex justify-between text-xs text-gray-400">
+                    <span>หมดอายุตอน 23:59 ทุกวัน</span>
+                </div>
+            </div>
+            <button id="qaov-bust-cache"
+                class="mt-3 w-full text-xs font-bold px-3 py-2 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200">
+                <i class="fa-solid fa-broom mr-1"></i> ล้างแคชทั้งหมด
+            </button>
+            <p class="text-[11px] text-gray-400 mt-2">กดหลังอัปเดต knowledge เพื่อให้คำตอบเก่าถูกสร้างใหม่</p>
+        </div>
+
+        <!-- Recent telemetry timeline -->
+        <div class="qaov-card lg:col-span-2">
+            <h4 class="!mb-3 justify-between" style="display:flex">
+                <span><i class="fa-solid fa-pulse text-pink-500"></i> เหตุการณ์ล่าสุด</span>
+                <button id="qaov-refresh-timeline" class="text-[11px] font-bold text-gray-400 hover:text-gray-700">
+                    <i class="fa-solid fa-arrows-rotate"></i> รีเฟรช
+                </button>
+            </h4>
+            <div id="qaov-timeline" class="space-y-1 max-h-72 overflow-y-auto pr-1">
+                <div class="text-xs text-gray-400 italic">กำลังโหลด...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick action shortcuts to other tabs -->
+    <div class="qaov-card">
+        <h4><i class="fa-solid fa-bolt-lightning text-violet-500"></i> ทางลัด</h4>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+            <a href="?section=ai_qa_lab&qa_tab=sandbox"
+               class="text-center px-3 py-3 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold text-xs transition">
+                <i class="fa-solid fa-flask block text-lg mb-1"></i> ทดสอบคำถาม
+            </a>
+            <a href="?section=ai_qa_lab&qa_tab=captured"
+               class="text-center px-3 py-3 rounded-xl bg-violet-50 hover:bg-violet-100 text-violet-700 font-bold text-xs transition">
+                <i class="fa-solid fa-inbox block text-lg mb-1"></i> รีวิวคำถาม
+            </a>
+            <a href="?section=ai_qa_lab&qa_tab=faq"
+               class="text-center px-3 py-3 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-xs transition">
+                <i class="fa-solid fa-book-bookmark block text-lg mb-1"></i> จัดการ FAQ
+            </a>
+            <a href="?section=ai_qa_lab&qa_tab=autoreply"
+               class="text-center px-3 py-3 rounded-xl bg-cyan-50 hover:bg-cyan-100 text-cyan-700 font-bold text-xs transition">
+                <i class="fa-solid fa-comments block text-lg mb-1"></i> ตั้ง Auto-Reply
+            </a>
+        </div>
+    </div>
+
+    <script>
+    (function() {
+        const CSRF_OV = '<?= get_csrf_token() ?>';
+
+        function setKpi(key, val) {
+            const el = document.querySelector(`[data-k="${key}"]`);
+            if (el) el.textContent = val;
+        }
+        function setKpiTone(targetSelector, tone) {
+            const el = document.querySelector(targetSelector);
+            if (el) el.setAttribute('data-tone', tone);
+        }
+        function pct(n) {
+            if (n === null || n === undefined) return '—';
+            return (Number(n) * 100).toFixed(1) + '%';
+        }
+        function fmtTime(ts) {
+            if (!ts) return '';
+            const d = new Date(ts.replace(' ', 'T') + '+07:00');
+            if (isNaN(d)) return ts;
+            return d.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        }
+        const eventBadge = {
+            gemini_call:           { color: '#6366f1', bg: '#eef2ff', label: 'Gemini call' },
+            gemini_success:        { color: '#047857', bg: '#d1fae5', label: 'Gemini OK' },
+            gemini_fail:           { color: '#b91c1c', bg: '#fee2e2', label: 'Gemini fail' },
+            cache_hit:             { color: '#b45309', bg: '#fef3c7', label: 'Cache hit' },
+            cache_miss:            { color: '#64748b', bg: '#f1f5f9', label: 'Cache miss' },
+            faq_hit:               { color: '#0369a1', bg: '#e0f2fe', label: 'FAQ hit' },
+            bypass_time_sensitive: { color: '#a21caf', bg: '#fae8ff', label: 'Bypass (time-sensitive)' },
+            fallback_used:         { color: '#9333ea', bg: '#f3e8ff', label: 'Fallback used' },
+            thumbs_up:             { color: '#047857', bg: '#d1fae5', label: '👍' },
+            thumbs_down:           { color: '#b91c1c', bg: '#fee2e2', label: '👎' },
+        };
+
+        async function loadHealth() {
+            try {
+                const r = await fetch('ajax_ai_qa.php?action=health_summary&window_hours=24', { credentials: 'same-origin' });
+                const j = await r.json();
+                if (!j.ok) return;
+                const t = j.telemetry || {};
+                const c = j.cache || {};
+                setKpi('gemini_calls', (t.gemini_calls || 0).toLocaleString('th-TH'));
+                setKpi('gemini_calls_sub', `OK ${t.gemini_success || 0} · fail ${t.gemini_fail || 0}`);
+                setKpi('gemini_fail_rate', pct(t.gemini_fail_rate));
+                setKpiTone('[data-k-tone="gemini_fail"]',
+                    (t.gemini_fail_rate || 0) < 0.05 ? 'good' :
+                    (t.gemini_fail_rate || 0) < 0.20 ? 'warn' : 'bad');
+                setKpi('cache_hit_rate', pct(t.cache_hit_rate));
+                setKpiTone('[data-k-tone="cache_hit"]',
+                    (t.cache_hit_rate || 0) >= 0.30 ? 'good' :
+                    (t.cache_hit_rate || 0) >= 0.10 ? 'warn' : 'neutral');
+                setKpi('satisfaction', t.satisfaction_rate === null ? '—' : pct(t.satisfaction_rate));
+                setKpi('satisfaction_sub', `👍 ${t.thumbs_up || 0} · 👎 ${t.thumbs_down || 0}`);
+                setKpiTone('[data-k-tone="satisfaction"]',
+                    t.satisfaction_rate === null ? 'neutral' :
+                    t.satisfaction_rate >= 0.8 ? 'good' :
+                    t.satisfaction_rate >= 0.5 ? 'warn' : 'bad');
+
+                document.getElementById('qaov-cache-total').textContent = (c.total || 0).toLocaleString('th-TH');
+                document.getElementById('qaov-cache-hits').textContent  = (c.hits || 0).toLocaleString('th-TH');
+            } catch (e) {
+                console.warn('health_summary failed', e);
+            }
+        }
+
+        async function loadTimeline() {
+            const tl = document.getElementById('qaov-timeline');
+            tl.innerHTML = '<div class="text-xs text-gray-400 italic">กำลังโหลด...</div>';
+            try {
+                const r = await fetch('ajax_ai_qa.php?action=telemetry_recent&limit=20', { credentials: 'same-origin' });
+                const j = await r.json();
+                if (!j.ok || !j.rows || j.rows.length === 0) {
+                    tl.innerHTML = '<div class="text-xs text-gray-400 italic">ยังไม่มีเหตุการณ์ — รอ user ถามคำถามใน LINE หรือลองที่ tab Sandbox</div>';
+                    return;
+                }
+                tl.innerHTML = j.rows.map(ev => {
+                    const b = eventBadge[ev.event_type] || { color: '#475569', bg: '#f1f5f9', label: ev.event_type };
+                    const meta = [];
+                    if (ev.model) meta.push(ev.model);
+                    if (ev.elapsed_ms) meta.push(ev.elapsed_ms + 'ms');
+                    if (ev.error_msg) meta.push(String(ev.error_msg).slice(0, 60));
+                    return `
+                        <div class="qaov-event">
+                            <span class="ev-time">${fmtTime(ev.created_at)}</span>
+                            <span class="ev-badge" style="color:${b.color};background:${b.bg}">${b.label}</span>
+                            <span class="ev-meta">${meta.map(x => `<span>${String(x).replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]))}</span>`).join(' · ')}</span>
+                        </div>
+                    `;
+                }).join('');
+            } catch (e) {
+                tl.innerHTML = '<div class="text-xs text-rose-500">โหลดไม่สำเร็จ: ' + e.message + '</div>';
+            }
+        }
+
+        document.getElementById('qaov-refresh-timeline')?.addEventListener('click', () => { loadHealth(); loadTimeline(); });
+        document.getElementById('qaov-bust-cache')?.addEventListener('click', async () => {
+            const { isConfirmed } = await Swal.fire({
+                title: 'ล้างแคชทั้งหมด?', text: 'คำตอบที่เก็บไว้วันนี้จะถูกลบ — คำถามครั้งถัดไปจะ generate ใหม่',
+                icon: 'warning', showCancelButton: true,
+                confirmButtonText: 'ล้าง', cancelButtonText: 'ยกเลิก', confirmButtonColor: '#e11d48',
+            });
+            if (!isConfirmed) return;
+            const fd = new FormData(); fd.append('action', 'cache_purge'); fd.append('csrf_token', CSRF_OV);
+            const r = await fetch('ajax_ai_qa.php', { method: 'POST', body: fd, credentials: 'same-origin' });
+            const j = await r.json();
+            if (j.ok) {
+                Swal.fire({ icon: 'success', title: `ล้างแคชแล้ว (${j.purged} รายการ)`, timer: 1500, showConfirmButton: false });
+                loadHealth();
+            } else {
+                Swal.fire({ icon: 'error', title: 'ล้างไม่สำเร็จ', text: j.message || '' });
+            }
+        });
+
+        loadHealth();
+        loadTimeline();
+        // Soft auto-refresh every 30s so the dashboard feels live
+        setInterval(() => { loadHealth(); loadTimeline(); }, 30000);
+    })();
+    </script>
+
+    <?php elseif ($_qa_tab === 'captured'): ?>
     <!-- ════════════ TAB: CAPTURED QUESTIONS ════════════ -->
 
     <!-- Stats cards -->
