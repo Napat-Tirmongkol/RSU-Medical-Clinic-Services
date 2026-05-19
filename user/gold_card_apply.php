@@ -125,7 +125,25 @@ $__navActive = 'services';
         #cam-stage video { transform: scaleX(-1); transition: transform 0.2s; }
         #cam-stage video.no-mirror { transform: none; }
         #cam-stage .cam-frame { width: 78%; height: 56%; border: 2px dashed rgba(255,255,255,0.55); border-radius: 1.5rem; }
-        #cam-snap-btn:active { transform: scale(0.92); }
+        #cam-stage .cam-controls {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+            padding: 20px 24px;
+            background: #000;
+        }
+        /* Shutter is absolutely centered → not affected by flex distribution
+           of the side buttons, stays in the middle regardless of viewport */
+        #cam-snap-btn {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            margin: 0;
+        }
+        #cam-snap-btn:active { transform: translate(-50%, -50%) scale(0.92); }
         #cam-snap-btn::after { content: ''; position: absolute; inset: 6px; border-radius: 9999px; background: #f59e0b; }
         #cam-stage button { -webkit-tap-highlight-color: transparent; }
     </style>
@@ -333,11 +351,11 @@ $__navActive = 'services';
             </button>
             <div id="cam-error" class="hidden absolute inset-x-5 bottom-5 bg-rose-500/95 text-white text-[12px] font-bold rounded-2xl px-4 py-3"></div>
         </div>
-        <div class="px-6 py-5 bg-black flex items-center justify-around">
+        <div class="cam-controls">
             <button type="button" onclick="gotoGallery()" class="w-12 h-12 rounded-full bg-white/10 text-white flex items-center justify-center" title="เลือกจากเครื่องแทน">
                 <i class="fa-solid fa-images"></i>
             </button>
-            <button type="button" id="cam-snap-btn" onclick="snapPhoto()" class="relative w-20 h-20 rounded-full bg-white shadow-xl border-4 border-white/40"></button>
+            <button type="button" id="cam-snap-btn" onclick="snapPhoto()" class="w-20 h-20 rounded-full bg-white shadow-xl border-4 border-white/40"></button>
             <button type="button" onclick="swapCamera()" class="w-12 h-12 rounded-full bg-white/10 text-white flex items-center justify-center" title="สลับกล้องหน้า/หลัง">
                 <i class="fa-solid fa-camera-rotate"></i>
             </button>
