@@ -41,8 +41,9 @@ try {
     $stmt = $pdo->prepare("
         SELECT id, status, full_name, citizen_id, application_date, created_at
         FROM gold_card_members
-        WHERE linked_user_id = :uid
-           OR (citizen_id IS NOT NULL AND citizen_id = :cid)
+        WHERE (linked_user_id = :uid
+           OR (citizen_id IS NOT NULL AND citizen_id = :cid))
+          AND deleted_at IS NULL
         ORDER BY id DESC LIMIT 1
     ");
     $stmt->execute([

@@ -133,7 +133,7 @@ try {
     $stmt = $pdo->prepare("
         SELECT id, status FROM gold_card_members
         WHERE (linked_user_id = :uid OR citizen_id = :cid)
-          AND (deleted_at IS NULL OR deleted_at IS NULL)
+          AND deleted_at IS NULL
         ORDER BY id DESC LIMIT 1
     ");
     $stmt->execute([':uid' => $userId, ':cid' => $citizenId]);
