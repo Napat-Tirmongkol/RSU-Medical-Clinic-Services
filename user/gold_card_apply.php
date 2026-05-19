@@ -129,33 +129,20 @@ $__navActive = 'services';
         #cam-stage.is-open { display: flex; }
         #cam-stage video { transform: scaleX(-1); transition: transform 0.2s; }
         #cam-stage video.no-mirror { transform: none; }
-        /* KYC framing — face oval on top, Thai national ID card box below
-           (aspect 85.60 / 53.98 mm = 1.586 : 1) so the user knows exactly
-           where to place each subject. Frame colours track the face detector
-           in real time via .is-ok / .is-warn / .is-multi modifier classes. */
-        #cam-stage .kyc-frames {
-            position: absolute; inset: 0;
-            pointer-events: none;
-            display: flex; flex-direction: column;
-            align-items: center; justify-content: space-between;
-            padding: 7% 6%;
-        }
-        #cam-stage .kyc-face,
-        #cam-stage .kyc-card {
-            position: relative;
-            border: 2.5px dashed rgba(255,255,255,0.7);
-            transition: border-color 0.25s, box-shadow 0.25s, background-color 0.25s;
-            background: rgba(0,0,0,0.04);
-        }
+        /* KYC framing — face oval centred in the viewfinder. Border colour
+           tracks the face detector in real time via .is-ok / .is-warn /
+           .is-multi modifier classes. */
         #cam-stage .kyc-face {
-            width: min(58%, 290px);
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: min(62%, 300px);
             aspect-ratio: 3 / 4;
             border-radius: 50%;
-        }
-        #cam-stage .kyc-card {
-            width: min(82%, 360px);
-            aspect-ratio: 1.586;       /* Thai national ID card ratio */
-            border-radius: 14px;
+            border: 2.5px dashed rgba(255,255,255,0.7);
+            background: rgba(0,0,0,0.04);
+            pointer-events: none;
+            transition: border-color 0.25s, box-shadow 0.25s, background-color 0.25s;
         }
         #cam-stage .kyc-face.is-ok    { border-color: rgba(16,185,129,0.95);  box-shadow: 0 0 0 4px rgba(16,185,129,0.18); }
         #cam-stage .kyc-face.is-warn  { border-color: rgba(244,63,94,0.9);    box-shadow: 0 0 0 4px rgba(244,63,94,0.18); }
@@ -313,15 +300,11 @@ $__navActive = 'services';
                     <p class="text-[11px] font-bold text-slate-500 leading-relaxed mb-3">
                         ถ่ายรูปตัวเองคู่กับบัตรประชาชนให้เห็นใบหน้าและข้อมูลในบัตรชัดเจน
                     </p>
-                    <ul class="text-[11px] font-semibold text-slate-600 space-y-1 mb-3 pl-4 list-disc">
+                    <ul class="text-[11px] font-semibold text-slate-600 space-y-1 mb-4 pl-4 list-disc">
                         <li>หน้าตรง ไม่ใส่หมวก/แว่นตาดำ/ที่คาดผม</li>
                         <li>แสงสว่างเพียงพอ ไม่เบลอ</li>
                         <li>เห็นข้อมูลในบัตรประชาชนชัดเจน</li>
                     </ul>
-                    <div class="bg-blue-50 border border-blue-100 rounded-xl px-3 py-2 mb-4 flex items-start gap-2 text-[10px] font-bold text-blue-700 leading-relaxed">
-                        <i class="fa-solid fa-shield-halved mt-0.5"></i>
-                        <span>รูปจะถูกส่งให้ Google Gemini AI ตรวจสอบคุณภาพอัตโนมัติ (ใส่แว่น/แมส/หมวก) ก่อนส่งใบสมัคร — ข้อมูล meta เช่น GPS จะถูกลบก่อนส่งทุกครั้ง</span>
-                    </div>
 
                     <!-- Hidden file inputs — used as fallback if getUserMedia isn't available -->
                     <input type="file" id="photo-input" name="photo" accept="image/*" capture="environment" class="hidden">
@@ -342,14 +325,6 @@ $__navActive = 'services';
                         </div>
                     </div>
 
-                    <!-- AI vision check result card (hidden until photo is checked) -->
-                    <div id="photo-check" class="hidden mt-4 rounded-2xl border p-4 text-[12px] leading-relaxed">
-                        <div id="photo-check-loading" class="hidden flex items-center gap-2 text-slate-600 font-bold">
-                            <i class="fa-solid fa-spinner fa-spin text-amber-500"></i>
-                            <span>กำลังตรวจสอบรูปด้วย AI…</span>
-                        </div>
-                        <div id="photo-check-result" class="hidden"></div>
-                    </div>
                 </div>
 
                 <!-- Signature card -->
@@ -397,17 +372,10 @@ $__navActive = 'services';
     <div id="cam-stage" class="fixed inset-0 hidden bg-black flex-col">
         <div class="flex-1 relative overflow-hidden">
             <video id="cam-video" autoplay playsinline muted class="w-full h-full object-cover"></video>
-            <div class="kyc-frames">
-                <div class="kyc-face">
-                    <span class="kyc-label">
-                        <i class="fa-solid fa-face-smile"></i> ใบหน้า
-                    </span>
-                </div>
-                <div class="kyc-card">
-                    <span class="kyc-label">
-                        <i class="fa-solid fa-id-card"></i> บัตรประชาชน
-                    </span>
-                </div>
+            <div class="kyc-face">
+                <span class="kyc-label">
+                    <i class="fa-solid fa-face-smile"></i> ใบหน้า
+                </span>
             </div>
             <div id="cam-status-pill" class="absolute top-5 left-5 px-3 py-1.5 rounded-full bg-black/60 text-white text-[11px] font-black tracking-wide flex items-center gap-1.5">
                 <i id="cam-status-icon" class="fa-solid fa-id-card"></i>
@@ -465,19 +433,7 @@ $__navActive = 'services';
     const photoEmpty = document.getElementById('photo-empty');
     const photoPreviewWrap = document.getElementById('photo-preview-wrap');
     const photoPreview = document.getElementById('photo-preview');
-    const photoCheckBox = document.getElementById('photo-check');
-    const photoCheckLoading = document.getElementById('photo-check-loading');
-    const photoCheckResult = document.getElementById('photo-check-result');
     window.compressedPhotoBlob = null;
-    // Vision-check state: null = not yet checked, false = checking,
-    // {passed, blockers, check} once finished, 'skipped' if AI not configured,
-    // 'error' if check call failed (treat as advisory).
-    let photoCheckState = null;
-    // Monotonic token + AbortController so a stale in-flight check can't
-    // overwrite the state of a newer photo if the user retakes / clears
-    // before the fetch resolves.
-    let photoCheckSeq = 0;
-    let photoCheckAbort = null;
     let lastBlobUrl = null;
 
     // Compress + downscale anything that comes from a file picker; canvas
@@ -518,7 +474,6 @@ $__navActive = 'services';
         photoEmpty.classList.add('hidden');
         photoPreviewWrap.classList.remove('hidden');
         photoZone.classList.add('has-file');
-        runPhotoCheck(blob);
     }
 
     async function handlePickedFile(file) {
@@ -536,11 +491,6 @@ $__navActive = 'services';
 
     function clearPhoto() {
         window.compressedPhotoBlob = null;
-        photoCheckState = null;
-        // Invalidate any in-flight AI check so its response can't write to
-        // photoCheckState after the user has already moved on
-        photoCheckSeq++;
-        if (photoCheckAbort) { try { photoCheckAbort.abort(); } catch (e) {} photoCheckAbort = null; }
         if (lastBlobUrl) { URL.revokeObjectURL(lastBlobUrl); lastBlobUrl = null; }
         if (photoPreview) photoPreview.removeAttribute('src');
         if (photoInput) photoInput.value = '';
@@ -548,9 +498,6 @@ $__navActive = 'services';
         photoEmpty.classList.remove('hidden');
         photoPreviewWrap.classList.add('hidden');
         photoZone.classList.remove('has-file');
-        photoCheckBox.classList.add('hidden');
-        photoCheckResult.classList.add('hidden');
-        photoCheckLoading.classList.add('hidden');
     }
 
     // ─── In-page camera (getUserMedia) ─────────────────────────────────────────
@@ -741,12 +688,11 @@ $__navActive = 'services';
     }
 
     // ─── Client-side face pre-check ────────────────────────────────────────────
-    // Tier 1 (this block): live face presence + framing feedback while the
-    //   user is still composing the shot. Native FaceDetector when available,
-    //   face-api.js TinyFaceDetector otherwise. ~0KB cost on Chrome Android,
-    //   ~290KB lazy-load on Safari/Firefox.
-    // Tier 2 (ajax_check_photo.php): full Gemini Vision check after snap
-    //   (glasses / mask / hat / ID card visible / quality).
+    // Live face presence + framing feedback while the user composes the shot.
+    // Native FaceDetector when available, face-api.js TinyFaceDetector otherwise.
+    // ~0KB cost on Chrome Android, ~290KB lazy-load on Safari/Firefox.
+    // If both detectors fail we just skip the live feedback — the snapped
+    // photo still goes through the form-level checks before submit.
     let nativeFaceDetector = null;
     let faceApiReady = false;
     let faceApiLoading = null;
@@ -783,7 +729,7 @@ $__navActive = 'services';
                     console.warn('[face-api] model load failed from', url, e?.message || e);
                 }
             }
-            console.warn('[face-api] all CDN mirrors failed — falling back to Gemini-only');
+            console.warn('[face-api] all CDN mirrors failed — skipping live face feedback');
             return null;
         })().finally(() => { faceApiLoading = null; });
         return faceApiLoading;
@@ -850,8 +796,6 @@ $__navActive = 'services';
     }
 
     // State → pill background + icon + status text + KYC face frame class.
-    // ID-card frame stays neutral because client-side detection only tracks
-    // faces; the card is verified server-side by Gemini after snap.
     const CAM_STATUS_STYLES = {
         default:   { bg: 'rgba(0,0,0,0.6)',      icon: 'fa-id-card',         text: 'ถ่ายให้เห็นหน้า + บัตรประชาชน',  faceClass: '',         warn: false, loading: false },
         loading:   { bg: 'rgba(0,0,0,0.6)',      icon: 'fa-spinner fa-spin', text: 'กำลังเตรียมตัวตรวจจับใบหน้า…',    faceClass: '',         warn: false, loading: true  },
@@ -886,93 +830,6 @@ $__navActive = 'services';
     window.snapPhoto = snapPhoto;
     window.gotoGallery = gotoGallery;
     window.clearPhoto = clearPhoto;
-
-    async function runPhotoCheck(blob) {
-        // Abort any previous in-flight check + claim a fresh seq token. Every
-        // mutation below is guarded by `mySeq === photoCheckSeq` so a slow
-        // response from an older photo can't overwrite the new photo's state.
-        const mySeq = ++photoCheckSeq;
-        if (photoCheckAbort) { try { photoCheckAbort.abort(); } catch (e) {} }
-        photoCheckAbort = ('AbortController' in window) ? new AbortController() : null;
-
-        photoCheckState = false; // checking
-        photoCheckBox.classList.remove('hidden');
-        photoCheckBox.className = 'mt-4 rounded-2xl border p-4 text-[12px] leading-relaxed bg-slate-50 border-slate-200';
-        photoCheckLoading.classList.remove('hidden');
-        photoCheckLoading.classList.add('flex');
-        photoCheckResult.classList.add('hidden');
-
-        const fd = new FormData();
-        fd.append('csrf_token', document.querySelector('input[name="csrf_token"]').value);
-        fd.append('photo', blob, 'check.jpg');
-
-        try {
-            const res = await fetch('ajax_check_photo.php', {
-                method: 'POST', body: fd, credentials: 'same-origin',
-                signal: photoCheckAbort?.signal,
-            });
-            const json = await res.json();
-            if (mySeq !== photoCheckSeq) return;   // a newer call superseded us
-            photoCheckLoading.classList.add('hidden');
-            photoCheckLoading.classList.remove('flex');
-            photoCheckResult.classList.remove('hidden');
-
-            if (json.skipped) {
-                photoCheckState = 'skipped';
-                photoCheckBox.className = 'mt-4 rounded-2xl border p-4 text-[12px] leading-relaxed bg-slate-50 border-slate-200';
-                photoCheckResult.innerHTML = `<div class="flex items-start gap-2 text-slate-600"><i class="fa-solid fa-circle-info mt-0.5"></i><div><b>ตรวจสอบด้วยตนเอง</b> — ระบบ AI ยังไม่พร้อม กรุณาตรวจรูปก่อนส่ง</div></div>`;
-                return;
-            }
-            if (json.status === 'error' || json.ok === false) {
-                photoCheckState = 'error';
-                photoCheckBox.className = 'mt-4 rounded-2xl border p-4 text-[12px] leading-relaxed bg-slate-50 border-slate-200';
-                photoCheckResult.innerHTML = `<div class="flex items-start gap-2 text-slate-600"><i class="fa-solid fa-triangle-exclamation mt-0.5 text-amber-500"></i><div><b>ตรวจสอบไม่สำเร็จ</b> — ${escapeHtml(json.message || 'ลองอีกครั้งภายหลัง')} (สามารถส่งต่อไปได้)</div></div>`;
-                return;
-            }
-
-            photoCheckState = json;
-            if (json.passed) {
-                photoCheckBox.className = 'mt-4 rounded-2xl border p-4 text-[12px] leading-relaxed bg-emerald-50 border-emerald-200';
-                photoCheckResult.innerHTML = `
-                    <div class="flex items-start gap-2 text-emerald-800">
-                        <i class="fa-solid fa-circle-check mt-0.5 text-emerald-600 text-base"></i>
-                        <div>
-                            <p class="font-black">รูปผ่านการตรวจสอบ</p>
-                            <p class="text-emerald-700 mt-0.5">${escapeHtml(json.check?.summary || 'เห็นใบหน้าและบัตรประชาชนชัดเจน')}</p>
-                            ${json.check?.wearing_glasses && !json.check?.dark_glasses
-                                ? '<p class="text-[11px] text-slate-500 mt-1.5"><i class="fa-solid fa-glasses mr-1"></i> ตรวจพบว่าใส่แว่น (เลนส์ใส) — ส่งได้ปกติ</p>'
-                                : ''}
-                        </div>
-                    </div>`;
-            } else {
-                photoCheckBox.className = 'mt-4 rounded-2xl border p-4 text-[12px] leading-relaxed bg-rose-50 border-rose-200';
-                const issuesHtml = (json.blockers || []).map(b =>
-                    `<li class="flex items-start gap-1.5"><i class="fa-solid fa-circle-xmark text-rose-500 text-[10px] mt-1"></i><span>${escapeHtml(b)}</span></li>`
-                ).join('');
-                photoCheckResult.innerHTML = `
-                    <div class="flex items-start gap-2 text-rose-800">
-                        <i class="fa-solid fa-triangle-exclamation mt-0.5 text-rose-600 text-base"></i>
-                        <div class="flex-1">
-                            <p class="font-black">พบปัญหาในรูป (${(json.blockers || []).length})</p>
-                            <ul class="mt-2 space-y-1 text-rose-700">${issuesHtml}</ul>
-                            <button type="button" onclick="clearPhoto(); openCamera();"
-                                class="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-rose-200 text-rose-700 font-black text-[11px] hover:bg-rose-100 transition">
-                                <i class="fa-solid fa-camera-rotate"></i> ถ่ายใหม่
-                            </button>
-                        </div>
-                    </div>`;
-            }
-        } catch (err) {
-            // AbortError from a superseded check should not touch state
-            if (mySeq !== photoCheckSeq || err?.name === 'AbortError') return;
-            photoCheckLoading.classList.add('hidden');
-            photoCheckLoading.classList.remove('flex');
-            photoCheckResult.classList.remove('hidden');
-            photoCheckState = 'error';
-            photoCheckBox.className = 'mt-4 rounded-2xl border p-4 text-[12px] leading-relaxed bg-slate-50 border-slate-200';
-            photoCheckResult.innerHTML = `<div class="flex items-start gap-2 text-slate-600"><i class="fa-solid fa-wifi mt-0.5 text-amber-500"></i><div><b>ตรวจสอบไม่สำเร็จ</b> — เน็ตขัดข้อง สามารถส่งใบสมัครต่อไปได้</div></div>`;
-        }
-    }
 
     function escapeHtml(s) {
         return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -1030,39 +887,6 @@ $__navActive = 'services';
             }
             if (!compressedPhotoBlob) {
                 return Swal.fire({icon:'warning', title:'กรุณาแนบรูปถ่าย', text:'ถ่ายรูปคู่กับบัตรประชาชนเพื่อยืนยันตัวตน'});
-            }
-            if (photoCheckState === false) {
-                return Swal.fire({icon:'info', title:'กำลังตรวจสอบรูป', text:'กรุณารอ AI ตรวจสอบรูปสักครู่ แล้วลองส่งอีกครั้ง'});
-            }
-            // Defensive: if a blob exists but the AI check never ran (e.g. an
-            // exception cancelled setPhotoBlob before runPhotoCheck), retry
-            // the check rather than letting the form submit silently
-            if (compressedPhotoBlob && photoCheckState === null) {
-                runPhotoCheck(compressedPhotoBlob);
-                return Swal.fire({icon:'info', title:'รอตรวจสอบรูป', text:'AI ยังไม่ได้ตรวจสอบรูป — กำลังตรวจให้ใหม่ กรุณารอครู่'});
-            }
-            // If AI flagged issues, require explicit confirmation before submitting
-            if (photoCheckState && typeof photoCheckState === 'object' && photoCheckState.passed === false) {
-                const blockerList = (photoCheckState.blockers || []).map(b => `<li>• ${b}</li>`).join('');
-                const { isConfirmed } = await Swal.fire({
-                    icon: 'warning',
-                    title: 'รูปยังไม่ผ่าน AI',
-                    html: `<div class="text-left text-sm">
-                        <p class="mb-2">ระบบตรวจพบ:</p>
-                        <ul class="text-rose-600 font-bold space-y-1 mb-3">${blockerList}</ul>
-                        <p class="text-xs text-slate-500">ถ้ายืนยันว่ารูปใช้ได้ ส่งต่อไปได้ — แต่เจ้าหน้าที่อาจขอให้ถ่ายใหม่</p>
-                    </div>`,
-                    showCancelButton: true,
-                    confirmButtonText: 'ส่งต่อไป',
-                    cancelButtonText: 'ถ่ายใหม่',
-                    reverseButtons: true,
-                    confirmButtonColor: '#f59e0b',
-                });
-                if (!isConfirmed) {
-                    clearPhoto();
-                    openCamera();
-                    return;
-                }
             }
             if (!signaturePad || signaturePad.isEmpty()) {
                 return Swal.fire({icon:'warning', title:'กรุณาเซ็นชื่อ', text:'เซ็นลายมือชื่อในกรอบสี่เหลี่ยม'});
