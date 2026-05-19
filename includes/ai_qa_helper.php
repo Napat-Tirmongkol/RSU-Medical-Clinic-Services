@@ -365,7 +365,26 @@ function ai_qa_generate_answer(string $question, ?PDO $pdo = null, ?DateTimeImmu
     // an equivalent question was answered today. Cached entries expire
     // at 23:59:59 Asia/Bangkok, so a stale answer can never live longer
     // than one calendar day before it's regenerated.
-    if ($pdo !== null) {
+    //
+    // BUT — when the question is time-sensitive (hours / "วันเสาร์" /
+    // tomorrow / doctor schedule) AND the clinic has an upcoming
+    // closure in the next 14 days, skip the cache entirely. The cached
+    // answer may have been generated before admin added the closure
+    // and would now serve "วันเสาร์เปิด 08:00-12:00" on a day that's
+    // actually "เทอมเบรค". Calendar must win over generic FAQ.
+    $skipCache = false;
+    if ($pdo !== null
+        && ai_qa_is_time_sensitive_question($question)
+        && ai_qa_has_imminent_closure($pdo, 14)
+    ) {
+        $skipCache = true;
+        ai_telemetry_log($pdo, 'bypass_closure_imminent', [
+            'source' => 'generate_answer',
+            'meta'   => ['lookahead_days' => 14],
+        ]);
+    }
+
+    if ($pdo !== null && !$skipCache) {
         $cached = ai_cache_get($pdo, $question);
         if ($cached !== null) {
             ai_telemetry_log($pdo, 'cache_hit', [
@@ -542,8 +561,13 @@ function ai_qa_generate_answer(string $question, ?PDO $pdo = null, ?DateTimeImmu
             'meta'       => ['confidence' => $confidence, 'category' => $category],
         ]);
         // Cache the fresh answer so the next identical question today
-        // skips the round-trip entirely.
-        ai_cache_put($pdo, $question, $result);
+        // skips the round-trip entirely — but only when we didn't bypass
+        // the cache for closure-aware regeneration. Writing closure-aware
+        // answers into the cache would defeat the bypass: tomorrow's
+        // question would re-read the same stale text we just regenerated.
+        if (!$skipCache) {
+            ai_cache_put($pdo, $question, $result);
+        }
     }
 
     return $result;
@@ -951,6 +975,35 @@ function ai_qa_is_time_sensitive_question(string $question): bool
         if (preg_match($p, $question)) return true;
     }
     return false;
+}
+
+/**
+ * True when the clinic has at least one closure-flagged row in
+ * sys_clinic_hours within the next $lookaheadDays days (default 14).
+ *
+ * Used to invalidate the FAQ + answer cache for time-sensitive
+ * questions: a generic "วันเสาร์เปิด 08:00-12:00" cached before admin
+ * added "เทอมเบรค 18-24" must not keep being served. Calling this on
+ * every generate keeps the bypass tied to live calendar state, not a
+ * snapshot taken at FAQ-create time.
+ */
+function ai_qa_has_imminent_closure(PDO $pdo, int $lookaheadDays = 14): bool
+{
+    $tz = defined('CLINIC_TZ_NAME') ? new DateTimeZone(CLINIC_TZ_NAME) : new DateTimeZone('Asia/Bangkok');
+    $today = (new DateTimeImmutable('now', $tz))->format('Y-m-d');
+    $end   = (new DateTimeImmutable('now', $tz))->modify("+{$lookaheadDays} days")->format('Y-m-d');
+    try {
+        $stmt = $pdo->prepare("
+            SELECT 1 FROM sys_clinic_hours
+             WHERE type IN ('holiday','special') AND is_closed = 1
+               AND specific_date BETWEEN :s AND :e
+             LIMIT 1
+        ");
+        $stmt->execute([':s' => $today, ':e' => $end]);
+        return (bool)$stmt->fetchColumn();
+    } catch (Throwable) {
+        return false;
+    }
 }
 
 /**
