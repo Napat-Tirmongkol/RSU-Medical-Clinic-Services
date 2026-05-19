@@ -286,6 +286,43 @@ function _qa_source_badge(string $s): string {
         transition: color .15s, border-color .15s;
     }
     .qa-tab:hover { color: #1f2937; }
+    /* Help drawer — slides in from right; portal-escape pattern so it
+       stacks above sidebars/headers regardless of containing-block trap */
+    .aiqa-help-backdrop { position:fixed; inset:0; background:rgba(15,23,42,.55); backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px); z-index:9100; display:none; }
+    .aiqa-help-backdrop.is-open { display:block; }
+    .aiqa-help-drawer { position:fixed; top:0; right:0; bottom:0; width:480px; max-width:100vw; background:#fff; box-shadow:-8px 0 40px rgba(0,0,0,.18); z-index:9101; transform:translateX(100%); transition:transform .25s cubic-bezier(.4,0,.2,1); overflow-y:auto; display:flex; flex-direction:column; }
+    .aiqa-help-drawer.is-open { transform:translateX(0); }
+    .aiqa-help-drawer .head { padding:18px 22px; border-bottom:1px solid #e5e7eb; display:flex; align-items:center; gap:10px; position:sticky; top:0; background:#fff; z-index:1; }
+    .aiqa-help-drawer .head h3 { margin:0; font-size:16px; font-weight:900; color:#0f172a; flex:1; }
+    .aiqa-help-drawer .head .close { width:32px; height:32px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; color:#64748b; background:transparent; border:none; cursor:pointer; }
+    .aiqa-help-drawer .head .close:hover { background:#f1f5f9; color:#0f172a; }
+    .aiqa-help-drawer .body { padding:14px 22px 28px; flex:1; }
+    .aiqa-help-sec { border:1.5px solid #e5e7eb; border-radius:12px; margin-bottom:10px; overflow:hidden; }
+    .aiqa-help-sec[open] { border-color:#c4b5fd; }
+    .aiqa-help-sec.is-highlight { animation: aiqaHi 1.4s ease-out; }
+    @keyframes aiqaHi { 0% { box-shadow:0 0 0 0 rgba(139,92,246,0); } 35% { box-shadow:0 0 0 4px rgba(139,92,246,.35); } 100% { box-shadow:0 0 0 0 rgba(139,92,246,0); } }
+    .aiqa-help-sec > summary { padding:12px 14px; font-size:13px; font-weight:800; color:#1f2937; cursor:pointer; display:flex; align-items:center; gap:8px; list-style:none; }
+    .aiqa-help-sec > summary::-webkit-details-marker { display:none; }
+    .aiqa-help-sec > summary::after { content:'\f078'; font-family:'Font Awesome 6 Free'; font-weight:900; margin-left:auto; color:#9ca3af; font-size:11px; transition:transform .2s; }
+    .aiqa-help-sec[open] > summary::after { transform:rotate(180deg); }
+    .aiqa-help-sec > summary:hover { background:#faf5ff; }
+    .aiqa-help-sec[open] > summary { background:#f3e8ff; color:#5b21b6; }
+    .aiqa-help-body { padding:12px 16px 16px; border-top:1.5px solid #f1f5f9; font-size:13px; line-height:1.7; color:#374151; }
+    .aiqa-help-body p { margin:6px 0; }
+    .aiqa-help-body ol, .aiqa-help-body ul { margin:6px 0 6px 22px; }
+    .aiqa-help-body li { margin:3px 0; }
+    .aiqa-help-body code { background:#f3e8ff; color:#6d28d9; padding:1px 6px; border-radius:5px; font-family:monospace; font-size:12px; }
+    .aiqa-help-body .tip { background:#ecfdf5; border-left:3px solid #10b981; padding:8px 12px; margin:8px 0; font-size:12px; border-radius:0 6px 6px 0; }
+    .aiqa-help-body .warn { background:#fef3c7; border-left:3px solid #f59e0b; padding:8px 12px; margin:8px 0; font-size:12px; border-radius:0 6px 6px 0; }
+    body[data-theme='dark'] .aiqa-help-drawer { background:#0f172a; }
+    body[data-theme='dark'] .aiqa-help-drawer .head { background:#0f172a; border-bottom-color:#1e293b; }
+    body[data-theme='dark'] .aiqa-help-drawer .head h3 { color:#e2e8f0; }
+    body[data-theme='dark'] .aiqa-help-sec { background:#0f172a; border-color:#1e293b; }
+    body[data-theme='dark'] .aiqa-help-sec > summary { color:#e2e8f0; }
+    body[data-theme='dark'] .aiqa-help-sec[open] > summary { background:#1e1b4b; color:#c4b5fd; }
+    body[data-theme='dark'] .aiqa-help-body { color:#cbd5e1; border-top-color:#1e293b; }
+    body[data-theme='dark'] .aiqa-help-body code { background:#1e1b4b; color:#c4b5fd; }
+
     .qa-tab.qa-tab-active--overview { color: #be185d; border-bottom-color: #db2777; }
     .qa-tab.qa-tab-active--captured { color: #7c3aed; border-bottom-color: #9333ea; }
     .qa-tab.qa-tab-active--faq      { color: #047857; border-bottom-color: #059669; }
@@ -552,6 +589,14 @@ function _qa_source_badge(string $s): string {
            class="qa-tab <?= $_qa_tab === 'autoreply' ? 'qa-tab-active--autoreply' : '' ?>">
             <i class="fa-solid fa-comments mr-1.5"></i> Auto-Reply
         </a>
+        <!-- Floating help trigger — drawer with full guide, jumps to the
+             section that matches the currently-open tab via data-help-anchor. -->
+        <button type="button" id="aiqa-help-btn"
+                data-current-tab="<?= htmlspecialchars($_qa_tab) ?>"
+                class="ml-auto px-3 py-2 text-violet-600 hover:bg-violet-50 rounded-lg font-bold text-sm"
+                title="วิธีใช้ AI QA Lab">
+            <i class="fa-solid fa-circle-question"></i> วิธีใช้
+        </button>
     </div>
 
     <?php if ($_qa_tab === 'overview'): /* ═══════ TAB: OVERVIEW / HEALTH ═══════ */ ?>
@@ -1828,6 +1873,269 @@ function _qa_source_badge(string $s): string {
             </button>
         </div>
     </div>
+
+    <!-- ════════════ HELP DRAWER ════════════ -->
+    <!-- Single drawer covering every tab. Sections carry data-tab="..."
+         so opening from a specific tab can auto-expand + highlight the
+         matching section. Drawer is teleported to <body> at open time
+         (portal-escape pattern) to avoid containing-block traps. -->
+    <div id="aiqa-help-backdrop" class="aiqa-help-backdrop"></div>
+    <aside id="aiqa-help-drawer" class="aiqa-help-drawer" role="dialog" aria-label="วิธีใช้ AI QA Lab">
+        <div class="head">
+            <i class="fa-solid fa-circle-question text-violet-600" style="font-size:20px"></i>
+            <h3>วิธีใช้ AI QA Lab</h3>
+            <button type="button" class="close" id="aiqa-help-close" aria-label="ปิด">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+        <div class="body">
+            <p class="text-xs text-gray-500 mb-3">
+                <i class="fa-solid fa-lightbulb text-amber-500 mr-1"></i>
+                คู่มือนี้ครอบคลุม flow ทั้งหมดของ AI QA Lab — กดที่หัวข้อเพื่อเปิดดู
+            </p>
+
+            <!-- 1. Flow + Getting started -->
+            <details class="aiqa-help-sec" data-tab="overview" open>
+                <summary><i class="fa-solid fa-route text-violet-600"></i> ภาพรวม flow + เริ่มต้นใช้งาน</summary>
+                <div class="aiqa-help-body">
+                    <p>AI QA Lab ทำงาน 5 ขั้นตอน — ทำตามลำดับนี้สำหรับ admin ใหม่:</p>
+                    <ol>
+                        <li><b>เปิด Auto-Reply</b> — ตั้งให้บอท LINE ตอบอัตโนมัติ (tab Auto-Reply)</li>
+                        <li><b>รีวิวคำถามที่เก็บมา</b> — เมื่อ user ถามจริง ระบบบันทึก → admin มา approve/edit คำตอบ (tab คำถามที่เก็บมา)</li>
+                        <li><b>สร้าง FAQ</b> — คำถามที่ stable เพื่อให้ตอบเร็ว (tab คลัง FAQ)</li>
+                        <li><b>ทดสอบใน Sandbox</b> — ก่อนเปิดใช้จริง ลองคำถามหลายแบบดูว่า AI ตอบได้ถูก (tab ทดสอบ)</li>
+                        <li><b>ติดตามสุขภาพระบบ</b> — ดู KPIs + timeline ใน tab ภาพรวม</li>
+                    </ol>
+                    <div class="tip">
+                        <b>เริ่มเร็วๆ:</b> สร้าง FAQ canonical 10-15 อัน (เวลาเปิด-ปิด, บริการ, ราคา, ติดต่อ) แล้วเปิด Auto-Reply ปล่อยให้ Phase 2 (Gemini) จัดการ variants ที่เหลือ — admin ค่อยมา promote เป็น variant ของ FAQ ภายหลัง
+                    </div>
+                </div>
+            </details>
+
+            <!-- 2. Closure / holiday / break -->
+            <details class="aiqa-help-sec" data-tab="overview">
+                <summary><i class="fa-solid fa-calendar-xmark text-amber-600"></i> จัดการวันหยุด / เทอมเบรค / closure</summary>
+                <div class="aiqa-help-body">
+                    <p>วันที่คลินิกปิด (วันหยุดราชการ, เทอมเบรค, ปิดปรับปรุง) ต้องเพิ่มที่:</p>
+                    <p><code>section ข้อมูลคลินิก → ชั่วโมงทำการ</code></p>
+                    <ol>
+                        <li>เลือกวันใน calendar (กดหลายวันได้)</li>
+                        <li>ใส่ชื่อเหตุการณ์ เช่น "เทอมเบรค" หรือ "ปิดปรับปรุง"</li>
+                        <li>กด "เพิ่ม" → ระบบเตือนถ้าทับ regular shift หมอ → confirm</li>
+                    </ol>
+                    <p>หลัง add closure ระบบทำ 4 อย่างอัตโนมัติ:</p>
+                    <ul>
+                        <li>Calendar แสดง chip "🛑 ชื่อเหตุการณ์" สีแดง</li>
+                        <li><code>get_clinic_doctors_for_date()</code> return [] (ไม่แสดงหมอ)</li>
+                        <li>AI matcher skip answer cache สำหรับคำถามเกี่ยวกับเวลา (14 วันก่อน closure)</li>
+                        <li>Generator prompt allow ระบุ closure specific date เช่น "วันเสาร์ที่ 23 พ.ค. ปิดเนื่องจากเทอมเบรค"</li>
+                    </ul>
+                    <div class="warn">
+                        ระบบ <b>ไม่ block</b> การสร้าง regular shift ทับ closure — แค่เตือน เพราะ recurring intent อาจ valid (คลินิกอาจเปิดกลับมาภายหลัง)
+                    </div>
+                </div>
+            </details>
+
+            <!-- 3. Captured Questions review -->
+            <details class="aiqa-help-sec" data-tab="captured">
+                <summary><i class="fa-solid fa-inbox text-violet-600"></i> รีวิวคำถามที่เก็บมา</summary>
+                <div class="aiqa-help-body">
+                    <p>คำถามจาก user (LINE + chat) ถูกบันทึกใน tab "คำถามที่เก็บมา" — admin รีวิวตาม workflow 4 ขั้น:</p>
+                    <ol>
+                        <li><b>คัดกรอง</b> — AI ตรวจว่าเป็นคำถามจริงหรือไม่ (ทักทาย/สแปม = ไม่ใช่)</li>
+                        <li><b>Generate</b> — AI ร่างคำตอบจาก clinic context</li>
+                        <li><b>อนุมัติ</b> — admin review draft → approve/edit/reject</li>
+                        <li><b>เป็น FAQ</b> — คำถามที่ approve = ใช้ตอบครั้งหน้าได้ทันที</li>
+                    </ol>
+                    <p><b>"promote ได้" chip สีม่วง</b> — คำถามที่ Gemini semantic-match กับ FAQ ที่มี → กดปุ่ม <i class="fa-solid fa-arrow-up-from-bracket"></i> เพื่อเพิ่มเป็น variant ของ FAQ นั้น → ครั้งถัดไปจะ exact-match (50ms แทน 2s)</p>
+                    <div class="tip">
+                        Workflow strip บนสุดของ tab แสดง count ของแต่ละขั้น — ขั้นที่มี hot work จะ pulse soft. คลิกเพื่อ filter เฉพาะขั้นนั้น
+                    </div>
+                </div>
+            </details>
+
+            <!-- 4. Time-sensitive vs Static FAQ -->
+            <details class="aiqa-help-sec" data-tab="faq">
+                <summary><i class="fa-solid fa-clock-rotate-left text-rose-600"></i> Time-sensitive vs Static FAQ</summary>
+                <div class="aiqa-help-body">
+                    <p>FAQ มี 2 แบบ — แยกด้วย checkbox <b>"🕒 คำถามนี้ขึ้นอยู่กับเวลา"</b> ตอน create:</p>
+                    <p><b>Static FAQ</b> (ไม่ tick) — เช่น "ราคาตรวจสุขภาพ", "ที่อยู่", "เบอร์ติดต่อ"</p>
+                    <ul>
+                        <li>คำตอบ stable ไม่เปลี่ยนตามวันเวลา</li>
+                        <li>เก็บใน DB → ตอบเร็ว (~50ms)</li>
+                        <li>Phase 1 exact match — ไม่ต้องเรียก Gemini</li>
+                    </ul>
+                    <p><b>Time-sensitive FAQ</b> (tick) — เช่น "วันเสาร์เปิดไหม", "พรุ่งนี้มีหมอไหม", "เปิดกี่โมง"</p>
+                    <ul>
+                        <li>คำตอบเปลี่ยนตามวันเวลา + closure ปัจจุบัน</li>
+                        <li>ระบบ <b>skip Phase 1</b> → ไป Gemini generate ใหม่ทุกครั้ง</li>
+                        <li>Cache layer ก็ skip ถ้ามี closure ภายใน 14 วัน</li>
+                    </ul>
+                    <div class="tip">
+                        ระบบมี <b>auto-detect</b>: ถ้าคำถามมี keyword เช่น <code>เปิด/ปิด/วันเสาร์/พรุ่งนี้/หมอ/เวร/นัด/เดือนไทย</code> → ตอน save FAQ จะ tick checkbox ให้อัตโนมัติ (admin un-tick ได้)
+                    </div>
+                    <p><b>ตัวอย่าง:</b></p>
+                    <ul>
+                        <li>"คลินิกเปิดกี่โมง?" → tick (มี "เปิด") → ตอบสด</li>
+                        <li>"ค่าตรวจสุขภาพเท่าไหร่?" → ไม่ tick → ตอบจาก DB</li>
+                        <li>"วันเสาร์มีหมอไหม?" → tick (มี "วันเสาร์" + "หมอ") → ตอบสด</li>
+                    </ul>
+                </div>
+            </details>
+
+            <!-- 5. Sandbox debug -->
+            <details class="aiqa-help-sec" data-tab="sandbox">
+                <summary><i class="fa-solid fa-flask text-purple-600"></i> Sandbox + Insight chips</summary>
+                <div class="aiqa-help-body">
+                    <p>Sandbox ใช้ทดสอบคำถามก่อนเปิดใช้จริง — admin เห็นทั้งคำตอบ + ว่าระบบใช้ข้อมูลอะไรมาตอบ</p>
+                    <p><b>Insight chips 4 อัน</b> หลังถาม:</p>
+                    <ul>
+                        <li><b>FAQ match</b> — บอกว่า answer มาจาก FAQ (exact_canonical / exact_variant / gemini_faq / generate_fresh)</li>
+                        <li><b>Chunks (RAG)</b> — semantic search ดึง chunk กี่อัน (จำนวน + score % ของแต่ละ chunk)</li>
+                        <li><b>Schedule debug</b> — ตารางหมอ + DB inventory (raw shifts + effective หลัง filter closure)</li>
+                        <li><b>Context size</b> — ขนาด context ที่ส่งให้ Gemini (chars)</li>
+                    </ul>
+                    <p>คลิกที่ chip → expand details เต็มของแต่ละส่วน</p>
+                    <p><b>"ดู/แก้ Generator prompt"</b> ลิงก์ใต้ input → deep-link ไปแก้ prompt ที่ใช้ generate คำตอบ</p>
+                    <div class="warn">
+                        <b>ถ้า answer ว่างเปล่า</b> + เห็น rose error card → ดู finishReason ใน error (MAX_TOKENS / SAFETY) เพื่อ debug
+                    </div>
+                </div>
+            </details>
+
+            <!-- 6. Telemetry / health -->
+            <details class="aiqa-help-sec" data-tab="overview">
+                <summary><i class="fa-solid fa-gauge-high text-pink-600"></i> Telemetry / Health monitoring</summary>
+                <div class="aiqa-help-body">
+                    <p>tab ภาพรวมแสดง KPI 4 อัน (window 24 ชม.) — colour-coded ตาม threshold:</p>
+                    <ul>
+                        <li><b>Gemini calls</b> — รวมทุก source · neutral</li>
+                        <li><b>Fail rate</b> — เป้า <code>&lt; 5%</code> · &lt;20% = warn · ≥20% = bad</li>
+                        <li><b>Cache hit rate</b> — ≥30% = good · ≥10% = warn · ยิ่งสูงยิ่งประหยัด quota</li>
+                        <li><b>Satisfaction</b> — 👍 / (👍 + 👎) · ≥80% good · ≥50% warn</li>
+                    </ul>
+                    <p><b>Timeline เหตุการณ์ล่าสุด</b> — last 20 events, auto-refresh 30s. Event types ที่สำคัญ:</p>
+                    <ul>
+                        <li><code>gemini_success</code> / <code>gemini_fail</code> — Gemini call OK/fail</li>
+                        <li><code>cache_hit</code> / <code>cache_miss</code> — answer cache</li>
+                        <li><code>bypass_time_sensitive</code> — คำถามจับ regex → skip FAQ</li>
+                        <li><code>bypass_closure_imminent</code> — closure ใน 14 วัน → skip cache</li>
+                        <li><code>fallback_used</code> — generator fail → fall back to FAQ</li>
+                    </ul>
+                    <p><b>การ์ด "การบำรุงรักษา"</b>:</p>
+                    <ul>
+                        <li><b>สแกน FAQ ล้าสมัย</b> — หา FAQ ที่ติดวันที่/เดือน เฉพาะ → mark time-sensitive หรือลบ</li>
+                        <li><b>ล้างแคช</b> — หลังแก้ knowledge ใหญ่ ใช้บังคับ generate ใหม่</li>
+                    </ul>
+                </div>
+            </details>
+
+            <!-- 7. Auto-Reply -->
+            <details class="aiqa-help-sec" data-tab="autoreply">
+                <summary><i class="fa-solid fa-comments text-cyan-600"></i> ตั้งค่า Auto-Reply (LINE)</summary>
+                <div class="aiqa-help-body">
+                    <p>Auto-Reply ทำให้ LINE bot ตอบคำถามอัตโนมัติด้วย AI</p>
+                    <ul>
+                        <li><b>enabled</b> — เปิด/ปิด auto-reply ทั้งระบบ</li>
+                        <li><b>only_when_closed</b> — ตอบเฉพาะตอนคลินิกปิด (0 = ตอบตลอด)</li>
+                    </ul>
+                    <p>เมื่อ user ส่งข้อความใน LINE:</p>
+                    <ol>
+                        <li>ระบบ capture คำถามลง <code>sys_ai_qa_log</code></li>
+                        <li>เรียก <code>ai_qa_match_faq()</code> หา answer</li>
+                        <li>ถ้ามี answer + reply ทันที</li>
+                        <li>ถ้าไม่มี → admin ดูใน Captured Questions tab</li>
+                    </ol>
+                    <div class="tip">
+                        <b>Tip:</b> เริ่มด้วย <code>only_when_closed=1</code> ก่อน — ปล่อยให้ AI ตอบเฉพาะนอกเวลา → admin ตอบเองในเวลาทำการ → เก็บ data ดู accuracy ก่อนเปิดเต็ม
+                    </div>
+                </div>
+            </details>
+
+            <!-- 8. Feedback log -->
+            <details class="aiqa-help-sec" data-tab="feedback">
+                <summary><i class="fa-solid fa-thumbs-up text-sky-600"></i> ผลตอบรับ (Feedback)</summary>
+                <div class="aiqa-help-body">
+                    <p>ทุกคำตอบที่ส่งให้ user มี 👍 / 👎 — admin ดูสรุปและรายละเอียดใน tab ผลตอบรับ</p>
+                    <ul>
+                        <li><b>Summary KPI</b> — total / 👍 / 👎 / no-rating / satisfaction %</li>
+                        <li><b>Filter</b> — by rating + source</li>
+                        <li><b>Comment box</b> — user ที่ 👎 จะมี optional comment</li>
+                    </ul>
+                    <p><b>ลำดับ action เมื่อเจอ 👎 บ่อย:</b></p>
+                    <ol>
+                        <li>เช็คคำตอบใน Captured Questions — ผิดตรงไหน?</li>
+                        <li>ถ้า phrasing → เพิ่ม variant ใน FAQ ที่ถูก</li>
+                        <li>ถ้า answer ผิด → edit คำตอบ + กด regenerate</li>
+                        <li>ถ้า prompt อ่อน → แก้ใน AI Prompts (link จาก Sandbox)</li>
+                    </ol>
+                </div>
+            </details>
+        </div>
+    </aside>
+
+    <script>
+    (function() {
+        const drawer  = document.getElementById('aiqa-help-drawer');
+        const backdrop = document.getElementById('aiqa-help-backdrop');
+        const openBtn = document.getElementById('aiqa-help-btn');
+        const closeBtn = document.getElementById('aiqa-help-close');
+        if (!drawer || !openBtn) return;
+
+        // Teleport to body once on first open — same portal-escape pattern
+        // we use for modals to dodge containing-block traps from
+        // header/backdrop-filter ancestors.
+        let teleported = false;
+        function teleport() {
+            if (teleported) return;
+            document.body.appendChild(backdrop);
+            document.body.appendChild(drawer);
+            teleported = true;
+        }
+
+        function highlightForTab(tab) {
+            // Collapse all, then open + flash the section whose data-tab matches.
+            // Sections without data-tab stay closed; the "ภาพรวม" section
+            // (overview) is the default landing when no specific tab match.
+            const sections = drawer.querySelectorAll('.aiqa-help-sec');
+            sections.forEach(s => { s.open = false; s.classList.remove('is-highlight'); });
+            const target = drawer.querySelector(`.aiqa-help-sec[data-tab="${tab}"]`)
+                        || drawer.querySelector('.aiqa-help-sec[data-tab="overview"]');
+            if (target) {
+                target.open = true;
+                // Scroll the body so the target is at top — drawer is its own
+                // scroll container, so target.scrollIntoView in the drawer body
+                // is what we want.
+                setTimeout(() => {
+                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    target.classList.add('is-highlight');
+                    setTimeout(() => target.classList.remove('is-highlight'), 1400);
+                }, 280);
+            }
+        }
+
+        function openDrawer() {
+            teleport();
+            const tab = openBtn.dataset.currentTab || 'overview';
+            highlightForTab(tab);
+            backdrop.classList.add('is-open');
+            // Force reflow before the transform transition so it animates.
+            drawer.offsetHeight;
+            drawer.classList.add('is-open');
+        }
+        function closeDrawer() {
+            drawer.classList.remove('is-open');
+            backdrop.classList.remove('is-open');
+        }
+
+        openBtn.addEventListener('click', openDrawer);
+        closeBtn.addEventListener('click', closeDrawer);
+        backdrop.addEventListener('click', closeDrawer);
+        document.addEventListener('keydown', e => {
+            if (e.key === 'Escape' && drawer.classList.contains('is-open')) closeDrawer();
+        });
+    })();
+    </script>
 </div>
 
 <script>
