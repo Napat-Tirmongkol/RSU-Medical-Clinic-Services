@@ -2867,10 +2867,30 @@ function renderResult(question, j) {
     bindFeedback();
 
     // ── Answer ────────────────────────────────────────────────────────────
+    // When the generator returns an empty string but emits a generator_error
+    // (Gemini timeouts, MAX_TOKENS, parse failures), render the error inline
+    // instead of an eerily blank card — otherwise the operator has no clue
+    // what happened.
     const answerBox = document.getElementById('sb-answer-box');
-    answerBox.innerHTML = typeof marked !== 'undefined'
-        ? marked.parse(j.answer || '')
-        : escH(j.answer || '');
+    const rawAnswer = (j.answer || '').toString().trim();
+    if (rawAnswer === '' && j.generator_error) {
+        answerBox.innerHTML = `
+            <div class="border border-rose-200 bg-rose-50 rounded-xl p-4">
+                <div class="flex items-center gap-2 text-rose-700 font-bold text-sm mb-1">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                    AI ไม่สามารถสร้างคำตอบได้
+                </div>
+                <div class="text-xs text-rose-800 mb-2">${escH(j.generator_error)}</div>
+                <div class="text-[11px] text-rose-600">
+                    ลองใหม่อีกครั้ง · ถ้ายังเจอบ่อย — เปิด tab "ภาพรวม" ดู Gemini fail rate
+                    หรือเช็ค context size (อาจยาวเกิน max tokens)
+                </div>
+            </div>`;
+    } else {
+        answerBox.innerHTML = typeof marked !== 'undefined'
+            ? marked.parse(rawAnswer)
+            : escH(rawAnswer);
+    }
 
     // ── Meta chips ────────────────────────────────────────────────────────
     const chips = document.getElementById('sb-meta-chips');

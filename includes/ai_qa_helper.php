@@ -417,6 +417,14 @@ function ai_qa_generate_answer(string $question, ?PDO $pdo = null, ?DateTimeImmu
             'temperature'      => 0.3,
             'maxOutputTokens'  => 1024,
             'responseMimeType' => 'application/json',
+            // Disable Gemini 2.5+ "thinking" so the entire 1024-token
+            // budget goes to the JSON we actually want. Without this
+            // the dynamic thinking phase eats 200-800 tokens of the
+            // budget and Gemini truncates the response with
+            // finishReason=MAX_TOKENS → blank answer on the user side.
+            'thinkingConfig'   => [
+                'thinkingBudget' => 0,
+            ],
         ],
     ], JSON_UNESCAPED_UNICODE);
 
@@ -472,13 +480,20 @@ function ai_qa_generate_answer(string $question, ?PDO $pdo = null, ?DateTimeImmu
 
         $resp = json_decode($rawText, true);
         $text = (string)($resp['candidates'][0]['content']['parts'][0]['text'] ?? '');
+        // Capture Gemini's own explanation BEFORE we re-shape the text —
+        // these tell us why an answer came back empty (MAX_TOKENS / SAFETY /
+        // RECITATION) without having to dig through the raw response JSON.
+        $finishReason = (string)($resp['candidates'][0]['finishReason'] ?? '');
+        $blockReason  = (string)($resp['promptFeedback']['blockReason'] ?? '');
         $text = preg_replace('/^```(?:json)?\s*/m', '', $text);
         $text = preg_replace('/```\s*$/m', '', $text);
         $text = trim($text);
 
         $parsed = json_decode($text, true);
         if (!is_array($parsed)) {
-            throw new RuntimeException('AI ตอบกลับในรูปแบบที่ไม่ถูกต้อง');
+            $hint = $finishReason !== '' ? " (finish={$finishReason})" : '';
+            if ($blockReason !== '') $hint .= " (block={$blockReason})";
+            throw new RuntimeException('AI ตอบกลับในรูปแบบที่ไม่ถูกต้อง' . $hint);
         }
 
         $category = (string)($parsed['category'] ?? 'อื่นๆ');
@@ -491,7 +506,13 @@ function ai_qa_generate_answer(string $question, ?PDO $pdo = null, ?DateTimeImmu
         if ($confidence > 1) $confidence = 1.0;
 
         if ($answer === '') {
-            throw new RuntimeException('AI ไม่ได้ส่งคำตอบกลับมา');
+            // Surface Gemini's verdict so the Lab / error log can show the
+            // operator whether to bump tokens, soften the prompt, or
+            // retry. MAX_TOKENS is the common one when the thinking
+            // budget eats the response.
+            $hint = $finishReason !== '' ? " (finish={$finishReason})" : '';
+            if ($blockReason !== '') $hint .= " (block={$blockReason})";
+            throw new RuntimeException('AI ไม่ได้ส่งคำตอบกลับมา' . $hint);
         }
     } catch (Throwable $e) {
         if ($pdo !== null) {
@@ -583,6 +604,7 @@ PROMPT;
             'temperature'      => 0.1,
             'maxOutputTokens'  => 2048,
             'responseMimeType' => 'application/json',
+            'thinkingConfig'   => ['thinkingBudget' => 0],
         ],
     ], JSON_UNESCAPED_UNICODE);
 
@@ -726,6 +748,7 @@ PROMPT;
                 'temperature'      => $temperature,
                 'maxOutputTokens'  => 1024,
                 'responseMimeType' => 'application/json',
+                'thinkingConfig'   => ['thinkingBudget' => 0],
             ],
         ], JSON_UNESCAPED_UNICODE);
 
