@@ -316,6 +316,34 @@ $__navActive = 'services';
 
     <?php include __DIR__ . '/../includes/user_bottom_nav.php'; ?>
 
+    <!-- ════════════ IN-PAGE CAMERA STAGE (getUserMedia) ════════════ -->
+    <!-- MUST live in the DOM before <script> below, otherwise getElementById
+         returns null at script-parse time -->
+    <div id="cam-stage" class="fixed inset-0 hidden bg-black flex-col">
+        <div class="flex-1 relative overflow-hidden">
+            <video id="cam-video" autoplay playsinline muted class="w-full h-full object-cover"></video>
+            <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div class="cam-frame"></div>
+            </div>
+            <div class="absolute top-5 left-5 px-3 py-1.5 rounded-full bg-black/60 text-white text-[11px] font-black tracking-wide">
+                <i class="fa-solid fa-id-card mr-1"></i> ถ่ายให้เห็นหน้า + บัตรประชาชน
+            </div>
+            <button type="button" onclick="closeCamera()" class="absolute top-5 right-5 w-11 h-11 rounded-full bg-black/60 text-white flex items-center justify-center text-lg">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+            <div id="cam-error" class="hidden absolute inset-x-5 bottom-5 bg-rose-500/95 text-white text-[12px] font-bold rounded-2xl px-4 py-3"></div>
+        </div>
+        <div class="px-6 py-5 bg-black flex items-center justify-around">
+            <button type="button" onclick="gotoGallery()" class="w-12 h-12 rounded-full bg-white/10 text-white flex items-center justify-center" title="เลือกจากเครื่องแทน">
+                <i class="fa-solid fa-images"></i>
+            </button>
+            <button type="button" id="cam-snap-btn" onclick="snapPhoto()" class="relative w-20 h-20 rounded-full bg-white shadow-xl border-4 border-white/40"></button>
+            <button type="button" onclick="swapCamera()" class="w-12 h-12 rounded-full bg-white/10 text-white flex items-center justify-center" title="สลับกล้องหน้า/หลัง">
+                <i class="fa-solid fa-camera-rotate"></i>
+            </button>
+        </div>
+    </div>
+
     <script>
     // Citizen ID Mod-11 validation
     function validateCitizenId(id) {
@@ -743,31 +771,5 @@ $__navActive = 'services';
         });
     }
     </script>
-
-    <!-- ════════════ IN-PAGE CAMERA STAGE (getUserMedia) ════════════ -->
-    <div id="cam-stage" class="fixed inset-0 hidden bg-black flex-col">
-        <div class="flex-1 relative overflow-hidden">
-            <video id="cam-video" autoplay playsinline muted class="w-full h-full object-cover"></video>
-            <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <div class="cam-frame"></div>
-            </div>
-            <div class="absolute top-5 left-5 px-3 py-1.5 rounded-full bg-black/60 text-white text-[11px] font-black tracking-wide">
-                <i class="fa-solid fa-id-card mr-1"></i> ถ่ายให้เห็นหน้า + บัตรประชาชน
-            </div>
-            <button type="button" onclick="closeCamera()" class="absolute top-5 right-5 w-11 h-11 rounded-full bg-black/60 text-white flex items-center justify-center text-lg">
-                <i class="fa-solid fa-xmark"></i>
-            </button>
-            <div id="cam-error" class="hidden absolute inset-x-5 bottom-5 bg-rose-500/95 text-white text-[12px] font-bold rounded-2xl px-4 py-3"></div>
-        </div>
-        <div class="px-6 py-5 bg-black flex items-center justify-around">
-            <button type="button" onclick="gotoGallery()" class="w-12 h-12 rounded-full bg-white/10 text-white flex items-center justify-center" title="เลือกจากเครื่องแทน">
-                <i class="fa-solid fa-images"></i>
-            </button>
-            <button type="button" id="cam-snap-btn" onclick="snapPhoto()" class="relative w-20 h-20 rounded-full bg-white shadow-xl border-4 border-white/40"></button>
-            <button type="button" onclick="swapCamera()" class="w-12 h-12 rounded-full bg-white/10 text-white flex items-center justify-center" title="สลับกล้องหน้า/หลัง">
-                <i class="fa-solid fa-camera-rotate"></i>
-            </button>
-        </div>
-    </div>
 </body>
 </html>
