@@ -118,6 +118,16 @@ $__navActive = 'services';
         .submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
         .clear-btn { background: #fee2e2; color: #b91c1c; padding: 10px 16px; border-radius: 12px; font-weight: 700; font-size: 13px; border: none; transition: all 0.2s; }
         .clear-btn:active { transform: scale(0.95); }
+
+        /* In-page camera stage (getUserMedia) */
+        #cam-stage { z-index: 9999; }
+        #cam-stage.is-open { display: flex; }
+        #cam-stage video { transform: scaleX(-1); transition: transform 0.2s; }
+        #cam-stage video.no-mirror { transform: none; }
+        #cam-stage .cam-frame { width: 78%; height: 56%; border: 2px dashed rgba(255,255,255,0.55); border-radius: 1.5rem; }
+        #cam-snap-btn:active { transform: scale(0.92); }
+        #cam-snap-btn::after { content: ''; position: absolute; inset: 6px; border-radius: 9999px; background: #f59e0b; }
+        #cam-stage button { -webkit-tap-highlight-color: transparent; }
     </style>
 </head>
 <body class="pb-32">
@@ -238,20 +248,24 @@ $__navActive = 'services';
                         <span>รูปจะถูกส่งให้ Google Gemini AI ตรวจสอบคุณภาพอัตโนมัติ (ใส่แว่น/แมส/หมวก) ก่อนส่งใบสมัคร — ข้อมูล meta เช่น GPS จะถูกลบก่อนส่งทุกครั้ง</span>
                     </div>
 
+                    <!-- Hidden file inputs — used as fallback if getUserMedia isn't available -->
                     <input type="file" id="photo-input" name="photo" accept="image/*" capture="environment" class="hidden">
-                    <label for="photo-input" id="photo-zone" class="upload-zone block">
+                    <input type="file" id="photo-gallery" accept="image/*" class="hidden">
+                    <div id="photo-zone" class="upload-zone block" onclick="if(!compressedPhotoBlob) openCamera()">
                         <div id="photo-empty">
                             <i class="fa-solid fa-camera text-3xl text-slate-300 mb-3"></i>
-                            <p class="text-[13px] font-black text-slate-700">แตะเพื่อถ่ายรูป / เลือกรูป</p>
+                            <p class="text-[13px] font-black text-slate-700">แตะเพื่อเปิดกล้อง</p>
                             <p class="text-[10px] font-semibold text-slate-400 mt-1">JPG, PNG • สูงสุด 10MB</p>
+                            <button type="button" onclick="event.preventDefault(); event.stopPropagation(); document.getElementById('photo-gallery').click();"
+                                class="mt-3 text-[11px] font-bold text-amber-600 underline decoration-dotted">หรือเลือกรูปจากเครื่อง</button>
                         </div>
                         <div id="photo-preview-wrap" class="hidden">
                             <img id="photo-preview" class="photo-preview" alt="Preview">
-                            <button type="button" onclick="event.preventDefault(); clearPhoto()" class="mt-3 clear-btn">
+                            <button type="button" onclick="event.preventDefault(); event.stopPropagation(); clearPhoto()" class="mt-3 clear-btn">
                                 <i class="fa-solid fa-rotate mr-1"></i> ถ่ายใหม่
                             </button>
                         </div>
-                    </label>
+                    </div>
 
                     <!-- AI vision check result card (hidden until photo is checked) -->
                     <div id="photo-check" class="hidden mt-4 rounded-2xl border p-4 text-[12px] leading-relaxed">
@@ -332,7 +346,8 @@ $__navActive = 'services';
     }
 
     // Photo handling
-    const photoInput = document.getElementById('photo-input');
+    const photoInput = document.getElementById('photo-input');         // capture=environment fallback
+    const photoGallery = document.getElementById('photo-gallery');     // pure gallery picker
     const photoZone = document.getElementById('photo-zone');
     const photoEmpty = document.getElementById('photo-empty');
     const photoPreviewWrap = document.getElementById('photo-preview-wrap');
@@ -340,25 +355,25 @@ $__navActive = 'services';
     const photoCheckBox = document.getElementById('photo-check');
     const photoCheckLoading = document.getElementById('photo-check-loading');
     const photoCheckResult = document.getElementById('photo-check-result');
-    let compressedPhotoBlob = null;
+    window.compressedPhotoBlob = null;
     // Vision-check state: null = not yet checked, false = checking,
     // {passed, blockers, check} once finished, 'skipped' if AI not configured,
     // 'error' if check call failed (treat as advisory).
     let photoCheckState = null;
 
-    if (photoInput) {
-        photoInput.addEventListener('change', async (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-            if (file.size > 10 * 1024 * 1024) {
-                Swal.fire({icon:'error', title:'ไฟล์ใหญ่เกินไป', text:'กรุณาเลือกไฟล์ขนาดไม่เกิน 10MB'});
-                return;
-            }
-
-            // Compress + show preview
+    // Compress + downscale anything that comes from a file picker; canvas
+    // snapshots from the in-page camera already arrive sized correctly so
+    // they go straight to setPhotoBlob().
+    async function compressFile(file) {
+        if (file.size > 10 * 1024 * 1024) {
+            Swal.fire({icon:'error', title:'ไฟล์ใหญ่เกินไป', text:'กรุณาเลือกไฟล์ขนาดไม่เกิน 10MB'});
+            return null;
+        }
+        return new Promise((resolve, reject) => {
             const img = new Image();
             const reader = new FileReader();
             reader.onload = (ev) => { img.src = ev.target.result; };
+            reader.onerror = () => reject(new Error('อ่านไฟล์ไม่ได้'));
             img.onload = () => {
                 const MAX_W = 1200;
                 const scale = Math.min(1, MAX_W / img.width);
@@ -366,23 +381,40 @@ $__navActive = 'services';
                 canvas.width = img.width * scale;
                 canvas.height = img.height * scale;
                 canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-                canvas.toBlob((blob) => {
-                    compressedPhotoBlob = blob;
-                    photoPreview.src = URL.createObjectURL(blob);
-                    photoEmpty.classList.add('hidden');
-                    photoPreviewWrap.classList.remove('hidden');
-                    photoZone.classList.add('has-file');
-                    runPhotoCheck(blob);
-                }, 'image/jpeg', 0.85);
+                canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error('compress fail')), 'image/jpeg', 0.85);
             };
+            img.onerror = () => reject(new Error('โหลดรูปไม่ได้'));
             reader.readAsDataURL(file);
         });
     }
 
+    function setPhotoBlob(blob) {
+        window.compressedPhotoBlob = blob;
+        photoPreview.src = URL.createObjectURL(blob);
+        photoEmpty.classList.add('hidden');
+        photoPreviewWrap.classList.remove('hidden');
+        photoZone.classList.add('has-file');
+        runPhotoCheck(blob);
+    }
+
+    async function handlePickedFile(file) {
+        if (!file) return;
+        try {
+            const blob = await compressFile(file);
+            if (blob) setPhotoBlob(blob);
+        } catch (e) {
+            Swal.fire({icon:'error', title:'เปิดรูปไม่ได้', text: e.message || 'กรุณาลองใหม่'});
+        }
+    }
+
+    photoInput?.addEventListener('change',   (e) => handlePickedFile(e.target.files[0]));
+    photoGallery?.addEventListener('change', (e) => handlePickedFile(e.target.files[0]));
+
     function clearPhoto() {
-        compressedPhotoBlob = null;
+        window.compressedPhotoBlob = null;
         photoCheckState = null;
-        photoInput.value = '';
+        if (photoInput) photoInput.value = '';
+        if (photoGallery) photoGallery.value = '';
         photoEmpty.classList.remove('hidden');
         photoPreviewWrap.classList.add('hidden');
         photoZone.classList.remove('has-file');
@@ -390,6 +422,118 @@ $__navActive = 'services';
         photoCheckResult.classList.add('hidden');
         photoCheckLoading.classList.add('hidden');
     }
+
+    // ─── In-page camera (getUserMedia) ─────────────────────────────────────────
+    const camStage = document.getElementById('cam-stage');
+    const camVideo = document.getElementById('cam-video');
+    const camError = document.getElementById('cam-error');
+    let cameraStream = null;
+    let cameraFacing = 'user';   // selfie+ID by default — user can swap to back
+
+    async function openCamera() {
+        // Browsers without getUserMedia → fall back to the capture file input
+        if (!navigator.mediaDevices?.getUserMedia) {
+            photoInput.click();
+            return;
+        }
+        camError.classList.add('hidden');
+        camStage.classList.remove('hidden');
+        camStage.classList.add('is-open');
+        try {
+            cameraStream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: cameraFacing, width: {ideal: 1280}, height: {ideal: 720} },
+                audio: false,
+            });
+        } catch (err) {
+            // Retry without facingMode constraint (laptops with single cam, etc.)
+            if (err.name === 'OverconstrainedError' || err.name === 'NotFoundError') {
+                try {
+                    cameraStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+                } catch (e2) {
+                    return cameraFailed(e2);
+                }
+            } else {
+                return cameraFailed(err);
+            }
+        }
+        camVideo.srcObject = cameraStream;
+        updateMirror();
+    }
+
+    function cameraFailed(err) {
+        closeCamera();
+        const msg = err?.name === 'NotAllowedError'
+            ? 'คุณยังไม่ได้อนุญาตให้ใช้กล้อง — กรุณาเลือกรูปจากเครื่องแทน'
+            : 'เปิดกล้องไม่ได้ — กรุณาเลือกรูปจากเครื่องแทน';
+        Swal.fire({icon:'warning', title:'เปิดกล้องไม่สำเร็จ', text: msg, confirmButtonColor:'#f59e0b'})
+            .then(() => photoGallery.click());
+    }
+
+    function closeCamera() {
+        if (cameraStream) {
+            cameraStream.getTracks().forEach(t => t.stop());
+            cameraStream = null;
+        }
+        camVideo.srcObject = null;
+        camStage.classList.add('hidden');
+        camStage.classList.remove('is-open');
+    }
+
+    async function swapCamera() {
+        cameraFacing = cameraFacing === 'user' ? 'environment' : 'user';
+        if (cameraStream) {
+            cameraStream.getTracks().forEach(t => t.stop());
+            cameraStream = null;
+        }
+        try {
+            cameraStream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: cameraFacing, width: {ideal: 1280}, height: {ideal: 720} },
+                audio: false,
+            });
+            camVideo.srcObject = cameraStream;
+            updateMirror();
+        } catch (err) {
+            camError.textContent = 'สลับกล้องไม่สำเร็จ — อุปกรณ์อาจมีกล้องเดียว';
+            camError.classList.remove('hidden');
+            setTimeout(() => camError.classList.add('hidden'), 2500);
+            // restore previous
+            cameraFacing = cameraFacing === 'user' ? 'environment' : 'user';
+            openCamera();
+        }
+    }
+
+    function updateMirror() {
+        // Mirror preview for front camera so the user sees themselves naturally;
+        // the captured canvas is drawn from the raw (un-mirrored) video stream,
+        // so the saved photo keeps the ID card text readable.
+        if (cameraFacing === 'user') camVideo.classList.remove('no-mirror');
+        else camVideo.classList.add('no-mirror');
+    }
+
+    function snapPhoto() {
+        if (!cameraStream || !camVideo.videoWidth) return;
+        const canvas = document.createElement('canvas');
+        canvas.width  = camVideo.videoWidth;
+        canvas.height = camVideo.videoHeight;
+        canvas.getContext('2d').drawImage(camVideo, 0, 0);
+        canvas.toBlob((blob) => {
+            if (!blob) return;
+            closeCamera();
+            setPhotoBlob(blob);
+        }, 'image/jpeg', 0.88);
+    }
+
+    function gotoGallery() {
+        closeCamera();
+        photoGallery.click();
+    }
+    // Expose camera fns globally so inline onclick handlers can reach them
+    window.openCamera = openCamera;
+    window.closeCamera = closeCamera;
+    window.swapCamera = swapCamera;
+    window.snapPhoto = snapPhoto;
+    window.gotoGallery = gotoGallery;
+    window.clearPhoto = clearPhoto;
 
     async function runPhotoCheck(blob) {
         photoCheckState = false; // checking
@@ -450,7 +594,7 @@ $__navActive = 'services';
                         <div class="flex-1">
                             <p class="font-black">พบปัญหาในรูป (${(json.blockers || []).length})</p>
                             <ul class="mt-2 space-y-1 text-rose-700">${issuesHtml}</ul>
-                            <button type="button" onclick="document.getElementById('photo-input').click()"
+                            <button type="button" onclick="clearPhoto(); openCamera();"
                                 class="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-rose-200 text-rose-700 font-black text-[11px] hover:bg-rose-100 transition">
                                 <i class="fa-solid fa-camera-rotate"></i> ถ่ายใหม่
                             </button>
@@ -545,7 +689,8 @@ $__navActive = 'services';
                     confirmButtonColor: '#f59e0b',
                 });
                 if (!isConfirmed) {
-                    photoInput.click();
+                    clearPhoto();
+                    openCamera();
                     return;
                 }
             }
@@ -598,5 +743,31 @@ $__navActive = 'services';
         });
     }
     </script>
+
+    <!-- ════════════ IN-PAGE CAMERA STAGE (getUserMedia) ════════════ -->
+    <div id="cam-stage" class="fixed inset-0 hidden bg-black flex-col">
+        <div class="flex-1 relative overflow-hidden">
+            <video id="cam-video" autoplay playsinline muted class="w-full h-full object-cover"></video>
+            <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div class="cam-frame"></div>
+            </div>
+            <div class="absolute top-5 left-5 px-3 py-1.5 rounded-full bg-black/60 text-white text-[11px] font-black tracking-wide">
+                <i class="fa-solid fa-id-card mr-1"></i> ถ่ายให้เห็นหน้า + บัตรประชาชน
+            </div>
+            <button type="button" onclick="closeCamera()" class="absolute top-5 right-5 w-11 h-11 rounded-full bg-black/60 text-white flex items-center justify-center text-lg">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+            <div id="cam-error" class="hidden absolute inset-x-5 bottom-5 bg-rose-500/95 text-white text-[12px] font-bold rounded-2xl px-4 py-3"></div>
+        </div>
+        <div class="px-6 py-5 bg-black flex items-center justify-around">
+            <button type="button" onclick="gotoGallery()" class="w-12 h-12 rounded-full bg-white/10 text-white flex items-center justify-center" title="เลือกจากเครื่องแทน">
+                <i class="fa-solid fa-images"></i>
+            </button>
+            <button type="button" id="cam-snap-btn" onclick="snapPhoto()" class="relative w-20 h-20 rounded-full bg-white shadow-xl border-4 border-white/40"></button>
+            <button type="button" onclick="swapCamera()" class="w-12 h-12 rounded-full bg-white/10 text-white flex items-center justify-center" title="สลับกล้องหน้า/หลัง">
+                <i class="fa-solid fa-camera-rotate"></i>
+            </button>
+        </div>
+    </div>
 </body>
 </html>
