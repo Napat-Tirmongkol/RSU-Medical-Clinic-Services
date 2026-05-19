@@ -361,7 +361,7 @@ $__navActive = 'services';
             <button type="button" onclick="closeCamera()" class="absolute top-5 right-5 w-11 h-11 rounded-full bg-black/60 text-white flex items-center justify-center text-lg">
                 <i class="fa-solid fa-xmark"></i>
             </button>
-            <div id="cam-error" class="hidden absolute inset-x-5 bottom-5 bg-rose-500/95 text-white text-[12px] font-bold rounded-2xl px-4 py-3"></div>
+            <div id="cam-error" class="hidden absolute left-5 right-5 bottom-5 bg-rose-500 text-white text-[12px] font-bold rounded-2xl px-4 py-3"></div>
         </div>
         <div class="cam-controls">
             <button type="button" onclick="gotoGallery()" class="w-12 h-12 rounded-full bg-white/10 text-white flex items-center justify-center" title="เลือกจากเครื่องแทน">
@@ -418,6 +418,12 @@ $__navActive = 'services';
     // {passed, blockers, check} once finished, 'skipped' if AI not configured,
     // 'error' if check call failed (treat as advisory).
     let photoCheckState = null;
+    // Monotonic token + AbortController so a stale in-flight check can't
+    // overwrite the state of a newer photo if the user retakes / clears
+    // before the fetch resolves.
+    let photoCheckSeq = 0;
+    let photoCheckAbort = null;
+    let lastBlobUrl = null;
 
     // Compress + downscale anything that comes from a file picker; canvas
     // snapshots from the in-page camera already arrive sized correctly so
@@ -448,7 +454,12 @@ $__navActive = 'services';
 
     function setPhotoBlob(blob) {
         window.compressedPhotoBlob = blob;
-        photoPreview.src = URL.createObjectURL(blob);
+        // Free any previously-issued blob URL before issuing a new one,
+        // otherwise iOS Safari accumulates them per re-take and eventually
+        // refuses to allocate more
+        if (lastBlobUrl) URL.revokeObjectURL(lastBlobUrl);
+        lastBlobUrl = URL.createObjectURL(blob);
+        photoPreview.src = lastBlobUrl;
         photoEmpty.classList.add('hidden');
         photoPreviewWrap.classList.remove('hidden');
         photoZone.classList.add('has-file');
@@ -471,6 +482,12 @@ $__navActive = 'services';
     function clearPhoto() {
         window.compressedPhotoBlob = null;
         photoCheckState = null;
+        // Invalidate any in-flight AI check so its response can't write to
+        // photoCheckState after the user has already moved on
+        photoCheckSeq++;
+        if (photoCheckAbort) { try { photoCheckAbort.abort(); } catch (e) {} photoCheckAbort = null; }
+        if (lastBlobUrl) { URL.revokeObjectURL(lastBlobUrl); lastBlobUrl = null; }
+        if (photoPreview) photoPreview.removeAttribute('src');
         if (photoInput) photoInput.value = '';
         if (photoGallery) photoGallery.value = '';
         photoEmpty.classList.remove('hidden');
@@ -487,11 +504,28 @@ $__navActive = 'services';
     const camError = document.getElementById('cam-error');
     let cameraStream = null;
     let cameraFacing = 'user';   // selfie+ID by default — user can swap to back
+    let cameraTransitioning = false;
+    let loadedDataHandler = null;
+
+    function attachStartOnReady() {
+        // Replace any pending loadeddata listener so quickly toggling the
+        // camera (open → close → open) can't leave an orphan handler that
+        // spins up a second detection interval on the new stream
+        if (loadedDataHandler) camVideo.removeEventListener('loadeddata', loadedDataHandler);
+        loadedDataHandler = () => { loadedDataHandler = null; startFaceDetection(); };
+        camVideo.addEventListener('loadeddata', loadedDataHandler, { once: true });
+    }
 
     async function openCamera() {
+        // Defensive: ignore reentrancy from rapid double-taps or a swap in
+        // progress — opening again while a stream still exists also throws
+        // NotReadableError on iOS Safari
+        if (cameraTransitioning || cameraStream) return;
+        cameraTransitioning = true;
         // Browsers without getUserMedia → fall back to the capture file input
         if (!navigator.mediaDevices?.getUserMedia) {
-            photoInput.click();
+            cameraTransitioning = false;
+            (photoInput || photoGallery)?.click();
             return;
         }
         camError.classList.add('hidden');
@@ -508,16 +542,19 @@ $__navActive = 'services';
                 try {
                     cameraStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
                 } catch (e2) {
+                    cameraTransitioning = false;
                     return cameraFailed(e2);
                 }
             } else {
+                cameraTransitioning = false;
                 return cameraFailed(err);
             }
         }
         camVideo.srcObject = cameraStream;
         updateMirror();
         // Wait for the first video frame so the detector has actual pixels
-        camVideo.addEventListener('loadeddata', () => startFaceDetection(), { once: true });
+        attachStartOnReady();
+        cameraTransitioning = false;
     }
 
     function cameraFailed(err) {
@@ -525,24 +562,49 @@ $__navActive = 'services';
         const msg = err?.name === 'NotAllowedError'
             ? 'คุณยังไม่ได้อนุญาตให้ใช้กล้อง — กรุณาเลือกรูปจากเครื่องแทน'
             : 'เปิดกล้องไม่ได้ — กรุณาเลือกรูปจากเครื่องแทน';
-        Swal.fire({icon:'warning', title:'เปิดกล้องไม่สำเร็จ', text: msg, confirmButtonColor:'#f59e0b'})
-            .then(() => photoGallery.click());
+        Swal.fire({
+            icon: 'warning',
+            title: 'เปิดกล้องไม่สำเร็จ',
+            text: msg,
+            confirmButtonText: 'เลือกรูปจากเครื่อง',
+            showCancelButton: true,
+            cancelButtonText: 'ปิด',
+            confirmButtonColor: '#f59e0b',
+            reverseButtons: true,
+        }).then(({ isConfirmed }) => {
+            // Only open the gallery if the user actually asked for it —
+            // dismissing the dialog shouldn't auto-trigger a file picker
+            if (isConfirmed) photoGallery?.click();
+        });
     }
 
     function closeCamera() {
         stopFaceDetection();
+        if (loadedDataHandler) {
+            camVideo.removeEventListener('loadeddata', loadedDataHandler);
+            loadedDataHandler = null;
+        }
         if (cameraStream) {
             cameraStream.getTracks().forEach(t => t.stop());
             cameraStream = null;
         }
-        camVideo.srcObject = null;
+        try { camVideo.pause(); } catch (e) {}   // iOS Safari guard
+        try { camVideo.srcObject = null; } catch (e) {}
         camStage.classList.add('hidden');
         camStage.classList.remove('is-open');
     }
 
     async function swapCamera() {
+        // Guard against rapid double-taps: getUserMedia on iOS throws
+        // NotReadableError if a previous track hasn't fully released yet
+        if (cameraTransitioning) return;
+        cameraTransitioning = true;
         cameraFacing = cameraFacing === 'user' ? 'environment' : 'user';
         stopFaceDetection();
+        if (loadedDataHandler) {
+            camVideo.removeEventListener('loadeddata', loadedDataHandler);
+            loadedDataHandler = null;
+        }
         if (cameraStream) {
             cameraStream.getTracks().forEach(t => t.stop());
             cameraStream = null;
@@ -554,15 +616,17 @@ $__navActive = 'services';
             });
             camVideo.srcObject = cameraStream;
             updateMirror();
-            camVideo.addEventListener('loadeddata', () => startFaceDetection(), { once: true });
+            attachStartOnReady();
         } catch (err) {
             camError.textContent = 'สลับกล้องไม่สำเร็จ — อุปกรณ์อาจมีกล้องเดียว';
             camError.classList.remove('hidden');
             setTimeout(() => camError.classList.add('hidden'), 2500);
-            // restore previous
-            cameraFacing = cameraFacing === 'user' ? 'environment' : 'user';
+            cameraFacing = cameraFacing === 'user' ? 'environment' : 'user';   // restore
+            cameraTransitioning = false;
             openCamera();
+            return;
         }
+        cameraTransitioning = false;
     }
 
     function updateMirror() {
@@ -689,6 +753,9 @@ $__navActive = 'services';
         // Possible race: loadeddata can fire after the user already closed the
         // camera. If the stream is gone, don't start anything.
         if (!cameraStream) return;
+        // Kill any prior loop before launching a new one — defensive guard
+        // against double-attach from rapid open/swap sequences
+        if (faceDetectInterval) { clearInterval(faceDetectInterval); faceDetectInterval = null; }
         setCamStatus('loading');
         const detector = await ensureFaceDetection();
         if (!cameraStream) return; // user closed camera while model was loading
@@ -760,6 +827,13 @@ $__navActive = 'services';
     window.clearPhoto = clearPhoto;
 
     async function runPhotoCheck(blob) {
+        // Abort any previous in-flight check + claim a fresh seq token. Every
+        // mutation below is guarded by `mySeq === photoCheckSeq` so a slow
+        // response from an older photo can't overwrite the new photo's state.
+        const mySeq = ++photoCheckSeq;
+        if (photoCheckAbort) { try { photoCheckAbort.abort(); } catch (e) {} }
+        photoCheckAbort = ('AbortController' in window) ? new AbortController() : null;
+
         photoCheckState = false; // checking
         photoCheckBox.classList.remove('hidden');
         photoCheckBox.className = 'mt-4 rounded-2xl border p-4 text-[12px] leading-relaxed bg-slate-50 border-slate-200';
@@ -774,8 +848,10 @@ $__navActive = 'services';
         try {
             const res = await fetch('ajax_check_photo.php', {
                 method: 'POST', body: fd, credentials: 'same-origin',
+                signal: photoCheckAbort?.signal,
             });
             const json = await res.json();
+            if (mySeq !== photoCheckSeq) return;   // a newer call superseded us
             photoCheckLoading.classList.add('hidden');
             photoCheckLoading.classList.remove('flex');
             photoCheckResult.classList.remove('hidden');
@@ -826,6 +902,8 @@ $__navActive = 'services';
                     </div>`;
             }
         } catch (err) {
+            // AbortError from a superseded check should not touch state
+            if (mySeq !== photoCheckSeq || err?.name === 'AbortError') return;
             photoCheckLoading.classList.add('hidden');
             photoCheckLoading.classList.remove('flex');
             photoCheckResult.classList.remove('hidden');
@@ -894,6 +972,13 @@ $__navActive = 'services';
             }
             if (photoCheckState === false) {
                 return Swal.fire({icon:'info', title:'กำลังตรวจสอบรูป', text:'กรุณารอ AI ตรวจสอบรูปสักครู่ แล้วลองส่งอีกครั้ง'});
+            }
+            // Defensive: if a blob exists but the AI check never ran (e.g. an
+            // exception cancelled setPhotoBlob before runPhotoCheck), retry
+            // the check rather than letting the form submit silently
+            if (compressedPhotoBlob && photoCheckState === null) {
+                runPhotoCheck(compressedPhotoBlob);
+                return Swal.fire({icon:'info', title:'รอตรวจสอบรูป', text:'AI ยังไม่ได้ตรวจสอบรูป — กำลังตรวจให้ใหม่ กรุณารอครู่'});
             }
             // If AI flagged issues, require explicit confirmation before submitting
             if (photoCheckState && typeof photoCheckState === 'object' && photoCheckState.passed === false) {
