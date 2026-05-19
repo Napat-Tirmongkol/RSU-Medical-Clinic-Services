@@ -200,6 +200,8 @@ function vh(?string $s): string { return htmlspecialchars((string) $s, ENT_QUOTE
             'no_gender'  => __('profile.lbl_gender'),
             'empty'      => __('profile.toast_error_phone'),
             'empty_student' => __('profile.lbl_id'),
+            'no_consent_general'   => 'กรุณายอมรับเงื่อนไขข้อมูลส่วนบุคคลทั่วไป (มาตรา 24)',
+            'no_consent_sensitive' => 'กรุณายอมรับเงื่อนไขข้อมูลอ่อนไหว (มาตรา 26)',
         ];
         $errMsg = $errMap[$err] ?? $err;
     ?>
@@ -554,34 +556,118 @@ function vh(?string $s): string { return htmlspecialchars((string) $s, ENT_QUOTE
                     </div>
                 </div>
 
-                <!-- ── PDPA ── -->
+                <!-- ── PDPA Consent v2 (Sec. 24 + Sec. 26 split) ── -->
+                <?php
+                // Bump version when text materially changes — server validates a hash
+                // of the served text and stores both with the consent record so a
+                // future audit can reconstruct exactly what the user saw.
+                $pdpaVersion = 'pdpa_v2_2025-05';
+                ?>
+                <input type="hidden" name="pdpa_version" value="<?= htmlspecialchars($pdpaVersion) ?>">
                 <div class="bg-white rounded-[2.5rem] p-7 border border-slate-50 shadow-sm space-y-5">
-                    <h3 class="text-sm font-black text-slate-900 uppercase tracking-widest"><?= __('profile.pdpa_title') ?></h3>
-                    <div id="pdpa-box" class="pdpa-box bg-slate-50 p-6 rounded-3xl text-[12px] text-slate-500 leading-relaxed max-h-64 overflow-y-auto custom-scrollbar border border-slate-100 space-y-4">
-                        <div class="text-slate-900 font-black mb-2"><?= __('profile.pdpa_welcome') ?></div>
+                    <div class="flex items-start justify-between gap-3">
+                        <h3 class="text-sm font-black text-slate-900 uppercase tracking-widest"><?= __('profile.pdpa_title') ?></h3>
+                        <span class="text-[9px] font-bold text-slate-400 whitespace-nowrap"><?= __('profile.pdpa_version_label') ?></span>
+                    </div>
+                    <div id="pdpa-box" class="pdpa-box bg-slate-50 p-6 rounded-3xl text-[12px] text-slate-600 leading-relaxed max-h-72 overflow-y-auto custom-scrollbar border border-slate-100 space-y-4">
+                        <div class="text-slate-900 font-black"><?= __('profile.pdpa_welcome') ?></div>
+
+                        <!-- Data Controller / DPO (มาตรา 23) -->
+                        <div>
+                            <div class="font-black text-slate-700"><?= __('profile.pdpa_controller_title') ?></div>
+                            <p><?= __('profile.pdpa_controller_desc') ?></p>
+                        </div>
+
+                        <!-- Legal basis (มาตรา 24, 26) -->
+                        <div>
+                            <div class="font-black text-slate-700"><?= __('profile.pdpa_legal_basis_title') ?></div>
+                            <p><?= __('profile.pdpa_legal_basis_desc') ?></p>
+                        </div>
+
                         <p><?= __('profile.pdpa_intro') ?></p>
-                        <div class="space-y-3">
-                            <?php foreach ([1,2,3,4] as $i): ?>
-                            <div>
-                                <div class="font-black text-slate-700"><?= __("profile.pdpa_item{$i}_title") ?></div>
-                                <p><?= __("profile.pdpa_item{$i}_desc") ?></p>
+
+                        <!-- ── Section 1: General data (มาตรา 24) ── -->
+                        <div class="pt-2 border-t border-slate-200">
+                            <div class="font-black text-emerald-700 text-[13px] mb-2"><?= __('profile.pdpa_section_general') ?></div>
+                            <div class="space-y-3">
+                                <div>
+                                    <div class="font-black text-slate-700"><?= __('profile.pdpa_general_cats_title') ?></div>
+                                    <p><?= __('profile.pdpa_general_cats_desc') ?></p>
+                                </div>
+                                <div>
+                                    <div class="font-black text-slate-700"><?= __('profile.pdpa_purposes_title') ?></div>
+                                    <div class="space-y-2 mt-1">
+                                        <?php foreach ([1,2,3,4] as $i): ?>
+                                        <div>
+                                            <div class="font-bold text-slate-700"><?= __("profile.pdpa_item{$i}_title") ?></div>
+                                            <p class="pl-3"><?= __("profile.pdpa_item{$i}_desc") ?></p>
+                                        </div>
+                                        <?php endforeach; ?>
+                                    </div>
+                                </div>
+                                <div>
+                                    <div class="font-black text-slate-700"><?= __('profile.pdpa_third_party_title') ?></div>
+                                    <p><?= __('profile.pdpa_third_party_desc') ?></p>
+                                </div>
+                                <div>
+                                    <div class="font-black text-slate-700"><?= __('profile.pdpa_retention_title') ?></div>
+                                    <p><?= __('profile.pdpa_retention_desc') ?></p>
+                                </div>
                             </div>
-                            <?php endforeach; ?>
                         </div>
-                        <div class="pt-2">
-                            <div class="font-black text-slate-700 underline underline-offset-4 decoration-slate-200 mb-1"><?= __('profile.pdpa_retention_title') ?></div>
-                            <p><?= __('profile.pdpa_retention_desc') ?></p>
+
+                        <!-- ── Section 2: Sensitive data (มาตรา 26) ── -->
+                        <div class="pt-2 border-t border-slate-200">
+                            <div class="font-black text-rose-700 text-[13px] mb-2"><?= __('profile.pdpa_section_sensitive') ?></div>
+                            <p class="text-rose-700 font-bold"><?= __('profile.pdpa_sensitive_intro') ?></p>
+                            <div class="space-y-3 mt-2">
+                                <div>
+                                    <div class="font-black text-slate-700"><?= __('profile.pdpa_sensitive_cats_title') ?></div>
+                                    <p><?= __('profile.pdpa_sensitive_cats_desc') ?></p>
+                                </div>
+                                <div>
+                                    <div class="font-black text-slate-700"><?= __('profile.pdpa_sensitive_purpose_title') ?></div>
+                                    <p><?= __('profile.pdpa_sensitive_purpose_desc') ?></p>
+                                </div>
+                            </div>
                         </div>
-                        <div class="pt-1">
-                            <div class="font-black text-slate-700 underline underline-offset-4 decoration-slate-200 mb-1"><?= __('profile.pdpa_rights_title') ?></div>
+
+                        <!-- ── Rights, withdrawal, refusal, complaint ── -->
+                        <div class="pt-2 border-t border-slate-200">
+                            <div class="font-black text-slate-700"><?= __('profile.pdpa_rights_title') ?></div>
                             <p><?= __('profile.pdpa_rights_desc') ?></p>
                         </div>
+                        <div>
+                            <div class="font-black text-slate-700"><?= __('profile.pdpa_withdrawal_title') ?></div>
+                            <p><?= __('profile.pdpa_withdrawal_desc') ?></p>
+                        </div>
+                        <div>
+                            <div class="font-black text-slate-700"><?= __('profile.pdpa_refusal_title') ?></div>
+                            <p><?= __('profile.pdpa_refusal_desc') ?></p>
+                        </div>
+                        <div>
+                            <div class="font-black text-slate-700"><?= __('profile.pdpa_complaint_title') ?></div>
+                            <p><?= __('profile.pdpa_complaint_desc') ?></p>
+                        </div>
                     </div>
+
                     <p id="pdpa-scroll-hint" class="<?= $isEditing ? 'hidden' : '' ?> text-[11px] font-bold text-amber-600 -mt-2"><i class="fa-solid fa-arrow-down mr-1"></i><?= __('profile.pdpa_scroll_hint') ?></p>
-                    <label id="pdpa-agree-wrap" class="flex items-center gap-4 p-5 bg-white rounded-3xl border border-slate-100 cursor-pointer active:scale-95 transition-all <?= !$isEditing ? 'opacity-50 pointer-events-none' : '' ?>">
-                        <input type="checkbox" id="pdpa-agree" name="agreed" value="1" required <?= $isEditing ? 'checked' : '' ?> <?= $disabled ?> class="w-6 h-6 rounded-lg text-[#2e9e63] focus:ring-[#2e9e63]">
-                        <span class="text-xs text-slate-600 font-bold"><?= __('profile.lbl_agree') ?></span>
+
+                    <!-- Two separate consent checkboxes — required under PDPA Sec. 26
+                         for explicit separate consent on sensitive data -->
+                    <label id="pdpa-agree-wrap" class="flex items-start gap-4 p-5 bg-emerald-50 rounded-3xl border border-emerald-100 cursor-pointer active:scale-95 transition-all <?= !$isEditing ? 'opacity-50 pointer-events-none' : '' ?>">
+                        <input type="checkbox" id="pdpa-agree" name="consent_general" value="1" required <?= $isEditing ? 'checked' : '' ?> <?= $disabled ?> class="mt-0.5 w-6 h-6 rounded-lg text-[#2e9e63] focus:ring-[#2e9e63]">
+                        <span class="text-xs text-slate-700 font-bold leading-relaxed"><?= __('profile.lbl_agree_general') ?></span>
                     </label>
+                    <label id="pdpa-agree-sensitive-wrap" class="flex items-start gap-4 p-5 bg-rose-50 rounded-3xl border border-rose-100 cursor-pointer active:scale-95 transition-all <?= !$isEditing ? 'opacity-50 pointer-events-none' : '' ?>">
+                        <input type="checkbox" id="pdpa-agree-sensitive" name="consent_sensitive" value="1" required <?= $isEditing ? 'checked' : '' ?> <?= $disabled ?> class="mt-0.5 w-6 h-6 rounded-lg text-rose-600 focus:ring-rose-500">
+                        <span class="text-xs text-slate-700 font-bold leading-relaxed"><?= __('profile.lbl_agree_sensitive') ?></span>
+                    </label>
+
+                    <!-- Legacy field for backwards compatibility with any old handlers
+                         that still look at `agreed` — gets ticked iff both granular
+                         checkboxes are ticked -->
+                    <input type="hidden" id="pdpa-agree-legacy" name="agreed" value="<?= $isEditing ? '1' : '' ?>">
                 </div>
 
                 <?php if ($mode === 'edit'): ?>
@@ -740,15 +826,31 @@ function vh(?string $s): string { return htmlspecialchars((string) $s, ENT_QUOTE
                 }
             });
 
-            // PDPA scroll-to-enable (only for first-time users)
+            // PDPA scroll-to-enable + dual-checkbox sync (only for first-time users)
             const pdpaBox = document.getElementById('pdpa-box');
             const pdpaAgree = document.getElementById('pdpa-agree');
+            const pdpaAgreeSensitive = document.getElementById('pdpa-agree-sensitive');
             const pdpaWrap = document.getElementById('pdpa-agree-wrap');
+            const pdpaWrapSensitive = document.getElementById('pdpa-agree-sensitive-wrap');
             const pdpaHint = document.getElementById('pdpa-scroll-hint');
+            const pdpaLegacy = document.getElementById('pdpa-agree-legacy');
+
+            // Keep the legacy `agreed` field in sync — only "1" when BOTH granular
+            // consents are ticked, so any downstream code that still inspects it
+            // can't see partial consent and think the user is fully on board
+            function syncLegacyAgreed() {
+                if (!pdpaLegacy) return;
+                pdpaLegacy.value = (pdpaAgree?.checked && pdpaAgreeSensitive?.checked) ? '1' : '';
+            }
+            pdpaAgree?.addEventListener('change', syncLegacyAgreed);
+            pdpaAgreeSensitive?.addEventListener('change', syncLegacyAgreed);
+            syncLegacyAgreed();
+
             if (pdpaBox && !IS_EDITING) {
                 const onScroll = () => {
                     if (pdpaBox.scrollTop + pdpaBox.clientHeight >= pdpaBox.scrollHeight - 10) {
                         pdpaWrap?.classList.remove('opacity-50', 'pointer-events-none');
+                        pdpaWrapSensitive?.classList.remove('opacity-50', 'pointer-events-none');
                         pdpaHint?.classList.add('hidden');
                         pdpaBox.removeEventListener('scroll', onScroll);
                     }

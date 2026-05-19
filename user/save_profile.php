@@ -43,6 +43,22 @@ if ($dobInput !== '') {
 $department  = trim((string) ($_POST['department']   ?? ''));
 $redirectBack = trim((string) ($_POST['redirect_back'] ?? ''));
 
+// ── PDPA v2 consent (Sec. 24 + Sec. 26 split) ──────────────────────────────
+// Both checkboxes are required for first-time registration. Edit-mode
+// submissions from users who already have a consent record on file don't
+// re-stamp (we trust the existing consent, see check further down).
+$consentGeneral   = !empty($_POST['consent_general'])   && (string)$_POST['consent_general']   === '1';
+$consentSensitive = !empty($_POST['consent_sensitive']) && (string)$_POST['consent_sensitive'] === '1';
+$pdpaVersion      = trim((string) ($_POST['pdpa_version'] ?? ''));
+// Whitelist to prevent a malicious POST from stamping an arbitrary version
+if (!preg_match('/^pdpa_v\d+_\d{4}-\d{2}$/', $pdpaVersion)) {
+    $pdpaVersion = 'pdpa_v2_2025-05';
+}
+$consentIp        = $_SERVER['REMOTE_ADDR'] ?? '';
+$consentUserAgent = substr((string)($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 500);
+// Hash the version tag so we can spot if someone replays an old record
+$consentTextHash  = hash('sha256', $pdpaVersion);
+
 // New medical fields
 $bloodType    = trim((string) ($_POST['blood_type']        ?? ''));
 $heightCm     = $_POST['height_cm'] ?? '';
@@ -107,15 +123,47 @@ try {
         'emergency_contact_phone'    => "VARCHAR(20)  NOT NULL DEFAULT ''",
         'emergency_contact_relation' => "VARCHAR(50)  NOT NULL DEFAULT ''",
         'member_id'                  => "VARCHAR(20) NOT NULL DEFAULT ''",
+        // PDPA v2 granular consent columns (Sec. 24 + Sec. 26)
+        'consent_general_accepted_at'    => "DATETIME NULL DEFAULT NULL",
+        'consent_general_version'        => "VARCHAR(50)  NULL DEFAULT NULL",
+        'consent_general_text_hash'      => "VARCHAR(64)  NULL DEFAULT NULL",
+        'consent_sensitive_accepted_at'  => "DATETIME NULL DEFAULT NULL",
+        'consent_sensitive_version'      => "VARCHAR(50)  NULL DEFAULT NULL",
+        'consent_sensitive_text_hash'    => "VARCHAR(64)  NULL DEFAULT NULL",
+        'consent_ip'                     => "VARCHAR(45)  NULL DEFAULT NULL",
+        'consent_user_agent'             => "VARCHAR(500) NULL DEFAULT NULL",
     ] as $col => $def) {
         try { $pdo->exec("ALTER TABLE sys_users ADD COLUMN IF NOT EXISTS {$col} {$def}"); } catch (PDOException) {}
     }
 
     $sidValue = ($status === 'other') ? null : $idNumber;
 
-    $stmtCheck = $pdo->prepare("SELECT id FROM sys_users WHERE line_user_id = :line_id LIMIT 1");
+    $stmtCheck = $pdo->prepare("SELECT id, consent_general_accepted_at, consent_sensitive_accepted_at
+                                FROM sys_users WHERE line_user_id = :line_id LIMIT 1");
     $stmtCheck->execute([':line_id' => $lineUserId]);
     $existingUser = $stmtCheck->fetch();
+
+    // PDPA gate (Sec. 24 + Sec. 26):
+    //   First-time registration → BOTH consents required.
+    //   Existing user editing other fields → preserve their original consent
+    //   timestamps, don't force re-consent on every profile edit.
+    $isFirstTime = empty($existingUser);
+    $hasPriorGeneral   = !empty($existingUser['consent_general_accepted_at']);
+    $hasPriorSensitive = !empty($existingUser['consent_sensitive_accepted_at']);
+
+    if ($isFirstTime) {
+        if (!$consentGeneral) {
+            header('Location: profile.php?error=no_consent_general', true, 303); exit;
+        }
+        if (!$consentSensitive) {
+            header('Location: profile.php?error=no_consent_sensitive', true, 303); exit;
+        }
+    }
+    // We only stamp the consent timestamp on the row when the user is actually
+    // giving NEW consent. SQL below uses COALESCE(:new, existing) so a return
+    // visitor whose checkboxes are pre-checked doesn't reset their original date.
+    $stampGeneral   = ($consentGeneral   && (!$hasPriorGeneral   || $isFirstTime)) ? date('Y-m-d H:i:s') : null;
+    $stampSensitive = ($consentSensitive && (!$hasPriorSensitive || $isFirstTime)) ? date('Y-m-d H:i:s') : null;
 
     $params = [
         ':prefix'     => $prefix,
@@ -139,9 +187,19 @@ try {
         ':em_phone'   => $emPhone,
         ':em_rel'     => $emRelation,
         ':line_id'    => $lineUserId,
+        ':consent_g_at'   => $stampGeneral,
+        ':consent_g_ver'  => $stampGeneral   !== null ? $pdpaVersion     : null,
+        ':consent_g_hash' => $stampGeneral   !== null ? $consentTextHash : null,
+        ':consent_s_at'   => $stampSensitive,
+        ':consent_s_ver'  => $stampSensitive !== null ? $pdpaVersion     : null,
+        ':consent_s_hash' => $stampSensitive !== null ? $consentTextHash : null,
+        ':consent_ip'     => ($stampGeneral !== null || $stampSensitive !== null) ? $consentIp        : null,
+        ':consent_ua'     => ($stampGeneral !== null || $stampSensitive !== null) ? $consentUserAgent : null,
     ];
 
     if ($existingUser) {
+        // COALESCE keeps prior consent timestamps when a user is just editing
+        // other fields — we only OVERWRITE when they explicitly re-consent
         $sql = "UPDATE sys_users SET
                     prefix = :prefix, first_name = :first_name, last_name = :last_name,
                     full_name = :name, student_personnel_id = :sid,
@@ -151,7 +209,15 @@ try {
                     allergies = :allergies, chronic_conditions = :chronic,
                     emergency_contact_name = :em_name,
                     emergency_contact_phone = :em_phone,
-                    emergency_contact_relation = :em_rel
+                    emergency_contact_relation = :em_rel,
+                    consent_general_accepted_at   = COALESCE(:consent_g_at, consent_general_accepted_at),
+                    consent_general_version       = COALESCE(:consent_g_ver, consent_general_version),
+                    consent_general_text_hash     = COALESCE(:consent_g_hash, consent_general_text_hash),
+                    consent_sensitive_accepted_at = COALESCE(:consent_s_at, consent_sensitive_accepted_at),
+                    consent_sensitive_version     = COALESCE(:consent_s_ver, consent_sensitive_version),
+                    consent_sensitive_text_hash   = COALESCE(:consent_s_hash, consent_sensitive_text_hash),
+                    consent_ip                    = COALESCE(:consent_ip, consent_ip),
+                    consent_user_agent            = COALESCE(:consent_ua, consent_user_agent)
                 WHERE line_user_id = :line_id";
     } else {
         $sql = "INSERT INTO sys_users
@@ -159,13 +225,19 @@ try {
                      student_personnel_id, citizen_id, phone_number, status, email,
                      gender, date_of_birth, department, blood_type, height_cm, weight_kg,
                      allergies, chronic_conditions,
-                     emergency_contact_name, emergency_contact_phone, emergency_contact_relation)
+                     emergency_contact_name, emergency_contact_phone, emergency_contact_relation,
+                     consent_general_accepted_at, consent_general_version, consent_general_text_hash,
+                     consent_sensitive_accepted_at, consent_sensitive_version, consent_sensitive_text_hash,
+                     consent_ip, consent_user_agent)
                 VALUES
                     (:line_id, :prefix, :first_name, :last_name, :name,
                      :sid, :cid, :phone, :status, :email,
                      :gender, :dob, :dept, :blood, :height, :weight,
                      :allergies, :chronic,
-                     :em_name, :em_phone, :em_rel)";
+                     :em_name, :em_phone, :em_rel,
+                     :consent_g_at, :consent_g_ver, :consent_g_hash,
+                     :consent_s_at, :consent_s_ver, :consent_s_hash,
+                     :consent_ip, :consent_ua)";
     }
 
     $stmt = $pdo->prepare($sql);
