@@ -236,6 +236,18 @@ try {
         $debugInventory['error'] = $e->getMessage();
     }
 
+    // matched_faq is true only when the answer actually came out of the
+    // FAQ pool (exact / variant / approved / Gemini semantic-pick).
+    // ai_qa_match_faq() also short-circuits to a fresh Gemini call for
+    // time-sensitive questions and returns matched_via='generate_fresh'
+    // — that's NOT a FAQ hit and the Sandbox shouldn't render the
+    // "พบคำตอบตรงจาก FAQ Knowledge Base" card for it.
+    $isFaqHit = $faqMatch !== null
+        && in_array(($faqMatch['matched_via'] ?? ''), [
+            'exact_canonical', 'exact_variant', 'exact_approved',
+            'gemini_faq', 'gemini_qa',
+        ], true);
+
     echo json_encode([
         'ok'              => true,
         'answer'          => $result['answer'],
@@ -243,9 +255,9 @@ try {
         'confidence'      => $result['confidence'] ?? null,
         'model'           => $result['model']       ?? '',
         'elapsed_ms'      => $elapsed,
-        'matched_faq'     => $faqMatch !== null,
+        'matched_faq'     => $isFaqHit,
         'matched_via'     => $matchedVia,
-        'faq_answer'      => $faqMatch ? ($faqMatch['answer'] ?? null) : null,
+        'faq_answer'      => $isFaqHit ? ($faqMatch['answer'] ?? null) : null,
         'generator_error' => $generatorError,
         'chunks'          => array_map(fn($c) => [
             'title'           => $c['title'],
