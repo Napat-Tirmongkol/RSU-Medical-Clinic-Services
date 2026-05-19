@@ -129,7 +129,54 @@ $__navActive = 'services';
         #cam-stage.is-open { display: flex; }
         #cam-stage video { transform: scaleX(-1); transition: transform 0.2s; }
         #cam-stage video.no-mirror { transform: none; }
-        #cam-stage .cam-frame { width: 78%; height: 56%; border: 2px dashed rgba(255,255,255,0.55); border-radius: 1.5rem; }
+        /* KYC framing — face oval on top, Thai national ID card box below
+           (aspect 85.60 / 53.98 mm = 1.586 : 1) so the user knows exactly
+           where to place each subject. Frame colours track the face detector
+           in real time via .is-ok / .is-warn / .is-multi modifier classes. */
+        #cam-stage .kyc-frames {
+            position: absolute; inset: 0;
+            pointer-events: none;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: space-between;
+            padding: 7% 6%;
+        }
+        #cam-stage .kyc-face,
+        #cam-stage .kyc-card {
+            position: relative;
+            border: 2.5px dashed rgba(255,255,255,0.7);
+            transition: border-color 0.25s, box-shadow 0.25s, background-color 0.25s;
+            background: rgba(0,0,0,0.04);
+        }
+        #cam-stage .kyc-face {
+            width: min(58%, 290px);
+            aspect-ratio: 3 / 4;
+            border-radius: 50%;
+        }
+        #cam-stage .kyc-card {
+            width: min(82%, 360px);
+            aspect-ratio: 1.586;       /* Thai national ID card ratio */
+            border-radius: 14px;
+        }
+        #cam-stage .kyc-face.is-ok    { border-color: rgba(16,185,129,0.95);  box-shadow: 0 0 0 4px rgba(16,185,129,0.18); }
+        #cam-stage .kyc-face.is-warn  { border-color: rgba(244,63,94,0.9);    box-shadow: 0 0 0 4px rgba(244,63,94,0.18); }
+        #cam-stage .kyc-face.is-multi { border-color: rgba(245,158,11,0.95);  box-shadow: 0 0 0 4px rgba(245,158,11,0.18); }
+        #cam-stage .kyc-label {
+            position: absolute;
+            top: -12px; left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.72);
+            color: #fff;
+            font-size: 10px;
+            font-weight: 900;
+            letter-spacing: 0.08em;
+            padding: 3px 10px;
+            border-radius: 9999px;
+            white-space: nowrap;
+            display: inline-flex; align-items: center; gap: 4px;
+        }
+        #cam-stage .kyc-face.is-ok .kyc-label    { background: rgba(16,185,129,0.95); }
+        #cam-stage .kyc-face.is-warn .kyc-label  { background: rgba(244,63,94,0.92); }
+        #cam-stage .kyc-face.is-multi .kyc-label { background: rgba(245,158,11,0.95); }
         #cam-stage .cam-controls {
             position: relative;
             display: flex;
@@ -156,7 +203,6 @@ $__navActive = 'services';
         /* Real-time face detection status pill */
         #cam-status-pill { transition: background 0.25s, color 0.25s; max-width: calc(100% - 90px); }
         #cam-status-pill.is-loading i { opacity: 0.9; }
-        #cam-stage .cam-frame { transition: border-color 0.25s; }
     </style>
 </head>
 <body class="pb-32">
@@ -351,8 +397,17 @@ $__navActive = 'services';
     <div id="cam-stage" class="fixed inset-0 hidden bg-black flex-col">
         <div class="flex-1 relative overflow-hidden">
             <video id="cam-video" autoplay playsinline muted class="w-full h-full object-cover"></video>
-            <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <div class="cam-frame"></div>
+            <div class="kyc-frames">
+                <div class="kyc-face">
+                    <span class="kyc-label">
+                        <i class="fa-solid fa-face-smile"></i> ใบหน้า
+                    </span>
+                </div>
+                <div class="kyc-card">
+                    <span class="kyc-label">
+                        <i class="fa-solid fa-id-card"></i> บัตรประชาชน
+                    </span>
+                </div>
             </div>
             <div id="cam-status-pill" class="absolute top-5 left-5 px-3 py-1.5 rounded-full bg-black/60 text-white text-[11px] font-black tracking-wide flex items-center gap-1.5">
                 <i id="cam-status-icon" class="fa-solid fa-id-card"></i>
@@ -794,19 +849,22 @@ $__navActive = 'services';
         else                  setCamStatus('multi', count);
     }
 
+    // State → pill background + icon + status text + KYC face frame class.
+    // ID-card frame stays neutral because client-side detection only tracks
+    // faces; the card is verified server-side by Gemini after snap.
     const CAM_STATUS_STYLES = {
-        default:   { bg: 'rgba(0,0,0,0.6)',      icon: 'fa-id-card',       text: 'ถ่ายให้เห็นหน้า + บัตรประชาชน', frame: 'rgba(255,255,255,0.55)', warn: false, loading: false },
-        loading:   { bg: 'rgba(0,0,0,0.6)',      icon: 'fa-spinner fa-spin', text: 'กำลังเตรียมตัวตรวจจับใบหน้า…',    frame: 'rgba(255,255,255,0.55)', warn: false, loading: true  },
-        'no-face': { bg: 'rgba(244,63,94,0.85)', icon: 'fa-user-slash',    text: 'ขยับให้ใบหน้าเข้ากรอบ',          frame: 'rgba(244,63,94,0.65)',  warn: true,  loading: false },
-        ok:        { bg: 'rgba(16,185,129,0.9)', icon: 'fa-circle-check',  text: 'พบใบหน้า — กดถ่ายได้',          frame: 'rgba(16,185,129,0.75)', warn: false, loading: false },
-        multi:     { bg: 'rgba(245,158,11,0.9)', icon: 'fa-users',         text: 'พบหลายใบหน้า — เน้นเฉพาะคุณ',     frame: 'rgba(245,158,11,0.75)', warn: true,  loading: false },
+        default:   { bg: 'rgba(0,0,0,0.6)',      icon: 'fa-id-card',         text: 'ถ่ายให้เห็นหน้า + บัตรประชาชน',  faceClass: '',         warn: false, loading: false },
+        loading:   { bg: 'rgba(0,0,0,0.6)',      icon: 'fa-spinner fa-spin', text: 'กำลังเตรียมตัวตรวจจับใบหน้า…',    faceClass: '',         warn: false, loading: true  },
+        'no-face': { bg: 'rgba(244,63,94,0.85)', icon: 'fa-user-slash',      text: 'ขยับใบหน้าเข้ากรอบบน',         faceClass: 'is-warn',  warn: true,  loading: false },
+        ok:        { bg: 'rgba(16,185,129,0.9)', icon: 'fa-circle-check',    text: 'พบใบหน้า — กดถ่ายได้',          faceClass: 'is-ok',    warn: false, loading: false },
+        multi:     { bg: 'rgba(245,158,11,0.9)', icon: 'fa-users',           text: 'พบหลายใบหน้า — เน้นเฉพาะคุณ',     faceClass: 'is-multi', warn: true,  loading: false },
     };
     function setCamStatus(state, count) {
         const s = CAM_STATUS_STYLES[state] || CAM_STATUS_STYLES.default;
         const pill = document.getElementById('cam-status-pill');
         const icon = document.getElementById('cam-status-icon');
         const text = document.getElementById('cam-status-text');
-        const frame = document.querySelector('#cam-stage .cam-frame');
+        const faceFrame = document.querySelector('#cam-stage .kyc-face');
         const snap = document.getElementById('cam-snap-btn');
         if (pill) {
             pill.style.background = s.bg;
@@ -814,7 +872,10 @@ $__navActive = 'services';
         }
         if (icon) icon.className = `fa-solid ${s.icon}`;
         if (text) text.textContent = state === 'multi' ? `พบ ${count} ใบหน้า — เน้นเฉพาะคุณ` : s.text;
-        if (frame) frame.style.borderColor = s.frame;
+        if (faceFrame) {
+            faceFrame.classList.remove('is-ok', 'is-warn', 'is-multi');
+            if (s.faceClass) faceFrame.classList.add(s.faceClass);
+        }
         if (snap) snap.classList.toggle('snap-warn', !!s.warn);
     }
 
