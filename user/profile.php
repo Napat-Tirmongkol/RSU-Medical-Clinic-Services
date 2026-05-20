@@ -565,9 +565,9 @@ function vh(?string $s): string { return htmlspecialchars((string) $s, ENT_QUOTE
                 ?>
                 <input type="hidden" name="pdpa_version" value="<?= htmlspecialchars($pdpaVersion) ?>">
                 <div class="bg-white rounded-[2.5rem] p-7 border border-slate-50 shadow-sm space-y-5">
-                    <div class="flex items-start justify-between gap-3">
-                        <h3 class="text-sm font-black text-slate-900 uppercase tracking-widest"><?= __('profile.pdpa_title') ?></h3>
-                        <span class="text-[9px] font-bold text-slate-400 whitespace-nowrap"><?= __('profile.pdpa_version_label') ?></span>
+                    <div class="space-y-1">
+                        <h3 class="text-sm font-black text-slate-900 uppercase tracking-widest leading-snug"><?= __('profile.pdpa_title') ?></h3>
+                        <p class="text-xs font-bold text-slate-400 leading-snug"><?= __('profile.pdpa_version_label') ?></p>
                     </div>
                     <div id="pdpa-box" class="pdpa-box bg-slate-50 p-6 rounded-3xl text-[12px] text-slate-600 leading-relaxed max-h-72 overflow-y-auto custom-scrollbar border border-slate-100 space-y-4">
                         <div class="text-slate-900 font-black"><?= __('profile.pdpa_welcome') ?></div>
