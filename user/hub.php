@@ -45,6 +45,24 @@ try {
         exit;
     }
 
+    // ── PDPA v2 re-consent gate ────────────────────────────────────────
+    // Legacy users (registered before the granular consent split) reach
+    // this branch with both consent timestamps still NULL. Send them to
+    // the dedicated re-consent page; they cannot proceed to the hub
+    // until they tick both boxes. The original destination is preserved
+    // as ?return= so save_consent.php can bounce them back.
+    //
+    // We tolerate the columns being absent on a stale install — if the
+    // SELECT * above raced an in-progress migration, $user['consent_*']
+    // simply isn't set and the gate fires (correct behaviour: legacy).
+    $hasGeneral   = !empty($user['consent_general_accepted_at']);
+    $hasSensitive = !empty($user['consent_sensitive_accepted_at']);
+    if (!$hasGeneral || !$hasSensitive) {
+        $returnUrl = $_SERVER['REQUEST_URI'] ?? 'hub.php';
+        header('Location: pdpa_reconsent.php?return=' . urlencode($returnUrl), true, 303);
+        exit;
+    }
+
     // Force any outstanding post-checkin survey before letting the user use the hub.
     // (Allows ?survey=done|skipped to land on hub once after submission.)
     if (!isset($_GET['survey'])) {
