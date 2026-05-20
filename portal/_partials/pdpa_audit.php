@@ -1,6 +1,11 @@
 <?php
 // portal/_partials/pdpa_audit.php — PDPA Consent Audit (read-only)
 // Loaded by portal/index.php — portal_CSRF + SweetAlert2 available
+//
+// Edit action is superadmin-only (matches the server-side gate in
+// ajax_pdpa_audit.php consent:update). Anyone with access_identity can
+// view; only superadmin can stamp/withdraw consent records.
+$paIsSuper = (($_SESSION['admin_role'] ?? '') === 'superadmin');
 ?>
 <style>
 .pa-page { padding: 4px 4px 80px; }
@@ -168,7 +173,9 @@ body[data-theme='dark'] .pa-filter-bar input, body[data-theme='dark'] .pa-filter
         <div style="display:flex; justify-content:space-between; gap:8px; margin-top:18px; flex-wrap:wrap">
             <div style="display:flex; gap:8px; flex-wrap:wrap">
                 <button type="button" class="btn-x ghost" onclick="paShowPreview()"><i class="fa-solid fa-eye"></i> พรีวิวข้อความ</button>
+                <?php if ($paIsSuper): ?>
                 <button type="button" class="btn-x primary" onclick="paShowEdit()" style="background:#7c3aed"><i class="fa-solid fa-pen-to-square"></i> แก้ไข Consent</button>
+                <?php endif; ?>
             </div>
             <button type="button" class="btn-x ghost" onclick="paCloseDetail()"><i class="fa-solid fa-xmark"></i> ปิด</button>
         </div>

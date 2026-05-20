@@ -85,20 +85,24 @@ $consentAccepted = !empty($_POST['consent_accepted']) && in_array(
     (string)$_POST['consent_accepted'], ['1', 'true', 'yes', 'on'], true
 );
 $consentVersion  = trim((string)($_POST['consent_version'] ?? ''));
-$consentHash     = trim((string)($_POST['consent_text_hash'] ?? ''));
 
 if (!$consentAccepted) {
     json_err('กรุณายอมรับนโยบายความเป็นส่วนตัว (PDPA) ก่อนส่งใบสมัคร');
 }
-// Frontend may not yet send version/hash — accept legacy defaults but log a
-// warning so PII reviewer can spot pre-migration submissions.
-if ($consentVersion === '') {
+// Whitelist the version tag — anything that doesn't match the strict
+// pdpa_vN_YYYY-MM regex is treated as a legacy / pre-migration submit
+if (!preg_match('/^pdpa_v\d+_\d{4}-\d{2}$/', $consentVersion)) {
+    if ($consentVersion !== '') {
+        error_log('[gold_card_apply] invalid consent_version "' . $consentVersion . '" for user_id=' . $userId);
+    }
     $consentVersion = 'legacy_pre_capture_v0';
-    error_log('[gold_card_apply] missing consent_version — using legacy default for user_id=' . $userId);
 }
-if ($consentHash === '' || !preg_match('/^[a-f0-9]{40,128}$/i', $consentHash)) {
-    $consentHash = str_repeat('0', 64);
-}
+// Hash the canonical version server-side. We deliberately DO NOT trust
+// $_POST['consent_text_hash'] — a malicious client could submit the hash
+// of a more permissive text and forge the forensic record. The hash is a
+// derivative of the version tag (which is authoritative + git-tracked),
+// so any reviewer can reconstruct what the user saw at that version.
+$consentHash = hash('sha256', $consentVersion);
 
 if (!citizen_mod11($citizenId)) json_err('รหัสบัตรประชาชนไม่ถูกต้อง');
 if ($fullName === '' || mb_strlen($fullName) > 200) json_err('กรุณากรอกชื่อ-นามสกุล');
@@ -118,14 +122,33 @@ if (!in_array($photoMime, ['image/jpeg', 'image/png', 'image/webp'], true)) {
     json_err('รูปต้องเป็น JPG/PNG/WEBP เท่านั้น');
 }
 
-// Signature base64
+// Signature base64 — defence-in-depth so a hostile client can't drop a
+// PHP polyglot, SVG/script blob, or multi-GB DoS payload via this path
 if (!str_starts_with($signatureB64, 'data:image/png;base64,')) {
     json_err('ลายเซ็นไม่ถูกต้อง');
 }
 $sigData = substr($signatureB64, strlen('data:image/png;base64,'));
 $sigBin  = base64_decode($sigData, true);
-if ($sigBin === false || strlen($sigBin) < 200) {
+if ($sigBin === false) {
     json_err('ลายเซ็นไม่ถูกต้อง — กรุณาเซ็นใหม่');
+}
+// Lower bound: signature_pad output is always larger than ~200B; upper
+// bound caps payload size to prevent disk/memory DoS via base64 inflation
+$sigLen = strlen($sigBin);
+if ($sigLen < 200 || $sigLen > 2 * 1024 * 1024) {
+    json_err('ลายเซ็นมีขนาดไม่ถูกต้อง — กรุณาเซ็นใหม่');
+}
+// Magic-bytes check — a real PNG starts with the 8-byte PNG signature.
+// String-prefix in the data URL alone is not enough; the body could be
+// anything once you strip the label.
+if (substr($sigBin, 0, 8) !== "\x89PNG\r\n\x1a\n") {
+    json_err('ลายเซ็นไม่ใช่ไฟล์ PNG ที่ถูกต้อง');
+}
+// Structural validation — confirms the byte stream actually decodes as a
+// PNG image and isn't oversized in dimensions
+$sigInfo = @getimagesizefromstring($sigBin);
+if (!$sigInfo || ($sigInfo[2] ?? 0) !== IMAGETYPE_PNG || $sigInfo[0] > 4000 || $sigInfo[1] > 4000) {
+    json_err('ลายเซ็นไม่ใช่ไฟล์ PNG ที่ถูกต้อง');
 }
 
 // ── Check duplicate application ──────────────────────────────────────────────

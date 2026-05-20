@@ -35,7 +35,13 @@ if (!$user) {
 if (!empty($user['consent_general_accepted_at']) && !empty($user['consent_sensitive_accepted_at'])) {
     $returnUrl = (string)($_GET['return'] ?? 'hub.php');
     // Whitelist — only allow same-app paths so an attacker can't redirect off-domain
-    if (!preg_match('/^[a-zA-Z0-9_\-\.\/]+(\?[^\s]*)?$/', $returnUrl)) $returnUrl = 'hub.php';
+    // Strict allow-list: must be a same-directory .php filename + optional
+    // querystring. Rejects path traversal (../), absolute (/), and protocol-
+    // relative (//evil.com/foo.php) URLs — all of which the older permissive
+    // regex accepted and could be weaponised for open-redirect phishing
+    if (!preg_match('/^[a-zA-Z0-9_\-]+\.php(\?[a-zA-Z0-9_\-=&%\.]*)?$/', $returnUrl) || strpos($returnUrl, '//') !== false) {
+        $returnUrl = 'hub.php';
+    }
     header('Location: ' . $returnUrl);
     exit;
 }

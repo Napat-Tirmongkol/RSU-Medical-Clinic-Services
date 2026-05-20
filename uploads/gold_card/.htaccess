@@ -1,0 +1,23 @@
+# uploads/gold_card/ — gold card application files (PII, sensitive)
+# Defense-in-depth on top of the umbrella .htaccess at uploads/. Explicit
+# here so a misconfigured AllowOverride or a future child htaccess can't
+# silently re-enable PHP execution on user-uploaded photos / signatures.
+<FilesMatch "\.(php|phtml|phar|pl|py|jsp|asp|aspx|sh|cgi|js\.php)$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order Deny,Allow
+        Deny from all
+    </IfModule>
+</FilesMatch>
+
+# All files in this directory MUST be reached through the
+# portal/ajax_gold_card.php?action=document:download proxy, which checks
+# auth + realpath confines + audit-logs the access. Direct hits get nothing.
+Options -Indexes
+<IfModule mod_php.c>
+    php_flag engine off
+</IfModule>
+RemoveHandler .php .phtml .phar .pl .py
+RemoveType .php .phtml .phar .pl .py

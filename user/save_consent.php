@@ -36,7 +36,11 @@ if (!preg_match('/^pdpa_v\d+_\d{4}-\d{2}$/', $pdpaVersion)) {
     $pdpaVersion = 'pdpa_v2_2025-05';
 }
 $returnUrl = (string)($_POST['return'] ?? 'hub.php');
-if (!preg_match('/^[a-zA-Z0-9_\-\.\/]+(\?[^\s]*)?$/', $returnUrl)) $returnUrl = 'hub.php';
+// Strict allow-list (matches pdpa_reconsent.php) — block path traversal +
+// protocol-relative URLs so a crafted POST can't redirect users off-domain
+if (!preg_match('/^[a-zA-Z0-9_\-]+\.php(\?[a-zA-Z0-9_\-=&%\.]*)?$/', $returnUrl) || strpos($returnUrl, '//') !== false) {
+    $returnUrl = 'hub.php';
+}
 
 $consentIp        = $_SERVER['REMOTE_ADDR'] ?? '';
 $consentUserAgent = substr((string)($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 500);
@@ -86,13 +90,16 @@ try {
     ]);
 
     // Audit log so the admin can see a "user X re-consented at version Y"
-    // row alongside their original registration
+    // row alongside their original registration. Do NOT include the user's
+    // full_name in the description body — the third arg already carries
+    // user_id, and Activity Logs is visible to access_system_logs viewers
+    // who shouldn't necessarily see who-consented-to-what by name.
     try {
-        $stmtUser = $pdo->prepare("SELECT id, full_name FROM sys_users WHERE line_user_id = :line_id LIMIT 1");
+        $stmtUser = $pdo->prepare("SELECT id FROM sys_users WHERE line_user_id = :line_id LIMIT 1");
         $stmtUser->execute([':line_id' => $lineUserId]);
         $u = $stmtUser->fetch(PDO::FETCH_ASSOC);
         if ($u) {
-            log_activity('PDPA Reconsent', "Legacy user re-consented to {$pdpaVersion} '{$u['full_name']}'", (int)$u['id']);
+            log_activity('PDPA Reconsent', "Legacy user re-consented to {$pdpaVersion}", (int)$u['id']);
         }
     } catch (Throwable $e) {
         error_log('[save_consent] audit log: ' . $e->getMessage());

@@ -124,7 +124,7 @@ if ($action === 'stats') {
     } catch (Throwable $e) {
         error_log('[pdpa_audit] stats: ' . $e->getMessage());
         header('Content-Type: application/json; charset=utf-8');
-        echo json_encode(['ok' => false, 'message' => 'ดึงสถิติไม่สำเร็จ: ' . $e->getMessage()]);
+        echo json_encode(['ok' => false, 'message' => 'ดึงสถิติไม่สำเร็จ — โปรดลองอีกครั้ง']);
     }
     exit;
 }
@@ -185,7 +185,7 @@ if ($action === 'list') {
     } catch (Throwable $e) {
         error_log('[pdpa_audit] list: ' . $e->getMessage());
         header('Content-Type: application/json; charset=utf-8');
-        echo json_encode(['ok' => false, 'message' => 'ดึงรายการไม่สำเร็จ: ' . $e->getMessage()]);
+        echo json_encode(['ok' => false, 'message' => 'ดึงรายการไม่สำเร็จ — โปรดลองอีกครั้ง']);
     }
     exit;
 }
@@ -193,7 +193,7 @@ if ($action === 'list') {
 if ($action === 'detail') {
     try {
         $id = (int)($_GET['id'] ?? 0);
-        if ($id <= 0) throw new Exception('id ไม่ถูกต้อง');
+        if ($id <= 0) throw new LogicException('id ไม่ถูกต้อง');
 
         $stmt = $pdo->prepare("SELECT id, full_name, citizen_id, line_user_id, status, email, phone_number,
                                       consent_general_accepted_at, consent_general_version, consent_general_text_hash,
@@ -202,7 +202,7 @@ if ($action === 'detail') {
                                FROM sys_users WHERE id = :id LIMIT 1");
         $stmt->execute([':id' => $id]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
-        if (!$row) throw new Exception('ไม่พบผู้ใช้');
+        if (!$row) throw new LogicException('ไม่พบผู้ใช้');
 
         // Re-compute the hash of the version tag to confirm DB record hasn't
         // been tampered with — should always match unless someone hand-edited
@@ -211,9 +211,14 @@ if ($action === 'detail') {
 
         header('Content-Type: application/json; charset=utf-8');
         echo json_encode(['ok' => true, 'row' => $row], JSON_UNESCAPED_UNICODE);
-    } catch (Throwable $e) {
+    } catch (LogicException $e) {
+        // Only validator-thrown messages (LogicException) carry safe text
         header('Content-Type: application/json; charset=utf-8');
         echo json_encode(['ok' => false, 'message' => $e->getMessage()]);
+    } catch (Throwable $e) {
+        error_log('[pdpa_audit] detail: ' . $e->getMessage());
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['ok' => false, 'message' => 'ดึงข้อมูลไม่สำเร็จ — โปรดลองอีกครั้ง']);
     }
     exit;
 }
@@ -229,7 +234,7 @@ if ($action === 'preview') {
     try {
         $version = trim((string)($_GET['version'] ?? 'pdpa_v2_2025-05'));
         if (!preg_match('/^pdpa_v\d+_\d{4}-\d{2}$/', $version)) {
-            throw new Exception('รูปแบบเวอร์ชันไม่ถูกต้อง');
+            throw new LogicException('รูปแบบเวอร์ชันไม่ถูกต้อง');
         }
 
         $knownVersions = ['pdpa_v2_2025-05'];
@@ -270,9 +275,13 @@ if ($action === 'preview') {
             'sections'  => $sections,
             'labels'    => $labels,
         ], JSON_UNESCAPED_UNICODE);
-    } catch (Throwable $e) {
+    } catch (LogicException $e) {
         header('Content-Type: application/json; charset=utf-8');
         echo json_encode(['ok' => false, 'message' => $e->getMessage()]);
+    } catch (Throwable $e) {
+        error_log('[pdpa_audit] preview: ' . $e->getMessage());
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['ok' => false, 'message' => 'ดึงข้อมูลพรีวิวไม่สำเร็จ — โปรดลองอีกครั้ง']);
     }
     exit;
 }
@@ -282,22 +291,32 @@ if ($action === 'consent:update') {
     // Every change goes into sys_activity_logs with the admin's name,
     // the operation, and a required free-text justification — without
     // that audit trail this endpoint would be a PDPA violation itself.
+    //
+    // Read-side actions (list/detail/export/preview) are gated to anyone
+    // with access_identity, but state-changing operations on consent
+    // records are forensic-equivalent to forging / erasing PDPA evidence
+    // and must be restricted to superadmin alone. The audit log records
+    // who did it; this gate ensures only the right "who" can.
     header('Content-Type: application/json; charset=utf-8');
+    if (!$isSuper) {
+        echo json_encode(['ok' => false, 'message' => 'การแก้ไข Consent ต้องใช้สิทธิ์ superadmin เท่านั้น']);
+        exit;
+    }
     try {
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            throw new Exception('ต้องเป็น POST');
+            throw new LogicException('ต้องเป็น POST');
         }
         validate_csrf_or_die();
 
         $userId = (int)($_POST['id'] ?? 0);
         $op     = (string)($_POST['op'] ?? '');
         $reason = trim((string)($_POST['reason'] ?? ''));
-        if ($userId <= 0) throw new Exception('id ไม่ถูกต้อง');
-        if (mb_strlen($reason) < 10) throw new Exception('กรุณาระบุเหตุผลอย่างน้อย 10 ตัวอักษร');
-        if (mb_strlen($reason) > 500) throw new Exception('เหตุผลต้องไม่เกิน 500 ตัวอักษร');
+        if ($userId <= 0) throw new LogicException('id ไม่ถูกต้อง');
+        if (mb_strlen($reason) < 10) throw new LogicException('กรุณาระบุเหตุผลอย่างน้อย 10 ตัวอักษร');
+        if (mb_strlen($reason) > 500) throw new LogicException('เหตุผลต้องไม่เกิน 500 ตัวอักษร');
 
         $allowed = ['stamp_general', 'stamp_sensitive', 'stamp_both', 'clear_general', 'clear_sensitive', 'clear_both'];
-        if (!in_array($op, $allowed, true)) throw new Exception('การกระทำไม่ถูกต้อง');
+        if (!in_array($op, $allowed, true)) throw new LogicException('การกระทำไม่ถูกต้อง');
 
         // Snapshot the user's current consent state so the audit log captures
         // exactly what changed, not just what was requested
@@ -307,7 +326,7 @@ if ($action === 'consent:update') {
                                FROM sys_users WHERE id = :id LIMIT 1");
         $stmt->execute([':id' => $userId]);
         $before = $stmt->fetch(PDO::FETCH_ASSOC);
-        if (!$before) throw new Exception('ไม่พบผู้ใช้');
+        if (!$before) throw new LogicException('ไม่พบผู้ใช้');
 
         $pdpaVersion     = 'pdpa_v2_2025-05';
         $consentTextHash = hash('sha256', $pdpaVersion);
@@ -357,12 +376,18 @@ if ($action === 'consent:update') {
         $stmt2->execute([':id' => $userId]);
         $after = $stmt2->fetch(PDO::FETCH_ASSOC);
 
-        $adminName = (string)($_SESSION['admin_username'] ?? $_SESSION['full_name'] ?? 'admin');
+        // PDPA-friendly audit description: keep IDs + op + reason + state diff,
+        // but DO NOT splash the target user's full name into the log body — the
+        // Activity Logs viewer is reachable via access_system_logs without
+        // requiring access_identity, so leaking the name here gives those
+        // viewers unintended visibility into who consented. user_id is enough;
+        // the name can be JOINed at view time by those who are authorised.
         $adminId   = (int)($_SESSION['admin_id'] ?? 0);
         $desc = sprintf(
-            "PDPA Audit edit by %s · user_id=%d (%s) · op=%s · reason=%s · before={g=%s,s=%s} · after={g=%s,s=%s}",
-            $adminName, $userId, $before['full_name'] ?? '',
-            $op, $reason,
+            "PDPA Audit edit · target_user_id=%d · op=%s · reason=%s · before={g=%s,s=%s} · after={g=%s,s=%s}",
+            $userId,
+            $op,
+            mb_substr($reason, 0, 500),
             $before['consent_general_accepted_at']   ?? 'NULL',
             $before['consent_sensitive_accepted_at'] ?? 'NULL',
             $after['consent_general_accepted_at']    ?? 'NULL',
@@ -377,8 +402,11 @@ if ($action === 'consent:update') {
             'message' => 'บันทึกเรียบร้อย',
             'after' => $after,
         ], JSON_UNESCAPED_UNICODE);
-    } catch (Throwable $e) {
+    } catch (LogicException $e) {
         echo json_encode(['ok' => false, 'message' => $e->getMessage()]);
+    } catch (Throwable $e) {
+        error_log('[pdpa_audit] consent:update: ' . $e->getMessage());
+        echo json_encode(['ok' => false, 'message' => 'บันทึกไม่สำเร็จ — โปรดลองอีกครั้ง']);
     }
     exit;
 }
@@ -432,7 +460,7 @@ if ($action === 'export') {
     } catch (Throwable $e) {
         error_log('[pdpa_audit] export: ' . $e->getMessage());
         http_response_code(500);
-        echo 'Export failed: ' . htmlspecialchars($e->getMessage());
+        echo 'Export failed — โปรดลองอีกครั้ง';
         exit;
     }
 }
