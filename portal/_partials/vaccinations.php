@@ -228,6 +228,7 @@ body[data-theme='dark'] #vx-edit-box textarea { background: #0f172a; border-colo
         <div class="vx-box-body" id="vx-edit-body"></div>
         <div class="vx-box-foot">
             <button type="button" class="btn-x ghost" onclick="vxCloseEdit()">ปิด</button>
+            <button type="button" class="btn-x ghost" onclick="vxOpenBulkApply()" id="vx-bulk-btn" style="display:none;color:#0d9488;border-color:#0d9488"><i class="fa-solid fa-arrows-to-circle"></i> ใช้กับทุก record ในแคมเปญ</button>
             <button type="button" class="btn-x primary" onclick="vxSubmitEdit()" id="vx-edit-save"><i class="fa-solid fa-floppy-disk"></i> บันทึก + ระบุเหตุผล</button>
         </div>
     </div>
@@ -415,6 +416,10 @@ body[data-theme='dark'] #vx-edit-box textarea { background: #0f172a; border-colo
             const json = await res.json();
             if (!json.ok) throw new Error(json.message);
             vxCurrentRow = json.row;
+            // Bulk-apply only makes sense when the record is linked to a
+            // campaign booking — otherwise there's no "campaign" to apply across
+            const bulkBtn = document.getElementById('vx-bulk-btn');
+            if (bulkBtn) bulkBtn.style.display = json.row.campaign_booking_id ? '' : 'none';
             document.getElementById('vx-edit-title').textContent = `แก้ไขบันทึก · ${json.row.full_name || '#'+id}`;
 
             const r = json.row;
@@ -557,12 +562,116 @@ body[data-theme='dark'] #vx-edit-box textarea { background: #0f172a; border-colo
         document.getElementById(id).addEventListener('change', () => vxLoadList(1));
     });
 
+    // Bulk Apply — take the field values currently shown in the form and
+    // push them to every other record in the same campaign. Modal asks the
+    // operator to check which fields to apply (defaults to lot + manufacturer
+    // which are the most common batch-level fields) plus a reason.
+    async function vxOpenBulkApply() {
+        if (!vxCurrentRow || !vxCurrentRow.campaign_booking_id) {
+            Swal.fire({ icon:'info', title:'ไม่สามารถ Apply ได้', text:'record นี้ไม่ได้ผูกกับแคมเปญ', customClass:{ container:'vx-swal-z' } });
+            return;
+        }
+        // Read what's currently in the form (may differ from server-side row
+        // if the operator just typed something but hasn't saved yet)
+        const cur = {
+            vaccine_type_id: document.getElementById('vx-f-type').value,
+            vaccine_name:    document.getElementById('vx-f-name').value,
+            dose_number:     document.getElementById('vx-f-dose').value,
+            lot_number:      document.getElementById('vx-f-lot').value,
+            manufacturer:    document.getElementById('vx-f-mfr').value,
+            injection_site:  document.getElementById('vx-f-site').value,
+            provider_name:   document.getElementById('vx-f-prov').value,
+            location:        document.getElementById('vx-f-loc').value,
+            next_due_date:   document.getElementById('vx-f-due').value,
+            certificate_no:  document.getElementById('vx-f-cert').value,
+        };
+        const labels = {
+            vaccine_type_id: 'ประเภทวัคซีน (catalog)',
+            vaccine_name: 'ชื่อวัคซีน',
+            dose_number: 'Dose #',
+            lot_number: 'Lot',
+            manufacturer: 'Manufacturer',
+            injection_site: 'Injection site',
+            provider_name: 'Provider',
+            location: 'Location',
+            next_due_date: 'Next due date',
+            certificate_no: 'Certificate No.',
+        };
+        // Default-on: lot + manufacturer (the typical batch-level fields)
+        const defaultOn = new Set(['lot_number','manufacturer']);
+        const checkboxes = Object.keys(labels).map(f => {
+            const v = cur[f];
+            const display = v ? esc(String(v)) : '<i style="color:#94a3b8">— ว่าง —</i>';
+            const checked = defaultOn.has(f) && v ? 'checked' : '';
+            return `<label style="display:flex;align-items:center;gap:8px;padding:6px 0;font-size:13px;cursor:pointer;border-bottom:1px solid #f1f5f9">
+                <input type="checkbox" class="vx-ba-check" value="${f}" ${checked} style="width:16px;height:16px">
+                <span style="flex:1"><b>${esc(labels[f])}</b>: <span style="color:#475569">${display}</span></span>
+            </label>`;
+        }).join('');
+
+        const { isConfirmed, value } = await Swal.fire({
+            title: 'ใช้ค่ากับทุก record ในแคมเปญ',
+            html: `<div style="text-align:left;font-size:13px">
+                       <div style="background:#fef3c7;border:1px solid #fde68a;padding:8px 12px;border-radius:8px;margin-bottom:12px;color:#92400e;font-size:11px;font-weight:700">
+                           <i class="fa-solid fa-triangle-exclamation"></i> เลือกเฉพาะฟิลด์ที่ต้องการ overwrite ทุก target record
+                       </div>
+                       <div style="max-height:300px;overflow-y:auto;border:1px solid #e2e8f0;border-radius:8px;padding:4px 12px;margin-bottom:12px">
+                           ${checkboxes}
+                       </div>
+                       <label style="display:block;font-weight:800;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">
+                           เหตุผล <span style="color:#dc2626">*</span>
+                       </label>
+                       <input type="text" id="vx-ba-reason" class="swal2-input" style="width:100%;margin:0" placeholder="เช่น apply lot จาก batch รับเข้าวันที่ ...">
+                   </div>`,
+            showCancelButton: true,
+            confirmButtonText: 'Apply ทั้งหมด',
+            cancelButtonText: 'ยกเลิก',
+            confirmButtonColor: '#0d9488',
+            reverseButtons: true,
+            focusConfirm: false,
+            customClass: { container: 'vx-swal-z' },
+            preConfirm: () => {
+                const checked = Array.from(document.querySelectorAll('.vx-ba-check:checked')).map(c => c.value);
+                const reason = (document.getElementById('vx-ba-reason').value || '').trim();
+                if (!checked.length) { Swal.showValidationMessage('เลือกอย่างน้อย 1 ฟิลด์'); return false; }
+                if (reason.length < 5) { Swal.showValidationMessage('เหตุผลต้องอย่างน้อย 5 ตัวอักษร'); return false; }
+                return { fields: checked, reason };
+            },
+        });
+        if (!isConfirmed || !value) return;
+
+        try {
+            const fd = new FormData();
+            fd.append('csrf_token', (typeof portal_CSRF !== 'undefined') ? portal_CSRF : '');
+            fd.append('source_id', vxCurrentRow.id);
+            fd.append('reason', value.reason);
+            for (const f of value.fields) fd.append('apply_' + f, '1');
+
+            const res = await fetch(AJAX + '?action=bulk_apply', { method: 'POST', body: fd, credentials: 'same-origin' });
+            const json = await res.json();
+            if (!json.ok) throw new Error(json.message);
+
+            await Swal.fire({
+                icon: 'success',
+                title: 'Apply สำเร็จ',
+                html: `อัพเดต <b>${json.updated}</b> records (จาก ${json.targets} targets)`,
+                customClass: { container: 'vx-swal-z' },
+            });
+            vxCloseEdit();
+            vxLoadStats();
+            vxLoadList(vxCurrent.page);
+        } catch (err) {
+            Swal.fire({ icon:'error', title:'Apply ล้มเหลว', text: err.message, customClass:{ container:'vx-swal-z' } });
+        }
+    }
+
     // Expose for inline handlers
     window.vxLoadList = vxLoadList;
     window.vxReset = vxReset;
     window.vxOpenEdit = vxOpenEdit;
     window.vxCloseEdit = vxCloseEdit;
     window.vxSubmitEdit = vxSubmitEdit;
+    window.vxOpenBulkApply = vxOpenBulkApply;
 
     // Backfill button — only present in DOM for superadmin viewers
     const backfillBtn = document.getElementById('vx-backfill-btn');

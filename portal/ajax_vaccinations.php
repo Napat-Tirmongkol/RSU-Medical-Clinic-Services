@@ -554,6 +554,154 @@ if ($action === 'backfill') {
     exit;
 }
 
+if ($action === 'bulk_apply') {
+    // Apply selected fields from one record onto every other record in the
+    // same campaign. Driven by the operator from the edit modal — "I just
+    // got the lot number off the box; apply to all 562 attendees".
+    //
+    // Safety:
+    //   - admin / superadmin only (no editors)
+    //   - explicit field whitelist + per-field validation (mirrors `update`)
+    //   - requires a justification reason (>= 5 chars) — same audit standard
+    //     as a single-record edit, multiplied by the affected row count
+    //   - operator must explicitly check each field to apply — sending the
+    //     whole modal payload would be too easy to misuse
+    //   - each affected row gets its own sys_vaccine_audit entry so the
+    //     timeline on individual records stays accurate
+    try {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') throw new LogicException('ต้องเป็น POST');
+        validate_csrf_or_die();
+        if (!($isSuper || $adminRole === 'admin')) throw new LogicException('ต้องใช้สิทธิ์ admin/superadmin');
+
+        $sourceId = (int)($_POST['source_id'] ?? 0);
+        $reason   = trim((string)($_POST['reason'] ?? ''));
+        if ($sourceId <= 0) throw new LogicException('source_id ไม่ถูกต้อง');
+        if (mb_strlen($reason) < 5)   throw new LogicException('กรุณาระบุเหตุผลอย่างน้อย 5 ตัวอักษร');
+        if (mb_strlen($reason) > 500) throw new LogicException('เหตุผลต้องไม่เกิน 500 ตัวอักษร');
+
+        // Fields the operator opted in to propagate. Only these will be
+        // copied; the rest are untouched on target rows. Whitelist matches
+        // the editable set in `update` minus status (deliberately excluded —
+        // bulk-flipping status across a campaign is too dangerous).
+        $applyFields = [];
+        $allowed = ['vaccine_type_id','vaccine_name','dose_number','lot_number','manufacturer',
+                    'injection_site','provider_name','location','next_due_date','certificate_no'];
+        foreach ($allowed as $f) {
+            if (!empty($_POST['apply_' . $f])) $applyFields[] = $f;
+        }
+        if (!$applyFields) throw new LogicException('ไม่ได้เลือกฟิลด์ที่จะ apply');
+
+        // Read source row
+        $stmt = $pdo->prepare("SELECT v.*, b.campaign_id
+                               FROM user_vaccination_records v
+                               LEFT JOIN camp_bookings b ON b.id = v.campaign_booking_id
+                               WHERE v.id = :id LIMIT 1");
+        $stmt->execute([':id' => $sourceId]);
+        $src = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$src) throw new LogicException('ไม่พบ source record');
+        if (empty($src['campaign_id'])) throw new LogicException('source record นี้ไม่ได้ผูกกับ campaign — bulk apply ไม่ได้');
+
+        // Find target rows: records whose underlying booking is in the same
+        // campaign, excluding the source itself
+        $stmt = $pdo->prepare("
+            SELECT v.id, v.vaccine_type_id, v.vaccine_name, v.dose_number,
+                   v.lot_number, v.manufacturer, v.injection_site, v.provider_name,
+                   v.location, v.next_due_date, v.certificate_no
+            FROM user_vaccination_records v
+            JOIN camp_bookings b ON b.id = v.campaign_booking_id
+            WHERE b.campaign_id = :cid
+              AND v.id <> :sid
+              AND v.status <> 'entered_in_error'
+        ");
+        $stmt->execute([':cid' => (int)$src['campaign_id'], ':sid' => $sourceId]);
+        $targets = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        if (!$targets) {
+            echo json_encode(['ok' => true, 'updated' => 0, 'message' => 'ไม่มี record อื่นในแคมเปญนี้']);
+            exit;
+        }
+
+        if (count($targets) > 2000) {
+            throw new LogicException('Bulk apply เกิน 2000 records — โปรดใช้ CLI script');
+        }
+
+        // Build SET clause once — same for all rows
+        $sets = [];
+        $sourceBind = [];
+        foreach ($applyFields as $f) {
+            $sets[] = "`{$f}` = :{$f}";
+            $sourceBind[":{$f}"] = $src[$f];
+        }
+        $sets[] = "updated_by = :uby";
+        $adminId   = (int)($_SESSION['admin_id'] ?? 0);
+        $sourceBind[':uby'] = $adminId ?: null;
+
+        $pdo->beginTransaction();
+        $updateStmt = $pdo->prepare("UPDATE user_vaccination_records SET " . implode(',', $sets) . " WHERE id = :id");
+        $auditStmt  = $pdo->prepare("INSERT INTO sys_vaccine_audit
+            (record_id, action, changes_json, reason, performed_by_id, performed_by_name, ip_addr)
+            VALUES (?, 'bulk_apply', ?, ?, ?, ?, ?)");
+
+        $adminName = (string)($_SESSION['admin_username'] ?? $_SESSION['full_name'] ?? 'admin');
+        $ip = $_SERVER['REMOTE_ADDR'] ?? null;
+        $updated = 0;
+        $reasonClipped = mb_substr($reason, 0, 500);
+
+        foreach ($targets as $t) {
+            // Per-row diff for the audit trail — only fields that actually
+            // changed end up in the timeline (saves clutter on no-op targets)
+            $diff = [];
+            foreach ($applyFields as $f) {
+                if ((string)($t[$f] ?? '') !== (string)$src[$f]) {
+                    $diff[$f] = ['from' => $t[$f] ?? null, 'to' => $src[$f]];
+                }
+            }
+            if (!$diff) continue; // nothing to change on this row
+
+            $bind = $sourceBind;
+            $bind[':id'] = $t['id'];
+            $updateStmt->execute($bind);
+
+            $auditStmt->execute([
+                $t['id'],
+                json_encode(['source_id' => $sourceId, 'changes' => $diff], JSON_UNESCAPED_UNICODE),
+                $reasonClipped,
+                $adminId ?: null,
+                $adminName,
+                $ip,
+            ]);
+            $updated++;
+        }
+
+        $pdo->commit();
+
+        try {
+            log_activity(
+                'Vaccine Bulk Apply',
+                "source_id={$sourceId} campaign_id={$src['campaign_id']} fields=" . implode(',', $applyFields)
+                . " targets=" . count($targets) . " updated={$updated} reason=" . mb_substr($reason, 0, 200),
+                $adminId ?: null
+            );
+        } catch (Throwable $e) {}
+
+        echo json_encode([
+            'ok'           => true,
+            'updated'      => $updated,
+            'targets'      => count($targets),
+            'campaign_id'  => (int)$src['campaign_id'],
+            'message'      => "อัพเดต {$updated} records (จาก " . count($targets) . " targets ในแคมเปญนี้)",
+        ], JSON_UNESCAPED_UNICODE);
+    } catch (LogicException $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        echo json_encode(['ok' => false, 'message' => $e->getMessage()]);
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        error_log('[vaccinations] bulk_apply: ' . $e->getMessage());
+        echo json_encode(['ok' => false, 'message' => 'Bulk apply ล้มเหลว — โปรดลองอีกครั้ง']);
+    }
+    exit;
+}
+
 if ($action === 'types') {
     try {
         $rows = $pdo->query("SELECT id, code, name_th, name_en, default_doses, interval_days, category, sort_order, is_active

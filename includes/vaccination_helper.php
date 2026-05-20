@@ -15,11 +15,17 @@ function record_vaccination_from_booking(PDO $pdo, int $bookingId): bool
     if ($bookingId <= 0) return false;
 
     try {
+        // Pull the booking + campaign + (optionally) the catalog row the
+        // campaign is linked to. LEFT JOIN sys_vaccine_types so legacy
+        // campaigns without a vaccine_type_id still work — we just won't
+        // pre-fill catalog-derived fields.
         $stmt = $pdo->prepare("
             SELECT b.id, b.student_id, b.campaign_id, b.attended_at, b.status,
-                   c.title, c.type
+                   c.title, c.type, c.vaccine_type_id,
+                   t.default_manufacturer
             FROM camp_bookings b
             JOIN camp_list c ON b.campaign_id = c.id
+            LEFT JOIN sys_vaccine_types t ON t.id = c.vaccine_type_id
             WHERE b.id = :id
             LIMIT 1
         ");
@@ -47,16 +53,26 @@ function record_vaccination_from_booking(PDO $pdo, int $bookingId): bool
 
         $vaccinatedAt = !empty($b['attended_at']) ? $b['attended_at'] : date('Y-m-d H:i:s');
 
+        // Pre-fill catalog-derived fields when the campaign is linked. NULLs
+        // are fine — admin can fill them in later via the dashboard edit modal
+        // or the bulk-apply action. Idempotent because the duplicate-check
+        // above already returned false if a record exists for this booking.
+        $vaccineTypeId = !empty($b['vaccine_type_id']) ? (int)$b['vaccine_type_id'] : null;
+        $manufacturer  = !empty($b['default_manufacturer']) ? (string)$b['default_manufacturer'] : null;
+
         $ins = $pdo->prepare("
             INSERT INTO user_vaccination_records
-                (user_id, campaign_booking_id, vaccine_name, vaccinated_at, status, created_at, updated_at)
+                (user_id, campaign_booking_id, vaccine_type_id, vaccine_name,
+                 manufacturer, vaccinated_at, status, created_at, updated_at)
             VALUES
-                (:uid, :bid, :name, :at, 'completed', NOW(), NOW())
+                (:uid, :bid, :vtid, :name, :mfr, :at, 'completed', NOW(), NOW())
         ");
         $ins->execute([
             ':uid'  => (int)$b['student_id'],
             ':bid'  => (int)$b['id'],
+            ':vtid' => $vaccineTypeId,
             ':name' => (string)$b['title'],
+            ':mfr'  => $manufacturer,
             ':at'   => $vaccinatedAt,
         ]);
 

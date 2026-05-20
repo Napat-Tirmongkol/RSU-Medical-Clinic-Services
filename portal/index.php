@@ -403,6 +403,7 @@ $categoryMap = [
     'db_schema' => 'tools',
     'sql_console' => 'tools',
     'vaccinations' => 'core',
+    'vaccine_catalog' => 'core',
     'admin_tool' => 'tools',
     'future_app' => 'dev',
 ];
@@ -1306,6 +1307,11 @@ try {
                     <button class="psb-item <?= $activeSection==='vaccinations'?'psb-active':'' ?>" data-section="vaccinations" data-new-key="vaccinations_v1" onclick="switchSection('vaccinations',this)">
                         <div class="psb-icon"><i class="fa-solid fa-syringe" style="color:#0d9488"></i></div>
                         <span class="psb-label" style="color:#0f766e;font-weight:900">บันทึกการฉีดวัคซีน</span>
+                        <span class="psb-new-badge">NEW</span>
+                    </button>
+                    <button class="psb-item <?= $activeSection==='vaccine_catalog'?'psb-active':'' ?>" data-section="vaccine_catalog" data-new-key="vaccine_catalog_v1" onclick="switchSection('vaccine_catalog',this)">
+                        <div class="psb-icon"><i class="fa-solid fa-pills" style="color:#0d9488"></i></div>
+                        <span class="psb-label" style="color:#0f766e;font-weight:900">ประเภทวัคซีน</span>
                         <span class="psb-new-badge">NEW</span>
                     </button>
                 </div>
@@ -3451,6 +3457,18 @@ try {
                 ?>
             </div>
 
+            <!-- ════════════ SECTION: VACCINE CATALOG (Phase 2) ════════════ -->
+            <div id="section-vaccine_catalog" class="portal-section"
+                style="<?= $activeSection==='vaccine_catalog'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); background:#f1f5f9; overflow-y:auto; padding:20px;">
+                <?php
+                if ($isSuper || $adminRole === 'admin' || !empty($_SESSION['access_identity'])) {
+                    include __DIR__ . '/_partials/vaccine_catalog.php';
+                } else {
+                    echo '<div style="padding:100px;text-align:center;font-weight:900;color:#dc2626"><i class="fa-solid fa-shield-slash mb-4" style="font-size:4rem;display:block"></i> ACCESS DENIED<br><span style="font-size:14px;color:#94a3b8;font-weight:600">ต้องมีสิทธิ์ access_identity หรือ role: admin/superadmin</span></div>';
+                }
+                ?>
+            </div>
+
             <!-- ════════════ SECTION: FINANCE (Cash Book) ════════════ -->
             <div id="section-finance" class="portal-section"
                 style="<?= $activeSection==='finance'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); background:#f1f5f9; overflow-y:auto; padding:20px;">
@@ -5512,6 +5530,7 @@ try {
             { id: 'db_schema',     label: 'Database Schema',     desc: 'กราฟความสัมพันธ์ของฐานข้อมูล', icon: 'fa-diagram-project', tone: 'info', type: 'section', target: 'db_schema' },
             { id: 'sql_console',   label: 'SQL Console (RO)',    desc: 'รัน SELECT diagnostic · superadmin only', icon: 'fa-terminal',  tone: 'warning', type: 'section', target: 'sql_console' },
             { id: 'vaccinations',  label: 'บันทึกการฉีดวัคซีน',     desc: 'จัดการประวัติวัคซีน · KPI · audit log', icon: 'fa-syringe',     tone: 'success', type: 'section', target: 'vaccinations' },
+            { id: 'vaccine_catalog', label: 'ประเภทวัคซีน (Catalog)', desc: 'CRUD vaccine types · ผูกกับ campaign', icon: 'fa-pills', tone: 'success', type: 'section', target: 'vaccine_catalog' },
             { id: 'settings',      label: 'Settings',            desc: 'ตั้งค่าระบบ',        shortcut: 'g s', icon: 'fa-gear',               tone: 'warning', type: 'section', target: 'settings' },
 
             { id: 'open_asset',    label: 'ครุภัณฑ์สำนักงาน',   desc: 'ทะเบียนทรัพย์สิน',  shortcut: 'g r', icon: 'fa-boxes-stacked',     tone: 'success', type: 'url',     target: '../asset/index.php' },
