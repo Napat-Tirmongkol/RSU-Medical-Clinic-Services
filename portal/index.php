@@ -2808,9 +2808,9 @@ try {
             <div id="idViewModal"
                 style="display:none;position:fixed;inset:0;z-index:200;background:rgba(15,23,42,.55);backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:20px">
                 <div
-                    style="background:#fff;border-radius:24px;width:100%;max-width:420px;overflow:hidden;box-shadow:0 25px 50px -12px rgba(0,0,0,.25)">
+                    style="background:#fff;border-radius:24px;width:100%;max-width:560px;max-height:90vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 25px 50px -12px rgba(0,0,0,.25)">
                     <div
-                        style="padding:20px 24px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;justify-content:space-between">
+                        style="padding:20px 24px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
                         <div style="display:flex;align-items:center;gap:10px">
                             <div
                                 style="width:36px;height:36px;background:#eef2ff;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#4f46e5">
@@ -2822,8 +2822,8 @@ try {
                             style="width:30px;height:30px;border-radius:8px;border:1px solid #e2e8f0;background:#f8fafc;color:#64748b;cursor:pointer"><i
                                 class="fa-solid fa-times" style="font-size:12px"></i></button>
                     </div>
-                    <div style="padding:20px 24px;display:flex;flex-direction:column;gap:12px" id="idViewBody"></div>
-                    <div style="padding:14px 24px;border-top:1px solid #f1f5f9;text-align:right">
+                    <div style="padding:20px 24px;display:flex;flex-direction:column;gap:10px;overflow-y:auto;flex:1" id="idViewBody"></div>
+                    <div style="padding:14px 24px;border-top:1px solid #f1f5f9;text-align:right;flex-shrink:0">
                         <button onclick="document.getElementById('idViewModal').style.display='none'"
                             style="padding:9px 22px;border-radius:10px;border:1.5px solid #e2e8f0;background:#f8fafc;color:#374151;font-size:13px;font-weight:700;cursor:pointer">ปิด</button>
                     </div>
@@ -4774,23 +4774,99 @@ try {
         function idOpenView(u) {
             var statusMap = { student: 'นักศึกษา', staff: 'บุคลากร/อาจารย์', teacher: 'อาจารย์', other: 'บุคคลทั่วไป' };
             var genderMap = { male: 'ชาย', female: 'หญิง', other: 'อื่นๆ' };
+            // Format helpers — kept inline so this stays a single self-contained
+            // function that any partial can call without extra dependencies
+            function fmtDate(s) {
+                if (!s) return '—';
+                var d = new Date(String(s).replace(' ', 'T'));
+                if (isNaN(d.getTime())) return s;
+                return d.toLocaleDateString('th-TH', { year:'numeric', month:'long', day:'numeric' });
+            }
+            function fmtDateTime(s) {
+                if (!s) return '—';
+                var d = new Date(String(s).replace(' ', 'T'));
+                if (isNaN(d.getTime())) return s;
+                return d.toLocaleString('th-TH', { year:'numeric', month:'long', day:'numeric', hour:'2-digit', minute:'2-digit' });
+            }
+            function consentPill(ts, ver) {
+                if (!ts) return '<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:9999px;background:#fee2e2;color:#b91c1c;font-size:11px;font-weight:800"><i class="fa-solid fa-xmark"></i> ยังไม่ยินยอม</span>';
+                return '<div><span style="display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:9999px;background:#dcfce7;color:#15803d;font-size:11px;font-weight:800"><i class="fa-solid fa-check"></i> ยินยอม</span> <span style="font-size:11px;color:#475569;margin-left:4px">' + fmtDateTime(ts) + '</span>'
+                    + (ver ? '<div style="font-family:ui-monospace,Menlo,monospace;font-size:10px;color:#7c3aed;margin-top:3px">' + ver + '</div>' : '')
+                    + '</div>';
+            }
+            // Sections use a single-string entry as the header marker; tuples
+            // are [label, value]; tuples with a 3rd "html" item bypass the
+            // text-escape pipeline (used for the PDPA pill markup)
             var map = [
-                ['ชื่อ-นามสกุล', u.full_name],
+                ['__section', 'ข้อมูลพื้นฐาน'],
+                ['ชื่อ-นามสกุล', (u.prefix ? u.prefix + ' ' : '') + (u.full_name || '')],
                 ['เลขบัตรประชาชน', u.citizen_id],
-                ['รหัสนักศึกษา / บุคลากร', u.student_personnel_id],
+                ['LINE User ID', u.line_user_id],
+                ['Member ID (QR/เช็คอิน)', u.member_id],
+
+                ['__section', 'ติดต่อ'],
                 ['เบอร์โทรศัพท์', u.phone_number],
                 ['อีเมล', u.email],
+
+                ['__section', 'ข้อมูลส่วนตัว'],
                 ['เพศ', genderMap[u.gender] || u.gender],
-                ['คณะ / หน่วยงาน', u.department],
+                ['วันเดือนปีเกิด', fmtDate(u.date_of_birth)],
+
+                ['__section', 'สังกัด'],
                 ['ประเภท', statusMap[u.status] || u.status],
+                ['คณะ / หน่วยงาน', u.department],
+                ['รหัสนักศึกษา / บุคลากร', u.student_personnel_id],
             ];
             if (u.status === 'other' && u.status_other) {
                 map.push(['ระบุสถานภาพ', u.status_other]);
             }
-            map.push(['วันที่ลงทะเบียน', u.created_at ? new Date(u.created_at.replace(' ', 'T')).toLocaleString('th-TH', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—']);
+            // Health data (Sec. 26 sensitive) — only render the section if at
+            // least one value is set; backend masks values for non-superadmin
+            var hasHealth = u.blood_type || u.height_cm || u.weight_kg || u.allergies || u.chronic_conditions;
+            if (hasHealth) {
+                map.push(['__section', 'ข้อมูลสุขภาพ (อ่อนไหว — มาตรา 26)']);
+                if (u.blood_type)         map.push(['หมู่เลือด', u.blood_type]);
+                if (u.height_cm)          map.push(['ส่วนสูง (ซม.)', u.height_cm]);
+                if (u.weight_kg)          map.push(['น้ำหนัก (กก.)', u.weight_kg]);
+                if (u.allergies)          map.push(['ประวัติแพ้ยา/อาหาร', u.allergies]);
+                if (u.chronic_conditions) map.push(['โรคประจำตัว', u.chronic_conditions]);
+            }
+            // Emergency contact — same gating
+            var hasEm = u.emergency_contact_name || u.emergency_contact_phone || u.emergency_contact_relation;
+            if (hasEm) {
+                map.push(['__section', 'ผู้ติดต่อกรณีฉุกเฉิน']);
+                map.push(['ชื่อ-สกุล', u.emergency_contact_name]);
+                map.push(['เบอร์โทร', u.emergency_contact_phone]);
+                map.push(['ความสัมพันธ์', u.emergency_contact_relation]);
+            }
+
+            // PDPA consent — always shown; pills render even on NULL
+            map.push(['__section', 'สถานะ PDPA Consent']);
+            map.push(['ทั่วไป (มาตรา 24)',   consentPill(u.consent_general_accepted_at,   u.consent_general_version),   'html']);
+            map.push(['อ่อนไหว (มาตรา 26)', consentPill(u.consent_sensitive_accepted_at, u.consent_sensitive_version), 'html']);
+            if (u.consent_ip || u.consent_user_agent) {
+                if (u.consent_ip)         map.push(['IP ตอนยินยอม', u.consent_ip]);
+                if (u.consent_user_agent) map.push(['User-Agent', u.consent_user_agent]);
+            }
+
+            map.push(['__section', 'เวลา']);
+            map.push(['วันที่ลงทะเบียน', fmtDateTime(u.created_at)]);
+
+            // Render — XSS-safe except for explicitly opted-in html rows
+            function esc(s) {
+                return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+                    return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c];
+                });
+            }
             document.getElementById('idViewBody').innerHTML = map.map(function (r) {
-                return '<div><div style="font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.1em;margin-bottom:3px">' + r[0] + '</div>'
-                    + '<div style="padding:10px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;font-size:13px;font-weight:700;color:#0f172a">' + (r[1] || '—') + '</div></div>';
+                if (r[0] === '__section') {
+                    return '<div style="font-size:11px;font-weight:900;color:#4f46e5;text-transform:uppercase;letter-spacing:.12em;margin:8px 0 2px;padding-bottom:4px;border-bottom:1.5px solid #e0e7ff">' + esc(r[1]) + '</div>';
+                }
+                var isHtml = r[2] === 'html';
+                var val = isHtml ? r[1] : esc(r[1] || '—');
+                if (!isHtml && (r[1] === null || r[1] === undefined || r[1] === '')) val = '—';
+                return '<div><div style="font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.1em;margin-bottom:3px">' + esc(r[0]) + '</div>'
+                    + '<div style="padding:10px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;font-size:13px;font-weight:700;color:#0f172a;word-break:break-word">' + val + '</div></div>';
             }).join('');
             document.getElementById('idViewModal').style.display = 'flex';
         }
