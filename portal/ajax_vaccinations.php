@@ -465,10 +465,16 @@ if ($action === 'update') {
 }
 
 if ($action === 'backfill') {
-    // One-shot backfill: scan completed-or-attended vaccine bookings that
-    // don't yet have a vaccination record and create one via the shared
-    // helper. Same SQL the CLI script uses, just bridged through AJAX so a
-    // superadmin can run it without SSH. Idempotent — safe to click twice.
+    // Two-step backfill in a single transaction:
+    //   1. Create user_vaccination_records for attended vaccine bookings
+    //      that don't have one yet (the helper does this idempotently)
+    //   2. Flip camp_bookings.status from 'confirmed' → 'completed' for
+    //      every vaccine booking with attended_at stamped. This brings
+    //      historical data in line with what the four check-in handlers
+    //      already do for new check-ins (atomic status+attended write).
+    //      Confirmed via SQL Console that nothing else triggers on the
+    //      status flip — no auto-survey / auto-pay / auto-mail hooks —
+    //      so the UPDATE is side-effect-free.
     try {
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') throw new LogicException('ต้องเป็น POST');
         validate_csrf_or_die();
@@ -476,6 +482,9 @@ if ($action === 'backfill') {
 
         require_once __DIR__ . '/../includes/vaccination_helper.php';
 
+        $pdo->beginTransaction();
+
+        // Step 1: vaccination records
         $sql = "SELECT b.id
                 FROM camp_bookings b
                 JOIN camp_list c ON b.campaign_id = c.id
@@ -490,6 +499,7 @@ if ($action === 'backfill') {
         // 5000 is plenty for one click; if there's ever more, run the CLI.
         $candidates = count($ids);
         if ($candidates > 5000) {
+            $pdo->rollBack();
             throw new LogicException("จำนวน candidates เกิน 5000 (ตอนนี้ {$candidates}) — รัน CLI script แทนเพื่อความปลอดภัย");
         }
 
@@ -498,11 +508,28 @@ if ($action === 'backfill') {
             if (record_vaccination_from_booking($pdo, $bid)) $created++;
         }
 
+        // Step 2: status flip for vaccine bookings with attended_at but
+        // status still 'confirmed'. Limited to type='vaccine' so we don't
+        // accidentally touch booking statuses for non-vaccine modules that
+        // may have a different lifecycle semantic for 'completed'.
+        $flipStmt = $pdo->prepare("
+            UPDATE camp_bookings b
+            JOIN camp_list c ON b.campaign_id = c.id
+            SET b.status = 'completed'
+            WHERE c.type = 'vaccine'
+              AND b.status = 'confirmed'
+              AND b.attended_at IS NOT NULL
+        ");
+        $flipStmt->execute();
+        $flipped = $flipStmt->rowCount();
+
+        $pdo->commit();
+
         $adminId   = (int)($_SESSION['admin_id'] ?? 0);
         try {
             log_activity(
                 'Vaccine Backfill',
-                "candidates={$candidates} · inserted={$created}",
+                "vaccination_records: candidates={$candidates} inserted={$created} · status_flip: confirmed→completed={$flipped}",
                 $adminId ?: null
             );
         } catch (Throwable $e) {
@@ -513,11 +540,14 @@ if ($action === 'backfill') {
             'ok'         => true,
             'candidates' => $candidates,
             'inserted'   => $created,
-            'message'    => "เพิ่ม {$created} records (จาก {$candidates} candidates)",
+            'flipped'    => $flipped,
+            'message'    => "เพิ่ม {$created} vaccination records + flip {$flipped} bookings เป็น completed",
         ], JSON_UNESCAPED_UNICODE);
     } catch (LogicException $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
         echo json_encode(['ok' => false, 'message' => $e->getMessage()]);
     } catch (Throwable $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
         error_log('[vaccinations] backfill: ' . $e->getMessage());
         echo json_encode(['ok' => false, 'message' => 'Backfill ล้มเหลว — โปรดลองอีกครั้ง']);
     }

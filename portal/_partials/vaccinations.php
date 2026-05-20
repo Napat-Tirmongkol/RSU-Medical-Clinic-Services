@@ -134,9 +134,10 @@ body[data-theme='dark'] #vx-edit-box textarea { background: #0f172a; border-colo
 
     <?php if ($vxIsSuper && $vxBackfillCount > 0): ?>
     <div style="background:#fef3c7;border:1.5px solid #fde68a;color:#92400e;padding:12px 16px;border-radius:12px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
-        <div style="font-size:13px;font-weight:700">
+        <div style="font-size:13px;font-weight:700;flex:1;min-width:240px">
             <i class="fa-solid fa-database" style="color:#b45309"></i>
-            พบ <b style="color:#92400e;font-size:15px"><?= number_format($vxBackfillCount) ?></b> booking ที่ผู้ใช้มาฉีดวัคซีนแล้ว แต่ยังไม่มี record — สามารถ backfill ได้
+            พบ <b style="color:#92400e;font-size:15px"><?= number_format($vxBackfillCount) ?></b> booking ที่ผู้ใช้มาฉีดแล้ว แต่ขาด record หรือ status ยังค้าง <code style="background:rgba(120,53,15,0.1);padding:1px 5px;border-radius:3px;font-size:11px">confirmed</code>
+            <div style="font-size:11px;font-weight:600;color:#9a3412;margin-top:4px">การ backfill จะทำ 2 อย่างใน transaction เดียว: (1) สร้าง vaccination records ที่ขาด · (2) flip booking status เป็น completed</div>
         </div>
         <button type="button" class="btn-x primary" id="vx-backfill-btn"
                 style="background:#b45309;color:#fff;padding:8px 16px;border-radius:8px;font-size:12px;font-weight:800;cursor:pointer;border:0">
@@ -570,7 +571,12 @@ body[data-theme='dark'] #vx-edit-box textarea { background: #0f172a; border-colo
             const { isConfirmed } = await Swal.fire({
                 icon: 'question',
                 title: 'รัน Backfill?',
-                html: 'ระบบจะสร้าง vaccination records ย้อนหลังสำหรับ booking ที่ผู้ใช้มาฉีดแล้ว (ปลอดภัยที่จะคลิกซ้ำ — idempotent)<br><br>การทำงานนี้จะบันทึก audit log ใน Activity Logs',
+                html: `ทำ 2 ขั้นตอนใน transaction เดียว:
+                       <ol style="text-align:left;font-size:13px;margin:8px 0 0;padding-left:24px">
+                         <li>สร้าง <code>user_vaccination_records</code> ที่ขาดสำหรับ booking attended</li>
+                         <li>Flip <code>camp_bookings.status</code> จาก <code>confirmed</code> → <code>completed</code> (เฉพาะ vaccine + มี attended_at)</li>
+                       </ol>
+                       <div style="margin-top:8px;font-size:11px;color:#64748b">ปลอดภัยที่จะคลิกซ้ำ · ทั้งคู่ idempotent · audit log ไป Activity Logs</div>`,
                 showCancelButton: true,
                 confirmButtonText: 'รัน Backfill',
                 cancelButtonText: 'ยกเลิก',
@@ -593,7 +599,10 @@ body[data-theme='dark'] #vx-edit-box textarea { background: #0f172a; border-colo
                 await Swal.fire({
                     icon: 'success',
                     title: 'Backfill สำเร็จ',
-                    html: `เพิ่ม <b>${json.inserted}</b> records (จาก ${json.candidates} candidates)`,
+                    html: `<div style="text-align:left;font-size:13px">
+                              <div>📋 Vaccination records: <b>+${json.inserted}</b> (จาก ${json.candidates} candidates)</div>
+                              <div>🔄 Booking status flip: <b>${json.flipped}</b> rows · confirmed → completed</div>
+                           </div>`,
                     confirmButtonText: 'ปิด',
                     confirmButtonColor: '#0d9488',
                     customClass: { container: 'vx-swal-z' },
