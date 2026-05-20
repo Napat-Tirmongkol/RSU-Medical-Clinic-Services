@@ -401,6 +401,7 @@ $categoryMap = [
     'privilege_inventory' => 'tools',
     'pdpa_audit' => 'tools',
     'db_schema' => 'tools',
+    'sql_console' => 'tools',
     'vaccinations' => 'core',
     'admin_tool' => 'tools',
     'future_app' => 'dev',
@@ -1342,6 +1343,13 @@ try {
                     <button class="psb-item <?= $activeSection==='db_schema'?'psb-active':'' ?>" data-section="db_schema" data-new-key="db_schema_v1" onclick="switchSection('db_schema',this)">
                         <div class="psb-icon"><i class="fa-solid fa-diagram-project" style="color:#0891b2"></i></div>
                         <span class="psb-label" style="color:#0e7490;font-weight:900">Database Schema</span>
+                        <span class="psb-new-badge">NEW</span>
+                    </button>
+                    <?php endif; ?>
+                    <?php if ($isSuper): ?>
+                    <button class="psb-item <?= $activeSection==='sql_console'?'psb-active':'' ?>" data-section="sql_console" data-new-key="sql_console_v1" onclick="switchSection('sql_console',this)">
+                        <div class="psb-icon"><i class="fa-solid fa-terminal" style="color:#ea580c"></i></div>
+                        <span class="psb-label" style="color:#c2410c;font-weight:900">SQL Console <span style="font-size:8px;color:#9a3412;background:#fed7aa;padding:1px 4px;border-radius:3px;margin-left:2px">RO</span></span>
                         <span class="psb-new-badge">NEW</span>
                     </button>
                     <?php endif; ?>
@@ -3419,6 +3427,18 @@ try {
                 ?>
             </div>
 
+            <!-- ════════════ SECTION: SQL CONSOLE (read-only, superadmin) ════════════ -->
+            <div id="section-sql_console" class="portal-section"
+                style="<?= $activeSection==='sql_console'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); background:#f1f5f9; overflow-y:auto; padding:20px;">
+                <?php
+                if ($isSuper) {
+                    include __DIR__ . '/_partials/sql_console.php';
+                } else {
+                    echo '<div style="padding:100px;text-align:center;font-weight:900;color:#dc2626"><i class="fa-solid fa-shield-slash mb-4" style="font-size:4rem;display:block"></i> ACCESS DENIED<br><span style="font-size:14px;color:#94a3b8;font-weight:600">SQL Console ใช้ได้เฉพาะ superadmin</span></div>';
+                }
+                ?>
+            </div>
+
             <!-- ════════════ SECTION: VACCINATIONS (Phase 1) ════════════ -->
             <div id="section-vaccinations" class="portal-section"
                 style="<?= $activeSection==='vaccinations'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); background:#f1f5f9; overflow-y:auto; padding:20px;">
@@ -5490,6 +5510,7 @@ try {
             { id: 'privilege_inventory', label: 'ISO Governance', desc: 'Privileged Access', icon: 'fa-shield-halved',      tone: 'success', type: 'section', target: 'privilege_inventory' },
             { id: 'pdpa_audit',    label: 'PDPA Audit',          desc: 'ตรวจสอบความยินยอม PDPA', icon: 'fa-user-shield',    tone: 'info',    type: 'section', target: 'pdpa_audit' },
             { id: 'db_schema',     label: 'Database Schema',     desc: 'กราฟความสัมพันธ์ของฐานข้อมูล', icon: 'fa-diagram-project', tone: 'info', type: 'section', target: 'db_schema' },
+            { id: 'sql_console',   label: 'SQL Console (RO)',    desc: 'รัน SELECT diagnostic · superadmin only', icon: 'fa-terminal',  tone: 'warning', type: 'section', target: 'sql_console' },
             { id: 'vaccinations',  label: 'บันทึกการฉีดวัคซีน',     desc: 'จัดการประวัติวัคซีน · KPI · audit log', icon: 'fa-syringe',     tone: 'success', type: 'section', target: 'vaccinations' },
             { id: 'settings',      label: 'Settings',            desc: 'ตั้งค่าระบบ',        shortcut: 'g s', icon: 'fa-gear',               tone: 'warning', type: 'section', target: 'settings' },
 
