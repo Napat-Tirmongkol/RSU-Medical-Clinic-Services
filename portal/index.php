@@ -1138,7 +1138,7 @@ try {
                     <?php endif; ?>
                     <?php if ($isSuper || !empty($_SESSION['access_identity'])): ?>
                     <button class="psb-item <?= $activeSection==='pdpa_audit'?'psb-active':'' ?>" data-section="pdpa_audit" onclick="switchSection('pdpa_audit',this)">
-                        <div class="psb-icon"><i class="fa-solid fa-shield-check" style="color:#7c3aed"></i></div>
+                        <div class="psb-icon"><i class="fa-solid fa-user-shield" style="color:#7c3aed"></i></div>
                         <span class="psb-label" style="color:#6d28d9;font-weight:900">PDPA Audit</span>
                     </button>
                     <?php endif; ?>
@@ -5336,7 +5336,7 @@ try {
             { id: 'activity_logs', label: 'Activity Logs',       desc: 'บันทึกกิจกรรมระบบ',  icon: 'fa-file-lines',         tone: 'neutral', type: 'section', target: 'activity_logs' },
             { id: 'error_logs',    label: 'Error Logs',          desc: 'บันทึกข้อผิดพลาด',  shortcut: 'g e', icon: 'fa-bug',                tone: 'danger',  type: 'section', target: 'error_logs' },
             { id: 'privilege_inventory', label: 'ISO Governance', desc: 'Privileged Access', icon: 'fa-shield-halved',      tone: 'success', type: 'section', target: 'privilege_inventory' },
-            { id: 'pdpa_audit',    label: 'PDPA Audit',          desc: 'ตรวจสอบความยินยอม PDPA', icon: 'fa-shield-check',   tone: 'info',    type: 'section', target: 'pdpa_audit' },
+            { id: 'pdpa_audit',    label: 'PDPA Audit',          desc: 'ตรวจสอบความยินยอม PDPA', icon: 'fa-user-shield',    tone: 'info',    type: 'section', target: 'pdpa_audit' },
             { id: 'settings',      label: 'Settings',            desc: 'ตั้งค่าระบบ',        shortcut: 'g s', icon: 'fa-gear',               tone: 'warning', type: 'section', target: 'settings' },
 
             { id: 'open_asset',    label: 'ครุภัณฑ์สำนักงาน',   desc: 'ทะเบียนทรัพย์สิน',  shortcut: 'g r', icon: 'fa-boxes-stacked',     tone: 'success', type: 'url',     target: '../asset/index.php' },

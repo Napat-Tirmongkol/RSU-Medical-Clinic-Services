@@ -22,6 +22,24 @@ if (!$canAudit) {
 $pdo    = db();
 $action = (string)($_GET['action'] ?? '');
 
+// Self-healing migration — mirrors what save_profile.php does on first
+// consent submit. We run it here too because an admin may open the audit
+// dashboard on a fresh install BEFORE any user has submitted the form,
+// which would otherwise blow up with "Unknown column consent_general_*"
+// every query below. ALTER TABLE IF NOT EXISTS is idempotent and cheap.
+foreach ([
+    'consent_general_accepted_at'    => "DATETIME NULL DEFAULT NULL",
+    'consent_general_version'        => "VARCHAR(50)  NULL DEFAULT NULL",
+    'consent_general_text_hash'      => "VARCHAR(64)  NULL DEFAULT NULL",
+    'consent_sensitive_accepted_at'  => "DATETIME NULL DEFAULT NULL",
+    'consent_sensitive_version'      => "VARCHAR(50)  NULL DEFAULT NULL",
+    'consent_sensitive_text_hash'    => "VARCHAR(64)  NULL DEFAULT NULL",
+    'consent_ip'                     => "VARCHAR(45)  NULL DEFAULT NULL",
+    'consent_user_agent'             => "VARCHAR(500) NULL DEFAULT NULL",
+] as $col => $def) {
+    try { $pdo->exec("ALTER TABLE sys_users ADD COLUMN IF NOT EXISTS {$col} {$def}"); } catch (PDOException) {}
+}
+
 // Reasonable per-page cap so a hostile URL can't ask for millions of rows
 function pa_clamp_int($v, int $lo, int $hi, int $default): int {
     $n = is_numeric($v) ? (int)$v : $default;

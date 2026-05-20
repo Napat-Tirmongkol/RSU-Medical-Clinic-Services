@@ -89,7 +89,7 @@ body[data-theme='dark'] .pa-filter-bar input, body[data-theme='dark'] .pa-filter
 </style>
 
 <div class="pa-page">
-    <h1 class="pa-h1"><i class="fa-solid fa-shield-check" style="color:#2e9e63"></i> PDPA Consent Audit</h1>
+    <h1 class="pa-h1"><i class="fa-solid fa-user-shield" style="color:#7c3aed"></i> PDPA Consent Audit</h1>
     <p class="pa-sub">ตรวจสอบและส่งออกบันทึกความยินยอม PDPA ของผู้ใช้ — ใช้ในการตรวจประเมิน ISO 27701 / ตอบ DSAR / ส่งหลักฐานต่อ PDPC</p>
 
     <!-- KPI tiles -->
