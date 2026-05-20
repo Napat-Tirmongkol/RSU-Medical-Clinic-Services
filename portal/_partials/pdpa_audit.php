@@ -86,6 +86,10 @@ body[data-theme='dark'] .pa-table th { background: #0f172a; color: #cbd5e1; bord
 body[data-theme='dark'] .pa-table td { border-color: #334155; }
 body[data-theme='dark'] .pa-table tbody tr:hover { background: #0f172a; }
 body[data-theme='dark'] .pa-filter-bar input, body[data-theme='dark'] .pa-filter-bar select { background: #0f172a; border-color: #334155; color: #e2e8f0; }
+
+/* Lift Swal above our 9000-z detail modal so the preview / edit popups
+   aren't trapped behind it */
+.swal2-container.pa-swal-z { z-index: 9999 !important; }
 </style>
 
 <div class="pa-page">
@@ -161,7 +165,11 @@ body[data-theme='dark'] .pa-filter-bar input, body[data-theme='dark'] .pa-filter
         <h3><i class="fa-solid fa-user-shield" style="color:#2e9e63"></i> รายละเอียดความยินยอม</h3>
         <p class="pa-sub" id="pa-detail-name">—</p>
         <div id="pa-detail-content"></div>
-        <div style="display:flex; justify-content:flex-end; margin-top:18px">
+        <div style="display:flex; justify-content:space-between; gap:8px; margin-top:18px; flex-wrap:wrap">
+            <div style="display:flex; gap:8px; flex-wrap:wrap">
+                <button type="button" class="btn-x ghost" onclick="paShowPreview()"><i class="fa-solid fa-eye"></i> พรีวิวข้อความ</button>
+                <button type="button" class="btn-x primary" onclick="paShowEdit()" style="background:#7c3aed"><i class="fa-solid fa-pen-to-square"></i> แก้ไข Consent</button>
+            </div>
             <button type="button" class="btn-x ghost" onclick="paCloseDetail()"><i class="fa-solid fa-xmark"></i> ปิด</button>
         </div>
     </div>
@@ -170,7 +178,10 @@ body[data-theme='dark'] .pa-filter-bar input, body[data-theme='dark'] .pa-filter
 <script>
 (function() {
     const AJAX = 'ajax_pdpa_audit.php';
-    let paCurrent = { page: 1, perPage: 20, totalPages: 1 };
+    let paCurrent  = { page: 1, perPage: 20, totalPages: 1 };
+    // Remember which user the detail modal is showing so the
+    // preview/edit Swal dialogs know whose record to act on
+    let paCurrentUser = null;
 
     // Soft pastel palette for version segments — deterministic so the same
     // version always gets the same colour across reloads
@@ -335,6 +346,7 @@ body[data-theme='dark'] .pa-filter-bar input, body[data-theme='dark'] .pa-filter
             const json = await res.json();
             if (!json.ok) throw new Error(json.message || 'load failed');
             const r = json.row;
+            paCurrentUser = r;
             nameEl.textContent = `${r.full_name || '—'} (#${r.id})`;
 
             const genVerify = r.consent_general_version ? (r.general_hash_verifies
@@ -386,6 +398,153 @@ body[data-theme='dark'] .pa-filter-bar input, body[data-theme='dark'] .pa-filter
     }
     function paCloseDetail() {
         document.getElementById('pa-detail-modal').classList.remove('is-open');
+        paCurrentUser = null;
+    }
+
+    // Preview — reconstruct the policy text matching the user's version tag.
+    // Falls back to the general version tag, then "current" if neither is set
+    // (legacy user). Renders inside a Swal so it can ride on top of the
+    // detail modal without z-index collisions.
+    async function paShowPreview() {
+        if (!paCurrentUser) return;
+        const version = paCurrentUser.consent_general_version
+                     || paCurrentUser.consent_sensitive_version
+                     || 'pdpa_v2_2025-05';
+        Swal.fire({
+            title: 'กำลังโหลดข้อความ…',
+            html: '<i class="fa-solid fa-spinner fa-spin" style="font-size:32px;color:#7c3aed"></i>',
+            showConfirmButton: false,
+            didOpen: () => Swal.showLoading(),
+            customClass: { container: 'pa-swal-z' },
+        });
+        try {
+            const res = await fetch(AJAX + '?action=preview&version=' + encodeURIComponent(version), { credentials: 'same-origin' });
+            const json = await res.json();
+            if (!json.ok) throw new Error(json.message || 'load failed');
+
+            const html = json.is_known
+                ? `<div style="text-align:left; font-size:13px; line-height:1.6; color:#334155; max-height:55vh; overflow-y:auto; padding-right:6px">
+                       <div style="font-weight:900; color:#0f172a; margin-bottom:8px">${paEscape(json.welcome)}</div>
+                       ${json.sections.map(s => `
+                           <div style="margin-top:12px">
+                               <div style="font-weight:800; color:#0f172a; font-size:13px; margin-bottom:3px">${paEscape(s.title)}</div>
+                               <div style="white-space:pre-line">${paEscape(s.body)}</div>
+                           </div>`).join('')}
+                       <hr style="margin:14px 0; border:0; border-top:1px dashed #cbd5e1">
+                       <div style="background:#f0fdf4; border:1.5px solid #bbf7d0; border-radius:10px; padding:10px 12px; margin-top:8px">
+                           <i class="fa-solid fa-check" style="color:#15803d"></i>
+                           <b style="color:#15803d"> ☐ ${paEscape(json.labels.general)}</b>
+                       </div>
+                       <div style="background:#fff1f2; border:1.5px solid #fecdd3; border-radius:10px; padding:10px 12px; margin-top:6px">
+                           <i class="fa-solid fa-check" style="color:#be123c"></i>
+                           <b style="color:#be123c"> ☐ ${paEscape(json.labels.sensitive)}</b>
+                       </div>
+                   </div>`
+                : `<div style="text-align:left; padding:20px; background:#fef3c7; border-radius:10px">
+                       <i class="fa-solid fa-triangle-exclamation" style="color:#b45309"></i>
+                       <b>เวอร์ชัน "${paEscape(json.version)}" ไม่มีในระบบ</b>
+                       <p style="margin-top:6px; font-size:12px">ไม่สามารถ reconstruct ข้อความได้ — ตรวจสอบ git log ของ <code>lang/th.php</code> ที่เวอร์ชันดังกล่าวเพื่ออ้างอิงเนื้อหา</p>
+                   </div>`;
+
+            Swal.fire({
+                title: `พรีวิวข้อความ · ${json.version}`,
+                html: html,
+                width: 780,
+                confirmButtonText: 'ปิด',
+                confirmButtonColor: '#64748b',
+                customClass: { container: 'pa-swal-z' },
+            });
+        } catch (err) {
+            Swal.fire({ icon: 'error', title: 'โหลดไม่สำเร็จ', text: err.message, customClass: { container: 'pa-swal-z' } });
+        }
+    }
+
+    // Edit — admin operations on a user's consent. Every op requires a reason,
+    // which is funneled into the server-side activity log alongside before/
+    // after state so any change has a defensible audit trail
+    async function paShowEdit() {
+        if (!paCurrentUser) return;
+        const u = paCurrentUser;
+        const gen = u.consent_general_accepted_at ? '<span style="color:#15803d">✓ มี</span>' : '<span style="color:#b91c1c">✗ ไม่มี</span>';
+        const sen = u.consent_sensitive_accepted_at ? '<span style="color:#15803d">✓ มี</span>' : '<span style="color:#b91c1c">✗ ไม่มี</span>';
+
+        const { isConfirmed, value } = await Swal.fire({
+            title: 'แก้ไข Consent',
+            html: `
+                <div style="text-align:left; font-size:13px">
+                    <div style="background:#f1f5f9; padding:10px 12px; border-radius:8px; margin-bottom:14px">
+                        <b>${paEscape(u.full_name)}</b> (#${u.id})<br>
+                        สถานะปัจจุบัน · ทั่วไป: ${gen} · อ่อนไหว: ${sen}
+                    </div>
+                    <label style="display:block; font-weight:800; margin-bottom:4px">การกระทำ</label>
+                    <select id="pa-swal-op" class="swal2-input" style="width:100%; margin:0 0 12px">
+                        <option value="">— เลือก —</option>
+                        <optgroup label="เพิ่ม Consent (สำหรับยินยอม offline หรือบันทึกย้อนหลัง)">
+                            <option value="stamp_general">เพิ่ม Consent ทั่วไป (มาตรา 24)</option>
+                            <option value="stamp_sensitive">เพิ่ม Consent อ่อนไหว (มาตรา 26)</option>
+                            <option value="stamp_both">เพิ่ม Consent ทั้งสอง</option>
+                        </optgroup>
+                        <optgroup label="ถอน Consent (สำหรับสิทธิ์ถอนความยินยอม PDPA Sec. 30)">
+                            <option value="clear_general">ถอน Consent ทั่วไป</option>
+                            <option value="clear_sensitive">ถอน Consent อ่อนไหว</option>
+                            <option value="clear_both">ถอน Consent ทั้งสอง</option>
+                        </optgroup>
+                    </select>
+                    <label style="display:block; font-weight:800; margin-bottom:4px">เหตุผล <span style="color:#dc2626">*</span> <span style="font-weight:600; color:#64748b; font-size:11px">(10-500 ตัวอักษร; จะถูกบันทึกใน audit log)</span></label>
+                    <textarea id="pa-swal-reason" class="swal2-textarea" style="width:100%; margin:0; min-height:80px" placeholder="เช่น: ผู้ใช้ยืนยัน consent ทางโทรศัพท์ #ticket-1234 / ผู้ใช้ขอใช้สิทธิ์ถอนความยินยอม PDPA ลงนามใบคำร้อง 2025-05-20"></textarea>
+                </div>`,
+            showCancelButton: true,
+            confirmButtonText: 'บันทึก',
+            cancelButtonText: 'ยกเลิก',
+            confirmButtonColor: '#7c3aed',
+            reverseButtons: true,
+            focusConfirm: false,
+            preConfirm: () => {
+                const op = document.getElementById('pa-swal-op').value;
+                const reason = document.getElementById('pa-swal-reason').value.trim();
+                if (!op) { Swal.showValidationMessage('กรุณาเลือกการกระทำ'); return false; }
+                if (reason.length < 10) { Swal.showValidationMessage('เหตุผลต้องอย่างน้อย 10 ตัวอักษร'); return false; }
+                if (reason.length > 500) { Swal.showValidationMessage('เหตุผลต้องไม่เกิน 500 ตัวอักษร'); return false; }
+                return { op, reason };
+            },
+        });
+        if (!isConfirmed || !value) return;
+
+        // Second confirmation for destructive ops (clears) — irreversible loss
+        // of the original consent record, so make the admin click again
+        if (value.op.startsWith('clear_')) {
+            const { isConfirmed: cf2 } = await Swal.fire({
+                icon: 'warning',
+                title: 'ยืนยันการถอน Consent?',
+                text: 'การถอน Consent จะลบบันทึกความยินยอมเดิม (timestamp + version + hash) ออกจากระบบ ไม่สามารถกู้คืนได้ ',
+                showCancelButton: true,
+                confirmButtonText: 'ยืนยันถอน',
+                cancelButtonText: 'ยกเลิก',
+                confirmButtonColor: '#dc2626',
+                reverseButtons: true,
+                customClass: { container: 'pa-swal-z' },
+            });
+            if (!cf2) return;
+        }
+
+        try {
+            const fd = new FormData();
+            fd.append('csrf_token', (typeof portal_CSRF !== 'undefined') ? portal_CSRF : '');
+            fd.append('id', u.id);
+            fd.append('op', value.op);
+            fd.append('reason', value.reason);
+            const res = await fetch(AJAX + '?action=consent:update', { method: 'POST', body: fd, credentials: 'same-origin' });
+            const json = await res.json();
+            if (!json.ok) throw new Error(json.message || 'save failed');
+
+            Swal.fire({ icon: 'success', title: 'บันทึกเรียบร้อย', text: 'การเปลี่ยนแปลงถูกบันทึกใน Activity Logs แล้ว', timer: 1800, showConfirmButton: false, customClass: { container: 'pa-swal-z' } });
+            // Refresh the detail panel + stats + list so the change is visible
+            paShowDetail(u.id);
+            paLoadStats();
+            paLoadList(paCurrent.page);
+        } catch (err) {
+            Swal.fire({ icon: 'error', title: 'บันทึกไม่สำเร็จ', text: err.message, customClass: { container: 'pa-swal-z' } });
+        }
     }
 
     // Debounced search-as-you-type — keep server quiet while user is still typing
@@ -403,6 +562,8 @@ body[data-theme='dark'] .pa-filter-bar input, body[data-theme='dark'] .pa-filter
     window.paExport = paExport;
     window.paShowDetail = paShowDetail;
     window.paCloseDetail = paCloseDetail;
+    window.paShowPreview = paShowPreview;
+    window.paShowEdit = paShowEdit;
 
     // Boot
     paLoadStats();

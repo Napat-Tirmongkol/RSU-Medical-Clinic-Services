@@ -214,6 +214,171 @@ if ($action === 'detail') {
     exit;
 }
 
+if ($action === 'preview') {
+    // Return the i18n-driven PDPA policy text plus metadata so the
+    // dashboard can reconstruct what a user saw when they consented.
+    // The registry maps a known version tag → the same i18n keys the
+    // user actually rendered. For now there's only one entry; future
+    // versions add to the registry rather than overwriting it, so the
+    // historical wording stays auditable.
+    require_once __DIR__ . '/../includes/lang.php';
+    try {
+        $version = trim((string)($_GET['version'] ?? 'pdpa_v2_2025-05'));
+        if (!preg_match('/^pdpa_v\d+_\d{4}-\d{2}$/', $version)) {
+            throw new Exception('รูปแบบเวอร์ชันไม่ถูกต้อง');
+        }
+
+        $knownVersions = ['pdpa_v2_2025-05'];
+        $isKnown = in_array($version, $knownVersions, true);
+
+        $sections = $isKnown ? [
+            ['title' => __('profile.pdpa_controller_title'),     'body' => __('profile.pdpa_controller_desc')],
+            ['title' => __('profile.pdpa_legal_basis_title'),    'body' => __('profile.pdpa_legal_basis_desc')],
+            ['title' => '— ข้อมูลทั่วไป —',                       'body' => __('profile.pdpa_intro')],
+            ['title' => __('profile.pdpa_general_cats_title'),   'body' => __('profile.pdpa_general_cats_desc')],
+            ['title' => __('profile.pdpa_purposes_title'),       'body' => implode("\n\n", array_map(
+                fn($i) => __("profile.pdpa_item{$i}_title") . ' ' . __("profile.pdpa_item{$i}_desc"),
+                [1,2,3,4]
+            ))],
+            ['title' => __('profile.pdpa_third_party_title'),    'body' => __('profile.pdpa_third_party_desc')],
+            ['title' => __('profile.pdpa_retention_title'),      'body' => __('profile.pdpa_retention_desc')],
+            ['title' => '— ข้อมูลอ่อนไหว (มาตรา 26) —',          'body' => __('profile.pdpa_sensitive_intro')],
+            ['title' => __('profile.pdpa_sensitive_cats_title'), 'body' => __('profile.pdpa_sensitive_cats_desc')],
+            ['title' => __('profile.pdpa_sensitive_purpose_title'),'body' => __('profile.pdpa_sensitive_purpose_desc')],
+            ['title' => __('profile.pdpa_rights_title'),         'body' => __('profile.pdpa_rights_desc')],
+            ['title' => __('profile.pdpa_withdrawal_title'),     'body' => __('profile.pdpa_withdrawal_desc')],
+            ['title' => __('profile.pdpa_refusal_title'),        'body' => __('profile.pdpa_refusal_desc')],
+            ['title' => __('profile.pdpa_complaint_title'),      'body' => __('profile.pdpa_complaint_desc')],
+        ] : [];
+
+        $labels = $isKnown ? [
+            'general'   => __('profile.lbl_agree_general'),
+            'sensitive' => __('profile.lbl_agree_sensitive'),
+        ] : null;
+
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode([
+            'ok'        => true,
+            'version'   => $version,
+            'is_known'  => $isKnown,
+            'title'     => $isKnown ? __('profile.pdpa_title') : 'เวอร์ชันนี้ไม่มีในระบบ',
+            'welcome'   => $isKnown ? __('profile.pdpa_welcome') : '',
+            'sections'  => $sections,
+            'labels'    => $labels,
+        ], JSON_UNESCAPED_UNICODE);
+    } catch (Throwable $e) {
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['ok' => false, 'message' => $e->getMessage()]);
+    }
+    exit;
+}
+
+if ($action === 'consent:update') {
+    // Admin-side edit: force-stamp or clear a user's consent state.
+    // Every change goes into sys_activity_logs with the admin's name,
+    // the operation, and a required free-text justification — without
+    // that audit trail this endpoint would be a PDPA violation itself.
+    header('Content-Type: application/json; charset=utf-8');
+    try {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            throw new Exception('ต้องเป็น POST');
+        }
+        validate_csrf_or_die();
+
+        $userId = (int)($_POST['id'] ?? 0);
+        $op     = (string)($_POST['op'] ?? '');
+        $reason = trim((string)($_POST['reason'] ?? ''));
+        if ($userId <= 0) throw new Exception('id ไม่ถูกต้อง');
+        if (mb_strlen($reason) < 10) throw new Exception('กรุณาระบุเหตุผลอย่างน้อย 10 ตัวอักษร');
+        if (mb_strlen($reason) > 500) throw new Exception('เหตุผลต้องไม่เกิน 500 ตัวอักษร');
+
+        $allowed = ['stamp_general', 'stamp_sensitive', 'stamp_both', 'clear_general', 'clear_sensitive', 'clear_both'];
+        if (!in_array($op, $allowed, true)) throw new Exception('การกระทำไม่ถูกต้อง');
+
+        // Snapshot the user's current consent state so the audit log captures
+        // exactly what changed, not just what was requested
+        $stmt = $pdo->prepare("SELECT id, full_name,
+                                      consent_general_accepted_at,   consent_general_version,
+                                      consent_sensitive_accepted_at, consent_sensitive_version
+                               FROM sys_users WHERE id = :id LIMIT 1");
+        $stmt->execute([':id' => $userId]);
+        $before = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$before) throw new Exception('ไม่พบผู้ใช้');
+
+        $pdpaVersion     = 'pdpa_v2_2025-05';
+        $consentTextHash = hash('sha256', $pdpaVersion);
+        $now             = date('Y-m-d H:i:s');
+
+        $sets = [];
+        $bind = [':id' => $userId];
+
+        if ($op === 'stamp_general' || $op === 'stamp_both') {
+            // Only stamp if currently NULL — otherwise we'd overwrite the
+            // legitimate original consent date with NOW(), losing forensic value
+            $sets[] = 'consent_general_accepted_at = COALESCE(consent_general_accepted_at, :now1)';
+            $sets[] = 'consent_general_version     = COALESCE(consent_general_version,     :ver1)';
+            $sets[] = 'consent_general_text_hash   = COALESCE(consent_general_text_hash,   :hash1)';
+            $bind[':now1']  = $now;
+            $bind[':ver1']  = $pdpaVersion;
+            $bind[':hash1'] = $consentTextHash;
+        }
+        if ($op === 'stamp_sensitive' || $op === 'stamp_both') {
+            $sets[] = 'consent_sensitive_accepted_at = COALESCE(consent_sensitive_accepted_at, :now2)';
+            $sets[] = 'consent_sensitive_version     = COALESCE(consent_sensitive_version,     :ver2)';
+            $sets[] = 'consent_sensitive_text_hash   = COALESCE(consent_sensitive_text_hash,   :hash2)';
+            $bind[':now2']  = $now;
+            $bind[':ver2']  = $pdpaVersion;
+            $bind[':hash2'] = $consentTextHash;
+        }
+        if ($op === 'clear_general' || $op === 'clear_both') {
+            $sets[] = 'consent_general_accepted_at = NULL';
+            $sets[] = 'consent_general_version     = NULL';
+            $sets[] = 'consent_general_text_hash   = NULL';
+        }
+        if ($op === 'clear_sensitive' || $op === 'clear_both') {
+            $sets[] = 'consent_sensitive_accepted_at = NULL';
+            $sets[] = 'consent_sensitive_version     = NULL';
+            $sets[] = 'consent_sensitive_text_hash   = NULL';
+        }
+
+        $sql = "UPDATE sys_users SET " . implode(', ', $sets) . " WHERE id = :id";
+        $upd = $pdo->prepare($sql);
+        $upd->execute($bind);
+
+        // Re-fetch to capture the actual post-state (COALESCE on stamp ops
+        // may have been a no-op if the field was already set)
+        $stmt2 = $pdo->prepare("SELECT consent_general_accepted_at, consent_general_version,
+                                       consent_sensitive_accepted_at, consent_sensitive_version
+                                FROM sys_users WHERE id = :id LIMIT 1");
+        $stmt2->execute([':id' => $userId]);
+        $after = $stmt2->fetch(PDO::FETCH_ASSOC);
+
+        $adminName = (string)($_SESSION['admin_username'] ?? $_SESSION['full_name'] ?? 'admin');
+        $adminId   = (int)($_SESSION['admin_id'] ?? 0);
+        $desc = sprintf(
+            "PDPA Audit edit by %s · user_id=%d (%s) · op=%s · reason=%s · before={g=%s,s=%s} · after={g=%s,s=%s}",
+            $adminName, $userId, $before['full_name'] ?? '',
+            $op, $reason,
+            $before['consent_general_accepted_at']   ?? 'NULL',
+            $before['consent_sensitive_accepted_at'] ?? 'NULL',
+            $after['consent_general_accepted_at']    ?? 'NULL',
+            $after['consent_sensitive_accepted_at']  ?? 'NULL'
+        );
+        try { log_activity('PDPA Consent Edit', $desc, $adminId ?: null); } catch (Throwable $e) {
+            error_log('[pdpa_audit] log_activity failed: ' . $e->getMessage());
+        }
+
+        echo json_encode([
+            'ok' => true,
+            'message' => 'บันทึกเรียบร้อย',
+            'after' => $after,
+        ], JSON_UNESCAPED_UNICODE);
+    } catch (Throwable $e) {
+        echo json_encode(['ok' => false, 'message' => $e->getMessage()]);
+    }
+    exit;
+}
+
 if ($action === 'export') {
     try {
         [$whereSql, $bind] = pa_build_filter($_GET);
