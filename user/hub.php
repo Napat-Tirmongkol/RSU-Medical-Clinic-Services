@@ -1793,12 +1793,54 @@ $pillTones = [
                                 <p class="text-emerald-200/80 text-[10px] font-black uppercase tracking-[0.18em] mt-0.5"><?= htmlspecialchars($status_label) ?></p>
                             </div>
                         </div>
-                        <div
-                            class="bg-emerald-400/20 border border-emerald-400/30 rounded-full px-4 py-1.5 backdrop-blur-md flex items-center gap-2">
+                        <?php
+                        // ── Identity verification signals ─────────────────────────────
+                        // The PDPA gate further up guarantees both consents are stamped
+                        // by the time we reach this card, so the visible "Verified" signal
+                        // is whether the user filled in identity-grade data themselves.
+                        // Three checks make up the badge — each one corresponds to a
+                        // profile field the user can fix on their own.
+                        $_cid = (string)($user['citizen_id'] ?? '');
+                        $_cidValid = false;
+                        if (preg_match('/^\d{13}$/', $_cid)) {
+                            $_sum = 0;
+                            for ($i = 0; $i < 12; $i++) $_sum += (int)$_cid[$i] * (13 - $i);
+                            $_cidValid = ((11 - ($_sum % 11)) % 10) === (int)$_cid[12];
+                        }
+                        $_hasDob   = !empty($user['date_of_birth']) && $user['date_of_birth'] !== '0000-00-00';
+                        $_hasPhone = preg_match('/^0\d{9}$/', (string)($user['phone_number'] ?? '')) === 1;
+
+                        $_verifyChecks = [
+                            'citizen' => $_cidValid,
+                            'dob'     => $_hasDob,
+                            'phone'   => $_hasPhone,
+                        ];
+                        $_verifyPassed = count(array_filter($_verifyChecks));
+                        $_verifyTotal  = count($_verifyChecks);
+                        $_isVerified   = ($_verifyPassed === $_verifyTotal);
+
+                        // Tooltip enumerates the actual missing checks so the user knows what to fix
+                        $_missingLabels = [];
+                        if (!$_cidValid) $_missingLabels[] = 'เลขบัตรประชาชน 13 หลัก (Mod-11)';
+                        if (!$_hasDob)   $_missingLabels[] = 'วันเดือนปีเกิด';
+                        if (!$_hasPhone) $_missingLabels[] = 'เบอร์โทร 10 หลัก';
+                        $_tooltip = $_isVerified
+                            ? 'ข้อมูลตัวตนครบถ้วน · PDPA ยินยอม'
+                            : 'ขาด: ' . implode(', ', $_missingLabels) . ' — แตะเพื่อกรอก';
+                        ?>
+                        <?php if ($_isVerified): ?>
+                        <a href="profile.php" title="<?= htmlspecialchars($_tooltip) ?>"
+                            class="bg-emerald-400/20 border border-emerald-400/30 rounded-full px-4 py-1.5 backdrop-blur-md flex items-center gap-2 hover:bg-emerald-400/30 transition-colors">
                             <i class="fa-solid fa-circle-check text-emerald-300 text-[10px]"></i>
-                            <span
-                                class="text-emerald-200 text-[9px] font-black uppercase tracking-[0.15em]">Verified</span>
-                        </div>
+                            <span class="text-emerald-200 text-[9px] font-black uppercase tracking-[0.15em]">Verified</span>
+                        </a>
+                        <?php else: ?>
+                        <a href="profile.php" title="<?= htmlspecialchars($_tooltip) ?>"
+                            class="bg-amber-400/25 border border-amber-300/40 rounded-full px-4 py-1.5 backdrop-blur-md flex items-center gap-2 hover:bg-amber-400/35 transition-colors">
+                            <i class="fa-solid fa-circle-exclamation text-amber-200 text-[10px]"></i>
+                            <span class="text-amber-100 text-[9px] font-black uppercase tracking-[0.15em]"><?= $_verifyPassed ?>/<?= $_verifyTotal ?> Verify</span>
+                        </a>
+                        <?php endif; ?>
                     </div>
 
                     <?php
