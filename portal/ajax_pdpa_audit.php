@@ -54,16 +54,20 @@ function pa_build_filter(array $query): array {
 
     $q = trim((string)($query['q'] ?? ''));
     if ($q !== '') {
-        $where[] = '(u.full_name LIKE :q OR u.citizen_id LIKE :q OR u.line_user_id LIKE :q OR u.consent_ip LIKE :q)';
-        $bind[':q'] = '%' . $q . '%';
+        // Native MySQL prepares (this project sets ATTR_EMULATE_PREPARES=false)
+        // forbid reusing the same named placeholder across an SQL statement,
+        // so each LIKE gets its own bind name with the same value
+        $where[] = '(u.full_name LIKE :q1 OR u.citizen_id LIKE :q2 OR u.line_user_id LIKE :q3 OR u.consent_ip LIKE :q4)';
+        $like = '%' . $q . '%';
+        $bind[':q1'] = $like; $bind[':q2'] = $like; $bind[':q3'] = $like; $bind[':q4'] = $like;
     }
 
     $version = trim((string)($query['version'] ?? ''));
     // version tag follows the strict pdpa_vN_YYYY-MM regex — anything else is rejected
     // so an attacker can't smuggle SQL through the version filter
     if ($version !== '' && preg_match('/^pdpa_v\d+_\d{4}-\d{2}$/', $version)) {
-        $where[] = '(u.consent_general_version = :ver OR u.consent_sensitive_version = :ver)';
-        $bind[':ver'] = $version;
+        $where[] = '(u.consent_general_version = :ver1 OR u.consent_sensitive_version = :ver2)';
+        $bind[':ver1'] = $version; $bind[':ver2'] = $version;
     }
 
     $status = (string)($query['status'] ?? '');
