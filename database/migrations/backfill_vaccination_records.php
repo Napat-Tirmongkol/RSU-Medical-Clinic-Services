@@ -21,13 +21,16 @@ try {
         exit(1);
     }
 
+    // Match the relaxed helper condition: backfill for any vaccine booking
+    // that either reached the formal `completed` status OR has attended_at
+    // stamped (which is what the real check-in flow actually does).
     $stmt = $pdo->query("
         SELECT b.id
         FROM camp_bookings b
         JOIN camp_list c ON b.campaign_id = c.id
         LEFT JOIN user_vaccination_records v ON v.campaign_booking_id = b.id
         WHERE c.type = 'vaccine'
-          AND b.status = 'completed'
+          AND (b.status = 'completed' OR b.attended_at IS NOT NULL)
           AND v.id IS NULL
         ORDER BY b.id ASC
     ");

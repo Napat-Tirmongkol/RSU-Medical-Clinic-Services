@@ -41,8 +41,9 @@ try {
     $stmt = $pdo->prepare("
         SELECT id, status, full_name, citizen_id, application_date, created_at
         FROM gold_card_members
-        WHERE linked_user_id = :uid
-           OR (citizen_id IS NOT NULL AND citizen_id = :cid)
+        WHERE (linked_user_id = :uid
+           OR (citizen_id IS NOT NULL AND citizen_id = :cid))
+          AND deleted_at IS NULL
         ORDER BY id DESC LIMIT 1
     ");
     $stmt->execute([
@@ -94,12 +95,18 @@ $__navActive = 'services';
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
     <title>สมัครสิทธิหลักประกันสุขภาพ (บัตรทอง)</title>
+    <link rel="icon" href="<?= defined('SITE_LOGO') && SITE_LOGO !== '' ? '../' . htmlspecialchars(SITE_LOGO, ENT_QUOTES, 'UTF-8') : '../favicon.ico?v=' . APP_VERSION ?>">
     <link rel="stylesheet" href="../assets/css/tailwind.min.css">
     <link rel="stylesheet" href="../assets/css/rsufont.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.all.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.1.7/dist/signature_pad.umd.min.js"></script>
+    <!-- face-api.js — loaded with defer so parser isn't blocked; only used as a
+         fallback when the browser doesn't expose the native FaceDetector API
+         (e.g. iOS Safari / Firefox / desktop Chrome). Model weights load lazily
+         on first camera open, not on page load. -->
+    <script defer src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
     <style>
         body { font-family: 'RSU_Regular', 'Sarabun', -apple-system, sans-serif; background: #f8fafc; }
         .field-label { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; color: #64748b; }
@@ -117,6 +124,73 @@ $__navActive = 'services';
         .submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
         .clear-btn { background: #fee2e2; color: #b91c1c; padding: 10px 16px; border-radius: 12px; font-weight: 700; font-size: 13px; border: none; transition: all 0.2s; }
         .clear-btn:active { transform: scale(0.95); }
+
+        /* In-page camera stage (getUserMedia) */
+        #cam-stage { z-index: 9999; }
+        #cam-stage.is-open { display: flex; }
+        #cam-stage video { transform: scaleX(-1); transition: transform 0.2s; }
+        #cam-stage video.no-mirror { transform: none; }
+        /* KYC framing — face oval centred in the viewfinder. Border colour
+           tracks the face detector in real time via .is-ok / .is-warn /
+           .is-multi modifier classes. */
+        #cam-stage .kyc-face {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: min(62%, 300px);
+            aspect-ratio: 3 / 4;
+            border-radius: 50%;
+            border: 2.5px dashed rgba(255,255,255,0.7);
+            background: rgba(0,0,0,0.04);
+            pointer-events: none;
+            transition: border-color 0.25s, box-shadow 0.25s, background-color 0.25s;
+        }
+        #cam-stage .kyc-face.is-ok    { border-color: rgba(16,185,129,0.95);  box-shadow: 0 0 0 4px rgba(16,185,129,0.18); }
+        #cam-stage .kyc-face.is-warn  { border-color: rgba(244,63,94,0.9);    box-shadow: 0 0 0 4px rgba(244,63,94,0.18); }
+        #cam-stage .kyc-face.is-multi { border-color: rgba(245,158,11,0.95);  box-shadow: 0 0 0 4px rgba(245,158,11,0.18); }
+        #cam-stage .kyc-label {
+            position: absolute;
+            top: -12px; left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.72);
+            color: #fff;
+            font-size: 10px;
+            font-weight: 900;
+            letter-spacing: 0.08em;
+            padding: 3px 10px;
+            border-radius: 9999px;
+            white-space: nowrap;
+            display: inline-flex; align-items: center; gap: 4px;
+        }
+        #cam-stage .kyc-face.is-ok .kyc-label    { background: rgba(16,185,129,0.95); }
+        #cam-stage .kyc-face.is-warn .kyc-label  { background: rgba(244,63,94,0.92); }
+        #cam-stage .kyc-face.is-multi .kyc-label { background: rgba(245,158,11,0.95); }
+        #cam-stage .cam-controls {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+            padding: 20px 24px;
+            background: #000;
+        }
+        /* Shutter is absolutely centered → not affected by flex distribution
+           of the side buttons, stays in the middle regardless of viewport */
+        #cam-snap-btn {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            margin: 0;
+        }
+        #cam-snap-btn:active { transform: translate(-50%, -50%) scale(0.92); }
+        #cam-snap-btn::after { content: ''; position: absolute; inset: 6px; border-radius: 9999px; background: #f59e0b; transition: background 0.2s; }
+        #cam-snap-btn.snap-warn::after { background: #94a3b8; }
+        #cam-snap-btn.snap-warn { box-shadow: 0 0 0 4px rgba(244, 63, 94, 0.35), 0 8px 18px rgba(0,0,0,0.45); }
+        #cam-stage button { -webkit-tap-highlight-color: transparent; }
+        /* Real-time face detection status pill */
+        #cam-status-pill { transition: background 0.25s, color 0.25s; max-width: calc(100% - 90px); }
+        #cam-status-pill.is-loading i { opacity: 0.9; }
     </style>
 </head>
 <body class="pb-32">
@@ -233,20 +307,25 @@ $__navActive = 'services';
                         <li>เห็นข้อมูลในบัตรประชาชนชัดเจน</li>
                     </ul>
 
+                    <!-- Hidden file inputs — used as fallback if getUserMedia isn't available -->
                     <input type="file" id="photo-input" name="photo" accept="image/*" capture="environment" class="hidden">
-                    <label for="photo-input" id="photo-zone" class="upload-zone block">
+                    <input type="file" id="photo-gallery" accept="image/*" class="hidden">
+                    <div id="photo-zone" class="upload-zone block" onclick="if(!compressedPhotoBlob) openCamera()">
                         <div id="photo-empty">
                             <i class="fa-solid fa-camera text-3xl text-slate-300 mb-3"></i>
-                            <p class="text-[13px] font-black text-slate-700">แตะเพื่อถ่ายรูป / เลือกรูป</p>
+                            <p class="text-[13px] font-black text-slate-700">แตะเพื่อเปิดกล้อง</p>
                             <p class="text-[10px] font-semibold text-slate-400 mt-1">JPG, PNG • สูงสุด 10MB</p>
+                            <button type="button" onclick="event.preventDefault(); event.stopPropagation(); document.getElementById('photo-gallery').click();"
+                                class="mt-3 text-[11px] font-bold text-amber-600 underline decoration-dotted">หรือเลือกรูปจากเครื่อง</button>
                         </div>
                         <div id="photo-preview-wrap" class="hidden">
                             <img id="photo-preview" class="photo-preview" alt="Preview">
-                            <button type="button" onclick="event.preventDefault(); clearPhoto()" class="mt-3 clear-btn">
+                            <button type="button" onclick="event.preventDefault(); event.stopPropagation(); clearPhoto()" class="mt-3 clear-btn">
                                 <i class="fa-solid fa-rotate mr-1"></i> ถ่ายใหม่
                             </button>
                         </div>
-                    </label>
+                    </div>
+
                 </div>
 
                 <!-- Signature card -->
@@ -274,7 +353,7 @@ $__navActive = 'services';
                     <label class="flex items-start gap-3 cursor-pointer">
                         <input type="checkbox" id="consent" required class="mt-1 w-5 h-5 accent-amber-500">
                         <span class="text-[12px] font-bold text-slate-700 leading-relaxed">
-                            ข้าพเจ้ายืนยันว่าข้อมูลและเอกสารทั้งหมดเป็นความจริง และยินยอมให้คลินิกใช้ข้อมูลเพื่อตรวจสอบและออกบัตรทอง
+                            ข้าพเจ้าขอรับรองว่าข้อมูลจำเพาะบุคคลตามที่ระบุในแบบฟอร์มนี้เป็นความจริง ข้าพเจ้าตกลงยินยอมให้คลินิกเก็บรวบรวมและใช้ข้อมูลส่วนบุคคล รวมถึงเอกสารระบุตัวตน เพื่อวัตถุประสงค์ในการตรวจสอบและดำเนินการออกบัตรทอง
                         </span>
                     </label>
 
@@ -287,6 +366,37 @@ $__navActive = 'services';
     </div>
 
     <?php include __DIR__ . '/../includes/user_bottom_nav.php'; ?>
+
+    <!-- ════════════ IN-PAGE CAMERA STAGE (getUserMedia) ════════════ -->
+    <!-- MUST live in the DOM before <script> below, otherwise getElementById
+         returns null at script-parse time -->
+    <div id="cam-stage" class="fixed inset-0 hidden bg-black flex-col">
+        <div class="flex-1 relative overflow-hidden">
+            <video id="cam-video" autoplay playsinline muted class="w-full h-full object-cover"></video>
+            <div class="kyc-face">
+                <span class="kyc-label">
+                    <i class="fa-solid fa-face-smile"></i> ใบหน้า
+                </span>
+            </div>
+            <div id="cam-status-pill" class="absolute top-5 left-5 px-3 py-1.5 rounded-full bg-black/60 text-white text-[11px] font-black tracking-wide flex items-center gap-1.5">
+                <i id="cam-status-icon" class="fa-solid fa-id-card"></i>
+                <span id="cam-status-text">ถ่ายให้เห็นหน้า + บัตรประชาชน</span>
+            </div>
+            <button type="button" onclick="closeCamera()" class="absolute top-5 right-5 w-11 h-11 rounded-full bg-black/60 text-white flex items-center justify-center text-lg">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+            <div id="cam-error" class="hidden absolute left-5 right-5 bottom-5 bg-rose-500 text-white text-[12px] font-bold rounded-2xl px-4 py-3"></div>
+        </div>
+        <div class="cam-controls">
+            <button type="button" onclick="gotoGallery()" class="w-12 h-12 rounded-full bg-white/10 text-white flex items-center justify-center" title="เลือกจากเครื่องแทน">
+                <i class="fa-solid fa-images"></i>
+            </button>
+            <button type="button" id="cam-snap-btn" onclick="snapPhoto()" class="w-20 h-20 rounded-full bg-white shadow-xl border-4 border-white/40"></button>
+            <button type="button" onclick="swapCamera()" class="w-12 h-12 rounded-full bg-white/10 text-white flex items-center justify-center" title="สลับกล้องหน้า/หลัง">
+                <i class="fa-solid fa-camera-rotate"></i>
+            </button>
+        </div>
+    </div>
 
     <script>
     // Citizen ID Mod-11 validation
@@ -318,26 +428,28 @@ $__navActive = 'services';
     }
 
     // Photo handling
-    const photoInput = document.getElementById('photo-input');
+    const photoInput = document.getElementById('photo-input');         // capture=environment fallback
+    const photoGallery = document.getElementById('photo-gallery');     // pure gallery picker
     const photoZone = document.getElementById('photo-zone');
     const photoEmpty = document.getElementById('photo-empty');
     const photoPreviewWrap = document.getElementById('photo-preview-wrap');
     const photoPreview = document.getElementById('photo-preview');
-    let compressedPhotoBlob = null;
+    window.compressedPhotoBlob = null;
+    let lastBlobUrl = null;
 
-    if (photoInput) {
-        photoInput.addEventListener('change', async (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-            if (file.size > 10 * 1024 * 1024) {
-                Swal.fire({icon:'error', title:'ไฟล์ใหญ่เกินไป', text:'กรุณาเลือกไฟล์ขนาดไม่เกิน 10MB'});
-                return;
-            }
-
-            // Compress + show preview
+    // Compress + downscale anything that comes from a file picker; canvas
+    // snapshots from the in-page camera already arrive sized correctly so
+    // they go straight to setPhotoBlob().
+    async function compressFile(file) {
+        if (file.size > 10 * 1024 * 1024) {
+            Swal.fire({icon:'error', title:'ไฟล์ใหญ่เกินไป', text:'กรุณาเลือกไฟล์ขนาดไม่เกิน 10MB'});
+            return null;
+        }
+        return new Promise((resolve, reject) => {
             const img = new Image();
             const reader = new FileReader();
             reader.onload = (ev) => { img.src = ev.target.result; };
+            reader.onerror = () => reject(new Error('อ่านไฟล์ไม่ได้'));
             img.onload = () => {
                 const MAX_W = 1200;
                 const scale = Math.min(1, MAX_W / img.width);
@@ -345,24 +457,383 @@ $__navActive = 'services';
                 canvas.width = img.width * scale;
                 canvas.height = img.height * scale;
                 canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-                canvas.toBlob((blob) => {
-                    compressedPhotoBlob = blob;
-                    photoPreview.src = URL.createObjectURL(blob);
-                    photoEmpty.classList.add('hidden');
-                    photoPreviewWrap.classList.remove('hidden');
-                    photoZone.classList.add('has-file');
-                }, 'image/jpeg', 0.85);
+                canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error('compress fail')), 'image/jpeg', 0.85);
             };
+            img.onerror = () => reject(new Error('โหลดรูปไม่ได้'));
             reader.readAsDataURL(file);
         });
     }
 
+    function setPhotoBlob(blob) {
+        window.compressedPhotoBlob = blob;
+        // Free any previously-issued blob URL before issuing a new one,
+        // otherwise iOS Safari accumulates them per re-take and eventually
+        // refuses to allocate more
+        if (lastBlobUrl) URL.revokeObjectURL(lastBlobUrl);
+        lastBlobUrl = URL.createObjectURL(blob);
+        photoPreview.src = lastBlobUrl;
+        photoEmpty.classList.add('hidden');
+        photoPreviewWrap.classList.remove('hidden');
+        photoZone.classList.add('has-file');
+    }
+
+    async function handlePickedFile(file) {
+        if (!file) return;
+        try {
+            const blob = await compressFile(file);
+            if (blob) setPhotoBlob(blob);
+        } catch (e) {
+            Swal.fire({icon:'error', title:'เปิดรูปไม่ได้', text: e.message || 'กรุณาลองใหม่'});
+        }
+    }
+
+    photoInput?.addEventListener('change',   (e) => handlePickedFile(e.target.files[0]));
+    photoGallery?.addEventListener('change', (e) => handlePickedFile(e.target.files[0]));
+
     function clearPhoto() {
-        compressedPhotoBlob = null;
-        photoInput.value = '';
+        window.compressedPhotoBlob = null;
+        if (lastBlobUrl) { URL.revokeObjectURL(lastBlobUrl); lastBlobUrl = null; }
+        if (photoPreview) photoPreview.removeAttribute('src');
+        if (photoInput) photoInput.value = '';
+        if (photoGallery) photoGallery.value = '';
         photoEmpty.classList.remove('hidden');
         photoPreviewWrap.classList.add('hidden');
         photoZone.classList.remove('has-file');
+    }
+
+    // ─── In-page camera (getUserMedia) ─────────────────────────────────────────
+    const camStage = document.getElementById('cam-stage');
+    const camVideo = document.getElementById('cam-video');
+    const camError = document.getElementById('cam-error');
+    let cameraStream = null;
+    let cameraFacing = 'user';   // selfie+ID by default — user can swap to back
+    let cameraTransitioning = false;
+    let loadedDataHandler = null;
+
+    function attachStartOnReady() {
+        // Replace any pending loadeddata listener so quickly toggling the
+        // camera (open → close → open) can't leave an orphan handler that
+        // spins up a second detection interval on the new stream
+        if (loadedDataHandler) camVideo.removeEventListener('loadeddata', loadedDataHandler);
+        loadedDataHandler = () => { loadedDataHandler = null; startFaceDetection(); };
+        camVideo.addEventListener('loadeddata', loadedDataHandler, { once: true });
+    }
+
+    async function openCamera() {
+        // Defensive: ignore reentrancy from rapid double-taps or a swap in
+        // progress — opening again while a stream still exists also throws
+        // NotReadableError on iOS Safari
+        if (cameraTransitioning || cameraStream) return;
+        cameraTransitioning = true;
+        // Browsers without getUserMedia → fall back to the capture file input
+        if (!navigator.mediaDevices?.getUserMedia) {
+            cameraTransitioning = false;
+            (photoInput || photoGallery)?.click();
+            return;
+        }
+        camError.classList.add('hidden');
+        camStage.classList.remove('hidden');
+        camStage.classList.add('is-open');
+        try {
+            cameraStream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: cameraFacing, width: {ideal: 1280}, height: {ideal: 720} },
+                audio: false,
+            });
+        } catch (err) {
+            // Retry without facingMode constraint (laptops with single cam, etc.)
+            if (err.name === 'OverconstrainedError' || err.name === 'NotFoundError') {
+                try {
+                    cameraStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+                } catch (e2) {
+                    cameraTransitioning = false;
+                    return cameraFailed(e2);
+                }
+            } else {
+                cameraTransitioning = false;
+                return cameraFailed(err);
+            }
+        }
+        camVideo.srcObject = cameraStream;
+        updateMirror();
+        // Wait for the first video frame so the detector has actual pixels
+        attachStartOnReady();
+        cameraTransitioning = false;
+    }
+
+    function cameraFailed(err) {
+        closeCamera();
+        const msg = err?.name === 'NotAllowedError'
+            ? 'คุณยังไม่ได้อนุญาตให้ใช้กล้อง — กรุณาเลือกรูปจากเครื่องแทน'
+            : 'เปิดกล้องไม่ได้ — กรุณาเลือกรูปจากเครื่องแทน';
+        Swal.fire({
+            icon: 'warning',
+            title: 'เปิดกล้องไม่สำเร็จ',
+            text: msg,
+            confirmButtonText: 'เลือกรูปจากเครื่อง',
+            showCancelButton: true,
+            cancelButtonText: 'ปิด',
+            confirmButtonColor: '#f59e0b',
+            reverseButtons: true,
+        }).then(({ isConfirmed }) => {
+            // Only open the gallery if the user actually asked for it —
+            // dismissing the dialog shouldn't auto-trigger a file picker
+            if (isConfirmed) photoGallery?.click();
+        });
+    }
+
+    function closeCamera() {
+        stopFaceDetection();
+        if (loadedDataHandler) {
+            camVideo.removeEventListener('loadeddata', loadedDataHandler);
+            loadedDataHandler = null;
+        }
+        if (cameraStream) {
+            cameraStream.getTracks().forEach(t => t.stop());
+            cameraStream = null;
+        }
+        try { camVideo.pause(); } catch (e) {}   // iOS Safari guard
+        try { camVideo.srcObject = null; } catch (e) {}
+        camStage.classList.add('hidden');
+        camStage.classList.remove('is-open');
+    }
+
+    async function swapCamera() {
+        // Guard against rapid double-taps: getUserMedia on iOS throws
+        // NotReadableError if a previous track hasn't fully released yet
+        if (cameraTransitioning) return;
+        cameraTransitioning = true;
+        cameraFacing = cameraFacing === 'user' ? 'environment' : 'user';
+        stopFaceDetection();
+        if (loadedDataHandler) {
+            camVideo.removeEventListener('loadeddata', loadedDataHandler);
+            loadedDataHandler = null;
+        }
+        if (cameraStream) {
+            cameraStream.getTracks().forEach(t => t.stop());
+            cameraStream = null;
+        }
+        try {
+            cameraStream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: cameraFacing, width: {ideal: 1280}, height: {ideal: 720} },
+                audio: false,
+            });
+            camVideo.srcObject = cameraStream;
+            updateMirror();
+            attachStartOnReady();
+        } catch (err) {
+            camError.textContent = 'สลับกล้องไม่สำเร็จ — อุปกรณ์อาจมีกล้องเดียว';
+            camError.classList.remove('hidden');
+            setTimeout(() => camError.classList.add('hidden'), 2500);
+            cameraFacing = cameraFacing === 'user' ? 'environment' : 'user';   // restore
+            cameraTransitioning = false;
+            openCamera();
+            return;
+        }
+        cameraTransitioning = false;
+    }
+
+    function updateMirror() {
+        // Mirror preview for front camera so the user sees themselves naturally;
+        // the captured canvas is drawn from the raw (un-mirrored) video stream,
+        // so the saved photo keeps the ID card text readable.
+        if (cameraFacing === 'user') camVideo.classList.remove('no-mirror');
+        else camVideo.classList.add('no-mirror');
+    }
+
+    async function snapPhoto() {
+        if (!cameraStream || !camVideo.videoWidth) return;
+
+        // Soft pre-snap gate based on the live detector. AI can false-negative,
+        // so we warn instead of disabling — user can still force the snap if
+        // they're confident the photo is fine.
+        if (lastFaceCount === 0) {
+            const { isConfirmed } = await Swal.fire({
+                icon: 'warning',
+                title: 'ไม่พบใบหน้าในกรอบ',
+                text: 'ระบบยังไม่เห็นใบหน้าของคุณ — ขยับเข้ากรอบก่อนถ่าย หรือกด "ถ่ายเลย" ถ้าแน่ใจว่ารูปใช้ได้',
+                showCancelButton: true,
+                confirmButtonText: 'ถ่ายเลย',
+                cancelButtonText: 'ขยับใหม่',
+                reverseButtons: true,
+                confirmButtonColor: '#f59e0b',
+            });
+            if (!isConfirmed) return;
+        } else if (lastFaceCount > 1) {
+            const { isConfirmed } = await Swal.fire({
+                icon: 'warning',
+                title: `พบ ${lastFaceCount} ใบหน้าในกรอบ`,
+                text: 'ใบสมัครควรมีเฉพาะใบหน้าของผู้สมัครเท่านั้น — กดถ่ายต่อ?',
+                showCancelButton: true,
+                confirmButtonText: 'ถ่ายเลย',
+                cancelButtonText: 'จัดใหม่',
+                reverseButtons: true,
+                confirmButtonColor: '#f59e0b',
+            });
+            if (!isConfirmed) return;
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width  = camVideo.videoWidth;
+        canvas.height = camVideo.videoHeight;
+        canvas.getContext('2d').drawImage(camVideo, 0, 0);
+        canvas.toBlob((blob) => {
+            if (!blob) return;
+            closeCamera();
+            setPhotoBlob(blob);
+        }, 'image/jpeg', 0.88);
+    }
+
+    function gotoGallery() {
+        closeCamera();
+        photoGallery.click();
+    }
+
+    // ─── Client-side face pre-check ────────────────────────────────────────────
+    // Live face presence + framing feedback while the user composes the shot.
+    // Native FaceDetector when available, face-api.js TinyFaceDetector otherwise.
+    // ~0KB cost on Chrome Android, ~290KB lazy-load on Safari/Firefox.
+    // If both detectors fail we just skip the live feedback — the snapped
+    // photo still goes through the form-level checks before submit.
+    let nativeFaceDetector = null;
+    let faceApiReady = false;
+    let faceApiLoading = null;
+    let faceDetectInterval = null;
+    let faceDetectRunning = false;
+    let lastFaceCount = -1;
+
+    async function ensureFaceDetection() {
+        if ('FaceDetector' in window) {
+            if (!nativeFaceDetector) {
+                try { nativeFaceDetector = new FaceDetector({ fastMode: true, maxDetectedFaces: 3 }); }
+                catch (e) { nativeFaceDetector = null; }
+            }
+            if (nativeFaceDetector) return 'native';
+        }
+        if (typeof faceapi === 'undefined') return null;
+        if (faceApiReady) return 'faceapi';
+        if (faceApiLoading) return faceApiLoading;
+        // The npm dist of face-api.js doesn't ship the /weights/ folder, so
+        // the jsdelivr /npm/ route 404s. Pull straight from the GitHub tag
+        // instead, with a couple of backup mirrors in case one CDN is down.
+        const MODEL_URLS = [
+            'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@0.22.2/weights',
+            'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights',
+            'https://unpkg.com/face-api.js@0.22.2/weights',
+        ];
+        faceApiLoading = (async () => {
+            for (const url of MODEL_URLS) {
+                try {
+                    await faceapi.nets.tinyFaceDetector.loadFromUri(url);
+                    faceApiReady = true;
+                    return 'faceapi';
+                } catch (e) {
+                    console.warn('[face-api] model load failed from', url, e?.message || e);
+                }
+            }
+            console.warn('[face-api] all CDN mirrors failed — skipping live face feedback');
+            return null;
+        })().finally(() => { faceApiLoading = null; });
+        return faceApiLoading;
+    }
+
+    async function detectFaceCountOnce() {
+        if (!cameraStream || !camVideo.videoWidth) return -1;
+        if (nativeFaceDetector) {
+            try { return (await nativeFaceDetector.detect(camVideo)).length; }
+            catch (e) { return -1; }
+        }
+        if (faceApiReady && typeof faceapi !== 'undefined') {
+            try {
+                const opts = new faceapi.TinyFaceDetectorOptions({ inputSize: 160, scoreThreshold: 0.5 });
+                return (await faceapi.detectAllFaces(camVideo, opts)).length;
+            } catch (e) { return -1; }
+        }
+        return -1;
+    }
+
+    async function startFaceDetection() {
+        // Possible race: loadeddata can fire after the user already closed the
+        // camera. If the stream is gone, don't start anything.
+        if (!cameraStream) return;
+        // Kill any prior loop before launching a new one — defensive guard
+        // against double-attach from rapid open/swap sequences
+        if (faceDetectInterval) { clearInterval(faceDetectInterval); faceDetectInterval = null; }
+        setCamStatus('loading');
+        const detector = await ensureFaceDetection();
+        if (!cameraStream) return; // user closed camera while model was loading
+        if (!detector) {
+            // No detector available — graceful fallback to neutral status
+            setCamStatus('default');
+            return;
+        }
+        // Take an immediate reading so the pill updates without waiting 600ms
+        const initialCount = await detectFaceCountOnce();
+        if (!cameraStream) return;
+        if (initialCount >= 0) updateFaceStatus(initialCount);
+        else setCamStatus('default');
+
+        faceDetectInterval = setInterval(async () => {
+            if (!cameraStream) { stopFaceDetection(); return; }   // camera closed mid-loop
+            if (faceDetectRunning) return;                          // previous tick still in flight
+            faceDetectRunning = true;
+            const count = await detectFaceCountOnce();
+            if (count >= 0) updateFaceStatus(count);
+            faceDetectRunning = false;
+        }, 600);
+    }
+
+    function stopFaceDetection() {
+        if (faceDetectInterval) { clearInterval(faceDetectInterval); faceDetectInterval = null; }
+        lastFaceCount = -1;
+        setCamStatus('default');
+    }
+
+    function updateFaceStatus(count) {
+        if (count === lastFaceCount) return;
+        lastFaceCount = count;
+        if (count === 0)      setCamStatus('no-face');
+        else if (count === 1) setCamStatus('ok');
+        else                  setCamStatus('multi', count);
+    }
+
+    // State → pill background + icon + status text + KYC face frame class.
+    const CAM_STATUS_STYLES = {
+        default:   { bg: 'rgba(0,0,0,0.6)',      icon: 'fa-id-card',         text: 'ถ่ายให้เห็นหน้า + บัตรประชาชน',  faceClass: '',         warn: false, loading: false },
+        loading:   { bg: 'rgba(0,0,0,0.6)',      icon: 'fa-spinner fa-spin', text: 'กำลังเตรียมตัวตรวจจับใบหน้า…',    faceClass: '',         warn: false, loading: true  },
+        'no-face': { bg: 'rgba(244,63,94,0.85)', icon: 'fa-user-slash',      text: 'ขยับใบหน้าเข้ากรอบบน',         faceClass: 'is-warn',  warn: true,  loading: false },
+        ok:        { bg: 'rgba(16,185,129,0.9)', icon: 'fa-circle-check',    text: 'พบใบหน้า — กดถ่ายได้',          faceClass: 'is-ok',    warn: false, loading: false },
+        multi:     { bg: 'rgba(245,158,11,0.9)', icon: 'fa-users',           text: 'พบหลายใบหน้า — เน้นเฉพาะคุณ',     faceClass: 'is-multi', warn: true,  loading: false },
+    };
+    function setCamStatus(state, count) {
+        const s = CAM_STATUS_STYLES[state] || CAM_STATUS_STYLES.default;
+        const pill = document.getElementById('cam-status-pill');
+        const icon = document.getElementById('cam-status-icon');
+        const text = document.getElementById('cam-status-text');
+        const faceFrame = document.querySelector('#cam-stage .kyc-face');
+        const snap = document.getElementById('cam-snap-btn');
+        if (pill) {
+            pill.style.background = s.bg;
+            pill.classList.toggle('is-loading', !!s.loading);
+        }
+        if (icon) icon.className = `fa-solid ${s.icon}`;
+        if (text) text.textContent = state === 'multi' ? `พบ ${count} ใบหน้า — เน้นเฉพาะคุณ` : s.text;
+        if (faceFrame) {
+            faceFrame.classList.remove('is-ok', 'is-warn', 'is-multi');
+            if (s.faceClass) faceFrame.classList.add(s.faceClass);
+        }
+        if (snap) snap.classList.toggle('snap-warn', !!s.warn);
+    }
+
+    // Expose camera fns globally so inline onclick handlers can reach them
+    window.openCamera = openCamera;
+    window.closeCamera = closeCamera;
+    window.swapCamera = swapCamera;
+    window.snapPhoto = snapPhoto;
+    window.gotoGallery = gotoGallery;
+    window.clearPhoto = clearPhoto;
+
+    function escapeHtml(s) {
+        return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     }
 
     // Signature canvas

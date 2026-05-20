@@ -399,6 +399,11 @@ $categoryMap = [
     'system_logs' => 'tools',
     'sentry_events' => 'tools',
     'privilege_inventory' => 'tools',
+    'pdpa_audit' => 'tools',
+    'db_schema' => 'tools',
+    'sql_console' => 'tools',
+    'vaccinations' => 'core',
+    'vaccine_catalog' => 'core',
     'admin_tool' => 'tools',
     'future_app' => 'dev',
 ];
@@ -890,6 +895,19 @@ try {
 
         // Auto-apply sidebar state on load
         window.addEventListener('DOMContentLoaded', function() {
+            // Hide NEW badge on items the user has already opened. We can't
+            // server-side gate this because the flag is per-browser; do it
+            // client-side at boot so the markup ships intact and the JS
+            // decides what's still actually NEW for *this* viewer.
+            try {
+                document.querySelectorAll('.psb-item[data-new-key]').forEach(function (b) {
+                    if (localStorage.getItem('psb_seen_' + b.dataset.newKey) === '1') {
+                        var badge = b.querySelector('.psb-new-badge');
+                        if (badge) badge.classList.add('is-dismissed');
+                    }
+                });
+            } catch (e) { /* localStorage disabled, fine */ }
+
             if (localStorage.getItem('portal_sidebar_collapsed') === '1') {
                 var sidebar = document.getElementById('portal-sidebar');
                 if (sidebar) {
@@ -969,6 +987,19 @@ try {
             }
             document.querySelectorAll('.portal-section').forEach(function (s) { s.style.display = 'none'; });
             target.style.display = '';
+            // Persist "user has seen this NEW feature" so the pulse pill
+            // doesn't keep advertising it forever. Uses the button's
+            // data-new-key (versioned: e.g. pdpa_audit_v1) so we can re-
+            // surface a NEW badge later if we ship v2 of the same section.
+            // Dismisses via the existing .is-dismissed class on .psb-new-badge
+            // (defined in portal.css for the apps-launcher badge).
+            if (btn && btn.dataset && btn.dataset.newKey) {
+                try {
+                    localStorage.setItem('psb_seen_' + btn.dataset.newKey, '1');
+                    var badge = btn.querySelector('.psb-new-badge');
+                    if (badge) badge.classList.add('is-dismissed');
+                } catch (e) { /* localStorage disabled, fine */ }
+            }
             document.querySelectorAll('.psb-item').forEach(function (b) {
                 b.classList.remove('psb-active');
                 b.removeAttribute('aria-current');
@@ -1135,6 +1166,13 @@ try {
                             <span class="psb-label" style="color:#059669;font-weight:900">ISO Governance</span>
                         </button>
                     <?php endif; ?>
+                    <?php if ($isSuper || !empty($_SESSION['access_identity'])): ?>
+                    <button class="psb-item <?= $activeSection==='pdpa_audit'?'psb-active':'' ?>" data-section="pdpa_audit" data-new-key="pdpa_audit_v1" onclick="switchSection('pdpa_audit',this)">
+                        <div class="psb-icon"><i class="fa-solid fa-user-shield" style="color:#7c3aed"></i></div>
+                        <span class="psb-label" style="color:#6d28d9;font-weight:900">PDPA Audit</span>
+                        <span class="psb-new-badge">NEW</span>
+                    </button>
+                    <?php endif; ?>
                 </div>
             <?php endif; ?>
 
@@ -1258,6 +1296,27 @@ try {
                 </div>
             <?php endif; ?>
 
+            <?php /* ── ยา (Pharmacy / Vaccination — Phase 1: vaccines only) ───── */ ?>
+            <?php if (!$registryOnly && ($isSuper || $adminRole === 'admin' || !empty($_SESSION['access_identity']))): ?>
+                <button type="button" class="psb-section-toggle" data-group="pharmacy" onclick="togglePsbGroup('pharmacy',this)">
+                    <i class="fa-solid fa-prescription-bottle-medical" style="color:#0d9488"></i>
+                    <span>ยา</span>
+                    <i class="fa-solid fa-chevron-down psb-chevron"></i>
+                </button>
+                <div class="psb-group" data-group="pharmacy">
+                    <button class="psb-item <?= $activeSection==='vaccinations'?'psb-active':'' ?>" data-section="vaccinations" data-new-key="vaccinations_v1" onclick="switchSection('vaccinations',this)">
+                        <div class="psb-icon"><i class="fa-solid fa-syringe" style="color:#0d9488"></i></div>
+                        <span class="psb-label" style="color:#0f766e;font-weight:900">บันทึกการฉีดวัคซีน</span>
+                        <span class="psb-new-badge">NEW</span>
+                    </button>
+                    <button class="psb-item <?= $activeSection==='vaccine_catalog'?'psb-active':'' ?>" data-section="vaccine_catalog" data-new-key="vaccine_catalog_v1" onclick="switchSection('vaccine_catalog',this)">
+                        <div class="psb-icon"><i class="fa-solid fa-pills" style="color:#0d9488"></i></div>
+                        <span class="psb-label" style="color:#0f766e;font-weight:900">ประเภทวัคซีน</span>
+                        <span class="psb-new-badge">NEW</span>
+                    </button>
+                </div>
+            <?php endif; ?>
+
             <?php /* ── ติดตามระบบ ──────────────────────────────────────── */ ?>
             <?php if (!$registryOnly && $hasSysLogs): ?>
                 <button type="button" class="psb-section-toggle" data-group="monitor" onclick="togglePsbGroup('monitor',this)">
@@ -1284,6 +1343,20 @@ try {
                     <button class="psb-item <?= $activeSection==='sentry_events'?'psb-active':'' ?>" data-section="sentry_events" onclick="switchSection('sentry_events',this)">
                         <div class="psb-icon"><i class="fa-solid fa-radiation" style="color:#8b5cf6"></i></div>
                         <span class="psb-label" style="color:#6d28d9;font-weight:900">Sentry Events</span>
+                    </button>
+                    <?php endif; ?>
+                    <?php if ($isSuper || $adminRole === 'admin' || !empty($_SESSION['access_identity'])): ?>
+                    <button class="psb-item <?= $activeSection==='db_schema'?'psb-active':'' ?>" data-section="db_schema" data-new-key="db_schema_v1" onclick="switchSection('db_schema',this)">
+                        <div class="psb-icon"><i class="fa-solid fa-diagram-project" style="color:#0891b2"></i></div>
+                        <span class="psb-label" style="color:#0e7490;font-weight:900">Database Schema</span>
+                        <span class="psb-new-badge">NEW</span>
+                    </button>
+                    <?php endif; ?>
+                    <?php if ($isSuper): ?>
+                    <button class="psb-item <?= $activeSection==='sql_console'?'psb-active':'' ?>" data-section="sql_console" data-new-key="sql_console_v1" onclick="switchSection('sql_console',this)">
+                        <div class="psb-icon"><i class="fa-solid fa-terminal" style="color:#ea580c"></i></div>
+                        <span class="psb-label" style="color:#c2410c;font-weight:900">SQL Console <span style="font-size:8px;color:#9a3412;background:#fed7aa;padding:1px 4px;border-radius:3px;margin-left:2px">RO</span></span>
+                        <span class="psb-new-badge">NEW</span>
                     </button>
                     <?php endif; ?>
                 </div>
@@ -2801,9 +2874,9 @@ try {
             <div id="idViewModal"
                 style="display:none;position:fixed;inset:0;z-index:200;background:rgba(15,23,42,.55);backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:20px">
                 <div
-                    style="background:#fff;border-radius:24px;width:100%;max-width:420px;overflow:hidden;box-shadow:0 25px 50px -12px rgba(0,0,0,.25)">
+                    style="background:#fff;border-radius:24px;width:100%;max-width:560px;max-height:90vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 25px 50px -12px rgba(0,0,0,.25)">
                     <div
-                        style="padding:20px 24px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;justify-content:space-between">
+                        style="padding:20px 24px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
                         <div style="display:flex;align-items:center;gap:10px">
                             <div
                                 style="width:36px;height:36px;background:#eef2ff;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#4f46e5">
@@ -2815,8 +2888,8 @@ try {
                             style="width:30px;height:30px;border-radius:8px;border:1px solid #e2e8f0;background:#f8fafc;color:#64748b;cursor:pointer"><i
                                 class="fa-solid fa-times" style="font-size:12px"></i></button>
                     </div>
-                    <div style="padding:20px 24px;display:flex;flex-direction:column;gap:12px" id="idViewBody"></div>
-                    <div style="padding:14px 24px;border-top:1px solid #f1f5f9;text-align:right">
+                    <div style="padding:20px 24px;display:flex;flex-direction:column;gap:10px;overflow-y:auto;flex:1" id="idViewBody"></div>
+                    <div style="padding:14px 24px;border-top:1px solid #f1f5f9;text-align:right;flex-shrink:0">
                         <button onclick="document.getElementById('idViewModal').style.display='none'"
                             style="padding:9px 22px;border-radius:10px;border:1.5px solid #e2e8f0;background:#f8fafc;color:#374151;font-size:13px;font-weight:700;cursor:pointer">ปิด</button>
                     </div>
@@ -3332,6 +3405,66 @@ try {
                     include __DIR__ . '/_partials/settings.php';
                 } else {
                     echo '<div style="padding:100px;text-align:center;font-weight:900;color:#dc2626"><i class="fa-solid fa-shield-slash mb-4" style="font-size:4rem;display:block"></i> ACCESS DENIED<br><span style="font-size:14px;color:#94a3b8;font-weight:600">You do not have permission to manage site settings.</span></div>';
+                }
+                ?>
+            </div>
+
+            <!-- ════════════ SECTION: PDPA AUDIT ════════════ -->
+            <div id="section-pdpa_audit" class="portal-section"
+                style="<?= $activeSection==='pdpa_audit'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); background:#f1f5f9; overflow-y:auto; padding:20px;">
+                <?php
+                if ($isSuper || !empty($_SESSION['access_identity'])) {
+                    include __DIR__ . '/_partials/pdpa_audit.php';
+                } else {
+                    echo '<div style="padding:100px;text-align:center;font-weight:900;color:#dc2626"><i class="fa-solid fa-shield-slash mb-4" style="font-size:4rem;display:block"></i> ACCESS DENIED<br><span style="font-size:14px;color:#94a3b8;font-weight:600">ต้องมีสิทธิ์ access_identity หรือ role: superadmin</span></div>';
+                }
+                ?>
+            </div>
+
+            <!-- ════════════ SECTION: DATABASE SCHEMA EXPLORER ════════════ -->
+            <div id="section-db_schema" class="portal-section"
+                style="<?= $activeSection==='db_schema'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); background:#f1f5f9; overflow-y:auto; padding:20px;">
+                <?php
+                if ($isSuper || $adminRole === 'admin' || !empty($_SESSION['access_identity'])) {
+                    include __DIR__ . '/_partials/db_schema.php';
+                } else {
+                    echo '<div style="padding:100px;text-align:center;font-weight:900;color:#dc2626"><i class="fa-solid fa-shield-slash mb-4" style="font-size:4rem;display:block"></i> ACCESS DENIED<br><span style="font-size:14px;color:#94a3b8;font-weight:600">ต้องมีสิทธิ์ access_identity หรือ role: admin/superadmin</span></div>';
+                }
+                ?>
+            </div>
+
+            <!-- ════════════ SECTION: SQL CONSOLE (read-only, superadmin) ════════════ -->
+            <div id="section-sql_console" class="portal-section"
+                style="<?= $activeSection==='sql_console'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); background:#f1f5f9; overflow-y:auto; padding:20px;">
+                <?php
+                if ($isSuper) {
+                    include __DIR__ . '/_partials/sql_console.php';
+                } else {
+                    echo '<div style="padding:100px;text-align:center;font-weight:900;color:#dc2626"><i class="fa-solid fa-shield-slash mb-4" style="font-size:4rem;display:block"></i> ACCESS DENIED<br><span style="font-size:14px;color:#94a3b8;font-weight:600">SQL Console ใช้ได้เฉพาะ superadmin</span></div>';
+                }
+                ?>
+            </div>
+
+            <!-- ════════════ SECTION: VACCINATIONS (Phase 1) ════════════ -->
+            <div id="section-vaccinations" class="portal-section"
+                style="<?= $activeSection==='vaccinations'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); background:#f1f5f9; overflow-y:auto; padding:20px;">
+                <?php
+                if ($isSuper || $adminRole === 'admin' || !empty($_SESSION['access_identity'])) {
+                    include __DIR__ . '/_partials/vaccinations.php';
+                } else {
+                    echo '<div style="padding:100px;text-align:center;font-weight:900;color:#dc2626"><i class="fa-solid fa-shield-slash mb-4" style="font-size:4rem;display:block"></i> ACCESS DENIED<br><span style="font-size:14px;color:#94a3b8;font-weight:600">ต้องมีสิทธิ์ access_identity หรือ role: admin/superadmin</span></div>';
+                }
+                ?>
+            </div>
+
+            <!-- ════════════ SECTION: VACCINE CATALOG (Phase 2) ════════════ -->
+            <div id="section-vaccine_catalog" class="portal-section"
+                style="<?= $activeSection==='vaccine_catalog'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); background:#f1f5f9; overflow-y:auto; padding:20px;">
+                <?php
+                if ($isSuper || $adminRole === 'admin' || !empty($_SESSION['access_identity'])) {
+                    include __DIR__ . '/_partials/vaccine_catalog.php';
+                } else {
+                    echo '<div style="padding:100px;text-align:center;font-weight:900;color:#dc2626"><i class="fa-solid fa-shield-slash mb-4" style="font-size:4rem;display:block"></i> ACCESS DENIED<br><span style="font-size:14px;color:#94a3b8;font-weight:600">ต้องมีสิทธิ์ access_identity หรือ role: admin/superadmin</span></div>';
                 }
                 ?>
             </div>
@@ -4755,23 +4888,99 @@ try {
         function idOpenView(u) {
             var statusMap = { student: 'นักศึกษา', staff: 'บุคลากร/อาจารย์', teacher: 'อาจารย์', other: 'บุคคลทั่วไป' };
             var genderMap = { male: 'ชาย', female: 'หญิง', other: 'อื่นๆ' };
+            // Format helpers — kept inline so this stays a single self-contained
+            // function that any partial can call without extra dependencies
+            function fmtDate(s) {
+                if (!s) return '—';
+                var d = new Date(String(s).replace(' ', 'T'));
+                if (isNaN(d.getTime())) return s;
+                return d.toLocaleDateString('th-TH', { year:'numeric', month:'long', day:'numeric' });
+            }
+            function fmtDateTime(s) {
+                if (!s) return '—';
+                var d = new Date(String(s).replace(' ', 'T'));
+                if (isNaN(d.getTime())) return s;
+                return d.toLocaleString('th-TH', { year:'numeric', month:'long', day:'numeric', hour:'2-digit', minute:'2-digit' });
+            }
+            function consentPill(ts, ver) {
+                if (!ts) return '<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:9999px;background:#fee2e2;color:#b91c1c;font-size:11px;font-weight:800"><i class="fa-solid fa-xmark"></i> ยังไม่ยินยอม</span>';
+                return '<div><span style="display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:9999px;background:#dcfce7;color:#15803d;font-size:11px;font-weight:800"><i class="fa-solid fa-check"></i> ยินยอม</span> <span style="font-size:11px;color:#475569;margin-left:4px">' + fmtDateTime(ts) + '</span>'
+                    + (ver ? '<div style="font-family:ui-monospace,Menlo,monospace;font-size:10px;color:#7c3aed;margin-top:3px">' + ver + '</div>' : '')
+                    + '</div>';
+            }
+            // Sections use a single-string entry as the header marker; tuples
+            // are [label, value]; tuples with a 3rd "html" item bypass the
+            // text-escape pipeline (used for the PDPA pill markup)
             var map = [
-                ['ชื่อ-นามสกุล', u.full_name],
+                ['__section', 'ข้อมูลพื้นฐาน'],
+                ['ชื่อ-นามสกุล', (u.prefix ? u.prefix + ' ' : '') + (u.full_name || '')],
                 ['เลขบัตรประชาชน', u.citizen_id],
-                ['รหัสนักศึกษา / บุคลากร', u.student_personnel_id],
+                ['LINE User ID', u.line_user_id],
+                ['Member ID (QR/เช็คอิน)', u.member_id],
+
+                ['__section', 'ติดต่อ'],
                 ['เบอร์โทรศัพท์', u.phone_number],
                 ['อีเมล', u.email],
+
+                ['__section', 'ข้อมูลส่วนตัว'],
                 ['เพศ', genderMap[u.gender] || u.gender],
-                ['คณะ / หน่วยงาน', u.department],
+                ['วันเดือนปีเกิด', fmtDate(u.date_of_birth)],
+
+                ['__section', 'สังกัด'],
                 ['ประเภท', statusMap[u.status] || u.status],
+                ['คณะ / หน่วยงาน', u.department],
+                ['รหัสนักศึกษา / บุคลากร', u.student_personnel_id],
             ];
             if (u.status === 'other' && u.status_other) {
                 map.push(['ระบุสถานภาพ', u.status_other]);
             }
-            map.push(['วันที่ลงทะเบียน', u.created_at ? new Date(u.created_at.replace(' ', 'T')).toLocaleString('th-TH', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—']);
+            // Health data (Sec. 26 sensitive) — only render the section if at
+            // least one value is set; backend masks values for non-superadmin
+            var hasHealth = u.blood_type || u.height_cm || u.weight_kg || u.allergies || u.chronic_conditions;
+            if (hasHealth) {
+                map.push(['__section', 'ข้อมูลสุขภาพ (อ่อนไหว — มาตรา 26)']);
+                if (u.blood_type)         map.push(['หมู่เลือด', u.blood_type]);
+                if (u.height_cm)          map.push(['ส่วนสูง (ซม.)', u.height_cm]);
+                if (u.weight_kg)          map.push(['น้ำหนัก (กก.)', u.weight_kg]);
+                if (u.allergies)          map.push(['ประวัติแพ้ยา/อาหาร', u.allergies]);
+                if (u.chronic_conditions) map.push(['โรคประจำตัว', u.chronic_conditions]);
+            }
+            // Emergency contact — same gating
+            var hasEm = u.emergency_contact_name || u.emergency_contact_phone || u.emergency_contact_relation;
+            if (hasEm) {
+                map.push(['__section', 'ผู้ติดต่อกรณีฉุกเฉิน']);
+                map.push(['ชื่อ-สกุล', u.emergency_contact_name]);
+                map.push(['เบอร์โทร', u.emergency_contact_phone]);
+                map.push(['ความสัมพันธ์', u.emergency_contact_relation]);
+            }
+
+            // PDPA consent — always shown; pills render even on NULL
+            map.push(['__section', 'สถานะ PDPA Consent']);
+            map.push(['ทั่วไป (มาตรา 24)',   consentPill(u.consent_general_accepted_at,   u.consent_general_version),   'html']);
+            map.push(['อ่อนไหว (มาตรา 26)', consentPill(u.consent_sensitive_accepted_at, u.consent_sensitive_version), 'html']);
+            if (u.consent_ip || u.consent_user_agent) {
+                if (u.consent_ip)         map.push(['IP ตอนยินยอม', u.consent_ip]);
+                if (u.consent_user_agent) map.push(['User-Agent', u.consent_user_agent]);
+            }
+
+            map.push(['__section', 'เวลา']);
+            map.push(['วันที่ลงทะเบียน', fmtDateTime(u.created_at)]);
+
+            // Render — XSS-safe except for explicitly opted-in html rows
+            function esc(s) {
+                return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+                    return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c];
+                });
+            }
             document.getElementById('idViewBody').innerHTML = map.map(function (r) {
-                return '<div><div style="font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.1em;margin-bottom:3px">' + r[0] + '</div>'
-                    + '<div style="padding:10px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;font-size:13px;font-weight:700;color:#0f172a">' + (r[1] || '—') + '</div></div>';
+                if (r[0] === '__section') {
+                    return '<div style="font-size:11px;font-weight:900;color:#4f46e5;text-transform:uppercase;letter-spacing:.12em;margin:8px 0 2px;padding-bottom:4px;border-bottom:1.5px solid #e0e7ff">' + esc(r[1]) + '</div>';
+                }
+                var isHtml = r[2] === 'html';
+                var val = isHtml ? r[1] : esc(r[1] || '—');
+                if (!isHtml && (r[1] === null || r[1] === undefined || r[1] === '')) val = '—';
+                return '<div><div style="font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.1em;margin-bottom:3px">' + esc(r[0]) + '</div>'
+                    + '<div style="padding:10px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;font-size:13px;font-weight:700;color:#0f172a;word-break:break-word">' + val + '</div></div>';
             }).join('');
             document.getElementById('idViewModal').style.display = 'flex';
         }
@@ -5317,6 +5526,11 @@ try {
             { id: 'activity_logs', label: 'Activity Logs',       desc: 'บันทึกกิจกรรมระบบ',  icon: 'fa-file-lines',         tone: 'neutral', type: 'section', target: 'activity_logs' },
             { id: 'error_logs',    label: 'Error Logs',          desc: 'บันทึกข้อผิดพลาด',  shortcut: 'g e', icon: 'fa-bug',                tone: 'danger',  type: 'section', target: 'error_logs' },
             { id: 'privilege_inventory', label: 'ISO Governance', desc: 'Privileged Access', icon: 'fa-shield-halved',      tone: 'success', type: 'section', target: 'privilege_inventory' },
+            { id: 'pdpa_audit',    label: 'PDPA Audit',          desc: 'ตรวจสอบความยินยอม PDPA', icon: 'fa-user-shield',    tone: 'info',    type: 'section', target: 'pdpa_audit' },
+            { id: 'db_schema',     label: 'Database Schema',     desc: 'กราฟความสัมพันธ์ของฐานข้อมูล', icon: 'fa-diagram-project', tone: 'info', type: 'section', target: 'db_schema' },
+            { id: 'sql_console',   label: 'SQL Console (RO)',    desc: 'รัน SELECT diagnostic · superadmin only', icon: 'fa-terminal',  tone: 'warning', type: 'section', target: 'sql_console' },
+            { id: 'vaccinations',  label: 'บันทึกการฉีดวัคซีน',     desc: 'จัดการประวัติวัคซีน · KPI · audit log', icon: 'fa-syringe',     tone: 'success', type: 'section', target: 'vaccinations' },
+            { id: 'vaccine_catalog', label: 'ประเภทวัคซีน (Catalog)', desc: 'CRUD vaccine types · ผูกกับ campaign', icon: 'fa-pills', tone: 'success', type: 'section', target: 'vaccine_catalog' },
             { id: 'settings',      label: 'Settings',            desc: 'ตั้งค่าระบบ',        shortcut: 'g s', icon: 'fa-gear',               tone: 'warning', type: 'section', target: 'settings' },
 
             { id: 'open_asset',    label: 'ครุภัณฑ์สำนักงาน',   desc: 'ทะเบียนทรัพย์สิน',  shortcut: 'g r', icon: 'fa-boxes-stacked',     tone: 'success', type: 'url',     target: '../asset/index.php' },

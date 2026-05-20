@@ -54,7 +54,7 @@ try {
     if ($userId > 0) {
         $stmt = $pdo->prepare("SELECT id, full_name, status, hospital_main, hospital_sub,
             coverage_start, coverage_end FROM gold_card_members
-            WHERE linked_user_id = :uid
+            WHERE linked_user_id = :uid AND deleted_at IS NULL
             ORDER BY (status = 'active') DESC, (status = 'approved') DESC, id DESC LIMIT 1");
         $stmt->execute([':uid' => $userId]);
         $goldCard = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
@@ -63,7 +63,7 @@ try {
     if (!$goldCard && $citizenId !== '') {
         $stmt = $pdo->prepare("SELECT id, full_name, status, hospital_main, hospital_sub,
             coverage_start, coverage_end FROM gold_card_members
-            WHERE citizen_id = :cid
+            WHERE citizen_id = :cid AND deleted_at IS NULL
             ORDER BY (status = 'active') DESC, (status = 'approved') DESC, id DESC LIMIT 1");
         $stmt->execute([':cid' => $citizenId]);
         $goldCard = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
@@ -72,7 +72,7 @@ try {
     if (!$goldCard && $fullName !== '') {
         $stmt = $pdo->prepare("SELECT id, full_name, status, hospital_main, hospital_sub,
             coverage_start, coverage_end FROM gold_card_members
-            WHERE full_name = :fn
+            WHERE full_name = :fn AND deleted_at IS NULL
             ORDER BY (status = 'active') DESC, (status = 'approved') DESC, id DESC LIMIT 1");
         $stmt->execute([':fn' => $fullName]);
         $goldCard = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;

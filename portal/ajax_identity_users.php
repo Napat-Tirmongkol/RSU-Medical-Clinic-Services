@@ -48,8 +48,22 @@ try {
     $stmtCount->execute($countParams);
     $totalRecords = (int)$stmtCount->fetchColumn();
 
-    // 2. Fetch records with LIMIT/OFFSET
-    $sql = "SELECT id, full_name, student_personnel_id, citizen_id, phone_number, email, department, gender, status, status_other, created_at 
+    // 2. Fetch records with LIMIT/OFFSET. Pulled fields cover what the
+    //    "ข้อมูลผู้ใช้งาน" modal renders end-to-end (identity, contact,
+    //    demographics, faculty, emergency contact, PDPA consent state).
+    //    Sensitive columns (health + raw IP/UA) are nulled out below for
+    //    non-superadmin viewers — keeping the SELECT shape stable makes
+    //    the frontend code branch-free.
+    $sql = "SELECT id, prefix, full_name, first_name, last_name,
+                   student_personnel_id, citizen_id, line_user_id, member_id,
+                   phone_number, email, department, gender, status, status_other,
+                   date_of_birth,
+                   blood_type, height_cm, weight_kg, allergies, chronic_conditions,
+                   emergency_contact_name, emergency_contact_phone, emergency_contact_relation,
+                   consent_general_accepted_at,   consent_general_version,
+                   consent_sensitive_accepted_at, consent_sensitive_version,
+                   consent_ip, consent_user_agent,
+                   created_at
             FROM sys_users WHERE 1=1";
     $params = [];
     if ($search !== '') {
@@ -81,11 +95,29 @@ try {
 
     // Mask citizen_id to last-4 digits — only superadmin sees the full value.
     // Reduces PHI exposure surface in list responses (PDPA Art. 32 data minimization).
+    // Same tiered redaction applied to LINE User ID, raw IP, raw UA — these
+    // are forensic-grade identifiers that an editor/access_registry viewer
+    // doesn't need to see in plain form to do their job.
     if ($adminRole !== 'superadmin') {
         foreach ($users as &$u) {
             if (!empty($u['citizen_id']) && strlen((string)$u['citizen_id']) >= 4) {
                 $u['citizen_id'] = str_repeat('•', max(0, strlen((string)$u['citizen_id']) - 4))
                                  . substr((string)$u['citizen_id'], -4);
+            }
+            // LINE User ID: keep last-6 only ("…abcdef") so support staff
+            // can correlate without exposing the full opaque user key
+            if (!empty($u['line_user_id'])) {
+                $lid = (string)$u['line_user_id'];
+                if (strlen($lid) > 6) $u['line_user_id'] = '…' . substr($lid, -6);
+            }
+            // Drop raw forensic evidence from non-superadmin payloads
+            $u['consent_ip']         = null;
+            $u['consent_user_agent'] = null;
+            // Health data is Sec. 26 sensitive — only superadmin sees raw
+            // values in the identity console. Other admins can still see
+            // "has health data on file" indirectly via consent status
+            foreach (['blood_type', 'height_cm', 'weight_kg', 'allergies', 'chronic_conditions'] as $col) {
+                if (!empty($u[$col])) $u[$col] = '[ข้อมูลอ่อนไหว — ดูได้เฉพาะ superadmin]';
             }
         }
         unset($u);

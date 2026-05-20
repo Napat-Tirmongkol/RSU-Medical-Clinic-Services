@@ -24,13 +24,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $status = $_POST['status'] ?? 'active';
     $availableUntil = !empty($_POST['available_until']) ? $_POST['available_until'] : null;
     $isAutoApprove = (int) ($_POST['is_auto_approve'] ?? 0);
+    // Optional vaccine-catalog linkage. Only stored when type='vaccine' —
+    // otherwise we explicitly NULL it so changing a vaccine campaign to a
+    // different type doesn't leave a dangling reference.
+    $vaccineTypeId = ($type === 'vaccine' && !empty($_POST['vaccine_type_id']))
+        ? (int)$_POST['vaccine_type_id']
+        : null;
 
     // 1. สร้างแคมเปญใหม่
     if ($action === 'add' && $title && $capacity >= 0) {
         try {
             $newToken = bin2hex(random_bytes(8)); // 16-char hex token
-            $sql = "INSERT INTO camp_list (title, type, description, total_capacity, available_until, status, is_auto_approve, share_token)
-                    VALUES (:title, :type, :description, :capacity, :until, :status, :auto_approve, :token)";
+            // Ensure vaccine_type_id column exists before INSERT (self-heal)
+            try { $pdo->exec("ALTER TABLE camp_list ADD COLUMN IF NOT EXISTS vaccine_type_id INT UNSIGNED NULL DEFAULT NULL"); } catch (PDOException) {}
+            $sql = "INSERT INTO camp_list (title, type, description, total_capacity, available_until, status, is_auto_approve, share_token, vaccine_type_id)
+                    VALUES (:title, :type, :description, :capacity, :until, :status, :auto_approve, :token, :vtid)";
             $stmt = $pdo->prepare($sql);
             $stmt->execute([
                 ':title' => $title,
@@ -40,7 +48,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ':until' => $availableUntil,
                 ':status' => $status,
                 ':auto_approve' => $isAutoApprove,
-                ':token' => $newToken
+                ':token' => $newToken,
+                ':vtid' => $vaccineTypeId,
             ]);
             $message = "สร้างแคมเปญเรียบร้อยแล้ว!";
             $messageType = "success";
@@ -64,8 +73,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $message = "จำนวนโควต้ารวม ต้องไม่น้อยกว่าจำนวนผู้ที่ลงทะเบียนไปแล้ว ({$used} คน)";
                     $messageType = "error";
                 } else {
-                    $sql = "UPDATE camp_list SET title = :title, type = :type, description = :description, 
-                            total_capacity = :capacity, available_until = :until, status = :status, is_auto_approve = :auto_approve WHERE id = :id";
+                    try { $pdo->exec("ALTER TABLE camp_list ADD COLUMN IF NOT EXISTS vaccine_type_id INT UNSIGNED NULL DEFAULT NULL"); } catch (PDOException) {}
+                    $sql = "UPDATE camp_list SET title = :title, type = :type, description = :description,
+                            total_capacity = :capacity, available_until = :until, status = :status,
+                            is_auto_approve = :auto_approve, vaccine_type_id = :vtid WHERE id = :id";
                     $stmt = $pdo->prepare($sql);
                     $stmt->execute([
                         ':title' => $title,
@@ -75,11 +86,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         ':until' => $availableUntil,
                         ':status' => $status,
                         ':auto_approve' => $isAutoApprove,
+                        ':vtid' => $vaccineTypeId,
                         ':id' => $id
                     ]);
                     $message = "อัปเดตข้อมูลแคมเปญสำเร็จ!";
                     $messageType = "success";
                     log_activity('update_campaign', "แก้ไขแคมเปญ ID: {$id} ({$title})");
+
+                    // Propagate the catalog linkage to historical
+                    // user_vaccination_records — only fills in NULL fields so
+                    // a manual override on any record stays intact. Same
+                    // intent as Phase-2 backfill but triggered eagerly when
+                    // the admin saves the campaign.
+                    if ($type === 'vaccine' && $vaccineTypeId !== null) {
+                        try {
+                            $stmt = $pdo->prepare("
+                                UPDATE user_vaccination_records v
+                                JOIN camp_bookings b ON b.id = v.campaign_booking_id
+                                LEFT JOIN sys_vaccine_types t ON t.id = :vtid
+                                SET v.vaccine_type_id = COALESCE(v.vaccine_type_id, :vtid),
+                                    v.manufacturer    = COALESCE(NULLIF(v.manufacturer, ''), t.default_manufacturer)
+                                WHERE b.campaign_id = :cid
+                                  AND (v.vaccine_type_id IS NULL
+                                       OR (v.manufacturer IS NULL OR v.manufacturer = ''))
+                            ");
+                            $stmt->execute([':vtid' => $vaccineTypeId, ':cid' => $id]);
+                            $propagated = $stmt->rowCount();
+                            if ($propagated > 0) {
+                                log_activity('Vaccine Catalog Propagate', "campaign_id={$id} vaccine_type_id={$vaccineTypeId} synced={$propagated}");
+                            }
+                        } catch (PDOException $e) {
+                            error_log("[campaign] catalog propagate: " . $e->getMessage());
+                        }
+                    }
                 }
             } catch (PDOException $e) {
                 $message = "เกิดข้อผิดพลาด: " . $e->getMessage();
@@ -152,6 +191,19 @@ try {
     ";
     $stmt = $pdo->query($sql);
     $camp_list = $stmt->fetchAll();
+
+    // Active vaccine catalog — drives the "ประเภทวัคซีน" dropdown in the
+    // create/edit modal. Wrapped in try/catch so a fresh deploy (where
+    // sys_vaccine_types may not exist yet) doesn't break the page.
+    $vaccineTypes = [];
+    try {
+        $vaccineTypes = $pdo->query("
+            SELECT id, code, name_th, default_doses, interval_days, default_manufacturer
+            FROM sys_vaccine_types
+            WHERE is_active = 1
+            ORDER BY sort_order ASC, name_th ASC
+        ")->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) { /* catalog not migrated yet — dropdown stays empty */ }
 } catch (PDOException $e) {
     $message = "ไม่พบตารางข้อมูล กรุณาตรวจสอบ Database";
     $messageType = "error";
@@ -678,7 +730,8 @@ renderPageHeader("จัดการแคมเปญ", "สร้างแค�
                                     data-until="<?= htmlspecialchars($c['available_until']) ?>"
                                     data-status="<?= htmlspecialchars($c['status']) ?>"
                                     data-desc="<?= htmlspecialchars($c['description'] ?? '') ?>"
-                                    data-auto="<?= htmlspecialchars($c['is_auto_approve']) ?>">
+                                    data-auto="<?= htmlspecialchars($c['is_auto_approve']) ?>"
+                                    data-vaccine-type-id="<?= htmlspecialchars((string)($c['vaccine_type_id'] ?? '')) ?>">
                                     <i class="fa-solid fa-pen-to-square pointer-events-none text-xs"></i>
                                 </button>
 
@@ -764,6 +817,26 @@ renderPageHeader("จัดการแคมเปญ", "สร้างแค�
                     </button>
                 </div>
                 <input type="hidden" id="modal_type" name="type" value="vaccine">
+            </div>
+
+            <!-- Vaccine catalog linkage (shown only when type='vaccine') -->
+            <div id="modal-vaccine-type-wrap">
+                <label class="form-label">ประเภทวัคซีน <span class="text-slate-400 text-xs font-normal">(ไม่บังคับ · ผูกกับ catalog เพื่อ pre-fill ทุก record)</span></label>
+                <div class="relative">
+                    <i class="form-input-icon fa-solid fa-syringe"></i>
+                    <select id="modal_vaccine_type_id" name="vaccine_type_id" class="form-input">
+                        <option value="">— ไม่ผูก / กรอกเอง —</option>
+                        <?php foreach ($vaccineTypes as $vt): ?>
+                            <option value="<?= (int)$vt['id'] ?>" data-mfr="<?= htmlspecialchars($vt['default_manufacturer'] ?? '') ?>">
+                                <?= htmlspecialchars($vt['code']) ?> · <?= htmlspecialchars($vt['name_th']) ?>
+                                <?= !empty($vt['default_doses']) ? ' · ' . (int)$vt['default_doses'] . ' dose' : '' ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <?php if (empty($vaccineTypes)): ?>
+                    <p class="text-[11px] text-amber-600 mt-1"><i class="fa-solid fa-circle-info"></i> ยังไม่มี vaccine catalog ใน Portal · เปิด <a href="../portal/index.php?section=vaccine_catalog" target="_blank" class="underline font-bold">ประเภทวัคซีน</a> เพื่อเพิ่ม</p>
+                <?php endif; ?>
             </div>
 
             <!-- Capacity -->
@@ -895,10 +968,20 @@ renderPageHeader("จัดการแคมเปญ", "สร้างแค�
         });
     }
 
+    // Toggle the vaccine-catalog dropdown visibility based on current type —
+    // only meaningful when type === 'vaccine'. Called from both the type
+    // picker and the edit-button code path.
+    function syncVaccineTypeVisibility() {
+        const wrap = document.getElementById('modal-vaccine-type-wrap');
+        if (!wrap) return;
+        wrap.style.display = (document.getElementById('modal_type').value === 'vaccine') ? '' : 'none';
+    }
+
     document.querySelectorAll('#modal-type-cards [data-value]').forEach(btn => {
         btn.addEventListener('click', function () {
             document.getElementById('modal_type').value = this.dataset.value;
             pickCard('modal-type-cards', this.dataset.value);
+            syncVaccineTypeVisibility();
         });
     });
     document.querySelectorAll('#modal-status-pills [data-value]').forEach(btn => {
@@ -929,6 +1012,12 @@ renderPageHeader("จัดการแคมเปญ", "สร้างแค�
         pickCard('modal-type-cards',    'vaccine');
         pickCard('modal-status-pills',  'active');
         pickCard('modal-approve-pills', '0');
+
+        // Reset vaccine-catalog dropdown to "no link" and reveal it (default
+        // create-flow starts on type=vaccine so dropdown should be visible)
+        const vtSel = document.getElementById('modal_vaccine_type_id');
+        if (vtSel) vtSel.value = '';
+        syncVaccineTypeVisibility();
 
         let btn = document.getElementById('modal_submit_btn');
         btn.innerHTML = '<i class="fa-solid fa-plus-circle"></i> <span>สร้างแคมเปญ</span>';
@@ -996,6 +1085,11 @@ renderPageHeader("จัดการแคมเปญ", "สร้างแค�
                 pickCard('modal-status-pills',  this.dataset.status);
                 pickCard('modal-approve-pills', this.dataset.auto);
                 document.getElementById('modal_description').value = this.dataset.desc;
+                // Restore the catalog dropdown selection + visibility based on
+                // the campaign's stored type. Empty string when no linkage.
+                const vtSel = document.getElementById('modal_vaccine_type_id');
+                if (vtSel) vtSel.value = this.dataset.vaccineTypeId || '';
+                syncVaccineTypeVisibility();
 
                 let submitBtn = document.getElementById('modal_submit_btn');
                 submitBtn.innerHTML = '<i class="fa-solid fa-save"></i> <span>บันทึกการแก้ไข</span>';
