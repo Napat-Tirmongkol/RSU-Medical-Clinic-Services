@@ -711,6 +711,7 @@ body[data-theme='dark'] #vx-edit-box textarea { background: #0f172a; border-colo
                     html: `<div style="text-align:left;font-size:13px">
                               <div>📋 Vaccination records: <b>+${json.inserted}</b> (จาก ${json.candidates} candidates)</div>
                               <div>🔄 Booking status flip: <b>${json.flipped}</b> rows · confirmed → completed</div>
+                              <div>🔗 Catalog sync: <b>${json.synced || 0}</b> rows · pulled vaccine_type_id / manufacturer จาก campaign linkage</div>
                            </div>`,
                     confirmButtonText: 'ปิด',
                     confirmButtonColor: '#0d9488',

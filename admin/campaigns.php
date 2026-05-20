@@ -92,6 +92,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $message = "อัปเดตข้อมูลแคมเปญสำเร็จ!";
                     $messageType = "success";
                     log_activity('update_campaign', "แก้ไขแคมเปญ ID: {$id} ({$title})");
+
+                    // Propagate the catalog linkage to historical
+                    // user_vaccination_records — only fills in NULL fields so
+                    // a manual override on any record stays intact. Same
+                    // intent as Phase-2 backfill but triggered eagerly when
+                    // the admin saves the campaign.
+                    if ($type === 'vaccine' && $vaccineTypeId !== null) {
+                        try {
+                            $stmt = $pdo->prepare("
+                                UPDATE user_vaccination_records v
+                                JOIN camp_bookings b ON b.id = v.campaign_booking_id
+                                LEFT JOIN sys_vaccine_types t ON t.id = :vtid
+                                SET v.vaccine_type_id = COALESCE(v.vaccine_type_id, :vtid),
+                                    v.manufacturer    = COALESCE(NULLIF(v.manufacturer, ''), t.default_manufacturer)
+                                WHERE b.campaign_id = :cid
+                                  AND (v.vaccine_type_id IS NULL
+                                       OR (v.manufacturer IS NULL OR v.manufacturer = ''))
+                            ");
+                            $stmt->execute([':vtid' => $vaccineTypeId, ':cid' => $id]);
+                            $propagated = $stmt->rowCount();
+                            if ($propagated > 0) {
+                                log_activity('Vaccine Catalog Propagate', "campaign_id={$id} vaccine_type_id={$vaccineTypeId} synced={$propagated}");
+                            }
+                        } catch (PDOException $e) {
+                            error_log("[campaign] catalog propagate: " . $e->getMessage());
+                        }
+                    }
                 }
             } catch (PDOException $e) {
                 $message = "เกิดข้อผิดพลาด: " . $e->getMessage();

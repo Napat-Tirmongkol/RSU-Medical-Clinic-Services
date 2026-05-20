@@ -523,13 +523,32 @@ if ($action === 'backfill') {
         $flipStmt->execute();
         $flipped = $flipStmt->rowCount();
 
+        // Step 3: catalog drift sync — for records whose campaign already
+        // has vaccine_type_id set but the record itself doesn't, pull the
+        // linkage + default_manufacturer down. COALESCE/NULLIF guards keep
+        // any manual override on the record untouched.
+        $syncStmt = $pdo->prepare("
+            UPDATE user_vaccination_records v
+            JOIN camp_bookings b ON b.id = v.campaign_booking_id
+            JOIN camp_list c ON c.id = b.campaign_id
+            LEFT JOIN sys_vaccine_types t ON t.id = c.vaccine_type_id
+            SET v.vaccine_type_id = COALESCE(v.vaccine_type_id, c.vaccine_type_id),
+                v.manufacturer    = COALESCE(NULLIF(v.manufacturer, ''), t.default_manufacturer)
+            WHERE c.type = 'vaccine'
+              AND c.vaccine_type_id IS NOT NULL
+              AND (v.vaccine_type_id IS NULL
+                   OR (v.manufacturer IS NULL OR v.manufacturer = ''))
+        ");
+        $syncStmt->execute();
+        $synced = $syncStmt->rowCount();
+
         $pdo->commit();
 
         $adminId   = (int)($_SESSION['admin_id'] ?? 0);
         try {
             log_activity(
                 'Vaccine Backfill',
-                "vaccination_records: candidates={$candidates} inserted={$created} · status_flip: confirmed→completed={$flipped}",
+                "vaccination_records: candidates={$candidates} inserted={$created} · status_flip: confirmed→completed={$flipped} · catalog_sync={$synced}",
                 $adminId ?: null
             );
         } catch (Throwable $e) {
@@ -541,7 +560,8 @@ if ($action === 'backfill') {
             'candidates' => $candidates,
             'inserted'   => $created,
             'flipped'    => $flipped,
-            'message'    => "เพิ่ม {$created} vaccination records + flip {$flipped} bookings เป็น completed",
+            'synced'     => $synced,
+            'message'    => "เพิ่ม {$created} vaccination records + flip {$flipped} bookings + sync {$synced} catalog references",
         ], JSON_UNESCAPED_UNICODE);
     } catch (LogicException $e) {
         if ($pdo->inTransaction()) $pdo->rollBack();
