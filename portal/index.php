@@ -401,6 +401,7 @@ $categoryMap = [
     'privilege_inventory' => 'tools',
     'pdpa_audit' => 'tools',
     'db_schema' => 'tools',
+    'vaccinations' => 'core',
     'admin_tool' => 'tools',
     'future_app' => 'dev',
 ];
@@ -1289,6 +1290,22 @@ try {
                     <button class="psb-item <?= $activeSection==='finance'?'psb-active':'' ?>" data-section="finance" onclick="switchSection('finance',this)">
                         <div class="psb-icon"><i class="fa-solid fa-book" style="color:#059669"></i></div>
                         <span class="psb-label" style="color:#047857;font-weight:900">Cash Book</span>
+                    </button>
+                </div>
+            <?php endif; ?>
+
+            <?php /* ── ยา (Pharmacy / Vaccination — Phase 1: vaccines only) ───── */ ?>
+            <?php if (!$registryOnly && ($isSuper || $adminRole === 'admin' || !empty($_SESSION['access_identity']))): ?>
+                <button type="button" class="psb-section-toggle" data-group="pharmacy" onclick="togglePsbGroup('pharmacy',this)">
+                    <i class="fa-solid fa-prescription-bottle-medical" style="color:#0d9488"></i>
+                    <span>ยา</span>
+                    <i class="fa-solid fa-chevron-down psb-chevron"></i>
+                </button>
+                <div class="psb-group" data-group="pharmacy">
+                    <button class="psb-item <?= $activeSection==='vaccinations'?'psb-active':'' ?>" data-section="vaccinations" data-new-key="vaccinations_v1" onclick="switchSection('vaccinations',this)">
+                        <div class="psb-icon"><i class="fa-solid fa-syringe" style="color:#0d9488"></i></div>
+                        <span class="psb-label" style="color:#0f766e;font-weight:900">บันทึกการฉีดวัคซีน</span>
+                        <span class="psb-new-badge">NEW</span>
                     </button>
                 </div>
             <?php endif; ?>
@@ -3402,6 +3419,18 @@ try {
                 ?>
             </div>
 
+            <!-- ════════════ SECTION: VACCINATIONS (Phase 1) ════════════ -->
+            <div id="section-vaccinations" class="portal-section"
+                style="<?= $activeSection==='vaccinations'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); background:#f1f5f9; overflow-y:auto; padding:20px;">
+                <?php
+                if ($isSuper || $adminRole === 'admin' || !empty($_SESSION['access_identity'])) {
+                    include __DIR__ . '/_partials/vaccinations.php';
+                } else {
+                    echo '<div style="padding:100px;text-align:center;font-weight:900;color:#dc2626"><i class="fa-solid fa-shield-slash mb-4" style="font-size:4rem;display:block"></i> ACCESS DENIED<br><span style="font-size:14px;color:#94a3b8;font-weight:600">ต้องมีสิทธิ์ access_identity หรือ role: admin/superadmin</span></div>';
+                }
+                ?>
+            </div>
+
             <!-- ════════════ SECTION: FINANCE (Cash Book) ════════════ -->
             <div id="section-finance" class="portal-section"
                 style="<?= $activeSection==='finance'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); background:#f1f5f9; overflow-y:auto; padding:20px;">
@@ -5461,6 +5490,7 @@ try {
             { id: 'privilege_inventory', label: 'ISO Governance', desc: 'Privileged Access', icon: 'fa-shield-halved',      tone: 'success', type: 'section', target: 'privilege_inventory' },
             { id: 'pdpa_audit',    label: 'PDPA Audit',          desc: 'ตรวจสอบความยินยอม PDPA', icon: 'fa-user-shield',    tone: 'info',    type: 'section', target: 'pdpa_audit' },
             { id: 'db_schema',     label: 'Database Schema',     desc: 'กราฟความสัมพันธ์ของฐานข้อมูล', icon: 'fa-diagram-project', tone: 'info', type: 'section', target: 'db_schema' },
+            { id: 'vaccinations',  label: 'บันทึกการฉีดวัคซีน',     desc: 'จัดการประวัติวัคซีน · KPI · audit log', icon: 'fa-syringe',     tone: 'success', type: 'section', target: 'vaccinations' },
             { id: 'settings',      label: 'Settings',            desc: 'ตั้งค่าระบบ',        shortcut: 'g s', icon: 'fa-gear',               tone: 'warning', type: 'section', target: 'settings' },
 
             { id: 'open_asset',    label: 'ครุภัณฑ์สำนักงาน',   desc: 'ทะเบียนทรัพย์สิน',  shortcut: 'g r', icon: 'fa-boxes-stacked',     tone: 'success', type: 'url',     target: '../asset/index.php' },
