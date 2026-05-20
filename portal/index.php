@@ -892,6 +892,19 @@ try {
 
         // Auto-apply sidebar state on load
         window.addEventListener('DOMContentLoaded', function() {
+            // Hide NEW badge on items the user has already opened. We can't
+            // server-side gate this because the flag is per-browser; do it
+            // client-side at boot so the markup ships intact and the JS
+            // decides what's still actually NEW for *this* viewer.
+            try {
+                document.querySelectorAll('.psb-item[data-new-key]').forEach(function (b) {
+                    if (localStorage.getItem('psb_seen_' + b.dataset.newKey) === '1') {
+                        var badge = b.querySelector('.psb-new-badge');
+                        if (badge) badge.classList.add('is-dismissed');
+                    }
+                });
+            } catch (e) { /* localStorage disabled, fine */ }
+
             if (localStorage.getItem('portal_sidebar_collapsed') === '1') {
                 var sidebar = document.getElementById('portal-sidebar');
                 if (sidebar) {
@@ -971,6 +984,19 @@ try {
             }
             document.querySelectorAll('.portal-section').forEach(function (s) { s.style.display = 'none'; });
             target.style.display = '';
+            // Persist "user has seen this NEW feature" so the pulse pill
+            // doesn't keep advertising it forever. Uses the button's
+            // data-new-key (versioned: e.g. pdpa_audit_v1) so we can re-
+            // surface a NEW badge later if we ship v2 of the same section.
+            // Dismisses via the existing .is-dismissed class on .psb-new-badge
+            // (defined in portal.css for the apps-launcher badge).
+            if (btn && btn.dataset && btn.dataset.newKey) {
+                try {
+                    localStorage.setItem('psb_seen_' + btn.dataset.newKey, '1');
+                    var badge = btn.querySelector('.psb-new-badge');
+                    if (badge) badge.classList.add('is-dismissed');
+                } catch (e) { /* localStorage disabled, fine */ }
+            }
             document.querySelectorAll('.psb-item').forEach(function (b) {
                 b.classList.remove('psb-active');
                 b.removeAttribute('aria-current');
@@ -1138,9 +1164,10 @@ try {
                         </button>
                     <?php endif; ?>
                     <?php if ($isSuper || !empty($_SESSION['access_identity'])): ?>
-                    <button class="psb-item <?= $activeSection==='pdpa_audit'?'psb-active':'' ?>" data-section="pdpa_audit" onclick="switchSection('pdpa_audit',this)">
+                    <button class="psb-item <?= $activeSection==='pdpa_audit'?'psb-active':'' ?>" data-section="pdpa_audit" data-new-key="pdpa_audit_v1" onclick="switchSection('pdpa_audit',this)">
                         <div class="psb-icon"><i class="fa-solid fa-user-shield" style="color:#7c3aed"></i></div>
                         <span class="psb-label" style="color:#6d28d9;font-weight:900">PDPA Audit</span>
+                        <span class="psb-new-badge">NEW</span>
                     </button>
                     <?php endif; ?>
                 </div>
@@ -1295,9 +1322,10 @@ try {
                     </button>
                     <?php endif; ?>
                     <?php if ($isSuper || $adminRole === 'admin' || !empty($_SESSION['access_identity'])): ?>
-                    <button class="psb-item <?= $activeSection==='db_schema'?'psb-active':'' ?>" data-section="db_schema" onclick="switchSection('db_schema',this)">
+                    <button class="psb-item <?= $activeSection==='db_schema'?'psb-active':'' ?>" data-section="db_schema" data-new-key="db_schema_v1" onclick="switchSection('db_schema',this)">
                         <div class="psb-icon"><i class="fa-solid fa-diagram-project" style="color:#0891b2"></i></div>
                         <span class="psb-label" style="color:#0e7490;font-weight:900">Database Schema</span>
+                        <span class="psb-new-badge">NEW</span>
                     </button>
                     <?php endif; ?>
                 </div>
