@@ -107,8 +107,10 @@ if ($action === 'graph') {
     try {
         // Tables in the current DB. INFORMATION_SCHEMA.TABLES.TABLE_ROWS is
         // an *estimate* for InnoDB — fine for a visualisation, not precise.
+        // Alias as `row_count` not `rows`: ROWS is a reserved word in
+        // MariaDB 10.6+ and breaks the SELECT parse otherwise.
         $tables = $pdo->query("
-            SELECT TABLE_NAME AS name, TABLE_ROWS AS rows
+            SELECT TABLE_NAME AS name, TABLE_ROWS AS row_count
             FROM INFORMATION_SCHEMA.TABLES
             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_TYPE = 'BASE TABLE'
             ORDER BY TABLE_NAME
@@ -150,7 +152,7 @@ if ($action === 'graph') {
                 'label'   => $t['name'],
                 'domain'  => $domain,
                 'color'   => $color,
-                'rows'    => (int)$t['rows'],
+                'rows'    => (int)$t['row_count'],
             ];
         }
 
@@ -209,15 +211,7 @@ if ($action === 'graph') {
         ], JSON_UNESCAPED_UNICODE);
     } catch (Throwable $e) {
         error_log('[db_schema] graph: ' . $e->getMessage());
-        // Surface the underlying message for superadmin only — this endpoint
-        // hits INFORMATION_SCHEMA which has a couple of failure modes specific
-        // to MySQL hosting setup (perm denied on KEY_COLUMN_USAGE, DATABASE()
-        // returning NULL on a stray connection) that are otherwise invisible.
-        // Non-superadmin still gets the generic message.
-        $msg = $isSuper
-            ? ('ดึง schema ไม่สำเร็จ: ' . $e->getMessage())
-            : 'ดึง schema ไม่สำเร็จ — โปรดลองอีกครั้ง';
-        echo json_encode(['ok' => false, 'message' => $msg]);
+        echo json_encode(['ok' => false, 'message' => 'ดึง schema ไม่สำเร็จ — โปรดลองอีกครั้ง']);
     }
     exit;
 }
