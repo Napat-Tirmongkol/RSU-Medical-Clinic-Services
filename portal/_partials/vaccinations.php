@@ -2,15 +2,18 @@
 // portal/_partials/vaccinations.php — Vaccination Records dashboard (Phase 1)
 // Loaded by portal/index.php — portal_CSRF + SweetAlert2 available
 $vxIsSuper = (($_SESSION['admin_role'] ?? '') === 'superadmin');
-// Pre-compute how many bookings could be backfilled — show only when > 0
-// so a healthy install doesn't see a useless button. Counts attended
-// vaccine bookings that don't yet have a record, mirroring the AJAX
-// backfill action's SQL exactly.
-$vxBackfillCount = 0;
+// Pre-compute three things the Backfill button could fix so we can show
+// the banner whenever ANY of them is non-zero (and tell the operator
+// what's wrong) instead of only the "missing records" case.
+$vxMissingRecords = 0;   // Step 1 candidates: attended bookings without a record
+$vxStatusGap      = 0;   // Step 2 candidates: attended bookings still status=confirmed
+$vxCatalogDrift   = 0;   // Step 3 candidates: records linked to a campaign that
+                         //   already has vaccine_type_id, but the record's own
+                         //   vaccine_type_id / manufacturer is still empty
 if ($vxIsSuper) {
     try {
         $_p = db();
-        $vxBackfillCount = (int)$_p->query("
+        $vxMissingRecords = (int)$_p->query("
             SELECT COUNT(*)
             FROM camp_bookings b
             JOIN camp_list c ON b.campaign_id = c.id
@@ -19,8 +22,26 @@ if ($vxIsSuper) {
               AND (b.status = 'completed' OR b.attended_at IS NOT NULL)
               AND v.id IS NULL
         ")->fetchColumn();
+        $vxStatusGap = (int)$_p->query("
+            SELECT COUNT(*)
+            FROM camp_bookings b
+            JOIN camp_list c ON b.campaign_id = c.id
+            WHERE c.type = 'vaccine'
+              AND b.status = 'confirmed'
+              AND b.attended_at IS NOT NULL
+        ")->fetchColumn();
+        $vxCatalogDrift = (int)$_p->query("
+            SELECT COUNT(*)
+            FROM user_vaccination_records v
+            JOIN camp_bookings b ON b.id = v.campaign_booking_id
+            JOIN camp_list c ON c.id = b.campaign_id
+            WHERE c.type = 'vaccine'
+              AND c.vaccine_type_id IS NOT NULL
+              AND (v.vaccine_type_id IS NULL OR v.manufacturer IS NULL OR v.manufacturer = '')
+        ")->fetchColumn();
     } catch (Throwable $e) { /* swallowed — UI just hides the button */ }
 }
+$vxNeedsBackfill = ($vxMissingRecords + $vxStatusGap + $vxCatalogDrift) > 0;
 ?>
 <style>
 .vx-page { padding: 4px 4px 80px; }
@@ -132,12 +153,22 @@ body[data-theme='dark'] #vx-edit-box textarea { background: #0f172a; border-colo
     <h1 class="vx-h1"><i class="fa-solid fa-syringe" style="color:#0d9488"></i> บันทึกการฉีดวัคซีน</h1>
     <p class="vx-sub">ดูและแก้ไขบันทึกการฉีดวัคซีนทั้งหมด · KPI รายเดือน · เพิ่ม lot/manufacturer/dose/certificate · audit log per record</p>
 
-    <?php if ($vxIsSuper && $vxBackfillCount > 0): ?>
+    <?php if ($vxIsSuper && $vxNeedsBackfill): ?>
     <div style="background:#fef3c7;border:1.5px solid #fde68a;color:#92400e;padding:12px 16px;border-radius:12px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
         <div style="font-size:13px;font-weight:700;flex:1;min-width:240px">
             <i class="fa-solid fa-database" style="color:#b45309"></i>
-            พบ <b style="color:#92400e;font-size:15px"><?= number_format($vxBackfillCount) ?></b> booking ที่ผู้ใช้มาฉีดแล้ว แต่ขาด record หรือ status ยังค้าง <code style="background:rgba(120,53,15,0.1);padding:1px 5px;border-radius:3px;font-size:11px">confirmed</code>
-            <div style="font-size:11px;font-weight:600;color:#9a3412;margin-top:4px">การ backfill จะทำ 2 อย่างใน transaction เดียว: (1) สร้าง vaccination records ที่ขาด · (2) flip booking status เป็น completed</div>
+            ระบบตรวจพบรายการที่ควร backfill:
+            <div style="font-size:11px;font-weight:600;color:#9a3412;margin-top:6px;display:flex;flex-direction:column;gap:2px">
+                <?php if ($vxMissingRecords > 0): ?>
+                    <span>• Missing records (booking attended แต่ไม่มี record): <b style="color:#92400e"><?= number_format($vxMissingRecords) ?></b></span>
+                <?php endif; ?>
+                <?php if ($vxStatusGap > 0): ?>
+                    <span>• Status ค้าง (attended แต่ status ยังเป็น confirmed): <b style="color:#92400e"><?= number_format($vxStatusGap) ?></b></span>
+                <?php endif; ?>
+                <?php if ($vxCatalogDrift > 0): ?>
+                    <span>• Catalog drift (records ที่ vaccine_type_id หรือ manufacturer ยังว่าง ทั้งที่ campaign ผูกแล้ว): <b style="color:#92400e"><?= number_format($vxCatalogDrift) ?></b></span>
+                <?php endif; ?>
+            </div>
         </div>
         <button type="button" class="btn-x primary" id="vx-backfill-btn"
                 style="background:#b45309;color:#fff;padding:8px 16px;border-radius:8px;font-size:12px;font-weight:800;cursor:pointer;border:0">
