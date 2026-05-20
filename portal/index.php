@@ -399,6 +399,7 @@ $categoryMap = [
     'system_logs' => 'tools',
     'sentry_events' => 'tools',
     'privilege_inventory' => 'tools',
+    'pdpa_audit' => 'tools',
     'admin_tool' => 'tools',
     'future_app' => 'dev',
 ];
@@ -1134,6 +1135,12 @@ try {
                             <div class="psb-icon"><i class="fa-solid fa-shield-halved" style="color:#10b981"></i></div>
                             <span class="psb-label" style="color:#059669;font-weight:900">ISO Governance</span>
                         </button>
+                    <?php endif; ?>
+                    <?php if ($isSuper || !empty($_SESSION['access_identity'])): ?>
+                    <button class="psb-item <?= $activeSection==='pdpa_audit'?'psb-active':'' ?>" data-section="pdpa_audit" onclick="switchSection('pdpa_audit',this)">
+                        <div class="psb-icon"><i class="fa-solid fa-shield-check" style="color:#7c3aed"></i></div>
+                        <span class="psb-label" style="color:#6d28d9;font-weight:900">PDPA Audit</span>
+                    </button>
                     <?php endif; ?>
                 </div>
             <?php endif; ?>
@@ -3336,6 +3343,18 @@ try {
                 ?>
             </div>
 
+            <!-- ════════════ SECTION: PDPA AUDIT ════════════ -->
+            <div id="section-pdpa_audit" class="portal-section"
+                style="<?= $activeSection==='pdpa_audit'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); background:#f1f5f9; overflow-y:auto; padding:20px;">
+                <?php
+                if ($isSuper || !empty($_SESSION['access_identity'])) {
+                    include __DIR__ . '/_partials/pdpa_audit.php';
+                } else {
+                    echo '<div style="padding:100px;text-align:center;font-weight:900;color:#dc2626"><i class="fa-solid fa-shield-slash mb-4" style="font-size:4rem;display:block"></i> ACCESS DENIED<br><span style="font-size:14px;color:#94a3b8;font-weight:600">ต้องมีสิทธิ์ access_identity หรือ role: superadmin</span></div>';
+                }
+                ?>
+            </div>
+
             <!-- ════════════ SECTION: FINANCE (Cash Book) ════════════ -->
             <div id="section-finance" class="portal-section"
                 style="<?= $activeSection==='finance'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); background:#f1f5f9; overflow-y:auto; padding:20px;">
@@ -5317,6 +5336,7 @@ try {
             { id: 'activity_logs', label: 'Activity Logs',       desc: 'บันทึกกิจกรรมระบบ',  icon: 'fa-file-lines',         tone: 'neutral', type: 'section', target: 'activity_logs' },
             { id: 'error_logs',    label: 'Error Logs',          desc: 'บันทึกข้อผิดพลาด',  shortcut: 'g e', icon: 'fa-bug',                tone: 'danger',  type: 'section', target: 'error_logs' },
             { id: 'privilege_inventory', label: 'ISO Governance', desc: 'Privileged Access', icon: 'fa-shield-halved',      tone: 'success', type: 'section', target: 'privilege_inventory' },
+            { id: 'pdpa_audit',    label: 'PDPA Audit',          desc: 'ตรวจสอบความยินยอม PDPA', icon: 'fa-shield-check',   tone: 'info',    type: 'section', target: 'pdpa_audit' },
             { id: 'settings',      label: 'Settings',            desc: 'ตั้งค่าระบบ',        shortcut: 'g s', icon: 'fa-gear',               tone: 'warning', type: 'section', target: 'settings' },
 
             { id: 'open_asset',    label: 'ครุภัณฑ์สำนักงาน',   desc: 'ทะเบียนทรัพย์สิน',  shortcut: 'g r', icon: 'fa-boxes-stacked',     tone: 'success', type: 'url',     target: '../asset/index.php' },
