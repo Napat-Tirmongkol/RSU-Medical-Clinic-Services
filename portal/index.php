@@ -400,6 +400,7 @@ $categoryMap = [
     'sentry_events' => 'tools',
     'privilege_inventory' => 'tools',
     'pdpa_audit' => 'tools',
+    'db_schema' => 'tools',
     'admin_tool' => 'tools',
     'future_app' => 'dev',
 ];
@@ -1291,6 +1292,12 @@ try {
                     <button class="psb-item <?= $activeSection==='sentry_events'?'psb-active':'' ?>" data-section="sentry_events" onclick="switchSection('sentry_events',this)">
                         <div class="psb-icon"><i class="fa-solid fa-radiation" style="color:#8b5cf6"></i></div>
                         <span class="psb-label" style="color:#6d28d9;font-weight:900">Sentry Events</span>
+                    </button>
+                    <?php endif; ?>
+                    <?php if ($isSuper || $adminRole === 'admin' || !empty($_SESSION['access_identity'])): ?>
+                    <button class="psb-item <?= $activeSection==='db_schema'?'psb-active':'' ?>" data-section="db_schema" onclick="switchSection('db_schema',this)">
+                        <div class="psb-icon"><i class="fa-solid fa-diagram-project" style="color:#0891b2"></i></div>
+                        <span class="psb-label" style="color:#0e7490;font-weight:900">Database Schema</span>
                     </button>
                     <?php endif; ?>
                 </div>
@@ -3355,6 +3362,18 @@ try {
                 ?>
             </div>
 
+            <!-- ════════════ SECTION: DATABASE SCHEMA EXPLORER ════════════ -->
+            <div id="section-db_schema" class="portal-section"
+                style="<?= $activeSection==='db_schema'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); background:#f1f5f9; overflow-y:auto; padding:20px;">
+                <?php
+                if ($isSuper || $adminRole === 'admin' || !empty($_SESSION['access_identity'])) {
+                    include __DIR__ . '/_partials/db_schema.php';
+                } else {
+                    echo '<div style="padding:100px;text-align:center;font-weight:900;color:#dc2626"><i class="fa-solid fa-shield-slash mb-4" style="font-size:4rem;display:block"></i> ACCESS DENIED<br><span style="font-size:14px;color:#94a3b8;font-weight:600">ต้องมีสิทธิ์ access_identity หรือ role: admin/superadmin</span></div>';
+                }
+                ?>
+            </div>
+
             <!-- ════════════ SECTION: FINANCE (Cash Book) ════════════ -->
             <div id="section-finance" class="portal-section"
                 style="<?= $activeSection==='finance'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); background:#f1f5f9; overflow-y:auto; padding:20px;">
@@ -5413,6 +5432,7 @@ try {
             { id: 'error_logs',    label: 'Error Logs',          desc: 'บันทึกข้อผิดพลาด',  shortcut: 'g e', icon: 'fa-bug',                tone: 'danger',  type: 'section', target: 'error_logs' },
             { id: 'privilege_inventory', label: 'ISO Governance', desc: 'Privileged Access', icon: 'fa-shield-halved',      tone: 'success', type: 'section', target: 'privilege_inventory' },
             { id: 'pdpa_audit',    label: 'PDPA Audit',          desc: 'ตรวจสอบความยินยอม PDPA', icon: 'fa-user-shield',    tone: 'info',    type: 'section', target: 'pdpa_audit' },
+            { id: 'db_schema',     label: 'Database Schema',     desc: 'กราฟความสัมพันธ์ของฐานข้อมูล', icon: 'fa-diagram-project', tone: 'info', type: 'section', target: 'db_schema' },
             { id: 'settings',      label: 'Settings',            desc: 'ตั้งค่าระบบ',        shortcut: 'g s', icon: 'fa-gear',               tone: 'warning', type: 'section', target: 'settings' },
 
             { id: 'open_asset',    label: 'ครุภัณฑ์สำนักงาน',   desc: 'ทะเบียนทรัพย์สิน',  shortcut: 'g r', icon: 'fa-boxes-stacked',     tone: 'success', type: 'url',     target: '../asset/index.php' },
