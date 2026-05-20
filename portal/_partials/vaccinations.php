@@ -2,7 +2,7 @@
 // portal/_partials/vaccinations.php — Vaccination Records dashboard (Phase 1)
 // Loaded by portal/index.php — portal_CSRF + SweetAlert2 available
 $vxIsSuper = (($_SESSION['admin_role'] ?? '') === 'superadmin');
-// Pre-compute three things the Backfill button could fix so we can show
+// Pre-compute four things the Backfill button could fix so we can show
 // the banner whenever ANY of them is non-zero (and tell the operator
 // what's wrong) instead of only the "missing records" case.
 $vxMissingRecords = 0;   // Step 1 candidates: attended bookings without a record
@@ -10,6 +10,10 @@ $vxStatusGap      = 0;   // Step 2 candidates: attended bookings still status=co
 $vxCatalogDrift   = 0;   // Step 3 candidates: records linked to a campaign that
                          //   already has vaccine_type_id, but the record's own
                          //   vaccine_type_id / manufacturer is still empty
+$vxNextDueDrift   = 0;   // Step 4 candidates: records that could have next_due
+                         //   computed from catalog interval_days but it's NULL
+                         //   (over-counts cases where dose==default_doses on
+                         //   purpose — Step 4 will skip those, banner is fine)
 if ($vxIsSuper) {
     try {
         $_p = db();
@@ -39,9 +43,18 @@ if ($vxIsSuper) {
               AND c.vaccine_type_id IS NOT NULL
               AND (v.vaccine_type_id IS NULL OR v.manufacturer IS NULL OR v.manufacturer = '')
         ")->fetchColumn();
+        $vxNextDueDrift = (int)$_p->query("
+            SELECT COUNT(*)
+            FROM user_vaccination_records v
+            JOIN sys_vaccine_types t ON t.id = v.vaccine_type_id
+            WHERE v.status = 'completed'
+              AND v.vaccine_type_id IS NOT NULL
+              AND t.interval_days IS NOT NULL AND t.interval_days > 0
+              AND (v.next_due_date IS NULL OR v.dose_number IS NULL)
+        ")->fetchColumn();
     } catch (Throwable $e) { /* swallowed — UI just hides the button */ }
 }
-$vxNeedsBackfill = ($vxMissingRecords + $vxStatusGap + $vxCatalogDrift) > 0;
+$vxNeedsBackfill = ($vxMissingRecords + $vxStatusGap + $vxCatalogDrift + $vxNextDueDrift) > 0;
 ?>
 <style>
 .vx-page { padding: 4px 4px 80px; }
@@ -167,6 +180,9 @@ body[data-theme='dark'] #vx-edit-box textarea { background: #0f172a; border-colo
                 <?php endif; ?>
                 <?php if ($vxCatalogDrift > 0): ?>
                     <span>• Catalog drift (records ที่ vaccine_type_id หรือ manufacturer ยังว่าง ทั้งที่ campaign ผูกแล้ว): <b style="color:#92400e"><?= number_format($vxCatalogDrift) ?></b></span>
+                <?php endif; ?>
+                <?php if ($vxNextDueDrift > 0): ?>
+                    <span>• Smart next_due drift (dose_number / next_due_date ยังคำนวณไม่ครบจาก catalog): <b style="color:#92400e"><?= number_format($vxNextDueDrift) ?></b></span>
                 <?php endif; ?>
             </div>
         </div>
@@ -742,7 +758,9 @@ body[data-theme='dark'] #vx-edit-box textarea { background: #0f172a; border-colo
                     html: `<div style="text-align:left;font-size:13px">
                               <div>📋 Vaccination records: <b>+${json.inserted}</b> (จาก ${json.candidates} candidates)</div>
                               <div>🔄 Booking status flip: <b>${json.flipped}</b> rows · confirmed → completed</div>
-                              <div>🔗 Catalog sync: <b>${json.synced || 0}</b> rows · pulled vaccine_type_id / manufacturer จาก campaign linkage</div>
+                              <div>🔗 Catalog sync: <b>${json.synced || 0}</b> rows · pulled vaccine_type_id / manufacturer</div>
+                              <div>🧮 Dose number: <b>${json.dose_fixed || 0}</b> rows · assigned smart sequence</div>
+                              <div>📅 Next due: <b>${json.due_fixed || 0}</b> rows · computed from catalog interval</div>
                            </div>`,
                     confirmButtonText: 'ปิด',
                     confirmButtonColor: '#0d9488',

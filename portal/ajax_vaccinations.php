@@ -542,13 +542,76 @@ if ($action === 'backfill') {
         $syncStmt->execute();
         $synced = $syncStmt->rowCount();
 
+        // Step 4: smart dose_number + next_due_date for completed records
+        // linked to a catalog row. Two phases in PHP so we can preserve
+        // per-user-per-type ordering and apply compute_vaccine_next_due()
+        // for the dose-vs-series logic:
+        //   4a. SELECT all completed vaccine-linked records ordered by
+        //       (user_id, vaccine_type_id, vaccinated_at, id) so each
+        //       (user,type) group is contiguous and chronologically sorted
+        //   4b. Assign dose_number = 1,2,3,... within each group and
+        //       compute next_due from the catalog's interval/default_doses
+        //   4c. UPDATE only when current values differ (idempotent +
+        //       respects manual admin overrides via the COALESCE-style
+        //       "don't overwrite when admin set non-NULL" check on dose
+        //       and the "next_due IS NULL" check)
+        $doseFixed = 0;
+        $dueFixed  = 0;
+        $rows = $pdo->query("
+            SELECT v.id, v.user_id, v.vaccine_type_id, v.vaccinated_at,
+                   v.dose_number, v.next_due_date,
+                   t.default_doses, t.interval_days
+            FROM user_vaccination_records v
+            JOIN sys_vaccine_types t ON t.id = v.vaccine_type_id
+            WHERE v.status = 'completed'
+              AND v.vaccine_type_id IS NOT NULL
+            ORDER BY v.user_id ASC, v.vaccine_type_id ASC, v.vaccinated_at ASC, v.id ASC
+        ")->fetchAll(PDO::FETCH_ASSOC);
+
+        $updDose = $pdo->prepare("UPDATE user_vaccination_records SET dose_number = :d WHERE id = :id");
+        $updDue  = $pdo->prepare("UPDATE user_vaccination_records SET next_due_date = :due WHERE id = :id");
+
+        $lastKey = null;
+        $seq = 0;
+        foreach ($rows as $r) {
+            $key = $r['user_id'] . ':' . $r['vaccine_type_id'];
+            if ($key !== $lastKey) { $seq = 0; $lastKey = $key; }
+            $seq++;
+
+            // Only overwrite dose_number when it differs and current value
+            // looks computer-generated (NULL or already matches the sequence
+            // — we treat any non-NULL value the operator set manually as
+            // sacred. A future "force recompute" toggle could relax this.)
+            if ($r['dose_number'] === null || (int)$r['dose_number'] !== $seq) {
+                if ($r['dose_number'] === null) {
+                    $updDose->execute([':d' => $seq, ':id' => $r['id']]);
+                    $doseFixed++;
+                }
+                // dose_number non-null but != sequence: skip (manual override)
+            }
+
+            $newDue = compute_vaccine_next_due(
+                (string)$r['vaccinated_at'],
+                $r['interval_days'] !== null ? (int)$r['interval_days'] : null,
+                $r['default_doses'] !== null ? (int)$r['default_doses'] : null,
+                $seq
+            );
+            // Only fill next_due when it's currently NULL — operator's manual
+            // value wins. If the computed value is NULL and stored is NULL,
+            // skip (no-op).
+            if ($r['next_due_date'] === null && $newDue !== null) {
+                $updDue->execute([':due' => $newDue, ':id' => $r['id']]);
+                $dueFixed++;
+            }
+        }
+
         $pdo->commit();
 
         $adminId   = (int)($_SESSION['admin_id'] ?? 0);
         try {
             log_activity(
                 'Vaccine Backfill',
-                "vaccination_records: candidates={$candidates} inserted={$created} · status_flip: confirmed→completed={$flipped} · catalog_sync={$synced}",
+                "vaccination_records: candidates={$candidates} inserted={$created} · status_flip: confirmed→completed={$flipped} · catalog_sync={$synced} · dose_fixed={$doseFixed} · due_fixed={$dueFixed}",
                 $adminId ?: null
             );
         } catch (Throwable $e) {
@@ -556,12 +619,14 @@ if ($action === 'backfill') {
         }
 
         echo json_encode([
-            'ok'         => true,
-            'candidates' => $candidates,
-            'inserted'   => $created,
-            'flipped'    => $flipped,
-            'synced'     => $synced,
-            'message'    => "เพิ่ม {$created} vaccination records + flip {$flipped} bookings + sync {$synced} catalog references",
+            'ok'          => true,
+            'candidates'  => $candidates,
+            'inserted'    => $created,
+            'flipped'     => $flipped,
+            'synced'      => $synced,
+            'dose_fixed'  => $doseFixed,
+            'due_fixed'   => $dueFixed,
+            'message'     => "เพิ่ม {$created} records · flip {$flipped} bookings · sync {$synced} catalog · dose {$doseFixed} · next_due {$dueFixed}",
         ], JSON_UNESCAPED_UNICODE);
     } catch (LogicException $e) {
         if ($pdo->inTransaction()) $pdo->rollBack();
