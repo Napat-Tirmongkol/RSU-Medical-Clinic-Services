@@ -464,6 +464,66 @@ if ($action === 'update') {
     exit;
 }
 
+if ($action === 'backfill') {
+    // One-shot backfill: scan completed-or-attended vaccine bookings that
+    // don't yet have a vaccination record and create one via the shared
+    // helper. Same SQL the CLI script uses, just bridged through AJAX so a
+    // superadmin can run it without SSH. Idempotent — safe to click twice.
+    try {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') throw new LogicException('ต้องเป็น POST');
+        validate_csrf_or_die();
+        if (!$isSuper) throw new LogicException('Backfill ต้องใช้สิทธิ์ superadmin');
+
+        require_once __DIR__ . '/../includes/vaccination_helper.php';
+
+        $sql = "SELECT b.id
+                FROM camp_bookings b
+                JOIN camp_list c ON b.campaign_id = c.id
+                LEFT JOIN user_vaccination_records v ON v.campaign_booking_id = b.id
+                WHERE c.type = 'vaccine'
+                  AND (b.status = 'completed' OR b.attended_at IS NOT NULL)
+                  AND v.id IS NULL
+                ORDER BY b.id ASC";
+        $ids = array_map('intval', $pdo->query($sql)->fetchAll(PDO::FETCH_COLUMN));
+
+        // Hard cap to avoid runaway loops on a misconfigured campaign.
+        // 5000 is plenty for one click; if there's ever more, run the CLI.
+        $candidates = count($ids);
+        if ($candidates > 5000) {
+            throw new LogicException("จำนวน candidates เกิน 5000 (ตอนนี้ {$candidates}) — รัน CLI script แทนเพื่อความปลอดภัย");
+        }
+
+        $created = 0;
+        foreach ($ids as $bid) {
+            if (record_vaccination_from_booking($pdo, $bid)) $created++;
+        }
+
+        $adminId   = (int)($_SESSION['admin_id'] ?? 0);
+        try {
+            log_activity(
+                'Vaccine Backfill',
+                "candidates={$candidates} · inserted={$created}",
+                $adminId ?: null
+            );
+        } catch (Throwable $e) {
+            error_log('[vaccinations] log_activity (backfill): ' . $e->getMessage());
+        }
+
+        echo json_encode([
+            'ok'         => true,
+            'candidates' => $candidates,
+            'inserted'   => $created,
+            'message'    => "เพิ่ม {$created} records (จาก {$candidates} candidates)",
+        ], JSON_UNESCAPED_UNICODE);
+    } catch (LogicException $e) {
+        echo json_encode(['ok' => false, 'message' => $e->getMessage()]);
+    } catch (Throwable $e) {
+        error_log('[vaccinations] backfill: ' . $e->getMessage());
+        echo json_encode(['ok' => false, 'message' => 'Backfill ล้มเหลว — โปรดลองอีกครั้ง']);
+    }
+    exit;
+}
+
 if ($action === 'types') {
     try {
         $rows = $pdo->query("SELECT id, code, name_th, name_en, default_doses, interval_days, category, sort_order, is_active

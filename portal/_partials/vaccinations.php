@@ -2,6 +2,25 @@
 // portal/_partials/vaccinations.php — Vaccination Records dashboard (Phase 1)
 // Loaded by portal/index.php — portal_CSRF + SweetAlert2 available
 $vxIsSuper = (($_SESSION['admin_role'] ?? '') === 'superadmin');
+// Pre-compute how many bookings could be backfilled — show only when > 0
+// so a healthy install doesn't see a useless button. Counts attended
+// vaccine bookings that don't yet have a record, mirroring the AJAX
+// backfill action's SQL exactly.
+$vxBackfillCount = 0;
+if ($vxIsSuper) {
+    try {
+        $_p = db();
+        $vxBackfillCount = (int)$_p->query("
+            SELECT COUNT(*)
+            FROM camp_bookings b
+            JOIN camp_list c ON b.campaign_id = c.id
+            LEFT JOIN user_vaccination_records v ON v.campaign_booking_id = b.id
+            WHERE c.type = 'vaccine'
+              AND (b.status = 'completed' OR b.attended_at IS NOT NULL)
+              AND v.id IS NULL
+        ")->fetchColumn();
+    } catch (Throwable $e) { /* swallowed — UI just hides the button */ }
+}
 ?>
 <style>
 .vx-page { padding: 4px 4px 80px; }
@@ -112,6 +131,19 @@ body[data-theme='dark'] #vx-edit-box textarea { background: #0f172a; border-colo
 <div class="vx-page">
     <h1 class="vx-h1"><i class="fa-solid fa-syringe" style="color:#0d9488"></i> บันทึกการฉีดวัคซีน</h1>
     <p class="vx-sub">ดูและแก้ไขบันทึกการฉีดวัคซีนทั้งหมด · KPI รายเดือน · เพิ่ม lot/manufacturer/dose/certificate · audit log per record</p>
+
+    <?php if ($vxIsSuper && $vxBackfillCount > 0): ?>
+    <div style="background:#fef3c7;border:1.5px solid #fde68a;color:#92400e;padding:12px 16px;border-radius:12px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+        <div style="font-size:13px;font-weight:700">
+            <i class="fa-solid fa-database" style="color:#b45309"></i>
+            พบ <b style="color:#92400e;font-size:15px"><?= number_format($vxBackfillCount) ?></b> booking ที่ผู้ใช้มาฉีดวัคซีนแล้ว แต่ยังไม่มี record — สามารถ backfill ได้
+        </div>
+        <button type="button" class="btn-x primary" id="vx-backfill-btn"
+                style="background:#b45309;color:#fff;padding:8px 16px;border-radius:8px;font-size:12px;font-weight:800;cursor:pointer;border:0">
+            <i class="fa-solid fa-arrows-rotate"></i> Backfill ทั้งหมด
+        </button>
+    </div>
+    <?php endif; ?>
 
     <!-- KPI tiles -->
     <div class="vx-kpis">
@@ -530,6 +562,51 @@ body[data-theme='dark'] #vx-edit-box textarea { background: #0f172a; border-colo
     window.vxOpenEdit = vxOpenEdit;
     window.vxCloseEdit = vxCloseEdit;
     window.vxSubmitEdit = vxSubmitEdit;
+
+    // Backfill button — only present in DOM for superadmin viewers
+    const backfillBtn = document.getElementById('vx-backfill-btn');
+    if (backfillBtn) {
+        backfillBtn.addEventListener('click', async () => {
+            const { isConfirmed } = await Swal.fire({
+                icon: 'question',
+                title: 'รัน Backfill?',
+                html: 'ระบบจะสร้าง vaccination records ย้อนหลังสำหรับ booking ที่ผู้ใช้มาฉีดแล้ว (ปลอดภัยที่จะคลิกซ้ำ — idempotent)<br><br>การทำงานนี้จะบันทึก audit log ใน Activity Logs',
+                showCancelButton: true,
+                confirmButtonText: 'รัน Backfill',
+                cancelButtonText: 'ยกเลิก',
+                confirmButtonColor: '#b45309',
+                reverseButtons: true,
+                customClass: { container: 'vx-swal-z' },
+            });
+            if (!isConfirmed) return;
+
+            backfillBtn.disabled = true;
+            const originalHtml = backfillBtn.innerHTML;
+            backfillBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> กำลังรัน…';
+            try {
+                const fd = new FormData();
+                fd.append('csrf_token', (typeof portal_CSRF !== 'undefined') ? portal_CSRF : '');
+                const res = await fetch(AJAX + '?action=backfill', { method: 'POST', body: fd, credentials: 'same-origin' });
+                const json = await res.json();
+                if (!json.ok) throw new Error(json.message);
+
+                await Swal.fire({
+                    icon: 'success',
+                    title: 'Backfill สำเร็จ',
+                    html: `เพิ่ม <b>${json.inserted}</b> records (จาก ${json.candidates} candidates)`,
+                    confirmButtonText: 'ปิด',
+                    confirmButtonColor: '#0d9488',
+                    customClass: { container: 'vx-swal-z' },
+                });
+                // Reload everything: KPI numbers + trend + table all change
+                location.reload();
+            } catch (err) {
+                Swal.fire({ icon: 'error', title: 'Backfill ล้มเหลว', text: err.message, customClass: { container: 'vx-swal-z' } });
+                backfillBtn.disabled = false;
+                backfillBtn.innerHTML = originalHtml;
+            }
+        });
+    }
 
     // Boot
     (async () => {

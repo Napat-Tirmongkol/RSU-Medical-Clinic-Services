@@ -28,7 +28,14 @@ function record_vaccination_from_booking(PDO $pdo, int $bookingId): bool
 
         if (!$b) return false;
         if (($b['type'] ?? '') !== 'vaccine') return false;
-        if (($b['status'] ?? '') !== 'completed') return false;
+        // Originally fired only when status === 'completed'. In production the
+        // check-in flow stamps attended_at but never flips status off
+        // 'confirmed' (audited: 562/575 attendees stayed at confirmed with
+        // attended_at set; only 13/575 were ever marked completed). Accept
+        // either signal so the auto-record fires on real-world flows.
+        $isAttended  = !empty($b['attended_at']);
+        $isCompleted = (($b['status'] ?? '') === 'completed');
+        if (!$isAttended && !$isCompleted) return false;
 
         $check = $pdo->prepare("
             SELECT id FROM user_vaccination_records
