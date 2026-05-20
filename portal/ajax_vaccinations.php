@@ -102,8 +102,15 @@ function vacc_clamp_int($v, int $lo, int $hi, int $default): int {
 
 // Shared filter builder — same WHERE for list + export
 function vacc_build_filter(array $query): array {
-    $where = ['v.status <> "entered_in_error"'];
-    $bind  = [];
+    // Bind the "entered_in_error" exclusion as a parameter instead of an
+    // inline string. The earlier form `v.status <> "entered_in_error"`
+    // worked only because MariaDB defaults to treating double quotes as
+    // string literals — flip ANSI_QUOTES on (or migrate to a hosting that
+    // does) and the same SQL would parse the double-quoted token as a
+    // column identifier, fail silently on JOIN, and the dashboard ends up
+    // showing a single stray row instead of the real list.
+    $where = ['v.status <> :exclude_status'];
+    $bind  = [':exclude_status' => 'entered_in_error'];
 
     $q = trim((string)($query['q'] ?? ''));
     if ($q !== '') {
