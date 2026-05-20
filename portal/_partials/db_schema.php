@@ -232,7 +232,8 @@ body[data-theme='dark'] .ds-table-card h3 { color: #f1f5f9; }
                 },
             ],
             layout: layoutOptions(layout),
-            wheelSensitivity: 0.2,
+            // Default wheel sensitivity — Cytoscape warns against custom values
+            // because they translate inconsistently across mice/trackpads/OSes
             minZoom: 0.15,
             maxZoom: 3,
         });
