@@ -25,7 +25,7 @@ $csrfToken = function_exists('get_csrf_token') ? get_csrf_token() : '';
         <div>
             <div class="sec-title" style="margin-bottom:2px">
                 <div class="w-8 h-8 rounded-lg bg-purple-600 flex items-center justify-center text-white shadow-lg shadow-purple-200 mr-1" style="font-size:12px">
-                    <i class="fa-solid fa-messages-question"></i>
+                    <i class="fa-solid fa-comments"></i>
                 </div>
                 ผู้ช่วยข้อมูล (AI Admin Chat)
             </div>

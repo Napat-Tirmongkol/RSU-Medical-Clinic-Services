@@ -1132,7 +1132,7 @@ try {
                         <span class="psb-label" style="color:#7c3aed;font-weight:900">AI Assistant</span>
                     </button>
                     <button class="psb-item <?= $activeSection==='admin_chat'?'psb-active':'' ?>" data-section="admin_chat" onclick="switchSection('admin_chat',this)">
-                        <div class="psb-icon"><i class="fa-solid fa-messages-question" style="color:#a855f7"></i></div>
+                        <div class="psb-icon"><i class="fa-solid fa-comments" style="color:#a855f7"></i></div>
                         <span class="psb-label" style="color:#7c3aed;font-weight:900">ผู้ช่วยข้อมูล</span>
                     </button>
                     <button class="psb-item <?= $activeSection==='ai_qa_lab'?'psb-active':'' ?>" data-section="ai_qa_lab" onclick="switchSection('ai_qa_lab',this)">
