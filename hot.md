@@ -54,6 +54,7 @@ Stack: PHP 8 + MySQL (PDO singleton) · Tailwind compiled CSS (no JIT) · vanill
 
 | ต้องการ | ดูที่ |
 |---|---|
+| **Code map (architecture overview)** | **`AI/knowledge/code-map.md`** — section/AJAX/helper catalog + diagnostic recipes |
 | Portal shell + section routing | `portal/index.php` |
 | Portal partial ใหม่ | `portal/_partials/<name>.php` |
 | Portal AJAX กลาง | `portal/ajax_clinic_master.php` (entity+action) |
