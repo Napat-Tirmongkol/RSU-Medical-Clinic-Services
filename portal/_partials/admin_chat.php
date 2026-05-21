@@ -130,6 +130,8 @@ $csrfToken = function_exists('get_csrf_token') ? get_csrf_token() : '';
 
 .ac-msg-row { display: flex; gap: 12px; }
 .ac-msg-row.is-admin { flex-direction: row-reverse; }
+.ac-msg-body { flex: 1 1 0; min-width: 0; }
+.ac-msg-row.is-admin .ac-msg-body { display: flex; flex-direction: column; align-items: flex-end; }
 .ac-avatar { width: 32px; height: 32px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .ac-avatar.bot { background: #1e293b; color: white; }
 .ac-avatar.admin { background: #a855f7; color: white; }
@@ -320,7 +322,7 @@ function acMsgHtml(m) {
         : `<div class="ac-avatar bot"><i class="fa-solid fa-robot"></i></div>`;
     return `<div class="ac-msg-row ${isAdmin ? 'is-admin' : ''}">
         ${avatar}
-        <div class="min-w-0">
+        <div class="ac-msg-body">
             <div class="ac-bubble ${isAdmin ? 'admin' : 'bot'}">${content}</div>
             ${meta}
         </div>

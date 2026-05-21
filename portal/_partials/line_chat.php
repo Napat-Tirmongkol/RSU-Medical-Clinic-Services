@@ -144,6 +144,8 @@ $lineTokenSet = line_chat_load_access_token() !== '';
 
 .lc-msg-row { display: flex; gap: 10px; align-items: flex-end; }
 .lc-msg-row.is-outbound { flex-direction: row-reverse; }
+.lc-msg-body { flex: 1 1 0; min-width: 0; }
+.lc-msg-row.is-outbound .lc-msg-body { display: flex; flex-direction: column; align-items: flex-end; }
 .lc-avatar { width: 28px; height: 28px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 12px; }
 .lc-avatar.user { background: #f1f5f9; color: #64748b; }
 .lc-avatar.admin { background: #06c755; color: white; }
@@ -317,9 +319,9 @@ function lcMsgHtml(m) {
     }
     return `<div class="lc-msg-row ${isOutbound ? 'is-outbound' : ''}">
         <div class="lc-avatar ${bubbleClass}">${avatarIcon}</div>
-        <div class="min-w-0">
+        <div class="lc-msg-body">
             <div class="lc-bubble ${bubbleClass}">${content}</div>
-            <div class="lc-bubble-meta ${isOutbound ? 'text-right' : ''}">${meta.join(' · ')}</div>
+            <div class="lc-bubble-meta">${meta.join(' · ')}</div>
         </div>
     </div>`;
 }
