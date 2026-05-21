@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Folder Structure Report · RSU Medical Clinic Services · พ.ค. 2569</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = {
+    theme: {
+        extend: {
+            fontFamily: {
+                sans: ['Sarabun', 'system-ui', 'sans-serif'],
+                mono: ['JetBrains Mono', 'monospace'],
+            },
+            colors: {
+                brand: {
+                    50:'#ecfdf5', 100:'#d1fae5', 200:'#a7f3d0', 300:'#6ee7b7',
+                    400:'#34d399', 500:'#2e9e63', 600:'#0d8a4f', 700:'#047857',
+                    800:'#065f46', 900:'#064e3b',
+                },
+                canvas: '#F8FAFF',
+            },
+            boxShadow: {
+                'glow-brand': '0 8px 32px -8px rgba(46, 158, 99, 0.45)',
+                'card': '0 1px 3px rgba(15, 23, 42, 0.06), 0 4px 12px rgba(15, 23, 42, 0.04)',
+                'lift': '0 12px 32px -8px rgba(15, 23, 42, 0.18)',
+            },
+        }
+    }
+}
+</script>
+<style>
+body { font-family: 'Sarabun', system-ui, sans-serif; background: #F8FAFF; color: #0f172a; }
+.mono { font-family: 'JetBrains Mono', monospace; }
+
+/* Hero rainbow strip */
+.rainbow-strip {
+    height: 4px;
+    background: linear-gradient(90deg, #2e9e63 0%, #06b6d4 20%, #6366f1 40%, #d946ef 60%, #f97316 80%, #2e9e63 100%);
+    background-size: 200% 100%;
+    animation: shimmer 14s linear infinite;
+}
+@keyframes shimmer { 0% { background-position: 0% 0; } 100% { background-position: -200% 0; } }
+
+/* Tree */
+.tree { font-family: 'JetBrains Mono', monospace; font-size: 13.5px; line-height: 1.85; }
+.tree details { padding-left: 0; }
+.tree details > summary {
+    cursor: pointer; list-style: none; user-select: none;
+    padding: 2px 6px; border-radius: 6px; transition: background .15s;
+    display: flex; align-items: center; gap: 8px;
+}
+.tree details > summary:hover { background: rgba(46, 158, 99, 0.08); }
+.tree details > summary::-webkit-details-marker { display: none; }
+.tree details > summary::before {
+    content: '\f105'; font-family: 'Font Awesome 6 Free'; font-weight: 900;
+    color: #94a3b8; width: 10px; transition: transform .2s; flex-shrink: 0;
+}
+.tree details[open] > summary::before { transform: rotate(90deg); }
+.tree .branch { padding-left: 24px; border-left: 1px dashed #cbd5e1; margin-left: 8px; }
+.tree .leaf { padding: 2px 6px 2px 24px; display: flex; align-items: center; gap: 8px; color: #475569; }
+.tree .folder-name { color: #0d8a4f; font-weight: 600; }
+.tree .file-name { color: #64748b; }
+.tree .note { color: #94a3b8; font-size: 12px; margin-left: 6px; font-family: 'Sarabun', sans-serif; font-weight: 400; }
+.tree .badge {
+    display: inline-flex; align-items: center; padding: 1px 7px; border-radius: 999px;
+    font-size: 10.5px; font-weight: 600; font-family: 'Sarabun', sans-serif;
+    margin-left: 4px;
+}
+.tree .b-core { background: #d1fae5; color: #065f46; }
+.tree .b-infra { background: #dbeafe; color: #1e40af; }
+.tree .b-junk { background: #fee2e2; color: #991b1b; }
+.tree .b-meta { background: #f3e8ff; color: #6b21a8; }
+
+/* Priority badges */
+.prio-p1 { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
+.prio-p2 { background: #fff7ed; color: #c2410c; border: 1px solid #fed7aa; }
+.prio-p3 { background: #f0f9ff; color: #0369a1; border: 1px solid #bae6fd; }
+
+/* KPI tile */
+.kpi {
+    background: white; border-radius: 16px; padding: 18px 20px;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06), 0 4px 12px rgba(15, 23, 42, 0.04);
+    border: 1px solid rgba(15, 23, 42, 0.05);
+    position: relative; overflow: hidden;
+    transition: transform .25s cubic-bezier(.16,1,.3,1), box-shadow .25s;
+}
+.kpi:hover { transform: translateY(-3px); box-shadow: 0 12px 32px -8px rgba(15, 23, 42, 0.18); }
+.kpi::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    background: linear-gradient(90deg, #2e9e63, #34d399);
+}
+.kpi[data-tone="blue"]::before { background: linear-gradient(90deg, #0ea5e9, #38bdf8); }
+.kpi[data-tone="amber"]::before { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+.kpi[data-tone="rose"]::before { background: linear-gradient(90deg, #e11d48, #fb7185); }
+
+/* Section title */
+.section-title { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
+.section-title::before {
+    content: ''; width: 4px; height: 28px; border-radius: 4px;
+    background: linear-gradient(180deg, #2e9e63, #34d399);
+}
+
+/* Concern card */
+.concern {
+    background: white; border-radius: 12px; border-left: 4px solid #f59e0b;
+    padding: 16px 20px; margin-bottom: 12px;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
+    transition: transform .2s, box-shadow .2s;
+}
+.concern:hover { transform: translateX(4px); box-shadow: 0 6px 16px -4px rgba(245, 158, 11, 0.25); }
+.concern[data-sev="high"] { border-left-color: #e11d48; }
+.concern[data-sev="low"] { border-left-color: #64748b; }
+
+/* Good card */
+.good {
+    background: linear-gradient(135deg, #ecfdf5 0%, #f0fdfa 100%);
+    border-radius: 12px; padding: 14px 18px;
+    border: 1px solid #a7f3d0;
+    display: flex; align-items: flex-start; gap: 12px;
+    transition: transform .2s;
+}
+.good:hover { transform: translateY(-2px); }
+.good i { color: #059669; margin-top: 3px; flex-shrink: 0; }
+
+/* Recommendation row */
+.rec-row {
+    background: white; border-radius: 10px; padding: 14px 18px;
+    display: grid; grid-template-columns: 60px 1fr 140px; gap: 16px; align-items: center;
+    border: 1px solid #e2e8f0; margin-bottom: 10px;
+    transition: transform .15s, box-shadow .15s;
+}
+.rec-row:hover { transform: translateX(4px); box-shadow: 0 6px 16px -4px rgba(15, 23, 42, 0.1); }
+.rec-impact { font-size: 12px; color: #64748b; }
+
+/* Table */
+.tbl { width: 100%; border-collapse: separate; border-spacing: 0; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06); }
+.tbl thead th { background: #f1f5f9; padding: 12px 16px; text-align: left; font-weight: 600; font-size: 13px; color: #475569; }
+.tbl tbody td { padding: 11px 16px; font-size: 14px; border-top: 1px solid #f1f5f9; }
+.tbl tbody tr:hover { background: #f8fafc; }
+.tbl .bar {
+    display: inline-block; height: 7px; border-radius: 4px;
+    background: linear-gradient(90deg, #2e9e63, #34d399); vertical-align: middle;
+    box-shadow: 0 0 8px rgba(46, 158, 99, 0.3);
+}
+
+/* Print */
+@media print {
+    body { background: white; }
+    .no-print { display: none !important; }
+    .kpi:hover, .concern:hover, .good:hover, .rec-row:hover { transform: none; box-shadow: none; }
+    details { page-break-inside: avoid; }
+    .rainbow-strip { display: none; }
+}
+
+/* Mobile */
+@media (max-width: 640px) {
+    .rec-row { grid-template-columns: 50px 1fr; }
+    .rec-impact { grid-column: 1 / -1; padding-left: 66px; margin-top: -8px; }
+}
+</style>
+</head>
+<body>
+
+<!-- Top rainbow strip -->
+<div class="rainbow-strip no-print"></div>
+
+<!-- Hero -->
+<header class="bg-white border-b border-slate-200">
+    <div class="max-w-6xl mx-auto px-6 py-8">
+        <div class="flex items-start justify-between flex-wrap gap-4">
+            <div>
+                <div class="flex items-center gap-3 mb-2">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center shadow-glow-brand">
+                        <i class="fa-solid fa-folder-tree text-white"></i>
+                    </div>
+                    <span class="text-xs uppercase tracking-widest text-slate-500 font-semibold">Architecture Review</span>
+                </div>
+                <h1 class="text-3xl font-bold text-slate-900">Folder Structure Report</h1>
+                <p class="text-slate-600 mt-1">RSU Medical Clinic Services · ตรวจสอบเมื่อ 21 พฤษภาคม 2569</p>
+            </div>
+            <div class="flex gap-2 no-print">
+                <button onclick="window.print()" class="px-4 py-2 bg-white border border-slate-300 rounded-lg text-sm font-medium hover:bg-slate-50 transition flex items-center gap-2">
+                    <i class="fa-solid fa-print"></i> พิมพ์ / Save PDF
+                </button>
+                <button onclick="expandAll()" class="px-4 py-2 bg-brand-500 text-white rounded-lg text-sm font-medium hover:bg-brand-600 transition flex items-center gap-2 shadow-glow-brand">
+                    <i class="fa-solid fa-expand"></i> ขยายทั้งหมด
+                </button>
+            </div>
+        </div>
+    </div>
+</header>
+
+<main class="max-w-6xl mx-auto px-6 py-8">
+
+    <!-- KPI Stats -->
+    <section class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
+        <div class="kpi">
+            <div class="text-xs uppercase tracking-wider text-slate-500 font-semibold">PHP Files (รวม)</div>
+            <div class="text-3xl font-bold text-slate-900 mt-1">534</div>
+            <div class="text-xs text-slate-500 mt-1">กระจาย 19 โมดูล</div>
+        </div>
+        <div class="kpi" data-tone="blue">
+            <div class="text-xs uppercase tracking-wider text-slate-500 font-semibold">Top-level Folders</div>
+            <div class="text-3xl font-bold text-slate-900 mt-1">36</div>
+            <div class="text-xs text-slate-500 mt-1">รวม config/system dirs</div>
+        </div>
+        <div class="kpi" data-tone="amber">
+            <div class="text-xs uppercase tracking-wider text-slate-500 font-semibold">Root-level Files</div>
+            <div class="text-3xl font-bold text-slate-900 mt-1">33</div>
+            <div class="text-xs text-slate-500 mt-1">(9 .md + 7 .php + 1 .sql 22MB)</div>
+        </div>
+        <div class="kpi" data-tone="rose">
+            <div class="text-xs uppercase tracking-wider text-slate-500 font-semibold">โมดูลใหญ่สุด</div>
+            <div class="text-3xl font-bold text-slate-900 mt-1">e_Borrow</div>
+            <div class="text-xs text-slate-500 mt-1">7.0 MB · 84 PHP</div>
+        </div>
+    </section>
+
+    <!-- Tree Section -->
+    <section class="mb-12">
+        <h2 class="section-title text-xl font-bold text-slate-900">
+            <span><i class="fa-solid fa-sitemap text-brand-500 mr-2"></i>โครงสร้างโฟลเดอร์ (Top-level)</span>
+        </h2>
+        <div class="bg-white rounded-2xl shadow-card p-6">
+            <div class="tree">
+                <details open>
+                    <summary>
+                        <i class="fa-solid fa-folder-open text-brand-500"></i>
+                        <span class="folder-name">RSU-Medical-Clinic-Services/</span>
+                        <span class="badge b-meta">root</span>
+                    </summary>
+                    <div class="branch">
+
+                        <!-- Core Modules -->
+                        <details open>
+                            <summary>
+                                <i class="fa-solid fa-folder text-brand-600"></i>
+                                <span class="folder-name">Core Modules</span>
+                                <span class="note">— โมดูลธุรกิจหลัก (user-facing)</span>
+                            </summary>
+                            <div class="branch">
+                                <details>
+                                    <summary><i class="fa-solid fa-folder text-brand-500"></i> <span class="folder-name">portal/</span> <span class="note">138 PHP · 4.3M</span> <span class="badge b-core">main hub</span></summary>
+                                    <div class="branch">
+                                        <div class="leaf"><i class="fa-solid fa-folder text-amber-500"></i> <span class="file-name">_partials/</span> <span class="note">39 sections (finance · ai_qa_lab · gold_card · ...)</span></div>
+                                        <div class="leaf"><i class="fa-solid fa-folder text-amber-500"></i> <span class="file-name">actions/</span> <span class="note">identity_actions, etc.</span></div>
+                                        <div class="leaf"><i class="fa-solid fa-folder text-amber-500"></i> <span class="file-name">api/</span> <span class="note">REST-style endpoints</span></div>
+                                        <div class="leaf"><i class="fa-solid fa-folder text-amber-500"></i> <span class="file-name">includes/</span></div>
+                                        <div class="leaf"><i class="fa-solid fa-folder text-amber-500"></i> <span class="file-name">queries/</span> <span class="note">identity_queries, ...</span></div>
+                                        <div class="leaf"><i class="fa-solid fa-file-code text-slate-400"></i> <span class="file-name">index.php</span> <span class="note">shell + section router</span></div>
+                                        <div class="leaf"><i class="fa-solid fa-file-code text-rose-400"></i> <span class="file-name">ajax_*.php × 23</span> <span class="note">⚠ AJAX กระจายที่ root</span></div>
+                                    </div>
+                                </details>
+                                <details>
+                                    <summary><i class="fa-solid fa-folder text-brand-500"></i> <span class="folder-name">e_Borrow/</span> <span class="note">84 PHP · 7.0M</span> <span class="badge b-core">largest</span></summary>
+                                    <div class="branch">
+                                        <div class="leaf"><i class="fa-solid fa-folder text-amber-500"></i> <span class="file-name">admin/</span> · <span class="file-name">ajax/</span> · <span class="file-name">process/</span></div>
+                                        <div class="leaf"><i class="fa-solid fa-folder text-amber-500"></i> <span class="file-name">assets/</span> <span class="note">own CSS (eb-skin.css)</span></div>
+                                        <div class="leaf"><i class="fa-solid fa-folder text-amber-500"></i> <span class="file-name">uploads/</span> <span class="note">own upload dir (asset/consumables ไม่มี)</span></div>
+                                    </div>
+                                </details>
+                                <div class="leaf"><i class="fa-solid fa-folder text-brand-500"></i> <span class="folder-name">admin/</span> <span class="note">55 PHP · 900K — legacy (e-campaign era: bookings, campaigns, time_slots)</span> <span class="badge b-junk">deprecate?</span></div>
+                                <div class="leaf"><i class="fa-solid fa-folder text-brand-500"></i> <span class="folder-name">user/</span> <span class="note">45 PHP · 832K — booking · hub · profile · checkin</span></div>
+                                <div class="leaf"><i class="fa-solid fa-folder text-brand-500"></i> <span class="folder-name">asset/</span> <span class="note">25 PHP — ครุภัณฑ์ (มี shared manage_locations.php)</span></div>
+                                <div class="leaf"><i class="fa-solid fa-folder text-brand-500"></i> <span class="folder-name">consumables/</span> <span class="note">20 PHP — วัสดุสิ้นเปลือง (ใช้ locations ร่วม asset)</span></div>
+                                <div class="leaf"><i class="fa-solid fa-folder text-brand-500"></i> <span class="folder-name">insurance_partner/</span> <span class="note">10 PHP — external partner upload</span></div>
+                                <div class="leaf"><i class="fa-solid fa-folder text-brand-500"></i> <span class="folder-name">staff/</span> <span class="note">5 PHP</span></div>
+                            </div>
+                        </details>
+
+                        <!-- Shared Infra -->
+                        <details>
+                            <summary>
+                                <i class="fa-solid fa-folder text-blue-600"></i>
+                                <span class="folder-name">Shared Infrastructure</span>
+                                <span class="note">— helpers · assets · APIs · cron</span>
+                            </summary>
+                            <div class="branch">
+                                <details>
+                                    <summary><i class="fa-solid fa-folder text-blue-500"></i> <span class="folder-name">includes/</span> <span class="note">33 PHP · 508K</span> <span class="badge b-infra">shared</span></summary>
+                                    <div class="branch">
+                                        <div class="leaf"><i class="fa-solid fa-file-code text-slate-400"></i> <span class="file-name">auth_helper · csrf · session_guard · rate_limit</span></div>
+                                        <div class="leaf"><i class="fa-solid fa-file-code text-slate-400"></i> <span class="file-name">ai_qa_helper · ai_cache_helper · ai_chunk_helper · ai_telemetry_helper · ...</span> <span class="note">(7 AI helpers)</span></div>
+                                        <div class="leaf"><i class="fa-solid fa-file-code text-slate-400"></i> <span class="file-name">finance_sync_helper · finance_receipt_helper</span></div>
+                                        <div class="leaf"><i class="fa-solid fa-file-code text-slate-400"></i> <span class="file-name">line_helper · mail_helper · chat_helper · clinic_status_helper</span></div>
+                                        <div class="leaf"><i class="fa-solid fa-folder text-amber-500"></i> <span class="file-name">user_modals/</span></div>
+                                    </div>
+                                </details>
+                                <div class="leaf"><i class="fa-solid fa-folder text-blue-500"></i> <span class="folder-name">assets/</span> <span class="note">12M — CSS (Tailwind built) · JS (RsuFx, RsuTour) · STYLE_GUIDE.md · vendor (phpqrcode)</span></div>
+                                <div class="leaf"><i class="fa-solid fa-folder text-blue-500"></i> <span class="folder-name">api/</span> <span class="note">4 PHP — line_webhook · log_js_error · sentry_webhook</span></div>
+                                <div class="leaf"><i class="fa-solid fa-folder text-blue-500"></i> <span class="folder-name">line_api/</span> <span class="note">8 PHP — แยกจาก api/ (?)</span> <span class="badge b-junk">overlap</span></div>
+                                <div class="leaf"><i class="fa-solid fa-folder text-blue-500"></i> <span class="folder-name">cron/</span> <span class="note">8 PHP — scheduled jobs</span></div>
+                                <div class="leaf"><i class="fa-solid fa-folder text-blue-500"></i> <span class="folder-name">config/</span> <span class="note">4 PHP — secrets.php (gitignored)</span></div>
+                                <div class="leaf"><i class="fa-solid fa-folder text-blue-500"></i> <span class="folder-name">database/migrations/</span> <span class="note">36 PHP — migration scripts (version-controlled)</span></div>
+                                <div class="leaf"><i class="fa-solid fa-folder text-blue-500"></i> <span class="folder-name">lang/</span> · <span class="folder-name">errors/</span> · <span class="folder-name">storage/</span> · <span class="folder-name">uploads/</span> · <span class="folder-name">public/</span></div>
+                            </div>
+                        </details>
+
+                        <!-- Meta / AI -->
+                        <details>
+                            <summary>
+                                <i class="fa-solid fa-folder text-purple-600"></i>
+                                <span class="folder-name">AI Memory / Tooling</span>
+                                <span class="note">— project memory + dev tooling</span>
+                            </summary>
+                            <div class="branch">
+                                <details>
+                                    <summary><i class="fa-solid fa-folder text-purple-500"></i> <span class="folder-name">AI/</span> <span class="note">108K — claude memory</span> <span class="badge b-meta">curated</span></summary>
+                                    <div class="branch">
+                                        <div class="leaf"><i class="fa-solid fa-folder text-amber-500"></i> <span class="file-name">logs/</span> <span class="note">append-only decision records</span></div>
+                                        <div class="leaf"><i class="fa-solid fa-folder text-amber-500"></i> <span class="file-name">knowledge/</span> <span class="note">distilled patterns</span></div>
+                                        <div class="leaf"><i class="fa-solid fa-folder text-amber-500"></i> <span class="file-name">scratch/</span> <span class="note">ephemeral workspace</span></div>
+                                    </div>
+                                </details>
+                                <div class="leaf"><i class="fa-solid fa-folder text-purple-500"></i> <span class="folder-name">.agents/</span> + <span class="folder-name">.claude/</span> <span class="note">— config skills+agents</span> <span class="badge b-junk">duplicate?</span></div>
+                                <div class="leaf"><i class="fa-solid fa-folder text-purple-500"></i> <span class="folder-name">tools/</span> · <span class="folder-name">scripts/</span> · <span class="folder-name">tests/</span></div>
+                            </div>
+                        </details>
+
+                        <!-- Junk drawer -->
+                        <details>
+                            <summary>
+                                <i class="fa-solid fa-folder text-rose-600"></i>
+                                <span class="folder-name">Legacy / Junk Drawers</span>
+                                <span class="note">— ของควรเคลียร์</span>
+                                <span class="badge b-junk">cleanup</span>
+                            </summary>
+                            <div class="branch">
+                                <div class="leaf"><i class="fa-solid fa-folder text-rose-400"></i> <span class="folder-name">scratch/</span> <span class="note">21 PHP — แยกจาก AI/scratch/ (concept ซ้ำ)</span></div>
+                                <div class="leaf"><i class="fa-solid fa-folder text-rose-400"></i> <span class="folder-name">archive/</span> <span class="note">1 PHP — e_Borrow เก่า</span></div>
+                                <div class="leaf"><i class="fa-solid fa-folder text-rose-400"></i> <span class="folder-name">design_handoff_user_hub/</span> <span class="note">128K — design artifact ค้าง</span></div>
+                                <div class="leaf"><i class="fa-solid fa-folder text-rose-400"></i> <span class="folder-name">error_docs/</span> <span class="note">แยกจาก errors/ (?)</span></div>
+                            </div>
+                        </details>
+
+                        <!-- Root files -->
+                        <details>
+                            <summary>
+                                <i class="fa-solid fa-file text-amber-600"></i>
+                                <span class="folder-name">Root-level files (33 ไฟล์)</span>
+                                <span class="note">— pollution ที่ root</span>
+                            </summary>
+                            <div class="branch">
+                                <div class="leaf"><i class="fa-solid fa-file-code text-slate-500"></i> <span class="file-name">index.php · config.php</span> <span class="note">entry + bootstrap</span></div>
+                                <div class="leaf"><i class="fa-solid fa-file-code text-amber-400"></i> <span class="file-name">privacy.php · terms.php</span> <span class="note">legal pages (ควรย้าย /user/legal/)</span></div>
+                                <div class="leaf"><i class="fa-solid fa-file-code text-amber-400"></i> <span class="file-name">e_campaign_help.php · gold_card_help.php · scholarship_help.php</span> <span class="note">help pages × 3</span></div>
+                                <div class="leaf"><i class="fa-solid fa-file-lines text-slate-500"></i> <span class="file-name">CLAUDE.md · hot.md · AGENTS.md</span> <span class="note">AI configs (จำเป็นต้องอยู่ root)</span></div>
+                                <div class="leaf"><i class="fa-solid fa-file-lines text-amber-400"></i> <span class="file-name">AI_GUIDE · E_CAMPAIGN_GUIDE · GOLD_CARD_GUIDE · SCHOLARSHIP_GUIDE · SOS_SYSTEM_SPEC · merge_plan</span> <span class="note">6 .md (ควรย้าย docs/modules/)</span></div>
+                                <div class="leaf"><i class="fa-solid fa-database text-rose-500"></i> <span class="file-name">rsu.sql</span> <span class="note">⚠ 22MB DB dump (ไม่ควรอยู่ใน git)</span></div>
+                                <div class="leaf"><i class="fa-solid fa-file-code text-amber-400"></i> <span class="file-name">satisfaction_modal_demo.html</span> <span class="note">artifact ค้าง</span></div>
+                            </div>
+                        </details>
+
+                    </div>
+                </details>
+            </div>
+        </div>
+    </section>
+
+    <!-- Module breakdown table -->
+    <section class="mb-12">
+        <h2 class="section-title text-xl font-bold text-slate-900">
+            <span><i class="fa-solid fa-table text-brand-500 mr-2"></i>เปรียบเทียบขนาดโมดูล</span>
+        </h2>
+        <div class="overflow-x-auto">
+            <table class="tbl">
+                <thead>
+                    <tr>
+                        <th>โมดูล</th>
+                        <th>PHP Files</th>
+                        <th>ขนาด</th>
+                        <th>หน้าที่</th>
+                        <th class="w-48">% PHP</th>
+                    </tr>
+                </thead>
+                <tbody class="mono">
+                    <tr><td><strong class="text-brand-700">portal/</strong></td><td>138</td><td>4.3M</td><td class="text-slate-600" style="font-family:Sarabun">Admin hub กลาง (finance, AI, identity, EDMS)</td><td><span class="bar" style="width:100%"></span></td></tr>
+                    <tr><td><strong class="text-brand-700">e_Borrow/</strong></td><td>84</td><td>7.0M</td><td class="text-slate-600" style="font-family:Sarabun">ยืม-คืนครุภัณฑ์ (own assets+uploads)</td><td><span class="bar" style="width:61%"></span></td></tr>
+                    <tr><td><strong class="text-amber-700">admin/</strong></td><td>55</td><td>900K</td><td class="text-slate-600" style="font-family:Sarabun">Legacy admin (e-campaign era)</td><td><span class="bar" style="width:40%"></span></td></tr>
+                    <tr><td><strong class="text-brand-700">user/</strong></td><td>45</td><td>832K</td><td class="text-slate-600" style="font-family:Sarabun">User-facing pages (booking, hub, checkin)</td><td><span class="bar" style="width:33%"></span></td></tr>
+                    <tr><td><strong class="text-blue-700">database/</strong></td><td>36</td><td>252K</td><td class="text-slate-600" style="font-family:Sarabun">Migration scripts (version control)</td><td><span class="bar" style="width:26%"></span></td></tr>
+                    <tr><td><strong class="text-blue-700">includes/</strong></td><td>33</td><td>508K</td><td class="text-slate-600" style="font-family:Sarabun">Shared helpers (auth, csrf, ai, finance)</td><td><span class="bar" style="width:24%"></span></td></tr>
+                    <tr><td><strong class="text-brand-700">asset/</strong></td><td>25</td><td>360K</td><td class="text-slate-600" style="font-family:Sarabun">ครุภัณฑ์สำนักงาน (shared locations)</td><td><span class="bar" style="width:18%"></span></td></tr>
+                    <tr><td><strong class="text-rose-700">scratch/</strong></td><td>21</td><td>92K</td><td class="text-slate-600" style="font-family:Sarabun">⚠ Junk drawer (concept ซ้ำ AI/scratch/)</td><td><span class="bar" style="width:15%"></span></td></tr>
+                    <tr><td><strong class="text-brand-700">consumables/</strong></td><td>20</td><td>284K</td><td class="text-slate-600" style="font-family:Sarabun">วัสดุสิ้นเปลือง</td><td><span class="bar" style="width:14%"></span></td></tr>
+                    <tr><td><strong class="text-brand-700">insurance_partner/</strong></td><td>10</td><td>124K</td><td class="text-slate-600" style="font-family:Sarabun">External partner uploads</td><td><span class="bar" style="width:7%"></span></td></tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <!-- Good points -->
+    <section class="mb-12">
+        <h2 class="section-title text-xl font-bold text-slate-900">
+            <span><i class="fa-solid fa-circle-check text-emerald-500 mr-2"></i>จุดที่ดี (Strengths)</span>
+        </h2>
+        <div class="grid md:grid-cols-2 gap-3">
+            <div class="good">
+                <i class="fa-solid fa-check-circle"></i>
+                <div>
+                    <strong class="text-slate-900">Modular แยกชัด</strong>
+                    <p class="text-sm text-slate-600 mt-1">แต่ละ business domain มีโฟลเดอร์ของตัวเอง พร้อม <span class="mono text-xs bg-white px-1.5 py-0.5 rounded">admin/</span>, <span class="mono text-xs bg-white px-1.5 py-0.5 rounded">ajax/</span>, <span class="mono text-xs bg-white px-1.5 py-0.5 rounded">includes/</span> ภายใน</p>
+                </div>
+            </div>
+            <div class="good">
+                <i class="fa-solid fa-check-circle"></i>
+                <div>
+                    <strong class="text-slate-900"><span class="mono">includes/</span> กลาง</strong>
+                    <p class="text-sm text-slate-600 mt-1">เก็บ helper ที่ใช้ข้ามโมดูล (auth, csrf, finance_sync, ai_*) — pattern สะอาด ไม่ซ้ำ</p>
+                </div>
+            </div>
+            <div class="good">
+                <i class="fa-solid fa-check-circle"></i>
+                <div>
+                    <strong class="text-slate-900"><span class="mono">portal/_partials/</span></strong>
+                    <p class="text-sm text-slate-600 mt-1">Section ของ admin hub แยกไฟล์ละ feature (39 partials) — แก้แล้วไม่กระทบกัน</p>
+                </div>
+            </div>
+            <div class="good">
+                <i class="fa-solid fa-check-circle"></i>
+                <div>
+                    <strong class="text-slate-900"><span class="mono">AI/</span> folder convention</strong>
+                    <p class="text-sm text-slate-600 mt-1">Context persistence ออกแบบดีตาม CLAUDE.md (logs/knowledge/scratch แยกชั้น)</p>
+                </div>
+            </div>
+            <div class="good">
+                <i class="fa-solid fa-check-circle"></i>
+                <div>
+                    <strong class="text-slate-900"><span class="mono">database/migrations/</span></strong>
+                    <p class="text-sm text-slate-600 mt-1">มี 36 migration scripts — schema version control เป็นระบบ</p>
+                </div>
+            </div>
+            <div class="good">
+                <i class="fa-solid fa-check-circle"></i>
+                <div>
+                    <strong class="text-slate-900">Sub-module shell skin pattern</strong>
+                    <p class="text-sm text-slate-600 mt-1">e_Borrow มี own assets/css แต่ match portal — ตัวอย่างของ "consistent UI ข้ามโมดูล"</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Concerns -->
+    <section class="mb-12">
+        <h2 class="section-title text-xl font-bold text-slate-900">
+            <span><i class="fa-solid fa-triangle-exclamation text-amber-500 mr-2"></i>จุดที่น่ากังวล (Concerns)</span>
+        </h2>
+
+        <div class="concern" data-sev="high">
+            <div class="flex items-start gap-3">
+                <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-rose-100 text-rose-700 text-sm font-bold flex-shrink-0">1</span>
+                <div class="flex-1">
+                    <strong class="text-slate-900">มี admin <em>สอง</em> folders → คนใหม่สับสน</strong>
+                    <p class="text-sm text-slate-600 mt-1">
+                        <span class="mono bg-slate-100 px-1.5 py-0.5 rounded text-xs">admin/</span> (root, 55 PHP) คือยุค e-campaign (bookings/campaigns/time_slots) ·
+                        <span class="mono bg-slate-100 px-1.5 py-0.5 rounded text-xs">portal/</span> (138 PHP) คือ hub กลางตัวใหม่ — ไม่มี note บอกว่าตัวไหน deprecated
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="concern" data-sev="high">
+            <div class="flex items-start gap-3">
+                <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-rose-100 text-rose-700 text-sm font-bold flex-shrink-0">2</span>
+                <div class="flex-1">
+                    <strong class="text-slate-900">AJAX endpoints กระจาย 23+ ไฟล์ที่ <span class="mono">portal/</span> root</strong>
+                    <p class="text-sm text-slate-600 mt-1">
+                        <span class="mono bg-slate-100 px-1.5 py-0.5 rounded text-xs">ajax_ai.php · ajax_finance.php · ajax_clinic_master.php · ajax_edms.php · ...</span> — มี <span class="mono">portal/api/</span> อยู่แล้ว ควรย้ายเข้า <span class="mono">portal/ajax/</span>
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="concern">
+            <div class="flex items-start gap-3">
+                <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-amber-100 text-amber-700 text-sm font-bold flex-shrink-0">3</span>
+                <div class="flex-1">
+                    <strong class="text-slate-900">Root pollution (33 ไฟล์)</strong>
+                    <p class="text-sm text-slate-600 mt-1">
+                        7 PHP (index/config/help×3/privacy/terms) · 9 .md (CLAUDE/hot/AGENTS + 6 module guides) · <span class="text-rose-600 font-semibold">rsu.sql 22MB</span> · <span class="mono">satisfaction_modal_demo.html</span> — ของไม่ควรอยู่ที่ root
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="concern">
+            <div class="flex items-start gap-3">
+                <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-amber-100 text-amber-700 text-sm font-bold flex-shrink-0">4</span>
+                <div class="flex-1">
+                    <strong class="text-slate-900">"Junk drawer" หลายตัว</strong>
+                    <p class="text-sm text-slate-600 mt-1">
+                        <span class="mono">scratch/</span> (root) แยกจาก <span class="mono">AI/scratch/</span> · <span class="mono">archive/</span> มี 1 ไฟล์ · <span class="mono">design_handoff_user_hub/</span> 128K · <span class="mono">error_docs/</span> แยกจาก <span class="mono">errors/</span>
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="concern" data-sev="low">
+            <div class="flex items-start gap-3">
+                <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-slate-200 text-slate-700 text-sm font-bold flex-shrink-0">5</span>
+                <div class="flex-1">
+                    <strong class="text-slate-900">ไม่ consistent ระหว่าง twin modules</strong>
+                    <p class="text-sm text-slate-600 mt-1">
+                        <span class="mono">e_Borrow/</span> มี own <span class="mono">uploads/</span>, own <span class="mono">assets/</span>, own <span class="mono">process/</span> · แต่ <span class="mono">asset/</span> + <span class="mono">consumables/</span> ขนาดเล็ก ไม่มี structure เดียวกัน
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="concern" data-sev="low">
+            <div class="flex items-start gap-3">
+                <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-slate-200 text-slate-700 text-sm font-bold flex-shrink-0">6</span>
+                <div class="flex-1">
+                    <strong class="text-slate-900"><span class="mono">.agents/</span> + <span class="mono">.claude/agents/</span> ซ้ำซ้อน</strong>
+                    <p class="text-sm text-slate-600 mt-1">
+                        2 folders มี skills+agents เหมือนกัน (legacy + new) — เลือกตัวเดียว ลด config drift
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="concern" data-sev="low">
+            <div class="flex items-start gap-3">
+                <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-slate-200 text-slate-700 text-sm font-bold flex-shrink-0">7</span>
+                <div class="flex-1">
+                    <strong class="text-slate-900">ไม่มี autoload / PSR-4</strong>
+                    <p class="text-sm text-slate-600 mt-1">
+                        Composer มี vendor แล้ว แต่ใช้แค่ third-party · <span class="mono">require_once</span> ใน app code ยังเป็น relative path manual
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Recommendations -->
+    <section class="mb-12">
+        <h2 class="section-title text-xl font-bold text-slate-900">
+            <span><i class="fa-solid fa-list-check text-brand-500 mr-2"></i>ข้อเสนอแนะ (เรียงตามลำดับความสำคัญ)</span>
+        </h2>
+
+        <div class="rec-row">
+            <div><span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold prio-p1">P1 · CRITICAL</span></div>
+            <div>
+                <strong class="text-slate-900">ย้าย <span class="mono">rsu.sql</span> ออกจาก git history + เพิ่ม <span class="mono">.gitignore</span></strong>
+                <p class="rec-impact">22MB ใน repo ไม่ควรมี · ใช้ <span class="mono">git filter-repo</span> ลบ history · ย้ายไป <span class="mono">database/dumps/</span> (gitignored)</p>
+            </div>
+            <div class="text-right text-sm text-slate-600">ลด repo size มาก</div>
+        </div>
+
+        <div class="rec-row">
+            <div><span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold prio-p1">P1 · CRITICAL</span></div>
+            <div>
+                <strong class="text-slate-900">ย้าย <span class="mono">*_help.php</span>, <span class="mono">privacy.php</span>, <span class="mono">terms.php</span> → <span class="mono">user/legal/</span></strong>
+                <p class="rec-impact">root จะเหลือเฉพาะ <span class="mono">index.php</span> + <span class="mono">config.php</span> — สะอาดและบอกหน้าที่ชัด</p>
+            </div>
+            <div class="text-right text-sm text-slate-600">root สะอาด</div>
+        </div>
+
+        <div class="rec-row">
+            <div><span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold prio-p1">P1 · CRITICAL</span></div>
+            <div>
+                <strong class="text-slate-900">รวม <span class="mono">scratch/</span> (root) เข้า <span class="mono">AI/scratch/</span> หรือลบทิ้ง</strong>
+                <p class="rec-impact">21 PHP ใน scratch ที่ไม่รู้ใครใช้ — ตรวจสอบก่อน archive แล้วลบ · กำจัด ambiguity ระหว่าง 2 "scratch"</p>
+            </div>
+            <div class="text-right text-sm text-slate-600">ลดความสับสน</div>
+        </div>
+
+        <div class="rec-row">
+            <div><span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold prio-p2">P2 · HIGH</span></div>
+            <div>
+                <strong class="text-slate-900">สร้าง <span class="mono">portal/ajax/</span> แล้วย้าย 23 ไฟล์ <span class="mono">ajax_*.php</span></strong>
+                <p class="rec-impact">ต้องอัพเดต path ใน JS fetch() ทั้งหมด — แต่ก็ทำเป็น batch เดียวด้วย sed/find ได้</p>
+            </div>
+            <div class="text-right text-sm text-slate-600">ลด portal root noise</div>
+        </div>
+
+        <div class="rec-row">
+            <div><span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold prio-p2">P2 · HIGH</span></div>
+            <div>
+                <strong class="text-slate-900">ย้าย module guides → <span class="mono">docs/modules/</span></strong>
+                <p class="rec-impact"><span class="mono">E_CAMPAIGN_GUIDE.md · GOLD_CARD_GUIDE.md · SCHOLARSHIP_GUIDE.md · SOS_SYSTEM_SPEC.md · AI_GUIDE.md · merge_plan.md</span> · เก็บ memory ตรงจุด</p>
+            </div>
+            <div class="text-right text-sm text-slate-600">root → 3 .md เท่านั้น</div>
+        </div>
+
+        <div class="rec-row">
+            <div><span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold prio-p2">P2 · HIGH</span></div>
+            <div>
+                <strong class="text-slate-900">รวม <span class="mono">errors/</span> + <span class="mono">error_docs/</span> ที่เดียว</strong>
+                <p class="rec-impact">ตรวจว่า <span class="mono">error_docs/</span> ใช้สำหรับอะไร — ถ้าเป็น error pages ก็ย้ายเข้า <span class="mono">errors/</span></p>
+            </div>
+            <div class="text-right text-sm text-slate-600">ลดความซ้ำ</div>
+        </div>
+
+        <div class="rec-row">
+            <div><span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold prio-p3">P3 · NICE</span></div>
+            <div>
+                <strong class="text-slate-900">ตัดสินใจชะตา <span class="mono">admin/</span> (legacy)</strong>
+                <p class="rec-impact">Deprecate ทั้ง folder + redirect ไป portal · หรือ rename เป็น <span class="mono">admin_legacy/</span> ให้ชัดว่าเก่า · พร้อม sunset deadline</p>
+            </div>
+            <div class="text-right text-sm text-slate-600">ลดความสับสน</div>
+        </div>
+
+        <div class="rec-row">
+            <div><span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold prio-p3">P3 · NICE</span></div>
+            <div>
+                <strong class="text-slate-900">ลบ <span class="mono">archive/</span>, <span class="mono">design_handoff_user_hub/</span></strong>
+                <p class="rec-impact">เช็คก่อนว่าไม่มี reference ที่ไหน · commit message ให้ระบุ revert hash ถ้าต้องเอากลับ</p>
+            </div>
+            <div class="text-right text-sm text-slate-600">สะอาด</div>
+        </div>
+
+        <div class="rec-row">
+            <div><span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold prio-p3">P3 · NICE</span></div>
+            <div>
+                <strong class="text-slate-900">เลือก <span class="mono">.agents/</span> หรือ <span class="mono">.claude/</span> ตัวเดียว</strong>
+                <p class="rec-impact">Claude Code อ่าน <span class="mono">.claude/</span> · ส่วน <span class="mono">.agents/</span> เป็น generic — เลือก <span class="mono">.claude/</span> ถ้าใช้ Claude เป็นหลัก</p>
+            </div>
+            <div class="text-right text-sm text-slate-600">ลด config drift</div>
+        </div>
+    </section>
+
+    <!-- Quick wins box -->
+    <section class="mb-12">
+        <div class="bg-gradient-to-br from-brand-500 to-brand-700 rounded-2xl p-8 text-white shadow-glow-brand">
+            <div class="flex items-start gap-4">
+                <div class="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0">
+                    <i class="fa-solid fa-rocket text-2xl"></i>
+                </div>
+                <div class="flex-1">
+                    <h3 class="text-xl font-bold mb-2">Quick Win แนะนำ (1 commit, ~30 นาที)</h3>
+                    <p class="text-brand-50 leading-relaxed">เริ่มจาก <strong>P1 — Root Cleanup</strong>: ย้าย <span class="mono bg-white/20 px-1.5 py-0.5 rounded text-xs">*_help.php</span> + <span class="mono bg-white/20 px-1.5 py-0.5 rounded text-xs">privacy.php</span> + <span class="mono bg-white/20 px-1.5 py-0.5 rounded text-xs">terms.php</span> ไปอยู่ <span class="mono bg-white/20 px-1.5 py-0.5 rounded text-xs">user/legal/</span> · ย้าย 6 module guides ไป <span class="mono bg-white/20 px-1.5 py-0.5 rounded text-xs">docs/modules/</span> · เพิ่ม <span class="mono bg-white/20 px-1.5 py-0.5 rounded text-xs">rsu.sql</span> เข้า <span class="mono bg-white/20 px-1.5 py-0.5 rounded text-xs">.gitignore</span> (history cleanup ทำตอนหลังได้)</p>
+                    <p class="text-brand-50 leading-relaxed mt-3">ผลลัพธ์: root จาก <strong>33 ไฟล์ → ~10 ไฟล์</strong> · low-risk · zero downtime · เห็นผลทันที</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+</main>
+
+<footer class="border-t border-slate-200 bg-white py-6">
+    <div class="max-w-6xl mx-auto px-6 text-center text-sm text-slate-500">
+        <p>Generated by Claude Code · Branch <span class="mono bg-slate-100 px-1.5 py-0.5 rounded text-xs">claude/review-folder-structure-oeVXM</span></p>
+        <p class="mt-1">ไฟล์รายงานเปิดได้ standalone บน browser · พิมพ์เป็น PDF ได้ด้วยปุ่ม "พิมพ์ / Save PDF" ด้านบน</p>
+    </div>
+</footer>
+
+<script>
+function expandAll() {
+    const all = document.querySelectorAll('.tree details');
+    const anyClosed = Array.from(all).some(d => !d.open);
+    all.forEach(d => d.open = anyClosed);
+    event.target.closest('button').innerHTML = anyClosed
+        ? '<i class="fa-solid fa-compress"></i> ย่อทั้งหมด'
+        : '<i class="fa-solid fa-expand"></i> ขยายทั้งหมด';
+}
+</script>
+
+</body>
+</html>
