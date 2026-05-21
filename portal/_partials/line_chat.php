@@ -1,8 +1,9 @@
 <?php
 // portal/_partials/line_chat.php — LINE Admin Chat UI
 // Gate: superadmin | admin role | access_ai flag
+require_once __DIR__ . '/../../includes/line_chat_helper.php';
 $csrfToken = function_exists('get_csrf_token') ? get_csrf_token() : '';
-$lineTokenSet = defined('LINE_CHANNEL_ACCESS_TOKEN') && !empty(LINE_CHANNEL_ACCESS_TOKEN);
+$lineTokenSet = line_chat_load_access_token() !== '';
 ?>
 
 <div class="lc-shell flex flex-col h-full bg-slate-50/50">

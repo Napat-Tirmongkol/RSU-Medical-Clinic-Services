@@ -14,6 +14,28 @@ declare(strict_types=1);
 require_once __DIR__ . '/line_helper.php';
 
 // ──────────────────────────────────────────────────────────────────
+// CONFIG — load LINE token from config/secrets.php
+// ──────────────────────────────────────────────────────────────────
+function line_chat_load_access_token(): string
+{
+    static $cached = null;
+    if ($cached !== null) return $cached;
+    $cached = '';
+    $secretsPath = __DIR__ . '/../config/secrets.php';
+    if (is_file($secretsPath)) {
+        try {
+            $secrets = require $secretsPath;
+            if (is_array($secrets)) {
+                $cached = (string)($secrets['LINE_MESSAGING_CHANNEL_ACCESS_TOKEN'] ?? '');
+            }
+        } catch (Throwable $e) {
+            error_log('[line_chat] load_access_token failed: ' . $e->getMessage());
+        }
+    }
+    return $cached;
+}
+
+// ──────────────────────────────────────────────────────────────────
 // SCHEMA — auto-migrate (idempotent)
 // ──────────────────────────────────────────────────────────────────
 function line_chat_ensure_schema(PDO $pdo): void
@@ -294,10 +316,9 @@ function line_chat_send_admin_reply(PDO $pdo, string $lineUserId, string $messag
     $rateMsg = line_chat_check_rate_limit($pdo, $adminId);
     if ($rateMsg !== null) throw new RuntimeException($rateMsg);
 
-    // Load access token
-    $token = '';
-    if (defined('LINE_CHANNEL_ACCESS_TOKEN')) $token = (string)LINE_CHANNEL_ACCESS_TOKEN;
-    if ($token === '') throw new RuntimeException('LINE_CHANNEL_ACCESS_TOKEN ยังไม่ตั้งค่า');
+    // Load access token from config/secrets.php (same pattern as api/line_webhook.php)
+    $token = line_chat_load_access_token();
+    if ($token === '') throw new RuntimeException('LINE_MESSAGING_CHANNEL_ACCESS_TOKEN ยังไม่ตั้งค่าใน config/secrets.php');
 
     // Push to LINE
     $messages = [['type' => 'text', 'text' => $messageText]];
