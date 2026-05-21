@@ -1,3 +1,31 @@
+<?php
+// docs/architecture/folder-structure-2026-05.php
+// ─────────────────────────────────────────────────────────────────────────────
+// Folder Structure Review (พ.ค. 2569) — internal architecture audit.
+// Restricted to portal admins (superadmin or admin) because it exposes
+// internal directory layout, module sizes, and identified weaknesses
+// that should not be public-facing.
+// ─────────────────────────────────────────────────────────────────────────────
+declare(strict_types=1);
+session_start();
+
+$adminRole = $_SESSION['admin_role'] ?? '';
+if ($adminRole !== 'superadmin' && $adminRole !== 'admin') {
+    http_response_code(403);
+    header('Content-Type: text/html; charset=utf-8');
+    ?>
+    <!DOCTYPE html><html lang="th"><head><meta charset="UTF-8"><title>Access Denied</title>
+    <style>body{font-family:sans-serif;background:#f8fafc;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;text-align:center}
+    .box{background:#fff;padding:40px 56px;border-radius:16px;box-shadow:0 4px 24px rgba(0,0,0,.08);max-width:480px}
+    h1{color:#dc2626;margin:0 0 8px 0}p{color:#64748b}a{color:#0f7349;font-weight:700}</style>
+    </head><body><div class="box"><h1>🛡️ Access Denied</h1>
+    <p>รายงาน Architecture Review สำหรับเจ้าหน้าที่ระดับผู้ดูแลระบบเท่านั้น</p>
+    <a href="/e-campaignv2/admin/auth/login.php">→ เข้าสู่ระบบ</a>
+    </div></body></html>
+    <?php
+    exit;
+}
+?>
 <!DOCTYPE html>
 <html lang="th">
 <head>

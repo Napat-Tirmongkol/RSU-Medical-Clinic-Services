@@ -60,6 +60,21 @@ $documents = [
         'color'       => '#4f46e5',
         'bg'          => '#eef2ff',
     ],
+    [
+        'key'         => 'folder_structure_2026_05',
+        'title'       => 'รายงานทบทวนโครงสร้างโฟลเดอร์',
+        'subtitle'    => 'Folder Structure Review — Architecture Audit (พ.ค. 2569)',
+        'description' => 'ตรวจสอบ layout ของ top-level folders: tree view · ขนาด/จำนวน PHP ต่อโมดูล · จุดที่ดี (6) · จุดที่กังวล (7) · ข้อเสนอแนะเรียงตาม P1/P2/P3 พร้อม Quick Win เริ่มต้น',
+        'category'    => 'report',
+        'access'      => ['superadmin', 'admin'],
+        'pages'       => 1,
+        'updated'     => '21 พ.ค. 2569',
+        'version'     => 'v1.0',
+        'url'         => '../docs/architecture/folder-structure-2026-05.php',
+        'icon'        => 'fa-folder-tree',
+        'color'       => '#f59e0b',
+        'bg'          => '#fef3c7',
+    ],
     // ── เพิ่มเอกสารใหม่ตรงนี้ตามรูปแบบเดียวกัน ─────────────────────────────
 ];
 
