@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/includes/auth.php';
+require_once __DIR__ . '/../includes/nurse_positions.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -121,9 +122,9 @@ function np_derive_from_schedule(PDO $pdo, string $entryDate): ?array
         $key      = $nid . '-' . $day;
         $code     = $sched[$key] ?? null;
         if (!$isWorking($code)) continue;
-        if ($position === 'พยาบาลวิชาชีพ') {
+        if ($position === NURSE_RN_POSITION) {
             $rnCount++;
-        } elseif (in_array($position, ['หัวหน้าหอผู้ป่วย', 'รองหัวหน้าหอผู้ป่วย', 'พยาบาลหัวหน้าเวร'], true)) {
+        } elseif (in_array($position, NURSE_HEAD_POSITIONS, true)) {
             $headCount++;
         }
     }

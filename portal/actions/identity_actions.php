@@ -4,6 +4,8 @@
  * POST Handlers for Identity & Governance (Users, Admins, Staff)
  */
 
+require_once __DIR__ . '/../../includes/nurse_positions.php';
+
 $idSaved = isset($_GET['saved']) && $_GET['saved'] === '1';
 $idError = '';
 
@@ -234,20 +236,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             foreach ($allowedFlagKeys as $k) {
                 $flagsObj[$k] = isset($_POST['flag_' . $k]) ? 1 : 0;
             }
+
+            // Auto-flag: ตำแหน่งพยาบาลต้องมี access_nurse_productivity เสมอ
+            // Symmetric — rename จากชื่อพยาบาล → ชื่ออื่น จะถอด flag ออก
+            // Source of truth: includes/nurse_positions.php
+            $autoFlagNote = '';
+            if (is_nurse_position($name)) {
+                $flagsObj['access_nurse_productivity'] = 1;
+                $autoFlagNote = ' [auto: nurse position → access_nurse_productivity=1]';
+            } elseif ($action === 'edit_position' && $posId > 0) {
+                // Fail-closed: ถ้า lookup ของเก่าพัง → block save แทนเงียบ
+                // กันเคส rename ออกจากพยาบาลแล้วยัง grant flag อยู่
+                try {
+                    $stmt = $pdo->prepare("SELECT name FROM sys_staff_positions WHERE id = ?");
+                    $stmt->execute([$posId]);
+                    $oldName = (string)($stmt->fetchColumn() ?: '');
+                    if ($oldName !== '' && is_nurse_position($oldName)) {
+                        $flagsObj['access_nurse_productivity'] = 0;
+                        $autoFlagNote = ' [auto: rename from nurse → access_nurse_productivity=0]';
+                    }
+                } catch (PDOException $e) {
+                    error_log('[identity_actions] auto-flag old-name lookup failed: ' . $e->getMessage());
+                    $idError = "ตรวจสอบชื่อตำแหน่งเดิมไม่ได้ — กรุณาลองอีกครั้ง";
+                }
+            }
+
             $flagsJson = json_encode($flagsObj, JSON_UNESCAPED_UNICODE);
 
-            if ($name === '') {
+            if ($name === '' && $idError === '') {
                 $idError = "กรุณาระบุชื่อตำแหน่ง";
-            } else {
+            }
+            if ($idError === '') {
                 try {
                     if ($action === 'add_position') {
                         $pdo->prepare("INSERT INTO sys_staff_positions (name, description, flags, created_by) VALUES (?,?,?,?)")
                             ->execute([$name, $desc ?: null, $flagsJson, $_SESSION['admin_id'] ?? null]);
-                        log_activity("Added Position", "เพิ่มตำแหน่งงาน: $name");
+                        log_activity("Added Position", "เพิ่มตำแหน่งงาน: $name" . $autoFlagNote);
                     } else {
                         $pdo->prepare("UPDATE sys_staff_positions SET name=?, description=?, flags=? WHERE id=?")
                             ->execute([$name, $desc ?: null, $flagsJson, $posId]);
-                        log_activity("Updated Position", "แก้ไขตำแหน่งงาน ID: $posId ($name)");
+                        log_activity("Updated Position", "แก้ไขตำแหน่งงาน ID: $posId ($name)" . $autoFlagNote);
                     }
                     header('Location: index.php?section=identity&tab=positions&saved=1'); exit;
                 } catch (PDOException $e) {

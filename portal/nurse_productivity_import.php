@@ -3,6 +3,7 @@
 declare(strict_types=1);
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/includes/auth.php';
+require_once __DIR__ . '/../includes/nurse_positions.php';
 require_once __DIR__ . '/../vendor/autoload.php';
 
 use PhpOffice\PhpSpreadsheet\IOFactory;
@@ -48,8 +49,8 @@ function np_derive(PDO $pdo, string $entryDate): ?array {
         $code = $s[($row['id'] ?? '') . '-' . $day] ?? null;
         if ($code === null || $code === '' || $code === 'O' || $code === 'o') continue;
         $pos = (string)($row['position'] ?? '');
-        if ($pos === 'พยาบาลวิชาชีพ') $rn++;
-        elseif (in_array($pos, ['หัวหน้าหอผู้ป่วย','รองหัวหน้าหอผู้ป่วย','พยาบาลหัวหน้าเวร'], true)) $head++;
+        if ($pos === NURSE_RN_POSITION) $rn++;
+        elseif (in_array($pos, NURSE_HEAD_POSITIONS, true)) $head++;
     }
     return ['rn' => $rn, 'head' => $head];
 }
