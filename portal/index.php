@@ -1131,6 +1131,10 @@ try {
                         <div class="psb-icon"><i class="fa-solid fa-wand-magic-sparkles" style="color:#8b5cf6"></i></div>
                         <span class="psb-label" style="color:#7c3aed;font-weight:900">AI Assistant</span>
                     </button>
+                    <button class="psb-item <?= $activeSection==='admin_chat'?'psb-active':'' ?>" data-section="admin_chat" onclick="switchSection('admin_chat',this)">
+                        <div class="psb-icon"><i class="fa-solid fa-messages-question" style="color:#a855f7"></i></div>
+                        <span class="psb-label" style="color:#7c3aed;font-weight:900">ผู้ช่วยข้อมูล</span>
+                    </button>
                     <button class="psb-item <?= $activeSection==='ai_qa_lab'?'psb-active':'' ?>" data-section="ai_qa_lab" onclick="switchSection('ai_qa_lab',this)">
                         <div class="psb-icon"><i class="fa-solid fa-flask-vial" style="color:#a855f7"></i></div>
                         <span class="psb-label" style="color:#7c3aed;font-weight:900">AI QA Lab</span>
@@ -3492,6 +3496,18 @@ try {
                 <?php
                 if ($hasAi) {
                     include __DIR__ . '/_partials/ai_assistant.php';
+                } else {
+                    echo $aiDeniedHtml;
+                }
+                ?>
+            </div>
+
+            <!-- ════════════ SECTION: ADMIN CHAT (AI ผู้ช่วยข้อมูล) ════════════ -->
+            <div id="section-admin_chat" class="portal-section"
+                style="<?= $activeSection==='admin_chat'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); overflow:hidden;">
+                <?php
+                if ($hasAi) {
+                    include __DIR__ . '/_partials/admin_chat.php';
                 } else {
                     echo $aiDeniedHtml;
                 }
