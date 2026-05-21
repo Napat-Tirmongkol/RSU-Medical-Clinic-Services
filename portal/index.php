@@ -1135,6 +1135,10 @@ try {
                         <div class="psb-icon"><i class="fa-solid fa-comments" style="color:#a855f7"></i></div>
                         <span class="psb-label" style="color:#7c3aed;font-weight:900">ผู้ช่วยข้อมูล</span>
                     </button>
+                    <button class="psb-item <?= $activeSection==='line_chat'?'psb-active':'' ?>" data-section="line_chat" onclick="switchSection('line_chat',this)">
+                        <div class="psb-icon"><i class="fa-brands fa-line" style="color:#06c755"></i></div>
+                        <span class="psb-label" style="color:#059669;font-weight:900">LINE Chat</span>
+                    </button>
                     <button class="psb-item <?= $activeSection==='ai_qa_lab'?'psb-active':'' ?>" data-section="ai_qa_lab" onclick="switchSection('ai_qa_lab',this)">
                         <div class="psb-icon"><i class="fa-solid fa-flask-vial" style="color:#a855f7"></i></div>
                         <span class="psb-label" style="color:#7c3aed;font-weight:900">AI QA Lab</span>
@@ -1246,12 +1250,6 @@ try {
                         <div class="psb-icon"><i class="fa-solid fa-bullhorn" style="color:#7c3aed"></i></div>
                         <span class="psb-label" style="color:#6d28d9;font-weight:900">ประกาศ</span>
                     </button>
-                    <?php if ($hasAi): ?>
-                    <button class="psb-item <?= $activeSection==='line_chat'?'psb-active':'' ?>" data-section="line_chat" onclick="switchSection('line_chat',this)">
-                        <div class="psb-icon"><i class="fa-brands fa-line" style="color:#06c755"></i></div>
-                        <span class="psb-label" style="color:#059669;font-weight:900">LINE Chat</span>
-                    </button>
-                    <?php endif; ?>
                     <?php if ($hasEdms): ?>
                         <button class="psb-item <?= $activeSection==='edms'?'psb-active':'' ?>" data-section="edms" onclick="switchSection('edms',this)" style="position:relative">
                             <div class="psb-icon"><i class="fa-solid fa-folder-open" style="color:#0ea5e9"></i></div>
