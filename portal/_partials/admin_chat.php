@@ -2,7 +2,7 @@
 // portal/_partials/admin_chat.php — AI Admin Chat (thread-based)
 // Gate: superadmin | admin role | access_ai flag
 $apiKeySet = defined('GEMINI_API_KEY') && !empty(GEMINI_API_KEY);
-$csrfToken = $_SESSION['portal_CSRF'] ?? '';
+$csrfToken = function_exists('get_csrf_token') ? get_csrf_token() : '';
 ?>
 
 <script src="https://cdn.jsdelivr.net/npm/marked@12.0.0/marked.min.js"></script>
