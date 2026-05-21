@@ -480,6 +480,13 @@ foreach ($data['events'] as $idx => $event) {
         require_once __DIR__ . '/../includes/ai_qa_helper.php';
         $lineMsgId = (string)($event['message']['id'] ?? '');
         $capturedQaLogId = capture_ai_qa(db(), 'line', $messageText, null, $userId, $lineMsgId !== '' ? $lineMsgId : null);
+
+        // Mirror to sys_line_chat_messages so admins can review + reply via portal
+        // (best-effort — never throws; failure is logged but doesn't block reply flow)
+        if ($userId) {
+            require_once __DIR__ . '/../includes/line_chat_helper.php';
+            line_chat_log_inbound(db(), $userId, $messageText, $lineMsgId !== '' ? $lineMsgId : null);
+        }
     }
 
     if ($userId && is_insurance_request($event)) {

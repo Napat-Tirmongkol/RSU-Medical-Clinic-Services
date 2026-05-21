@@ -1246,6 +1246,12 @@ try {
                         <div class="psb-icon"><i class="fa-solid fa-bullhorn" style="color:#7c3aed"></i></div>
                         <span class="psb-label" style="color:#6d28d9;font-weight:900">ประกาศ</span>
                     </button>
+                    <?php if ($hasAi): ?>
+                    <button class="psb-item <?= $activeSection==='line_chat'?'psb-active':'' ?>" data-section="line_chat" onclick="switchSection('line_chat',this)">
+                        <div class="psb-icon"><i class="fa-brands fa-line" style="color:#06c755"></i></div>
+                        <span class="psb-label" style="color:#059669;font-weight:900">LINE Chat</span>
+                    </button>
+                    <?php endif; ?>
                     <?php if ($hasEdms): ?>
                         <button class="psb-item <?= $activeSection==='edms'?'psb-active':'' ?>" data-section="edms" onclick="switchSection('edms',this)" style="position:relative">
                             <div class="psb-icon"><i class="fa-solid fa-folder-open" style="color:#0ea5e9"></i></div>
@@ -3508,6 +3514,18 @@ try {
                 <?php
                 if ($hasAi) {
                     include __DIR__ . '/_partials/admin_chat.php';
+                } else {
+                    echo $aiDeniedHtml;
+                }
+                ?>
+            </div>
+
+            <!-- ════════════ SECTION: LINE CHAT (admin reply to LINE users) ════════════ -->
+            <div id="section-line_chat" class="portal-section"
+                style="<?= $activeSection==='line_chat'?'':'display:none;' ?> width:100%; height:calc(100vh - 60px); overflow:hidden;">
+                <?php
+                if ($hasAi) {
+                    include __DIR__ . '/_partials/line_chat.php';
                 } else {
                     echo $aiDeniedHtml;
                 }
