@@ -542,6 +542,273 @@ $webhookUrl = "$protocol://$host$uri";
         border-color: rgba(139,92,246,.7);
         color: #ddd6fe;
     }
+
+    /* ════════════════════════════════════════════════════
+       Page-level UX: Sticky nav · Status grid · Banners · Back-to-top
+       ════════════════════════════════════════════════════ */
+
+    /* === Status Overview Grid === */
+    .ls-status-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+        gap: 12px;
+        margin: 0 0 22px;
+    }
+    .ls-status-tile {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 14px 16px;
+        background: linear-gradient(135deg, #fff 0%, #f8fafc 100%);
+        border: 1.5px solid #e2e8f0;
+        border-radius: 16px;
+        transition: transform 0.22s cubic-bezier(.16,1,.3,1), box-shadow 0.22s, border-color 0.22s;
+        cursor: pointer;
+        text-decoration: none;
+        position: relative;
+        overflow: hidden;
+    }
+    .ls-status-tile:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 18px rgba(15,23,42,.08);
+        border-color: #94a3b8;
+    }
+    .ls-status-tile::after {
+        content: '';
+        position: absolute;
+        right: -30px; top: -30px;
+        width: 80px; height: 80px;
+        background: radial-gradient(circle, var(--tile-glow, rgba(14,165,233,.12)) 0%, transparent 70%);
+        pointer-events: none;
+    }
+    .ls-status-tile[data-tone="ok"]    { --tile-glow: rgba(16,185,129,.18); }
+    .ls-status-tile[data-tone="warn"]  { --tile-glow: rgba(245,158,11,.18); }
+    .ls-status-tile[data-tone="error"] { --tile-glow: rgba(239,68,68,.18); }
+    .ls-status-tile[data-tone="info"]  { --tile-glow: rgba(14,165,233,.18); }
+    .ls-status-tile[data-tone="muted"] { --tile-glow: rgba(148,163,184,.18); }
+
+    .ls-status-icon {
+        width: 42px; height: 42px;
+        border-radius: 12px;
+        display: flex; align-items: center; justify-content: center;
+        flex-shrink: 0;
+        font-size: 16px;
+        color: #fff;
+        box-shadow: 0 3px 8px rgba(15,23,42,.18);
+        position: relative;
+        z-index: 1;
+    }
+    .ls-status-tile[data-tone="ok"]    .ls-status-icon { background: linear-gradient(135deg, #10b981 0%, #059669 100%); }
+    .ls-status-tile[data-tone="warn"]  .ls-status-icon { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); }
+    .ls-status-tile[data-tone="error"] .ls-status-icon { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); }
+    .ls-status-tile[data-tone="info"]  .ls-status-icon { background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); }
+    .ls-status-tile[data-tone="muted"] .ls-status-icon { background: linear-gradient(135deg, #94a3b8 0%, #64748b 100%); }
+
+    .ls-status-body { flex: 1; min-width: 0; position: relative; z-index: 1; }
+    .ls-status-label {
+        font-size: 10px; font-weight: 900;
+        color: #94a3b8;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+    }
+    .ls-status-value {
+        font-size: 16px; font-weight: 900;
+        color: #0f172a;
+        line-height: 1.2;
+        margin-top: 2px;
+        word-break: break-word;
+    }
+    .ls-status-meta {
+        font-size: 10.5px;
+        color: #64748b;
+        margin-top: 3px;
+        font-weight: 600;
+    }
+
+    /* === Sticky Quick Nav === */
+    .ls-quick-nav {
+        position: sticky;
+        top: 0; /* overridden by JS to match portal-header height */
+        z-index: 35;
+        margin: 0 -1rem 24px;
+        padding: 10px 16px;
+        background: rgba(255,255,255,.92);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        border-bottom: 1.5px solid rgba(226,232,240,.7);
+        display: flex;
+        gap: 8px;
+        overflow-x: auto;
+        scrollbar-width: thin;
+    }
+    .ls-quick-nav::-webkit-scrollbar { height: 4px; }
+    .ls-quick-nav::-webkit-scrollbar-track { background: transparent; }
+    .ls-quick-nav::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 99px; }
+    .ls-nav-chip {
+        flex-shrink: 0;
+        padding: 7px 14px;
+        border-radius: 999px;
+        background: #f1f5f9;
+        border: 1.5px solid transparent;
+        color: #475569;
+        font-size: 12px;
+        font-weight: 800;
+        cursor: pointer;
+        transition: all 0.18s;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        white-space: nowrap;
+    }
+    .ls-nav-chip:hover {
+        background: #e2e8f0;
+        transform: translateY(-1px);
+        color: #1e293b;
+    }
+    .ls-nav-chip i { font-size: 11px; opacity: 0.8; }
+    .ls-nav-chip.is-active {
+        background: linear-gradient(180deg, #06b6d4 0%, #0891b2 100%);
+        color: #fff;
+        border-color: #0e7490;
+        box-shadow: 0 3px 10px rgba(6,182,212,.4);
+    }
+    .ls-nav-chip.is-active i { opacity: 1; }
+
+    /* === Section Banners (replaces hairline dividers) === */
+    .ls-section-banner {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 14px 18px;
+        margin: 36px 0 18px;
+        background: linear-gradient(90deg, var(--banner-tint, #f0fdf4) 0%, transparent 75%);
+        border-left: 5px solid var(--banner-accent, #22c55e);
+        border-radius: 0 14px 14px 0;
+        position: relative;
+        scroll-margin-top: 80px; /* offset for sticky portal header + nav */
+    }
+    .ls-section-banner-icon {
+        width: 42px; height: 42px;
+        background: #fff;
+        border: 1.5px solid var(--banner-accent, #22c55e);
+        border-radius: 12px;
+        display: inline-flex; align-items: center; justify-content: center;
+        color: var(--banner-accent, #22c55e);
+        font-size: 17px;
+        box-shadow: 0 2px 6px rgba(15,23,42,.08);
+        flex-shrink: 0;
+    }
+    .ls-section-banner-text { flex: 1; min-width: 0; }
+    .ls-section-banner h2 {
+        font-size: 16px;
+        font-weight: 900;
+        color: var(--banner-accent-dark, #15803d);
+        margin: 0;
+        line-height: 1.3;
+        letter-spacing: -0.01em;
+    }
+    .ls-section-banner p {
+        font-size: 12px;
+        color: #64748b;
+        margin: 3px 0 0;
+        line-height: 1.5;
+        font-weight: 500;
+    }
+    .ls-section-banner-aside {
+        flex-shrink: 0;
+        font-size: 11px;
+        font-weight: 700;
+        color: #64748b;
+    }
+
+    /* Section banner color presets */
+    .ls-section-banner[data-tone="config"]   { --banner-tint: #f0f9ff; --banner-accent: #0ea5e9; --banner-accent-dark: #075985; }
+    .ls-section-banner[data-tone="groups"]   { --banner-tint: #f0fdf4; --banner-accent: #22c55e; --banner-accent-dark: #15803d; }
+    .ls-section-banner[data-tone="stats"]    { --banner-tint: #ecfdf5; --banner-accent: #2e9e63; --banner-accent-dark: #14532d; }
+    .ls-section-banner[data-tone="richmenu"] { --banner-tint: #ecfeff; --banner-accent: #06b6d4; --banner-accent-dark: #0e7490; }
+    .ls-section-banner[data-tone="creator"]  { --banner-tint: #fff7ed; --banner-accent: #f97316; --banner-accent-dark: #c2410c; }
+
+    /* === Back to Top Button === */
+    .ls-back-top {
+        position: fixed;
+        right: 20px;
+        bottom: 92px; /* above the tour ? FAB at 20px bottom */
+        width: 44px; height: 44px;
+        background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
+        color: #fff;
+        border: 0;
+        border-radius: 50%;
+        cursor: pointer;
+        z-index: 80;
+        box-shadow: 0 6px 18px rgba(15,23,42,.28);
+        opacity: 0;
+        pointer-events: none;
+        transform: translateY(12px);
+        transition: transform 0.25s cubic-bezier(.16,1,.3,1), opacity 0.25s, box-shadow 0.25s;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 15px;
+    }
+    .ls-back-top.is-visible {
+        opacity: 1;
+        pointer-events: auto;
+        transform: translateY(0);
+    }
+    .ls-back-top:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 12px 26px rgba(15,23,42,.4);
+    }
+    .ls-back-top:active { transform: translateY(-1px); }
+
+    /* === Dark Mode === */
+    body[data-theme='dark'] .ls-status-tile {
+        background: linear-gradient(135deg, #0f172a 0%, #0b1220 100%);
+        border-color: #1e293b;
+    }
+    body[data-theme='dark'] .ls-status-tile:hover { border-color: #475569; }
+    body[data-theme='dark'] .ls-status-label { color: #64748b; }
+    body[data-theme='dark'] .ls-status-value { color: #f1f5f9; }
+    body[data-theme='dark'] .ls-status-meta { color: #94a3b8; }
+
+    body[data-theme='dark'] .ls-quick-nav {
+        background: rgba(15,23,42,.92);
+        border-bottom-color: #1e293b;
+    }
+    body[data-theme='dark'] .ls-nav-chip {
+        background: #1e293b;
+        color: #cbd5e1;
+    }
+    body[data-theme='dark'] .ls-nav-chip:hover {
+        background: #334155;
+        color: #f1f5f9;
+    }
+
+    body[data-theme='dark'] .ls-section-banner {
+        background: linear-gradient(90deg, color-mix(in srgb, var(--banner-accent) 18%, transparent) 0%, transparent 75%);
+    }
+    body[data-theme='dark'] .ls-section-banner-icon {
+        background: #0f172a;
+        color: var(--banner-accent);
+        border-color: color-mix(in srgb, var(--banner-accent) 50%, transparent);
+    }
+    body[data-theme='dark'] .ls-section-banner h2 { color: #f1f5f9; }
+    body[data-theme='dark'] .ls-section-banner-aside { color: #94a3b8; }
+
+    body[data-theme='dark'] .ls-back-top {
+        background: linear-gradient(180deg, #f1f5f9 0%, #cbd5e1 100%);
+        color: #0f172a;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .ls-status-tile, .ls-back-top, .ls-nav-chip { transition: none !important; transform: none !important; }
+    }
+
+    @media (max-width: 640px) {
+        .ls-section-banner { padding: 12px 14px; }
+        .ls-section-banner h2 { font-size: 14.5px; }
+        .ls-section-banner p { font-size: 11px; }
+        .ls-section-banner-icon { width: 36px; height: 36px; font-size: 15px; }
+    }
 </style>
 
 <div class="px-4 py-8">
@@ -560,6 +827,88 @@ $webhookUrl = "$protocol://$host$uri";
         <button onclick="switchSection('settings')" class="px-4 py-2 bg-slate-100 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-200 transition-all flex items-center gap-2">
             <i class="fa-solid fa-arrow-left"></i> กลับไปที่ Settings
         </button>
+    </div>
+
+    <!-- ──────── Sticky quick-nav ──────── -->
+    <nav class="ls-quick-nav" id="lsQuickNav" aria-label="LINE settings sections">
+        <button type="button" class="ls-nav-chip is-active" data-target="ls-sec-config">
+            <i class="fa-solid fa-key"></i><span>API & Webhook</span>
+        </button>
+        <button type="button" class="ls-nav-chip" data-target="ls-sec-groups">
+            <i class="fa-solid fa-users"></i><span>กลุ่ม LINE</span>
+        </button>
+        <button type="button" class="ls-nav-chip" data-target="ls-sec-stats">
+            <i class="fa-solid fa-chart-column"></i><span>สถิติ</span>
+        </button>
+        <button type="button" class="ls-nav-chip" data-target="ls-sec-richmenu">
+            <i class="fa-solid fa-bars-staggered"></i><span>Rich Menu</span>
+        </button>
+        <button type="button" class="ls-nav-chip" data-target="ls-sec-creator">
+            <i class="fa-solid fa-bolt"></i><span>สร้าง Menu</span>
+        </button>
+    </nav>
+
+    <!-- ──────── Status Overview ──────── -->
+    <?php
+        $_tokenOk  = !empty($secrets['LINE_MESSAGING_CHANNEL_ACCESS_TOKEN']);
+        $_secretOk = !empty($secrets['LINE_MESSAGING_CHANNEL_SECRET']);
+    ?>
+    <div class="ls-status-grid" id="lsStatusGrid">
+        <div class="ls-status-tile" data-tone="<?= $_tokenOk ? 'ok' : 'error' ?>" id="lsStatusToken" onclick="lsScrollTo('ls-sec-config')">
+            <div class="ls-status-icon">
+                <i class="fa-solid <?= $_tokenOk ? 'fa-circle-check' : 'fa-circle-xmark' ?>"></i>
+            </div>
+            <div class="ls-status-body">
+                <div class="ls-status-label">Channel API</div>
+                <div class="ls-status-value"><?= $_tokenOk ? 'พร้อมใช้งาน' : 'ยังไม่ตั้งค่า' ?></div>
+                <div class="ls-status-meta"><?= $_secretOk ? 'Token + Secret ครบ' : ($_tokenOk ? 'ขาด secret' : 'ใส่ token/secret') ?></div>
+            </div>
+        </div>
+
+        <div class="ls-status-tile" data-tone="info" id="lsStatusWebhook" onclick="lsScrollTo('ls-sec-config')">
+            <div class="ls-status-icon"><i class="fa-solid fa-link"></i></div>
+            <div class="ls-status-body">
+                <div class="ls-status-label">Webhook URL</div>
+                <div class="ls-status-value">พร้อม</div>
+                <div class="ls-status-meta">กดดูที่การ์ดด้านล่าง</div>
+            </div>
+        </div>
+
+        <div class="ls-status-tile" data-tone="muted" id="lsStatusQuota" onclick="lsScrollTo('ls-sec-stats')">
+            <div class="ls-status-icon"><i class="fa-solid fa-gauge"></i></div>
+            <div class="ls-status-body">
+                <div class="ls-status-label">โควต้าเดือนนี้</div>
+                <div class="ls-status-value">—</div>
+                <div class="ls-status-meta">โหลดสถิติเพื่อดูตัวเลข</div>
+            </div>
+        </div>
+
+        <div class="ls-status-tile" data-tone="muted" id="lsStatusRichMenu" onclick="lsScrollTo('ls-sec-richmenu')">
+            <div class="ls-status-icon"><i class="fa-solid fa-bars-staggered"></i></div>
+            <div class="ls-status-body">
+                <div class="ls-status-label">Rich Menu</div>
+                <div class="ls-status-value">กำลังโหลด...</div>
+                <div class="ls-status-meta">&nbsp;</div>
+            </div>
+        </div>
+
+        <div class="ls-status-tile" data-tone="muted" id="lsStatusGroups" onclick="lsScrollTo('ls-sec-groups')">
+            <div class="ls-status-icon"><i class="fa-solid fa-users"></i></div>
+            <div class="ls-status-body">
+                <div class="ls-status-label">กลุ่ม LINE</div>
+                <div class="ls-status-value">—</div>
+                <div class="ls-status-meta">รอข้อมูล</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ──────── Section banner: Config ──────── -->
+    <div class="ls-section-banner" data-tone="config" id="ls-sec-config">
+        <div class="ls-section-banner-icon"><i class="fa-solid fa-key"></i></div>
+        <div class="ls-section-banner-text">
+            <h2>Webhook & API Credentials</h2>
+            <p>เชื่อมต่อ LINE Messaging API · ตั้งค่า Channel Token + Secret · ทดสอบส่งข้อความ</p>
+        </div>
     </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -675,12 +1024,12 @@ $webhookUrl = "$protocol://$host$uri";
     <!-- ════════════════════════════════════════════════════ -->
     <!-- LINE Groups                                          -->
     <!-- ════════════════════════════════════════════════════ -->
-    <div style="display:flex;align-items:center;gap:14px;margin:36px 0 18px">
-        <div style="flex:1;height:1.5px;background:#f1f5f9"></div>
-        <span style="font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.18em;color:#94a3b8;white-space:nowrap">
-            <i class="fa-solid fa-users" style="color:#22c55e;margin-right:5px"></i>กลุ่ม LINE ที่ OA อยู่ด้วย
-        </span>
-        <div style="flex:1;height:1.5px;background:#f1f5f9"></div>
+    <div class="ls-section-banner" data-tone="groups" id="ls-sec-groups">
+        <div class="ls-section-banner-icon"><i class="fa-solid fa-users"></i></div>
+        <div class="ls-section-banner-text">
+            <h2>กลุ่ม LINE ที่ OA อยู่ด้วย</h2>
+            <p>OA ถูกเชิญเข้ากลุ่มไหนบ้าง · ตั้งกลุ่มหลักสำหรับ push SOS / ประกาศ · ทดสอบส่งข้อความเข้ากลุ่ม</p>
+        </div>
     </div>
 
     <div class="line-card fx-tilt fx-tilt-light shadow-sm" data-tilt="3" style="border-top:4px solid #22c55e">
@@ -837,12 +1186,12 @@ $webhookUrl = "$protocol://$host$uri";
     <!-- ════════════════════════════════════════════════════ -->
     <!-- สถิติการส่งข้อความ                                   -->
     <!-- ════════════════════════════════════════════════════ -->
-    <div style="display:flex;align-items:center;gap:14px;margin:36px 0 24px">
-        <div style="flex:1;height:1.5px;background:#f1f5f9"></div>
-        <span style="font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.18em;color:#94a3b8;white-space:nowrap">
-            <i class="fa-solid fa-chart-bar" style="color:#2e9e63;margin-right:5px"></i>สถิติการส่งข้อความ
-        </span>
-        <div style="flex:1;height:1.5px;background:#f1f5f9"></div>
+    <div class="ls-section-banner" data-tone="stats" id="ls-sec-stats">
+        <div class="ls-section-banner-icon"><i class="fa-solid fa-chart-column"></i></div>
+        <div class="ls-section-banner-text">
+            <h2>สถิติการส่งข้อความ</h2>
+            <p>โควต้าต่อเดือน · ใช้ไปกี่ข้อความ · breakdown ตามประเภท (Broadcast / Push / Multicast …) · กราฟ trend</p>
+        </div>
     </div>
 
     <!-- Date Picker + Refresh -->
@@ -1170,6 +1519,15 @@ function sendTestLineP() {
 </script>
 
 <!-- ════════════ Rich Menu (per-user binding) ════════════ -->
+<div class="max-w-4xl mx-auto px-4 md:px-6">
+    <div class="ls-section-banner" data-tone="richmenu" id="ls-sec-richmenu">
+        <div class="ls-section-banner-icon"><i class="fa-solid fa-bars-staggered"></i></div>
+        <div class="ls-section-banner-text">
+            <h2>Rich Menu — สลับเมนูตามสถานะผู้ใช้</h2>
+            <p>เลือก rich menu จาก LINE OA · per-user binding (guest/member) · sync ผู้ใช้เก่า · auto-compress ภาพ</p>
+        </div>
+    </div>
+</div>
 <div class="max-w-4xl mx-auto px-4 md:px-6 pb-12 mt-2">
     <div class="bg-white rounded-3xl border border-slate-200 shadow-sm p-6" id="rmSection">
         <div class="flex items-start justify-between gap-4 mb-1 flex-wrap">
@@ -1755,7 +2113,16 @@ function sendTestLineP() {
 </script>
 
 <!-- ════════════ Rich Menu Creator (เรียก API LINE สร้างให้) ════════════ -->
-<div class="max-w-4xl mx-auto px-4 md:px-6 pb-12 mt-4">
+<div class="max-w-4xl mx-auto px-4 md:px-6">
+    <div class="ls-section-banner" data-tone="creator" id="ls-sec-creator">
+        <div class="ls-section-banner-icon"><i class="fa-solid fa-bolt"></i></div>
+        <div class="ls-section-banner-text">
+            <h2>สร้าง Rich Menu ใหม่ผ่าน API</h2>
+            <p>สร้าง config + อัพภาพได้ในคลิกเดียว · รับไฟล์ ≤10 MB ระบบบีบให้ · ทางเลือกสำหรับ admin ที่ไม่อยากเข้า OA Console</p>
+        </div>
+    </div>
+</div>
+<div class="max-w-4xl mx-auto px-4 md:px-6 pb-12 mt-2">
     <div class="bg-white rounded-3xl border border-slate-200 shadow-sm p-6">
         <div class="flex items-center gap-3 mb-1">
             <div class="w-10 h-10 bg-purple-50 text-purple-600 rounded-2xl border border-purple-100 flex items-center justify-center">
@@ -2018,5 +2385,164 @@ function sendTestLineP() {
 
         if (typeof rmRefreshList === 'function') rmRefreshList();
     };
+})();
+</script>
+
+<!-- ════════════ Back-to-Top Button ════════════ -->
+<button type="button" class="ls-back-top" id="lsBackToTop" aria-label="กลับขึ้นด้านบน" title="กลับขึ้นด้านบน">
+    <i class="fa-solid fa-arrow-up"></i>
+</button>
+
+<script>
+/* ════════════════════════════════════════════════════
+   Page UX: Scroll-spy nav · Status populate · Back-to-top
+   ════════════════════════════════════════════════════ */
+(function lineSettingsPageUx() {
+    'use strict';
+
+    // ─── Position sticky nav below portal header ───
+    function alignStickyNav() {
+        const nav    = document.getElementById('lsQuickNav');
+        const header = document.querySelector('.portal-header');
+        if (!nav) return;
+        const top = header ? header.offsetHeight : 0;
+        nav.style.top = top + 'px';
+        // Update scroll-margin-top on banners so anchors land below nav
+        document.querySelectorAll('.ls-section-banner').forEach(b => {
+            b.style.scrollMarginTop = (top + nav.offsetHeight + 8) + 'px';
+        });
+    }
+    alignStickyNav();
+    window.addEventListener('resize', alignStickyNav, { passive: true });
+
+    // ─── Smooth scroll on chip click ───
+    const chips = document.querySelectorAll('.ls-nav-chip');
+    window.lsScrollTo = function(targetId) {
+        const t = document.getElementById(targetId);
+        if (t) t.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
+    chips.forEach(c => {
+        c.addEventListener('click', e => {
+            e.preventDefault();
+            window.lsScrollTo(c.dataset.target);
+        });
+    });
+
+    // ─── Scroll-spy ───
+    if ('IntersectionObserver' in window) {
+        const targets = Array.from(chips)
+            .map(c => document.getElementById(c.dataset.target))
+            .filter(Boolean);
+        if (targets.length) {
+            const io = new IntersectionObserver(entries => {
+                for (const e of entries) {
+                    if (e.isIntersecting) {
+                        const id = e.target.id;
+                        chips.forEach(c => c.classList.toggle('is-active', c.dataset.target === id));
+                    }
+                }
+            }, { rootMargin: '-25% 0px -55% 0px', threshold: 0 });
+            targets.forEach(t => io.observe(t));
+        }
+    }
+
+    // ─── Back-to-top ───
+    const backBtn = document.getElementById('lsBackToTop');
+    if (backBtn) {
+        const onScroll = () => {
+            backBtn.classList.toggle('is-visible', window.scrollY > 600);
+        };
+        window.addEventListener('scroll', onScroll, { passive: true });
+        backBtn.addEventListener('click', () => {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+        onScroll();
+    }
+
+    // ─── Populate status tiles ───
+    function updateTile(id, opts) {
+        const tile = document.getElementById(id);
+        if (!tile) return;
+        if (opts.tone) tile.setAttribute('data-tone', opts.tone);
+        if (opts.value !== undefined) {
+            const v = tile.querySelector('.ls-status-value');
+            if (v) v.textContent = opts.value;
+        }
+        if (opts.meta !== undefined) {
+            const m = tile.querySelector('.ls-status-meta');
+            if (m) m.textContent = opts.meta;
+        }
+        if (opts.icon) {
+            const i = tile.querySelector('.ls-status-icon i');
+            if (i) i.className = opts.icon;
+        }
+    }
+
+    // Rich Menu state — fetch from settings
+    fetch('ajax_line_richmenu.php?action=get')
+        .then(r => r.json())
+        .then(d => {
+            if (!d || !d.ok) return;
+            const enabled = !!d.enabled;
+            const guest   = d.ids?.guest  || '';
+            const member  = d.ids?.member || '';
+            const bothSet = !!(guest && member);
+            updateTile('lsStatusRichMenu', {
+                tone: enabled ? (bothSet ? 'ok' : 'warn') : 'warn',
+                value: enabled ? 'เปิดใช้งาน' : 'ปิดอยู่',
+                meta: `Guest ${guest ? '✓' : '—'} · Member ${member ? '✓' : '—'}`,
+                icon: enabled ? 'fa-solid fa-toggle-on' : 'fa-solid fa-toggle-off',
+            });
+        })
+        .catch(() => updateTile('lsStatusRichMenu', { tone: 'muted', value: 'โหลดไม่ได้', meta: '—' }));
+
+    // Groups count — fetch from groups API
+    fetch('ajax_line_groups.php?action=list')
+        .then(r => r.json())
+        .then(d => {
+            if (!d || !d.ok) return;
+            const groups = d.groups || [];
+            const n = groups.length;
+            updateTile('lsStatusGroups', {
+                tone: n > 0 ? 'info' : 'muted',
+                value: n > 0 ? `${n} กลุ่ม` : 'ยังไม่มีกลุ่ม',
+                meta: d.default_id ? 'มีกลุ่มหลัก ✓' : (n > 0 ? 'ยังไม่ตั้งกลุ่มหลัก' : 'เชิญ OA เข้ากลุ่ม'),
+            });
+        })
+        .catch(() => updateTile('lsStatusGroups', { tone: 'muted', value: 'โหลดไม่ได้', meta: '—' }));
+
+    // Quota tile — listen to stats panel data when it loads
+    // ls-q-used and ls-q-limit are populated by the existing loadStats() function
+    const observeQuota = () => {
+        const used  = document.getElementById('ls-q-used');
+        const limit = document.getElementById('ls-q-limit');
+        if (!used || !limit) return;
+        const refresh = () => {
+            const u = (used.textContent || '').trim();
+            const l = (limit.textContent || '').trim();
+            if (u === '—' || u === '') return;
+            const uNum = parseInt(u.replace(/[^\d]/g, '')) || 0;
+            const lText = l.toLowerCase();
+            if (lText.includes('ไม่จำกัด') || lText.includes('unlimited') || lText === '∞') {
+                updateTile('lsStatusQuota', { tone: 'ok', value: `${uNum.toLocaleString()} ข้อความ`, meta: 'โควต้าไม่จำกัด' });
+                return;
+            }
+            const lNum = parseInt(l.replace(/[^\d]/g, '')) || 0;
+            if (lNum > 0) {
+                const pct = Math.round((uNum / lNum) * 100);
+                const tone = pct >= 90 ? 'error' : pct >= 70 ? 'warn' : 'ok';
+                updateTile('lsStatusQuota', {
+                    tone,
+                    value: `${pct}% ใช้แล้ว`,
+                    meta: `${uNum.toLocaleString()} / ${lNum.toLocaleString()}`,
+                });
+            }
+        };
+        const mo = new MutationObserver(refresh);
+        mo.observe(used,  { childList: true, characterData: true, subtree: true });
+        mo.observe(limit, { childList: true, characterData: true, subtree: true });
+        refresh();
+    };
+    observeQuota();
 })();
 </script>
