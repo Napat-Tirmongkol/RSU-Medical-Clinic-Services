@@ -250,8 +250,10 @@ try {
             echo json_encode(['ok' => false, 'message' => 'รองรับเฉพาะ PNG / JPEG']);
             exit;
         }
-        if ((int)$f['size'] > 1024 * 1024) {
-            echo json_encode(['ok' => false, 'message' => 'ขนาดไฟล์ต้องไม่เกิน 1 MB']);
+        $MAX_UPLOAD = 10 * 1024 * 1024;   // 10 MB — รับไฟล์ใหญ่ได้แล้วระบบบีบเอง
+        $LINE_LIMIT = 1024 * 1024;        // 1 MB — LINE hard limit
+        if ((int)$f['size'] > $MAX_UPLOAD) {
+            echo json_encode(['ok' => false, 'message' => 'ขนาดไฟล์ต้องไม่เกิน 10 MB']);
             exit;
         }
 
@@ -264,16 +266,37 @@ try {
             exit;
         }
 
+        // บีบให้ ≤ 1 MB ก่อนส่ง LINE ถ้าจำเป็น
+        $uploadPath = $f['tmp_name'];
+        $uploadMime = $mime;
+        $compressInfo = null;
+        if ((int)$f['size'] > $LINE_LIMIT) {
+            $compress = line_richmenu_compress_image($f['tmp_name'], $mime, $LINE_LIMIT);
+            if (!$compress['ok']) {
+                echo json_encode(['ok' => false, 'message' => 'บีบภาพไม่สำเร็จ: ' . ($compress['error'] ?? 'unknown')]);
+                exit;
+            }
+            $uploadPath = $compress['path'];
+            $uploadMime = $compress['mime'];
+            $compressInfo = [
+                'original_mb' => round($compress['original_bytes'] / 1048576, 2),
+                'compressed_mb' => round($compress['bytes'] / 1048576, 2),
+                'quality' => $compress['quality'],
+            ];
+        }
+
         // Step 1: create
         $cr = line_richmenu_create($config);
         if (!$cr['ok'] || empty($cr['richMenuId'])) {
+            if ($uploadPath !== $f['tmp_name']) @unlink($uploadPath);
             echo json_encode(['ok' => false, 'step' => 'create', 'message' => $cr['error'] ?? 'create ล้มเหลว']);
             exit;
         }
         $rid = $cr['richMenuId'];
 
         // Step 2: upload
-        $up = line_richmenu_upload_image($rid, $f['tmp_name'], $mime);
+        $up = line_richmenu_upload_image($rid, $uploadPath, $uploadMime);
+        if ($uploadPath !== $f['tmp_name']) @unlink($uploadPath);
         if (!$up['ok']) {
             // rollback: ลบ rich menu ที่สร้างไปแล้วเพราะไม่มีภาพ
             line_richmenu_delete($rid);
@@ -288,8 +311,17 @@ try {
             exit;
         }
 
-        log_activity('LINE Rich Menu', "Created richMenuId={$rid} (name=" . ($config['name'] ?? '-') . ")");
-        echo json_encode(['ok' => true, 'richMenuId' => $rid, 'message' => 'สร้างสำเร็จ']);
+        $logMsg = "Created richMenuId={$rid} (name=" . ($config['name'] ?? '-') . ")";
+        if ($compressInfo) {
+            $logMsg .= sprintf(' [compressed %.2fMB→%.2fMB q=%d]', $compressInfo['original_mb'], $compressInfo['compressed_mb'], $compressInfo['quality']);
+        }
+        log_activity('LINE Rich Menu', $logMsg);
+        echo json_encode([
+            'ok' => true,
+            'richMenuId' => $rid,
+            'message' => 'สร้างสำเร็จ',
+            'compressed' => $compressInfo,
+        ]);
         exit;
     }
 

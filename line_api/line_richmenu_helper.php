@@ -348,6 +348,103 @@ if (!function_exists('line_richmenu_create')) {
     }
 }
 
+if (!function_exists('line_richmenu_compress_image')) {
+    /**
+     * บีบภาพให้ขนาดไฟล์ ≤ $targetMaxBytes ก่อนส่งให้ LINE
+     * (LINE จำกัด rich menu image ≤ 1 MB — ของจริงระบบจะรับไฟล์ใหญ่กว่าได้แล้วบีบให้)
+     *
+     * Strategy: re-encode เป็น JPEG ลดคุณภาพลงเรื่อยๆ (85 → 75 → 65 → 55 → 45 → 35)
+     * คงขนาด pixel เดิมเสมอ (LINE บังคับให้ตรง config size)
+     *
+     * @param string $srcPath   ไฟล์ต้นฉบับ
+     * @param string $srcMime   image/png หรือ image/jpeg
+     * @param int    $targetMaxBytes ขนาดเป้าหมาย (default 1 MB)
+     * @return array{ok:bool, path:?string, mime:?string, bytes:int, quality:?int, original_bytes:int, error:?string}
+     */
+    function line_richmenu_compress_image(string $srcPath, string $srcMime, int $targetMaxBytes = 1048576): array
+    {
+        $origBytes = (int)@filesize($srcPath) ?: 0;
+        $result = [
+            'ok' => false, 'path' => null, 'mime' => null,
+            'bytes' => 0, 'quality' => null, 'original_bytes' => $origBytes, 'error' => null,
+        ];
+
+        if (!extension_loaded('gd')) {
+            $result['error'] = 'GD extension ไม่ได้เปิด — บีบภาพไม่ได้';
+            return $result;
+        }
+        if (!file_exists($srcPath)) {
+            $result['error'] = 'ไม่พบไฟล์ต้นฉบับ';
+            return $result;
+        }
+
+        $img = null;
+        if ($srcMime === 'image/png') {
+            $img = @imagecreatefrompng($srcPath);
+            if ($img !== false) {
+                $w = imagesx($img);
+                $h = imagesy($img);
+                $flat = imagecreatetruecolor($w, $h);
+                imagefilledrectangle($flat, 0, 0, $w, $h, imagecolorallocate($flat, 255, 255, 255));
+                imagecopy($flat, $img, 0, 0, 0, 0, $w, $h);
+                imagedestroy($img);
+                $img = $flat;
+            }
+        } elseif ($srcMime === 'image/jpeg') {
+            $img = @imagecreatefromjpeg($srcPath);
+        } else {
+            $result['error'] = "mime ไม่รองรับ: $srcMime";
+            return $result;
+        }
+
+        if (!$img) {
+            $result['error'] = 'อ่านภาพไม่สำเร็จ (ไฟล์เสียหรือ format ไม่ตรง mime)';
+            return $result;
+        }
+
+        $tmpPath = tempnam(sys_get_temp_dir(), 'rm_compress_') . '.jpg';
+        $qualities = [85, 75, 65, 55, 45, 35];
+        $finalBytes = 0;
+        $finalQuality = null;
+
+        foreach ($qualities as $q) {
+            if (!@imagejpeg($img, $tmpPath, $q)) continue;
+            $sz = (int)@filesize($tmpPath);
+            if ($sz > 0 && $sz <= $targetMaxBytes) {
+                $finalBytes = $sz;
+                $finalQuality = $q;
+                break;
+            }
+            $finalBytes = $sz;
+            $finalQuality = $q;
+        }
+
+        imagedestroy($img);
+
+        if ($finalBytes === 0) {
+            @unlink($tmpPath);
+            $result['error'] = 'บีบภาพไม่สำเร็จ — imagejpeg() ล้มเหลว';
+            return $result;
+        }
+        if ($finalBytes > $targetMaxBytes) {
+            @unlink($tmpPath);
+            $result['error'] = sprintf(
+                'บีบที่ quality 35 แล้วยังเหลือ %.2f MB — ลองลดขนาด pixel หรือใช้ภาพที่ซับซ้อนน้อยลง',
+                $finalBytes / 1048576
+            );
+            $result['bytes'] = $finalBytes;
+            return $result;
+        }
+
+        $result['ok'] = true;
+        $result['path'] = $tmpPath;
+        $result['mime'] = 'image/jpeg';
+        $result['bytes'] = $finalBytes;
+        $result['quality'] = $finalQuality;
+        return $result;
+    }
+}
+
 if (!function_exists('line_richmenu_upload_image')) {
     /**
      * อัพโหลดรูปสำหรับ rich menu (ขั้นที่ 2 หลัง create)

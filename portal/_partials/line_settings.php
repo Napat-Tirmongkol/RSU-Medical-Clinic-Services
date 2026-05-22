@@ -1624,7 +1624,7 @@ function sendTestLineP() {
             <i class="fa-solid fa-triangle-exclamation text-amber-500 mt-0.5"></i>
             <div>
                 <span class="font-black">ข้อกำหนดของ LINE:</span>
-                ขนาดภาพต้องตรงกับ size ที่เลือกเป๊ะ ๆ · PNG/JPEG · ไม่เกิน 1 MB · click areas ต้องไม่ออกนอกขอบภาพ
+                ขนาดภาพต้องตรงกับ size ที่เลือกเป๊ะ ๆ · PNG/JPEG · <b>ไม่เกิน 10 MB</b> (ระบบบีบให้อัตโนมัติเหลือ ≤1 MB ก่อนส่ง LINE) · click areas ต้องไม่ออกนอกขอบภาพ
             </div>
         </div>
 
@@ -1658,7 +1658,7 @@ function sendTestLineP() {
                     </select>
                 </div>
                 <div>
-                    <label class="block text-[11px] font-black uppercase tracking-widest text-slate-500 mb-1.5">ไฟล์ภาพ (PNG/JPEG, ≤1MB)</label>
+                    <label class="block text-[11px] font-black uppercase tracking-widest text-slate-500 mb-1.5">ไฟล์ภาพ (PNG/JPEG, ≤10MB · ระบบบีบให้)</label>
                     <input type="file" name="image" id="rcImage" accept="image/png,image/jpeg" required
                         class="w-full text-xs font-bold text-slate-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-black file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100">
                 </div>
@@ -1857,11 +1857,19 @@ function sendTestLineP() {
         if (target === 'member') document.getElementById('rmMemberId').value = r.richMenuId;
 
         const auto = (target === 'guest' || target === 'member') ? `<br><small>วางลงช่อง <b>${target}</b> แล้ว — อย่าลืมกด "บันทึก ID" ด้านบน</small>` : '';
+        const compressBadge = r.compressed
+            ? `<div style="margin-top:10px;padding:8px 12px;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:8px;font-size:11.5px;color:#065f46;display:inline-block">
+                 <i class="fa-solid fa-compress" style="margin-right:4px"></i>
+                 บีบจาก <b>${r.compressed.original_mb} MB</b> → <b>${r.compressed.compressed_mb} MB</b> (JPEG quality ${r.compressed.quality})
+               </div>`
+            : '';
         Swal.fire({
             icon: 'success',
             title: 'สร้างสำเร็จ',
-            html: `<code style="font-size:11px;background:#f1f5f9;padding:4px 8px;border-radius:6px;display:inline-block;margin-top:8px;word-break:break-all">${r.richMenuId}</code>${auto}`,
+            html: `<code style="font-size:11px;background:#f1f5f9;padding:4px 8px;border-radius:6px;display:inline-block;margin-top:8px;word-break:break-all">${r.richMenuId}</code>${compressBadge}${auto}`,
         });
+
+        if (typeof rmRefreshList === 'function') rmRefreshList();
     };
 })();
 </script>
