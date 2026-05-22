@@ -53,8 +53,8 @@ $apiKeySet = defined('GEMINI_API_KEY') && !empty(GEMINI_API_KEY);
             <div class="space-y-2 max-w-[85%]">
                 <div class="bg-white border border-slate-200 p-4 rounded-2xl rounded-tl-none shadow-sm text-sm text-slate-700 leading-relaxed">
                     <strong>สวัสดีครับ! ผม AI Assistant</strong> 👋<br>
-                    ผมสามารถช่วยคุณวิเคราะห์ข้อมูลแคมเปญ สรุปยอดจอง หรือตรวจสอบปัญหาต่างๆ ในระบบได้แบบเรียลไทม์<br><br>
-                    ลองถามผมดูนะครับ เช่น <em>"สรุปแคมเปญ 5 อันดับแรกที่มีคนจองเยอะที่สุด"</em> หรือ <em>"วิเคราะห์ Error Logs ล่าสุดให้หน่อย"</em>
+                    ผมเข้าถึงข้อมูลได้ทั่วระบบ — แคมเปญ · การเงิน · ตารางหมอ · คลังพัสดุ · ผู้ใช้งาน · activity log · errors<br><br>
+                    ลองถามผมดูนะครับ เช่น <em>"รายจ่ายเดือนนี้เท่าไหร่"</em>, <em>"หมอใครออกตรวจวันนี้"</em>, หรือ <em>"วัสดุไหนใกล้หมด"</em>
                 </div>
                 <div class="text-[10px] text-slate-400 font-bold ml-1">SYSTEM ASSISTANT</div>
             </div>
@@ -63,14 +63,26 @@ $apiKeySet = defined('GEMINI_API_KEY') && !empty(GEMINI_API_KEY);
 
     <!-- Suggestions/Chips -->
     <div class="px-6 py-3 bg-slate-50 border-t border-slate-200 overflow-x-auto no-scrollbar flex gap-2" id="aiSuggestions">
-        <button onclick="aiSend('สรุปแคมเปญยอดนิยม')" class="whitespace-nowrap px-4 py-1.5 bg-white border border-slate-200 rounded-full text-[12px] font-bold text-slate-600 hover:border-purple-400 hover:text-purple-600 transition-all shadow-sm">
-            <i class="fa-solid fa-chart-line mr-1 text-purple-500"></i> สรุปแคมเปญยอดนิยม
+        <button onclick="aiSend('ภาพรวมระบบทุกโมดูลตอนนี้')" class="whitespace-nowrap px-4 py-1.5 bg-white border border-slate-200 rounded-full text-[12px] font-bold text-slate-600 hover:border-purple-400 hover:text-purple-600 transition-all shadow-sm">
+            <i class="fa-solid fa-gauge-high mr-1 text-purple-500"></i> ภาพรวมระบบ
         </button>
-        <button onclick="aiSend('วิเคราะห์การยกเลิกจอง')" class="whitespace-nowrap px-4 py-1.5 bg-white border border-slate-200 rounded-full text-[12px] font-bold text-slate-600 hover:border-purple-400 hover:text-purple-600 transition-all shadow-sm">
-            <i class="fa-solid fa-user-minus mr-1 text-purple-500"></i> วิเคราะห์การยกเลิก
+        <button onclick="aiSend('สรุปรายรับ-รายจ่ายเดือนนี้')" class="whitespace-nowrap px-4 py-1.5 bg-white border border-slate-200 rounded-full text-[12px] font-bold text-slate-600 hover:border-emerald-400 hover:text-emerald-600 transition-all shadow-sm">
+            <i class="fa-solid fa-money-bill-trend-up mr-1 text-emerald-500"></i> การเงินเดือนนี้
         </button>
-        <button onclick="aiSend('ตรวจสอบ Error Logs')" class="whitespace-nowrap px-4 py-1.5 bg-white border border-slate-200 rounded-full text-[12px] font-bold text-slate-600 hover:border-purple-400 hover:text-purple-600 transition-all shadow-sm">
-            <i class="fa-solid fa-bug mr-1 text-purple-500"></i> ตรวจสอบ Error
+        <button onclick="aiSend('หมอใครออกตรวจวันนี้บ้าง')" class="whitespace-nowrap px-4 py-1.5 bg-white border border-slate-200 rounded-full text-[12px] font-bold text-slate-600 hover:border-sky-400 hover:text-sky-600 transition-all shadow-sm">
+            <i class="fa-solid fa-user-doctor mr-1 text-sky-500"></i> ตารางหมอวันนี้
+        </button>
+        <button onclick="aiSend('วัสดุสิ้นเปลืองไหนใกล้หมดบ้าง')" class="whitespace-nowrap px-4 py-1.5 bg-white border border-slate-200 rounded-full text-[12px] font-bold text-slate-600 hover:border-amber-400 hover:text-amber-600 transition-all shadow-sm">
+            <i class="fa-solid fa-boxes-stacked mr-1 text-amber-500"></i> วัสดุใกล้หมด
+        </button>
+        <button onclick="aiSend('สรุปแคมเปญที่มีคนจองเยอะสุด 5 อันดับ')" class="whitespace-nowrap px-4 py-1.5 bg-white border border-slate-200 rounded-full text-[12px] font-bold text-slate-600 hover:border-purple-400 hover:text-purple-600 transition-all shadow-sm">
+            <i class="fa-solid fa-chart-line mr-1 text-purple-500"></i> แคมเปญยอดนิยม
+        </button>
+        <button onclick="aiSend('Activity logs ของ admin ล่าสุด')" class="whitespace-nowrap px-4 py-1.5 bg-white border border-slate-200 rounded-full text-[12px] font-bold text-slate-600 hover:border-cyan-400 hover:text-cyan-600 transition-all shadow-sm">
+            <i class="fa-solid fa-clock-rotate-left mr-1 text-cyan-500"></i> Activity logs
+        </button>
+        <button onclick="aiSend('ตรวจ Error Logs ล่าสุด')" class="whitespace-nowrap px-4 py-1.5 bg-white border border-slate-200 rounded-full text-[12px] font-bold text-slate-600 hover:border-rose-400 hover:text-rose-600 transition-all shadow-sm">
+            <i class="fa-solid fa-bug mr-1 text-rose-500"></i> Error logs
         </button>
     </div>
 
