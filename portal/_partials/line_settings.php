@@ -286,6 +286,141 @@ $webhookUrl = "$protocol://$host$uri";
         .rm-power-switch.is-on .rm-power-led { animation: none; }
         .rm-toggle-thumb { transition: none; }
     }
+
+    /* ════════════ Rich Menu picker cards ════════════ */
+    .rm-menu-card {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+        padding: 11px 14px;
+        background: #f8fafc;
+        border: 1.5px solid #e2e8f0;
+        border-radius: 14px;
+        transition: border-color 0.18s, background 0.18s, transform 0.18s, box-shadow 0.18s;
+        flex-wrap: wrap;
+    }
+    .rm-menu-card:hover {
+        background: #fff;
+        border-color: #94a3b8;
+        transform: translateY(-1px);
+        box-shadow: 0 3px 8px rgba(15,23,42,.08);
+    }
+    .rm-menu-card.is-active {
+        background: linear-gradient(180deg, #f0fdf4, #ecfdf5);
+        border-color: #4ade80;
+        box-shadow: inset 3px 0 0 #16a34a;
+    }
+    .rm-menu-card-info { flex: 1 1 280px; min-width: 0; }
+    .rm-menu-card-name {
+        font-size: 13.5px;
+        font-weight: 800;
+        color: #0f172a;
+    }
+    .rm-menu-card-id {
+        font-family: ui-monospace, 'Courier New', monospace;
+        font-size: 10.5px;
+        color: #64748b;
+        margin-top: 2px;
+        word-break: break-all;
+        line-height: 1.4;
+    }
+    .rm-menu-card-meta {
+        font-size: 10px;
+        color: #94a3b8;
+        margin-top: 3px;
+    }
+    .rm-card-tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 2px 8px;
+        border-radius: 999px;
+        font-size: 9.5px;
+        font-weight: 900;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+    }
+    .rm-card-tag-amber   { background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; }
+    .rm-card-tag-emerald { background: #dcfce7; color: #15803d; border: 1px solid #86efac; }
+
+    .rm-menu-card-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+    .rm-card-btn {
+        padding: 6px 11px;
+        background: #fff;
+        border: 1.5px solid #cbd5e1;
+        border-radius: 9px;
+        font-size: 11px;
+        font-weight: 800;
+        color: #475569;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        transition: all 0.15s;
+    }
+    .rm-card-btn:hover {
+        background: #f1f5f9;
+        border-color: #94a3b8;
+        color: #1e293b;
+        transform: translateY(-1px);
+    }
+    .rm-card-btn.is-success {
+        background: #dcfce7 !important;
+        border-color: #16a34a !important;
+        color: #15803d !important;
+    }
+    .rm-card-btn-amber:hover {
+        background: #fef3c7;
+        border-color: #f59e0b;
+        color: #92400e;
+    }
+    .rm-card-btn-emerald:hover {
+        background: #dcfce7;
+        border-color: #16a34a;
+        color: #15803d;
+    }
+
+    .rm-input-flash {
+        animation: rmInputFlash 0.85s ease;
+    }
+    @keyframes rmInputFlash {
+        0%   { background: #fef3c7 !important; box-shadow: 0 0 0 4px rgba(245,158,11,.35); border-color: #f59e0b !important; }
+        100% { box-shadow: 0 0 0 0 rgba(245,158,11,0); }
+    }
+
+    /* Dark mode */
+    body[data-theme='dark'] .rm-menu-card {
+        background: #0f172a;
+        border-color: #1e293b;
+    }
+    body[data-theme='dark'] .rm-menu-card:hover {
+        background: #1e293b;
+        border-color: #475569;
+    }
+    body[data-theme='dark'] .rm-menu-card.is-active {
+        background: linear-gradient(180deg, rgba(22,163,74,.12), rgba(22,163,74,.08));
+        border-color: rgba(74,222,128,.5);
+        box-shadow: inset 3px 0 0 #4ade80;
+    }
+    body[data-theme='dark'] .rm-menu-card-name { color: #f1f5f9; }
+    body[data-theme='dark'] .rm-menu-card-id   { color: #94a3b8; }
+    body[data-theme='dark'] .rm-menu-card-meta { color: #64748b; }
+    body[data-theme='dark'] .rm-card-btn {
+        background: #1e293b;
+        border-color: #334155;
+        color: #cbd5e1;
+    }
+    body[data-theme='dark'] .rm-card-btn:hover {
+        background: #334155;
+        border-color: #64748b;
+        color: #f1f5f9;
+    }
+    body[data-theme='dark'] #rmMenuListEmpty {
+        background: rgba(15,23,42,.5);
+        border-color: #334155;
+        color: #64748b !important;
+    }
 </style>
 
 <div class="px-4 py-8">
@@ -970,6 +1105,25 @@ function sendTestLineP() {
             </div>
         </div>
 
+        <!-- ──────── Rich menus picker ──────── -->
+        <div class="mt-5">
+            <div class="flex items-center justify-between mb-2 flex-wrap gap-2">
+                <h4 class="text-xs font-black uppercase tracking-widest text-slate-500 inline-flex items-center gap-1.5">
+                    <i class="fa-solid fa-list-ul text-emerald-500"></i>
+                    Rich menus ของ OA นี้ — กดปุ่มเพื่อวางลงช่องด้านบน
+                </h4>
+                <button type="button" onclick="rmRefreshList()" class="text-[10px] font-black text-slate-500 hover:text-emerald-600 inline-flex items-center gap-1 px-2 py-1 rounded-md hover:bg-slate-100 transition">
+                    <i class="fa-solid fa-rotate" id="rmRefreshIcon"></i> รีเฟรช
+                </button>
+            </div>
+            <div id="rmMenuCards" class="space-y-2"></div>
+            <div id="rmMenuListEmpty" class="hidden text-[11px] text-slate-400 font-medium italic py-4 text-center bg-slate-50 border border-dashed border-slate-200 rounded-xl">
+                <i class="fa-solid fa-circle-info mr-1"></i>
+                ยังไม่มี rich menu — สร้างใน LINE OA Console หรือใช้ "สร้าง Rich Menu" ด้านล่าง
+            </div>
+            <div id="rmMenuListError" class="hidden text-[11px] text-rose-600 font-medium bg-rose-50 border border-rose-100 rounded-xl px-3 py-2"></div>
+        </div>
+
         <div class="flex flex-wrap gap-2 mt-4 items-center">
             <button onclick="rmSaveIds()" class="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-black inline-flex items-center gap-1.5 transition-colors">
                 <i class="fa-solid fa-floppy-disk"></i> บันทึก ID
@@ -1048,8 +1202,6 @@ function sendTestLineP() {
                     </div>
                     <p class="text-[10px] text-slate-400 font-medium mt-1">— add bot เป็นเพื่อน + เห็น Console rich menu ในเชต → คัด userId ตัวเองมาดูได้</p>
                 </div>
-
-                <div id="rmListBox" class="text-[11px] text-slate-500 font-mono whitespace-pre-wrap pt-3 border-t border-slate-100 mt-2"></div>
             </div>
         </details>
     </div>
@@ -1323,23 +1475,134 @@ function sendTestLineP() {
         }
     };
 
+    function rmEscapeHtml(s) {
+        return String(s ?? '').replace(/[&<>"']/g, c => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        }[c]));
+    }
+
+    function rmRenderMenuCards(menus, errorMsg) {
+        const wrap   = document.getElementById('rmMenuCards');
+        const empty  = document.getElementById('rmMenuListEmpty');
+        const errBox = document.getElementById('rmMenuListError');
+        if (!wrap) return;
+
+        wrap.innerHTML = '';
+        empty.classList.add('hidden');
+        errBox.classList.add('hidden');
+
+        if (errorMsg) {
+            errBox.innerHTML = `<i class="fa-solid fa-triangle-exclamation mr-1"></i> ดึง list จาก LINE ไม่ได้: ${rmEscapeHtml(errorMsg)}`;
+            errBox.classList.remove('hidden');
+            return;
+        }
+        if (!menus || !menus.length) {
+            empty.classList.remove('hidden');
+            return;
+        }
+
+        const guestId  = document.getElementById('rmGuestId').value.trim();
+        const memberId = document.getElementById('rmMemberId').value.trim();
+
+        menus.forEach(m => {
+            const id   = m.richMenuId || '';
+            const name = m.name || '(no name)';
+            const size = m.size ? `${m.size.width}×${m.size.height}` : '';
+            const chat = m.chatBarText || '';
+            const isGuest  = id === guestId  && id !== '';
+            const isMember = id === memberId && id !== '';
+
+            const tags = [];
+            if (isGuest)  tags.push('<span class="rm-card-tag rm-card-tag-amber">Guest ปัจจุบัน</span>');
+            if (isMember) tags.push('<span class="rm-card-tag rm-card-tag-emerald">Member ปัจจุบัน</span>');
+
+            const card = document.createElement('div');
+            card.className = 'rm-menu-card';
+            if (isGuest || isMember) card.classList.add('is-active');
+            card.innerHTML = `
+                <div class="rm-menu-card-info">
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <span class="rm-menu-card-name">${rmEscapeHtml(name)}</span>
+                        ${tags.join('')}
+                    </div>
+                    <div class="rm-menu-card-id" title="${rmEscapeHtml(id)}">${rmEscapeHtml(id)}</div>
+                    ${(size || chat) ? `<div class="rm-menu-card-meta">${size}${size && chat ? ' · ' : ''}${rmEscapeHtml(chat)}</div>` : ''}
+                </div>
+                <div class="rm-menu-card-actions">
+                    <button type="button" class="rm-card-btn" data-action="copy" data-id="${rmEscapeHtml(id)}" title="คัดลอก ID ไปยัง clipboard">
+                        <i class="fa-solid fa-copy"></i><span>คัด ID</span>
+                    </button>
+                    <button type="button" class="rm-card-btn rm-card-btn-amber" data-action="use-guest" data-id="${rmEscapeHtml(id)}" title="วางลงช่อง Guest">
+                        <i class="fa-solid fa-user-plus"></i><span>Guest</span>
+                    </button>
+                    <button type="button" class="rm-card-btn rm-card-btn-emerald" data-action="use-member" data-id="${rmEscapeHtml(id)}" title="วางลงช่อง Member">
+                        <i class="fa-solid fa-user-check"></i><span>Member</span>
+                    </button>
+                </div>
+            `;
+            wrap.appendChild(card);
+        });
+
+        wrap.querySelectorAll('.rm-card-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const action = btn.dataset.action;
+                const id     = btn.dataset.id || '';
+                if (!id) return;
+                if (action === 'copy') {
+                    try {
+                        await navigator.clipboard.writeText(id);
+                        const orig = btn.innerHTML;
+                        btn.innerHTML = '<i class="fa-solid fa-check"></i><span>คัดแล้ว</span>';
+                        btn.classList.add('is-success');
+                        setTimeout(() => {
+                            btn.innerHTML = orig;
+                            btn.classList.remove('is-success');
+                        }, 1500);
+                    } catch (e) {
+                        Swal.fire({ icon: 'error', title: 'คัดลอกไม่สำเร็จ', text: String(e.message || e) });
+                    }
+                } else {
+                    const target  = action === 'use-guest' ? 'guest' : 'member';
+                    const fieldId = target === 'guest' ? 'rmGuestId' : 'rmMemberId';
+                    const input   = document.getElementById(fieldId);
+                    input.value = id;
+                    input.classList.add('rm-input-flash');
+                    setTimeout(() => input.classList.remove('rm-input-flash'), 900);
+                    Swal.fire({
+                        toast: true,
+                        position: 'top',
+                        icon: 'info',
+                        title: `วางลงช่อง ${target === 'guest' ? 'Guest' : 'Member'} แล้ว`,
+                        text: 'อย่าลืมกด "บันทึก ID" ด้านล่าง',
+                        timer: 2400,
+                        showConfirmButton: false,
+                    });
+                    rmRenderMenuCards(menus); // re-render เพื่ออัพเดท active tag
+                }
+            });
+        });
+    }
+
+    window.rmRefreshList = async function() {
+        const icon = document.getElementById('rmRefreshIcon');
+        if (icon) icon.classList.add('fa-spin');
+        try {
+            const r = await fetch('ajax_line_richmenu.php?action=get').then(x => x.json());
+            if (r && r.ok) rmRenderMenuCards(r.richmenus || [], r.list_error || '');
+        } catch (e) {
+            rmRenderMenuCards([], String(e.message || e));
+        } finally {
+            if (icon) setTimeout(() => icon.classList.remove('fa-spin'), 400);
+        }
+    };
+
     // โหลด initial state
     rmGet().then(d => {
         if (!d || !d.ok) return;
         rmApplyEnabledUI(!!d.enabled);
         document.getElementById('rmGuestId').value  = d.ids.guest  || '';
         document.getElementById('rmMemberId').value = d.ids.member || '';
-        const box = document.getElementById('rmListBox');
-        if (box) {
-            if (d.richmenus && d.richmenus.length) {
-                box.textContent = 'Rich menus ที่สร้างผ่าน API:\n' +
-                    d.richmenus.map(m => `  ${m.richMenuId}  →  ${m.name || '(no name)'}`).join('\n');
-            } else if (d.list_error) {
-                box.textContent = 'หมายเหตุ: ดึง list ไม่ได้ (' + d.list_error + ')';
-            } else {
-                box.textContent = 'ไม่มี rich menu ที่สร้างผ่าน API (ที่สร้างใน Console จะไม่ปรากฏที่นี่ แต่ยังใช้ได้)';
-            }
-        }
+        rmRenderMenuCards(d.richmenus || [], d.list_error || '');
     });
 })();
 </script>
