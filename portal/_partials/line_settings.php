@@ -421,6 +421,127 @@ $webhookUrl = "$protocol://$host$uri";
         border-color: #334155;
         color: #64748b !important;
     }
+
+    /* ════════════ Bulk Sync Bar (prominent) ════════════ */
+    .rm-bulk-bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 16px 18px;
+        background:
+            linear-gradient(135deg, #faf5ff 0%, #ede9fe 60%, #ddd6fe 100%);
+        border: 1.5px solid #c4b5fd;
+        border-radius: 18px;
+        flex-wrap: wrap;
+        position: relative;
+        overflow: hidden;
+    }
+    .rm-bulk-bar::before {
+        content: '';
+        position: absolute;
+        top: -50%;
+        right: -10%;
+        width: 200px;
+        height: 200px;
+        background: radial-gradient(circle, rgba(139,92,246,.25) 0%, transparent 70%);
+        pointer-events: none;
+    }
+    .rm-bulk-info { flex: 1 1 320px; min-width: 0; position: relative; z-index: 1; }
+    .rm-bulk-info-title {
+        font-size: 14.5px;
+        font-weight: 900;
+        color: #5b21b6;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .rm-bulk-info-title i {
+        color: #8b5cf6;
+        font-size: 17px;
+        background: #fff;
+        width: 32px;
+        height: 32px;
+        border-radius: 10px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 2px 6px rgba(139,92,246,.25);
+    }
+    .rm-bulk-info-desc {
+        font-size: 11.5px;
+        color: #6d28d9;
+        font-weight: 500;
+        margin-top: 6px;
+        line-height: 1.55;
+        max-width: 540px;
+    }
+    .rm-bulk-actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        position: relative;
+        z-index: 1;
+    }
+    .rm-bulk-btn {
+        padding: 11px 18px;
+        border-radius: 12px;
+        font-size: 13px;
+        font-weight: 900;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        border: 0;
+        transition: transform 0.18s, box-shadow 0.18s, background 0.18s;
+    }
+    .rm-bulk-btn-primary {
+        background: linear-gradient(180deg, #8b5cf6 0%, #7c3aed 100%);
+        color: #fff;
+        box-shadow: 0 4px 12px rgba(139,92,246,.4), inset 0 1px 0 rgba(255,255,255,.25);
+    }
+    .rm-bulk-btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 7px 18px rgba(139,92,246,.55), inset 0 1px 0 rgba(255,255,255,.25);
+    }
+    .rm-bulk-btn-primary:active { transform: translateY(0); }
+    .rm-bulk-btn-primary i { font-size: 14px; }
+    .rm-bulk-btn-ghost {
+        background: rgba(255,255,255,.6);
+        color: #6d28d9;
+        border: 1.5px solid rgba(139,92,246,.3);
+        backdrop-filter: blur(4px);
+    }
+    .rm-bulk-btn-ghost:hover {
+        background: #fff;
+        border-color: rgba(139,92,246,.55);
+        color: #5b21b6;
+    }
+
+    /* Dark mode */
+    body[data-theme='dark'] .rm-bulk-bar {
+        background: linear-gradient(135deg, rgba(124,58,237,.18) 0%, rgba(139,92,246,.15) 100%);
+        border-color: rgba(139,92,246,.4);
+    }
+    body[data-theme='dark'] .rm-bulk-bar::before {
+        background: radial-gradient(circle, rgba(139,92,246,.35) 0%, transparent 70%);
+    }
+    body[data-theme='dark'] .rm-bulk-info-title { color: #c4b5fd; }
+    body[data-theme='dark'] .rm-bulk-info-title i {
+        background: rgba(15,23,42,.6);
+        color: #a78bfa;
+    }
+    body[data-theme='dark'] .rm-bulk-info-desc { color: #a78bfa; }
+    body[data-theme='dark'] .rm-bulk-btn-ghost {
+        background: rgba(15,23,42,.6);
+        color: #c4b5fd;
+        border-color: rgba(139,92,246,.4);
+    }
+    body[data-theme='dark'] .rm-bulk-btn-ghost:hover {
+        background: rgba(15,23,42,.85);
+        border-color: rgba(139,92,246,.7);
+        color: #ddd6fe;
+    }
 </style>
 
 <div class="px-4 py-8">
@@ -1140,6 +1261,30 @@ function sendTestLineP() {
             </label>
         </div>
 
+        <!-- ──────── Bulk sync bar (เด่นๆ — ใช้บ่อยเมื่อเปลี่ยน menu) ──────── -->
+        <div class="rm-bulk-bar mt-5">
+            <div class="rm-bulk-info">
+                <div class="rm-bulk-info-title">
+                    <i class="fa-solid fa-people-arrows"></i>
+                    Sync rich menu ให้ user เก่า
+                </div>
+                <p class="rm-bulk-info-desc">
+                    หลังเปลี่ยน Member/Guest ID ต้อง sync เพื่อให้ user ที่ link เมนูเก่าอยู่เห็นเมนูใหม่ ·
+                    auto-detect member vs guest ตาม DB · batch 50/รอบ · LINE rate limit 100 req/sec
+                </p>
+            </div>
+            <div class="rm-bulk-actions">
+                <button type="button" onclick="rmSyncAll()" class="rm-bulk-btn rm-bulk-btn-primary">
+                    <i class="fa-solid fa-arrows-spin"></i>
+                    <span>Sync ทุก user</span>
+                </button>
+                <button type="button" onclick="rmShowAudit()" class="rm-bulk-btn rm-bulk-btn-ghost">
+                    <i class="fa-solid fa-clock-rotate-left"></i>
+                    <span>Audit log</span>
+                </button>
+            </div>
+        </div>
+
         <details class="mt-5 group">
             <summary class="cursor-pointer text-xs font-black text-slate-600 hover:text-slate-800 list-none inline-flex items-center gap-1.5">
                 <i class="fa-solid fa-chevron-right group-open:rotate-90 transition-transform text-[10px]"></i>
@@ -1166,16 +1311,6 @@ function sendTestLineP() {
                         <span class="font-black">Unlink</span> = ลบ binding → fallback default
                     </p>
                 </div>
-
-                <div class="pt-2 flex flex-wrap gap-2">
-                    <button onclick="rmSyncAll()" class="px-3 py-2 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 text-xs font-black border border-purple-200 inline-flex items-center gap-1.5">
-                        <i class="fa-solid fa-people-arrows"></i> Sync ทุก member ที่มี line_user_id → member menu
-                    </button>
-                    <button onclick="rmShowAudit()" class="px-3 py-2 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-black border border-slate-200 inline-flex items-center gap-1.5">
-                        <i class="fa-solid fa-clock-rotate-left"></i> ดู Audit log
-                    </button>
-                </div>
-                <p class="text-[10px] text-slate-400 font-medium mt-1">Sync ทำเป็น batch 50/รอบ พร้อมแถบ progress · Audit log เก็บประวัติ sync/unlink ต่อ user (50 รายการล่าสุด)</p>
 
                 <!-- Lookup Console rich menu ID -->
                 <div class="pt-3 border-t border-slate-100 mt-2">
@@ -1291,10 +1426,22 @@ function sendTestLineP() {
 
     window.rmSyncAll = async function() {
         const c = await Swal.fire({
-            title: 'Sync ทุก member?',
-            text: 'จะ link member menu ให้ user ทุกคนที่มี line_user_id ใน DB (ทำเป็น batch 50/รอบ)',
+            title: 'Sync ทุก user?',
+            html: `
+                <div style="text-align:left;font-size:13px;color:#475569;line-height:1.6">
+                    ระบบจะวนทุก user ที่มี <code>line_user_id</code> ใน DB →
+                    auto-detect ว่าเป็น <b style="color:#15803d">member</b> (มี record ใน sys_users) หรือ <b style="color:#92400e">guest</b> →
+                    link rich menu ตามนั้น
+                    <div style="margin-top:10px;padding:8px 10px;background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;font-size:11.5px;color:#78350f">
+                        <i class="fa-solid fa-circle-info"></i>
+                        การทำงานนี้จะ <b>เขียนทับ rich menu ที่ user link อยู่ปัจจุบัน</b> · batch 50/รอบ
+                    </div>
+                </div>
+            `,
             icon: 'warning', showCancelButton: true,
-            confirmButtonText: 'เริ่ม Sync', cancelButtonText: 'ยกเลิก',
+            confirmButtonText: '<i class="fa-solid fa-arrows-spin"></i> เริ่ม Sync',
+            cancelButtonText: 'ยกเลิก',
+            confirmButtonColor: '#7c3aed',
         });
         if (!c.isConfirmed) return;
 
