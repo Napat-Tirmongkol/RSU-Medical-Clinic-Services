@@ -4,7 +4,7 @@
  * ส่ง Error Digest Email ให้ admin เมื่อมี error ใหม่ใน sys_error_logs
  *
  * ── วิธีตั้งค่า cron-job.org ──────────────────────────────────────────────────
- *  URL     : https://healthycampus.rsu.ac.th/e-campaignv2/cron/send_error_digest.php?token=rsu_purge_a8f3k2m9x
+ *  URL     : https://healthycampus.rsu.ac.th/rsu-clinic/cron/send_error_digest.php?token=rsu_purge_a8f3k2m9x
  *  Schedule: ทุก 30 นาที
  *
  * ── ตั้งค่า ────────────────────────────────────────────────────────────────────

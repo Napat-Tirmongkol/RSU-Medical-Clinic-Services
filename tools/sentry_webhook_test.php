@@ -7,7 +7,7 @@
  *
  * Usage (on the production server, in the project root):
  *   php tools/sentry_webhook_test.php
- *   php tools/sentry_webhook_test.php https://healthycampus.rsu.ac.th/e-campaignv2/api/sentry_webhook.php
+ *   php tools/sentry_webhook_test.php https://healthycampus.rsu.ac.th/rsu-clinic/api/sentry_webhook.php
  *
  * The script:
  *   - Reads SENTRY_WEBHOOK_SECRET from config/secrets.php

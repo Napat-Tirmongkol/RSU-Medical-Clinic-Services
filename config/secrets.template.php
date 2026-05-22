@@ -5,7 +5,7 @@
 
 return [
     // --- Application Base URL (REQUIRED for password-reset emails, OAuth) ---
-    // Absolute URL of the deployed app, e.g. 'https://clinic.rsu.ac.th/e-campaignv2'
+    // Absolute URL of the deployed app, e.g. 'https://clinic.rsu.ac.th/rsu-clinic'
     // Leave empty in dev = password-reset emails will refuse to send (fail-closed
     // anti-host-header-injection). Always set this for production.
     'APP_BASE_URL' => '',

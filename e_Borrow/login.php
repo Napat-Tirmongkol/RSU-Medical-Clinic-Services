@@ -1,6 +1,6 @@
 <?php
 // e_Borrow/login.php — ระบบ login ของ e_Borrow ถูกยกเลิกแล้ว
-// ผู้ใช้เข้าระบบผ่าน main app (e-campaignv2/index.php) แล้วมาที่นี่ผ่าน hub
+// ผู้ใช้เข้าระบบผ่าน main app (rsu-clinic/index.php) แล้วมาที่นี่ผ่าน hub
 declare(strict_types=1);
 session_start();
 require_once __DIR__ . '/../config.php';

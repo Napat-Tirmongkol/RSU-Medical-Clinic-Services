@@ -28,7 +28,7 @@ if ($adminRole !== 'superadmin' && $adminRole !== 'admin') {
         <h1>🛡️ Access Denied</h1>
         <p>เอกสารนี้สำหรับผู้บริหารระบบ (Admin) เท่านั้น</p>
         <p>กรุณาเข้าสู่ระบบผ่านหน้า Portal Admin ก่อน</p>
-        <a href="/e-campaignv2/admin/auth/login.php">→ เข้าสู่ระบบ</a>
+        <a href="/rsu-clinic/admin/auth/login.php">→ เข้าสู่ระบบ</a>
     </div>
     </body></html>
     <?php
@@ -372,7 +372,7 @@ if ($adminRole !== 'superadmin' && $adminRole !== 'admin') {
         <div class="row"><span class="lbl">ผู้เสนอโครงการ</span><span class="val">ศูนย์บริการสุขภาพ มหาวิทยาลัยรังสิต</span></div>
         <div class="row"><span class="lbl">หน่วยงานรับผิดชอบ</span><span class="val">งานเทคโนโลยีสารสนเทศ คลินิก RSU Medical</span></div>
         <div class="row"><span class="lbl">ระยะเวลาดำเนินการ</span><span class="val">ปีงบประมาณ 2569 (พฤษภาคม 2569 — เมษายน 2570)</span></div>
-        <div class="row"><span class="lbl">URL ระบบ</span><span class="val">https://healthycampus.rsu.ac.th/e-campaignv2/user/</span></div>
+        <div class="row"><span class="lbl">URL ระบบ</span><span class="val">https://healthycampus.rsu.ac.th/rsu-clinic/user/</span></div>
         <div class="row"><span class="lbl">เวอร์ชันเอกสาร</span><span class="val">v1.0 — พฤษภาคม 2569</span></div>
     </div>
 </div>

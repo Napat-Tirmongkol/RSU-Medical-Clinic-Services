@@ -88,7 +88,7 @@ try {
         $lineSecrets = file_exists(__DIR__ . '/../config/secrets.php') ? require __DIR__ . '/../config/secrets.php' : [];
         $liffId  = $lineSecrets['LINE_LIFF_ID'] ?? '';
         $lineToken = $lineSecrets['EBORROW_LINE_MESSAGE_TOKEN'] ?? $lineSecrets['LINE_MESSAGING_CHANNEL_ACCESS_TOKEN'] ?? '';
-        $liffUrl = $liffId ? "https://liff.line.me/{$liffId}" : "https://healthycampus.rsu.ac.th/e-campaignv2/user/index.php";
+        $liffUrl = $liffId ? "https://liff.line.me/{$liffId}" : "https://healthycampus.rsu.ac.th/rsu-clinic/user/index.php";
 
         $lineMessages = [
             [

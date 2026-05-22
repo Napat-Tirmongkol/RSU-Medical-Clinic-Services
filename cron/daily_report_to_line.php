@@ -5,7 +5,7 @@
  * ส่งสรุป "รายงานรายวัน" (admin/daily_report.php) เข้ากลุ่ม LINE ทุกวัน
  *
  * ── วิธีตั้งค่า cron-job.org ──────────────────────────────────────────────────
- *  URL     : https://healthycampus.rsu.ac.th/e-campaignv2/cron/daily_report_to_line.php?token=YOUR_SECRET_TOKEN
+ *  URL     : https://healthycampus.rsu.ac.th/rsu-clinic/cron/daily_report_to_line.php?token=YOUR_SECRET_TOKEN
  *  Schedule: ทุกวัน เวลา 17:00 (Asia/Bangkok)
  *  Timeout : 30 วินาที
  *
@@ -172,7 +172,7 @@ try {
 
 // ── Build Flex Message ───────────────────────────────────────────────────
 $siteName = defined('SITE_NAME') ? SITE_NAME : 'RSU Medical Clinic';
-$reportUrl = 'https://healthycampus.rsu.ac.th/e-campaignv2/admin/daily_report.php?date=' . urlencode($date);
+$reportUrl = 'https://healthycampus.rsu.ac.th/rsu-clinic/admin/daily_report.php?date=' . urlencode($date);
 
 function dr_kpi_box(string $label, int $value, int $yestValue, bool $higherIsBetter, string $unit = ''): array
 {

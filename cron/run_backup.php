@@ -3,10 +3,10 @@
  * cron/run_backup.php
  * HTTP endpoint สำหรับ cron-job.org เรียกทำ DB Backup
  *
- * URL: https://healthycampus.rsu.ac.th/e-campaignv2/cron/run_backup.php?token=YOUR_SECRET_TOKEN
+ * URL: https://healthycampus.rsu.ac.th/rsu-clinic/cron/run_backup.php?token=YOUR_SECRET_TOKEN
  *
  * ── วิธีตั้งค่า cron-job.org ──────────────────────────────────────
- *  URL    : https://healthycampus.rsu.ac.th/e-campaignv2/cron/run_backup.php?token=YOUR_SECRET_TOKEN
+ *  URL    : https://healthycampus.rsu.ac.th/rsu-clinic/cron/run_backup.php?token=YOUR_SECRET_TOKEN
  *  Schedule: Every day at 2:00 (Asia/Bangkok)
  * ──────────────────────────────────────────────────────────────────
  */

@@ -5,7 +5,7 @@
  * Diagnostic script: ทดสอบระบบ "User Cancel Booking" + Email ทุก Step
  * ⚠️  ใช้สำหรับ DEV/TEST เท่านั้น — ห้ามนำขึ้น Production
  *
- * วิธีรัน: http://localhost/e-campaignv2/tests/test_cancel_booking.php
+ * วิธีรัน: http://localhost/rsu-clinic/tests/test_cancel_booking.php
  * ─────────────────────────────────────────────────────────────────────────────
  */
 declare(strict_types=1);

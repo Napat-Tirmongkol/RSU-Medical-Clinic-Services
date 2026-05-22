@@ -63,10 +63,10 @@ assetUpdateMobileLayout();
 
     // Register on load (so it doesn't compete with critical rendering)
     window.addEventListener('load', () => {
-        // Detect mount path dynamically (works for /asset/ AND /e-campaignv2/asset/ etc.)
+        // Detect mount path dynamically (works for /asset/ AND /rsu-clinic/asset/ etc.)
         const m = window.location.pathname.match(/^(.*\/asset\/)/);
         if (!m) return;
-        const scopePath = m[1];               // e.g. "/e-campaignv2/asset/"
+        const scopePath = m[1];               // e.g. "/rsu-clinic/asset/"
         const swPath    = scopePath + 'sw.js';
         navigator.serviceWorker.register(swPath, { scope: scopePath })
             .then(reg => {

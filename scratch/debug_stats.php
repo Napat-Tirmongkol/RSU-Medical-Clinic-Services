@@ -1,5 +1,5 @@
 <?php
-require 'c:/xampp/htdocs/e-campaignv2/config/db_connect.php';
+require 'c:/xampp/htdocs/rsu-clinic/config/db_connect.php';
 $pdo = db();
 echo "--- ALL CAMPAIGNS ---\n";
 $stmt = $pdo->query('SELECT id, name, status, total_capacity FROM camp_list');

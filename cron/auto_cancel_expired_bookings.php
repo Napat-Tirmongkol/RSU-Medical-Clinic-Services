@@ -5,7 +5,7 @@
  * ยกเลิกการจองที่ "เลยวันนัดหมายแต่ไม่มาเช็คอิน" อัตโนมัติ + แจ้งเตือนผู้ใช้
  *
  * ── วิธีตั้งค่า cron-job.org ──────────────────────────────────────────────────
- *  URL     : https://healthycampus.rsu.ac.th/e-campaignv2/cron/auto_cancel_expired_bookings.php?token=YOUR_SECRET_TOKEN
+ *  URL     : https://healthycampus.rsu.ac.th/rsu-clinic/cron/auto_cancel_expired_bookings.php?token=YOUR_SECRET_TOKEN
  *  Schedule: ทุกวัน เวลา 02:00 (Asia/Bangkok)  — เลือกเวลาที่ traffic น้อย
  *
  * ── เกณฑ์ที่จะยกเลิก ─────────────────────────────────────────────────────────
