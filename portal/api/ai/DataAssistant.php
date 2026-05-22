@@ -348,7 +348,7 @@ class DataAssistant {
                     // Overrides + off ของวันนั้น
                     $stmt = $this->pdo->prepare("
                         SELECT ms.full_name AS หมอ, s.start_time AS เริ่ม, s.end_time AS สิ้นสุด,
-                               s.type AS ประเภท, cr.name AS ห้อง, s.note AS หมายเหตุ
+                               s.type AS ประเภท, cr.name AS ห้อง, s.notes AS หมายเหตุ
                         FROM sys_doctor_schedule s
                         LEFT JOIN sys_medical_staff ms ON ms.id = s.staff_id
                         LEFT JOIN sys_clinic_rooms  cr ON cr.id = s.room_id
@@ -358,10 +358,10 @@ class DataAssistant {
                     $stmt->execute([':d' => $date]);
                     $specifics = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-                    // Recurring ของวัน weekday นั้น (ตัดออกถ้ามี override ในวันเดียวกัน)
+                    // Recurring weekly shifts ที่ตรง weekday + ยังไม่หมดอายุ + ไม่มี override/off ของหมอคนนี้ในวันนั้น
                     $stmt = $this->pdo->prepare("
                         SELECT ms.full_name AS หมอ, s.start_time AS เริ่ม, s.end_time AS สิ้นสุด,
-                               s.type AS ประเภท, cr.name AS ห้อง, s.note AS หมายเหตุ
+                               s.type AS ประเภท, cr.name AS ห้อง, s.notes AS หมายเหตุ
                         FROM sys_doctor_schedule s
                         LEFT JOIN sys_medical_staff ms ON ms.id = s.staff_id
                         LEFT JOIN sys_clinic_rooms  cr ON cr.id = s.room_id
@@ -369,9 +369,11 @@ class DataAssistant {
                           AND s.type = 'regular'
                           AND s.weekday = :w
                           AND (s.recur_end_date IS NULL OR s.recur_end_date >= :d)
-                          AND s.staff_id NOT IN (
-                              SELECT IFNULL(staff_id,0) FROM sys_doctor_schedule
-                              WHERE is_active = 1 AND specific_date = :d2
+                          AND NOT EXISTS (
+                              SELECT 1 FROM sys_doctor_schedule o
+                              WHERE o.is_active = 1
+                                AND o.specific_date = :d2
+                                AND o.staff_id = s.staff_id
                           )
                         ORDER BY s.start_time ASC
                     ");
@@ -394,19 +396,17 @@ class DataAssistant {
                     $end   = date('Y-m-d', strtotime("$start +6 days"));
                     $stmt = $this->pdo->prepare("
                         SELECT ms.full_name AS หมอ,
-                               COUNT(*) AS จำนวนเวร,
-                               GROUP_CONCAT(DISTINCT s.type) AS ประเภทเวร
+                               COUNT(DISTINCT CASE WHEN s.type='regular' THEN s.weekday END) AS วันที่ออกตรวจประจำ,
+                               COUNT(CASE WHEN s.type='override' AND s.specific_date BETWEEN :f AND :t THEN 1 END) AS เวรเสริมสัปดาห์นี้,
+                               COUNT(CASE WHEN s.type='off' AND s.specific_date BETWEEN :f2 AND :t2 THEN 1 END) AS ลาสัปดาห์นี้
                         FROM sys_doctor_schedule s
-                        LEFT JOIN sys_medical_staff ms ON ms.id = s.staff_id
-                        WHERE s.is_active = 1
-                          AND (
-                              (s.specific_date BETWEEN :f AND :t)
-                              OR (s.type = 'regular' AND (s.recur_end_date IS NULL OR s.recur_end_date >= :f2))
-                          )
+                        INNER JOIN sys_medical_staff ms ON ms.id = s.staff_id
+                        WHERE s.is_active = 1 AND ms.is_active = 1
                         GROUP BY ms.id, ms.full_name
-                        ORDER BY จำนวนเวร DESC
+                        HAVING (วันที่ออกตรวจประจำ + เวรเสริมสัปดาห์นี้ + ลาสัปดาห์นี้) > 0
+                        ORDER BY วันที่ออกตรวจประจำ DESC
                     ");
-                    $stmt->execute([':f' => $start, ':t' => $end, ':f2' => $start]);
+                    $stmt->execute([':f' => $start, ':t' => $end, ':f2' => $start, ':t2' => $end]);
                     return [
                         'สัปดาห์' => "$start ถึง $end",
                         'รายชื่อหมอ' => $stmt->fetchAll(PDO::FETCH_ASSOC),
@@ -441,7 +441,11 @@ class DataAssistant {
                         SELECT
                             COUNT(*) AS จำนวนรายการ,
                             COALESCE(SUM(quantity), 0) AS จำนวนรวม,
-                            COALESCE(SUM(price * quantity), 0) AS มูลค่ารวม,
+                            SUM(CASE WHEN status='in_use'   THEN 1 ELSE 0 END) AS ใช้งานอยู่,
+                            SUM(CASE WHEN status='repair'   THEN 1 ELSE 0 END) AS กำลังซ่อม,
+                            SUM(CASE WHEN status='reserve'  THEN 1 ELSE 0 END) AS สำรอง,
+                            SUM(CASE WHEN status='disposed' THEN 1 ELSE 0 END) AS จำหน่ายออก,
+                            SUM(CASE WHEN status='lost'     THEN 1 ELSE 0 END) AS สูญหาย,
                             SUM(CASE WHEN warranty_until IS NOT NULL AND warranty_until BETWEEN :t AND :n90 THEN 1 ELSE 0 END) AS ใกล้หมดประกัน_90วัน,
                             SUM(CASE WHEN warranty_until IS NOT NULL AND warranty_until <  :t2 THEN 1 ELSE 0 END) AS หมดประกันแล้ว
                         FROM assets
@@ -479,13 +483,18 @@ class DataAssistant {
                 case 'get_recent_activities': {
                     $limit  = max(1, min(100, (int)($args['limit'] ?? 15)));
                     $action = trim((string)($args['action'] ?? ''));
-                    $where  = $action ? "WHERE action LIKE :a" : "";
+                    $where  = $action ? "WHERE a.action LIKE :a" : "";
                     $sql = "
-                        SELECT timestamp AS เวลา, user_name AS ผู้ใช้, action AS การกระทำ,
-                               module AS โมดูล, target_type AS ประเภทเป้าหมาย, description AS รายละเอียด
-                        FROM sys_activity_logs
+                        SELECT a.timestamp AS เวลา,
+                               COALESCE(ad.full_name, s.full_name, 'System') AS ผู้ใช้,
+                               a.action AS การกระทำ,
+                               a.description AS รายละเอียด,
+                               a.ip_address AS ip
+                        FROM sys_activity_logs a
+                        LEFT JOIN sys_admins ad ON ad.id = a.user_id
+                        LEFT JOIN sys_staff  s  ON s.id  = a.user_id
                         $where
-                        ORDER BY timestamp DESC
+                        ORDER BY a.timestamp DESC
                         LIMIT :l
                     ";
                     $stmt = $this->pdo->prepare($sql);
