@@ -139,7 +139,7 @@ try {
                         กลับหน้าก่อนหน้า
                     </a>
                     
-                    <a href="/rsu-clinic/user/hub.php" 
+                    <a href="/e-campaignv2/user/hub.php" 
                        class="flex items-center justify-center gap-3 w-full py-5 bg-white text-slate-400 font-black rounded-2xl border border-slate-100 hover:bg-slate-50 transition-all active:scale-95 text-sm uppercase tracking-wider">
                         <i class="fa-solid fa-house"></i>
                         ไปหน้าหลัก

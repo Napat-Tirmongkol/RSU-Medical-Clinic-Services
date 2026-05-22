@@ -157,7 +157,7 @@ function send_line_cancellation(string $lineUserId, array $data): void {
                 [
                     'type'  => 'uri',
                     'label' => '👉 จองใหม่',
-                    'uri'   => 'https://healthycampus.rsu.ac.th/rsu-clinic/user/booking_campaign.php'
+                    'uri'   => 'https://healthycampus.rsu.ac.th/e-campaignv2/user/booking_campaign.php'
                 ]
             ]
         ]

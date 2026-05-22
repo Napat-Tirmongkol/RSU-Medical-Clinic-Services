@@ -4,7 +4,7 @@
  * ลบ error log เก่ากว่า 30 วัน และ activity log เก่ากว่า 90 วัน
  *
  * ── วิธีตั้งค่า cron-job.org ──────────────────────────────────────
- *  URL     : https://healthycampus.rsu.ac.th/rsu-clinic/cron/purge_error_logs.php?token=YOUR_SECRET_TOKEN
+ *  URL     : https://healthycampus.rsu.ac.th/e-campaignv2/cron/purge_error_logs.php?token=YOUR_SECRET_TOKEN
  *  Schedule: Every day at 2:00 (Asia/Bangkok)
  * ──────────────────────────────────────────────────────────────────
  */

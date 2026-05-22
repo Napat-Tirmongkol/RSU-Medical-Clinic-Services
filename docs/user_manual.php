@@ -194,7 +194,7 @@ declare(strict_types=1);
     <div style="background:rgba(255,255,255,0.7); border:1px solid rgba(15,115,73,0.2); border-radius:12px; padding:20px 24px; font-size:11pt">
         <div style="display:flex;justify-content:space-between;margin:3px 0"><span style="font-weight:700;color:#475569">ใช้กับ</span><span style="font-weight:600;color:#0f172a">นักศึกษา · บุคลากร · บุคคลทั่วไป</span></div>
         <div style="display:flex;justify-content:space-between;margin:3px 0"><span style="font-weight:700;color:#475569">เข้าใช้งานผ่าน</span><span style="font-weight:600;color:#0f172a">LINE OA: @RSU-MedicalClinic</span></div>
-        <div style="display:flex;justify-content:space-between;margin:3px 0"><span style="font-weight:700;color:#475569">URL ระบบ</span><span style="font-weight:600;color:#0f172a">healthycampus.rsu.ac.th/rsu-clinic/user/</span></div>
+        <div style="display:flex;justify-content:space-between;margin:3px 0"><span style="font-weight:700;color:#475569">URL ระบบ</span><span style="font-weight:600;color:#0f172a">healthycampus.rsu.ac.th/e-campaignv2/user/</span></div>
         <div style="display:flex;justify-content:space-between;margin:3px 0"><span style="font-weight:700;color:#475569">เวอร์ชัน</span><span style="font-weight:600;color:#0f172a">v1.0 — พฤษภาคม 2569</span></div>
     </div>
 </div>

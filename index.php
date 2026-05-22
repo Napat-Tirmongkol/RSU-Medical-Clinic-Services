@@ -1,8 +1,8 @@
 <?php
 /**
- * rsu-clinic/index.php  — Root entry point
+ * e-campaignv2/index.php  — Root entry point
  *
- * Browser / LINE LIFF มักจะ request /rsu-clinic/index.php
+ * Browser / LINE LIFF มักจะ request /e-campaignv2/index.php
  * ไฟล์นี้จะตรวจสอบ session แล้วส่งต่อไปหน้าที่ถูกต้อง
  * โดยไม่ต้องให้ user เห็นหน้าขาว
  */

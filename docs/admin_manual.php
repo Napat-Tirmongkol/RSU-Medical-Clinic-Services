@@ -19,7 +19,7 @@ if ($adminRole !== 'superadmin' && $adminRole !== 'admin') {
     h1{color:#dc2626;margin:0 0 8px 0}p{color:#64748b}a{color:#0f7349;font-weight:700}</style>
     </head><body><div class="box"><h1>🛡️ Access Denied</h1>
     <p>คู่มือ Admin สำหรับเจ้าหน้าที่ระดับผู้ดูแลระบบเท่านั้น</p>
-    <a href="/rsu-clinic/admin/auth/login.php">→ เข้าสู่ระบบ</a>
+    <a href="/e-campaignv2/admin/auth/login.php">→ เข้าสู่ระบบ</a>
     </div></body></html>
     <?php
     exit;
@@ -194,7 +194,7 @@ if ($adminRole !== 'superadmin' && $adminRole !== 'admin') {
     </div>
     <div style="background:rgba(255,255,255,0.7); border:1px solid rgba(79,70,229,0.2); border-radius:12px; padding:20px 24px; font-size:11pt">
         <div style="display:flex;justify-content:space-between;margin:3px 0"><span style="font-weight:700;color:#475569">เป้าหมาย</span><span style="font-weight:600;color:#0f172a">เจ้าหน้าที่ระดับ <span class="role-badge role-super">superadmin</span> และ <span class="role-badge role-admin">admin</span></span></div>
-        <div style="display:flex;justify-content:space-between;margin:3px 0"><span style="font-weight:700;color:#475569">URL Portal</span><span style="font-weight:600;color:#0f172a">healthycampus.rsu.ac.th/rsu-clinic/portal/</span></div>
+        <div style="display:flex;justify-content:space-between;margin:3px 0"><span style="font-weight:700;color:#475569">URL Portal</span><span style="font-weight:600;color:#0f172a">healthycampus.rsu.ac.th/e-campaignv2/portal/</span></div>
         <div style="display:flex;justify-content:space-between;margin:3px 0"><span style="font-weight:700;color:#475569">เวอร์ชัน</span><span style="font-weight:600;color:#0f172a">v1.0 — พฤษภาคม 2569</span></div>
     </div>
 </div>
@@ -237,7 +237,7 @@ if ($adminRole !== 'superadmin' && $adminRole !== 'admin') {
 
     <h3>1.2 วิธีเข้าสู่ระบบ</h3>
     <div class="step-card">
-        <span class="step-num">1</span><h4>เปิด <code>healthycampus.rsu.ac.th/rsu-clinic/admin/auth/login.php</code></h4>
+        <span class="step-num">1</span><h4>เปิด <code>healthycampus.rsu.ac.th/e-campaignv2/admin/auth/login.php</code></h4>
     </div>
     <div class="step-card">
         <span class="step-num">2</span><h4>กรอก username + password ที่ได้รับจาก superadmin</h4>

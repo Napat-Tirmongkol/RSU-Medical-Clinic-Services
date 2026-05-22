@@ -23,9 +23,9 @@ try {
     if($pdo->query("SELECT COUNT(*) FROM sys_app_links")->fetchColumn() == 0) {
         $stmt = $pdo->prepare("INSERT INTO sys_app_links (category, title, description, url, icon, color_theme, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)");
         
-        $stmt->execute(['system', 'หน้าเว็บ E-Campaign เบื้องหน้า', 'ระบบลงทะเบียนกิจกรรมและจองคิว', '/rsu-clinic/', 'fa-hospital-user', 'emerald', 1]);
-        $stmt->execute(['system', 'ระบบ E-Borrow', 'ค้นหาและทำรายการยืม-คืน อุปกรณ์', '/rsu-clinic/e_Borrow/', 'fa-box-open', 'blue', 2]);
-        $stmt->execute(['system', 'Admin Login Portal', 'ทางเข้าการจัดการสำหรับเจ้าหน้าที่', '/rsu-clinic/login.php', 'fa-shield-halved', 'amber', 3]);
+        $stmt->execute(['system', 'หน้าเว็บ E-Campaign เบื้องหน้า', 'ระบบลงทะเบียนกิจกรรมและจองคิว', '/e-campaignv2/', 'fa-hospital-user', 'emerald', 1]);
+        $stmt->execute(['system', 'ระบบ E-Borrow', 'ค้นหาและทำรายการยืม-คืน อุปกรณ์', '/e-campaignv2/e_Borrow/', 'fa-box-open', 'blue', 2]);
+        $stmt->execute(['system', 'Admin Login Portal', 'ทางเข้าการจัดการสำหรับเจ้าหน้าที่', '/e-campaignv2/login.php', 'fa-shield-halved', 'amber', 3]);
         
         $stmt->execute(['liff', 'LINE LIFF - หน้าแรกผู้ป่วย', 'ระบบฝังใน LINE OA สำหรับผู้ป่วยดูคิวของตนเอง', 'https://liff.line.me/1234567890-abcdef', 'fa-line', 'line', 4]);
         $stmt->execute(['liff', 'LINE LIFF - แบบสอบถามคัดกรอง', 'หน้าตอบแบบสอบถามก่อนเข้าร่วมกิจกรรม', 'https://liff.line.me/1234567890-ghijkl', 'fa-line', 'line', 5]);

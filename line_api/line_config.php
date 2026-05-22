@@ -37,7 +37,7 @@ $host = $_SERVER['HTTP_HOST'] ?? 'healthycampus.rsu.ac.th';
 $scriptDir = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/line_api/index.php'));
 $scriptDir = rtrim($scriptDir, '/');
 
-// Expect script dir like "/rsu-clinic/line_api" or "/line_api"
+// Expect script dir like "/e-campaignv2/line_api" or "/line_api"
 $base_path = preg_replace('#/line_api$#', '', $scriptDir);
 if ($base_path === false || $base_path === '/' || $base_path === '.') {
     $base_path = '';

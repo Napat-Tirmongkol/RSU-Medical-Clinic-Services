@@ -14,8 +14,8 @@ define('LINE_LOGIN_CHANNEL_SECRET', $secrets['LINE_LOGIN_CHANNEL_SECRET_NEW'] ??
 define('LINE_MESSAGING_API_TOKEN', $secrets['EBORROW_LINE_MESSAGE_TOKEN'] ?? 'YOUR_EBORROW_TOKEN');
 
 // สร้าง callback URL จาก SCRIPT_NAME (web path จริง, ใช้งานได้ทั้ง Apache/IIS)
-// SCRIPT_NAME ตัวอย่าง: /rsu-clinic/e_Borrow/login.php
-//                        /rsu-clinic/e_Borrow/admin/login.php
+// SCRIPT_NAME ตัวอย่าง: /e-campaignv2/e_Borrow/login.php
+//                        /e-campaignv2/e_Borrow/admin/login.php
 // หา /e_Borrow แล้ว cut เอาเฉพาะ prefix + /e_Borrow
 $_eb_script   = str_replace('\\', '/', $_SERVER['SCRIPT_NAME'] ?? '');
 $_eb_pos      = strrpos($_eb_script, '/e_Borrow');

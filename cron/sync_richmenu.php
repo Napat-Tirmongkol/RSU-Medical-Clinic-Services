@@ -8,7 +8,7 @@
  * (LINE API จะ overwrite binding เดิมด้วย richMenuId เดียวกัน — ไม่มี side effect)
  *
  * ── วิธีตั้งค่า cron-job.org ──────────────────────────────────────────────────
- *  URL     : https://healthycampus.rsu.ac.th/rsu-clinic/cron/sync_richmenu.php?token=YOUR_SECRET_TOKEN
+ *  URL     : https://healthycampus.rsu.ac.th/e-campaignv2/cron/sync_richmenu.php?token=YOUR_SECRET_TOKEN
  *  Schedule: สัปดาห์ละครั้ง (เช่น ทุกวันอาทิตย์ 03:00 Asia/Bangkok)
  *
  *  Optional query params:

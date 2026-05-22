@@ -4,7 +4,7 @@
  * ส่งอีเมลแจ้งเตือนนัดหมาย 1 วันล่วงหน้า — พร้อม delay ระหว่างแต่ละเมล
  *
  * ── วิธีตั้งค่า cron-job.org ──────────────────────────────────────────────────
- *  URL     : https://healthycampus.rsu.ac.th/rsu-clinic/cron/send_appointment_reminders.php?token=YOUR_SECRET_TOKEN
+ *  URL     : https://healthycampus.rsu.ac.th/e-campaignv2/cron/send_appointment_reminders.php?token=YOUR_SECRET_TOKEN
  *  Schedule: ทุกวัน เวลา 08:00 (Asia/Bangkok)
  *
  * ── Delay ────────────────────────────────────────────────────────────────────

@@ -6,7 +6,7 @@
 #  วิธีติดตั้ง cron job:
 #  1. เปิด crontab:  crontab -e
 #  2. เพิ่มบรรทัดนี้ (สำรองทุกวัน ตี 2):
-#     0 2 * * * /bin/bash /var/www/html/rsu-clinic/cron/backup_db.sh >> /var/www/html/rsu-clinic/cron/logs/backup.log 2>&1
+#     0 2 * * * /bin/bash /var/www/html/e-campaignv2/cron/backup_db.sh >> /var/www/html/e-campaignv2/cron/logs/backup.log 2>&1
 # ══════════════════════════════════════════════════════
 
 # ── หา root path ของโปรเจกต์ (1 ระดับเหนือ cron/) ────
