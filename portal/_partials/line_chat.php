@@ -67,9 +67,15 @@ $lineTokenSet = line_chat_load_access_token() !== '';
 
             <!-- Convo header -->
             <div id="lcConvoHeader" class="px-5 py-3 border-b border-slate-100 bg-white flex items-center justify-between shrink-0">
-                <div class="min-w-0">
-                    <div id="lcConvoTitle" class="text-sm font-black text-slate-700 truncate">เลือกบทสนทนา</div>
-                    <div id="lcConvoMeta" class="lc-subtitle text-slate-400 font-bold mt-0.5">หรือคลิก "รีโหลด" ดูบทสนทนาใหม่</div>
+                <div class="lc-header-row">
+                    <div id="lcHeaderPic" class="lc-header-pic">
+                        <i class="fa-brands fa-line text-emerald-500"></i>
+                    </div>
+                    <div class="min-w-0 flex-1">
+                        <div id="lcConvoTitle" class="text-sm font-black text-slate-700 truncate">เลือกบทสนทนา</div>
+                        <div id="lcConvoMeta" class="lc-subtitle text-slate-400 font-bold mt-0.5">หรือคลิก "รีโหลด" ดูบทสนทนาใหม่</div>
+                        <div id="lcConvoBadges" class="mt-1 flex items-center gap-1 flex-wrap"></div>
+                    </div>
                 </div>
             </div>
 
@@ -133,14 +139,30 @@ $lineTokenSet = line_chat_load_access_token() !== '';
     border: 1.5px solid transparent;
     transition: background 0.15s, border-color 0.15s;
     position: relative;
+    display: flex; gap: 10px; align-items: flex-start;
 }
 .lc-convo-item:hover { background: #f1f5f9; }
 .lc-convo-item.active { background: rgba(6,199,85,.08); border-color: rgba(6,199,85,.30); }
-.lc-convo-item .c-name { font-size: 13px; font-weight: 800; color: #334155; display: flex; align-items: center; gap: 6px; }
-.lc-convo-item .c-uid  { font-size: 10px; color: #94a3b8; font-family: ui-monospace, monospace; font-weight: 600; }
+.lc-convo-pic { width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0; background: #f1f5f9; display: flex; align-items: center; justify-content: center; color: #94a3b8; overflow: hidden; }
+.lc-convo-pic img { width: 100%; height: 100%; object-fit: cover; }
+.lc-convo-body { flex: 1; min-width: 0; }
+.lc-convo-item .c-name { font-size: 13px; font-weight: 800; color: #334155; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.lc-convo-item .c-uid  { font-size: 10px; color: #94a3b8; font-family: ui-monospace, monospace; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lc-convo-item .c-preview { font-size: 12px; color: #64748b; margin-top: 4px; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; }
 .lc-convo-item .c-meta { font-size: 10px; color: #94a3b8; font-weight: 600; margin-top: 4px; display: flex; justify-content: space-between; }
 .lc-convo-item .c-badge { background: #ef4444; color: white; font-size: 9px; font-weight: 900; padding: 1px 6px; border-radius: 999px; }
+
+/* Status pills — student/faculty/staff/other */
+.lc-status { font-size: 10px; font-weight: 800; padding: 2px 8px; border-radius: 999px; display: inline-flex; align-items: center; gap: 3px; }
+.lc-status.tone-info   { background: rgba(59,130,246,.12); color: #2563eb; }
+.lc-status.tone-accent { background: rgba(168,85,247,.12); color: #9333ea; }
+.lc-status.tone-amber  { background: rgba(245,158,11,.15); color: #b45309; }
+.lc-status.tone-slate  { background: rgba(100,116,139,.15); color: #475569; }
+
+/* Convo header avatar (right panel top) */
+.lc-header-pic { width: 44px; height: 44px; border-radius: 50%; overflow: hidden; flex-shrink: 0; background: #f1f5f9; display: flex; align-items: center; justify-content: center; color: #94a3b8; }
+.lc-header-pic img { width: 100%; height: 100%; object-fit: cover; }
+.lc-header-row { display: flex; gap: 12px; align-items: center; min-width: 0; flex: 1; }
 
 .lc-msg-row { display: flex; gap: 10px; align-items: flex-end; }
 .lc-msg-row.is-outbound { flex-direction: row-reverse; }
@@ -188,6 +210,12 @@ body[data-theme='dark'] #section-line_chat .bg-amber-50 { background: rgba(245,1
 body[data-theme='dark'] #section-line_chat .text-amber-700,
 body[data-theme='dark'] #section-line_chat .text-amber-900 { color:#fcd34d !important; }
 body[data-theme='dark'] #section-line_chat .lc-bubble.system { background: rgba(245,158,11,.22) !important; color:#fde68a !important; }
+body[data-theme='dark'] #section-line_chat .lc-convo-pic,
+body[data-theme='dark'] #section-line_chat .lc-header-pic { background: rgba(148,163,184,.14) !important; color:#94a3b8; }
+body[data-theme='dark'] #section-line_chat .lc-status.tone-info   { background: rgba(59,130,246,.20) !important; color:#60a5fa !important; }
+body[data-theme='dark'] #section-line_chat .lc-status.tone-accent { background: rgba(168,85,247,.20) !important; color:#c084fc !important; }
+body[data-theme='dark'] #section-line_chat .lc-status.tone-amber  { background: rgba(245,158,11,.20) !important; color:#fbbf24 !important; }
+body[data-theme='dark'] #section-line_chat .lc-status.tone-slate  { background: rgba(148,163,184,.18) !important; color:#cbd5e1 !important; }
 </style>
 
 <script>
@@ -227,6 +255,29 @@ async function lcLoadConvos() {
     }
 }
 
+function lcPicHtml(pictureUrl, fallbackLine = true) {
+    if (pictureUrl) {
+        return `<img src="${lcEsc(pictureUrl)}" alt="" referrerpolicy="no-referrer" onerror="this.replaceWith(Object.assign(document.createElement('i'),{className:'fa-brands fa-line text-emerald-500'}))">`;
+    }
+    return fallbackLine ? '<i class="fa-brands fa-line text-emerald-500"></i>' : '<i class="fa-solid fa-user"></i>';
+}
+
+function lcStatusBadgeHtml(sysUser) {
+    if (!sysUser) return '<span class="lc-status tone-slate"><i class="fa-solid fa-circle-question"></i>ยังไม่ลงทะเบียน</span>';
+    const tone = lcEsc(sysUser.status_tone || 'slate');
+    const label = lcEsc(sysUser.status_label || 'ไม่ระบุ');
+    return `<span class="lc-status tone-${tone}">${label}</span>`;
+}
+
+function lcDisplayName(c) {
+    // System full_name has priority — falls back to LINE display name → "LINE User"
+    if (c.system_user && c.system_user.full_name) {
+        const prefix = c.system_user.prefix ? c.system_user.prefix + ' ' : '';
+        return prefix + c.system_user.full_name;
+    }
+    return c.profile_display_name || c.line_display_name || 'LINE User';
+}
+
 function lcRenderConvos() {
     const box = document.getElementById('lcConvoList');
     const list = lcState.conversations;
@@ -237,18 +288,25 @@ function lcRenderConvos() {
             const uid = String(c.line_user_id || '');
             const active = (uid === lcState.currentUid) ? ' active' : '';
             const uidShort = lcEsc(uid.slice(0, 12) + '…');
-            const name = lcEsc(c.line_display_name || 'LINE User');
+            const name = lcEsc(lcDisplayName(c));
+            const lineName = c.profile_display_name ? `<span class="text-slate-400 font-normal" style="font-size:11px">· ${lcEsc(c.profile_display_name)}</span>` : '';
             const lastMsg = lcEsc((c.last_msg_text || '').slice(0, 80));
             const dirIcon = c.last_msg_direction === 'inbound'
                 ? '<i class="fa-solid fa-arrow-down text-slate-400 mr-1"></i>'
                 : '<i class="fa-solid fa-arrow-up text-emerald-500 mr-1"></i>';
             const time = lcEsc((c.last_msg_at || '').slice(5, 16).replace('T', ' '));
-            const badge = parseInt(c.needs_reply, 10) ? '<span class="c-badge">ต้องตอบ</span>' : '';
+            const needBadge = parseInt(c.needs_reply, 10) ? '<span class="c-badge">ต้องตอบ</span>' : '';
+            const statusBadge = lcStatusBadgeHtml(c.system_user);
+            const pic = lcPicHtml(c.profile_picture_url, true);
             return `<div class="lc-convo-item${active}" data-uid="${lcEsc(uid)}">
-                <div class="c-name"><i class="fa-brands fa-line text-emerald-500"></i>${name} ${badge}</div>
-                <div class="c-uid">${uidShort}</div>
-                <div class="c-preview">${dirIcon}${lastMsg}</div>
-                <div class="c-meta"><span>${time}</span><span>${parseInt(c.total_msgs, 10) || 0} ข้อความ</span></div>
+                <div class="lc-convo-pic">${pic}</div>
+                <div class="lc-convo-body">
+                    <div class="c-name">${name} ${needBadge}</div>
+                    <div class="mt-0.5">${statusBadge} ${lineName}</div>
+                    <div class="c-uid">${uidShort}</div>
+                    <div class="c-preview">${dirIcon}${lastMsg}</div>
+                    <div class="c-meta"><span>${time}</span><span>${parseInt(c.total_msgs, 10) || 0} ข้อความ</span></div>
+                </div>
             </div>`;
         }).join('');
     }
@@ -267,9 +325,32 @@ async function lcOpenConvo(lineUserId) {
         const res = await lcAjax('conversation', 'get', null, { line_user_id: lineUserId, limit: 200 });
         if (!res.ok) throw new Error(res.message);
         lcState.currentConvo = res.data;
-        const name = res.data.line_display_name || 'LINE User';
-        document.getElementById('lcConvoTitle').textContent = name;
+
+        // Display name: system match > LINE profile > LINE display in messages > fallback
+        const sys = res.data.system_user;
+        let titleName;
+        if (sys && sys.full_name) {
+            titleName = (sys.prefix ? sys.prefix + ' ' : '') + sys.full_name;
+        } else {
+            titleName = res.data.line_display_name || 'LINE User';
+        }
+        document.getElementById('lcConvoTitle').textContent = titleName;
         document.getElementById('lcConvoMeta').textContent = lineUserId;
+
+        // Header avatar
+        document.getElementById('lcHeaderPic').innerHTML = lcPicHtml(res.data.line_picture_url, true);
+
+        // Badges row: status badge + LINE profile name (if different from system name) + student/personnel ID
+        const badges = [];
+        badges.push(lcStatusBadgeHtml(sys));
+        if (sys && sys.student_personnel_id) {
+            badges.push(`<span class="lc-status tone-slate"><i class="fa-solid fa-id-badge"></i>${lcEsc(sys.student_personnel_id)}</span>`);
+        }
+        if (res.data.line_display_name && (!sys || res.data.line_display_name !== sys.full_name)) {
+            badges.push(`<span class="lc-status tone-slate"><i class="fa-brands fa-line text-emerald-500"></i>${lcEsc(res.data.line_display_name)}</span>`);
+        }
+        document.getElementById('lcConvoBadges').innerHTML = badges.join('');
+
         lcRenderMessages(res.data.messages || []);
     } catch (e) {
         document.getElementById('lcMessages').innerHTML =

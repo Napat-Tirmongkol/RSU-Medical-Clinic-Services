@@ -62,10 +62,151 @@ function line_chat_ensure_schema(PDO $pdo): void
                 INDEX idx_created (created_at)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         ");
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS sys_line_profiles (
+                line_user_id VARCHAR(64) PRIMARY KEY,
+                display_name VARCHAR(120) NULL,
+                picture_url VARCHAR(500) NULL,
+                status_message TEXT NULL,
+                last_fetched_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                INDEX idx_last_fetched (last_fetched_at)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        ");
         $done = true;
     } catch (PDOException $e) {
         error_log('[line_chat] ensure_schema failed: ' . $e->getMessage());
     }
+}
+
+// ──────────────────────────────────────────────────────────────────
+// PROFILE — cache + LINE API fetch + system user match
+// ──────────────────────────────────────────────────────────────────
+
+/** ดึง profile จาก LINE Messaging API (live call — ไม่ cache) */
+function line_chat_fetch_profile_from_line(string $lineUserId): ?array
+{
+    $token = line_chat_load_access_token();
+    if ($token === '' || $lineUserId === '') return null;
+
+    $url = "https://api.line.me/v2/bot/profile/" . urlencode($lineUserId);
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_HTTPHEADER     => ['Authorization: Bearer ' . $token],
+        CURLOPT_TIMEOUT        => 8,
+        CURLOPT_CONNECTTIMEOUT => 3,
+    ]);
+    $resp = curl_exec($ch);
+    $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    if ($code !== 200 || !$resp) {
+        error_log("[line_chat] profile API HTTP $code for " . substr($lineUserId, 0, 12));
+        return null;
+    }
+    $data = json_decode((string)$resp, true);
+    if (!is_array($data)) return null;
+    return [
+        'displayName'   => $data['displayName'] ?? null,
+        'pictureUrl'    => $data['pictureUrl']  ?? null,
+        'statusMessage' => $data['statusMessage'] ?? null,
+    ];
+}
+
+/**
+ * คืน profile ของ LINE user — cache-aware
+ * @param int $staleSeconds  default 7 วัน — refresh ถ้า cache เก่ากว่านี้
+ */
+function line_chat_get_profile(PDO $pdo, string $lineUserId, int $staleSeconds = 604800): ?array
+{
+    if ($lineUserId === '') return null;
+    line_chat_ensure_schema($pdo);
+
+    $cached = null;
+    try {
+        $stmt = $pdo->prepare("
+            SELECT display_name, picture_url, status_message,
+                   UNIX_TIMESTAMP(last_fetched_at) AS fetched_ts
+            FROM sys_line_profiles WHERE line_user_id = ?
+        ");
+        $stmt->execute([$lineUserId]);
+        $cached = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+    } catch (PDOException $e) {
+        error_log('[line_chat] profile cache read failed: ' . $e->getMessage());
+    }
+
+    $now = time();
+    if ($cached && ($now - (int)$cached['fetched_ts']) < $staleSeconds) {
+        return [
+            'display_name'   => $cached['display_name'],
+            'picture_url'    => $cached['picture_url'],
+            'status_message' => $cached['status_message'],
+        ];
+    }
+
+    // Stale or missing — try LINE API
+    $fresh = line_chat_fetch_profile_from_line($lineUserId);
+    if (!$fresh) {
+        // API failed — fallback to stale cache if any
+        return $cached ? [
+            'display_name'   => $cached['display_name'],
+            'picture_url'    => $cached['picture_url'],
+            'status_message' => $cached['status_message'],
+        ] : null;
+    }
+
+    // Upsert cache
+    try {
+        $up = $pdo->prepare("
+            INSERT INTO sys_line_profiles (line_user_id, display_name, picture_url, status_message)
+            VALUES (?, ?, ?, ?)
+            ON DUPLICATE KEY UPDATE
+                display_name   = VALUES(display_name),
+                picture_url    = VALUES(picture_url),
+                status_message = VALUES(status_message),
+                last_fetched_at = CURRENT_TIMESTAMP
+        ");
+        $up->execute([$lineUserId, $fresh['displayName'], $fresh['pictureUrl'], $fresh['statusMessage']]);
+    } catch (PDOException $e) {
+        error_log('[line_chat] profile cache upsert failed: ' . $e->getMessage());
+    }
+
+    return [
+        'display_name'   => $fresh['displayName'],
+        'picture_url'    => $fresh['pictureUrl'],
+        'status_message' => $fresh['statusMessage'],
+    ];
+}
+
+/**
+ * Match LINE UID → sys_users row (returns prefix, full_name, status, student_personnel_id)
+ * ใช้ helper เดิม find_user_by_line_uid() (handle line_user_id_new fallback)
+ */
+function line_chat_match_system_user(PDO $pdo, string $lineUserId): ?array
+{
+    if ($lineUserId === '') return null;
+    require_once __DIR__ . '/line_helper.php';
+    if (!function_exists('find_user_by_line_uid')) return null;
+    try {
+        return find_user_by_line_uid($pdo, $lineUserId,
+            'id, prefix, full_name, status, student_personnel_id, picture_url'
+        );
+    } catch (Throwable $e) {
+        error_log('[line_chat] match_system_user failed: ' . $e->getMessage());
+        return null;
+    }
+}
+
+/** Map status code → Thai label + tone for badge */
+function line_chat_status_label(?string $status): array
+{
+    $map = [
+        'student' => ['label' => 'นักศึกษา',      'tone' => 'info'],
+        'faculty' => ['label' => 'อาจารย์',        'tone' => 'accent'],
+        'staff'   => ['label' => 'เจ้าหน้าที่',     'tone' => 'amber'],
+        'other'   => ['label' => 'บุคคลทั่วไป',    'tone' => 'slate'],
+    ];
+    return $map[$status ?? ''] ?? ['label' => 'ไม่ระบุ', 'tone' => 'slate'];
 }
 
 // ──────────────────────────────────────────────────────────────────
@@ -175,7 +316,11 @@ function line_chat_list_conversations(PDO $pdo, string $filter = 'all', int $pag
     $total = (int)$countStmt->fetchColumn();
 
     $listSql = "
-        SELECT * FROM ($base) AS c
+        SELECT c.*,
+               p.display_name AS profile_display_name,
+               p.picture_url  AS profile_picture_url
+        FROM ($base) AS c
+        LEFT JOIN sys_line_profiles p ON p.line_user_id = c.line_user_id
         WHERE $where
         ORDER BY last_msg_at DESC
         LIMIT $perPage OFFSET $offset
@@ -186,6 +331,21 @@ function line_chat_list_conversations(PDO $pdo, string $filter = 'all', int $pag
 
     foreach ($rows as &$r) {
         $r['needs_reply'] = (empty($r['last_outbound_at']) || ($r['last_inbound_at'] && $r['last_inbound_at'] > $r['last_outbound_at'])) ? 1 : 0;
+        // System user match — adds prefix/full_name/status if user registered in portal
+        $sysUser = line_chat_match_system_user($pdo, (string)$r['line_user_id']);
+        if ($sysUser) {
+            $statusInfo = line_chat_status_label($sysUser['status'] ?? null);
+            $r['system_user'] = [
+                'prefix'                => $sysUser['prefix'] ?? null,
+                'full_name'             => $sysUser['full_name'] ?? null,
+                'status'                => $sysUser['status'] ?? null,
+                'status_label'          => $statusInfo['label'],
+                'status_tone'           => $statusInfo['tone'],
+                'student_personnel_id'  => $sysUser['student_personnel_id'] ?? null,
+            ];
+        } else {
+            $r['system_user'] = null;
+        }
     }
     unset($r);
 
@@ -217,15 +377,36 @@ function line_chat_get_conversation(PDO $pdo, string $lineUserId, int $limit = 2
     $stmt->execute([$lineUserId]);
     $messages = array_reverse($stmt->fetchAll(PDO::FETCH_ASSOC));
 
-    // Display name = ล่าสุดที่ไม่ NULL
-    $displayName = null;
-    foreach ($messages as $m) {
-        if (!empty($m['line_display_name'])) { $displayName = $m['line_display_name']; break; }
+    // Profile lookup (refreshes cache if stale — admin opening = good trigger)
+    $profile = line_chat_get_profile($pdo, $lineUserId);
+    $sysUser = line_chat_match_system_user($pdo, $lineUserId);
+    $systemBundle = null;
+    if ($sysUser) {
+        $statusInfo = line_chat_status_label($sysUser['status'] ?? null);
+        $systemBundle = [
+            'prefix'                => $sysUser['prefix'] ?? null,
+            'full_name'             => $sysUser['full_name'] ?? null,
+            'status'                => $sysUser['status'] ?? null,
+            'status_label'          => $statusInfo['label'],
+            'status_tone'           => $statusInfo['tone'],
+            'student_personnel_id'  => $sysUser['student_personnel_id'] ?? null,
+        ];
+    }
+
+    // Fallback display name: snapshot in messages → profile → null
+    $displayName = $profile['display_name'] ?? null;
+    if (!$displayName) {
+        foreach ($messages as $m) {
+            if (!empty($m['line_display_name'])) { $displayName = $m['line_display_name']; break; }
+        }
     }
 
     return [
         'line_user_id'      => $lineUserId,
         'line_display_name' => $displayName,
+        'line_picture_url'  => $profile['picture_url'] ?? null,
+        'line_status_msg'   => $profile['status_message'] ?? null,
+        'system_user'       => $systemBundle,
         'messages'          => $messages,
     ];
 }
