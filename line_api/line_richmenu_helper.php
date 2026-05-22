@@ -6,6 +6,7 @@
  *  "guest" (ยังไม่ลงทะเบียน) กับ "member" (มี record ใน sys_users + line_user_id)
  *
  * Settings เก็บใน sys_site_settings (keys):
+ *   - line.richmenu.enabled    (master switch: '1' = on, '0' = off — default on)
  *   - line.richmenu.guest_id
  *   - line.richmenu.member_id
  *
@@ -207,6 +208,46 @@ if (!function_exists('line_richmenu_save_ids')) {
             return true;
         } catch (Throwable $e) {
             error_log('[line_richmenu_save_ids] ' . $e->getMessage());
+            return false;
+        }
+    }
+}
+
+if (!function_exists('line_richmenu_is_enabled')) {
+    /**
+     * Master switch — false = หยุด sync ทั้งระบบ (webhook + manual sync ก็ no-op)
+     * Default = true (เพื่อ backward compat กับ install เก่าที่ไม่มี row นี้)
+     */
+    function line_richmenu_is_enabled(): bool
+    {
+        try {
+            $pdo = db();
+            $stmt = $pdo->prepare("SELECT setting_value FROM sys_site_settings
+                                   WHERE setting_key = 'line.richmenu.enabled' LIMIT 1");
+            $stmt->execute();
+            $v = $stmt->fetchColumn();
+            if ($v === false) return true;
+            return $v === '1' || $v === 1 || strtolower((string)$v) === 'true';
+        } catch (Throwable $e) {
+            error_log('[line_richmenu_is_enabled] ' . $e->getMessage());
+            return true;
+        }
+    }
+}
+
+if (!function_exists('line_richmenu_set_enabled')) {
+    function line_richmenu_set_enabled(bool $enabled): bool
+    {
+        try {
+            $pdo = db();
+            $v = $enabled ? '1' : '0';
+            $stmt = $pdo->prepare("INSERT INTO sys_site_settings (setting_key, setting_value)
+                                   VALUES ('line.richmenu.enabled', :v)
+                                   ON DUPLICATE KEY UPDATE setting_value = :v2");
+            $stmt->execute([':v' => $v, ':v2' => $v]);
+            return true;
+        } catch (Throwable $e) {
+            error_log('[line_richmenu_set_enabled] ' . $e->getMessage());
             return false;
         }
     }
@@ -552,6 +593,11 @@ if (!function_exists('line_richmenu_sync_user')) {
     function line_richmenu_sync_user(string $lineUserId, ?bool $forceIsMember = null, string $source = ''): array
     {
         if ($lineUserId === '') return ['ok' => false, 'state' => 'none', 'error' => 'lineUserId ว่าง'];
+
+        if (!line_richmenu_is_enabled()) {
+            line_richmenu_audit_log($lineUserId, 'sync_skipped', 'disabled', '', 'feature off', $source);
+            return ['ok' => false, 'state' => 'disabled', 'error' => 'feature disabled'];
+        }
 
         $ids = line_richmenu_get_ids();
         $isMember = $forceIsMember ?? line_richmenu_is_registered_user($lineUserId);

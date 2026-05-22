@@ -32,6 +32,7 @@ try {
         $list = line_richmenu_list();
         echo json_encode([
             'ok'        => true,
+            'enabled'   => line_richmenu_is_enabled(),
             'ids'       => $ids,
             'richmenus' => $list['richmenus'],
             'list_error'=> $list['error'],
@@ -44,6 +45,19 @@ try {
         exit;
     }
     validate_csrf_or_die();
+
+    if ($action === 'toggle_enabled') {
+        $enabled = isset($_POST['enabled']) && $_POST['enabled'] !== '' && $_POST['enabled'] !== '0';
+        $ok = line_richmenu_set_enabled($enabled);
+        echo json_encode([
+            'ok'      => $ok,
+            'enabled' => $enabled,
+            'message' => $ok
+                ? ($enabled ? 'เปิดใช้งาน Rich Menu auto-sync แล้ว' : 'ปิดใช้งานแล้ว — ระบบจะหยุด link เมนูให้ user ใหม่')
+                : 'บันทึกไม่สำเร็จ',
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
 
     if ($action === 'save_ids') {
         $guest    = trim((string)($_POST['guest_id']  ?? ''));

@@ -119,6 +119,173 @@ $webhookUrl = "$protocol://$host$uri";
     @media (prefers-reduced-motion: reduce) {
         #section-line_settings .line-card { transition: none !important; transform: none !important; }
     }
+
+    /* ════════════ Retro Power Switch (Rich Menu master on/off) ════════════ */
+    .rm-power-switch {
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 14px 10px 16px;
+        background: linear-gradient(180deg, #f1f5f9 0%, #cbd5e1 100%);
+        border: 2px solid #94a3b8;
+        border-radius: 10px;
+        box-shadow:
+            inset 0 2px 0 rgba(255,255,255,.85),
+            inset 0 -2px 0 rgba(0,0,0,.08),
+            0 3px 6px rgba(15,23,42,.12);
+        font-family: 'Courier New', ui-monospace, monospace;
+        user-select: none;
+    }
+    .rm-power-label {
+        font-size: 10px;
+        font-weight: 900;
+        letter-spacing: 0.18em;
+        color: #475569;
+        text-transform: uppercase;
+        text-shadow: 1px 1px 0 rgba(255,255,255,.7);
+    }
+    .rm-power-led {
+        position: relative;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: radial-gradient(circle at 35% 35%, #7f1d1d 0%, #450a0a 70%);
+        box-shadow:
+            inset 0 1px 2px rgba(0,0,0,.7),
+            0 0 0 2px #1e293b,
+            0 0 0 3px #64748b;
+        transition: background 0.25s, box-shadow 0.25s;
+    }
+    .rm-power-switch.is-on .rm-power-led {
+        background: radial-gradient(circle at 35% 35%, #bbf7d0 0%, #16a34a 60%, #14532d 100%);
+        box-shadow:
+            inset 0 1px 2px rgba(255,255,255,.4),
+            0 0 0 2px #14532d,
+            0 0 0 3px #64748b,
+            0 0 10px rgba(74,222,128,.7);
+        animation: rmLedPulse 2.4s ease-in-out infinite;
+    }
+    @keyframes rmLedPulse {
+        0%, 100% { box-shadow: inset 0 1px 2px rgba(255,255,255,.4), 0 0 0 2px #14532d, 0 0 0 3px #64748b, 0 0 10px rgba(74,222,128,.7); }
+        50%      { box-shadow: inset 0 1px 2px rgba(255,255,255,.4), 0 0 0 2px #14532d, 0 0 0 3px #64748b, 0 0 14px rgba(74,222,128,1); }
+    }
+    .rm-toggle {
+        background: none;
+        border: 0;
+        cursor: pointer;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .rm-toggle-track {
+        position: relative;
+        display: inline-block;
+        width: 62px;
+        height: 28px;
+        background: linear-gradient(180deg, #475569 0%, #1e293b 100%);
+        border: 2px solid #0f172a;
+        border-radius: 4px;
+        box-shadow: inset 0 2px 5px rgba(0,0,0,.7);
+    }
+    .rm-toggle-track::before,
+    .rm-toggle-track::after {
+        content: '';
+        position: absolute;
+        top: 50%;
+        transform: translateY(-50%);
+        font-family: 'Courier New', monospace;
+        font-size: 8px;
+        font-weight: 900;
+        letter-spacing: 0.05em;
+        color: rgba(255,255,255,.35);
+        text-shadow: 1px 1px 0 rgba(0,0,0,.5);
+    }
+    .rm-toggle-track::before { content: 'ON';  left: 7px; }
+    .rm-toggle-track::after  { content: 'OFF'; right: 6px; }
+    .rm-toggle-thumb {
+        position: absolute;
+        top: 2px;
+        left: 2px;
+        width: 22px;
+        height: 20px;
+        background:
+            linear-gradient(180deg, #fafafa 0%, #cbd5e1 50%, #94a3b8 100%);
+        border: 1px solid #475569;
+        border-radius: 3px;
+        box-shadow:
+            inset 0 1px 0 rgba(255,255,255,.9),
+            inset 0 -1px 0 rgba(0,0,0,.2),
+            0 2px 3px rgba(0,0,0,.4);
+        transition: left 0.18s cubic-bezier(.4,1.5,.6,1);
+    }
+    .rm-toggle-thumb::before {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 14px;
+        height: 2px;
+        background: rgba(0,0,0,.25);
+        border-radius: 1px;
+        box-shadow: 0 3px 0 rgba(0,0,0,.25), 0 -3px 0 rgba(0,0,0,.25);
+    }
+    .rm-power-switch.is-on .rm-toggle-track {
+        background: linear-gradient(180deg, #16a34a 0%, #14532d 100%);
+        border-color: #052e16;
+    }
+    .rm-power-switch.is-on .rm-toggle-thumb {
+        left: 36px;
+    }
+    .rm-toggle-state {
+        font-size: 14px;
+        font-weight: 900;
+        color: #b91c1c;
+        min-width: 36px;
+        text-align: left;
+        letter-spacing: 0.05em;
+        text-shadow: 1px 1px 0 rgba(255,255,255,.6);
+    }
+    .rm-power-switch.is-on .rm-toggle-state { color: #15803d; }
+    .rm-toggle:focus-visible { outline: 2px dashed #0ea5e9; outline-offset: 4px; border-radius: 4px; }
+
+    /* Dark mode */
+    body[data-theme='dark'] .rm-power-switch {
+        background: linear-gradient(180deg, #334155 0%, #0f172a 100%);
+        border-color: #475569;
+        box-shadow: inset 0 2px 0 rgba(255,255,255,.08), inset 0 -2px 0 rgba(0,0,0,.4), 0 3px 6px rgba(0,0,0,.4);
+    }
+    body[data-theme='dark'] .rm-power-label { color: #cbd5e1; text-shadow: 1px 1px 0 rgba(0,0,0,.5); }
+    body[data-theme='dark'] .rm-toggle-state { color: #f87171; text-shadow: 1px 1px 0 rgba(0,0,0,.6); }
+    body[data-theme='dark'] .rm-power-switch.is-on .rm-toggle-state { color: #4ade80; }
+
+    /* Disabled banner ครอบ section เมื่อปิด */
+    .rm-disabled-banner {
+        display: none;
+        margin-top: 14px;
+        padding: 10px 14px;
+        background: linear-gradient(180deg, #fef3c7, #fde68a);
+        border: 1.5px dashed #d97706;
+        border-radius: 10px;
+        color: #78350f;
+        font-size: 12px;
+        font-weight: 700;
+        gap: 8px;
+        align-items: center;
+    }
+    .rm-power-switch.is-off ~ .rm-disabled-banner,
+    #rmSection.is-disabled .rm-disabled-banner { display: flex; }
+    body[data-theme='dark'] .rm-disabled-banner {
+        background: rgba(217,119,6,.15);
+        border-color: rgba(217,119,6,.5);
+        color: #fcd34d;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .rm-power-switch.is-on .rm-power-led { animation: none; }
+        .rm-toggle-thumb { transition: none; }
+    }
 </style>
 
 <div class="px-4 py-8">
@@ -748,15 +915,31 @@ function sendTestLineP() {
 
 <!-- ════════════ Rich Menu (per-user binding) ════════════ -->
 <div class="max-w-4xl mx-auto px-4 md:px-6 pb-12 mt-2">
-    <div class="bg-white rounded-3xl border border-slate-200 shadow-sm p-6">
-        <div class="flex items-center gap-3 mb-1">
-            <div class="w-10 h-10 bg-emerald-50 text-emerald-600 rounded-2xl border border-emerald-100 flex items-center justify-center">
-                <i class="fa-solid fa-bars-staggered"></i>
+    <div class="bg-white rounded-3xl border border-slate-200 shadow-sm p-6" id="rmSection">
+        <div class="flex items-start justify-between gap-4 mb-1 flex-wrap">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-emerald-50 text-emerald-600 rounded-2xl border border-emerald-100 flex items-center justify-center">
+                    <i class="fa-solid fa-bars-staggered"></i>
+                </div>
+                <div>
+                    <h3 class="text-lg font-black text-slate-800">Rich Menu — สลับตามสถานะผู้ใช้</h3>
+                    <p class="text-xs text-slate-500 font-medium">guest = ยังไม่ลงทะเบียน · member = มี record ใน sys_users + line_user_id</p>
+                </div>
             </div>
-            <div>
-                <h3 class="text-lg font-black text-slate-800">Rich Menu — สลับตามสถานะผู้ใช้</h3>
-                <p class="text-xs text-slate-500 font-medium">guest = ยังไม่ลงทะเบียน · member = มี record ใน sys_users + line_user_id</p>
+            <div class="rm-power-switch" id="rmPowerSwitch" title="เปิด/ปิด auto-sync rich menu ทั้งระบบ">
+                <span class="rm-power-led" aria-hidden="true"></span>
+                <span class="rm-power-label">AUTO-SYNC</span>
+                <button type="button" class="rm-toggle" onclick="rmToggleEnabled()" id="rmToggleBtn" aria-pressed="false" aria-label="เปิดปิดการทำงาน Rich Menu auto-sync">
+                    <span class="rm-toggle-track" aria-hidden="true">
+                        <span class="rm-toggle-thumb"></span>
+                    </span>
+                    <span class="rm-toggle-state" id="rmToggleState">OFF</span>
+                </button>
             </div>
+        </div>
+        <div class="rm-disabled-banner" id="rmDisabledBanner">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+            <span>ปิดอยู่ — webhook จะไม่ link rich menu ให้ user ใหม่ · user ที่ link อยู่แล้วยังเห็นเมนูเดิม</span>
         </div>
 
         <div class="bg-sky-50 border border-sky-100 rounded-2xl p-3 mt-4 text-xs text-sky-800 font-medium flex gap-2 items-start">
@@ -1095,9 +1278,55 @@ function sendTestLineP() {
         rmShowLookupResult(r, `Rich menu ที่ผูกกับ <code>${uid.substring(0,12)}…</code>:`);
     };
 
+    function rmApplyEnabledUI(enabled) {
+        const sw  = document.getElementById('rmPowerSwitch');
+        const btn = document.getElementById('rmToggleBtn');
+        const lbl = document.getElementById('rmToggleState');
+        const sec = document.getElementById('rmSection');
+        if (!sw) return;
+        sw.classList.toggle('is-on',  !!enabled);
+        sw.classList.toggle('is-off', !enabled);
+        if (sec) sec.classList.toggle('is-disabled', !enabled);
+        if (btn) btn.setAttribute('aria-pressed', enabled ? 'true' : 'false');
+        if (lbl) lbl.textContent = enabled ? 'ON' : 'OFF';
+    }
+
+    window.rmToggleEnabled = async function() {
+        const sw = document.getElementById('rmPowerSwitch');
+        const currentlyOn = sw && sw.classList.contains('is-on');
+        const next = !currentlyOn;
+
+        const c = await Swal.fire({
+            icon: 'question',
+            title: next ? 'เปิดใช้งาน Rich Menu?' : 'ปิดใช้งาน Rich Menu?',
+            html: next
+                ? 'webhook จะ link เมนูให้ user ใหม่ที่ follow OA อัตโนมัติ'
+                : 'webhook จะ <b>หยุด link</b> เมนูให้ user ใหม่<br><small class="text-slate-500">user ที่ link เมนูอยู่แล้วจะยังเห็นเมนูเดิม</small>',
+            showCancelButton: true,
+            confirmButtonText: next ? 'เปิด' : 'ปิด',
+            cancelButtonText: 'ยกเลิก',
+            confirmButtonColor: next ? '#16a34a' : '#dc2626',
+        });
+        if (!c.isConfirmed) return;
+
+        const r = await rmPost('toggle_enabled', { enabled: next ? '1' : '0' });
+        if (r.ok) {
+            rmApplyEnabledUI(!!r.enabled);
+            Swal.fire({
+                icon: 'success',
+                title: r.message || 'บันทึกแล้ว',
+                timer: 1500,
+                showConfirmButton: false,
+            });
+        } else {
+            Swal.fire({ icon: 'error', title: 'บันทึกไม่สำเร็จ', text: r.message || '' });
+        }
+    };
+
     // โหลด initial state
     rmGet().then(d => {
         if (!d || !d.ok) return;
+        rmApplyEnabledUI(!!d.enabled);
         document.getElementById('rmGuestId').value  = d.ids.guest  || '';
         document.getElementById('rmMemberId').value = d.ids.member || '';
         const box = document.getElementById('rmListBox');
