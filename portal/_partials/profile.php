@@ -14,6 +14,11 @@ if (!isset($pdo) || !($pdo instanceof PDO)) {
 $staffId = (int)($_SESSION['admin_id'] ?? 0);
 $me = null;
 if ($staffId > 0) {
+    // Auto-migrate LINE profile columns (idempotent) — เผื่อยังไม่รัน migration
+    try { $pdo->exec("ALTER TABLE sys_staff ADD COLUMN IF NOT EXISTS line_display_name VARCHAR(120) NULL DEFAULT NULL"); } catch (PDOException) {}
+    try { $pdo->exec("ALTER TABLE sys_staff ADD COLUMN IF NOT EXISTS line_picture_url VARCHAR(500) NULL DEFAULT NULL"); } catch (PDOException) {}
+    try { $pdo->exec("ALTER TABLE sys_staff ADD COLUMN IF NOT EXISTS notify_sla_via_line TINYINT(1) NOT NULL DEFAULT 1"); } catch (PDOException) {}
+
     $stmt = $pdo->prepare("SELECT username, full_name, role, ecampaign_role,
                                   IFNULL(linked_line_user_id, '') AS linked_line_user_id,
                                   IFNULL(line_display_name, '') AS line_display_name,

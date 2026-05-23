@@ -154,6 +154,9 @@ if (($_SESSION['line_login_flow'] ?? '') === 'staff_link') {
             error_log('[staff_link] welcome push failed: ' . $e->getMessage());
         }
 
+        // Invalidate header LINE profile cache → reload on next request
+        unset($_SESSION['_line_profile_cache']);
+
         $_SESSION['line_link_flash'] = ['ok' => true, 'msg' => 'เชื่อมบัญชี LINE สำเร็จ — เราได้ส่งข้อความยืนยันไปยัง LINE ของคุณแล้ว'];
     } catch (Throwable $e) {
         error_log('[staff_link] save failed: ' . $e->getMessage());

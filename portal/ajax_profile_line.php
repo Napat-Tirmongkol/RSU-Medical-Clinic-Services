@@ -52,6 +52,9 @@ try {
             $pdo->prepare("UPDATE sys_staff SET linked_line_user_id = NULL, line_display_name = NULL, line_picture_url = NULL WHERE id = ?")
                 ->execute([$staffId]);
 
+            // Invalidate header avatar cache → header refresh กลับเป็น role icon
+            unset($_SESSION['_line_profile_cache']);
+
             // Audit
             try {
                 $audit = $pdo->prepare("INSERT INTO sys_access_audit_logs (target_id, target_type, changed_by, justification, change_snapshot) VALUES (?, 'staff_line_unlink', ?, ?, ?)");
