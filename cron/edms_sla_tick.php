@@ -3,8 +3,6 @@
  * cron/edms_sla_tick.php
  * EDMS SLA — periodic tick (cron-driven)
  *
- * Schedule: ทุก 1 ชั่วโมง (crontab: "0 * * * *")
- *
  * Job:
  *   1. Warning detection — routing ที่ใกล้ breach (เหลือ ≤ warn_at_pct% ของเวลา) แต่ยัง on_track
  *      → mark sla_state='warning' + warned_at + notify assignee
@@ -15,13 +13,23 @@
  *
  * Concurrency: advisory lock GET_LOCK('edms_sla_tick', 0)
  *
- * Setup:
- *   Crontab:  0 * * * * curl -s "https://yourdomain.com/cron/edms_sla_tick.php?token=YOUR_TOKEN" > /dev/null
- *   Or CLI:   php /path/to/cron/edms_sla_tick.php --token=YOUR_TOKEN
+ * ── วิธีตั้งค่า cron-job.org ──────────────────────────────────────────────────
+ *  URL     : https://healthycampus.rsu.ac.th/e-campaignv2/cron/edms_sla_tick.php?token=YOUR_SECRET_TOKEN
+ *  Schedule: Every hour (Asia/Bangkok) — crontab "0 * * * *"
+ *  Method  : GET
+ *  Timeout : 60s
+ *
+ * ── หรือเรียกผ่าน CLI (server-side cron) ─────────────────────────────────────
+ *  0 * * * * /usr/bin/php /path/to/cron/edms_sla_tick.php --token=YOUR_SECRET_TOKEN > /dev/null 2>&1
+ * ─────────────────────────────────────────────────────────────────────────────
+ *
+ * Token: เปลี่ยน SLA_TICK_TOKEN ด้านล่าง หรือใช้ env EDMS_SLA_CRON_TOKEN
  */
 declare(strict_types=1);
 
-// ── Secret Token (กัน abuse) ─────────────────────────────────────────────
+// ── Secret Token (ต้องตรงกันกับที่ใส่ใน URL ของ cron-job.org) ──────────────
+// อ่านจาก env ก่อน → fallback เป็น default ด้านล่าง
+// ⚠️ เปลี่ยน default token นี้ใน production!
 define('SLA_TICK_TOKEN', getenv('EDMS_SLA_CRON_TOKEN') ?: 'rsu_sla_tick_8a7f3k2m');
 
 $isCli = (php_sapi_name() === 'cli');
