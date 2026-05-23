@@ -157,7 +157,7 @@ $tonePalette = [
         </div>
         <div class="flex-1 min-w-0">
             <h2 class="text-2xl font-black text-slate-800">สารบรรณอิเล็กทรอนิกส์</h2>
-            <p class="text-slate-500 text-sm font-medium">Electronic Document Management System (EDMS)</p>
+            <p class="text-slate-500 text-sm font-medium">รับ-ส่งเอกสาร · บันทึกข้อความ · มอบหมายงาน — พร้อมติดตามเวลาดำเนินการ</p>
         </div>
         <?php if (!empty($_SESSION['access_edms']) || ($_SESSION['admin_role'] ?? '') === 'superadmin'): ?>
             <a href="?section=edms&edms_view=doctypes"
