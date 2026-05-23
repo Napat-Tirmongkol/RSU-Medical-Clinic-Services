@@ -16,7 +16,7 @@ require_once __DIR__ . '/edms/_helpers.php';
 
 $_view = $_GET['edms_view'] ?? '';
 $_validViews = ['list', 'detail', 'myinbox', 'reports', 'categories', 'doctypes',
-                'sla_dashboard', 'sla_policies', 'sla_calendar'];
+                'sla_dashboard', 'sla_policies'];
 
 // Shared style block — emit before any early return so sub-views inherit it
 ?>

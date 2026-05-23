@@ -5,7 +5,7 @@
 > Status: ✅ All 7 decisions confirmed — พร้อม implement
 >
 > **Confirmed decisions:**
-> 1. Business hours: Mon-Fri 08:00-16:00
+> 1. Business hours: **อ้างอิงปฏิทินคลินิก `sys_clinic_hours`** (revised 2026-05-23) — ตั้งค่าที่ `?section=clinic_data&cd_view=hours`
 > 2. Escalation: superadmin + dept head (`sys_staff_positions.is_head`)
 > 3. LINE push: default on (toggle ผ่าน `sys_staff.notify_sla_via_line`)
 > 4. Cron: ทุก 1 ชั่วโมง

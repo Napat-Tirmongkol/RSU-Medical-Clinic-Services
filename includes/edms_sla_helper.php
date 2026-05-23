@@ -19,21 +19,24 @@
  *   sla_event_log(pdo, routing_id, doc_id, event_type, ?actor_user_id, ?reason, ?metadata): void
  *
  * Business hours:
- *   ดูจาก sys_doc_sla_calendar (kind='business_hours' + 'holiday')
- *   - business_hours: ผูกกับ weekday (0=อาทิตย์...6=เสาร์) + start_time/end_time
- *   - holiday: ผูกกับ specific_date (ข้ามทั้งวัน)
+ *   อ้างอิงจาก `sys_clinic_hours` (ปฏิทินคลินิก) ผ่าน get_clinic_hours_for_date()
+ *   - type='regular' : เวลาประจำสัปดาห์ (weekday + open/close_time)
+ *   - type='holiday' : วันหยุดเฉพาะ (specific_date + is_closed)
+ *   - type='special' : วันเปิดพิเศษ override holiday/regular
  *
- *   sla_compute_deadline() คำนวณโดย "เดิน" จาก $start ไปทีละวินาที business time
- *   ที่เหลือ — ถ้า business_hours_only=false ใช้ wall-clock ตรงๆ
+ *   sla_compute_deadline() คำนวณโดย "เดิน" จาก $start ไปทีละช่วง business time
+ *   ที่เหลือ — ถ้า $businessOnly=false ใช้ wall-clock ตรงๆ
  *
- * Time zone:
- *   ใช้ Asia/Bangkok เสมอ (มาตรฐานโปรเจกต์)
+ * Time zone: ใช้ Asia/Bangkok เสมอ (มาตรฐานโปรเจกต์)
  *
  * Dependencies:
  *   - PDO (จาก config.php)
- *   - tables: sys_doc_sla_policies, sys_doc_sla_calendar, sys_doc_sla_events, sys_doc_routings
+ *   - includes/clinic_status_helper.php → get_clinic_hours_for_date()
+ *   - tables: sys_doc_sla_policies, sys_clinic_hours, sys_doc_sla_events, sys_doc_routings
  */
 declare(strict_types=1);
+
+require_once __DIR__ . '/clinic_status_helper.php';
 
 if (!function_exists('sla_tz')) {
     function sla_tz(): DateTimeZone {
@@ -82,60 +85,46 @@ if (!function_exists('sla_get_policy')) {
     }
 }
 
-if (!function_exists('sla_get_business_calendar')) {
+if (!function_exists('sla_get_day_hours')) {
     /**
-     * โหลด business_hours rows + holidays — cache per-request
-     * @return array{hours: array<int, array{start:string,end:string}>, holidays: array<string, bool>}
+     * คืน business hours สำหรับวันที่ระบุ — อ่านจาก sys_clinic_hours (ปฏิทินคลินิก)
+     *
+     * @return array{closed:bool, start:?string, end:?string}
+     *   - closed=true → วันหยุด / ยังไม่ตั้งค่า / is_closed=1
+     *   - start/end → 'HH:MM:SS' (ภายในวันนั้น)
+     *
+     * Cache per-request ต่อ date.
      */
-    function sla_get_business_calendar(PDO $pdo): array {
-        static $cache = null;
-        if ($cache !== null) return $cache;
-
-        $hours = [];      // weekday => ['start'=>HH:MM:SS, 'end'=>HH:MM:SS]
-        $holidays = [];   // 'Y-m-d' => true
+    function sla_get_day_hours(PDO $pdo, string $date): array {
+        static $cache = [];
+        if (isset($cache[$date])) return $cache[$date];
 
         try {
-            $rows = $pdo->query("SELECT kind, weekday, specific_date, start_time, end_time
-                FROM sys_doc_sla_calendar WHERE is_active = 1")->fetchAll(PDO::FETCH_ASSOC) ?: [];
-            foreach ($rows as $r) {
-                if ($r['kind'] === 'business_hours' && $r['weekday'] !== null) {
-                    $hours[(int)$r['weekday']] = [
-                        'start' => $r['start_time'] ?: '08:00:00',
-                        'end'   => $r['end_time']   ?: '16:00:00',
-                    ];
-                } elseif ($r['kind'] === 'holiday' && !empty($r['specific_date'])) {
-                    $holidays[$r['specific_date']] = true;
-                }
+            $h = get_clinic_hours_for_date($pdo, $date);
+            // get_clinic_hours_for_date returns: closed, open_time (HH:MM), close_time, note, source
+            if (!empty($h['closed']) || empty($h['open_time']) || empty($h['close_time'])) {
+                return $cache[$date] = ['closed' => true, 'start' => null, 'end' => null];
             }
-        } catch (PDOException $e) {
-            error_log('[sla_get_business_calendar] ' . $e->getMessage());
+            // Normalize HH:MM → HH:MM:SS
+            $start = strlen((string)$h['open_time']) === 5 ? $h['open_time'] . ':00' : $h['open_time'];
+            $end   = strlen((string)$h['close_time']) === 5 ? $h['close_time'] . ':00' : $h['close_time'];
+            return $cache[$date] = ['closed' => false, 'start' => $start, 'end' => $end];
+        } catch (Throwable $e) {
+            error_log('[sla_get_day_hours] ' . $e->getMessage());
+            return $cache[$date] = ['closed' => true, 'start' => null, 'end' => null];
         }
-
-        // Fallback default: Mon-Fri 08:00-16:00 ถ้า DB ยังไม่ seed
-        if (empty($hours)) {
-            foreach ([1, 2, 3, 4, 5] as $wd) {
-                $hours[$wd] = ['start' => '08:00:00', 'end' => '16:00:00'];
-            }
-        }
-
-        return $cache = ['hours' => $hours, 'holidays' => $holidays];
     }
 }
 
 if (!function_exists('sla_is_business_time')) {
     /**
-     * ตรวจว่า $dt อยู่ในเวลาทำการ (skip weekends + holidays)
+     * ตรวจว่า $dt อยู่ในเวลาทำการ ตามปฏิทินคลินิก
      */
     function sla_is_business_time(PDO $pdo, DateTimeImmutable $dt): bool {
-        $cal = sla_get_business_calendar($pdo);
-        $wd = (int)$dt->format('w');  // 0=Sun, 6=Sat
-        $date = $dt->format('Y-m-d');
-
-        if (isset($cal['holidays'][$date])) return false;
-        if (!isset($cal['hours'][$wd])) return false;
-
+        $hours = sla_get_day_hours($pdo, $dt->format('Y-m-d'));
+        if ($hours['closed']) return false;
         $time = $dt->format('H:i:s');
-        return ($time >= $cal['hours'][$wd]['start'] && $time < $cal['hours'][$wd]['end']);
+        return ($time >= $hours['start'] && $time < $hours['end']);
     }
 }
 
@@ -144,7 +133,7 @@ if (!function_exists('sla_compute_deadline')) {
      * คำนวณ deadline DATETIME จาก start + ชั่วโมง
      *
      * ถ้า $businessOnly = false → start + $hours hours (wall-clock)
-     * ถ้า $businessOnly = true  → เดิน business time ทีละช่วง จนสะสมครบ $hours
+     * ถ้า $businessOnly = true  → เดิน business time ตามปฏิทินคลินิก (sys_clinic_hours)
      *
      * @param float $hours จำนวนชั่วโมง (รองรับทศนิยม เช่น 2.5)
      */
@@ -156,7 +145,6 @@ if (!function_exists('sla_compute_deadline')) {
             return $start->add(new DateInterval('PT' . $secondsNeeded . 'S'));
         }
 
-        $cal = sla_get_business_calendar($pdo);
         $cursor = $start;
 
         // Hard cap: 365 วันกัน infinite loop (case calendar เพี้ยน)
@@ -164,19 +152,17 @@ if (!function_exists('sla_compute_deadline')) {
         $iter = 0;
 
         while ($secondsNeeded > 0 && $iter++ < $maxIter) {
-            $wd = (int)$cursor->format('w');
             $date = $cursor->format('Y-m-d');
+            $hours = sla_get_day_hours($pdo, $date);
 
-            // Holiday หรือ off-day → กระโดดไปต้นวันถัดไป
-            if (isset($cal['holidays'][$date]) || !isset($cal['hours'][$wd])) {
+            // ปิด / ไม่มีเวลาทำการ → กระโดดไปต้นวันถัดไป
+            if ($hours['closed']) {
                 $cursor = $cursor->setTime(0, 0, 0)->add(new DateInterval('P1D'));
                 continue;
             }
 
-            $startStr = $cal['hours'][$wd]['start'];
-            $endStr   = $cal['hours'][$wd]['end'];
-            $dayStart = DateTimeImmutable::createFromFormat('Y-m-d H:i:s', "{$date} {$startStr}", sla_tz());
-            $dayEnd   = DateTimeImmutable::createFromFormat('Y-m-d H:i:s', "{$date} {$endStr}",   sla_tz());
+            $dayStart = DateTimeImmutable::createFromFormat('Y-m-d H:i:s', "{$date} {$hours['start']}", sla_tz());
+            $dayEnd   = DateTimeImmutable::createFromFormat('Y-m-d H:i:s', "{$date} {$hours['end']}",   sla_tz());
 
             // ก่อนเวลาเปิด → fast-forward ไป start
             if ($cursor < $dayStart) {

@@ -9,9 +9,8 @@
  *   policy:toggle         — toggle is_active [requires sla_admin]
  *   policy:delete         — ลบ policy (block ถ้ามี routing อ้างอิงอยู่) [requires sla_admin]
  *
- *   calendar:list         — list business_hours + holidays
- *   calendar:upsert       — แก้เวลาทำการ / เพิ่มวันหยุด [requires sla_admin]
- *   calendar:delete       — ลบ entry [requires sla_admin]
+ *   (Business hours / holiday: ใช้ปฏิทินคลินิก sys_clinic_hours
+ *    — admin ตั้งค่าที่ ?section=clinic_data&cd_view=hours)
  *
  *   routing:acknowledge   — กดรับทราบ (assignee/superadmin only)
  *   routing:extend        — ขอยืด/ย่น deadline (reason required)
@@ -166,69 +165,6 @@ try {
             }
             $pdo->prepare("DELETE FROM sys_doc_sla_policies WHERE id = ?")->execute([$id]);
             echo json_encode(['ok' => true, 'message' => 'ลบ policy แล้ว'], JSON_UNESCAPED_UNICODE);
-            exit;
-        }
-
-        // ════════════════ CALENDAR ════════════════
-        case 'calendar:list': {
-            $rows = $pdo->query("SELECT * FROM sys_doc_sla_calendar
-                ORDER BY kind ASC, weekday ASC, specific_date ASC, id ASC")->fetchAll(PDO::FETCH_ASSOC) ?: [];
-            $weekdayNames = ['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์'];
-            foreach ($rows as &$r) {
-                if ($r['kind'] === 'business_hours' && $r['weekday'] !== null) {
-                    $r['weekday_name'] = $weekdayNames[(int)$r['weekday']] ?? '?';
-                }
-            }
-            echo json_encode(['ok' => true, 'rows' => $rows], JSON_UNESCAPED_UNICODE);
-            exit;
-        }
-
-        case 'calendar:upsert': {
-            _sla_require_admin($isSlaAdmin);
-            $id          = (int)($_POST['id'] ?? 0);
-            $kind        = $_POST['kind'] ?? '';
-            $weekday     = ($_POST['weekday'] ?? '') !== '' ? (int)$_POST['weekday'] : null;
-            $specificDate = trim($_POST['specific_date'] ?? '') ?: null;
-            $startTime   = trim($_POST['start_time'] ?? '') ?: null;
-            $endTime     = trim($_POST['end_time'] ?? '') ?: null;
-            $name        = trim($_POST['name'] ?? '') ?: null;
-            $isActive    = isset($_POST['is_active']) ? ((int)$_POST['is_active'] ? 1 : 0) : 1;
-
-            if (!in_array($kind, ['business_hours','holiday'], true)) throw new RuntimeException('kind ไม่ถูกต้อง');
-            if ($kind === 'business_hours') {
-                if ($weekday === null || $weekday < 0 || $weekday > 6) throw new RuntimeException('weekday ต้องเป็น 0-6');
-                if (!$startTime || !$endTime) throw new RuntimeException('ต้องระบุเวลา start/end');
-                if ($startTime >= $endTime) throw new RuntimeException('start_time ต้องน้อยกว่า end_time');
-            } else { // holiday
-                if (!$specificDate) throw new RuntimeException('ต้องระบุวันที่');
-                $weekday = null;
-                $startTime = null;
-                $endTime = null;
-            }
-
-            if ($id > 0) {
-                $pdo->prepare("UPDATE sys_doc_sla_calendar
-                    SET kind=?, weekday=?, specific_date=?, start_time=?, end_time=?, name=?, is_active=?
-                    WHERE id=?")
-                    ->execute([$kind, $weekday, $specificDate, $startTime, $endTime, $name, $isActive, $id]);
-                $msg = 'แก้ไขรายการแล้ว';
-            } else {
-                $pdo->prepare("INSERT INTO sys_doc_sla_calendar
-                    (kind, weekday, specific_date, start_time, end_time, name, is_active)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)")
-                    ->execute([$kind, $weekday, $specificDate, $startTime, $endTime, $name, $isActive]);
-                $msg = 'เพิ่มรายการแล้ว';
-            }
-            echo json_encode(['ok' => true, 'message' => $msg], JSON_UNESCAPED_UNICODE);
-            exit;
-        }
-
-        case 'calendar:delete': {
-            _sla_require_admin($isSlaAdmin);
-            $id = (int)($_POST['id'] ?? 0);
-            if ($id <= 0) throw new RuntimeException('ระบุ id ไม่ถูกต้อง');
-            $pdo->prepare("DELETE FROM sys_doc_sla_calendar WHERE id = ?")->execute([$id]);
-            echo json_encode(['ok' => true, 'message' => 'ลบรายการแล้ว'], JSON_UNESCAPED_UNICODE);
             exit;
         }
 

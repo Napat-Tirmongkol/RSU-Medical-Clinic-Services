@@ -76,9 +76,12 @@ try {
     </div>
 
     <div class="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-        <div class="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+        <div class="px-4 py-3 border-b border-slate-100 flex items-center justify-between gap-3 flex-wrap">
             <p class="text-[11px] font-black text-slate-400">หน้า <?= $page ?> / <?= $totalPages ?> · รวม <?= $total ?> รายการ</p>
-            <p class="text-[10px] font-bold text-slate-400">หน่วย: business hours (Mon-Fri 08:00-16:00)</p>
+            <p class="text-[10px] font-bold text-slate-400">
+                หน่วย: business hours · อ้างอิงเวลาทำการจาก
+                <a href="?section=clinic_data&cd_view=hours" class="text-cyan-600 hover:underline">ปฏิทินคลินิก</a>
+            </p>
         </div>
         <div class="overflow-x-auto">
             <table class="min-w-full text-sm">
@@ -233,7 +236,9 @@ try {
             </div>
             <label class="flex items-center gap-2 cursor-pointer pt-2">
                 <input type="checkbox" name="business_hours_only" id="sp-biz" checked class="w-4 h-4 accent-purple-500">
-                <span class="text-xs font-bold text-slate-700">นับเฉพาะเวลาทำการ (Mon-Fri 08:00-16:00)</span>
+                <span class="text-xs font-bold text-slate-700">นับเฉพาะเวลาทำการ (ตาม
+                    <a href="?section=clinic_data&cd_view=hours" target="_blank" class="text-cyan-600 hover:underline" onclick="event.stopPropagation()">ปฏิทินคลินิก</a>)
+                </span>
             </label>
             <div class="flex justify-end gap-2 pt-3 border-t border-slate-100 mt-4">
                 <button type="button" onclick="slaPolicyClose()" class="px-4 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-50">ยกเลิก</button>

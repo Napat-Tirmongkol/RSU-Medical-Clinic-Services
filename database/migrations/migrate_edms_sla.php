@@ -65,25 +65,11 @@ try {
     _log($results, false, 'sys_doc_sla_policies: ' . $e->getMessage());
 }
 
-// ── 2) sys_doc_sla_calendar ──────────────────────────────────────────────
-try {
-    $pdo->exec("CREATE TABLE IF NOT EXISTS sys_doc_sla_calendar (
-        id              INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-        kind            ENUM('business_hours','holiday') NOT NULL,
-        weekday         TINYINT NULL COMMENT '0=อาทิตย์...6=เสาร์ (สำหรับ business_hours)',
-        specific_date   DATE NULL COMMENT 'สำหรับ holiday',
-        start_time      TIME NULL,
-        end_time        TIME NULL,
-        name            VARCHAR(120) NULL COMMENT 'ชื่อวันหยุด',
-        is_active       TINYINT(1) NOT NULL DEFAULT 1,
-        created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        INDEX idx_kind (kind, is_active),
-        INDEX idx_specific_date (specific_date)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
-    _log($results, true, 'สร้างตาราง sys_doc_sla_calendar');
-} catch (PDOException $e) {
-    _log($results, false, 'sys_doc_sla_calendar: ' . $e->getMessage());
-}
+// ── 2) Business calendar: ใช้ sys_clinic_hours (ปฏิทินคลินิก) ───────────
+// SLA module ไม่สร้างตารางปฏิทินของตัวเอง — อ้างอิงเวลาทำการจาก
+// sys_clinic_hours ผ่าน get_clinic_hours_for_date() ใน clinic_status_helper.php
+// (ตั้งค่าได้ที่ portal/_partials/clinic_data/hours.php)
+_log($results, true, 'Business calendar: อ้างอิง sys_clinic_hours (ปฏิทินคลินิก) — ตั้งค่าที่ ?section=clinic_data&cd_view=hours');
 
 // ── 3) sys_doc_sla_events ────────────────────────────────────────────────
 try {
@@ -190,21 +176,8 @@ if (!empty($posCols)) {
     }
 }
 
-// ── 7) Seed business_hours: Mon-Fri 08:00-16:00 ──────────────────────────
-try {
-    $cnt = (int)$pdo->query("SELECT COUNT(*) FROM sys_doc_sla_calendar WHERE kind='business_hours'")->fetchColumn();
-    if ($cnt === 0) {
-        $stmt = $pdo->prepare("INSERT INTO sys_doc_sla_calendar (kind, weekday, start_time, end_time, is_active) VALUES ('business_hours', ?, '08:00:00', '16:00:00', 1)");
-        foreach ([1, 2, 3, 4, 5] as $weekday) {  // Mon-Fri
-            $stmt->execute([$weekday]);
-        }
-        _log($results, true, 'Seed business_hours Mon-Fri 08:00-16:00 (5 records)');
-    } else {
-        _log($results, true, "business_hours seeded ไว้แล้ว ({$cnt} records)");
-    }
-} catch (PDOException $e) {
-    _log($results, false, 'seed business_hours: ' . $e->getMessage());
-}
+// ── 7) Seed business_hours: ข้าม — ใช้ sys_clinic_hours แทน ─────────────
+_log($results, true, 'ข้าม seed business_hours — ใช้ sys_clinic_hours (ปฏิทินคลินิก) แทน');
 
 // ── 8) Seed 16 SLA policies (4 doc_type × 4 priority) ────────────────────
 try {
