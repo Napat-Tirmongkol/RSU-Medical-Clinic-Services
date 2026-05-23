@@ -15,6 +15,11 @@
     <link rel="stylesheet" href="../assets/css/tailwind.min.css">
     <link rel="stylesheet" href="../assets/css/portal.css?v=<?= @filemtime(__DIR__ . '/../assets/css/portal.css') ?: (defined('APP_BUILD') ? APP_BUILD : time()) ?>">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <!-- Chart.js — loaded globally so all section pages (nurse_productivity,
+         gold_card, activity_dashboard, edms/sla_dashboard, etc.) have access
+         without each having to script-tag it. Some partials still load their
+         own copy — harmless re-load from CDN cache. -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script src="../assets/js/safe-fetch.js?v=<?= @filemtime(__DIR__ . '/../assets/js/safe-fetch.js') ?: (defined('APP_BUILD') ? APP_BUILD : time()) ?>"></script>
     <script defer src="../assets/js/rsu-fx.js?v=<?= @filemtime(__DIR__ . '/../assets/js/rsu-fx.js') ?: (defined('APP_BUILD') ? APP_BUILD : time()) ?>"></script>
     <!-- Suppress harmless AbortError from skipped View Transitions

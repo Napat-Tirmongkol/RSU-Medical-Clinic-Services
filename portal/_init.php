@@ -53,6 +53,11 @@ $hasAi                = $isSuper || !empty($_SESSION['access_ai']);
 // Common "ACCESS DENIED" markup snippets — used by inline gate checks in section files
 $aiDeniedHtml = '<div style="padding:100px;text-align:center;font-weight:900;color:#dc2626"><i class="fa-solid fa-shield-slash mb-4" style="font-size:4rem;display:block"></i> ACCESS DENIED<br><span style="font-size:14px;color:#94a3b8;font-weight:600">ต้องมีสิทธิ์ access_ai</span></div>';
 
+// Default state for vars referenced by _layout_bottom.php on every page.
+// Only pages that include _portal_data.php (dashboard / announcements / identity / settings)
+// will overwrite these with real values — the rest stay safe at defaults.
+$ann_saved = false;
+
 // Per-page section name — set by each section file before calling layout_start()
 // Default = empty (page must declare its own)
 $activeSection = $_GET['section'] ?? '';
