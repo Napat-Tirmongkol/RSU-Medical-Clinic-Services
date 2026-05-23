@@ -511,13 +511,13 @@ if (!function_exists('sla_remaining_seconds')) {
 if (!function_exists('sla_state_label')) {
     function sla_state_label(string $state): string {
         return [
-            'on_track'  => 'ตามเวลา',
+            'on_track'  => 'อยู่ในเวลา',
             'warning'   => 'ใกล้หมดเวลา',
-            'breached'  => 'เลย deadline',
-            'met'       => 'เสร็จตามเวลา',
-            'paused'    => 'หยุดชั่วคราว',
+            'breached'  => 'เลยกำหนด',
+            'met'       => 'เสร็จทันเวลา',
+            'paused'    => 'หยุดรอข้อมูล',
             'cancelled' => 'ยกเลิก',
-            'none'      => 'ไม่มี SLA',
+            'none'      => 'ไม่มีเวลานับ',
         ][$state] ?? $state;
     }
 }
@@ -538,7 +538,7 @@ if (!function_exists('sla_state_color')) {
 
 if (!function_exists('sla_format_remaining_thai')) {
     /**
-     * แปลงวินาทีคงเหลือ → "X ชม. Y นาที" หรือ "เลย deadline X ชม."
+     * แปลงวินาทีคงเหลือ → "เหลือ X ชม. Y นาที" หรือ "เลยมา X ชม."
      */
     function sla_format_remaining_thai(?int $secs): string {
         if ($secs === null) return '-';
@@ -549,6 +549,6 @@ if (!function_exists('sla_format_remaining_thai')) {
         if ($h > 0) $parts[] = "{$h} ชม.";
         if ($m > 0 || $h === 0) $parts[] = "{$m} นาที";
         $str = implode(' ', $parts);
-        return $secs < 0 ? "เลย {$str}" : "เหลือ {$str}";
+        return $secs < 0 ? "เลยมา {$str}" : "เหลือ {$str}";
     }
 }

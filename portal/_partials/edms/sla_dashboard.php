@@ -18,8 +18,8 @@ declare(strict_types=1);
             <i class="fa-solid fa-gauge-high"></i>
         </div>
         <div class="flex-1 min-w-0">
-            <h2 class="text-2xl font-black text-slate-800">SLA Dashboard</h2>
-            <p class="text-slate-500 text-sm font-medium">ติดตามประสิทธิภาพการดำเนินการเอกสารตาม Service Level Agreement</p>
+            <h2 class="text-2xl font-black text-slate-800">ภาพรวมเวลาดำเนินการ</h2>
+            <p class="text-slate-500 text-sm font-medium">เอกสาร/งาน ทำตามเวลาที่ตกลงไว้หรือเปล่า — กี่ % ตรงเวลา ใกล้หมด หรือเกิน</p>
         </div>
         <div class="flex gap-2">
             <button onclick="slaSetPeriod('month')" id="sla-period-month"
@@ -35,37 +35,37 @@ declare(strict_types=1);
 
     <!-- KPI tiles -->
     <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-        <div class="bg-white rounded-2xl border border-emerald-200 p-4 shadow-sm fx-tilt fx-tilt-light" data-tilt="4">
+        <div class="bg-white rounded-2xl border border-emerald-200 p-4 shadow-sm fx-tilt fx-tilt-light" data-tilt="4" title="เปอร์เซ็นต์ของเอกสาร/งานที่ปิดทันเวลา (ก่อนเลยกำหนด)">
             <div class="flex items-center justify-between">
-                <p class="text-[10px] font-black uppercase tracking-widest text-emerald-500">ตรงเวลา</p>
+                <p class="text-[10px] font-black uppercase tracking-widest text-emerald-500">เสร็จทันเวลา</p>
                 <i class="fa-solid fa-circle-check text-emerald-400 text-sm"></i>
             </div>
             <p class="text-3xl font-black text-emerald-600 mt-2"><span id="sla-kpi-ontime" data-counter="0">0</span>%</p>
             <p class="text-[10px] font-bold text-slate-400 mt-1" id="sla-kpi-ontime-delta">—</p>
         </div>
-        <div class="bg-white rounded-2xl border border-amber-200 p-4 shadow-sm fx-tilt fx-tilt-light" data-tilt="4">
+        <div class="bg-white rounded-2xl border border-amber-200 p-4 shadow-sm fx-tilt fx-tilt-light" data-tilt="4" title="เอกสาร/งานที่ยังไม่เสร็จและกำลังจะเลยกำหนด">
             <div class="flex items-center justify-between">
                 <p class="text-[10px] font-black uppercase tracking-widest text-amber-500">ใกล้หมดเวลา</p>
                 <i class="fa-solid fa-triangle-exclamation text-amber-400 text-sm"></i>
             </div>
             <p class="text-3xl font-black text-amber-600 mt-2"><span id="sla-kpi-warning" data-counter="0">0</span></p>
-            <p class="text-[10px] font-bold text-slate-400 mt-1">รายการที่ต้องเร่ง</p>
+            <p class="text-[10px] font-bold text-slate-400 mt-1">ต้องเร่งทำให้เสร็จ</p>
         </div>
-        <div class="bg-white rounded-2xl border border-rose-200 p-4 shadow-sm fx-tilt fx-tilt-light" data-tilt="4">
+        <div class="bg-white rounded-2xl border border-rose-200 p-4 shadow-sm fx-tilt fx-tilt-light" data-tilt="4" title="เอกสาร/งานที่เลยกำหนดเวลาแล้ว แต่ยังไม่ปิด">
             <div class="flex items-center justify-between">
-                <p class="text-[10px] font-black uppercase tracking-widest text-rose-500">เลย deadline</p>
+                <p class="text-[10px] font-black uppercase tracking-widest text-rose-500">เลยกำหนด</p>
                 <i class="fa-solid fa-circle-exclamation text-rose-400 text-sm"></i>
             </div>
             <p class="text-3xl font-black text-rose-600 mt-2"><span id="sla-kpi-breached" data-counter="0">0</span></p>
             <p class="text-[10px] font-bold text-slate-400 mt-1" id="sla-kpi-breached-delta">—</p>
         </div>
-        <div class="bg-white rounded-2xl border border-sky-200 p-4 shadow-sm fx-tilt fx-tilt-light" data-tilt="4">
+        <div class="bg-white rounded-2xl border border-sky-200 p-4 shadow-sm fx-tilt fx-tilt-light" data-tilt="4" title="เวลาเฉลี่ยตั้งแต่รับเรื่องจนปิดเรื่อง (ของที่เสร็จแล้ว)">
             <div class="flex items-center justify-between">
-                <p class="text-[10px] font-black uppercase tracking-widest text-sky-500">เฉลี่ย TAT</p>
+                <p class="text-[10px] font-black uppercase tracking-widest text-sky-500">เวลาเฉลี่ยที่ใช้</p>
                 <i class="fa-solid fa-clock text-sky-400 text-sm"></i>
             </div>
             <p class="text-3xl font-black text-sky-600 mt-2"><span id="sla-kpi-tat" data-counter="0">0</span><span class="text-base">ชม.</span></p>
-            <p class="text-[10px] font-bold text-slate-400 mt-1">จาก start ถึง met</p>
+            <p class="text-[10px] font-bold text-slate-400 mt-1">ตั้งแต่เริ่ม ถึง ปิดเรื่อง</p>
         </div>
     </div>
 
@@ -73,14 +73,14 @@ declare(strict_types=1);
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
         <!-- Trend (bar 12 เดือน) -->
         <div class="lg:col-span-2 bg-white rounded-3xl border border-slate-200 shadow-sm p-5">
-            <p class="text-[11px] font-black uppercase tracking-widest text-slate-500 mb-3">แนวโน้ม 12 เดือนล่าสุด</p>
+            <p class="text-[11px] font-black uppercase tracking-widest text-slate-500 mb-3">ย้อนหลัง 12 เดือน · เทียบ "เสร็จทัน" กับ "เลยกำหนด"</p>
             <div class="relative h-72">
                 <canvas id="sla-chart-trend"></canvas>
             </div>
         </div>
         <!-- By dept donut -->
         <div class="bg-white rounded-3xl border border-slate-200 shadow-sm p-5">
-            <p class="text-[11px] font-black uppercase tracking-widest text-slate-500 mb-3">Breach by ฝ่าย (90 วัน)</p>
+            <p class="text-[11px] font-black uppercase tracking-widest text-slate-500 mb-3">ฝ่ายที่เลยกำหนดบ่อย · ย้อนหลัง 90 วัน</p>
             <div class="relative h-72">
                 <canvas id="sla-chart-dept"></canvas>
             </div>
@@ -91,8 +91,8 @@ declare(strict_types=1);
     <div class="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden mb-6">
         <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
             <div>
-                <p class="text-sm font-black text-slate-800">รายการที่ต้องเร่งด่วน</p>
-                <p class="text-[11px] font-bold text-slate-400">เรียงตาม deadline ใกล้สุด</p>
+                <p class="text-sm font-black text-slate-800">ต้องเร่งทำให้เสร็จ</p>
+                <p class="text-[11px] font-bold text-slate-400">ใกล้หมดเวลา หรือเลยกำหนดแล้ว · เรียงจากที่หมดก่อน</p>
             </div>
             <button onclick="slaReload()" class="text-xs font-black text-emerald-600 hover:underline">
                 <i class="fa-solid fa-rotate"></i> รีโหลด
@@ -102,10 +102,10 @@ declare(strict_types=1);
             <table class="min-w-full text-sm">
                 <thead class="bg-slate-50 text-[10px] font-black uppercase tracking-widest text-slate-400">
                     <tr>
-                        <th class="px-4 py-3 text-left">เอกสาร</th>
+                        <th class="px-4 py-3 text-left">เอกสาร / งาน</th>
                         <th class="px-4 py-3 text-left">ผู้รับผิดชอบ</th>
-                        <th class="px-4 py-3 text-left">Deadline</th>
-                        <th class="px-4 py-3 text-center">เวลาเหลือ</th>
+                        <th class="px-4 py-3 text-left">ต้องเสร็จก่อน</th>
+                        <th class="px-4 py-3 text-center">เวลาที่เหลือ</th>
                         <th class="px-4 py-3 text-center">สถานะ</th>
                         <th class="px-4 py-3 text-right"></th>
                     </tr>
@@ -198,8 +198,8 @@ declare(strict_types=1);
             data: {
                 labels: r.labels,
                 datasets: [
-                    { label: 'ตรงเวลา', data: r.met, backgroundColor: 'rgba(16,185,129,.85)', borderRadius: 6 },
-                    { label: 'เลย deadline', data: r.breached, backgroundColor: 'rgba(244,63,94,.85)', borderRadius: 6 },
+                    { label: 'เสร็จทันเวลา', data: r.met, backgroundColor: 'rgba(16,185,129,.85)', borderRadius: 6 },
+                    { label: 'เลยกำหนด', data: r.breached, backgroundColor: 'rgba(244,63,94,.85)', borderRadius: 6 },
                 ],
             },
             options: {
@@ -236,9 +236,13 @@ declare(strict_types=1);
         const r = await ajax('dashboard', 'overdue_list');
         const tbody = document.getElementById('sla-overdue-body');
         if (!r.ok || !r.rows || r.rows.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="6" class="px-4 py-12 text-center text-slate-400 text-xs font-bold">
-                <i class="fa-solid fa-check-double text-2xl mb-2 block text-emerald-300"></i>
-                ไม่มีรายการที่ต้องเร่งด่วน
+            tbody.innerHTML = `<tr><td colspan="6" class="px-4 py-16 text-center">
+                <i class="fa-solid fa-check-double text-3xl mb-3 block text-emerald-300"></i>
+                <p class="text-emerald-700 text-sm font-black mb-1">เยี่ยม! ทุกอย่างอยู่ในเวลา</p>
+                <p class="text-slate-400 text-xs font-bold">ไม่มีเอกสาร/งานที่ใกล้หมดเวลา หรือเลยกำหนด</p>
+                <a href="?section=edms&edms_view=myinbox" class="inline-flex items-center gap-1.5 mt-3 px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-black hover:bg-emerald-100">
+                    <i class="fa-solid fa-inbox"></i> ดูกล่องของฉัน
+                </a>
             </td></tr>`;
             return;
         }
@@ -248,7 +252,7 @@ declare(strict_types=1);
         };
         const labels = {
             warning:  'ใกล้หมดเวลา',
-            breached: 'เลย deadline',
+            breached: 'เลยกำหนดแล้ว',
         };
         const fmtRemaining = (mins) => {
             const abs = Math.abs(mins);
@@ -256,9 +260,9 @@ declare(strict_types=1);
             const m = abs % 60;
             const parts = [];
             if (h > 0) parts.push(`${h} ชม.`);
-            if (m > 0 || h === 0) parts.push(`${m} น.`);
+            if (m > 0 || h === 0) parts.push(`${m} นาที`);
             const str = parts.join(' ');
-            return mins < 0 ? `เลย ${str}` : `เหลือ ${str}`;
+            return mins < 0 ? `เลยมา ${str}` : `เหลือ ${str}`;
         };
         const escape = (s) => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
         tbody.innerHTML = r.rows.map(row => {

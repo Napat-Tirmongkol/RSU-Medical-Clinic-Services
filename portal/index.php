@@ -1629,10 +1629,10 @@ try {
 
                     // EDMS / สารบรรณอิเล็กทรอนิกส์ — เฉพาะคนที่ access_edms
                     if ($hasEdms) {
-                        // 1) SLA breached — เร่งด่วนสุด แสดงก่อน
+                        // 1) เลยกำหนด — เร่งด่วนสุด แสดงก่อน
                         if ($edmsBreachedMine > 0) {
                             $today_items[] = [
-                                'label' => 'เลย deadline (เอกสาร/งาน)',
+                                'label' => 'เลยกำหนดแล้ว — ต้องเร่งด่วน',
                                 'value' => $edmsBreachedMine,
                                 'icon'  => 'fa-circle-exclamation',
                                 'tone'  => 'danger',
@@ -1642,7 +1642,7 @@ try {
                         // 2) Warning — ใกล้หมดเวลา
                         if ($edmsWarningMine > 0) {
                             $today_items[] = [
-                                'label' => 'ใกล้หมดเวลา (เอกสาร/งาน)',
+                                'label' => 'ใกล้หมดเวลา — รีบทำให้เสร็จ',
                                 'value' => $edmsWarningMine,
                                 'icon'  => 'fa-triangle-exclamation',
                                 'tone'  => 'warning',
@@ -1652,7 +1652,7 @@ try {
                         // 3) Tasks ของฉัน (ถ้ามี — เน้นว่าเป็นงานมอบหมาย)
                         if ($edmsTaskMine > 0) {
                             $today_items[] = [
-                                'label' => 'งานที่ได้รับมอบหมาย',
+                                'label' => 'งานที่ต้องทำ',
                                 'value' => $edmsTaskMine,
                                 'icon'  => 'fa-list-check',
                                 'tone'  => 'info',
@@ -1663,7 +1663,7 @@ try {
                         $_docOnlyInbox = max(0, $edmsInboxBadge - $edmsTaskMine);
                         if ($_docOnlyInbox > 0) {
                             $today_items[] = [
-                                'label' => 'เอกสารรอดำเนินการ',
+                                'label' => 'เอกสารที่ต้องดำเนินการ',
                                 'value' => $_docOnlyInbox,
                                 'icon'  => 'fa-folder-open',
                                 'tone'  => 'accent',

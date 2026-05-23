@@ -90,10 +90,10 @@ try {
                         <th class="px-4 py-3 text-left">ประเภท</th>
                         <th class="px-4 py-3 text-left">ความเร่งด่วน</th>
                         <th class="px-4 py-3 text-left">ชื่อ</th>
-                        <th class="px-4 py-3 text-center">Ack (ชม.)</th>
-                        <th class="px-4 py-3 text-center">Resolve (ชม.)</th>
-                        <th class="px-4 py-3 text-center">Warn @ %</th>
-                        <th class="px-4 py-3 text-center">Escalate</th>
+                        <th class="px-4 py-3 text-center" title="ผู้รับต้องกด 'รับทราบ' ภายในกี่ชั่วโมง">ต้องรับทราบใน (ชม.)</th>
+                        <th class="px-4 py-3 text-center" title="ต้องทำให้เสร็จภายในกี่ชั่วโมง">ต้องเสร็จใน (ชม.)</th>
+                        <th class="px-4 py-3 text-center" title="แจ้งเตือนเมื่อเหลือเวลากี่ %">เตือนเมื่อเหลือ</th>
+                        <th class="px-4 py-3 text-center" title="ถ้าเลยเวลา แจ้งใครต่อ">ถ้าเลยเวลา แจ้ง</th>
                         <th class="px-4 py-3 text-center">สถานะ</th>
                         <th class="px-4 py-3 text-right"></th>
                     </tr>
@@ -113,7 +113,7 @@ try {
                         $dtIcon = $docTypeRow['icon'] ?? 'fa-file';
                         $dtTone = $docTypeRow['tone'] ?? 'slate';
                         $priColor = $p['priority_color'] ?: 'slate';
-                        $escLabel = ['superadmin' => 'Superadmin', 'dept_head' => 'หัวหน้าฝ่าย', 'superadmin+dept_head' => 'ทั้งคู่'][$p['escalate_to_role']] ?? '—';
+                        $escLabel = ['superadmin' => 'ผู้ดูแลระบบ', 'dept_head' => 'หัวหน้าฝ่าย', 'superadmin+dept_head' => 'ทั้งคู่'][$p['escalate_to_role']] ?? '—';
                     ?>
                         <tr class="hover:bg-slate-50/60 transition-colors">
                             <td class="px-4 py-3">
@@ -209,27 +209,30 @@ try {
             </div>
             <div class="grid grid-cols-2 gap-3">
                 <div>
-                    <label class="text-[11px] font-black text-slate-500 uppercase">Ack hours *</label>
+                    <label class="text-[11px] font-black text-slate-500 uppercase">ต้องรับทราบใน (ชม.) *</label>
                     <input type="number" step="0.5" min="0.5" max="720" name="ack_hours" id="sp-ack" required value="4"
                         class="w-full mt-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-amber-600">
+                    <p class="text-[10px] font-medium text-slate-400 mt-1">เวลาที่ผู้รับต้องกด "รับทราบ"</p>
                 </div>
                 <div>
-                    <label class="text-[11px] font-black text-slate-500 uppercase">Resolve hours *</label>
+                    <label class="text-[11px] font-black text-slate-500 uppercase">ต้องเสร็จใน (ชม.) *</label>
                     <input type="number" step="0.5" min="0.5" max="720" name="resolve_hours" id="sp-resolve" required value="48"
                         class="w-full mt-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-emerald-600">
+                    <p class="text-[10px] font-medium text-slate-400 mt-1">เวลาที่ต้องทำให้เสร็จทั้งหมด</p>
                 </div>
             </div>
             <div class="grid grid-cols-2 gap-3">
                 <div>
-                    <label class="text-[11px] font-black text-slate-500 uppercase">Warn @ %</label>
+                    <label class="text-[11px] font-black text-slate-500 uppercase">เตือนเมื่อเหลือ (%)</label>
                     <input type="number" step="1" min="0" max="100" name="warn_at_pct" id="sp-warn" value="20"
                         class="w-full mt-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800">
+                    <p class="text-[10px] font-medium text-slate-400 mt-1">เช่น 20% = เตือนเมื่อเหลือ 1/5 ของเวลา</p>
                 </div>
                 <div>
-                    <label class="text-[11px] font-black text-slate-500 uppercase">Escalate to</label>
+                    <label class="text-[11px] font-black text-slate-500 uppercase">ถ้าเลยเวลา แจ้งใคร</label>
                     <select name="escalate_to_role" id="sp-escalate" class="w-full mt-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800">
-                        <option value="superadmin+dept_head">Superadmin + หัวหน้าฝ่าย</option>
-                        <option value="superadmin">Superadmin เท่านั้น</option>
+                        <option value="superadmin+dept_head">ผู้ดูแลระบบ + หัวหน้าฝ่าย</option>
+                        <option value="superadmin">ผู้ดูแลระบบเท่านั้น</option>
                         <option value="dept_head">หัวหน้าฝ่ายเท่านั้น</option>
                     </select>
                 </div>

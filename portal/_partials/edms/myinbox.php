@@ -129,12 +129,12 @@ $routingStatusLabels = [
             <p class="text-[10px] font-black uppercase tracking-widest text-orange-500">ใกล้หมดเวลา</p>
             <p class="text-2xl font-black text-orange-600 mt-1"><?= number_format($kpis['warning']) ?></p>
         </div>
-        <div class="bg-white rounded-2xl border border-rose-200 p-4 shadow-sm">
-            <p class="text-[10px] font-black uppercase tracking-widest text-rose-500">เลย deadline</p>
+        <div class="bg-white rounded-2xl border border-rose-200 p-4 shadow-sm" title="เอกสาร/งาน ที่เลยเวลาที่ต้องเสร็จแล้ว — รีบทำให้เสร็จด่วน">
+            <p class="text-[10px] font-black uppercase tracking-widest text-rose-500">เลยกำหนด</p>
             <p class="text-2xl font-black text-rose-600 mt-1"><?= number_format($kpis['breached']) ?></p>
         </div>
-        <div class="bg-white rounded-2xl border border-emerald-200 p-4 shadow-sm">
-            <p class="text-[10px] font-black uppercase tracking-widest text-emerald-500">ดำเนินการแล้ว</p>
+        <div class="bg-white rounded-2xl border border-emerald-200 p-4 shadow-sm" title="เอกสาร/งานที่ปิดเรื่องแล้ว">
+            <p class="text-[10px] font-black uppercase tracking-widest text-emerald-500">เสร็จแล้ว</p>
             <p class="text-2xl font-black text-emerald-600 mt-1"><?= number_format($kpis['done']) ?></p>
         </div>
     </div>
@@ -143,11 +143,11 @@ $routingStatusLabels = [
     <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-2 mb-5 inline-flex gap-1 flex-wrap">
         <?php
         $tabs = [
-            'open'     => ['label' => 'รอดำเนินการ',  'tone' => 'amber'],
+            'open'     => ['label' => 'รอทำ',          'tone' => 'amber'],
             'warning'  => ['label' => 'ใกล้หมดเวลา',   'tone' => 'orange'],
-            'breached' => ['label' => 'เลย deadline',  'tone' => 'rose'],
-            'paused'   => ['label' => 'หยุดชั่วคราว',  'tone' => 'slate'],
-            'done'     => ['label' => 'ดำเนินการแล้ว', 'tone' => 'emerald'],
+            'breached' => ['label' => 'เลยกำหนด',      'tone' => 'rose'],
+            'paused'   => ['label' => 'หยุดรอข้อมูล',  'tone' => 'slate'],
+            'done'     => ['label' => 'เสร็จแล้ว',     'tone' => 'emerald'],
             'all'      => ['label' => 'ทั้งหมด',       'tone' => 'sky'],
         ];
         foreach ($tabs as $k => $cfg):
@@ -175,17 +175,42 @@ $routingStatusLabels = [
                         <th class="px-4 py-3 text-left">เอกสาร</th>
                         <th class="px-4 py-3 text-left">การดำเนินการ</th>
                         <th class="px-4 py-3 text-left">จาก</th>
-                        <th class="px-4 py-3 text-left">SLA Deadline</th>
-                        <th class="px-4 py-3 text-center">เวลาเหลือ</th>
+                        <th class="px-4 py-3 text-left" title="วันเวลาที่ต้องทำให้เสร็จ">ต้องเสร็จก่อน</th>
+                        <th class="px-4 py-3 text-center" title="เวลาที่เหลือก่อนจะเลยกำหนด">เหลือเวลา</th>
                         <th class="px-4 py-3 text-center">สถานะ</th>
                         <th class="px-4 py-3 text-right"></th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-50">
-                    <?php if (empty($rows)): ?>
-                        <tr><td colspan="8" class="px-4 py-16 text-center text-slate-400 font-bold text-sm">
-                            <i class="fa-solid fa-inbox text-3xl mb-3 block text-slate-200"></i>
-                            <?= $filter === 'open' ? 'ยังไม่มีเอกสารรอดำเนินการ' : 'ไม่มีรายการ' ?>
+                    <?php if (empty($rows)):
+                        // ── Empty state ที่บอกขั้นถัดไป ────────────────────
+                        $_emptyConfig = match($filter) {
+                            'open'     => ['icon' => 'fa-mug-hot',          'color' => 'emerald', 'title' => 'ทำงานครบหมดแล้ว!', 'desc' => 'ไม่มีเอกสาร/งานรอทำในกล่องของคุณ — ดูประวัติได้ที่แท็บ "ทั้งหมด"'],
+                            'warning'  => ['icon' => 'fa-circle-check',     'color' => 'emerald', 'title' => 'ไม่มีอะไรใกล้หมดเวลา',        'desc' => 'ทุกชิ้นยังมีเวลาเหลือมากพอ — กลับไปแท็บ "รอทำ" เพื่อดูทั้งหมด'],
+                            'breached' => ['icon' => 'fa-shield-check',     'color' => 'emerald', 'title' => 'ไม่มีรายการเลยกำหนด',          'desc' => 'ดีมาก! ไม่มีอะไรที่ทำไม่ทันเวลา'],
+                            'paused'   => ['icon' => 'fa-play',             'color' => 'sky',     'title' => 'ไม่มีรายการที่หยุดรอข้อมูล',  'desc' => 'ถ้าต้องรอข้อมูลเพิ่มจากใคร — กดปุ่ม "หยุดรอข้อมูล" ในรายการนั้น'],
+                            'done'     => ['icon' => 'fa-folder-plus',      'color' => 'sky',     'title' => 'ยังไม่มีรายการที่ปิดเสร็จ',     'desc' => 'รายการที่ทำเสร็จแล้วจะมาแสดงที่นี่'],
+                            default    => ['icon' => 'fa-inbox',            'color' => 'slate',   'title' => 'ไม่มีรายการ',                  'desc' => ''],
+                        };
+                        $_ec = $_emptyConfig;
+                    ?>
+                        <tr><td colspan="8" class="px-4 py-16 text-center">
+                            <i class="fa-solid <?= $_ec['icon'] ?> text-4xl mb-3 block text-<?= $_ec['color'] ?>-300"></i>
+                            <p class="text-<?= $_ec['color'] ?>-700 text-base font-black mb-1"><?= htmlspecialchars($_ec['title']) ?></p>
+                            <?php if ($_ec['desc']): ?>
+                                <p class="text-slate-400 text-xs font-bold mb-4 max-w-md mx-auto"><?= htmlspecialchars($_ec['desc']) ?></p>
+                            <?php endif; ?>
+                            <?php if ($filter !== 'open' && $filter !== 'all'): ?>
+                                <a href="?section=edms&edms_view=myinbox&filter=open"
+                                   class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-50 text-amber-700 border border-amber-200 text-xs font-black hover:bg-amber-100">
+                                    <i class="fa-solid fa-list"></i> ดูรายการที่รอทำ
+                                </a>
+                            <?php elseif ($filter === 'open'): ?>
+                                <a href="?section=edms&edms_view=list&type=task"
+                                   class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-cyan-50 text-cyan-700 border border-cyan-200 text-xs font-black hover:bg-cyan-100">
+                                    <i class="fa-solid fa-plus"></i> สร้างงานใหม่
+                                </a>
+                            <?php endif; ?>
                         </td></tr>
                     <?php else: foreach ($rows as $r):
                         $tm = $typeMap[$r['doc_type']] ?? $typeMap['incoming'];
@@ -195,13 +220,13 @@ $routingStatusLabels = [
                         $slaState = $r['sla_state'] ?? 'none';
                         $minsLeft = $r['minutes_left'] !== null ? (int)$r['minutes_left'] : null;
                         $slaToneMap = [
-                            'on_track'  => ['label' => 'ตามเวลา',     'badge' => 'bg-emerald-50 text-emerald-700 border-emerald-200'],
+                            'on_track'  => ['label' => 'อยู่ในเวลา',  'badge' => 'bg-emerald-50 text-emerald-700 border-emerald-200'],
                             'warning'   => ['label' => 'ใกล้หมดเวลา', 'badge' => 'bg-amber-50 text-amber-700 border-amber-200'],
-                            'breached'  => ['label' => 'เลย deadline','badge' => 'bg-rose-50 text-rose-700 border-rose-200'],
-                            'met'       => ['label' => 'เสร็จตามเวลา','badge' => 'bg-sky-50 text-sky-700 border-sky-200'],
-                            'paused'    => ['label' => 'หยุดชั่วคราว','badge' => 'bg-slate-100 text-slate-700 border-slate-200'],
+                            'breached'  => ['label' => 'เลยกำหนด',    'badge' => 'bg-rose-50 text-rose-700 border-rose-200'],
+                            'met'       => ['label' => 'เสร็จทันเวลา','badge' => 'bg-sky-50 text-sky-700 border-sky-200'],
+                            'paused'    => ['label' => 'หยุดรอข้อมูล','badge' => 'bg-slate-100 text-slate-700 border-slate-200'],
                             'cancelled' => ['label' => 'ยกเลิก',      'badge' => 'bg-slate-50 text-slate-500 border-slate-100'],
-                            'none'      => ['label' => 'ไม่มี SLA',   'badge' => 'bg-slate-50 text-slate-400 border-slate-100'],
+                            'none'      => ['label' => 'ไม่มีเวลานับ','badge' => 'bg-slate-50 text-slate-400 border-slate-100'],
                         ];
                         $slaInfo = $slaToneMap[$slaState] ?? $slaToneMap['none'];
                         $isOverdue = ($slaState === 'breached');
@@ -214,10 +239,10 @@ $routingStatusLabels = [
                             $mm = $abs % 60;
                             $parts = [];
                             if ($h > 0) $parts[] = "{$h} ชม.";
-                            if ($mm > 0 || $h === 0) $parts[] = "{$mm} น.";
+                            if ($mm > 0 || $h === 0) $parts[] = "{$mm} นาที";
                             $str = implode(' ', $parts);
                             $cls = $m < 0 ? 'text-rose-600' : ($m < 120 ? 'text-amber-600' : 'text-slate-600');
-                            return [($m < 0 ? "เลย {$str}" : "เหลือ {$str}"), $cls];
+                            return [($m < 0 ? "เลยมา {$str}" : "เหลือ {$str}"), $cls];
                         };
                         [$remText, $remCls] = $fmtRem($minsLeft);
                     ?>
@@ -246,7 +271,7 @@ $routingStatusLabels = [
                                 <?php if ($r['resolve_deadline_at']): ?>
                                     <?= date('d/m H:i', strtotime($r['resolve_deadline_at'])) ?>
                                     <?php if ($r['ack_deadline_at'] && empty($r['acknowledged_at'])): ?>
-                                        <div class="text-[9px] text-amber-600 mt-0.5">รับทราบ: <?= date('d/m H:i', strtotime($r['ack_deadline_at'])) ?></div>
+                                        <div class="text-[9px] text-amber-600 mt-0.5" title="กดรับทราบก่อนเวลานี้">กดรับทราบก่อน: <?= date('d/m H:i', strtotime($r['ack_deadline_at'])) ?></div>
                                     <?php endif; ?>
                                 <?php else: ?>
                                     <span class="text-slate-400">—</span>
