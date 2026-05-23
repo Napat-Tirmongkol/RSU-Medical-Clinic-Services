@@ -44,12 +44,14 @@ if (!function_exists('sla_get_routing_context')) {
      */
     function sla_get_routing_context(PDO $pdo, int $routingId): ?array {
         try {
+            // Prefer linked_line_user_id_new (new LINE Login provider) → fallback linked_line_user_id
+            // sys_staff ไม่มี s.line_user_id (อันนั้นอยู่ใน sys_users) — ห้ามใช้
             $st = $pdo->prepare("SELECT r.id AS routing_id, r.doc_id, r.to_user_id, r.to_dept,
                 r.sla_state, r.resolve_deadline_at, r.ack_deadline_at, r.policy_id,
                 d.doc_number, d.subject, d.doc_type, d.priority_id,
                 s.id AS assignee_id, s.full_name AS assignee_name,
-                COALESCE(s.linked_line_user_id, s.line_user_id) AS line_user_id,
-                s.department_id, s.notify_sla_via_line,
+                COALESCE(NULLIF(s.linked_line_user_id_new, ''), s.linked_line_user_id) AS line_user_id,
+                s.department_id, COALESCE(s.notify_sla_via_line, 1) AS notify_sla_via_line,
                 p.escalate_to_role
                 FROM sys_doc_routings r
                 JOIN sys_doc_documents d ON d.id = r.doc_id
@@ -135,7 +137,7 @@ if (!function_exists('sla_get_dept_heads')) {
         try {
             // Try is_head flag first (after Sprint 1 migration)
             $st = $pdo->prepare("SELECT s.id, s.full_name,
-                COALESCE(s.linked_line_user_id, s.line_user_id) AS line_user_id,
+                COALESCE(NULLIF(s.linked_line_user_id_new, ''), s.linked_line_user_id) AS line_user_id,
                 COALESCE(s.notify_sla_via_line, 1) AS notify_sla_via_line
                 FROM sys_staff s
                 JOIN sys_staff_positions p ON p.id = s.position_id AND p.is_head = 1
@@ -157,12 +159,12 @@ if (!function_exists('sla_get_superadmins')) {
      */
     function sla_get_superadmins(PDO $pdo): array {
         try {
-            // sys_admins.role = 'superadmin' → join sys_staff สำหรับ LINE info
+            // sys_admins.role = 'superadmin' → join sys_staff (ผ่าน username เพราะ id pool ต่างกัน) สำหรับ LINE info
             $rows = $pdo->query("SELECT a.id, COALESCE(s.full_name, a.username) AS full_name,
-                COALESCE(s.linked_line_user_id, s.line_user_id) AS line_user_id,
+                COALESCE(NULLIF(s.linked_line_user_id_new, ''), s.linked_line_user_id) AS line_user_id,
                 COALESCE(s.notify_sla_via_line, 1) AS notify_sla_via_line
                 FROM sys_admins a
-                LEFT JOIN sys_staff s ON s.id = a.id OR s.username = a.username
+                LEFT JOIN sys_staff s ON s.username = a.username
                 WHERE a.role = 'superadmin'")->fetchAll(PDO::FETCH_ASSOC) ?: [];
             return $rows;
         } catch (PDOException $e) {
