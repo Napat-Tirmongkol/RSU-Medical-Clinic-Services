@@ -1271,8 +1271,15 @@ try {
                         <div class="psb-icon"><i class="fa-solid fa-bullhorn" style="color:#7c3aed"></i></div>
                         <span class="psb-label" style="color:#6d28d9;font-weight:900">ประกาศ</span>
                     </button>
-                    <?php if ($hasEdms): ?>
-                        <button class="psb-item <?= $activeSection==='edms'?'psb-active':'' ?>" data-section="edms" onclick="switchSection('edms',this)" style="position:relative">
+                    <?php if ($hasEdms):
+                        // detect sub-view สำหรับ highlight sidebar item
+                        $_edmsView = $_GET['edms_view'] ?? '';
+                        $_isSlaDash = ($activeSection === 'edms' && $_edmsView === 'sla_dashboard');
+                        $_isSlaPol  = ($activeSection === 'edms' && $_edmsView === 'sla_policies');
+                        // parent active เฉพาะตอนอยู่ section=edms และไม่ใช่ sub-view ที่มีปุ่มแยก
+                        $_isEdmsParent = ($activeSection === 'edms' && !$_isSlaDash && !$_isSlaPol);
+                    ?>
+                        <button class="psb-item <?= $_isEdmsParent ? 'psb-active' : '' ?>" data-section="edms" onclick="switchSection('edms',this)" style="position:relative">
                             <div class="psb-icon"><i class="fa-solid fa-folder-open" style="color:#0ea5e9"></i></div>
                             <span class="psb-label" style="color:#0284c7;font-weight:900">สารบรรณอิเล็กทรอนิกส์</span>
                             <?php if ($edmsInboxBadge > 0): ?>
@@ -1281,14 +1288,14 @@ try {
                                 </span>
                             <?php endif; ?>
                         </button>
-                        <?php /* EDMS sub-menu: SLA */ ?>
-                        <a class="psb-item" href="?section=edms&edms_view=sla_dashboard" onclick="switchSection('edms',this); window.location.search='?section=edms&edms_view=sla_dashboard'; return false;">
+                        <?php /* EDMS sub-menu: SLA — เป็น sub-section ของ section=edms แต่ highlight แยก */ ?>
+                        <a class="psb-item <?= $_isSlaDash ? 'psb-active' : '' ?>" href="?section=edms&edms_view=sla_dashboard">
                             <div class="psb-icon"><i class="fa-solid fa-gauge-high" style="color:#10b981"></i></div>
                             <span class="psb-label" style="color:#047857;font-weight:900;font-size:12px;padding-left:8px">— SLA Dashboard</span>
                         </a>
                         <?php $_canSlaAdmin = ($adminRole === 'superadmin') || !empty($_SESSION['access_edms_sla_admin']); ?>
                         <?php if ($_canSlaAdmin): ?>
-                            <a class="psb-item" href="?section=edms&edms_view=sla_policies" onclick="switchSection('edms',this); window.location.search='?section=edms&edms_view=sla_policies'; return false;">
+                            <a class="psb-item <?= $_isSlaPol ? 'psb-active' : '' ?>" href="?section=edms&edms_view=sla_policies">
                                 <div class="psb-icon"><i class="fa-solid fa-stopwatch-20" style="color:#a855f7"></i></div>
                                 <span class="psb-label" style="color:#7e22ce;font-weight:900;font-size:12px;padding-left:8px">— นโยบาย SLA</span>
                             </a>
