@@ -445,6 +445,17 @@ a.psb-item, a.psb-item:link, a.psb-item:visited, a.psb-item:active {
     text-decoration: none;
 }
 .psb-item:hover, .psb-item:focus { text-decoration: none; }
+/* a11y — keyboard focus ring (only on tab nav, not mouse click — uses :focus-visible) */
+.psb-item:focus-visible {
+    outline: 2px solid var(--acc);
+    outline-offset: -2px;
+    background: var(--acc-tint);
+    color: var(--acc);
+}
+.psb-section-toggle:focus-visible {
+    outline: 2px solid var(--acc);
+    outline-offset: -2px;
+}
 .psb-item::before {
     /* Sliding accent rail on the left edge */
     content: '';
