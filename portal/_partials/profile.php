@@ -16,6 +16,8 @@ $me = null;
 if ($staffId > 0) {
     $stmt = $pdo->prepare("SELECT username, full_name, role, ecampaign_role,
                                   IFNULL(linked_line_user_id, '') AS linked_line_user_id,
+                                  IFNULL(line_display_name, '') AS line_display_name,
+                                  IFNULL(line_picture_url, '') AS line_picture_url,
                                   IFNULL(notify_sla_via_line, 1) AS notify_sla_via_line,
                                   IFNULL(access_ecampaign,0) AS access_ecampaign,
                                   IFNULL(access_eborrow,0)   AS access_eborrow,
@@ -333,23 +335,53 @@ $accessLabels = [
                     ผูกบัญชี LINE ของคุณกับบัญชี Staff เพื่อรับการแจ้งเตือน — เช่น SLA warning / breach, เอกสารใหม่ที่ถูกมอบหมาย
                 </p>
 
-                <?php if ($lineLinked): ?>
+                <?php if ($lineLinked):
+                    $_lineName = (string)($me['line_display_name'] ?? '');
+                    $_linePic  = (string)($me['line_picture_url'] ?? '');
+                ?>
                     <div class="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 mb-3">
                         <div class="flex items-center justify-between gap-3 flex-wrap">
-                            <div class="flex items-center gap-3">
-                                <div class="w-11 h-11 rounded-full bg-white border border-emerald-200 flex items-center justify-center text-2xl" style="color:#06c755">
-                                    <i class="fa-brands fa-line"></i>
-                                </div>
-                                <div>
-                                    <p class="text-xs font-black text-emerald-700">เชื่อมต่อแล้ว <i class="fa-solid fa-circle-check ml-0.5"></i></p>
-                                    <p class="text-[10px] font-mono text-slate-500 mt-0.5"><?= htmlspecialchars(substr($lineUid, 0, 8) . '...' . substr($lineUid, -6)) ?></p>
+                            <div class="flex items-center gap-3 min-w-0">
+                                <?php if ($_linePic !== ''): ?>
+                                    <img src="<?= htmlspecialchars($_linePic) ?>" alt="LINE profile"
+                                        class="w-12 h-12 rounded-full object-cover border-2 border-emerald-300 shadow-sm bg-white"
+                                        onerror="this.outerHTML='<div class=&quot;w-12 h-12 rounded-full bg-white border-2 border-emerald-300 flex items-center justify-center text-2xl shadow-sm&quot; style=&quot;color:#06c755&quot;><i class=&quot;fa-brands fa-line&quot;></i></div>'">
+                                <?php else: ?>
+                                    <div class="w-12 h-12 rounded-full bg-white border-2 border-emerald-300 flex items-center justify-center text-2xl shadow-sm" style="color:#06c755">
+                                        <i class="fa-brands fa-line"></i>
+                                    </div>
+                                <?php endif; ?>
+                                <div class="min-w-0">
+                                    <p class="text-sm font-black text-emerald-700 flex items-center gap-1 truncate">
+                                        <?= $_lineName !== '' ? htmlspecialchars($_lineName) : 'LINE Account' ?>
+                                        <i class="fa-solid fa-circle-check text-emerald-500 text-xs flex-shrink-0" title="ยืนยันแล้ว"></i>
+                                    </p>
+                                    <p class="text-[10px] font-bold text-emerald-600 mt-0.5">
+                                        <i class="fa-solid fa-circle-check text-[8px] mr-0.5"></i>เชื่อมต่อแล้ว
+                                    </p>
+                                    <p class="text-[10px] font-mono text-slate-400 mt-0.5" title="<?= htmlspecialchars($lineUid) ?>">
+                                        <?= htmlspecialchars(substr($lineUid, 0, 8) . '...' . substr($lineUid, -6)) ?>
+                                    </p>
                                 </div>
                             </div>
-                            <button type="button" onclick="profileUnlinkLine()" class="bg-white hover:bg-rose-50 text-rose-600 border border-rose-200 px-3 py-1.5 rounded-xl text-xs font-black inline-flex items-center gap-1.5">
+                            <button type="button" onclick="profileUnlinkLine()" class="bg-white hover:bg-rose-50 text-rose-600 border border-rose-200 px-3 py-1.5 rounded-xl text-xs font-black inline-flex items-center gap-1.5 flex-shrink-0">
                                 <i class="fa-solid fa-link-slash"></i> ยกเลิกการเชื่อม
                             </button>
                         </div>
                     </div>
+
+                    <?php if ($_lineName === '' && $_linePic === ''): ?>
+                        <div class="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 mb-3 flex items-center justify-between gap-2">
+                            <p class="text-[11px] font-bold text-amber-700">
+                                <i class="fa-solid fa-info-circle"></i>
+                                ยังไม่มีข้อมูลโปรไฟล์ LINE — เชื่อมใหม่เพื่อ sync ชื่อ + รูป
+                            </p>
+                            <a href="../line_api/staff_link_line.php"
+                               class="bg-amber-500 hover:bg-amber-600 text-white px-3 py-1 rounded-lg text-[10px] font-black inline-flex items-center gap-1 flex-shrink-0">
+                                <i class="fa-solid fa-rotate"></i> Sync
+                            </a>
+                        </div>
+                    <?php endif; ?>
 
                     <label class="flex items-center gap-2 cursor-pointer p-3 bg-slate-50 rounded-xl border border-slate-100">
                         <input type="checkbox" id="profile-notify-line" <?= $notifyViaLine ? 'checked' : '' ?> onchange="profileToggleNotifyLine(this.checked)" class="w-4 h-4 accent-emerald-500">

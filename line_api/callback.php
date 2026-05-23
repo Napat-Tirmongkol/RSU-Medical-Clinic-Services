@@ -98,8 +98,10 @@ if (($_SESSION['line_login_flow'] ?? '') === 'staff_link') {
     try {
         $pdo = db();
 
-        // ── Auto-migrate: notify_sla_via_line column (เผื่อยังไม่รัน migration) ──
+        // ── Auto-migrate columns เผื่อยังไม่รัน migration ──
         try { $pdo->exec("ALTER TABLE sys_staff ADD COLUMN IF NOT EXISTS notify_sla_via_line TINYINT(1) NOT NULL DEFAULT 1"); } catch (PDOException) {}
+        try { $pdo->exec("ALTER TABLE sys_staff ADD COLUMN IF NOT EXISTS line_display_name VARCHAR(120) NULL DEFAULT NULL"); } catch (PDOException) {}
+        try { $pdo->exec("ALTER TABLE sys_staff ADD COLUMN IF NOT EXISTS line_picture_url VARCHAR(500) NULL DEFAULT NULL"); } catch (PDOException) {}
 
         // ── ตรวจว่า line_user_id นี้ถูกผูกกับ staff คนอื่นแล้วหรือไม่ ──
         $check = $pdo->prepare("SELECT id, full_name FROM sys_staff WHERE linked_line_user_id = ? AND id != ? LIMIT 1");
@@ -115,9 +117,9 @@ if (($_SESSION['line_login_flow'] ?? '') === 'staff_link') {
             exit;
         }
 
-        // ── Save linked_line_user_id + audit ──
-        $upd = $pdo->prepare("UPDATE sys_staff SET linked_line_user_id = ? WHERE id = ?");
-        $upd->execute([$line_user_id, $staffId]);
+        // ── Save linked_line_user_id + display name + picture + audit ──
+        $upd = $pdo->prepare("UPDATE sys_staff SET linked_line_user_id = ?, line_display_name = ?, line_picture_url = ? WHERE id = ?");
+        $upd->execute([$line_user_id, $displayName, $linePicture ?: null, $staffId]);
 
         // Audit log (best-effort)
         try {

@@ -44,7 +44,13 @@ try {
             }
             $oldUid = $row['linked_line_user_id'];
 
-            $pdo->prepare("UPDATE sys_staff SET linked_line_user_id = NULL WHERE id = ?")->execute([$staffId]);
+            // Auto-migrate (เผื่อยังไม่มี column)
+            try { $pdo->exec("ALTER TABLE sys_staff ADD COLUMN IF NOT EXISTS line_display_name VARCHAR(120) NULL"); } catch (PDOException) {}
+            try { $pdo->exec("ALTER TABLE sys_staff ADD COLUMN IF NOT EXISTS line_picture_url VARCHAR(500) NULL"); } catch (PDOException) {}
+
+            // Clear all LINE profile data
+            $pdo->prepare("UPDATE sys_staff SET linked_line_user_id = NULL, line_display_name = NULL, line_picture_url = NULL WHERE id = ?")
+                ->execute([$staffId]);
 
             // Audit
             try {
