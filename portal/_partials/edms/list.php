@@ -392,14 +392,8 @@ $confidentialityLabels = [
                 <input type="hidden" name="id" id="edmsId" value="">
                 <input type="hidden" name="doc_type" value="<?= htmlspecialchars($type) ?>">
 
-                <!-- Subject -->
-                <div class="mb-4">
-                    <label class="edms-label"><?= $_isTask ? 'ชื่องาน' : 'เรื่อง' ?> <span class="text-rose-500">*</span></label>
-                    <input type="text" name="subject" id="edmsSubject" required class="edms-input"
-                        placeholder="<?= $_isTask ? 'เช่น จัดเตรียมรายงานประจำเดือน / ตรวจสอบสต็อกยา' : 'เช่น ขอเชิญประชุม / ขออนุมัติงบประมาณ' ?>">
-                </div>
-
                 <?php
+                // คำนวณ flags ก่อน render — ใช้ใน label/placeholder ต่างๆ
                 $_systemTypes = ['incoming','outgoing','internal','circular','task'];
                 $_isCustomType = !in_array($type, $_systemTypes, true);
                 $_isTask       = ($type === 'task');
@@ -408,6 +402,14 @@ $confidentialityLabels = [
                 $_showSender   = !$_isTask && (in_array($type, ['incoming','internal'], true) || $_isCustomType);
                 $_showRecip    = !$_isTask && (in_array($type, ['outgoing','internal','circular'], true) || $_isCustomType);
                 ?>
+
+                <!-- Subject -->
+                <div class="mb-4">
+                    <label class="edms-label"><?= $_isTask ? 'ชื่องาน' : 'เรื่อง' ?> <span class="text-rose-500">*</span></label>
+                    <input type="text" name="subject" id="edmsSubject" required class="edms-input"
+                        placeholder="<?= $_isTask ? 'เช่น จัดเตรียมรายงานประจำเดือน / ตรวจสอบสต็อกยา' : 'เช่น ขอเชิญประชุม / ขออนุมัติงบประมาณ' ?>">
+                </div>
+
                 <div class="grid grid-cols-2 gap-3 mb-4">
                     <div>
                         <label class="edms-label"><?= $_isTask ? 'วันที่สร้าง' : 'ลงวันที่' ?></label>
