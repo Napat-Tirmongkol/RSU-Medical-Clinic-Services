@@ -409,6 +409,27 @@ $categoryMap = [
 ];
 
 /**
+ * (3a) LINE LINK PROMPT — ตรวจว่า staff ยังไม่ผูก LINE + ยังไม่เลือก "ไม่ต้องเตือนอีก"
+ * แสดง popup ตอน login portal ครั้งแรกของ session (handled ที่ JS ใช้ sessionStorage)
+ */
+$_showLineLinkPrompt = false;
+if (!empty($_SESSION['is_ecampaign_staff']) && !empty($_SESSION['admin_id'])) {
+    try {
+        // Auto-migrate dismissed flag (idempotent)
+        try { $pdo->exec("ALTER TABLE sys_staff ADD COLUMN IF NOT EXISTS dismissed_line_link_prompt TINYINT(1) NOT NULL DEFAULT 0"); } catch (PDOException) {}
+
+        $_lcheck = $pdo->prepare("SELECT IFNULL(linked_line_user_id, '') AS uid, IFNULL(dismissed_line_link_prompt, 0) AS dismissed FROM sys_staff WHERE id = ? LIMIT 1");
+        $_lcheck->execute([(int)$_SESSION['admin_id']]);
+        $_lr = $_lcheck->fetch(PDO::FETCH_ASSOC);
+        if ($_lr && $_lr['uid'] === '' && (int)$_lr['dismissed'] === 0) {
+            $_showLineLinkPrompt = true;
+        }
+    } catch (PDOException $e) {
+        error_log('[line_link_prompt] check failed: ' . $e->getMessage());
+    }
+}
+
+/**
  * (3) RECENT ACTIVITY FETCH
  * แสดงเฉพาะกิจกรรมของ user ปัจจุบัน (privacy: ไม่ปนกับคนอื่น)
  */
@@ -5297,6 +5318,96 @@ try {
         /* ── Maintenance Mode Logic (Merged from Admin Tool) ─────────────────────── */
         const portal_CSRF = <?= json_encode(get_csrf_token()) ?>;
         const HAS_ACCESS_FINANCE = <?= json_encode($isSuper || $adminRole === 'admin' || !empty($_SESSION['access_finance'])) ?>;
+        const SHOW_LINE_LINK_PROMPT = <?= json_encode($_showLineLinkPrompt ?? false) ?>;
+
+        /* ── LINE Link Prompt — แจ้งให้ staff ผูก LINE ตอน login ครั้งแรกของ session ── */
+        (function(){
+            if (!SHOW_LINE_LINK_PROMPT) return;
+            // skip ถ้า dismiss ใน session นี้แล้ว
+            if (sessionStorage.getItem('line_link_dismissed') === '1') return;
+            // skip ถ้าอยู่ในหน้า profile แล้ว (user เห็น link button อยู่)
+            const activeSection = <?= json_encode($activeSection) ?>;
+            if (activeSection === 'profile') return;
+
+            // ดีเลย์เล็กน้อยกัน flash UI ตอนเข้าเว็บ
+            const showPrompt = () => {
+                if (!window.Swal) {
+                    // SweetAlert2 ยังไม่โหลด → retry
+                    setTimeout(showPrompt, 400);
+                    return;
+                }
+                Swal.fire({
+                    title: '<i class="fa-brands fa-line" style="color:#06c755"></i> เชื่อมต่อบัญชี LINE',
+                    html: `
+                        <div style="text-align:left;font-size:14px;color:#475569;line-height:1.7">
+                            <p style="margin-bottom:12px">
+                                <strong style="color:#0f172a">ยังไม่ได้ผูก LINE กับบัญชี Staff</strong>
+                            </p>
+                            <p style="margin-bottom:8px">เมื่อผูกแล้วจะได้รับการแจ้งเตือนผ่าน LINE สำหรับ:</p>
+                            <ul style="list-style:none;padding-left:0;margin:0 0 14px;font-size:13px">
+                                <li style="padding:3px 0">
+                                    <i class="fa-solid fa-bell" style="color:#f59e0b;width:18px"></i>
+                                    SLA warning / breach / escalation
+                                </li>
+                                <li style="padding:3px 0">
+                                    <i class="fa-solid fa-envelope-open-text" style="color:#0ea5e9;width:18px"></i>
+                                    เอกสารใหม่ที่ถูกมอบหมาย
+                                </li>
+                                <li style="padding:3px 0">
+                                    <i class="fa-solid fa-circle-info" style="color:#a855f7;width:18px"></i>
+                                    การแจ้งเตือนสำคัญอื่นๆ จากระบบ
+                                </li>
+                            </ul>
+                            <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#64748b;cursor:pointer;padding:8px;background:#f8fafc;border-radius:8px">
+                                <input type="checkbox" id="line-prompt-dontshow" style="width:14px;height:14px;accent-color:#dc2626">
+                                <span>ไม่ต้องเตือนอีก</span>
+                            </label>
+                        </div>
+                    `,
+                    showCancelButton: true,
+                    confirmButtonText: '<i class="fa-brands fa-line"></i> เชื่อมต่อเลย',
+                    cancelButtonText: 'ไว้ทีหลัง',
+                    confirmButtonColor: '#06c755',
+                    cancelButtonColor: '#94a3b8',
+                    reverseButtons: true,
+                    focusConfirm: false,
+                    allowOutsideClick: false,
+                    customClass: { popup: 'rounded-3xl' },
+                }).then(result => {
+                    const dontShowAgain = document.getElementById('line-prompt-dontshow')?.checked;
+
+                    if (result.isConfirmed) {
+                        // เชื่อมต่อ — redirect ทันที (ไม่ต้องสน checkbox)
+                        window.location.href = '../line_api/staff_link_line.php';
+                        return;
+                    }
+
+                    // ไว้ทีหลัง
+                    sessionStorage.setItem('line_link_dismissed', '1');
+
+                    if (dontShowAgain) {
+                        // ปิดถาวร via AJAX
+                        const fd = new FormData();
+                        fd.append('csrf_token', portal_CSRF);
+                        fd.append('action', 'dismiss_link_prompt');
+                        fetch('ajax_profile_line.php', { method: 'POST', body: fd, credentials: 'same-origin' })
+                            .then(r => r.json())
+                            .then(r => {
+                                if (r.ok && window.Swal) {
+                                    Swal.fire({
+                                        icon: 'info', title: 'ปิดการเตือนแล้ว',
+                                        text: 'คุณยังเชื่อม LINE ได้ที่หน้าโปรไฟล์',
+                                        timer: 1800, showConfirmButton: false, toast: true, position: 'top-end',
+                                    });
+                                }
+                            })
+                            .catch(() => {});
+                    }
+                });
+            };
+            // ดีเลย์ 600ms กัน flash + ให้ portal render เสร็จ
+            setTimeout(showPrompt, 600);
+        })();
 
         function showPortalToast(msg, type = 'success') {
             const id = 'portal-runtime-toast';

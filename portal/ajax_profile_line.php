@@ -87,6 +87,14 @@ try {
             exit;
         }
 
+        case 'dismiss_link_prompt': {
+            // user เลือก "ไม่ต้องเตือนอีก" — set permanent flag
+            try { $pdo->exec("ALTER TABLE sys_staff ADD COLUMN IF NOT EXISTS dismissed_line_link_prompt TINYINT(1) NOT NULL DEFAULT 0"); } catch (PDOException) {}
+            $pdo->prepare("UPDATE sys_staff SET dismissed_line_link_prompt = 1 WHERE id = ?")->execute([$staffId]);
+            echo json_encode(['ok' => true, 'message' => 'ปิดการเตือนถาวรแล้ว'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
         default:
             throw new RuntimeException('Unknown action: ' . htmlspecialchars($action));
     }
