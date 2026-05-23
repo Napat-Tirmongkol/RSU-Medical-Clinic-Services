@@ -5780,48 +5780,82 @@ try {
 
     <script>
     (function () {
+        // ── User permission map (from PHP session) ──────────────────────────
+        const USER_ACCESS = {
+            isSuper:         <?= json_encode($isSuper) ?>,
+            isAdminRole:     <?= json_encode($adminRole === 'admin') ?>,
+            access_eborrow:    <?= json_encode((bool)($_SESSION['access_eborrow']    ?? 0)) ?>,
+            access_ecampaign:  <?= json_encode((bool)($_SESSION['access_ecampaign']  ?? 0)) ?>,
+            access_insurance:  <?= json_encode((bool)($_SESSION['access_insurance']  ?? 0)) ?>,
+            access_registry:   <?= json_encode((bool)($_SESSION['access_registry']   ?? 0)) ?>,
+            access_edms:       <?= json_encode((bool)($_SESSION['access_edms']       ?? 0)) ?>,
+            access_ai:         <?= json_encode((bool)($_SESSION['access_ai']         ?? 0)) ?>,
+            access_asset:      <?= json_encode((bool)($_SESSION['access_asset']      ?? 0)) ?>,
+            access_consumables:<?= json_encode((bool)($_SESSION['access_consumables']?? 0)) ?>,
+            access_finance:    <?= json_encode((bool)($_SESSION['access_finance']    ?? 0)) ?>,
+            access_system_logs:<?= json_encode((bool)($_SESSION['access_system_logs']?? 0)) ?>,
+            access_site_settings:<?= json_encode((bool)($_SESSION['access_site_settings']?? 0)) ?>,
+            access_identity:   <?= json_encode((bool)($_SESSION['access_identity']   ?? 0)) ?>,
+        };
+        // Helper: check ว่า user มีสิทธิ์ตาม access string
+        // Accepts: 'superadmin', 'admin', 'access_xxx', หรือ array รวมกัน (OR)
+        function hasAccess(req) {
+            if (!req) return true;  // no restriction
+            const arr = Array.isArray(req) ? req : [req];
+            return arr.some(k => {
+                if (k === 'superadmin') return USER_ACCESS.isSuper;
+                if (k === 'admin')      return USER_ACCESS.isAdminRole || USER_ACCESS.isSuper;
+                return USER_ACCESS[k] === true;
+            });
+        }
+
         // ── Command catalog ──────────────────────────────────────────────
         // type: 'section' = call switchSection, 'url' = navigate
+        // access: optional string/array — ถ้าไม่ระบุ = allow ทุกคน
         const ALL_COMMANDS = [
             { id: 'dashboard',     label: 'Dashboard',           desc: 'ภาพรวม + งานวันนี้', shortcut: 'g d', icon: 'fa-chart-pie',          tone: 'success', type: 'section', target: 'dashboard' },
-            { id: 'ai_assistant',  label: 'AI Assistant',        desc: 'ผู้ช่วย AI',         icon: 'fa-wand-magic-sparkles', tone: 'accent', type: 'section', target: 'ai_assistant' },
-            { id: 'ai_qa_lab',     label: 'AI QA Lab',           desc: 'Sandbox คำถามจาก user', icon: 'fa-flask-vial',      tone: 'accent', type: 'section', target: 'ai_qa_lab' },
-            { id: 'identity',      label: 'Identity & Governance', desc: 'จัดการสิทธิ์ผู้ใช้', shortcut: 'g i', icon: 'fa-id-card-clip',  tone: 'info',    type: 'section', target: 'identity' },
-            { id: 'insurance_sync', label: 'Insurance Hub',      desc: 'ระบบสิทธิ์ประกัน',   icon: 'fa-shield-halved',      tone: 'info',    type: 'section', target: 'insurance_sync' },
-            { id: 'insurance_dashboard', label: 'Dashboard Workbook', desc: 'ภาพรวม + แก้ widgets · Multi-workbook', icon: 'fa-chart-pie',     tone: 'info',    type: 'section', target: 'insurance_dashboard' },
-            { id: 'gold_card_pending', label: 'ย้ายสิทธิ์บัตรทอง', desc: 'คิวคำขอย้ายสิทธิ์บัตรทองจาก user', icon: 'fa-hourglass-half', tone: 'info',    type: 'section', target: 'gold_card_pending' },
-            { id: 'gold_card',     label: 'บัตรทอง',             desc: 'จัดการบัตรทอง + เอกสาร', icon: 'fa-id-card',         tone: 'warning', type: 'section', target: 'gold_card' },
-            { id: 'registry_upload', label: 'อัพโหลดรายชื่อ',    desc: 'ทะเบียน',            icon: 'fa-id-card-clip',      tone: 'info',    type: 'section', target: 'registry_upload' },
-            { id: 'batch_status',  label: 'สถานะเอกสาร',         desc: 'Insurance Batch',    icon: 'fa-list-check',         tone: 'info',    type: 'section', target: 'batch_status' },
+            { id: 'ai_assistant',  label: 'AI Assistant',        desc: 'ผู้ช่วย AI',         icon: 'fa-wand-magic-sparkles', tone: 'accent', type: 'section', target: 'ai_assistant', access: ['access_ai','superadmin'] },
+            { id: 'ai_qa_lab',     label: 'AI QA Lab',           desc: 'Sandbox คำถามจาก user', icon: 'fa-flask-vial',      tone: 'accent', type: 'section', target: 'ai_qa_lab', access: ['access_ai','superadmin'] },
+            { id: 'identity',      label: 'Identity & Governance', desc: 'จัดการสิทธิ์ผู้ใช้', shortcut: 'g i', icon: 'fa-id-card-clip',  tone: 'info',    type: 'section', target: 'identity', access: ['access_identity','superadmin'] },
+            { id: 'insurance_sync', label: 'Insurance Hub',      desc: 'ระบบสิทธิ์ประกัน',   icon: 'fa-shield-halved',      tone: 'info',    type: 'section', target: 'insurance_sync', access: ['access_insurance','superadmin'] },
+            { id: 'insurance_dashboard', label: 'Dashboard Workbook', desc: 'ภาพรวม + แก้ widgets · Multi-workbook', icon: 'fa-chart-pie',     tone: 'info',    type: 'section', target: 'insurance_dashboard', access: ['access_insurance','superadmin'] },
+            { id: 'gold_card_pending', label: 'ย้ายสิทธิ์บัตรทอง', desc: 'คิวคำขอย้ายสิทธิ์บัตรทองจาก user', icon: 'fa-hourglass-half', tone: 'info',    type: 'section', target: 'gold_card_pending', access: ['access_insurance','superadmin'] },
+            { id: 'gold_card',     label: 'บัตรทอง',             desc: 'จัดการบัตรทอง + เอกสาร', icon: 'fa-id-card',         tone: 'warning', type: 'section', target: 'gold_card', access: ['access_insurance','superadmin'] },
+            { id: 'registry_upload', label: 'อัพโหลดรายชื่อ',    desc: 'ทะเบียน',            icon: 'fa-id-card-clip',      tone: 'info',    type: 'section', target: 'registry_upload', access: ['access_registry','access_insurance','superadmin'] },
+            { id: 'batch_status',  label: 'สถานะเอกสาร',         desc: 'Insurance Batch',    icon: 'fa-list-check',         tone: 'info',    type: 'section', target: 'batch_status', access: ['access_insurance','superadmin'] },
 <?php if ($isSuper): ?>
-            { id: 'manage_insurance_partners', label: 'Insurance Partners', desc: 'จัดการพาร์ทเนอร์', icon: 'fa-handshake', tone: 'success', type: 'section', target: 'manage_insurance_partners' },
+            { id: 'manage_insurance_partners', label: 'Insurance Partners', desc: 'จัดการพาร์ทเนอร์', icon: 'fa-handshake', tone: 'success', type: 'section', target: 'manage_insurance_partners', access: 'superadmin' },
 <?php endif; ?>
             { id: 'announcements', label: 'ประกาศ',              desc: 'จัดการประกาศ Hub',  shortcut: 'g a', icon: 'fa-bullhorn',           tone: 'accent',  type: 'section', target: 'announcements' },
-            { id: 'activity_logs', label: 'Activity Logs',       desc: 'บันทึกกิจกรรมระบบ',  icon: 'fa-file-lines',         tone: 'neutral', type: 'section', target: 'activity_logs' },
-            { id: 'error_logs',    label: 'Error Logs',          desc: 'บันทึกข้อผิดพลาด',  shortcut: 'g e', icon: 'fa-bug',                tone: 'danger',  type: 'section', target: 'error_logs' },
-            { id: 'privilege_inventory', label: 'ISO Governance', desc: 'Privileged Access', icon: 'fa-shield-halved',      tone: 'success', type: 'section', target: 'privilege_inventory' },
-            { id: 'pdpa_audit',    label: 'PDPA Audit',          desc: 'ตรวจสอบความยินยอม PDPA', icon: 'fa-user-shield',    tone: 'info',    type: 'section', target: 'pdpa_audit' },
-            { id: 'db_schema',     label: 'Database Schema',     desc: 'กราฟความสัมพันธ์ของฐานข้อมูล', icon: 'fa-diagram-project', tone: 'info', type: 'section', target: 'db_schema' },
-            { id: 'sql_console',   label: 'SQL Console (RO)',    desc: 'รัน SELECT diagnostic · superadmin only', icon: 'fa-terminal',  tone: 'warning', type: 'section', target: 'sql_console' },
-            { id: 'vaccinations',  label: 'บันทึกการฉีดวัคซีน',     desc: 'จัดการประวัติวัคซีน · KPI · audit log', icon: 'fa-syringe',     tone: 'success', type: 'section', target: 'vaccinations' },
-            { id: 'vaccine_catalog', label: 'ประเภทวัคซีน (Catalog)', desc: 'CRUD vaccine types · ผูกกับ campaign', icon: 'fa-pills', tone: 'success', type: 'section', target: 'vaccine_catalog' },
-            { id: 'settings',      label: 'Settings',            desc: 'ตั้งค่าระบบ',        shortcut: 'g s', icon: 'fa-gear',               tone: 'warning', type: 'section', target: 'settings' },
+            { id: 'edms',          label: 'สารบรรณอิเล็กทรอนิกส์', desc: 'EDMS + งาน/Tasks', icon: 'fa-folder-open',         tone: 'info',   type: 'section', target: 'edms', access: ['access_edms','superadmin'] },
+            { id: 'activity_logs', label: 'Activity Logs',       desc: 'บันทึกกิจกรรมระบบ',  icon: 'fa-file-lines',         tone: 'neutral', type: 'section', target: 'activity_logs', access: ['access_system_logs','superadmin'] },
+            { id: 'error_logs',    label: 'Error Logs',          desc: 'บันทึกข้อผิดพลาด',  shortcut: 'g e', icon: 'fa-bug',                tone: 'danger',  type: 'section', target: 'error_logs', access: ['access_system_logs','superadmin'] },
+            { id: 'privilege_inventory', label: 'ISO Governance', desc: 'Privileged Access', icon: 'fa-shield-halved',      tone: 'success', type: 'section', target: 'privilege_inventory', access: 'superadmin' },
+            { id: 'pdpa_audit',    label: 'PDPA Audit',          desc: 'ตรวจสอบความยินยอม PDPA', icon: 'fa-user-shield',    tone: 'info',    type: 'section', target: 'pdpa_audit', access: 'superadmin' },
+            { id: 'db_schema',     label: 'Database Schema',     desc: 'กราฟความสัมพันธ์ของฐานข้อมูล', icon: 'fa-diagram-project', tone: 'info', type: 'section', target: 'db_schema', access: 'superadmin' },
+            { id: 'sql_console',   label: 'SQL Console (RO)',    desc: 'รัน SELECT diagnostic · superadmin only', icon: 'fa-terminal',  tone: 'warning', type: 'section', target: 'sql_console', access: 'superadmin' },
+            { id: 'vaccinations',  label: 'บันทึกการฉีดวัคซีน',     desc: 'จัดการประวัติวัคซีน · KPI · audit log', icon: 'fa-syringe',     tone: 'success', type: 'section', target: 'vaccinations', access: ['access_ecampaign','superadmin'] },
+            { id: 'vaccine_catalog', label: 'ประเภทวัคซีน (Catalog)', desc: 'CRUD vaccine types · ผูกกับ campaign', icon: 'fa-pills', tone: 'success', type: 'section', target: 'vaccine_catalog', access: ['access_ecampaign','superadmin'] },
+            { id: 'settings',      label: 'Settings',            desc: 'ตั้งค่าระบบ',        shortcut: 'g s', icon: 'fa-gear',               tone: 'warning', type: 'section', target: 'settings', access: ['access_site_settings','superadmin'] },
 
-            { id: 'open_asset',    label: 'ครุภัณฑ์สำนักงาน',   desc: 'ทะเบียนทรัพย์สิน',  shortcut: 'g r', icon: 'fa-boxes-stacked',     tone: 'success', type: 'url',     target: '../asset/index.php' },
-            { id: 'open_campaign', label: 'Campaign Manager',    desc: 'จัดการแคมเปญ',      icon: 'fa-bullhorn',           tone: 'info',    type: 'url',     target: '../admin/campaigns.php' },
-            { id: 'open_eborrow',  label: 'e-Borrow & Inventory', desc: 'ระบบยืม-คืนอุปกรณ์', icon: 'fa-toolbox',         tone: 'neutral', type: 'url',     target: '../e_Borrow/admin/index.php' },
-            { id: 'open_users',    label: 'Users Center',        desc: 'รายชื่อผู้ใช้',     icon: 'fa-users',              tone: 'info',    type: 'url',     target: 'users.php' },
-            { id: 'open_support',  label: 'Live Support Chat',   desc: 'แชทตอบกลับผู้ใช้',  icon: 'fa-comments',           tone: 'info',    type: 'url',     target: 'support_chat.php' },
+            { id: 'open_asset',    label: 'ครุภัณฑ์สำนักงาน',   desc: 'ทะเบียนทรัพย์สิน',  shortcut: 'g r', icon: 'fa-boxes-stacked',     tone: 'success', type: 'url',     target: '../asset/index.php', access: ['access_asset','admin','superadmin'] },
+            { id: 'open_campaign', label: 'Campaign Manager',    desc: 'จัดการแคมเปญ',      icon: 'fa-bullhorn',           tone: 'info',    type: 'url',     target: '../admin/campaigns.php', access: ['access_ecampaign','admin','superadmin'] },
+            { id: 'open_eborrow',  label: 'e-Borrow & Inventory', desc: 'ระบบยืม-คืนอุปกรณ์', icon: 'fa-toolbox',         tone: 'neutral', type: 'url',     target: '../e_Borrow/admin/index.php', access: ['access_eborrow','admin','superadmin'] },
+            { id: 'open_users',    label: 'Users Center',        desc: 'รายชื่อผู้ใช้',     icon: 'fa-users',              tone: 'info',    type: 'url',     target: 'users.php', access: 'superadmin' },
+            { id: 'open_support',  label: 'Live Support Chat',   desc: 'แชทตอบกลับผู้ใช้',  icon: 'fa-comments',           tone: 'info',    type: 'url',     target: 'support_chat.php', access: ['access_ai','admin','superadmin'] },
         ];
 
         // Filter to commands that exist for this user
-        // (sidebar links only render for sections the user can access)
+        // 1. type='section' → check both sidebar render + explicit access
+        // 2. type='url'     → check explicit access (sidebar ไม่มี data-section)
         const accessibleSections = new Set(
             Array.from(document.querySelectorAll('[data-section]')).map(el => el.dataset.section)
         );
-        const COMMANDS = ALL_COMMANDS.filter(c =>
-            c.type === 'url' || accessibleSections.has(c.target)
-        );
+        const COMMANDS = ALL_COMMANDS.filter(c => {
+            if (!hasAccess(c.access)) return false;  // permission gate
+            if (c.type === 'section') return accessibleSections.has(c.target);
+            return true;  // url type — passed access gate already
+        });
 
         // ── State ────────────────────────────────────────────────────────
         const overlay = document.getElementById('cmdk-overlay');
