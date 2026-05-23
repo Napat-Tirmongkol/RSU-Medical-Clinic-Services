@@ -252,7 +252,13 @@ try {
 
 <script>
 (function(){
-    const csrf = window.portal_CSRF || '';
+    // portal_CSRF อยู่ใน portal/index.php (script-scope const) — เข้า window ไม่ได้ ใช้ try-catch resolve
+    function getCsrf() { try { return portal_CSRF; } catch { return window.portal_CSRF || ''; } }
+
+    async function parseJsonSafe(res) {
+        const t = await res.text();
+        try { return JSON.parse(t); } catch { return { ok: false, message: t.substring(0,200) }; }
+    }
 
     function slaPolicyTeleport() {
         const el = document.getElementById('sla-policy-modal');
@@ -289,12 +295,12 @@ try {
         e.preventDefault();
         const form = e.target;
         const fd = new FormData(form);
-        fd.append('csrf_token', csrf);
+        fd.append('csrf_token', getCsrf());
         fd.append('entity', 'policy');
         fd.append('action', 'upsert');
         if (!form.business_hours_only.checked) fd.set('business_hours_only', '0');
         else fd.set('business_hours_only', '1');
-        const r = await fetch('ajax_edms_sla.php', { method: 'POST', body: fd, credentials: 'same-origin' }).then(r=>r.json());
+        const r = await fetch('ajax_edms_sla.php', { method: 'POST', body: fd, credentials: 'same-origin' }).then(parseJsonSafe);
         if (r.ok) {
             Swal.fire({ icon: 'success', title: r.message, timer: 1200, showConfirmButton: false });
             setTimeout(() => location.reload(), 1300);
@@ -305,8 +311,8 @@ try {
 
     window.slaPolicyToggle = async function(id) {
         const fd = new FormData();
-        fd.append('csrf_token', csrf); fd.append('entity', 'policy'); fd.append('action', 'toggle'); fd.append('id', id);
-        const r = await fetch('ajax_edms_sla.php', { method: 'POST', body: fd, credentials: 'same-origin' }).then(r=>r.json());
+        fd.append('csrf_token', getCsrf()); fd.append('entity', 'policy'); fd.append('action', 'toggle'); fd.append('id', id);
+        const r = await fetch('ajax_edms_sla.php', { method: 'POST', body: fd, credentials: 'same-origin' }).then(parseJsonSafe);
         if (r.ok) location.reload();
         else Swal.fire({ icon: 'error', title: r.message });
     };
@@ -320,8 +326,8 @@ try {
         });
         if (!isConfirmed) return;
         const fd = new FormData();
-        fd.append('csrf_token', csrf); fd.append('entity', 'policy'); fd.append('action', 'delete'); fd.append('id', id);
-        const r = await fetch('ajax_edms_sla.php', { method: 'POST', body: fd, credentials: 'same-origin' }).then(r=>r.json());
+        fd.append('csrf_token', getCsrf()); fd.append('entity', 'policy'); fd.append('action', 'delete'); fd.append('id', id);
+        const r = await fetch('ajax_edms_sla.php', { method: 'POST', body: fd, credentials: 'same-origin' }).then(parseJsonSafe);
         if (r.ok) { Swal.fire({ icon: 'success', title: r.message, timer: 1200, showConfirmButton: false }); setTimeout(()=>location.reload(), 1300); }
         else Swal.fire({ icon: 'error', title: r.message });
     };

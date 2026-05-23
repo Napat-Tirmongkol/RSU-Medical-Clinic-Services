@@ -790,16 +790,18 @@ $routingStatusLabels = [
 <script>
 // ════════ SLA Action helpers (Sprint 2) ════════
 (function(){
-    const csrf = window.portal_CSRF || '';
+    // portal_CSRF อยู่ใน script-scope ของ portal/index.php — เข้า window ไม่ได้ ต้อง resolve ตอน call
+    function getCsrf() { try { return portal_CSRF; } catch { return window.portal_CSRF || ''; } }
 
     async function slaAjax(entity, action, params = {}) {
         const fd = new FormData();
-        fd.append('csrf_token', csrf);
+        fd.append('csrf_token', getCsrf());
         fd.append('entity', entity);
         fd.append('action', action);
         Object.entries(params).forEach(([k, v]) => fd.append(k, v));
         const res = await fetch('ajax_edms_sla.php', { method: 'POST', body: fd, credentials: 'same-origin' });
-        return res.json();
+        const text = await res.text();
+        try { return JSON.parse(text); } catch { return { ok: false, message: text.substring(0,200) || 'unexpected response' }; }
     }
 
     window.slaAck = async function(routingId) {

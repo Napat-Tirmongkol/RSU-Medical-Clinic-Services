@@ -431,15 +431,23 @@ $accessLabels = [
 
 // ════════ LINE Link self-service ════════
 (function(){
-    const csrf = window.portal_CSRF || '';
+    // portal_CSRF เป็น const declared ที่ portal/index.php (ท้ายไฟล์) — เข้า window ไม่ได้
+    // อ่าน identifier ตรงๆ ตอน call (ไม่ใช่ตอน script load) เพราะ TDZ
+    function getCsrf() {
+        try { return portal_CSRF; }
+        catch { return window.portal_CSRF || ''; }
+    }
 
     async function profileLineAjax(action, params = {}) {
         const fd = new FormData();
-        fd.append('csrf_token', csrf);
+        fd.append('csrf_token', getCsrf());
         fd.append('action', action);
         Object.entries(params).forEach(([k, v]) => fd.append(k, v));
         const res = await fetch('ajax_profile_line.php', { method: 'POST', body: fd, credentials: 'same-origin' });
-        return res.json();
+        // server returns 403 HTML on CSRF fail — guard parse กัน throw SyntaxError
+        const text = await res.text();
+        try { return JSON.parse(text); }
+        catch { return { ok: false, message: text.substring(0, 200) || 'unexpected response' }; }
     }
 
     window.profileUnlinkLine = async function() {
