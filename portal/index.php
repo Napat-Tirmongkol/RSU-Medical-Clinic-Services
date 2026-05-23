@@ -1101,15 +1101,41 @@ try {
             $hasInventory      = $hasAsset || $hasConsumables;
 
             // EDMS pending count badge — count routings where current user is recipient and status is open
-            $edmsInboxBadge = 0;
+            $edmsInboxBadge   = 0;
+            $edmsBreachedMine = 0;
+            $edmsWarningMine  = 0;
+            $edmsTaskMine     = 0;
             if ($hasEdms) {
                 $_uid = (int)($_SESSION['admin_id'] ?? 0);
                 if ($_uid > 0) {
                     try {
+                        // Total open inbox count (เดิม — ใช้ใน sidebar badge)
                         $_st = $pdo->prepare("SELECT COUNT(*) FROM sys_doc_routings WHERE to_user_id = ? AND status IN ('pending','acknowledged')");
                         $_st->execute([$_uid]);
                         $edmsInboxBadge = (int)$_st->fetchColumn();
                     } catch (PDOException) { /* table not yet migrated */ }
+
+                    try {
+                        // Breached + warning count แยก (SLA module)
+                        $_st = $pdo->prepare("SELECT
+                            SUM(CASE WHEN sla_state = 'breached' THEN 1 ELSE 0 END) AS breached,
+                            SUM(CASE WHEN sla_state = 'warning' THEN 1 ELSE 0 END) AS warning
+                            FROM sys_doc_routings
+                            WHERE to_user_id = ? AND status IN ('pending','acknowledged')");
+                        $_st->execute([$_uid]);
+                        $_sr = $_st->fetch(PDO::FETCH_ASSOC) ?: [];
+                        $edmsBreachedMine = (int)($_sr['breached'] ?? 0);
+                        $edmsWarningMine  = (int)($_sr['warning'] ?? 0);
+                    } catch (PDOException) { /* sla columns ยังไม่มี */ }
+
+                    try {
+                        // Task count (มอบหมายงาน) — แยกจากเอกสารทางการ
+                        $_st = $pdo->prepare("SELECT COUNT(*) FROM sys_doc_routings r
+                            JOIN sys_doc_documents d ON d.id = r.doc_id
+                            WHERE r.to_user_id = ? AND r.status IN ('pending','acknowledged') AND d.doc_type = 'task'");
+                        $_st->execute([$_uid]);
+                        $edmsTaskMine = (int)$_st->fetchColumn();
+                    } catch (PDOException) {}
                 }
             }
             ?>
@@ -1599,6 +1625,51 @@ try {
                             'tone'  => 'danger',
                             'href'  => 'javascript:switchSection(\'error_logs\')',
                         ];
+                    }
+
+                    // EDMS / สารบรรณอิเล็กทรอนิกส์ — เฉพาะคนที่ access_edms
+                    if ($hasEdms) {
+                        // 1) SLA breached — เร่งด่วนสุด แสดงก่อน
+                        if ($edmsBreachedMine > 0) {
+                            $today_items[] = [
+                                'label' => 'เลย deadline (เอกสาร/งาน)',
+                                'value' => $edmsBreachedMine,
+                                'icon'  => 'fa-circle-exclamation',
+                                'tone'  => 'danger',
+                                'href'  => '?section=edms&edms_view=myinbox&filter=breached',
+                            ];
+                        }
+                        // 2) Warning — ใกล้หมดเวลา
+                        if ($edmsWarningMine > 0) {
+                            $today_items[] = [
+                                'label' => 'ใกล้หมดเวลา (เอกสาร/งาน)',
+                                'value' => $edmsWarningMine,
+                                'icon'  => 'fa-triangle-exclamation',
+                                'tone'  => 'warning',
+                                'href'  => '?section=edms&edms_view=myinbox&filter=warning',
+                            ];
+                        }
+                        // 3) Tasks ของฉัน (ถ้ามี — เน้นว่าเป็นงานมอบหมาย)
+                        if ($edmsTaskMine > 0) {
+                            $today_items[] = [
+                                'label' => 'งานที่ได้รับมอบหมาย',
+                                'value' => $edmsTaskMine,
+                                'icon'  => 'fa-list-check',
+                                'tone'  => 'info',
+                                'href'  => '?section=edms&edms_view=myinbox&filter=open',
+                            ];
+                        }
+                        // 4) เอกสารใน inbox (เฉพาะที่ไม่ใช่ task — กัน double-count)
+                        $_docOnlyInbox = max(0, $edmsInboxBadge - $edmsTaskMine);
+                        if ($_docOnlyInbox > 0) {
+                            $today_items[] = [
+                                'label' => 'เอกสารรอดำเนินการ',
+                                'value' => $_docOnlyInbox,
+                                'icon'  => 'fa-folder-open',
+                                'tone'  => 'accent',
+                                'href'  => '?section=edms&edms_view=myinbox&filter=open',
+                            ];
+                        }
                     }
                     ?>
                     <section class="au d1">
