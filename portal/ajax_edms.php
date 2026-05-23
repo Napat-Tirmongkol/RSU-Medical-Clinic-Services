@@ -20,6 +20,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/_partials/edms/_helpers.php';
+require_once __DIR__ . '/../includes/edms_sla_helper.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -494,6 +495,20 @@ try {
             $comment  = trim($_POST['comment'] ?? '') ?: null;
             $dueDate  = edms_normalize_date($_POST['due_date'] ?? null);
 
+            // SLA override (Auto + ติ๊ก "กำหนดเวลาเอง")
+            $slaOverride = !empty($_POST['sla_override']);
+            $slaAckOver  = trim($_POST['sla_ack_deadline'] ?? '') ?: null;
+            $slaResOver  = trim($_POST['sla_resolve_deadline'] ?? '') ?: null;
+            $slaReason   = trim($_POST['sla_reason'] ?? '') ?: null;
+            if ($slaOverride) {
+                if (!$slaAckOver || !$slaResOver) {
+                    throw new RuntimeException('กำหนดเวลาเอง: ต้องระบุทั้ง ack และ resolve deadline');
+                }
+                if (!$slaReason) {
+                    throw new RuntimeException('กำหนดเวลาเอง: ต้องระบุเหตุผล');
+                }
+            }
+
             if ($docId <= 0) throw new RuntimeException('ระบุ doc_id ไม่ถูกต้อง');
             if (!$toUser && !$toDept) throw new RuntimeException('กรุณาเลือกผู้รับหรือฝ่ายปลายทาง');
             if (!in_array($rAction, ['forward','assign','approve','sign','return','note','close'], true)) {
@@ -523,12 +538,24 @@ try {
             }
             $pdo->commit();
 
+            // Auto-attach SLA — outside transaction (best-effort)
+            $slaOverrideArr = null;
+            if ($slaOverride) {
+                $slaOverrideArr = [
+                    'ack_deadline_at'     => $slaAckOver,
+                    'resolve_deadline_at' => $slaResOver,
+                    'reason'              => $slaReason,
+                ];
+            }
+            sla_attach_to_routing($pdo, $newRouteId, $slaOverrideArr);
+
             edms_log($pdo, $docId, $userId, 'route', [
                 'routing_id' => $newRouteId,
                 'action'     => $rAction,
                 'to_user_id' => $toUser,
                 'to_dept'    => $toDept,
                 'due_date'   => $dueDate,
+                'sla_override' => $slaOverride,
             ]);
 
             echo json_encode(['ok' => true, 'message' => 'โอนเอกสารแล้ว', 'routing_id' => $newRouteId], JSON_UNESCAPED_UNICODE);
@@ -592,6 +619,20 @@ try {
                     ->execute([$userId ?: null, $route['doc_id']]);
             }
             $pdo->commit();
+
+            // SLA hooks (outside transaction)
+            if ($newStatus === 'acknowledged') {
+                sla_acknowledge($pdo, $routeId, $userId ?: null);
+            } elseif ($newStatus === 'done') {
+                sla_mark_met($pdo, $routeId, $userId ?: null);
+            } elseif ($newStatus === 'returned') {
+                // ตีกลับ → cancel SLA ของ routing เดิม (ไม่ใช่ breach)
+                try {
+                    $pdo->prepare("UPDATE sys_doc_routings SET sla_state = 'cancelled' WHERE id = ? AND sla_state NOT IN ('met','cancelled','none')")
+                        ->execute([$routeId]);
+                    sla_event_log($pdo, $routeId, (int)$route['doc_id'], 'cancelled', $userId ?: null, 'routing returned');
+                } catch (PDOException) {}
+            }
 
             edms_log($pdo, (int)$route['doc_id'], $userId, $newStatus === 'done' ? 'route_done' : ($newStatus === 'returned' ? 'route_return' : 'route_ack'), [
                 'routing_id' => $routeId,
