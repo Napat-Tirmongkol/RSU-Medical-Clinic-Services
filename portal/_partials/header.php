@@ -171,9 +171,33 @@
     var errorUrl   = <?= json_encode($notifErrorUrl) ?>;
     var bookingUrl = <?= json_encode($notifBookingUrl) ?>;
 
+    // ── Permission flags (จาก PHP session) ────────────────────────────
+    var canSeeErrors = <?= json_encode(
+        ($_SESSION['admin_role'] ?? '') === 'superadmin' ||
+        ($_SESSION['role'] ?? '') === 'superadmin' ||
+        !empty($_SESSION['access_system_logs'])
+    ) ?>;
+    var canSeeBookings = <?= json_encode(
+        ($_SESSION['admin_role'] ?? '') === 'superadmin' ||
+        ($_SESSION['role'] ?? '') === 'superadmin' ||
+        in_array($_SESSION['admin_role'] ?? '', ['admin'], true) ||
+        !empty($_SESSION['access_ecampaign'])
+    ) ?>;
+
+    // Filter raw counts ตาม permission ก่อน render (สำหรับ panel + badge total)
+    function filterByAccess(d) {
+        return {
+            status: d.status,
+            errors_today:     canSeeErrors   ? (d.errors_today || 0)     : 0,
+            pending_bookings: canSeeBookings ? (d.pending_bookings || 0) : 0,
+            total:            (canSeeErrors   ? (d.errors_today || 0)     : 0)
+                            + (canSeeBookings ? (d.pending_bookings || 0) : 0),
+        };
+    }
+
     function renderItems(d) {
         var html = '';
-        if (d.errors_today > 0) {
+        if (canSeeErrors && d.errors_today > 0) {
             html += '<a href="' + errorUrl + '" class="flex items-center gap-4 px-5 py-4 hover:bg-rose-50/50 transition-all group" style="display: flex; align-items: center; text-decoration: none;">'
                   + '<div class="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 shadow-sm group-hover:scale-110 transition-transform" style="background:#fff1f2;color:#e11d48; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">'
                   + '<i class="fa-solid fa-bug text-sm"></i></div>'
@@ -182,7 +206,7 @@
                   + '<div class="text-[11px] font-medium text-gray-500" style="white-space: nowrap;">' + d.errors_today + ' รายการใหม่</div></div>'
                   + '<i class="fa-solid fa-chevron-right text-[10px] text-gray-300 group-hover:text-rose-400 transition-colors shrink-0" style="flex-shrink: 0; margin-left: auto;"></i></a>';
         }
-        if (d.pending_bookings > 0) {
+        if (canSeeBookings && d.pending_bookings > 0) {
             html += '<a href="' + bookingUrl + '" class="flex items-center gap-4 px-5 py-4 hover:bg-amber-50/50 transition-all group" style="display: flex; align-items: center; text-decoration: none;">'
                   + '<div class="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 shadow-sm group-hover:scale-110 transition-transform" style="background:#fffbeb;color:#d97706; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">'
                   + '<i class="fa-solid fa-clock-rotate-left text-sm"></i></div>'
@@ -202,8 +226,9 @@
     function fetchNotifications() {
         fetch(ajaxUrl)
             .then(function (r) { return r.json(); })
-            .then(function (d) {
-                if (d.status !== 'success') return;
+            .then(function (raw) {
+                if (raw.status !== 'success') return;
+                var d = filterByAccess(raw);  // filter ตาม permission ก่อนใช้
                 var total = d.total;
                 if (total > 0) {
                     badge.textContent = total > 99 ? '99+' : total;
@@ -232,7 +257,7 @@
                 items.innerHTML = '<div class="px-4 py-8 text-sm text-gray-400 text-center">กำลังโหลด...</div>';
                 fetch(ajaxUrl)
                     .then(function (r) { return r.json(); })
-                    .then(renderItems)
+                    .then(function (raw) { renderItems(filterByAccess(raw)); })
                     .catch(function () {
                         items.innerHTML = '<div class="px-4 py-8 text-sm text-red-400 text-center">โหลดข้อมูลไม่สำเร็จ</div>';
                     });
