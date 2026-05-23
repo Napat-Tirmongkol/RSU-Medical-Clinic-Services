@@ -1173,6 +1173,9 @@ try {
             $hasAsset          = $isSuper || in_array($_SESSION['role'] ?? '', ['admin','editor'], true) || !empty($_SESSION['access_asset']);
             $hasConsumables    = $isSuper || in_array($_SESSION['role'] ?? '', ['admin','editor'], true) || !empty($_SESSION['access_consumables']);
             $hasInventory      = $hasAsset || $hasConsumables;
+            // Group-toggle visibility flag — must match the OR of all inner-item gates
+            // (Avoids empty group headers that confuse users when they expand and find nothing.)
+            $hasInsuranceGroup = $isSuper || $hasInsurance || $hasRegistry;
 
             // EDMS pending count badge — count routings where current user is recipient and status is open
             $edmsInboxBadge   = 0;
@@ -1310,14 +1313,14 @@ try {
             <?php endif; ?>
 
             <?php /* ── ประกันสุขภาพ ─────────────────────────────────────── */ ?>
-            <?php if (!$registryOnly || $hasRegistry || $hasInsurance): ?>
+            <?php if ($hasInsuranceGroup): ?>
                 <button type="button" class="psb-section-toggle" data-group="insurance" onclick="togglePsbGroup('insurance',this)">
                     <i class="fa-solid fa-hospital-user" style="color:#0ea5e9"></i>
                     <span>ประกันสุขภาพ</span>
                     <i class="fa-solid fa-chevron-down psb-chevron"></i>
                 </button>
                 <div class="psb-group" data-group="insurance">
-                    <?php if (!$registryOnly): ?>
+                    <?php if (!$registryOnly && $hasInsurance): ?>
                         <button class="psb-item <?= $activeSection==='insurance_dashboard'?'psb-active':'' ?>" data-section="insurance_dashboard" onclick="switchSection('insurance_dashboard',this)">
                             <div class="psb-icon"><i class="fa-solid fa-chart-pie" style="color:#3b82f6"></i></div>
                             <span class="psb-label" style="color:#1d4ed8;font-weight:900">Dashboard Workbook</span>
