@@ -1260,6 +1260,22 @@ try {
                                 </span>
                             <?php endif; ?>
                         </button>
+                        <?php /* EDMS sub-menu: SLA */ ?>
+                        <a class="psb-item" href="?section=edms&edms_view=sla_dashboard" onclick="switchSection('edms',this); window.location.search='?section=edms&edms_view=sla_dashboard'; return false;">
+                            <div class="psb-icon"><i class="fa-solid fa-gauge-high" style="color:#10b981"></i></div>
+                            <span class="psb-label" style="color:#047857;font-weight:900;font-size:12px;padding-left:8px">— SLA Dashboard</span>
+                        </a>
+                        <?php $_canSlaAdmin = ($adminRole === 'superadmin') || !empty($_SESSION['access_edms_sla_admin']); ?>
+                        <?php if ($_canSlaAdmin): ?>
+                            <a class="psb-item" href="?section=edms&edms_view=sla_policies" onclick="switchSection('edms',this); window.location.search='?section=edms&edms_view=sla_policies'; return false;">
+                                <div class="psb-icon"><i class="fa-solid fa-stopwatch-20" style="color:#a855f7"></i></div>
+                                <span class="psb-label" style="color:#7e22ce;font-weight:900;font-size:12px;padding-left:8px">— นโยบาย SLA</span>
+                            </a>
+                            <a class="psb-item" href="?section=edms&edms_view=sla_calendar" onclick="switchSection('edms',this); window.location.search='?section=edms&edms_view=sla_calendar'; return false;">
+                                <div class="psb-icon"><i class="fa-solid fa-calendar-days" style="color:#06b6d4"></i></div>
+                                <span class="psb-label" style="color:#0e7490;font-weight:900;font-size:12px;padding-left:8px">— ปฏิทินเวลาทำการ</span>
+                            </a>
+                        <?php endif; ?>
                     <?php endif; ?>
                 </div>
             <?php endif; ?>
