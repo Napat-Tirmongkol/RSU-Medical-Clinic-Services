@@ -1276,7 +1276,11 @@ try {
             <?php endif; ?>
 
             <?php /* ── สิทธิ์ & ความปลอดภัย ──────────────────────────────── */ ?>
-            <?php if (!$registryOnly): ?>
+            <?php
+            // Gate the group header itself: render only if user can see at least one item inside.
+            // (Empty group toggles confuse users — they expand and find nothing.)
+            $hasSecurityGroup = $isSuper || !empty($_SESSION['access_identity']);
+            if (!$registryOnly && $hasSecurityGroup): ?>
                 <button type="button" class="psb-section-toggle" data-group="security" onclick="togglePsbGroup('security',this)">
                     <i class="fa-solid fa-shield-halved" style="color:#2563eb"></i>
                     <span>สิทธิ์ &amp; ความปลอดภัย</span>
