@@ -628,12 +628,16 @@ async function handleStatusUpdate(e) {
         fd.append('log_id', logId);
         fd.append('status', status);
         fd.append('resolve_comment', comment);
+        fd.append('csrf_token', '<?= get_csrf_token() ?>');
 
         const res = await fetch('ajax_error_logs.php', {
             method: 'POST',
             body: fd
         });
-        const data = await res.json();
+        const text = await res.text();
+        let data;
+        try { data = JSON.parse(text); }
+        catch { data = { ok: false, error: text.substring(0, 200) || 'unexpected response' }; }
 
         if (data.ok) {
             updateStatusUI(logId, status, comment);
