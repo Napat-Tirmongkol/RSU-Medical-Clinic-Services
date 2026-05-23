@@ -106,22 +106,25 @@ body {
     box-shadow: 0 4px 18px rgba(46,158,99,.06);
     position: sticky; top: 0; z-index: 40;
 }
-/* Bold rainbow accent strip on top of the header — gives instant personality */
+/* Subtle brand accent strip — calmer than full rainbow */
 .portal-header::before {
     content: '';
     position: absolute;
     inset: 0 0 auto 0;
-    height: 3px;
+    height: 2px;
     background: linear-gradient(90deg,
-        #2e9e63 0%, #14b8a6 22%, #0ea5e9 42%,
-        #6366f1 60%, #d946ef 78%, #f59e0b 100%);
+        #2e9e63 0%, #14b8a6 35%, #3bba7a 70%, #2e9e63 100%);
     background-size: 200% 100%;
-    animation: hdrShimmer 14s linear infinite;
+    animation: hdrShimmer 22s linear infinite;
+    opacity: 0.85;
     z-index: 1;
 }
 @keyframes hdrShimmer {
     from { background-position: 0% 0%; }
     to   { background-position: 200% 0%; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .portal-header::before { animation: none; }
 }
 .brand-icon {
     width: 44px; height: 44px;
@@ -1697,6 +1700,56 @@ body[data-theme='dark'] .pin-btn.active {
     border-radius: var(--r-md);
     color: var(--c-tone-success);
 }
+
+/* Priority HERO — single "do this first" callout */
+.priority-hero {
+    display: block;
+    margin-bottom: 12px;
+    padding: 16px 20px;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-left: 5px solid var(--c-tone-danger);
+    border-radius: var(--r-md);
+    text-decoration: none; color: inherit;
+    transition: transform .15s, box-shadow .15s, border-color .15s;
+    position: relative;
+}
+.priority-hero:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px -8px rgba(15,23,42,.18);
+    border-color: var(--c-tone-danger);
+}
+.priority-hero--warning { border-left-color: var(--c-tone-warning); }
+.priority-hero--warning:hover { border-color: var(--c-tone-warning); }
+.priority-hero-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--c-tone-danger);
+    color: #fff;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 11px; font-weight: 700;
+    margin-bottom: 10px;
+}
+.priority-hero--warning .priority-hero-pill { background: var(--c-tone-warning); color: #78350f; }
+.priority-hero-body {
+    display: flex; align-items: center; gap: 14px;
+}
+.priority-hero-icon {
+    width: 48px; height: 48px;
+    background: var(--c-tone-danger-bg);
+    color: var(--c-tone-danger);
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; flex-shrink: 0;
+}
+.priority-hero--warning .priority-hero-icon { background: var(--c-tone-warning-bg); color: var(--c-tone-warning); }
+.priority-hero-text { flex: 1; min-width: 0; }
+.priority-hero-num { font-size: 28px; font-weight: 700; color: #0f172a; line-height: 1; }
+.priority-hero-label { font-size: 14px; color: #475569; margin-top: 4px; font-weight: 500; }
+.priority-hero-arrow { color: #94a3b8; font-size: 14px; flex-shrink: 0; }
+body[data-theme='dark'] .priority-hero { background: #1e293b; border-color: #334155; }
+body[data-theme='dark'] .priority-hero-num { color: #f1f5f9; }
+body[data-theme='dark'] .priority-hero-label { color: #cbd5e1; }
 .priority-empty i { font-size: 1.4rem; }
 .priority-empty strong { font-weight: 700; font-size: var(--t-body); display: block; }
 .priority-empty p { font-size: var(--t-meta); margin: 2px 0 0; opacity: .85; }

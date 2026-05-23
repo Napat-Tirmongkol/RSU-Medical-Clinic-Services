@@ -942,9 +942,18 @@ try {
                 }
             }
 
-            // Apply saved per-group collapse state
+            // Apply saved per-group collapse state.
+            // First-time visitor (no saved state): default-collapse everything except OVERVIEW
+            // — sidebar with 12 sections expanded is overwhelming for Staff ทั่วไป.
             try {
-                var saved = JSON.parse(localStorage.getItem('psb_groups_collapsed') || '[]');
+                var savedRaw = localStorage.getItem('psb_groups_collapsed');
+                var saved;
+                if (savedRaw === null) {
+                    saved = ['ai','security','insurance','comm','inventory','finance','monitor','reports','docs','masterdata','settings'];
+                    localStorage.setItem('psb_groups_collapsed', JSON.stringify(saved));
+                } else {
+                    saved = JSON.parse(savedRaw);
+                }
                 saved.forEach(function (key) {
                     var btn = document.querySelector('.psb-section-toggle[data-group="' + key + '"]');
                     var grp = document.querySelector('.psb-group[data-group="' + key + '"]');
@@ -965,6 +974,58 @@ try {
                     var btn = document.querySelector('.psb-section-toggle[data-group="' + key + '"]');
                     if (btn) btn.classList.remove('collapsed');
                 }
+            }
+
+            // ── Sidebar search ─────────────────────────────────────
+            // กรอง psb-item ตาม text + ซ่อน group ที่ไม่เหลือ item ที่ตรง
+            var searchInput = document.getElementById('psb-search');
+            var clearBtn = document.getElementById('psb-search-clear');
+            if (searchInput) {
+                var doFilter = function () {
+                    var q = (searchInput.value || '').trim().toLowerCase();
+                    clearBtn.style.display = q ? 'block' : 'none';
+                    document.querySelectorAll('.psb-group').forEach(function (grp) {
+                        var key = grp.getAttribute('data-group');
+                        var anyMatch = false;
+                        grp.querySelectorAll('.psb-item').forEach(function (item) {
+                            var label = (item.textContent || '').toLowerCase();
+                            var match = !q || label.indexOf(q) >= 0;
+                            item.style.display = match ? '' : 'none';
+                            if (match && q) anyMatch = true;
+                        });
+                        // While searching, auto-expand groups with matches; restore on clear
+                        if (q) {
+                            var btn = document.querySelector('.psb-section-toggle[data-group="' + key + '"]');
+                            if (anyMatch) {
+                                grp.classList.remove('collapsed');
+                                if (btn) btn.classList.remove('collapsed');
+                                grp.style.display = '';
+                                if (btn) btn.style.display = '';
+                            } else {
+                                grp.style.display = 'none';
+                                if (btn) btn.style.display = 'none';
+                            }
+                        } else {
+                            grp.style.display = '';
+                            var btn2 = document.querySelector('.psb-section-toggle[data-group="' + key + '"]');
+                            if (btn2) btn2.style.display = '';
+                        }
+                    });
+                };
+                searchInput.addEventListener('input', doFilter);
+                window.psbClearSearch = function () {
+                    searchInput.value = '';
+                    doFilter();
+                    searchInput.focus();
+                };
+                // Cmd/Ctrl+K shortcut
+                document.addEventListener('keydown', function (e) {
+                    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+                        e.preventDefault();
+                        searchInput.focus();
+                        searchInput.select();
+                    }
+                });
             }
         });
 
@@ -1079,6 +1140,19 @@ try {
                 <i id="sidebar-toggle-icon" class="fa-solid fa-chevron-left"
                     style="font-size:11px;transition:transform .3s"></i>
             </button>
+        </div>
+
+        <!-- Sidebar search (filters menu items by Thai label) -->
+        <div id="psb-search-wrap" style="padding:10px 12px 6px;">
+            <div style="position:relative;">
+                <i class="fa-solid fa-magnifying-glass" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:11px;pointer-events:none;"></i>
+                <input type="search" id="psb-search" placeholder="ค้นหาเมนู… (Ctrl+K)" autocomplete="off"
+                    style="width:100%;padding:7px 28px 7px 28px;border:1px solid #e2e8f0;border-radius:9px;font-size:12px;background:#fafbfc;color:#0f172a;outline:none;transition:border-color .15s, background .15s;">
+                <button type="button" id="psb-search-clear" onclick="psbClearSearch()" aria-label="ล้างคำค้นหา"
+                    style="display:none;position:absolute;right:6px;top:50%;transform:translateY(-50%);width:18px;height:18px;border-radius:50%;border:none;background:#e2e8f0;color:#475569;cursor:pointer;font-size:9px;line-height:18px;padding:0;">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
         </div>
 
         <!-- Nav items (grouped) -->
@@ -1710,7 +1784,7 @@ try {
                             </div>
                             <div class="dash-hero-kpis">
                                 <?php foreach ($heroKpis as $i => $k): ?>
-                                <div class="dash-kpi fx-tilt fx-tilt-dark" data-tone="<?= $k['tone'] ?>" data-tilt="5" style="animation-delay:<?= 0.1 + $i * 0.08 ?>s">
+                                <div class="dash-kpi" data-tone="<?= $k['tone'] ?>" style="animation-delay:<?= 0.1 + $i * 0.08 ?>s">
                                     <div class="dash-kpi-ic"><i class="fa-solid <?= $k['icon'] ?>"></i></div>
                                     <div class="dash-kpi-body">
                                         <div class="dash-kpi-num">
@@ -1744,10 +1818,34 @@ try {
                                         <p>ทุกอย่างเรียบร้อยใน 24 ชั่วโมงที่ผ่านมา</p>
                                     </div>
                                 </div>
-                            <?php else: ?>
+                            <?php else:
+                                // เรียงตามความเร่งด่วน: danger → warning → accent → info → success
+                                $_toneRank = ['danger' => 0, 'warning' => 1, 'accent' => 2, 'info' => 3, 'success' => 4];
+                                usort($today_items, function($a, $b) use ($_toneRank) {
+                                    return ($_toneRank[$a['tone']] ?? 99) <=> ($_toneRank[$b['tone']] ?? 99);
+                                });
+                                // แยก hero (อันที่เร่งสุด) ออกจาก list ปกติ
+                                $_hero = ($today_items[0]['tone'] === 'danger' || $today_items[0]['tone'] === 'warning')
+                                    ? array_shift($today_items)
+                                    : null;
+                            ?>
+                                <?php if ($_hero): ?>
+                                    <a href="<?= htmlspecialchars($_hero['href']) ?>" class="priority-hero priority-hero--<?= $_hero['tone'] ?>">
+                                        <div class="priority-hero-pill"><i class="fa-solid fa-fire"></i> ทำอันนี้ก่อน</div>
+                                        <div class="priority-hero-body">
+                                            <div class="priority-hero-icon"><i class="fa-solid <?= $_hero['icon'] ?>"></i></div>
+                                            <div class="priority-hero-text">
+                                                <div class="priority-hero-num"><span data-counter="<?= (int)$_hero['value'] ?>">0</span></div>
+                                                <div class="priority-hero-label"><?= htmlspecialchars($_hero['label']) ?></div>
+                                            </div>
+                                            <i class="fa-solid fa-arrow-right priority-hero-arrow"></i>
+                                        </div>
+                                    </a>
+                                <?php endif; ?>
+                                <?php if (!empty($today_items)): ?>
                                 <div class="priority-grid">
                                     <?php foreach ($today_items as $it): ?>
-                                        <a href="<?= htmlspecialchars($it['href']) ?>" class="priority-item priority-item--<?= $it['tone'] ?> fx-tilt fx-tilt-light" data-tilt="4">
+                                        <a href="<?= htmlspecialchars($it['href']) ?>" class="priority-item priority-item--<?= $it['tone'] ?>">
                                             <div class="priority-item-icon"><i class="fa-solid <?= $it['icon'] ?>"></i></div>
                                             <div class="priority-item-body">
                                                 <div class="priority-item-num"><span data-counter="<?= (int)$it['value'] ?>">0</span></div>
@@ -1757,6 +1855,7 @@ try {
                                         </a>
                                     <?php endforeach; ?>
                                 </div>
+                                <?php endif; ?>
                             <?php endif; ?>
                         </div>
                     </section>

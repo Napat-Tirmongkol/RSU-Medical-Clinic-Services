@@ -114,48 +114,53 @@ $routingStatusLabels = [
             <i class="fa-solid fa-bell"></i>
         </div>
         <div class="flex-1 min-w-0">
-            <h2 class="text-2xl font-black text-slate-800">Inbox ของฉัน</h2>
-            <p class="text-slate-500 text-sm font-medium">เอกสารที่ถูกมอบหมายให้ดำเนินการ</p>
+            <h2 class="text-2xl font-bold text-slate-800">กล่องของฉัน</h2>
+            <p class="text-slate-500 text-sm">เอกสาร · งาน · ที่มอบหมายให้คุณดำเนินการ</p>
         </div>
+        <button type="button" id="mi-help-btn" onclick="window._miHelp && window._miHelp()"
+            class="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-600 bg-slate-50 border border-slate-200 hover:bg-slate-100 hover:text-slate-800 transition-colors"
+            title="ดูคำอธิบายแต่ละส่วน">
+            <i class="fa-solid fa-circle-question"></i> ช่วยเหลือ
+        </button>
     </div>
 
-    <!-- KPI -->
+    <!-- KPI — calm with semantic accent stripe -->
     <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
-        <div class="bg-white rounded-2xl border border-amber-200 p-4 shadow-sm">
-            <p class="text-[10px] font-black uppercase tracking-widest text-amber-500">รอดำเนินการ</p>
-            <p class="text-2xl font-black text-amber-600 mt-1"><?= number_format($kpis['open']) ?></p>
+        <div class="bg-white rounded-2xl border border-slate-200 border-l-4 border-l-amber-500 p-4">
+            <p class="text-xs font-semibold text-amber-700">รอทำ</p>
+            <p class="text-2xl font-bold text-slate-900 mt-1"><?= number_format($kpis['open']) ?></p>
         </div>
-        <div class="bg-white rounded-2xl border border-orange-200 p-4 shadow-sm">
-            <p class="text-[10px] font-black uppercase tracking-widest text-orange-500">ใกล้หมดเวลา</p>
-            <p class="text-2xl font-black text-orange-600 mt-1"><?= number_format($kpis['warning']) ?></p>
+        <div class="bg-white rounded-2xl border border-slate-200 border-l-4 border-l-orange-500 p-4">
+            <p class="text-xs font-semibold text-orange-700">ใกล้หมดเวลา</p>
+            <p class="text-2xl font-bold text-slate-900 mt-1"><?= number_format($kpis['warning']) ?></p>
         </div>
-        <div class="bg-white rounded-2xl border border-rose-200 p-4 shadow-sm" title="เอกสาร/งาน ที่เลยเวลาที่ต้องเสร็จแล้ว — รีบทำให้เสร็จด่วน">
-            <p class="text-[10px] font-black uppercase tracking-widest text-rose-500">เลยกำหนด</p>
-            <p class="text-2xl font-black text-rose-600 mt-1"><?= number_format($kpis['breached']) ?></p>
+        <div class="bg-white rounded-2xl border border-slate-200 border-l-4 border-l-rose-500 p-4" title="เอกสาร/งาน ที่เลยเวลาที่ต้องเสร็จแล้ว — รีบทำให้เสร็จด่วน">
+            <p class="text-xs font-semibold text-rose-700">เลยกำหนด</p>
+            <p class="text-2xl font-bold text-slate-900 mt-1"><?= number_format($kpis['breached']) ?></p>
         </div>
-        <div class="bg-white rounded-2xl border border-emerald-200 p-4 shadow-sm" title="เอกสาร/งานที่ปิดเรื่องแล้ว">
-            <p class="text-[10px] font-black uppercase tracking-widest text-emerald-500">เสร็จแล้ว</p>
-            <p class="text-2xl font-black text-emerald-600 mt-1"><?= number_format($kpis['done']) ?></p>
+        <div class="bg-white rounded-2xl border border-slate-200 border-l-4 border-l-emerald-500 p-4" title="เอกสาร/งานที่ปิดเรื่องแล้ว">
+            <p class="text-xs font-semibold text-emerald-700">เสร็จแล้ว</p>
+            <p class="text-2xl font-bold text-slate-900 mt-1"><?= number_format($kpis['done']) ?></p>
         </div>
     </div>
 
-    <!-- Filter tabs -->
-    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-2 mb-5 inline-flex gap-1 flex-wrap">
+    <!-- Filter tabs — เรียง: ทั้งหมด ก่อน, แล้วเรียงตามเร่งด่วน -->
+    <div class="bg-white rounded-2xl border border-slate-200 p-2 mb-5 inline-flex gap-1 flex-wrap">
         <?php
         $tabs = [
+            'all'      => ['label' => 'ทั้งหมด',       'tone' => 'sky'],
             'open'     => ['label' => 'รอทำ',          'tone' => 'amber'],
             'warning'  => ['label' => 'ใกล้หมดเวลา',   'tone' => 'orange'],
             'breached' => ['label' => 'เลยกำหนด',      'tone' => 'rose'],
             'paused'   => ['label' => 'หยุดรอข้อมูล',  'tone' => 'slate'],
             'done'     => ['label' => 'เสร็จแล้ว',     'tone' => 'emerald'],
-            'all'      => ['label' => 'ทั้งหมด',       'tone' => 'sky'],
         ];
         foreach ($tabs as $k => $cfg):
             $isActive = ($k === $filter);
             $tone = $cfg['tone'];
         ?>
             <a href="?section=edms&edms_view=myinbox&filter=<?= urlencode($k) ?>"
-               class="px-4 py-2 rounded-xl text-xs font-black transition-all
+               class="px-4 py-2 rounded-xl text-xs font-semibold transition-all
                       <?= $isActive ? "bg-{$tone}-50 text-{$tone}-700 border border-{$tone}-100" : 'text-slate-500 hover:bg-slate-50' ?>">
                 <?= htmlspecialchars($cfg['label']) ?>
             </a>
@@ -163,13 +168,13 @@ $routingStatusLabels = [
     </div>
 
     <!-- Table -->
-    <div class="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="bg-white rounded-3xl border border-slate-200 overflow-hidden">
         <div class="px-4 py-3 border-b border-slate-100">
-            <p class="text-[11px] font-black text-slate-400">หน้า <?= $page ?> / <?= $totalPages ?> · รวม <?= $total ?> รายการ</p>
+            <p class="text-xs text-slate-500">หน้า <?= $page ?> / <?= $totalPages ?> · รวม <?= $total ?> รายการ</p>
         </div>
         <div class="overflow-x-auto">
             <table class="min-w-full text-sm">
-                <thead class="bg-slate-50 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                <thead class="bg-slate-50 text-xs font-semibold text-slate-500">
                     <tr>
                         <th class="px-4 py-3 text-left">ประเภท</th>
                         <th class="px-4 py-3 text-left">เอกสาร</th>
@@ -314,3 +319,17 @@ $routingStatusLabels = [
         <?php endif; ?>
     </div>
 </div>
+
+<script>
+(function(){
+    const miSteps = [
+        { popover: { title: 'นี่คือกล่องของคุณ', description: 'รวมเอกสารและงานทุกชิ้นที่มอบหมายให้คุณดำเนินการ — ไม่ใช่ของคนอื่น' } },
+        { element: '.grid.grid-cols-2', popover: { title: '4 KPI ด้านบน', description: 'นับจำนวนแต่ละสถานะอย่างรวดเร็ว · สีแดง = เลยกำหนด ควรทำก่อน', side: 'bottom' } },
+        { element: 'a[href*="filter=breached"]', popover: { title: 'แท็บกรอง', description: 'คลิกเพื่อดูเฉพาะเอกสารที่อยู่ในสถานะนั้น เช่น "เลยกำหนด" หรือ "ใกล้หมดเวลา"', side: 'bottom' } },
+        { popover: { title: 'แต่ละแถวคืออะไร?', description: 'คลิกที่ชื่อเอกสารเพื่อเปิดดู — มีปุ่ม "รับทราบ" / "หยุดรอข้อมูล" / "ขอเลื่อนเวลา" ในหน้าเอกสาร' } },
+        { popover: { title: 'จบทัวร์', description: 'กด <i class="fa-solid fa-circle-question"></i> ช่วยเหลือ มุมบนขวาเพื่อดูทัวร์อีกครั้งได้ตลอด' } },
+    ];
+    window._miHelp = function(){ window.RsuTour && RsuTour.start(miSteps, 'myinbox'); };
+    window.RsuTour && RsuTour.maybeAutoStart('myinbox', miSteps);
+})();
+</script>
