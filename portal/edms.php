@@ -19,7 +19,7 @@ if (!isset($_GET['edms_view']) && isset($_GET['view'])) {
 
 layout_start(['section' => 'edms', 'title' => 'สารบรรณอิเล็กทรอนิกส์']);
 ?>
-            <div class="portal-section"
+            <div id="section-edms" class="portal-section"
                 style="width:100%; height:calc(100vh - 60px); background:#f8fafc; overflow-y:auto;">
                 <?php
                 if ($adminRole === 'superadmin' || !empty($_SESSION['access_edms'])) {

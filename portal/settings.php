@@ -9,7 +9,7 @@ require_once __DIR__ . '/_layout.php';
 
 layout_start(['section' => 'settings', 'title' => 'ตั้งค่าระบบ']);
 ?>
-            <div class="portal-section"
+            <div id="section-settings" class="portal-section"
                 style="width:100%; height:calc(100vh - 60px); background:#f1f5f9; overflow-y:auto;">
                 <?php
                 if ($adminRole === 'superadmin' || !empty($_SESSION['access_site_settings'])) {

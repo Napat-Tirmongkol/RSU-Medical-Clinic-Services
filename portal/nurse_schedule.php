@@ -8,7 +8,7 @@ require_once __DIR__ . '/_layout.php';
 
 layout_start(['section' => 'nurse_schedule', 'title' => 'ตารางเวรพยาบาล']);
 ?>
-            <div class="portal-section"
+            <div id="section-nurse_schedule" class="portal-section"
                 style="width:100%; height:calc(100vh - 60px); padding:0; overflow:hidden;">
                 <iframe src="nurse_schedule.php"
                     style="width:100%; height:100%; border:0; display:block;"

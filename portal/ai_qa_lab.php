@@ -8,7 +8,7 @@ require_once __DIR__ . '/_layout.php';
 
 layout_start(['section' => 'ai_qa_lab', 'title' => 'AI QA Lab']);
 ?>
-            <div class="portal-section"
+            <div id="section-ai_qa_lab" class="portal-section"
                 style="width:100%; height:calc(100vh - 60px); background:#f8fafc; overflow-y:auto;">
                 <?php
                 if ($hasAi) {

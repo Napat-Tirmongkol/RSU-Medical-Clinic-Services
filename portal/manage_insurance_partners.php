@@ -8,7 +8,7 @@ require_once __DIR__ . '/_layout.php';
 
 layout_start(['section' => 'manage_insurance_partners', 'title' => 'Insurance Partners']);
 ?>
-            <div class="portal-section"
+            <div id="section-manage_insurance_partners" class="portal-section"
                 style="width:100%; height:calc(100vh - 60px); background:#f8fafc; overflow-y:auto;">
                 <?php
                 if ($adminRole === 'superadmin') {

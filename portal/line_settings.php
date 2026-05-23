@@ -8,7 +8,7 @@ require_once __DIR__ . '/_layout.php';
 
 layout_start(['section' => 'line_settings', 'title' => 'LINE Settings']);
 ?>
-            <div class="portal-section"
+            <div id="section-line_settings" class="portal-section"
                 style="width:100%; height:calc(100vh - 60px); background:#f8fafc; overflow-y:auto;">
                 <?php 
                 if ($adminRole === 'superadmin' || !empty($_SESSION['access_site_settings'])) {

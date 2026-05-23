@@ -8,7 +8,7 @@ require_once __DIR__ . '/_layout.php';
 
 layout_start(['section' => 'privilege_inventory', 'title' => 'ISO Governance']);
 ?>
-            <div class="portal-section" 
+            <div id="section-privilege_inventory" class="portal-section" 
                 style="width:100%; height:calc(100vh - 60px); background:#f8fafc; overflow-y:auto;">
                 <div class="px-5 md:px-8 py-8">
                     <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:24px">

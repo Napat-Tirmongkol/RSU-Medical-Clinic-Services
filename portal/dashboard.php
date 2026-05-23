@@ -9,7 +9,7 @@ require_once __DIR__ . '/_layout.php';
 
 layout_start(['section' => 'dashboard', 'title' => 'Dashboard']);
 ?>
-            <div class="portal-section" style="">
+            <div id="section-dashboard" class="portal-section" style="">
                 <div class="max-w-[1280px] mx-auto px-5 md:px-8 py-8 space-y-8">
 
                     <!-- ── PRIORITY PANEL: งานวันนี้ ──────────────────────────────── -->

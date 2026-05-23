@@ -9,7 +9,7 @@ require_once __DIR__ . '/_layout.php';
 
 layout_start(['section' => 'announcements', 'title' => 'ประกาศ']);
 ?>
-            <div class="portal-section" 
+            <div id="section-announcements" class="portal-section" 
                 style="width:100%; height:calc(100vh - 60px); background:#f8fafc; overflow-y:auto;">
                 <div class="px-5 md:px-8 py-8">
 

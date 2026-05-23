@@ -8,7 +8,7 @@ require_once __DIR__ . '/_layout.php';
 
 layout_start(['section' => 'ai_assistant', 'title' => 'AI Assistant']);
 ?>
-            <div class="portal-section"
+            <div id="section-ai_assistant" class="portal-section"
                 style="width:100%; height:calc(100vh - 60px); overflow:hidden;">
                 <?php
                 if ($hasAi) {

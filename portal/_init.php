@@ -58,6 +58,44 @@ $aiDeniedHtml = '<div style="padding:100px;text-align:center;font-weight:900;col
 // will overwrite these with real values — the rest stay safe at defaults.
 $ann_saved = false;
 
+// EDMS inbox / SLA badge counts.
+// Used in 2 scopes: sidebar (badge on "สารบรรณ" item) + dashboard priority panel.
+// Compute once here so both surfaces share the same data without re-querying.
+$edmsInboxBadge   = 0;
+$edmsBreachedMine = 0;
+$edmsWarningMine  = 0;
+$edmsTaskMine     = 0;
+if ($hasEdms) {
+    $_uid = (int)($_SESSION['admin_id'] ?? 0);
+    if ($_uid > 0) {
+        try {
+            $_st = $pdo->prepare("SELECT COUNT(*) FROM sys_doc_routings WHERE to_user_id = ? AND status IN ('pending','acknowledged')");
+            $_st->execute([$_uid]);
+            $edmsInboxBadge = (int)$_st->fetchColumn();
+        } catch (PDOException) { /* table not yet migrated */ }
+
+        try {
+            $_st = $pdo->prepare("SELECT
+                SUM(CASE WHEN sla_state = 'breached' THEN 1 ELSE 0 END) AS breached,
+                SUM(CASE WHEN sla_state = 'warning' THEN 1 ELSE 0 END) AS warning
+                FROM sys_doc_routings
+                WHERE to_user_id = ? AND status IN ('pending','acknowledged')");
+            $_st->execute([$_uid]);
+            $_sr = $_st->fetch(PDO::FETCH_ASSOC) ?: [];
+            $edmsBreachedMine = (int)($_sr['breached'] ?? 0);
+            $edmsWarningMine  = (int)($_sr['warning'] ?? 0);
+        } catch (PDOException) { /* sla columns not yet migrated */ }
+
+        try {
+            $_st = $pdo->prepare("SELECT COUNT(*) FROM sys_doc_routings r
+                JOIN sys_doc_documents d ON d.id = r.doc_id
+                WHERE r.to_user_id = ? AND r.status IN ('pending','acknowledged') AND d.doc_type = 'task'");
+            $_st->execute([$_uid]);
+            $edmsTaskMine = (int)$_st->fetchColumn();
+        } catch (PDOException) { /* schema gap */ }
+    }
+}
+
 // Per-page section name — set by each section file before calling layout_start()
 // Default = empty (page must declare its own)
 $activeSection = $_GET['section'] ?? '';

@@ -44,7 +44,8 @@ function layout_start(array $opts = []): void
            $hasScholarship, $hasDashboardAdmin, $hasMonthlyReport,
            $hasNurseProductivity, $hasDailySummary, $hasAsset, $hasConsumables,
            $hasInventory, $hasFinance, $hasInsuranceGroup, $hasSecurityGroup,
-           $canEcampaign, $canEborrow, $canSystemLogs;
+           $canEcampaign, $canEborrow, $canSystemLogs,
+           $edmsInboxBadge, $edmsBreachedMine, $edmsWarningMine, $edmsTaskMine;
 
     $activeSection = $opts['section'] ?? '';
     $pageTitle     = $opts['title']   ?? '';

@@ -8,7 +8,7 @@ require_once __DIR__ . '/_layout.php';
 
 layout_start(['section' => 'sentry_test', 'title' => 'Sentry Test']);
 ?>
-            <div class="portal-section"
+            <div id="section-sentry_test" class="portal-section"
                 style="background:#f8fafc; overflow-y:auto;">
                 <?php
                 if ($isSuper) {

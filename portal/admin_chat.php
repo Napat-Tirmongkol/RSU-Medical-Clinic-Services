@@ -8,7 +8,7 @@ require_once __DIR__ . '/_layout.php';
 
 layout_start(['section' => 'admin_chat', 'title' => 'ผู้ช่วยข้อมูล']);
 ?>
-            <div class="portal-section"
+            <div id="section-admin_chat" class="portal-section"
                 style="width:100%; height:calc(100vh - 60px); overflow:hidden;">
                 <?php
                 if ($hasAi) {

@@ -518,44 +518,10 @@
             // (Avoids empty group headers that confuse users when they expand and find nothing.)
             $hasInsuranceGroup = $isSuper || $hasInsurance || $hasRegistry;
 
-            // EDMS pending count badge — count routings where current user is recipient and status is open
-            $edmsInboxBadge   = 0;
-            $edmsBreachedMine = 0;
-            $edmsWarningMine  = 0;
-            $edmsTaskMine     = 0;
-            if ($hasEdms) {
-                $_uid = (int)($_SESSION['admin_id'] ?? 0);
-                if ($_uid > 0) {
-                    try {
-                        // Total open inbox count (เดิม — ใช้ใน sidebar badge)
-                        $_st = $pdo->prepare("SELECT COUNT(*) FROM sys_doc_routings WHERE to_user_id = ? AND status IN ('pending','acknowledged')");
-                        $_st->execute([$_uid]);
-                        $edmsInboxBadge = (int)$_st->fetchColumn();
-                    } catch (PDOException) { /* table not yet migrated */ }
-
-                    try {
-                        // Breached + warning count แยก (SLA module)
-                        $_st = $pdo->prepare("SELECT
-                            SUM(CASE WHEN sla_state = 'breached' THEN 1 ELSE 0 END) AS breached,
-                            SUM(CASE WHEN sla_state = 'warning' THEN 1 ELSE 0 END) AS warning
-                            FROM sys_doc_routings
-                            WHERE to_user_id = ? AND status IN ('pending','acknowledged')");
-                        $_st->execute([$_uid]);
-                        $_sr = $_st->fetch(PDO::FETCH_ASSOC) ?: [];
-                        $edmsBreachedMine = (int)($_sr['breached'] ?? 0);
-                        $edmsWarningMine  = (int)($_sr['warning'] ?? 0);
-                    } catch (PDOException) { /* sla columns ยังไม่มี */ }
-
-                    try {
-                        // Task count (มอบหมายงาน) — แยกจากเอกสารทางการ
-                        $_st = $pdo->prepare("SELECT COUNT(*) FROM sys_doc_routings r
-                            JOIN sys_doc_documents d ON d.id = r.doc_id
-                            WHERE r.to_user_id = ? AND r.status IN ('pending','acknowledged') AND d.doc_type = 'task'");
-                        $_st->execute([$_uid]);
-                        $edmsTaskMine = (int)$_st->fetchColumn();
-                    } catch (PDOException) {}
-                }
-            }
+            // EDMS badge counts ($edmsInboxBadge, $edmsBreachedMine,
+            // $edmsWarningMine, $edmsTaskMine) are now computed in _init.php
+            // and brought into this scope via the `global` declaration in
+            // layout_start(). Sidebar + dashboard both read the same values.
             ?>
 
             <?php /* ── OVERVIEW ───────────────────────────────────────────── */ ?>

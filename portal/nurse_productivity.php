@@ -8,7 +8,7 @@ require_once __DIR__ . '/_layout.php';
 
 layout_start(['section' => 'nurse_productivity', 'title' => 'Productivity พยาบาล']);
 ?>
-            <div class="portal-section"
+            <div id="section-nurse_productivity" class="portal-section"
                 style="width:100%; height:calc(100vh - 60px); background:#f1f5f9; overflow-y:auto; padding:20px;">
                 <?php
                 if ($hasNurseProductivity) {
