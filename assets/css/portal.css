@@ -438,6 +438,11 @@ body {
     margin-bottom: 2px; overflow: hidden;
     text-decoration: none;  /* a.psb-item — no underline */
 }
+/* a.psb-item — kill browser :link/:visited tint that bleeds through */
+a.psb-item, a.psb-item:link, a.psb-item:visited, a.psb-item:active {
+    color: #475569;
+    text-decoration: none;
+}
 .psb-item:hover, .psb-item:focus { text-decoration: none; }
 .psb-item::before {
     /* Sliding accent rail on the left edge */
