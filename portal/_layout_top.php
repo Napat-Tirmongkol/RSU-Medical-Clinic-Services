@@ -297,39 +297,39 @@
                 }
             }
 
-            // Apply saved per-group collapse state.
-            // First-time visitor (no saved state): default-collapse everything except OVERVIEW
-            // — sidebar with 12 sections expanded is overwhelming for Staff ทั่วไป.
-            try {
-                var savedRaw = localStorage.getItem('psb_groups_collapsed');
-                var saved;
-                if (savedRaw === null) {
-                    saved = ['ai','security','insurance','comm','inventory','finance','monitor','reports','docs','masterdata','settings'];
-                    localStorage.setItem('psb_groups_collapsed', JSON.stringify(saved));
-                } else {
-                    saved = JSON.parse(savedRaw);
+            // Sidebar collapse behavior (after multi-page refactor 2026-05-23):
+            //   On every page load, force-collapse every group EXCEPT:
+            //     - 'overview'  (always-pinned top group with Dashboard)
+            //     - the group containing the active item (auto-expand for context)
+            //
+            // Why ignore localStorage? Each navigation = full page reload. Persisting
+            // per-group state across reloads makes the sidebar grow noisy as users
+            // explore — bottoms out at "everything expanded" and never returns to a
+            // tidy state. Forcing collapse on load keeps the sidebar tidy across
+            // navigations. User can still toggle groups within a single page; that
+            // toggle is just not persisted into the next page load.
+            (function applyDefaultCollapse() {
+                var activeItem = document.querySelector('.psb-item.psb-active');
+                var activeGroupKey = null;
+                if (activeItem) {
+                    var grp = activeItem.closest('.psb-group');
+                    if (grp) activeGroupKey = grp.getAttribute('data-group');
                 }
-                saved.forEach(function (key) {
+                var KEEP_OPEN = { overview: true };
+                if (activeGroupKey) KEEP_OPEN[activeGroupKey] = true;
+
+                document.querySelectorAll('.psb-group').forEach(function (grp) {
+                    var key = grp.getAttribute('data-group');
                     var btn = document.querySelector('.psb-section-toggle[data-group="' + key + '"]');
-                    var grp = document.querySelector('.psb-group[data-group="' + key + '"]');
-                    if (btn && grp) {
-                        btn.classList.add('collapsed');
+                    if (KEEP_OPEN[key]) {
+                        grp.classList.remove('collapsed');
+                        if (btn) btn.classList.remove('collapsed');
+                    } else {
                         grp.classList.add('collapsed');
+                        if (btn) btn.classList.add('collapsed');
                     }
                 });
-            } catch (e) { /* silent */ }
-
-            // Auto-expand the group containing the active item (override saved collapse)
-            var activeItem = document.querySelector('.psb-item.psb-active');
-            if (activeItem) {
-                var grp = activeItem.closest('.psb-group');
-                if (grp) {
-                    var key = grp.getAttribute('data-group');
-                    grp.classList.remove('collapsed');
-                    var btn = document.querySelector('.psb-section-toggle[data-group="' + key + '"]');
-                    if (btn) btn.classList.remove('collapsed');
-                }
-            }
+            })();
 
             // ── Sidebar search ─────────────────────────────────────
             // กรอง psb-item ตาม text + ซ่อน group ที่ไม่เหลือ item ที่ตรง
@@ -384,22 +384,20 @@
             }
         });
 
-        // Toggle a sidebar group open/closed; persist to localStorage
+        // Toggle a sidebar group open/closed (in-page only — not persisted).
+        // After 2026-05-23 multi-page refactor: per-group state resets on every
+        // navigation. See applyDefaultCollapse() above for rationale.
         window.togglePsbGroup = function (key, btnEl) {
             var btn = btnEl || document.querySelector('.psb-section-toggle[data-group="' + key + '"]');
             var grp = document.querySelector('.psb-group[data-group="' + key + '"]');
             if (!btn || !grp) return;
             var nowCollapsed = btn.classList.toggle('collapsed');
             grp.classList.toggle('collapsed', nowCollapsed);
-
-            try {
-                var saved = JSON.parse(localStorage.getItem('psb_groups_collapsed') || '[]');
-                var idx = saved.indexOf(key);
-                if (nowCollapsed && idx < 0) saved.push(key);
-                if (!nowCollapsed && idx >= 0) saved.splice(idx, 1);
-                localStorage.setItem('psb_groups_collapsed', JSON.stringify(saved));
-            } catch (e) { /* silent */ }
         };
+
+        // Clean up stale localStorage key from the old persisted-state design.
+        // (Harmless if missing — just removes leftover from previous behavior.)
+        try { localStorage.removeItem('psb_groups_collapsed'); } catch (e) {}
 
         window.switchSection = function (sectionId, btn) {
             var target = document.getElementById('section-' + sectionId);
