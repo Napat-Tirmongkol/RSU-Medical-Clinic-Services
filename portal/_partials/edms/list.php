@@ -355,20 +355,23 @@ $confidentialityLabels = [
 
                 <!-- Subject -->
                 <div class="mb-4">
-                    <label class="edms-label">เรื่อง <span class="text-rose-500">*</span></label>
-                    <input type="text" name="subject" id="edmsSubject" required class="edms-input" placeholder="เช่น ขอเชิญประชุม / ขออนุมัติงบประมาณ">
+                    <label class="edms-label"><?= $_isTask ? 'ชื่องาน' : 'เรื่อง' ?> <span class="text-rose-500">*</span></label>
+                    <input type="text" name="subject" id="edmsSubject" required class="edms-input"
+                        placeholder="<?= $_isTask ? 'เช่น จัดเตรียมรายงานประจำเดือน / ตรวจสอบสต็อกยา' : 'เช่น ขอเชิญประชุม / ขออนุมัติงบประมาณ' ?>">
                 </div>
 
                 <?php
-                $_systemTypes = ['incoming','outgoing','internal','circular'];
+                $_systemTypes = ['incoming','outgoing','internal','circular','task'];
                 $_isCustomType = !in_array($type, $_systemTypes, true);
-                $_showReceived = ($type === 'incoming' || $_isCustomType);
-                $_showSender   = (in_array($type, ['incoming','internal'], true) || $_isCustomType);
-                $_showRecip    = (in_array($type, ['outgoing','internal','circular'], true) || $_isCustomType);
+                $_isTask       = ($type === 'task');
+                // Task ไม่ใช้ฟิลด์ทางการของจดหมาย — แสดง task-style แทน
+                $_showReceived = !$_isTask && ($type === 'incoming' || $_isCustomType);
+                $_showSender   = !$_isTask && (in_array($type, ['incoming','internal'], true) || $_isCustomType);
+                $_showRecip    = !$_isTask && (in_array($type, ['outgoing','internal','circular'], true) || $_isCustomType);
                 ?>
                 <div class="grid grid-cols-2 gap-3 mb-4">
                     <div>
-                        <label class="edms-label">ลงวันที่</label>
+                        <label class="edms-label"><?= $_isTask ? 'วันที่สร้าง' : 'ลงวันที่' ?></label>
                         <input type="date" name="doc_date" id="edmsDocDate" class="edms-input" value="<?= date('Y-m-d') ?>">
                     </div>
                     <?php if ($_showReceived): ?>
@@ -415,8 +418,9 @@ $confidentialityLabels = [
                 </div>
 
                 <div class="mb-4">
-                    <label class="edms-label">สรุปย่อ</label>
-                    <textarea name="summary" id="edmsSummary" rows="2" class="edms-input" placeholder="สรุปสั้น ๆ ใช้แสดงในรายการ"></textarea>
+                    <label class="edms-label"><?= $_isTask ? 'รายละเอียดงาน' : 'สรุปย่อ' ?></label>
+                    <textarea name="summary" id="edmsSummary" rows="<?= $_isTask ? 3 : 2 ?>" class="edms-input"
+                        placeholder="<?= $_isTask ? 'อธิบายงานที่ต้องทำ ขอบเขต ผลลัพธ์ที่ต้องการ' : 'สรุปสั้น ๆ ใช้แสดงในรายการ' ?>"></textarea>
                 </div>
 
                 <div class="mb-4">

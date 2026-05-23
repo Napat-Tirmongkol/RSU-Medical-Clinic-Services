@@ -227,6 +227,12 @@ try {
                     'very_urgent' => [4.0, 24.0],
                     'most_urgent' => [2.0, 8.0],
                 ],
+                'task' => [  // งาน — flexible deadline กว่าหนังสือ
+                    'normal'      => [8.0, 40.0],   // ack 1 วัน, resolve 1 สัปดาห์ทำการ
+                    'urgent'      => [4.0, 16.0],   // ack ครึ่งวัน, resolve 2 วันทำการ
+                    'very_urgent' => [2.0, 8.0],    // ack 2 ชม., resolve 1 วันทำการ
+                    'most_urgent' => [2.0, 4.0],    // ack 2 ชม., resolve ครึ่งวัน
+                ],
             ];
 
             // Aliases for priority codes/names (fallback ตามตำแหน่ง)

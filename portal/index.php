@@ -1274,10 +1274,12 @@ try {
                     <?php if ($hasEdms):
                         // detect sub-view สำหรับ highlight sidebar item
                         $_edmsView = $_GET['edms_view'] ?? '';
+                        $_edmsType = $_GET['type'] ?? '';
                         $_isSlaDash = ($activeSection === 'edms' && $_edmsView === 'sla_dashboard');
                         $_isSlaPol  = ($activeSection === 'edms' && $_edmsView === 'sla_policies');
+                        $_isTasks   = ($activeSection === 'edms' && $_edmsView === 'list' && $_edmsType === 'task');
                         // parent active เฉพาะตอนอยู่ section=edms และไม่ใช่ sub-view ที่มีปุ่มแยก
-                        $_isEdmsParent = ($activeSection === 'edms' && !$_isSlaDash && !$_isSlaPol);
+                        $_isEdmsParent = ($activeSection === 'edms' && !$_isSlaDash && !$_isSlaPol && !$_isTasks);
                     ?>
                         <button class="psb-item <?= $_isEdmsParent ? 'psb-active' : '' ?>" data-section="edms" onclick="switchSection('edms',this)" style="position:relative">
                             <div class="psb-icon"><i class="fa-solid fa-folder-open" style="color:#0ea5e9"></i></div>
@@ -1288,6 +1290,11 @@ try {
                                 </span>
                             <?php endif; ?>
                         </button>
+                        <?php /* EDMS sub-menu: Tasks — งานที่มอบหมาย (ไม่ใช่เอกสารทางการ) */ ?>
+                        <a class="psb-item <?= $_isTasks ? 'psb-active' : '' ?>" href="?section=edms&edms_view=list&type=task">
+                            <div class="psb-icon"><i class="fa-solid fa-list-check" style="color:#06b6d4"></i></div>
+                            <span class="psb-label" style="color:#0e7490;font-weight:900;font-size:12px;padding-left:8px">— งาน/Tasks</span>
+                        </a>
                         <?php /* EDMS sub-menu: SLA — เป็น sub-section ของ section=edms แต่ highlight แยก */ ?>
                         <a class="psb-item <?= $_isSlaDash ? 'psb-active' : '' ?>" href="?section=edms&edms_view=sla_dashboard">
                             <div class="psb-icon"><i class="fa-solid fa-gauge-high" style="color:#10b981"></i></div>
