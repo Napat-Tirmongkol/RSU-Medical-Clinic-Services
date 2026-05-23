@@ -570,17 +570,17 @@
                 <div class="psb-group" data-group="overview">
                     <a class="psb-item <?= $activeSection==='dashboard'?'psb-active':'' ?>" data-section="dashboard" href="dashboard.php">
                         <div class="psb-icon"><i class="fa-solid fa-chart-pie" style="color:#059669"></i></div>
-                        <span class="psb-label" style="color:#059669;font-weight:900">Dashboard</span>
+                        <span class="psb-label">Dashboard</span>
                     </a>
                     <a class="psb-item <?= $activeSection==='apps'?'psb-active':'' ?>" data-section="apps" href="apps.php" id="psb-apps-launcher">
                         <div class="psb-icon"><i class="fa-solid fa-grip" style="color:#2e9e63"></i></div>
-                        <span class="psb-label" style="color:#15803d;font-weight:900">App Launcher</span>
+                        <span class="psb-label">App Launcher</span>
                         <span class="psb-new-badge" id="psb-apps-new-badge">NEW</span>
                     </a>
                     <?php if ($isStaff): ?>
                         <a class="psb-item <?= $activeSection==='profile'?'psb-active':'' ?>" data-section="profile" href="profile.php">
                             <div class="psb-icon"><i class="fa-solid fa-user-pen" style="color:#0891b2"></i></div>
-                            <span class="psb-label" style="color:#0e7490;font-weight:900">โปรไฟล์ของฉัน</span>
+                            <span class="psb-label">โปรไฟล์ของฉัน</span>
                         </a>
                     <?php endif; ?>
                 </div>
@@ -596,27 +596,27 @@
                 <div class="psb-group" data-group="ai">
                     <a class="psb-item" data-section="ai_assistant" href="ai_assistant.php">
                         <div class="psb-icon"><i class="fa-solid fa-wand-magic-sparkles" style="color:#8b5cf6"></i></div>
-                        <span class="psb-label" style="color:#7c3aed;font-weight:900">AI Assistant</span>
+                        <span class="psb-label">AI Assistant</span>
                     </a>
                     <a class="psb-item <?= $activeSection==='admin_chat'?'psb-active':'' ?>" data-section="admin_chat" href="admin_chat.php">
                         <div class="psb-icon"><i class="fa-solid fa-comments" style="color:#a855f7"></i></div>
-                        <span class="psb-label" style="color:#7c3aed;font-weight:900">ผู้ช่วยข้อมูล</span>
+                        <span class="psb-label">ผู้ช่วยข้อมูล</span>
                     </a>
                     <a class="psb-item <?= $activeSection==='line_chat'?'psb-active':'' ?>" data-section="line_chat" href="line_chat.php">
                         <div class="psb-icon"><i class="fa-brands fa-line" style="color:#06c755"></i></div>
-                        <span class="psb-label" style="color:#059669;font-weight:900">LINE Chat</span>
+                        <span class="psb-label">LINE Chat</span>
                     </a>
                     <a class="psb-item <?= $activeSection==='ai_qa_lab'?'psb-active':'' ?>" data-section="ai_qa_lab" href="ai_qa_lab.php">
                         <div class="psb-icon"><i class="fa-solid fa-flask-vial" style="color:#a855f7"></i></div>
-                        <span class="psb-label" style="color:#7c3aed;font-weight:900">AI QA Lab</span>
+                        <span class="psb-label">AI QA Lab</span>
                     </a>
                     <a class="psb-item <?= $activeSection==='ai_prompts'?'psb-active':'' ?>" data-section="ai_prompts" href="ai_prompts.php">
                         <div class="psb-icon"><i class="fa-solid fa-code" style="color:#a855f7"></i></div>
-                        <span class="psb-label" style="color:#7c3aed;font-weight:900">AI Prompts</span>
+                        <span class="psb-label">AI Prompts</span>
                     </a>
                     <a class="psb-item <?= $activeSection==='ai_knowledge'?'psb-active':'' ?>" data-section="ai_knowledge" href="ai_knowledge.php">
                         <div class="psb-icon"><i class="fa-solid fa-database" style="color:#10b981"></i></div>
-                        <span class="psb-label" style="color:#059669;font-weight:900">AI Knowledge</span>
+                        <span class="psb-label">AI Knowledge</span>
                     </a>
                 </div>
             <?php endif; ?>
@@ -636,19 +636,19 @@
                     <?php if ($isSuper || !empty($_SESSION['access_identity'])): ?>
                     <a class="psb-item" data-section="identity" href="identity.php">
                         <div class="psb-icon"><i class="fa-solid fa-id-card-clip" style="color:#2563eb"></i></div>
-                        <span class="psb-label" style="color:#1d4ed8;font-weight:900">Identity &amp; Governance</span>
+                        <span class="psb-label">Identity &amp; Governance</span>
                     </a>
                     <?php endif; ?>
                     <?php if ($isSuper): ?>
                         <a class="psb-item" data-section="privilege_inventory" href="privilege_inventory.php">
                             <div class="psb-icon"><i class="fa-solid fa-shield-halved" style="color:#10b981"></i></div>
-                            <span class="psb-label" style="color:#059669;font-weight:900">ISO Governance</span>
+                            <span class="psb-label">ISO Governance</span>
                         </a>
                     <?php endif; ?>
                     <?php if ($isSuper || !empty($_SESSION['access_identity'])): ?>
                     <a class="psb-item <?= $activeSection==='pdpa_audit'?'psb-active':'' ?>" data-section="pdpa_audit" href="pdpa_audit.php" data-new-key="pdpa_audit_v1">
                         <div class="psb-icon"><i class="fa-solid fa-user-shield" style="color:#7c3aed"></i></div>
-                        <span class="psb-label" style="color:#6d28d9;font-weight:900">PDPA Audit</span>
+                        <span class="psb-label">PDPA Audit</span>
                         <span class="psb-new-badge">NEW</span>
                     </a>
                     <?php endif; ?>
@@ -666,15 +666,15 @@
                     <?php if (!$registryOnly && $hasInsurance): ?>
                         <a class="psb-item <?= $activeSection==='insurance_dashboard'?'psb-active':'' ?>" data-section="insurance_dashboard" href="insurance_dashboard.php">
                             <div class="psb-icon"><i class="fa-solid fa-chart-pie" style="color:#3b82f6"></i></div>
-                            <span class="psb-label" style="color:#1d4ed8;font-weight:900">Dashboard Workbook</span>
+                            <span class="psb-label">Dashboard Workbook</span>
                         </a>
                         <a class="psb-item" data-section="insurance_sync" href="insurance_sync.php">
                             <div class="psb-icon"><i class="fa-solid fa-shield-halved" style="color:#0ea5e9"></i></div>
-                            <span class="psb-label" style="color:#0284c7;font-weight:900">Insurance Hub</span>
+                            <span class="psb-label">Insurance Hub</span>
                         </a>
                         <a class="psb-item <?= $activeSection==='gold_card_pending'?'psb-active':'' ?>" data-section="gold_card_pending" href="gold_card_pending.php">
                             <div class="psb-icon"><i class="fa-solid fa-hourglass-half" style="color:#3b82f6"></i></div>
-                            <span class="psb-label" style="color:#1d4ed8;font-weight:900">ย้ายสิทธิ์บัตรทอง</span>
+                            <span class="psb-label">ย้ายสิทธิ์บัตรทอง</span>
                             <?php
                             $pendingBadgeCount = 0;
                             try { $pendingBadgeCount = (int)db()->query("SELECT COUNT(*) FROM gold_card_members WHERE status = 'submitted'")->fetchColumn(); }
@@ -685,25 +685,25 @@
                         </a>
                         <a class="psb-item <?= $activeSection==='gold_card'?'psb-active':'' ?>" data-section="gold_card" href="gold_card.php">
                             <div class="psb-icon"><i class="fa-solid fa-id-card" style="color:#f59e0b"></i></div>
-                            <span class="psb-label" style="color:#b45309;font-weight:900">บัตรทอง</span>
+                            <span class="psb-label">บัตรทอง</span>
                         </a>
                     <?php endif; ?>
                     <?php if ($hasRegistry): ?>
                         <a class="psb-item <?= $activeSection==='registry_upload'?'psb-active':'' ?>" data-section="registry_upload" href="registry_upload.php">
                             <div class="psb-icon"><i class="fa-solid fa-id-card-clip" style="color:#06b6d4"></i></div>
-                            <span class="psb-label" style="color:#0891b2;font-weight:900">อัพโหลดรายชื่อ (ทะเบียน)</span>
+                            <span class="psb-label">อัพโหลดรายชื่อ (ทะเบียน)</span>
                         </a>
                     <?php endif; ?>
                     <?php if ($hasInsurance): ?>
                         <a class="psb-item <?= $activeSection==='batch_status'?'psb-active':'' ?>" data-section="batch_status" href="batch_status.php">
                             <div class="psb-icon"><i class="fa-solid fa-list-check" style="color:#0891b2"></i></div>
-                            <span class="psb-label" style="color:#0e7490;font-weight:900">สถานะเอกสาร</span>
+                            <span class="psb-label">สถานะเอกสาร</span>
                         </a>
                     <?php endif; ?>
                     <?php if (!$registryOnly && $isSuper): ?>
                         <a class="psb-item" data-section="manage_insurance_partners" href="manage_insurance_partners.php">
                             <div class="psb-icon"><i class="fa-solid fa-handshake" style="color:#10b981"></i></div>
-                            <span class="psb-label" style="color:#059669;font-weight:900">Insurance Partners</span>
+                            <span class="psb-label">Insurance Partners</span>
                         </a>
                     <?php endif; ?>
                 </div>
@@ -719,7 +719,7 @@
                 <div class="psb-group" data-group="comm">
                     <a class="psb-item" data-section="announcements" href="announcements.php">
                         <div class="psb-icon"><i class="fa-solid fa-bullhorn" style="color:#7c3aed"></i></div>
-                        <span class="psb-label" style="color:#6d28d9;font-weight:900">ประกาศ</span>
+                        <span class="psb-label">ประกาศ</span>
                     </a>
                     <?php if ($hasEdms):
                         // detect sub-view สำหรับ highlight sidebar item
@@ -733,7 +733,7 @@
                     ?>
                         <a class="psb-item <?= $_isEdmsParent ? 'psb-active' : '' ?>" data-section="edms" href="edms.php" style="position:relative">
                             <div class="psb-icon"><i class="fa-solid fa-folder-open" style="color:#0ea5e9"></i></div>
-                            <span class="psb-label" style="color:#0284c7;font-weight:900">สารบรรณอิเล็กทรอนิกส์</span>
+                            <span class="psb-label">สารบรรณอิเล็กทรอนิกส์</span>
                             <?php if ($edmsInboxBadge > 0): ?>
                                 <span style="margin-left:auto;display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:20px;padding:0 6px;border-radius:99px;background:#f59e0b;color:#fff;font-size:10px;font-weight:900;box-shadow:0 1px 2px rgba(0,0,0,.1)" title="<?= $edmsInboxBadge ?> รายการรอดำเนินการ">
                                     <?= $edmsInboxBadge > 99 ? '99+' : $edmsInboxBadge ?>
@@ -744,20 +744,20 @@
                         <a class="psb-item <?= $_isTasks ? 'psb-active' : '' ?>"
                            href="edms.php?view=list&type=task">
                             <div class="psb-icon"><i class="fa-solid fa-list-check" style="color:#06b6d4"></i></div>
-                            <span class="psb-label" style="color:#0e7490;font-weight:900;font-size:12px;padding-left:8px">— งาน/Tasks</span>
+                            <span class="psb-label">— งาน/Tasks</span>
                         </a>
                         <?php /* EDMS sub-menu: SLA — เป็น sub-section ของ section=edms แต่ highlight แยก */ ?>
                         <a class="psb-item <?= $_isSlaDash ? 'psb-active' : '' ?>"
                            href="edms.php?view=sla_dashboard">
                             <div class="psb-icon"><i class="fa-solid fa-gauge-high" style="color:#10b981"></i></div>
-                            <span class="psb-label" style="color:#047857;font-weight:900;font-size:12px;padding-left:8px">— SLA Dashboard</span>
+                            <span class="psb-label">— SLA Dashboard</span>
                         </a>
                         <?php $_canSlaAdmin = ($adminRole === 'superadmin') || !empty($_SESSION['access_edms_sla_admin']); ?>
                         <?php if ($_canSlaAdmin): ?>
                             <a class="psb-item <?= $_isSlaPol ? 'psb-active' : '' ?>"
                                href="edms.php?view=sla_policies">
                                 <div class="psb-icon"><i class="fa-solid fa-stopwatch-20" style="color:#a855f7"></i></div>
-                                <span class="psb-label" style="color:#7e22ce;font-weight:900;font-size:12px;padding-left:8px">— นโยบาย SLA</span>
+                                <span class="psb-label">— นโยบาย SLA</span>
                             </a>
                         <?php endif; ?>
                     <?php endif; ?>
@@ -775,13 +775,13 @@
                     <?php if ($hasAsset): ?>
                         <a href="../asset/index.php" class="psb-item" style="text-decoration:none">
                             <div class="psb-icon"><i class="fa-solid fa-boxes-stacked" style="color:#0d9488"></i></div>
-                            <span class="psb-label" style="color:#0f766e;font-weight:900">ครุภัณฑ์สำนักงาน</span>
+                            <span class="psb-label">ครุภัณฑ์สำนักงาน</span>
                         </a>
                     <?php endif; ?>
                     <?php if ($hasConsumables): ?>
                         <a href="../consumables/index.php" class="psb-item" style="text-decoration:none">
                             <div class="psb-icon"><i class="fa-solid fa-box-open" style="color:#2e9e63"></i></div>
-                            <span class="psb-label" style="color:#2e7d52;font-weight:900">วัสดุสิ้นเปลือง</span>
+                            <span class="psb-label">วัสดุสิ้นเปลือง</span>
                         </a>
                     <?php endif; ?>
                 </div>
@@ -799,7 +799,7 @@
                 <div class="psb-group" data-group="finance">
                     <a class="psb-item <?= $activeSection==='finance'?'psb-active':'' ?>" data-section="finance" href="finance.php">
                         <div class="psb-icon"><i class="fa-solid fa-book" style="color:#059669"></i></div>
-                        <span class="psb-label" style="color:#047857;font-weight:900">Cash Book</span>
+                        <span class="psb-label">Cash Book</span>
                     </a>
                 </div>
             <?php endif; ?>
@@ -814,12 +814,12 @@
                 <div class="psb-group" data-group="pharmacy">
                     <a class="psb-item <?= $activeSection==='vaccinations'?'psb-active':'' ?>" data-section="vaccinations" href="vaccinations.php" data-new-key="vaccinations_v1">
                         <div class="psb-icon"><i class="fa-solid fa-syringe" style="color:#0d9488"></i></div>
-                        <span class="psb-label" style="color:#0f766e;font-weight:900">บันทึกการฉีดวัคซีน</span>
+                        <span class="psb-label">บันทึกการฉีดวัคซีน</span>
                         <span class="psb-new-badge">NEW</span>
                     </a>
                     <a class="psb-item <?= $activeSection==='vaccine_catalog'?'psb-active':'' ?>" data-section="vaccine_catalog" href="vaccine_catalog.php" data-new-key="vaccine_catalog_v1">
                         <div class="psb-icon"><i class="fa-solid fa-pills" style="color:#0d9488"></i></div>
-                        <span class="psb-label" style="color:#0f766e;font-weight:900">ประเภทวัคซีน</span>
+                        <span class="psb-label">ประเภทวัคซีน</span>
                         <span class="psb-new-badge">NEW</span>
                     </a>
                 </div>
@@ -836,34 +836,34 @@
                     <?php if (($_SESSION['admin_role'] ?? '') === 'superadmin'): ?>
                     <a class="psb-item" data-section="activity_dashboard" href="activity_dashboard.php">
                         <div class="psb-icon"><i class="fa-solid fa-chart-line" style="color:#8b5cf6"></i></div>
-                        <span class="psb-label" style="color:#6d28d9;font-weight:900">Activity Dashboard</span>
+                        <span class="psb-label">Activity Dashboard</span>
                     </a>
                     <?php endif; ?>
                     <a class="psb-item" data-section="activity_logs" href="activity_logs.php">
                         <div class="psb-icon"><i class="fa-solid fa-file-lines" style="color:#64748b"></i></div>
-                        <span class="psb-label" style="color:#475569;font-weight:900">Activity Logs</span>
+                        <span class="psb-label">Activity Logs</span>
                     </a>
                     <a class="psb-item" data-section="error_logs" href="error_logs.php">
                         <div class="psb-icon"><i class="fa-solid fa-bug" style="color:#ef4444"></i></div>
-                        <span class="psb-label" style="color:#dc2626;font-weight:900">Error Logs</span>
+                        <span class="psb-label">Error Logs</span>
                     </a>
                     <?php if ($adminRole === 'superadmin'): ?>
                     <a class="psb-item <?= $activeSection==='sentry_events'?'psb-active':'' ?>" data-section="sentry_events" href="sentry_events.php">
                         <div class="psb-icon"><i class="fa-solid fa-radiation" style="color:#8b5cf6"></i></div>
-                        <span class="psb-label" style="color:#6d28d9;font-weight:900">Sentry Events</span>
+                        <span class="psb-label">Sentry Events</span>
                     </a>
                     <?php endif; ?>
                     <?php if ($isSuper || $adminRole === 'admin' || !empty($_SESSION['access_identity'])): ?>
                     <a class="psb-item <?= $activeSection==='db_schema'?'psb-active':'' ?>" data-section="db_schema" href="db_schema.php" data-new-key="db_schema_v1">
                         <div class="psb-icon"><i class="fa-solid fa-diagram-project" style="color:#0891b2"></i></div>
-                        <span class="psb-label" style="color:#0e7490;font-weight:900">Database Schema</span>
+                        <span class="psb-label">Database Schema</span>
                         <span class="psb-new-badge">NEW</span>
                     </a>
                     <?php endif; ?>
                     <?php if ($isSuper): ?>
                     <a class="psb-item <?= $activeSection==='sql_console'?'psb-active':'' ?>" data-section="sql_console" href="sql_console.php" data-new-key="sql_console_v1">
                         <div class="psb-icon"><i class="fa-solid fa-terminal" style="color:#ea580c"></i></div>
-                        <span class="psb-label" style="color:#c2410c;font-weight:900">SQL Console <span style="font-size:8px;color:#9a3412;background:#fed7aa;padding:1px 4px;border-radius:3px;margin-left:2px">RO</span></span>
+                        <span class="psb-label">SQL Console <span style="font-size:8px;color:#9a3412;background:#fed7aa;padding:1px 4px;border-radius:3px;margin-left:2px">RO</span></span>
                         <span class="psb-new-badge">NEW</span>
                     </a>
                     <?php endif; ?>
@@ -881,19 +881,19 @@
                     <?php if ($hasDailySummary): ?>
                     <a class="psb-item <?= $activeSection==='daily_summary'?'psb-active':'' ?>" data-section="daily_summary" href="daily_summary.php">
                         <div class="psb-icon"><i class="fa-solid fa-clipboard-check" style="color:#f59e0b"></i></div>
-                        <span class="psb-label" style="color:#b45309;font-weight:900">สรุปงานประจำวัน</span>
+                        <span class="psb-label">สรุปงานประจำวัน</span>
                     </a>
                     <?php endif; ?>
                     <?php if ($hasMonthlyReport): ?>
                     <a class="psb-item <?= $activeSection==='monthly_report'?'psb-active':'' ?>" data-section="monthly_report" href="monthly_report.php">
                         <div class="psb-icon"><i class="fa-solid fa-calendar-days" style="color:#f59e0b"></i></div>
-                        <span class="psb-label" style="color:#b45309;font-weight:900">รายงานประจำเดือน</span>
+                        <span class="psb-label">รายงานประจำเดือน</span>
                     </a>
                     <?php endif; ?>
                     <?php if ($hasNurseProductivity): ?>
                     <a class="psb-item <?= $activeSection==='nurse_productivity'?'psb-active':'' ?>" data-section="nurse_productivity" href="nurse_productivity.php">
                         <div class="psb-icon"><i class="fa-solid fa-user-nurse" style="color:#f59e0b"></i></div>
-                        <span class="psb-label" style="color:#b45309;font-weight:900">Productivity พยาบาล</span>
+                        <span class="psb-label">Productivity พยาบาล</span>
                     </a>
                     <?php endif; ?>
                 </div>
@@ -909,7 +909,7 @@
                 <div class="psb-group" data-group="docs">
                     <a class="psb-item <?= $activeSection==='documents'?'psb-active':'' ?>" data-section="documents" href="documents.php">
                         <div class="psb-icon"><i class="fa-solid fa-file-lines" style="color:#0f7349"></i></div>
-                        <span class="psb-label" style="color:#064e3b;font-weight:900">คลังเอกสาร</span>
+                        <span class="psb-label">คลังเอกสาร</span>
                     </a>
                 </div>
             <?php endif; ?>
@@ -926,17 +926,17 @@
                 <div class="psb-group" data-group="masterdata">
                     <a class="psb-item <?= $activeSection==='clinic_data'?'psb-active':'' ?>" data-section="clinic_data" href="clinic_data.php">
                         <div class="psb-icon"><i class="fa-solid fa-hospital" style="color:#0d9488"></i></div>
-                        <span class="psb-label" style="color:#0f766e;font-weight:900">ข้อมูลคลินิก</span>
+                        <span class="psb-label">ข้อมูลคลินิก</span>
                     </a>
                     <?php if ($hasScholarship): ?>
                         <a class="psb-item <?= $activeSection==='scholarship'?'psb-active':'' ?>" data-section="scholarship" href="scholarship.php">
                             <div class="psb-icon"><i class="fa-solid fa-graduation-cap" style="color:#10b981"></i></div>
-                            <span class="psb-label" style="color:#059669;font-weight:900">นักศึกษาทุน</span>
+                            <span class="psb-label">นักศึกษาทุน</span>
                         </a>
                     <?php endif; ?>
                     <a class="psb-item <?= $activeSection==='nurse_schedule'?'psb-active':'' ?>" data-section="nurse_schedule" href="nurse_schedule.php">
                         <div class="psb-icon"><i class="fa-solid fa-user-nurse" style="color:#0ea5e9"></i></div>
-                        <span class="psb-label" style="color:#0284c7;font-weight:900">ตารางเวรพยาบาล</span>
+                        <span class="psb-label">ตารางเวรพยาบาล</span>
                     </a>
                 </div>
             <?php endif; ?>
@@ -951,7 +951,7 @@
                 <div class="psb-group" data-group="settings">
                     <a class="psb-item" data-section="settings" href="settings.php">
                         <div class="psb-icon"><i class="fa-solid fa-gear" style="color:#d97706"></i></div>
-                        <span class="psb-label" style="color:#b45309;font-weight:900">Settings</span>
+                        <span class="psb-label">Settings</span>
                     </a>
                 </div>
             <?php endif; ?>
