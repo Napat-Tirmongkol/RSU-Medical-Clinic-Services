@@ -14,6 +14,20 @@ declare(strict_types=1);
 if (!function_exists('layout_start')) {
 
 /**
+ * Internal state shared between layout_start() and layout_end().
+ * (Function-local vars in layout_start aren't visible in layout_end —
+ *  use a static holder so _layout_bottom.php can read $activeSection etc.)
+ */
+function _layout_state(?array $set = null): array
+{
+    static $state = ['section' => '', 'title' => ''];
+    if ($set !== null) {
+        $state = array_merge($state, $set);
+    }
+    return $state;
+}
+
+/**
  * Render layout top (DOCTYPE → opening <main>).
  * Caller MUST have required _init.php first (we use its globals).
  *
@@ -35,6 +49,9 @@ function layout_start(array $opts = []): void
     $activeSection = $opts['section'] ?? '';
     $pageTitle     = $opts['title']   ?? '';
 
+    // Persist so layout_end() can recover these
+    _layout_state(['section' => $activeSection, 'title' => $pageTitle]);
+
     // Used by some sidebar items / header
     $idSearch = $_GET['id_search'] ?? '';
 
@@ -49,6 +66,12 @@ function layout_end(): void
     global $pdo, $adminRole, $isStaff, $isSuper, $registryOnly,
            $hasRegistry, $hasInsurance, $hasSysLogs, $hasSiteSet, $hasEdms,
            $hasInsuranceGroup, $hasSecurityGroup;
+
+    // Recover the section context that layout_start() saved.
+    // _layout_bottom.php references $activeSection (e.g. LINE-link prompt skip on profile)
+    $_state        = _layout_state();
+    $activeSection = $_state['section'];
+    $pageTitle     = $_state['title'];
 
     include __DIR__ . '/_layout_bottom.php';
 }
