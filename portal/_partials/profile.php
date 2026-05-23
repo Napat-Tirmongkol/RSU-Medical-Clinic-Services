@@ -15,6 +15,8 @@ $staffId = (int)($_SESSION['admin_id'] ?? 0);
 $me = null;
 if ($staffId > 0) {
     $stmt = $pdo->prepare("SELECT username, full_name, role, ecampaign_role,
+                                  IFNULL(linked_line_user_id, '') AS linked_line_user_id,
+                                  IFNULL(notify_sla_via_line, 1) AS notify_sla_via_line,
                                   IFNULL(access_ecampaign,0) AS access_ecampaign,
                                   IFNULL(access_eborrow,0)   AS access_eborrow,
                                   IFNULL(access_insurance,0) AS access_insurance,
@@ -306,6 +308,68 @@ $accessLabels = [
             </div>
         </form>
 
+        <!-- เชื่อมต่อบัญชี LINE -->
+        <?php
+            $lineLinked = !empty($me['linked_line_user_id']);
+            $lineUid = (string)($me['linked_line_user_id'] ?? '');
+            $notifyViaLine = (int)($me['notify_sla_via_line'] ?? 1) === 1;
+            $linkFlash = $_SESSION['line_link_flash'] ?? null;
+            unset($_SESSION['line_link_flash']);
+        ?>
+        <div class="pf-card fx-tilt fx-tilt-light" data-tilt="3">
+            <div class="pf-card-head">
+                <i class="fa-brands fa-line" style="color:#06c755"></i>
+                <h3>เชื่อมต่อบัญชี LINE</h3>
+            </div>
+            <div class="pf-card-body">
+                <?php if ($linkFlash): ?>
+                    <div class="rounded-2xl border <?= $linkFlash['ok'] ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-rose-50 border-rose-200 text-rose-700' ?> px-4 py-2.5 text-xs font-bold mb-4">
+                        <i class="fa-solid <?= $linkFlash['ok'] ? 'fa-check-circle' : 'fa-circle-exclamation' ?> mr-1"></i>
+                        <?= htmlspecialchars($linkFlash['msg']) ?>
+                    </div>
+                <?php endif; ?>
+
+                <p class="text-[12px] text-slate-500 font-medium mb-4">
+                    ผูกบัญชี LINE ของคุณกับบัญชี Staff เพื่อรับการแจ้งเตือน — เช่น SLA warning / breach, เอกสารใหม่ที่ถูกมอบหมาย
+                </p>
+
+                <?php if ($lineLinked): ?>
+                    <div class="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 mb-3">
+                        <div class="flex items-center justify-between gap-3 flex-wrap">
+                            <div class="flex items-center gap-3">
+                                <div class="w-11 h-11 rounded-full bg-white border border-emerald-200 flex items-center justify-center text-2xl" style="color:#06c755">
+                                    <i class="fa-brands fa-line"></i>
+                                </div>
+                                <div>
+                                    <p class="text-xs font-black text-emerald-700">เชื่อมต่อแล้ว <i class="fa-solid fa-circle-check ml-0.5"></i></p>
+                                    <p class="text-[10px] font-mono text-slate-500 mt-0.5"><?= htmlspecialchars(substr($lineUid, 0, 8) . '...' . substr($lineUid, -6)) ?></p>
+                                </div>
+                            </div>
+                            <button type="button" onclick="profileUnlinkLine()" class="bg-white hover:bg-rose-50 text-rose-600 border border-rose-200 px-3 py-1.5 rounded-xl text-xs font-black inline-flex items-center gap-1.5">
+                                <i class="fa-solid fa-link-slash"></i> ยกเลิกการเชื่อม
+                            </button>
+                        </div>
+                    </div>
+
+                    <label class="flex items-center gap-2 cursor-pointer p-3 bg-slate-50 rounded-xl border border-slate-100">
+                        <input type="checkbox" id="profile-notify-line" <?= $notifyViaLine ? 'checked' : '' ?> onchange="profileToggleNotifyLine(this.checked)" class="w-4 h-4 accent-emerald-500">
+                        <span class="text-xs font-bold text-slate-700">รับแจ้งเตือน SLA ผ่าน LINE (warning / breach / escalation)</span>
+                    </label>
+                <?php else: ?>
+                    <a href="../line_api/staff_link_line.php"
+                       class="inline-flex items-center gap-2 text-white px-5 py-2.5 rounded-2xl text-sm font-black shadow-sm transition-all hover:opacity-90"
+                       style="background:#06c755">
+                        <i class="fa-brands fa-line text-lg"></i>
+                        เชื่อมต่อบัญชี LINE
+                    </a>
+                    <p class="text-[11px] font-bold text-slate-400 mt-3">
+                        <i class="fa-solid fa-info-circle text-slate-300"></i>
+                        จะเปิดหน้า LINE Login — เข้าด้วยบัญชีที่อยากผูก แล้วระบบจะกลับมาที่หน้านี้
+                    </p>
+                <?php endif; ?>
+            </div>
+        </div>
+
         <!-- สิทธิ์การเข้าถึงระบบ -->
         <div class="pf-card fx-tilt fx-tilt-light" data-tilt="3">
             <div class="pf-card-head">
@@ -363,5 +427,51 @@ $accessLabels = [
             }
         }
     });
+})();
+
+// ════════ LINE Link self-service ════════
+(function(){
+    const csrf = window.portal_CSRF || '';
+
+    async function profileLineAjax(action, params = {}) {
+        const fd = new FormData();
+        fd.append('csrf_token', csrf);
+        fd.append('action', action);
+        Object.entries(params).forEach(([k, v]) => fd.append(k, v));
+        const res = await fetch('ajax_profile_line.php', { method: 'POST', body: fd, credentials: 'same-origin' });
+        return res.json();
+    }
+
+    window.profileUnlinkLine = async function() {
+        const { isConfirmed } = await Swal.fire({
+            icon: 'warning',
+            title: 'ยกเลิกการเชื่อมบัญชี LINE?',
+            text: 'คุณจะไม่ได้รับการแจ้งเตือนผ่าน LINE อีก — เชื่อมใหม่ได้ตลอดเวลา',
+            showCancelButton: true,
+            confirmButtonText: 'ยกเลิกการเชื่อม',
+            cancelButtonText: 'ไม่ใช่ตอนนี้',
+            confirmButtonColor: '#dc2626',
+        });
+        if (!isConfirmed) return;
+        const r = await profileLineAjax('unlink');
+        if (r.ok) {
+            await Swal.fire({ icon: 'success', title: r.message, timer: 1300, showConfirmButton: false });
+            location.reload();
+        } else {
+            Swal.fire({ icon: 'error', title: 'ไม่สำเร็จ', text: r.message });
+        }
+    };
+
+    window.profileToggleNotifyLine = async function(checked) {
+        const r = await profileLineAjax('toggle_notify_sla', { enabled: checked ? 1 : 0 });
+        if (r.ok) {
+            if (window.Swal) Swal.fire({ icon: 'success', title: r.message, timer: 900, showConfirmButton: false, position: 'top-end', toast: true });
+        } else {
+            Swal.fire({ icon: 'error', title: r.message });
+            // Revert checkbox
+            const box = document.getElementById('profile-notify-line');
+            if (box) box.checked = !checked;
+        }
+    };
 })();
 </script>

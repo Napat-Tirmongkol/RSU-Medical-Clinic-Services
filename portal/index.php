@@ -3034,6 +3034,20 @@ try {
                                     </div>
 
 
+                                    <!-- LINE Linked UID (Admin fallback — staff ส่วนใหญ่ผูกเองที่หน้า profile) -->
+                                    <div id="govLineLinkSection" style="display:none;margin-bottom:14px;padding:14px;border:1.5px dashed #86efac;background:#f0fdf4;border-radius:14px">
+                                        <label style="display:flex;align-items:center;gap:6px;font-weight:800;font-size:12px;color:#15803d;margin-bottom:6px">
+                                            <i class="fa-brands fa-line" style="color:#06c755"></i> เชื่อมบัญชี LINE (Admin fallback)
+                                            <span style="font-weight:normal;color:#65a30d;font-size:10.5px">— ปกติให้ staff ผูกเองที่หน้า profile</span>
+                                        </label>
+                                        <input type="text" name="linked_line_user_id" id="govLinkedLineUid" class="premium-input"
+                                            style="width:100%;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:12px"
+                                            placeholder="U[a-f0-9]{32} — ถ้าทราบ LINE User ID ของ staff สามารถใส่ตรงนี้">
+                                        <p style="margin:6px 0 0;font-size:10.5px;color:#65a30d;font-weight:600">
+                                            <i class="fa-solid fa-info-circle"></i> ปล่อยว่างได้ — staff คลิก "เชื่อมต่อ LINE" ในหน้า profile ของตัวเอง (ปลอดภัยกว่า)
+                                        </p>
+                                    </div>
+
                                     <!-- e-Borrow Card -->
                                     <div id="govEbCard" onclick="toggleGovAccess('govEbAccess', 'govEbRole', this)" class="premium-role-card orange p-4" style="border-radius:18px;border:1.5px solid #fed7aa;background:#fffaf5;cursor:pointer;transition:all 0.2s">
                                         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
@@ -4483,6 +4497,7 @@ try {
             // Set visuals based on type
             const govPosWrap = document.getElementById('govPositionWrap');
             const govJobWrap = document.getElementById('govJobTitleWrap');
+            const govLineSection = document.getElementById('govLineLinkSection');
             if (type === 'admin') {
                 title.textContent = (mode === 'add' ? 'เพิ่ม System Admin' : 'จัดการสิทธิ์ System Admin');
                 icon.style.background = '#f5f3ff';
@@ -4493,6 +4508,7 @@ try {
                 document.getElementById('govEcCard').style.opacity = '1';
                 if (govPosWrap) govPosWrap.style.display = 'none';
                 if (govJobWrap) govJobWrap.style.display = 'none';
+                if (govLineSection) govLineSection.style.display = 'none';
             } else {
                 title.textContent = (mode === 'add' ? 'เพิ่ม Staff Record' : 'จัดการสิทธิ์ Staff & Roles');
                 icon.style.background = '#eff6ff';
@@ -4503,6 +4519,7 @@ try {
                 document.getElementById('govAdminOnlyCard').style.display = 'none';
                 document.getElementById('govEbCard').style.opacity = '1';
                 document.getElementById('govEcCard').style.opacity = '1';
+                if (govLineSection) govLineSection.style.display = (mode === 'edit') ? 'block' : 'none';
             }
 
             // Fill data if editing
@@ -4542,6 +4559,8 @@ try {
                         if (dvEl) dvEl.checked = parseInt(data.access_director_view) === 1;
                         const idEl = document.getElementById('govIdentityAccess');
                         if (idEl) idEl.checked = parseInt(data.access_identity) === 1;
+                        const lineUidEl = document.getElementById('govLinkedLineUid');
+                        if (lineUidEl) lineUidEl.value = data.linked_line_user_id || '';
                         const deptSel = document.getElementById('govDepartmentId');
                         if (deptSel) deptSel.value = data.department_id ? String(data.department_id) : '';
 
@@ -4590,6 +4609,8 @@ try {
                     if (dvElR) dvElR.checked = false;
                     const idElR = document.getElementById('govIdentityAccess');
                     if (idElR) idElR.checked = false;
+                    const lineUidElR = document.getElementById('govLinkedLineUid');
+                    if (lineUidElR) lineUidElR.value = '';
                     const deptSelR = document.getElementById('govDepartmentId');
                     if (deptSelR) deptSelR.value = '';
                     const posSel = document.getElementById('govPositionId');
