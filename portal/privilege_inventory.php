@@ -1,10 +1,33 @@
 <?php
 /**
  * portal/privilege_inventory.php
- * Section page — auto-generated from monolithic index.php refactor.
+ * ISO 27001:2022 A.5.18 — Privileged Access Inventory.
  */
 require __DIR__ . '/_init.php';
 require_once __DIR__ . '/_layout.php';
+
+// Fetch privilege inventory (superadmin-only — table joins sys_admins for display names).
+// Was previously loaded inside monolithic index.php; restored here so the
+// standalone page renders the rows instead of an empty list.
+$privilegeInventory = [];
+$adminListForSelect = [];
+if ($adminRole === 'superadmin') {
+    try {
+        $privilegeInventory = $pdo->query(
+            "SELECT p.*, a.full_name as admin_full_name, a.username as admin_username
+             FROM sys_admin_privilege_inventory p
+             LEFT JOIN sys_admins a ON p.user_id = a.id
+             ORDER BY p.assigned_at DESC"
+        )->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) { /* table not yet migrated — show empty state */ }
+
+    // For the "Add Privilege" modal dropdown
+    try {
+        $adminListForSelect = $pdo->query(
+            "SELECT id, full_name, username FROM sys_admins ORDER BY full_name ASC"
+        )->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {}
+}
 
 layout_start(['section' => 'privilege_inventory', 'title' => 'ISO Governance']);
 ?>
@@ -109,4 +132,84 @@ layout_start(['section' => 'privilege_inventory', 'title' => 'ISO Governance']);
                     </div>
                 </div>
             </div>
+
+            <!-- Add Privilege Modal (extracted from old monolithic identity section) -->
+            <div id="privModal" style="display:none;position:fixed;inset:0;z-index:9000;background:rgba(15,23,42,.6);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:20px">
+                <div style="background:#fff;border-radius:28px;width:100%;max-width:480px;box-shadow:0 25px 50px -12px rgba(0,0,0,0.25);overflow:hidden">
+                    <div style="padding:24px;background:#fcfdfd;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center">
+                        <h3 style="margin:0;font-size:18px;font-weight:900;color:#0f172a">🛡️ บันทึกการถือสิทธิ์ระดับสูง</h3>
+                        <button type="button" onclick="document.getElementById('privModal').style.display='none'" style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:20px"><i class="fa-solid fa-xmark"></i></button>
+                    </div>
+                    <form id="privForm" style="padding:24px" enctype="multipart/form-data">
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+                            <div>
+                                <label style="display:block;font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;margin-bottom:6px">ผู้รับสิทธิ์ (Admin)</label>
+                                <select name="user_id" class="premium-input" style="width:100%" required>
+                                    <option value="">-- เลือกเจ้าหน้าที่ --</option>
+                                    <?php foreach ($adminListForSelect as $adm): ?>
+                                        <option value="<?= $adm['id'] ?>"><?= htmlspecialchars($adm['full_name']) ?> (@<?= htmlspecialchars($adm['username']) ?>)</option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div>
+                                <label style="display:block;font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;margin-bottom:6px">บทบาท/ระดับสิทธิ์</label>
+                                <input type="text" name="role_assigned" class="premium-input" style="width:100%" required placeholder="เช่น Super Admin">
+                            </div>
+                        </div>
+                        <div style="margin-bottom:16px">
+                            <label style="display:block;font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;margin-bottom:6px">เหตุผลความจำเป็น (Justification)</label>
+                            <textarea name="justification" class="premium-input" style="width:100%;height:60px" required placeholder="ระบุเหตุผลในการให้สิทธิ์..."></textarea>
+                        </div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+                            <div>
+                                <label style="display:block;font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;margin-bottom:6px">ผู้อนุมัติ (Approved By)</label>
+                                <input type="text" name="approved_by" class="premium-input" style="width:100%" required placeholder="ชื่อผู้อนุมัติ">
+                            </div>
+                            <div>
+                                <label style="display:block;font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;margin-bottom:6px">วันหมดอายุ (ถ้ามี)</label>
+                                <input type="date" name="expiry_date" class="premium-input" style="width:100%">
+                            </div>
+                        </div>
+                        <div style="margin-bottom:24px">
+                            <label style="display:block;font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;margin-bottom:6px">หลักฐานการอนุมัติ (PDF/Image)</label>
+                            <input type="file" name="approval_doc" class="premium-input" style="width:100%" accept=".pdf,image/*">
+                        </div>
+                        <div style="display:flex;gap:12px">
+                            <button type="button" onclick="document.getElementById('privModal').style.display='none'" style="flex:1;padding:12px;border-radius:14px;background:#f1f5f9;color:#475569;font-weight:800;border:none;cursor:pointer">ยกเลิก</button>
+                            <button type="submit" id="btnSavePriv" style="flex:1;padding:12px;border-radius:14px;background:#2e9e63;color:#fff;font-weight:800;border:none;cursor:pointer;box-shadow:0 4px 12px rgba(46,158,99,.2)">บันทึกรายการ</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            <script>
+                function openAddPrivilegeModal() {
+                    // Teleport to body so fixed-position anchors to viewport (escape any
+                    // ancestor containing-block created by transform/backdrop-filter on
+                    // sidebar/header — see CLAUDE.md "Portal-Escape Pattern")
+                    var m = document.getElementById('privModal');
+                    if (m && m.parentElement !== document.body) document.body.appendChild(m);
+                    if (m) m.style.display = 'flex';
+                }
+                document.getElementById('privForm')?.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    const fd = new FormData(this);
+                    const btn = document.getElementById('btnSavePriv');
+                    btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> กำลังบันทึก...';
+
+                    fetch('ajax_privilege_inventory.php', { method: 'POST', body: fd })
+                    .then(r => r.json())
+                    .then(d => {
+                        if(d.status === 'success') {
+                            Swal.fire({ icon: 'success', title: 'สำเร็จ', text: d.message }).then(() => location.reload());
+                        } else {
+                            Swal.fire({ icon: 'error', title: 'ผิดพลาด', text: d.message });
+                            btn.disabled = false; btn.textContent = 'บันทึกรายการ';
+                        }
+                    })
+                    .catch(err => {
+                        Swal.fire({ icon: 'error', title: 'Error', text: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้' });
+                        btn.disabled = false; btn.textContent = 'บันทึกรายการ';
+                    });
+                });
+            </script>
 <?php layout_end(); ?>
