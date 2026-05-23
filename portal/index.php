@@ -2627,6 +2627,7 @@ try {
                                                 'access_system_logs'    => ['Logs',             '#64748b'],
                                                 'access_site_settings'  => ['Settings',         '#7c3aed'],
                                                 'access_edms'           => ['EDMS',             '#0ea5e9'],
+                                                'access_edms_sla_admin' => ['EDMS-SLA',         '#a855f7'],
                                                 'access_ai'             => ['AI Suite',         '#a855f7'],
                                                 'access_consumables'    => ['Consumables',      '#f43f5e'],
                                                 'access_asset'          => ['Asset',            '#f59e0b'],
@@ -3129,6 +3130,14 @@ try {
                                                 </div>
                                                 <input type="checkbox" name="edms_access" id="govEdmsAccess" value="1" style="width:16px;height:16px" onclick="event.stopPropagation()">
                                             </div>
+                                            <!-- EDMS SLA Admin (จัด policy + ปฏิทินเวลาทำการ) -->
+                                            <div onclick="document.getElementById('govEdmsSlaAdminAccess').click()" class="premium-role-card" style="border-radius:14px;border:1.5px solid #e2e8f0;background:#fff;cursor:pointer;padding:12px;transition:all 0.2s;display:flex;align-items:center;justify-content:space-between">
+                                                <div style="display:flex;align-items:center;gap:10px">
+                                                    <i class="fa-solid fa-stopwatch-20 text-purple-500"></i>
+                                                    <span style="font-weight:800;font-size:12px;color:#475569">EDMS SLA Admin (จัด policy + ปฏิทิน)</span>
+                                                </div>
+                                                <input type="checkbox" name="edms_sla_admin_access" id="govEdmsSlaAdminAccess" value="1" style="width:16px;height:16px" onclick="event.stopPropagation()">
+                                            </div>
                                             <!-- AI Suite (Assistant / QA Lab / Prompts / Knowledge) -->
                                             <div onclick="document.getElementById('govAiAccess').click()" class="premium-role-card" style="border-radius:14px;border:1.5px solid #e2e8f0;background:#fff;cursor:pointer;padding:12px;transition:all 0.2s;display:flex;align-items:center;justify-content:space-between">
                                                 <div style="display:flex;align-items:center;gap:10px">
@@ -3303,6 +3312,7 @@ try {
                                             'access_system_logs'    => ['System Logs',      'fa-list-ul',            '#64748b'],
                                             'access_site_settings'  => ['Site Settings',    'fa-sliders',            '#7c3aed'],
                                             'access_edms'           => ['EDMS',             'fa-folder-open',        '#0ea5e9'],
+                                            'access_edms_sla_admin' => ['EDMS SLA Admin',   'fa-stopwatch-20',       '#a855f7'],
                                             'access_ai'             => ['AI Suite',         'fa-wand-magic-sparkles','#a855f7'],
                                             'access_consumables'    => ['Consumables',      'fa-syringe',            '#f43f5e'],
                                             'access_asset'          => ['Asset Inventory',  'fa-warehouse',          '#f59e0b'],
@@ -4519,6 +4529,7 @@ try {
                         document.getElementById('govSettAccess').checked = parseInt(data.access_site_settings) === 1;
                         document.getElementById('govRegAccess').checked = parseInt(data.access_registry) === 1;
                         document.getElementById('govEdmsAccess').checked = parseInt(data.access_edms) === 1;
+                        document.getElementById('govEdmsSlaAdminAccess').checked = parseInt(data.access_edms_sla_admin) === 1;
                         document.getElementById('govAiAccess').checked = parseInt(data.access_ai) === 1;
                         document.getElementById('govConsumablesAccess').checked = parseInt(data.access_consumables) === 1;
                         document.getElementById('govAssetAccess').checked = parseInt(data.access_asset) === 1;
@@ -4566,6 +4577,7 @@ try {
                     document.getElementById('govSettAccess').checked = false;
                     document.getElementById('govRegAccess').checked = false;
                     document.getElementById('govEdmsAccess').checked = false;
+                    document.getElementById('govEdmsSlaAdminAccess').checked = false;
                     document.getElementById('govAiAccess').checked = false;
                     document.getElementById('govConsumablesAccess').checked = false;
                     document.getElementById('govAssetAccess').checked = false;
@@ -4804,6 +4816,7 @@ try {
             ['access_system_logs',   'govLogsAccess'],
             ['access_site_settings', 'govSettAccess'],
             ['access_edms',          'govEdmsAccess'],
+            ['access_edms_sla_admin','govEdmsSlaAdminAccess'],
             ['access_ai',            'govAiAccess'],
             ['access_consumables',   'govConsumablesAccess'],
             ['access_asset',         'govAssetAccess'],

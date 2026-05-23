@@ -100,6 +100,9 @@ if ($adminRole === 'superadmin') {
         if (!in_array('access_edms', $cols)) {
             $pdo->exec("ALTER TABLE sys_staff ADD COLUMN access_edms TINYINT(1) DEFAULT 0");
         }
+        if (!in_array('access_edms_sla_admin', $cols)) {
+            $pdo->exec("ALTER TABLE sys_staff ADD COLUMN access_edms_sla_admin TINYINT(1) DEFAULT 0");
+        }
         if (!in_array('access_ai', $cols)) {
             $pdo->exec("ALTER TABLE sys_staff ADD COLUMN access_ai TINYINT(1) DEFAULT 0");
         }
@@ -177,6 +180,7 @@ if ($adminRole === 'superadmin') {
                    IFNULL(s.access_site_settings, 0) AS access_site_settings,
                    IFNULL(s.access_registry, 0) AS access_registry,
                    IFNULL(s.access_edms, 0) AS access_edms,
+                   IFNULL(s.access_edms_sla_admin, 0) AS access_edms_sla_admin,
                    IFNULL(s.access_ai, 0) AS access_ai,
                    IFNULL(s.access_consumables, 0) AS access_consumables,
                    IFNULL(s.access_asset, 0) AS access_asset,

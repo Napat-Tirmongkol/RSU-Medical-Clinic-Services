@@ -61,6 +61,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                        IFNULL(s.access_site_settings, 0) AS access_site_settings,
                        IFNULL(s.access_registry, 0) AS access_registry,
                        IFNULL(s.access_edms, 0) AS access_edms,
+                       IFNULL(s.access_edms_sla_admin, 0) AS access_edms_sla_admin,
                        IFNULL(s.access_ai, 0) AS access_ai,
                        IFNULL(s.access_consumables, 0) AS access_consumables,
                        IFNULL(s.access_asset, 0) AS access_asset,
@@ -86,7 +87,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $posFlags = json_decode($staff['position_flags'], true) ?: [];
                 foreach ([
                     'access_ecampaign','access_eborrow','access_insurance','access_system_logs',
-                    'access_site_settings','access_registry','access_edms',
+                    'access_site_settings','access_registry','access_edms','access_edms_sla_admin',
                     'access_ai','access_consumables','access_asset','access_finance','access_scholarship',
                     'access_dashboard_admin','access_monthly_report','access_nurse_productivity','access_daily_summary','access_director_view',
                     'access_identity'
@@ -125,6 +126,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $_SESSION['access_site_settings']  = (int)$staff['access_site_settings'];
                     $_SESSION['access_registry']       = (int)$staff['access_registry'];
                     $_SESSION['access_edms']           = (int)$staff['access_edms'];
+                    $_SESSION['access_edms_sla_admin'] = (int)$staff['access_edms_sla_admin'];
                     $_SESSION['access_ai']             = (int)$staff['access_ai'];
                     $_SESSION['access_consumables']    = (int)$staff['access_consumables'];
                     $_SESSION['access_asset']          = (int)$staff['access_asset'];
