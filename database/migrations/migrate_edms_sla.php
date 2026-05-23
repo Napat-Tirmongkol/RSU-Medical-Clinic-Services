@@ -179,98 +179,96 @@ if (!empty($posCols)) {
 // ── 7) Seed business_hours: ข้าม — ใช้ sys_clinic_hours แทน ─────────────
 _log($results, true, 'ข้าม seed business_hours — ใช้ sys_clinic_hours (ปฏิทินคลินิก) แทน');
 
-// ── 8) Seed 16 SLA policies (4 doc_type × 4 priority) ────────────────────
+// ── 8) Seed 20 SLA policies (5 doc_type × 4 priority) ────────────────────
+// Idempotent — UNIQUE (doc_type, priority_id) constraint → INSERT IGNORE skip ของเดิม
+// รันซ้ำได้ → backfill เฉพาะที่ยังไม่มี (เช่น เพิ่ม task type ทีหลัง)
 try {
-    $cnt = (int)$pdo->query("SELECT COUNT(*) FROM sys_doc_sla_policies")->fetchColumn();
-    if ($cnt === 0) {
-        // ดึง priority categories (ปกติ/ด่วน/ด่วนมาก/ด่วนที่สุด)
-        $priorities = $pdo->query("
-            SELECT id, code, name FROM sys_doc_categories
-            WHERE kind='priority' AND is_active=1
-            ORDER BY sort_order ASC, id ASC
-        ")->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    // ดึง priority categories (ปกติ/ด่วน/ด่วนมาก/ด่วนที่สุด)
+    $priorities = $pdo->query("
+        SELECT id, code, name FROM sys_doc_categories
+        WHERE kind='priority' AND is_active=1
+        ORDER BY sort_order ASC, id ASC
+    ")->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
-        if (count($priorities) === 0) {
-            _log($results, false, 'ยังไม่มี priority categories — รัน migrate_edms_module.php ก่อน');
-        } else {
-            // Map by code → id (fallback by name)
-            $pmap = [];
-            foreach ($priorities as $p) {
-                $pmap[$p['code']] = (int)$p['id'];
-                $pmap[$p['name']] = (int)$p['id'];
-            }
+    if (count($priorities) === 0) {
+        _log($results, false, 'ยังไม่มี priority categories — รัน migrate_edms_module.php ก่อน');
+    } else {
+        // Map by code → id (fallback by name)
+        $pmap = [];
+        foreach ($priorities as $p) {
+            $pmap[$p['code']] = (int)$p['id'];
+            $pmap[$p['name']] = (int)$p['id'];
+        }
 
-            // Matrix: [doc_type][priority_key] = [ack_h, resolve_h]
-            // ack ขั้นต่ำ 2h เพื่อให้ warning window (20% ของ ack) ≥ 24 min กว่า cron tick (60 min)
-            $matrix = [
-                'incoming' => [
-                    'normal'      => [8.0, 72.0],
-                    'urgent'      => [4.0, 24.0],
-                    'very_urgent' => [2.0, 8.0],
-                    'most_urgent' => [2.0, 4.0],
-                ],
-                'outgoing' => [
-                    'normal'      => [8.0, 72.0],
-                    'urgent'      => [4.0, 48.0],
-                    'very_urgent' => [2.0, 16.0],
-                    'most_urgent' => [2.0, 8.0],
-                ],
-                'internal' => [
-                    'normal'      => [6.0, 48.0],
-                    'urgent'      => [4.0, 24.0],
-                    'very_urgent' => [2.0, 12.0],
-                    'most_urgent' => [2.0, 6.0],
-                ],
-                'circular' => [
-                    'normal'      => [24.0, 168.0],
-                    'urgent'      => [8.0, 48.0],
-                    'very_urgent' => [4.0, 24.0],
-                    'most_urgent' => [2.0, 8.0],
-                ],
-                'task' => [  // งาน — flexible deadline กว่าหนังสือ
-                    'normal'      => [8.0, 40.0],   // ack 1 วัน, resolve 1 สัปดาห์ทำการ
-                    'urgent'      => [4.0, 16.0],   // ack ครึ่งวัน, resolve 2 วันทำการ
-                    'very_urgent' => [2.0, 8.0],    // ack 2 ชม., resolve 1 วันทำการ
-                    'most_urgent' => [2.0, 4.0],    // ack 2 ชม., resolve ครึ่งวัน
-                ],
-            ];
+        // Matrix: [doc_type][priority_key] = [ack_h, resolve_h]
+        // ack ขั้นต่ำ 2h เพื่อให้ warning window (20% ของ ack) ≥ 24 min กว่า cron tick (60 min)
+        $matrix = [
+            'incoming' => [
+                'normal'      => [8.0, 72.0],
+                'urgent'      => [4.0, 24.0],
+                'very_urgent' => [2.0, 8.0],
+                'most_urgent' => [2.0, 4.0],
+            ],
+            'outgoing' => [
+                'normal'      => [8.0, 72.0],
+                'urgent'      => [4.0, 48.0],
+                'very_urgent' => [2.0, 16.0],
+                'most_urgent' => [2.0, 8.0],
+            ],
+            'internal' => [
+                'normal'      => [6.0, 48.0],
+                'urgent'      => [4.0, 24.0],
+                'very_urgent' => [2.0, 12.0],
+                'most_urgent' => [2.0, 6.0],
+            ],
+            'circular' => [
+                'normal'      => [24.0, 168.0],
+                'urgent'      => [8.0, 48.0],
+                'very_urgent' => [4.0, 24.0],
+                'most_urgent' => [2.0, 8.0],
+            ],
+            'task' => [  // งาน — flexible deadline กว่าหนังสือ
+                'normal'      => [8.0, 40.0],   // ack 1 วัน, resolve 1 สัปดาห์ทำการ
+                'urgent'      => [4.0, 16.0],   // ack ครึ่งวัน, resolve 2 วันทำการ
+                'very_urgent' => [2.0, 8.0],    // ack 2 ชม., resolve 1 วันทำการ
+                'most_urgent' => [2.0, 4.0],    // ack 2 ชม., resolve ครึ่งวัน
+            ],
+        ];
 
-            // Aliases for priority codes/names (fallback ตามตำแหน่ง)
-            $priorityKeys = ['normal', 'urgent', 'very_urgent', 'most_urgent'];
-            $thaiNames    = ['ปกติ', 'ด่วน', 'ด่วนมาก', 'ด่วนที่สุด'];
+        // Aliases for priority codes/names (fallback ตามตำแหน่ง)
+        $priorityKeys = ['normal', 'urgent', 'very_urgent', 'most_urgent'];
+        $thaiNames    = ['ปกติ', 'ด่วน', 'ด่วนมาก', 'ด่วนที่สุด'];
 
-            $ins = $pdo->prepare("INSERT INTO sys_doc_sla_policies
-                (doc_type, priority_id, name, ack_hours, resolve_hours, warn_at_pct, business_hours_only, escalate_to_role, sort_order)
-                VALUES (?, ?, ?, ?, ?, 20, 1, 'superadmin+dept_head', ?)");
+        // INSERT IGNORE → idempotent rerun, ไม่ overwrite policy ที่ admin แก้แล้ว
+        $ins = $pdo->prepare("INSERT IGNORE INTO sys_doc_sla_policies
+            (doc_type, priority_id, name, ack_hours, resolve_hours, warn_at_pct, business_hours_only, escalate_to_role, sort_order)
+            VALUES (?, ?, ?, ?, ?, 20, 1, 'superadmin+dept_head', ?)");
 
-            $created = 0;
-            $order = 0;
-            foreach ($matrix as $docType => $rows) {
-                $i = 0;
-                foreach ($rows as $pkey => $hours) {
-                    // หา priority_id จาก code/name หรือใช้ตำแหน่ง $i
-                    $pid = $pmap[$pkey] ?? $pmap[$thaiNames[$i] ?? ''] ?? null;
-                    if ($pid === null && isset($priorities[$i])) {
-                        $pid = (int)$priorities[$i]['id'];
-                    }
-                    if ($pid === null) {
-                        $i++;
-                        $order++;
-                        continue;
-                    }
-                    $name = "SLA · {$docType} · " . ($thaiNames[$i] ?? $pkey);
-                    try {
-                        $ins->execute([$docType, $pid, $name, $hours[0], $hours[1], $order]);
-                        $created++;
-                    } catch (PDOException) { /* unique conflict — skip */ }
+        $created = 0;
+        $skipped = 0;
+        $order = 0;
+        foreach ($matrix as $docType => $rows) {
+            $i = 0;
+            foreach ($rows as $pkey => $hours) {
+                // หา priority_id จาก code/name หรือใช้ตำแหน่ง $i
+                $pid = $pmap[$pkey] ?? $pmap[$thaiNames[$i] ?? ''] ?? null;
+                if ($pid === null && isset($priorities[$i])) {
+                    $pid = (int)$priorities[$i]['id'];
+                }
+                if ($pid === null) {
                     $i++;
                     $order++;
+                    continue;
                 }
+                $name = "SLA · {$docType} · " . ($thaiNames[$i] ?? $pkey);
+                $ins->execute([$docType, $pid, $name, $hours[0], $hours[1], $order]);
+                if ($ins->rowCount() > 0) $created++;
+                else $skipped++;
+                $i++;
+                $order++;
             }
-            _log($results, true, "Seed {$created} SLA policies");
         }
-    } else {
-        _log($results, true, "policies seeded ไว้แล้ว ({$cnt} records)");
+        _log($results, true, "SLA policies: +{$created} ใหม่, {$skipped} มีอยู่แล้ว (ไม่ overwrite)");
     }
 } catch (PDOException $e) {
     _log($results, false, 'seed policies: ' . $e->getMessage());
