@@ -1,21 +1,21 @@
 <?php
 /**
- * portal/line_settings.php — หน้าตั้งค่า LINE Messaging API (Standalone Wrapper)
+ * portal/line_settings.php
+ * Section page — auto-generated from monolithic index.php refactor.
  */
-declare(strict_types=1);
+require __DIR__ . '/_init.php';
+require_once __DIR__ . '/_layout.php';
 
-require_once __DIR__ . '/../config.php';
-require_once __DIR__ . '/includes/auth.php';
-
-if (($_SESSION['admin_role'] ?? '') !== 'superadmin') {
-    header('Location: index.php'); exit;
-}
-
-$secrets = require __DIR__ . '/../config/secrets.php';
-$_GET['layout'] = 'none'; 
-require_once __DIR__ . '/../admin/includes/header.php';
-
-// เรียกใช้ Partial
-include __DIR__ . '/_partials/line_settings.php';
-
-require_once __DIR__ . '/../admin/includes/footer.php';
+layout_start(['section' => 'line_settings', 'title' => 'LINE Settings']);
+?>
+            <div class="portal-section"
+                style="width:100%; height:calc(100vh - 60px); background:#f8fafc; overflow-y:auto;">
+                <?php 
+                if ($adminRole === 'superadmin' || !empty($_SESSION['access_site_settings'])) {
+                    include __DIR__ . '/_partials/line_settings.php'; 
+                } else {
+                    echo '<div style="padding:100px;text-align:center;font-weight:900;color:#dc2626"><i class="fa-solid fa-shield-slash mb-4" style="font-size:4rem;display:block"></i> ACCESS DENIED</div>';
+                }
+                ?>
+            </div>
+<?php layout_end(); ?>

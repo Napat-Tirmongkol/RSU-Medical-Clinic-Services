@@ -436,7 +436,9 @@ body {
     font-size: 13px; font-weight: 600; color: #475569;
     transition: background .2s, color .18s, padding .28s, gap .28s, transform .18s;
     margin-bottom: 2px; overflow: hidden;
+    text-decoration: none;  /* a.psb-item — no underline */
 }
+.psb-item:hover, .psb-item:focus { text-decoration: none; }
 .psb-item::before {
     /* Sliding accent rail on the left edge */
     content: '';
