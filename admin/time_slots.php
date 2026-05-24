@@ -429,13 +429,70 @@ $header_actions = '
 <button id="addSlotBtn" onclick="openAddSlotModal(\'' . date('Y-m-d') . '\')" class="ts-cta">
     <i class="fa-solid fa-plus-circle"></i><span class="btn-add-text">สร้างรอบเวลา</span>
 </button>
-<select id="monthSelect" onchange="location.href=\'?month=\'+this.value.split(\'-\')[1]+\'&year=\'+this.value.split(\'-\')[0]" class="ts-month-select">';
-    for ($i = -3; $i <= 6; $i++) {
-        $d = date('Y-m', strtotime("$i months"));
-        $selected = ($d == "$year-".str_pad($month, 2, '0', STR_PAD_LEFT)) ? 'selected' : '';
-        $header_actions .= "<option value='{$d}' {$selected}>".date('M Y', strtotime("$i months"))."</option>";
+<div class="ts-month-nav" role="group" aria-label="เลือกเดือน">';
+
+    // Build prev/next/today URLs preserving other query params
+    $_currentYM = sprintf('%04d-%02d-01', $year, $month);
+    $_prevTs    = strtotime("$_currentYM -1 month");
+    $_nextTs    = strtotime("$_currentYM +1 month");
+    $_todayYM   = date('Y-m');
+    $_isCurrent = (sprintf('%04d-%02d', $year, $month) === $_todayYM);
+
+    $_navUrl = function(int $ts) {
+        $q = $_GET;
+        $q['month'] = date('m', $ts);
+        $q['year']  = date('Y', $ts);
+        return '?' . http_build_query($q);
+    };
+    $_prevUrl  = $_navUrl($_prevTs);
+    $_nextUrl  = $_navUrl($_nextTs);
+    $_todayUrl = $_navUrl(time());
+
+    $_thMonths = ['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+    $_yearBE   = $year + 543;
+    $_label    = $_thMonths[$month] . ' ' . $_yearBE;
+
+    $header_actions .= '
+        <a href="' . htmlspecialchars($_prevUrl) . '" class="ts-month-nav-btn" title="เดือนก่อนหน้า" aria-label="เดือนก่อนหน้า">
+            <i class="fa-solid fa-chevron-left"></i>
+        </a>
+        <button type="button" id="monthLabelBtn" class="ts-month-label" onclick="document.getElementById(\'monthPickerPop\').classList.toggle(\'open\')" aria-haspopup="true">
+            ' . htmlspecialchars($_label) . '
+            <i class="fa-solid fa-caret-down ts-month-label-caret"></i>
+        </button>
+        <a href="' . htmlspecialchars($_nextUrl) . '" class="ts-month-nav-btn" title="เดือนถัดไป" aria-label="เดือนถัดไป">
+            <i class="fa-solid fa-chevron-right"></i>
+        </a>';
+
+    if (!$_isCurrent) {
+        $header_actions .= '
+        <a href="' . htmlspecialchars($_todayUrl) . '" class="ts-month-today-btn" title="กลับไปเดือนปัจจุบัน">วันนี้</a>';
     }
-$header_actions .= '</select>';
+
+    // Mini month picker (popup) — show this year + range
+    $header_actions .= '
+        <div id="monthPickerPop" class="ts-month-pop" role="dialog">
+            <div class="ts-month-pop-year">' . htmlspecialchars($_yearBE) . '</div>
+            <div class="ts-month-pop-grid">';
+    for ($m = 1; $m <= 12; $m++) {
+        $_isActive = ($m === (int)$month);
+        $_url = $_navUrl(strtotime(sprintf('%04d-%02d-01', $year, $m)));
+        $header_actions .= '
+                <a href="' . htmlspecialchars($_url) . '" class="ts-month-pop-cell' . ($_isActive ? ' is-active' : '') . '">'
+                . htmlspecialchars($_thMonths[$m]) . '</a>';
+    }
+    $header_actions .= '
+            </div>
+            <div class="ts-month-pop-yearnav">
+                <a href="' . htmlspecialchars($_navUrl(strtotime(sprintf('%04d-%02d-01', $year - 1, $month)))) . '" class="ts-month-pop-yearbtn">
+                    <i class="fa-solid fa-chevron-left"></i> ' . htmlspecialchars(($year - 1) + 543) . '
+                </a>
+                <a href="' . htmlspecialchars($_navUrl(strtotime(sprintf('%04d-%02d-01', $year + 1, $month)))) . '" class="ts-month-pop-yearbtn">
+                    ' . htmlspecialchars(($year + 1) + 543) . ' <i class="fa-solid fa-chevron-right"></i>
+                </a>
+            </div>
+        </div>
+    </div>';
 
 renderPageHeader("รอบเวลาแคมเปญ", "เลือกวันและเวลาเปิดรับจอง — สร้างพร้อมกันหลายวันได้", $header_actions);
 ?>
@@ -524,20 +581,80 @@ body[data-theme='dark'] .ts-view-toggle button.is-active {
     color: var(--ec-brand-400);
     box-shadow: none;
 }
-.ts-month-select {
-    padding: 8px 14px;
-    border-radius: 12px;
-    background: var(--ec-surface);
-    border: 1px solid var(--ec-border);
-    font-size: 13px;
-    font-weight: 700;
-    color: var(--ec-ink-1);
-    cursor: pointer;
-    outline: none;
-    transition: border-color .15s;
+/* ── Month nav: prev/next + label dropdown + "วันนี้" ─────────── */
+.ts-month-nav {
+    display: inline-flex; align-items: center; gap: 2px;
+    background: var(--ec-surface); border: 1px solid var(--ec-border);
+    border-radius: 12px; padding: 3px; position: relative;
 }
-.ts-month-select:hover { border-color: var(--ec-brand-200); }
-.ts-month-select:focus { border-color: var(--ec-brand-500); box-shadow: 0 0 0 3px rgba(46,158,99,.15); }
+.ts-month-nav-btn {
+    width: 32px; height: 32px; border-radius: 8px;
+    display: inline-flex; align-items: center; justify-content: center;
+    color: var(--ec-ink-2); text-decoration: none;
+    font-size: 12px; transition: all .15s;
+}
+.ts-month-nav-btn:hover { background: var(--ec-bg-2, #f1f5f9); color: var(--ec-ink-1); }
+.ts-month-label {
+    min-width: 120px; height: 32px;
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 0 12px; background: transparent; border: 0;
+    font-size: 13px; font-weight: 800; color: var(--ec-ink-1);
+    cursor: pointer; border-radius: 8px; transition: background .15s;
+    font-family: inherit;
+}
+.ts-month-label:hover { background: var(--ec-bg-2, #f1f5f9); }
+.ts-month-label-caret { font-size: 9px; opacity: .55; transition: transform .2s; }
+.ts-month-pop.open ~ * .ts-month-label-caret,
+.ts-month-nav .ts-month-pop.open + * .ts-month-label-caret { transform: rotate(180deg); }
+.ts-month-today-btn {
+    margin-left: 6px; padding: 0 14px; height: 32px;
+    display: inline-flex; align-items: center;
+    background: linear-gradient(135deg, var(--ec-brand-500), var(--ec-brand-600));
+    color: #fff; text-decoration: none;
+    border-radius: 8px; font-size: 12px; font-weight: 800;
+    box-shadow: 0 2px 8px -2px rgba(46,158,99,.4);
+    transition: all .15s;
+}
+.ts-month-today-btn:hover { filter: brightness(1.1); transform: translateY(-1px); }
+
+/* Mini month picker popup */
+.ts-month-pop {
+    position: absolute; top: calc(100% + 8px); left: 50%; transform: translateX(-50%);
+    background: var(--ec-surface); border: 1px solid var(--ec-border);
+    border-radius: 14px; padding: 12px;
+    box-shadow: 0 12px 32px -8px rgba(15,23,42,.18), 0 4px 12px -4px rgba(15,23,42,.08);
+    min-width: 260px; z-index: 50;
+    opacity: 0; pointer-events: none; transform: translateX(-50%) translateY(-4px);
+    transition: opacity .18s, transform .18s;
+}
+.ts-month-pop.open { opacity: 1; pointer-events: auto; transform: translateX(-50%) translateY(0); }
+.ts-month-pop-year {
+    text-align: center; font-size: 14px; font-weight: 800; color: var(--ec-ink-1);
+    padding-bottom: 8px; border-bottom: 1px solid var(--ec-border); margin-bottom: 8px;
+}
+.ts-month-pop-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+.ts-month-pop-cell {
+    padding: 10px 8px; text-align: center; border-radius: 8px;
+    font-size: 12px; font-weight: 700; color: var(--ec-ink-2);
+    text-decoration: none; transition: all .15s;
+}
+.ts-month-pop-cell:hover { background: var(--ec-bg-2, #f1f5f9); color: var(--ec-ink-1); }
+.ts-month-pop-cell.is-active {
+    background: var(--ec-brand-500); color: #fff;
+    box-shadow: 0 2px 8px -2px rgba(46,158,99,.4);
+}
+.ts-month-pop-yearnav {
+    display: flex; justify-content: space-between; gap: 6px;
+    margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--ec-border);
+}
+.ts-month-pop-yearbtn {
+    flex: 1; padding: 6px 10px; border-radius: 8px;
+    background: var(--ec-bg-2, #f8fafc);
+    font-size: 11px; font-weight: 700; color: var(--ec-ink-2);
+    text-decoration: none; text-align: center; transition: all .15s;
+    display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+}
+.ts-month-pop-yearbtn:hover { background: var(--ec-brand-50, #ecfdf5); color: var(--ec-brand-700); }
 
 .ts-danger-btn {
     display: inline-flex; align-items: center; gap: 6px;
@@ -1101,7 +1218,9 @@ body[data-theme='dark'] .ts-row-btn.del  { background: rgba(239,68,68,.15);   co
     .slot-card   { padding: 3px 5px; margin-bottom: 3px; }
     .btn-add-text { display: none; }
     .ts-cta      { padding: 8px 12px; }
-    .ts-month-select { padding: 8px 10px; font-size: 12px; }
+    .ts-month-nav .ts-month-nav-btn { width: 28px; height: 28px; }
+    .ts-month-nav .ts-month-label { min-width: 96px; font-size: 12px; height: 28px; }
+    .ts-month-nav .ts-month-today-btn { padding: 0 10px; height: 28px; font-size: 11px; }
     .ts-multi-trigger { max-width: 160px; }
     .ts-modal-box { max-height: 96vh; }
     .ts-modal-header, .ts-modal-body, .ts-modal-footer { padding-left: 16px; padding-right: 16px; }
@@ -1690,6 +1809,17 @@ document.addEventListener('click', function(e) {
     if (e.target.classList && e.target.classList.contains('ts-modal')) {
         e.target.classList.add('hidden');
         document.body.style.overflow = '';
+    }
+    // close month picker popup when clicking outside
+    const pop = document.getElementById('monthPickerPop');
+    const btn = document.getElementById('monthLabelBtn');
+    if (pop && pop.classList.contains('open') && !pop.contains(e.target) && e.target !== btn && !btn?.contains(e.target)) {
+        pop.classList.remove('open');
+    }
+});
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        document.getElementById('monthPickerPop')?.classList.remove('open');
     }
 });
 </script>
