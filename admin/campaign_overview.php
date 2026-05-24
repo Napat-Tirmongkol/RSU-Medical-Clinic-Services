@@ -48,6 +48,7 @@ if ($campaignId > 0) {
         foreach ($stmt2->fetchAll(PDO::FETCH_ASSOC) as $row) {
             $statusBreakdown[$row['status']] = (int)$row['cnt'];
         }
+        $stats['awaiting'] = $statusBreakdown['confirmed'] ?? 0;
 
         // Trend รายวัน (30 วันล่าสุด)
         $stmt3 = $pdo->prepare("
@@ -237,13 +238,14 @@ foreach ($slotUtil as $sl) {
 </div>
 
 <!-- KPI Cards -->
-<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
     <?php
     $cards = [
-        ['label' => 'โควต้าทั้งหมด', 'value' => number_format($stats['cap']),      'icon' => 'fa-users',          'color' => 'text-blue-600',   'bg' => 'bg-blue-50'],
-        ['label' => 'จองแล้ว',        'value' => number_format($stats['used']),     'icon' => 'fa-clipboard-check','color' => 'text-green-600',  'bg' => 'bg-green-50'],
-        ['label' => 'คงเหลือ',        'value' => number_format($stats['remaining']),'icon' => 'fa-circle-dot',    'color' => 'text-amber-600',  'bg' => 'bg-amber-50'],
-        ['label' => 'เต็ม',           'value' => $stats['pct'] . '%',              'icon' => 'fa-chart-pie',      'color' => 'text-purple-600', 'bg' => 'bg-purple-50'],
+        ['label' => 'โควต้าทั้งหมด', 'value' => number_format($stats['cap']),      'icon' => 'fa-users',           'color' => 'text-blue-600',   'bg' => 'bg-blue-50'],
+        ['label' => 'จองแล้ว',        'value' => number_format($stats['used']),     'icon' => 'fa-clipboard-check', 'color' => 'text-green-600',  'bg' => 'bg-green-50'],
+        ['label' => 'รอเข้าร่วม',     'value' => number_format($stats['awaiting']), 'icon' => 'fa-user-clock',      'color' => 'text-teal-600',   'bg' => 'bg-teal-50'],
+        ['label' => 'คงเหลือ',        'value' => number_format($stats['remaining']),'icon' => 'fa-circle-dot',      'color' => 'text-amber-600',  'bg' => 'bg-amber-50'],
+        ['label' => 'เต็ม',           'value' => $stats['pct'] . '%',              'icon' => 'fa-chart-pie',       'color' => 'text-purple-600', 'bg' => 'bg-purple-50'],
     ];
     foreach ($cards as $i => $card):
     ?>
@@ -255,10 +257,14 @@ foreach ($slotUtil as $sl) {
             </div>
         </div>
         <p class="text-3xl font-[950] text-gray-900"><?= $card['value'] ?></p>
-        <?php if ($i === 3): ?>
+        <?php if ($card['label'] === 'เต็ม'): ?>
         <div class="mt-3 h-2 bg-gray-100 rounded-full overflow-hidden">
             <div class="h-full bg-purple-400 rounded-full transition-all" style="width:<?= min(100,$stats['pct']) ?>%"></div>
         </div>
+        <?php elseif ($card['label'] === 'รอเข้าร่วม' && $stats['used'] > 0): ?>
+        <p class="mt-2 text-[11px] text-gray-400">
+            <?= round($stats['awaiting'] / $stats['used'] * 100) ?>% ของผู้จอง · รอวันงาน
+        </p>
         <?php endif; ?>
     </div>
     <?php endforeach; ?>
