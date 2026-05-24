@@ -278,7 +278,7 @@ foreach ($slotUtil as $sl) {
     <?php
     $cards = [
         ['label' => 'โควต้าทั้งหมด', 'value' => number_format($stats['cap']),      'icon' => 'fa-users',           'color' => 'text-blue-600',   'bg' => 'bg-blue-50'],
-        ['label' => 'จองแล้ว',        'value' => number_format($stats['used']),     'icon' => 'fa-clipboard-check', 'color' => 'text-green-600',  'bg' => 'bg-green-50'],
+        ['label' => 'เข้าร่วมแล้ว',  'value' => number_format($stats['attended']), 'icon' => 'fa-circle-check',    'color' => 'text-green-600',  'bg' => 'bg-green-50'],
         ['label' => 'รอเข้าร่วม',     'value' => number_format($stats['awaiting']), 'icon' => 'fa-user-clock',      'color' => 'text-teal-600',   'bg' => 'bg-teal-50'],
         ['label' => 'คงเหลือ',        'value' => number_format($stats['remaining']),'icon' => 'fa-circle-dot',      'color' => 'text-amber-600',  'bg' => 'bg-amber-50'],
         ['label' => 'เต็ม',           'value' => $stats['pct'] . '%',              'icon' => 'fa-chart-pie',       'color' => 'text-purple-600', 'bg' => 'bg-purple-50'],
@@ -300,11 +300,11 @@ foreach ($slotUtil as $sl) {
         <p class="mt-1.5 text-[10px] text-gray-400">จากผู้ครองโควต้า <?= number_format($stats['occupied']) ?> คน</p>
         <?php elseif ($card['label'] === 'คงเหลือ'): ?>
         <p class="mt-2 text-[11px] text-gray-400">
-            หลังหักรอเข้าร่วม <?= number_format($stats['awaiting']) ?> + เข้าร่วมแล้ว <?= number_format($stats['attended']) ?>
+            <?= number_format($stats['cap']) ?> − <?= number_format($stats['attended']) ?> − <?= number_format($stats['awaiting']) ?>
         </p>
-        <?php elseif ($card['label'] === 'รอเข้าร่วม' && $stats['used'] > 0): ?>
+        <?php elseif ($card['label'] === 'รอเข้าร่วม' && $stats['awaiting'] > 0): ?>
         <p class="mt-2 text-[11px] text-gray-400">
-            <?= round($stats['awaiting'] / $stats['used'] * 100) ?>% ของผู้จอง · รอวันงาน
+            <i class="fa-regular fa-calendar mr-1"></i>รอวันงาน · ยังไม่มาเช็คอิน
         </p>
         <?php endif; ?>
     </div>
