@@ -48,11 +48,17 @@ $surveyStats     = ['count' => 0, 'avg_rating' => null];
 
 if ($campaignId > 0) {
     try {
+        // used_capacity here = all non-cancelled bookings (booked + confirmed + completed).
+        // This intentionally differs from campaigns.php / time_slots.php / ajax helpers
+        // which use ('booked','confirmed') for slot-pipeline checks. In a SUMMARY REPORT
+        // the user expects "จองแล้ว" to count everyone who actually booked (including
+        // those who already attended), not just the active pipeline.
         $stmt = $pdo->prepare("
             SELECT c.*,
                 (SELECT COUNT(*) FROM camp_slots    s WHERE s.campaign_id = c.id) AS total_slots,
                 (SELECT COUNT(*) FROM camp_bookings b WHERE b.campaign_id = c.id) AS total_bookings,
-                (SELECT COUNT(*) FROM camp_bookings b WHERE b.campaign_id = c.id AND b.status IN ('booked','confirmed')) AS used_capacity
+                (SELECT COUNT(*) FROM camp_bookings b WHERE b.campaign_id = c.id
+                   AND b.status NOT IN ('cancelled','cancelled_by_admin')) AS used_capacity
             FROM camp_list c WHERE c.id = :id
         ");
         $stmt->execute([':id' => $campaignId]);
