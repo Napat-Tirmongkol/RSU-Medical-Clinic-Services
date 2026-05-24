@@ -50,13 +50,17 @@ if ($campaignId > 0) {
         }
         $stats['awaiting'] = $statusBreakdown['confirmed'] ?? 0;
 
-        // Trend รายวัน (30 วันล่าสุด)
+        // Trend รายวัน — 30 วันล่าสุดที่มีการจอง (ไม่ใช่ 30 calendar days)
+        // ที่เปลี่ยน: filter "created_at >= NOW() - 30 day" ทำให้แคมเปญที่จองนานแล้วได้กราฟว่าง
         $stmt3 = $pdo->prepare("
-            SELECT DATE(created_at) AS day, COUNT(*) AS cnt
-            FROM camp_bookings
-            WHERE campaign_id = :id AND created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
-            GROUP BY DATE(created_at)
-            ORDER BY day ASC
+            SELECT day, cnt FROM (
+                SELECT DATE(created_at) AS day, COUNT(*) AS cnt
+                FROM camp_bookings
+                WHERE campaign_id = :id
+                GROUP BY DATE(created_at)
+                ORDER BY day DESC
+                LIMIT 30
+            ) t ORDER BY day ASC
         ");
         $stmt3->execute([':id' => $campaignId]);
         $dailyTrend = $stmt3->fetchAll(PDO::FETCH_ASSOC);
@@ -76,7 +80,14 @@ if ($campaignId > 0) {
         $stmt4->execute([':id' => $campaignId]);
         $slotUtil = $stmt4->fetchAll(PDO::FETCH_ASSOC);
 
-        // รายชื่อผู้จองล่าสุด
+        // รายชื่อผู้จอง — 25/หน้า (CLAUDE.md: pagination required)
+        $bookingsPerPage = 25;
+        $bookingsPage    = max(1, (int)($_GET['bp'] ?? 1));
+        $bookingsTotal   = (int)$pdo->query("SELECT COUNT(*) FROM camp_bookings WHERE campaign_id = " . (int)$campaignId)->fetchColumn();
+        $bookingsPages   = max(1, (int)ceil($bookingsTotal / $bookingsPerPage));
+        if ($bookingsPage > $bookingsPages) $bookingsPage = $bookingsPages;
+        $bookingsOffset  = ($bookingsPage - 1) * $bookingsPerPage;
+
         $stmt5 = $pdo->prepare("
             SELECT b.id, b.status, b.created_at,
                 u.full_name, u.student_personnel_id, u.phone_number,
@@ -86,10 +97,19 @@ if ($campaignId > 0) {
             JOIN camp_slots s ON b.slot_id = s.id
             WHERE b.campaign_id = :id
             ORDER BY b.created_at DESC
-            LIMIT 100
+            LIMIT :lim OFFSET :off
         ");
-        $stmt5->execute([':id' => $campaignId]);
+        $stmt5->bindValue(':id',  $campaignId,      PDO::PARAM_INT);
+        $stmt5->bindValue(':lim', $bookingsPerPage, PDO::PARAM_INT);
+        $stmt5->bindValue(':off', $bookingsOffset,  PDO::PARAM_INT);
+        $stmt5->execute();
         $recentBookings = $stmt5->fetchAll(PDO::FETCH_ASSOC);
+    }
+}
+
+if (!function_exists('co_pager_url')) {
+    function co_pager_url(string $param, int $page): string {
+        $q = $_GET; $q[$param] = $page; return '?' . http_build_query($q);
     }
 }
 
@@ -323,7 +343,7 @@ foreach ($slotUtil as $sl) {
     <!-- Line: Trend รายวัน -->
     <div class="card p-5 fade-up" style="animation-delay:.15s">
         <h3 class="font-bold text-gray-700 mb-4 flex items-center gap-2">
-            <i class="fa-solid fa-chart-line text-purple-500"></i> การจองรายวัน (30 วันล่าสุด)
+            <i class="fa-solid fa-chart-line text-purple-500"></i> การจองรายวัน (30 วันล่าสุดที่มีข้อมูล)
         </h3>
         <?php if (!empty($trendData)): ?>
         <canvas id="trendChart" height="160"></canvas>
@@ -355,13 +375,17 @@ foreach ($slotUtil as $sl) {
 <!-- Bookings Table -->
 <div class="card p-5 fade-up" style="animation-delay:.25s">
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-        <h3 class="font-bold text-gray-700 flex items-center gap-2">
+        <h3 class="font-bold text-gray-700 flex items-center gap-2 flex-wrap">
             <i class="fa-solid fa-list text-gray-400"></i>
             รายชื่อผู้จอง
-            <span class="ml-1 text-xs font-semibold bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full"><?= count($recentBookings) ?></span>
+            <span class="ml-1 text-xs font-semibold bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full"><?= number_format($bookingsTotal) ?></span>
+            <?php if ($bookingsPages > 1): ?>
+            <span class="text-[11px] font-normal text-gray-400">หน้า <?= $bookingsPage ?>/<?= $bookingsPages ?></span>
+            <?php endif; ?>
         </h3>
         <div class="flex gap-2">
-            <input id="bookingSearch" type="text" placeholder="ค้นหาชื่อ / รหัส..."
+            <input id="bookingSearch" type="text" placeholder="ค้นหาในหน้านี้..."
+                title="ค้นหาเฉพาะหน้าปัจจุบัน · ต้องการค้นหาทุกหน้า ให้ใช้หน้า ผู้เข้าร่วม"
                 class="border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-300 w-52">
             <a href="reports.php?campaign_id=<?= $campaignId ?>" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-xl transition-colors flex items-center gap-1.5">
                 <i class="fa-solid fa-download text-xs"></i> Export
@@ -411,6 +435,40 @@ foreach ($slotUtil as $sl) {
             </tbody>
         </table>
     </div>
+
+    <?php if ($bookingsPages > 1): ?>
+    <!-- Pagination — 25/page · window ±2 per CLAUDE.md -->
+    <div class="mt-4 pt-3 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-3">
+        <p class="text-[11px] text-gray-400">
+            แสดง <?= number_format($bookingsOffset + 1) ?>–<?= number_format(min($bookingsOffset + $bookingsPerPage, $bookingsTotal)) ?>
+            จากทั้งหมด <?= number_format($bookingsTotal) ?> รายการ
+        </p>
+        <div class="flex items-center gap-1">
+            <?php
+            $win = 2;
+            $showFirst = $bookingsPage > $win + 1;
+            $showLast  = $bookingsPage < $bookingsPages - $win;
+            ?>
+            <a href="<?= co_pager_url('bp', 1) ?>" class="px-2 py-1 text-xs rounded-lg <?= $bookingsPage===1 ? 'pointer-events-none text-gray-300' : 'text-gray-500 hover:bg-gray-100' ?>" title="หน้าแรก">«</a>
+            <a href="<?= co_pager_url('bp', max(1, $bookingsPage - 1)) ?>" class="px-2 py-1 text-xs rounded-lg <?= $bookingsPage===1 ? 'pointer-events-none text-gray-300' : 'text-gray-500 hover:bg-gray-100' ?>" title="ก่อนหน้า">‹</a>
+            <?php if ($showFirst): ?>
+                <a href="<?= co_pager_url('bp', 1) ?>" class="px-2.5 py-1 text-xs rounded-lg text-gray-500 hover:bg-gray-100">1</a>
+                <span class="text-gray-300 text-xs">…</span>
+            <?php endif; ?>
+            <?php for ($p = max(1, $bookingsPage - $win); $p <= min($bookingsPages, $bookingsPage + $win); $p++): ?>
+                <a href="<?= co_pager_url('bp', $p) ?>"
+                   class="px-2.5 py-1 text-xs rounded-lg font-semibold <?= $p === $bookingsPage ? 'text-white' : 'text-gray-500 hover:bg-gray-100' ?>"
+                   style="<?= $p === $bookingsPage ? 'background:#0052CC' : '' ?>"><?= $p ?></a>
+            <?php endfor; ?>
+            <?php if ($showLast): ?>
+                <span class="text-gray-300 text-xs">…</span>
+                <a href="<?= co_pager_url('bp', $bookingsPages) ?>" class="px-2.5 py-1 text-xs rounded-lg text-gray-500 hover:bg-gray-100"><?= $bookingsPages ?></a>
+            <?php endif; ?>
+            <a href="<?= co_pager_url('bp', min($bookingsPages, $bookingsPage + 1)) ?>" class="px-2 py-1 text-xs rounded-lg <?= $bookingsPage===$bookingsPages ? 'pointer-events-none text-gray-300' : 'text-gray-500 hover:bg-gray-100' ?>" title="ถัดไป">›</a>
+            <a href="<?= co_pager_url('bp', $bookingsPages) ?>" class="px-2 py-1 text-xs rounded-lg <?= $bookingsPage===$bookingsPages ? 'pointer-events-none text-gray-300' : 'text-gray-500 hover:bg-gray-100' ?>" title="หน้าสุดท้าย">»</a>
+        </div>
+    </div>
+    <?php endif; ?>
     <?php endif; ?>
 </div>
 
