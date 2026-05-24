@@ -67,10 +67,25 @@ if (!$tokenOk) {
         $state = 'invalid';
     } elseif ((int)($campaign['walkin_enabled'] ?? 0) !== 1) {
         $state = 'walkin_disabled';
-    } elseif ($campaign['status'] !== 'active'
-              || ($campaign['available_from']  && $campaign['available_from']  > date('Y-m-d'))
-              || ($campaign['available_until'] && $campaign['available_until'] < date('Y-m-d'))) {
+    } elseif ($campaign['status'] !== 'active') {
+        // Non-active status takes precedence over date — admin manually set it
         $state = 'campaign_closed';
+        $closedReason = match ($campaign['status']) {
+            'full'        => 'แคมเปญนี้เต็มแล้ว ปิดรับลงทะเบียนเพิ่ม',
+            'closed'      => 'แคมเปญนี้ปิดรับสมัครแล้ว',
+            'inactive'    => 'แคมเปญนี้หยุดให้บริการชั่วคราว',
+            'archived'    => 'แคมเปญนี้ถูกจัดเก็บแล้ว ไม่เปิดรับสมัครอีก',
+            'draft'       => 'แคมเปญนี้ยังเป็นฉบับร่าง ยังไม่เปิดให้ลงทะเบียน',
+            'coming_soon' => 'แคมเปญนี้จะเปิดรับเร็วๆ นี้',
+            'private'     => 'แคมเปญนี้เปิดเฉพาะลิงก์ส่วนตัว ไม่รับ Walk-in',
+            default       => 'แคมเปญนี้ไม่เปิดให้ลงทะเบียน Walk-in ในขณะนี้',
+        };
+    } elseif ($campaign['available_from']  && $campaign['available_from']  > date('Y-m-d')) {
+        $state = 'campaign_closed';
+        $closedReason = 'ยังไม่ถึงวันเริ่มลงทะเบียน (เริ่ม ' . walkin_fmt_date($campaign['available_from']) . ')';
+    } elseif ($campaign['available_until'] && $campaign['available_until'] < date('Y-m-d')) {
+        $state = 'campaign_closed';
+        $closedReason = 'หมดเขตลงทะเบียนแล้ว (วันสุดท้าย: ' . walkin_fmt_date($campaign['available_until']) . ')';
     } elseif ((int)$campaign['used'] >= (int)$campaign['total_capacity']) {
         $state = 'full';
     } else {
@@ -487,10 +502,20 @@ $typeInfo = walkin_type_label((string)($campaign['type'] ?? ''));
       <div class="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-gray-200">
         <i class="fa-solid fa-calendar-xmark text-4xl text-gray-400"></i>
       </div>
-      <h2 class="text-2xl font-black text-gray-900 mb-1">กิจกรรมหมดเขต</h2>
-      <p class="text-sm text-gray-500">
-        กิจกรรมนี้ปิดรับสมัครหรือยังไม่ถึงวันเริ่มลงทะเบียน
+      <h2 class="text-2xl font-black text-gray-900 mb-1">ลงทะเบียนไม่ได้</h2>
+      <p class="text-sm text-gray-600 leading-relaxed mb-3">
+        <?= htmlspecialchars($closedReason ?? 'แคมเปญนี้ไม่เปิดให้ลงทะเบียน Walk-in ในขณะนี้') ?>
       </p>
+      <?php if ($campaign && !empty($campaign['title'])): ?>
+      <div class="bg-gray-50 rounded-2xl p-3 border border-gray-100 text-xs text-gray-500 mb-1">
+        <span class="font-bold text-gray-700"><?= htmlspecialchars($campaign['title']) ?></span>
+      </div>
+      <?php endif; ?>
+      <?php if (!empty($campaign['contact_phone'])): ?>
+      <p class="text-xs text-gray-400 mt-4">
+        <i class="fa-solid fa-phone mr-1"></i> สอบถาม: <?= htmlspecialchars($campaign['contact_phone']) ?>
+      </p>
+      <?php endif; ?>
     </div>
 
   <?php else: ?>

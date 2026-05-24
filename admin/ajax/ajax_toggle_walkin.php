@@ -27,10 +27,47 @@ try {
 } catch (PDOException) {}
 
 try {
-    $row = $pdo->prepare("SELECT walkin_enabled FROM camp_list WHERE id = :id LIMIT 1");
+    $row = $pdo->prepare("SELECT walkin_enabled, status, available_from, available_until
+                          FROM camp_list WHERE id = :id LIMIT 1");
     $row->execute([':id' => $campaign_id]);
-    $current = (int)($row->fetchColumn() ?? 0);
+    $camp = $row->fetch(PDO::FETCH_ASSOC);
+    if (!$camp) {
+        echo json_encode(['status' => 'error', 'message' => 'ไม่พบแคมเปญ']);
+        exit;
+    }
+    $current = (int)($camp['walkin_enabled'] ?? 0);
     $new_val = $current ? 0 : 1;
+
+    // Refuse to ENABLE walk-in when campaign status disallows registration.
+    // Disabling is always allowed (admin can defensively turn off anytime).
+    if ($new_val === 1) {
+        $reason = '';
+        if ($camp['status'] !== 'active') {
+            $statusLabel = match ($camp['status']) {
+                'full'        => 'เต็มแล้ว',
+                'closed'      => 'ปิดรับ',
+                'inactive'    => 'หยุดชั่วคราว',
+                'archived'    => 'เก็บถาวร',
+                'draft'       => 'ฉบับร่าง',
+                'coming_soon' => 'เร็วๆ นี้',
+                'private'     => 'ลิงก์ส่วนตัว',
+                default       => (string)$camp['status'],
+            };
+            $reason = "สถานะแคมเปญเป็น '{$statusLabel}' — เปลี่ยนเป็น 'เปิดรับสมัคร' ก่อน";
+        } elseif (!empty($camp['available_until']) && $camp['available_until'] < date('Y-m-d')) {
+            $reason = 'แคมเปญหมดเขตแล้ว (วันสุดท้าย ' . $camp['available_until'] . ')';
+        } elseif (!empty($camp['available_from']) && $camp['available_from'] > date('Y-m-d')) {
+            $reason = 'ยังไม่ถึงวันเริ่มแคมเปญ (' . $camp['available_from'] . ')';
+        }
+        if ($reason !== '') {
+            echo json_encode([
+                'status'         => 'error',
+                'walkin_enabled' => 0,
+                'message'        => 'เปิด Walk-in ไม่ได้: ' . $reason,
+            ]);
+            exit;
+        }
+    }
 
     $pdo->prepare("UPDATE camp_list SET walkin_enabled = :v WHERE id = :id")
         ->execute([':v' => $new_val, ':id' => $campaign_id]);

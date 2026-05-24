@@ -174,12 +174,20 @@ require_once __DIR__ . '/includes/header.php';
             <a href="campaigns.php" class="text-sm text-blue-600 hover:underline whitespace-nowrap flex-shrink-0">
                 <i class="fa-solid fa-pen-to-square mr-1"></i>แก้ไขแคมเปญ
             </a>
+            <?php
+                $_coWalkinOn     = (int)($campaign['walkin_enabled'] ?? 0) === 1;
+                $_coExpired      = !empty($campaign['available_until']) && $campaign['available_until'] < date('Y-m-d');
+                $_coWalkinBlocked = ($campaign['status'] !== 'active') || $_coExpired;
+            ?>
             <button type="button"
-                    onclick="showWalkinQrModalCo(<?= (int)$campaignId ?>, <?= (int)($campaign['walkin_enabled'] ?? 0) ?>)"
-                    class="text-sm text-amber-700 hover:underline whitespace-nowrap flex-shrink-0 inline-flex items-center gap-1 cursor-pointer bg-transparent border-0 p-0">
+                    onclick="showWalkinQrModalCo(<?= (int)$campaignId ?>, <?= $_coWalkinOn ? 1 : 0 ?>, <?= $_coWalkinBlocked ? 1 : 0 ?>, '<?= htmlspecialchars($campaign['status'], ENT_QUOTES) ?>')"
+                    class="text-sm <?= $_coWalkinBlocked ? 'text-gray-400' : 'text-amber-700' ?> hover:underline whitespace-nowrap flex-shrink-0 inline-flex items-center gap-1 cursor-pointer bg-transparent border-0 p-0"
+                    title="<?= $_coWalkinBlocked ? 'Walk-in ปิดอัตโนมัติเพราะสถานะแคมเปญ' : 'QR Walk-in ลงทะเบียนหน้างาน' ?>">
                 <i class="fa-solid fa-person-walking"></i>QR Walk-in
-                <?php if ((int)($campaign['walkin_enabled'] ?? 0) === 1): ?>
+                <?php if ($_coWalkinOn && !$_coWalkinBlocked): ?>
                 <span class="inline-block w-1.5 h-1.5 bg-amber-500 rounded-full ml-1" title="เปิดอยู่"></span>
+                <?php elseif ($_coWalkinOn && $_coWalkinBlocked): ?>
+                <span class="inline-block w-1.5 h-1.5 bg-orange-500 rounded-full ml-1" title="เปิดไว้แต่สถานะแคมเปญปิดอยู่"></span>
                 <?php endif; ?>
             </button>
             <a href="campaign_report.php?id=<?= (int)$campaignId ?>" target="_blank" class="text-sm text-emerald-600 hover:underline whitespace-nowrap flex-shrink-0">
@@ -617,6 +625,18 @@ document.getElementById('bookingSearch')?.addEventListener('input', function() {
     </div>
 
     <div class="flex flex-col items-center px-6 pt-6 pb-4">
+
+      <!-- Status warning banner (shown when campaign status non-active) -->
+      <div id="walkinStatusWarningCo" class="hidden w-full mb-3 p-3 rounded-xl border-l-4 bg-orange-50 border-orange-400">
+        <div class="flex gap-2 items-start">
+          <i class="fa-solid fa-triangle-exclamation text-orange-500 mt-0.5"></i>
+          <div class="flex-1">
+            <p class="text-[12px] font-black text-orange-900 mb-1">Walk-in ปิดอยู่ตามสถานะแคมเปญ</p>
+            <p class="text-[11px] text-orange-700 leading-relaxed" id="walkinStatusWarningTextCo">—</p>
+          </div>
+        </div>
+      </div>
+
       <div class="w-52 h-52 bg-gray-50 rounded-2xl border-2 border-dashed border-amber-200 flex items-center justify-center overflow-hidden mb-4" id="walkinQrImgWrapCo">
         <i class="fa-solid fa-spinner fa-spin text-3xl text-gray-300"></i>
       </div>
@@ -660,17 +680,40 @@ document.getElementById('bookingSearch')?.addEventListener('input', function() {
 <script>
 // _Co suffix on identifiers to avoid clashing if campaigns.php JS is also loaded
 const CSRF_WALKIN_QR_CO = '<?= get_csrf_token() ?>';
+const WALKIN_STATUS_LABELS_CO = {
+    full:        'เต็มแล้ว',
+    closed:      'ปิดรับ',
+    inactive:    'หยุดชั่วคราว',
+    archived:    'เก็บถาวร',
+    draft:       'ฉบับร่าง',
+    coming_soon: 'เร็วๆ นี้',
+    private:     'ลิงก์ส่วนตัว',
+};
 let _walkinCurrentIdCo = 0;
 let _walkinEnabledCo   = 0;
+let _walkinBlockedCo   = 0;
 
-function showWalkinQrModalCo(campaignId, enabled) {
+function showWalkinQrModalCo(campaignId, enabled, blocked, status) {
     _walkinCurrentIdCo = campaignId;
     _walkinEnabledCo   = enabled;
+    _walkinBlockedCo   = blocked || 0;
+    const statusKey    = status || '';
 
     const wrap = document.getElementById('walkinQrImgWrapCo');
     wrap.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-3xl text-gray-300"></i>';
     document.getElementById('walkinCopyInputCo').value = 'กำลังโหลด...';
     document.getElementById('walkinQrTitleCo').textContent = <?= json_encode($campaign['title'] ?? '') ?> || `Campaign #${campaignId}`;
+
+    // Status warning
+    const warnBox = document.getElementById('walkinStatusWarningCo');
+    const warnTxt = document.getElementById('walkinStatusWarningTextCo');
+    if (_walkinBlockedCo) {
+        const lbl = WALKIN_STATUS_LABELS_CO[statusKey] || statusKey || 'ไม่ active';
+        warnTxt.textContent = `สถานะแคมเปญตอนนี้คือ "${lbl}" — แม้จะเปิด Walk-in QR ระบบจะปฏิเสธการลงทะเบียนทั้งหมด · เปลี่ยนสถานะเป็น "เปิดรับสมัคร" ก่อน แล้วค่อยเปิด Walk-in`;
+        warnBox.classList.remove('hidden');
+    } else {
+        warnBox.classList.add('hidden');
+    }
 
     const img = new Image();
     img.src = `../user/api_walkin_qr.php?campaign=${campaignId}&t=${Date.now()}`;
@@ -702,10 +745,20 @@ function setWalkinToggleUICo(enabled) {
     const btn  = document.getElementById('walkinToggleBtnCo');
     const icon = btn.querySelector('i');
     const txt  = btn.querySelector('span');
+    if (_walkinBlockedCo && !enabled) {
+        btn.style.cssText  = 'background:#f3f4f6;color:#9ca3af;border:1.5px solid #e5e7eb;cursor:not-allowed';
+        btn.disabled = true;
+        icon.className = 'fa-solid fa-ban';
+        txt.textContent  = 'เปิดไม่ได้ — เปลี่ยนสถานะแคมเปญก่อน';
+        return;
+    }
+    btn.disabled = false;
     if (enabled) {
         btn.style.cssText = 'background:#fef3c7;color:#b45309;border:1.5px solid #fcd34d';
         icon.className = 'fa-solid fa-toggle-on';
-        txt.textContent  = 'Walk-in เปิดอยู่ — กดเพื่อปิด';
+        txt.textContent  = _walkinBlockedCo
+            ? 'Walk-in เปิดอยู่ (แต่สถานะปิด) — กดเพื่อปิด'
+            : 'Walk-in เปิดอยู่ — กดเพื่อปิด';
     } else {
         btn.style.cssText = 'background:#f3f4f6;color:#6b7280;border:1.5px solid #e5e7eb';
         icon.className = 'fa-solid fa-toggle-off';
@@ -715,6 +768,7 @@ function setWalkinToggleUICo(enabled) {
 
 function toggleWalkinQrCo() {
     const btn = document.getElementById('walkinToggleBtnCo');
+    if (btn.disabled) return;
     btn.disabled = true;
     const fd = new FormData();
     fd.append('campaign_id', _walkinCurrentIdCo);
@@ -725,10 +779,18 @@ function toggleWalkinQrCo() {
             if (d.status === 'success') {
                 _walkinEnabledCo = d.walkin_enabled;
                 setWalkinToggleUICo(_walkinEnabledCo);
+            } else if (d.message) {
+                if (window.Swal) {
+                    Swal.fire({ icon: 'warning', title: 'เปิดไม่ได้', text: d.message, confirmButtonColor: '#d97706' });
+                } else {
+                    alert(d.message);
+                }
             }
         })
         .catch(() => {})
-        .finally(() => { btn.disabled = false; });
+        .finally(() => {
+            if (!_walkinBlockedCo || _walkinEnabledCo) btn.disabled = false;
+        });
 }
 
 function copyWalkinUrlCo() {
