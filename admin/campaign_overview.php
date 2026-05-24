@@ -5,6 +5,9 @@ require_once __DIR__ . '/includes/auth.php';
 
 $pdo = db();
 
+// Ensure walkin_enabled column exists (idempotent — same logic in campaigns.php)
+try { $pdo->exec("ALTER TABLE camp_list ADD COLUMN IF NOT EXISTS walkin_enabled TINYINT(1) NOT NULL DEFAULT 0"); } catch (PDOException) {}
+
 // รับ campaign_id จาก GET
 $campaignId = (int)($_GET['id'] ?? 0);
 
@@ -171,6 +174,14 @@ require_once __DIR__ . '/includes/header.php';
             <a href="campaigns.php" class="text-sm text-blue-600 hover:underline whitespace-nowrap flex-shrink-0">
                 <i class="fa-solid fa-pen-to-square mr-1"></i>แก้ไขแคมเปญ
             </a>
+            <button type="button"
+                    onclick="showWalkinQrModalCo(<?= (int)$campaignId ?>, <?= (int)($campaign['walkin_enabled'] ?? 0) ?>)"
+                    class="text-sm text-amber-700 hover:underline whitespace-nowrap flex-shrink-0 inline-flex items-center gap-1 cursor-pointer bg-transparent border-0 p-0">
+                <i class="fa-solid fa-person-walking"></i>QR Walk-in
+                <?php if ((int)($campaign['walkin_enabled'] ?? 0) === 1): ?>
+                <span class="inline-block w-1.5 h-1.5 bg-amber-500 rounded-full ml-1" title="เปิดอยู่"></span>
+                <?php endif; ?>
+            </button>
             <a href="campaign_report.php?id=<?= (int)$campaignId ?>" target="_blank" class="text-sm text-emerald-600 hover:underline whitespace-nowrap flex-shrink-0">
                 <i class="fa-solid fa-print mr-1"></i>พิมพ์รายงาน / PDF
             </a>
@@ -581,5 +592,171 @@ document.getElementById('bookingSearch')?.addEventListener('input', function() {
 </script>
 
 <?php endif; // end if $campaign ?>
+
+<!-- ══ Walk-in QR Modal (mirrored from campaigns.php for reuse) ══════════════ -->
+<div id="walkinQrOverlayCo"
+     class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden items-center justify-center p-4"
+     style="display:none;z-index:9000">
+  <div class="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden">
+
+    <div class="flex items-center justify-between px-5 py-4"
+         style="background:linear-gradient(135deg,#d97706,#f59e0b)">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center">
+          <i class="fa-solid fa-person-walking text-white"></i>
+        </div>
+        <div>
+          <p class="text-white font-black text-sm">QR Walk-in</p>
+          <p class="text-white/80 text-[11px]" id="walkinQrTitleCo">—</p>
+        </div>
+      </div>
+      <button onclick="closeWalkinQrModalCo()"
+              class="w-8 h-8 bg-white/20 hover:bg-white/30 rounded-xl flex items-center justify-center transition-all">
+        <i class="fa-solid fa-times text-white text-sm"></i>
+      </button>
+    </div>
+
+    <div class="flex flex-col items-center px-6 pt-6 pb-4">
+      <div class="w-52 h-52 bg-gray-50 rounded-2xl border-2 border-dashed border-amber-200 flex items-center justify-center overflow-hidden mb-4" id="walkinQrImgWrapCo">
+        <i class="fa-solid fa-spinner fa-spin text-3xl text-gray-300"></i>
+      </div>
+
+      <button id="walkinToggleBtnCo" onclick="toggleWalkinQrCo()"
+              class="w-full py-2.5 rounded-xl font-black text-sm mb-3 transition-all flex items-center justify-center gap-2">
+        <i class="fa-solid fa-toggle-on"></i> <span>Walk-in เปิดอยู่</span>
+      </button>
+
+      <p class="text-[11px] text-gray-500 text-center mb-3 leading-relaxed">
+        ผู้ป่วยสแกน → Login LINE → ยืนยัน<br>
+        <span class="text-amber-600 font-bold">ระบบเช็คอินทันที</span> ไม่ต้องจองล่วงหน้า
+      </p>
+
+      <div class="w-full flex gap-2 mb-3">
+        <input id="walkinCopyInputCo" type="text" readonly
+               class="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs text-gray-500 font-mono overflow-hidden"
+               placeholder="กำลังโหลด URL...">
+        <button onclick="copyWalkinUrlCo()"
+                class="px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-xl transition-all" title="คัดลอก">
+          <i class="fa-solid fa-copy text-gray-500 text-sm" id="walkinCopyIconCo"></i>
+        </button>
+      </div>
+
+      <div class="w-full grid grid-cols-2 gap-2 mb-2">
+        <button onclick="downloadWalkinQrCo()"
+                class="py-2.5 bg-gray-50 hover:bg-gray-100 rounded-xl text-xs font-bold text-gray-600 transition-all flex items-center justify-center gap-1.5 border border-gray-200">
+          <i class="fa-solid fa-download"></i> PNG
+        </button>
+        <button onclick="openWalkinPosterCo()"
+                class="py-2.5 rounded-xl text-xs font-bold text-white transition-all flex items-center justify-center gap-1.5"
+                style="background:linear-gradient(135deg,#d97706,#f59e0b)">
+          <i class="fa-solid fa-print"></i> โปสเตอร์ A4
+        </button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// _Co suffix on identifiers to avoid clashing if campaigns.php JS is also loaded
+const CSRF_WALKIN_QR_CO = '<?= get_csrf_token() ?>';
+let _walkinCurrentIdCo = 0;
+let _walkinEnabledCo   = 0;
+
+function showWalkinQrModalCo(campaignId, enabled) {
+    _walkinCurrentIdCo = campaignId;
+    _walkinEnabledCo   = enabled;
+
+    const wrap = document.getElementById('walkinQrImgWrapCo');
+    wrap.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-3xl text-gray-300"></i>';
+    document.getElementById('walkinCopyInputCo').value = 'กำลังโหลด...';
+    document.getElementById('walkinQrTitleCo').textContent = <?= json_encode($campaign['title'] ?? '') ?> || `Campaign #${campaignId}`;
+
+    const img = new Image();
+    img.src = `../user/api_walkin_qr.php?campaign=${campaignId}&t=${Date.now()}`;
+    img.className = 'w-full h-full object-contain p-2';
+    img.onload  = () => { wrap.innerHTML = ''; wrap.appendChild(img); };
+    img.onerror = () => { wrap.innerHTML = '<p class="text-xs text-red-400">โหลด QR ไม่ได้</p>'; };
+
+    fetch(`ajax/ajax_get_walkin_url.php?campaign=${campaignId}`)
+        .then(r => r.json())
+        .then(d => { document.getElementById('walkinCopyInputCo').value = d.url || ''; })
+        .catch(() => { document.getElementById('walkinCopyInputCo').value = ''; });
+
+    setWalkinToggleUICo(_walkinEnabledCo);
+
+    const overlay = document.getElementById('walkinQrOverlayCo');
+    if (overlay.parentElement !== document.body) document.body.appendChild(overlay);
+    overlay.style.display = 'flex';
+}
+
+function closeWalkinQrModalCo() {
+    document.getElementById('walkinQrOverlayCo').style.display = 'none';
+}
+
+document.getElementById('walkinQrOverlayCo').addEventListener('click', function(e) {
+    if (e.target === this) closeWalkinQrModalCo();
+});
+
+function setWalkinToggleUICo(enabled) {
+    const btn  = document.getElementById('walkinToggleBtnCo');
+    const icon = btn.querySelector('i');
+    const txt  = btn.querySelector('span');
+    if (enabled) {
+        btn.style.cssText = 'background:#fef3c7;color:#b45309;border:1.5px solid #fcd34d';
+        icon.className = 'fa-solid fa-toggle-on';
+        txt.textContent  = 'Walk-in เปิดอยู่ — กดเพื่อปิด';
+    } else {
+        btn.style.cssText = 'background:#f3f4f6;color:#6b7280;border:1.5px solid #e5e7eb';
+        icon.className = 'fa-solid fa-toggle-off';
+        txt.textContent  = 'Walk-in ปิดอยู่ — กดเพื่อเปิด';
+    }
+}
+
+function toggleWalkinQrCo() {
+    const btn = document.getElementById('walkinToggleBtnCo');
+    btn.disabled = true;
+    const fd = new FormData();
+    fd.append('campaign_id', _walkinCurrentIdCo);
+    fd.append('csrf_token',  CSRF_WALKIN_QR_CO);
+    fetch('ajax/ajax_toggle_walkin.php', { method: 'POST', body: fd })
+        .then(r => r.json())
+        .then(d => {
+            if (d.status === 'success') {
+                _walkinEnabledCo = d.walkin_enabled;
+                setWalkinToggleUICo(_walkinEnabledCo);
+            }
+        })
+        .catch(() => {})
+        .finally(() => { btn.disabled = false; });
+}
+
+function copyWalkinUrlCo() {
+    const input = document.getElementById('walkinCopyInputCo');
+    if (!input.value) return;
+    navigator.clipboard.writeText(input.value).catch(() => {
+        input.select();
+        document.execCommand('copy');
+    });
+    const icon = document.getElementById('walkinCopyIconCo');
+    icon.className = 'fa-solid fa-check text-amber-600 text-sm';
+    setTimeout(() => { icon.className = 'fa-solid fa-copy text-gray-500 text-sm'; }, 1500);
+}
+
+function downloadWalkinQrCo() {
+    if (!_walkinCurrentIdCo) return;
+    const a = document.createElement('a');
+    a.href = `../user/api_walkin_qr.php?campaign=${_walkinCurrentIdCo}&size=14`;
+    a.download = `walkin-qr-${_walkinCurrentIdCo}.png`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+}
+
+function openWalkinPosterCo() {
+    if (!_walkinCurrentIdCo) return;
+    window.open(`walkin_poster.php?cid=${_walkinCurrentIdCo}`, '_blank');
+}
+</script>
 
 <?php require_once __DIR__ . '/includes/footer.php'; ?>
