@@ -3067,14 +3067,19 @@ document.getElementById('insDetailModal').addEventListener('click', function(e) 
                     <?php foreach ($camp_list as $c):
                         $style = getCampStyle($c['type']);
                         $remaining = $c['total_capacity'] - $c['used_seats'];
+                        $isClosed = ($c['status'] === 'closed');
                         $isFull = ($remaining <= 0 || $c['status'] === 'full');
                         $isComing = ($c['status'] === 'coming_soon');
                         ?>
                         <div
-                            class="bg-white rounded-[2.5rem] p-7 border border-slate-100 shadow-[0_15px_30px_rgba(0,0,0,0.03)] relative transition-all hover:shadow-xl <?= ($isFull || $isComing) ? 'opacity-70' : '' ?>">
+                            class="bg-white rounded-[2.5rem] p-7 border border-slate-100 shadow-[0_15px_30px_rgba(0,0,0,0.03)] relative transition-all hover:shadow-xl <?= ($isFull || $isComing || $isClosed) ? 'opacity-70' : '' ?>">
                             <div class="flex justify-between items-start mb-5">
                                 <span class="px-4 py-1.5 rounded-xl border <?= $style['class'] ?> text-[10px] font-black uppercase tracking-widest"><?= $style['label'] ?></span>
-                                <?php if ($isComing): ?>
+                                <?php if ($isClosed): ?>
+                                    <span class="inline-flex items-center gap-1.5 text-orange-600 text-[10px] font-black uppercase tracking-widest">
+                                        <i class="fa-solid fa-lock"></i> ปิดรับสมัคร
+                                    </span>
+                                <?php elseif ($isComing): ?>
                                     <span class="text-purple-600 text-[10px] font-black uppercase tracking-widest">Coming Soon</span>
                                 <?php elseif ($isFull): ?>
                                     <span class="text-red-500 text-[10px] font-black uppercase tracking-widest">Fully Booked</span>
@@ -3088,7 +3093,11 @@ document.getElementById('insDetailModal').addEventListener('click', function(e) 
                             <h4 class="text-slate-900 font-black text-base mb-6 leading-snug">
                                 <?= htmlspecialchars($c['title'] ?? '') ?>
                             </h4>
-                            <?php if ($isComing): ?>
+                            <?php if ($isClosed): ?>
+                                <button disabled class="w-full h-16 bg-orange-50 text-orange-500 font-black rounded-2xl cursor-not-allowed text-sm flex items-center justify-center gap-2">
+                                    <i class="fa-solid fa-lock"></i> ปิดรับสมัครแล้ว
+                                </button>
+                            <?php elseif ($isComing): ?>
                                 <button disabled class="w-full h-16 bg-purple-50 text-purple-400 font-black rounded-2xl cursor-not-allowed text-sm">COMING SOON</button>
                             <?php elseif ($isFull): ?>
                                 <button disabled class="w-full h-16 bg-slate-100 text-slate-400 font-black rounded-2xl cursor-not-allowed text-sm">NOT AVAILABLE</button>
