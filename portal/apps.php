@@ -1,9 +1,12 @@
 <?php
 /**
  * portal/apps.php
- * Section page — auto-generated from monolithic index.php refactor.
+ * App Launcher — grid of all clinic modules.
+ * Requires _portal_data.php for $projects, $userPins, $categoryMap (the
+ * apps_launcher partial early-returns if $projects is unset).
  */
 require __DIR__ . '/_init.php';
+require_once __DIR__ . '/_portal_data.php';
 require_once __DIR__ . '/_layout.php';
 
 layout_start(['section' => 'apps', 'title' => 'App Launcher']);
