@@ -60,6 +60,17 @@ try {
     $campaigns = [];
 }
 
+// Active campaigns + their open slots (for walk-in modal)
+try {
+    $walkinCampaigns = $pdo->query("
+        SELECT id, title FROM camp_list
+        WHERE status IN ('active','closed','full')
+        ORDER BY (status='active') DESC, title ASC
+    ")->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException) {
+    $walkinCampaigns = [];
+}
+
 // ── Initial data (first page, no search term) ────────────────────────────────
 $dataWhere  = "s.slot_date BETWEEN :start AND :end AND b.status IN ('booked','confirmed','completed','cancelled','cancelled_by_admin','expired')";
 $dataParams = [':start' => $dateFrom, ':end' => $dateTo];
@@ -81,6 +92,7 @@ try {
     $stmt = $pdo->prepare("
         SELECT
             b.id AS booking_id, b.status, b.created_at, b.campaign_id,
+            COALESCE(b.is_walk_in, 0) AS is_walk_in,
             u.full_name, u.student_personnel_id, u.phone_number,
             s.slot_date, s.start_time, s.end_time,
             c.title AS campaign_title
@@ -179,6 +191,11 @@ require_once __DIR__ . '/includes/header.php';
             </select>
         </div>
 
+        <button onclick="openWalkinModal()"
+            class="px-5 py-2.5 bg-amber-500 text-white rounded-2xl text-xs font-black tracking-wider hover:brightness-110 active:scale-95 transition-all flex items-center gap-2 shadow-sm shadow-amber-200 whitespace-nowrap self-end">
+            <i class="fa-solid fa-person-walking"></i> เพิ่ม Walk-in
+        </button>
+
         <button onclick="exportCsv()"
             class="px-5 py-2.5 bg-emerald-600 text-white rounded-2xl text-xs font-black tracking-wider hover:brightness-110 active:scale-95 transition-all flex items-center gap-2 shadow-sm shadow-emerald-200 whitespace-nowrap self-end">
             <i class="fa-solid fa-file-csv"></i> ดาวน์โหลด CSV
@@ -271,6 +288,82 @@ require_once __DIR__ . '/includes/header.php';
             <i class="fa-solid fa-user-check mr-1"></i>เช็คอินทั้งหมด</button>
         <button onclick="bulkCancel()"
             class="bg-white border border-gray-100 text-red-500 px-6 py-3 rounded-2xl text-xs font-black tracking-wider hover:bg-red-50 transition-all active:scale-95">ยกเลิก</button>
+    </div>
+</div>
+
+<!-- ════════════════════ WALK-IN MODAL ════════════════════ -->
+<div id="walkinModal" class="hidden fixed inset-0 items-center justify-center" style="background:rgba(15,23,42,.55);backdrop-filter:blur(6px);z-index:9000">
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-xl mx-4 overflow-hidden" style="max-height:92vh;display:flex;flex-direction:column">
+        <div class="px-6 py-4 border-b border-gray-100 flex items-center gap-3">
+            <div class="w-10 h-10 bg-amber-50 rounded-xl flex items-center justify-center text-amber-600">
+                <i class="fa-solid fa-person-walking"></i>
+            </div>
+            <div class="flex-1">
+                <h3 class="text-lg font-black text-gray-800">เพิ่ม Walk-in</h3>
+                <p class="text-[11px] text-gray-400">บันทึกผู้ที่ไม่ได้จองล่วงหน้าแต่มาเข้าร่วมกิจกรรม</p>
+            </div>
+            <button type="button" onclick="closeWalkinModal()" class="w-9 h-9 rounded-full hover:bg-gray-100 text-gray-400"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+
+        <div class="p-6 space-y-4 overflow-y-auto" style="min-height:0">
+            <!-- Step 1: campaign + slot -->
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="text-[10px] font-black tracking-wider text-gray-400 block mb-1.5">แคมเปญ *</label>
+                    <select id="walkin_campaign" onchange="walkinLoadSlots()" class="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold outline-none focus:border-amber-400 focus:bg-white">
+                        <option value="">— เลือก —</option>
+                        <?php foreach ($walkinCampaigns as $wc): ?>
+                            <option value="<?= (int)$wc['id'] ?>"><?= htmlspecialchars($wc['title']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div>
+                    <label class="text-[10px] font-black tracking-wider text-gray-400 block mb-1.5">รอบเวลา *</label>
+                    <select id="walkin_slot" disabled class="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold outline-none focus:border-amber-400 focus:bg-white">
+                        <option value="">— เลือกแคมเปญก่อน —</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Step 2: user (search or create) -->
+            <div>
+                <label class="text-[10px] font-black tracking-wider text-gray-400 block mb-1.5">ผู้เข้าร่วม *</label>
+                <div class="relative">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
+                    <input type="text" id="walkin_search" placeholder="ค้นหารหัส / ชื่อ / เบอร์ — หรือพิมพ์เพื่อสร้างใหม่"
+                        oninput="walkinSearch(this.value)"
+                        class="w-full pl-9 pr-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold outline-none focus:border-amber-400 focus:bg-white">
+                </div>
+                <div id="walkin_results" class="mt-1 bg-white border border-gray-100 rounded-xl shadow-sm max-h-48 overflow-y-auto hidden"></div>
+
+                <!-- Selected user pill -->
+                <div id="walkin_selected" class="mt-2 hidden p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-center gap-3">
+                    <div class="w-9 h-9 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center"><i class="fa-solid fa-user"></i></div>
+                    <div class="flex-1 min-w-0">
+                        <p id="walkin_sel_name" class="font-black text-gray-800 text-sm truncate"></p>
+                        <p id="walkin_sel_meta" class="text-[11px] text-gray-500"></p>
+                    </div>
+                    <button type="button" onclick="walkinClearUser()" class="text-gray-400 hover:text-rose-500"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+
+                <!-- Inline create form -->
+                <div id="walkin_create" class="mt-3 hidden p-3 bg-blue-50 border border-blue-200 rounded-xl space-y-2">
+                    <p class="text-[11px] font-bold text-blue-700">ไม่พบในระบบ — สร้าง user ใหม่</p>
+                    <div class="grid grid-cols-2 gap-2">
+                        <input type="text" id="walkin_new_sid" placeholder="รหัสนักศึกษา/บุคลากร *" class="px-2.5 py-2 bg-white border border-blue-100 rounded-lg text-xs font-bold outline-none focus:border-blue-400">
+                        <input type="text" id="walkin_new_name" placeholder="ชื่อ-สกุล *" class="px-2.5 py-2 bg-white border border-blue-100 rounded-lg text-xs font-bold outline-none focus:border-blue-400">
+                    </div>
+                    <input type="tel" id="walkin_new_phone" placeholder="เบอร์โทร (ไม่บังคับ)" class="w-full px-2.5 py-2 bg-white border border-blue-100 rounded-lg text-xs font-bold outline-none focus:border-blue-400">
+                </div>
+            </div>
+        </div>
+
+        <div class="px-6 py-4 border-t border-gray-100 flex justify-end gap-2">
+            <button type="button" onclick="closeWalkinModal()" class="px-4 py-2 bg-white border border-gray-200 text-gray-600 rounded-xl text-sm font-bold hover:bg-gray-50">ยกเลิก</button>
+            <button type="button" id="walkin_submit" onclick="submitWalkin(false)" disabled class="px-5 py-2 bg-amber-500 text-white rounded-xl text-sm font-black hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2">
+                <i class="fa-solid fa-check"></i> บันทึก Walk-in
+            </button>
+        </div>
     </div>
 </div>
 
@@ -699,6 +792,166 @@ function updateRowStatus(id, newStatus) {
 
 // ── Init pagination on load ───────────────────────────────────────────────────
 renderPagination(<?= $page ?>, <?= $totalPages ?>, <?= $totalBookings ?>);
+
+// ════════════════════ WALK-IN MODAL HANDLERS ════════════════════
+let walkinSearchTimer = null;
+let walkinSelectedUser = null;
+let walkinTeleported   = false;
+
+function walkinTeleport() {
+    const m = document.getElementById('walkinModal');
+    if (m && !walkinTeleported) { document.body.appendChild(m); walkinTeleported = true; }
+    return m;
+}
+function openWalkinModal() {
+    const m = walkinTeleport();
+    // Reset state
+    walkinSelectedUser = null;
+    document.getElementById('walkin_campaign').value = '';
+    document.getElementById('walkin_slot').innerHTML = '<option value="">— เลือกแคมเปญก่อน —</option>';
+    document.getElementById('walkin_slot').disabled = true;
+    document.getElementById('walkin_search').value = '';
+    document.getElementById('walkin_results').classList.add('hidden');
+    document.getElementById('walkin_selected').classList.add('hidden');
+    document.getElementById('walkin_create').classList.add('hidden');
+    document.getElementById('walkin_new_sid').value = '';
+    document.getElementById('walkin_new_name').value = '';
+    document.getElementById('walkin_new_phone').value = '';
+    document.getElementById('walkin_submit').disabled = true;
+    m.classList.remove('hidden'); m.classList.add('flex');
+}
+function closeWalkinModal() {
+    const m = document.getElementById('walkinModal');
+    m.classList.add('hidden'); m.classList.remove('flex');
+}
+async function walkinLoadSlots() {
+    const cid = document.getElementById('walkin_campaign').value;
+    const sel = document.getElementById('walkin_slot');
+    sel.disabled = true; sel.innerHTML = '<option>กำลังโหลด...</option>';
+    if (!cid) { sel.innerHTML = '<option value="">— เลือกแคมเปญก่อน —</option>'; return; }
+    const fd = new FormData();
+    fd.append('mode','slots'); fd.append('campaign_id', cid); fd.append('csrf_token', CSRF);
+    const r = await fetch('ajax/ajax_add_walkin.php', {method:'POST', body:fd}).then(r=>r.json());
+    sel.innerHTML = '<option value="">— เลือกรอบเวลา —</option>';
+    let todayPicked = false;
+    const today = new Date().toISOString().slice(0,10);
+    (r.results || []).forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s.id;
+        const isFull = s.used >= s.max_capacity;
+        opt.textContent = `${s.slot_date} ${s.start_time.slice(0,5)}–${s.end_time.slice(0,5)} (${s.used}/${s.max_capacity}${isFull ? ' เต็ม' : ''})`;
+        // Auto-select first slot of today
+        if (!todayPicked && s.slot_date === today) { opt.selected = true; todayPicked = true; }
+        sel.appendChild(opt);
+    });
+    sel.disabled = false;
+    walkinUpdateSubmitState();
+}
+function walkinSearch(q) {
+    clearTimeout(walkinSearchTimer);
+    const box = document.getElementById('walkin_results');
+    const createBox = document.getElementById('walkin_create');
+    if (!q || q.length < 2) {
+        box.classList.add('hidden');
+        createBox.classList.add('hidden');
+        return;
+    }
+    walkinSearchTimer = setTimeout(async () => {
+        const fd = new FormData();
+        fd.append('mode','search'); fd.append('q', q); fd.append('csrf_token', CSRF);
+        const r = await fetch('ajax/ajax_add_walkin.php', {method:'POST', body:fd}).then(r=>r.json());
+        const results = r.results || [];
+        if (!results.length) {
+            box.classList.add('hidden');
+            // Pre-fill create form with the query if it looks like an ID
+            document.getElementById('walkin_new_sid').value  = /^[0-9A-Za-z\-]{4,}$/.test(q) ? q : '';
+            document.getElementById('walkin_new_name').value = /^[0-9A-Za-z\-]{4,}$/.test(q) ? '' : q;
+            createBox.classList.remove('hidden');
+            walkinUpdateSubmitState();
+            return;
+        }
+        createBox.classList.add('hidden');
+        box.innerHTML = results.map(u =>
+            `<div class="px-3 py-2 hover:bg-amber-50 cursor-pointer border-b border-gray-50 last:border-0"
+                  onclick='walkinPickUser(${JSON.stringify(u).replace(/'/g,"&apos;")})'>
+                <div class="font-bold text-sm text-gray-800">${escapeHtml(u.full_name || '—')}</div>
+                <div class="text-[11px] text-gray-500">${escapeHtml(u.student_personnel_id || '—')} · ${escapeHtml(u.phone_number || '—')}</div>
+            </div>`
+        ).join('');
+        box.classList.remove('hidden');
+    }, 300);
+}
+function escapeHtml(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function walkinPickUser(u) {
+    walkinSelectedUser = u;
+    document.getElementById('walkin_results').classList.add('hidden');
+    document.getElementById('walkin_create').classList.add('hidden');
+    document.getElementById('walkin_search').value = '';
+    document.getElementById('walkin_sel_name').textContent = u.full_name || '—';
+    document.getElementById('walkin_sel_meta').textContent = `${u.student_personnel_id || '—'} · ${u.phone_number || '—'}`;
+    document.getElementById('walkin_selected').classList.remove('hidden');
+    walkinUpdateSubmitState();
+}
+function walkinClearUser() {
+    walkinSelectedUser = null;
+    document.getElementById('walkin_selected').classList.add('hidden');
+    document.getElementById('walkin_search').value = '';
+    walkinUpdateSubmitState();
+}
+function walkinUpdateSubmitState() {
+    const cid = document.getElementById('walkin_campaign').value;
+    const sid = document.getElementById('walkin_slot').value;
+    const hasPicked = !!walkinSelectedUser;
+    const hasCreate = !document.getElementById('walkin_create').classList.contains('hidden')
+                      && document.getElementById('walkin_new_sid').value.trim()
+                      && document.getElementById('walkin_new_name').value.trim();
+    document.getElementById('walkin_submit').disabled = !(cid && sid && (hasPicked || hasCreate));
+}
+// Wire create-form inputs to refresh submit state
+['walkin_new_sid','walkin_new_name','walkin_campaign','walkin_slot'].forEach(id =>
+    document.addEventListener('input', e => { if (e.target.id === id) walkinUpdateSubmitState(); })
+);
+
+async function submitWalkin(forceOver) {
+    const fd = new FormData();
+    fd.append('mode','create');
+    fd.append('campaign_id', document.getElementById('walkin_campaign').value);
+    fd.append('slot_id', document.getElementById('walkin_slot').value);
+    fd.append('csrf_token', CSRF);
+    if (forceOver) fd.append('force_over_capacity', '1');
+    if (walkinSelectedUser) {
+        fd.append('user_id', walkinSelectedUser.id);
+    } else {
+        fd.append('user_id', '0');
+        fd.append('student_personnel_id', document.getElementById('walkin_new_sid').value.trim());
+        fd.append('full_name',             document.getElementById('walkin_new_name').value.trim());
+        fd.append('phone_number',          document.getElementById('walkin_new_phone').value.trim());
+    }
+    const r = await fetch('ajax/ajax_add_walkin.php', {method:'POST', body:fd}).then(r=>r.json());
+    if (r.status === 'over_capacity') {
+        const c = await Swal.fire({
+            icon:'warning',
+            title:'Slot เต็มแล้ว',
+            text: r.message,
+            showCancelButton:true,
+            confirmButtonText:'เพิ่มอยู่ดี',
+            cancelButtonText:'ยกเลิก',
+            confirmButtonColor:'#f59e0b',
+        });
+        if (c.isConfirmed) return submitWalkin(true);
+        return;
+    }
+    if (r.status !== 'success') {
+        Swal.fire({icon:'error', title:'ไม่สามารถเพิ่มได้', text: r.message || 'unknown'});
+        return;
+    }
+    closeWalkinModal();
+    Swal.fire({icon:'success', title:'เพิ่ม Walk-in เรียบร้อย', timer:1500, showConfirmButton:false});
+    setTimeout(() => location.reload(), 700);
+}
+document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') document.getElementById('walkinModal')?.classList.add('hidden');
+});
 </script>
 
 <?php require_once __DIR__ . '/includes/footer.php'; ?>

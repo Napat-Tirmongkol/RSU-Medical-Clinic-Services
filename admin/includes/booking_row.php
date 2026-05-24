@@ -36,7 +36,12 @@ if (!function_exists('render_booking_rows')) {
         <div class="text-[10px] text-gray-400 font-medium">#<?= $b['campaign_id'] ?></div>
     </td>
     <td class="px-3 py-2 text-center">
-        <?php if ($b['status'] === 'booked'): ?>
+        <?php if (!empty($b['is_walk_in'])): ?>
+            <span class="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-100 text-amber-700 text-[10px] font-black rounded-full border border-amber-200 tracking-wider" title="ผู้เข้าร่วมแบบ Walk-in">
+                <i class="fa-solid fa-person-walking"></i> Walk-in
+            </span>
+            <br><span class="text-[9px] text-gray-400 font-bold">เข้าร่วมแล้ว</span>
+        <?php elseif ($b['status'] === 'booked'): ?>
             <span class="px-2.5 py-1 bg-amber-50 text-amber-600 text-[10px] font-black rounded-full border border-amber-100 tracking-wider animate-pulse">รออนุมัติ</span>
         <?php elseif ($b['status'] === 'confirmed'): ?>
             <span class="px-2.5 py-1 bg-emerald-50 text-emerald-600 text-[10px] font-black rounded-full border border-emerald-100 tracking-wider">รอเข้าร่วม</span>

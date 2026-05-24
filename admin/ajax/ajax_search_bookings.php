@@ -91,6 +91,7 @@ try {
     $stmt = $pdo->prepare("
         SELECT
             b.id AS booking_id, b.status, b.created_at, b.campaign_id,
+            COALESCE(b.is_walk_in, 0) AS is_walk_in,
             u.full_name, u.student_personnel_id, u.phone_number,
             s.slot_date, s.start_time, s.end_time,
             c.title AS campaign_title
