@@ -492,7 +492,9 @@ if ($next_appt) {
         'action'    => 'showBorrow()',
         'cta_label' => __('hub.hero.cta.manage'),
     ];
-} elseif (!empty($healthOverview['vaccine_next_due'])) {
+} elseif (!empty($healthOverview['vaccine_next_due'])
+    && ((int) round((strtotime($healthOverview['vaccine_next_due']['next_due_date']) - $todayTs) / 86400)) <= 30
+) {
     $vd = $healthOverview['vaccine_next_due'];
     $smartHero = [
         'kind'      => 'vaccine',
