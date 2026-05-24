@@ -519,7 +519,7 @@ require_once __DIR__ . '/includes/header.php';
     }
     .act-btn-delete:hover { background: #e11d48; color: #fff; border-color: #e11d48; box-shadow: 0 4px 12px rgba(225,29,72,.3); transform: translateY(-1px); }
     .act-btn-disabled {
-        background: #f9fafb; color: #d1d5db; border-color: #e5e7eb; cursor: not-allowed;
+        background: #f1f5f9; color: #94a3b8; border-color: #cbd5e1; cursor: not-allowed;
     }
 
     /* ── Modal ────────────────────────────────────────────────── */
@@ -859,7 +859,7 @@ renderPageHeader("สร้างแคมเปญ", "สร้างแคม�
                                     target="_blank"
                                     class="w-9 h-9 bg-green-50 text-[#2e9e63] rounded-xl flex items-center justify-center hover:bg-[#2e9e63] hover:text-white transition-all shadow-sm border border-green-100"
                                     title="เปิดสแกนเนอร์">
-                                    <i class="fa-solid fa-barcode-scan text-xs"></i>
+                                    <i class="fa-solid fa-camera text-xs"></i>
                                 </a>
 
                                 <!-- Campaign QR Check-in -->
