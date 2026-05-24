@@ -765,6 +765,10 @@
                         <div class="psb-icon"><i class="fa-solid fa-book" style="color:#059669"></i></div>
                         <span class="psb-label">Cash Book</span>
                     </a>
+                    <a class="psb-item <?= $activeSection==='billing_services'?'psb-active':'' ?>" data-section="billing_services" href="billing_services.php">
+                        <div class="psb-icon"><i class="fa-solid fa-list-check" style="color:#059669"></i></div>
+                        <span class="psb-label">บริการคลินิก</span>
+                    </a>
                 </div>
             <?php endif; ?>
 
