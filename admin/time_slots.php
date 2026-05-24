@@ -285,9 +285,19 @@ $year = $_GET['year'] ?? date('Y');
 
 $stmt = $pdo->prepare("
     SELECT ts.*, c.title as campaign_title,
-           (SELECT COUNT(*) FROM camp_bookings a WHERE a.slot_id = ts.id AND a.status IN ('booked', 'confirmed')) as booked_count
-    FROM camp_slots ts 
-    JOIN camp_list c ON ts.campaign_id = c.id 
+           -- booked_count includes 'completed' so historical slots still show real attendance
+           -- (active reservations + people who already checked in). Excludes cancelled/expired.
+           (SELECT COUNT(*) FROM camp_bookings a
+              WHERE a.slot_id = ts.id
+                AND a.status IN ('booked','confirmed','completed')) AS booked_count,
+           (SELECT COUNT(*) FROM camp_bookings a
+              WHERE a.slot_id = ts.id
+                AND a.status IN ('booked','confirmed'))             AS active_count,
+           (SELECT COUNT(*) FROM camp_bookings a
+              WHERE a.slot_id = ts.id
+                AND a.status = 'completed')                         AS completed_count
+    FROM camp_slots ts
+    JOIN camp_list c ON ts.campaign_id = c.id
     WHERE MONTH(ts.slot_date) = ? AND YEAR(ts.slot_date) = ?
     ORDER BY ts.slot_date, ts.start_time
 ");
@@ -1139,9 +1149,11 @@ body[data-theme='dark'] .flatpickr-month .flatpickr-next-month svg {
                         <?php foreach ($calendarData[$currentDate] as $s):
                             $cId   = $s['campaign_id'] ?? 0;
                             $cc    = $campaignColors[$cId] ?? ['cls' => 'slot-pal-emerald'];
-                            $booked  = (int)($s['booked_count'] ?? 0);
-                            $max     = (int)$s['max_capacity'];
-                            $percent = $max > 0 ? ($booked / $max) * 100 : 0;
+                            $booked    = (int)($s['booked_count']    ?? 0);   // active + completed (display)
+                            $active    = (int)($s['active_count']    ?? 0);   // booked + confirmed only
+                            $completed = (int)($s['completed_count'] ?? 0);   // checked-in
+                            $max       = (int)$s['max_capacity'];
+                            $percent   = $max > 0 ? ($booked / $max) * 100 : 0;
 
                             if ($percent >= 100) {
                                 $toneCls = 'tone-full'; $barClr = '#ef4444';
@@ -1150,6 +1162,13 @@ body[data-theme='dark'] .flatpickr-month .flatpickr-next-month svg {
                             } else {
                                 $toneCls = 'tone-ok';   $barClr = '#22c55e';
                             }
+
+                            // tooltip breakdown — show only if there's any completed
+                            $tipParts = [];
+                            $tipParts[] = "รวม {$booked}/{$max}";
+                            if ($active > 0)    $tipParts[] = "รอเช็คอิน {$active}";
+                            if ($completed > 0) $tipParts[] = "เช็คอินแล้ว {$completed}";
+                            $tip = implode(' · ', $tipParts);
                         ?>
                         <div class="slot-item slot-card filter-camp-<?= (int)$cId ?> <?= $cc['cls'] ?>">
                             <div class="flex justify-between items-center">
@@ -1160,8 +1179,8 @@ body[data-theme='dark'] .flatpickr-month .flatpickr-next-month svg {
                                         onchange="toggleSlotSelection(this)">
                                     <span class="text-[11px] font-bold <?= $percent >= 100 ? 'line-through opacity-50' : '' ?>"><?= substr($s['start_time'], 0, 5) ?></span>
                                 </div>
-                                <span class="stat-badge <?= $toneCls ?>" style="padding:2px 7px; font-size:10px;" title="<?= (int)$booked ?>/<?= (int)$max ?>">
-                                    <?= (int)$booked ?>/<?= (int)$max ?>
+                                <span class="stat-badge <?= $toneCls ?>" style="padding:2px 7px; font-size:10px;" title="<?= htmlspecialchars($tip) ?>">
+                                    <?= (int)$booked ?>/<?= (int)$max ?><?= $completed > 0 ? ' ✓' : '' ?>
                                 </span>
                             </div>
                             <div class="cap-bar mt-1">
@@ -1179,9 +1198,9 @@ body[data-theme='dark'] .flatpickr-month .flatpickr-next-month svg {
                                     class="slot-act-btn" style="background:#fef3c7;color:#d97706" title="แก้ไข">
                                     <i class="fa-solid fa-pen"></i>
                                 </button>
-                                <?php if ($booked > 0): ?>
-                                <button onclick="bulkCancelSlot(<?= (int)$s['id'] ?>,<?= json_encode($s['campaign_title']) ?>,'<?= htmlspecialchars($s['slot_date']) ?>','<?= substr($s['start_time'],0,5) ?>-<?= substr($s['end_time'],0,5) ?>',<?= (int)$booked ?>)"
-                                    class="slot-act-btn" style="background:#dbeafe;color:#0284c7" title="ยกเลิกการจองทั้งหมด">
+                                <?php if ($active > 0): // only show "cancel all" when there are active (cancellable) bookings ?>
+                                <button onclick="bulkCancelSlot(<?= (int)$s['id'] ?>,<?= json_encode($s['campaign_title']) ?>,'<?= htmlspecialchars($s['slot_date']) ?>','<?= substr($s['start_time'],0,5) ?>-<?= substr($s['end_time'],0,5) ?>',<?= (int)$active ?>)"
+                                    class="slot-act-btn" style="background:#dbeafe;color:#0284c7" title="ยกเลิกการจองที่รอเช็คอินทั้งหมด">
                                     <i class="fa-solid fa-ban"></i>
                                 </button>
                                 <?php endif; ?>
@@ -1219,13 +1238,19 @@ body[data-theme='dark'] .flatpickr-month .flatpickr-next-month svg {
             </thead>
             <tbody class="text-sm">
                 <?php foreach ($slots as $s):
-                    $booked  = (int)($s['booked_count'] ?? 0);
-                    $max     = (int)$s['max_capacity'];
-                    $percent = $max > 0 ? ($booked / $max) * 100 : 0;
+                    $booked    = (int)($s['booked_count']    ?? 0);   // active + completed
+                    $active    = (int)($s['active_count']    ?? 0);   // pending only
+                    $completed = (int)($s['completed_count'] ?? 0);   // checked-in
+                    $max       = (int)$s['max_capacity'];
+                    $percent   = $max > 0 ? ($booked / $max) * 100 : 0;
                     if ($percent >= 100)    { $toneCls = 'tone-full'; }
                     elseif ($percent >= 80) { $toneCls = 'tone-near'; }
                     else                    { $toneCls = 'tone-ok'; }
                     $dateObj = new DateTime($s['slot_date']);
+                    $tipParts = ["รวม {$booked}/{$max}"];
+                    if ($active > 0)    $tipParts[] = "รอเช็คอิน {$active}";
+                    if ($completed > 0) $tipParts[] = "เช็คอินแล้ว {$completed}";
+                    $tip = implode(' · ', $tipParts);
                 ?>
                 <tr data-camp-id="<?= (int)$s['campaign_id'] ?>">
                     <td class="text-center">
@@ -1239,7 +1264,9 @@ body[data-theme='dark'] .flatpickr-month .flatpickr-next-month svg {
                     </td>
                     <td style="color:var(--ec-ink-2); font-weight:500; max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"><?= htmlspecialchars($s['campaign_title']) ?></td>
                     <td class="text-center" data-sort="<?= $percent ?>">
-                        <span class="stat-badge <?= $toneCls ?>"><?= (int)$booked ?> / <?= (int)$max ?></span>
+                        <span class="stat-badge <?= $toneCls ?>" title="<?= htmlspecialchars($tip) ?>">
+                            <?= (int)$booked ?> / <?= (int)$max ?><?= $completed > 0 ? ' ✓' : '' ?>
+                        </span>
                     </td>
                     <td class="text-center">
                         <div class="flex items-center justify-center gap-2">
@@ -2282,9 +2309,16 @@ function renderDailySlots(slots, date) {
     }
 
     let rows = slots.map(s => {
-        const pct      = s.max_capacity > 0 ? (s.booked_count / s.max_capacity) * 100 : 0;
-        const toneCls  = pct >= 100 ? 'tone-full' : pct >= 80 ? 'tone-near' : 'tone-ok';
-        const barClr   = pct >= 100 ? '#ef4444' : pct >= 80 ? '#f59e0b' : '#22c55e';
+        const booked    = parseInt(s.booked_count, 10)    || 0;  // active + completed
+        const active    = parseInt(s.active_count, 10)    || 0;
+        const completed = parseInt(s.completed_count, 10) || 0;
+        const pct       = s.max_capacity > 0 ? (booked / s.max_capacity) * 100 : 0;
+        const toneCls   = pct >= 100 ? 'tone-full' : pct >= 80 ? 'tone-near' : 'tone-ok';
+        const barClr    = pct >= 100 ? '#ef4444' : pct >= 80 ? '#f59e0b' : '#22c55e';
+        const tipParts  = [`รวม ${booked}/${s.max_capacity}`];
+        if (active    > 0) tipParts.push(`รอเช็คอิน ${active}`);
+        if (completed > 0) tipParts.push(`เช็คอินแล้ว ${completed}`);
+        const tip = tipParts.join(' · ');
 
         return `
         <tr id="drow-${s.id}" style="border-bottom:1px solid var(--ec-border-soft); transition: background .12s;">
@@ -2298,13 +2332,14 @@ function renderDailySlots(slots, date) {
             </td>
             <td style="padding:12px 16px; white-space:nowrap;">
                 <div style="display:flex; align-items:center; gap:8px;">
-                    <span class="stat-badge ${toneCls}" style="white-space:nowrap;">
-                        ${s.booked_count} / ${s.max_capacity}
+                    <span class="stat-badge ${toneCls}" style="white-space:nowrap;" title="${escHtml(tip)}">
+                        ${booked} / ${s.max_capacity}${completed > 0 ? ' ✓' : ''}
                     </span>
                     <div style="width:60px; min-width:60px; height:4px; background:var(--ec-border); border-radius:99px; overflow:hidden;">
                         <div style="width:${Math.min(pct,100)}%; height:100%; background:${barClr}; border-radius:99px;"></div>
                     </div>
                 </div>
+                ${completed > 0 ? `<div style="font-size:10px; color:var(--ec-ink-4); margin-top:2px;">รอเช็คอิน ${active} · เช็คอินแล้ว ${completed}</div>` : ''}
             </td>
             <td style="padding:12px 16px; white-space:nowrap;">
                 <div style="display:flex; gap:6px; justify-content:flex-end;">

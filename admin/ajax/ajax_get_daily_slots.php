@@ -34,7 +34,10 @@ if ($action === 'get') {
             cs.start_time,
             cs.end_time,
             cs.max_capacity,
-            COUNT(CASE WHEN cb.status IN ('booked','confirmed') THEN 1 END) AS booked_count
+            -- includes 'completed' so historical slots reflect actual attendance
+            COUNT(CASE WHEN cb.status IN ('booked','confirmed','completed') THEN 1 END) AS booked_count,
+            COUNT(CASE WHEN cb.status IN ('booked','confirmed') THEN 1 END)             AS active_count,
+            COUNT(CASE WHEN cb.status = 'completed' THEN 1 END)                         AS completed_count
         FROM camp_slots cs
         JOIN camp_list  cl ON cl.id = cs.campaign_id
         LEFT JOIN camp_bookings cb ON cb.slot_id = cs.id
