@@ -732,7 +732,7 @@ if (!function_exists('renderPageHeader')) {
         //   reports.php       → Export CSV in ผู้เข้าร่วม (more powerful filter)
 
         navSection('campaign', 'var(--ec-acc-campaign)', 'แคมเปญ', [
-            ['../admin/campaigns.php',  'fa-layer-group',     'จัดการแคมเปญ'],
+            ['../admin/campaigns.php',  'fa-layer-group',     'สร้างแคมเปญ'],
             ['../admin/time_slots.php', 'fa-calendar-alt',    'รอบเวลา'],
             ['../admin/bookings.php',   'fa-clipboard-check', 'ผู้เข้าร่วม', $pendingBookings],
         ], $cur);

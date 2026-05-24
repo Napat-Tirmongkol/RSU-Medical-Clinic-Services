@@ -525,7 +525,7 @@ $header_actions = '
 <button onclick="openAddModal()" class="bg-[#2e9e63] text-white px-6 py-3 rounded-2xl font-bold transition-all shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/40 hover:-translate-y-1 flex items-center gap-2" style="background-color: #2e9e63;">
     <i class="fa-solid fa-plus-circle text-lg"></i> สร้างแคมเปญใหม่
 </button>';
-renderPageHeader("จัดการแคมเปญ", "สร้างแคมเปญใหม่, กำหนดโควต้า, และตั้งเวลารับลงทะเบียน", $header_actions);
+renderPageHeader("สร้างแคมเปญ", "สร้างแคมเปญใหม่, กำหนดโควต้า, และตั้งเวลารับลงทะเบียน", $header_actions);
 ?>
 
 <?php if ($message): ?>
