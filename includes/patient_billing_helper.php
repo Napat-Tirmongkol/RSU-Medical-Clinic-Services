@@ -280,3 +280,230 @@ function pb_validate_service_payload(array $p): array
         'sort_order'  => $sort,
     ]];
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Encounter (visit) helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Generate the next encounter number. Format: ENC-{yearBE}-{seq:06d}.
+ * Sequence is per-calendar-year (Buddhist Era) and continuous regardless of
+ * draft/finalized status — deleted drafts leave gaps which is acceptable.
+ *
+ * Race-tolerant: caller MUST insert under a UNIQUE constraint and retry on
+ * collision. Low-traffic clinic so single-attempt is almost always fine.
+ */
+function pb_next_encounter_no(PDO $pdo): string
+{
+    $yearBE = (int)date('Y') + 543;
+    $prefix = "ENC-{$yearBE}-";
+    $st = $pdo->prepare("SELECT encounter_no FROM sys_billing_encounters
+                         WHERE encounter_no LIKE :prefix
+                         ORDER BY id DESC LIMIT 1");
+    $st->execute([':prefix' => $prefix . '%']);
+    $last = (string)($st->fetchColumn() ?: '');
+    $seq  = (preg_match('/(\d{6})$/', $last, $m)) ? ((int)$m[1] + 1) : 1;
+    return sprintf('%s%06d', $prefix, $seq);
+}
+
+/**
+ * Lightweight patient typeahead — searches sys_users by name / student id /
+ * phone / citizen_id. Returns at most 15 rows.
+ */
+function pb_lookup_patient(PDO $pdo, string $q): array
+{
+    $q = trim($q);
+    if ($q === '' || mb_strlen($q) < 1) return [];
+    $like = '%' . $q . '%';
+    $st = $pdo->prepare("
+        SELECT id, full_name, student_personnel_id, phone_number, citizen_id, status
+        FROM sys_users
+        WHERE full_name LIKE :q
+           OR student_personnel_id LIKE :q
+           OR phone_number LIKE :q
+           OR citizen_id  LIKE :q
+        ORDER BY
+          CASE WHEN student_personnel_id = :exact OR citizen_id = :exact THEN 0 ELSE 1 END,
+          full_name ASC
+        LIMIT 15
+    ");
+    $st->execute([':q' => $like, ':exact' => $q]);
+    return $st->fetchAll(PDO::FETCH_ASSOC);
+}
+
+/**
+ * Provider (doctor/nurse) typeahead — searches sys_staff by name / official
+ * title / job title. Returns at most 15 rows.
+ */
+function pb_lookup_provider(PDO $pdo, string $q): array
+{
+    $q = trim($q);
+    if ($q === '') return [];
+    $like = '%' . $q . '%';
+    try {
+        $st = $pdo->prepare("
+            SELECT id, full_name,
+                   COALESCE(NULLIF(official_title,''), NULLIF(job_title,''), '') AS title
+            FROM sys_staff
+            WHERE full_name LIKE :q
+               OR official_title LIKE :q
+               OR job_title LIKE :q
+            ORDER BY full_name ASC
+            LIMIT 15
+        ");
+        $st->execute([':q' => $like]);
+        return $st->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException) {
+        return [];
+    }
+}
+
+/**
+ * Recalculate encounter totals from its line items. Returns the computed
+ * subtotal so callers can reuse without a second SELECT.
+ */
+function pb_recalc_encounter_totals(PDO $pdo, int $encounterId): float
+{
+    // line_total is already (qty × unit_price − discount) per row
+    $st = $pdo->prepare("SELECT COALESCE(SUM(line_total),0)
+                         FROM sys_billing_encounter_items
+                         WHERE encounter_id = :id");
+    $st->execute([':id' => $encounterId]);
+    $subtotal = (float)$st->fetchColumn();
+
+    // Read current header discount/tax so we can compute final total
+    $hdr = $pdo->prepare("SELECT discount, tax FROM sys_billing_encounters WHERE id = :id");
+    $hdr->execute([':id' => $encounterId]);
+    $h = $hdr->fetch(PDO::FETCH_ASSOC);
+    if (!$h) return $subtotal;
+
+    $discount = (float)$h['discount'];
+    $tax      = (float)$h['tax'];
+    $total    = max(0, $subtotal - $discount) + $tax;
+
+    $up = $pdo->prepare("UPDATE sys_billing_encounters
+                         SET subtotal = :sub, total = :tot
+                         WHERE id = :id");
+    $up->execute([':sub' => $subtotal, ':tot' => $total, ':id' => $encounterId]);
+    return $subtotal;
+}
+
+/**
+ * List encounters with filters + pagination.
+ *
+ * @param array $opts {
+ *     @type string $q          Search by encounter_no or patient name
+ *     @type string $status     One of draft|finalized|invoiced|cancelled (or '')
+ *     @type string $date_from  YYYY-MM-DD
+ *     @type string $date_to    YYYY-MM-DD
+ *     @type int    $patient_id Filter to one patient
+ *     @type int    $page       1-based
+ *     @type int    $per_page   Default 20
+ * }
+ */
+function pb_list_encounters(PDO $pdo, array $opts = []): array
+{
+    pb_ensure_schema($pdo);
+
+    $q        = trim((string)($opts['q']        ?? ''));
+    $status   = trim((string)($opts['status']   ?? ''));
+    $dateFrom = trim((string)($opts['date_from'] ?? ''));
+    $dateTo   = trim((string)($opts['date_to']   ?? ''));
+    $patient  = (int)($opts['patient_id'] ?? 0);
+    $page     = max(1, (int)($opts['page']     ?? 1));
+    $perPage  = max(1, min(200, (int)($opts['per_page'] ?? 20)));
+
+    $where  = [];
+    $params = [];
+    if ($q !== '') {
+        $where[]      = '(e.encounter_no LIKE :q OR u.full_name LIKE :q OR u.student_personnel_id LIKE :q)';
+        $params[':q'] = '%' . $q . '%';
+    }
+    if ($status !== '' && in_array($status, ['draft','finalized','invoiced','cancelled'], true)) {
+        $where[]              = 'e.status = :status';
+        $params[':status']    = $status;
+    }
+    if ($dateFrom !== '') {
+        $where[]              = 'e.visit_date >= :date_from';
+        $params[':date_from'] = $dateFrom;
+    }
+    if ($dateTo !== '') {
+        $where[]              = 'e.visit_date <= :date_to';
+        $params[':date_to']   = $dateTo;
+    }
+    if ($patient > 0) {
+        $where[]               = 'e.patient_id = :patient';
+        $params[':patient']    = $patient;
+    }
+    $whereSql = $where ? 'WHERE ' . implode(' AND ', $where) : '';
+
+    // total
+    $cntSql = "SELECT COUNT(*)
+               FROM sys_billing_encounters e
+               LEFT JOIN sys_users u ON u.id = e.patient_id
+               {$whereSql}";
+    $cntSt = $pdo->prepare($cntSql);
+    foreach ($params as $k => $v) $cntSt->bindValue($k, $v);
+    $cntSt->execute();
+    $total = (int)$cntSt->fetchColumn();
+
+    // page
+    $offset = ($page - 1) * $perPage;
+    $sql = "SELECT e.id, e.encounter_no, e.patient_id, e.visit_date, e.provider_id,
+                   e.diagnosis, e.status, e.subtotal, e.discount, e.tax, e.total,
+                   e.created_at, e.finalized_at,
+                   u.full_name AS patient_name, u.student_personnel_id AS patient_code,
+                   s.full_name AS provider_name
+            FROM sys_billing_encounters e
+            LEFT JOIN sys_users u ON u.id = e.patient_id
+            LEFT JOIN sys_staff s ON s.id = e.provider_id
+            {$whereSql}
+            ORDER BY e.visit_date DESC, e.id DESC
+            LIMIT :limit OFFSET :offset";
+    $st = $pdo->prepare($sql);
+    foreach ($params as $k => $v) $st->bindValue($k, $v);
+    $st->bindValue(':limit',  $perPage, PDO::PARAM_INT);
+    $st->bindValue(':offset', $offset,  PDO::PARAM_INT);
+    $st->execute();
+
+    return [
+        'rows'     => $st->fetchAll(PDO::FETCH_ASSOC),
+        'total'    => $total,
+        'page'     => $page,
+        'per_page' => $perPage,
+        'pages'    => max(1, (int)ceil($total / $perPage)),
+    ];
+}
+
+/**
+ * Validate + normalize an encounter payload (header only).
+ */
+function pb_validate_encounter_header(array $p): array
+{
+    $errors  = [];
+    $patient = (int)($p['patient_id'] ?? 0);
+    $visit   = trim((string)($p['visit_date'] ?? ''));
+    $provider = (int)($p['provider_id'] ?? 0) ?: null;
+    $diag    = trim((string)($p['diagnosis'] ?? ''));
+    $notes   = trim((string)($p['notes']     ?? ''));
+    $discount = max(0.0, (float)($p['discount'] ?? 0));
+    $tax      = max(0.0, (float)($p['tax']      ?? 0));
+
+    if ($patient <= 0)               $errors['patient_id'] = 'ระบุผู้ป่วย';
+    if ($visit === '')               $errors['visit_date'] = 'ระบุวันเข้ารับบริการ';
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $visit))
+                                     $errors['visit_date'] = 'รูปแบบวันที่ไม่ถูกต้อง';
+    if (mb_strlen($diag) > 500)      $errors['diagnosis']  = 'การวินิจฉัยยาวเกินไป';
+
+    if ($errors) return ['ok' => false, 'errors' => $errors];
+
+    return ['ok' => true, 'data' => [
+        'patient_id'  => $patient,
+        'visit_date'  => $visit,
+        'provider_id' => $provider,
+        'diagnosis'   => $diag !== '' ? $diag : null,
+        'notes'       => $notes !== '' ? $notes : null,
+        'discount'    => $discount,
+        'tax'         => $tax,
+    ]];
+}

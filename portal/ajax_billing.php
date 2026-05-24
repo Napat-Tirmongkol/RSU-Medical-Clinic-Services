@@ -50,9 +50,9 @@ pb_ensure_schema($pdo);
 
 try {
     switch ($entity) {
-        case 'service':
-            handle_service($pdo, $verb, $adminId);
-            break;
+        case 'service':   handle_service($pdo, $verb, $adminId);   break;
+        case 'encounter': handle_encounter($pdo, $verb, $adminId); break;
+        case 'lookup':    handle_lookup($pdo, $verb);              break;
         default:
             echo json_encode(['ok' => false, 'message' => 'entity ไม่รู้จัก: ' . $entity]);
     }
@@ -207,5 +207,314 @@ function handle_service(PDO $pdo, string $verb, int $adminId): void
 
         default:
             echo json_encode(['ok' => false, 'message' => 'service action ไม่รู้จัก: ' . $verb]);
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Lookups (typeahead for encounter form)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function handle_lookup(PDO $pdo, string $verb): void
+{
+    $q = trim((string)($_REQUEST['q'] ?? ''));
+    switch ($verb) {
+        case 'patient':
+            echo json_encode(['ok' => true, 'rows' => pb_lookup_patient($pdo, $q)],
+                JSON_UNESCAPED_UNICODE);
+            return;
+        case 'provider':
+            echo json_encode(['ok' => true, 'rows' => pb_lookup_provider($pdo, $q)],
+                JSON_UNESCAPED_UNICODE);
+            return;
+        case 'service':
+            // Active services only, name/code match — different from service:list
+            // (no pagination, no inactive). Used by the encounter line-item picker.
+            $like = '%' . $q . '%';
+            $sql  = $q === ''
+                ? "SELECT id, code, name, category, unit_price, unit_label
+                   FROM sys_billing_services WHERE is_active = 1
+                   ORDER BY sort_order ASC, name ASC LIMIT 20"
+                : "SELECT id, code, name, category, unit_price, unit_label
+                   FROM sys_billing_services
+                   WHERE is_active = 1 AND (code LIKE :q OR name LIKE :q)
+                   ORDER BY sort_order ASC, name ASC LIMIT 20";
+            $st = $pdo->prepare($sql);
+            if ($q !== '') $st->bindValue(':q', $like);
+            $st->execute();
+            echo json_encode(['ok' => true, 'rows' => $st->fetchAll(PDO::FETCH_ASSOC)],
+                JSON_UNESCAPED_UNICODE);
+            return;
+        default:
+            echo json_encode(['ok' => false, 'message' => 'lookup verb ไม่รู้จัก: ' . $verb]);
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Encounter (visit) — list, get, save, finalize, cancel, delete
+// ─────────────────────────────────────────────────────────────────────────────
+
+function handle_encounter(PDO $pdo, string $verb, int $adminId): void
+{
+    switch ($verb) {
+        case 'list': {
+            $res = pb_list_encounters($pdo, [
+                'q'          => $_REQUEST['q']          ?? '',
+                'status'     => $_REQUEST['status']     ?? '',
+                'date_from'  => $_REQUEST['date_from']  ?? '',
+                'date_to'    => $_REQUEST['date_to']    ?? '',
+                'patient_id' => (int)($_REQUEST['patient_id'] ?? 0),
+                'page'       => (int)($_REQUEST['page']     ?? 1),
+                'per_page'   => (int)($_REQUEST['per_page'] ?? 20),
+            ]);
+            echo json_encode(['ok' => true] + $res, JSON_UNESCAPED_UNICODE);
+            return;
+        }
+
+        case 'get': {
+            $id = (int)($_REQUEST['id'] ?? 0);
+            if ($id <= 0) { echo json_encode(['ok' => false, 'message' => 'id ไม่ถูกต้อง']); return; }
+            $hdr = $pdo->prepare("
+                SELECT e.*,
+                       u.full_name AS patient_name, u.student_personnel_id AS patient_code,
+                       u.phone_number AS patient_phone, u.citizen_id AS patient_citizen,
+                       s.full_name AS provider_name
+                FROM sys_billing_encounters e
+                LEFT JOIN sys_users u ON u.id = e.patient_id
+                LEFT JOIN sys_staff s ON s.id = e.provider_id
+                WHERE e.id = :id
+            ");
+            $hdr->execute([':id' => $id]);
+            $row = $hdr->fetch(PDO::FETCH_ASSOC);
+            if (!$row) { echo json_encode(['ok' => false, 'message' => 'ไม่พบข้อมูล']); return; }
+
+            $items = $pdo->prepare("
+                SELECT id, service_id, service_code, service_name,
+                       quantity, unit_price, discount, line_total, note
+                FROM sys_billing_encounter_items
+                WHERE encounter_id = :id
+                ORDER BY id ASC
+            ");
+            $items->execute([':id' => $id]);
+            $row['items'] = $items->fetchAll(PDO::FETCH_ASSOC);
+
+            echo json_encode(['ok' => true, 'row' => $row], JSON_UNESCAPED_UNICODE);
+            return;
+        }
+
+        case 'save': {
+            // Single save endpoint handles both insert (id=0) and update (id>0).
+            // Items array fully replaces existing items on update — cleaner than
+            // tracking diffs from the client.
+            $id = (int)($_POST['id'] ?? 0);
+
+            $v = pb_validate_encounter_header($_POST);
+            if (!$v['ok']) {
+                echo json_encode(['ok' => false, 'message' => 'ข้อมูลส่วนหัวไม่ถูกต้อง', 'errors' => $v['errors']]);
+                return;
+            }
+            $h = $v['data'];
+
+            // Items can arrive as JSON string (preferred) or items[] form array
+            $itemsRaw = $_POST['items'] ?? '[]';
+            if (is_string($itemsRaw)) {
+                $items = json_decode($itemsRaw, true) ?: [];
+            } else {
+                $items = (array)$itemsRaw;
+            }
+
+            if (empty($items)) {
+                echo json_encode(['ok' => false, 'message' => 'ต้องมีรายการบริการอย่างน้อย 1 รายการ']);
+                return;
+            }
+
+            // Validate items (lookup current price as snapshot if not provided)
+            $cleanItems = [];
+            $subtotal   = 0.0;
+            foreach ($items as $i => $it) {
+                $serviceId = (int)($it['service_id'] ?? 0);
+                $qty       = max(0.01, (float)($it['quantity']   ?? 1));
+                $price     = (float)($it['unit_price'] ?? 0);
+                $lineDisc  = max(0.0, (float)($it['discount']  ?? 0));
+                $note      = trim((string)($it['note'] ?? ''));
+
+                if ($serviceId <= 0) {
+                    echo json_encode(['ok' => false, 'message' => "รายการที่ " . ($i+1) . " ขาดข้อมูลบริการ"]);
+                    return;
+                }
+                // Snapshot service info — service price/name might change in future
+                $svc = $pdo->prepare("SELECT code, name, unit_price
+                                       FROM sys_billing_services WHERE id = :id");
+                $svc->execute([':id' => $serviceId]);
+                $s = $svc->fetch(PDO::FETCH_ASSOC);
+                if (!$s) {
+                    echo json_encode(['ok' => false, 'message' => "รายการที่ " . ($i+1) . " — ไม่พบบริการ"]);
+                    return;
+                }
+                if ($price <= 0) $price = (float)$s['unit_price'];
+
+                $lineTotal = max(0, ($qty * $price) - $lineDisc);
+                $subtotal += $lineTotal;
+
+                $cleanItems[] = [
+                    'service_id'   => $serviceId,
+                    'service_code' => $s['code'],
+                    'service_name' => $s['name'],
+                    'quantity'     => $qty,
+                    'unit_price'   => $price,
+                    'discount'     => $lineDisc,
+                    'line_total'   => $lineTotal,
+                    'note'         => $note !== '' ? $note : null,
+                ];
+            }
+
+            $total = max(0, $subtotal - $h['discount']) + $h['tax'];
+
+            $pdo->beginTransaction();
+            try {
+                if ($id > 0) {
+                    // UPDATE — only allowed when status='draft'
+                    $cur = $pdo->prepare("SELECT status FROM sys_billing_encounters WHERE id = :id FOR UPDATE");
+                    $cur->execute([':id' => $id]);
+                    $curStatus = (string)$cur->fetchColumn();
+                    if ($curStatus === '') {
+                        throw new RuntimeException('ไม่พบ encounter ที่จะแก้ไข');
+                    }
+                    if ($curStatus !== 'draft') {
+                        throw new RuntimeException("encounter สถานะ '{$curStatus}' แก้ไขไม่ได้ — มีเฉพาะ draft เท่านั้น");
+                    }
+                    $up = $pdo->prepare("UPDATE sys_billing_encounters SET
+                        patient_id = :pid, visit_date = :vd, provider_id = :prov,
+                        diagnosis = :diag, notes = :notes,
+                        subtotal = :sub, discount = :disc, tax = :tax, total = :tot
+                        WHERE id = :id");
+                    $up->execute([
+                        ':id'    => $id,
+                        ':pid'   => $h['patient_id'],
+                        ':vd'    => $h['visit_date'],
+                        ':prov'  => $h['provider_id'],
+                        ':diag'  => $h['diagnosis'],
+                        ':notes' => $h['notes'],
+                        ':sub'   => $subtotal,
+                        ':disc'  => $h['discount'],
+                        ':tax'   => $h['tax'],
+                        ':tot'   => $total,
+                    ]);
+                    // Replace items (delete + insert all)
+                    $pdo->prepare("DELETE FROM sys_billing_encounter_items WHERE encounter_id = :id")
+                        ->execute([':id' => $id]);
+                } else {
+                    // INSERT — generate encounter_no with retry on unique collision
+                    $maxRetry = 3;
+                    for ($try = 0; $try < $maxRetry; $try++) {
+                        $no = pb_next_encounter_no($pdo);
+                        try {
+                            $ins = $pdo->prepare("INSERT INTO sys_billing_encounters
+                                (encounter_no, patient_id, visit_date, provider_id,
+                                 diagnosis, notes, status, subtotal, discount, tax, total, created_by)
+                                VALUES
+                                (:no, :pid, :vd, :prov, :diag, :notes, 'draft',
+                                 :sub, :disc, :tax, :tot, :by)");
+                            $ins->execute([
+                                ':no'    => $no,
+                                ':pid'   => $h['patient_id'],
+                                ':vd'    => $h['visit_date'],
+                                ':prov'  => $h['provider_id'],
+                                ':diag'  => $h['diagnosis'],
+                                ':notes' => $h['notes'],
+                                ':sub'   => $subtotal,
+                                ':disc'  => $h['discount'],
+                                ':tax'   => $h['tax'],
+                                ':tot'   => $total,
+                                ':by'    => $adminId ?: null,
+                            ]);
+                            $id = (int)$pdo->lastInsertId();
+                            break;
+                        } catch (PDOException $e) {
+                            if (($e->errorInfo[1] ?? 0) === 1062 && $try < $maxRetry - 1) {
+                                continue;  // collision — regenerate and retry
+                            }
+                            throw $e;
+                        }
+                    }
+                }
+
+                // Insert items
+                $insItem = $pdo->prepare("INSERT INTO sys_billing_encounter_items
+                    (encounter_id, service_id, service_code, service_name,
+                     quantity, unit_price, discount, line_total, note)
+                    VALUES
+                    (:enc, :sid, :code, :sname, :qty, :price, :disc, :lt, :note)");
+                foreach ($cleanItems as $ci) {
+                    $insItem->execute([
+                        ':enc'   => $id,
+                        ':sid'   => $ci['service_id'],
+                        ':code'  => $ci['service_code'],
+                        ':sname' => $ci['service_name'],
+                        ':qty'   => $ci['quantity'],
+                        ':price' => $ci['unit_price'],
+                        ':disc'  => $ci['discount'],
+                        ':lt'    => $ci['line_total'],
+                        ':note'  => $ci['note'],
+                    ]);
+                }
+
+                $pdo->commit();
+                echo json_encode(['ok' => true, 'id' => $id,
+                                  'message' => 'บันทึก encounter แล้ว']);
+            } catch (Throwable $e) {
+                if ($pdo->inTransaction()) $pdo->rollBack();
+                echo json_encode(['ok' => false, 'message' => $e->getMessage()]);
+            }
+            return;
+        }
+
+        case 'finalize': {
+            $id = (int)($_POST['id'] ?? 0);
+            if ($id <= 0) { echo json_encode(['ok' => false, 'message' => 'id ไม่ถูกต้อง']); return; }
+            $st = $pdo->prepare("UPDATE sys_billing_encounters
+                                 SET status = 'finalized', finalized_at = NOW()
+                                 WHERE id = :id AND status = 'draft'");
+            $st->execute([':id' => $id]);
+            if ($st->rowCount() === 0) {
+                echo json_encode(['ok' => false, 'message' => 'ปิด encounter ไม่ได้ — สถานะไม่ใช่ draft แล้ว']);
+                return;
+            }
+            echo json_encode(['ok' => true, 'message' => 'ปิด encounter เรียบร้อย พร้อมออกใบแจ้งหนี้']);
+            return;
+        }
+
+        case 'cancel': {
+            $id = (int)($_POST['id'] ?? 0);
+            if ($id <= 0) { echo json_encode(['ok' => false, 'message' => 'id ไม่ถูกต้อง']); return; }
+            // Can cancel anything that isn't already invoiced (refund flow is different)
+            $st = $pdo->prepare("UPDATE sys_billing_encounters
+                                 SET status = 'cancelled'
+                                 WHERE id = :id AND status IN ('draft','finalized')");
+            $st->execute([':id' => $id]);
+            if ($st->rowCount() === 0) {
+                echo json_encode(['ok' => false, 'message' => 'ยกเลิกไม่ได้ — อาจถูกออกใบแจ้งหนี้แล้ว']);
+                return;
+            }
+            echo json_encode(['ok' => true, 'message' => 'ยกเลิก encounter แล้ว']);
+            return;
+        }
+
+        case 'delete': {
+            // Only drafts can be deleted. Others get cancelled.
+            $id = (int)($_POST['id'] ?? 0);
+            if ($id <= 0) { echo json_encode(['ok' => false, 'message' => 'id ไม่ถูกต้อง']); return; }
+            $st = $pdo->prepare("DELETE FROM sys_billing_encounters
+                                 WHERE id = :id AND status = 'draft'");
+            $st->execute([':id' => $id]);
+            if ($st->rowCount() === 0) {
+                echo json_encode(['ok' => false, 'message' => 'ลบไม่ได้ — มีเฉพาะ draft เท่านั้นที่ลบได้']);
+                return;
+            }
+            echo json_encode(['ok' => true, 'message' => 'ลบ encounter แล้ว']);
+            return;
+        }
+
+        default:
+            echo json_encode(['ok' => false, 'message' => 'encounter action ไม่รู้จัก: ' . $verb]);
     }
 }

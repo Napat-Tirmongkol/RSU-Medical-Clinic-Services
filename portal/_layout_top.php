@@ -769,6 +769,10 @@
                         <div class="psb-icon"><i class="fa-solid fa-list-check" style="color:#059669"></i></div>
                         <span class="psb-label">บริการคลินิก</span>
                     </a>
+                    <a class="psb-item <?= $activeSection==='billing_encounters'?'psb-active':'' ?>" data-section="billing_encounters" href="billing_encounters.php">
+                        <div class="psb-icon"><i class="fa-solid fa-notes-medical" style="color:#059669"></i></div>
+                        <span class="psb-label">บันทึกการเข้ารับบริการ</span>
+                    </a>
                 </div>
             <?php endif; ?>
 
