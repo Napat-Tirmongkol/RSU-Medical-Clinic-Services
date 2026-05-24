@@ -57,6 +57,10 @@ if ($campaignId > 0) {
 try {
     $pdo = db();
 
+    // Ensure is_walk_in column exists (mirror of bookings.php migration —
+    // needed when this endpoint is hit before bookings.php has been loaded)
+    try { $pdo->exec("ALTER TABLE camp_bookings ADD COLUMN IF NOT EXISTS is_walk_in TINYINT(1) NOT NULL DEFAULT 0"); } catch (PDOException) {}
+
     // KPI counts scoped to date+campaign only (not affected by search/status tab)
     $kpiParams = [':kstart' => $dateFrom, ':kend' => $dateTo];
     $kpiWhere  = 's.slot_date BETWEEN :kstart AND :kend';

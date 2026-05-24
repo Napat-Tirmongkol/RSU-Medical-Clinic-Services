@@ -9,6 +9,12 @@ require_once __DIR__ . '/includes/auth.php';
 
 $pdo = db();
 
+// Ensure is_walk_in column exists (idempotent — same logic in ajax_add_walkin.php
+// and user/ajax_walkin_submit.php; needed here because bookings.php SELECTs the
+// column directly without going through those entry points)
+try { $pdo->exec("ALTER TABLE camp_bookings ADD COLUMN IF NOT EXISTS is_walk_in TINYINT(1) NOT NULL DEFAULT 0"); } catch (PDOException) {}
+try { $pdo->exec("ALTER TABLE camp_bookings ADD INDEX idx_walk_in (is_walk_in)"); } catch (PDOException) {}
+
 // ── Date range (default: 3 months back → 3 months forward) ───────────────────
 $dateFrom = $_GET['date_from'] ?? date('Y-m-d', strtotime('-3 months'));
 $dateTo   = $_GET['date_to']   ?? date('Y-m-d', strtotime('+3 months'));
