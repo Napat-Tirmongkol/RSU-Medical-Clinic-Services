@@ -185,6 +185,7 @@ function statusLabel(string $s): string {
         'booked'             => 'รอเจ้าหน้าที่ยืนยัน',
         'confirmed'          => 'ยืนยันการจอง',
         'completed'          => 'มาตามนัดแล้ว',
+        'expired'            => 'ไม่มาตามนัด (เลยวัน)',
         'cancelled'          => 'ผู้ใช้ยกเลิกเอง',
         'cancelled_by_admin' => 'เจ้าหน้าที่ยกเลิก',
         default              => $s,
@@ -511,16 +512,20 @@ if (!$printMode) {
 // Pre-compute donut paths
 $donutTotal = array_sum($statusBreakdown);
 $donutSegments = [];
-// Single source of truth for status colors — bar list + donut share this map
+// Single source of truth for status colors — bar list + donut share this map.
+// All 6 status values from the camp_bookings ENUM are represented; if any
+// future status is added, the donut would otherwise fall back to slate-grey
+// and leave a gap (see hot.md for the cron job that flips bookings to 'expired').
 $statusColors = [
-    'completed'          => '#0d9488',  // teal: attended successfully
-    'confirmed'          => '#22c55e',  // green: confirmed, awaiting attendance
-    'booked'             => '#f59e0b',  // amber: pending admin confirmation
-    'cancelled'          => '#ef4444',  // red:  user cancelled
-    'cancelled_by_admin' => '#94a3b8',  // slate: admin cancelled
+    'completed'          => '#0d9488',  // teal:   attended successfully
+    'confirmed'          => '#22c55e',  // green:  confirmed, awaiting attendance
+    'booked'             => '#f59e0b',  // amber:  pending admin confirmation
+    'expired'            => '#ea580c',  // orange: missed appointment (auto-flipped by cron)
+    'cancelled'          => '#ef4444',  // red:    user cancelled
+    'cancelled_by_admin' => '#94a3b8',  // slate:  admin cancelled
 ];
 // Render order for both bar list and donut segments
-$statusOrder = ['completed', 'confirmed', 'booked', 'cancelled', 'cancelled_by_admin'];
+$statusOrder = ['completed', 'confirmed', 'booked', 'expired', 'cancelled', 'cancelled_by_admin'];
 if ($donutTotal > 0) {
     $cumPct = 0;
     foreach ($statusOrder as $st) {
