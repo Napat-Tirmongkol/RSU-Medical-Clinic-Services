@@ -8,6 +8,49 @@ $pdo = db();
 // สร้าง column qr_enabled ถ้ายังไม่มี
 try { $pdo->exec("ALTER TABLE camp_list ADD COLUMN qr_enabled TINYINT(1) NOT NULL DEFAULT 0"); } catch (PDOException) {}
 
+// ── Clinic schedule integration — ส่งให้ flatpickr ใช้ disable/highlight ────
+$clinicRegularHours = [0=>null,1=>null,2=>null,3=>null,4=>null,5=>null,6=>null];
+try {
+    $rs = $pdo->query("SELECT weekday, open_time, close_time, is_closed, note
+                         FROM sys_clinic_hours
+                        WHERE type='regular'");
+    foreach ($rs as $r) {
+        $wd = (int)$r['weekday'];
+        $clinicRegularHours[$wd] = [
+            'closed'     => (int)($r['is_closed'] ?? 0) === 1,
+            'open_time'  => !empty($r['open_time'])  ? substr((string)$r['open_time'], 0, 5)  : null,
+            'close_time' => !empty($r['close_time']) ? substr((string)$r['close_time'], 0, 5) : null,
+            'note'       => (string)($r['note'] ?? ''),
+        ];
+    }
+} catch (PDOException) {}
+
+$clinicOverrides = [];  // 'YYYY-MM-DD' => {...}
+try {
+    $stmt = $pdo->prepare(
+        "SELECT specific_date, type, open_time, close_time, is_closed, note
+           FROM sys_clinic_hours
+          WHERE type IN ('holiday','special')
+            AND specific_date BETWEEN :s AND :e
+          ORDER BY (type='special') DESC, specific_date ASC"
+    );
+    $stmt->execute([
+        ':s' => (new DateTime('-2 months'))->format('Y-m-d'),
+        ':e' => (new DateTime('+12 months'))->format('Y-m-d'),
+    ]);
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+        $d = $r['specific_date'];
+        if (isset($clinicOverrides[$d])) continue;  // special wins (ORDER BY)
+        $clinicOverrides[$d] = [
+            'closed'     => (int)($r['is_closed'] ?? 0) === 1,
+            'open_time'  => !empty($r['open_time'])  ? substr((string)$r['open_time'], 0, 5)  : null,
+            'close_time' => !empty($r['close_time']) ? substr((string)$r['close_time'], 0, 5) : null,
+            'note'       => (string)($r['note'] ?? ''),
+            'source'     => $r['type'],  // 'holiday' | 'special'
+        ];
+    }
+} catch (PDOException) {}
+
 $activeCampaigns = $pdo->query("SELECT id, title, qr_enabled, status FROM camp_list WHERE status = 'active' ORDER BY title ASC")->fetchAll();
 $allCampaigns    = $pdo->query("SELECT id, title, qr_enabled, status FROM camp_list ORDER BY title ASC")->fetchAll();
 
@@ -1101,6 +1144,54 @@ body[data-theme='dark'] .ts-row-btn.del  { background: rgba(239,68,68,.15);   co
     color: #fff;
 }
 
+/* ── Clinic-aware date picker styling ────────────────────────────── */
+.ts-clinic-hint {
+    margin-top: 10px; padding: 8px 12px; border-radius: 10px;
+    background: #f8fafc; border: 1px solid #e2e8f0; font-size: 12px; line-height: 1.5;
+    min-height: 0; transition: all .2s;
+}
+.ts-clinic-hint:empty { display: none; }
+.ts-clinic-hint i { margin-right: 4px; }
+.ts-clinic-legend {
+    margin-top: 8px; display: flex; gap: 14px; flex-wrap: wrap;
+    font-size: 11px; color: #64748b;
+}
+.ts-clinic-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.ts-cal-dot {
+    width: 8px; height: 8px; border-radius: 50%; display: inline-block;
+}
+.ts-cal-dot.dot-holiday { background: #ef4444; }
+.ts-cal-dot.dot-special { background: #f59e0b; }
+.ts-cal-dot.dot-closed  { background: #94a3b8; }
+
+/* Calendar day markers (flatpickr) */
+.flatpickr-day.ts-cal-holiday {
+    background: rgba(239,68,68,.08); color: #b91c1c; font-weight: 600;
+    position: relative;
+}
+.flatpickr-day.ts-cal-special {
+    background: rgba(245,158,11,.10); color: #b45309; font-weight: 600;
+    position: relative;
+}
+.flatpickr-day.ts-cal-closed {
+    background: #f1f5f9; color: #cbd5e1; text-decoration: line-through;
+    cursor: not-allowed;
+}
+.flatpickr-day.ts-cal-holiday::after,
+.flatpickr-day.ts-cal-special::after {
+    content: ""; position: absolute; bottom: 3px; left: 50%;
+    transform: translateX(-50%); width: 4px; height: 4px; border-radius: 50%;
+}
+.flatpickr-day.ts-cal-holiday::after { background: #ef4444; }
+.flatpickr-day.ts-cal-special::after { background: #f59e0b; }
+
+body[data-theme='dark'] .ts-clinic-hint {
+    background: rgba(15,23,42,.5); border-color: #334155; color: #cbd5e1;
+}
+body[data-theme='dark'] .flatpickr-day.ts-cal-closed {
+    background: #1e293b; color: #475569;
+}
+
 /* Flatpickr dark mode tweaks */
 body[data-theme='dark'] .flatpickr-calendar {
     background: var(--ec-surface);
@@ -1350,6 +1441,12 @@ body[data-theme='dark'] .flatpickr-month .flatpickr-next-month svg {
             <div class="ts-field-card">
                 <label class="ts-label-eyebrow">เลือกวันที่ต้องการจัดกิจกรรม (เลือกได้หลายวัน) *</label>
                 <input type="text" name="selected_dates" id="modal_selected_dates" placeholder="คลิกเพื่อเลือกจากปฏิทิน..." required class="ts-input" style="cursor:pointer;">
+                <div id="clinicHint" class="ts-clinic-hint" aria-live="polite"></div>
+                <p class="ts-clinic-legend">
+                    <span><span class="ts-cal-dot dot-holiday"></span>วันหยุด</span>
+                    <span><span class="ts-cal-dot dot-special"></span>วันพิเศษ</span>
+                    <span><span class="ts-cal-dot dot-closed"></span>คลินิคปิด</span>
+                </p>
             </div>
 
             <!-- โซนสร้างช่วงเวลาอัตโนมัติ -->
@@ -1526,11 +1623,79 @@ let tableInst = null;
 let initialTableTbodyHTML = ''; // เก็บ HTML ต้นฉบับของตารางไว้สำหรับ filter ใหม่
 let globalSelectedSlots = new Set(); // เก็บ ID รายการที่ถูกเลือกไว้เพื่อให้ Sync ตรงกันทุกมุมมอง
 
+// ── Clinic schedule (injected from PHP) ───────────────────────────────
+const CLINIC_REGULAR   = <?= json_encode($clinicRegularHours, JSON_UNESCAPED_UNICODE) ?>;
+const CLINIC_OVERRIDES = <?= json_encode($clinicOverrides,    JSON_UNESCAPED_UNICODE) ?>;
+const THAI_WD = ['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์'];
+
+function fmtDate(d) {
+    const y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,'0'), dd = String(d.getDate()).padStart(2,'0');
+    return `${y}-${m}-${dd}`;
+}
+function clinicHoursFor(dateStr) {
+    if (CLINIC_OVERRIDES[dateStr]) return { ...CLINIC_OVERRIDES[dateStr], _source: CLINIC_OVERRIDES[dateStr].source };
+    const wd = new Date(dateStr + 'T00:00:00').getDay();
+    const reg = CLINIC_REGULAR[wd];
+    return reg ? { ...reg, _source: 'regular' } : { closed: false, open_time: null, close_time: null, _source: 'unknown' };
+}
+function updateClinicHint(selectedDates) {
+    const el = document.getElementById('clinicHint');
+    if (!el) return;
+    if (!selectedDates || !selectedDates.length) { el.innerHTML = ''; return; }
+    // แสดง hint ของวันที่เลือกล่าสุด (หรือ summarize ถ้าเลือกหลายวัน)
+    const last = selectedDates[selectedDates.length - 1];
+    const ds = fmtDate(last);
+    const h  = clinicHoursFor(ds);
+    const wdLabel = THAI_WD[last.getDay()];
+    const dateLabel = last.toLocaleDateString('th-TH', { day:'numeric', month:'short', year:'numeric' });
+    let html = '';
+    if (h.closed) {
+        html = `<i class="fa-solid fa-circle-xmark text-rose-500"></i> <strong>${wdLabel} ${dateLabel}</strong> — คลินิคปิด`;
+        if (h.note) html += ` <span class="text-gray-500">(${h.note})</span>`;
+    } else if (h.open_time && h.close_time) {
+        const srcBadge = h._source === 'special'  ? ' <span class="text-amber-600 font-bold">[วันพิเศษ]</span>' :
+                         h._source === 'holiday' ? ' <span class="text-rose-600 font-bold">[วันหยุด · เปิดพิเศษ]</span>' : '';
+        html = `<i class="fa-solid fa-clock text-emerald-600"></i> <strong>${wdLabel} ${dateLabel}</strong> เปิด ${h.open_time}–${h.close_time}${srcBadge}`;
+        if (h.note) html += ` <span class="text-gray-500">· ${h.note}</span>`;
+    } else {
+        html = `<i class="fa-solid fa-circle-question text-gray-400"></i> <strong>${wdLabel} ${dateLabel}</strong> — ไม่มีข้อมูลเวลาเปิด-ปิด`;
+    }
+    if (selectedDates.length > 1) html += ` <span class="text-gray-400">(+อีก ${selectedDates.length - 1} วัน)</span>`;
+    el.innerHTML = html;
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     fp = flatpickr("#modal_selected_dates", {
         mode: "multiple",
         dateFormat: "Y-m-d",
         locale: "th",
+        disable: [
+            function(date) {
+                const h = clinicHoursFor(fmtDate(date));
+                return h.closed === true;
+            }
+        ],
+        onChange: function(selectedDates) {
+            updateClinicHint(selectedDates);
+        },
+        onDayCreate: function(_dObj, _dStr, _fp, dayElem) {
+            const d  = dayElem.dateObj;
+            if (!d) return;
+            const ds = fmtDate(d);
+            const ov = CLINIC_OVERRIDES[ds];
+            if (ov) {
+                const cls = ov.closed ? 'ts-cal-closed' : (ov.source === 'special' ? 'ts-cal-special' : 'ts-cal-holiday');
+                dayElem.classList.add(cls);
+                const title = (ov.closed ? 'คลินิคปิด' : `เปิด ${ov.open_time||'?'}–${ov.close_time||'?'}`) + (ov.note ? ` · ${ov.note}` : '');
+                dayElem.setAttribute('title', title);
+            } else {
+                const reg = CLINIC_REGULAR[d.getDay()];
+                if (reg && reg.closed) {
+                    dayElem.classList.add('ts-cal-closed');
+                    dayElem.setAttribute('title', 'คลินิคปิดประจำสัปดาห์');
+                }
+            }
+        }
     });
 
     if (document.getElementById("slotsTable")) {
