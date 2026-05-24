@@ -8,8 +8,22 @@ $pdo = db();
 // สร้าง column qr_enabled ถ้ายังไม่มี
 try { $pdo->exec("ALTER TABLE camp_list ADD COLUMN qr_enabled TINYINT(1) NOT NULL DEFAULT 0"); } catch (PDOException) {}
 
-$activeCampaigns = $pdo->query("SELECT id, title, qr_enabled FROM camp_list WHERE status = 'active' ORDER BY title ASC")->fetchAll();
-$allCampaigns    = $pdo->query("SELECT id, title, qr_enabled FROM camp_list ORDER BY title ASC")->fetchAll();
+$activeCampaigns = $pdo->query("SELECT id, title, qr_enabled, status FROM camp_list WHERE status = 'active' ORDER BY title ASC")->fetchAll();
+$allCampaigns    = $pdo->query("SELECT id, title, qr_enabled, status FROM camp_list ORDER BY title ASC")->fetchAll();
+
+// Campaigns that actually have slots in the viewing month — used by the filter dropdown
+// (avoids broken state when slots exist for archived/non-active campaigns)
+$_month_for_filter = $_GET['month'] ?? date('m');
+$_year_for_filter  = $_GET['year']  ?? date('Y');
+$_filterStmt = $pdo->prepare("
+    SELECT DISTINCT c.id, c.title, c.status
+    FROM camp_list c
+    JOIN camp_slots s ON s.campaign_id = c.id
+    WHERE MONTH(s.slot_date) = ? AND YEAR(s.slot_date) = ?
+    ORDER BY c.title ASC
+");
+$_filterStmt->execute([$_month_for_filter, $_year_for_filter]);
+$filterCampaigns = $_filterStmt->fetchAll();
 
 // map campaign_id → qr_enabled
 $qrEnabledMap = [];
@@ -33,12 +47,18 @@ $colors = [
     ['cls' => 'slot-pal-teal'],
 ];
 
+// Assign colors to every campaign that might appear (active + filter list)
+// so slot cards from archived campaigns still get a consistent color.
 $campaignColors = [];
 $c_idx = 0;
-foreach ($activeCampaigns as $ac) {
-    $campaignColors[$ac['id']] = $colors[$c_idx % count($colors)];
+$_colorPool = [];
+foreach ($activeCampaigns as $ac) $_colorPool[(int)$ac['id']] = $ac['title'];
+foreach ($filterCampaigns as $ac) $_colorPool[(int)$ac['id']] = $ac['title'];
+foreach ($_colorPool as $cid => $_t) {
+    $campaignColors[$cid] = $colors[$c_idx % count($colors)];
     $c_idx++;
 }
+unset($_colorPool);
 
 // ==========================================
 // ส่วนจัดการ AJAX / POST (เพิ่ม/ลบ รอบเวลา)
@@ -333,13 +353,24 @@ $header_actions = '
                 <span style="font-weight:700;color:var(--ec-ink-1);">เลือกทั้งหมด</span>
             </label>
             <div style="height:1px; background:var(--ec-border-soft); margin:4px 0;"></div>';
-            foreach ($activeCampaigns as $ac) {
+            // Use $filterCampaigns (campaigns with slots in this month) instead of
+            // $activeCampaigns — so archived/inactive campaigns with existing slots
+            // are also filterable. Falls back to $allCampaigns if month has 0 slots.
+            $_dropdownList = !empty($filterCampaigns) ? $filterCampaigns : $allCampaigns;
+            foreach ($_dropdownList as $ac) {
+                $_statusLabel = ($ac['status'] ?? 'active') !== 'active'
+                    ? ' <span style="font-size:9px; padding:1px 5px; border-radius:99px; background:var(--ec-surface-2); color:var(--ec-ink-4); margin-left:4px;">' . htmlspecialchars($ac['status'] ?? '') . '</span>'
+                    : '';
                 $header_actions .= '
                 <label class="camp-label-item ts-multi-item" data-title="' . htmlspecialchars(strtolower($ac['title'])) . '">
                     <input type="checkbox" value="' . (int)$ac['id'] . '" checked onchange="updateMultiSelectFilter()" class="camp-checkbox w-4 h-4 cursor-pointer" style="accent-color:var(--ec-brand-500);">
-                    <span>' . htmlspecialchars($ac['title']) . '</span>
+                    <span>' . htmlspecialchars($ac['title']) . $_statusLabel . '</span>
                 </label>';
             }
+            if (empty($_dropdownList)) {
+                $header_actions .= '<div style="padding:16px 8px; text-align:center; font-size:12px; color:var(--ec-ink-4);">ยังไม่มีแคมเปญในระบบ</div>';
+            }
+            unset($_dropdownList);
             $header_actions .= '
         </div>
     </div>
@@ -1607,23 +1638,34 @@ function toggleAllCampaigns(el) {
 function updateMultiSelectFilter() {
     const checkboxes = document.querySelectorAll('.camp-checkbox');
     const selectAllCb = document.getElementById('selectAllCamps');
-    
+    const label = document.getElementById('multiSelectLabel');
+
+    // Defensive: if no campaign checkboxes exist (e.g. month has no slots
+    // OR all campaigns referenced by slots are missing from $filterCampaigns),
+    // show every slot — don't filter them all out.
+    if (checkboxes.length === 0) {
+        document.querySelectorAll('.slot-item').forEach(s => { s.style.display = 'block'; });
+        if (label) label.innerText = 'ไม่มีแคมเปญให้กรอง';
+        return;
+    }
+
     let checkedIds = [];
     checkboxes.forEach(cb => {
         if (cb.checked) checkedIds.push(cb.value);
     });
 
     // ตรวจสอบเช็ค 'เลือกทั้งหมด' อัตโนมัติถ้าย่อยถูกเช็คหมด
-    selectAllCb.checked = (checkedIds.length === checkboxes.length);
+    if (selectAllCb) selectAllCb.checked = (checkedIds.length === checkboxes.length);
 
-    // อัปเดตข้อความบนปุ่ม Label 
-    const label = document.getElementById('multiSelectLabel');
-    if (checkedIds.length === checkboxes.length) {
-        label.innerText = 'แสดงทุกแคมเปญ';
-    } else if (checkedIds.length === 0) {
-        label.innerText = 'ไม่ได้เลือกแคมเปญเลย';
-    } else {
-        label.innerText = `เลือกไว้ (${checkedIds.length}/${checkboxes.length})`;
+    // อัปเดตข้อความบนปุ่ม Label
+    if (label) {
+        if (checkedIds.length === checkboxes.length) {
+            label.innerText = 'แสดงทุกแคมเปญ';
+        } else if (checkedIds.length === 0) {
+            label.innerText = 'ไม่ได้เลือกแคมเปญเลย';
+        } else {
+            label.innerText = `เลือกไว้ (${checkedIds.length}/${checkboxes.length})`;
+        }
     }
 
     // ทำการซ่อน/แสดง .slot-item ในปฏิทินแบบเรียลไทม์
@@ -1635,7 +1677,7 @@ function updateMultiSelectFilter() {
                 isMatch = true;
             }
         });
-        
+
         if (isMatch) {
             slot.style.display = 'block';
         } else {
