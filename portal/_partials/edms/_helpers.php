@@ -41,7 +41,14 @@ if (!function_exists('edms_ensure_doc_types_schema')) {
                 $stmt->execute(['outgoing', 'หนังสือส่ง',    'ส่ง',    'ออกจากคลินิกไปยังหน่วยงานอื่น',     'fa-paper-plane', 'emerald', 20]);
                 $stmt->execute(['internal', 'บันทึกข้อความ', 'บันทึก', 'หนังสือภายในระหว่างฝ่าย',           'fa-file-lines',  'violet',  30]);
                 $stmt->execute(['circular', 'หนังสือเวียน',  'เวียน',  'ประกาศ/แจ้งเวียนหลายฝ่าย',         'fa-bullhorn',    'amber',   40]);
+                $stmt->execute(['task',     'งาน/Task',     'งาน',    'งานที่มอบหมาย ไม่ผูกกับเอกสารทางการ', 'fa-list-check',  'cyan',    50]);
             }
+
+            // Backfill: ถ้าตารางมีอยู่แล้ว แต่ยังไม่มี task → INSERT IGNORE
+            try {
+                $pdo->prepare("INSERT IGNORE INTO sys_doc_types (code, name, short_label, description, icon, tone, sort_order, is_system, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, 1, 1)")
+                    ->execute(['task', 'งาน/Task', 'งาน', 'งานที่มอบหมาย ไม่ผูกกับเอกสารทางการ', 'fa-list-check', 'cyan', 50]);
+            } catch (PDOException) { /* ignore */ }
 
             // ENUM → VARCHAR (idempotent)
             foreach (['sys_doc_documents', 'sys_doc_counters'] as $t) {

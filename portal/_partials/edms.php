@@ -15,7 +15,8 @@ declare(strict_types=1);
 require_once __DIR__ . '/edms/_helpers.php';
 
 $_view = $_GET['edms_view'] ?? '';
-$_validViews = ['list', 'detail', 'myinbox', 'reports', 'categories', 'doctypes'];
+$_validViews = ['list', 'detail', 'myinbox', 'reports', 'categories', 'doctypes',
+                'sla_dashboard', 'sla_policies'];
 
 // Shared style block — emit before any early return so sub-views inherit it
 ?>
@@ -156,7 +157,7 @@ $tonePalette = [
         </div>
         <div class="flex-1 min-w-0">
             <h2 class="text-2xl font-black text-slate-800">สารบรรณอิเล็กทรอนิกส์</h2>
-            <p class="text-slate-500 text-sm font-medium">Electronic Document Management System (EDMS)</p>
+            <p class="text-slate-500 text-sm font-medium">รับ-ส่งเอกสาร · บันทึกข้อความ · มอบหมายงาน — พร้อมติดตามเวลาดำเนินการ</p>
         </div>
         <?php if (!empty($_SESSION['access_edms']) || ($_SESSION['admin_role'] ?? '') === 'superadmin'): ?>
             <a href="?section=edms&edms_view=doctypes"

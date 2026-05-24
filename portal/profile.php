@@ -1,15 +1,21 @@
 <?php
 /**
  * portal/profile.php
- * Legacy URL — เนื้อหาจริงย้ายไปเป็น section ใน portal/index.php?section=profile
- * คงไฟล์ไว้เพื่อให้ลิงก์/บุ๊กมาร์กเก่าใช้งานต่อได้
+ * Section page — auto-generated from monolithic index.php refactor.
  */
-session_start();
+require __DIR__ . '/_init.php';
+require_once __DIR__ . '/_layout.php';
 
-if (empty($_SESSION['admin_logged_in'])) {
-    header('Location: ../admin/auth/login.php');
-    exit;
-}
-
-header('Location: index.php?section=profile', true, 302);
-exit;
+layout_start(['section' => 'profile', 'title' => 'โปรไฟล์ของฉัน']);
+?>
+            <div id="section-profile" class="portal-section"
+                style="width:100%; height:calc(100vh - 60px); background:#f8fafc; overflow-y:auto;">
+                <?php
+                if ($isStaff) {
+                    include __DIR__ . '/_partials/profile.php';
+                } else {
+                    echo '<div style="padding:100px;text-align:center;font-weight:900;color:#dc2626"><i class="fa-solid fa-shield-slash mb-4" style="font-size:4rem;display:block"></i> ACCESS DENIED<br><span style="font-size:14px;color:#94a3b8;font-weight:600">หน้าโปรไฟล์ใช้ได้เฉพาะบัญชีเจ้าหน้าที่ (e-Campaign Staff)</span></div>';
+                }
+                ?>
+            </div>
+<?php layout_end(); ?>

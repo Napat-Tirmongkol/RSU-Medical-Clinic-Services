@@ -370,6 +370,34 @@ $routingStatusLabels = [
                         $rAct = $routingActionLabels[$r['action']] ?? ['label' => $r['action'], 'icon' => 'fa-share', 'tone' => 'slate'];
                         $rSt  = $routingStatusLabels[$r['status']] ?? ['label' => $r['status'], 'tone' => 'bg-slate-50 text-slate-600 border-slate-200'];
                         $isOverdue = $r['due_date'] && in_array($r['status'], ['pending','acknowledged'], true) && $r['due_date'] < date('Y-m-d');
+
+                        // SLA info
+                        $slaState = $r['sla_state'] ?? 'none';
+                        $slaToneMap = [
+                            'on_track'  => ['label' => 'อยู่ในเวลา',   'badge' => 'bg-emerald-50 text-emerald-700 border-emerald-200', 'icon' => 'fa-circle-check'],
+                            'warning'   => ['label' => 'ใกล้หมดเวลา',  'badge' => 'bg-amber-50 text-amber-700 border-amber-200', 'icon' => 'fa-triangle-exclamation'],
+                            'breached'  => ['label' => 'เลยกำหนด',     'badge' => 'bg-rose-50 text-rose-700 border-rose-200', 'icon' => 'fa-circle-exclamation'],
+                            'met'       => ['label' => 'เสร็จทันเวลา', 'badge' => 'bg-sky-50 text-sky-700 border-sky-200', 'icon' => 'fa-double-check'],
+                            'paused'    => ['label' => 'หยุดรอข้อมูล', 'badge' => 'bg-slate-100 text-slate-700 border-slate-200', 'icon' => 'fa-pause'],
+                            'cancelled' => ['label' => 'ยกเลิก',        'badge' => 'bg-slate-50 text-slate-500 border-slate-100', 'icon' => 'fa-ban'],
+                            'none'      => ['label' => '',             'badge' => '', 'icon' => ''],
+                        ];
+                        $slaInfo = $slaToneMap[$slaState] ?? $slaToneMap['none'];
+                        $hasSla = ($slaState !== 'none' && !empty($r['resolve_deadline_at']));
+
+                        // คำนวณ progress bar (0-100%)
+                        $progressPct = 0;
+                        if ($hasSla) {
+                            $start = strtotime($r['created_at']);
+                            $endDl = strtotime($r['resolve_deadline_at']);
+                            $now = time();
+                            $total = max(1, $endDl - $start);
+                            $elapsed = max(0, $now - $start);
+                            $progressPct = min(100, ($elapsed / $total) * 100);
+                        }
+
+                        $canAct = ((int)$r['to_user_id'] === $currentUserId && in_array($r['status'], ['pending','acknowledged'], true))
+                                  || (($_SESSION['admin_role'] ?? '') === 'superadmin' && in_array($r['status'], ['pending','acknowledged'], true));
                     ?>
                         <li class="relative">
                             <div class="absolute -left-8 top-1 w-7 h-7 rounded-full bg-<?= $rAct['tone'] ?>-100 text-<?= $rAct['tone'] ?>-600 border-2 border-white shadow-sm flex items-center justify-center text-xs">
@@ -382,9 +410,9 @@ $routingStatusLabels = [
                                             <?= htmlspecialchars($rAct['label']) ?>
                                         </span>
                                         <span class="inline-flex px-2 py-0.5 rounded-full text-[10px] font-black border <?= $rSt['tone'] ?>"><?= htmlspecialchars($rSt['label']) ?></span>
-                                        <?php if ($isOverdue): ?>
-                                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 border border-rose-200 text-[10px] font-black">
-                                                <i class="fa-solid fa-circle-exclamation text-[8px]"></i> เกินกำหนด
+                                        <?php if ($hasSla): ?>
+                                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black border <?= $slaInfo['badge'] ?>">
+                                                <i class="fa-solid <?= $slaInfo['icon'] ?> text-[8px]"></i> <?= htmlspecialchars($slaInfo['label']) ?>
                                             </span>
                                         <?php endif; ?>
                                     </div>
@@ -403,7 +431,58 @@ $routingStatusLabels = [
                                         <i class="fa-solid fa-quote-left text-[10px] text-slate-300 mr-1"></i><?= nl2br(htmlspecialchars($r['comment'])) ?>
                                     </p>
                                 <?php endif; ?>
-                                <?php if (!empty($r['due_date'])): ?>
+
+                                <?php /* SLA progress + timeline */ ?>
+                                <?php if ($hasSla): ?>
+                                    <div class="mt-3 bg-white border border-slate-100 rounded-xl px-3 py-2.5">
+                                        <div class="flex items-center justify-between text-[10px] font-bold text-slate-500 mb-1.5">
+                                            <span><i class="fa-solid fa-stopwatch text-[8px] mr-0.5"></i> เวลาที่ใช้ไปแล้ว</span>
+                                            <span>
+                                                <?php if (!empty($r['acknowledged_at'])): ?>
+                                                    <span class="text-emerald-600" title="ผู้รับกดรับทราบเมื่อ">รับทราบ <?= date('d/m H:i', strtotime($r['acknowledged_at'])) ?></span> ·
+                                                <?php elseif (!empty($r['ack_deadline_at'])): ?>
+                                                    <span class="text-amber-600" title="ต้องกดรับทราบก่อนเวลานี้">กดรับทราบก่อน <?= date('d/m H:i', strtotime($r['ack_deadline_at'])) ?></span> ·
+                                                <?php endif; ?>
+                                                <span class="text-slate-600" title="ต้องทำให้เสร็จก่อนเวลานี้">เสร็จก่อน <?= date('d/m H:i', strtotime($r['resolve_deadline_at'])) ?></span>
+                                            </span>
+                                        </div>
+                                        <div class="h-2 bg-slate-100 rounded-full overflow-hidden">
+                                            <?php
+                                            $barColor = match($slaState) {
+                                                'breached' => 'bg-rose-500',
+                                                'warning'  => 'bg-amber-500',
+                                                'paused'   => 'bg-slate-400',
+                                                'met'      => 'bg-sky-500',
+                                                default    => 'bg-emerald-500',
+                                            };
+                                            ?>
+                                            <div class="<?= $barColor ?> h-full rounded-full transition-all" style="width: <?= number_format($progressPct, 1) ?>%"></div>
+                                        </div>
+                                        <?php if ($canAct): ?>
+                                            <div class="flex items-center justify-end gap-1.5 mt-2 flex-wrap">
+                                                <?php if (empty($r['acknowledged_at']) && in_array($r['status'], ['pending'], true)): ?>
+                                                    <button onclick="slaAck(<?= (int)$r['id'] ?>)" title="ยืนยันว่าเห็นและจะดำเนินการ" class="px-2.5 py-1 bg-sky-50 text-sky-700 border border-sky-200 rounded-lg text-[10px] font-black hover:bg-sky-100">
+                                                        <i class="fa-solid fa-hand"></i> รับทราบ
+                                                    </button>
+                                                <?php endif; ?>
+                                                <?php if ($slaState !== 'paused'): ?>
+                                                    <button onclick="slaPause(<?= (int)$r['id'] ?>)" title="หยุดนับเวลาชั่วคราว เช่น รอเอกสาร/รออนุมัติ" class="px-2.5 py-1 bg-slate-50 text-slate-700 border border-slate-200 rounded-lg text-[10px] font-black hover:bg-slate-100">
+                                                        <i class="fa-solid fa-pause"></i> หยุดรอข้อมูล
+                                                    </button>
+                                                <?php else: ?>
+                                                    <button onclick="slaResume(<?= (int)$r['id'] ?>)" title="กลับมาทำต่อ — ระบบจะชดเชยเวลาที่หยุดไปให้" class="px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg text-[10px] font-black hover:bg-emerald-100">
+                                                        <i class="fa-solid fa-play"></i> เริ่มทำต่อ
+                                                    </button>
+                                                <?php endif; ?>
+                                                <button onclick='slaExtend(<?= (int)$r["id"] ?>, <?= json_encode(["ack" => $r["ack_deadline_at"], "resolve" => $r["resolve_deadline_at"]], JSON_UNESCAPED_UNICODE | JSON_HEX_APOS | JSON_HEX_QUOT) ?>)' title="ปรับเวลาที่ต้องเสร็จใหม่ ต้องระบุเหตุผล" class="px-2.5 py-1 bg-purple-50 text-purple-700 border border-purple-200 rounded-lg text-[10px] font-black hover:bg-purple-100">
+                                                    <i class="fa-solid fa-clock-rotate-left"></i> ขอเลื่อนเวลา
+                                                </button>
+                                            </div>
+                                        <?php endif; ?>
+                                    </div>
+                                <?php endif; ?>
+
+                                <?php if (!empty($r['due_date']) && !$hasSla): ?>
                                     <p class="text-[11px] font-black text-<?= $isOverdue ? 'rose' : 'slate' ?>-500 mt-2">
                                         <i class="fa-solid fa-flag mr-1"></i>กำหนด: <?= date('d/m/Y', strtotime($r['due_date'])) ?>
                                     </p>
@@ -622,9 +701,36 @@ $routingStatusLabels = [
                     <input type="date" id="edmsRouteDue" class="edms-input">
                 </div>
             </div>
-            <div class="mb-2">
+            <div class="mb-3">
                 <label class="edms-label">บันทึก / สั่งการ</label>
                 <textarea id="edmsRouteComment" rows="3" class="edms-input" placeholder="ตัวอย่าง: โปรดดำเนินการตามที่เสนอ"></textarea>
+            </div>
+
+            <!-- SLA Override (default: auto จาก policy) -->
+            <div class="bg-purple-50 border border-purple-200 rounded-2xl p-3 mb-2">
+                <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" id="edmsSlaOverride" onchange="edmsToggleSlaOverride()" class="w-4 h-4 accent-purple-500">
+                    <span class="text-xs font-black text-purple-700">
+                        <i class="fa-solid fa-stopwatch mr-1"></i>กำหนดเวลาเอง
+                    </span>
+                    <span class="text-[10px] font-bold text-slate-500 ml-1">(ปกติระบบคิดให้อัตโนมัติตามความเร่งด่วน)</span>
+                </label>
+                <div id="edmsSlaOverrideBox" class="hidden mt-3 space-y-2">
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="text-[10px] font-black text-slate-500 uppercase block">ต้องรับทราบก่อน</label>
+                            <input type="datetime-local" id="edmsSlaAck" class="w-full mt-1 px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-bold">
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-black text-slate-500 uppercase block">ต้องเสร็จก่อน</label>
+                            <input type="datetime-local" id="edmsSlaRes" class="w-full mt-1 px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-bold">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="text-[10px] font-black text-slate-500 uppercase block">เหตุผล (จำเป็น)</label>
+                        <input type="text" id="edmsSlaReason" placeholder="เช่น งานเร่งของผู้บริหาร / รอข้อมูลจากภายนอก" class="w-full mt-1 px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-bold">
+                    </div>
+                </div>
             </div>
         </div>
         <div class="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center gap-2">
@@ -682,6 +788,113 @@ $routingStatusLabels = [
 </div>
 
 <script>
+// ════════ SLA Action helpers (Sprint 2) ════════
+(function(){
+    // portal_CSRF อยู่ใน script-scope ของ portal/index.php — เข้า window ไม่ได้ ต้อง resolve ตอน call
+    function getCsrf() { try { return portal_CSRF; } catch { return window.portal_CSRF || ''; } }
+
+    async function slaAjax(entity, action, params = {}) {
+        const fd = new FormData();
+        fd.append('csrf_token', getCsrf());
+        fd.append('entity', entity);
+        fd.append('action', action);
+        Object.entries(params).forEach(([k, v]) => fd.append(k, v));
+        const res = await fetch('ajax_edms_sla.php', { method: 'POST', body: fd, credentials: 'same-origin' });
+        const text = await res.text();
+        try { return JSON.parse(text); } catch { return { ok: false, message: text.substring(0,200) || 'unexpected response' }; }
+    }
+
+    window.slaAck = async function(routingId) {
+        const { isConfirmed } = await Swal.fire({
+            icon: 'question', title: 'รับทราบเอกสารนี้?',
+            text: 'ระบบจะบันทึกว่าคุณเห็นและพร้อมจะดำเนินการแล้ว',
+            showCancelButton: true, confirmButtonText: 'รับทราบ', cancelButtonText: 'ยังก่อน',
+            confirmButtonColor: '#0ea5e9'
+        });
+        if (!isConfirmed) return;
+        const r = await slaAjax('routing', 'acknowledge', { routing_id: routingId });
+        if (r.ok) { Swal.fire({ icon: 'success', title: r.message, timer: 1200, showConfirmButton: false }); setTimeout(()=>location.reload(), 1300); }
+        else Swal.fire({ icon: 'error', title: r.message });
+    };
+
+    window.slaPause = async function(routingId) {
+        const { value: reason, isConfirmed } = await Swal.fire({
+            icon: 'info', title: 'หยุดนับเวลาชั่วคราว?',
+            text: 'ใช้เมื่อต้องรอข้อมูลจากคนอื่น — ระบบจะหยุดนับ และนาฬิกาจะเริ่มอีกครั้งตอนคุณกด "เริ่มทำต่อ"',
+            input: 'textarea',
+            inputLabel: 'เหตุผลที่ต้องหยุดรอ',
+            inputPlaceholder: 'เช่น รอเอกสารจากฝ่ายอื่น / รอผู้บริหารอนุมัติ',
+            showCancelButton: true, confirmButtonText: 'หยุดรอ', cancelButtonText: 'ยกเลิก',
+            confirmButtonColor: '#64748b',
+            inputValidator: (v) => !v || v.length < 3 ? 'กรุณาระบุเหตุผล (อย่างน้อย 3 ตัวอักษร)' : null,
+        });
+        if (!isConfirmed) return;
+        const r = await slaAjax('routing', 'pause', { routing_id: routingId, reason });
+        if (r.ok) { Swal.fire({ icon: 'success', title: r.message, timer: 1200, showConfirmButton: false }); setTimeout(()=>location.reload(), 1300); }
+        else Swal.fire({ icon: 'error', title: r.message });
+    };
+
+    window.slaResume = async function(routingId) {
+        const { isConfirmed } = await Swal.fire({
+            icon: 'question', title: 'เริ่มทำต่อ?',
+            text: 'ระบบจะเลื่อนเวลาที่ต้องเสร็จออกไป โดยชดเชยช่วงที่หยุดรอ',
+            showCancelButton: true, confirmButtonText: 'เริ่มทำต่อ', cancelButtonText: 'ยังก่อน',
+            confirmButtonColor: '#10b981'
+        });
+        if (!isConfirmed) return;
+        const r = await slaAjax('routing', 'resume', { routing_id: routingId });
+        if (r.ok) { Swal.fire({ icon: 'success', title: r.message, timer: 1200, showConfirmButton: false }); setTimeout(()=>location.reload(), 1300); }
+        else Swal.fire({ icon: 'error', title: r.message });
+    };
+
+    window.slaExtend = async function(routingId, currentDeadlines) {
+        const ackVal = currentDeadlines.ack ? currentDeadlines.ack.substring(0, 16).replace(' ', 'T') : '';
+        const resVal = currentDeadlines.resolve ? currentDeadlines.resolve.substring(0, 16).replace(' ', 'T') : '';
+        const html = `
+            <div class="text-left space-y-3">
+                <p class="text-xs text-slate-500 mb-2">ปรับเวลาใหม่ — กรอกเฉพาะอันที่อยากเปลี่ยน เว้นว่างได้ถ้าไม่เปลี่ยน</p>
+                <div>
+                    <label class="text-xs font-black text-slate-600 block mb-1">ต้องรับทราบก่อน (เดิม: ${ackVal || '—'})</label>
+                    <input type="datetime-local" id="sla-ext-ack" value="${ackVal}" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold">
+                </div>
+                <div>
+                    <label class="text-xs font-black text-slate-600 block mb-1">ต้องเสร็จก่อน (เดิม: ${resVal || '—'})</label>
+                    <input type="datetime-local" id="sla-ext-res" value="${resVal}" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold">
+                </div>
+                <div>
+                    <label class="text-xs font-black text-slate-600 block mb-1">เหตุผลที่ต้องเลื่อน *</label>
+                    <textarea id="sla-ext-reason" rows="2" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold" placeholder="เช่น งานเร่งของผู้บริหาร / รอข้อมูลจากภายนอก"></textarea>
+                </div>
+            </div>`;
+        const { isConfirmed } = await Swal.fire({
+            icon: 'question', title: 'ขอเลื่อนเวลา',
+            html, showCancelButton: true, confirmButtonText: 'บันทึก', cancelButtonText: 'ยกเลิก',
+            confirmButtonColor: '#a855f7',
+            preConfirm: () => {
+                const ack = document.getElementById('sla-ext-ack').value;
+                const res = document.getElementById('sla-ext-res').value;
+                const reason = document.getElementById('sla-ext-reason').value;
+                if (!ack && !res) { Swal.showValidationMessage('กรอกเวลาใหม่อย่างน้อย 1 ช่อง'); return false; }
+                if (!reason || reason.length < 3) { Swal.showValidationMessage('ระบุเหตุผล (อย่างน้อย 3 ตัวอักษร)'); return false; }
+                return { ack, res, reason };
+            }
+        });
+        if (!isConfirmed) return;
+        const v = Swal.getResult ? Swal.getResult() : null;
+        const ack = document.getElementById('sla-ext-ack')?.value;
+        const res = document.getElementById('sla-ext-res')?.value;
+        const reason = document.getElementById('sla-ext-reason')?.value;
+        const r = await slaAjax('routing', 'extend', {
+            routing_id: routingId,
+            new_ack_deadline: ack ? ack.replace('T', ' ') + ':00' : '',
+            new_resolve_deadline: res ? res.replace('T', ' ') + ':00' : '',
+            reason,
+        });
+        if (r.ok) { Swal.fire({ icon: 'success', title: r.message, timer: 1200, showConfirmButton: false }); setTimeout(()=>location.reload(), 1300); }
+        else Swal.fire({ icon: 'error', title: r.message });
+    };
+})();
+
 window.edmsViewer = function(id, name, kind) {
     const modal = document.getElementById('edmsViewerModal');
     const iframe = document.getElementById('edmsViewerIframe');
@@ -1045,6 +1258,11 @@ document.getElementById('edmsRoutingModal').addEventListener('click', e => {
     if (e.target.id === 'edmsRoutingModal') edmsCloseRouting();
 });
 
+window.edmsToggleSlaOverride = function() {
+    const isOn = document.getElementById('edmsSlaOverride').checked;
+    document.getElementById('edmsSlaOverrideBox').classList.toggle('hidden', !isOn);
+};
+
 window.edmsSubmitRouting = async function() {
     const toUser = document.getElementById('edmsRouteToUser').value;
     const toDept = document.getElementById('edmsRouteToDept').value.trim();
@@ -1052,14 +1270,36 @@ window.edmsSubmitRouting = async function() {
         Swal.fire({ icon: 'warning', title: 'กรุณาเลือกผู้รับ', text: 'ระบุผู้รับหรือฝ่ายปลายทางอย่างน้อย 1 อย่าง' });
         return;
     }
-    const res = await edmsAjax('routing', 'forward', {
+
+    // SLA override
+    const slaOverride = document.getElementById('edmsSlaOverride').checked;
+    const params = {
         doc_id: EDMS_DOC_ID,
         to_user_id: toUser,
         to_dept: toDept,
         r_action: document.getElementById('edmsRouteAction').value,
         comment: document.getElementById('edmsRouteComment').value,
         due_date: document.getElementById('edmsRouteDue').value,
-    });
+    };
+    if (slaOverride) {
+        const ack = document.getElementById('edmsSlaAck').value;
+        const res = document.getElementById('edmsSlaRes').value;
+        const reason = document.getElementById('edmsSlaReason').value.trim();
+        if (!ack || !res) {
+            Swal.fire({ icon: 'warning', title: 'กรอกเวลาให้ครบ', text: 'ทั้ง Ack และ Resolve deadline' });
+            return;
+        }
+        if (!reason || reason.length < 3) {
+            Swal.fire({ icon: 'warning', title: 'ระบุเหตุผล', text: 'เหตุผลในการกำหนดเวลาเอง (3+ ตัวอักษร)' });
+            return;
+        }
+        params.sla_override = '1';
+        params.sla_ack_deadline     = ack.replace('T', ' ') + ':00';
+        params.sla_resolve_deadline = res.replace('T', ' ') + ':00';
+        params.sla_reason = reason;
+    }
+
+    const res = await edmsAjax('routing', 'forward', params);
     if (res.ok) {
         await Swal.fire({ icon: 'success', title: res.message || 'โอนแล้ว', timer: 1100, showConfirmButton: false });
         window.location.reload();

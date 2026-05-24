@@ -4,26 +4,30 @@
 ?>
 <style>
 .fin-card { background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:16px; }
-.fin-kpi { display:flex; align-items:center; gap:12px; padding:14px 16px; border-radius:12px; border:1px solid transparent; }
+.fin-kpi { display:flex; align-items:center; gap:12px; padding:14px 16px; border-radius:12px; border:1px solid #e2e8f0; border-left-width:4px; background:#fff; }
 .fin-kpi .ic { width:40px; height:40px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0; }
-.fin-kpi .num { font-size:20px; font-weight:900; color:#0f172a; }
-.fin-kpi .lbl { font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.5px; }
+.fin-kpi .num { font-size:22px; font-weight:700; color:#0f172a; }
+.fin-kpi .lbl { font-size:12px; font-weight:600; color:#64748b; letter-spacing:0; }
 
-/* KPI tones — light mode */
-.fin-kpi[data-tone="income"]  { background:#f0fdf4; }
+/* KPI tones — light mode (calm: white bg + colored stripe + colored icon only) */
+.fin-kpi[data-tone="income"]  { border-left-color:#15803d; }
 .fin-kpi[data-tone="income"] .ic  { background:#dcfce7; color:#15803d; }
-.fin-kpi[data-tone="expense"] { background:#fef2f2; }
+.fin-kpi[data-tone="income"] .lbl { color:#15803d; }
+.fin-kpi[data-tone="expense"] { border-left-color:#b91c1c; }
 .fin-kpi[data-tone="expense"] .ic { background:#fee2e2; color:#b91c1c; }
-.fin-kpi[data-tone="net"]     { background:#eff6ff; }
+.fin-kpi[data-tone="expense"] .lbl { color:#b91c1c; }
+.fin-kpi[data-tone="net"]     { border-left-color:#1e40af; }
 .fin-kpi[data-tone="net"] .ic     { background:#dbeafe; color:#1e40af; }
-.fin-kpi[data-tone="count"]   { background:#fafafa; }
+.fin-kpi[data-tone="net"] .lbl { color:#1e40af; }
+.fin-kpi[data-tone="count"]   { border-left-color:#64748b; }
 .fin-kpi[data-tone="count"] .ic   { background:#e2e8f0; color:#475569; }
+.fin-kpi[data-tone="count"] .lbl { color:#475569; }
 .fin-filter-bar { display:flex; flex-wrap:wrap; gap:8px; align-items:end; }
 .fin-filter-bar label { font-size:11px; font-weight:700; color:#475569; display:block; margin-bottom:3px; }
 .fin-filter-bar input, .fin-filter-bar select { font-size:13px; padding:7px 10px; border:1px solid #cbd5e1; border-radius:8px; background:#fff; }
 .fin-filter-bar input[type="search"] { min-width: 220px; }
 .fin-table { width:100%; border-collapse:collapse; font-size:13px; }
-.fin-table th { background:#f8fafc; padding:9px 10px; text-align:left; font-size:11px; font-weight:800; color:#475569; text-transform:uppercase; border-bottom:1px solid #e2e8f0; }
+.fin-table th { background:#f8fafc; padding:10px; text-align:left; font-size:12px; font-weight:600; color:#475569; border-bottom:1px solid #e2e8f0; }
 .fin-table td { padding:10px; border-bottom:1px solid #f1f5f9; vertical-align:middle; }
 .fin-table tbody tr:hover { background:#fafbfc; }
 .fin-table tbody tr.is-selected { background:#f0faf4; }
@@ -245,13 +249,16 @@ body[data-theme='dark'] .fin-bulk-bar { box-shadow:0 20px 40px -10px rgba(0,0,0,
     <!-- Header -->
     <div class="flex items-center justify-between gap-3 flex-wrap">
         <div>
-            <h2 class="text-xl font-black text-slate-800 flex items-center gap-2">
+            <h2 class="text-xl font-bold text-slate-800 flex items-center gap-2">
                 <i class="fa-solid fa-money-bill-trend-up text-emerald-600"></i>
-                ระบบการเงิน — Cash Book
+                บันทึกรายรับ-รายจ่าย
             </h2>
-            <p class="text-xs text-slate-500 mt-1">บันทึกรายรับ-รายจ่ายของคลินิก ดูสรุปตามช่วงเวลา + หมวดหมู่</p>
+            <p class="text-xs text-slate-500 mt-1">บันทึกเงินที่เข้า-ออกของคลินิก ดูสรุปตามช่วงเวลา + หมวดหมู่</p>
         </div>
         <div class="flex items-center gap-2 flex-wrap">
+            <button type="button" onclick="window._finHelp && window._finHelp()" class="btn-solid bg-slate-100 text-slate-700 hover:bg-slate-200 text-sm" title="ดูคำอธิบายแต่ละส่วน">
+                <i class="fa-solid fa-circle-question"></i>
+            </button>
             <button id="finBtnExport" class="btn-solid bg-slate-100 text-slate-700 hover:bg-slate-200 text-sm" title="ดาวน์โหลด CSV ตามตัวกรองที่เลือก">
                 <i class="fa-solid fa-file-csv"></i> CSV
             </button>
@@ -1449,5 +1456,17 @@ body[data-theme='dark'] .fin-bulk-bar { box-shadow:0 20px 40px -10px rgba(0,0,0,
     document.getElementById('finBtnCategories').onclick = openCategoriesModal;
 
     load(1);
+
+    // ── Help tour ─────────────────────────────────────────
+    const finSteps = [
+        { popover: { title: 'บันทึกรายรับ-รายจ่าย', description: 'หน้านี้ใช้บันทึกเงินที่เข้าและออกของคลินิก — เหมือนสมุดบัญชีที่ทำในคอม' } },
+        { element: '#finBtnAdd', popover: { title: 'เพิ่มรายการ', description: 'กดเพื่อบันทึกเงินที่รับเข้าหรือจ่ายออก · ระบุหมวด + จำนวน + วันที่', side: 'left' } },
+        { element: '.fin-quick-dates', popover: { title: 'เลือกช่วงเวลาเร็ว', description: 'คลิกชิป "วันนี้" / "เดือนนี้" / "ปีนี้" เพื่อกรองรายการในช่วงนั้นทันที', side: 'bottom' } },
+        { element: '#finBtnCategories', popover: { title: 'จัดการหมวดหมู่', description: 'เพิ่ม/แก้ชื่อหมวดของรายรับ-รายจ่าย เช่น "ค่าน้ำ" / "เงินค่าบริการ"', side: 'bottom' } },
+        { element: '#finBtnRecurring', popover: { title: 'รายการประจำเดือน', description: 'ตั้งค่าใช้จ่ายที่เกิดทุกเดือน (ค่าน้ำ ค่าไฟ ค่าเช่า) ระบบจะสร้างให้อัตโนมัติ', side: 'bottom' } },
+        { element: '#finBtnExport', popover: { title: 'ดาวน์โหลดเป็น CSV', description: 'ส่งออกไฟล์ Excel ตามตัวกรองที่เลือก เพื่อพิมพ์หรือส่งให้ผู้ตรวจสอบ', side: 'left' } },
+    ];
+    window._finHelp = function(){ window.RsuTour && RsuTour.start(finSteps, 'finance'); };
+    if (window.RsuTour) RsuTour.maybeAutoStart('finance', finSteps);
 })();
 </script>

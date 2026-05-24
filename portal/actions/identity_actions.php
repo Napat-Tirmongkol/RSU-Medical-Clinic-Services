@@ -95,7 +95,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $settAccess = (int)($_POST['sett_access'] ?? 0);
                     $regAccess = (int)($_POST['reg_access'] ?? 0);
                     $edmsAccess = (int)($_POST['edms_access'] ?? 0);
+                    $edmsSlaAdminAccess = (int)($_POST['edms_sla_admin_access'] ?? 0);
                     $aiAccess = (int)($_POST['ai_access'] ?? 0);
+
+                    // LINE linked UID (admin manual fallback) — validate format U[0-9a-f]{32}
+                    $linkedLineUid = trim((string)($_POST['linked_line_user_id'] ?? ''));
+                    if ($linkedLineUid !== '' && !preg_match('/^U[0-9a-f]{32}$/', $linkedLineUid)) {
+                        $linkedLineUid = '';  // silently drop invalid format (don't break flow)
+                    }
+                    $linkedLineUid = $linkedLineUid !== '' ? $linkedLineUid : null;
                     $consumablesAccess = (int)($_POST['consumables_access'] ?? 0);
                     $assetAccess = (int)($_POST['asset_access'] ?? 0);
                     $financeAccess = (int)($_POST['finance_access'] ?? 0);
@@ -119,6 +127,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     // Ensure new flag columns exist (for existing installs)
                     try { $pdo->exec("ALTER TABLE sys_staff ADD COLUMN access_registry TINYINT(1) DEFAULT 0"); } catch(PDOException $e) {}
                     try { $pdo->exec("ALTER TABLE sys_staff ADD COLUMN access_edms TINYINT(1) DEFAULT 0"); } catch(PDOException $e) {}
+                    try { $pdo->exec("ALTER TABLE sys_staff ADD COLUMN access_edms_sla_admin TINYINT(1) DEFAULT 0"); } catch(PDOException $e) {}
                     try { $pdo->exec("ALTER TABLE sys_staff ADD COLUMN access_ai TINYINT(1) DEFAULT 0"); } catch(PDOException $e) {}
                     try { $pdo->exec("ALTER TABLE sys_staff ADD COLUMN access_consumables TINYINT(1) DEFAULT 0"); } catch(PDOException $e) {}
                     try { $pdo->exec("ALTER TABLE sys_staff ADD COLUMN access_asset TINYINT(1) DEFAULT 0"); } catch(PDOException $e) {}
@@ -151,13 +160,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                     if ($action === 'add_identity_gov') {
                         $hashed = password_hash($password ?: bin2hex(random_bytes(8)), PASSWORD_DEFAULT);
-                        $pdo->prepare("INSERT INTO sys_staff (full_name, username, email, password_hash, role, position_id, job_title, department_id, access_eborrow, account_status, access_ecampaign, ecampaign_role, access_insurance, access_system_logs, access_site_settings, access_registry, access_edms, access_ai, access_consumables, access_asset, access_finance, access_scholarship, access_dashboard_admin, access_monthly_report, access_nurse_productivity, access_daily_summary, access_director_view, access_identity) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
-                            ->execute([$fullName, $username, $email, $hashed, $ebRole, $positionId, $jobTitle, $departmentId, $ebAccess, $status, $ecAccess, $ecRole, $insAccess, $logsAccess, $settAccess, $regAccess, $edmsAccess, $aiAccess, $consumablesAccess, $assetAccess, $financeAccess, $scholarshipAccess, $dashboardAccess, $monthlyReportAccess, $nurseProductivityAccess, $dailySummaryAccess, $directorViewAccess, $identityAccess]);
+                        $pdo->prepare("INSERT INTO sys_staff (full_name, username, email, password_hash, role, position_id, job_title, department_id, access_eborrow, account_status, access_ecampaign, ecampaign_role, access_insurance, access_system_logs, access_site_settings, access_registry, access_edms, access_edms_sla_admin, access_ai, access_consumables, access_asset, access_finance, access_scholarship, access_dashboard_admin, access_monthly_report, access_nurse_productivity, access_daily_summary, access_director_view, access_identity) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+                            ->execute([$fullName, $username, $email, $hashed, $ebRole, $positionId, $jobTitle, $departmentId, $ebAccess, $status, $ecAccess, $ecRole, $insAccess, $logsAccess, $settAccess, $regAccess, $edmsAccess, $edmsSlaAdminAccess, $aiAccess, $consumablesAccess, $assetAccess, $financeAccess, $scholarshipAccess, $dashboardAccess, $monthlyReportAccess, $nurseProductivityAccess, $dailySummaryAccess, $directorViewAccess, $identityAccess]);
                         $targetId = (int)$pdo->lastInsertId();
+                        // LINE link on create (rare — admin มี UID เด็กในมือก่อนสร้าง)
+                        if ($linkedLineUid !== null) {
+                            try { $pdo->prepare("UPDATE sys_staff SET linked_line_user_id = ? WHERE id = ?")->execute([$linkedLineUid, $targetId]); } catch (PDOException) {}
+                        }
                     } else {
-                        $pdo->prepare("UPDATE sys_staff SET full_name=?, username=?, email=?, role=?, position_id=?, job_title=?, department_id=?, access_eborrow=?, account_status=?, access_ecampaign=?, ecampaign_role=?, access_insurance=?, access_system_logs=?, access_site_settings=?, access_registry=?, access_edms=?, access_ai=?, access_consumables=?, access_asset=?, access_finance=?, access_scholarship=?, access_dashboard_admin=?, access_monthly_report=?, access_nurse_productivity=?, access_daily_summary=?, access_director_view=?, access_identity=? WHERE id=?")
-                            ->execute([$fullName, $username, $email, $ebRole, $positionId, $jobTitle, $departmentId, $ebAccess, $status, $ecAccess, $ecRole, $insAccess, $logsAccess, $settAccess, $regAccess, $edmsAccess, $aiAccess, $consumablesAccess, $assetAccess, $financeAccess, $scholarshipAccess, $dashboardAccess, $monthlyReportAccess, $nurseProductivityAccess, $dailySummaryAccess, $directorViewAccess, $identityAccess, $targetId]);
+                        $pdo->prepare("UPDATE sys_staff SET full_name=?, username=?, email=?, role=?, position_id=?, job_title=?, department_id=?, access_eborrow=?, account_status=?, access_ecampaign=?, ecampaign_role=?, access_insurance=?, access_system_logs=?, access_site_settings=?, access_registry=?, access_edms=?, access_edms_sla_admin=?, access_ai=?, access_consumables=?, access_asset=?, access_finance=?, access_scholarship=?, access_dashboard_admin=?, access_monthly_report=?, access_nurse_productivity=?, access_daily_summary=?, access_director_view=?, access_identity=? WHERE id=?")
+                            ->execute([$fullName, $username, $email, $ebRole, $positionId, $jobTitle, $departmentId, $ebAccess, $status, $ecAccess, $ecRole, $insAccess, $logsAccess, $settAccess, $regAccess, $edmsAccess, $edmsSlaAdminAccess, $aiAccess, $consumablesAccess, $assetAccess, $financeAccess, $scholarshipAccess, $dashboardAccess, $monthlyReportAccess, $nurseProductivityAccess, $dailySummaryAccess, $directorViewAccess, $identityAccess, $targetId]);
                         if (!empty($password)) $pdo->prepare("UPDATE sys_staff SET password_hash=? WHERE id=?")->execute([password_hash($password, PASSWORD_DEFAULT), $targetId]);
+
+                        // LINE link (admin fallback): update เฉพาะถ้า field มีค่าใน POST (POST exists check แม่นกว่า — ป้องกัน clobber)
+                        if (array_key_exists('linked_line_user_id', $_POST)) {
+                            try {
+                                // ตรวจ duplicate ก่อน assign
+                                if ($linkedLineUid !== null) {
+                                    $dup = $pdo->prepare("SELECT id, full_name FROM sys_staff WHERE linked_line_user_id = ? AND id != ? LIMIT 1");
+                                    $dup->execute([$linkedLineUid, $targetId]);
+                                    $other = $dup->fetch(PDO::FETCH_ASSOC);
+                                    if ($other) {
+                                        throw new RuntimeException("LINE UID ถูกผูกกับ Staff อื่นแล้ว ({$other['full_name']})");
+                                    }
+                                }
+                                $pdo->prepare("UPDATE sys_staff SET linked_line_user_id = ? WHERE id = ?")->execute([$linkedLineUid, $targetId]);
+                            } catch (Throwable $e) {
+                                $idError = 'LINE UID: ' . $e->getMessage();
+                            }
+                        }
                     }
                 }
 
@@ -189,7 +220,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Whitelist flag keys ที่ระบบรู้จัก (ป้องกันยัด key แปลกปลอม)
         $allowedFlagKeys = [
             'access_ecampaign','access_eborrow','access_insurance','access_system_logs',
-            'access_site_settings','access_registry','access_edms',
+            'access_site_settings','access_registry','access_edms','access_edms_sla_admin',
             'access_ai','access_consumables','access_asset','access_finance','access_scholarship',
             'access_dashboard_admin','access_monthly_report','access_nurse_productivity','access_daily_summary','access_director_view',
             'access_identity',

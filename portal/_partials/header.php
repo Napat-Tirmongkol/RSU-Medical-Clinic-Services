@@ -78,15 +78,65 @@
                 <?php
                 // profile.php อ้าง sys_staff (admin_id ของ staff) — ทำลิงก์เฉพาะ staff session
                 $_canEditProfile = !empty($_SESSION['is_ecampaign_staff']);
+
+                // ── คำนวณ role label + tone ตาม session ────────────────────────
+                $_isStaff       = !empty($_SESSION['is_ecampaign_staff']);
+                $_isSuperRole   = ($_SESSION['admin_role'] ?? '') === 'superadmin'
+                                  || ($_SESSION['role'] ?? '') === 'superadmin';
+                $_rawRole       = $_SESSION['admin_role'] ?? $_SESSION['role'] ?? 'guest';
+                $_roleConfig = [
+                    'superadmin' => ['label' => 'Super Admin', 'icon' => 'fa-crown',       'grad' => 'linear-gradient(135deg, #a855f7, #ec4899)', 'shadow' => 'shadow-purple-500/30'],
+                    'admin'      => ['label' => 'Admin',       'icon' => 'fa-user-shield', 'grad' => 'linear-gradient(135deg, #2e9e63, #10b981)', 'shadow' => 'shadow-emerald-500/20'],
+                    'editor'     => ['label' => 'Editor',      'icon' => 'fa-user-pen',    'grad' => 'linear-gradient(135deg, #0ea5e9, #06b6d4)', 'shadow' => 'shadow-sky-500/20'],
+                    'employee'   => ['label' => 'Staff',       'icon' => 'fa-user',        'grad' => 'linear-gradient(135deg, #64748b, #94a3b8)', 'shadow' => 'shadow-slate-500/20'],
+                    'librarian'  => ['label' => 'Librarian',   'icon' => 'fa-book',        'grad' => 'linear-gradient(135deg, #f59e0b, #d97706)', 'shadow' => 'shadow-amber-500/20'],
+                    'guest'      => ['label' => 'Guest',       'icon' => 'fa-user-circle', 'grad' => 'linear-gradient(135deg, #94a3b8, #cbd5e1)', 'shadow' => 'shadow-slate-300/20'],
+                ];
+                $_rc = $_roleConfig[$_rawRole] ?? $_roleConfig['guest'];
+
+                // ── ดึง LINE profile (cache ใน session) ─────────────────────────
+                if ($_isStaff && !isset($_SESSION['_line_profile_cache'])) {
+                    // Auto-migrate columns (idempotent) — กัน prod ที่ยังไม่ได้รัน migration
+                    try { $pdo->exec("ALTER TABLE sys_staff ADD COLUMN IF NOT EXISTS line_display_name VARCHAR(120) NULL DEFAULT NULL"); } catch (PDOException) {}
+                    try { $pdo->exec("ALTER TABLE sys_staff ADD COLUMN IF NOT EXISTS line_picture_url VARCHAR(500) NULL DEFAULT NULL"); } catch (PDOException) {}
+
+                    try {
+                        $_pst = $pdo->prepare("SELECT IFNULL(line_picture_url,'') AS pic, IFNULL(line_display_name,'') AS name FROM sys_staff WHERE id = ? LIMIT 1");
+                        $_pst->execute([(int)($_SESSION['admin_id'] ?? 0)]);
+                        $_lp = $_pst->fetch(PDO::FETCH_ASSOC) ?: ['pic' => '', 'name' => ''];
+                        $_SESSION['_line_profile_cache'] = $_lp;
+                    } catch (PDOException) {
+                        $_SESSION['_line_profile_cache'] = ['pic' => '', 'name' => ''];
+                    }
+                }
+                $_linePic  = $_SESSION['_line_profile_cache']['pic']  ?? '';
+                $_lineName = $_SESSION['_line_profile_cache']['name'] ?? '';
+
+                // ── Build text block (role label + name) ────────────────────────
+                $_displayName = $_SESSION['admin_username'] ?? 'Administrator';
                 $_idTextHtml = '<div class="text-right hidden sm:block">'
-                             . '<div class="text-[9px] font-extrabold uppercase tracking-widest text-slate-500 leading-none mb-1">Admin</div>'
+                             . '<div class="text-[9px] font-extrabold uppercase tracking-widest leading-none mb-1" style="color:#64748b">' . htmlspecialchars($_rc['label']) . '</div>'
                              . '<div class="text-[13px] font-black text-slate-900 leading-none">'
-                             .   htmlspecialchars($_SESSION['admin_username'] ?? 'Administrator')
+                             .   htmlspecialchars($_displayName)
                              . '</div>'
                              . '</div>';
-                $_idAvatarHtml = '<div class="w-9 h-9 rounded-xl flex flex-shrink-0 items-center justify-center shadow-md shadow-emerald-500/20 text-sm" style="background: linear-gradient(135deg, #2e9e63, #10b981); color:#fff;">'
-                               . '<i class="fa-solid fa-user-shield"></i>'
-                               . '</div>';
+
+                // ── Build avatar (priority: LINE pic > role icon) ───────────────
+                if ($_linePic !== '') {
+                    $_idAvatarHtml = '<div class="relative w-9 h-9 flex-shrink-0">'
+                                   . '<img src="' . htmlspecialchars($_linePic) . '" alt="' . htmlspecialchars($_lineName ?: $_displayName) . '"'
+                                   .   ' class="w-9 h-9 rounded-xl object-cover shadow-md ' . $_rc['shadow'] . '"'
+                                   .   ' style="border:2px solid #06c755"'
+                                   .   ' onerror="this.outerHTML=\'<div class=&quot;w-9 h-9 rounded-xl flex items-center justify-center shadow-md ' . $_rc['shadow'] . ' text-sm&quot; style=&quot;background:' . $_rc['grad'] . ';color:#fff&quot;><i class=&quot;fa-solid ' . $_rc['icon'] . '&quot;></i></div>\'">'
+                                   . '<span class="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full flex items-center justify-center bg-white" title="เชื่อม LINE">'
+                                   .   '<i class="fa-brands fa-line text-[10px]" style="color:#06c755"></i>'
+                                   . '</span>'
+                                   . '</div>';
+                } else {
+                    $_idAvatarHtml = '<div class="w-9 h-9 rounded-xl flex flex-shrink-0 items-center justify-center shadow-md ' . $_rc['shadow'] . ' text-sm" style="background:' . $_rc['grad'] . ';color:#fff;">'
+                                   . '<i class="fa-solid ' . $_rc['icon'] . '"></i>'
+                                   . '</div>';
+                }
                 ?>
                 <?php if ($_canEditProfile): ?>
                     <a href="index.php?section=profile" title="แก้ไขโปรไฟล์เจ้าหน้าที่"
@@ -121,9 +171,33 @@
     var errorUrl   = <?= json_encode($notifErrorUrl) ?>;
     var bookingUrl = <?= json_encode($notifBookingUrl) ?>;
 
+    // ── Permission flags (จาก PHP session) ────────────────────────────
+    var canSeeErrors = <?= json_encode(
+        ($_SESSION['admin_role'] ?? '') === 'superadmin' ||
+        ($_SESSION['role'] ?? '') === 'superadmin' ||
+        !empty($_SESSION['access_system_logs'])
+    ) ?>;
+    var canSeeBookings = <?= json_encode(
+        ($_SESSION['admin_role'] ?? '') === 'superadmin' ||
+        ($_SESSION['role'] ?? '') === 'superadmin' ||
+        in_array($_SESSION['admin_role'] ?? '', ['admin'], true) ||
+        !empty($_SESSION['access_ecampaign'])
+    ) ?>;
+
+    // Filter raw counts ตาม permission ก่อน render (สำหรับ panel + badge total)
+    function filterByAccess(d) {
+        return {
+            status: d.status,
+            errors_today:     canSeeErrors   ? (d.errors_today || 0)     : 0,
+            pending_bookings: canSeeBookings ? (d.pending_bookings || 0) : 0,
+            total:            (canSeeErrors   ? (d.errors_today || 0)     : 0)
+                            + (canSeeBookings ? (d.pending_bookings || 0) : 0),
+        };
+    }
+
     function renderItems(d) {
         var html = '';
-        if (d.errors_today > 0) {
+        if (canSeeErrors && d.errors_today > 0) {
             html += '<a href="' + errorUrl + '" class="flex items-center gap-4 px-5 py-4 hover:bg-rose-50/50 transition-all group" style="display: flex; align-items: center; text-decoration: none;">'
                   + '<div class="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 shadow-sm group-hover:scale-110 transition-transform" style="background:#fff1f2;color:#e11d48; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">'
                   + '<i class="fa-solid fa-bug text-sm"></i></div>'
@@ -132,7 +206,7 @@
                   + '<div class="text-[11px] font-medium text-gray-500" style="white-space: nowrap;">' + d.errors_today + ' รายการใหม่</div></div>'
                   + '<i class="fa-solid fa-chevron-right text-[10px] text-gray-300 group-hover:text-rose-400 transition-colors shrink-0" style="flex-shrink: 0; margin-left: auto;"></i></a>';
         }
-        if (d.pending_bookings > 0) {
+        if (canSeeBookings && d.pending_bookings > 0) {
             html += '<a href="' + bookingUrl + '" class="flex items-center gap-4 px-5 py-4 hover:bg-amber-50/50 transition-all group" style="display: flex; align-items: center; text-decoration: none;">'
                   + '<div class="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 shadow-sm group-hover:scale-110 transition-transform" style="background:#fffbeb;color:#d97706; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">'
                   + '<i class="fa-solid fa-clock-rotate-left text-sm"></i></div>'
@@ -152,8 +226,9 @@
     function fetchNotifications() {
         fetch(ajaxUrl)
             .then(function (r) { return r.json(); })
-            .then(function (d) {
-                if (d.status !== 'success') return;
+            .then(function (raw) {
+                if (raw.status !== 'success') return;
+                var d = filterByAccess(raw);  // filter ตาม permission ก่อนใช้
                 var total = d.total;
                 if (total > 0) {
                     badge.textContent = total > 99 ? '99+' : total;
@@ -182,7 +257,7 @@
                 items.innerHTML = '<div class="px-4 py-8 text-sm text-gray-400 text-center">กำลังโหลด...</div>';
                 fetch(ajaxUrl)
                     .then(function (r) { return r.json(); })
-                    .then(renderItems)
+                    .then(function (raw) { renderItems(filterByAccess(raw)); })
                     .catch(function () {
                         items.innerHTML = '<div class="px-4 py-8 text-sm text-red-400 text-center">โหลดข้อมูลไม่สำเร็จ</div>';
                     });
