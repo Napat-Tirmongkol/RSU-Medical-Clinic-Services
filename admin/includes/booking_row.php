@@ -37,9 +37,9 @@ if (!function_exists('render_booking_rows')) {
     </td>
     <td class="px-3 py-2 text-center">
         <?php if ($b['status'] === 'booked'): ?>
-            <span class="px-2.5 py-1 bg-amber-50 text-amber-600 text-[10px] font-black uppercase rounded-full border border-amber-100 tracking-wider animate-pulse">Pending</span>
+            <span class="px-2.5 py-1 bg-amber-50 text-amber-600 text-[10px] font-black rounded-full border border-amber-100 tracking-wider animate-pulse">รออนุมัติ</span>
         <?php elseif ($b['status'] === 'confirmed'): ?>
-            <span class="px-2.5 py-1 bg-emerald-50 text-emerald-600 text-[10px] font-black uppercase rounded-full border border-emerald-100 tracking-wider">Confirmed</span>
+            <span class="px-2.5 py-1 bg-emerald-50 text-emerald-600 text-[10px] font-black rounded-full border border-emerald-100 tracking-wider">รอเข้าร่วม</span>
         <?php elseif ($b['status'] === 'completed'): ?>
             <span class="px-2.5 py-1 bg-teal-50 text-teal-600 text-[10px] font-black uppercase rounded-full border border-teal-100 tracking-wider">เข้าร่วมแล้ว</span>
         <?php elseif ($b['status'] === 'expired'): ?>

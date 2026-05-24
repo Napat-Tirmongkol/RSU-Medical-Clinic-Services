@@ -129,45 +129,45 @@ require_once __DIR__ . '/includes/header.php';
         <div class="bg-white border border-gray-100 p-4 px-6 rounded-[24px] shadow-sm flex items-center gap-4">
             <div class="w-12 h-12 bg-amber-50 text-amber-500 rounded-full flex items-center justify-center text-xl shadow-inner animate-pulse"><i class="fa-solid fa-clock-rotate-left"></i></div>
             <div>
-                <h5 class="text-[10px] text-amber-600 font-black uppercase tracking-widest">Pending</h5>
+                <h5 class="text-[10px] text-amber-600 font-black tracking-wider">รออนุมัติ</h5>
                 <p id="kpiPending" class="text-2xl font-black text-gray-900">' . number_format($total_pending) . '</p>
             </div>
         </div>
         <div class="bg-white border border-gray-100 p-4 px-6 rounded-[24px] shadow-sm flex items-center gap-4">
             <div class="w-12 h-12 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center text-xl shadow-inner"><i class="fa-solid fa-circle-check"></i></div>
             <div>
-                <h5 class="text-[10px] text-emerald-600 font-black uppercase tracking-widest">Confirmed</h5>
+                <h5 class="text-[10px] text-emerald-600 font-black tracking-wider">รอเข้าร่วม</h5>
                 <p id="kpiConfirmed" class="text-2xl font-black text-gray-900">' . number_format($total_confirmed) . '</p>
             </div>
         </div>
         <div class="bg-white border border-gray-100 p-4 px-6 rounded-[24px] shadow-sm flex items-center gap-4">
             <div class="w-12 h-12 bg-teal-50 text-teal-500 rounded-full flex items-center justify-center text-xl shadow-inner"><i class="fa-solid fa-user-check"></i></div>
             <div>
-                <h5 class="text-[10px] text-teal-600 font-black uppercase tracking-widest">เข้าร่วมแล้ว</h5>
+                <h5 class="text-[10px] text-teal-600 font-black tracking-wider">เข้าร่วมแล้ว</h5>
                 <p id="kpiCompleted" class="text-2xl font-black text-gray-900">' . number_format($total_completed) . '</p>
             </div>
         </div>';
-    renderPageHeader("Booking Management Center", "ศูนย์บริหารจัดการคิวการจองแบบองค์รวม", $header_actions);
+    renderPageHeader("ศูนย์จัดการคิวการจอง", "ดู · อนุมัติ · เช็คอินผู้เข้าร่วมทุกแคมเปญในที่เดียว", $header_actions);
     ?>
 
     <!-- FILTER BAR: Date range + Campaign + Export -->
     <section class="bg-white border border-gray-100 p-5 rounded-[32px] shadow-sm flex flex-wrap items-end gap-4">
         <div class="flex items-end gap-2">
             <div>
-                <label class="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1.5 pl-1">จากวันที่</label>
+                <label class="block text-[10px] font-black tracking-wider text-gray-400 mb-1.5 pl-1">จากวันที่</label>
                 <input type="date" id="filterDateFrom" value="<?= htmlspecialchars($dateFrom) ?>"
                     class="px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-2xl text-sm font-medium outline-none focus:ring-4 focus:ring-blue-50 focus:bg-white transition-all">
             </div>
             <span class="pb-2.5 text-gray-400 font-bold">—</span>
             <div>
-                <label class="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1.5 pl-1">ถึงวันที่</label>
+                <label class="block text-[10px] font-black tracking-wider text-gray-400 mb-1.5 pl-1">ถึงวันที่</label>
                 <input type="date" id="filterDateTo" value="<?= htmlspecialchars($dateTo) ?>"
                     class="px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-2xl text-sm font-medium outline-none focus:ring-4 focus:ring-blue-50 focus:bg-white transition-all">
             </div>
         </div>
 
         <div>
-            <label class="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1.5 pl-1">กิจกรรม</label>
+            <label class="block text-[10px] font-black tracking-wider text-gray-400 mb-1.5 pl-1">แคมเปญ</label>
             <select id="filterCampaign"
                 class="px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-2xl text-sm font-medium outline-none focus:ring-4 focus:ring-blue-50 focus:bg-white transition-all min-w-[200px]">
                 <option value="0">— ทุกกิจกรรม —</option>
@@ -180,8 +180,8 @@ require_once __DIR__ . '/includes/header.php';
         </div>
 
         <button onclick="exportCsv()"
-            class="px-5 py-2.5 bg-emerald-600 text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:brightness-110 active:scale-95 transition-all flex items-center gap-2 shadow-sm shadow-emerald-200 whitespace-nowrap self-end">
-            <i class="fa-solid fa-file-csv"></i> Export CSV
+            class="px-5 py-2.5 bg-emerald-600 text-white rounded-2xl text-xs font-black tracking-wider hover:brightness-110 active:scale-95 transition-all flex items-center gap-2 shadow-sm shadow-emerald-200 whitespace-nowrap self-end">
+            <i class="fa-solid fa-file-csv"></i> ดาวน์โหลด CSV
         </button>
     </section>
 
@@ -189,22 +189,22 @@ require_once __DIR__ . '/includes/header.php';
     <section class="bg-white border border-gray-100 p-5 rounded-[32px] shadow-sm flex flex-col lg:flex-row justify-between items-center gap-6">
         <div class="flex items-center gap-1.5 p-1.5 bg-gray-50 rounded-2xl overflow-x-auto no-scrollbar max-w-full">
             <button onclick="setStatusTab('all', this)"
-                class="status-tab tab-active px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all">All</button>
+                class="status-tab tab-active px-5 py-2.5 rounded-xl text-xs font-black tracking-wider transition-all">ทั้งหมด</button>
             <button onclick="setStatusTab('booked', this)"
-                class="status-tab px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest text-gray-400 hover:text-gray-900 transition-all flex items-center gap-2">
-                Pending <span id="badge-booked" class="px-2 py-0.5 bg-amber-100 text-amber-600 rounded-lg text-[10px]"><?= $total_pending ?></span>
+                class="status-tab px-5 py-2.5 rounded-xl text-xs font-black tracking-wider text-gray-400 hover:text-gray-900 transition-all flex items-center gap-2">
+                รออนุมัติ <span id="badge-booked" class="px-2 py-0.5 bg-amber-100 text-amber-600 rounded-lg text-[10px]"><?= $total_pending ?></span>
             </button>
             <button onclick="setStatusTab('confirmed', this)"
-                class="status-tab px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest text-gray-400 hover:text-gray-900 transition-all flex items-center gap-2">
-                Confirmed <span id="badge-confirmed" class="px-2 py-0.5 bg-emerald-100 text-emerald-600 rounded-lg text-[10px]"><?= $total_confirmed ?></span>
+                class="status-tab px-5 py-2.5 rounded-xl text-xs font-black tracking-wider text-gray-400 hover:text-gray-900 transition-all flex items-center gap-2">
+                รอเข้าร่วม <span id="badge-confirmed" class="px-2 py-0.5 bg-emerald-100 text-emerald-600 rounded-lg text-[10px]"><?= $total_confirmed ?></span>
             </button>
             <button onclick="setStatusTab('completed', this)"
-                class="status-tab px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest text-gray-400 hover:text-gray-900 transition-all flex items-center gap-2">
+                class="status-tab px-5 py-2.5 rounded-xl text-xs font-black tracking-wider text-gray-400 hover:text-gray-900 transition-all flex items-center gap-2">
                 เข้าร่วมแล้ว <span id="badge-completed" class="px-2 py-0.5 bg-teal-100 text-teal-600 rounded-lg text-[10px]"><?= $total_completed ?></span>
             </button>
             <button onclick="setStatusTab('cancelled', this)"
-                class="status-tab px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest text-gray-400 hover:text-gray-900 transition-all flex items-center gap-2">
-                Cancelled <span id="badge-cancelled" class="px-2 py-0.5 bg-red-100 text-red-600 rounded-lg text-[10px]"><?= $total_cancelled ?></span>
+                class="status-tab px-5 py-2.5 rounded-xl text-xs font-black tracking-wider text-gray-400 hover:text-gray-900 transition-all flex items-center gap-2">
+                ยกเลิก <span id="badge-cancelled" class="px-2 py-0.5 bg-red-100 text-red-600 rounded-lg text-[10px]"><?= $total_cancelled ?></span>
             </button>
         </div>
 
@@ -220,15 +220,15 @@ require_once __DIR__ . '/includes/header.php';
         <div class="overflow-x-auto">
             <table class="w-full text-left border-collapse whitespace-nowrap">
                 <thead>
-                    <tr class="bg-gray-50 text-gray-400 text-[10px] font-black uppercase tracking-[0.12em] border-b border-gray-100">
+                    <tr class="bg-gray-50 text-gray-400 text-[10px] font-black tracking-wider border-b border-gray-100">
                         <td class="px-3 py-3 w-10 text-center">
                             <input type="checkbox" onchange="toggleAllRows(this)" class="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
                         </td>
-                        <td class="px-3 py-3">Date & Time</td>
-                        <td class="px-3 py-3">User/Student</td>
-                        <td class="px-3 py-3">Campaign Info</td>
-                        <td class="px-3 py-3 text-center">Status</td>
-                        <td class="px-3 py-3 text-center">Quick Actions</td>
+                        <td class="px-3 py-3">วัน-เวลา</td>
+                        <td class="px-3 py-3">ผู้ใช้/นักศึกษา</td>
+                        <td class="px-3 py-3">ข้อมูลแคมเปญ</td>
+                        <td class="px-3 py-3 text-center">สถานะ</td>
+                        <td class="px-3 py-3 text-center">จัดการ</td>
                     </tr>
                 </thead>
                 <tbody id="bookingTbody" class="divide-y divide-gray-50">
@@ -247,7 +247,7 @@ require_once __DIR__ . '/includes/header.php';
 <div id="drawerOverlay" class="fixed inset-0 drawer-overlay hidden opacity-0" style="z-index:150" onclick="closeDrawer()"></div>
 <aside id="sideDrawer" class="fixed top-0 right-0 h-screen w-full md:w-[480px] bg-white shadow-2xl translate-x-full hidden flex flex-col transition-all duration-300" style="z-index:200">
     <div class="p-8 border-b border-gray-100 flex justify-between items-center">
-        <h3 class="text-2xl font-black text-gray-900 tracking-tight">Booking Info</h3>
+        <h3 class="text-2xl font-black text-gray-900 tracking-tight">ข้อมูลการจอง</h3>
         <button onclick="closeDrawer()" class="w-10 h-10 bg-gray-50 rounded-full flex items-center justify-center hover:bg-gray-100 transition-all">
             <i class="fa-solid fa-xmark"></i>
         </button>
@@ -259,18 +259,18 @@ require_once __DIR__ . '/includes/header.php';
 <!-- FLOATING ACTION BAR -->
 <div id="actionBar" class="fixed bottom-10 left-1/2 -translate-x-1/2 z-[50] glass-card px-8 py-4 rounded-[32px] shadow-2xl border-2 border-blue-600/10 hidden translate-y-full flex items-center gap-10">
     <div class="flex flex-col">
-        <span class="text-[10px] font-black uppercase tracking-widest text-blue-600 opacity-60">Operations</span>
+        <span class="text-[10px] font-black tracking-wider text-blue-600 opacity-60">การจัดการ</span>
         <span class="text-sm font-black text-gray-900"><span id="selectedCount">0</span> รายการที่เลือก</span>
     </div>
     <div class="flex items-center gap-3">
         <button onclick="bulkApprove()"
-            class="bg-blue-600 text-white px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl shadow-blue-200 hover:brightness-110 transition-all active:scale-95">Approve All</button>
+            class="bg-blue-600 text-white px-6 py-3 rounded-2xl text-xs font-black tracking-wider shadow-xl shadow-blue-200 hover:brightness-110 transition-all active:scale-95">อนุมัติทั้งหมด</button>
         <button onclick="bulkCheckin()"
             style="background-color:#0d9488;color:#fff;box-shadow:0 20px 25px -5px rgba(13,148,136,.3)"
-            class="px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest hover:brightness-110 transition-all active:scale-95">
-            <i class="fa-solid fa-user-check mr-1"></i>Check-in All</button>
+            class="px-6 py-3 rounded-2xl text-xs font-black tracking-wider hover:brightness-110 transition-all active:scale-95">
+            <i class="fa-solid fa-user-check mr-1"></i>เช็คอินทั้งหมด</button>
         <button onclick="bulkCancel()"
-            class="bg-white border border-gray-100 text-red-500 px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-red-50 transition-all active:scale-95">Cancel</button>
+            class="bg-white border border-gray-100 text-red-500 px-6 py-3 rounded-2xl text-xs font-black tracking-wider hover:bg-red-50 transition-all active:scale-95">ยกเลิก</button>
     </div>
 </div>
 
@@ -443,23 +443,23 @@ function openDrawer(dataStr) {
 
     document.getElementById('drawerContent').innerHTML = `
         <div class="space-y-3">
-            <span class="px-3 py-1 bg-blue-100 text-blue-700 text-[10px] font-black rounded-lg uppercase tracking-widest">Profile Detail</span>
+            <span class="px-3 py-1 bg-blue-100 text-blue-700 text-[10px] font-black rounded-lg tracking-wider">ข้อมูลผู้ใช้</span>
             <h4 class="text-4xl font-[900] text-gray-900 tracking-tight leading-tight">${data.full_name}</h4>
-            <p class="text-gray-400 font-bold uppercase tracking-widest text-sm underline decoration-blue-500 decoration-2">ID: ${data.student_personnel_id}</p>
+            <p class="text-gray-400 font-bold tracking-wider text-sm underline decoration-blue-500 decoration-2">รหัส: ${data.student_personnel_id}</p>
         </div>
         <div class="grid grid-cols-2 gap-8">
             <div>
-                <label class="text-[10px] font-black uppercase tracking-widest text-gray-400 block mb-2">Primary Phone</label>
+                <label class="text-[10px] font-black tracking-wider text-gray-400 block mb-2">เบอร์โทรศัพท์</label>
                 <p class="text-xl font-black text-gray-800">${data.phone_number}</p>
             </div>
             <div>
-                <label class="text-[10px] font-black uppercase tracking-widest text-gray-400 block mb-2">Campaign Unit</label>
+                <label class="text-[10px] font-black tracking-wider text-gray-400 block mb-2">รหัสแคมเปญ</label>
                 <p class="text-xl font-black text-primary">#${data.campaign_id}</p>
             </div>
         </div>
         <div class="space-y-6">
             <div class="p-8 bg-gray-50 rounded-[32px] border border-gray-100">
-                <label class="text-[10px] font-black uppercase tracking-widest text-gray-400 block mb-4">Booked Schedule</label>
+                <label class="text-[10px] font-black tracking-wider text-gray-400 block mb-4">ตารางที่จอง</label>
                 <div class="flex items-center gap-5">
                     <div class="w-14 h-14 bg-white rounded-2xl flex items-center justify-center text-2xl text-primary shadow-sm"><i class="fa-regular fa-calendar-check"></i></div>
                     <div>
@@ -469,22 +469,22 @@ function openDrawer(dataStr) {
                 </div>
             </div>
             <div class="p-8 bg-gray-50 rounded-[32px] border border-gray-100">
-                <label class="text-[10px] font-black uppercase tracking-widest text-gray-400 block mb-4">Selected Activity</label>
+                <label class="text-[10px] font-black tracking-wider text-gray-400 block mb-4">แคมเปญที่เลือก</label>
                 <p class="text-base font-bold text-gray-800 leading-relaxed">${data.campaign_title}</p>
             </div>
         </div>`;
 
     document.getElementById('drawerFooter').innerHTML =
         data.status === 'booked' ? `
-            <button onclick="approveOne(${data.booking_id})" class="flex-1 bg-blue-600 text-white py-5 rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-blue-200">Approve Booking</button>
-            <button onclick="rejectOne(${data.booking_id})" class="flex-1 bg-white text-red-500 py-5 rounded-2xl font-black uppercase tracking-widest text-xs border border-gray-200">Reject</button>`
+            <button onclick="approveOne(${data.booking_id})" class="flex-1 bg-blue-600 text-white py-5 rounded-2xl font-black tracking-wider text-xs shadow-xl shadow-blue-200">อนุมัติการจอง</button>
+            <button onclick="rejectOne(${data.booking_id})" class="flex-1 bg-white text-red-500 py-5 rounded-2xl font-black tracking-wider text-xs border border-gray-200">ปฏิเสธ</button>`
         : data.status === 'confirmed' ? `
-            <button onclick="checkinOne(${data.booking_id})" class="flex-1 bg-[#0052CC] text-white py-5 rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-blue-200"><i class="fa-solid fa-user-check mr-2"></i>รับเข้าร่วมงาน</button>
-            <button onclick="rescheduleOne(${data.booking_id})" class="flex-1 bg-orange-500 text-white py-5 rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-orange-200">เลื่อนคิว</button>`
+            <button onclick="checkinOne(${data.booking_id})" class="flex-1 bg-[#0052CC] text-white py-5 rounded-2xl font-black tracking-wider text-xs shadow-xl shadow-blue-200"><i class="fa-solid fa-user-check mr-2"></i>รับเข้าร่วมงาน</button>
+            <button onclick="rescheduleOne(${data.booking_id})" class="flex-1 bg-orange-500 text-white py-5 rounded-2xl font-black tracking-wider text-xs shadow-xl shadow-orange-200">เลื่อนคิว</button>`
         : data.status === 'completed' ? `
-            <button onclick="cancelAttendanceOne(${data.booking_id})" class="flex-1 bg-rose-500 text-white py-5 rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-rose-200"><i class="fa-solid fa-rotate-left mr-2"></i>ยกเลิกการเข้าร่วม</button>
-            <button onclick="closeDrawer()" class="flex-none px-6 bg-white border border-gray-200 text-gray-500 py-5 rounded-2xl font-black uppercase tracking-widest text-xs">ปิด</button>`
-        : `<button onclick="closeDrawer()" class="w-full bg-gray-900 text-white py-5 rounded-2xl font-black uppercase tracking-widest text-xs">Close Profile</button>`;
+            <button onclick="cancelAttendanceOne(${data.booking_id})" class="flex-1 bg-rose-500 text-white py-5 rounded-2xl font-black tracking-wider text-xs shadow-xl shadow-rose-200"><i class="fa-solid fa-rotate-left mr-2"></i>ยกเลิกการเข้าร่วม</button>
+            <button onclick="closeDrawer()" class="flex-none px-6 bg-white border border-gray-200 text-gray-500 py-5 rounded-2xl font-black tracking-wider text-xs">ปิด</button>`
+        : `<button onclick="closeDrawer()" class="w-full bg-gray-900 text-white py-5 rounded-2xl font-black tracking-wider text-xs">ปิดหน้าโปรไฟล์</button>`;
 
     drawer.classList.remove('hidden');
     overlay.classList.remove('hidden');
@@ -535,7 +535,7 @@ function updateActionBar() {
 
 // ── API actions ───────────────────────────────────────────────────────────────
 function approveOne(id) {
-    Swal.fire({ title:'ยืนยันการอนุมัติ?', text:'ระบบจะเปลี่ยนสถานะเป็น Confirmed', icon:'question',
+    Swal.fire({ title:'ยืนยันการอนุมัติ?', text:'ระบบจะเปลี่ยนสถานะเป็น "รอเข้าร่วม"', icon:'question',
         showCancelButton:true, confirmButtonColor:'#0052CC', confirmButtonText:'ใช่, อนุมัติเลย', cancelButtonText:'ยกเลิก'
     }).then(r => r.isConfirmed && performApiCall('ajax/ajax_approve_booking.php', id, 'อนุมัติเรียบร้อย!', 'success', 'confirmed'));
 }
@@ -551,7 +551,7 @@ function checkinOne(id) {
     Swal.fire({ title:'รับเข้าร่วมงาน?', text:'สถานะจะเปลี่ยนเป็น "เข้าร่วมแล้ว"', icon:'question',
         showCancelButton:true, confirmButtonColor:'#0d9488', confirmButtonText:'ยืนยัน', cancelButtonText:'ยกเลิก',
         customClass:{title:'font-prompt',confirmButton:'font-prompt',cancelButton:'font-prompt'}
-    }).then(r => { if (r.isConfirmed) { closeDrawer(); performApiCall('ajax/ajax_checkin_booking.php', id, 'Check-in สำเร็จ!', 'success', 'completed'); }});
+    }).then(r => { if (r.isConfirmed) { closeDrawer(); performApiCall('ajax/ajax_checkin_booking.php', id, 'เช็คอินสำเร็จ!', 'success', 'completed'); }});
 }
 
 function rescheduleOne(id) {
@@ -613,7 +613,7 @@ function bulkApprove() {
 
 function bulkCheckin() {
     const ids = getSelectedIds();
-    Swal.fire({ title:`Check-in ทั้งหมด ${ids.length} รายการ?`, text:'เฉพาะรายการที่มีสถานะ Confirmed เท่านั้น', icon:'question',
+    Swal.fire({ title:`เช็คอินทั้งหมด ${ids.length} รายการ?`, text:'เฉพาะรายการที่มีสถานะ "รอเข้าร่วม" เท่านั้น', icon:'question',
         showCancelButton:true, confirmButtonColor:'#0d9488', confirmButtonText:'ยืนยัน Check-in',
         customClass:{title:'font-prompt',confirmButton:'font-prompt',cancelButton:'font-prompt'}
     }).then(result => {
@@ -683,8 +683,8 @@ function updateRowStatus(id, newStatus) {
     const actionDiv = tr.querySelector('td:last-child div');
     if (statusTd) {
         const badges = {
-            confirmed: '<span class="px-4 py-1.5 bg-emerald-50 text-emerald-600 text-[10px] font-black uppercase rounded-full border border-emerald-100 tracking-widest">Confirmed</span>',
-            completed: '<span class="px-4 py-1.5 bg-teal-50 text-teal-600 text-[10px] font-black uppercase rounded-full border border-teal-100 tracking-widest">เข้าร่วมแล้ว</span>',
+            confirmed: '<span class="px-4 py-1.5 bg-emerald-50 text-emerald-600 text-[10px] font-black rounded-full border border-emerald-100 tracking-wider">รอเข้าร่วม</span>',
+            completed: '<span class="px-4 py-1.5 bg-teal-50 text-teal-600 text-[10px] font-black rounded-full border border-teal-100 tracking-wider">เข้าร่วมแล้ว</span>',
         };
         statusTd.innerHTML = badges[newStatus] || `<span class="px-4 py-1.5 bg-gray-50 text-gray-400 text-[10px] font-black uppercase rounded-full tracking-widest">${newStatus}</span>`;
     }
