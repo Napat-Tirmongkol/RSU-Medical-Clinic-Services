@@ -105,7 +105,7 @@ if ($campaign) {
             GROUP BY s.start_time, s.end_time
             HAVING cnt > 0
             ORDER BY cnt DESC, s.start_time ASC
-            LIMIT 8
+            LIMIT 6
         ");
         $st->execute([':id' => $campaignId]);
         $slotTimeTrend = $st->fetchAll(PDO::FETCH_ASSOC);
@@ -188,10 +188,11 @@ $dailySlotAgg = array_values($dailySlotAgg);
 
 // Top-attended days (ranked by people who actually came) — for the
 // "วันที่มีคนเข้ามาใช้บริการมากที่สุด" section. Drop days with zero
-// attendance so the list stays focused.
+// attendance so the list stays focused. Top 8 keeps the report at
+// 2 print pages for typical campaigns.
 $topAttendedDays = array_values(array_filter($dailySlotAgg, fn($d) => (int)$d['attended'] > 0));
 usort($topAttendedDays, fn($a, $b) => (int)$b['attended'] <=> (int)$a['attended']);
-$topAttendedDays = array_slice($topAttendedDays, 0, 10);
+$topAttendedDays = array_slice($topAttendedDays, 0, 8);
 
 // ─────────────────────────────────────────────────────────────
 // Helpers
@@ -361,9 +362,9 @@ if (!$printMode) {
 .cr-band {
     background: linear-gradient(135deg, #2e9e63 0%, #3bba7a 100%);
     color:#fff;
-    padding: 22px 26px;
+    padding: 18px 22px;
     border-radius: 12px;
-    margin-bottom: 22px;
+    margin-bottom: 16px;
     position:relative;
     overflow:hidden;
 }
@@ -383,17 +384,17 @@ if (!$printMode) {
 /* Section title */
 .cr-h {
     display:flex; align-items:center; gap:10px;
-    margin: 22px 0 12px 0; font-size:13pt; font-weight:800; color:#0f172a;
+    margin: 16px 0 10px 0; font-size:13pt; font-weight:800; color:#0f172a;
     border-left:4px solid #2e9e63; padding-left:10px;
 }
 
 /* KPI grid */
 .cr-kpi {
-    display:grid; grid-template-columns: repeat(4, 1fr); gap:10px; margin-bottom:8px;
+    display:grid; grid-template-columns: repeat(4, 1fr); gap:8px; margin-bottom:6px;
 }
 .cr-kpi-tile {
-    border:1.5px solid #e5e7eb; border-radius:12px; padding:12px 14px; background:#fafafa;
-    display:flex; flex-direction:column; gap:4px;
+    border:1.5px solid #e5e7eb; border-radius:12px; padding:10px 12px; background:#fafafa;
+    display:flex; flex-direction:column; gap:3px;
 }
 .cr-kpi-tile.is-brand   { background:linear-gradient(180deg,#ecfdf5,#fff); border-color:#bbf7d0; }
 .cr-kpi-tile.is-info    { background:linear-gradient(180deg,#eff6ff,#fff); border-color:#bfdbfe; }
@@ -419,9 +420,9 @@ if (!$printMode) {
 .cr-donut { width:170px; height:170px; margin:0 auto; }
 
 /* Tables */
-.cr-table { width:100%; border-collapse:collapse; font-size:10.5pt; margin-bottom:10px; }
-.cr-table th { background:#f1f5f9; padding:8px 10px; text-align:left; font-weight:700; color:#334155; border-bottom:2px solid #cbd5e1; }
-.cr-table td { padding:7px 10px; border-bottom:1px solid #f1f5f9; vertical-align:top; }
+.cr-table { width:100%; border-collapse:collapse; font-size:10.5pt; margin-bottom:8px; }
+.cr-table th { background:#f1f5f9; padding:6px 9px; text-align:left; font-weight:700; color:#334155; border-bottom:2px solid #cbd5e1; }
+.cr-table td { padding:5px 9px; border-bottom:1px solid #f1f5f9; vertical-align:middle; }
 .cr-table tr:nth-child(even) td { background:#fafbfc; }
 .cr-table tr:hover td { background:#f0fdf4; }
 .cr-status-pill { display:inline-block; padding:2px 9px; border-radius:999px; font-size:9pt; font-weight:700; }
@@ -454,9 +455,13 @@ if (!$printMode) {
         -webkit-print-color-adjust: exact; print-color-adjust: exact;
     }
     .cr-h, .cr-kpi { page-break-inside: avoid; }
-    .cr-table { page-break-inside: auto; }
+    .cr-table { page-break-inside: avoid; }
     .cr-table tr { page-break-inside: avoid; page-break-after: auto; }
     thead { display: table-header-group; }
+    /* Keep participants callout together — small block, no point splitting */
+    .cr-participants-callout, .cr-footer { page-break-inside: avoid; }
+    /* Keep section heading with its first content (avoid orphan heading) */
+    .cr-h + * { page-break-before: avoid; }
 }
 
 @media (max-width: 720px) {
@@ -699,7 +704,7 @@ $today = date('Y-m-d');
     </div>
     <p style="font-size:9.5pt;color:#94a3b8;margin-top:0;">
         <i class="fa-solid fa-circle-info"></i>
-        รวมยอดจองจากทุกวันตามช่วงเวลาเริ่มรอบ (ไม่นับที่ยกเลิก) · แสดงสูงสุด 8 ช่วงเวลา
+        รวมยอดจองจากทุกวันตามช่วงเวลาเริ่มรอบ (ไม่นับที่ยกเลิก) · แสดงสูงสุด 6 ช่วงเวลา
     </p>
     <?php endif; ?>
 
@@ -748,7 +753,7 @@ $today = date('Y-m-d');
     </table>
     <p style="font-size:9.5pt;color:#94a3b8;margin-top:-4px;">
         <i class="fa-solid fa-circle-info"></i>
-        เรียงตามจำนวนคน "มาตามนัด" จากมากไปน้อย · แสดงสูงสุด 10 วัน · ตัดวันที่ไม่มีคนมาออก
+        เรียงตามจำนวนคน "มาตามนัด" จากมากไปน้อย · แสดงสูงสุด 8 วัน · ตัดวันที่ไม่มีคนมาออก
         <?php if (count($dailySlotAgg) > count($topAttendedDays)): ?>
             · ทั้งแคมเปญมี <?= count($dailySlotAgg) ?> วัน — ดูครบทุกวันได้ในไฟล์ CSV
         <?php endif; ?>
@@ -758,7 +763,7 @@ $today = date('Y-m-d');
     <!-- Participants summary callout (ยุบตารางรายชื่อ → callout ดาวน์โหลด) -->
     <?php if (!empty($participants)): ?>
     <div class="cr-h"><i class="fa-solid fa-users text-[#2e9e63]"></i> รายชื่อผู้เข้าร่วม</div>
-    <div style="background:linear-gradient(135deg,#f0fdf4,#ecfdf5);border:1.5px solid #bbf7d0;border-radius:14px;padding:18px 22px;display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;">
+    <div class="cr-participants-callout" style="background:linear-gradient(135deg,#f0fdf4,#ecfdf5);border:1.5px solid #bbf7d0;border-radius:14px;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;">
         <div style="flex:1;min-width:240px;">
             <div style="font-size:11pt;font-weight:800;color:#15803d;letter-spacing:.04em;text-transform:uppercase;margin-bottom:4px;">
                 <i class="fa-solid fa-database"></i> มีผู้ลงทะเบียนรวม <?= number_format(count($participants)) ?> ราย
