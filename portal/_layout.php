@@ -66,7 +66,12 @@ function layout_end(): void
 {
     global $pdo, $adminRole, $isStaff, $isSuper, $registryOnly,
            $hasRegistry, $hasInsurance, $hasSysLogs, $hasSiteSet, $hasEdms,
-           $hasInsuranceGroup, $hasSecurityGroup;
+           $hasInsuranceGroup, $hasSecurityGroup,
+           $ann_saved;  // referenced by _layout_bottom.php's announcement-modal auto-open
+
+    // Defensive default — _init.php sets this to false, but on pages that
+    // don't pull _init (legacy entry points) avoid an undefined-variable warning.
+    if (!isset($ann_saved)) $ann_saved = false;
 
     // Recover the section context that layout_start() saved.
     // _layout_bottom.php references $activeSection (e.g. LINE-link prompt skip on profile)
