@@ -64,20 +64,28 @@ $typeColors = ['exam'=>'emerald','vaccination'=>'blue','lab'=>'purple','consult'
 
     <form id="rm-add" onsubmit="rmAdd(event)" class="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 mb-6">
         <p class="text-[11px] font-black uppercase tracking-widest text-slate-500 mb-4">เพิ่มห้องใหม่</p>
-        <div class="grid grid-cols-2 md:grid-cols-6 gap-3">
-            <input type="text" name="code" placeholder="รหัส *" required
-                class="px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 outline-none">
+        <div class="grid grid-cols-2 md:grid-cols-12 gap-3 mb-2">
+            <input type="text" name="code" id="rm-add-code" placeholder="รหัส (เว้นว่างได้)" title="รหัสเรียกขานสั้นๆ เช่น R1, ER, VAC-01 · เว้นว่างให้ระบบสร้างให้"
+                class="md:col-span-2 px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 outline-none focus:border-amber-400 focus:bg-white">
             <input type="text" name="name" placeholder="ชื่อห้อง *" required
-                class="md:col-span-2 px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 outline-none">
-            <select name="type" class="px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 outline-none">
+                class="md:col-span-4 px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 outline-none focus:border-amber-400 focus:bg-white">
+            <select name="type" id="rm-add-type" onchange="rmRefreshSuggestedCode()" class="md:col-span-2 px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 outline-none focus:border-amber-400 focus:bg-white">
                 <?php foreach ($typeLabels as $k=>$l): ?><option value="<?= $k ?>"><?= $l ?></option><?php endforeach; ?>
             </select>
-            <input type="number" name="capacity" min="1" value="1" placeholder="ความจุ"
-                class="px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 outline-none">
-            <button type="submit" class="px-4 py-2.5 bg-amber-500 text-white rounded-xl text-sm font-black hover:bg-amber-600 transition-all flex items-center justify-center gap-2">
+            <input type="number" name="capacity" min="1" value="1" placeholder="ความจุ" title="ความจุ (คน)"
+                class="md:col-span-1 px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 outline-none focus:border-amber-400 focus:bg-white">
+            <input type="text" name="floor" placeholder="ชั้น" title="ชั้น (ไม่บังคับ)"
+                class="md:col-span-1 px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 outline-none focus:border-amber-400 focus:bg-white">
+            <button type="submit" class="md:col-span-2 px-4 py-2.5 bg-amber-500 text-white rounded-xl text-sm font-black hover:bg-amber-600 transition-all flex items-center justify-center gap-2">
                 <i class="fa-solid fa-plus"></i>เพิ่ม
             </button>
         </div>
+        <p class="text-[11px] text-slate-400 mb-3">
+            <i class="fa-solid fa-circle-info text-slate-300 mr-1"></i>
+            <strong>รหัส</strong> = ตัวอักษรสั้นๆ ใช้อ้างอิงห้องในระบบ (เช่น R1, ER, VAC-01) · เว้นว่างให้ระบบตั้งให้อัตโนมัติเป็น <span id="rm-code-suggest" class="font-mono font-bold text-amber-600">EXM-01</span>
+        </p>
+        <textarea name="notes" rows="2" placeholder="รายละเอียดเพิ่มเติม (ไม่บังคับ) — เช่น อุปกรณ์ที่มี · ตำแหน่งที่ตั้ง · เบอร์โทรภายใน"
+            class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-700 outline-none focus:border-amber-400 focus:bg-white resize-none"></textarea>
     </form>
 
     <div class="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
@@ -98,12 +106,12 @@ $typeColors = ['exam'=>'emerald','vaccination'=>'blue','lab'=>'purple','consult'
                 <thead class="bg-slate-50 text-[10px] font-black uppercase tracking-widest text-slate-400">
                     <tr>
                         <th class="px-5 py-3 text-left">รหัส</th>
-                        <th class="px-5 py-3 text-left">ชื่อห้อง</th>
+                        <th class="px-5 py-3 text-left">ชื่อ / รายละเอียด</th>
                         <th class="px-5 py-3 text-left">ประเภท</th>
                         <th class="px-5 py-3 text-center">ความจุ</th>
                         <th class="px-5 py-3 text-left">ชั้น</th>
                         <th class="px-5 py-3 text-center">สถานะ</th>
-                        <th class="px-5 py-3"></th>
+                        <th class="px-5 py-3 text-right">จัดการ</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-50">
@@ -111,23 +119,33 @@ $typeColors = ['exam'=>'emerald','vaccination'=>'blue','lab'=>'purple','consult'
                         <tr><td colspan="7" class="px-5 py-12 text-center text-slate-400 font-bold text-sm">— ยังไม่มีข้อมูล —</td></tr>
                     <?php else: foreach ($rows as $r):
                         $color = $typeColors[$r['type']] ?? 'slate';
+                        $rowJson = htmlspecialchars(json_encode($r, JSON_UNESCAPED_UNICODE), ENT_QUOTES);
                     ?>
                         <tr class="hover:bg-slate-50/60" id="room-row-<?= (int)$r['id'] ?>">
-                            <td class="px-5 py-3 font-mono font-black text-slate-700 text-xs"><?= htmlspecialchars($r['code']) ?></td>
-                            <td class="px-5 py-3 font-black text-slate-800"><?= htmlspecialchars($r['name']) ?></td>
-                            <td class="px-5 py-3"><span class="inline-flex px-2.5 py-0.5 rounded-full bg-<?= $color ?>-50 text-<?= $color ?>-700 border border-<?= $color ?>-100 text-[10px] font-black"><?= htmlspecialchars($typeLabels[$r['type']] ?? $r['type']) ?></span></td>
-                            <td class="px-5 py-3 text-center font-black text-slate-700"><?= (int)$r['capacity'] ?></td>
-                            <td class="px-5 py-3 text-xs font-bold text-slate-500"><?= htmlspecialchars($r['floor'] ?: '-') ?></td>
-                            <td class="px-5 py-3 text-center">
+                            <td class="px-5 py-3 font-mono font-black text-slate-700 text-xs align-top"><?= htmlspecialchars($r['code']) ?></td>
+                            <td class="px-5 py-3 align-top">
+                                <div class="font-black text-slate-800"><?= htmlspecialchars($r['name']) ?></div>
+                                <?php if (!empty($r['notes'])): ?>
+                                <div class="mt-1 text-[11px] text-slate-500 font-medium line-clamp-2 max-w-md" title="<?= htmlspecialchars($r['notes']) ?>">
+                                    <i class="fa-regular fa-note-sticky text-slate-300 mr-1"></i><?= htmlspecialchars($r['notes']) ?>
+                                </div>
+                                <?php endif; ?>
+                            </td>
+                            <td class="px-5 py-3 align-top"><span class="inline-flex px-2.5 py-0.5 rounded-full bg-<?= $color ?>-50 text-<?= $color ?>-700 border border-<?= $color ?>-100 text-[10px] font-black"><?= htmlspecialchars($typeLabels[$r['type']] ?? $r['type']) ?></span></td>
+                            <td class="px-5 py-3 text-center font-black text-slate-700 align-top"><?= (int)$r['capacity'] ?></td>
+                            <td class="px-5 py-3 text-xs font-bold text-slate-500 align-top"><?= htmlspecialchars($r['floor'] ?: '-') ?></td>
+                            <td class="px-5 py-3 text-center align-top">
                                 <button onclick="rmToggle(<?= (int)$r['id'] ?>)"
                                     class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black border <?= $r['is_active'] ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-slate-100 text-slate-500 border-slate-200' ?>">
                                     <span class="w-1.5 h-1.5 rounded-full <?= $r['is_active'] ? 'bg-emerald-500' : 'bg-slate-400' ?>"></span>
                                     <?= $r['is_active'] ? 'Active' : 'Inactive' ?>
                                 </button>
                             </td>
-                            <td class="px-5 py-3 text-right">
+                            <td class="px-5 py-3 text-right align-top whitespace-nowrap">
+                                <button onclick='rmEdit(<?= $rowJson ?>)'
+                                    class="text-blue-500 hover:bg-blue-50 px-2 py-1 rounded text-xs" title="แก้ไข"><i class="fa-solid fa-pen-to-square"></i></button>
                                 <button onclick="rmDelete(<?= (int)$r['id'] ?>, '<?= htmlspecialchars(addslashes($r['name']), ENT_QUOTES) ?>')"
-                                    class="text-rose-500 hover:bg-rose-50 px-2 py-1 rounded text-xs"><i class="fa-solid fa-trash"></i></button>
+                                    class="text-rose-500 hover:bg-rose-50 px-2 py-1 rounded text-xs" title="ลบ"><i class="fa-solid fa-trash"></i></button>
                             </td>
                         </tr>
                     <?php endforeach; endif; ?>
@@ -156,7 +174,83 @@ $typeColors = ['exam'=>'emerald','vaccination'=>'blue','lab'=>'purple','consult'
     </div>
 </div>
 
+<!-- Edit Modal — teleported to body via rmEdit() to escape stacking context -->
+<div id="rmEditModal" class="hidden fixed inset-0 items-center justify-center" style="background:rgba(15,23,42,.55);backdrop-filter:blur(6px);z-index:9000">
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-2xl mx-4 overflow-hidden" style="max-height:90vh;display:flex;flex-direction:column">
+        <div class="px-6 py-4 border-b border-slate-100 flex items-center gap-3">
+            <div class="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center text-blue-600">
+                <i class="fa-solid fa-pen-to-square"></i>
+            </div>
+            <div class="flex-1">
+                <h3 class="text-lg font-black text-slate-800">แก้ไขห้อง / พื้นที่</h3>
+                <p class="text-[11px] text-slate-400 font-medium">เปลี่ยนแปลงจะมีผลทันทีต่อแคมเปญและรอบเวลาที่อ้างถึง</p>
+            </div>
+            <button type="button" onclick="rmCloseEdit()" class="w-9 h-9 rounded-full hover:bg-slate-100 text-slate-400 text-sm flex items-center justify-center"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <form id="rm-edit-form" onsubmit="rmUpdate(event)" class="p-6 space-y-4 overflow-y-auto" style="min-height:0">
+            <input type="hidden" name="id" id="rm-edit-id">
+            <div class="grid grid-cols-2 md:grid-cols-12 gap-3">
+                <div class="md:col-span-3">
+                    <label class="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1.5">รหัส *</label>
+                    <input type="text" name="code" id="rm-edit-code" required
+                        class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 outline-none focus:border-blue-400 focus:bg-white">
+                </div>
+                <div class="md:col-span-9">
+                    <label class="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1.5">ชื่อห้อง *</label>
+                    <input type="text" name="name" id="rm-edit-name" required
+                        class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 outline-none focus:border-blue-400 focus:bg-white">
+                </div>
+                <div class="md:col-span-6">
+                    <label class="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1.5">ประเภท</label>
+                    <select name="type" id="rm-edit-type" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 outline-none focus:border-blue-400 focus:bg-white">
+                        <?php foreach ($typeLabels as $k=>$l): ?><option value="<?= $k ?>"><?= $l ?></option><?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="md:col-span-3">
+                    <label class="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1.5">ความจุ (คน)</label>
+                    <input type="number" name="capacity" id="rm-edit-capacity" min="1" value="1"
+                        class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 outline-none focus:border-blue-400 focus:bg-white">
+                </div>
+                <div class="md:col-span-3">
+                    <label class="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1.5">ชั้น</label>
+                    <input type="text" name="floor" id="rm-edit-floor" placeholder="เช่น 2"
+                        class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 outline-none focus:border-blue-400 focus:bg-white">
+                </div>
+            </div>
+            <div>
+                <label class="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1.5">รายละเอียดเพิ่มเติม</label>
+                <textarea name="notes" id="rm-edit-notes" rows="4"
+                    placeholder="อุปกรณ์ที่มี · ตำแหน่งที่ตั้ง · เบอร์โทรภายใน · เวลาให้บริการ (ถ้าต่างจากคลินิคหลัก)"
+                    class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-700 outline-none focus:border-blue-400 focus:bg-white resize-none"></textarea>
+            </div>
+        </form>
+        <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
+            <button type="button" onclick="rmCloseEdit()" class="px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl text-sm font-bold hover:bg-slate-50">ยกเลิก</button>
+            <button type="button" onclick="document.getElementById('rm-edit-form').requestSubmit()" class="px-5 py-2 bg-blue-600 text-white rounded-xl text-sm font-black hover:bg-blue-700 flex items-center gap-2">
+                <i class="fa-solid fa-save"></i> บันทึก
+            </button>
+        </div>
+    </div>
+</div>
+
 <script>
+// Suggested code preview — mirrors the server-side generator
+const RM_TYPE_PREFIX = { exam:'EXM', vaccination:'VAC', lab:'LAB', consult:'CON', other:'OTH' };
+const RM_EXISTING_CODES = <?= json_encode(array_column($rows, 'code'), JSON_UNESCAPED_UNICODE) ?>;
+function rmRefreshSuggestedCode() {
+    const t = document.getElementById('rm-add-type')?.value || 'exam';
+    const prefix = RM_TYPE_PREFIX[t] || 'OTH';
+    // find next number 01..99 not already taken (server still validates)
+    let n = 1;
+    while (RM_EXISTING_CODES.includes(`${prefix}-${String(n).padStart(2,'0')}`) && n < 99) n++;
+    const suggested = `${prefix}-${String(n).padStart(2,'0')}`;
+    const el = document.getElementById('rm-code-suggest');
+    if (el) el.textContent = suggested;
+    const inp = document.getElementById('rm-add-code');
+    if (inp) inp.placeholder = `เว้นว่าง = ${suggested}`;
+}
+document.addEventListener('DOMContentLoaded', rmRefreshSuggestedCode);
+
 function cdReload(view) {
     const url = new URL(window.location.origin + window.location.pathname + window.location.search);
     url.searchParams.set('section', 'clinic_data');
@@ -189,4 +283,42 @@ async function rmToggle(id) {
     const res = await rmPost('toggle', {id});
     if (res.ok) cdReload('rooms');
 }
+
+// ── Edit modal — teleport to body to escape stacking context ──────
+function rmEditTeleport() {
+    const el = document.getElementById('rmEditModal');
+    if (el && el.parentElement !== document.body) document.body.appendChild(el);
+    return el;
+}
+function rmEdit(row) {
+    const m = rmEditTeleport();
+    document.getElementById('rm-edit-id').value       = row.id;
+    document.getElementById('rm-edit-code').value     = row.code     || '';
+    document.getElementById('rm-edit-name').value     = row.name     || '';
+    document.getElementById('rm-edit-type').value     = row.type     || 'exam';
+    document.getElementById('rm-edit-capacity').value = row.capacity || 1;
+    document.getElementById('rm-edit-floor').value    = row.floor    || '';
+    document.getElementById('rm-edit-notes').value    = row.notes    || '';
+    m.classList.remove('hidden');
+    m.classList.add('flex');
+}
+function rmCloseEdit() {
+    const m = document.getElementById('rmEditModal');
+    m.classList.add('hidden');
+    m.classList.remove('flex');
+}
+async function rmUpdate(e) {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const res = await rmPost('update', Object.fromEntries(fd.entries()));
+    if (res.ok) { showPortalToast(res.message, 'success'); setTimeout(()=>cdReload('rooms'),600); }
+    else Swal.fire('Error', res.message, 'error');
+}
+// Click backdrop or Escape to close
+document.addEventListener('click', e => {
+    if (e.target.id === 'rmEditModal') rmCloseEdit();
+});
+document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') rmCloseEdit();
+});
 </script>

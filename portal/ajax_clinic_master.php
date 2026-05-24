@@ -385,8 +385,38 @@ try {
 
         // ── Rooms ────────────────────────────────────────────────────────
         case 'rooms:add':
+            $code = trim((string)($_POST['code'] ?? ''));
+            $type = $_POST['type'] ?? 'exam';
+            if ($code === '') {
+                // Auto-generate from type prefix + next sequential 2-digit number
+                $prefixMap = ['exam'=>'EXM','vaccination'=>'VAC','lab'=>'LAB','consult'=>'CON','other'=>'OTH'];
+                $prefix = $prefixMap[$type] ?? 'OTH';
+                for ($i = 1; $i < 1000; $i++) {
+                    $try = sprintf('%s-%02d', $prefix, $i);
+                    $chk = $pdo->prepare("SELECT 1 FROM sys_clinic_rooms WHERE code = ? LIMIT 1");
+                    $chk->execute([$try]);
+                    if (!$chk->fetchColumn()) { $code = $try; break; }
+                }
+            }
             $stmt = $pdo->prepare("INSERT INTO sys_clinic_rooms (code, name, type, capacity, floor, notes)
                 VALUES (?, ?, ?, ?, ?, ?)");
+            $stmt->execute([
+                $code,
+                trim((string)($_POST['name'] ?? '')),
+                $type,
+                max(1, (int)($_POST['capacity'] ?? 1)),
+                trim((string)($_POST['floor'] ?? '')) ?: null,
+                trim((string)($_POST['notes'] ?? '')) ?: null,
+            ]);
+            echo json_encode(['ok' => true, 'message' => "เพิ่มห้องแล้ว (รหัส $code)"]);
+            return;
+
+        case 'rooms:update':
+            $id = (int)($_POST['id'] ?? 0);
+            if ($id <= 0) { echo json_encode(['ok' => false, 'message' => 'invalid id']); return; }
+            $stmt = $pdo->prepare("UPDATE sys_clinic_rooms
+                SET code = ?, name = ?, type = ?, capacity = ?, floor = ?, notes = ?
+                WHERE id = ?");
             $stmt->execute([
                 trim((string)($_POST['code'] ?? '')),
                 trim((string)($_POST['name'] ?? '')),
@@ -394,8 +424,9 @@ try {
                 max(1, (int)($_POST['capacity'] ?? 1)),
                 trim((string)($_POST['floor'] ?? '')) ?: null,
                 trim((string)($_POST['notes'] ?? '')) ?: null,
+                $id,
             ]);
-            echo json_encode(['ok' => true, 'message' => 'เพิ่มห้องแล้ว']);
+            echo json_encode(['ok' => true, 'message' => 'บันทึกแล้ว']);
             return;
 
         case 'rooms:delete':

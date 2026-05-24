@@ -78,6 +78,95 @@ if (!$line_user_id) {
     die("Authentication failed. (ไม่สามารถรับ Profile ได้)");
 }
 
+// ════════════════════════════════════════════════════════════════════════
+// Staff Link Flow — ถ้ามาจาก staff_link_line.php → จัดการแยก ไม่ใช่ user flow
+// ════════════════════════════════════════════════════════════════════════
+if (($_SESSION['line_login_flow'] ?? '') === 'staff_link') {
+    $staffId = (int)($_SESSION['line_login_staff_id'] ?? 0);
+    $startedAt = (int)($_SESSION['line_login_started_at'] ?? 0);
+
+    // Cleanup markers
+    unset($_SESSION['line_login_flow'], $_SESSION['line_login_staff_id'], $_SESSION['line_login_started_at']);
+
+    // Safety: ถ้า session marker เก่าเกิน 10 นาที → reject
+    if ($staffId <= 0 || (time() - $startedAt) > 600) {
+        $_SESSION['line_link_flash'] = ['ok' => false, 'msg' => 'session หมดอายุ กรุณาเริ่มเชื่อม LINE อีกครั้ง'];
+        header('Location: ../portal/index.php?section=profile');
+        exit;
+    }
+
+    try {
+        $pdo = db();
+
+        // ── Auto-migrate columns เผื่อยังไม่รัน migration ──
+        try { $pdo->exec("ALTER TABLE sys_staff ADD COLUMN IF NOT EXISTS notify_sla_via_line TINYINT(1) NOT NULL DEFAULT 1"); } catch (PDOException) {}
+        try { $pdo->exec("ALTER TABLE sys_staff ADD COLUMN IF NOT EXISTS line_display_name VARCHAR(120) NULL DEFAULT NULL"); } catch (PDOException) {}
+        try { $pdo->exec("ALTER TABLE sys_staff ADD COLUMN IF NOT EXISTS line_picture_url VARCHAR(500) NULL DEFAULT NULL"); } catch (PDOException) {}
+
+        // ── ตรวจว่า line_user_id นี้ถูกผูกกับ staff คนอื่นแล้วหรือไม่ ──
+        $check = $pdo->prepare("SELECT id, full_name FROM sys_staff WHERE linked_line_user_id = ? AND id != ? LIMIT 1");
+        $check->execute([$line_user_id, $staffId]);
+        $existing = $check->fetch(PDO::FETCH_ASSOC);
+
+        if ($existing) {
+            $_SESSION['line_link_flash'] = [
+                'ok' => false,
+                'msg' => 'LINE บัญชีนี้ถูกผูกกับ Staff คนอื่นแล้ว (' . htmlspecialchars($existing['full_name']) . ') — กรุณาใช้บัญชี LINE อื่น',
+            ];
+            header('Location: ../portal/index.php?section=profile');
+            exit;
+        }
+
+        // ── Save linked_line_user_id + display name + picture + audit ──
+        $upd = $pdo->prepare("UPDATE sys_staff SET linked_line_user_id = ?, line_display_name = ?, line_picture_url = ? WHERE id = ?");
+        $upd->execute([$line_user_id, $displayName, $linePicture ?: null, $staffId]);
+
+        // Audit log (best-effort)
+        try {
+            $audit = $pdo->prepare("INSERT INTO sys_access_audit_logs (target_id, target_type, changed_by, justification, change_snapshot) VALUES (?, 'staff_line_link', ?, ?, ?)");
+            $audit->execute([
+                $staffId,
+                $staffId,
+                'Self-service LINE link via OAuth',
+                json_encode([
+                    'line_user_id' => $line_user_id,
+                    'display_name' => $displayName,
+                    'ip_address'   => $_SERVER['REMOTE_ADDR'] ?? null,
+                    'user_agent'   => $_SERVER['HTTP_USER_AGENT'] ?? null,
+                ], JSON_UNESCAPED_UNICODE),
+            ]);
+        } catch (PDOException) { /* table may not exist */ }
+
+        // ── ส่ง LINE push ยืนยัน (best-effort) ──
+        try {
+            require_once __DIR__ . '/../includes/line_helper.php';
+            $secretsPath = __DIR__ . '/../config/secrets.php';
+            $secrets = is_file($secretsPath) ? (require $secretsPath) : [];
+            $msgToken = $secrets['LINE_MESSAGING_CHANNEL_ACCESS_TOKEN'] ?? '';
+            if ($msgToken !== '') {
+                $st2 = $pdo->prepare("SELECT full_name FROM sys_staff WHERE id = ?");
+                $st2->execute([$staffId]);
+                $staffName = $st2->fetchColumn() ?: '';
+                $welcome = "✅ เชื่อมบัญชีสำเร็จ\n\nยินดีต้อนรับ คุณ {$staffName}\n\nคุณจะได้รับการแจ้งเตือนผ่าน LINE สำหรับ:\n• SLA warning / breach\n• เอกสารใหม่ที่ถูกมอบหมาย\n• การ escalation\n\nตั้งค่าได้ที่หน้าโปรไฟล์ของระบบ";
+                send_line_push($line_user_id, [['type' => 'text', 'text' => $welcome]], $msgToken);
+            }
+        } catch (Throwable $e) {
+            error_log('[staff_link] welcome push failed: ' . $e->getMessage());
+        }
+
+        // Invalidate header LINE profile cache → reload on next request
+        unset($_SESSION['_line_profile_cache']);
+
+        $_SESSION['line_link_flash'] = ['ok' => true, 'msg' => 'เชื่อมบัญชี LINE สำเร็จ — เราได้ส่งข้อความยืนยันไปยัง LINE ของคุณแล้ว'];
+    } catch (Throwable $e) {
+        error_log('[staff_link] save failed: ' . $e->getMessage());
+        $_SESSION['line_link_flash'] = ['ok' => false, 'msg' => 'เกิดข้อผิดพลาดในการบันทึก: ' . $e->getMessage()];
+    }
+
+    header('Location: ../portal/index.php?section=profile');
+    exit;
+}
+
 try {
     $pdo = db();
     

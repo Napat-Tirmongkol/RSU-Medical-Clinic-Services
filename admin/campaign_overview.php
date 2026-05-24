@@ -5,6 +5,9 @@ require_once __DIR__ . '/includes/auth.php';
 
 $pdo = db();
 
+// Ensure walkin_enabled column exists (idempotent — same logic in campaigns.php)
+try { $pdo->exec("ALTER TABLE camp_list ADD COLUMN IF NOT EXISTS walkin_enabled TINYINT(1) NOT NULL DEFAULT 0"); } catch (PDOException) {}
+
 // รับ campaign_id จาก GET
 $campaignId = (int)($_GET['id'] ?? 0);
 
@@ -32,11 +35,8 @@ if ($campaignId > 0) {
 
     if ($campaign) {
         $cap = (int)$campaign['total_capacity'];
-        $used = (int)$campaign['used_capacity'];
-        $remaining = max(0, $cap - $used);
-        $pct = $cap > 0 ? round($used / $cap * 100) : 0;
-
-        $stats = compact('cap', 'used', 'remaining', 'pct');
+        $used = (int)$campaign['used_capacity'];  // booked + confirmed (active pipeline)
+        $stats = compact('cap', 'used');
 
         // สถิติแยกตามสถานะ
         $stmt2 = $pdo->prepare("
@@ -49,21 +49,33 @@ if ($campaignId > 0) {
             $statusBreakdown[$row['status']] = (int)$row['cnt'];
         }
 
-        // Trend รายวัน (30 วันล่าสุด)
+        // คำนวณ remaining/pct โดยรวม completed ด้วย (โควต้าที่ "ถูกใช้ไปจริง")
+        $stats['awaiting']  = $statusBreakdown['confirmed'] ?? 0;
+        $stats['attended']  = $statusBreakdown['completed'] ?? 0;
+        $stats['occupied']  = $used + $stats['attended'];  // booked + confirmed + completed
+        $stats['remaining'] = max(0, $cap - $stats['occupied']);
+        $stats['pct']       = $cap > 0 ? round($stats['occupied'] / $cap * 100) : 0;
+
+        // Trend รายวัน — 30 วันล่าสุดที่มีการจอง (ไม่ใช่ 30 calendar days)
+        // ที่เปลี่ยน: filter "created_at >= NOW() - 30 day" ทำให้แคมเปญที่จองนานแล้วได้กราฟว่าง
         $stmt3 = $pdo->prepare("
-            SELECT DATE(created_at) AS day, COUNT(*) AS cnt
-            FROM camp_bookings
-            WHERE campaign_id = :id AND created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
-            GROUP BY DATE(created_at)
-            ORDER BY day ASC
+            SELECT day, cnt FROM (
+                SELECT DATE(created_at) AS day, COUNT(*) AS cnt
+                FROM camp_bookings
+                WHERE campaign_id = :id
+                GROUP BY DATE(created_at)
+                ORDER BY day DESC
+                LIMIT 30
+            ) t ORDER BY day ASC
         ");
         $stmt3->execute([':id' => $campaignId]);
         $dailyTrend = $stmt3->fetchAll(PDO::FETCH_ASSOC);
 
-        // การใช้งานรายรอบ (slot utilization)
+        // การใช้งานรายรอบ (slot utilization) — นับทุกการจองที่ "ครองโควต้า" จริง
+        // (booked + confirmed + completed + expired) ไม่นับยกเลิกที่คืนโควต้าแล้ว
         $stmt4 = $pdo->prepare("
             SELECT s.id, s.slot_date, s.start_time, s.end_time, s.max_capacity,
-                COUNT(CASE WHEN b.status IN ('booked','confirmed') THEN 1 END) AS booked_cnt
+                COUNT(CASE WHEN b.status NOT IN ('cancelled','cancelled_by_admin') THEN 1 END) AS booked_cnt
             FROM camp_slots s
             LEFT JOIN camp_bookings b ON b.slot_id = s.id
             WHERE s.campaign_id = :id
@@ -74,7 +86,14 @@ if ($campaignId > 0) {
         $stmt4->execute([':id' => $campaignId]);
         $slotUtil = $stmt4->fetchAll(PDO::FETCH_ASSOC);
 
-        // รายชื่อผู้จองล่าสุด
+        // รายชื่อผู้จอง — 25/หน้า (CLAUDE.md: pagination required)
+        $bookingsPerPage = 25;
+        $bookingsPage    = max(1, (int)($_GET['bp'] ?? 1));
+        $bookingsTotal   = (int)$pdo->query("SELECT COUNT(*) FROM camp_bookings WHERE campaign_id = " . (int)$campaignId)->fetchColumn();
+        $bookingsPages   = max(1, (int)ceil($bookingsTotal / $bookingsPerPage));
+        if ($bookingsPage > $bookingsPages) $bookingsPage = $bookingsPages;
+        $bookingsOffset  = ($bookingsPage - 1) * $bookingsPerPage;
+
         $stmt5 = $pdo->prepare("
             SELECT b.id, b.status, b.created_at,
                 u.full_name, u.student_personnel_id, u.phone_number,
@@ -84,10 +103,19 @@ if ($campaignId > 0) {
             JOIN camp_slots s ON b.slot_id = s.id
             WHERE b.campaign_id = :id
             ORDER BY b.created_at DESC
-            LIMIT 100
+            LIMIT :lim OFFSET :off
         ");
-        $stmt5->execute([':id' => $campaignId]);
+        $stmt5->bindValue(':id',  $campaignId,      PDO::PARAM_INT);
+        $stmt5->bindValue(':lim', $bookingsPerPage, PDO::PARAM_INT);
+        $stmt5->bindValue(':off', $bookingsOffset,  PDO::PARAM_INT);
+        $stmt5->execute();
         $recentBookings = $stmt5->fetchAll(PDO::FETCH_ASSOC);
+    }
+}
+
+if (!function_exists('co_pager_url')) {
+    function co_pager_url(string $param, int $page): string {
+        $q = $_GET; $q[$param] = $page; return '?' . http_build_query($q);
     }
 }
 
@@ -146,6 +174,25 @@ require_once __DIR__ . '/includes/header.php';
             <a href="campaigns.php" class="text-sm text-blue-600 hover:underline whitespace-nowrap flex-shrink-0">
                 <i class="fa-solid fa-pen-to-square mr-1"></i>แก้ไขแคมเปญ
             </a>
+            <?php
+                $_coWalkinOn     = (int)($campaign['walkin_enabled'] ?? 0) === 1;
+                $_coExpired      = !empty($campaign['available_until']) && $campaign['available_until'] < date('Y-m-d');
+                $_coWalkinBlocked = ($campaign['status'] !== 'active') || $_coExpired;
+            ?>
+            <button type="button"
+                    onclick="showWalkinQrModalCo(<?= (int)$campaignId ?>, <?= $_coWalkinOn ? 1 : 0 ?>, <?= $_coWalkinBlocked ? 1 : 0 ?>, '<?= htmlspecialchars($campaign['status'], ENT_QUOTES) ?>')"
+                    class="text-sm <?= $_coWalkinBlocked ? 'text-gray-400' : 'text-amber-700' ?> hover:underline whitespace-nowrap flex-shrink-0 inline-flex items-center gap-1 cursor-pointer bg-transparent border-0 p-0"
+                    title="<?= $_coWalkinBlocked ? 'Walk-in ปิดอัตโนมัติเพราะสถานะแคมเปญ' : 'QR Walk-in ลงทะเบียนหน้างาน' ?>">
+                <i class="fa-solid fa-person-walking"></i>QR Walk-in
+                <?php if ($_coWalkinOn && !$_coWalkinBlocked): ?>
+                <span class="inline-block w-1.5 h-1.5 bg-amber-500 rounded-full ml-1" title="เปิดอยู่"></span>
+                <?php elseif ($_coWalkinOn && $_coWalkinBlocked): ?>
+                <span class="inline-block w-1.5 h-1.5 bg-orange-500 rounded-full ml-1" title="เปิดไว้แต่สถานะแคมเปญปิดอยู่"></span>
+                <?php endif; ?>
+            </button>
+            <a href="campaign_report.php?id=<?= (int)$campaignId ?>" target="_blank" class="text-sm text-emerald-600 hover:underline whitespace-nowrap flex-shrink-0">
+                <i class="fa-solid fa-print mr-1"></i>พิมพ์รายงาน / PDF
+            </a>
             <?php endif; ?>
         </div>
     </div>
@@ -166,21 +213,33 @@ require_once __DIR__ . '/includes/header.php';
 <?php
 // ข้อมูลสำหรับ charts (encode เป็น JSON)
 $statusColors = [
-    'confirmed'          => '#22c55e',
     'booked'             => '#f59e0b',
+    'confirmed'          => '#14b8a6',
+    'completed'          => '#2e9e63',
     'cancelled'          => '#ef4444',
     'cancelled_by_admin' => '#9ca3af',
+    'expired'            => '#64748b',
 ];
 $statusLabelsMap = [
-    'confirmed'          => 'ยืนยันแล้ว',
-    'booked'             => 'รอยืนยัน',
+    'booked'             => 'รออนุมัติ',
+    'confirmed'          => 'รอเข้าร่วม',
+    'completed'          => 'เข้าร่วมแล้ว',
     'cancelled'          => 'ยกเลิก (ผู้ใช้)',
     'cancelled_by_admin' => 'ยกเลิก (Admin)',
+    'expired'            => 'ไม่มาตามนัด',
 ];
+// แสดงเรียงตาม lifecycle (รออนุมัติ → รอเข้าร่วม → เข้าร่วม → ยกเลิก/expired)
+$statusOrder = ['booked','confirmed','completed','expired','cancelled','cancelled_by_admin'];
 $donutLabels = [];
 $donutData   = [];
 $donutColors = [];
-foreach ($statusBreakdown as $st => $cnt) {
+// เรียงตาม lifecycle ก่อน → ที่เหลือต่อท้าย
+$orderedStatuses = array_merge(
+    array_intersect($statusOrder, array_keys($statusBreakdown)),
+    array_diff(array_keys($statusBreakdown), $statusOrder)
+);
+foreach ($orderedStatuses as $st) {
+    $cnt = $statusBreakdown[$st];
     $donutLabels[] = $statusLabelsMap[$st] ?? $st;
     $donutData[]   = $cnt;
     $donutColors[] = $statusColors[$st] ?? '#6b7280';
@@ -234,13 +293,14 @@ foreach ($slotUtil as $sl) {
 </div>
 
 <!-- KPI Cards -->
-<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
     <?php
     $cards = [
-        ['label' => 'โควต้าทั้งหมด', 'value' => number_format($stats['cap']),      'icon' => 'fa-users',          'color' => 'text-blue-600',   'bg' => 'bg-blue-50'],
-        ['label' => 'จองแล้ว',        'value' => number_format($stats['used']),     'icon' => 'fa-clipboard-check','color' => 'text-green-600',  'bg' => 'bg-green-50'],
-        ['label' => 'คงเหลือ',        'value' => number_format($stats['remaining']),'icon' => 'fa-circle-dot',    'color' => 'text-amber-600',  'bg' => 'bg-amber-50'],
-        ['label' => 'เต็ม',           'value' => $stats['pct'] . '%',              'icon' => 'fa-chart-pie',      'color' => 'text-purple-600', 'bg' => 'bg-purple-50'],
+        ['label' => 'โควต้าทั้งหมด', 'value' => number_format($stats['cap']),      'icon' => 'fa-users',           'color' => 'text-blue-600',   'bg' => 'bg-blue-50'],
+        ['label' => 'เข้าร่วมแล้ว',  'value' => number_format($stats['attended']), 'icon' => 'fa-circle-check',    'color' => 'text-green-600',  'bg' => 'bg-green-50'],
+        ['label' => 'รอเข้าร่วม',     'value' => number_format($stats['awaiting']), 'icon' => 'fa-user-clock',      'color' => 'text-teal-600',   'bg' => 'bg-teal-50'],
+        ['label' => 'คงเหลือ',        'value' => number_format($stats['remaining']),'icon' => 'fa-circle-dot',      'color' => 'text-amber-600',  'bg' => 'bg-amber-50'],
+        ['label' => 'เต็ม',           'value' => $stats['pct'] . '%',              'icon' => 'fa-chart-pie',       'color' => 'text-purple-600', 'bg' => 'bg-purple-50'],
     ];
     foreach ($cards as $i => $card):
     ?>
@@ -252,10 +312,19 @@ foreach ($slotUtil as $sl) {
             </div>
         </div>
         <p class="text-3xl font-[950] text-gray-900"><?= $card['value'] ?></p>
-        <?php if ($i === 3): ?>
+        <?php if ($card['label'] === 'เต็ม'): ?>
         <div class="mt-3 h-2 bg-gray-100 rounded-full overflow-hidden">
             <div class="h-full bg-purple-400 rounded-full transition-all" style="width:<?= min(100,$stats['pct']) ?>%"></div>
         </div>
+        <p class="mt-1.5 text-[10px] text-gray-400">จากผู้ครองโควต้า <?= number_format($stats['occupied']) ?> คน</p>
+        <?php elseif ($card['label'] === 'คงเหลือ'): ?>
+        <p class="mt-2 text-[11px] text-gray-400">
+            <?= number_format($stats['cap']) ?> − <?= number_format($stats['attended']) ?> − <?= number_format($stats['awaiting']) ?>
+        </p>
+        <?php elseif ($card['label'] === 'รอเข้าร่วม' && $stats['awaiting'] > 0): ?>
+        <p class="mt-2 text-[11px] text-gray-400">
+            <i class="fa-regular fa-calendar mr-1"></i>รอวันงาน · ยังไม่มาเช็คอิน
+        </p>
         <?php endif; ?>
     </div>
     <?php endforeach; ?>
@@ -266,9 +335,14 @@ foreach ($slotUtil as $sl) {
 
     <!-- Donut: สถานะ -->
     <div class="card p-5 fade-up" style="animation-delay:.1s">
-        <h3 class="font-bold text-gray-700 mb-4 flex items-center gap-2">
-            <i class="fa-solid fa-chart-donut text-blue-500"></i> สัดส่วนสถานะการจอง
-        </h3>
+        <div class="mb-4">
+            <h3 class="font-bold text-gray-700 flex items-center gap-2">
+                <i class="fa-solid fa-chart-donut text-blue-500"></i> สัดส่วนสถานะการจอง
+            </h3>
+            <p class="text-[11px] text-gray-400 mt-1">
+                ประวัติทั้งหมดของแคมเปญ (รวมเข้าร่วมแล้ว · ยกเลิก · ไม่มาตามนัด) — ไม่เท่ากับ "จองแล้ว" ใน KPI ด้านบนที่นับเฉพาะคิวที่ยังอยู่ในระบบ
+            </p>
+        </div>
         <?php if (!empty($donutData)): ?>
         <div class="flex flex-col sm:flex-row items-center gap-6">
             <div class="relative w-44 h-44 shrink-0">
@@ -296,7 +370,7 @@ foreach ($slotUtil as $sl) {
     <!-- Line: Trend รายวัน -->
     <div class="card p-5 fade-up" style="animation-delay:.15s">
         <h3 class="font-bold text-gray-700 mb-4 flex items-center gap-2">
-            <i class="fa-solid fa-chart-line text-purple-500"></i> การจองรายวัน (30 วันล่าสุด)
+            <i class="fa-solid fa-chart-line text-purple-500"></i> การจองรายวัน (30 วันล่าสุดที่มีข้อมูล)
         </h3>
         <?php if (!empty($trendData)): ?>
         <canvas id="trendChart" height="160"></canvas>
@@ -309,9 +383,14 @@ foreach ($slotUtil as $sl) {
 <!-- Slot Utilization Bar Chart -->
 <?php if (!empty($slotUtil)): ?>
 <div class="card p-5 mb-6 fade-up" style="animation-delay:.2s">
-    <h3 class="font-bold text-gray-700 mb-4 flex items-center gap-2">
-        <i class="fa-solid fa-chart-column text-teal-500"></i> การใช้งานรายรอบเวลา
-    </h3>
+    <div class="mb-4">
+        <h3 class="font-bold text-gray-700 flex items-center gap-2">
+            <i class="fa-solid fa-chart-column text-teal-500"></i> การใช้งานรายรอบเวลา
+        </h3>
+        <p class="text-[11px] text-gray-400 mt-1">
+            แท่งเขียว = คนที่ครองโควต้าจริง (รออนุมัติ + รอเข้าร่วม + เข้าร่วมแล้ว + ไม่มาตามนัด) · แท่งเทาอ่อน = โควต้ารวมของรอบ
+        </p>
+    </div>
     <div class="overflow-x-auto">
         <div style="min-width:<?= max(400, count($slotUtil) * 54) ?>px; height:220px;">
             <canvas id="slotChart"></canvas>
@@ -323,13 +402,17 @@ foreach ($slotUtil as $sl) {
 <!-- Bookings Table -->
 <div class="card p-5 fade-up" style="animation-delay:.25s">
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-        <h3 class="font-bold text-gray-700 flex items-center gap-2">
+        <h3 class="font-bold text-gray-700 flex items-center gap-2 flex-wrap">
             <i class="fa-solid fa-list text-gray-400"></i>
             รายชื่อผู้จอง
-            <span class="ml-1 text-xs font-semibold bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full"><?= count($recentBookings) ?></span>
+            <span class="ml-1 text-xs font-semibold bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full"><?= number_format($bookingsTotal) ?></span>
+            <?php if ($bookingsPages > 1): ?>
+            <span class="text-[11px] font-normal text-gray-400">หน้า <?= $bookingsPage ?>/<?= $bookingsPages ?></span>
+            <?php endif; ?>
         </h3>
         <div class="flex gap-2">
-            <input id="bookingSearch" type="text" placeholder="ค้นหาชื่อ / รหัส..."
+            <input id="bookingSearch" type="text" placeholder="ค้นหาในหน้านี้..."
+                title="ค้นหาเฉพาะหน้าปัจจุบัน · ต้องการค้นหาทุกหน้า ให้ใช้หน้า ผู้เข้าร่วม"
                 class="border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-300 w-52">
             <a href="reports.php?campaign_id=<?= $campaignId ?>" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-xl transition-colors flex items-center gap-1.5">
                 <i class="fa-solid fa-download text-xs"></i> Export
@@ -379,6 +462,40 @@ foreach ($slotUtil as $sl) {
             </tbody>
         </table>
     </div>
+
+    <?php if ($bookingsPages > 1): ?>
+    <!-- Pagination — 25/page · window ±2 per CLAUDE.md -->
+    <div class="mt-4 pt-3 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-3">
+        <p class="text-[11px] text-gray-400">
+            แสดง <?= number_format($bookingsOffset + 1) ?>–<?= number_format(min($bookingsOffset + $bookingsPerPage, $bookingsTotal)) ?>
+            จากทั้งหมด <?= number_format($bookingsTotal) ?> รายการ
+        </p>
+        <div class="flex items-center gap-1">
+            <?php
+            $win = 2;
+            $showFirst = $bookingsPage > $win + 1;
+            $showLast  = $bookingsPage < $bookingsPages - $win;
+            ?>
+            <a href="<?= co_pager_url('bp', 1) ?>" class="px-2 py-1 text-xs rounded-lg <?= $bookingsPage===1 ? 'pointer-events-none text-gray-300' : 'text-gray-500 hover:bg-gray-100' ?>" title="หน้าแรก">«</a>
+            <a href="<?= co_pager_url('bp', max(1, $bookingsPage - 1)) ?>" class="px-2 py-1 text-xs rounded-lg <?= $bookingsPage===1 ? 'pointer-events-none text-gray-300' : 'text-gray-500 hover:bg-gray-100' ?>" title="ก่อนหน้า">‹</a>
+            <?php if ($showFirst): ?>
+                <a href="<?= co_pager_url('bp', 1) ?>" class="px-2.5 py-1 text-xs rounded-lg text-gray-500 hover:bg-gray-100">1</a>
+                <span class="text-gray-300 text-xs">…</span>
+            <?php endif; ?>
+            <?php for ($p = max(1, $bookingsPage - $win); $p <= min($bookingsPages, $bookingsPage + $win); $p++): ?>
+                <a href="<?= co_pager_url('bp', $p) ?>"
+                   class="px-2.5 py-1 text-xs rounded-lg font-semibold <?= $p === $bookingsPage ? 'text-white' : 'text-gray-500 hover:bg-gray-100' ?>"
+                   style="<?= $p === $bookingsPage ? 'background:#0052CC' : '' ?>"><?= $p ?></a>
+            <?php endfor; ?>
+            <?php if ($showLast): ?>
+                <span class="text-gray-300 text-xs">…</span>
+                <a href="<?= co_pager_url('bp', $bookingsPages) ?>" class="px-2.5 py-1 text-xs rounded-lg text-gray-500 hover:bg-gray-100"><?= $bookingsPages ?></a>
+            <?php endif; ?>
+            <a href="<?= co_pager_url('bp', min($bookingsPages, $bookingsPage + 1)) ?>" class="px-2 py-1 text-xs rounded-lg <?= $bookingsPage===$bookingsPages ? 'pointer-events-none text-gray-300' : 'text-gray-500 hover:bg-gray-100' ?>" title="ถัดไป">›</a>
+            <a href="<?= co_pager_url('bp', $bookingsPages) ?>" class="px-2 py-1 text-xs rounded-lg <?= $bookingsPage===$bookingsPages ? 'pointer-events-none text-gray-300' : 'text-gray-500 hover:bg-gray-100' ?>" title="หน้าสุดท้าย">»</a>
+        </div>
+    </div>
+    <?php endif; ?>
     <?php endif; ?>
 </div>
 
@@ -483,5 +600,225 @@ document.getElementById('bookingSearch')?.addEventListener('input', function() {
 </script>
 
 <?php endif; // end if $campaign ?>
+
+<!-- ══ Walk-in QR Modal (mirrored from campaigns.php for reuse) ══════════════ -->
+<div id="walkinQrOverlayCo"
+     class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden items-center justify-center p-4"
+     style="display:none;z-index:9000">
+  <div class="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden">
+
+    <div class="flex items-center justify-between px-5 py-4"
+         style="background:linear-gradient(135deg,#d97706,#f59e0b)">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center">
+          <i class="fa-solid fa-person-walking text-white"></i>
+        </div>
+        <div>
+          <p class="text-white font-black text-sm">QR Walk-in</p>
+          <p class="text-white/80 text-[11px]" id="walkinQrTitleCo">—</p>
+        </div>
+      </div>
+      <button onclick="closeWalkinQrModalCo()"
+              class="w-8 h-8 bg-white/20 hover:bg-white/30 rounded-xl flex items-center justify-center transition-all">
+        <i class="fa-solid fa-times text-white text-sm"></i>
+      </button>
+    </div>
+
+    <div class="flex flex-col items-center px-6 pt-6 pb-4">
+
+      <!-- Status warning banner (shown when campaign status non-active) -->
+      <div id="walkinStatusWarningCo" class="hidden w-full mb-3 p-3 rounded-xl border-l-4 bg-orange-50 border-orange-400">
+        <div class="flex gap-2 items-start">
+          <i class="fa-solid fa-triangle-exclamation text-orange-500 mt-0.5"></i>
+          <div class="flex-1">
+            <p class="text-[12px] font-black text-orange-900 mb-1">Walk-in ปิดอยู่ตามสถานะแคมเปญ</p>
+            <p class="text-[11px] text-orange-700 leading-relaxed" id="walkinStatusWarningTextCo">—</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="w-52 h-52 bg-gray-50 rounded-2xl border-2 border-dashed border-amber-200 flex items-center justify-center overflow-hidden mb-4" id="walkinQrImgWrapCo">
+        <i class="fa-solid fa-spinner fa-spin text-3xl text-gray-300"></i>
+      </div>
+
+      <button id="walkinToggleBtnCo" onclick="toggleWalkinQrCo()"
+              class="w-full py-2.5 rounded-xl font-black text-sm mb-3 transition-all flex items-center justify-center gap-2">
+        <i class="fa-solid fa-toggle-on"></i> <span>Walk-in เปิดอยู่</span>
+      </button>
+
+      <p class="text-[11px] text-gray-500 text-center mb-3 leading-relaxed">
+        ผู้ป่วยสแกน → Login LINE → ยืนยัน<br>
+        <span class="text-amber-600 font-bold">ระบบเช็คอินทันที</span> ไม่ต้องจองล่วงหน้า
+      </p>
+
+      <div class="w-full flex gap-2 mb-3">
+        <input id="walkinCopyInputCo" type="text" readonly
+               class="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs text-gray-500 font-mono overflow-hidden"
+               placeholder="กำลังโหลด URL...">
+        <button onclick="copyWalkinUrlCo()"
+                class="px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-xl transition-all" title="คัดลอก">
+          <i class="fa-solid fa-copy text-gray-500 text-sm" id="walkinCopyIconCo"></i>
+        </button>
+      </div>
+
+      <div class="w-full grid grid-cols-2 gap-2 mb-2">
+        <button onclick="downloadWalkinQrCo()"
+                class="py-2.5 bg-gray-50 hover:bg-gray-100 rounded-xl text-xs font-bold text-gray-600 transition-all flex items-center justify-center gap-1.5 border border-gray-200">
+          <i class="fa-solid fa-download"></i> PNG
+        </button>
+        <button onclick="openWalkinPosterCo()"
+                class="py-2.5 rounded-xl text-xs font-bold text-white transition-all flex items-center justify-center gap-1.5"
+                style="background:linear-gradient(135deg,#d97706,#f59e0b)">
+          <i class="fa-solid fa-print"></i> โปสเตอร์ A4
+        </button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// _Co suffix on identifiers to avoid clashing if campaigns.php JS is also loaded
+const CSRF_WALKIN_QR_CO = '<?= get_csrf_token() ?>';
+const WALKIN_STATUS_LABELS_CO = {
+    full:        'เต็มแล้ว',
+    closed:      'ปิดรับ',
+    inactive:    'หยุดชั่วคราว',
+    archived:    'เก็บถาวร',
+    draft:       'ฉบับร่าง',
+    coming_soon: 'เร็วๆ นี้',
+    private:     'ลิงก์ส่วนตัว',
+};
+let _walkinCurrentIdCo = 0;
+let _walkinEnabledCo   = 0;
+let _walkinBlockedCo   = 0;
+
+function showWalkinQrModalCo(campaignId, enabled, blocked, status) {
+    _walkinCurrentIdCo = campaignId;
+    _walkinEnabledCo   = enabled;
+    _walkinBlockedCo   = blocked || 0;
+    const statusKey    = status || '';
+
+    const wrap = document.getElementById('walkinQrImgWrapCo');
+    wrap.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-3xl text-gray-300"></i>';
+    document.getElementById('walkinCopyInputCo').value = 'กำลังโหลด...';
+    document.getElementById('walkinQrTitleCo').textContent = <?= json_encode($campaign['title'] ?? '') ?> || `Campaign #${campaignId}`;
+
+    // Status warning
+    const warnBox = document.getElementById('walkinStatusWarningCo');
+    const warnTxt = document.getElementById('walkinStatusWarningTextCo');
+    if (_walkinBlockedCo) {
+        const lbl = WALKIN_STATUS_LABELS_CO[statusKey] || statusKey || 'ไม่ active';
+        warnTxt.textContent = `สถานะแคมเปญตอนนี้คือ "${lbl}" — แม้จะเปิด Walk-in QR ระบบจะปฏิเสธการลงทะเบียนทั้งหมด · เปลี่ยนสถานะเป็น "เปิดรับสมัคร" ก่อน แล้วค่อยเปิด Walk-in`;
+        warnBox.classList.remove('hidden');
+    } else {
+        warnBox.classList.add('hidden');
+    }
+
+    const img = new Image();
+    img.src = `../user/api_walkin_qr.php?campaign=${campaignId}&t=${Date.now()}`;
+    img.className = 'w-full h-full object-contain p-2';
+    img.onload  = () => { wrap.innerHTML = ''; wrap.appendChild(img); };
+    img.onerror = () => { wrap.innerHTML = '<p class="text-xs text-red-400">โหลด QR ไม่ได้</p>'; };
+
+    fetch(`ajax/ajax_get_walkin_url.php?campaign=${campaignId}`)
+        .then(r => r.json())
+        .then(d => { document.getElementById('walkinCopyInputCo').value = d.url || ''; })
+        .catch(() => { document.getElementById('walkinCopyInputCo').value = ''; });
+
+    setWalkinToggleUICo(_walkinEnabledCo);
+
+    const overlay = document.getElementById('walkinQrOverlayCo');
+    if (overlay.parentElement !== document.body) document.body.appendChild(overlay);
+    overlay.style.display = 'flex';
+}
+
+function closeWalkinQrModalCo() {
+    document.getElementById('walkinQrOverlayCo').style.display = 'none';
+}
+
+document.getElementById('walkinQrOverlayCo').addEventListener('click', function(e) {
+    if (e.target === this) closeWalkinQrModalCo();
+});
+
+function setWalkinToggleUICo(enabled) {
+    const btn  = document.getElementById('walkinToggleBtnCo');
+    const icon = btn.querySelector('i');
+    const txt  = btn.querySelector('span');
+    if (_walkinBlockedCo && !enabled) {
+        btn.style.cssText  = 'background:#f3f4f6;color:#9ca3af;border:1.5px solid #e5e7eb;cursor:not-allowed';
+        btn.disabled = true;
+        icon.className = 'fa-solid fa-ban';
+        txt.textContent  = 'เปิดไม่ได้ — เปลี่ยนสถานะแคมเปญก่อน';
+        return;
+    }
+    btn.disabled = false;
+    if (enabled) {
+        btn.style.cssText = 'background:#fef3c7;color:#b45309;border:1.5px solid #fcd34d';
+        icon.className = 'fa-solid fa-toggle-on';
+        txt.textContent  = _walkinBlockedCo
+            ? 'Walk-in เปิดอยู่ (แต่สถานะปิด) — กดเพื่อปิด'
+            : 'Walk-in เปิดอยู่ — กดเพื่อปิด';
+    } else {
+        btn.style.cssText = 'background:#f3f4f6;color:#6b7280;border:1.5px solid #e5e7eb';
+        icon.className = 'fa-solid fa-toggle-off';
+        txt.textContent  = 'Walk-in ปิดอยู่ — กดเพื่อเปิด';
+    }
+}
+
+function toggleWalkinQrCo() {
+    const btn = document.getElementById('walkinToggleBtnCo');
+    if (btn.disabled) return;
+    btn.disabled = true;
+    const fd = new FormData();
+    fd.append('campaign_id', _walkinCurrentIdCo);
+    fd.append('csrf_token',  CSRF_WALKIN_QR_CO);
+    fetch('ajax/ajax_toggle_walkin.php', { method: 'POST', body: fd })
+        .then(r => r.json())
+        .then(d => {
+            if (d.status === 'success') {
+                _walkinEnabledCo = d.walkin_enabled;
+                setWalkinToggleUICo(_walkinEnabledCo);
+            } else if (d.message) {
+                if (window.Swal) {
+                    Swal.fire({ icon: 'warning', title: 'เปิดไม่ได้', text: d.message, confirmButtonColor: '#d97706' });
+                } else {
+                    alert(d.message);
+                }
+            }
+        })
+        .catch(() => {})
+        .finally(() => {
+            if (!_walkinBlockedCo || _walkinEnabledCo) btn.disabled = false;
+        });
+}
+
+function copyWalkinUrlCo() {
+    const input = document.getElementById('walkinCopyInputCo');
+    if (!input.value) return;
+    navigator.clipboard.writeText(input.value).catch(() => {
+        input.select();
+        document.execCommand('copy');
+    });
+    const icon = document.getElementById('walkinCopyIconCo');
+    icon.className = 'fa-solid fa-check text-amber-600 text-sm';
+    setTimeout(() => { icon.className = 'fa-solid fa-copy text-gray-500 text-sm'; }, 1500);
+}
+
+function downloadWalkinQrCo() {
+    if (!_walkinCurrentIdCo) return;
+    const a = document.createElement('a');
+    a.href = `../user/api_walkin_qr.php?campaign=${_walkinCurrentIdCo}&size=14`;
+    a.download = `walkin-qr-${_walkinCurrentIdCo}.png`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+}
+
+function openWalkinPosterCo() {
+    if (!_walkinCurrentIdCo) return;
+    window.open(`walkin_poster.php?cid=${_walkinCurrentIdCo}`, '_blank');
+}
+</script>
 
 <?php require_once __DIR__ . '/includes/footer.php'; ?>

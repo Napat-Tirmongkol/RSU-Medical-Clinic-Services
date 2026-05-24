@@ -9,6 +9,43 @@ $messageType = '';
 
 // Ensure qr_enabled column exists
 try { $pdo->exec("ALTER TABLE camp_list ADD COLUMN qr_enabled TINYINT(1) NOT NULL DEFAULT 0"); } catch (PDOException) {}
+// Walk-in QR (separate from check-in QR — controls on-site registration via poster)
+try { $pdo->exec("ALTER TABLE camp_list ADD COLUMN walkin_enabled TINYINT(1) NOT NULL DEFAULT 0"); } catch (PDOException) {}
+// Ensure room_id (link to sys_clinic_rooms) — added for campaign location
+try { $pdo->exec("ALTER TABLE camp_list ADD COLUMN room_id INT UNSIGNED NULL DEFAULT NULL"); } catch (PDOException) {}
+try { $pdo->exec("ALTER TABLE camp_list ADD INDEX idx_room_id (room_id)"); } catch (PDOException) {}
+
+// ── Self-heal additional fields (added per UX audit) ─────────────
+foreach ([
+    "ADD COLUMN available_from DATE NULL DEFAULT NULL",
+    "ADD COLUMN target_audience ENUM('all','student','staff','other') NOT NULL DEFAULT 'all'",
+    "ADD COLUMN what_to_bring TEXT NULL",
+    "ADD COLUMN prerequisites TEXT NULL",
+    "ADD COLUMN contact_phone VARCHAR(30) NULL",
+    "ADD COLUMN cover_image VARCHAR(255) NULL",
+    "ADD COLUMN max_per_user TINYINT UNSIGNED NOT NULL DEFAULT 1",
+    "ADD COLUMN cancel_deadline_hours SMALLINT UNSIGNED NOT NULL DEFAULT 24",
+] as $_ddl) {
+    try { $pdo->exec("ALTER TABLE camp_list $_ddl"); } catch (PDOException) {}
+}
+
+// Load active clinic rooms for the location selector
+$clinicRooms = [];
+try {
+    $clinicRooms = $pdo->query(
+        "SELECT id, code, name, type, floor
+           FROM sys_clinic_rooms
+          WHERE is_active = 1
+          ORDER BY type ASC, code ASC"
+    )->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException) {}
+$roomTypeLabels = [
+    'exam'        => 'ห้องตรวจ',
+    'vaccination' => 'ห้องฉีดวัคซีน',
+    'lab'         => 'ห้องแล็บ',
+    'consult'     => 'ห้องให้คำปรึกษา',
+    'other'       => 'อื่นๆ',
+];
 
 // ==========================================
 // ส่วนจัดการ POST Request (เพิ่ม / แก้ไข / ลบ แคมเปญ)
@@ -30,6 +67,72 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $vaccineTypeId = ($type === 'vaccine' && !empty($_POST['vaccine_type_id']))
         ? (int)$_POST['vaccine_type_id']
         : null;
+    $roomId = !empty($_POST['room_id']) ? (int)$_POST['room_id'] : null;
+
+    $availableFrom        = !empty($_POST['available_from']) ? $_POST['available_from'] : null;
+    $targetAudience       = in_array($_POST['target_audience'] ?? 'all', ['all','student','staff','other'], true) ? $_POST['target_audience'] : 'all';
+    $whatToBring          = trim($_POST['what_to_bring'] ?? '');
+    $prerequisites        = trim($_POST['prerequisites'] ?? '');
+    $contactPhone         = trim($_POST['contact_phone'] ?? '');
+    $maxPerUser           = max(1, min(99, (int)($_POST['max_per_user'] ?? 1)));
+    $cancelDeadlineHours  = max(0, min(720, (int)($_POST['cancel_deadline_hours'] ?? 24)));
+
+    // ── Cover image — keep existing OR upload new OR remove ───────
+    // Logic priority: remove_cover=1 → NULL · new file → save · else keep current
+    $coverImage = trim($_POST['cover_image_existing'] ?? '');
+    $removeCover = !empty($_POST['remove_cover']) && $_POST['remove_cover'] == '1';
+    $coverUploadError = '';
+
+    if ($removeCover) {
+        // Delete old file from disk if it's under uploads/campaigns/
+        if (!empty($coverImage)) {
+            $oldAbs = realpath(__DIR__ . '/../' . $coverImage);
+            $root   = realpath(__DIR__ . '/../uploads/campaigns') ?: '';
+            if ($oldAbs && $root && strpos($oldAbs, $root) === 0 && is_file($oldAbs)) {
+                @unlink($oldAbs);
+            }
+        }
+        $coverImage = '';
+    } elseif (!empty($_FILES['cover_image']['name']) && $_FILES['cover_image']['error'] === UPLOAD_ERR_OK) {
+        $file = $_FILES['cover_image'];
+        $maxSize = 5 * 1024 * 1024; // 5MB
+        if ($file['size'] > $maxSize) {
+            $coverUploadError = 'ขนาดรูปต้องไม่เกิน 5MB';
+        } elseif (!is_uploaded_file($file['tmp_name'])) {
+            $coverUploadError = 'ไฟล์อัปโหลดไม่ถูกต้อง';
+        } else {
+            $mimeToExt = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'];
+            $finfo = new finfo(FILEINFO_MIME_TYPE);
+            $mime  = $finfo->file($file['tmp_name']) ?: '';
+            if (!isset($mimeToExt[$mime])) {
+                $coverUploadError = 'รองรับเฉพาะ JPG, PNG, WEBP';
+            } else {
+                $sub = date('Y/m');
+                $dir = __DIR__ . "/../uploads/campaigns/$sub";
+                if (!is_dir($dir)) @mkdir($dir, 0755, true);
+                // drop .htaccess deny-all at uploads/campaigns root once
+                $rootHt = __DIR__ . '/../uploads/campaigns/.htaccess';
+                if (!file_exists($rootHt)) {
+                    @file_put_contents($rootHt, "Order deny,allow\nDeny from all\n<FilesMatch \"\\.(jpg|jpeg|png|webp)$\">\n    Order allow,deny\n    Allow from all\n</FilesMatch>\n");
+                }
+                $name   = bin2hex(random_bytes(12)) . '.' . $mimeToExt[$mime];
+                $target = "$dir/$name";
+                if (move_uploaded_file($file['tmp_name'], $target)) {
+                    // Delete old file if replacing
+                    if (!empty($coverImage)) {
+                        $oldAbs = realpath(__DIR__ . '/../' . $coverImage);
+                        $root   = realpath(__DIR__ . '/../uploads/campaigns') ?: '';
+                        if ($oldAbs && $root && strpos($oldAbs, $root) === 0 && is_file($oldAbs)) {
+                            @unlink($oldAbs);
+                        }
+                    }
+                    $coverImage = "uploads/campaigns/$sub/$name";
+                } else {
+                    $coverUploadError = 'บันทึกไฟล์ไม่สำเร็จ';
+                }
+            }
+        }
+    }
 
     // 1. สร้างแคมเปญใหม่
     if ($action === 'add' && $title && $capacity >= 0) {
@@ -37,22 +140,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $newToken = bin2hex(random_bytes(8)); // 16-char hex token
             // Ensure vaccine_type_id column exists before INSERT (self-heal)
             try { $pdo->exec("ALTER TABLE camp_list ADD COLUMN IF NOT EXISTS vaccine_type_id INT UNSIGNED NULL DEFAULT NULL"); } catch (PDOException) {}
-            $sql = "INSERT INTO camp_list (title, type, description, total_capacity, available_until, status, is_auto_approve, share_token, vaccine_type_id)
-                    VALUES (:title, :type, :description, :capacity, :until, :status, :auto_approve, :token, :vtid)";
+            $sql = "INSERT INTO camp_list (title, type, description, total_capacity,
+                    available_from, available_until, status, is_auto_approve, share_token, vaccine_type_id, room_id,
+                    target_audience, what_to_bring, prerequisites, contact_phone, cover_image, max_per_user, cancel_deadline_hours)
+                    VALUES (:title, :type, :description, :capacity,
+                    :avail_from, :until, :status, :auto_approve, :token, :vtid, :room_id,
+                    :audience, :bring, :prereq, :phone, :cover, :max_per_user, :cancel_hours)";
             $stmt = $pdo->prepare($sql);
             $stmt->execute([
                 ':title' => $title,
                 ':type' => $type,
                 ':description' => $description,
                 ':capacity' => $capacity,
+                ':avail_from'    => $availableFrom,
                 ':until' => $availableUntil,
                 ':status' => $status,
                 ':auto_approve' => $isAutoApprove,
                 ':token' => $newToken,
                 ':vtid' => $vaccineTypeId,
+                ':room_id' => $roomId,
+                ':audience'      => $targetAudience,
+                ':bring'         => $whatToBring ?: null,
+                ':prereq'        => $prerequisites ?: null,
+                ':phone'         => $contactPhone ?: null,
+                ':cover'         => $coverImage ?: null,
+                ':max_per_user'  => $maxPerUser,
+                ':cancel_hours'  => $cancelDeadlineHours,
             ]);
-            $message = "สร้างแคมเปญเรียบร้อยแล้ว!";
-            $messageType = "success";
+            $message = "สร้างแคมเปญเรียบร้อยแล้ว!" . ($coverUploadError ? " ⚠ รูปหน้าปก: {$coverUploadError}" : '');
+            $messageType = $coverUploadError ? "warning" : "success";
             log_activity('create_campaign', "สร้างแคมเปญใหม่: {$title} (จุ {$capacity} คน)");
         } catch (PDOException $e) {
             $message = "เกิดข้อผิดพลาด: " . $e->getMessage();
@@ -75,22 +191,51 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 } else {
                     try { $pdo->exec("ALTER TABLE camp_list ADD COLUMN IF NOT EXISTS vaccine_type_id INT UNSIGNED NULL DEFAULT NULL"); } catch (PDOException) {}
                     $sql = "UPDATE camp_list SET title = :title, type = :type, description = :description,
-                            total_capacity = :capacity, available_until = :until, status = :status,
-                            is_auto_approve = :auto_approve, vaccine_type_id = :vtid WHERE id = :id";
+                            total_capacity = :capacity, available_from = :avail_from, available_until = :until, status = :status,
+                            is_auto_approve = :auto_approve, vaccine_type_id = :vtid, room_id = :room_id,
+                            target_audience = :audience, what_to_bring = :bring, prerequisites = :prereq,
+                            contact_phone = :phone, cover_image = :cover,
+                            max_per_user = :max_per_user, cancel_deadline_hours = :cancel_hours
+                            WHERE id = :id";
                     $stmt = $pdo->prepare($sql);
                     $stmt->execute([
                         ':title' => $title,
                         ':type' => $type,
                         ':description' => $description,
                         ':capacity' => $capacity,
+                        ':avail_from'    => $availableFrom,
                         ':until' => $availableUntil,
                         ':status' => $status,
                         ':auto_approve' => $isAutoApprove,
                         ':vtid' => $vaccineTypeId,
+                        ':room_id' => $roomId,
+                        ':audience'      => $targetAudience,
+                        ':bring'         => $whatToBring ?: null,
+                        ':prereq'        => $prerequisites ?: null,
+                        ':phone'         => $contactPhone ?: null,
+                        ':cover'         => $coverImage ?: null,
+                        ':max_per_user'  => $maxPerUser,
+                        ':cancel_hours'  => $cancelDeadlineHours,
                         ':id' => $id
                     ]);
-                    $message = "อัปเดตข้อมูลแคมเปญสำเร็จ!";
-                    $messageType = "success";
+                    // If admin changed status away from 'active' (or set an expired date),
+                    // auto-disable walk-in so the QR doesn't keep accepting registrations.
+                    // Walk-in only makes sense for live campaigns.
+                    $isExpired = $availableUntil && $availableUntil < date('Y-m-d');
+                    $needsAutoDisable = ($status !== 'active' || $isExpired);
+                    if ($needsAutoDisable) {
+                        try {
+                            $pdo->prepare("UPDATE camp_list SET walkin_enabled = 0
+                                             WHERE id = :id AND walkin_enabled = 1")
+                                ->execute([':id' => $id]);
+                        } catch (PDOException) {}
+                    }
+
+                    $message = "อัปเดตข้อมูลแคมเปญสำเร็จ!" . ($coverUploadError ? " ⚠ รูปหน้าปก: {$coverUploadError}" : '');
+                    if ($needsAutoDisable) {
+                        $message .= " · ปิด Walk-in QR อัตโนมัติ (สถานะไม่ active)";
+                    }
+                    $messageType = $coverUploadError ? "warning" : "success";
                     log_activity('update_campaign', "แก้ไขแคมเปญ ID: {$id} ({$title})");
 
                     // Propagate the catalog linkage to historical
@@ -180,8 +325,11 @@ try {
     $sql = "
         SELECT
             c.*,
-            (SELECT COUNT(*) FROM camp_bookings a WHERE a.campaign_id = c.id AND a.status IN ('booked', 'confirmed')) AS used_capacity
+            r.code AS room_code, r.name AS room_name, r.type AS room_type, r.floor AS room_floor,
+            (SELECT COUNT(*) FROM camp_bookings a WHERE a.campaign_id = c.id AND a.status IN ('booked', 'confirmed')) AS used_capacity,
+            (SELECT COUNT(*) FROM camp_bookings a WHERE a.campaign_id = c.id AND a.status IN ('booked', 'confirmed', 'completed')) AS occupied_capacity
         FROM camp_list c
+        LEFT JOIN sys_clinic_rooms r ON c.room_id = r.id
         ORDER BY
             CASE
                 WHEN c.status = 'active' AND (c.available_until IS NULL OR c.available_until >= CURDATE()) THEN 0
@@ -356,6 +504,7 @@ require_once __DIR__ . '/includes/header.php';
     .badge-draft    { background: #f8fafc; color: #64748b; border-color: #e2e8f0; }
     .badge-coming   { background: #f5f3ff; color: #7c3aed; border-color: #ddd6fe; }
     .badge-full     { background: #fef2f2; color: #ef4444; border-color: #fecaca; }
+    .badge-closed   { background: #fff7ed; color: #c2410c; border-color: #fed7aa; }
     .badge-archived { background: #f1f5f9; color: #334155; border-color: #cbd5e1; }
     .badge-private  { background: #fff7ed; color: #ea580c; border-color: #ffedd5; }
 
@@ -390,7 +539,7 @@ require_once __DIR__ . '/includes/header.php';
     }
     .act-btn-delete:hover { background: #e11d48; color: #fff; border-color: #e11d48; box-shadow: 0 4px 12px rgba(225,29,72,.3); transform: translateY(-1px); }
     .act-btn-disabled {
-        background: #f9fafb; color: #d1d5db; border-color: #e5e7eb; cursor: not-allowed;
+        background: #f1f5f9; color: #94a3b8; border-color: #cbd5e1; cursor: not-allowed;
     }
 
     /* ── Modal ────────────────────────────────────────────────── */
@@ -484,6 +633,44 @@ require_once __DIR__ . '/includes/header.php';
         position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
         color: #94a3b8; pointer-events: none; font-size: .85rem;
     }
+    /* ── Cover image dropzone ─────────────────────────────── */
+    .cover-dropzone {
+        position: relative;
+        min-height: 140px;
+        border: 2px dashed #e2e8f0;
+        border-radius: 12px;
+        background: #f8fafc;
+        cursor: pointer;
+        transition: all .15s;
+        overflow: hidden;
+    }
+    .cover-dropzone:hover { border-color: #2e9e63; background: #f0fdf4; }
+    .cover-dropzone.is-dragover { border-color: #2e9e63; background: #ecfdf5; border-style: solid; }
+    .cover-dropzone-empty {
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        height: 140px; text-align: center; padding: 16px;
+    }
+    .cover-dropzone-preview { position: relative; min-height: 140px; }
+    .cover-dropzone-preview img {
+        display: block; width: 100%; max-height: 240px;
+        object-fit: cover; background: #f1f5f9;
+    }
+    .cover-remove-btn {
+        position: absolute; top: 8px; right: 8px;
+        width: 32px; height: 32px; border-radius: 50%;
+        background: rgba(15,23,42,.7); color: #fff; border: 0;
+        display: flex; align-items: center; justify-content: center;
+        cursor: pointer; transition: all .15s;
+        font-size: 14px;
+    }
+    .cover-remove-btn:hover { background: #ef4444; transform: scale(1.08); }
+    body[data-theme='dark'] .cover-dropzone {
+        background: rgba(15,23,42,.5); border-color: #334155;
+    }
+    body[data-theme='dark'] .cover-dropzone:hover {
+        background: rgba(46,158,99,.10); border-color: var(--ec-brand-500, #2e9e63);
+    }
+
     .form-label {
         display: block;
         font-size: .8rem;
@@ -525,7 +712,7 @@ $header_actions = '
 <button onclick="openAddModal()" class="bg-[#2e9e63] text-white px-6 py-3 rounded-2xl font-bold transition-all shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/40 hover:-translate-y-1 flex items-center gap-2" style="background-color: #2e9e63;">
     <i class="fa-solid fa-plus-circle text-lg"></i> สร้างแคมเปญใหม่
 </button>';
-renderPageHeader("จัดการแคมเปญ", "สร้างแคมเปญใหม่, กำหนดโควต้า, และตั้งเวลารับลงทะเบียน", $header_actions);
+renderPageHeader("สร้างแคมเปญ", "สร้างแคมเปญใหม่, กำหนดโควต้า, และตั้งเวลารับลงทะเบียน", $header_actions);
 ?>
 
 <?php if ($message): ?>
@@ -583,14 +770,16 @@ renderPageHeader("จัดการแคมเปญ", "สร้างแค�
                 </tr>
             <?php else: ?>
                 <?php foreach ($camp_list as $c):
-                    $remaining = $c['total_capacity'] - $c['used_capacity'];
+                    // occupied = booked + confirmed + completed (โควต้าที่ถูกใช้ไปจริง · ตรงกับหน้าภาพรวมแคมเปญ)
+                    $occupied  = (int)($c['occupied_capacity'] ?? $c['used_capacity']);
+                    $remaining = max(0, $c['total_capacity'] - $occupied);
                     $isLow = ($remaining <= 10 && $c['total_capacity'] > 0);
                     $typeDetails = getCampaignTypeDetails($c['type']);
                     $isExpired = $c['available_until'] && (strtotime($c['available_until']) < strtotime(date('Y-m-d')));
                     $isInactive = ($c['status'] === 'inactive' || $isExpired);
                     ?>
                     <?php
-                        $usedPct = $c['total_capacity'] > 0 ? min(100, round($c['used_capacity'] / $c['total_capacity'] * 100)) : 0;
+                        $usedPct = $c['total_capacity'] > 0 ? min(100, round($occupied / $c['total_capacity'] * 100)) : 0;
                         $barColor = $usedPct >= 90 ? '#ef4444' : ($usedPct >= 60 ? '#f59e0b' : '#10b981');
                     ?>
                     <tr class="glass-tr group campaign-row <?= $isInactive ? 'is-inactive' : 'is-active' ?>" style="<?= $isInactive ? 'opacity:.55' : '' ?>">
@@ -607,12 +796,17 @@ renderPageHeader("จัดการแคมเปญ", "สร้างแค�
                                         <?= $typeDetails['label'] ?>
                                     </span>
                                     <div class="flex flex-wrap items-center gap-1 text-[11px] text-gray-500 font-semibold">
-                                        <span class="bg-gray-100 px-2 py-0.5 rounded-md whitespace-nowrap">
-                                            <i class="fa-solid fa-users text-gray-400 mr-1"></i><?= number_format($c['total_capacity']) ?>
+                                        <span class="bg-gray-100 px-2 py-0.5 rounded-md whitespace-nowrap" title="โควต้ารวม">
+                                            <i class="fa-solid fa-users text-gray-400 mr-1"></i>โควต้า <?= number_format($c['total_capacity']) ?>
                                         </span>
-                                        <span class="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-md whitespace-nowrap">
-                                            <i class="fa-solid fa-user-check mr-1"></i><?= number_format($c['used_capacity']) ?> จอง
+                                        <span class="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-md whitespace-nowrap" title="จำนวนที่จองทั้งหมด">
+                                            <i class="fa-solid fa-user-check mr-1"></i>จองแล้ว <?= number_format($c['used_capacity']) ?> คน
                                         </span>
+                                        <?php if (!empty($c['room_name'])): ?>
+                                        <span class="bg-blue-50 text-blue-700 px-2 py-0.5 rounded-md whitespace-nowrap" title="<?= htmlspecialchars($c['room_code'] . ' · ' . ($roomTypeLabels[$c['room_type']] ?? '') . (!empty($c['room_floor']) ? ' · ชั้น ' . $c['room_floor'] : '')) ?>">
+                                            <i class="fa-solid fa-location-dot mr-1"></i><?= htmlspecialchars($c['room_name']) ?>
+                                        </span>
+                                        <?php endif; ?>
                                     </div>
                                 </div>
                             </div>
@@ -647,12 +841,13 @@ renderPageHeader("จัดการแคมเปญ", "สร้างแค�
                                     <span class="status-dot dot-expired"></span> หมดเขต
                                 </span>
                             <?php else: ?>
-                                <?php 
+                                <?php
                                 $badgeClass = match($c['status']) {
                                     'draft' => 'badge-draft',
                                     'coming_soon' => 'badge-coming',
                                     'active' => 'badge-active',
                                     'full' => 'badge-full',
+                                    'closed' => 'badge-closed',
                                     'archived' => 'badge-archived',
                                     'private' => 'badge-private',
                                     default => 'badge-inactive'
@@ -662,6 +857,7 @@ renderPageHeader("จัดการแคมเปญ", "สร้างแค�
                                     'coming_soon' => 'เร็วๆ นี้',
                                     'active' => 'เปิดรับสมัคร',
                                     'full' => 'เต็มแล้ว',
+                                    'closed' => 'ปิดรับ',
                                     'archived' => 'เก็บถาวร',
                                     'private' => 'ลิงก์ส่วนตัว',
                                     default => 'ปิดชั่วคราว'
@@ -687,7 +883,7 @@ renderPageHeader("จัดการแคมเปญ", "สร้างแค�
                                     target="_blank"
                                     class="w-9 h-9 bg-green-50 text-[#2e9e63] rounded-xl flex items-center justify-center hover:bg-[#2e9e63] hover:text-white transition-all shadow-sm border border-green-100"
                                     title="เปิดสแกนเนอร์">
-                                    <i class="fa-solid fa-barcode-scan text-xs"></i>
+                                    <i class="fa-solid fa-camera text-xs"></i>
                                 </a>
 
                                 <!-- Campaign QR Check-in -->
@@ -697,6 +893,31 @@ renderPageHeader("จัดการแคมเปญ", "สร้างแค�
                                            <?= ($c['qr_enabled'] ?? 0) ? 'bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-500 hover:text-white' : 'bg-gray-50 text-gray-400 border-gray-200 hover:bg-gray-200' ?>"
                                     title="QR เช็คอินรายวัน">
                                     <i class="fa-solid fa-qrcode"></i>
+                                </button>
+
+                                <!-- Walk-in QR (on-site registration via poster) -->
+                                <?php
+                                    $_walkinOn       = (int)($c['walkin_enabled'] ?? 0) === 1;
+                                    // Campaign status that disallows Walk-in even if flag is on
+                                    $_walkinBlocked  = ($c['status'] !== 'active') || $isExpired;
+                                    $_walkinBtnCls   = $_walkinBlocked
+                                        ? 'bg-gray-100 text-gray-400 border-gray-200 hover:bg-gray-200 opacity-70'
+                                        : ($_walkinOn
+                                            ? 'bg-amber-50 text-amber-600 border-amber-200 hover:bg-amber-500 hover:text-white'
+                                            : 'bg-gray-50 text-gray-400 border-gray-200 hover:bg-gray-200');
+                                    $_walkinTitle    = $_walkinBlocked
+                                        ? 'Walk-in QR ปิดอัตโนมัติเพราะสถานะแคมเปญ — เปลี่ยนเป็น "เปิดรับสมัคร" ก่อน'
+                                        : 'QR Walk-in ลงทะเบียนหน้างาน';
+                                ?>
+                                <button type="button"
+                                    onclick="showWalkinQrModal(<?= $c['id'] ?>, <?= $_walkinOn ? 1 : 0 ?>, <?= $_walkinBlocked ? 1 : 0 ?>, '<?= htmlspecialchars($c['status'], ENT_QUOTES) ?>')"
+                                    class="walkin-qr-btn w-9 h-9 rounded-xl flex items-center justify-center transition-all shadow-sm border text-xs relative <?= $_walkinBtnCls ?>"
+                                    title="<?= htmlspecialchars($_walkinTitle, ENT_QUOTES) ?>">
+                                    <i class="fa-solid fa-person-walking"></i>
+                                    <?php if ($_walkinOn && $_walkinBlocked): ?>
+                                    <!-- "stale flag" warning dot — walkin_enabled=1 but campaign status blocks it -->
+                                    <span class="absolute top-0 right-0 w-2.5 h-2.5 bg-orange-500 rounded-full border border-white" title="Walk-in QR เปิดไว้แต่สถานะปิดอยู่"></span>
+                                    <?php endif; ?>
                                 </button>
 
                                 <!-- Share Link -->
@@ -731,7 +952,16 @@ renderPageHeader("จัดการแคมเปญ", "สร้างแค�
                                     data-status="<?= htmlspecialchars($c['status']) ?>"
                                     data-desc="<?= htmlspecialchars($c['description'] ?? '') ?>"
                                     data-auto="<?= htmlspecialchars($c['is_auto_approve']) ?>"
-                                    data-vaccine-type-id="<?= htmlspecialchars((string)($c['vaccine_type_id'] ?? '')) ?>">
+                                    data-vaccine-type-id="<?= htmlspecialchars((string)($c['vaccine_type_id'] ?? '')) ?>"
+                                    data-room-id="<?= htmlspecialchars((string)($c['room_id'] ?? '')) ?>"
+                                    data-from="<?= htmlspecialchars((string)($c['available_from'] ?? '')) ?>"
+                                    data-audience="<?= htmlspecialchars((string)($c['target_audience'] ?? 'all')) ?>"
+                                    data-max-per-user="<?= htmlspecialchars((string)($c['max_per_user'] ?? 1)) ?>"
+                                    data-cancel-hours="<?= htmlspecialchars((string)($c['cancel_deadline_hours'] ?? 24)) ?>"
+                                    data-phone="<?= htmlspecialchars((string)($c['contact_phone'] ?? '')) ?>"
+                                    data-cover="<?= htmlspecialchars((string)($c['cover_image'] ?? '')) ?>"
+                                    data-prereq="<?= htmlspecialchars((string)($c['prerequisites'] ?? '')) ?>"
+                                    data-bring="<?= htmlspecialchars((string)($c['what_to_bring'] ?? '')) ?>">
                                     <i class="fa-solid fa-pen-to-square pointer-events-none text-xs"></i>
                                 </button>
 
@@ -780,7 +1010,7 @@ renderPageHeader("จัดการแคมเปญ", "สร้างแค�
         </div>
 
         <!-- Modal Form -->
-        <form method="POST" class="p-5 space-y-4 bg-white overflow-y-auto custom-scrollbar" style="max-height:calc(100vh - 140px)">
+        <form method="POST" enctype="multipart/form-data" class="p-5 space-y-4 bg-white overflow-y-auto custom-scrollbar" style="max-height:calc(100vh - 140px)">
             <?php csrf_field(); ?>
             <input type="hidden" name="action" id="modal_action" value="add">
             <input type="hidden" name="campaign_id" id="modal_campaign_id">
@@ -874,8 +1104,14 @@ renderPageHeader("จัดการแคมเปญ", "สร้างแค�
                                 style="--sel-color:#ef4444;--sel-bg:#fef2f2;--sel-border:#fecaca">
                             <i class="fa-solid fa-users-slash"></i> เต็มแล้ว
                         </button>
+                        <button type="button" class="modal-status-pill" data-value="closed"
+                                style="--sel-color:#c2410c;--sel-bg:#fff7ed;--sel-border:#fed7aa"
+                                title="โชว์อยู่ในระบบแต่ไม่รับการจองเพิ่ม (เช่น จบกิจกรรมแล้ว)">
+                            <i class="fa-solid fa-lock"></i> ปิดรับ
+                        </button>
                         <button type="button" class="modal-status-pill" data-value="inactive"
-                                style="--sel-color:#6b7280;--sel-bg:#f9fafb;--sel-border:#d1d5db">
+                                style="--sel-color:#6b7280;--sel-bg:#f9fafb;--sel-border:#d1d5db"
+                                title="ซ่อนจากผู้ใช้ — กลับมาเปิดใหม่ได้">
                             <i class="fa-solid fa-circle-pause"></i> ปิดชั่วคราว
                         </button>
                         <button type="button" class="modal-status-pill" data-value="archived"
@@ -890,29 +1126,156 @@ renderPageHeader("จัดการแคมเปญ", "สร้างแค�
                     <div class="flex gap-2" id="modal-approve-pills">
                         <button type="button" class="modal-approve-pill" data-value="0"
                                 style="--sel-color:#16a34a;--sel-bg:#f0fdf4;--sel-border:#86efac">
-                            <i class="fa-solid fa-user-shield"></i> แอดมิน
+                            <i class="fa-solid fa-user-shield"></i> ต้องอนุมัติ
                         </button>
                         <button type="button" class="modal-approve-pill" data-value="1"
                                 style="--sel-color:#d97706;--sel-bg:#fffbeb;--sel-border:#fcd34d">
-                            <i class="fa-solid fa-bolt"></i> Auto
+                            <i class="fa-solid fa-bolt"></i> อัตโนมัติ
                         </button>
                     </div>
                     <input type="hidden" id="modal_is_auto_approve" name="is_auto_approve" value="0">
                 </div>
             </div>
 
-            <!-- Date -->
+            <!-- Location (clinic room) -->
             <div>
-                <label class="form-label">เปิดรับถึงวันที่ <span class="text-gray-400 font-normal">(ไม่บังคับ)</span></label>
+                <label class="form-label">
+                    สถานที่ <span class="text-gray-400 font-normal">(ไม่บังคับ)</span>
+                    <a href="../portal/index.php?section=clinic_data&cd_view=rooms" target="_blank" rel="noopener"
+                       class="ml-1 text-[11px] text-blue-600 hover:underline">
+                        <i class="fa-solid fa-up-right-from-square"></i> จัดการสถานที่
+                    </a>
+                </label>
                 <div class="relative">
-                    <i class="form-input-icon fa-regular fa-calendar-xmark"></i>
-                    <input type="date" id="modal_available_until" name="available_until" class="form-input">
+                    <i class="form-input-icon fa-solid fa-location-dot"></i>
+                    <select id="modal_room_id" name="room_id" class="form-input" style="padding-left:38px">
+                        <option value="">— ไม่ระบุ —</option>
+                        <?php
+                        // Group by type for readability
+                        $_grouped = [];
+                        foreach ($clinicRooms as $r) { $_grouped[$r['type']][] = $r; }
+                        foreach ($_grouped as $_t => $_rooms): ?>
+                            <optgroup label="<?= htmlspecialchars($roomTypeLabels[$_t] ?? $_t) ?>">
+                                <?php foreach ($_rooms as $r): ?>
+                                <option value="<?= (int)$r['id'] ?>">
+                                    <?= htmlspecialchars($r['code']) ?> · <?= htmlspecialchars($r['name']) ?><?php if (!empty($r['floor'])): ?> · ชั้น <?= htmlspecialchars($r['floor']) ?><?php endif; ?>
+                                </option>
+                                <?php endforeach; ?>
+                            </optgroup>
+                        <?php endforeach; ?>
+                        <?php if (empty($clinicRooms)): ?>
+                            <option value="" disabled>ยังไม่มีสถานที่ในระบบ — เพิ่มจาก "จัดการสถานที่"</option>
+                        <?php endif; ?>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Booking window: from / until -->
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="form-label">เปิดรับตั้งแต่ <span class="text-gray-400 font-normal">(ไม่บังคับ)</span></label>
+                    <div class="relative">
+                        <i class="form-input-icon fa-regular fa-calendar-check"></i>
+                        <input type="date" id="modal_available_from" name="available_from" class="form-input">
+                    </div>
+                </div>
+                <div>
+                    <label class="form-label">เปิดรับถึงวันที่ <span class="text-gray-400 font-normal">(ไม่บังคับ)</span></label>
+                    <div class="relative">
+                        <i class="form-input-icon fa-regular fa-calendar-xmark"></i>
+                        <input type="date" id="modal_available_until" name="available_until" class="form-input">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Target audience + per-user limit + cancel deadline -->
+            <div class="grid grid-cols-3 gap-3">
+                <div>
+                    <label class="form-label">กลุ่มเป้าหมาย</label>
+                    <div class="relative">
+                        <i class="form-input-icon fa-solid fa-user-group"></i>
+                        <select id="modal_target_audience" name="target_audience" class="form-input" style="padding-left:38px">
+                            <option value="all">ทุกคน</option>
+                            <option value="student">นักศึกษา</option>
+                            <option value="staff">บุคลากร</option>
+                            <option value="other">อื่นๆ</option>
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label class="form-label">จองได้สูงสุด/คน</label>
+                    <div class="relative">
+                        <i class="form-input-icon fa-solid fa-ticket"></i>
+                        <input type="number" id="modal_max_per_user" name="max_per_user" min="1" max="99" value="1"
+                            class="form-input">
+                    </div>
+                </div>
+                <div>
+                    <label class="form-label">ยกเลิกล่วงหน้า (ชม.)</label>
+                    <div class="relative">
+                        <i class="form-input-icon fa-regular fa-clock"></i>
+                        <input type="number" id="modal_cancel_deadline_hours" name="cancel_deadline_hours" min="0" max="720" value="24"
+                            class="form-input">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Contact phone -->
+            <div>
+                <label class="form-label">เบอร์ติดต่อสอบถาม <span class="text-gray-400 font-normal">(ไม่บังคับ)</span></label>
+                <div class="relative">
+                    <i class="form-input-icon fa-solid fa-phone"></i>
+                    <input type="text" id="modal_contact_phone" name="contact_phone" placeholder="02-xxx-xxxx หรือ 08x-xxx-xxxx"
+                        class="form-input">
+                </div>
+            </div>
+
+            <!-- Cover image upload -->
+            <div>
+                <label class="form-label">รูปหน้าปก <span class="text-gray-400 font-normal">(ไม่บังคับ · JPG/PNG/WEBP ≤ 5MB)</span></label>
+                <input type="hidden" id="modal_cover_image_existing" name="cover_image_existing" value="">
+                <input type="hidden" id="modal_remove_cover" name="remove_cover" value="0">
+                <div id="modal_cover_dropzone" class="cover-dropzone" onclick="document.getElementById('modal_cover_file').click()">
+                    <div id="modal_cover_empty" class="cover-dropzone-empty">
+                        <i class="fa-regular fa-image text-3xl text-gray-300 mb-2"></i>
+                        <p class="text-sm font-semibold text-gray-500">คลิกเพื่อเลือกรูป</p>
+                        <p class="text-[11px] text-gray-400 mt-0.5">หรือลากไฟล์มาวางที่นี่</p>
+                    </div>
+                    <div id="modal_cover_preview" class="cover-dropzone-preview hidden">
+                        <img id="modal_cover_preview_img" src="" alt="cover preview">
+                        <button type="button" class="cover-remove-btn" onclick="event.stopPropagation(); clearCoverImage()" title="ลบรูป">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    </div>
+                </div>
+                <input type="file" id="modal_cover_file" name="cover_image" accept="image/jpeg,image/png,image/webp" class="hidden" onchange="handleCoverFileSelect(this)">
+            </div>
+
+            <!-- Prerequisites -->
+            <div>
+                <label class="form-label">เงื่อนไขก่อนเข้าร่วม <span class="text-gray-400 font-normal">(ไม่บังคับ)</span></label>
+                <div class="relative">
+                    <i class="fa-solid fa-circle-exclamation text-gray-400 absolute top-3.5 left-3.5 text-sm pointer-events-none"></i>
+                    <textarea id="modal_prerequisites" name="prerequisites" rows="2"
+                        placeholder="เช่น เคยฉีดเข็มแรกแล้ว ≥ 30 วัน · ไม่มีไข้ใน 7 วันที่ผ่านมา"
+                        class="form-input resize-none custom-scrollbar" style="padding-top:10px;padding-bottom:10px"></textarea>
+                </div>
+            </div>
+
+            <!-- What to bring -->
+            <div>
+                <label class="form-label">สิ่งที่ต้องเตรียมมา <span class="text-gray-400 font-normal">(ไม่บังคับ)</span></label>
+                <div class="relative">
+                    <i class="fa-solid fa-suitcase-medical text-gray-400 absolute top-3.5 left-3.5 text-sm pointer-events-none"></i>
+                    <textarea id="modal_what_to_bring" name="what_to_bring" rows="2"
+                        placeholder="เช่น บัตรประชาชน · สมุดวัคซีน · ใบรับรองแพทย์"
+                        class="form-input resize-none custom-scrollbar" style="padding-top:10px;padding-bottom:10px"></textarea>
                 </div>
             </div>
 
             <!-- Description -->
             <div>
-                <label class="form-label">รายละเอียด / สถานที่ <span class="text-gray-400 font-normal">(ไม่บังคับ)</span></label>
+                <label class="form-label">รายละเอียดเพิ่มเติม <span class="text-gray-400 font-normal">(ไม่บังคับ)</span></label>
                 <div class="relative">
                     <i class="fa-solid fa-align-left text-gray-400 absolute top-3.5 left-3.5 text-sm pointer-events-none"></i>
                     <textarea id="modal_description" name="description" rows="2"
@@ -962,6 +1325,57 @@ renderPageHeader("จัดการแคมเปญ", "สร้างแค�
     });
 
     /* ── Icon-picker helpers ─────────────────────────────────── */
+    // ── Cover image upload helpers ─────────────────────────────
+    function showCoverPreview(src) {
+        document.getElementById('modal_cover_empty').classList.add('hidden');
+        document.getElementById('modal_cover_preview').classList.remove('hidden');
+        document.getElementById('modal_cover_preview_img').src = src;
+    }
+    function showCoverEmpty() {
+        document.getElementById('modal_cover_empty').classList.remove('hidden');
+        document.getElementById('modal_cover_preview').classList.add('hidden');
+        document.getElementById('modal_cover_preview_img').src = '';
+    }
+    function handleCoverFileSelect(input) {
+        if (!input.files || !input.files[0]) return;
+        const f = input.files[0];
+        if (f.size > 5 * 1024 * 1024) {
+            Swal.fire({ icon:'error', title:'ไฟล์ใหญ่เกิน', text:'ขนาดต้องไม่เกิน 5MB' });
+            input.value = '';
+            return;
+        }
+        if (!['image/jpeg','image/png','image/webp'].includes(f.type)) {
+            Swal.fire({ icon:'error', title:'ชนิดไฟล์ไม่รองรับ', text:'รองรับ JPG, PNG, WEBP' });
+            input.value = '';
+            return;
+        }
+        const reader = new FileReader();
+        reader.onload = e => showCoverPreview(e.target.result);
+        reader.readAsDataURL(f);
+        document.getElementById('modal_remove_cover').value = '0';
+    }
+    function clearCoverImage() {
+        document.getElementById('modal_cover_file').value = '';
+        document.getElementById('modal_remove_cover').value = '1';
+        showCoverEmpty();
+    }
+    // Drag and drop binding
+    document.addEventListener('DOMContentLoaded', function() {
+        const dz = document.getElementById('modal_cover_dropzone');
+        if (!dz) return;
+        ['dragenter','dragover'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.add('is-dragover'); }));
+        ['dragleave','drop'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.remove('is-dragover'); }));
+        dz.addEventListener('drop', e => {
+            const f = e.dataTransfer?.files?.[0];
+            if (!f) return;
+            const input = document.getElementById('modal_cover_file');
+            const dt = new DataTransfer();
+            dt.items.add(f);
+            input.files = dt.files;
+            handleCoverFileSelect(input);
+        });
+    });
+
     function pickCard(containerId, value) {
         document.querySelectorAll('#' + containerId + ' [data-value]').forEach(el => {
             el.classList.toggle('is-selected', el.dataset.value === String(value));
@@ -1008,6 +1422,19 @@ renderPageHeader("จัดการแคมเปญ", "สร้างแค�
         document.getElementById('modal_status').value = 'active';
         document.getElementById('modal_is_auto_approve').value = '0';
         document.getElementById('modal_description').value = '';
+        document.getElementById('modal_room_id').value = '';
+        document.getElementById('modal_available_from').value = '';
+        document.getElementById('modal_target_audience').value = 'all';
+        document.getElementById('modal_max_per_user').value = '1';
+        document.getElementById('modal_cancel_deadline_hours').value = '24';
+        document.getElementById('modal_contact_phone').value = '';
+        document.getElementById('modal_prerequisites').value = '';
+        document.getElementById('modal_what_to_bring').value = '';
+        // Reset cover-image dropzone
+        document.getElementById('modal_cover_file').value = '';
+        document.getElementById('modal_cover_image_existing').value = '';
+        document.getElementById('modal_remove_cover').value = '0';
+        showCoverEmpty();
 
         pickCard('modal-type-cards',    'vaccine');
         pickCard('modal-status-pills',  'active');
@@ -1085,6 +1512,24 @@ renderPageHeader("จัดการแคมเปญ", "สร้างแค�
                 pickCard('modal-status-pills',  this.dataset.status);
                 pickCard('modal-approve-pills', this.dataset.auto);
                 document.getElementById('modal_description').value = this.dataset.desc;
+                document.getElementById('modal_room_id').value = this.dataset.roomId || '';
+                document.getElementById('modal_available_from').value = this.dataset.from || '';
+                document.getElementById('modal_target_audience').value = this.dataset.audience || 'all';
+                document.getElementById('modal_max_per_user').value = this.dataset.maxPerUser || '1';
+                document.getElementById('modal_cancel_deadline_hours').value = this.dataset.cancelHours ?? '24';
+                document.getElementById('modal_contact_phone').value = this.dataset.phone || '';
+                document.getElementById('modal_prerequisites').value = this.dataset.prereq || '';
+                document.getElementById('modal_what_to_bring').value = this.dataset.bring || '';
+                // Cover-image: show existing or empty state
+                const existingCover = this.dataset.cover || '';
+                document.getElementById('modal_cover_file').value = '';
+                document.getElementById('modal_cover_image_existing').value = existingCover;
+                document.getElementById('modal_remove_cover').value = '0';
+                if (existingCover) {
+                    showCoverPreview('../' + existingCover);
+                } else {
+                    showCoverEmpty();
+                }
                 // Restore the catalog dropdown selection + visibility based on
                 // the campaign's stored type. Empty string when no linkage.
                 const vtSel = document.getElementById('modal_vaccine_type_id');
@@ -1277,6 +1722,269 @@ function printCampaignQr() {
     </head><body><img src="${img.src}"><h2>${title}</h2><p style="font-size:12px;color:#888">สแกนเพื่อเช็คอิน · RSU Medical Clinic</p>
     <script>window.onload=()=>window.print()<\/script></body></html>`);
     w.document.close();
+}
+</script>
+
+<!-- ══ Walk-in QR Modal ══════════════════════════════════════════════════════ -->
+<div id="walkinQrOverlay"
+     class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden items-center justify-center p-4"
+     style="display:none;z-index:9000">
+  <div class="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden">
+
+    <!-- Header (amber theme = walk-in) -->
+    <div class="flex items-center justify-between px-5 py-4"
+         style="background:linear-gradient(135deg,#d97706,#f59e0b)">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center">
+          <i class="fa-solid fa-person-walking text-white"></i>
+        </div>
+        <div>
+          <p class="text-white font-black text-sm">QR Walk-in</p>
+          <p class="text-white/80 text-[11px]" id="walkinQrTitle">—</p>
+        </div>
+      </div>
+      <button onclick="closeWalkinQrModal()"
+              class="w-8 h-8 bg-white/20 hover:bg-white/30 rounded-xl flex items-center justify-center transition-all">
+        <i class="fa-solid fa-times text-white text-sm"></i>
+      </button>
+    </div>
+
+    <!-- QR -->
+    <div class="flex flex-col items-center px-6 pt-6 pb-4">
+
+      <!-- Status warning banner (hidden by default; shown when campaign status non-active) -->
+      <div id="walkinStatusWarning" class="hidden w-full mb-3 p-3 rounded-xl border-l-4 bg-orange-50 border-orange-400">
+        <div class="flex gap-2 items-start">
+          <i class="fa-solid fa-triangle-exclamation text-orange-500 mt-0.5"></i>
+          <div class="flex-1">
+            <p class="text-[12px] font-black text-orange-900 mb-1">Walk-in ปิดอยู่ตามสถานะแคมเปญ</p>
+            <p class="text-[11px] text-orange-700 leading-relaxed" id="walkinStatusWarningText">—</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="w-52 h-52 bg-gray-50 rounded-2xl border-2 border-dashed border-amber-200 flex items-center justify-center overflow-hidden mb-4" id="walkinQrImgWrap">
+        <i class="fa-solid fa-spinner fa-spin text-3xl text-gray-300"></i>
+      </div>
+
+      <!-- Toggle on/off -->
+      <button id="walkinToggleBtn" onclick="toggleWalkinQr()"
+              class="w-full py-2.5 rounded-xl font-black text-sm mb-3 transition-all flex items-center justify-center gap-2">
+        <i class="fa-solid fa-toggle-on"></i> <span>Walk-in เปิดอยู่</span>
+      </button>
+
+      <!-- Hint -->
+      <p class="text-[11px] text-gray-500 text-center mb-3 leading-relaxed">
+        ผู้ป่วยสแกน → Login LINE → ยืนยัน<br>
+        <span class="text-amber-600 font-bold">ระบบเช็คอินทันที</span> ไม่ต้องจองล่วงหน้า
+      </p>
+
+      <!-- Copy URL -->
+      <div class="w-full flex gap-2 mb-3">
+        <input id="walkinCopyInput" type="text" readonly
+               class="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs text-gray-500 font-mono overflow-hidden"
+               placeholder="กำลังโหลด URL...">
+        <button onclick="copyWalkinUrl()"
+                class="px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-xl transition-all" title="คัดลอก">
+          <i class="fa-solid fa-copy text-gray-500 text-sm" id="walkinCopyIcon"></i>
+        </button>
+      </div>
+
+      <!-- Action buttons (2 rows) -->
+      <div class="w-full grid grid-cols-2 gap-2 mb-2">
+        <button onclick="downloadWalkinQr()"
+                class="py-2.5 bg-gray-50 hover:bg-gray-100 rounded-xl text-xs font-bold text-gray-600 transition-all flex items-center justify-center gap-1.5 border border-gray-200">
+          <i class="fa-solid fa-download"></i> PNG
+        </button>
+        <button onclick="openWalkinPoster()"
+                class="py-2.5 rounded-xl text-xs font-bold text-white transition-all flex items-center justify-center gap-1.5"
+                style="background:linear-gradient(135deg,#d97706,#f59e0b)">
+          <i class="fa-solid fa-print"></i> โปสเตอร์ A4
+        </button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const CSRF_WALKIN_QR = '<?= get_csrf_token() ?>';
+const WALKIN_STATUS_LABELS = {
+    full:        'เต็มแล้ว',
+    closed:      'ปิดรับ',
+    inactive:    'หยุดชั่วคราว',
+    archived:    'เก็บถาวร',
+    draft:       'ฉบับร่าง',
+    coming_soon: 'เร็วๆ นี้',
+    private:     'ลิงก์ส่วนตัว',
+};
+let _walkinCurrentId = 0;
+let _walkinEnabled   = 0;
+let _walkinBlocked   = 0;  // 1 if campaign status disallows walk-in
+
+function showWalkinQrModal(campaignId, enabled, blocked, status) {
+    _walkinCurrentId = campaignId;
+    _walkinEnabled   = enabled;
+    _walkinBlocked   = blocked || 0;
+    const statusKey  = status || '';
+
+    // Reset UI
+    const wrap = document.getElementById('walkinQrImgWrap');
+    wrap.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-3xl text-gray-300"></i>';
+    document.getElementById('walkinCopyInput').value = 'กำลังโหลด...';
+
+    // Status warning banner
+    const warnBox = document.getElementById('walkinStatusWarning');
+    const warnTxt = document.getElementById('walkinStatusWarningText');
+    if (_walkinBlocked) {
+        const lbl = WALKIN_STATUS_LABELS[statusKey] || statusKey || 'ไม่ active';
+        warnTxt.textContent = `สถานะแคมเปญตอนนี้คือ "${lbl}" — แม้จะเปิด Walk-in QR ระบบจะปฏิเสธการลงทะเบียนทั้งหมด · เปลี่ยนสถานะเป็น "เปิดรับสมัคร" ก่อน แล้วค่อยเปิด Walk-in`;
+        warnBox.classList.remove('hidden');
+    } else {
+        warnBox.classList.add('hidden');
+    }
+
+    // Title from edit-btn data
+    const row = document.querySelector(`.edit-btn[data-id="${campaignId}"]`);
+    document.getElementById('walkinQrTitle').textContent = row ? row.dataset.title : `Campaign #${campaignId}`;
+
+    // QR image
+    const img = new Image();
+    img.src = `../user/api_walkin_qr.php?campaign=${campaignId}&t=${Date.now()}`;
+    img.className = 'w-full h-full object-contain p-2';
+    img.onload  = () => { wrap.innerHTML = ''; wrap.appendChild(img); };
+    img.onerror = () => { wrap.innerHTML = '<p class="text-xs text-red-400">โหลด QR ไม่ได้</p>'; };
+
+    // URL
+    fetch(`ajax/ajax_get_walkin_url.php?campaign=${campaignId}`)
+        .then(r => r.json())
+        .then(d => { document.getElementById('walkinCopyInput').value = d.url || ''; })
+        .catch(() => { document.getElementById('walkinCopyInput').value = ''; });
+
+    setWalkinToggleUI(_walkinEnabled);
+
+    // Teleport to body to escape any ancestor stacking context (Portal-Escape pattern)
+    const overlay = document.getElementById('walkinQrOverlay');
+    if (overlay.parentElement !== document.body) document.body.appendChild(overlay);
+    overlay.style.display = 'flex';
+}
+
+function closeWalkinQrModal() {
+    document.getElementById('walkinQrOverlay').style.display = 'none';
+}
+
+document.getElementById('walkinQrOverlay').addEventListener('click', function(e) {
+    if (e.target === this) closeWalkinQrModal();
+});
+
+function setWalkinToggleUI(enabled) {
+    const btn  = document.getElementById('walkinToggleBtn');
+    const icon = btn.querySelector('i');
+    const txt  = btn.querySelector('span');
+
+    // If campaign status blocks walk-in, the toggle should reflect that
+    // and refuse to enable. Admin must change status first.
+    if (_walkinBlocked && !enabled) {
+        btn.style.cssText  = 'background:#f3f4f6;color:#9ca3af;border:1.5px solid #e5e7eb;cursor:not-allowed';
+        btn.disabled = true;
+        icon.className = 'fa-solid fa-ban';
+        txt.textContent  = 'เปิดไม่ได้ — เปลี่ยนสถานะแคมเปญก่อน';
+        return;
+    }
+    btn.disabled = false;
+
+    if (enabled) {
+        btn.style.cssText = 'background:#fef3c7;color:#b45309;border:1.5px solid #fcd34d';
+        icon.className = 'fa-solid fa-toggle-on';
+        txt.textContent  = _walkinBlocked
+            ? 'Walk-in เปิดอยู่ (แต่สถานะปิด) — กดเพื่อปิด'
+            : 'Walk-in เปิดอยู่ — กดเพื่อปิด';
+    } else {
+        btn.style.cssText = 'background:#f3f4f6;color:#6b7280;border:1.5px solid #e5e7eb';
+        icon.className = 'fa-solid fa-toggle-off';
+        txt.textContent  = 'Walk-in ปิดอยู่ — กดเพื่อเปิด';
+    }
+}
+
+function toggleWalkinQr() {
+    const btn = document.getElementById('walkinToggleBtn');
+    if (btn.disabled) return;
+    btn.disabled = true;
+
+    const fd = new FormData();
+    fd.append('campaign_id', _walkinCurrentId);
+    fd.append('csrf_token',  CSRF_WALKIN_QR);
+
+    fetch('ajax/ajax_toggle_walkin.php', { method: 'POST', body: fd })
+        .then(r => r.json())
+        .then(d => {
+            if (d.status === 'success') {
+                _walkinEnabled = d.walkin_enabled;
+                setWalkinToggleUI(_walkinEnabled);
+
+                // Update table-row button color + onclick handler (preserve blocked state)
+                const tableBtn = document.querySelector(`button.walkin-qr-btn[onclick^="showWalkinQrModal(${_walkinCurrentId},"]`);
+                if (tableBtn) {
+                    const currentOnClick = tableBtn.getAttribute('onclick') || '';
+                    // Extract trailing args (blocked, status) from existing onclick
+                    const m = currentOnClick.match(/showWalkinQrModal\(\d+,\s*\d+,\s*(\d+),\s*'([^']*)'\)/);
+                    const blockedArg = m ? m[1] : '0';
+                    const statusArg  = m ? m[2] : '';
+                    tableBtn.setAttribute('onclick',
+                        `showWalkinQrModal(${_walkinCurrentId}, ${d.walkin_enabled}, ${blockedArg}, '${statusArg}')`);
+
+                    const onCls  = 'bg-amber-50 text-amber-600 border-amber-200 hover:bg-amber-500 hover:text-white';
+                    const offCls = 'bg-gray-50 text-gray-400 border-gray-200 hover:bg-gray-200';
+                    const blockedCls = 'bg-gray-100 text-gray-400 border-gray-200 hover:bg-gray-200 opacity-70';
+                    if (blockedArg === '1') {
+                        // Keep blocked styling regardless of enabled flag
+                    } else if (d.walkin_enabled) {
+                        tableBtn.className = tableBtn.className.replace(offCls, onCls);
+                    } else {
+                        tableBtn.className = tableBtn.className.replace(onCls, offCls);
+                    }
+                }
+            } else if (d.message) {
+                // Show server-side rejection (e.g., trying to enable for non-active campaign)
+                if (window.Swal) {
+                    Swal.fire({ icon: 'warning', title: 'เปิดไม่ได้', text: d.message, confirmButtonColor: '#d97706' });
+                } else {
+                    alert(d.message);
+                }
+            }
+        })
+        .catch(() => {})
+        .finally(() => {
+            // setWalkinToggleUI may have re-disabled the button (if blocked)
+            if (!_walkinBlocked || _walkinEnabled) btn.disabled = false;
+        });
+}
+
+function copyWalkinUrl() {
+    const input = document.getElementById('walkinCopyInput');
+    if (!input.value) return;
+    navigator.clipboard.writeText(input.value).catch(() => {
+        input.select();
+        document.execCommand('copy');
+    });
+    const icon = document.getElementById('walkinCopyIcon');
+    icon.className = 'fa-solid fa-check text-amber-600 text-sm';
+    setTimeout(() => { icon.className = 'fa-solid fa-copy text-gray-500 text-sm'; }, 1500);
+}
+
+function downloadWalkinQr() {
+    if (!_walkinCurrentId) return;
+    const a = document.createElement('a');
+    a.href = `../user/api_walkin_qr.php?campaign=${_walkinCurrentId}&size=14`;
+    a.download = `walkin-qr-${_walkinCurrentId}.png`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+}
+
+function openWalkinPoster() {
+    if (!_walkinCurrentId) return;
+    window.open(`walkin_poster.php?cid=${_walkinCurrentId}`, '_blank');
 }
 </script>
 

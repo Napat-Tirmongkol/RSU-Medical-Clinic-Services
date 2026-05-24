@@ -8,8 +8,65 @@ $pdo = db();
 // สร้าง column qr_enabled ถ้ายังไม่มี
 try { $pdo->exec("ALTER TABLE camp_list ADD COLUMN qr_enabled TINYINT(1) NOT NULL DEFAULT 0"); } catch (PDOException) {}
 
-$activeCampaigns = $pdo->query("SELECT id, title, qr_enabled FROM camp_list WHERE status = 'active' ORDER BY title ASC")->fetchAll();
-$allCampaigns    = $pdo->query("SELECT id, title, qr_enabled FROM camp_list ORDER BY title ASC")->fetchAll();
+// ── Clinic schedule integration — ส่งให้ flatpickr ใช้ disable/highlight ────
+$clinicRegularHours = [0=>null,1=>null,2=>null,3=>null,4=>null,5=>null,6=>null];
+try {
+    $rs = $pdo->query("SELECT weekday, open_time, close_time, is_closed, note
+                         FROM sys_clinic_hours
+                        WHERE type='regular'");
+    foreach ($rs as $r) {
+        $wd = (int)$r['weekday'];
+        $clinicRegularHours[$wd] = [
+            'closed'     => (int)($r['is_closed'] ?? 0) === 1,
+            'open_time'  => !empty($r['open_time'])  ? substr((string)$r['open_time'], 0, 5)  : null,
+            'close_time' => !empty($r['close_time']) ? substr((string)$r['close_time'], 0, 5) : null,
+            'note'       => (string)($r['note'] ?? ''),
+        ];
+    }
+} catch (PDOException) {}
+
+$clinicOverrides = [];  // 'YYYY-MM-DD' => {...}
+try {
+    $stmt = $pdo->prepare(
+        "SELECT specific_date, type, open_time, close_time, is_closed, note
+           FROM sys_clinic_hours
+          WHERE type IN ('holiday','special')
+            AND specific_date BETWEEN :s AND :e
+          ORDER BY (type='special') DESC, specific_date ASC"
+    );
+    $stmt->execute([
+        ':s' => (new DateTime('-2 months'))->format('Y-m-d'),
+        ':e' => (new DateTime('+12 months'))->format('Y-m-d'),
+    ]);
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+        $d = $r['specific_date'];
+        if (isset($clinicOverrides[$d])) continue;  // special wins (ORDER BY)
+        $clinicOverrides[$d] = [
+            'closed'     => (int)($r['is_closed'] ?? 0) === 1,
+            'open_time'  => !empty($r['open_time'])  ? substr((string)$r['open_time'], 0, 5)  : null,
+            'close_time' => !empty($r['close_time']) ? substr((string)$r['close_time'], 0, 5) : null,
+            'note'       => (string)($r['note'] ?? ''),
+            'source'     => $r['type'],  // 'holiday' | 'special'
+        ];
+    }
+} catch (PDOException) {}
+
+$activeCampaigns = $pdo->query("SELECT id, title, qr_enabled, status FROM camp_list WHERE status = 'active' ORDER BY title ASC")->fetchAll();
+$allCampaigns    = $pdo->query("SELECT id, title, qr_enabled, status FROM camp_list ORDER BY title ASC")->fetchAll();
+
+// Campaigns that actually have slots in the viewing month — used by the filter dropdown
+// (avoids broken state when slots exist for archived/non-active campaigns)
+$_month_for_filter = $_GET['month'] ?? date('m');
+$_year_for_filter  = $_GET['year']  ?? date('Y');
+$_filterStmt = $pdo->prepare("
+    SELECT DISTINCT c.id, c.title, c.status
+    FROM camp_list c
+    JOIN camp_slots s ON s.campaign_id = c.id
+    WHERE MONTH(s.slot_date) = ? AND YEAR(s.slot_date) = ?
+    ORDER BY c.title ASC
+");
+$_filterStmt->execute([$_month_for_filter, $_year_for_filter]);
+$filterCampaigns = $_filterStmt->fetchAll();
 
 // map campaign_id → qr_enabled
 $qrEnabledMap = [];
@@ -25,20 +82,26 @@ function slot_checkin_url(int $slot_id): string {
 }
 
 $colors = [
-    ['bg' => 'bg-emerald-50', 'border' => 'border-emerald-100', 'text' => 'text-emerald-700', 'badge' => 'text-emerald-500'],
-    ['bg' => 'bg-green-50', 'border' => 'border-green-100', 'text' => 'text-green-700', 'badge' => 'text-green-500'],
-    ['bg' => 'bg-purple-50', 'border' => 'border-purple-100', 'text' => 'text-purple-700', 'badge' => 'text-purple-500'],
-    ['bg' => 'bg-orange-50', 'border' => 'border-orange-100', 'text' => 'text-orange-700', 'badge' => 'text-orange-500'],
-    ['bg' => 'bg-red-50', 'border' => 'border-red-100', 'text' => 'text-red-700', 'badge' => 'text-red-500'],
-    ['bg' => 'bg-teal-50', 'border' => 'border-teal-100', 'text' => 'text-teal-700', 'badge' => 'text-teal-500'],
+    ['cls' => 'slot-pal-emerald'],
+    ['cls' => 'slot-pal-green'],
+    ['cls' => 'slot-pal-purple'],
+    ['cls' => 'slot-pal-orange'],
+    ['cls' => 'slot-pal-red'],
+    ['cls' => 'slot-pal-teal'],
 ];
 
+// Assign colors to every campaign that might appear (active + filter list)
+// so slot cards from archived campaigns still get a consistent color.
 $campaignColors = [];
 $c_idx = 0;
-foreach ($activeCampaigns as $ac) {
-    $campaignColors[$ac['id']] = $colors[$c_idx % count($colors)];
+$_colorPool = [];
+foreach ($activeCampaigns as $ac) $_colorPool[(int)$ac['id']] = $ac['title'];
+foreach ($filterCampaigns as $ac) $_colorPool[(int)$ac['id']] = $ac['title'];
+foreach ($_colorPool as $cid => $_t) {
+    $campaignColors[$cid] = $colors[$c_idx % count($colors)];
     $c_idx++;
 }
+unset($_colorPool);
 
 // ==========================================
 // ส่วนจัดการ AJAX / POST (เพิ่ม/ลบ รอบเวลา)
@@ -285,9 +348,19 @@ $year = $_GET['year'] ?? date('Y');
 
 $stmt = $pdo->prepare("
     SELECT ts.*, c.title as campaign_title,
-           (SELECT COUNT(*) FROM camp_bookings a WHERE a.slot_id = ts.id AND a.status IN ('booked', 'confirmed')) as booked_count
-    FROM camp_slots ts 
-    JOIN camp_list c ON ts.campaign_id = c.id 
+           -- booked_count includes 'completed' so historical slots still show real attendance
+           -- (active reservations + people who already checked in). Excludes cancelled/expired.
+           (SELECT COUNT(*) FROM camp_bookings a
+              WHERE a.slot_id = ts.id
+                AND a.status IN ('booked','confirmed','completed')) AS booked_count,
+           (SELECT COUNT(*) FROM camp_bookings a
+              WHERE a.slot_id = ts.id
+                AND a.status IN ('booked','confirmed'))             AS active_count,
+           (SELECT COUNT(*) FROM camp_bookings a
+              WHERE a.slot_id = ts.id
+                AND a.status = 'completed')                         AS completed_count
+    FROM camp_slots ts
+    JOIN camp_list c ON ts.campaign_id = c.id
     WHERE MONTH(ts.slot_date) = ? AND YEAR(ts.slot_date) = ?
     ORDER BY ts.slot_date, ts.start_time
 ");
@@ -302,82 +375,367 @@ foreach ($slots as $s) {
 require_once __DIR__ . '/includes/header.php';
 
 $header_actions = '
-<button id="deleteMultiBtn" onclick="deleteSelectedSlots()" style="display: none;" class="bg-red-500 text-white px-4 py-2 rounded-xl font-prompt text-sm font-bold shadow-sm hover:bg-red-600 transition-colors items-center gap-2">
+<button id="deleteMultiBtn" onclick="deleteSelectedSlots()" style="display: none;" class="ts-danger-btn">
     <i class="fa-solid fa-trash-can"></i> ลบที่เลือก (<span id="selectedSlotCount">0</span>)
 </button>
 <div class="relative" id="multiSelectContainer">
-    <button type="button" onclick="toggleMultiSelect(event)" class="px-4 py-2 border border-gray-200 rounded-xl bg-white font-prompt text-sm shadow-sm hover:bg-gray-50 text-gray-700 flex items-center justify-between transition-colors gap-2" style="min-width:0;max-width:224px;">
-        <span id="multiSelectLabel" class="truncate font-semibold text-[#2e9e63]">แสดงทุกแคมเปญ</span>
-        <i class="fa-solid fa-chevron-down text-[10px] text-gray-400 flex-shrink-0"></i>
+    <button type="button" onclick="toggleMultiSelect(event)" class="ts-multi-trigger">
+        <span id="multiSelectLabel" class="truncate">แสดงทุกแคมเปญ</span>
+        <i class="fa-solid fa-chevron-down text-[10px]" style="color:var(--ec-ink-4); flex-shrink:0;"></i>
     </button>
-    <div id="multiSelectDropdown" class="w-64 bg-white rounded-xl shadow-xl border border-gray-100 flex-col overflow-hidden" style="display:none;position:fixed;z-index:1000" onclick="event.stopPropagation()">
-        <div class="p-2 border-b border-gray-100 bg-gray-50">
-            <div class="relative">
-                <i class="fa-solid fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
-                <input type="text" id="multiSelectSearch" onkeyup="searchCampaigns(this.value)" placeholder="ค้นหาแคมเปญ..." class="w-full pl-8 pr-3 py-1.5 text-sm border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-[#2e9e63] font-prompt transition-shadow">
+    <div id="multiSelectDropdown" class="ts-multi-dropdown" style="display:none;position:fixed;z-index:9001;flex-direction:column;" onclick="event.stopPropagation()">
+        <div class="ts-multi-header">
+            <div style="position:relative;">
+                <i class="fa-solid fa-search" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--ec-ink-4);font-size:11px;"></i>
+                <input type="text" id="multiSelectSearch" onkeyup="searchCampaigns(this.value)" placeholder="ค้นหาแคมเปญ..." class="ts-multi-search" style="padding-left:28px;">
             </div>
         </div>
-        <div class="max-h-60 overflow-y-auto p-2 space-y-0.5" id="multiSelectList">
-            <label class="flex items-center gap-3 px-2 py-2 hover:bg-emerald-50/50 rounded-lg cursor-pointer transition-colors group">
-                <input type="checkbox" id="selectAllCamps" checked onchange="toggleAllCampaigns(this)" class="w-4 h-4 text-[#2e9e63] rounded border-gray-300 focus:ring-[#2e9e63] transition-colors cursor-pointer">
-                <span class="text-sm font-bold text-gray-800 group-hover:text-[#2e9e63] transition-colors">เลือกทั้งหมด</span>
+        <div class="ts-multi-list" id="multiSelectList">
+            <label class="ts-multi-item">
+                <input type="checkbox" id="selectAllCamps" checked onchange="toggleAllCampaigns(this)" class="w-4 h-4 cursor-pointer" style="accent-color:var(--ec-brand-500);">
+                <span style="font-weight:700;color:var(--ec-ink-1);">เลือกทั้งหมด</span>
             </label>
-            <div class="h-px bg-gray-100 my-1"></div>';
-            foreach ($activeCampaigns as $ac) {
+            <div style="height:1px; background:var(--ec-border-soft); margin:4px 0;"></div>';
+            // Use $filterCampaigns (campaigns with slots in this month) instead of
+            // $activeCampaigns — so archived/inactive campaigns with existing slots
+            // are also filterable. Falls back to $allCampaigns if month has 0 slots.
+            $_dropdownList = !empty($filterCampaigns) ? $filterCampaigns : $allCampaigns;
+            foreach ($_dropdownList as $ac) {
+                $_statusLabel = ($ac['status'] ?? 'active') !== 'active'
+                    ? ' <span style="font-size:9px; padding:1px 5px; border-radius:99px; background:var(--ec-surface-2); color:var(--ec-ink-4); margin-left:4px;">' . htmlspecialchars($ac['status'] ?? '') . '</span>'
+                    : '';
                 $header_actions .= '
-                <label class="camp-label-item flex items-center gap-3 px-2 py-2 hover:bg-gray-50 rounded-lg cursor-pointer transition-colors group" data-title="' . htmlspecialchars(strtolower($ac['title'])) . '">
-                    <input type="checkbox" value="' . $ac['id'] . '" checked onchange="updateMultiSelectFilter()" class="camp-checkbox w-4 h-4 text-[#2e9e63] rounded border-gray-300 focus:ring-[#2e9e63] transition-colors cursor-pointer">
-                    <span class="text-sm text-gray-600 line-clamp-1 break-all group-hover:text-gray-900 transition-colors">' . htmlspecialchars($ac['title']) . '</span>
+                <label class="camp-label-item ts-multi-item" data-title="' . htmlspecialchars(strtolower($ac['title'])) . '">
+                    <input type="checkbox" value="' . (int)$ac['id'] . '" checked onchange="updateMultiSelectFilter()" class="camp-checkbox w-4 h-4 cursor-pointer" style="accent-color:var(--ec-brand-500);">
+                    <span>' . htmlspecialchars($ac['title']) . $_statusLabel . '</span>
                 </label>';
             }
+            if (empty($_dropdownList)) {
+                $header_actions .= '<div style="padding:16px 8px; text-align:center; font-size:12px; color:var(--ec-ink-4);">ยังไม่มีแคมเปญในระบบ</div>';
+            }
+            unset($_dropdownList);
             $header_actions .= '
         </div>
     </div>
 </div>
-<div class="flex items-center bg-gray-100 p-1 rounded-xl">
-    <button onclick="switchView(\'calendar\')" id="btnViewCalendar" class="px-3 py-1.5 text-sm font-bold rounded-lg bg-white shadow-sm text-[#2e9e63] transition-all" title="มุมมองปฏิทิน">
+<div class="ts-view-toggle">
+    <button onclick="switchView(\'calendar\')" id="btnViewCalendar" class="is-active" title="มุมมองปฏิทิน">
         <i class="fa-solid fa-calendar-alt"></i>
     </button>
-    <button onclick="switchView(\'table\')" id="btnViewTable" class="px-3 py-1.5 text-sm font-bold rounded-lg text-gray-500 hover:text-gray-700 hover:bg-white transition-all" title="มุมมองตาราง">
+    <button onclick="switchView(\'table\')" id="btnViewTable" title="มุมมองตาราง">
         <i class="fa-solid fa-list-ul"></i>
     </button>
 </div>
-<button id="addSlotBtn" onclick="openAddSlotModal(\'' . date('Y-m-d') . '\')" class="bg-[#2e9e63] text-white px-5 py-2.5 rounded-xl font-prompt text-sm font-bold shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/40 hover:-translate-y-0.5 transition-all flex items-center gap-2" style="background-color: #2e9e63;">
-    <i class="fa-solid fa-plus-circle"></i><span class="btn-add-text"> สร้างรอบเวลา</span>
+<button id="addSlotBtn" onclick="openAddSlotModal(\'' . date('Y-m-d') . '\')" class="ts-cta">
+    <i class="fa-solid fa-plus-circle"></i><span class="btn-add-text">สร้างรอบเวลา</span>
 </button>
-<select id="monthSelect" onchange="location.href=\'?month=\'+this.value.split(\'-\')[1]+\'&year=\'+this.value.split(\'-\')[0]" class="px-4 py-2.5 border border-gray-200 rounded-xl bg-white font-prompt text-sm font-bold text-gray-700 outline-none shadow-sm cursor-pointer hover:bg-gray-50">';
-    for($i = -3; $i <= 6; $i++) {
-        $d = date('Y-m', strtotime("$i months"));
-        $selected = ($d == "$year-".str_pad($month, 2, '0', STR_PAD_LEFT)) ? 'selected' : '';
-        $header_actions .= "<option value='$d' $selected>".date('M Y', strtotime("$i months"))."</option>";
-    }
-$header_actions .= '</select>';
+<div class="ts-month-nav" role="group" aria-label="เลือกเดือน">';
 
-renderPageHeader("Campaign Time Slots", "กำหนดช่วงเวลารับคิวต่อรอบ (เลือกสร้างพร้อมกันได้หลายวัน)", $header_actions);
+    // Build prev/next/today URLs preserving other query params
+    $_currentYM = sprintf('%04d-%02d-01', $year, $month);
+    $_prevTs    = strtotime("$_currentYM -1 month");
+    $_nextTs    = strtotime("$_currentYM +1 month");
+    $_todayYM   = date('Y-m');
+    $_isCurrent = (sprintf('%04d-%02d', $year, $month) === $_todayYM);
+
+    $_navUrl = function(int $ts) {
+        $q = $_GET;
+        $q['month'] = date('m', $ts);
+        $q['year']  = date('Y', $ts);
+        return '?' . http_build_query($q);
+    };
+    $_prevUrl  = $_navUrl($_prevTs);
+    $_nextUrl  = $_navUrl($_nextTs);
+    $_todayUrl = $_navUrl(time());
+
+    $_thMonths = ['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+    $_yearBE   = $year + 543;
+    $_label    = $_thMonths[$month] . ' ' . $_yearBE;
+
+    $header_actions .= '
+        <a href="' . htmlspecialchars($_prevUrl) . '" class="ts-month-nav-btn" title="เดือนก่อนหน้า" aria-label="เดือนก่อนหน้า">
+            <i class="fa-solid fa-chevron-left"></i>
+        </a>
+        <button type="button" id="monthLabelBtn" class="ts-month-label" onclick="document.getElementById(\'monthPickerPop\').classList.toggle(\'open\')" aria-haspopup="true">
+            ' . htmlspecialchars($_label) . '
+            <i class="fa-solid fa-caret-down ts-month-label-caret"></i>
+        </button>
+        <a href="' . htmlspecialchars($_nextUrl) . '" class="ts-month-nav-btn" title="เดือนถัดไป" aria-label="เดือนถัดไป">
+            <i class="fa-solid fa-chevron-right"></i>
+        </a>';
+
+    if (!$_isCurrent) {
+        $header_actions .= '
+        <a href="' . htmlspecialchars($_todayUrl) . '" class="ts-month-today-btn" title="กลับไปเดือนปัจจุบัน">วันนี้</a>';
+    }
+
+    // Mini month picker (popup) — show this year + range
+    $header_actions .= '
+        <div id="monthPickerPop" class="ts-month-pop" role="dialog">
+            <div class="ts-month-pop-year">' . htmlspecialchars($_yearBE) . '</div>
+            <div class="ts-month-pop-grid">';
+    for ($m = 1; $m <= 12; $m++) {
+        $_isActive = ($m === (int)$month);
+        $_url = $_navUrl(strtotime(sprintf('%04d-%02d-01', $year, $m)));
+        $header_actions .= '
+                <a href="' . htmlspecialchars($_url) . '" class="ts-month-pop-cell' . ($_isActive ? ' is-active' : '') . '">'
+                . htmlspecialchars($_thMonths[$m]) . '</a>';
+    }
+    $header_actions .= '
+            </div>
+            <div class="ts-month-pop-yearnav">
+                <a href="' . htmlspecialchars($_navUrl(strtotime(sprintf('%04d-%02d-01', $year - 1, $month)))) . '" class="ts-month-pop-yearbtn">
+                    <i class="fa-solid fa-chevron-left"></i> ' . htmlspecialchars(($year - 1) + 543) . '
+                </a>
+                <a href="' . htmlspecialchars($_navUrl(strtotime(sprintf('%04d-%02d-01', $year + 1, $month)))) . '" class="ts-month-pop-yearbtn">
+                    ' . htmlspecialchars(($year + 1) + 543) . ' <i class="fa-solid fa-chevron-right"></i>
+                </a>
+            </div>
+        </div>
+    </div>';
+
+renderPageHeader("รอบเวลาแคมเปญ", "เลือกวันและเวลาเปิดรับจอง — สร้างพร้อมกันหลายวันได้", $header_actions);
 ?>
 
 <style>
+/* ── Time Slots — uses CSS vars from shell, dark-mode aware ─── */
 @keyframes slideUpFade {
     0%   { opacity: 0; transform: translateY(12px); }
     100% { opacity: 1; transform: translateY(0); }
 }
-.animate-slide-up  { animation: slideUpFade .45s cubic-bezier(.16,1,.3,1) both; }
-.delay-100         { animation-delay: .08s; }
+.animate-slide-up { animation: slideUpFade .45s cubic-bezier(.16,1,.3,1) both; }
+.delay-100        { animation-delay: .08s; }
+@media (prefers-reduced-motion: reduce) {
+    .animate-slide-up { animation: none; }
+}
 
 /* ── Scrollbar ───────────────────────────────── */
 ::-webkit-scrollbar       { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 99px; }
-::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+::-webkit-scrollbar-thumb { background: var(--ec-border); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: var(--ec-ink-4); }
 .scrollbar-hide { scrollbar-width: none; }
 .scrollbar-hide::-webkit-scrollbar { display: none; }
 
+/* ── Toolbar mini-controls (header actions) ──── */
+.ts-mini-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 8px 14px;
+    border-radius: 12px;
+    background: var(--ec-surface);
+    border: 1px solid var(--ec-border);
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--ec-ink-2);
+    transition: all .15s;
+    cursor: pointer;
+}
+.ts-mini-btn:hover {
+    border-color: var(--ec-brand-200);
+    color: var(--ec-brand-700);
+    transform: translateY(-1px);
+    box-shadow: var(--ec-shadow-md);
+}
+body[data-theme='dark'] .ts-mini-btn:hover {
+    color: var(--ec-brand-400);
+    border-color: rgba(46,158,99,.3);
+}
+.ts-cta {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 10px 18px;
+    border-radius: 12px;
+    color: #fff;
+    background: linear-gradient(135deg, #1f7a4d, #2e9e63 60%, #34d399);
+    font-size: 13px;
+    font-weight: 800;
+    border: 0;
+    cursor: pointer;
+    box-shadow: 0 8px 20px -6px rgba(46,158,99,.45);
+    transition: all .15s;
+}
+.ts-cta:hover { transform: translateY(-1px); box-shadow: 0 14px 28px -6px rgba(46,158,99,.55); }
+.ts-view-toggle {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 4px;
+    border-radius: 12px;
+    background: var(--ec-surface-2);
+    border: 1px solid var(--ec-border);
+}
+.ts-view-toggle button {
+    padding: 6px 10px;
+    border-radius: 9px;
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    color: var(--ec-ink-3);
+    font-size: 13px;
+    transition: all .15s;
+}
+.ts-view-toggle button.is-active {
+    background: var(--ec-surface);
+    color: var(--ec-brand-700);
+    box-shadow: 0 1px 3px rgba(15,23,42,.08);
+}
+body[data-theme='dark'] .ts-view-toggle button.is-active {
+    background: rgba(46,158,99,.18);
+    color: var(--ec-brand-400);
+    box-shadow: none;
+}
+/* ── Month nav: prev/next + label dropdown + "วันนี้" ─────────── */
+.ts-month-nav {
+    display: inline-flex; align-items: center; gap: 2px;
+    background: var(--ec-surface); border: 1px solid var(--ec-border);
+    border-radius: 12px; padding: 3px; position: relative;
+}
+.ts-month-nav-btn {
+    width: 32px; height: 32px; border-radius: 8px;
+    display: inline-flex; align-items: center; justify-content: center;
+    color: var(--ec-ink-2); text-decoration: none;
+    font-size: 12px; transition: all .15s;
+}
+.ts-month-nav-btn:hover { background: var(--ec-bg-2, #f1f5f9); color: var(--ec-ink-1); }
+.ts-month-label {
+    min-width: 120px; height: 32px;
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 0 12px; background: transparent; border: 0;
+    font-size: 13px; font-weight: 800; color: var(--ec-ink-1);
+    cursor: pointer; border-radius: 8px; transition: background .15s;
+    font-family: inherit;
+}
+.ts-month-label:hover { background: var(--ec-bg-2, #f1f5f9); }
+.ts-month-label-caret { font-size: 9px; opacity: .55; transition: transform .2s; }
+.ts-month-pop.open ~ * .ts-month-label-caret,
+.ts-month-nav .ts-month-pop.open + * .ts-month-label-caret { transform: rotate(180deg); }
+.ts-month-today-btn {
+    margin-left: 6px; padding: 0 14px; height: 32px;
+    display: inline-flex; align-items: center;
+    background: linear-gradient(135deg, var(--ec-brand-500), var(--ec-brand-600));
+    color: #fff; text-decoration: none;
+    border-radius: 8px; font-size: 12px; font-weight: 800;
+    box-shadow: 0 2px 8px -2px rgba(46,158,99,.4);
+    transition: all .15s;
+}
+.ts-month-today-btn:hover { filter: brightness(1.1); transform: translateY(-1px); }
+
+/* Mini month picker popup */
+.ts-month-pop {
+    position: absolute; top: calc(100% + 8px); left: 50%; transform: translateX(-50%);
+    background: var(--ec-surface); border: 1px solid var(--ec-border);
+    border-radius: 14px; padding: 12px;
+    box-shadow: 0 12px 32px -8px rgba(15,23,42,.18), 0 4px 12px -4px rgba(15,23,42,.08);
+    min-width: 260px; z-index: 50;
+    opacity: 0; pointer-events: none; transform: translateX(-50%) translateY(-4px);
+    transition: opacity .18s, transform .18s;
+}
+.ts-month-pop.open { opacity: 1; pointer-events: auto; transform: translateX(-50%) translateY(0); }
+.ts-month-pop-year {
+    text-align: center; font-size: 14px; font-weight: 800; color: var(--ec-ink-1);
+    padding-bottom: 8px; border-bottom: 1px solid var(--ec-border); margin-bottom: 8px;
+}
+.ts-month-pop-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+.ts-month-pop-cell {
+    padding: 10px 8px; text-align: center; border-radius: 8px;
+    font-size: 12px; font-weight: 700; color: var(--ec-ink-2);
+    text-decoration: none; transition: all .15s;
+}
+.ts-month-pop-cell:hover { background: var(--ec-bg-2, #f1f5f9); color: var(--ec-ink-1); }
+.ts-month-pop-cell.is-active {
+    background: var(--ec-brand-500); color: #fff;
+    box-shadow: 0 2px 8px -2px rgba(46,158,99,.4);
+}
+.ts-month-pop-yearnav {
+    display: flex; justify-content: space-between; gap: 6px;
+    margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--ec-border);
+}
+.ts-month-pop-yearbtn {
+    flex: 1; padding: 6px 10px; border-radius: 8px;
+    background: var(--ec-bg-2, #f8fafc);
+    font-size: 11px; font-weight: 700; color: var(--ec-ink-2);
+    text-decoration: none; text-align: center; transition: all .15s;
+    display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+}
+.ts-month-pop-yearbtn:hover { background: var(--ec-brand-50, #ecfdf5); color: var(--ec-brand-700); }
+
+.ts-danger-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 8px 14px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #dc2626, #ef4444);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 700;
+    border: 0;
+    cursor: pointer;
+    box-shadow: 0 6px 16px -4px rgba(239,68,68,.4);
+    transition: all .15s;
+}
+.ts-danger-btn:hover { transform: translateY(-1px); box-shadow: 0 12px 24px -6px rgba(239,68,68,.5); }
+
+/* ── Multi-select campaign dropdown ─────────── */
+.ts-multi-trigger {
+    display: inline-flex; align-items: center; justify-content: space-between; gap: 8px;
+    padding: 8px 14px;
+    border-radius: 12px;
+    background: var(--ec-surface);
+    border: 1px solid var(--ec-border);
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--ec-brand-700);
+    cursor: pointer;
+    transition: border-color .15s;
+    max-width: 224px; min-width: 0;
+}
+.ts-multi-trigger:hover { border-color: var(--ec-brand-200); }
+body[data-theme='dark'] .ts-multi-trigger { color: var(--ec-brand-400); }
+.ts-multi-dropdown {
+    width: 256px;
+    background: var(--ec-surface);
+    border: 1px solid var(--ec-border);
+    border-radius: 14px;
+    box-shadow: 0 14px 40px -10px rgba(15,23,42,.18);
+    overflow: hidden;
+}
+body[data-theme='dark'] .ts-multi-dropdown {
+    box-shadow: 0 14px 40px -10px rgba(0,0,0,.6);
+}
+.ts-multi-header {
+    padding: 8px;
+    background: var(--ec-surface-2);
+    border-bottom: 1px solid var(--ec-border-soft);
+}
+.ts-multi-search {
+    width: 100%;
+    padding: 6px 30px 6px 28px;
+    font-size: 13px;
+    background: var(--ec-surface);
+    border: 1px solid var(--ec-border);
+    border-radius: 9px;
+    color: var(--ec-ink-1);
+    outline: none;
+}
+.ts-multi-search:focus { border-color: var(--ec-brand-500); box-shadow: 0 0 0 3px rgba(46,158,99,.15); }
+.ts-multi-list { max-height: 240px; overflow-y: auto; padding: 6px; }
+.ts-multi-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px;
+    border-radius: 9px;
+    cursor: pointer;
+    transition: background .12s;
+}
+.ts-multi-item:hover { background: var(--ec-surface-2); }
+.ts-multi-item span {
+    font-size: 13px;
+    color: var(--ec-ink-2);
+    flex: 1;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
 /* ── Calendar container ──────────────────────── */
 .cal-wrap {
-    background: #fff;
+    background: var(--ec-surface);
     border-radius: 20px;
-    box-shadow: 0 1px 3px rgba(0,0,0,.06), 0 4px 16px rgba(0,0,0,.04);
-    border: 1px solid #f0f2f5;
+    box-shadow: var(--ec-shadow-md);
+    border: 1px solid var(--ec-border);
     overflow: hidden;
 }
 
@@ -389,65 +747,80 @@ renderPageHeader("Campaign Time Slots", "กำหนดช่วงเวลา
     text-align: center;
     font-size: 11px;
     font-weight: 800;
-    letter-spacing: .08em;
+    letter-spacing: .06em;
     text-transform: uppercase;
 }
-.cal-head.sunday { color: #fca5a5; }
+.cal-head.sunday { color: #fecaca; }
 
 /* ── Day cell ────────────────────────────────── */
 .cal-cell {
-    background: #fff;
+    background: var(--ec-surface);
     min-height: 130px;
     padding: 8px;
-    border-top: 1px solid #f0f2f5;
-    border-right: 1px solid #f0f2f5;
+    border-top: 1px solid var(--ec-border-soft);
+    border-right: 1px solid var(--ec-border-soft);
     display: flex;
     flex-direction: column;
     transition: background .15s;
     position: relative;
 }
-.cal-cell:hover { background: #f8faff; }
-.cal-cell.empty { background: #fafbfc; }
+.cal-cell:hover { background: var(--ec-surface-2); }
+.cal-cell.empty {
+    background: var(--ec-surface-2);
+    opacity: .6;
+}
+body[data-theme='dark'] .cal-cell:hover {
+    background: rgba(255,255,255,.04);
+}
 
 /* ── Date number ─────────────────────────────── */
 .cal-date {
     width: 26px; height: 26px;
     display: flex; align-items: center; justify-content: center;
     font-size: 13px; font-weight: 700; border-radius: 50%;
-    color: #374151;
+    color: var(--ec-ink-2);
     flex-shrink: 0;
 }
 .cal-date.today {
-    background: linear-gradient(135deg, #2e9e63, #10b981);
+    background: linear-gradient(135deg, #2e9e63, #34d399);
     color: #fff;
-    box-shadow: 0 2px 8px rgba(0,82,204,.35);
+    box-shadow: 0 3px 10px rgba(46,158,99,.4);
 }
 
 /* ── Add-slot hover button ───────────────────── */
 .cal-add-btn {
-    opacity: 0; transition: opacity .15s;
+    opacity: 0; transition: opacity .15s, transform .15s;
     width: 24px; height: 24px;
-    background: #e8f0fe; color: #2e9e63;
-    border-radius: 7px; border: none; cursor: pointer;
+    background: var(--ec-brand-50);
+    color: var(--ec-brand-700);
+    border-radius: 8px; border: none; cursor: pointer;
     display: flex; align-items: center; justify-content: center;
     font-size: 11px;
 }
 .cal-cell:hover .cal-add-btn { opacity: 1; }
+.cal-add-btn:hover { transform: scale(1.08); }
+body[data-theme='dark'] .cal-add-btn {
+    background: rgba(46,158,99,.18);
+    color: var(--ec-brand-400);
+}
 
 /* ── Slot card inside cell ───────────────────── */
 .slot-card {
     border-radius: 8px;
     padding: 5px 7px;
     margin-bottom: 4px;
-    border: 1px solid transparent;
+    border: 1px solid var(--ec-border-soft);
     position: relative;
     transition: box-shadow .15s, transform .15s;
     cursor: default;
 }
 .slot-card:hover {
-    box-shadow: 0 2px 8px rgba(0,0,0,.1);
+    box-shadow: 0 4px 12px rgba(0,0,0,.12);
     transform: translateY(-1px);
     z-index: 1;
+}
+body[data-theme='dark'] .slot-card:hover {
+    box-shadow: 0 6px 18px rgba(0,0,0,.5);
 }
 .slot-card .slot-actions {
     position: absolute; top: 4px; right: 4px;
@@ -460,29 +833,38 @@ renderPageHeader("Campaign Time Slots", "กำหนดช่วงเวลา
     display: flex; align-items: center; justify-content: center;
     font-size: 8px; transition: all .15s;
 }
+.slot-act-btn:hover { transform: scale(1.12); }
 
 /* ── Capacity bar ────────────────────────────── */
-.cap-bar { height: 3px; border-radius: 99px; background: rgba(0,0,0,.08); overflow: hidden; margin: 3px 0; }
+.cap-bar {
+    height: 3px;
+    border-radius: 99px;
+    background: rgba(0,0,0,.08);
+    overflow: hidden;
+    margin: 3px 0;
+}
+body[data-theme='dark'] .cap-bar { background: rgba(255,255,255,.1); }
 .cap-bar-fill { height: 100%; border-radius: 99px; transition: width .3s; }
 
 /* ── Table ───────────────────────────────────── */
 .slots-table { width: 100%; border-collapse: separate; border-spacing: 0; }
 .slots-table thead th {
     background: linear-gradient(135deg, #2e9e63 0%, #10b981 100%);
-    color: rgba(255,255,255,.85);
-    font-size: 11px; font-weight: 800;
-    letter-spacing: .08em; text-transform: uppercase;
+    color: rgba(255,255,255,.92);
+    font-size: 11px; font-weight: 700;
+    letter-spacing: .06em; text-transform: uppercase;
     padding: 14px 20px;
 }
 .slots-table thead th:first-child { border-radius: 14px 0 0 0; }
 .slots-table thead th:last-child  { border-radius: 0 14px 0 0; }
 .slots-table tbody tr { transition: background .12s; }
-.slots-table tbody tr:hover td { background: #f5f8ff; }
+.slots-table tbody tr:hover td { background: var(--ec-surface-2); }
 .slots-table tbody td {
     padding: 14px 20px;
-    border-bottom: 1px solid #f3f4f6;
+    border-bottom: 1px solid var(--ec-border-soft);
     font-size: 13.5px;
-    background: #fff;
+    background: var(--ec-surface);
+    color: var(--ec-ink-2);
 }
 
 /* ── Status badge ────────────────────────────── */
@@ -492,16 +874,341 @@ renderPageHeader("Campaign Time Slots", "กำหนดช่วงเวลา
     font-size: 11px; font-weight: 700; white-space: nowrap;
 }
 
-/* ── Modal glass ─────────────────────────────── */
-.glass-modal {
-    background: #fff;
-    border: 1px solid rgba(255,255,255,.3);
-    box-shadow: 0 24px 48px -8px rgba(0,0,0,.2);
+/* ── Slot tones (used by both calendar + table + modals) ── */
+.tone-full  { background: #fee2e2; color: #b91c1c; }
+.tone-near  { background: #fef9c3; color: #a16207; }
+.tone-ok    { background: #dcfce7; color: #15803d; }
+body[data-theme='dark'] .tone-full { background: rgba(239,68,68,.2); color: #fca5a5; }
+body[data-theme='dark'] .tone-near { background: rgba(245,158,11,.2); color: #fcd34d; }
+body[data-theme='dark'] .tone-ok   { background: rgba(34,197,94,.2);  color: #86efac; }
+
+/* Slot card color rotation (campaign-driven) — dark-mode aware */
+.slot-pal-emerald { background: #ecfdf5; color: #047857; }
+.slot-pal-green   { background: #f0fdf4; color: #15803d; }
+.slot-pal-purple  { background: #faf5ff; color: #6b21a8; }
+.slot-pal-orange  { background: #fff7ed; color: #c2410c; }
+.slot-pal-red     { background: #fef2f2; color: #b91c1c; }
+.slot-pal-teal    { background: #f0fdfa; color: #0f766e; }
+body[data-theme='dark'] .slot-pal-emerald { background: rgba(16,185,129,.15); color: #6ee7b7; }
+body[data-theme='dark'] .slot-pal-green   { background: rgba(34,197,94,.15);  color: #86efac; }
+body[data-theme='dark'] .slot-pal-purple  { background: rgba(168,85,247,.15); color: #d8b4fe; }
+body[data-theme='dark'] .slot-pal-orange  { background: rgba(249,115,22,.15); color: #fdba74; }
+body[data-theme='dark'] .slot-pal-red     { background: rgba(239,68,68,.15);  color: #fca5a5; }
+body[data-theme='dark'] .slot-pal-teal    { background: rgba(20,184,166,.15); color: #5eead4; }
+
+/* ── Modal — Portal-Escape pattern (z-index 9000+) ─── */
+.ts-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 9000 !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    background: rgba(15,23,42,.6);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+}
+/* CRITICAL: .hidden Tailwind utility must override .ts-modal flex */
+.ts-modal.hidden { display: none !important; }
+.ts-modal-box {
+    background: var(--ec-surface);
+    border-radius: 22px;
+    width: 100%;
+    max-width: 520px;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid var(--ec-border);
+    box-shadow: 0 28px 60px -10px rgba(0,0,0,.35);
+    animation: slideUpFade .35s cubic-bezier(.16,1,.3,1) both;
+}
+.ts-modal-box.lg { max-width: 760px; }
+.ts-modal-header {
+    padding: 18px 22px;
+    display: flex; align-items: center; justify-content: space-between;
+    flex-shrink: 0;
+    color: #fff;
+}
+.ts-modal-header.brand  { background: linear-gradient(135deg, #1f7a4d, #2e9e63 60%, #34d399); }
+.ts-modal-header.amber  { background: linear-gradient(135deg, #c2410c, #f59e0b 60%, #fbbf24); }
+.ts-modal-header.brand-soft {
+    background: linear-gradient(135deg, var(--ec-brand-50), #f0fdf4);
+    color: var(--ec-ink-1);
+    border-bottom: 1px solid var(--ec-border-soft);
+}
+body[data-theme='dark'] .ts-modal-header.brand-soft {
+    background: linear-gradient(135deg, rgba(46,158,99,.2), rgba(46,158,99,.08));
+    color: var(--ec-ink-1);
+}
+.ts-modal-title {
+    display: flex; align-items: center; gap: 12px;
+    font-size: 16px; font-weight: 800;
+    margin: 0;
+}
+.ts-modal-icon {
+    width: 36px; height: 36px;
+    background: rgba(255,255,255,.22);
+    border-radius: 11px;
+    display: flex; align-items: center; justify-content: center;
+}
+.ts-modal-header.brand-soft .ts-modal-icon {
+    background: linear-gradient(135deg, #2e9e63, #34d399);
+    color: #fff;
+}
+.ts-modal-close {
+    width: 32px; height: 32px;
+    background: rgba(255,255,255,.2);
+    color: #fff;
+    border-radius: 99px;
+    border: 0; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background .15s;
+}
+.ts-modal-close:hover { background: rgba(255,255,255,.32); }
+.ts-modal-header.brand-soft .ts-modal-close {
+    background: var(--ec-surface-2); color: var(--ec-ink-3);
+}
+.ts-modal-header.brand-soft .ts-modal-close:hover { background: var(--ec-border); color: var(--ec-ink-1); }
+.ts-modal-body {
+    padding: 18px 22px;
+    overflow-y: auto;
+    flex: 1;
+    color: var(--ec-ink-2);
+}
+.ts-modal-footer {
+    padding: 14px 22px;
+    border-top: 1px solid var(--ec-border-soft);
+    background: var(--ec-surface-2);
+    flex-shrink: 0;
+    display: flex; gap: 10px;
 }
 
-/* ── Modal header strips ─────────────────────── */
-.modal-hdr-blue   { background: linear-gradient(135deg,#2e9e63,#10b981); }
-.modal-hdr-amber  { background: linear-gradient(135deg,#f59e0b,#d97706); }
+/* Modal inputs (dark-mode aware) */
+.ts-input, .ts-select {
+    width: 100%;
+    padding: 9px 14px;
+    background: var(--ec-surface);
+    border: 1px solid var(--ec-border);
+    border-radius: 12px;
+    font-size: 13px;
+    color: var(--ec-ink-1);
+    outline: none;
+    transition: border-color .15s, box-shadow .15s;
+}
+.ts-input:focus, .ts-select:focus {
+    border-color: var(--ec-brand-500);
+    box-shadow: 0 0 0 3px rgba(46,158,99,.15);
+}
+.ts-input[type="time"], .ts-input[type="number"] {
+    font-variant-numeric: tabular-nums;
+}
+.ts-label {
+    display: block;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ec-ink-2);
+    margin-bottom: 6px;
+}
+.ts-label-eyebrow {
+    display: block;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--ec-ink-3);
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+}
+.ts-field-card {
+    background: var(--ec-surface-2);
+    padding: 12px;
+    border-radius: 14px;
+    border: 1px solid var(--ec-border-soft);
+}
+.ts-field-card.brand {
+    background: var(--ec-brand-50);
+    border-color: var(--ec-brand-200);
+}
+body[data-theme='dark'] .ts-field-card.brand {
+    background: rgba(46,158,99,.1);
+    border-color: rgba(46,158,99,.25);
+}
+
+.ts-btn-primary {
+    padding: 12px 20px;
+    background: linear-gradient(135deg, #1f7a4d, #2e9e63 60%, #34d399);
+    color: #fff;
+    border: 0; border-radius: 14px;
+    font-size: 14px; font-weight: 800;
+    cursor: pointer;
+    transition: all .15s;
+    box-shadow: 0 8px 20px -6px rgba(46,158,99,.45);
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+}
+.ts-btn-primary:hover { transform: translateY(-1px); box-shadow: 0 14px 28px -6px rgba(46,158,99,.55); }
+.ts-btn-amber {
+    padding: 12px 20px;
+    background: linear-gradient(135deg, #c2410c, #f59e0b 60%, #fbbf24);
+    color: #fff;
+    border: 0; border-radius: 14px;
+    font-size: 14px; font-weight: 800;
+    cursor: pointer;
+    transition: all .15s;
+    box-shadow: 0 8px 20px -6px rgba(245,158,11,.45);
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+}
+.ts-btn-amber:hover { transform: translateY(-1px); box-shadow: 0 14px 28px -6px rgba(245,158,11,.55); }
+.ts-btn-ghost {
+    padding: 12px 20px;
+    background: var(--ec-surface);
+    color: var(--ec-ink-2);
+    border: 1px solid var(--ec-border);
+    border-radius: 14px;
+    font-size: 14px; font-weight: 700;
+    cursor: pointer;
+    transition: all .15s;
+}
+.ts-btn-ghost:hover {
+    background: var(--ec-surface-2);
+    border-color: var(--ec-ink-4);
+}
+
+/* ── QR modal — toggle + image + copy ───────────── */
+.qr-toggle-btn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px 16px;
+    border-radius: 12px;
+    font-weight: 700;
+    font-size: 13px;
+    border: 1px solid var(--ec-border);
+    background: var(--ec-surface-2);
+    color: var(--ec-ink-3);
+    cursor: pointer;
+    transition: all .15s;
+}
+.qr-toggle-btn.is-on {
+    background: #dcfce7;
+    color: #16a34a;
+    border-color: #bbf7d0;
+}
+.qr-toggle-btn.is-off {
+    background: var(--ec-surface-2);
+    color: var(--ec-ink-3);
+    border-color: var(--ec-border);
+}
+body[data-theme='dark'] .qr-toggle-btn.is-on {
+    background: rgba(34,197,94,.18);
+    color: #86efac;
+    border-color: rgba(34,197,94,.3);
+}
+.qr-img-wrap {
+    width: 232px; height: 232px;
+    padding: 12px;
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: inset 0 1px 3px rgba(0,0,0,.06);
+    border: 1px solid var(--ec-border-soft);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+}
+.qr-img-wrap img {
+    width: 100%; height: 100%;
+    object-fit: contain;
+    display: block;
+}
+.qr-img-wrap .qr-state {
+    position: absolute;
+    inset: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    background: var(--ec-surface-2);
+    color: var(--ec-ink-3);
+    font-size: 12px;
+    text-align: center;
+    border-radius: 8px;
+    padding: 8px;
+}
+.qr-img-wrap .qr-state i { font-size: 24px; }
+.qr-img-wrap .qr-state.error { color: #b91c1c; background: #fef2f2; }
+.qr-img-wrap.loading img,
+.qr-img-wrap.error img { visibility: hidden; }
+.qr-img-wrap:not(.loading):not(.error) .qr-state { display: none; }
+.qr-copy-btn {
+    width: 36px; height: 36px;
+    background: var(--ec-surface-2);
+    border: 1px solid var(--ec-border);
+    border-radius: 11px;
+    color: var(--ec-ink-2);
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: all .15s;
+    display: flex; align-items: center; justify-content: center;
+}
+.qr-copy-btn:hover { border-color: var(--ec-brand-200); color: var(--ec-brand-700); }
+
+/* ── Action button row in table ──────────────── */
+.ts-row-btn {
+    width: 32px; height: 32px;
+    border-radius: 10px;
+    border: 1px solid;
+    display: inline-flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    transition: all .15s;
+    background: transparent;
+}
+.ts-row-btn:hover { transform: translateY(-1px); }
+.ts-row-btn.qr     { background: #ecfdf5; color: #047857; border-color: #a7f3d0; }
+.ts-row-btn.qr:hover { background: #10b981; color: #fff; border-color: #10b981; }
+.ts-row-btn.edit   { background: #fffbeb; color: #b45309; border-color: #fde68a; }
+.ts-row-btn.edit:hover { background: #f59e0b; color: #fff; border-color: #f59e0b; }
+.ts-row-btn.del    { background: #fef2f2; color: #b91c1c; border-color: #fecaca; }
+.ts-row-btn.del:hover { background: #ef4444; color: #fff; border-color: #ef4444; }
+body[data-theme='dark'] .ts-row-btn.qr   { background: rgba(16,185,129,.15);  color: #6ee7b7; border-color: rgba(16,185,129,.3); }
+body[data-theme='dark'] .ts-row-btn.edit { background: rgba(245,158,11,.15);  color: #fcd34d; border-color: rgba(245,158,11,.3); }
+body[data-theme='dark'] .ts-row-btn.del  { background: rgba(239,68,68,.15);   color: #fca5a5; border-color: rgba(239,68,68,.3); }
+
+/* ── Empty state ─────────────────────────────── */
+.ts-empty {
+    background: var(--ec-surface);
+    border: 1px dashed var(--ec-border);
+    border-radius: 22px;
+    padding: 40px 20px;
+    text-align: center;
+    color: var(--ec-ink-3);
+}
+.ts-empty-icon {
+    width: 72px; height: 72px;
+    background: var(--ec-surface-2);
+    color: var(--ec-ink-4);
+    border-radius: 999px;
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 14px;
+    font-size: 32px;
+}
+.ts-empty h3 {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--ec-ink-1);
+    margin: 0 0 6px;
+}
+.ts-empty p {
+    font-size: 13px;
+    color: var(--ec-ink-3);
+    margin: 0;
+    max-width: 360px;
+    margin: 0 auto;
+}
 
 /* ── Mobile responsive ───────────────────────── */
 @media (max-width: 639px) {
@@ -510,21 +1217,175 @@ renderPageHeader("Campaign Time Slots", "กำหนดช่วงเวลา
     .cal-date    { width: 20px; height: 20px; font-size: 11px; }
     .slot-card   { padding: 3px 5px; margin-bottom: 3px; }
     .btn-add-text { display: none; }
-    #addSlotBtn  { padding: 8px 12px !important; }
-    #monthSelect { padding: 8px 10px !important; font-size: 12px; }
-    #multiSelectContainer button { max-width: 160px; min-width: 0; }
+    .ts-cta      { padding: 8px 12px; }
+    .ts-month-nav .ts-month-nav-btn { width: 28px; height: 28px; }
+    .ts-month-nav .ts-month-label { min-width: 96px; font-size: 12px; height: 28px; }
+    .ts-month-nav .ts-month-today-btn { padding: 0 10px; height: 28px; font-size: 11px; }
+    .ts-multi-trigger { max-width: 160px; }
+    .ts-modal-box { max-height: 96vh; }
+    .ts-modal-header, .ts-modal-body, .ts-modal-footer { padding-left: 16px; padding-right: 16px; }
+}
+
+/* ── DataTable (simple-datatables) — dark mode + brand focus ── */
+.dataTable-wrapper .dataTable-container {
+    border-bottom: 1px solid var(--ec-border-soft);
+    font-family: inherit;
+}
+.dataTable-table > thead > tr > th {
+    border-bottom: 1px solid var(--ec-border);
+}
+.dataTable-input, .dataTable-selector {
+    background: var(--ec-surface);
+    border: 1px solid var(--ec-border);
+    border-radius: 10px;
+    padding: .4rem .6rem;
+    font-size: 13px;
+    outline: none;
+    color: var(--ec-ink-1);
+    font-family: inherit;
+}
+.dataTable-input:focus, .dataTable-selector:focus {
+    border-color: var(--ec-brand-500);
+    box-shadow: 0 0 0 3px rgba(46,158,99,.15);
+}
+.dataTable-info, .dataTable-bottom {
+    font-size: 13px;
+    color: var(--ec-ink-3);
+    margin-top: .5rem;
+}
+.dataTable-pagination a {
+    color: var(--ec-ink-2);
+    border-radius: 8px;
+    padding: 4px 9px;
+}
+.dataTable-pagination .active a, .dataTable-pagination a:hover {
+    background: var(--ec-brand-500);
+    color: #fff;
+}
+
+/* ── Clinic schedule markers on main calendar ──────────────────── */
+.cal-cell { position: relative; }
+.cal-cell.cal-clinic-closed {
+    background: repeating-linear-gradient(
+        135deg,
+        #f1f5f9 0 8px,
+        #e2e8f0 8px 16px
+    );
+}
+.cal-cell.cal-clinic-holiday        { background: rgba(239,68,68,.04); }
+.cal-cell.cal-clinic-holiday-open   { background: rgba(245,158,11,.05); }
+.cal-cell.cal-clinic-special        { background: rgba(245,158,11,.06); }
+
+.cal-clinic-badge {
+    position: absolute; top: 4px; right: 6px;
+    font-size: 9px; font-weight: 800; letter-spacing: .04em;
+    padding: 2px 7px; border-radius: 999px;
+    background: #f8fafc; color: #475569; border: 1px solid #e2e8f0;
+    line-height: 1; white-space: nowrap; z-index: 2;
+    pointer-events: auto; cursor: help;
+}
+.cal-clinic-closed       .cal-clinic-badge { background: #fef2f2; color: #b91c1c; border-color: #fecaca; }
+.cal-clinic-holiday-open .cal-clinic-badge { background: #fffbeb; color: #b45309; border-color: #fde68a; }
+.cal-clinic-special      .cal-clinic-badge { background: #fffbeb; color: #b45309; border-color: #fde68a; }
+
+body[data-theme='dark'] .cal-cell.cal-clinic-closed {
+    background: repeating-linear-gradient(135deg, #1e293b 0 8px, #0f172a 8px 16px);
+}
+body[data-theme='dark'] .cal-cell.cal-clinic-holiday      { background: rgba(239,68,68,.10); }
+body[data-theme='dark'] .cal-cell.cal-clinic-holiday-open,
+body[data-theme='dark'] .cal-cell.cal-clinic-special      { background: rgba(245,158,11,.12); }
+body[data-theme='dark'] .cal-clinic-badge {
+    background: rgba(15,23,42,.7); color: #cbd5e1; border-color: #334155;
+}
+
+/* ── Clinic-aware date picker styling ────────────────────────────── */
+.ts-clinic-hint {
+    margin-top: 10px; padding: 8px 12px; border-radius: 10px;
+    background: #f8fafc; border: 1px solid #e2e8f0; font-size: 12px; line-height: 1.5;
+    min-height: 0; transition: all .2s;
+}
+.ts-clinic-hint:empty { display: none; }
+.ts-clinic-hint i { margin-right: 4px; }
+.ts-clinic-legend {
+    margin-top: 8px; display: flex; gap: 14px; flex-wrap: wrap;
+    font-size: 11px; color: #64748b;
+}
+.ts-clinic-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.ts-cal-dot {
+    width: 8px; height: 8px; border-radius: 50%; display: inline-block;
+}
+.ts-cal-dot.dot-holiday { background: #ef4444; }
+.ts-cal-dot.dot-special { background: #f59e0b; }
+.ts-cal-dot.dot-closed  { background: #94a3b8; }
+
+/* Calendar day markers (flatpickr) */
+.flatpickr-day.ts-cal-holiday {
+    background: rgba(239,68,68,.08); color: #b91c1c; font-weight: 600;
+    position: relative;
+}
+.flatpickr-day.ts-cal-special {
+    background: rgba(245,158,11,.10); color: #b45309; font-weight: 600;
+    position: relative;
+}
+.flatpickr-day.ts-cal-closed {
+    background: #f1f5f9; color: #cbd5e1; text-decoration: line-through;
+    cursor: not-allowed;
+}
+.flatpickr-day.ts-cal-holiday::after,
+.flatpickr-day.ts-cal-special::after {
+    content: ""; position: absolute; bottom: 3px; left: 50%;
+    transform: translateX(-50%); width: 4px; height: 4px; border-radius: 50%;
+}
+.flatpickr-day.ts-cal-holiday::after { background: #ef4444; }
+.flatpickr-day.ts-cal-special::after { background: #f59e0b; }
+
+body[data-theme='dark'] .ts-clinic-hint {
+    background: rgba(15,23,42,.5); border-color: #334155; color: #cbd5e1;
+}
+body[data-theme='dark'] .flatpickr-day.ts-cal-closed {
+    background: #1e293b; color: #475569;
+}
+
+/* Flatpickr dark mode tweaks */
+body[data-theme='dark'] .flatpickr-calendar {
+    background: var(--ec-surface);
+    border-color: var(--ec-border);
+    box-shadow: 0 14px 40px -10px rgba(0,0,0,.6);
+}
+body[data-theme='dark'] .flatpickr-day {
+    color: var(--ec-ink-2);
+}
+body[data-theme='dark'] .flatpickr-day:hover {
+    background: rgba(46,158,99,.18);
+}
+body[data-theme='dark'] .flatpickr-day.selected {
+    background: var(--ec-brand-500);
+    color: #fff;
+    border-color: var(--ec-brand-500);
+}
+body[data-theme='dark'] .flatpickr-months,
+body[data-theme='dark'] .flatpickr-weekdays {
+    background: var(--ec-surface);
+    color: var(--ec-ink-1);
+}
+body[data-theme='dark'] .flatpickr-weekday { color: var(--ec-ink-3); }
+body[data-theme='dark'] .flatpickr-current-month .cur-month,
+body[data-theme='dark'] .flatpickr-current-month input.cur-year {
+    color: var(--ec-ink-1);
+}
+body[data-theme='dark'] .flatpickr-month .flatpickr-prev-month svg,
+body[data-theme='dark'] .flatpickr-month .flatpickr-next-month svg {
+    fill: var(--ec-ink-2);
 }
 </style>
 
 <?php if (count($slots) === 0): ?>
-<div class="mb-6 flex flex-col items-center justify-center p-10 bg-white border border-gray-200 border-dashed rounded-3xl animate-slide-up">
-    <div class="w-20 h-20 mb-4 bg-gray-50 rounded-full flex items-center justify-center text-gray-300">
-        <i class="fa-regular fa-calendar-times text-4xl"></i>
+<div class="ts-empty animate-slide-up" style="margin-bottom:24px;">
+    <div class="ts-empty-icon">
+        <i class="fa-regular fa-calendar-times"></i>
     </div>
-    <h3 class="text-xl font-black text-gray-700 mb-2">ยังไม่มีเวลารับคิวสำหรับเดือนนี้</h3>
-    <p class="text-gray-500 font-medium mb-6 text-center text-sm max-w-sm">
-        เลือกเดือนและปี จากแถบเครื่องมือด้านบน<br>แล้วกดสร้างรอบเวลาแคมเปญ เพื่อเริ่มต้นเพิ่มคิวจอง
-    </p>
+    <h3>ยังไม่มีรอบเวลาในเดือนนี้</h3>
+    <p>เลือกเดือน/ปีจากแถบเครื่องมือด้านบน แล้วกด "สร้างรอบเวลา" เพื่อเริ่มเปิดรับจอง</p>
 </div>
 <?php endif; ?>
 
@@ -546,8 +1407,50 @@ renderPageHeader("Campaign Time Slots", "กำหนดช่วงเวลา
         for ($day = 1; $day <= $daysInMonth; $day++) {
             $currentDate = "$year-" . str_pad($month, 2, '0', STR_PAD_LEFT) . "-" . str_pad($day, 2, '0', STR_PAD_LEFT);
             $isToday = $currentDate == date('Y-m-d');
+
+            // Clinic status for this date — override > regular weekday
+            $cellClinic = null;
+            $cellClass  = '';
+            if (isset($clinicOverrides[$currentDate])) {
+                $cellClinic = $clinicOverrides[$currentDate];
+                if ($cellClinic['closed']) {
+                    $cellClass = 'cal-clinic-closed cal-clinic-holiday';
+                } elseif ($cellClinic['source'] === 'special') {
+                    $cellClass = 'cal-clinic-special';
+                } else {
+                    $cellClass = 'cal-clinic-holiday-open';
+                }
+            } else {
+                $wd  = (int)date('w', strtotime($currentDate));
+                $reg = $clinicRegularHours[$wd] ?? null;
+                if ($reg && $reg['closed']) {
+                    $cellClinic = $reg + ['source' => 'regular'];
+                    $cellClass  = 'cal-clinic-closed';
+                }
+            }
             ?>
-            <div class="cal-cell">
+            <div class="cal-cell <?= $cellClass ?>">
+                <?php if ($cellClinic): ?>
+                <?php
+                    $badgeText = '';
+                    $badgeTitle = '';
+                    if ($cellClinic['closed']) {
+                        $badgeText  = $cellClinic['source'] === 'holiday' ? 'วันหยุด' : 'ปิด';
+                        $badgeTitle = !empty($cellClinic['note']) ? $cellClinic['note'] : 'คลินิคปิด';
+                    } elseif (($cellClinic['source'] ?? '') === 'special') {
+                        $badgeText  = 'วันพิเศษ';
+                        $badgeTitle = ($cellClinic['open_time'] ?? '?') . '–' . ($cellClinic['close_time'] ?? '?')
+                                    . (!empty($cellClinic['note']) ? ' · ' . $cellClinic['note'] : '');
+                    } elseif (($cellClinic['source'] ?? '') === 'holiday') {
+                        $badgeText  = 'หยุด·เปิดพิเศษ';
+                        $badgeTitle = ($cellClinic['open_time'] ?? '?') . '–' . ($cellClinic['close_time'] ?? '?')
+                                    . (!empty($cellClinic['note']) ? ' · ' . $cellClinic['note'] : '');
+                    }
+                ?>
+                <?php if ($badgeText): ?>
+                <span class="cal-clinic-badge" title="<?= htmlspecialchars($badgeTitle, ENT_QUOTES) ?>"><?= htmlspecialchars($badgeText) ?></span>
+                <?php endif; ?>
+                <?php endif; ?>
                 <div class="flex justify-between items-center mb-2">
                     <div class="flex items-center gap-1.5">
                         <input type="checkbox" class="day-select-cb w-3.5 h-3.5 text-red-500 rounded border-gray-300 focus:ring-red-500 cursor-pointer opacity-40 hover:opacity-100 checked:opacity-100 transition-opacity" onchange="toggleDaySlots(this)" title="เลือกทั้งหมดในวันนี้">
@@ -563,57 +1466,63 @@ renderPageHeader("Campaign Time Slots", "กำหนดช่วงเวลา
                     <?php if (isset($calendarData[$currentDate])): ?>
                         <?php foreach ($calendarData[$currentDate] as $s):
                             $cId   = $s['campaign_id'] ?? 0;
-                            $cc    = $campaignColors[$cId] ?? ['bg'=>'bg-gray-50','border'=>'border-gray-100','text'=>'text-gray-600','badge'=>'text-gray-500'];
-                            $booked  = (int)($s['booked_count'] ?? 0);
-                            $max     = (int)$s['max_capacity'];
-                            $percent = $max > 0 ? ($booked / $max) * 100 : 0;
+                            $cc    = $campaignColors[$cId] ?? ['cls' => 'slot-pal-emerald'];
+                            $booked    = (int)($s['booked_count']    ?? 0);   // active + completed (display)
+                            $active    = (int)($s['active_count']    ?? 0);   // booked + confirmed only
+                            $completed = (int)($s['completed_count'] ?? 0);   // checked-in
+                            $max       = (int)$s['max_capacity'];
+                            $percent   = $max > 0 ? ($booked / $max) * 100 : 0;
 
                             if ($percent >= 100) {
-                                $badgeCls = 'background:#fee2e2;color:#b91c1c';
-                                $barClr   = '#ef4444';
+                                $toneCls = 'tone-full'; $barClr = '#ef4444';
                             } elseif ($percent >= 80) {
-                                $badgeCls = 'background:#fef9c3;color:#a16207';
-                                $barClr   = '#facc15';
+                                $toneCls = 'tone-near'; $barClr = '#f59e0b';
                             } else {
-                                $badgeCls = 'background:#dcfce7;color:#15803d';
-                                $barClr   = '#22c55e';
+                                $toneCls = 'tone-ok';   $barClr = '#22c55e';
                             }
+
+                            // tooltip breakdown — show only if there's any completed
+                            $tipParts = [];
+                            $tipParts[] = "รวม {$booked}/{$max}";
+                            if ($active > 0)    $tipParts[] = "รอเช็คอิน {$active}";
+                            if ($completed > 0) $tipParts[] = "เช็คอินแล้ว {$completed}";
+                            $tip = implode(' · ', $tipParts);
                         ?>
-                        <div class="slot-item slot-card filter-camp-<?= $cId ?> <?= $cc['bg'] ?> <?= $cc['text'] ?>"
-                             style="border-color: rgba(0,0,0,.06)">
+                        <div class="slot-item slot-card filter-camp-<?= (int)$cId ?> <?= $cc['cls'] ?>">
                             <div class="flex justify-between items-center">
                                 <div class="flex items-center gap-1.5">
-                                    <input type="checkbox" value="<?= $s['id'] ?>"
-                                        class="slot-select-cb calendar-slot-cb w-3 h-3 text-red-500 rounded border-gray-300 focus:ring-red-500 cursor-pointer opacity-40 hover:opacity-100 checked:opacity-100 transition-opacity flex-shrink-0"
+                                    <input type="checkbox" value="<?= (int)$s['id'] ?>"
+                                        class="slot-select-cb calendar-slot-cb w-3 h-3 rounded cursor-pointer opacity-40 hover:opacity-100 checked:opacity-100 transition-opacity flex-shrink-0"
+                                        style="accent-color:#ef4444;"
                                         onchange="toggleSlotSelection(this)">
-                                    <span class="text-[11px] font-black <?= $percent >= 100 ? 'line-through opacity-50' : '' ?>"><?= substr($s['start_time'], 0, 5) ?></span>
+                                    <span class="text-[11px] font-bold <?= $percent >= 100 ? 'line-through opacity-50' : '' ?>"><?= substr($s['start_time'], 0, 5) ?></span>
                                 </div>
-                                <span class="text-[10px] font-bold rounded-full px-1.5 py-0.5" style="<?= $badgeCls ?>" title="<?= $booked ?>/<?= $max ?>">
-                                    +<?= $booked ?>/<?= $max ?>
+                                <span class="stat-badge <?= $toneCls ?>" style="padding:2px 7px; font-size:10px;" title="<?= htmlspecialchars($tip) ?>">
+                                    <?= (int)$booked ?>/<?= (int)$max ?><?= $completed > 0 ? ' ✓' : '' ?>
                                 </span>
                             </div>
                             <div class="cap-bar mt-1">
                                 <div class="cap-bar-fill" style="width:<?= min($percent,100) ?>%;background:<?= $barClr ?>"></div>
                             </div>
-                            <div class="truncate text-[9px] font-semibold opacity-70 mt-0.5" title="<?= htmlspecialchars($s['campaign_title']) ?>">
+                            <div class="truncate text-[9px] font-semibold opacity-75 mt-0.5" title="<?= htmlspecialchars($s['campaign_title']) ?>">
                                 <?= htmlspecialchars($s['campaign_title']) ?>
                             </div>
                             <div class="slot-actions">
-                                <button onclick="showQrModal(<?= $s['id'] ?>,<?= $s['campaign_id'] ?>)"
+                                <button onclick="showQrModal(<?= (int)$s['id'] ?>,<?= (int)$s['campaign_id'] ?>)"
                                     class="slot-act-btn" style="background:#dcfce7;color:#16a34a" title="QR Check-in">
                                     <i class="fa-solid fa-qrcode"></i>
                                 </button>
-                                <button onclick="openEditSlotModal(<?= $s['id'] ?>,<?= $cId ?>,'<?= substr($s['start_time'],0,5) ?>','<?= substr($s['end_time'],0,5) ?>',<?= $max ?>)"
+                                <button onclick="openEditSlotModal(<?= (int)$s['id'] ?>,<?= (int)$cId ?>,'<?= substr($s['start_time'],0,5) ?>','<?= substr($s['end_time'],0,5) ?>',<?= (int)$max ?>)"
                                     class="slot-act-btn" style="background:#fef3c7;color:#d97706" title="แก้ไข">
                                     <i class="fa-solid fa-pen"></i>
                                 </button>
-                                <?php if ($booked > 0): ?>
-                                <button onclick="bulkCancelSlot(<?= $s['id'] ?>,'<?= htmlspecialchars($s['campaign_title']) ?>','<?= $s['slot_date'] ?>','<?= substr($s['start_time'],0,5) ?>-<?= substr($s['end_time'],0,5) ?>',<?= $booked ?>)"
-                                    class="slot-act-btn" style="background:#dbeafe;color:#0284c7" title="ยกเลิกการจองทั้งหมด">
+                                <?php if ($active > 0): // only show "cancel all" when there are active (cancellable) bookings ?>
+                                <button onclick="bulkCancelSlot(<?= (int)$s['id'] ?>,<?= json_encode($s['campaign_title']) ?>,'<?= htmlspecialchars($s['slot_date']) ?>','<?= substr($s['start_time'],0,5) ?>-<?= substr($s['end_time'],0,5) ?>',<?= (int)$active ?>)"
+                                    class="slot-act-btn" style="background:#dbeafe;color:#0284c7" title="ยกเลิกการจองที่รอเช็คอินทั้งหมด">
                                     <i class="fa-solid fa-ban"></i>
                                 </button>
                                 <?php endif; ?>
-                                <button onclick="deleteSlot(<?= $s['id'] ?>)"
+                                <button onclick="deleteSlot(<?= (int)$s['id'] ?>)"
                                     class="slot-act-btn" style="background:#fee2e2;color:#dc2626" title="ลบ">
                                     <i class="fa-solid fa-times"></i>
                                 </button>
@@ -630,13 +1539,13 @@ renderPageHeader("Campaign Time Slots", "กำหนดช่วงเวลา
     </div>
 </div>
 
-<div id="tableViewContainer" class="hidden animate-slide-up delay-100 mb-10 overflow-hidden" style="background:#fff;border-radius:20px;box-shadow:0 1px 3px rgba(0,0,0,.06),0 4px 16px rgba(0,0,0,.04);border:1px solid #f0f2f5">
+<div id="tableViewContainer" class="hidden animate-slide-up delay-100 mb-10 overflow-hidden" style="background:var(--ec-surface);border-radius:20px;box-shadow:var(--ec-shadow-md);border:1px solid var(--ec-border);">
     <div class="overflow-x-auto">
         <table id="slotsTable" class="slots-table">
             <thead>
                 <tr>
                     <th class="text-center w-10" data-sortable="false">
-                        <input type="checkbox" id="selectAllTable" class="w-4 h-4 rounded border-white/40 cursor-pointer" onchange="toggleAllTableSlots(this)">
+                        <input type="checkbox" id="selectAllTable" class="w-4 h-4 rounded cursor-pointer" style="accent-color:#fff;" onchange="toggleAllTableSlots(this)">
                     </th>
                     <th><i class="fa-regular fa-calendar mr-1.5 opacity-70"></i>วันที่</th>
                     <th><i class="fa-regular fa-clock mr-1.5 opacity-70"></i>เวลา</th>
@@ -647,40 +1556,45 @@ renderPageHeader("Campaign Time Slots", "กำหนดช่วงเวลา
             </thead>
             <tbody class="text-sm">
                 <?php foreach ($slots as $s):
-                    $booked  = (int)($s['booked_count'] ?? 0);
-                    $max     = (int)$s['max_capacity'];
-                    $percent = $max > 0 ? ($booked / $max) * 100 : 0;
-                    if ($percent >= 100)     { $badgeSt = 'background:#fee2e2;color:#b91c1c'; }
-                    elseif ($percent >= 80)  { $badgeSt = 'background:#fef9c3;color:#a16207'; }
-                    else                     { $badgeSt = 'background:#dcfce7;color:#15803d'; }
+                    $booked    = (int)($s['booked_count']    ?? 0);   // active + completed
+                    $active    = (int)($s['active_count']    ?? 0);   // pending only
+                    $completed = (int)($s['completed_count'] ?? 0);   // checked-in
+                    $max       = (int)$s['max_capacity'];
+                    $percent   = $max > 0 ? ($booked / $max) * 100 : 0;
+                    if ($percent >= 100)    { $toneCls = 'tone-full'; }
+                    elseif ($percent >= 80) { $toneCls = 'tone-near'; }
+                    else                    { $toneCls = 'tone-ok'; }
                     $dateObj = new DateTime($s['slot_date']);
+                    $tipParts = ["รวม {$booked}/{$max}"];
+                    if ($active > 0)    $tipParts[] = "รอเช็คอิน {$active}";
+                    if ($completed > 0) $tipParts[] = "เช็คอินแล้ว {$completed}";
+                    $tip = implode(' · ', $tipParts);
                 ?>
-                <tr data-camp-id="<?= $s['campaign_id'] ?>">
+                <tr data-camp-id="<?= (int)$s['campaign_id'] ?>">
                     <td class="text-center">
-                        <input type="checkbox" value="<?= $s['id'] ?>" class="slot-select-cb table-slot-cb w-4 h-4 text-[#2e9e63] rounded border-gray-300 focus:ring-[#2e9e63] cursor-pointer opacity-50 hover:opacity-100 checked:opacity-100 transition-opacity" onchange="toggleSlotSelection(this)">
+                        <input type="checkbox" value="<?= (int)$s['id'] ?>" class="slot-select-cb table-slot-cb w-4 h-4 rounded cursor-pointer opacity-50 hover:opacity-100 checked:opacity-100 transition-opacity" style="accent-color:var(--ec-brand-500);" onchange="toggleSlotSelection(this)">
                     </td>
-                    <td data-sort="<?= $s['slot_date'] ?>">
-                        <span class="font-bold text-gray-800"><?= $dateObj->format('d/m/Y') ?></span>
+                    <td data-sort="<?= htmlspecialchars($s['slot_date']) ?>">
+                        <span style="font-weight:700; color:var(--ec-ink-1);"><?= $dateObj->format('d/m/Y') ?></span>
                     </td>
                     <td>
-                        <span class="font-black text-[#2e9e63] bg-emerald-50 px-2.5 py-1 rounded-lg text-[12px]"><?= substr($s['start_time'],0,5) ?> – <?= substr($s['end_time'],0,5) ?></span>
+                        <span style="font-weight:800; color:var(--ec-brand-700); background:var(--ec-brand-50); padding:4px 10px; border-radius:9px; font-size:12px;"><?= substr($s['start_time'],0,5) ?> – <?= substr($s['end_time'],0,5) ?></span>
                     </td>
-                    <td class="text-gray-600 font-medium max-w-[220px] truncate"><?= htmlspecialchars($s['campaign_title']) ?></td>
+                    <td style="color:var(--ec-ink-2); font-weight:500; max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"><?= htmlspecialchars($s['campaign_title']) ?></td>
                     <td class="text-center" data-sort="<?= $percent ?>">
-                        <span class="stat-badge" style="<?= $badgeSt ?>"><?= $booked ?> / <?= $max ?></span>
+                        <span class="stat-badge <?= $toneCls ?>" title="<?= htmlspecialchars($tip) ?>">
+                            <?= (int)$booked ?> / <?= (int)$max ?><?= $completed > 0 ? ' ✓' : '' ?>
+                        </span>
                     </td>
                     <td class="text-center">
                         <div class="flex items-center justify-center gap-2">
-                            <button onclick="showQrModal(<?= $s['id'] ?>,<?= $s['campaign_id'] ?>)"
-                                class="w-8 h-8 rounded-xl text-emerald-600 bg-emerald-50 border border-emerald-100 hover:bg-emerald-500 hover:text-white transition-all shadow-sm" title="QR Check-in">
+                            <button onclick="showQrModal(<?= (int)$s['id'] ?>,<?= (int)$s['campaign_id'] ?>)" class="ts-row-btn qr" title="QR Check-in">
                                 <i class="fa-solid fa-qrcode text-xs"></i>
                             </button>
-                            <button onclick="openEditSlotModal(<?= $s['id'] ?>,<?= $s['campaign_id'] ?>,'<?= substr($s['start_time'],0,5) ?>','<?= substr($s['end_time'],0,5) ?>',<?= $max ?>)"
-                                class="w-8 h-8 rounded-xl text-amber-500 bg-amber-50 border border-amber-100 hover:bg-amber-500 hover:text-white transition-all shadow-sm" title="แก้ไข">
+                            <button onclick="openEditSlotModal(<?= (int)$s['id'] ?>,<?= (int)$s['campaign_id'] ?>,'<?= substr($s['start_time'],0,5) ?>','<?= substr($s['end_time'],0,5) ?>',<?= (int)$max ?>)" class="ts-row-btn edit" title="แก้ไข">
                                 <i class="fa-solid fa-pen text-xs"></i>
                             </button>
-                            <button onclick="deleteSlot(<?= $s['id'] ?>)"
-                                class="w-8 h-8 rounded-xl text-red-500 bg-red-50 border border-red-100 hover:bg-red-500 hover:text-white transition-all shadow-sm" title="ลบ">
+                            <button onclick="deleteSlot(<?= (int)$s['id'] ?>)" class="ts-row-btn del" title="ลบ">
                                 <i class="fa-solid fa-trash text-xs"></i>
                             </button>
                         </div>
@@ -692,213 +1606,303 @@ renderPageHeader("Campaign Time Slots", "กำหนดช่วงเวลา
     </div>
 </div>
 
-<div id="slotModal" class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm hidden flex items-center justify-center p-4" style="z-index: 1000;">
-    <div class="glass-modal rounded-[24px] w-full max-w-lg flex flex-col max-h-[90vh] overflow-hidden animate-slide-up border border-white/50">
-        <div class="modal-hdr-blue p-5 flex justify-between items-center shrink-0">
-            <h3 class="text-lg font-black text-white flex items-center gap-3">
-                <div class="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center"><i class="fa-solid fa-calendar-plus"></i></div>
+<div id="slotModal" class="ts-modal hidden">
+    <div class="ts-modal-box">
+        <div class="ts-modal-header brand">
+            <h3 class="ts-modal-title">
+                <div class="ts-modal-icon"><i class="fa-solid fa-calendar-plus"></i></div>
                 สร้างรอบเวลาแคมเปญ
             </h3>
-            <button type="button" onclick="document.getElementById('slotModal').classList.add('hidden')" class="w-8 h-8 flex items-center justify-center bg-white/20 text-white rounded-full hover:bg-white/30 transition-colors focus:outline-none"><i class="fa-solid fa-times"></i></button>
+            <button type="button" onclick="closeTsModal('slotModal')" class="ts-modal-close" aria-label="ปิด"><i class="fa-solid fa-times"></i></button>
         </div>
-        <form id="slotForm" class="flex flex-col flex-1 overflow-hidden">
+        <form id="slotForm" style="display:flex; flex-direction:column; flex:1; overflow:hidden;">
             <input type="hidden" name="action" value="add_slot">
             <?php csrf_field(); ?>
-            
-            <div class="p-5 space-y-4 overflow-y-auto flex-1 scrollbar-hide">
-            
+
+            <div class="ts-modal-body scrollbar-hide" style="display:flex; flex-direction:column; gap:14px;">
+
             <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-1">เลือกแคมเปญ <span class="text-red-500">*</span></label>
-                <div class="relative">
-                    <select name="campaign_id" required class="w-full px-4 py-2 border border-gray-200 rounded-xl font-prompt text-sm outline-none focus:ring-2 focus:ring-[#2e9e63] bg-white appearance-none">
+                <label class="ts-label">เลือกแคมเปญ <span style="color:#ef4444;">*</span></label>
+                <div style="position:relative;">
+                    <select name="campaign_id" required class="ts-select" style="appearance:none; padding-right:36px;">
                         <option value="" disabled selected>-- เลือกกิจกรรม --</option>
                         <?php foreach ($activeCampaigns as $ac): ?>
-                            <option value="<?= $ac['id'] ?>"><?= htmlspecialchars($ac['title']) ?></option>
+                            <option value="<?= (int)$ac['id'] ?>"><?= htmlspecialchars($ac['title']) ?></option>
                         <?php endforeach; ?>
                     </select>
-                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-gray-500"><i class="fa-solid fa-chevron-down text-xs"></i></div>
+                    <i class="fa-solid fa-chevron-down" style="position:absolute; top:50%; right:14px; transform:translateY(-50%); color:var(--ec-ink-4); font-size:11px; pointer-events:none;"></i>
                 </div>
             </div>
 
-            <div class="bg-gray-50 p-3 rounded-xl border border-gray-100">
-                <label class="block text-[11px] uppercase tracking-wider font-bold text-gray-500 mb-1">เลือกวันที่ต้องการจัดกิจกรรม (เลือกได้หลายวัน) <span class="text-red-500">*</span></label>
-                <input type="text" name="selected_dates" id="modal_selected_dates" placeholder="คลิกเพื่อเลือกจากปฏิทิน..." required class="w-full px-3 py-2 border border-emerald-200 bg-white rounded-lg font-prompt text-sm outline-none focus:ring-2 focus:ring-[#2e9e63] cursor-pointer shadow-inner">
+            <div class="ts-field-card">
+                <label class="ts-label-eyebrow">เลือกวันที่ต้องการจัดกิจกรรม (เลือกได้หลายวัน) *</label>
+                <input type="text" name="selected_dates" id="modal_selected_dates" placeholder="คลิกเพื่อเลือกจากปฏิทิน..." required class="ts-input" style="cursor:pointer;">
+                <div id="clinicHint" class="ts-clinic-hint" aria-live="polite"></div>
+                <p class="ts-clinic-legend">
+                    <span><span class="ts-cal-dot dot-holiday"></span>วันหยุด</span>
+                    <span><span class="ts-cal-dot dot-special"></span>วันพิเศษ</span>
+                    <span><span class="ts-cal-dot dot-closed"></span>คลินิคปิด</span>
+                </p>
             </div>
 
             <!-- โซนสร้างช่วงเวลาอัตโนมัติ -->
-            <div class="bg-emerald-50/50 p-3 rounded-xl border border-emerald-100">
-                <div class="flex justify-between items-center cursor-pointer" onclick="document.getElementById('autoGenBody').classList.toggle('hidden'); document.getElementById('autoGenIcon').classList.toggle('fa-chevron-down'); document.getElementById('autoGenIcon').classList.toggle('fa-chevron-up');">
-                    <label class="text-[13px] font-bold text-[#2e9e63] cursor-pointer flex items-center gap-2 m-0">
+            <div class="ts-field-card brand">
+                <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="document.getElementById('autoGenBody').classList.toggle('hidden'); document.getElementById('autoGenIcon').classList.toggle('fa-chevron-down'); document.getElementById('autoGenIcon').classList.toggle('fa-chevron-up');">
+                    <label style="font-size:13px; font-weight:700; color:var(--ec-brand-700); cursor:pointer; display:flex; align-items:center; gap:8px; margin:0;">
                         <i class="fa-solid fa-wand-magic-sparkles"></i> สร้างช่วงเวลาย่อยอัตโนมัติ
                     </label>
-                    <i id="autoGenIcon" class="fa-solid fa-chevron-down text-emerald-400 text-xs"></i>
+                    <i id="autoGenIcon" class="fa-solid fa-chevron-down" style="color:var(--ec-brand-500); font-size:11px;"></i>
                 </div>
-                
-                <div id="autoGenBody" class="hidden space-y-3 pt-3 border-t border-emerald-100 mt-2">
+
+                <div id="autoGenBody" class="hidden" style="padding-top:12px; border-top:1px solid var(--ec-brand-200); margin-top:10px; display:flex; flex-direction:column; gap:10px;">
                     <div class="grid grid-cols-2 gap-3">
                         <div>
-                            <label class="block text-[11px] font-bold text-gray-500 mb-1">เริ่มงาน</label>
-                            <input type="time" id="auto_start" value="09:00" class="w-full px-3 py-2 border border-emerald-200 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-[#2e9e63]">
+                            <label class="ts-label-eyebrow">เริ่มงาน</label>
+                            <input type="time" id="auto_start" value="09:00" class="ts-input" style="padding:7px 12px;">
                         </div>
                         <div>
-                            <label class="block text-[11px] font-bold text-gray-500 mb-1">เลิกงาน</label>
-                            <input type="time" id="auto_end" value="16:00" class="w-full px-3 py-2 border border-emerald-200 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-[#2e9e63]">
+                            <label class="ts-label-eyebrow">เลิกงาน</label>
+                            <input type="time" id="auto_end" value="16:00" class="ts-input" style="padding:7px 12px;">
                         </div>
                     </div>
                     <div class="grid grid-cols-2 gap-3">
                         <div>
-                            <label class="block text-[11px] font-bold text-gray-500 mb-1">เวลาย่อยต่อรอบ (นาที)</label>
-                            <input type="number" id="auto_duration" value="60" min="5" step="5" class="w-full px-3 py-2 border border-emerald-200 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-[#2e9e63]">
+                            <label class="ts-label-eyebrow">เวลาย่อยต่อรอบ (นาที)</label>
+                            <input type="number" id="auto_duration" value="60" min="5" step="5" class="ts-input" style="padding:7px 12px;">
                         </div>
                         <div>
-                            <label class="block text-[11px] font-bold text-gray-500 mb-1">พักเบรก (ถ้ามี)</label>
-                            <div class="flex items-center gap-1 bg-white border border-emerald-200 rounded-lg overflow-hidden pr-2 focus-within:ring-2 focus-within:ring-[#2e9e63]">
-                                <input type="time" id="auto_break_start" value="12:00" class="w-full px-1 py-2 text-sm border-none outline-none">
-                                <span class="text-gray-400 text-xs">-</span>
-                                <input type="time" id="auto_break_end" value="13:00" class="w-full px-1 py-2 text-sm border-none outline-none">
+                            <label class="ts-label-eyebrow">พักเบรก (ถ้ามี)</label>
+                            <div style="display:flex; align-items:center; gap:4px; background:var(--ec-surface); border:1px solid var(--ec-border); border-radius:12px; overflow:hidden; padding-right:8px;">
+                                <input type="time" id="auto_break_start" value="12:00" style="width:100%; padding:6px 8px; font-size:13px; border:0; background:transparent; outline:none; color:var(--ec-ink-1);">
+                                <span style="color:var(--ec-ink-4); font-size:11px;">–</span>
+                                <input type="time" id="auto_break_end" value="13:00" style="width:100%; padding:6px 8px; font-size:13px; border:0; background:transparent; outline:none; color:var(--ec-ink-1);">
                             </div>
                         </div>
                     </div>
-                    <button type="button" onclick="generateTimeSlots()" class="w-full py-2 bg-emerald-100/80 text-[#2e9e63] font-bold rounded-lg hover:bg-emerald-200 transition-colors text-[13px] border border-emerald-200">
-                        <i class="fa-solid fa-bolt mr-1"></i> เลื่อนลงช่องด้านล่างอัตโนมัติ
+                    <button type="button" onclick="generateTimeSlots()" style="width:100%; padding:9px 14px; background:var(--ec-brand-100); color:var(--ec-brand-700); font-weight:700; border-radius:10px; transition:background .15s; font-size:13px; border:1px solid var(--ec-brand-200); cursor:pointer;">
+                        <i class="fa-solid fa-bolt mr-1"></i> เติมช่วงเวลาด้านล่างอัตโนมัติ
                     </button>
                 </div>
             </div>
 
-            <div class="space-y-3" id="time_slots_container">
-                <div class="time-slot-row flex items-end gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100 relative group overflow-hidden">
+            <div id="time_slots_container" style="display:flex; flex-direction:column; gap:10px;">
+                <div class="time-slot-row" style="display:flex; align-items:flex-end; gap:10px; padding:12px; background:var(--ec-surface-2); border-radius:12px; border:1px solid var(--ec-border-soft); position:relative;">
                     <div class="flex-1">
-                        <label class="block text-[11px] uppercase tracking-wider font-bold text-gray-500 mb-1">เวลาเริ่ม <span class="text-red-500">*</span></label>
-                        <input type="time" name="start_time[]" required class="w-full px-3 py-2 border border-gray-200 rounded-lg font-prompt text-sm outline-none focus:ring-2 focus:ring-[#2e9e63] bg-white">
+                        <label class="ts-label-eyebrow">เวลาเริ่ม *</label>
+                        <input type="time" name="start_time[]" required class="ts-input" style="padding:8px 12px;">
                     </div>
                     <div class="flex-1">
-                        <label class="block text-[11px] uppercase tracking-wider font-bold text-gray-500 mb-1">เวลาสิ้นสุด <span class="text-red-500">*</span></label>
-                        <input type="time" name="end_time[]" required class="w-full px-3 py-2 border border-gray-200 rounded-lg font-prompt text-sm outline-none focus:ring-2 focus:ring-[#2e9e63] bg-white">
+                        <label class="ts-label-eyebrow">เวลาสิ้นสุด *</label>
+                        <input type="time" name="end_time[]" required class="ts-input" style="padding:8px 12px;">
                     </div>
-                    <button type="button" onclick="removeTimeSlot(this)" class="remove-time-btn hidden w-10 h-[38px] min-w-[40px] bg-white border border-gray-200 text-red-500 hover:text-white hover:bg-red-500 hover:border-red-500 rounded-lg flex items-center justify-center transition-colors shadow-sm">
+                    <button type="button" onclick="removeTimeSlot(this)" class="remove-time-btn hidden" style="min-width:40px; height:38px; background:var(--ec-surface); border:1px solid var(--ec-border); color:#ef4444; border-radius:10px; cursor:pointer; transition:all .15s;">
                         <i class="fa-solid fa-trash"></i>
                     </button>
                 </div>
             </div>
-            <button type="button" onclick="addTimeSlot()" class="w-full py-2 border border-dashed border-[#2e9e63] text-[#2e9e63] font-bold rounded-xl hover:bg-emerald-50 transition-colors text-sm flex items-center justify-center gap-2">
+            <button type="button" onclick="addTimeSlot()" style="width:100%; padding:10px 14px; border:1.5px dashed var(--ec-brand-500); color:var(--ec-brand-700); font-weight:700; border-radius:14px; background:transparent; cursor:pointer; transition:background .15s; font-size:13px; display:flex; align-items:center; justify-content:center; gap:8px;">
                 <i class="fa-solid fa-plus-circle"></i> เพิ่มช่วงเวลาอีก
             </button>
 
             <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-1">จำนวนรับรวมต่อวัน (ระบบจะหารเฉลี่ยให้ทุกรอบเวลา) <span class="text-red-500">*</span></label>
-                <input type="number" name="max_capacity" value="50" min="1" required class="w-full px-4 py-2 border border-gray-200 rounded-xl font-prompt text-sm outline-none focus:ring-2 focus:ring-[#2e9e63]">
+                <label class="ts-label">จำนวนรับรวมต่อวัน (ระบบจะหารเฉลี่ยให้ทุกรอบเวลา) <span style="color:#ef4444;">*</span></label>
+                <input type="number" name="max_capacity" value="50" min="1" required class="ts-input">
             </div>
 
             </div>
-            
-            <div class="p-5 border-t border-gray-100 bg-gray-50/50 shrink-0 flex gap-3">
-                <button type="button" onclick="document.getElementById('slotModal').classList.add('hidden')" class="w-1/3 bg-white border-2 border-gray-200 text-gray-700 font-bold py-3.5 rounded-2xl hover:bg-gray-50 hover:border-gray-300 transition-colors shadow-sm">ยกเลิก</button>
-                <button type="submit" class="w-2/3 bg-[#2e9e63] text-white font-bold py-3.5 rounded-2xl hover:shadow-lg hover:shadow-emerald-500/30 hover:-translate-y-0.5 transition-all text-lg tracking-wide shadow-sm flex items-center justify-center gap-2" style="background-color: #2e9e63;"><i class="fa-solid fa-save"></i> บันทึกรอบเวลา</button>
+
+            <div class="ts-modal-footer">
+                <button type="button" onclick="closeTsModal('slotModal')" class="ts-btn-ghost" style="flex:1;">ยกเลิก</button>
+                <button type="submit" class="ts-btn-primary" style="flex:2;"><i class="fa-solid fa-save"></i> บันทึกรอบเวลา</button>
             </div>
         </form>
     </div>
 </div>
 
-<div id="editSlotModal" class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm hidden flex items-center justify-center p-4" style="z-index: 1000;">
-    <div class="glass-modal rounded-[24px] w-full max-w-lg flex flex-col max-h-[90vh] overflow-hidden animate-slide-up border border-white/50">
-        <div class="modal-hdr-amber p-5 flex justify-between items-center shrink-0">
-            <h3 class="text-lg font-black text-white flex items-center gap-3">
-                <div class="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center"><i class="fa-solid fa-pen-to-square"></i></div>
+<div id="editSlotModal" class="ts-modal hidden">
+    <div class="ts-modal-box">
+        <div class="ts-modal-header amber">
+            <h3 class="ts-modal-title">
+                <div class="ts-modal-icon"><i class="fa-solid fa-pen-to-square"></i></div>
                 แก้ไขข้อมูลรอบเวลา
             </h3>
-            <button type="button" onclick="document.getElementById('editSlotModal').classList.add('hidden')" class="w-8 h-8 flex items-center justify-center bg-white/20 text-white rounded-full hover:bg-white/30 transition-colors focus:outline-none"><i class="fa-solid fa-times"></i></button>
+            <button type="button" onclick="closeTsModal('editSlotModal')" class="ts-modal-close" aria-label="ปิด"><i class="fa-solid fa-times"></i></button>
         </div>
-        <form id="editSlotForm" class="flex flex-col flex-1 overflow-hidden">
+        <form id="editSlotForm" style="display:flex; flex-direction:column; flex:1; overflow:hidden;">
             <input type="hidden" name="action" value="edit_slot">
             <input type="hidden" name="slot_id" id="edit_slot_id">
             <?php csrf_field(); ?>
-            
-            <div class="p-5 space-y-4 overflow-y-auto flex-1 scrollbar-hide">
-            
+
+            <div class="ts-modal-body scrollbar-hide" style="display:flex; flex-direction:column; gap:14px;">
+
             <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-1">แคมเปญ <span class="text-red-500">*</span></label>
-                <div class="relative">
-                    <select name="campaign_id" id="edit_campaign_id" required class="w-full px-4 py-2 border border-gray-200 rounded-xl font-prompt text-sm outline-none focus:ring-2 focus:ring-yellow-500 bg-gray-50 appearance-none pointer-events-none text-gray-500">
+                <label class="ts-label">แคมเปญ <span style="color:#ef4444;">*</span></label>
+                <div style="position:relative;">
+                    <select name="campaign_id" id="edit_campaign_id" required class="ts-select" style="appearance:none; padding-right:36px; background:var(--ec-surface-2); pointer-events:none; color:var(--ec-ink-3);">
                         <?php foreach ($allCampaigns as $ac): ?>
-                            <option value="<?= $ac['id'] ?>"><?= htmlspecialchars($ac['title']) ?></option>
+                            <option value="<?= (int)$ac['id'] ?>"><?= htmlspecialchars($ac['title']) ?></option>
                         <?php endforeach; ?>
                     </select>
-                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-gray-500"><i class="fa-solid fa-lock text-xs"></i></div>
+                    <i class="fa-solid fa-lock" style="position:absolute; top:50%; right:14px; transform:translateY(-50%); color:var(--ec-ink-4); font-size:11px; pointer-events:none;"></i>
                 </div>
             </div>
 
-            <div class="grid grid-cols-2 gap-4">
+            <div class="grid grid-cols-2 gap-3">
                 <div>
-                    <label class="block text-sm font-semibold text-gray-700 mb-1">เวลาเริ่ม <span class="text-red-500">*</span></label>
-                    <input type="time" name="start_time" id="edit_start_time" required class="w-full px-4 py-2 border border-gray-200 rounded-xl font-prompt text-sm outline-none focus:ring-2 focus:ring-yellow-500">
+                    <label class="ts-label">เวลาเริ่ม <span style="color:#ef4444;">*</span></label>
+                    <input type="time" name="start_time" id="edit_start_time" required class="ts-input">
                 </div>
                 <div>
-                    <label class="block text-sm font-semibold text-gray-700 mb-1">เวลาสิ้นสุด <span class="text-red-500">*</span></label>
-                    <input type="time" name="end_time" id="edit_end_time" required class="w-full px-4 py-2 border border-gray-200 rounded-xl font-prompt text-sm outline-none focus:ring-2 focus:ring-yellow-500">
+                    <label class="ts-label">เวลาสิ้นสุด <span style="color:#ef4444;">*</span></label>
+                    <input type="time" name="end_time" id="edit_end_time" required class="ts-input">
                 </div>
             </div>
 
             <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-1">จำนวนรับ (ที่นั่ง) <span class="text-red-500">*</span></label>
-                <input type="number" name="max_capacity" id="edit_max_capacity" min="1" required class="w-full px-4 py-2 border border-gray-200 rounded-xl font-prompt text-sm outline-none focus:ring-2 focus:ring-yellow-500">
+                <label class="ts-label">จำนวนรับ (ที่นั่ง) <span style="color:#ef4444;">*</span></label>
+                <input type="number" name="max_capacity" id="edit_max_capacity" min="1" required class="ts-input">
             </div>
 
             </div>
 
-            <div class="p-5 border-t border-gray-100 bg-gray-50/50 shrink-0 flex gap-3">
-                <button type="button" onclick="document.getElementById('editSlotModal').classList.add('hidden')" class="w-1/3 bg-white border-2 border-gray-200 text-gray-700 font-bold py-3.5 rounded-2xl hover:bg-gray-50 hover:border-gray-300 transition-colors shadow-sm">ยกเลิก</button>
-                <button type="submit" class="w-2/3 bg-[#f59e0b] text-white font-bold py-3.5 rounded-2xl hover:shadow-lg hover:shadow-amber-500/30 hover:-translate-y-0.5 transition-all text-lg tracking-wide shadow-sm flex items-center justify-center gap-2" style="background-color: #f59e0b;"><i class="fa-solid fa-save"></i> บันทึกการแก้ไข</button>
+            <div class="ts-modal-footer">
+                <button type="button" onclick="closeTsModal('editSlotModal')" class="ts-btn-ghost" style="flex:1;">ยกเลิก</button>
+                <button type="submit" class="ts-btn-amber" style="flex:2;"><i class="fa-solid fa-save"></i> บันทึกการแก้ไข</button>
             </div>
         </form>
     </div>
 </div>
-<!-- โหลด Flatpickr สำหรับ Date Picker แบบเลือกหลายวัน -->
+<!-- Flatpickr for multi-date picker -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script src="https://npmcdn.com/flatpickr/dist/l10n/th.js"></script>
 
+<!-- simple-datatables for table view sorting + pagination -->
 <link href="https://cdn.jsdelivr.net/npm/simple-datatables@latest/dist/style.css" rel="stylesheet" type="text/css">
 <script src="https://cdn.jsdelivr.net/npm/simple-datatables@latest" type="text/javascript"></script>
 
-<style>
-.dataTable-wrapper .dataTable-container {
-    border-bottom: 1px solid #f3f4f6;
-    font-family: inherit;
+<script>
+// ── Portal-Escape modal helpers (teleport to <body>) ─────────
+function openTsModal(id) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    if (el.parentElement !== document.body) document.body.appendChild(el);
+    el.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
 }
-.dataTable-table > thead > tr > th {
-    border-bottom: 1px solid #e5e7eb;
+function closeTsModal(id) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.classList.add('hidden');
+    // restore body scroll if no other modal open
+    var openModals = document.querySelectorAll('.ts-modal:not(.hidden)');
+    if (openModals.length === 0) document.body.style.overflow = '';
 }
-.dataTable-input, .dataTable-selector {
-    border: 1px solid #e5e7eb;
-    border-radius: 0.5rem;
-    padding: 0.35rem 0.5rem;
-    font-size: 0.875rem;
-    outline: none;
-    font-family: inherit;
-}
-.dataTable-input:focus, .dataTable-selector:focus {
-    border-color: #2e9e63;
-    box-shadow: 0 0 0 2px rgba(0, 82, 204, 0.2);
-}
-.dataTable-info, .dataTable-bottom {
-    font-size: 0.875rem;
-    color: #6B7280;
-    margin-top: 0.5rem;
-}
-</style>
+// Close any open modal on Escape
+document.addEventListener('keydown', function(e) {
+    if (e.key !== 'Escape') return;
+    document.querySelectorAll('.ts-modal:not(.hidden)').forEach(function(m){ m.classList.add('hidden'); });
+    document.body.style.overflow = '';
+});
+// Click outside ts-modal box to close
+document.addEventListener('click', function(e) {
+    if (e.target.classList && e.target.classList.contains('ts-modal')) {
+        e.target.classList.add('hidden');
+        document.body.style.overflow = '';
+    }
+    // close month picker popup when clicking outside
+    const pop = document.getElementById('monthPickerPop');
+    const btn = document.getElementById('monthLabelBtn');
+    if (pop && pop.classList.contains('open') && !pop.contains(e.target) && e.target !== btn && !btn?.contains(e.target)) {
+        pop.classList.remove('open');
+    }
+});
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        document.getElementById('monthPickerPop')?.classList.remove('open');
+    }
+});
+</script>
 
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
 let fp;
 let tableInst = null;
 let initialTableTbodyHTML = ''; // เก็บ HTML ต้นฉบับของตารางไว้สำหรับ filter ใหม่
 let globalSelectedSlots = new Set(); // เก็บ ID รายการที่ถูกเลือกไว้เพื่อให้ Sync ตรงกันทุกมุมมอง
 
+// ── Clinic schedule (injected from PHP) ───────────────────────────────
+const CLINIC_REGULAR   = <?= json_encode($clinicRegularHours, JSON_UNESCAPED_UNICODE) ?>;
+const CLINIC_OVERRIDES = <?= json_encode($clinicOverrides,    JSON_UNESCAPED_UNICODE) ?>;
+const THAI_WD = ['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์'];
+
+function fmtDate(d) {
+    const y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,'0'), dd = String(d.getDate()).padStart(2,'0');
+    return `${y}-${m}-${dd}`;
+}
+function clinicHoursFor(dateStr) {
+    if (CLINIC_OVERRIDES[dateStr]) return { ...CLINIC_OVERRIDES[dateStr], _source: CLINIC_OVERRIDES[dateStr].source };
+    const wd = new Date(dateStr + 'T00:00:00').getDay();
+    const reg = CLINIC_REGULAR[wd];
+    return reg ? { ...reg, _source: 'regular' } : { closed: false, open_time: null, close_time: null, _source: 'unknown' };
+}
+function updateClinicHint(selectedDates) {
+    const el = document.getElementById('clinicHint');
+    if (!el) return;
+    if (!selectedDates || !selectedDates.length) { el.innerHTML = ''; return; }
+    // แสดง hint ของวันที่เลือกล่าสุด (หรือ summarize ถ้าเลือกหลายวัน)
+    const last = selectedDates[selectedDates.length - 1];
+    const ds = fmtDate(last);
+    const h  = clinicHoursFor(ds);
+    const wdLabel = THAI_WD[last.getDay()];
+    const dateLabel = last.toLocaleDateString('th-TH', { day:'numeric', month:'short', year:'numeric' });
+    let html = '';
+    if (h.closed) {
+        html = `<i class="fa-solid fa-circle-xmark text-rose-500"></i> <strong>${wdLabel} ${dateLabel}</strong> — คลินิคปิด`;
+        if (h.note) html += ` <span class="text-gray-500">(${h.note})</span>`;
+    } else if (h.open_time && h.close_time) {
+        const srcBadge = h._source === 'special'  ? ' <span class="text-amber-600 font-bold">[วันพิเศษ]</span>' :
+                         h._source === 'holiday' ? ' <span class="text-rose-600 font-bold">[วันหยุด · เปิดพิเศษ]</span>' : '';
+        html = `<i class="fa-solid fa-clock text-emerald-600"></i> <strong>${wdLabel} ${dateLabel}</strong> เปิด ${h.open_time}–${h.close_time}${srcBadge}`;
+        if (h.note) html += ` <span class="text-gray-500">· ${h.note}</span>`;
+    } else {
+        html = `<i class="fa-solid fa-circle-question text-gray-400"></i> <strong>${wdLabel} ${dateLabel}</strong> — ไม่มีข้อมูลเวลาเปิด-ปิด`;
+    }
+    if (selectedDates.length > 1) html += ` <span class="text-gray-400">(+อีก ${selectedDates.length - 1} วัน)</span>`;
+    el.innerHTML = html;
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     fp = flatpickr("#modal_selected_dates", {
         mode: "multiple",
         dateFormat: "Y-m-d",
         locale: "th",
+        disable: [
+            function(date) {
+                const h = clinicHoursFor(fmtDate(date));
+                return h.closed === true;
+            }
+        ],
+        onChange: function(selectedDates) {
+            updateClinicHint(selectedDates);
+        },
+        onDayCreate: function(_dObj, _dStr, _fp, dayElem) {
+            const d  = dayElem.dateObj;
+            if (!d) return;
+            const ds = fmtDate(d);
+            const ov = CLINIC_OVERRIDES[ds];
+            if (ov) {
+                const cls = ov.closed ? 'ts-cal-closed' : (ov.source === 'special' ? 'ts-cal-special' : 'ts-cal-holiday');
+                dayElem.classList.add(cls);
+                const title = (ov.closed ? 'คลินิคปิด' : `เปิด ${ov.open_time||'?'}–${ov.close_time||'?'}`) + (ov.note ? ` · ${ov.note}` : '');
+                dayElem.setAttribute('title', title);
+            } else {
+                const reg = CLINIC_REGULAR[d.getDay()];
+                if (reg && reg.closed) {
+                    dayElem.classList.add('ts-cal-closed');
+                    dayElem.setAttribute('title', 'คลินิคปิดประจำสัปดาห์');
+                }
+            }
+        }
     });
 
     if (document.getElementById("slotsTable")) {
@@ -906,7 +1910,7 @@ document.addEventListener('DOMContentLoaded', function() {
         tableInst = new simpleDatatables.DataTable("#slotsTable", {
             searchable: true,
             fixedHeight: false,
-            perPage: 15,
+            perPage: 20,
             labels: {
                 placeholder: "ค้นหา...",
                 perPage: "รายการต่อหน้า",
@@ -1006,23 +2010,34 @@ function toggleAllCampaigns(el) {
 function updateMultiSelectFilter() {
     const checkboxes = document.querySelectorAll('.camp-checkbox');
     const selectAllCb = document.getElementById('selectAllCamps');
-    
+    const label = document.getElementById('multiSelectLabel');
+
+    // Defensive: if no campaign checkboxes exist (e.g. month has no slots
+    // OR all campaigns referenced by slots are missing from $filterCampaigns),
+    // show every slot — don't filter them all out.
+    if (checkboxes.length === 0) {
+        document.querySelectorAll('.slot-item').forEach(s => { s.style.display = 'block'; });
+        if (label) label.innerText = 'ไม่มีแคมเปญให้กรอง';
+        return;
+    }
+
     let checkedIds = [];
     checkboxes.forEach(cb => {
         if (cb.checked) checkedIds.push(cb.value);
     });
 
     // ตรวจสอบเช็ค 'เลือกทั้งหมด' อัตโนมัติถ้าย่อยถูกเช็คหมด
-    selectAllCb.checked = (checkedIds.length === checkboxes.length);
+    if (selectAllCb) selectAllCb.checked = (checkedIds.length === checkboxes.length);
 
-    // อัปเดตข้อความบนปุ่ม Label 
-    const label = document.getElementById('multiSelectLabel');
-    if (checkedIds.length === checkboxes.length) {
-        label.innerText = 'แสดงทุกแคมเปญ';
-    } else if (checkedIds.length === 0) {
-        label.innerText = 'ไม่ได้เลือกแคมเปญเลย';
-    } else {
-        label.innerText = `เลือกไว้ (${checkedIds.length}/${checkboxes.length})`;
+    // อัปเดตข้อความบนปุ่ม Label
+    if (label) {
+        if (checkedIds.length === checkboxes.length) {
+            label.innerText = 'แสดงทุกแคมเปญ';
+        } else if (checkedIds.length === 0) {
+            label.innerText = 'ไม่ได้เลือกแคมเปญเลย';
+        } else {
+            label.innerText = `เลือกไว้ (${checkedIds.length}/${checkboxes.length})`;
+        }
     }
 
     // ทำการซ่อน/แสดง .slot-item ในปฏิทินแบบเรียลไทม์
@@ -1034,7 +2049,7 @@ function updateMultiSelectFilter() {
                 isMatch = true;
             }
         });
-        
+
         if (isMatch) {
             slot.style.display = 'block';
         } else {
@@ -1056,7 +2071,7 @@ function openAddSlotModal(date) {
     container.querySelectorAll('input[type="time"]').forEach(input => input.value = '');
     updateRemoveButtons();
 
-    document.getElementById('slotModal').classList.remove('hidden');
+    openTsModal('slotModal');
 }
 
 // ฟังก์ชันเพิ่มช่วงเวลาใหม่ในฟอร์ม Add Slot แบบ Dynamic
@@ -1095,7 +2110,7 @@ function openEditSlotModal(slotId, campaignId, startTime, endTime, maxCap) {
     document.getElementById('edit_start_time').value = startTime;
     document.getElementById('edit_end_time').value = endTime;
     document.getElementById('edit_max_capacity').value = maxCap;
-    document.getElementById('editSlotModal').classList.remove('hidden');
+    openTsModal('editSlotModal');
 }
 
 // Refresh calendar + table in-place without full page reload
@@ -1145,7 +2160,7 @@ document.getElementById('slotForm').addEventListener('submit', function(e) {
     .then(r => r.json())
     .then(data => {
         if (data.status === 'success') {
-            document.getElementById('slotModal').classList.add('hidden');
+            closeTsModal('slotModal');
             document.getElementById('slotForm').reset();
             Swal.fire({
                 title: 'บันทึกสำเร็จ!',
@@ -1173,7 +2188,7 @@ document.getElementById('editSlotForm').addEventListener('submit', function(e) {
     .then(r => r.json())
     .then(data => {
         if (data.status === 'success') {
-            document.getElementById('editSlotModal').classList.add('hidden');
+            closeTsModal('editSlotModal');
             Swal.fire({
                 title: 'แก้ไขสำเร็จ!',
                 text: data.message,
@@ -1466,17 +2481,18 @@ function generateTimeSlots() {
 
     slots.forEach(slot => {
         const row = document.createElement('div');
-        row.className = "time-slot-row flex items-end gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100 relative group overflow-hidden";
+        row.className = "time-slot-row";
+        row.style.cssText = "display:flex; align-items:flex-end; gap:10px; padding:12px; background:var(--ec-surface-2); border-radius:12px; border:1px solid var(--ec-border-soft); position:relative;";
         row.innerHTML = `
             <div class="flex-1">
-                <label class="block text-[11px] uppercase tracking-wider font-bold text-gray-500 mb-1">เวลาเริ่ม <span class="text-red-500">*</span></label>
-                <input type="time" name="start_time[]" value="${slot.st}" required class="w-full px-3 py-2 border border-gray-200 rounded-lg font-prompt text-sm outline-none focus:ring-2 focus:ring-[#2e9e63] bg-white">
+                <label class="ts-label-eyebrow">เวลาเริ่ม *</label>
+                <input type="time" name="start_time[]" value="${slot.st}" required class="ts-input" style="padding:8px 12px;">
             </div>
             <div class="flex-1">
-                <label class="block text-[11px] uppercase tracking-wider font-bold text-gray-500 mb-1">เวลาสิ้นสุด <span class="text-red-500">*</span></label>
-                <input type="time" name="end_time[]" value="${slot.et}" required class="w-full px-3 py-2 border border-gray-200 rounded-lg font-prompt text-sm outline-none focus:ring-2 focus:ring-[#2e9e63] bg-white">
+                <label class="ts-label-eyebrow">เวลาสิ้นสุด *</label>
+                <input type="time" name="end_time[]" value="${slot.et}" required class="ts-input" style="padding:8px 12px;">
             </div>
-            <button type="button" onclick="removeTimeSlot(this)" class="remove-time-btn w-10 h-[38px] min-w-[40px] bg-white border border-gray-200 text-red-500 hover:text-white hover:bg-red-500 hover:border-red-500 rounded-lg flex items-center justify-center transition-colors shadow-sm">
+            <button type="button" onclick="removeTimeSlot(this)" class="remove-time-btn" style="min-width:40px; height:38px; background:var(--ec-surface); border:1px solid var(--ec-border); color:#ef4444; border-radius:10px; cursor:pointer; transition:all .15s;">
                 <i class="fa-solid fa-trash"></i>
             </button>
         `;
@@ -1547,7 +2563,7 @@ updateMultiSelectFilter = function() {
             tableInst = new simpleDatatables.DataTable("#slotsTable", {
                 searchable: true,
                 fixedHeight: false,
-                perPage: 15,
+                perPage: 20,
                 labels: {
                     placeholder: "ค้นหา...",
                     perPage: "รายการต่อหน้า",
@@ -1621,31 +2637,24 @@ function deleteSelectedSlots() {
 <!-- ========================================================
      DAILY SLOTS MODAL
      ======================================================== -->
-<div id="dailyModal" class="fixed inset-0 flex items-center justify-center p-4" style="display:none;z-index:9999">
-    <div class="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" onclick="closeDailyModal()"></div>
-    <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col overflow-hidden animate-slide-up">
-
-        <!-- Header -->
-        <div class="modal-hdr-blue px-6 py-4 flex items-center justify-between shrink-0">
-            <div class="flex items-center gap-3">
-                <div class="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center">
-                    <i class="fa-solid fa-calendar-day text-white"></i>
-                </div>
+<div id="dailyModal" class="ts-modal hidden">
+    <div class="ts-modal-box lg">
+        <div class="ts-modal-header brand">
+            <h3 class="ts-modal-title">
+                <div class="ts-modal-icon"><i class="fa-solid fa-calendar-day"></i></div>
                 <div>
-                    <h3 class="text-white font-black text-lg leading-none" id="dailyModalTitle">รอบเวลาประจำวัน</h3>
-                    <p class="text-blue-100 text-xs mt-0.5" id="dailyModalSub"></p>
+                    <div id="dailyModalTitle" style="line-height:1.1;">รอบเวลาประจำวัน</div>
+                    <p id="dailyModalSub" style="font-size:11px; font-weight:500; opacity:.85; margin:2px 0 0;"></p>
                 </div>
-            </div>
-            <button onclick="closeDailyModal()" class="w-8 h-8 bg-white/20 hover:bg-white/30 rounded-full flex items-center justify-center text-white transition-colors">
+            </h3>
+            <button onclick="closeDailyModal()" class="ts-modal-close" aria-label="ปิด">
                 <i class="fa-solid fa-times"></i>
             </button>
         </div>
-
-        <!-- Body -->
-        <div class="overflow-y-auto flex-1 p-5" id="dailyModalBody">
-            <div class="flex items-center justify-center py-12 text-gray-400">
-                <i class="fa-solid fa-spinner fa-spin text-2xl mr-3 text-[#2e9e63]"></i>
-                <span class="font-prompt">กำลังโหลด...</span>
+        <div id="dailyModalBody" class="ts-modal-body">
+            <div style="display:flex; align-items:center; justify-content:center; padding:48px 0; color:var(--ec-ink-3);">
+                <i class="fa-solid fa-spinner fa-spin text-2xl mr-3" style="color:var(--ec-brand-500);"></i>
+                <span>กำลังโหลด...</span>
             </div>
         </div>
     </div>
@@ -1656,8 +2665,7 @@ let _dailyDate = '';
 
 function openDailyModal(date) {
     _dailyDate = date;
-    const modal = document.getElementById('dailyModal');
-    modal.style.display = 'flex';
+    openTsModal('dailyModal');
 
     // Format date for display
     const d = new Date(date + 'T00:00:00');
@@ -1669,16 +2677,14 @@ function openDailyModal(date) {
 }
 
 function closeDailyModal() {
-    document.getElementById('dailyModal').style.display = 'none';
+    closeTsModal('dailyModal');
 }
-
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDailyModal(); });
 
 function loadDailySlots(date) {
     document.getElementById('dailyModalBody').innerHTML = `
-        <div class="flex items-center justify-center py-12 text-gray-400">
-            <i class="fa-solid fa-spinner fa-spin text-2xl mr-3 text-[#2e9e63]"></i>
-            <span class="font-prompt">กำลังโหลด...</span>
+        <div style="display:flex; align-items:center; justify-content:center; padding:48px 0; color:var(--ec-ink-3);">
+            <i class="fa-solid fa-spinner fa-spin text-2xl mr-3" style="color:var(--ec-brand-500);"></i>
+            <span>กำลังโหลด...</span>
         </div>`;
 
     const fd = new FormData();
@@ -1691,66 +2697,70 @@ function loadDailySlots(date) {
     .then(data => {
         if (data.status !== 'success') {
             document.getElementById('dailyModalBody').innerHTML =
-                `<p class="text-center text-red-500 py-8 font-prompt">${data.message}</p>`;
+                `<p style="text-align:center; color:#ef4444; padding:32px 0;">${escHtml(data.message || 'ไม่สามารถโหลดข้อมูลได้')}</p>`;
             return;
         }
         renderDailySlots(data.slots, date);
     })
     .catch(() => {
         document.getElementById('dailyModalBody').innerHTML =
-            '<p class="text-center text-red-500 py-8 font-prompt">ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้</p>';
+            '<p style="text-align:center; color:#ef4444; padding:32px 0;">ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้</p>';
     });
 }
 
 function renderDailySlots(slots, date) {
     if (!slots.length) {
         document.getElementById('dailyModalBody').innerHTML = `
-            <div class="text-center py-12">
-                <i class="fa-solid fa-calendar-xmark text-4xl text-gray-300 mb-3 block"></i>
-                <p class="text-gray-400 font-prompt">ไม่มีรอบเวลาในวันนี้</p>
-                <button onclick="openAddSlotModal('${date}'); closeDailyModal();"
-                    class="mt-4 px-5 py-2 bg-[#2e9e63] text-white rounded-xl text-sm font-bold font-prompt hover:bg-blue-700 transition-colors">
-                    <i class="fa-solid fa-plus mr-1"></i> สร้างรอบเวลา
+            <div class="ts-empty" style="background:transparent; border:0; padding:32px 16px;">
+                <div class="ts-empty-icon"><i class="fa-solid fa-calendar-xmark"></i></div>
+                <h3>ไม่มีรอบเวลาในวันนี้</h3>
+                <p style="margin-bottom:16px;">สร้างรอบเวลาแรกของวันนี้เพื่อเปิดรับจอง</p>
+                <button onclick="openAddSlotModal('${date}'); closeDailyModal();" class="ts-cta" style="margin-top:14px;">
+                    <i class="fa-solid fa-plus"></i> สร้างรอบเวลา
                 </button>
             </div>`;
         return;
     }
 
     let rows = slots.map(s => {
-        const pct     = s.max_capacity > 0 ? (s.booked_count / s.max_capacity) * 100 : 0;
-        const badgeSt = pct >= 100 ? 'background:#fee2e2;color:#b91c1c'
-                      : pct >= 80  ? 'background:#fef9c3;color:#a16207'
-                      :              'background:#dcfce7;color:#15803d';
-        const barClr  = pct >= 100 ? '#ef4444' : pct >= 80 ? '#facc15' : '#22c55e';
+        const booked    = parseInt(s.booked_count, 10)    || 0;  // active + completed
+        const active    = parseInt(s.active_count, 10)    || 0;
+        const completed = parseInt(s.completed_count, 10) || 0;
+        const pct       = s.max_capacity > 0 ? (booked / s.max_capacity) * 100 : 0;
+        const toneCls   = pct >= 100 ? 'tone-full' : pct >= 80 ? 'tone-near' : 'tone-ok';
+        const barClr    = pct >= 100 ? '#ef4444' : pct >= 80 ? '#f59e0b' : '#22c55e';
+        const tipParts  = [`รวม ${booked}/${s.max_capacity}`];
+        if (active    > 0) tipParts.push(`รอเช็คอิน ${active}`);
+        if (completed > 0) tipParts.push(`เช็คอินแล้ว ${completed}`);
+        const tip = tipParts.join(' · ');
 
         return `
-        <tr id="drow-${s.id}" class="border-b border-gray-50 hover:bg-gray-50/80 transition-colors">
-            <td class="px-4 py-3">
-                <span class="font-semibold text-gray-800 text-sm">${escHtml(s.campaign_title)}</span>
+        <tr id="drow-${s.id}" style="border-bottom:1px solid var(--ec-border-soft); transition: background .12s;">
+            <td style="padding:12px 16px;">
+                <span style="font-weight:600; color:var(--ec-ink-1); font-size:13px;">${escHtml(s.campaign_title)}</span>
             </td>
-            <td class="px-4 py-3" style="white-space:nowrap">
-                <span class="font-black text-[#2e9e63] bg-emerald-50 px-2.5 py-1 rounded-lg text-xs" style="white-space:nowrap;display:inline-block">
+            <td style="padding:12px 16px; white-space:nowrap;">
+                <span style="font-weight:800; color:var(--ec-brand-700); background:var(--ec-brand-50); padding:4px 10px; border-radius:9px; font-size:12px; display:inline-block;">
                     ${s.start_time.slice(0,5)} – ${s.end_time.slice(0,5)}
                 </span>
             </td>
-            <td class="px-4 py-3" style="white-space:nowrap">
-                <div style="display:flex;align-items:center;gap:8px;flex-wrap:nowrap">
-                    <span class="text-xs font-bold rounded-full px-2.5 py-1" style="${badgeSt};white-space:nowrap;display:inline-block">
-                        ${s.booked_count} / ${s.max_capacity}
+            <td style="padding:12px 16px; white-space:nowrap;">
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <span class="stat-badge ${toneCls}" style="white-space:nowrap;" title="${escHtml(tip)}">
+                        ${booked} / ${s.max_capacity}${completed > 0 ? ' ✓' : ''}
                     </span>
-                    <div style="width:60px;min-width:60px;height:4px;background:#e5e7eb;border-radius:99px;overflow:hidden">
-                        <div style="width:${Math.min(pct,100)}%;height:100%;background:${barClr};border-radius:99px"></div>
+                    <div style="width:60px; min-width:60px; height:4px; background:var(--ec-border); border-radius:99px; overflow:hidden;">
+                        <div style="width:${Math.min(pct,100)}%; height:100%; background:${barClr}; border-radius:99px;"></div>
                     </div>
                 </div>
+                ${completed > 0 ? `<div style="font-size:10px; color:var(--ec-ink-4); margin-top:2px;">รอเช็คอิน ${active} · เช็คอินแล้ว ${completed}</div>` : ''}
             </td>
-            <td class="px-4 py-3" style="white-space:nowrap">
-                <div style="display:flex;gap:4px;justify-content:flex-end;align-items:center">
-                    <button onclick="dailyEditRow(${s.id},'${s.start_time.slice(0,5)}','${s.end_time.slice(0,5)}',${s.max_capacity})"
-                        class="w-8 h-8 rounded-lg bg-amber-50 border border-amber-100 text-amber-500 hover:bg-amber-500 hover:text-white transition-all" title="แก้ไข" style="flex-shrink:0">
+            <td style="padding:12px 16px; white-space:nowrap;">
+                <div style="display:flex; gap:6px; justify-content:flex-end;">
+                    <button onclick="dailyEditRow(${s.id},'${s.start_time.slice(0,5)}','${s.end_time.slice(0,5)}',${s.max_capacity})" class="ts-row-btn edit" title="แก้ไข">
                         <i class="fa-solid fa-pen text-xs"></i>
                     </button>
-                    <button onclick="dailyDeleteSlot(${s.id},'${date}')"
-                        class="w-8 h-8 rounded-lg bg-red-50 border border-red-100 text-red-500 hover:bg-red-500 hover:text-white transition-all" title="ลบ" style="flex-shrink:0">
+                    <button onclick="dailyDeleteSlot(${s.id},'${date}')" class="ts-row-btn del" title="ลบ">
                         <i class="fa-solid fa-trash text-xs"></i>
                     </button>
                 </div>
@@ -1759,24 +2769,23 @@ function renderDailySlots(slots, date) {
     }).join('');
 
     document.getElementById('dailyModalBody').innerHTML = `
-        <div class="flex justify-between items-center mb-4">
-            <p class="text-sm text-gray-500 font-prompt">พบ <b class="text-gray-800">${slots.length}</b> รอบเวลา</p>
-            <button onclick="openAddSlotModal('${date}'); closeDailyModal();"
-                class="px-4 py-1.5 bg-[#2e9e63] text-white rounded-xl text-xs font-bold font-prompt hover:bg-blue-700 transition-colors flex items-center gap-1.5">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+            <p style="font-size:13px; color:var(--ec-ink-3); margin:0;">พบ <b style="color:var(--ec-ink-1);">${slots.length}</b> รอบเวลา</p>
+            <button onclick="openAddSlotModal('${date}'); closeDailyModal();" class="ts-cta" style="padding:7px 14px; font-size:12px;">
                 <i class="fa-solid fa-plus"></i> สร้างรอบเวลา
             </button>
         </div>
-        <div class="overflow-x-auto rounded-xl border border-gray-100">
-            <table class="w-full text-left">
+        <div style="overflow-x:auto; border-radius:14px; border:1px solid var(--ec-border-soft);">
+            <table style="width:100%; border-collapse:separate; border-spacing:0;">
                 <thead>
-                    <tr style="background:linear-gradient(135deg,#2e9e63,#10b981)">
-                        <th class="px-4 py-3 text-xs font-bold text-white/80 uppercase tracking-wider">แคมเปญ</th>
-                        <th class="px-4 py-3 text-xs font-bold text-white/80 uppercase tracking-wider" style="white-space:nowrap;width:120px">เวลา</th>
-                        <th class="px-4 py-3 text-xs font-bold text-white/80 uppercase tracking-wider" style="white-space:nowrap;width:160px">ยอดจอง</th>
-                        <th class="px-4 py-3 text-xs font-bold text-white/80 uppercase tracking-wider text-right" style="white-space:nowrap;width:90px">จัดการ</th>
+                    <tr style="background:linear-gradient(135deg,#2e9e63,#10b981);">
+                        <th style="padding:12px 16px; font-size:11px; font-weight:700; color:rgba(255,255,255,.92); text-transform:uppercase; letter-spacing:.06em; text-align:left;">แคมเปญ</th>
+                        <th style="padding:12px 16px; font-size:11px; font-weight:700; color:rgba(255,255,255,.92); text-transform:uppercase; letter-spacing:.06em; text-align:left; white-space:nowrap; width:140px;">เวลา</th>
+                        <th style="padding:12px 16px; font-size:11px; font-weight:700; color:rgba(255,255,255,.92); text-transform:uppercase; letter-spacing:.06em; text-align:left; white-space:nowrap; width:170px;">ยอดจอง</th>
+                        <th style="padding:12px 16px; font-size:11px; font-weight:700; color:rgba(255,255,255,.92); text-transform:uppercase; letter-spacing:.06em; text-align:right; white-space:nowrap; width:90px;">จัดการ</th>
                     </tr>
                 </thead>
-                <tbody class="bg-white">${rows}</tbody>
+                <tbody style="background:var(--ec-surface);">${rows}</tbody>
             </table>
         </div>`;
 }
@@ -1790,26 +2799,20 @@ function dailyEditRow(id, start, end, cap) {
     const row = document.getElementById('drow-' + id);
     if (!row) return;
     row.innerHTML = `
-        <td class="px-4 py-2" colspan="2">
-            <div class="flex gap-2 items-center flex-wrap">
-                <input type="time" id="de_start_${id}" value="${start}"
-                    class="border border-gray-200 rounded-lg px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-[#2e9e63]">
-                <span class="text-gray-400 text-sm">–</span>
-                <input type="time" id="de_end_${id}" value="${end}"
-                    class="border border-gray-200 rounded-lg px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-[#2e9e63]">
-                <input type="number" id="de_cap_${id}" value="${cap}" min="1"
-                    class="border border-gray-200 rounded-lg px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-[#2e9e63] w-20"
-                    placeholder="ที่นั่ง">
+        <td style="padding:10px 16px;" colspan="2">
+            <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                <input type="time" id="de_start_${id}" value="${start}" class="ts-input" style="padding:6px 10px; width:auto;">
+                <span style="color:var(--ec-ink-4); font-size:13px;">–</span>
+                <input type="time" id="de_end_${id}" value="${end}" class="ts-input" style="padding:6px 10px; width:auto;">
+                <input type="number" id="de_cap_${id}" value="${cap}" min="1" class="ts-input" style="padding:6px 10px; width:80px;" placeholder="ที่นั่ง">
             </div>
         </td>
-        <td class="px-4 py-2" colspan="2">
-            <div class="flex gap-2 justify-end">
-                <button onclick="dailySaveEdit(${id})"
-                    class="px-3 py-1.5 bg-[#2e9e63] text-white rounded-lg text-xs font-bold hover:bg-blue-700 transition-colors font-prompt">
+        <td style="padding:10px 16px;" colspan="2">
+            <div style="display:flex; gap:8px; justify-content:flex-end;">
+                <button onclick="dailySaveEdit(${id})" style="padding:6px 12px; background:linear-gradient(135deg,#2e9e63,#34d399); color:#fff; border-radius:9px; font-size:12px; font-weight:700; border:0; cursor:pointer;">
                     <i class="fa-solid fa-save mr-1"></i>บันทึก
                 </button>
-                <button onclick="loadDailySlots('${_dailyDate}')"
-                    class="px-3 py-1.5 bg-gray-100 text-gray-600 rounded-lg text-xs font-bold hover:bg-gray-200 transition-colors font-prompt">
+                <button onclick="loadDailySlots('${_dailyDate}')" style="padding:6px 12px; background:var(--ec-surface-2); color:var(--ec-ink-2); border-radius:9px; font-size:12px; font-weight:700; border:1px solid var(--ec-border); cursor:pointer;">
                     ยกเลิก
                 </button>
             </div>
@@ -1884,7 +2887,22 @@ const CSRF_QR = '<?= get_csrf_token() ?>';
 
 function showQrModal(slotId, campaignId) {
     const qrEnabled = !!QR_ENABLED_MAP[campaignId];
-    document.getElementById('qrImg').src = `../user/api_slot_qr.php?slot=${slotId}`;
+    const img  = document.getElementById('qrImg');
+    const wrap = document.getElementById('qrImgWrap');
+    const state = wrap.querySelector('.qr-state');
+
+    // QR image loading state machine
+    wrap.classList.remove('error');
+    wrap.classList.add('loading');
+    state.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i><span>กำลังสร้าง QR...</span>';
+    img.onload  = () => { wrap.classList.remove('loading','error'); };
+    img.onerror = () => {
+        wrap.classList.remove('loading');
+        wrap.classList.add('error');
+        state.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i><span>โหลด QR ไม่ได้<br><span style="font-size:10px;opacity:.8">ตรวจสอบ slot ID หรือลองใหม่</span></span>';
+    };
+    img.src = `../user/api_slot_qr.php?slot=${slotId}&_=${Date.now()}`;
+
     document.getElementById('qrCampaignId').value = campaignId;
     setQrToggleUI(document.getElementById('qrToggleBtn'), qrEnabled);
 
@@ -1896,17 +2914,15 @@ function showQrModal(slotId, campaignId) {
         .then(d => { copyInput.value = d.url || ''; })
         .catch(() => { copyInput.value = ''; });
 
-    document.getElementById('qrModal').classList.remove('hidden');
+    openTsModal('qrModal');
 }
 
 function setQrToggleUI(btn, enabled) {
-    if (enabled) {
-        btn.innerHTML = '<i class="fa-solid fa-toggle-on text-lg"></i> QR เปิดใช้งาน';
-        btn.style.cssText = 'background:#dcfce7;color:#16a34a;border-color:#bbf7d0';
-    } else {
-        btn.innerHTML = '<i class="fa-solid fa-toggle-off text-lg"></i> QR ปิดอยู่';
-        btn.style.cssText = 'background:#f3f4f6;color:#6b7280;border-color:#e5e7eb';
-    }
+    btn.classList.remove('is-on','is-off');
+    btn.classList.add(enabled ? 'is-on' : 'is-off');
+    btn.innerHTML = enabled
+        ? '<i class="fa-solid fa-toggle-on text-lg"></i> QR เปิดใช้งาน'
+        : '<i class="fa-solid fa-toggle-off text-lg"></i> QR ปิดอยู่';
 }
 
 function toggleCampaignQr() {
@@ -1958,62 +2974,40 @@ function printQr() {
 </script>
 
 <!-- ── QR Modal ──────────────────────────────────────────────────── -->
-<div id="qrModal"
-     class="hidden fixed inset-0 flex items-center justify-center"
-     style="background:rgba(0,0,0,.5);backdrop-filter:blur(4px);z-index:900"
-     onclick="if(event.target===this)this.classList.add('hidden')">
-  <div class="bg-white rounded-3xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden"
-       onclick="event.stopPropagation()">
-
-    <!-- Header -->
-    <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between"
-         style="background:linear-gradient(135deg,#e8f8f0,#f0fdf4)">
-      <div class="flex items-center gap-3">
-        <div class="w-9 h-9 rounded-xl flex items-center justify-center"
-             style="background:linear-gradient(135deg,#2e9e63,#4ade80)">
-          <i class="fa-solid fa-qrcode text-white text-sm"></i>
-        </div>
-        <span class="font-black text-gray-800">QR Check-in</span>
-      </div>
-      <button onclick="document.getElementById('qrModal').classList.add('hidden')"
-              class="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center hover:bg-gray-200 transition-colors text-gray-500">
+<div id="qrModal" class="ts-modal hidden">
+  <div class="ts-modal-box" style="max-width:400px;">
+    <div class="ts-modal-header brand-soft">
+      <h3 class="ts-modal-title">
+        <div class="ts-modal-icon"><i class="fa-solid fa-qrcode text-sm"></i></div>
+        QR Check-in
+      </h3>
+      <button onclick="closeTsModal('qrModal')" class="ts-modal-close" aria-label="ปิด">
         <i class="fa-solid fa-xmark text-xs"></i>
       </button>
     </div>
 
-    <!-- Body -->
-    <div class="p-6 flex flex-col items-center gap-4">
-
-      <!-- QR Image -->
-      <div class="p-3 bg-white rounded-2xl shadow-inner border border-gray-100">
-        <img id="qrImg" src="" alt="QR Code" class="w-52 h-52 object-contain"
-             onerror="this.alt='โหลด QR ไม่ได้'">
+    <div class="ts-modal-body" style="display:flex; flex-direction:column; align-items:center; gap:14px; padding:24px;">
+      <div id="qrImgWrap" class="qr-img-wrap loading">
+        <img id="qrImg" src="" alt="QR Code">
+        <div class="qr-state">
+          <i class="fa-solid fa-spinner fa-spin"></i>
+          <span>กำลังสร้าง QR...</span>
+        </div>
       </div>
 
-      <!-- Toggle QR -->
       <input type="hidden" id="qrCampaignId" value="0">
-      <button id="qrToggleBtn" onclick="toggleCampaignQr()"
-              class="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl font-bold text-sm border transition-all">
-      </button>
+      <button id="qrToggleBtn" onclick="toggleCampaignQr()" class="qr-toggle-btn is-off"></button>
 
-      <!-- Copy URL -->
-      <div class="w-full flex items-center gap-2">
-        <input id="qrCopyUrl" type="text" readonly
-               class="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-500 font-mono"
-               placeholder="กำลังโหลด URL...">
-        <button id="qrCopyBtn" onclick="copyCheckinUrl()"
-                class="w-9 h-9 bg-gray-100 rounded-xl flex items-center justify-center hover:bg-gray-200 transition-colors text-gray-600 flex-shrink-0"
-                title="คัดลอก URL">
+      <div style="width:100%; display:flex; align-items:center; gap:8px;">
+        <input id="qrCopyUrl" type="text" readonly class="ts-input" style="padding:8px 12px; font-size:11px; font-family:monospace; color:var(--ec-ink-3);" placeholder="กำลังโหลด URL...">
+        <button id="qrCopyBtn" onclick="copyCheckinUrl()" class="qr-copy-btn" title="คัดลอก URL">
           <i class="fa-solid fa-copy text-xs"></i>
         </button>
       </div>
 
-      <!-- Print -->
-      <button onclick="printQr()"
-              class="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl font-bold text-sm bg-gray-50 border border-gray-200 text-gray-600 hover:bg-gray-100 transition-colors">
+      <button onclick="printQr()" class="ts-btn-ghost" style="width:100%; padding:10px 16px;">
         <i class="fa-solid fa-print"></i> พิมพ์ QR Code
       </button>
-
     </div>
   </div>
 </div>

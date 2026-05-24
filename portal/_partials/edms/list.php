@@ -106,11 +106,50 @@ try {
 
 $totalPages = max(1, (int)ceil($total / $limit));
 
-// Categories for filter + compose modal
+// Categories for filter + compose modal — LEFT JOIN SLA policy ของ doc_type ปัจจุบัน
+// เพื่อแสดง ack/resolve hours ใน dropdown
 $priorities = [];
 try {
-    $priorities = $pdo->query("SELECT id, code, name, color FROM sys_doc_categories WHERE kind='priority' AND is_active=1 ORDER BY sort_order ASC")->fetchAll(PDO::FETCH_ASSOC);
-} catch (PDOException) {}
+    $st = $pdo->prepare("
+        SELECT c.id, c.code, c.name, c.color,
+               p.ack_hours, p.resolve_hours, p.business_hours_only
+        FROM sys_doc_categories c
+        LEFT JOIN sys_doc_sla_policies p
+               ON p.priority_id = c.id AND p.doc_type = ? AND p.is_active = 1
+        WHERE c.kind = 'priority' AND c.is_active = 1
+        ORDER BY c.sort_order ASC, c.id ASC
+    ");
+    $st->execute([$type]);
+    $priorities = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+} catch (PDOException) {
+    // Fallback: ถ้า sys_doc_sla_policies ยังไม่มี (migration ยังไม่รัน)
+    try {
+        $priorities = $pdo->query("SELECT id, code, name, color, NULL AS ack_hours, NULL AS resolve_hours, NULL AS business_hours_only
+            FROM sys_doc_categories WHERE kind='priority' AND is_active=1 ORDER BY sort_order ASC")->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    } catch (PDOException) {}
+}
+
+// Helper: format SLA suffix สำหรับ dropdown option
+// "· รับใน 4 ชม. · เสร็จใน 16 ชม. (เวลาทำการ)"
+$_fmtSlaHours = function(?float $h): string {
+    if ($h === null || $h <= 0) return '';
+    if ($h < 1) return rtrim(rtrim(number_format($h, 2), '0'), '.') . ' ชม.';
+    if ($h < 24) return rtrim(rtrim(number_format($h, 1), '0'), '.') . ' ชม.';
+    $days = $h / 8;  // 1 business day = 8h
+    if ($days <= 7) return rtrim(rtrim(number_format($days, 1), '0'), '.') . ' วันทำการ';
+    return rtrim(rtrim(number_format($days, 0), '0'), '.') . ' วันทำการ';
+};
+$_fmtSlaSuffix = function(array $p) use ($_fmtSlaHours): string {
+    $ack = isset($p['ack_hours']) ? (float)$p['ack_hours'] : null;
+    $res = isset($p['resolve_hours']) ? (float)$p['resolve_hours'] : null;
+    if ($ack === null && $res === null) return '';
+    $parts = [];
+    if ($ack !== null && $ack > 0) $parts[] = 'รับ ' . $_fmtSlaHours($ack);
+    if ($res !== null && $res > 0) $parts[] = 'เสร็จ ' . $_fmtSlaHours($res);
+    if (empty($parts)) return '';
+    $bh = !empty($p['business_hours_only']) ? ' · เวลาทำการ' : '';
+    return ' · ' . implode(' · ', $parts) . $bh;
+};
 
 $statusLabels = [
     'draft'       => ['label' => 'ฉบับร่าง',       'tone' => 'bg-slate-100 text-slate-600 border-slate-200'],
@@ -353,22 +392,27 @@ $confidentialityLabels = [
                 <input type="hidden" name="id" id="edmsId" value="">
                 <input type="hidden" name="doc_type" value="<?= htmlspecialchars($type) ?>">
 
+                <?php
+                // คำนวณ flags ก่อน render — ใช้ใน label/placeholder ต่างๆ
+                $_systemTypes = ['incoming','outgoing','internal','circular','task'];
+                $_isCustomType = !in_array($type, $_systemTypes, true);
+                $_isTask       = ($type === 'task');
+                // Task ไม่ใช้ฟิลด์ทางการของจดหมาย — แสดง task-style แทน
+                $_showReceived = !$_isTask && ($type === 'incoming' || $_isCustomType);
+                $_showSender   = !$_isTask && (in_array($type, ['incoming','internal'], true) || $_isCustomType);
+                $_showRecip    = !$_isTask && (in_array($type, ['outgoing','internal','circular'], true) || $_isCustomType);
+                ?>
+
                 <!-- Subject -->
                 <div class="mb-4">
-                    <label class="edms-label">เรื่อง <span class="text-rose-500">*</span></label>
-                    <input type="text" name="subject" id="edmsSubject" required class="edms-input" placeholder="เช่น ขอเชิญประชุม / ขออนุมัติงบประมาณ">
+                    <label class="edms-label"><?= $_isTask ? 'ชื่องาน' : 'เรื่อง' ?> <span class="text-rose-500">*</span></label>
+                    <input type="text" name="subject" id="edmsSubject" required class="edms-input"
+                        placeholder="<?= $_isTask ? 'เช่น จัดเตรียมรายงานประจำเดือน / ตรวจสอบสต็อกยา' : 'เช่น ขอเชิญประชุม / ขออนุมัติงบประมาณ' ?>">
                 </div>
 
-                <?php
-                $_systemTypes = ['incoming','outgoing','internal','circular'];
-                $_isCustomType = !in_array($type, $_systemTypes, true);
-                $_showReceived = ($type === 'incoming' || $_isCustomType);
-                $_showSender   = (in_array($type, ['incoming','internal'], true) || $_isCustomType);
-                $_showRecip    = (in_array($type, ['outgoing','internal','circular'], true) || $_isCustomType);
-                ?>
                 <div class="grid grid-cols-2 gap-3 mb-4">
                     <div>
-                        <label class="edms-label">ลงวันที่</label>
+                        <label class="edms-label"><?= $_isTask ? 'วันที่สร้าง' : 'ลงวันที่' ?></label>
                         <input type="date" name="doc_date" id="edmsDocDate" class="edms-input" value="<?= date('Y-m-d') ?>">
                     </div>
                     <?php if ($_showReceived): ?>
@@ -400,9 +444,21 @@ $confidentialityLabels = [
                         <select name="priority_id" id="edmsPriority" class="edms-input">
                             <option value="">— เลือก —</option>
                             <?php foreach ($priorities as $p): ?>
-                                <option value="<?= (int)$p['id'] ?>"><?= htmlspecialchars($p['name']) ?></option>
+                                <option value="<?= (int)$p['id'] ?>"><?= htmlspecialchars($p['name'] . $_fmtSlaSuffix($p)) ?></option>
                             <?php endforeach; ?>
                         </select>
+                        <p class="text-[10px] font-bold text-slate-400 mt-1">
+                            <i class="fa-solid fa-stopwatch text-[9px]"></i>
+                            <?php
+                                $_anyHasSla = false;
+                                foreach ($priorities as $_pp) { if (!empty($_pp['ack_hours'])) { $_anyHasSla = true; break; } }
+                                if ($_anyHasSla):
+                            ?>
+                                เวลา SLA อ้างอิงจาก<a href="?section=edms&edms_view=sla_policies" class="text-purple-600 hover:underline">นโยบาย SLA</a>
+                            <?php else: ?>
+                                ยังไม่มีนโยบาย SLA สำหรับประเภท <?= htmlspecialchars($type) ?> — <a href="?section=edms&edms_view=sla_policies" class="text-purple-600 hover:underline">ตั้งค่า</a>
+                            <?php endif; ?>
+                        </p>
                     </div>
                     <div>
                         <label class="edms-label">ชั้นความลับ</label>
@@ -415,8 +471,9 @@ $confidentialityLabels = [
                 </div>
 
                 <div class="mb-4">
-                    <label class="edms-label">สรุปย่อ</label>
-                    <textarea name="summary" id="edmsSummary" rows="2" class="edms-input" placeholder="สรุปสั้น ๆ ใช้แสดงในรายการ"></textarea>
+                    <label class="edms-label"><?= $_isTask ? 'รายละเอียดงาน' : 'สรุปย่อ' ?></label>
+                    <textarea name="summary" id="edmsSummary" rows="<?= $_isTask ? 3 : 2 ?>" class="edms-input"
+                        placeholder="<?= $_isTask ? 'อธิบายงานที่ต้องทำ ขอบเขต ผลลัพธ์ที่ต้องการ' : 'สรุปสั้น ๆ ใช้แสดงในรายการ' ?>"></textarea>
                 </div>
 
                 <div class="mb-4">
