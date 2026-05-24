@@ -398,6 +398,24 @@ try {
             echo json_encode(['ok' => true, 'message' => 'เพิ่มห้องแล้ว']);
             return;
 
+        case 'rooms:update':
+            $id = (int)($_POST['id'] ?? 0);
+            if ($id <= 0) { echo json_encode(['ok' => false, 'message' => 'invalid id']); return; }
+            $stmt = $pdo->prepare("UPDATE sys_clinic_rooms
+                SET code = ?, name = ?, type = ?, capacity = ?, floor = ?, notes = ?
+                WHERE id = ?");
+            $stmt->execute([
+                trim((string)($_POST['code'] ?? '')),
+                trim((string)($_POST['name'] ?? '')),
+                $_POST['type'] ?? 'exam',
+                max(1, (int)($_POST['capacity'] ?? 1)),
+                trim((string)($_POST['floor'] ?? '')) ?: null,
+                trim((string)($_POST['notes'] ?? '')) ?: null,
+                $id,
+            ]);
+            echo json_encode(['ok' => true, 'message' => 'บันทึกแล้ว']);
+            return;
+
         case 'rooms:delete':
             $pdo->prepare("DELETE FROM sys_clinic_rooms WHERE id = ?")->execute([(int)$_POST['id']]);
             echo json_encode(['ok' => true, 'message' => 'ลบแล้ว']);
