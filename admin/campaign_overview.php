@@ -61,10 +61,11 @@ if ($campaignId > 0) {
         $stmt3->execute([':id' => $campaignId]);
         $dailyTrend = $stmt3->fetchAll(PDO::FETCH_ASSOC);
 
-        // การใช้งานรายรอบ (slot utilization)
+        // การใช้งานรายรอบ (slot utilization) — นับทุกการจองที่ "ครองโควต้า" จริง
+        // (booked + confirmed + completed + expired) ไม่นับยกเลิกที่คืนโควต้าแล้ว
         $stmt4 = $pdo->prepare("
             SELECT s.id, s.slot_date, s.start_time, s.end_time, s.max_capacity,
-                COUNT(CASE WHEN b.status IN ('booked','confirmed') THEN 1 END) AS booked_cnt
+                COUNT(CASE WHEN b.status NOT IN ('cancelled','cancelled_by_admin') THEN 1 END) AS booked_cnt
             FROM camp_slots s
             LEFT JOIN camp_bookings b ON b.slot_id = s.id
             WHERE s.campaign_id = :id
@@ -335,9 +336,14 @@ foreach ($slotUtil as $sl) {
 <!-- Slot Utilization Bar Chart -->
 <?php if (!empty($slotUtil)): ?>
 <div class="card p-5 mb-6 fade-up" style="animation-delay:.2s">
-    <h3 class="font-bold text-gray-700 mb-4 flex items-center gap-2">
-        <i class="fa-solid fa-chart-column text-teal-500"></i> การใช้งานรายรอบเวลา
-    </h3>
+    <div class="mb-4">
+        <h3 class="font-bold text-gray-700 flex items-center gap-2">
+            <i class="fa-solid fa-chart-column text-teal-500"></i> การใช้งานรายรอบเวลา
+        </h3>
+        <p class="text-[11px] text-gray-400 mt-1">
+            แท่งเขียว = คนที่ครองโควต้าจริง (รออนุมัติ + รอเข้าร่วม + เข้าร่วมแล้ว + ไม่มาตามนัด) · แท่งเทาอ่อน = โควต้ารวมของรอบ
+        </p>
+    </div>
     <div class="overflow-x-auto">
         <div style="min-width:<?= max(400, count($slotUtil) * 54) ?>px; height:220px;">
             <canvas id="slotChart"></canvas>
