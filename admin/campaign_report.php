@@ -184,6 +184,13 @@ foreach ($slotUtil as $sl) {
 }
 $dailySlotAgg = array_values($dailySlotAgg);
 
+// Top-attended days (ranked by people who actually came) — for the
+// "วันที่มีคนเข้ามาใช้บริการมากที่สุด" section. Drop days with zero
+// attendance so the list stays focused.
+$topAttendedDays = array_values(array_filter($dailySlotAgg, fn($d) => (int)$d['attended'] > 0));
+usort($topAttendedDays, fn($a, $b) => (int)$b['attended'] <=> (int)$a['attended']);
+$topAttendedDays = array_slice($topAttendedDays, 0, 10);
+
 // ─────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────
@@ -695,34 +702,37 @@ $today = date('Y-m-d');
     </p>
     <?php endif; ?>
 
-    <!-- Slot utilization (รายวัน — ยุบจากรายรอบ) -->
-    <?php if (!empty($dailySlotAgg)): ?>
-    <div class="cr-h"><i class="fa-regular fa-calendar-check text-[#2e9e63]"></i> สรุปยอดจองแต่ละวัน</div>
+    <!-- Top attended days — ranked by who actually came -->
+    <?php if (!empty($topAttendedDays)): ?>
+    <div class="cr-h"><i class="fa-regular fa-calendar-check text-[#2e9e63]"></i> วันที่มีคนเข้ามาใช้บริการมากที่สุด</div>
     <table class="cr-table">
         <thead>
             <tr>
+                <th style="width:50px;text-align:center;">อันดับ</th>
                 <th>วันที่จัดงาน</th>
                 <th style="text-align:center;">รอบเวลา</th>
                 <th style="text-align:center;">รับได้</th>
-                <th style="text-align:center;">มีคนจอง</th>
                 <th style="text-align:center;">มาตามนัด</th>
-                <th>เต็มแค่ไหน</th>
+                <th>ใช้บริการกี่%</th>
             </tr>
         </thead>
         <tbody>
-            <?php foreach ($dailySlotAgg as $d):
+            <?php foreach ($topAttendedDays as $i => $d):
                 $maxCap = (int)$d['capacity'];
-                $booked = (int)$d['booked'];
                 $att    = (int)$d['attended'];
-                $pct    = $maxCap > 0 ? round($booked / $maxCap * 100) : 0;
+                $pct    = $maxCap > 0 ? round($att / $maxCap * 100) : 0;
                 $color  = $pct >= 90 ? '#dc2626' : ($pct >= 60 ? '#f59e0b' : '#22c55e');
+                $isTop  = ($i === 0);
             ?>
-            <tr>
-                <td><?= thDate($d['date']) ?></td>
+            <tr<?= $isTop ? ' style="background:#fef3c7;"' : '' ?>>
+                <td style="text-align:center;font-weight:800;color:<?= $isTop ? '#d97706' : '#94a3b8' ?>;">
+                    <?php if ($isTop): ?><i class="fa-solid fa-trophy" style="margin-right:2px;"></i><?php endif; ?>
+                    <?= $i + 1 ?>
+                </td>
+                <td<?= $isTop ? ' style="font-weight:800;"' : '' ?>><?= thDate($d['date']) ?></td>
                 <td style="text-align:center;"><?= number_format((int)$d['slots']) ?> รอบ</td>
                 <td style="text-align:center;"><?= number_format($maxCap) ?></td>
-                <td style="text-align:center;font-weight:700;"><?= number_format($booked) ?></td>
-                <td style="text-align:center;color:#15803d;font-weight:700;"><?= number_format($att) ?></td>
+                <td style="text-align:center;color:#15803d;font-weight:800;font-size:11pt;"><?= number_format($att) ?></td>
                 <td>
                     <div style="display:flex;align-items:center;gap:8px;">
                         <div style="flex:1;height:10px;background:#f1f5f9;border-radius:5px;overflow:hidden;">
@@ -737,7 +747,10 @@ $today = date('Y-m-d');
     </table>
     <p style="font-size:9.5pt;color:#94a3b8;margin-top:-4px;">
         <i class="fa-solid fa-circle-info"></i>
-        รวม <?= count($slotUtil) ?> รอบ จาก <?= count($dailySlotAgg) ?> วัน · ดูแยกแต่ละรอบได้ในไฟล์ CSV
+        เรียงตามจำนวนคน "มาตามนัด" จากมากไปน้อย · แสดงสูงสุด 10 วัน · ตัดวันที่ไม่มีคนมาออก
+        <?php if (count($dailySlotAgg) > count($topAttendedDays)): ?>
+            · ทั้งแคมเปญมี <?= count($dailySlotAgg) ?> วัน — ดูครบทุกวันได้ในไฟล์ CSV
+        <?php endif; ?>
     </p>
     <?php endif; ?>
 
