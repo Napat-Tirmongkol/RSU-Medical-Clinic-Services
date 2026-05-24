@@ -106,7 +106,7 @@ try {
         SELECT c.*,
                (SELECT COUNT(*) FROM camp_bookings a WHERE a.campaign_id = c.id AND a.status IN ('booked', 'confirmed')) as used_seats
         FROM camp_list c
-        WHERE c.status IN ('active', 'coming_soon', 'full')
+        WHERE c.status IN ('active', 'coming_soon', 'full', 'closed')
         AND (c.available_until IS NULL OR c.available_until >= :today)
         ORDER BY 
             CASE WHEN c.status = 'active' THEN 0 ELSE 1 END ASC,
