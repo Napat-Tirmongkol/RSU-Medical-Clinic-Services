@@ -64,12 +64,12 @@ $typeColors = ['exam'=>'emerald','vaccination'=>'blue','lab'=>'purple','consult'
 
     <form id="rm-add" onsubmit="rmAdd(event)" class="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 mb-6">
         <p class="text-[11px] font-black uppercase tracking-widest text-slate-500 mb-4">เพิ่มห้องใหม่</p>
-        <div class="grid grid-cols-2 md:grid-cols-12 gap-3 mb-3">
-            <input type="text" name="code" placeholder="รหัส *" required
+        <div class="grid grid-cols-2 md:grid-cols-12 gap-3 mb-2">
+            <input type="text" name="code" id="rm-add-code" placeholder="รหัส (เว้นว่างได้)" title="รหัสเรียกขานสั้นๆ เช่น R1, ER, VAC-01 · เว้นว่างให้ระบบสร้างให้"
                 class="md:col-span-2 px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 outline-none focus:border-amber-400 focus:bg-white">
             <input type="text" name="name" placeholder="ชื่อห้อง *" required
                 class="md:col-span-4 px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 outline-none focus:border-amber-400 focus:bg-white">
-            <select name="type" class="md:col-span-2 px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 outline-none focus:border-amber-400 focus:bg-white">
+            <select name="type" id="rm-add-type" onchange="rmRefreshSuggestedCode()" class="md:col-span-2 px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 outline-none focus:border-amber-400 focus:bg-white">
                 <?php foreach ($typeLabels as $k=>$l): ?><option value="<?= $k ?>"><?= $l ?></option><?php endforeach; ?>
             </select>
             <input type="number" name="capacity" min="1" value="1" placeholder="ความจุ" title="ความจุ (คน)"
@@ -80,6 +80,10 @@ $typeColors = ['exam'=>'emerald','vaccination'=>'blue','lab'=>'purple','consult'
                 <i class="fa-solid fa-plus"></i>เพิ่ม
             </button>
         </div>
+        <p class="text-[11px] text-slate-400 mb-3">
+            <i class="fa-solid fa-circle-info text-slate-300 mr-1"></i>
+            <strong>รหัส</strong> = ตัวอักษรสั้นๆ ใช้อ้างอิงห้องในระบบ (เช่น R1, ER, VAC-01) · เว้นว่างให้ระบบตั้งให้อัตโนมัติเป็น <span id="rm-code-suggest" class="font-mono font-bold text-amber-600">EXM-01</span>
+        </p>
         <textarea name="notes" rows="2" placeholder="รายละเอียดเพิ่มเติม (ไม่บังคับ) — เช่น อุปกรณ์ที่มี · ตำแหน่งที่ตั้ง · เบอร์โทรภายใน"
             class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-700 outline-none focus:border-amber-400 focus:bg-white resize-none"></textarea>
     </form>
@@ -230,6 +234,23 @@ $typeColors = ['exam'=>'emerald','vaccination'=>'blue','lab'=>'purple','consult'
 </div>
 
 <script>
+// Suggested code preview — mirrors the server-side generator
+const RM_TYPE_PREFIX = { exam:'EXM', vaccination:'VAC', lab:'LAB', consult:'CON', other:'OTH' };
+const RM_EXISTING_CODES = <?= json_encode(array_column($rows, 'code'), JSON_UNESCAPED_UNICODE) ?>;
+function rmRefreshSuggestedCode() {
+    const t = document.getElementById('rm-add-type')?.value || 'exam';
+    const prefix = RM_TYPE_PREFIX[t] || 'OTH';
+    // find next number 01..99 not already taken (server still validates)
+    let n = 1;
+    while (RM_EXISTING_CODES.includes(`${prefix}-${String(n).padStart(2,'0')}`) && n < 99) n++;
+    const suggested = `${prefix}-${String(n).padStart(2,'0')}`;
+    const el = document.getElementById('rm-code-suggest');
+    if (el) el.textContent = suggested;
+    const inp = document.getElementById('rm-add-code');
+    if (inp) inp.placeholder = `เว้นว่าง = ${suggested}`;
+}
+document.addEventListener('DOMContentLoaded', rmRefreshSuggestedCode);
+
 function cdReload(view) {
     const url = new URL(window.location.origin + window.location.pathname + window.location.search);
     url.searchParams.set('section', 'clinic_data');
