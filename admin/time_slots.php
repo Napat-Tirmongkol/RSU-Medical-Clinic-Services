@@ -871,6 +871,89 @@ body[data-theme='dark'] .ts-field-card.brand {
     border-color: var(--ec-ink-4);
 }
 
+/* ── QR modal — toggle + image + copy ───────────── */
+.qr-toggle-btn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px 16px;
+    border-radius: 12px;
+    font-weight: 700;
+    font-size: 13px;
+    border: 1px solid var(--ec-border);
+    background: var(--ec-surface-2);
+    color: var(--ec-ink-3);
+    cursor: pointer;
+    transition: all .15s;
+}
+.qr-toggle-btn.is-on {
+    background: #dcfce7;
+    color: #16a34a;
+    border-color: #bbf7d0;
+}
+.qr-toggle-btn.is-off {
+    background: var(--ec-surface-2);
+    color: var(--ec-ink-3);
+    border-color: var(--ec-border);
+}
+body[data-theme='dark'] .qr-toggle-btn.is-on {
+    background: rgba(34,197,94,.18);
+    color: #86efac;
+    border-color: rgba(34,197,94,.3);
+}
+.qr-img-wrap {
+    width: 232px; height: 232px;
+    padding: 12px;
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: inset 0 1px 3px rgba(0,0,0,.06);
+    border: 1px solid var(--ec-border-soft);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+}
+.qr-img-wrap img {
+    width: 100%; height: 100%;
+    object-fit: contain;
+    display: block;
+}
+.qr-img-wrap .qr-state {
+    position: absolute;
+    inset: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    background: var(--ec-surface-2);
+    color: var(--ec-ink-3);
+    font-size: 12px;
+    text-align: center;
+    border-radius: 8px;
+    padding: 8px;
+}
+.qr-img-wrap .qr-state i { font-size: 24px; }
+.qr-img-wrap .qr-state.error { color: #b91c1c; background: #fef2f2; }
+.qr-img-wrap.loading img,
+.qr-img-wrap.error img { visibility: hidden; }
+.qr-img-wrap:not(.loading):not(.error) .qr-state { display: none; }
+.qr-copy-btn {
+    width: 36px; height: 36px;
+    background: var(--ec-surface-2);
+    border: 1px solid var(--ec-border);
+    border-radius: 11px;
+    color: var(--ec-ink-2);
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: all .15s;
+    display: flex; align-items: center; justify-content: center;
+}
+.qr-copy-btn:hover { border-color: var(--ec-brand-200); color: var(--ec-brand-700); }
+
 /* ── Action button row in table ──────────────── */
 .ts-row-btn {
     width: 32px; height: 32px;
@@ -2353,7 +2436,22 @@ const CSRF_QR = '<?= get_csrf_token() ?>';
 
 function showQrModal(slotId, campaignId) {
     const qrEnabled = !!QR_ENABLED_MAP[campaignId];
-    document.getElementById('qrImg').src = `../user/api_slot_qr.php?slot=${slotId}`;
+    const img  = document.getElementById('qrImg');
+    const wrap = document.getElementById('qrImgWrap');
+    const state = wrap.querySelector('.qr-state');
+
+    // QR image loading state machine
+    wrap.classList.remove('error');
+    wrap.classList.add('loading');
+    state.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i><span>กำลังสร้าง QR...</span>';
+    img.onload  = () => { wrap.classList.remove('loading','error'); };
+    img.onerror = () => {
+        wrap.classList.remove('loading');
+        wrap.classList.add('error');
+        state.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i><span>โหลด QR ไม่ได้<br><span style="font-size:10px;opacity:.8">ตรวจสอบ slot ID หรือลองใหม่</span></span>';
+    };
+    img.src = `../user/api_slot_qr.php?slot=${slotId}&_=${Date.now()}`;
+
     document.getElementById('qrCampaignId').value = campaignId;
     setQrToggleUI(document.getElementById('qrToggleBtn'), qrEnabled);
 
@@ -2369,13 +2467,11 @@ function showQrModal(slotId, campaignId) {
 }
 
 function setQrToggleUI(btn, enabled) {
-    if (enabled) {
-        btn.innerHTML = '<i class="fa-solid fa-toggle-on text-lg"></i> QR เปิดใช้งาน';
-        btn.style.cssText = 'background:#dcfce7;color:#16a34a;border:1px solid #bbf7d0;';
-    } else {
-        btn.innerHTML = '<i class="fa-solid fa-toggle-off text-lg"></i> QR ปิดอยู่';
-        btn.style.cssText = 'background:var(--ec-surface-2);color:var(--ec-ink-3);border:1px solid var(--ec-border);';
-    }
+    btn.classList.remove('is-on','is-off');
+    btn.classList.add(enabled ? 'is-on' : 'is-off');
+    btn.innerHTML = enabled
+        ? '<i class="fa-solid fa-toggle-on text-lg"></i> QR เปิดใช้งาน'
+        : '<i class="fa-solid fa-toggle-off text-lg"></i> QR ปิดอยู่';
 }
 
 function toggleCampaignQr() {
@@ -2440,16 +2536,20 @@ function printQr() {
     </div>
 
     <div class="ts-modal-body" style="display:flex; flex-direction:column; align-items:center; gap:14px; padding:24px;">
-      <div style="padding:12px; background:#fff; border-radius:16px; box-shadow:inset 0 1px 3px rgba(0,0,0,.06); border:1px solid var(--ec-border-soft);">
-        <img id="qrImg" src="" alt="QR Code" style="width:208px; height:208px; object-fit:contain; display:block;" onerror="this.alt='โหลด QR ไม่ได้'">
+      <div id="qrImgWrap" class="qr-img-wrap loading">
+        <img id="qrImg" src="" alt="QR Code">
+        <div class="qr-state">
+          <i class="fa-solid fa-spinner fa-spin"></i>
+          <span>กำลังสร้าง QR...</span>
+        </div>
       </div>
 
       <input type="hidden" id="qrCampaignId" value="0">
-      <button id="qrToggleBtn" onclick="toggleCampaignQr()" style="width:100%; display:flex; align-items:center; justify-content:center; gap:8px; padding:10px 16px; border-radius:12px; font-weight:700; font-size:13px; border:1px solid var(--ec-border); cursor:pointer; transition:all .15s;"></button>
+      <button id="qrToggleBtn" onclick="toggleCampaignQr()" class="qr-toggle-btn is-off"></button>
 
       <div style="width:100%; display:flex; align-items:center; gap:8px;">
         <input id="qrCopyUrl" type="text" readonly class="ts-input" style="padding:8px 12px; font-size:11px; font-family:monospace; color:var(--ec-ink-3);" placeholder="กำลังโหลด URL...">
-        <button id="qrCopyBtn" onclick="copyCheckinUrl()" style="width:36px; height:36px; background:var(--ec-surface-2); border:1px solid var(--ec-border); border-radius:11px; color:var(--ec-ink-2); cursor:pointer; flex-shrink:0; transition:all .15s;" title="คัดลอก URL">
+        <button id="qrCopyBtn" onclick="copyCheckinUrl()" class="qr-copy-btn" title="คัดลอก URL">
           <i class="fa-solid fa-copy text-xs"></i>
         </button>
       </div>
