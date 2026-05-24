@@ -41,7 +41,7 @@ $kpi = [
     'total_slots'      => 0,
 ];
 $statusBreakdown = [];
-$dailyTrend      = [];
+$slotTimeTrend   = [];
 $slotUtil        = [];
 $participants    = [];
 $surveyStats     = ['count' => 0, 'avg_rating' => null];
@@ -89,17 +89,24 @@ if ($campaign) {
     $kpi['cancelled']       = $statusBreakdown['cancelled'] ?? 0;
     $kpi['cancelled_admin'] = $statusBreakdown['cancelled_by_admin'] ?? 0;
 
-    // daily booking trend (created_at)
+    // booking demand by slot time (which time-of-day people prefer)
+    // — aggregates active bookings (non-cancelled) across all dates by start_time
     try {
         $st = $pdo->prepare("
-            SELECT DATE(created_at) d, COUNT(*) c
-            FROM camp_bookings
-            WHERE campaign_id = :id AND created_at >= DATE_SUB(CURDATE(), INTERVAL 60 DAY)
-            GROUP BY DATE(created_at)
-            ORDER BY d ASC
+            SELECT s.start_time, s.end_time,
+                   SUM(CASE WHEN b.id IS NOT NULL
+                                AND b.status NOT IN ('cancelled','cancelled_by_admin')
+                            THEN 1 ELSE 0 END) AS cnt
+            FROM camp_slots s
+            LEFT JOIN camp_bookings b ON b.slot_id = s.id
+            WHERE s.campaign_id = :id
+            GROUP BY s.start_time, s.end_time
+            HAVING cnt > 0
+            ORDER BY cnt DESC, s.start_time ASC
+            LIMIT 8
         ");
         $st->execute([':id' => $campaignId]);
-        $dailyTrend = $st->fetchAll(PDO::FETCH_ASSOC);
+        $slotTimeTrend = $st->fetchAll(PDO::FETCH_ASSOC);
     } catch (PDOException) {}
 
     // slot utilization
@@ -416,11 +423,6 @@ if (!$printMode) {
 .cr-status-cancelled { background:#f1f5f9; color:#64748b; }
 
 /* Sparkline-style trend bars */
-.cr-trend { display:flex; align-items:flex-end; gap:3px; height:110px; padding:6px 0; border-bottom:1.5px solid #e5e7eb; }
-.cr-trend-bar { flex:1; min-width:6px; background:linear-gradient(180deg,#3bba7a,#2e9e63); border-radius:3px 3px 0 0; position:relative; opacity:.88; }
-.cr-trend-bar:hover { opacity:1; }
-.cr-trend-bar[data-zero="1"] { background:#f1f5f9; }
-.cr-trend-labels { display:flex; justify-content:space-between; font-size:8.5pt; color:#94a3b8; margin-top:4px; }
 
 /* Footer */
 .cr-footer {
@@ -440,7 +442,7 @@ if (!$printMode) {
         margin:0 !important; padding:0 !important; border-radius:0 !important;
     }
     .cr-band { border-radius:0 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    .cr-kpi-tile, .cr-status-pill, .cr-bar-fill, .cr-trend-bar {
+    .cr-kpi-tile, .cr-status-pill, .cr-bar-fill {
         -webkit-print-color-adjust: exact; print-color-adjust: exact;
     }
     .cr-h, .cr-kpi { page-break-inside: avoid; }
@@ -543,10 +545,12 @@ if ($donutTotal > 0) {
     }
 }
 
-// Daily trend max for bar scaling
-$trendMax = 0;
-foreach ($dailyTrend as $d) { $trendMax = max($trendMax, (int)$d['c']); }
-$trendMax = max($trendMax, 1);
+// Max booking count for slot-time bar scaling
+$slotTimeMax = 0;
+foreach ($slotTimeTrend as $r) { $slotTimeMax = max($slotTimeMax, (int)$r['cnt']); }
+$slotTimeMax = max($slotTimeMax, 1);
+// Sum for percentage display (only top-N shown, so this is the visible total)
+$slotTimeSum = array_sum(array_column($slotTimeTrend, 'cnt'));
 
 $today = date('Y-m-d');
 ?>
@@ -660,23 +664,35 @@ $today = date('Y-m-d');
         </div>
     </div>
 
-    <!-- Daily trend -->
-    <?php if (!empty($dailyTrend)): ?>
-    <div class="cr-h"><i class="fa-solid fa-chart-line text-[#2e9e63]"></i> จำนวนการจองในแต่ละวัน (60 วันล่าสุด)</div>
-    <div class="cr-trend">
-        <?php foreach ($dailyTrend as $d):
-            $h = round((int)$d['c'] / $trendMax * 100);
-            $isZero = (int)$d['c'] === 0 ? 1 : 0;
+    <!-- Slot-time popularity (which time-of-day people book most) -->
+    <?php if (!empty($slotTimeTrend)): ?>
+    <div class="cr-h"><i class="fa-solid fa-clock text-[#2e9e63]"></i> ช่วงเวลาที่มีการจองมากที่สุด</div>
+    <div style="margin-bottom:6px;">
+        <?php foreach ($slotTimeTrend as $i => $r):
+            $cnt   = (int)$r['cnt'];
+            $pct   = round($cnt / $slotTimeMax * 100, 1);
+            $share = $slotTimeSum > 0 ? round($cnt / $slotTimeSum * 100, 1) : 0;
+            $isTop = ($i === 0);
+            $color = $isTop ? '#0d9488' : '#3bba7a';  // teal for #1, brand green for rest
         ?>
-        <div class="cr-trend-bar" style="height:<?= max(2, $h) ?>%;" data-zero="<?= $isZero ?>"
-             title="<?= thDate($d['d']) ?>: <?= (int)$d['c'] ?> ราย"></div>
+        <div class="cr-bar-row">
+            <div class="cr-bar-label">
+                <?php if ($isTop): ?><i class="fa-solid fa-trophy" style="color:#d97706;margin-right:4px;"></i><?php endif; ?>
+                <?= substr($r['start_time'], 0, 5) ?>–<?= substr($r['end_time'], 0, 5) ?> น.
+            </div>
+            <div class="cr-bar-track">
+                <div class="cr-bar-fill" style="width:<?= max(8, $pct) ?>%; background:<?= $color ?>;">
+                    <?= number_format($cnt) ?> ราย
+                </div>
+            </div>
+            <div class="cr-bar-count"><?= $share ?>% ของยอดนี้</div>
+        </div>
         <?php endforeach; ?>
     </div>
-    <div class="cr-trend-labels">
-        <span><?= !empty($dailyTrend) ? thDate($dailyTrend[0]['d']) : '' ?></span>
-        <span style="font-weight:700;color:#475569;">วันที่จองสูงสุด: <?= $trendMax ?> ราย</span>
-        <span><?= !empty($dailyTrend) ? thDate(end($dailyTrend)['d']) : '' ?></span>
-    </div>
+    <p style="font-size:9.5pt;color:#94a3b8;margin-top:0;">
+        <i class="fa-solid fa-circle-info"></i>
+        รวมยอดจองจากทุกวันตามช่วงเวลาเริ่มรอบ (ไม่นับที่ยกเลิก) · แสดงสูงสุด 8 ช่วงเวลา
+    </p>
     <?php endif; ?>
 
     <!-- Slot utilization (รายวัน — ยุบจากรายรอบ) -->
