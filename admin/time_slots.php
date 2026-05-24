@@ -1144,6 +1144,41 @@ body[data-theme='dark'] .ts-row-btn.del  { background: rgba(239,68,68,.15);   co
     color: #fff;
 }
 
+/* ── Clinic schedule markers on main calendar ──────────────────── */
+.cal-cell { position: relative; }
+.cal-cell.cal-clinic-closed {
+    background: repeating-linear-gradient(
+        135deg,
+        #f1f5f9 0 8px,
+        #e2e8f0 8px 16px
+    );
+}
+.cal-cell.cal-clinic-holiday        { background: rgba(239,68,68,.04); }
+.cal-cell.cal-clinic-holiday-open   { background: rgba(245,158,11,.05); }
+.cal-cell.cal-clinic-special        { background: rgba(245,158,11,.06); }
+
+.cal-clinic-badge {
+    position: absolute; top: 4px; right: 6px;
+    font-size: 9px; font-weight: 800; letter-spacing: .04em;
+    padding: 2px 7px; border-radius: 999px;
+    background: #f8fafc; color: #475569; border: 1px solid #e2e8f0;
+    line-height: 1; white-space: nowrap; z-index: 2;
+    pointer-events: auto; cursor: help;
+}
+.cal-clinic-closed       .cal-clinic-badge { background: #fef2f2; color: #b91c1c; border-color: #fecaca; }
+.cal-clinic-holiday-open .cal-clinic-badge { background: #fffbeb; color: #b45309; border-color: #fde68a; }
+.cal-clinic-special      .cal-clinic-badge { background: #fffbeb; color: #b45309; border-color: #fde68a; }
+
+body[data-theme='dark'] .cal-cell.cal-clinic-closed {
+    background: repeating-linear-gradient(135deg, #1e293b 0 8px, #0f172a 8px 16px);
+}
+body[data-theme='dark'] .cal-cell.cal-clinic-holiday      { background: rgba(239,68,68,.10); }
+body[data-theme='dark'] .cal-cell.cal-clinic-holiday-open,
+body[data-theme='dark'] .cal-cell.cal-clinic-special      { background: rgba(245,158,11,.12); }
+body[data-theme='dark'] .cal-clinic-badge {
+    background: rgba(15,23,42,.7); color: #cbd5e1; border-color: #334155;
+}
+
 /* ── Clinic-aware date picker styling ────────────────────────────── */
 .ts-clinic-hint {
     margin-top: 10px; padding: 8px 12px; border-radius: 10px;
@@ -1253,8 +1288,50 @@ body[data-theme='dark'] .flatpickr-month .flatpickr-next-month svg {
         for ($day = 1; $day <= $daysInMonth; $day++) {
             $currentDate = "$year-" . str_pad($month, 2, '0', STR_PAD_LEFT) . "-" . str_pad($day, 2, '0', STR_PAD_LEFT);
             $isToday = $currentDate == date('Y-m-d');
+
+            // Clinic status for this date — override > regular weekday
+            $cellClinic = null;
+            $cellClass  = '';
+            if (isset($clinicOverrides[$currentDate])) {
+                $cellClinic = $clinicOverrides[$currentDate];
+                if ($cellClinic['closed']) {
+                    $cellClass = 'cal-clinic-closed cal-clinic-holiday';
+                } elseif ($cellClinic['source'] === 'special') {
+                    $cellClass = 'cal-clinic-special';
+                } else {
+                    $cellClass = 'cal-clinic-holiday-open';
+                }
+            } else {
+                $wd  = (int)date('w', strtotime($currentDate));
+                $reg = $clinicRegularHours[$wd] ?? null;
+                if ($reg && $reg['closed']) {
+                    $cellClinic = $reg + ['source' => 'regular'];
+                    $cellClass  = 'cal-clinic-closed';
+                }
+            }
             ?>
-            <div class="cal-cell">
+            <div class="cal-cell <?= $cellClass ?>">
+                <?php if ($cellClinic): ?>
+                <?php
+                    $badgeText = '';
+                    $badgeTitle = '';
+                    if ($cellClinic['closed']) {
+                        $badgeText  = $cellClinic['source'] === 'holiday' ? 'วันหยุด' : 'ปิด';
+                        $badgeTitle = !empty($cellClinic['note']) ? $cellClinic['note'] : 'คลินิคปิด';
+                    } elseif (($cellClinic['source'] ?? '') === 'special') {
+                        $badgeText  = 'วันพิเศษ';
+                        $badgeTitle = ($cellClinic['open_time'] ?? '?') . '–' . ($cellClinic['close_time'] ?? '?')
+                                    . (!empty($cellClinic['note']) ? ' · ' . $cellClinic['note'] : '');
+                    } elseif (($cellClinic['source'] ?? '') === 'holiday') {
+                        $badgeText  = 'หยุด·เปิดพิเศษ';
+                        $badgeTitle = ($cellClinic['open_time'] ?? '?') . '–' . ($cellClinic['close_time'] ?? '?')
+                                    . (!empty($cellClinic['note']) ? ' · ' . $cellClinic['note'] : '');
+                    }
+                ?>
+                <?php if ($badgeText): ?>
+                <span class="cal-clinic-badge" title="<?= htmlspecialchars($badgeTitle, ENT_QUOTES) ?>"><?= htmlspecialchars($badgeText) ?></span>
+                <?php endif; ?>
+                <?php endif; ?>
                 <div class="flex justify-between items-center mb-2">
                     <div class="flex items-center gap-1.5">
                         <input type="checkbox" class="day-select-cb w-3.5 h-3.5 text-red-500 rounded border-gray-300 focus:ring-red-500 cursor-pointer opacity-40 hover:opacity-100 checked:opacity-100 transition-opacity" onchange="toggleDaySlots(this)" title="เลือกทั้งหมดในวันนี้">
