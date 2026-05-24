@@ -725,19 +725,16 @@ if (!function_exists('renderPageHeader')) {
 
         <?php
         // Hidden from sidebar (still accessible via direct URL):
-        //   kpi.php         → Dashboard already covers it
-        //   line_stats.php  → removed per user request
+        //   kpi.php           → Dashboard already covers it
+        //   line_stats.php    → removed per user request
+        //   activity_logs.php → removed per user request
         //   campaign_report.php → "พิมพ์ PDF" button in เจาะแคมเปญ
-        //   reports.php     → Export CSV in ผู้เข้าร่วม (more powerful filter)
+        //   reports.php       → Export CSV in ผู้เข้าร่วม (more powerful filter)
 
         navSection('campaign', 'var(--ec-acc-campaign)', 'แคมเปญ', [
             ['../admin/campaigns.php',  'fa-layer-group',     'จัดการแคมเปญ'],
             ['../admin/time_slots.php', 'fa-calendar-alt',    'รอบเวลา'],
             ['../admin/bookings.php',   'fa-clipboard-check', 'ผู้เข้าร่วม', $pendingBookings],
-        ], $cur);
-
-        navSection('tools', 'var(--ec-acc-tools)', 'เครื่องมือ', [
-            ['../admin/activity_logs.php', 'fa-clipboard-list', 'บันทึกกิจกรรม'],
         ], $cur);
         ?>
 
