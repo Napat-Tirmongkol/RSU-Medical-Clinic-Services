@@ -176,10 +176,10 @@ $dailySlotAgg = array_values($dailySlotAgg);
 // ─────────────────────────────────────────────────────────────
 function statusLabel(string $s): string {
     return match($s) {
-        'booked'             => 'รอยืนยัน',
-        'confirmed'          => 'ยืนยันแล้ว',
-        'cancelled'          => 'ยกเลิก (ผู้ใช้)',
-        'cancelled_by_admin' => 'ยกเลิก (Admin)',
+        'booked'             => 'รอเจ้าหน้าที่ยืนยัน',
+        'confirmed'          => 'ยืนยันการจอง',
+        'cancelled'          => 'ผู้ใช้ยกเลิกเอง',
+        'cancelled_by_admin' => 'เจ้าหน้าที่ยกเลิก',
         default              => $s,
     };
 }
@@ -189,6 +189,19 @@ function campaignTypeLabel(?string $t): string {
         'training'     => 'อบรม/สัมมนา',
         'health_check' => 'ตรวจสุขภาพ',
         default        => 'กิจกรรมอื่นๆ',
+    };
+}
+function campaignStatusLabel(?string $s): string {
+    return match($s) {
+        'active'      => 'เปิดรับสมัคร',
+        'full'        => 'เต็มแล้ว',
+        'closed'      => 'ปิดรับสมัคร',
+        'inactive'    => 'หยุดชั่วคราว',
+        'archived'    => 'เก็บถาวร',
+        'draft'       => 'ฉบับร่าง',
+        'coming_soon' => 'เร็วๆ นี้',
+        'private'     => 'ลิงก์ส่วนตัว',
+        default       => $s ?? '—',
     };
 }
 function thDate(?string $d): string {
@@ -227,14 +240,14 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv' && $campaign) {
     fputcsv($out, ['ชื่อแคมเปญ', $campaign['title']]);
     fputcsv($out, ['ประเภท', campaignTypeLabel($campaign['type'] ?? null)]);
     fputcsv($out, ['ช่วงเวลาเปิดจอง', thDate($campaign['available_from'] ?? null) . ' — ' . thDate($campaign['available_until'] ?? null)]);
-    fputcsv($out, ['ความจุรวม', $kpi['capacity']]);
-    fputcsv($out, ['จองแล้ว (active)', $kpi['used'] . ' (' . $kpi['fill_pct'] . '%)']);
-    fputcsv($out, ['มาเข้าร่วม', $kpi['attended']]);
-    fputcsv($out, ['ขาด/ไม่มาตามนัด', $kpi['absent']]);
-    fputcsv($out, ['อัตราเข้าร่วม', $kpi['attendance_pct'] . '%']);
-    fputcsv($out, ['ยกเลิก (ผู้ใช้)', $kpi['cancelled']]);
-    fputcsv($out, ['ยกเลิก (Admin)', $kpi['cancelled_admin']]);
-    fputcsv($out, ['คะแนนความพึงพอใจเฉลี่ย', $surveyStats['avg_rating'] !== null ? $surveyStats['avg_rating'] . ' / 5 (n=' . $surveyStats['count'] . ')' : 'ไม่มีข้อมูล']);
+    fputcsv($out, ['รับได้ทั้งหมด', $kpi['capacity']]);
+    fputcsv($out, ['จองแล้ว', $kpi['used'] . ' (' . $kpi['fill_pct'] . '%)']);
+    fputcsv($out, ['มาตามนัด', $kpi['attended']]);
+    fputcsv($out, ['ไม่มาตามนัด', $kpi['absent']]);
+    fputcsv($out, ['อัตราการมา', $kpi['attendance_pct'] . '%']);
+    fputcsv($out, ['ผู้ใช้ยกเลิกเอง', $kpi['cancelled']]);
+    fputcsv($out, ['เจ้าหน้าที่ยกเลิก', $kpi['cancelled_admin']]);
+    fputcsv($out, ['คะแนนความพึงพอใจเฉลี่ย', $surveyStats['avg_rating'] !== null ? $surveyStats['avg_rating'] . ' / 5 (จากผู้ตอบ ' . $surveyStats['count'] . ' คน)' : 'ยังไม่มีผู้ตอบ']);
     fputcsv($out, []);
 
     fputcsv($out, ['รายชื่อผู้ลงทะเบียน']);
@@ -244,9 +257,9 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv' && $campaign) {
         $i++;
         $cs   = calcStatus($p, $today);
         $stat = match($cs) {
-            'attended'  => 'มาเข้าร่วม',
-            'absent'    => 'ขาด',
-            'upcoming'  => 'รอเข้าร่วม',
+            'attended'  => 'มาตามนัด',
+            'absent'    => 'ไม่มา',
+            'upcoming'  => 'รอวันงาน',
             'cancelled' => statusLabel($p['status']),
         };
         fputcsv($out, [
@@ -528,7 +541,7 @@ $today = date('Y-m-d');
         <div class="cr-band-meta">
             <span class="cr-pill"><i class="fa-solid fa-tag"></i> <?= htmlspecialchars(campaignTypeLabel($campaign['type'] ?? null)) ?></span>
             <span class="cr-pill"><i class="fa-regular fa-calendar"></i> <?= thDate($campaign['available_from'] ?? null) ?> — <?= thDate($campaign['available_until'] ?? null) ?></span>
-            <span class="cr-pill"><i class="fa-solid fa-circle-check"></i> <?= htmlspecialchars($campaign['status'] ?? '—') ?></span>
+            <span class="cr-pill"><i class="fa-solid fa-circle-check"></i> <?= htmlspecialchars(campaignStatusLabel($campaign['status'] ?? null)) ?></span>
             <?php if (!empty($campaign['location'])): ?>
             <span class="cr-pill"><i class="fa-solid fa-location-dot"></i> <?= htmlspecialchars($campaign['location']) ?></span>
             <?php endif; ?>
@@ -536,45 +549,45 @@ $today = date('Y-m-d');
     </div>
 
     <!-- KPI tiles -->
-    <div class="cr-h"><i class="fa-solid fa-chart-pie text-[#2e9e63]"></i> ดัชนีหลัก (Key Metrics)</div>
+    <div class="cr-h"><i class="fa-solid fa-chart-pie text-[#2e9e63]"></i> สรุปตัวเลขสำคัญ</div>
     <div class="cr-kpi">
         <div class="cr-kpi-tile is-brand">
-            <div class="cr-kpi-label">ความจุรวม</div>
+            <div class="cr-kpi-label">รับได้ทั้งหมด</div>
             <div class="cr-kpi-value"><?= number_format($kpi['capacity']) ?></div>
             <div class="cr-kpi-sub"><?= number_format($kpi['total_slots']) ?> รอบ</div>
         </div>
         <div class="cr-kpi-tile is-info">
-            <div class="cr-kpi-label">จองแล้ว (Active)</div>
+            <div class="cr-kpi-label">จองแล้ว</div>
             <div class="cr-kpi-value"><?= number_format($kpi['used']) ?></div>
-            <div class="cr-kpi-sub"><?= $kpi['fill_pct'] ?>% ของความจุ · เหลือ <?= number_format($kpi['remaining']) ?></div>
+            <div class="cr-kpi-sub"><?= $kpi['fill_pct'] ?>% เต็ม · เหลือ <?= number_format($kpi['remaining']) ?> ที่</div>
         </div>
         <div class="cr-kpi-tile is-brand">
-            <div class="cr-kpi-label">มาเข้าร่วม</div>
+            <div class="cr-kpi-label">มาตามนัด</div>
             <div class="cr-kpi-value"><?= number_format($kpi['attended']) ?></div>
-            <div class="cr-kpi-sub">อัตราเข้าร่วม <?= $kpi['attendance_pct'] ?>%</div>
+            <div class="cr-kpi-sub">มาแล้ว <?= $kpi['attendance_pct'] ?>% ของที่จอง</div>
         </div>
         <div class="cr-kpi-tile is-danger">
-            <div class="cr-kpi-label">ขาด/ไม่มาตามนัด</div>
+            <div class="cr-kpi-label">ไม่มาตามนัด</div>
             <div class="cr-kpi-value"><?= number_format($kpi['absent']) ?></div>
-            <div class="cr-kpi-sub">เลยวันงานแล้ว</div>
+            <div class="cr-kpi-sub">ผ่านวันงานแล้ว</div>
         </div>
         <div class="cr-kpi-tile is-amber">
-            <div class="cr-kpi-label">รอเข้าร่วม</div>
+            <div class="cr-kpi-label">รอวันงาน</div>
             <div class="cr-kpi-value"><?= number_format($kpi['upcoming']) ?></div>
-            <div class="cr-kpi-sub">ยังไม่ถึงวัน</div>
+            <div class="cr-kpi-sub">ยังไม่ถึงวันนัด</div>
         </div>
         <div class="cr-kpi-tile is-slate">
-            <div class="cr-kpi-label">ยกเลิก</div>
+            <div class="cr-kpi-label">ยกเลิกแล้ว</div>
             <div class="cr-kpi-value"><?= number_format($kpi['cancelled'] + $kpi['cancelled_admin']) ?></div>
-            <div class="cr-kpi-sub">ผู้ใช้ <?= number_format($kpi['cancelled']) ?> · Admin <?= number_format($kpi['cancelled_admin']) ?></div>
+            <div class="cr-kpi-sub">ผู้ใช้ยกเลิก <?= number_format($kpi['cancelled']) ?> · เจ้าหน้าที่ยกเลิก <?= number_format($kpi['cancelled_admin']) ?></div>
         </div>
         <div class="cr-kpi-tile is-info">
-            <div class="cr-kpi-label">การจองรวม</div>
+            <div class="cr-kpi-label">ยอดจองทั้งหมด</div>
             <div class="cr-kpi-value"><?= number_format($kpi['total_bookings']) ?></div>
-            <div class="cr-kpi-sub">รวมที่ยกเลิกแล้ว</div>
+            <div class="cr-kpi-sub">นับรวมที่ยกเลิกด้วย</div>
         </div>
         <div class="cr-kpi-tile is-violet">
-            <div class="cr-kpi-label">ความพึงพอใจ</div>
+            <div class="cr-kpi-label">คะแนนความพึงพอใจ</div>
             <div class="cr-kpi-value">
                 <?= $surveyStats['avg_rating'] !== null ? $surveyStats['avg_rating'] : '—' ?>
                 <?php if ($surveyStats['avg_rating'] !== null): ?><span style="font-size:11pt;color:#64748b;font-weight:600;">/5</span><?php endif; ?>
@@ -586,7 +599,7 @@ $today = date('Y-m-d');
     </div>
 
     <!-- Status breakdown + Donut -->
-    <div class="cr-h"><i class="fa-solid fa-layer-group text-[#2e9e63]"></i> สถานะการจอง (Status Breakdown)</div>
+    <div class="cr-h"><i class="fa-solid fa-layer-group text-[#2e9e63]"></i> แยกตามสถานะการจอง</div>
     <div class="cr-row2">
         <div>
             <?php if ($donutTotal === 0): ?>
@@ -636,35 +649,35 @@ $today = date('Y-m-d');
 
     <!-- Daily trend -->
     <?php if (!empty($dailyTrend)): ?>
-    <div class="cr-h"><i class="fa-solid fa-chart-line text-[#2e9e63]"></i> แนวโน้มการจองรายวัน (60 วันล่าสุด)</div>
+    <div class="cr-h"><i class="fa-solid fa-chart-line text-[#2e9e63]"></i> จำนวนการจองในแต่ละวัน (60 วันล่าสุด)</div>
     <div class="cr-trend">
         <?php foreach ($dailyTrend as $d):
             $h = round((int)$d['c'] / $trendMax * 100);
             $isZero = (int)$d['c'] === 0 ? 1 : 0;
         ?>
         <div class="cr-trend-bar" style="height:<?= max(2, $h) ?>%;" data-zero="<?= $isZero ?>"
-             title="<?= thDate($d['d']) ?>: <?= (int)$d['c'] ?> รายการ"></div>
+             title="<?= thDate($d['d']) ?>: <?= (int)$d['c'] ?> ราย"></div>
         <?php endforeach; ?>
     </div>
     <div class="cr-trend-labels">
         <span><?= !empty($dailyTrend) ? thDate($dailyTrend[0]['d']) : '' ?></span>
-        <span style="font-weight:700;color:#475569;">สูงสุด <?= $trendMax ?> รายการ/วัน</span>
+        <span style="font-weight:700;color:#475569;">วันที่จองสูงสุด: <?= $trendMax ?> ราย</span>
         <span><?= !empty($dailyTrend) ? thDate(end($dailyTrend)['d']) : '' ?></span>
     </div>
     <?php endif; ?>
 
     <!-- Slot utilization (รายวัน — ยุบจากรายรอบ) -->
     <?php if (!empty($dailySlotAgg)): ?>
-    <div class="cr-h"><i class="fa-regular fa-calendar-check text-[#2e9e63]"></i> สรุปการใช้งานรายวัน (Daily Utilization)</div>
+    <div class="cr-h"><i class="fa-regular fa-calendar-check text-[#2e9e63]"></i> สรุปยอดจองแต่ละวัน</div>
     <table class="cr-table">
         <thead>
             <tr>
                 <th>วันที่จัดงาน</th>
-                <th style="text-align:center;">จำนวนรอบ</th>
-                <th style="text-align:center;">ความจุรวม</th>
-                <th style="text-align:center;">จอง</th>
-                <th style="text-align:center;">เข้าร่วม</th>
-                <th>การใช้งาน</th>
+                <th style="text-align:center;">รอบเวลา</th>
+                <th style="text-align:center;">รับได้</th>
+                <th style="text-align:center;">มีคนจอง</th>
+                <th style="text-align:center;">มาตามนัด</th>
+                <th>เต็มแค่ไหน</th>
             </tr>
         </thead>
         <tbody>
@@ -695,7 +708,7 @@ $today = date('Y-m-d');
     </table>
     <p style="font-size:9.5pt;color:#94a3b8;margin-top:-4px;">
         <i class="fa-solid fa-circle-info"></i>
-        รวมจาก <?= count($slotUtil) ?> รอบ ใน <?= count($dailySlotAgg) ?> วัน · ดูรายละเอียดรายรอบใน CSV
+        รวม <?= count($slotUtil) ?> รอบ จาก <?= count($dailySlotAgg) ?> วัน · ดูแยกแต่ละรอบได้ในไฟล์ CSV
     </p>
     <?php endif; ?>
 
@@ -705,11 +718,11 @@ $today = date('Y-m-d');
     <div style="background:linear-gradient(135deg,#f0fdf4,#ecfdf5);border:1.5px solid #bbf7d0;border-radius:14px;padding:18px 22px;display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;">
         <div style="flex:1;min-width:240px;">
             <div style="font-size:11pt;font-weight:800;color:#15803d;letter-spacing:.04em;text-transform:uppercase;margin-bottom:4px;">
-                <i class="fa-solid fa-database"></i> ผู้ลงทะเบียนทั้งหมด <?= number_format(count($participants)) ?> รายการ
+                <i class="fa-solid fa-database"></i> มีผู้ลงทะเบียนรวม <?= number_format(count($participants)) ?> ราย
             </div>
             <p style="font-size:10.5pt;color:#475569;margin:0;line-height:1.5;">
-                ตารางรายชื่อทั้งหมดมีจำนวนมากเกินกว่าจะใส่ในรายงานสรุป
-                <strong>กรุณาดาวน์โหลด CSV</strong> เพื่อดูรายละเอียด รหัส ชื่อ-นามสกุล เบอร์โทร รอบที่จอง สถานะ และเวลาเช็คอินครบทุกรายการ
+                รายชื่อทั้งหมดมีจำนวนมากเกินกว่าจะใส่ในรายงานสรุปนี้
+                <strong>กดดาวน์โหลด CSV</strong> เพื่อดูชื่อ-นามสกุล เบอร์โทร รอบที่จอง สถานะ และเวลาเช็คอินของทุกคนแบบเปิดใน Excel ได้
             </p>
         </div>
         <a href="?id=<?= (int)$campaignId ?>&export=csv" class="no-print"
@@ -722,12 +735,12 @@ $today = date('Y-m-d');
     <!-- Footer -->
     <div class="cr-footer">
         <div>
-            <strong>ออกรายงานโดย:</strong>
+            <strong>ผู้ออกรายงาน:</strong>
             <?= htmlspecialchars($_SESSION['admin_full_name'] ?? $_SESSION['admin_username'] ?? $_SESSION['full_name'] ?? 'Admin') ?>
             (<?= htmlspecialchars($_SESSION['admin_role'] ?? $_SESSION['role'] ?? '—') ?>)
         </div>
         <div>
-            ออก ณ <?= thDateTime(date('Y-m-d H:i:s')) ?>
+            ออกรายงานเมื่อ <?= thDateTime(date('Y-m-d H:i:s')) ?>
         </div>
     </div>
 </div>
