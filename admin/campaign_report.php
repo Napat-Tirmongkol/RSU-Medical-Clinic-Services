@@ -184,6 +184,7 @@ function statusLabel(string $s): string {
     return match($s) {
         'booked'             => 'รอเจ้าหน้าที่ยืนยัน',
         'confirmed'          => 'ยืนยันการจอง',
+        'completed'          => 'มาตามนัดแล้ว',
         'cancelled'          => 'ผู้ใช้ยกเลิกเอง',
         'cancelled_by_admin' => 'เจ้าหน้าที่ยกเลิก',
         default              => $s,
@@ -510,22 +511,28 @@ if (!$printMode) {
 // Pre-compute donut paths
 $donutTotal = array_sum($statusBreakdown);
 $donutSegments = [];
+// Single source of truth for status colors — bar list + donut share this map
+$statusColors = [
+    'completed'          => '#0d9488',  // teal: attended successfully
+    'confirmed'          => '#22c55e',  // green: confirmed, awaiting attendance
+    'booked'             => '#f59e0b',  // amber: pending admin confirmation
+    'cancelled'          => '#ef4444',  // red:  user cancelled
+    'cancelled_by_admin' => '#94a3b8',  // slate: admin cancelled
+];
+// Render order for both bar list and donut segments
+$statusOrder = ['completed', 'confirmed', 'booked', 'cancelled', 'cancelled_by_admin'];
 if ($donutTotal > 0) {
-    $colors = [
-        'confirmed'          => '#22c55e',
-        'booked'             => '#f59e0b',
-        'cancelled'          => '#ef4444',
-        'cancelled_by_admin' => '#94a3b8',
-    ];
     $cumPct = 0;
-    foreach ($statusBreakdown as $st => $cnt) {
+    foreach ($statusOrder as $st) {
+        $cnt = $statusBreakdown[$st] ?? 0;
+        if ($cnt === 0) continue;
         $pct = $cnt / $donutTotal;
         $donutSegments[] = [
             'status' => $st,
             'count'  => $cnt,
             'pct'    => $pct,
             'offset' => $cumPct,
-            'color'  => $colors[$st] ?? '#cbd5e1',
+            'color'  => $statusColors[$st] ?? '#cbd5e1',
         ];
         $cumPct += $pct;
     }
@@ -610,16 +617,11 @@ $today = date('Y-m-d');
         <div>
             <?php if ($donutTotal === 0): ?>
                 <p style="color:#94a3b8;font-style:italic;">ยังไม่มีข้อมูลการจอง</p>
-            <?php else: foreach (['confirmed','booked','cancelled','cancelled_by_admin'] as $st):
+            <?php else: foreach ($statusOrder as $st):
                 $cnt = $statusBreakdown[$st] ?? 0;
                 if ($cnt === 0) continue;
                 $pct = round($cnt / $donutTotal * 100, 1);
-                $color = match($st) {
-                    'confirmed' => '#22c55e',
-                    'booked'    => '#f59e0b',
-                    'cancelled' => '#ef4444',
-                    default     => '#94a3b8',
-                };
+                $color = $statusColors[$st] ?? '#cbd5e1';
             ?>
             <div class="cr-bar-row">
                 <div class="cr-bar-label"><?= statusLabel($st) ?></div>
