@@ -718,7 +718,7 @@ if (!function_exists('renderPageHeader')) {
         <div style="margin-top:14px; display:flex; flex-direction:column; gap:2px;">
             <?php
             navLink('../admin/index.php',             'fa-chart-pie',    'Dashboard',       $cur);
-            navLink('../admin/campaign_overview.php', 'fa-chart-bar',    'เจาะแคมเปญ',      $cur);
+            navLink('../admin/campaign_overview.php', 'fa-chart-bar',    'ภาพรวมแคมเปญ',    $cur);
             navLink('../admin/daily_report.php',      'fa-calendar-day', 'รายงานประจำวัน',  $cur);
             ?>
         </div>
@@ -728,7 +728,7 @@ if (!function_exists('renderPageHeader')) {
         //   kpi.php           → Dashboard already covers it
         //   line_stats.php    → removed per user request
         //   activity_logs.php → removed per user request
-        //   campaign_report.php → "พิมพ์ PDF" button in เจาะแคมเปญ
+        //   campaign_report.php → "พิมพ์ PDF" button in ภาพรวมแคมเปญ
         //   reports.php       → Export CSV in ผู้เข้าร่วม (more powerful filter)
 
         navSection('campaign', 'var(--ec-acc-campaign)', 'แคมเปญ', [
