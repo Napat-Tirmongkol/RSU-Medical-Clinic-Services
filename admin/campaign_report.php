@@ -559,7 +559,7 @@ $today = date('Y-m-d');
         <div class="cr-kpi-tile is-info">
             <div class="cr-kpi-label">จองแล้ว</div>
             <div class="cr-kpi-value"><?= number_format($kpi['used']) ?></div>
-            <div class="cr-kpi-sub"><?= $kpi['fill_pct'] ?>% เต็ม · เหลือ <?= number_format($kpi['remaining']) ?> ที่</div>
+            <div class="cr-kpi-sub">คิดเป็น <?= $kpi['fill_pct'] ?>% · เหลืออีก <?= number_format($kpi['remaining']) ?> ที่</div>
         </div>
         <div class="cr-kpi-tile is-brand">
             <div class="cr-kpi-label">มาตามนัด</div>
@@ -579,7 +579,7 @@ $today = date('Y-m-d');
         <div class="cr-kpi-tile is-slate">
             <div class="cr-kpi-label">ยกเลิกแล้ว</div>
             <div class="cr-kpi-value"><?= number_format($kpi['cancelled'] + $kpi['cancelled_admin']) ?></div>
-            <div class="cr-kpi-sub">ผู้ใช้ยกเลิก <?= number_format($kpi['cancelled']) ?> · เจ้าหน้าที่ยกเลิก <?= number_format($kpi['cancelled_admin']) ?></div>
+            <div class="cr-kpi-sub">ผู้ใช้ <?= number_format($kpi['cancelled']) ?> · เจ้าหน้าที่ <?= number_format($kpi['cancelled_admin']) ?></div>
         </div>
         <div class="cr-kpi-tile is-info">
             <div class="cr-kpi-label">ยอดจองทั้งหมด</div>
