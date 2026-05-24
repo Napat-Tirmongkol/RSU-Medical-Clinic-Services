@@ -146,6 +146,9 @@ require_once __DIR__ . '/includes/header.php';
             <a href="campaigns.php" class="text-sm text-blue-600 hover:underline whitespace-nowrap flex-shrink-0">
                 <i class="fa-solid fa-pen-to-square mr-1"></i>แก้ไขแคมเปญ
             </a>
+            <a href="campaign_report.php?id=<?= (int)$campaignId ?>" target="_blank" class="text-sm text-emerald-600 hover:underline whitespace-nowrap flex-shrink-0">
+                <i class="fa-solid fa-print mr-1"></i>พิมพ์รายงาน / PDF
+            </a>
             <?php endif; ?>
         </div>
     </div>

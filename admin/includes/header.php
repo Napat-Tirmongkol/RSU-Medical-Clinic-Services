@@ -714,29 +714,31 @@ if (!function_exists('renderPageHeader')) {
         }
         ?>
 
-        <!-- Dashboard (always visible, no section) -->
-        <div style="margin-top:14px;">
-            <?php navLink('../admin/index.php', 'fa-chart-pie', 'Dashboard', $cur); ?>
+        <!-- Top-level shortcuts (no section grouping) -->
+        <div style="margin-top:14px; display:flex; flex-direction:column; gap:2px;">
+            <?php
+            navLink('../admin/index.php',         'fa-chart-pie',    'Dashboard',       $cur);
+            navLink('../admin/daily_report.php',  'fa-calendar-day', 'รายงานประจำวัน',  $cur);
+            ?>
         </div>
 
         <?php
-        navSection('overview', 'var(--ec-acc-overview)', 'ภาพรวม', [
-            ['../admin/kpi.php',               'fa-gauge-high',   'KPI'],
-            ['../admin/campaign_overview.php', 'fa-chart-bar',    'ภาพรวมแคมเปญ'],
+        // KPI hidden — merged into Dashboard
+        // kpi.php still accessible via direct URL for legacy bookmarks
+        navSection('overview', 'var(--ec-acc-overview)', 'วิเคราะห์', [
+            ['../admin/campaign_overview.php', 'fa-chart-bar',    'เจาะแคมเปญ'],
             ['../admin/line_stats.php',        'fa-comment-dots', 'LINE OA'],
         ], $cur);
 
         navSection('campaign', 'var(--ec-acc-campaign)', 'แคมเปญ', [
-            ['../admin/campaigns.php',  'fa-layer-group',     'แคมเปญ'],
+            ['../admin/campaigns.php',  'fa-layer-group',     'จัดการแคมเปญ'],
             ['../admin/time_slots.php', 'fa-calendar-alt',    'รอบเวลา'],
             ['../admin/bookings.php',   'fa-clipboard-check', 'ผู้เข้าร่วม', $pendingBookings],
         ], $cur);
 
-        navSection('report', 'var(--ec-acc-report)', 'รายงาน', [
-            ['../admin/reports.php',         'fa-file-lines',   'รายงานรวม'],
-            ['../admin/campaign_report.php', 'fa-file-invoice', 'สรุปรายแคมเปญ'],
-            ['../admin/daily_report.php',    'fa-calendar-day', 'รายงานรายวัน'],
-        ], $cur);
+        // สรุปรายแคมเปญ (campaign_report.php) → "พิมพ์ PDF" button in เจาะแคมเปญ
+        // รายงานรวม (reports.php) → Export CSV in ผู้เข้าร่วม (more powerful filter)
+        // Both still accessible via direct URL for legacy bookmarks
 
         navSection('tools', 'var(--ec-acc-tools)', 'เครื่องมือ', [
             ['../admin/activity_logs.php', 'fa-clipboard-list', 'บันทึกกิจกรรม'],
