@@ -40,11 +40,11 @@ try {
 
     // Refuse to ENABLE walk-in when campaign status disallows registration.
     // Disabling is always allowed (admin can defensively turn off anytime).
+    // 'full' is allowed — walk-in is meant to handle overflow beyond the planned quota.
     if ($new_val === 1) {
         $reason = '';
-        if ($camp['status'] !== 'active') {
+        if (!in_array($camp['status'], ['active', 'full'], true)) {
             $statusLabel = match ($camp['status']) {
-                'full'        => 'เต็มแล้ว',
                 'closed'      => 'ปิดรับ',
                 'inactive'    => 'หยุดชั่วคราว',
                 'archived'    => 'เก็บถาวร',

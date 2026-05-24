@@ -218,11 +218,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         ':cancel_hours'  => $cancelDeadlineHours,
                         ':id' => $id
                     ]);
-                    // If admin changed status away from 'active' (or set an expired date),
-                    // auto-disable walk-in so the QR doesn't keep accepting registrations.
-                    // Walk-in only makes sense for live campaigns.
+                    // If admin changed status to something that closes registration
+                    // (or set an expired date), auto-disable walk-in so the QR doesn't
+                    // keep accepting registrations. 'full' is kept enabled because
+                    // walk-in is meant to handle overflow beyond the planned quota.
                     $isExpired = $availableUntil && $availableUntil < date('Y-m-d');
-                    $needsAutoDisable = ($status !== 'active' || $isExpired);
+                    $needsAutoDisable = (!in_array($status, ['active', 'full'], true) || $isExpired);
                     if ($needsAutoDisable) {
                         try {
                             $pdo->prepare("UPDATE camp_list SET walkin_enabled = 0
@@ -898,8 +899,9 @@ renderPageHeader("สร้างแคมเปญ", "สร้างแคม�
                                 <!-- Walk-in QR (on-site registration via poster) -->
                                 <?php
                                     $_walkinOn       = (int)($c['walkin_enabled'] ?? 0) === 1;
-                                    // Campaign status that disallows Walk-in even if flag is on
-                                    $_walkinBlocked  = ($c['status'] !== 'active') || $isExpired;
+                                    // Campaign status that disallows Walk-in even if flag is on.
+                                    // 'active' + 'full' both allow walk-in (full = overflow lane).
+                                    $_walkinBlocked  = (!in_array($c['status'], ['active', 'full'], true)) || $isExpired;
                                     $_walkinBtnCls   = $_walkinBlocked
                                         ? 'bg-gray-100 text-gray-400 border-gray-200 hover:bg-gray-200 opacity-70'
                                         : ($_walkinOn

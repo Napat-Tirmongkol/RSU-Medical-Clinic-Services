@@ -177,7 +177,8 @@ require_once __DIR__ . '/includes/header.php';
             <?php
                 $_coWalkinOn     = (int)($campaign['walkin_enabled'] ?? 0) === 1;
                 $_coExpired      = !empty($campaign['available_until']) && $campaign['available_until'] < date('Y-m-d');
-                $_coWalkinBlocked = ($campaign['status'] !== 'active') || $_coExpired;
+                // 'active' + 'full' both allow walk-in (full = overflow lane)
+                $_coWalkinBlocked = (!in_array($campaign['status'], ['active', 'full'], true)) || $_coExpired;
             ?>
             <button type="button"
                     onclick="showWalkinQrModalCo(<?= (int)$campaignId ?>, <?= $_coWalkinOn ? 1 : 0 ?>, <?= $_coWalkinBlocked ? 1 : 0 ?>, '<?= htmlspecialchars($campaign['status'], ENT_QUOTES) ?>')"
