@@ -220,15 +220,15 @@ require_once __DIR__ . '/includes/header.php';
         <div class="overflow-x-auto">
             <table class="w-full text-left border-collapse whitespace-nowrap">
                 <thead>
-                    <tr class="bg-gray-50 text-gray-400 text-[11px] font-black uppercase tracking-[0.15em] border-b border-gray-100">
-                        <td class="p-6 w-12 text-center">
-                            <input type="checkbox" onchange="toggleAllRows(this)" class="w-5 h-5 rounded-md border-gray-300 text-blue-600 focus:ring-blue-500">
+                    <tr class="bg-gray-50 text-gray-400 text-[10px] font-black uppercase tracking-[0.12em] border-b border-gray-100">
+                        <td class="px-3 py-3 w-10 text-center">
+                            <input type="checkbox" onchange="toggleAllRows(this)" class="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
                         </td>
-                        <td class="p-6">Date & Time</td>
-                        <td class="p-6">User/Student</td>
-                        <td class="p-6">Campaign Info</td>
-                        <td class="p-6 text-center">Status</td>
-                        <td class="p-6 text-center">Quick Actions</td>
+                        <td class="px-3 py-3">Date & Time</td>
+                        <td class="px-3 py-3">User/Student</td>
+                        <td class="px-3 py-3">Campaign Info</td>
+                        <td class="px-3 py-3 text-center">Status</td>
+                        <td class="px-3 py-3 text-center">Quick Actions</td>
                     </tr>
                 </thead>
                 <tbody id="bookingTbody" class="divide-y divide-gray-50">
