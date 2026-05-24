@@ -32,11 +32,8 @@ if ($campaignId > 0) {
 
     if ($campaign) {
         $cap = (int)$campaign['total_capacity'];
-        $used = (int)$campaign['used_capacity'];
-        $remaining = max(0, $cap - $used);
-        $pct = $cap > 0 ? round($used / $cap * 100) : 0;
-
-        $stats = compact('cap', 'used', 'remaining', 'pct');
+        $used = (int)$campaign['used_capacity'];  // booked + confirmed (active pipeline)
+        $stats = compact('cap', 'used');
 
         // สถิติแยกตามสถานะ
         $stmt2 = $pdo->prepare("
@@ -48,7 +45,13 @@ if ($campaignId > 0) {
         foreach ($stmt2->fetchAll(PDO::FETCH_ASSOC) as $row) {
             $statusBreakdown[$row['status']] = (int)$row['cnt'];
         }
-        $stats['awaiting'] = $statusBreakdown['confirmed'] ?? 0;
+
+        // คำนวณ remaining/pct โดยรวม completed ด้วย (โควต้าที่ "ถูกใช้ไปจริง")
+        $stats['awaiting']  = $statusBreakdown['confirmed'] ?? 0;
+        $stats['attended']  = $statusBreakdown['completed'] ?? 0;
+        $stats['occupied']  = $used + $stats['attended'];  // booked + confirmed + completed
+        $stats['remaining'] = max(0, $cap - $stats['occupied']);
+        $stats['pct']       = $cap > 0 ? round($stats['occupied'] / $cap * 100) : 0;
 
         // Trend รายวัน — 30 วันล่าสุดที่มีการจอง (ไม่ใช่ 30 calendar days)
         // ที่เปลี่ยน: filter "created_at >= NOW() - 30 day" ทำให้แคมเปญที่จองนานแล้วได้กราฟว่าง
@@ -294,6 +297,11 @@ foreach ($slotUtil as $sl) {
         <div class="mt-3 h-2 bg-gray-100 rounded-full overflow-hidden">
             <div class="h-full bg-purple-400 rounded-full transition-all" style="width:<?= min(100,$stats['pct']) ?>%"></div>
         </div>
+        <p class="mt-1.5 text-[10px] text-gray-400">จากผู้ครองโควต้า <?= number_format($stats['occupied']) ?> คน</p>
+        <?php elseif ($card['label'] === 'คงเหลือ'): ?>
+        <p class="mt-2 text-[11px] text-gray-400">
+            หลังหักรอเข้าร่วม <?= number_format($stats['awaiting']) ?> + เข้าร่วมแล้ว <?= number_format($stats['attended']) ?>
+        </p>
         <?php elseif ($card['label'] === 'รอเข้าร่วม' && $stats['used'] > 0): ?>
         <p class="mt-2 text-[11px] text-gray-400">
             <?= round($stats['awaiting'] / $stats['used'] * 100) ?>% ของผู้จอง · รอวันงาน
