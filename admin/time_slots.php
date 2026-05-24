@@ -708,6 +708,8 @@ body[data-theme='dark'] .slot-pal-teal    { background: rgba(20,184,166,.15); co
     backdrop-filter: blur(6px);
     -webkit-backdrop-filter: blur(6px);
 }
+/* CRITICAL: .hidden Tailwind utility must override .ts-modal flex */
+.ts-modal.hidden { display: none !important; }
 .ts-modal-box {
     background: var(--ec-surface);
     border-radius: 22px;
