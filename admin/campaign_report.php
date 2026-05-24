@@ -2,7 +2,9 @@
 // admin/campaign_report.php — Print/PDF-ready summary report per campaign.
 // เปิดผ่าน sidebar "รายงาน > สรุปรายแคมเปญ" หรือลิงก์ตรง ?id=<campaign_id>
 //
-// ✦ Layout : A4 print-friendly, รองรับ window.print() และ html2pdf.js
+// ✦ Layout : A4 print-friendly, ใช้ window.print() สำหรับทั้ง พิมพ์ และ บันทึก PDF
+//            (เลิกใช้ html2pdf.js เพราะ html2canvas rasterize ภาษาไทยผิด —
+//            สระและวรรณยุกต์ลอยผิดตำแหน่ง)
 // ✦ Data   : campaign info + KPI + status breakdown + daily trend
 //            + slot-by-slot utilization + รายชื่อผู้เข้าร่วม + survey avg
 declare(strict_types=1);
@@ -314,7 +316,6 @@ if (!$printMode) {
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <?php endif; ?>
 
 <style>
@@ -492,11 +493,11 @@ if (!$printMode) {
         </select>
     </form>
     <?php if ($campaign): ?>
-    <button type="button" onclick="window.print()" class="cr-btn cr-btn-print" title="พิมพ์ / Save as PDF (Browser)">
+    <button type="button" onclick="window.print()" class="cr-btn cr-btn-print" title="พิมพ์ออกกระดาษ">
         <i class="fa-solid fa-print"></i> พิมพ์รายงาน
     </button>
-    <button type="button" onclick="crSavePdf()" class="cr-btn cr-btn-pdf" title="ดาวน์โหลด PDF">
-        <i class="fa-solid fa-file-pdf"></i> ดาวน์โหลด PDF
+    <button type="button" onclick="crSavePdf()" class="cr-btn cr-btn-pdf" title="บันทึกไฟล์ PDF (ภาษาไทยถูกต้อง)">
+        <i class="fa-solid fa-file-pdf"></i> บันทึก PDF
     </button>
     <a href="?id=<?= (int)$campaignId ?>&export=csv" class="cr-btn cr-btn-csv">
         <i class="fa-solid fa-file-csv"></i> Excel/CSV
@@ -788,19 +789,36 @@ $today = date('Y-m-d');
 </div>
 
 <script>
+// Save as PDF — use the browser's native print → "Save as PDF" pipeline.
+// We dropped html2pdf.js because html2canvas rasterizes Thai character-by-character
+// and breaks combining-mark positioning (สระ + วรรณยุกต์ลอยผิดตำแหน่ง — "ฉีด" → "ฉดี",
+// "ป้อง" → "ปอ้ง"). The browser uses OS-level HarfBuzz shaping which renders Thai
+// correctly. Trade-off: user must confirm "บันทึกเป็น PDF" in the print dialog
+// instead of an instant download — first-time hint explains how.
 function crSavePdf() {
-    const el = document.getElementById('crDoc');
-    if (!el) return;
-    const t  = <?= json_encode($campaign['title']) ?>;
-    const fn = 'campaign_report_' + (t || '<?= $campaignId ?>').replace(/[^a-zA-Z0-9ก-๛_-]/g, '_') + '_<?= date('Ymd') ?>.pdf';
-    html2pdf().set({
-        margin:       [10, 8, 10, 8],
-        filename:     fn,
-        image:        { type: 'jpeg', quality: 0.96 },
-        html2canvas:  { scale: 2, useCORS: true, scrollY: 0 },
-        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        pagebreak:    { mode: ['css', 'legacy'] }
-    }).from(el).save();
+    const HINT_KEY = 'cr_pdf_hint_shown_v1';
+    let hintShown = false;
+    try { hintShown = localStorage.getItem(HINT_KEY) === '1'; } catch (e) {}
+
+    if (!hintShown && window.Swal) {
+        Swal.fire({
+            icon: 'info',
+            title: 'วิธีบันทึกเป็น PDF',
+            html: '<div style="text-align:left;font-size:14px;line-height:1.7;">' +
+                  'ในกล่องพิมพ์ที่เปิดขึ้น:<br>' +
+                  '<b>1.</b> ช่อง <b>"ปลายทาง"</b> (Destination) → เลือก <b>"บันทึกเป็น PDF"</b><br>' +
+                  '<b>2.</b> กดปุ่ม <b>"บันทึก"</b> ที่มุมขวาล่าง<br><br>' +
+                  '<small style="color:#64748b;">เปลี่ยนวิธีนี้เพราะ html2pdf เดิม render ภาษาไทยผิด (สระลอยผิดตำแหน่ง)</small>' +
+                  '</div>',
+            confirmButtonText: 'เข้าใจแล้ว · เปิดกล่องพิมพ์',
+            confirmButtonColor: '#2e9e63',
+        }).then(() => {
+            try { localStorage.setItem(HINT_KEY, '1'); } catch (e) {}
+            window.print();
+        });
+    } else {
+        window.print();
+    }
 }
 </script>
 
@@ -810,9 +828,5 @@ function crSavePdf() {
 </body>
 </html>
 <?php else: ?>
-<?php
-// Inject html2pdf only on screen
-?>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <?php require_once __DIR__ . '/includes/footer.php'; ?>
 <?php endif; ?>
