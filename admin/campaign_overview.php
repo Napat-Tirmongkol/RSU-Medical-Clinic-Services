@@ -170,21 +170,33 @@ require_once __DIR__ . '/includes/header.php';
 <?php
 // ข้อมูลสำหรับ charts (encode เป็น JSON)
 $statusColors = [
-    'confirmed'          => '#22c55e',
     'booked'             => '#f59e0b',
+    'confirmed'          => '#14b8a6',
+    'completed'          => '#2e9e63',
     'cancelled'          => '#ef4444',
     'cancelled_by_admin' => '#9ca3af',
+    'expired'            => '#64748b',
 ];
 $statusLabelsMap = [
-    'confirmed'          => 'ยืนยันแล้ว',
-    'booked'             => 'รอยืนยัน',
+    'booked'             => 'รออนุมัติ',
+    'confirmed'          => 'รอเข้าร่วม',
+    'completed'          => 'เข้าร่วมแล้ว',
     'cancelled'          => 'ยกเลิก (ผู้ใช้)',
     'cancelled_by_admin' => 'ยกเลิก (Admin)',
+    'expired'            => 'ไม่มาตามนัด',
 ];
+// แสดงเรียงตาม lifecycle (รออนุมัติ → รอเข้าร่วม → เข้าร่วม → ยกเลิก/expired)
+$statusOrder = ['booked','confirmed','completed','expired','cancelled','cancelled_by_admin'];
 $donutLabels = [];
 $donutData   = [];
 $donutColors = [];
-foreach ($statusBreakdown as $st => $cnt) {
+// เรียงตาม lifecycle ก่อน → ที่เหลือต่อท้าย
+$orderedStatuses = array_merge(
+    array_intersect($statusOrder, array_keys($statusBreakdown)),
+    array_diff(array_keys($statusBreakdown), $statusOrder)
+);
+foreach ($orderedStatuses as $st) {
+    $cnt = $statusBreakdown[$st];
     $donutLabels[] = $statusLabelsMap[$st] ?? $st;
     $donutData[]   = $cnt;
     $donutColors[] = $statusColors[$st] ?? '#6b7280';
@@ -275,9 +287,14 @@ foreach ($slotUtil as $sl) {
 
     <!-- Donut: สถานะ -->
     <div class="card p-5 fade-up" style="animation-delay:.1s">
-        <h3 class="font-bold text-gray-700 mb-4 flex items-center gap-2">
-            <i class="fa-solid fa-chart-donut text-blue-500"></i> สัดส่วนสถานะการจอง
-        </h3>
+        <div class="mb-4">
+            <h3 class="font-bold text-gray-700 flex items-center gap-2">
+                <i class="fa-solid fa-chart-donut text-blue-500"></i> สัดส่วนสถานะการจอง
+            </h3>
+            <p class="text-[11px] text-gray-400 mt-1">
+                ประวัติทั้งหมดของแคมเปญ (รวมเข้าร่วมแล้ว · ยกเลิก · ไม่มาตามนัด) — ไม่เท่ากับ "จองแล้ว" ใน KPI ด้านบนที่นับเฉพาะคิวที่ยังอยู่ในระบบ
+            </p>
+        </div>
         <?php if (!empty($donutData)): ?>
         <div class="flex flex-col sm:flex-row items-center gap-6">
             <div class="relative w-44 h-44 shrink-0">
