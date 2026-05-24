@@ -27,6 +27,9 @@ $_jsEndpoint  = str_repeat('../', $_depth) . 'api/log_js_error.php';
       };
       window.addEventListener('unhandledrejection', function (e) {
         var r = e.reason;
+        // Skip harmless AbortError from skipped View Transitions
+        // (filter defined in header.php — same predicate to keep behavior consistent)
+        if (typeof window.__isSkippedViewTransition === 'function' && window.__isSkippedViewTransition(r)) return;
         send({ level:'error', message:'UnhandledRejection: '+(r instanceof Error?r.message:String(r)), source:'promise', stack:r instanceof Error?(r.stack||''):'', url:location.href });
       });
       var _ce = console.error.bind(console);

@@ -28,6 +28,30 @@ if (!function_exists('renderPageHeader')) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>e-Campaign — Admin</title>
     <link rel="icon" href="../favicon.ico">
+
+    <!-- Suppress harmless AbortError from skipped View Transitions.
+         Must run BEFORE other scripts (Sentry, SweetAlert2) so the listener
+         is registered before any rejection can fire. -->
+    <script>
+        (function() {
+            function isSkippedViewTransition(r) {
+                if (!r) return false;
+                var name = String(r.name || '');
+                var msg  = String(r.message || r || '');
+                return name === 'AbortError'
+                    && /transition.*skip|skip.*transition/i.test(msg);
+            }
+            // Expose for footer error tracker to filter the same way
+            window.__isSkippedViewTransition = isSkippedViewTransition;
+            window.addEventListener('unhandledrejection', function(e) {
+                if (isSkippedViewTransition(e.reason)) {
+                    e.preventDefault();
+                    e.stopImmediatePropagation();
+                }
+            });
+        })();
+    </script>
+
     <link rel="stylesheet" href="../assets/css/tailwind.min.css">
     <link rel="stylesheet" href="../assets/css/portal.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
@@ -583,16 +607,6 @@ if (!function_exists('renderPageHeader')) {
 
     <!-- SweetAlert2 (used by admin pages) -->
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-
-    <!-- Suppress harmless AbortError from skipped View Transitions -->
-    <script>
-        window.addEventListener('unhandledrejection', function(e) {
-            var r = e.reason;
-            if (r && r.name === 'AbortError' && /transition/i.test(r.message || '')) {
-                e.preventDefault();
-            }
-        });
-    </script>
 
     <!-- Theme Sync Support -->
     <script>
