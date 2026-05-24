@@ -1538,7 +1538,7 @@ document.addEventListener('DOMContentLoaded', function() {
         tableInst = new simpleDatatables.DataTable("#slotsTable", {
             searchable: true,
             fixedHeight: false,
-            perPage: 15,
+            perPage: 20,
             labels: {
                 placeholder: "ค้นหา...",
                 perPage: "รายการต่อหน้า",
@@ -2191,7 +2191,7 @@ updateMultiSelectFilter = function() {
             tableInst = new simpleDatatables.DataTable("#slotsTable", {
                 searchable: true,
                 fixedHeight: false,
-                perPage: 15,
+                perPage: 20,
                 labels: {
                     placeholder: "ค้นหา...",
                     perPage: "รายการต่อหน้า",
