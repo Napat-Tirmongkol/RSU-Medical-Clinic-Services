@@ -489,6 +489,33 @@ foreach ($data['events'] as $idx => $event) {
         }
     }
 
+    // Capture non-text inbound messages (sticker/image/location/file/audio/video)
+    // so admins see them in LINE Chat panel — message_text stores JSON metadata.
+    if ($type === 'message' && $userId && $messageText === '') {
+        $mtype = (string)($event['message']['type'] ?? '');
+        if (in_array($mtype, ['sticker','image','location','file','audio','video'], true)) {
+            $lineMsgId = (string)($event['message']['id'] ?? '');
+            $meta = ['type' => $mtype, 'line_msg_id' => $lineMsgId];
+            if ($mtype === 'sticker') {
+                $meta['package_id'] = (string)($event['message']['packageId'] ?? '');
+                $meta['sticker_id'] = (string)($event['message']['stickerId'] ?? '');
+                $meta['keywords']   = $event['message']['keywords'] ?? [];
+            } elseif ($mtype === 'location') {
+                $meta['title']     = (string)($event['message']['title'] ?? '');
+                $meta['address']   = (string)($event['message']['address'] ?? '');
+                $meta['latitude']  = (float)($event['message']['latitude'] ?? 0);
+                $meta['longitude'] = (float)($event['message']['longitude'] ?? 0);
+            } elseif ($mtype === 'file') {
+                $meta['file_name'] = (string)($event['message']['fileName'] ?? '');
+                $meta['file_size'] = (int)($event['message']['fileSize'] ?? 0);
+            }
+            require_once __DIR__ . '/../includes/line_chat_helper.php';
+            // Store as JSON in message_text — UI parses based on message_type column
+            $jsonMeta = json_encode($meta, JSON_UNESCAPED_UNICODE);
+            line_chat_log_inbound(db(), $userId, $jsonMeta !== false ? $jsonMeta : '[]', $lineMsgId !== '' ? $lineMsgId : null, null, $mtype);
+        }
+    }
+
     if ($userId && is_insurance_request($event)) {
         line_webhook_log('Insurance request detected', [
             'line_user_id' => line_mask_uid($userId),
