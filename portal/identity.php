@@ -997,5 +997,306 @@ layout_start(['section' => 'identity', 'title' => 'Identity & Governance']);
                             </button>
                         </div>
                     </div>
+
+            <div id="idEditModal"
+                style="display:none;position:fixed;inset:0;z-index:200;background:rgba(15,23,42,.55);backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:20px">
+                <div
+                    style="background:#fff;border-radius:24px;width:100%;max-width:480px;overflow:hidden;box-shadow:0 25px 50px -12px rgba(0,0,0,.25)">
+                    <div
+                        style="padding:20px 24px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;justify-content:space-between">
+                        <div style="display:flex;align-items:center;gap:10px">
+                            <div
+                                style="width:36px;height:36px;background:#fffbeb;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#d97706">
+                                <i class="fa-solid fa-user-pen"></i>
+                            </div>
+                            <span style="font-size:15px;font-weight:900;color:#d97706">แก้ไขข้อมูลผู้ใช้</span>
+                        </div>
+                        <button onclick="document.getElementById('idEditModal').style.display='none'"
+                            style="width:30px;height:30px;border-radius:8px;border:1px solid #e2e8f0;background:#f8fafc;color:#64748b;cursor:pointer">
+                            <i class="fa-solid fa-times" style="font-size:12px"></i>
+                        </button>
+                    </div>
+                    <form method="POST" style="padding:20px 24px;display:flex;flex-direction:column;gap:14px">
+                        <input type="hidden" name="action" value="portal_edit_user">
+                        <input type="hidden" name="user_id" id="id_edit_uid">
+                        <?php if (function_exists('csrf_field'))
+                            csrf_field(); ?>
+                        <div>
+                            <label
+                                style="display:block;font-size:10px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.1em;margin-bottom:5px">ชื่อ-นามสกุล
+                                <span style="color:#ef4444">*</span></label>
+                            <input id="id_edit_name" name="full_name" required
+                                style="width:100%;padding:10px 14px;border:1.5px solid #e2e8f0;border-radius:12px;font-size:13px;font-family:inherit;font-weight:600;outline:none;box-sizing:border-box"
+                                onfocus="this.style.borderColor='#6366f1'" onblur="this.style.borderColor='#e2e8f0'">
+                        </div>
+                        <div>
+                            <label
+                                style="display:block;font-size:10px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.1em;margin-bottom:5px">เลขบัตรประชาชน</label>
+                            <input id="id_edit_citizen" name="citizen_id" maxlength="13"
+                                style="width:100%;padding:10px 14px;border:1.5px solid #e2e8f0;border-radius:12px;font-size:13px;font-family:inherit;font-weight:600;outline:none;box-sizing:border-box;letter-spacing:.1em"
+                                onfocus="this.style.borderColor='#6366f1'" onblur="this.style.borderColor='#e2e8f0'">
+                        </div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                            <div>
+                                <label
+                                    style="display:block;font-size:10px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.1em;margin-bottom:5px">รหัสนักศึกษา</label>
+                                <input id="id_edit_sid" name="student_personnel_id" maxlength="15"
+                                    style="width:100%;padding:10px 14px;border:1.5px solid #e2e8f0;border-radius:12px;font-size:13px;font-family:inherit;font-weight:600;outline:none;box-sizing:border-box"
+                                    onfocus="this.style.borderColor='#6366f1'"
+                                    onblur="this.style.borderColor='#e2e8f0'">
+                            </div>
+                            <div>
+                                <label
+                                    style="display:block;font-size:10px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.1em;margin-bottom:5px">เบอร์โทร</label>
+                                <input id="id_edit_phone" name="phone_number"
+                                    style="width:100%;padding:10px 14px;border:1.5px solid #e2e8f0;border-radius:12px;font-size:13px;font-family:inherit;font-weight:600;outline:none;box-sizing:border-box"
+                                    onfocus="this.style.borderColor='#6366f1'"
+                                    onblur="this.style.borderColor='#e2e8f0'">
+                            </div>
+                        </div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                            <div>
+                                <label
+                                    style="display:block;font-size:10px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.1em;margin-bottom:5px">อีเมล</label>
+                                <input id="id_edit_email" name="email" type="email"
+                                    style="width:100%;padding:10px 14px;border:1.5px solid #e2e8f0;border-radius:12px;font-size:13px;font-family:inherit;font-weight:600;outline:none;box-sizing:border-box"
+                                    onfocus="this.style.borderColor='#6366f1'" onblur="this.style.borderColor='#e2e8f0'"
+                                    placeholder="example@rsu.ac.th">
+                            </div>
+                            <div>
+                                <label
+                                    style="display:block;font-size:10px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.1em;margin-bottom:5px">เพศ</label>
+                                <select id="id_edit_gender" name="gender"
+                                    style="width:100%;padding:10px 14px;border:1.5px solid #e2e8f0;border-radius:12px;font-size:13px;font-family:inherit;font-weight:600;outline:none;background:#fff">
+                                    <option value="">-- ไม่ระบุ --</option>
+                                    <option value="male">ชาย</option>
+                                    <option value="female">หญิง</option>
+                                    <option value="other">อื่นๆ</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div>
+                            <label
+                                style="display:block;font-size:10px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.1em;margin-bottom:5px">คณะ
+                                / หน่วยงาน</label>
+                            <input id="id_edit_dept" name="department"
+                                style="width:100%;padding:10px 14px;border:1.5px solid #e2e8f0;border-radius:12px;font-size:13px;font-family:inherit;font-weight:600;outline:none;box-sizing:border-box"
+                                onfocus="this.style.borderColor='#6366f1'" onblur="this.style.borderColor='#e2e8f0'"
+                                placeholder="เช่น คณะนิเทศศาสตร์">
+                        </div>
+                        <div>
+                            <label
+                                style="display:block;font-size:10px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.1em;margin-bottom:5px">ประเภท
+                                <span style="color:#ef4444">*</span></label>
+                            <select id="id_edit_status" name="status"
+                                style="width:100%;padding:10px 14px;border:1.5px solid #e2e8f0;border-radius:12px;font-size:13px;font-family:inherit;font-weight:600;outline:none;background:#fff"
+                                onchange="document.getElementById('id_edit_sother_wrap').style.display=this.value==='other'?'block':'none'">
+                                <option value="">-- เลือก --</option>
+                                <option value="student">นักศึกษา</option>
+                                <option value="staff">บุคลากร/อาจารย์</option>
+                                <option value="other">บุคคลทั่วไป</option>
+                            </select>
+                        </div>
+                        <div id="id_edit_sother_wrap" style="display:none">
+                            <label
+                                style="display:block;font-size:10px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.1em;margin-bottom:5px">ระบุสถานภาพ
+                                (กรณีเลือก "อื่นๆ")</label>
+                            <input id="id_edit_sother" name="status_other"
+                                style="width:100%;padding:10px 14px;border:1.5px solid #e2e8f0;border-radius:12px;font-size:13px;font-family:inherit;font-weight:600;outline:none;box-sizing:border-box"
+                                onfocus="this.style.borderColor='#6366f1'" onblur="this.style.borderColor='#e2e8f0'"
+                                placeholder="เช่น ศิษย์เก่า, ผู้ปกครอง">
+                        </div>
+                        <div style="display:flex;gap:10px;padding-top:6px">
+                            <button type="button" onclick="document.getElementById('idEditModal').style.display='none'"
+                                style="flex:1;padding:11px;border-radius:12px;border:1.5px solid #e2e8f0;background:#f8fafc;color:#374151;font-size:13px;font-weight:700;cursor:pointer">ยกเลิก</button>
+                            <button type="submit"
+                                style="flex:2;padding:11px;border-radius:12px;border:none;background:linear-gradient(90deg,#d97706,#f59e0b);color:#fff;font-size:13px;font-weight:800;cursor:pointer">
+                                <i class="fa-solid fa-floppy-disk" style="margin-right:6px"></i>บันทึก
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- View Modal (Identity) -->
+            <div id="idViewModal"
+                style="display:none;position:fixed;inset:0;z-index:200;background:rgba(15,23,42,.55);backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:20px">
+                <div
+                    style="background:#fff;border-radius:24px;width:100%;max-width:420px;overflow:hidden;box-shadow:0 25px 50px -12px rgba(0,0,0,.25)">
+                    <div
+                        style="padding:20px 24px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;justify-content:space-between">
+                        <div style="display:flex;align-items:center;gap:10px">
+                            <div
+                                style="width:36px;height:36px;background:#eef2ff;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#4f46e5">
+                                <i class="fa-solid fa-user"></i>
+                            </div>
+                            <span style="font-size:15px;font-weight:900;color:#4f46e5">ข้อมูลผู้ใช้งาน</span>
+                        </div>
+                        <button onclick="document.getElementById('idViewModal').style.display='none'"
+                            style="width:30px;height:30px;border-radius:8px;border:1px solid #e2e8f0;background:#f8fafc;color:#64748b;cursor:pointer"><i
+                                class="fa-solid fa-times" style="font-size:12px"></i></button>
+                    </div>
+                    <div style="padding:20px 24px;display:flex;flex-direction:column;gap:12px" id="idViewBody"></div>
+                    <div style="padding:14px 24px;border-top:1px solid #f1f5f9;text-align:right">
+                        <button onclick="document.getElementById('idViewModal').style.display='none'"
+                            style="padding:9px 22px;border-radius:10px;border:1.5px solid #e2e8f0;background:#f8fafc;color:#374151;font-size:13px;font-weight:700;cursor:pointer">ปิด</button>
+                    </div>
+                </div>
+            </div>
+
+
+                <!-- Position (ตำแหน่งงาน) Modal -->
+                <?php if ($adminRole === 'superadmin'): ?>
+                <div id="idPosModal" style="display:none;position:fixed;inset:0;z-index:400;background:rgba(15,23,42,.6);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:20px">
+                    <div style="background:#fff;border-radius:24px;width:100%;max-width:540px;max-height:90vh;overflow-y:auto;box-shadow:0 25px 50px -12px rgba(0,0,0,0.25)">
+                        <form method="POST" id="idPosForm">
+                            <?php csrf_field(); ?>
+                            <input type="hidden" name="action" id="posAction" value="add_position">
+                            <input type="hidden" name="position_id" id="posId" value="">
+
+                            <div style="padding:22px 26px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;justify-content:space-between">
+                                <div style="display:flex;align-items:center;gap:10px">
+                                    <div style="width:38px;height:38px;background:#f5f3ff;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#7c3aed">
+                                        <i class="fa-solid fa-user-tag"></i>
+                                    </div>
+                                    <span id="posModalTitle" style="font-size:15px;font-weight:900;color:#1e293b">สร้างตำแหน่งใหม่</span>
+                                </div>
+                                <button type="button" onclick="document.getElementById('idPosModal').style.display='none'" style="width:32px;height:32px;border-radius:9px;border:1.5px solid #e2e8f0;background:#f8fafc;color:#64748b;cursor:pointer"><i class="fa-solid fa-xmark"></i></button>
+                            </div>
+
+                            <div style="padding:22px 26px;display:flex;flex-direction:column;gap:16px">
+                                <div>
+                                    <label style="display:block;font-size:12px;font-weight:800;color:#475569;margin-bottom:6px">ชื่อตำแหน่ง <span style="color:#ef4444">*</span></label>
+                                    <input type="text" name="position_name" id="posName" required class="premium-input" style="width:100%" placeholder="เช่น ธุรการ, ดูแลข้อมูลคลินิก, ดูแลนักศึกษาทุน">
+                                </div>
+                                <div>
+                                    <label style="display:block;font-size:12px;font-weight:800;color:#475569;margin-bottom:6px">คำอธิบาย <span style="font-weight:normal;color:#94a3b8;font-size:11px">(ไม่บังคับ)</span></label>
+                                    <textarea name="position_description" id="posDescription" class="premium-input" style="width:100%;min-height:60px;resize:vertical" placeholder="หน้าที่ความรับผิดชอบหรือ scope ของตำแหน่งนี้"></textarea>
+                                </div>
+
+                                <div>
+                                    <label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:800;color:#475569;margin-bottom:8px">
+                                        <i class="fa-solid fa-shield-halved" style="color:#7c3aed"></i> เลือก Flag ที่ตำแหน่งนี้จะได้รับ
+                                    </label>
+                                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                                        <?php
+                                        $posFlagInputs = [
+                                            'access_eborrow'        => ['e-Borrow',         'fa-toolbox',            '#f97316'],
+                                            'access_ecampaign'      => ['e-Campaign',       'fa-bullhorn',           '#2563eb'],
+                                            'access_insurance'      => ['Insurance Sync',   'fa-shield-halved',      '#10b981'],
+                                            'access_registry'       => ['Registry Upload',  'fa-id-card-clip',       '#06b6d4'],
+                                            'access_system_logs'    => ['System Logs',      'fa-list-ul',            '#64748b'],
+                                            'access_site_settings'  => ['Site Settings',    'fa-sliders',            '#7c3aed'],
+                                            'access_edms'           => ['EDMS',             'fa-folder-open',        '#0ea5e9'],
+                                            'access_ai'             => ['AI Suite',         'fa-wand-magic-sparkles','#a855f7'],
+                                            'access_consumables'    => ['Consumables',      'fa-syringe',            '#f43f5e'],
+                                            'access_asset'          => ['Asset Inventory',  'fa-warehouse',          '#f59e0b'],
+                                            'access_finance'        => ['การเงิน (Cash Book)','fa-money-bill-trend-up','#059669'],
+                                            'access_scholarship'    => ['Scholarship',      'fa-graduation-cap',     '#10b981'],
+                                            'access_dashboard_admin'=> ['Dashboard Editor', 'fa-chart-pie',          '#3b82f6'],
+                                            'access_monthly_report' => ['รายงานประจำเดือน',  'fa-clipboard-list',     '#f59e0b'],
+                                            'access_nurse_productivity'=>['Productivity พยาบาล','fa-user-nurse',         '#f59e0b'],
+                                            'access_daily_summary'  => ['สรุปงานประจำวัน',     'fa-clipboard-check',    '#f59e0b'],
+                                            'access_director_view'  => ['ผู้อำนวยการ',       'fa-user-tie',           '#f43f5e'],
+                                            'access_identity'       => ['Identity & Gov',     'fa-id-card-clip',       '#2563eb'],
+                                        ];
+                                        foreach ($posFlagInputs as $key => [$label, $icon, $color]):
+                                        ?>
+                                            <label style="display:flex;align-items:center;gap:8px;padding:10px 12px;border:1.5px solid #e2e8f0;border-radius:10px;cursor:pointer;transition:all .15s;background:#fff" class="pos-flag-card">
+                                                <input type="checkbox" name="flag_<?= $key ?>" id="posFlag_<?= $key ?>" value="1" style="width:15px;height:15px;cursor:pointer">
+                                                <i class="fa-solid <?= $icon ?>" style="color:<?= $color ?>;font-size:11px"></i>
+                                                <span style="font-size:11.5px;font-weight:700;color:#475569"><?= $label ?></span>
+                                            </label>
+                                        <?php endforeach; ?>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div style="padding:18px 26px;background:#f8fafc;border-top:1px solid #f1f5f9;display:flex;gap:10px">
+                                <button type="button" onclick="document.getElementById('idPosModal').style.display='none'" style="flex:1;padding:11px;border-radius:11px;border:1.5px solid #e2e8f0;background:#fff;color:#475569;font-weight:800;font-size:13px;cursor:pointer">ยกเลิก</button>
+                                <button type="submit" style="flex:2;padding:11px;border-radius:11px;border:none;background:linear-gradient(135deg,#7c3aed,#6d28d9);color:#fff;font-weight:900;font-size:13px;cursor:pointer;box-shadow:0 8px 16px -4px rgba(124,58,237,.3);display:flex;align-items:center;justify-content:center;gap:8px">
+                                    <i class="fa-solid fa-floppy-disk"></i> บันทึกตำแหน่ง
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+                <?php endif; ?>
+
+                <!-- Add Privilege Modal -->
+                <div id="privModal" style="display:none;position:fixed;inset:0;z-index:500;background:rgba(15,23,42,.6);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:20px">
+                    <div style="background:#fff;border-radius:28px;width:100%;max-width:480px;box-shadow:0 25px 50px -12px rgba(0,0,0,0.25);overflow:hidden">
+                        <div style="padding:24px;background:#fcfdfd;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center">
+                            <h3 style="margin:0;font-size:18px;font-weight:900;color:#0f172a">🛡️ บันทึกการถือสิทธิ์ระดับสูง</h3>
+                            <button type="button" onclick="document.getElementById('privModal').style.display='none'" style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:20px"><i class="fa-solid fa-xmark"></i></button>
+                        </div>
+                        <form id="privForm" style="padding:24px" enctype="multipart/form-data">
+                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+                                <div>
+                                    <label style="display:block;font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;margin-bottom:6px">ผู้รับสิทธิ์ (Admin)</label>
+                                    <select name="user_id" class="premium-input" style="width:100%" required>
+                                        <option value="">-- เลือกเจ้าหน้าที่ --</option>
+                                        <?php foreach ($adminListForSelect as $adm): ?>
+                                            <option value="<?= $adm['id'] ?>"><?= htmlspecialchars($adm['full_name']) ?> (@<?= htmlspecialchars($adm['username']) ?>)</option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label style="display:block;font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;margin-bottom:6px">บทบาท/ระดับสิทธิ์</label>
+                                    <input type="text" name="role_assigned" class="premium-input" style="width:100%" required placeholder="เช่น Super Admin">
+                                </div>
+                            </div>
+                            <div style="margin-bottom:16px">
+                                <label style="display:block;font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;margin-bottom:6px">เหตุผลความจำเป็น (Justification)</label>
+                                <textarea name="justification" class="premium-input" style="width:100%;height:60px" required placeholder="ระบุเหตุผลในการให้สิทธิ์..."></textarea>
+                            </div>
+                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+                                <div>
+                                    <label style="display:block;font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;margin-bottom:6px">ผู้อนุมัติ (Approved By)</label>
+                                    <input type="text" name="approved_by" class="premium-input" style="width:100%" required placeholder="ชื่อผู้อนุมัติ">
+                                </div>
+                                <div>
+                                    <label style="display:block;font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;margin-bottom:6px">วันหมดอายุ (ถ้ามี)</label>
+                                    <input type="date" name="expiry_date" class="premium-input" style="width:100%">
+                                </div>
+                            </div>
+                            <div style="margin-bottom:24px">
+                                <label style="display:block;font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;margin-bottom:6px">หลักฐานการอนุมัติ (PDF/Image)</label>
+                                <input type="file" name="approval_doc" class="premium-input" style="width:100%" accept=".pdf,image/*">
+                            </div>
+                            <div style="display:flex;gap:12px">
+                                <button type="button" onclick="document.getElementById('privModal').style.display='none'" style="flex:1;padding:12px;border-radius:14px;background:#f1f5f9;color:#475569;font-weight:800;border:none;cursor:pointer">ยกเลิก</button>
+                                <button type="submit" id="btnSavePriv" style="flex:1;padding:12px;border-radius:14px;background:#2e9e63;color:#fff;font-weight:800;border:none;cursor:pointer;box-shadow:0 4px 12px rgba(46,158,99,.2)">บันทึกรายการ</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+                <script>
+                    function openAddPrivilegeModal() {
+                        document.getElementById('privModal').style.display = 'flex';
+                    }
+                    document.getElementById('privForm')?.addEventListener('submit', function(e) {
+                        e.preventDefault();
+                        const fd = new FormData(this);
+                        const btn = document.getElementById('btnSavePriv');
+                        btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> กำลังบันทึก...';
+                        
+                        fetch('ajax_privilege_inventory.php', { method: 'POST', body: fd })
+                        .then(r => r.json())
+                        .then(d => {
+                            if(d.status === 'success') {
+                                Swal.fire({ icon: 'success', title: 'สำเร็จ', text: d.message }).then(() => location.reload());
+                            } else {
+                                Swal.fire({ icon: 'error', title: 'ผิดพลาด', text: d.message });
+                                btn.disabled = false; btn.textContent = 'บันทึกรายการ';
+                            }
+                        })
+                        .catch(err => {
+                            Swal.fire({ icon: 'error', title: 'Error', text: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้' });
+                            btn.disabled = false; btn.textContent = 'บันทึกรายการ';
+                        });
+                    });
+                </script>
+
             </div><!-- /section-identity -->
 <?php layout_end(); ?>
