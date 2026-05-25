@@ -67,11 +67,11 @@ if (!$tokenOk) {
         $state = 'invalid';
     } elseif ((int)($campaign['walkin_enabled'] ?? 0) !== 1) {
         $state = 'walkin_disabled';
-    } elseif ($campaign['status'] !== 'active') {
-        // Non-active status takes precedence over date — admin manually set it
+    } elseif (!in_array($campaign['status'], ['active', 'full'], true)) {
+        // Non-active/non-full status takes precedence over date — admin manually set it.
+        // 'full' is allowed because walk-in is the overflow lane for at-capacity campaigns.
         $state = 'campaign_closed';
         $closedReason = match ($campaign['status']) {
-            'full'        => 'แคมเปญนี้เต็มแล้ว ปิดรับลงทะเบียนเพิ่ม',
             'closed'      => 'แคมเปญนี้ปิดรับสมัครแล้ว',
             'inactive'    => 'แคมเปญนี้หยุดให้บริการชั่วคราว',
             'archived'    => 'แคมเปญนี้ถูกจัดเก็บแล้ว ไม่เปิดรับสมัครอีก',
@@ -86,9 +86,9 @@ if (!$tokenOk) {
     } elseif ($campaign['available_until'] && $campaign['available_until'] < date('Y-m-d')) {
         $state = 'campaign_closed';
         $closedReason = 'หมดเขตลงทะเบียนแล้ว (วันสุดท้าย: ' . walkin_fmt_date($campaign['available_until']) . ')';
-    } elseif ((int)$campaign['used'] >= (int)$campaign['total_capacity']) {
-        $state = 'full';
     } else {
+        // Note: total_capacity is intentionally NOT checked here — walk-in is allowed
+        // to exceed the planned quota. Slot-level capacity is still enforced below.
         // Check LINE session
         $lineUserId = $_SESSION['line_user_id'] ?? '';
         if ($lineUserId === '') {

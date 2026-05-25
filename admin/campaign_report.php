@@ -2,7 +2,9 @@
 // admin/campaign_report.php — Print/PDF-ready summary report per campaign.
 // เปิดผ่าน sidebar "รายงาน > สรุปรายแคมเปญ" หรือลิงก์ตรง ?id=<campaign_id>
 //
-// ✦ Layout : A4 print-friendly, รองรับ window.print() และ html2pdf.js
+// ✦ Layout : A4 print-friendly, ใช้ window.print() สำหรับทั้ง พิมพ์ และ บันทึก PDF
+//            (เลิกใช้ html2pdf.js เพราะ html2canvas rasterize ภาษาไทยผิด —
+//            สระและวรรณยุกต์ลอยผิดตำแหน่ง)
 // ✦ Data   : campaign info + KPI + status breakdown + daily trend
 //            + slot-by-slot utilization + รายชื่อผู้เข้าร่วม + survey avg
 declare(strict_types=1);
@@ -41,18 +43,24 @@ $kpi = [
     'total_slots'      => 0,
 ];
 $statusBreakdown = [];
-$dailyTrend      = [];
+$slotTimeTrend   = [];
 $slotUtil        = [];
 $participants    = [];
 $surveyStats     = ['count' => 0, 'avg_rating' => null];
 
 if ($campaignId > 0) {
     try {
+        // used_capacity here = all non-cancelled bookings (booked + confirmed + completed).
+        // This intentionally differs from campaigns.php / time_slots.php / ajax helpers
+        // which use ('booked','confirmed') for slot-pipeline checks. In a SUMMARY REPORT
+        // the user expects "จองแล้ว" to count everyone who actually booked (including
+        // those who already attended), not just the active pipeline.
         $stmt = $pdo->prepare("
             SELECT c.*,
                 (SELECT COUNT(*) FROM camp_slots    s WHERE s.campaign_id = c.id) AS total_slots,
                 (SELECT COUNT(*) FROM camp_bookings b WHERE b.campaign_id = c.id) AS total_bookings,
-                (SELECT COUNT(*) FROM camp_bookings b WHERE b.campaign_id = c.id AND b.status IN ('booked','confirmed')) AS used_capacity
+                (SELECT COUNT(*) FROM camp_bookings b WHERE b.campaign_id = c.id
+                   AND b.status NOT IN ('cancelled','cancelled_by_admin')) AS used_capacity
             FROM camp_list c WHERE c.id = :id
         ");
         $stmt->execute([':id' => $campaignId]);
@@ -83,17 +91,24 @@ if ($campaign) {
     $kpi['cancelled']       = $statusBreakdown['cancelled'] ?? 0;
     $kpi['cancelled_admin'] = $statusBreakdown['cancelled_by_admin'] ?? 0;
 
-    // daily booking trend (created_at)
+    // booking demand by slot time (which time-of-day people prefer)
+    // — aggregates active bookings (non-cancelled) across all dates by start_time
     try {
         $st = $pdo->prepare("
-            SELECT DATE(created_at) d, COUNT(*) c
-            FROM camp_bookings
-            WHERE campaign_id = :id AND created_at >= DATE_SUB(CURDATE(), INTERVAL 60 DAY)
-            GROUP BY DATE(created_at)
-            ORDER BY d ASC
+            SELECT s.start_time, s.end_time,
+                   SUM(CASE WHEN b.id IS NOT NULL
+                                AND b.status NOT IN ('cancelled','cancelled_by_admin')
+                            THEN 1 ELSE 0 END) AS cnt
+            FROM camp_slots s
+            LEFT JOIN camp_bookings b ON b.slot_id = s.id
+            WHERE s.campaign_id = :id
+            GROUP BY s.start_time, s.end_time
+            HAVING cnt > 0
+            ORDER BY cnt DESC, s.start_time ASC
+            LIMIT 6
         ");
         $st->execute([':id' => $campaignId]);
-        $dailyTrend = $st->fetchAll(PDO::FETCH_ASSOC);
+        $slotTimeTrend = $st->fetchAll(PDO::FETCH_ASSOC);
     } catch (PDOException) {}
 
     // slot utilization
@@ -171,15 +186,25 @@ foreach ($slotUtil as $sl) {
 }
 $dailySlotAgg = array_values($dailySlotAgg);
 
+// Top-attended days (ranked by people who actually came) — for the
+// "วันที่มีคนเข้ามาใช้บริการมากที่สุด" section. Drop days with zero
+// attendance so the list stays focused. Top 8 keeps the report at
+// 2 print pages for typical campaigns.
+$topAttendedDays = array_values(array_filter($dailySlotAgg, fn($d) => (int)$d['attended'] > 0));
+usort($topAttendedDays, fn($a, $b) => (int)$b['attended'] <=> (int)$a['attended']);
+$topAttendedDays = array_slice($topAttendedDays, 0, 8);
+
 // ─────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────
 function statusLabel(string $s): string {
     return match($s) {
-        'booked'             => 'รอยืนยัน',
-        'confirmed'          => 'ยืนยันแล้ว',
-        'cancelled'          => 'ยกเลิก (ผู้ใช้)',
-        'cancelled_by_admin' => 'ยกเลิก (Admin)',
+        'booked'             => 'รอเจ้าหน้าที่ยืนยัน',
+        'confirmed'          => 'ยืนยันการจอง',
+        'completed'          => 'มาตามนัดแล้ว',
+        'expired'            => 'ไม่มาตามนัด (เลยวัน)',
+        'cancelled'          => 'ผู้ใช้ยกเลิกเอง',
+        'cancelled_by_admin' => 'เจ้าหน้าที่ยกเลิก',
         default              => $s,
     };
 }
@@ -189,6 +214,19 @@ function campaignTypeLabel(?string $t): string {
         'training'     => 'อบรม/สัมมนา',
         'health_check' => 'ตรวจสุขภาพ',
         default        => 'กิจกรรมอื่นๆ',
+    };
+}
+function campaignStatusLabel(?string $s): string {
+    return match($s) {
+        'active'      => 'เปิดรับสมัคร',
+        'full'        => 'เต็มแล้ว',
+        'closed'      => 'ปิดรับสมัคร',
+        'inactive'    => 'หยุดชั่วคราว',
+        'archived'    => 'เก็บถาวร',
+        'draft'       => 'ฉบับร่าง',
+        'coming_soon' => 'เร็วๆ นี้',
+        'private'     => 'ลิงก์ส่วนตัว',
+        default       => $s ?? '—',
     };
 }
 function thDate(?string $d): string {
@@ -227,14 +265,14 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv' && $campaign) {
     fputcsv($out, ['ชื่อแคมเปญ', $campaign['title']]);
     fputcsv($out, ['ประเภท', campaignTypeLabel($campaign['type'] ?? null)]);
     fputcsv($out, ['ช่วงเวลาเปิดจอง', thDate($campaign['available_from'] ?? null) . ' — ' . thDate($campaign['available_until'] ?? null)]);
-    fputcsv($out, ['ความจุรวม', $kpi['capacity']]);
-    fputcsv($out, ['จองแล้ว (active)', $kpi['used'] . ' (' . $kpi['fill_pct'] . '%)']);
-    fputcsv($out, ['มาเข้าร่วม', $kpi['attended']]);
-    fputcsv($out, ['ขาด/ไม่มาตามนัด', $kpi['absent']]);
-    fputcsv($out, ['อัตราเข้าร่วม', $kpi['attendance_pct'] . '%']);
-    fputcsv($out, ['ยกเลิก (ผู้ใช้)', $kpi['cancelled']]);
-    fputcsv($out, ['ยกเลิก (Admin)', $kpi['cancelled_admin']]);
-    fputcsv($out, ['คะแนนความพึงพอใจเฉลี่ย', $surveyStats['avg_rating'] !== null ? $surveyStats['avg_rating'] . ' / 5 (n=' . $surveyStats['count'] . ')' : 'ไม่มีข้อมูล']);
+    fputcsv($out, ['รับได้ทั้งหมด', $kpi['capacity']]);
+    fputcsv($out, ['จองแล้ว', $kpi['used'] . ' (' . $kpi['fill_pct'] . '%)']);
+    fputcsv($out, ['มาตามนัด', $kpi['attended']]);
+    fputcsv($out, ['ไม่มาตามนัด', $kpi['absent']]);
+    fputcsv($out, ['อัตราการมา', $kpi['attendance_pct'] . '%']);
+    fputcsv($out, ['ผู้ใช้ยกเลิกเอง', $kpi['cancelled']]);
+    fputcsv($out, ['เจ้าหน้าที่ยกเลิก', $kpi['cancelled_admin']]);
+    fputcsv($out, ['คะแนนความพึงพอใจเฉลี่ย', $surveyStats['avg_rating'] !== null ? $surveyStats['avg_rating'] . ' / 5 (จากผู้ตอบ ' . $surveyStats['count'] . ' คน)' : 'ยังไม่มีผู้ตอบ']);
     fputcsv($out, []);
 
     fputcsv($out, ['รายชื่อผู้ลงทะเบียน']);
@@ -244,9 +282,9 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv' && $campaign) {
         $i++;
         $cs   = calcStatus($p, $today);
         $stat = match($cs) {
-            'attended'  => 'มาเข้าร่วม',
-            'absent'    => 'ขาด',
-            'upcoming'  => 'รอเข้าร่วม',
+            'attended'  => 'มาตามนัด',
+            'absent'    => 'ไม่มา',
+            'upcoming'  => 'รอวันงาน',
             'cancelled' => statusLabel($p['status']),
         };
         fputcsv($out, [
@@ -279,7 +317,6 @@ if (!$printMode) {
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <?php endif; ?>
 
 <style>
@@ -325,9 +362,9 @@ if (!$printMode) {
 .cr-band {
     background: linear-gradient(135deg, #2e9e63 0%, #3bba7a 100%);
     color:#fff;
-    padding: 22px 26px;
+    padding: 18px 22px;
     border-radius: 12px;
-    margin-bottom: 22px;
+    margin-bottom: 16px;
     position:relative;
     overflow:hidden;
 }
@@ -347,17 +384,17 @@ if (!$printMode) {
 /* Section title */
 .cr-h {
     display:flex; align-items:center; gap:10px;
-    margin: 22px 0 12px 0; font-size:13pt; font-weight:800; color:#0f172a;
+    margin: 16px 0 10px 0; font-size:13pt; font-weight:800; color:#0f172a;
     border-left:4px solid #2e9e63; padding-left:10px;
 }
 
 /* KPI grid */
 .cr-kpi {
-    display:grid; grid-template-columns: repeat(4, 1fr); gap:10px; margin-bottom:8px;
+    display:grid; grid-template-columns: repeat(4, 1fr); gap:8px; margin-bottom:6px;
 }
 .cr-kpi-tile {
-    border:1.5px solid #e5e7eb; border-radius:12px; padding:12px 14px; background:#fafafa;
-    display:flex; flex-direction:column; gap:4px;
+    border:1.5px solid #e5e7eb; border-radius:12px; padding:10px 12px; background:#fafafa;
+    display:flex; flex-direction:column; gap:3px;
 }
 .cr-kpi-tile.is-brand   { background:linear-gradient(180deg,#ecfdf5,#fff); border-color:#bbf7d0; }
 .cr-kpi-tile.is-info    { background:linear-gradient(180deg,#eff6ff,#fff); border-color:#bfdbfe; }
@@ -383,9 +420,9 @@ if (!$printMode) {
 .cr-donut { width:170px; height:170px; margin:0 auto; }
 
 /* Tables */
-.cr-table { width:100%; border-collapse:collapse; font-size:10.5pt; margin-bottom:10px; }
-.cr-table th { background:#f1f5f9; padding:8px 10px; text-align:left; font-weight:700; color:#334155; border-bottom:2px solid #cbd5e1; }
-.cr-table td { padding:7px 10px; border-bottom:1px solid #f1f5f9; vertical-align:top; }
+.cr-table { width:100%; border-collapse:collapse; font-size:10.5pt; margin-bottom:8px; }
+.cr-table th { background:#f1f5f9; padding:6px 9px; text-align:left; font-weight:700; color:#334155; border-bottom:2px solid #cbd5e1; }
+.cr-table td { padding:5px 9px; border-bottom:1px solid #f1f5f9; vertical-align:middle; }
 .cr-table tr:nth-child(even) td { background:#fafbfc; }
 .cr-table tr:hover td { background:#f0fdf4; }
 .cr-status-pill { display:inline-block; padding:2px 9px; border-radius:999px; font-size:9pt; font-weight:700; }
@@ -395,11 +432,6 @@ if (!$printMode) {
 .cr-status-cancelled { background:#f1f5f9; color:#64748b; }
 
 /* Sparkline-style trend bars */
-.cr-trend { display:flex; align-items:flex-end; gap:3px; height:110px; padding:6px 0; border-bottom:1.5px solid #e5e7eb; }
-.cr-trend-bar { flex:1; min-width:6px; background:linear-gradient(180deg,#3bba7a,#2e9e63); border-radius:3px 3px 0 0; position:relative; opacity:.88; }
-.cr-trend-bar:hover { opacity:1; }
-.cr-trend-bar[data-zero="1"] { background:#f1f5f9; }
-.cr-trend-labels { display:flex; justify-content:space-between; font-size:8.5pt; color:#94a3b8; margin-top:4px; }
 
 /* Footer */
 .cr-footer {
@@ -419,13 +451,17 @@ if (!$printMode) {
         margin:0 !important; padding:0 !important; border-radius:0 !important;
     }
     .cr-band { border-radius:0 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    .cr-kpi-tile, .cr-status-pill, .cr-bar-fill, .cr-trend-bar {
+    .cr-kpi-tile, .cr-status-pill, .cr-bar-fill {
         -webkit-print-color-adjust: exact; print-color-adjust: exact;
     }
     .cr-h, .cr-kpi { page-break-inside: avoid; }
-    .cr-table { page-break-inside: auto; }
+    .cr-table { page-break-inside: avoid; }
     .cr-table tr { page-break-inside: avoid; page-break-after: auto; }
     thead { display: table-header-group; }
+    /* Keep participants callout together — small block, no point splitting */
+    .cr-participants-callout, .cr-footer { page-break-inside: avoid; }
+    /* Keep section heading with its first content (avoid orphan heading) */
+    .cr-h + * { page-break-before: avoid; }
 }
 
 @media (max-width: 720px) {
@@ -462,11 +498,11 @@ if (!$printMode) {
         </select>
     </form>
     <?php if ($campaign): ?>
-    <button type="button" onclick="window.print()" class="cr-btn cr-btn-print" title="พิมพ์ / Save as PDF (Browser)">
+    <button type="button" onclick="window.print()" class="cr-btn cr-btn-print" title="พิมพ์ออกกระดาษ">
         <i class="fa-solid fa-print"></i> พิมพ์รายงาน
     </button>
-    <button type="button" onclick="crSavePdf()" class="cr-btn cr-btn-pdf" title="ดาวน์โหลด PDF">
-        <i class="fa-solid fa-file-pdf"></i> ดาวน์โหลด PDF
+    <button type="button" onclick="crSavePdf()" class="cr-btn cr-btn-pdf" title="บันทึกไฟล์ PDF (ภาษาไทยถูกต้อง)">
+        <i class="fa-solid fa-file-pdf"></i> บันทึก PDF
     </button>
     <a href="?id=<?= (int)$campaignId ?>&export=csv" class="cr-btn cr-btn-csv">
         <i class="fa-solid fa-file-csv"></i> Excel/CSV
@@ -491,31 +527,43 @@ if (!$printMode) {
 // Pre-compute donut paths
 $donutTotal = array_sum($statusBreakdown);
 $donutSegments = [];
+// Single source of truth for status colors — bar list + donut share this map.
+// All 6 status values from the camp_bookings ENUM are represented; if any
+// future status is added, the donut would otherwise fall back to slate-grey
+// and leave a gap (see hot.md for the cron job that flips bookings to 'expired').
+$statusColors = [
+    'completed'          => '#0d9488',  // teal:   attended successfully
+    'confirmed'          => '#22c55e',  // green:  confirmed, awaiting attendance
+    'booked'             => '#f59e0b',  // amber:  pending admin confirmation
+    'expired'            => '#ea580c',  // orange: missed appointment (auto-flipped by cron)
+    'cancelled'          => '#ef4444',  // red:    user cancelled
+    'cancelled_by_admin' => '#94a3b8',  // slate:  admin cancelled
+];
+// Render order for both bar list and donut segments
+$statusOrder = ['completed', 'confirmed', 'booked', 'expired', 'cancelled', 'cancelled_by_admin'];
 if ($donutTotal > 0) {
-    $colors = [
-        'confirmed'          => '#22c55e',
-        'booked'             => '#f59e0b',
-        'cancelled'          => '#ef4444',
-        'cancelled_by_admin' => '#94a3b8',
-    ];
     $cumPct = 0;
-    foreach ($statusBreakdown as $st => $cnt) {
+    foreach ($statusOrder as $st) {
+        $cnt = $statusBreakdown[$st] ?? 0;
+        if ($cnt === 0) continue;
         $pct = $cnt / $donutTotal;
         $donutSegments[] = [
             'status' => $st,
             'count'  => $cnt,
             'pct'    => $pct,
             'offset' => $cumPct,
-            'color'  => $colors[$st] ?? '#cbd5e1',
+            'color'  => $statusColors[$st] ?? '#cbd5e1',
         ];
         $cumPct += $pct;
     }
 }
 
-// Daily trend max for bar scaling
-$trendMax = 0;
-foreach ($dailyTrend as $d) { $trendMax = max($trendMax, (int)$d['c']); }
-$trendMax = max($trendMax, 1);
+// Max booking count for slot-time bar scaling
+$slotTimeMax = 0;
+foreach ($slotTimeTrend as $r) { $slotTimeMax = max($slotTimeMax, (int)$r['cnt']); }
+$slotTimeMax = max($slotTimeMax, 1);
+// Sum for percentage display (only top-N shown, so this is the visible total)
+$slotTimeSum = array_sum(array_column($slotTimeTrend, 'cnt'));
 
 $today = date('Y-m-d');
 ?>
@@ -528,7 +576,7 @@ $today = date('Y-m-d');
         <div class="cr-band-meta">
             <span class="cr-pill"><i class="fa-solid fa-tag"></i> <?= htmlspecialchars(campaignTypeLabel($campaign['type'] ?? null)) ?></span>
             <span class="cr-pill"><i class="fa-regular fa-calendar"></i> <?= thDate($campaign['available_from'] ?? null) ?> — <?= thDate($campaign['available_until'] ?? null) ?></span>
-            <span class="cr-pill"><i class="fa-solid fa-circle-check"></i> <?= htmlspecialchars($campaign['status'] ?? '—') ?></span>
+            <span class="cr-pill"><i class="fa-solid fa-circle-check"></i> <?= htmlspecialchars(campaignStatusLabel($campaign['status'] ?? null)) ?></span>
             <?php if (!empty($campaign['location'])): ?>
             <span class="cr-pill"><i class="fa-solid fa-location-dot"></i> <?= htmlspecialchars($campaign['location']) ?></span>
             <?php endif; ?>
@@ -536,45 +584,45 @@ $today = date('Y-m-d');
     </div>
 
     <!-- KPI tiles -->
-    <div class="cr-h"><i class="fa-solid fa-chart-pie text-[#2e9e63]"></i> ดัชนีหลัก (Key Metrics)</div>
+    <div class="cr-h"><i class="fa-solid fa-chart-pie text-[#2e9e63]"></i> สรุปตัวเลขสำคัญ</div>
     <div class="cr-kpi">
         <div class="cr-kpi-tile is-brand">
-            <div class="cr-kpi-label">ความจุรวม</div>
+            <div class="cr-kpi-label">รับได้ทั้งหมด</div>
             <div class="cr-kpi-value"><?= number_format($kpi['capacity']) ?></div>
             <div class="cr-kpi-sub"><?= number_format($kpi['total_slots']) ?> รอบ</div>
         </div>
         <div class="cr-kpi-tile is-info">
-            <div class="cr-kpi-label">จองแล้ว (Active)</div>
+            <div class="cr-kpi-label">จองแล้ว</div>
             <div class="cr-kpi-value"><?= number_format($kpi['used']) ?></div>
-            <div class="cr-kpi-sub"><?= $kpi['fill_pct'] ?>% ของความจุ · เหลือ <?= number_format($kpi['remaining']) ?></div>
+            <div class="cr-kpi-sub">คิดเป็น <?= $kpi['fill_pct'] ?>% · เหลืออีก <?= number_format($kpi['remaining']) ?> ที่</div>
         </div>
         <div class="cr-kpi-tile is-brand">
-            <div class="cr-kpi-label">มาเข้าร่วม</div>
+            <div class="cr-kpi-label">มาตามนัด</div>
             <div class="cr-kpi-value"><?= number_format($kpi['attended']) ?></div>
-            <div class="cr-kpi-sub">อัตราเข้าร่วม <?= $kpi['attendance_pct'] ?>%</div>
+            <div class="cr-kpi-sub">มาแล้ว <?= $kpi['attendance_pct'] ?>% ของที่จอง</div>
         </div>
         <div class="cr-kpi-tile is-danger">
-            <div class="cr-kpi-label">ขาด/ไม่มาตามนัด</div>
+            <div class="cr-kpi-label">ไม่มาตามนัด</div>
             <div class="cr-kpi-value"><?= number_format($kpi['absent']) ?></div>
-            <div class="cr-kpi-sub">เลยวันงานแล้ว</div>
+            <div class="cr-kpi-sub">ผ่านวันงานแล้ว</div>
         </div>
         <div class="cr-kpi-tile is-amber">
-            <div class="cr-kpi-label">รอเข้าร่วม</div>
+            <div class="cr-kpi-label">รอวันงาน</div>
             <div class="cr-kpi-value"><?= number_format($kpi['upcoming']) ?></div>
-            <div class="cr-kpi-sub">ยังไม่ถึงวัน</div>
+            <div class="cr-kpi-sub">ยังไม่ถึงวันนัด</div>
         </div>
         <div class="cr-kpi-tile is-slate">
-            <div class="cr-kpi-label">ยกเลิก</div>
+            <div class="cr-kpi-label">ยกเลิกแล้ว</div>
             <div class="cr-kpi-value"><?= number_format($kpi['cancelled'] + $kpi['cancelled_admin']) ?></div>
-            <div class="cr-kpi-sub">ผู้ใช้ <?= number_format($kpi['cancelled']) ?> · Admin <?= number_format($kpi['cancelled_admin']) ?></div>
+            <div class="cr-kpi-sub">ผู้ใช้ <?= number_format($kpi['cancelled']) ?> · เจ้าหน้าที่ <?= number_format($kpi['cancelled_admin']) ?></div>
         </div>
         <div class="cr-kpi-tile is-info">
-            <div class="cr-kpi-label">การจองรวม</div>
+            <div class="cr-kpi-label">ยอดจองทั้งหมด</div>
             <div class="cr-kpi-value"><?= number_format($kpi['total_bookings']) ?></div>
-            <div class="cr-kpi-sub">รวมที่ยกเลิกแล้ว</div>
+            <div class="cr-kpi-sub">นับรวมที่ยกเลิกด้วย</div>
         </div>
         <div class="cr-kpi-tile is-violet">
-            <div class="cr-kpi-label">ความพึงพอใจ</div>
+            <div class="cr-kpi-label">คะแนนความพึงพอใจ</div>
             <div class="cr-kpi-value">
                 <?= $surveyStats['avg_rating'] !== null ? $surveyStats['avg_rating'] : '—' ?>
                 <?php if ($surveyStats['avg_rating'] !== null): ?><span style="font-size:11pt;color:#64748b;font-weight:600;">/5</span><?php endif; ?>
@@ -586,21 +634,16 @@ $today = date('Y-m-d');
     </div>
 
     <!-- Status breakdown + Donut -->
-    <div class="cr-h"><i class="fa-solid fa-layer-group text-[#2e9e63]"></i> สถานะการจอง (Status Breakdown)</div>
+    <div class="cr-h"><i class="fa-solid fa-layer-group text-[#2e9e63]"></i> แยกตามสถานะการจอง</div>
     <div class="cr-row2">
         <div>
             <?php if ($donutTotal === 0): ?>
                 <p style="color:#94a3b8;font-style:italic;">ยังไม่มีข้อมูลการจอง</p>
-            <?php else: foreach (['confirmed','booked','cancelled','cancelled_by_admin'] as $st):
+            <?php else: foreach ($statusOrder as $st):
                 $cnt = $statusBreakdown[$st] ?? 0;
                 if ($cnt === 0) continue;
                 $pct = round($cnt / $donutTotal * 100, 1);
-                $color = match($st) {
-                    'confirmed' => '#22c55e',
-                    'booked'    => '#f59e0b',
-                    'cancelled' => '#ef4444',
-                    default     => '#94a3b8',
-                };
+                $color = $statusColors[$st] ?? '#cbd5e1';
             ?>
             <div class="cr-bar-row">
                 <div class="cr-bar-label"><?= statusLabel($st) ?></div>
@@ -634,53 +677,68 @@ $today = date('Y-m-d');
         </div>
     </div>
 
-    <!-- Daily trend -->
-    <?php if (!empty($dailyTrend)): ?>
-    <div class="cr-h"><i class="fa-solid fa-chart-line text-[#2e9e63]"></i> แนวโน้มการจองรายวัน (60 วันล่าสุด)</div>
-    <div class="cr-trend">
-        <?php foreach ($dailyTrend as $d):
-            $h = round((int)$d['c'] / $trendMax * 100);
-            $isZero = (int)$d['c'] === 0 ? 1 : 0;
+    <!-- Slot-time popularity (which time-of-day people book most) -->
+    <?php if (!empty($slotTimeTrend)): ?>
+    <div class="cr-h"><i class="fa-solid fa-clock text-[#2e9e63]"></i> ช่วงเวลาที่มีการจองมากที่สุด</div>
+    <div style="margin-bottom:6px;">
+        <?php foreach ($slotTimeTrend as $i => $r):
+            $cnt   = (int)$r['cnt'];
+            $pct   = round($cnt / $slotTimeMax * 100, 1);
+            $share = $slotTimeSum > 0 ? round($cnt / $slotTimeSum * 100, 1) : 0;
+            $isTop = ($i === 0);
+            $color = $isTop ? '#0d9488' : '#3bba7a';  // teal for #1, brand green for rest
         ?>
-        <div class="cr-trend-bar" style="height:<?= max(2, $h) ?>%;" data-zero="<?= $isZero ?>"
-             title="<?= thDate($d['d']) ?>: <?= (int)$d['c'] ?> รายการ"></div>
+        <div class="cr-bar-row">
+            <div class="cr-bar-label">
+                <?php if ($isTop): ?><i class="fa-solid fa-trophy" style="color:#d97706;margin-right:4px;"></i><?php endif; ?>
+                <?= substr($r['start_time'], 0, 5) ?>–<?= substr($r['end_time'], 0, 5) ?> น.
+            </div>
+            <div class="cr-bar-track">
+                <div class="cr-bar-fill" style="width:<?= max(8, $pct) ?>%; background:<?= $color ?>;">
+                    <?= number_format($cnt) ?> ราย
+                </div>
+            </div>
+            <div class="cr-bar-count"><?= $share ?>% ของยอดนี้</div>
+        </div>
         <?php endforeach; ?>
     </div>
-    <div class="cr-trend-labels">
-        <span><?= !empty($dailyTrend) ? thDate($dailyTrend[0]['d']) : '' ?></span>
-        <span style="font-weight:700;color:#475569;">สูงสุด <?= $trendMax ?> รายการ/วัน</span>
-        <span><?= !empty($dailyTrend) ? thDate(end($dailyTrend)['d']) : '' ?></span>
-    </div>
+    <p style="font-size:9.5pt;color:#94a3b8;margin-top:0;">
+        <i class="fa-solid fa-circle-info"></i>
+        รวมยอดจองจากทุกวันตามช่วงเวลาเริ่มรอบ (ไม่นับที่ยกเลิก) · แสดงสูงสุด 6 ช่วงเวลา
+    </p>
     <?php endif; ?>
 
-    <!-- Slot utilization (รายวัน — ยุบจากรายรอบ) -->
-    <?php if (!empty($dailySlotAgg)): ?>
-    <div class="cr-h"><i class="fa-regular fa-calendar-check text-[#2e9e63]"></i> สรุปการใช้งานรายวัน (Daily Utilization)</div>
+    <!-- Top attended days — ranked by who actually came -->
+    <?php if (!empty($topAttendedDays)): ?>
+    <div class="cr-h"><i class="fa-regular fa-calendar-check text-[#2e9e63]"></i> วันที่มีคนเข้ามาใช้บริการมากที่สุด</div>
     <table class="cr-table">
         <thead>
             <tr>
+                <th style="width:50px;text-align:center;">อันดับ</th>
                 <th>วันที่จัดงาน</th>
-                <th style="text-align:center;">จำนวนรอบ</th>
-                <th style="text-align:center;">ความจุรวม</th>
-                <th style="text-align:center;">จอง</th>
-                <th style="text-align:center;">เข้าร่วม</th>
-                <th>การใช้งาน</th>
+                <th style="text-align:center;">รอบเวลา</th>
+                <th style="text-align:center;">รับได้</th>
+                <th style="text-align:center;">มาตามนัด</th>
+                <th>ใช้บริการกี่%</th>
             </tr>
         </thead>
         <tbody>
-            <?php foreach ($dailySlotAgg as $d):
+            <?php foreach ($topAttendedDays as $i => $d):
                 $maxCap = (int)$d['capacity'];
-                $booked = (int)$d['booked'];
                 $att    = (int)$d['attended'];
-                $pct    = $maxCap > 0 ? round($booked / $maxCap * 100) : 0;
+                $pct    = $maxCap > 0 ? round($att / $maxCap * 100) : 0;
                 $color  = $pct >= 90 ? '#dc2626' : ($pct >= 60 ? '#f59e0b' : '#22c55e');
+                $isTop  = ($i === 0);
             ?>
-            <tr>
-                <td><?= thDate($d['date']) ?></td>
+            <tr<?= $isTop ? ' style="background:#fef3c7;"' : '' ?>>
+                <td style="text-align:center;font-weight:800;color:<?= $isTop ? '#d97706' : '#94a3b8' ?>;">
+                    <?php if ($isTop): ?><i class="fa-solid fa-trophy" style="margin-right:2px;"></i><?php endif; ?>
+                    <?= $i + 1 ?>
+                </td>
+                <td<?= $isTop ? ' style="font-weight:800;"' : '' ?>><?= thDate($d['date']) ?></td>
                 <td style="text-align:center;"><?= number_format((int)$d['slots']) ?> รอบ</td>
                 <td style="text-align:center;"><?= number_format($maxCap) ?></td>
-                <td style="text-align:center;font-weight:700;"><?= number_format($booked) ?></td>
-                <td style="text-align:center;color:#15803d;font-weight:700;"><?= number_format($att) ?></td>
+                <td style="text-align:center;color:#15803d;font-weight:800;font-size:11pt;"><?= number_format($att) ?></td>
                 <td>
                     <div style="display:flex;align-items:center;gap:8px;">
                         <div style="flex:1;height:10px;background:#f1f5f9;border-radius:5px;overflow:hidden;">
@@ -695,21 +753,24 @@ $today = date('Y-m-d');
     </table>
     <p style="font-size:9.5pt;color:#94a3b8;margin-top:-4px;">
         <i class="fa-solid fa-circle-info"></i>
-        รวมจาก <?= count($slotUtil) ?> รอบ ใน <?= count($dailySlotAgg) ?> วัน · ดูรายละเอียดรายรอบใน CSV
+        เรียงตามจำนวนคน "มาตามนัด" จากมากไปน้อย · แสดงสูงสุด 8 วัน · ตัดวันที่ไม่มีคนมาออก
+        <?php if (count($dailySlotAgg) > count($topAttendedDays)): ?>
+            · ทั้งแคมเปญมี <?= count($dailySlotAgg) ?> วัน — ดูครบทุกวันได้ในไฟล์ CSV
+        <?php endif; ?>
     </p>
     <?php endif; ?>
 
     <!-- Participants summary callout (ยุบตารางรายชื่อ → callout ดาวน์โหลด) -->
     <?php if (!empty($participants)): ?>
     <div class="cr-h"><i class="fa-solid fa-users text-[#2e9e63]"></i> รายชื่อผู้เข้าร่วม</div>
-    <div style="background:linear-gradient(135deg,#f0fdf4,#ecfdf5);border:1.5px solid #bbf7d0;border-radius:14px;padding:18px 22px;display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;">
+    <div class="cr-participants-callout" style="background:linear-gradient(135deg,#f0fdf4,#ecfdf5);border:1.5px solid #bbf7d0;border-radius:14px;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;">
         <div style="flex:1;min-width:240px;">
             <div style="font-size:11pt;font-weight:800;color:#15803d;letter-spacing:.04em;text-transform:uppercase;margin-bottom:4px;">
-                <i class="fa-solid fa-database"></i> ผู้ลงทะเบียนทั้งหมด <?= number_format(count($participants)) ?> รายการ
+                <i class="fa-solid fa-database"></i> มีผู้ลงทะเบียนรวม <?= number_format(count($participants)) ?> ราย
             </div>
             <p style="font-size:10.5pt;color:#475569;margin:0;line-height:1.5;">
-                ตารางรายชื่อทั้งหมดมีจำนวนมากเกินกว่าจะใส่ในรายงานสรุป
-                <strong>กรุณาดาวน์โหลด CSV</strong> เพื่อดูรายละเอียด รหัส ชื่อ-นามสกุล เบอร์โทร รอบที่จอง สถานะ และเวลาเช็คอินครบทุกรายการ
+                รายชื่อทั้งหมดมีจำนวนมากเกินกว่าจะใส่ในรายงานสรุปนี้
+                <strong>กดดาวน์โหลด CSV</strong> เพื่อดูชื่อ-นามสกุล เบอร์โทร รอบที่จอง สถานะ และเวลาเช็คอินของทุกคนแบบเปิดใน Excel ได้
             </p>
         </div>
         <a href="?id=<?= (int)$campaignId ?>&export=csv" class="no-print"
@@ -722,30 +783,47 @@ $today = date('Y-m-d');
     <!-- Footer -->
     <div class="cr-footer">
         <div>
-            <strong>ออกรายงานโดย:</strong>
+            <strong>ผู้ออกรายงาน:</strong>
             <?= htmlspecialchars($_SESSION['admin_full_name'] ?? $_SESSION['admin_username'] ?? $_SESSION['full_name'] ?? 'Admin') ?>
             (<?= htmlspecialchars($_SESSION['admin_role'] ?? $_SESSION['role'] ?? '—') ?>)
         </div>
         <div>
-            ออก ณ <?= thDateTime(date('Y-m-d H:i:s')) ?>
+            ออกรายงานเมื่อ <?= thDateTime(date('Y-m-d H:i:s')) ?>
         </div>
     </div>
 </div>
 
 <script>
+// Save as PDF — use the browser's native print → "Save as PDF" pipeline.
+// We dropped html2pdf.js because html2canvas rasterizes Thai character-by-character
+// and breaks combining-mark positioning (สระ + วรรณยุกต์ลอยผิดตำแหน่ง — "ฉีด" → "ฉดี",
+// "ป้อง" → "ปอ้ง"). The browser uses OS-level HarfBuzz shaping which renders Thai
+// correctly. Trade-off: user must confirm "บันทึกเป็น PDF" in the print dialog
+// instead of an instant download — first-time hint explains how.
 function crSavePdf() {
-    const el = document.getElementById('crDoc');
-    if (!el) return;
-    const t  = <?= json_encode($campaign['title']) ?>;
-    const fn = 'campaign_report_' + (t || '<?= $campaignId ?>').replace(/[^a-zA-Z0-9ก-๛_-]/g, '_') + '_<?= date('Ymd') ?>.pdf';
-    html2pdf().set({
-        margin:       [10, 8, 10, 8],
-        filename:     fn,
-        image:        { type: 'jpeg', quality: 0.96 },
-        html2canvas:  { scale: 2, useCORS: true, scrollY: 0 },
-        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        pagebreak:    { mode: ['css', 'legacy'] }
-    }).from(el).save();
+    const HINT_KEY = 'cr_pdf_hint_shown_v1';
+    let hintShown = false;
+    try { hintShown = localStorage.getItem(HINT_KEY) === '1'; } catch (e) {}
+
+    if (!hintShown && window.Swal) {
+        Swal.fire({
+            icon: 'info',
+            title: 'วิธีบันทึกเป็น PDF',
+            html: '<div style="text-align:left;font-size:14px;line-height:1.7;">' +
+                  'ในกล่องพิมพ์ที่เปิดขึ้น:<br>' +
+                  '<b>1.</b> ช่อง <b>"ปลายทาง"</b> (Destination) → เลือก <b>"บันทึกเป็น PDF"</b><br>' +
+                  '<b>2.</b> กดปุ่ม <b>"บันทึก"</b> ที่มุมขวาล่าง<br><br>' +
+                  '<small style="color:#64748b;">เปลี่ยนวิธีนี้เพราะ html2pdf เดิม render ภาษาไทยผิด (สระลอยผิดตำแหน่ง)</small>' +
+                  '</div>',
+            confirmButtonText: 'เข้าใจแล้ว · เปิดกล่องพิมพ์',
+            confirmButtonColor: '#2e9e63',
+        }).then(() => {
+            try { localStorage.setItem(HINT_KEY, '1'); } catch (e) {}
+            window.print();
+        });
+    } else {
+        window.print();
+    }
 }
 </script>
 
@@ -755,9 +833,5 @@ function crSavePdf() {
 </body>
 </html>
 <?php else: ?>
-<?php
-// Inject html2pdf only on screen
-?>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <?php require_once __DIR__ . '/includes/footer.php'; ?>
 <?php endif; ?>

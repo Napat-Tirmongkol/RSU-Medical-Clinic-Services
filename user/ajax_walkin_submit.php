@@ -81,7 +81,9 @@ try {
 
     if (!$campaign)                              walkin_redirect_err($campaignId, $token, 'invalid');
     if ((int)$campaign['walkin_enabled'] !== 1)  walkin_redirect_err($campaignId, $token, 'walkin_disabled');
-    if ($campaign['status'] !== 'active')        walkin_redirect_err($campaignId, $token, 'campaign_closed');
+    // 'active' + 'full' both pass — walk-in is the overflow lane when status='full'
+    if (!in_array($campaign['status'], ['active', 'full'], true))
+                                                 walkin_redirect_err($campaignId, $token, 'campaign_closed');
     if ($campaign['available_from']  && $campaign['available_from']  > date('Y-m-d'))
                                                  walkin_redirect_err($campaignId, $token, 'campaign_closed');
     if ($campaign['available_until'] && $campaign['available_until'] < date('Y-m-d'))
@@ -104,17 +106,9 @@ try {
             walkin_redirect_err($campaignId, $token, 'already');
         }
 
-        // Re-check campaign capacity
-        $stcap = $pdo->prepare("
-            SELECT COUNT(*) FROM camp_bookings
-            WHERE campaign_id = :cid AND status IN ('booked','confirmed','completed')
-            FOR UPDATE
-        ");
-        $stcap->execute([':cid' => $campaignId]);
-        if ((int)$stcap->fetchColumn() >= (int)$campaign['total_capacity']) {
-            $pdo->rollBack();
-            walkin_redirect_err($campaignId, $token, 'full');
-        }
+        // Campaign-level total_capacity is intentionally NOT enforced here.
+        // Walk-in is designed to handle overflow beyond the planned quota —
+        // slot-level capacity (below) is the only hard gate.
 
         // Re-check slot validity + capacity (must be today, time not passed, capacity left)
         $sts = $pdo->prepare("

@@ -2,7 +2,9 @@
 // admin/walkin_poster.php — A4 print-ready Walk-in poster
 // Layout: Clinic header → Campaign title → Large QR (~8x8cm) → Steps → Footer
 // Print: A4 portrait · auto-trigger print on load (?autoprint=1)
-// Download: html2pdf.js available via "ดาวน์โหลด PDF" button
+// Save PDF: window.print() + browser's "Save as PDF" destination
+//           (dropped html2pdf.js — html2canvas rasterizes Thai chars
+//           individually and breaks combining-mark positioning)
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/includes/auth.php';
 
@@ -72,19 +74,19 @@ $siteName  = defined('SITE_NAME') ? SITE_NAME : 'RSU Medical Clinic';
 <link rel="stylesheet" href="../assets/css/tailwind.min.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <link rel="stylesheet" href="../assets/css/rsufont.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <style>
   * { font-family: 'Sarabun', sans-serif; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   body { background: #e2e8f0; padding: 24px; margin: 0; }
 
-  /* A4 page: 210 × 297 mm. Use mm for accurate print sizing. */
+  /* A4 page: 210 × 297 mm. Use mm for accurate print sizing.
+     Hard height (not min-height) + overflow hidden enforces single-page fit. */
   .a4-page {
     width: 210mm;
-    min-height: 297mm;
+    height: 297mm;
     margin: 0 auto;
     background: #fff;
     box-shadow: 0 10px 40px rgba(0,0,0,.15);
-    padding: 18mm;
+    padding: 14mm 14mm 12mm;
     box-sizing: border-box;
     display: flex;
     flex-direction: column;
@@ -97,98 +99,119 @@ $siteName  = defined('SITE_NAME') ? SITE_NAME : 'RSU Medical Clinic';
     content: '';
     position: absolute;
     top: 0; left: 0; right: 0;
-    height: 8mm;
+    height: 6mm;
     background: linear-gradient(90deg, #d97706 0%, #f59e0b 25%, #fbbf24 50%, #f59e0b 75%, #d97706 100%);
   }
 
   .clinic-header {
-    margin-top: 4mm;
-    margin-bottom: 6mm;
+    margin-top: 2mm;
+    margin-bottom: 4mm;
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding-bottom: 6mm;
+    gap: 10px;
+    padding-bottom: 4mm;
     border-bottom: 1.5px dashed #e2e8f0;
+    flex-shrink: 0;
   }
   .clinic-logo {
-    width: 18mm;
-    height: 18mm;
-    border-radius: 12px;
+    width: 14mm;
+    height: 14mm;
+    border-radius: 10px;
     background: linear-gradient(135deg, #d97706, #f59e0b);
     color: white;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 22px;
+    font-size: 18px;
     flex-shrink: 0;
     box-shadow: 0 4px 14px rgba(217,119,6,.30);
   }
   .clinic-label-row {
     flex: 1;
+    min-width: 0;
   }
   .clinic-name {
-    font-size: 16px;
+    font-size: 14px;
     font-weight: 800;
     color: #0f172a;
   }
   .clinic-sub {
-    font-size: 11px;
+    font-size: 10px;
     color: #64748b;
-    margin-top: 2px;
+    margin-top: 1px;
   }
   .walkin-badge {
     background: linear-gradient(135deg, #d97706, #f59e0b);
     color: white;
-    padding: 6px 14px;
+    padding: 5px 11px;
     border-radius: 999px;
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 800;
     letter-spacing: 0.05em;
     text-transform: uppercase;
     box-shadow: 0 4px 12px rgba(217,119,6,.25);
+    flex-shrink: 0;
   }
 
   .campaign-title-row {
     text-align: center;
-    margin-bottom: 6mm;
+    margin-bottom: 4mm;
+    flex-shrink: 0;
   }
   .type-pill {
     display: inline-block;
-    padding: 5px 14px;
+    padding: 4px 12px;
     border-radius: 999px;
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 700;
-    margin-bottom: 8px;
+    margin-bottom: 6px;
     letter-spacing: 0.04em;
   }
   .campaign-title {
-    font-size: 28px;
+    font-size: 22px;
     font-weight: 900;
     color: #0f172a;
-    line-height: 1.18;
-    margin-bottom: 4px;
+    line-height: 1.2;
+    margin-bottom: 3px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
   }
   .campaign-meta {
-    font-size: 12px;
+    font-size: 11px;
+    color: #475569;
+    margin-top: 3px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .campaign-meta-inline {
+    font-size: 11px;
     color: #475569;
     margin-top: 4px;
+    -webkit-line-clamp: unset;
+    display: block;
+    overflow: visible;
   }
 
   .qr-section {
     text-align: center;
-    margin: 4mm 0 6mm;
+    margin: 2mm 0 3mm;
     flex: 1;
     display: flex;
     flex-direction: column;
     justify-content: center;
     align-items: center;
+    min-height: 0;
   }
   .qr-frame {
     display: inline-block;
-    padding: 12mm;
+    padding: 7mm;
     background: white;
     border: 4px solid #d97706;
-    border-radius: 18px;
+    border-radius: 16px;
     box-shadow: 0 12px 32px rgba(217,119,6,.20);
     position: relative;
   }
@@ -196,86 +219,88 @@ $siteName  = defined('SITE_NAME') ? SITE_NAME : 'RSU Medical Clinic';
   .qr-corner-tl, .qr-corner-tr, .qr-corner-bl, .qr-corner-br {
     content: '';
     position: absolute;
-    width: 18px;
-    height: 18px;
+    width: 16px;
+    height: 16px;
     border-color: #d97706;
     border-style: solid;
   }
-  .qr-corner-tl { top: 6px; left: 6px;  border-width: 3px 0 0 3px; }
-  .qr-corner-tr { top: 6px; right: 6px; border-width: 3px 3px 0 0; }
-  .qr-corner-bl { bottom: 6px; left: 6px;  border-width: 0 0 3px 3px; }
-  .qr-corner-br { bottom: 6px; right: 6px; border-width: 0 3px 3px 0; }
+  .qr-corner-tl { top: 5px; left: 5px;  border-width: 3px 0 0 3px; }
+  .qr-corner-tr { top: 5px; right: 5px; border-width: 3px 3px 0 0; }
+  .qr-corner-bl { bottom: 5px; left: 5px;  border-width: 0 0 3px 3px; }
+  .qr-corner-br { bottom: 5px; right: 5px; border-width: 0 3px 3px 0; }
 
   .qr-img {
-    width: 88mm;
-    height: 88mm;
+    width: 72mm;
+    height: 72mm;
     display: block;
   }
   .scan-label {
-    margin-top: 5mm;
-    font-size: 20px;
+    margin-top: 3mm;
+    font-size: 17px;
     font-weight: 900;
     color: #d97706;
     letter-spacing: 0.03em;
   }
   .scan-sublabel {
-    font-size: 12px;
+    font-size: 11px;
     color: #64748b;
     margin-top: 2px;
   }
 
   .steps-section {
-    margin-top: 4mm;
+    margin-top: 2mm;
     background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
-    border-radius: 14px;
-    padding: 6mm;
+    border-radius: 12px;
+    padding: 4mm;
     border: 1.5px solid #fbbf24;
+    flex-shrink: 0;
   }
   .steps-title {
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 800;
     color: #92400e;
-    margin-bottom: 6px;
+    margin-bottom: 5px;
     text-align: center;
     letter-spacing: 0.05em;
   }
   .steps-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: 8px;
+    gap: 6px;
   }
   .step-card {
     background: white;
-    border-radius: 10px;
-    padding: 9px 6px;
+    border-radius: 9px;
+    padding: 6px 4px;
     text-align: center;
     border: 1px solid #fde68a;
   }
   .step-num {
     display: inline-flex;
-    width: 22px;
-    height: 22px;
+    width: 20px;
+    height: 20px;
     border-radius: 50%;
     background: #d97706;
     color: white;
     align-items: center;
     justify-content: center;
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 900;
-    margin-bottom: 4px;
+    margin-bottom: 3px;
   }
-  .step-icon { font-size: 18px; color: #d97706; margin-bottom: 3px; display: block; }
-  .step-text { font-size: 10px; font-weight: 700; color: #334155; line-height: 1.3; }
+  .step-icon { font-size: 16px; color: #d97706; margin-bottom: 2px; display: block; }
+  .step-text { font-size: 9px; font-weight: 700; color: #334155; line-height: 1.3; }
 
   .footer-row {
-    margin-top: 5mm;
-    padding-top: 4mm;
+    margin-top: 3mm;
+    padding-top: 3mm;
     border-top: 1.5px dashed #e2e8f0;
     display: flex;
     justify-content: space-between;
     align-items: center;
     font-size: 10px;
     color: #64748b;
+    flex-shrink: 0;
   }
   .contact-text { font-weight: 700; color: #475569; }
 
@@ -327,8 +352,12 @@ $siteName  = defined('SITE_NAME') ? SITE_NAME : 'RSU Medical Clinic';
 
 <div class="toolbar">
   <a href="campaigns.php"><i class="fa-solid fa-arrow-left"></i> กลับ</a>
-  <button onclick="downloadPdf()"><i class="fa-solid fa-file-pdf"></i> ดาวน์โหลด PDF</button>
-  <button class="btn-primary" onclick="window.print()"><i class="fa-solid fa-print"></i> พิมพ์โปสเตอร์</button>
+  <button onclick="savePdf()" title="เปิดกล่องพิมพ์ของ browser → เลือก 'บันทึกเป็น PDF' ที่ช่องปลายทาง (ภาษาไทยถูกต้อง)">
+    <i class="fa-solid fa-file-pdf"></i> บันทึก PDF
+  </button>
+  <button class="btn-primary" onclick="window.print()" title="พิมพ์ออกกระดาษ A4">
+    <i class="fa-solid fa-print"></i> พิมพ์โปสเตอร์
+  </button>
 </div>
 
 <div class="a4-page" id="posterPage">
@@ -356,7 +385,7 @@ $siteName  = defined('SITE_NAME') ? SITE_NAME : 'RSU Medical Clinic';
     <?php if (!empty($campaign['description'])): ?>
     <div class="campaign-meta"><?= htmlspecialchars($campaign['description']) ?></div>
     <?php endif; ?>
-    <div class="campaign-meta" style="margin-top:6px">
+    <div class="campaign-meta-inline">
       <?php if ($campaign['available_until']): ?>
         <i class="fa-regular fa-calendar"></i>
         เปิดรับถึง <?= poster_fmt_date((string)$campaign['available_until']) ?>
@@ -428,16 +457,23 @@ $siteName  = defined('SITE_NAME') ? SITE_NAME : 'RSU Medical Clinic';
 </div>
 
 <script>
-  function downloadPdf() {
-    const el = document.getElementById('posterPage');
-    const filename = 'walkin-poster-<?= $campaignId ?>-<?= date('Ymd') ?>.pdf';
-    html2pdf().set({
-      margin: 0,
-      filename: filename,
-      image:   { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true, allowTaint: true },
-      jsPDF:   { unit: 'mm', format: 'a4', orientation: 'portrait' }
-    }).from(el).save();
+  // Save as PDF — uses the browser's native print → "Save as PDF" pipeline.
+  // We dropped html2pdf.js because html2canvas rasterizes Thai chars
+  // individually without combining-mark shaping (สระ/วรรณยุกต์ลอยผิดตำแหน่ง).
+  // The browser uses OS-level HarfBuzz which renders Thai correctly.
+  function savePdf() {
+    const HINT_KEY = 'walkin_poster_pdf_hint_v1';
+    let hintShown = false;
+    try { hintShown = localStorage.getItem(HINT_KEY) === '1'; } catch (e) {}
+
+    if (!hintShown) {
+      try { localStorage.setItem(HINT_KEY, '1'); } catch (e) {}
+      alert('ในกล่องพิมพ์ที่กำลังจะเปิดขึ้น:\n\n' +
+            '1. ช่อง "ปลายทาง" (Destination) → เลือก "บันทึกเป็น PDF"\n' +
+            '2. กดปุ่ม "บันทึก"\n\n' +
+            'หมายเหตุ: เลิกใช้ html2pdf เพราะ render ภาษาไทยผิด (สระลอยผิดตำแหน่ง)');
+    }
+    window.print();
   }
 
   <?php if ($autoprint): ?>

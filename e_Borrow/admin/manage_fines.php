@@ -220,7 +220,7 @@ async function eborrowFineSendToFinance(data) {
                        <div>วันที่: <b>${txnDate}</b></div>
                        <div>ยอด: <b>${Number(j.amount).toLocaleString('th-TH', {minimumFractionDigits: 2})} บาท</b></div>
                        ${monthHint}
-                       <div style="margin-top:10px"><a href="../portal/index.php?section=finance" target="_blank" style="color:#059669;text-decoration:underline">เปิดดู Cash Book →</a></div>
+                       <div style="margin-top:10px"><a href="../portal/finance.php" target="_blank" style="color:#059669;text-decoration:underline">เปิดดู Cash Book →</a></div>
                    </div>`,
             confirmButtonColor: '#059669'
         });

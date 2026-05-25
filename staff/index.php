@@ -41,6 +41,36 @@ if (empty($_SESSION['staff_name']) && !empty($_SESSION['admin_username'])) {
 }
 
 require_once __DIR__ . '/../config.php';
+
+// Walk-in QR — fetch campaigns that staff can present to walk-in patients.
+// Mirrors the gate in admin/ajax/ajax_toggle_walkin.php: 'active' + 'full' both
+// allow walk-in (full = overflow lane, slot capacity still gates downstream).
+$walkinCampaigns = [];
+try {
+    $pdo = db();
+    $pdo->exec("ALTER TABLE camp_list ADD COLUMN IF NOT EXISTS walkin_enabled TINYINT(1) NOT NULL DEFAULT 0");
+    $stmt = $pdo->prepare("
+        SELECT id, title, type, status
+        FROM camp_list
+        WHERE walkin_enabled = 1
+          AND status IN ('active', 'full')
+          AND (available_until IS NULL OR available_until >= CURDATE())
+          AND (available_from  IS NULL OR available_from  <= CURDATE())
+        ORDER BY (status = 'active') DESC, id DESC
+        LIMIT 30
+    ");
+    $stmt->execute();
+    $walkinCampaigns = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (Throwable) {}
+
+function staff_type_meta(string $t): array {
+    return match ($t) {
+        'vaccine'      => ['ฉีดวัคซีน',  'fa-syringe'],
+        'training'     => ['อบรม',       'fa-chalkboard-user'],
+        'health_check' => ['ตรวจสุขภาพ', 'fa-stethoscope'],
+        default        => ['กิจกรรม',     'fa-calendar-check'],
+    };
+}
 ?>
 <!DOCTYPE html>
 <html lang="th">
@@ -152,6 +182,86 @@ require_once __DIR__ . '/../config.php';
             </button>
         </div>
         <p class="text-[9px] text-gray-400 mt-2"><i class="fa-solid fa-circle-info mr-1"></i>เครื่องยิงบาร์โค้ดจะทำงานอัตโนมัติเมื่อวางเคอร์เซอร์ในช่องนี้</p>
+    </div>
+
+    <!-- ── Walk-in QR — present a QR for patients to scan at the counter ── -->
+    <div class="mt-4 bg-white p-6 rounded-3xl shadow-lg border border-amber-100">
+        <div class="flex items-center justify-between mb-3">
+            <p class="text-[10px] text-amber-600 font-bold uppercase tracking-widest">
+                <i class="fa-solid fa-person-walking mr-1"></i> Walk-in QR (ผู้ป่วยลงทะเบียนเอง)
+            </p>
+            <span class="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full">
+                <?= count($walkinCampaigns) ?> แคมเปญ
+            </span>
+        </div>
+        <p class="text-xs text-gray-500 mb-3">
+            แสดง QR หน้าจอให้ผู้ป่วย → ผู้ป่วยสแกนด้วยมือถือ → ลงทะเบียน LINE + เช็คอินอัตโนมัติ
+        </p>
+
+        <?php if (empty($walkinCampaigns)): ?>
+        <div class="text-center text-gray-400 py-6 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
+            <i class="fa-solid fa-circle-info text-2xl mb-2 block opacity-50"></i>
+            <div class="text-sm font-semibold">ยังไม่มีแคมเปญที่เปิด Walk-in</div>
+            <div class="text-[11px] mt-1">ให้ admin เปิดสวิตช์ Walk-in QR ในหน้า "สร้างแคมเปญ" ก่อน</div>
+        </div>
+        <?php else: ?>
+        <div class="space-y-2">
+            <?php foreach ($walkinCampaigns as $c): ?>
+                <?php [$_tLabel, $_tIcon] = staff_type_meta((string)$c['type']); ?>
+            <button type="button"
+                    onclick="showWalkinQr(<?= (int)$c['id'] ?>, <?= htmlspecialchars(json_encode($c['title'], JSON_UNESCAPED_UNICODE), ENT_QUOTES) ?>, <?= htmlspecialchars(json_encode($_tLabel, JSON_UNESCAPED_UNICODE), ENT_QUOTES) ?>)"
+                    class="w-full flex items-center justify-between gap-3 p-3 rounded-2xl border-2 border-amber-100 bg-amber-50 hover:bg-amber-100 hover:border-amber-200 active:scale-[.99] transition-all text-left">
+                <div class="flex items-center gap-2.5 min-w-0">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-amber-600 text-white flex items-center justify-center flex-shrink-0 shadow-sm shadow-amber-200">
+                        <i class="fa-solid <?= $_tIcon ?>"></i>
+                    </div>
+                    <div class="min-w-0 flex-1">
+                        <div class="text-sm font-bold text-amber-900 truncate"><?= htmlspecialchars($c['title']) ?></div>
+                        <div class="text-[11px] text-amber-700 font-semibold">
+                            <?= $_tLabel ?>
+                            <?php if ($c['status'] === 'full'): ?>
+                                · <span class="text-rose-600">เต็มโควต้า (รับ overflow)</span>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+                <i class="fa-solid fa-qrcode text-amber-600 text-lg"></i>
+            </button>
+            <?php endforeach; ?>
+        </div>
+        <?php endif; ?>
+    </div>
+</div>
+
+<!-- Walk-in QR display modal -->
+<div id="walkinQrModal" style="display:none;position:fixed;inset:0;z-index:9500;background:rgba(15,23,42,.65);backdrop-filter:blur(8px);align-items:center;justify-content:center;padding:16px"
+     onclick="if(event.target===this)closeWalkinQr()">
+    <div style="background:#fff;border-radius:24px;width:100%;max-width:380px;overflow:hidden;box-shadow:0 25px 50px -12px rgba(0,0,0,.4);max-height:95vh;display:flex;flex-direction:column">
+        <div style="padding:14px 18px;background:linear-gradient(135deg,#d97706,#f59e0b);color:#fff;display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
+            <div style="min-width:0">
+                <div style="font-size:10px;font-weight:800;letter-spacing:.1em;opacity:.85">
+                    <i class="fa-solid fa-person-walking mr-1"></i>WALK-IN QR
+                </div>
+                <div id="walkinModalTitle" style="font-size:14px;font-weight:900;margin-top:1px;line-height:1.3"></div>
+                <div id="walkinModalType" style="font-size:11px;opacity:.9;margin-top:1px"></div>
+            </div>
+            <button onclick="closeWalkinQr()" style="width:30px;height:30px;border-radius:8px;border:none;background:rgba(255,255,255,.2);color:#fff;cursor:pointer;flex-shrink:0">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+        <div style="padding:20px;text-align:center;overflow-y:auto">
+            <div style="display:inline-block;padding:14px;background:#fff;border:3px solid #d97706;border-radius:18px">
+                <img id="walkinQrImg" src="" alt="QR" style="width:260px;height:260px;display:block">
+            </div>
+            <p style="margin:14px 0 4px;font-size:13px;color:#475569;font-weight:700">
+                <i class="fa-solid fa-mobile-screen text-amber-500 mr-1"></i>
+                ให้ผู้ป่วยเปิดกล้องมือถือสแกน
+            </p>
+            <p style="font-size:11px;color:#94a3b8">Login LINE → กรอกข้อมูล → เช็คอินอัตโนมัติ</p>
+            <button onclick="closeWalkinQr()" class="mt-3 bg-amber-500 hover:bg-amber-600 text-white px-5 py-2 rounded-xl text-sm font-bold transition-all">
+                <i class="fa-solid fa-check mr-1"></i> เสร็จแล้ว
+            </button>
+        </div>
     </div>
 </div>
 
@@ -397,6 +507,25 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     btnSubmitManual.addEventListener('click', handleManualSubmit);
+});
+
+// ── Walk-in QR modal ────────────────────────────────────────────────
+function showWalkinQr(cid, title, typeLabel) {
+    document.getElementById('walkinModalTitle').textContent = title || '';
+    document.getElementById('walkinModalType').textContent  = typeLabel || '';
+    // size=12 = 12px per module ~ 280-300px image, sharp on phones
+    document.getElementById('walkinQrImg').src =
+        '../user/api_walkin_qr.php?campaign=' + encodeURIComponent(cid) + '&size=12&t=' + Date.now();
+    document.getElementById('walkinQrModal').style.display = 'flex';
+}
+function closeWalkinQr() {
+    document.getElementById('walkinQrModal').style.display = 'none';
+    document.getElementById('walkinQrImg').src = '';
+}
+document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && document.getElementById('walkinQrModal').style.display === 'flex') {
+        closeWalkinQr();
+    }
 });
 </script>
 </body>

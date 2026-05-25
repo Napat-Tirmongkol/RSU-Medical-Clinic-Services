@@ -15,6 +15,13 @@
     <link rel="stylesheet" href="../assets/css/tailwind.min.css">
     <link rel="stylesheet" href="../assets/css/portal.css?v=<?= @filemtime(__DIR__ . '/../assets/css/portal.css') ?: (defined('APP_BUILD') ? APP_BUILD : time()) ?>">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        /* SweetAlert2 z-index must beat the Portal-Escape modals (9000-9999)
+           so confirm/error popups appear ABOVE — otherwise validation alerts
+           render behind the gov / edit / view / pos / priv modals and look
+           like clicks are doing nothing. */
+        .swal2-container { z-index: 10500 !important; }
+    </style>
     <!-- Chart.js — loaded globally so all section pages (nurse_productivity,
          gold_card, activity_dashboard, edms/sla_dashboard, etc.) have access
          without each having to script-tag it. Some partials still load their
@@ -765,6 +772,30 @@
                         <div class="psb-icon"><i class="fa-solid fa-book" style="color:#059669"></i></div>
                         <span class="psb-label">Cash Book</span>
                     </a>
+                    <a class="psb-item <?= $activeSection==='billing_services'?'psb-active':'' ?>" data-section="billing_services" href="billing_services.php">
+                        <div class="psb-icon"><i class="fa-solid fa-list-check" style="color:#059669"></i></div>
+                        <span class="psb-label">บริการคลินิก</span>
+                    </a>
+                    <a class="psb-item <?= $activeSection==='billing_encounters'?'psb-active':'' ?>" data-section="billing_encounters" href="billing_encounters.php">
+                        <div class="psb-icon"><i class="fa-solid fa-notes-medical" style="color:#059669"></i></div>
+                        <span class="psb-label">บันทึกการเข้ารับบริการ</span>
+                    </a>
+                    <a class="psb-item <?= $activeSection==='billing_invoices'?'psb-active':'' ?>" data-section="billing_invoices" href="billing_invoices.php">
+                        <div class="psb-icon"><i class="fa-solid fa-file-invoice-dollar" style="color:#059669"></i></div>
+                        <span class="psb-label">ใบแจ้งหนี้ &amp; รับชำระ</span>
+                    </a>
+                    <a class="psb-item <?= $activeSection==='billing_ar_aging'?'psb-active':'' ?>" data-section="billing_ar_aging" href="billing_ar_aging.php">
+                        <div class="psb-icon"><i class="fa-solid fa-chart-bar" style="color:#059669"></i></div>
+                        <span class="psb-label">ลูกหนี้คงค้าง (AR)</span>
+                    </a>
+                    <a class="psb-item <?= $activeSection==='payroll_employees'?'psb-active':'' ?>" data-section="payroll_employees" href="payroll_employees.php">
+                        <div class="psb-icon"><i class="fa-solid fa-users-gear" style="color:#059669"></i></div>
+                        <span class="psb-label">Payroll · พนักงาน</span>
+                    </a>
+                    <a class="psb-item <?= $activeSection==='payroll_periods'?'psb-active':'' ?>" data-section="payroll_periods" href="payroll_periods.php">
+                        <div class="psb-icon"><i class="fa-solid fa-calendar-days" style="color:#059669"></i></div>
+                        <span class="psb-label">Payroll · งวดเงินเดือน</span>
+                    </a>
                 </div>
             <?php endif; ?>
 
@@ -891,6 +922,10 @@
                     <a class="psb-item <?= $activeSection==='clinic_data'?'psb-active':'' ?>" data-section="clinic_data" href="clinic_data.php">
                         <div class="psb-icon"><i class="fa-solid fa-hospital" style="color:#0d9488"></i></div>
                         <span class="psb-label">ข้อมูลคลินิก</span>
+                    </a>
+                    <a class="psb-item <?= $activeSection==='vitals_bp'?'psb-active':'' ?>" data-section="vitals_bp" href="vitals_bp.php">
+                        <div class="psb-icon"><i class="fa-solid fa-heart-pulse" style="color:#dc2626"></i></div>
+                        <span class="psb-label">สมุดความดันโลหิต</span>
                     </a>
                     <?php if ($hasScholarship): ?>
                         <a class="psb-item <?= $activeSection==='scholarship'?'psb-active':'' ?>" data-section="scholarship" href="scholarship.php">
