@@ -661,5 +661,341 @@ layout_start(['section' => 'identity', 'title' => 'Identity & Governance']);
 
                 </div>
                 <?php endif; ?>
+                <div id="idGovModal" style="display:none;position:fixed;inset:0;z-index:300;background:rgba(15,23,42,.6);backdrop-filter:blur(8px);align-items:center;justify-content:center;padding:20px">
+                    <div style="background:#fff;border-radius:28px;width:100%;max-width:720px;overflow:hidden;box-shadow:0 25px 50px -12px rgba(0,0,0,.3);display:flex;flex-direction:column;max-height:90vh">
+                        <!-- Modal Header -->
+                        <div style="padding:24px 30px;background:linear-gradient(90deg,#f8fafc,#fff);border-bottom:1px solid #f1f5f9;display:flex;align-items:center;justify-content:space-between">
+                            <div style="display:flex;align-items:center;gap:15px">
+                                <div id="govModalIcon" style="width:45px;height:45px;border-radius:14px;background:#eff6ff;color:#2563eb;display:flex;align-items:center;justify-content:center;font-size:20px;box-shadow:0 4px 10px rgba(37,99,235,0.1)">
+                                    <i class="fa-solid fa-user-shield"></i>
+                                </div>
+                                <div>
+                                    <h3 id="govModalTitle" style="margin:0;font-size:18px;font-weight:900;color:#0f172a">จัดการสิทธิ์ผู้ใช้งานระบบ</h3>
+                                    <p style="margin:2px 0 0;font-size:12px;color:#64748b;font-weight:600">Identity & Access Governance Interface</p>
+                                </div>
+                            </div>
+                            <button onclick="document.getElementById('idGovModal').style.display='none'" style="width:36px;height:36px;border-radius:10px;border:1.5px solid #e2e8f0;background:#fff;color:#94a3b8;cursor:pointer;transition:all 0.2s" onmouseover="this.style.color='#ef4444';this.style.borderColor='#fecaca'" onmouseout="this.style.color='#94a3b8';this.style.borderColor='#e2e8f0'">
+                                <i class="fa-solid fa-xmark"></i>
+                            </button>
+                        </div>
+
+                        <!-- Modal Body (Scrollable) -->
+                        <form method="POST" id="idGovForm" style="overflow-y:auto;padding:30px">
+                            <input type="hidden" name="action" id="govAction" value="save_identity_gov">
+                            <input type="hidden" name="target_id" id="govTargetId">
+                            <input type="hidden" name="target_type" id="govTargetType"> <!-- 'admin' or 'staff' -->
+                            <?php csrf_field(); ?>
+
+                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:30px">
+                                <!-- Column 1: Core Identity -->
+                                <div style="display:flex;flex-direction:column;gap:20px">
+                                    <div style="font-size:11px;font-weight:900;color:#94a3b8;text-transform:uppercase;letter-spacing:.1em;display:flex;align-items:center;gap:8px">
+                                        <i class="fa-solid fa-id-card"></i> ข้อมูลพื้นฐานบัญชี
+                                    </div>
+                                    
+                                    <div>
+                                        <label style="display:block;font-size:12px;font-weight:800;color:#475569;margin-bottom:6px">ชื่อ-นามสกุล <span style="color:#ef4444">*</span></label>
+                                        <input type="text" name="full_name" id="govFullName" required class="premium-input" style="width:100%">
+                                    </div>
+                                    
+                                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                                        <div>
+                                            <label style="display:block;font-size:12px;font-weight:800;color:#475569;margin-bottom:6px">Username</label>
+                                            <input type="text" name="username" id="govUsername" required class="premium-input" style="width:100%">
+                                        </div>
+                                        <div>
+                                            <label style="display:block;font-size:12px;font-weight:800;color:#475569;margin-bottom:6px">สถานะบัญชี</label>
+                                            <select name="status" id="govStatus" class="premium-input" style="width:100%;background-image:none">
+                                                <option value="active">Active</option>
+                                                <option value="suspended">Suspended</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label style="display:block;font-size:12px;font-weight:800;color:#475569;margin-bottom:6px">อีเมล</label>
+                                        <input type="email" name="email" id="govEmail" class="premium-input" style="width:100%" placeholder="— ไม่มีข้อมูล —">
+                                    </div>
+
+                                    <div>
+                                        <label style="display:block;font-size:12px;font-weight:800;color:#475569;margin-bottom:6px">รหัสผ่าน <span style="font-weight:normal;color:#94a3b8;font-size:11px">(เว้นว่างหากไม่เปลี่ยน)</span></label>
+                                        <input type="password" name="password" id="govPassword" class="premium-input" style="width:100%" placeholder="••••••••">
+                                    </div>
+                                </div>
+
+                                <!-- Column 2: System Roles -->
+                                <div style="display:flex;flex-direction:column;gap:20px">
+                                    <div style="font-size:11px;font-weight:900;color:#94a3b8;text-transform:uppercase;letter-spacing:.1em;display:flex;align-items:center;gap:8px">
+                                        <i class="fa-solid fa-shield-halved"></i> กำหนดสิทธิ์รายระบบ
+                                    </div>
+
+                                    <!-- Job Title (free-text descriptor — e.g. พยาบาล/ธุรการ) — ไม่เกี่ยวกับ permission -->
+                                    <div id="govJobTitleWrap" style="display:none">
+                                        <label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:800;color:#475569;margin-bottom:6px">
+                                            <i class="fa-solid fa-id-badge" style="color:#0891b2"></i> ตำแหน่งงาน (Job Title)
+                                            <span style="color:#94a3b8;font-weight:normal;font-size:11px">เช่น พยาบาล / ธุรการ / แพทย์ — ไม่เกี่ยวกับสิทธิ์</span>
+                                        </label>
+                                        <input type="text" name="job_title" id="govJobTitle" class="premium-input" style="width:100%" maxlength="120"
+                                               list="govJobTitleSuggest" placeholder="เช่น พยาบาล">
+                                        <datalist id="govJobTitleSuggest">
+                                            <option value="พยาบาลวิชาชีพ">
+                                            <option value="พยาบาลเทคนิค">
+                                            <option value="ผู้ช่วยพยาบาล">
+                                            <option value="แพทย์">
+                                            <option value="ผู้ช่วยแพทย์">
+                                            <option value="ธุรการ">
+                                            <option value="เภสัชกร">
+                                            <option value="ผู้ช่วยเภสัชกร">
+                                            <option value="หัวหน้าฝ่าย">
+                                            <option value="ผู้จัดการ">
+                                            <option value="IT Support">
+                                        </datalist>
+                                        <p id="govOrgPositionInfo" style="display:none;margin:6px 0 0;font-size:11px;color:#0891b2;font-weight:600">
+                                            <i class="fa-solid fa-sitemap"></i> ตำแหน่งในผังองค์กร: <span id="govOrgPositionTitle"></span>
+                                            <span style="color:#94a3b8">(แก้ที่ Chain of Command)</span>
+                                        </p>
+                                    </div>
+
+                                    <!-- Permission Template selector — Hybrid: ผูก position = lock flag, Custom = override เอง -->
+                                    <div id="govPositionWrap" style="display:none">
+                                        <label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:800;color:#475569;margin-bottom:6px">
+                                            <i class="fa-solid fa-user-tag" style="color:#7c3aed"></i> ชุดสิทธิ์ตำแหน่ง (Permission Template)
+                                            <span style="color:#94a3b8;font-weight:normal;font-size:11px">ผูกแล้ว flag จะ lock ตามตำแหน่ง</span>
+                                        </label>
+                                        <select name="position_id" id="govPositionId" class="premium-input" style="width:100%;background-image:none" onchange="onGovPositionChange()">
+                                            <option value="">— Custom (กำหนด flag เอง) —</option>
+                                            <?php foreach (($allPositions ?? []) as $pos): ?>
+                                                <option value="<?= (int)$pos['id'] ?>" data-flags='<?= htmlspecialchars($pos['flags'] ?? '{}', ENT_QUOTES) ?>'>
+                                                    <?= htmlspecialchars($pos['name']) ?><?= !empty($pos['description']) ? ' — ' . htmlspecialchars($pos['description']) : '' ?>
+                                                </option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                        <p id="govPositionLockNote" style="display:none;margin:6px 0 0;font-size:11px;color:#7c3aed;font-weight:700">
+                                            <i class="fa-solid fa-lock"></i> Flag ของตำแหน่งจะถูก apply ทันที (live link) — ปลด lock โดยเลือก "Custom"
+                                        </p>
+                                    </div>
+
+
+                                    <!-- e-Borrow Card -->
+                                    <div id="govEbCard" onclick="toggleGovAccess('govEbAccess', 'govEbRole', this)" class="premium-role-card orange p-4" style="border-radius:18px;border:1.5px solid #fed7aa;background:#fffaf5;cursor:pointer;transition:all 0.2s">
+                                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+                                            <div style="display:flex;align-items:center;gap:10px">
+                                                <div id="govEbIcon" style="width:32px;height:32px;background:#ffedd5;color:#ea580c;border-radius:8px;display:flex;align-items:center;justify-content:center"><i class="fa-solid fa-box-archive"></i></div>
+                                                <span style="font-weight:900;font-size:13px;color:#9a3412">e-Borrow & Inventory</span>
+                                            </div>
+                                            <input type="checkbox" id="govEbAccess" name="eb_access" value="1" checked style="width:18px;height:18px;cursor:pointer" onclick="event.stopPropagation(); syncGovUI('govEbAccess', 'govEbRole', 'govEbCard')">
+                                        </div>
+                                        <select name="eb_role" id="govEbRole" class="premium-input" style="width:100%;font-size:12px;border-color:#fed7aa" onclick="event.stopPropagation()">
+                                            <option value="employee">Employee (เจ้าหน้าที่ทั่วไป)</option>
+                                            <option value="librarian">Librarian (บรรณารักษ์)</option>
+                                            <option value="technician">Technician (ช่างเทคนิค)</option>
+                                            <option value="supervisor">Supervisor (หัวหน้างาน)</option>
+                                            <option value="admin">System Administrator (ผู้ดูแลสูงสุด)</option>
+                                        </select>
+                                    </div>
+
+                                    <!-- e-Campaign Card -->
+                                    <div id="govEcCard" onclick="toggleGovAccess('govEcAccess', 'govEcRole', this)" class="premium-role-card blue p-4" style="border-radius:18px;border:1.5px solid #bfdbfe;background:#f0f7ff;cursor:pointer;transition:all 0.2s">
+                                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+                                            <div style="display:flex;align-items:center;gap:10px">
+                                                <div id="govEcIcon" style="width:32px;height:32px;background:#dbeafe;color:#2563eb;border-radius:8px;display:flex;align-items:center;justify-content:center"><i class="fa-solid fa-bullhorn"></i></div>
+                                                <span style="font-weight:900;font-size:13px;color:#1e40af">e-Campaign System</span>
+                                            </div>
+                                            <input type="checkbox" name="ec_access" id="govEcAccess" value="1" style="width:18px;height:18px;cursor:pointer" onclick="event.stopPropagation(); syncGovUI('govEcAccess', 'govEcRole', 'govEcCard')">
+                                        </div>
+                                        <select name="ec_role" id="govEcRole" class="premium-input" style="width:100%;font-size:12px;border-color:#bfdbfe" onclick="event.stopPropagation()">
+                                            <option value="editor">Content Editor (จัดการกิจกรรม)</option>
+                                            <option value="admin">System Administrator (ผู้ดูแลสูงสุด)</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <!-- Portal Role Card (Only for Admins) -->
+                                    <div id="govAdminOnlyCard" style="display:none;background:#f5f3ff;border:1.5px solid #ddd6fe;border-radius:18px;padding:15px">
+                                        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+                                            <div style="width:30px;height:30px;background:#ede9fe;color:#7c3aed;border-radius:8px;display:flex;align-items:center;justify-content:center"><i class="fa-solid fa-crown"></i></div>
+                                            <span style="font-weight:900;font-size:13px;color:#5b21b6">Portal Management</span>
+                                        </div>
+                                        <select name="admin_role" id="govAdminRole" class="premium-input" style="width:100%;font-size:12px;border-color:#ddd6fe">
+                                            <option value="admin">Standard Admin</option>
+                                            <option value="editor">Standard Editor</option>
+                                            <option value="superadmin">Super Administrator (FULL CONTROL)</option>
+                                        </select>
+                                    </div>
+
+                                    <!-- Portal Extension Rights -->
+                                    <div style="display:flex;flex-direction:column;gap:12px">
+                                        <div style="font-size:11px;font-weight:900;color:#94a3b8;text-transform:uppercase;letter-spacing:.1em;display:flex;align-items:center;gap:8px">
+                                            <i class="fa-solid fa-puzzle-piece"></i> ส่วนขยาย (Extensions)
+                                        </div>
+                                        <div style="display:grid;grid-template-columns:1fr;gap:10px">
+                                            <!-- Insurance -->
+                                            <div onclick="document.getElementById('govInsAccess').click()" class="premium-role-card" style="border-radius:14px;border:1.5px solid #e2e8f0;background:#fff;cursor:pointer;padding:12px;transition:all 0.2s;display:flex;align-items:center;justify-content:space-between">
+                                                <div style="display:flex;align-items:center;gap:10px">
+                                                    <i class="fa-solid fa-shield-heart text-emerald-500"></i>
+                                                    <span style="font-weight:800;font-size:12px;color:#475569">Insurance Sync Hub</span>
+                                                </div>
+                                                <input type="checkbox" name="ins_access" id="govInsAccess" value="1" style="width:16px;height:16px" onclick="event.stopPropagation()">
+                                            </div>
+                                            <!-- Registry (ฝ่ายทะเบียน — upload only) -->
+                                            <div onclick="document.getElementById('govRegAccess').click()" class="premium-role-card" style="border-radius:14px;border:1.5px solid #e2e8f0;background:#fff;cursor:pointer;padding:12px;transition:all 0.2s;display:flex;align-items:center;justify-content:space-between">
+                                                <div style="display:flex;align-items:center;gap:10px">
+                                                    <i class="fa-solid fa-id-card-clip text-cyan-500"></i>
+                                                    <span style="font-weight:800;font-size:12px;color:#475569">Registry Upload (ฝ่ายทะเบียน)</span>
+                                                </div>
+                                                <input type="checkbox" name="reg_access" id="govRegAccess" value="1" style="width:16px;height:16px" onclick="event.stopPropagation()">
+                                            </div>
+                                            <!-- Logs -->
+                                            <div onclick="document.getElementById('govLogsAccess').click()" class="premium-role-card" style="border-radius:14px;border:1.5px solid #e2e8f0;background:#fff;cursor:pointer;padding:12px;transition:all 0.2s;display:flex;align-items:center;justify-content:space-between">
+                                                <div style="display:flex;align-items:center;gap:10px">
+                                                    <i class="fa-solid fa-list-ul text-slate-500"></i>
+                                                    <span style="font-weight:800;font-size:12px;color:#475569">System Activity Logs</span>
+                                                </div>
+                                                <input type="checkbox" name="logs_access" id="govLogsAccess" value="1" style="width:16px;height:16px" onclick="event.stopPropagation()">
+                                            </div>
+                                            <!-- Settings -->
+                                            <div onclick="document.getElementById('govSettAccess').click()" class="premium-role-card" style="border-radius:14px;border:1.5px solid #e2e8f0;background:#fff;cursor:pointer;padding:12px;transition:all 0.2s;display:flex;align-items:center;justify-content:space-between">
+                                                <div style="display:flex;align-items:center;gap:10px">
+                                                    <i class="fa-solid fa-sliders text-slate-500"></i>
+                                                    <span style="font-weight:800;font-size:12px;color:#475569">Global Site Settings</span>
+                                                </div>
+                                                <input type="checkbox" name="sett_access" id="govSettAccess" value="1" style="width:16px;height:16px" onclick="event.stopPropagation()">
+                                            </div>
+                                            <!-- EDMS (สารบรรณอิเล็กทรอนิกส์) -->
+                                            <div onclick="document.getElementById('govEdmsAccess').click()" class="premium-role-card" style="border-radius:14px;border:1.5px solid #e2e8f0;background:#fff;cursor:pointer;padding:12px;transition:all 0.2s;display:flex;align-items:center;justify-content:space-between">
+                                                <div style="display:flex;align-items:center;gap:10px">
+                                                    <i class="fa-solid fa-folder-open text-sky-500"></i>
+                                                    <span style="font-weight:800;font-size:12px;color:#475569">สารบรรณอิเล็กทรอนิกส์ (EDMS)</span>
+                                                </div>
+                                                <input type="checkbox" name="edms_access" id="govEdmsAccess" value="1" style="width:16px;height:16px" onclick="event.stopPropagation()">
+                                            </div>
+                                            <!-- AI Suite (Assistant / QA Lab / Prompts / Knowledge) -->
+                                            <div onclick="document.getElementById('govAiAccess').click()" class="premium-role-card" style="border-radius:14px;border:1.5px solid #e2e8f0;background:#fff;cursor:pointer;padding:12px;transition:all 0.2s;display:flex;align-items:center;justify-content:space-between">
+                                                <div style="display:flex;align-items:center;gap:10px">
+                                                    <i class="fa-solid fa-wand-magic-sparkles text-purple-500"></i>
+                                                    <span style="font-weight:800;font-size:12px;color:#475569">AI Suite (Assistant / QA / Prompts / Knowledge)</span>
+                                                </div>
+                                                <input type="checkbox" name="ai_access" id="govAiAccess" value="1" style="width:16px;height:16px" onclick="event.stopPropagation()">
+                                            </div>
+                                            <!-- Consumables (วัสดุสิ้นเปลือง) -->
+                                            <div onclick="document.getElementById('govConsumablesAccess').click()" class="premium-role-card" style="border-radius:14px;border:1.5px solid #e2e8f0;background:#fff;cursor:pointer;padding:12px;transition:all 0.2s;display:flex;align-items:center;justify-content:space-between">
+                                                <div style="display:flex;align-items:center;gap:10px">
+                                                    <i class="fa-solid fa-syringe text-rose-500"></i>
+                                                    <span style="font-weight:800;font-size:12px;color:#475569">วัสดุสิ้นเปลือง (Consumables)</span>
+                                                </div>
+                                                <input type="checkbox" name="consumables_access" id="govConsumablesAccess" value="1" style="width:16px;height:16px" onclick="event.stopPropagation()">
+                                            </div>
+                                            <!-- Asset (ครุภัณฑ์) -->
+                                            <div onclick="document.getElementById('govAssetAccess').click()" class="premium-role-card" style="border-radius:14px;border:1.5px solid #e2e8f0;background:#fff;cursor:pointer;padding:12px;transition:all 0.2s;display:flex;align-items:center;justify-content:space-between">
+                                                <div style="display:flex;align-items:center;gap:10px">
+                                                    <i class="fa-solid fa-warehouse text-amber-500"></i>
+                                                    <span style="font-weight:800;font-size:12px;color:#475569">ครุภัณฑ์ (Asset Inventory)</span>
+                                                </div>
+                                                <input type="checkbox" name="asset_access" id="govAssetAccess" value="1" style="width:16px;height:16px" onclick="event.stopPropagation()">
+                                            </div>
+                                            <!-- Finance (Cash Book) -->
+                                            <div onclick="document.getElementById('govFinanceAccess').click()" class="premium-role-card" style="border-radius:14px;border:1.5px solid #e2e8f0;background:#fff;cursor:pointer;padding:12px;transition:all 0.2s;display:flex;align-items:center;justify-content:space-between">
+                                                <div style="display:flex;align-items:center;gap:10px">
+                                                    <i class="fa-solid fa-money-bill-trend-up text-emerald-500"></i>
+                                                    <span style="font-weight:800;font-size:12px;color:#475569">การเงิน (Cash Book)</span>
+                                                </div>
+                                                <input type="checkbox" name="finance_access" id="govFinanceAccess" value="1" style="width:16px;height:16px" onclick="event.stopPropagation()">
+                                            </div>
+                                            <!-- Scholarship (นักศึกษาทุน) -->
+                                            <div onclick="document.getElementById('govScholarshipAccess').click()" class="premium-role-card" style="border-radius:14px;border:1.5px solid #e2e8f0;background:#fff;cursor:pointer;padding:12px;transition:all 0.2s;display:flex;align-items:center;justify-content:space-between">
+                                                <div style="display:flex;align-items:center;gap:10px">
+                                                    <i class="fa-solid fa-graduation-cap text-emerald-500"></i>
+                                                    <span style="font-weight:800;font-size:12px;color:#475569">นักศึกษาทุน (Scholarship)</span>
+                                                </div>
+                                                <input type="checkbox" name="scholarship_access" id="govScholarshipAccess" value="1" style="width:16px;height:16px" onclick="event.stopPropagation()">
+                                            </div>
+                                            <!-- Dashboard Admin (แก้ไข Insurance Dashboard) -->
+                                            <div onclick="document.getElementById('govDashboardAccess').click()" class="premium-role-card" style="border-radius:14px;border:1.5px solid #e2e8f0;background:#fff;cursor:pointer;padding:12px;transition:all 0.2s;display:flex;align-items:center;justify-content:space-between">
+                                                <div style="display:flex;align-items:center;gap:10px">
+                                                    <i class="fa-solid fa-chart-pie text-blue-500"></i>
+                                                    <span style="font-weight:800;font-size:12px;color:#475569">Dashboard Workbook Editor (สิทธิ์แก้ไข widget)</span>
+                                                </div>
+                                                <input type="checkbox" name="dashboard_admin_access" id="govDashboardAccess" value="1" style="width:16px;height:16px" onclick="event.stopPropagation()">
+                                            </div>
+                                            <!-- Monthly Report (กรอกรายงานประจำเดือน) -->
+                                            <div onclick="document.getElementById('govMonthlyReportAccess').click()" class="premium-role-card" style="border-radius:14px;border:1.5px solid #e2e8f0;background:#fff;cursor:pointer;padding:12px;transition:all 0.2s;display:flex;align-items:center;justify-content:space-between">
+                                                <div style="display:flex;align-items:center;gap:10px">
+                                                    <i class="fa-solid fa-clipboard-list text-amber-500"></i>
+                                                    <span style="font-weight:800;font-size:12px;color:#475569">รายงานประจำเดือน (กรอก/แก้ของฝ่ายตัวเอง)</span>
+                                                </div>
+                                                <input type="checkbox" name="monthly_report_access" id="govMonthlyReportAccess" value="1" style="width:16px;height:16px" onclick="event.stopPropagation()">
+                                            </div>
+                                            <!-- Nurse Productivity -->
+                                            <div onclick="document.getElementById('govNurseProductivityAccess').click()" class="premium-role-card" style="border-radius:14px;border:1.5px solid #e2e8f0;background:#fff;cursor:pointer;padding:12px;transition:all 0.2s;display:flex;align-items:center;justify-content:space-between">
+                                                <div style="display:flex;align-items:center;gap:10px">
+                                                    <i class="fa-solid fa-user-nurse text-amber-500"></i>
+                                                    <span style="font-weight:800;font-size:12px;color:#475569">Productivity พยาบาล OPD (คำนวณภาระงาน)</span>
+                                                </div>
+                                                <input type="checkbox" name="nurse_productivity_access" id="govNurseProductivityAccess" value="1" style="width:16px;height:16px" onclick="event.stopPropagation()">
+                                            </div>
+                                            <!-- Daily Summary -->
+                                            <div onclick="document.getElementById('govDailySummaryAccess').click()" class="premium-role-card" style="border-radius:14px;border:1.5px solid #e2e8f0;background:#fff;cursor:pointer;padding:12px;transition:all 0.2s;display:flex;align-items:center;justify-content:space-between">
+                                                <div style="display:flex;align-items:center;gap:10px">
+                                                    <i class="fa-solid fa-clipboard-check text-amber-500"></i>
+                                                    <span style="font-weight:800;font-size:12px;color:#475569">สรุปงานประจำวัน (Daily Summary dashboard)</span>
+                                                </div>
+                                                <input type="checkbox" name="daily_summary_access" id="govDailySummaryAccess" value="1" style="width:16px;height:16px" onclick="event.stopPropagation()">
+                                            </div>
+                                            <!-- Director View (ผู้อำนวยการ) -->
+                                            <div onclick="document.getElementById('govDirectorViewAccess').click()" class="premium-role-card" style="border-radius:14px;border:1.5px solid #e2e8f0;background:#fff;cursor:pointer;padding:12px;transition:all 0.2s;display:flex;align-items:center;justify-content:space-between">
+                                                <div style="display:flex;align-items:center;gap:10px">
+                                                    <i class="fa-solid fa-user-tie text-rose-500"></i>
+                                                    <span style="font-weight:800;font-size:12px;color:#475569">ผู้อำนวยการ (ดูทุกฝ่าย + อนุมัติรายงาน)</span>
+                                                </div>
+                                                <input type="checkbox" name="director_view_access" id="govDirectorViewAccess" value="1" style="width:16px;height:16px" onclick="event.stopPropagation()">
+                                            </div>
+                                            <!-- Identity & Governance (จัดการสิทธิ์ผู้ใช้) -->
+                                            <div onclick="document.getElementById('govIdentityAccess').click()" class="premium-role-card" style="border-radius:14px;border:1.5px solid #e2e8f0;background:#fff;cursor:pointer;padding:12px;transition:all 0.2s;display:flex;align-items:center;justify-content:space-between">
+                                                <div style="display:flex;align-items:center;gap:10px">
+                                                    <i class="fa-solid fa-id-card-clip text-blue-600"></i>
+                                                    <span style="font-weight:800;font-size:12px;color:#475569">Identity &amp; Governance (จัดการสิทธิ์/ตำแหน่ง/ฝ่าย)</span>
+                                                </div>
+                                                <input type="checkbox" name="identity_access" id="govIdentityAccess" value="1" style="width:16px;height:16px" onclick="event.stopPropagation()">
+                                            </div>
+                                            <!-- Department dropdown -->
+                                            <div class="premium-role-card" style="border-radius:14px;border:1.5px solid #e2e8f0;background:#fff;padding:12px;display:flex;align-items:center;justify-content:space-between;gap:10px">
+                                                <div style="display:flex;align-items:center;gap:10px;min-width:0">
+                                                    <i class="fa-solid fa-sitemap text-indigo-500"></i>
+                                                    <span style="font-weight:800;font-size:12px;color:#475569;white-space:nowrap">ฝ่าย/หน่วยงาน</span>
+                                                </div>
+                                                <select name="department_id" id="govDepartmentId" class="premium-input" style="flex:1;height:32px;padding:0 8px;font-size:12px;font-weight:700">
+                                                    <option value="">— ไม่ระบุ —</option>
+                                                    <?php
+                                                    try {
+                                                        $deptRows = $pdo->query("SELECT id, name FROM sys_departments WHERE active=1 ORDER BY sort_order, name")->fetchAll(PDO::FETCH_ASSOC);
+                                                        foreach ($deptRows as $d) {
+                                                            echo '<option value="' . (int)$d['id'] . '">' . htmlspecialchars($d['name']) . '</option>';
+                                                        }
+                                                    } catch (PDOException $e) { /* table not yet created */ }
+                                                    ?>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Audit Justification -->
+                            <div style="margin-top:30px;padding-top:20px;border-top:1.5px dashed #e2e8f0">
+                                <label style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:900;color:#dc2626;margin-bottom:8px">
+                                    <i class="fa-solid fa-shield-check"></i> เหตุผลความจำเป็นในการปรับสิทธิ์ (Justification) <span style="color:#ef4444">*</span>
+                                </label>
+                                <textarea name="justification" id="govJustification" required class="premium-input" style="width:100%;height:70px;padding:12px;font-size:13px;border-color:#fecaca" placeholder="ตัวอย่าง: ได้รับมอบหมายให้ดูแลระบบ e-Borrow เพิ่มเติมตามคำสั่งคณะ..."></textarea>
+                                <p style="margin:6px 0 0;font-size:10px;color:#94a3b8;font-weight:700"><i class="fa-solid fa-info-circle"></i> ISO 27001 Requirement: ทุกการปรับเปลี่ยนสิทธิ์ต้องมีการระบุเหตุผลความจำเป็นทางธุรกิจ</p>
+                            </div>
+                        </form>
+
+                        <!-- Modal Footer -->
+                        <div style="padding:24px 30px;background:#f8fafc;border-top:1px solid #f1f5f9;display:flex;gap:12px">
+                            <button type="button" onclick="document.getElementById('idGovModal').style.display='none'" style="flex:1;padding:13px;border-radius:14px;border:1.5px solid #e2e8f0;background:#fff;color:#475569;font-weight:800;font-size:14px;cursor:pointer">ยกเลิก</button>
+                            <button type="button" onclick="confirmGovSubmit()" style="flex:2;padding:13px;border-radius:14px;border:none;background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;font-weight:900;font-size:14px;cursor:pointer;box-shadow:0 10px 20px -5px rgba(37,99,235,0.3);display:flex;align-items:center;justify-content:center;gap:8px">
+                                <i class="fa-solid fa-check-double"></i> ยืนยันการปรับปรุงสิทธิ์
+                            </button>
+                        </div>
+                    </div>
             </div><!-- /section-identity -->
 <?php layout_end(); ?>
