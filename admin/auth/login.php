@@ -10,8 +10,9 @@ if (isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true
 require_once __DIR__ . '/../../config.php';
 require_once __DIR__ . '/../../includes/rate_limit.php';
 
-// Check rate limit (5 attempts per 5 minutes)
-rate_limit_check('admin_login', 5, 300, 'login.php');
+// IP-based brute-force protection: 5 failed attempts → 5 minute lockout.
+// แทน session-based rate limit เดิมที่ bypass ได้ด้วยการ rotate cookie
+rate_limit_ip_check_or_redirect('admin_login', 5, 300);
 
 $error = $_SESSION['login_error'] ?? '';
 unset($_SESSION['login_error']);
@@ -27,7 +28,7 @@ if (($_GET['error'] ?? '') === 'too_many_attempts') {
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     validate_csrf_or_die();
-    $username = $_POST['username'] ?? '';
+    $username = trim($_POST['username'] ?? '');
     $password = $_POST['password'] ?? '';
 
     try {
@@ -36,8 +37,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->execute([':uname' => $username]);
         $admin = $stmt->fetch();
 
-        if ($admin && password_verify($password, $admin['password'])) {
-            rate_limit_clear('admin_login');
+        // Mask username-enumeration timing oracle — ถ้า user ไม่มีจริง ก็ยังต้อง
+        // เสีย CPU เทียบเท่า password_verify() กัน attacker วัดเวลาตอบ
+        // dummy hash: bcrypt valid + cost ตรงกับ production (PHP 8.x default = 12)
+        $dummyHash = '$2y$12$IVQJwsWr.gGbN7/sS3Z9..5ie9lN55IVDUWV.sr70DjTvB0jRbVWu';
+        $passwordOk = password_verify($password, $admin ? $admin['password'] : $dummyHash);
+
+        $ipForLog = rate_limit_ip_addr();
+
+        if ($admin && $passwordOk) {
+            rate_limit_ip_clear('admin_login');
             $_SESSION['admin_logged_in'] = true;
             $_SESSION['admin_id'] = $admin['id'];
             $_SESSION['admin_username'] = $admin['full_name'] ?: $admin['username'];
@@ -54,10 +63,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             header('Location: ../../portal/index.php');
             exit;
         } else {
-            rate_limit_hit('admin_login', 5, 300);
+            rate_limit_ip_hit('admin_login', 5, 300);
+            // SIEM/intrusion-detection trail — log แม้ไม่รู้ว่า username ถูกหรือผิด
+            // (ไม่ leak ว่ามี user อยู่จริงไหม เพราะ message เดียวกัน)
+            log_activity('admin_login_failed',
+                "Failed login attempt: username='" . mb_substr($username, 0, 100) . "' from IP {$ipForLog}",
+                null);
             $error = 'ชื่อผู้ใช้ หรือ รหัสผ่านไม่ถูกต้อง';
         }
     } catch (PDOException $e) {
+        error_log('[admin_login] ' . $e->getMessage());
         $error = 'ระบบฐานข้อมูลขัดข้อง กรุณาลองใหม่ในภายหลัง';
     }
 }
