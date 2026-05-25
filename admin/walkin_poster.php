@@ -2,7 +2,9 @@
 // admin/walkin_poster.php — A4 print-ready Walk-in poster
 // Layout: Clinic header → Campaign title → Large QR (~8x8cm) → Steps → Footer
 // Print: A4 portrait · auto-trigger print on load (?autoprint=1)
-// Download: html2pdf.js available via "ดาวน์โหลด PDF" button
+// Save PDF: window.print() + browser's "Save as PDF" destination
+//           (dropped html2pdf.js — html2canvas rasterizes Thai chars
+//           individually and breaks combining-mark positioning)
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/includes/auth.php';
 
@@ -72,7 +74,6 @@ $siteName  = defined('SITE_NAME') ? SITE_NAME : 'RSU Medical Clinic';
 <link rel="stylesheet" href="../assets/css/tailwind.min.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <link rel="stylesheet" href="../assets/css/rsufont.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <style>
   * { font-family: 'Sarabun', sans-serif; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   body { background: #e2e8f0; padding: 24px; margin: 0; }
@@ -351,8 +352,12 @@ $siteName  = defined('SITE_NAME') ? SITE_NAME : 'RSU Medical Clinic';
 
 <div class="toolbar">
   <a href="campaigns.php"><i class="fa-solid fa-arrow-left"></i> กลับ</a>
-  <button onclick="downloadPdf()"><i class="fa-solid fa-file-pdf"></i> ดาวน์โหลด PDF</button>
-  <button class="btn-primary" onclick="window.print()"><i class="fa-solid fa-print"></i> พิมพ์โปสเตอร์</button>
+  <button onclick="savePdf()" title="เปิดกล่องพิมพ์ของ browser → เลือก 'บันทึกเป็น PDF' ที่ช่องปลายทาง (ภาษาไทยถูกต้อง)">
+    <i class="fa-solid fa-file-pdf"></i> บันทึก PDF
+  </button>
+  <button class="btn-primary" onclick="window.print()" title="พิมพ์ออกกระดาษ A4">
+    <i class="fa-solid fa-print"></i> พิมพ์โปสเตอร์
+  </button>
 </div>
 
 <div class="a4-page" id="posterPage">
@@ -452,16 +457,23 @@ $siteName  = defined('SITE_NAME') ? SITE_NAME : 'RSU Medical Clinic';
 </div>
 
 <script>
-  function downloadPdf() {
-    const el = document.getElementById('posterPage');
-    const filename = 'walkin-poster-<?= $campaignId ?>-<?= date('Ymd') ?>.pdf';
-    html2pdf().set({
-      margin: 0,
-      filename: filename,
-      image:   { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true, allowTaint: true },
-      jsPDF:   { unit: 'mm', format: 'a4', orientation: 'portrait' }
-    }).from(el).save();
+  // Save as PDF — uses the browser's native print → "Save as PDF" pipeline.
+  // We dropped html2pdf.js because html2canvas rasterizes Thai chars
+  // individually without combining-mark shaping (สระ/วรรณยุกต์ลอยผิดตำแหน่ง).
+  // The browser uses OS-level HarfBuzz which renders Thai correctly.
+  function savePdf() {
+    const HINT_KEY = 'walkin_poster_pdf_hint_v1';
+    let hintShown = false;
+    try { hintShown = localStorage.getItem(HINT_KEY) === '1'; } catch (e) {}
+
+    if (!hintShown) {
+      try { localStorage.setItem(HINT_KEY, '1'); } catch (e) {}
+      alert('ในกล่องพิมพ์ที่กำลังจะเปิดขึ้น:\n\n' +
+            '1. ช่อง "ปลายทาง" (Destination) → เลือก "บันทึกเป็น PDF"\n' +
+            '2. กดปุ่ม "บันทึก"\n\n' +
+            'หมายเหตุ: เลิกใช้ html2pdf เพราะ render ภาษาไทยผิด (สระลอยผิดตำแหน่ง)');
+    }
+    window.print();
   }
 
   <?php if ($autoprint): ?>
