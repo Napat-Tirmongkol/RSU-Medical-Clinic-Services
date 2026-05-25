@@ -44,6 +44,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['admin_email'] = $admin['email'];
             $_SESSION['admin_role'] = $admin['role'];
             session_regenerate_id(true);
+            // CSRF rotation: regenerate ID ไม่ลบ session data → token เดิมยัง valid
+            // → unset เพื่อให้ token ใหม่สร้างตอน get_csrf_token() request ถัดไป
+            unset($_SESSION['csrf_token']);
 
             // บันทึกกิจกรรม: เข้าสู่ระบบ
             log_activity('Login', "Admin '{$admin['username']}' เข้าสู่ระบบระบบจัดการกลาง (Portal)", (int)$admin['id']);

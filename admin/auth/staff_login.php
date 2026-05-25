@@ -78,7 +78,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->execute([':uname' => $username]);
             $staff = $stmt->fetch(PDO::FETCH_ASSOC);
 
-            // Live link: ถ้าผูก position อยู่ ใช้ flag จาก position แทน flag ใน sys_staff
+            // Live link: ถ้าผูก position อยู่ ใช้ flag จาก position แทน flag ใน sys_staff.
+            //
+            // ⚠️ Side effect: ถ้า admin "revoke" flag ที่ user-level (set sys_staff.access_xxx=0)
+            // แต่ position มี flag=1 อยู่ → ตอน login จะ overwrite กลับเป็น 1 → user-level
+            // revocation ถูก mask อย่างเงียบๆ. Detect + log สำหรับ audit trail (ISO 27001
+            // requires explicit access decision trail) — ไม่เปลี่ยน behavior เพราะอาจเป็น
+            // by-design "position = live source of truth". Future: ถ้าเปลี่ยนเป็น AND logic
+            // (most restrictive wins) ต้อง coordinate กับ Identity Governance UI
+            $positionMaskedFlags = [];
             if ($staff && !empty($staff['position_id']) && !empty($staff['position_flags'])) {
                 $posFlags = json_decode($staff['position_flags'], true) ?: [];
                 foreach ([
@@ -88,8 +96,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'access_dashboard_admin','access_monthly_report','access_nurse_productivity','access_daily_summary','access_director_view',
                     'access_identity'
                 ] as $flagKey) {
-                    $staff[$flagKey] = (int)($posFlags[$flagKey] ?? 0);
+                    $userLevel = (int)($staff[$flagKey] ?? 0);
+                    $posLevel  = (int)($posFlags[$flagKey] ?? 0);
+                    if ($userLevel === 0 && $posLevel === 1) {
+                        $positionMaskedFlags[] = $flagKey;
+                    }
+                    $staff[$flagKey] = $posLevel;
                 }
+                // ⚠️ log ของ masking detection ทำใน success branch ด้านล่าง — defer ไป
+                // หลัง password verify ผ่านเพื่อกันการ trigger spam log จาก attacker ที่
+                // ส่ง wrong password ซ้ำๆ ด้วย username ที่รู้
             }
 
             // Mask username-enumeration timing oracle — ถ้า user ไม่มีจริง ก็ยัง
@@ -133,6 +149,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
 
                     session_regenerate_id(true);
+                    // CSRF rotation: regenerate session ID ไม่ได้ลบ session data
+                    // → token ที่ใช้ก่อน login ยัง valid → session fixation surface.
+                    // unset เพื่อให้ get_csrf_token() ตอน request ถัดไป สร้าง token ใหม่
+                    unset($_SESSION['csrf_token']);
                     rate_limit_ip_clear('staff_login');
 
                     $_SESSION['admin_logged_in']       = true;
@@ -166,6 +186,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $_SESSION['_admin_last_activity']  = time();
 
                     log_activity('staff_login', "เจ้าหน้าที่ '{$staff['full_name']}' (Username: {$staff['username']}) เข้าสู่ระบบ e-Campaign", (int)$staff['id']);
+
+                    // ISO 27001 audit trail: หาก position override grant สิทธิ์ที่
+                    // user-level revoke ไว้ → log ตอนนี้ (defer จากตอน flag merge เพื่อ
+                    // กัน log spam จาก wrong-password attempts ที่รู้ username)
+                    if (!empty($positionMaskedFlags)) {
+                        log_activity('staff_position_override_masked_revoke',
+                            "Position override granted ".implode(',', $positionMaskedFlags)." despite user-level revoke (username='{$staff['username']}')",
+                            (int)$staff['id']);
+                    }
 
                     header('Location: ../../portal/index.php');
                     exit;
