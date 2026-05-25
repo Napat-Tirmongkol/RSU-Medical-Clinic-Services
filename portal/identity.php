@@ -1001,7 +1001,7 @@ layout_start(['section' => 'identity', 'title' => 'Identity & Governance']);
             <div id="idEditModal"
                 style="display:none;position:fixed;inset:0;z-index:9100;background:rgba(15,23,42,.55);backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:20px">
                 <div
-                    style="background:#fff;border-radius:24px;width:100%;max-width:480px;overflow:hidden;box-shadow:0 25px 50px -12px rgba(0,0,0,.25)">
+                    style="background:#fff;border-radius:24px;width:100%;max-width:480px;max-height:90vh;overflow:hidden;box-shadow:0 25px 50px -12px rgba(0,0,0,.25);display:flex;flex-direction:column">
                     <div
                         style="padding:20px 24px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;justify-content:space-between">
                         <div style="display:flex;align-items:center;gap:10px">
@@ -1016,7 +1016,7 @@ layout_start(['section' => 'identity', 'title' => 'Identity & Governance']);
                             <i class="fa-solid fa-times" style="font-size:12px"></i>
                         </button>
                     </div>
-                    <form method="POST" style="padding:20px 24px;display:flex;flex-direction:column;gap:14px">
+                    <form method="POST" style="padding:20px 24px;display:flex;flex-direction:column;gap:14px;overflow-y:auto;flex:1;min-height:0">
                         <input type="hidden" name="action" value="portal_edit_user">
                         <input type="hidden" name="user_id" id="id_edit_uid">
                         <?php if (function_exists('csrf_field'))
@@ -1122,7 +1122,7 @@ layout_start(['section' => 'identity', 'title' => 'Identity & Governance']);
             <div id="idViewModal"
                 style="display:none;position:fixed;inset:0;z-index:9100;background:rgba(15,23,42,.55);backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:20px">
                 <div
-                    style="background:#fff;border-radius:24px;width:100%;max-width:420px;overflow:hidden;box-shadow:0 25px 50px -12px rgba(0,0,0,.25)">
+                    style="background:#fff;border-radius:24px;width:100%;max-width:520px;max-height:90vh;overflow:hidden;box-shadow:0 25px 50px -12px rgba(0,0,0,.25);display:flex;flex-direction:column">
                     <div
                         style="padding:20px 24px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;justify-content:space-between">
                         <div style="display:flex;align-items:center;gap:10px">
@@ -1136,8 +1136,8 @@ layout_start(['section' => 'identity', 'title' => 'Identity & Governance']);
                             style="width:30px;height:30px;border-radius:8px;border:1px solid #e2e8f0;background:#f8fafc;color:#64748b;cursor:pointer"><i
                                 class="fa-solid fa-times" style="font-size:12px"></i></button>
                     </div>
-                    <div style="padding:20px 24px;display:flex;flex-direction:column;gap:12px" id="idViewBody"></div>
-                    <div style="padding:14px 24px;border-top:1px solid #f1f5f9;text-align:right">
+                    <div style="padding:20px 24px;display:flex;flex-direction:column;gap:12px;overflow-y:auto;flex:1;min-height:0" id="idViewBody"></div>
+                    <div style="padding:14px 24px;border-top:1px solid #f1f5f9;text-align:right;flex-shrink:0">
                         <button onclick="document.getElementById('idViewModal').style.display='none'"
                             style="padding:9px 22px;border-radius:10px;border:1.5px solid #e2e8f0;background:#f8fafc;color:#374151;font-size:13px;font-weight:700;cursor:pointer">ปิด</button>
                     </div>
@@ -1225,7 +1225,7 @@ layout_start(['section' => 'identity', 'title' => 'Identity & Governance']);
 
                 <!-- Add Privilege Modal -->
                 <div id="privModal" style="display:none;position:fixed;inset:0;z-index:9400;background:rgba(15,23,42,.6);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:20px">
-                    <div style="background:#fff;border-radius:28px;width:100%;max-width:480px;box-shadow:0 25px 50px -12px rgba(0,0,0,0.25);overflow:hidden">
+                    <div style="background:#fff;border-radius:28px;width:100%;max-width:480px;max-height:90vh;box-shadow:0 25px 50px -12px rgba(0,0,0,0.25);overflow-y:auto">
                         <div style="padding:24px;background:#fcfdfd;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center">
                             <h3 style="margin:0;font-size:18px;font-weight:900;color:#0f172a">🛡️ บันทึกการถือสิทธิ์ระดับสูง</h3>
                             <button type="button" onclick="document.getElementById('privModal').style.display='none'" style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:20px"><i class="fa-solid fa-xmark"></i></button>
