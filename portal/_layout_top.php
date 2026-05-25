@@ -781,6 +781,14 @@
                         <div class="psb-icon"><i class="fa-solid fa-chart-bar" style="color:#059669"></i></div>
                         <span class="psb-label">ลูกหนี้คงค้าง (AR)</span>
                     </a>
+                    <a class="psb-item <?= $activeSection==='payroll_employees'?'psb-active':'' ?>" data-section="payroll_employees" href="payroll_employees.php">
+                        <div class="psb-icon"><i class="fa-solid fa-users-gear" style="color:#059669"></i></div>
+                        <span class="psb-label">Payroll · พนักงาน</span>
+                    </a>
+                    <a class="psb-item <?= $activeSection==='payroll_periods'?'psb-active':'' ?>" data-section="payroll_periods" href="payroll_periods.php">
+                        <div class="psb-icon"><i class="fa-solid fa-calendar-days" style="color:#059669"></i></div>
+                        <span class="psb-label">Payroll · งวดเงินเดือน</span>
+                    </a>
                 </div>
             <?php endif; ?>
 
