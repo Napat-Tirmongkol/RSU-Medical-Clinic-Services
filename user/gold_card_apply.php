@@ -113,7 +113,7 @@ $__navActive = 'services';
         .form-input { width: 100%; padding: 12px 14px; border: 1.5px solid #e2e8f0; border-radius: 14px; font-size: 14px; font-weight: 600; background: white; transition: all 0.2s; }
         .form-input:focus { outline: none; border-color: #f59e0b; box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.1); }
         .form-input:invalid:not(:placeholder-shown) { border-color: #f87171; }
-        #signature-canvas { background: white; border: 2px dashed #cbd5e1; border-radius: 14px; touch-action: none; cursor: crosshair; width: 100%; }
+        #signature-canvas { background: white; border: 2px dashed #cbd5e1; border-radius: 14px; touch-action: none; cursor: crosshair; width: 100%; min-height: 280px; }
         #signature-canvas.has-signature { border-color: #10b981; border-style: solid; }
         .photo-preview { width: 100%; max-height: 280px; object-fit: cover; border-radius: 14px; border: 2px solid #e2e8f0; }
         .upload-zone { border: 2px dashed #cbd5e1; border-radius: 14px; padding: 32px 16px; text-align: center; transition: all 0.2s; cursor: pointer; background: white; }
@@ -336,7 +336,7 @@ $__navActive = 'services';
                     </div>
                     <p class="text-[11px] font-bold text-slate-500 mb-3">เซ็นชื่อในกรอบสี่เหลี่ยมด้านล่าง</p>
 
-                    <canvas id="signature-canvas" height="200"></canvas>
+                    <canvas id="signature-canvas" height="280"></canvas>
 
                     <div class="flex gap-2 mt-3">
                         <button type="button" onclick="clearSignature()" class="clear-btn flex-1">
