@@ -1295,6 +1295,12 @@
         (function () {
             var params = new URLSearchParams(window.location.search);
             var sec = params.get('section');
+            // หลัง multi-page refactor URL ไม่มี ?section= แล้ว — derive จาก pathname
+            // เช่น /portal/identity.php → sec = 'identity'
+            if (!sec) {
+                var m = window.location.pathname.match(/\/([a-z_]+)\.php$/i);
+                if (m) sec = m[1];
+            }
             var tab = params.get('tab');
             if (sec) {
                 var btn = document.querySelector('.psb-item[data-section="' + sec + '"]');
