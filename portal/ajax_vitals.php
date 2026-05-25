@@ -174,19 +174,24 @@ function handle_lookup_patient(PDO $pdo, string $verb): void
         return;
     }
     $like = '%' . $q . '%';
+    // PDO::ATTR_EMULATE_PREPARES is OFF (db_connect.php:33) so each named
+    // placeholder must appear exactly once — repeated :q would throw HY093.
     $st = $pdo->prepare("
         SELECT id, full_name, student_personnel_id, phone_number, citizen_id, status
         FROM sys_users
-        WHERE full_name LIKE :q
-           OR student_personnel_id LIKE :q
-           OR phone_number LIKE :q
-           OR citizen_id  LIKE :q
+        WHERE full_name           LIKE :q1
+           OR student_personnel_id LIKE :q2
+           OR phone_number         LIKE :q3
+           OR citizen_id           LIKE :q4
         ORDER BY
-          CASE WHEN student_personnel_id = :exact OR citizen_id = :exact THEN 0 ELSE 1 END,
+          CASE WHEN student_personnel_id = :exact1 OR citizen_id = :exact2 THEN 0 ELSE 1 END,
           full_name ASC
         LIMIT 15
     ");
-    $st->execute([':q' => $like, ':exact' => $q]);
+    $st->execute([
+        ':q1' => $like, ':q2' => $like, ':q3' => $like, ':q4' => $like,
+        ':exact1' => $q, ':exact2' => $q,
+    ]);
     echo json_encode(['ok' => true, 'rows' => $st->fetchAll(PDO::FETCH_ASSOC)],
         JSON_UNESCAPED_UNICODE);
 }

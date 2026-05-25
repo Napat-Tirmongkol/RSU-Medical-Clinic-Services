@@ -199,8 +199,9 @@ function pb_list_services(PDO $pdo, array $opts = []): array
     $where  = [];
     $params = [];
     if ($q !== '') {
-        $where[]        = '(code LIKE :q OR name LIKE :q)';
-        $params[':q']   = '%' . $q . '%';
+        $where[]            = '(code LIKE :q1 OR name LIKE :q2)';
+        $params[':q1']      = '%' . $q . '%';
+        $params[':q2']      = '%' . $q . '%';
     }
     if ($category !== '' && isset(PB_SERVICE_CATEGORIES[$category])) {
         $where[]               = 'category = :category';
@@ -315,19 +316,23 @@ function pb_lookup_patient(PDO $pdo, string $q): array
     $q = trim($q);
     if ($q === '' || mb_strlen($q) < 1) return [];
     $like = '%' . $q . '%';
+    // PDO emulate-prepares is off — bind a unique name per placeholder.
     $st = $pdo->prepare("
         SELECT id, full_name, student_personnel_id, phone_number, citizen_id, status
         FROM sys_users
-        WHERE full_name LIKE :q
-           OR student_personnel_id LIKE :q
-           OR phone_number LIKE :q
-           OR citizen_id  LIKE :q
+        WHERE full_name           LIKE :q1
+           OR student_personnel_id LIKE :q2
+           OR phone_number         LIKE :q3
+           OR citizen_id           LIKE :q4
         ORDER BY
-          CASE WHEN student_personnel_id = :exact OR citizen_id = :exact THEN 0 ELSE 1 END,
+          CASE WHEN student_personnel_id = :exact1 OR citizen_id = :exact2 THEN 0 ELSE 1 END,
           full_name ASC
         LIMIT 15
     ");
-    $st->execute([':q' => $like, ':exact' => $q]);
+    $st->execute([
+        ':q1' => $like, ':q2' => $like, ':q3' => $like, ':q4' => $like,
+        ':exact1' => $q, ':exact2' => $q,
+    ]);
     return $st->fetchAll(PDO::FETCH_ASSOC);
 }
 
@@ -345,13 +350,13 @@ function pb_lookup_provider(PDO $pdo, string $q): array
             SELECT id, full_name,
                    COALESCE(NULLIF(official_title,''), NULLIF(job_title,''), '') AS title
             FROM sys_staff
-            WHERE full_name LIKE :q
-               OR official_title LIKE :q
-               OR job_title LIKE :q
+            WHERE full_name      LIKE :q1
+               OR official_title LIKE :q2
+               OR job_title      LIKE :q3
             ORDER BY full_name ASC
             LIMIT 15
         ");
-        $st->execute([':q' => $like]);
+        $st->execute([':q1' => $like, ':q2' => $like, ':q3' => $like]);
         return $st->fetchAll(PDO::FETCH_ASSOC);
     } catch (PDOException) {
         return [];
@@ -416,8 +421,10 @@ function pb_list_encounters(PDO $pdo, array $opts = []): array
     $where  = [];
     $params = [];
     if ($q !== '') {
-        $where[]      = '(e.encounter_no LIKE :q OR u.full_name LIKE :q OR u.student_personnel_id LIKE :q)';
-        $params[':q'] = '%' . $q . '%';
+        $where[]            = '(e.encounter_no LIKE :q1 OR u.full_name LIKE :q2 OR u.student_personnel_id LIKE :q3)';
+        $params[':q1']      = '%' . $q . '%';
+        $params[':q2']      = '%' . $q . '%';
+        $params[':q3']      = '%' . $q . '%';
     }
     if ($status !== '' && in_array($status, ['draft','finalized','invoiced','cancelled'], true)) {
         $where[]              = 'e.status = :status';
@@ -650,8 +657,10 @@ function pb_list_invoices(PDO $pdo, array $opts = []): array
     $where  = [];
     $params = [];
     if ($q !== '') {
-        $where[]      = '(i.invoice_no LIKE :q OR u.full_name LIKE :q OR u.student_personnel_id LIKE :q)';
-        $params[':q'] = '%' . $q . '%';
+        $where[]            = '(i.invoice_no LIKE :q1 OR u.full_name LIKE :q2 OR u.student_personnel_id LIKE :q3)';
+        $params[':q1']      = '%' . $q . '%';
+        $params[':q2']      = '%' . $q . '%';
+        $params[':q3']      = '%' . $q . '%';
     }
     if ($status !== '' && isset(PB_INVOICE_STATUSES[$status])) {
         $where[]              = 'i.status = :status';

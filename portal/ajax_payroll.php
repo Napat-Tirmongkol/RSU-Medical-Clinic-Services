@@ -343,10 +343,14 @@ function handle_lookup_pr(PDO $pdo, string $verb): void
                    FROM sys_staff s
                    LEFT JOIN sys_payroll_employees e ON e.staff_id = s.id
                    WHERE e.id IS NULL
-                     AND (s.full_name LIKE :q OR s.job_title LIKE :q OR s.official_title LIKE :q)
+                     AND (s.full_name LIKE :q1 OR s.job_title LIKE :q2 OR s.official_title LIKE :q3)
                    ORDER BY s.full_name ASC LIMIT 20";
             $st = $pdo->prepare($sql);
-            if ($q !== '') $st->bindValue(':q', $like);
+            if ($q !== '') {
+                $st->bindValue(':q1', $like);
+                $st->bindValue(':q2', $like);
+                $st->bindValue(':q3', $like);
+            }
             $st->execute();
             echo json_encode(['ok' => true, 'rows' => $st->fetchAll(PDO::FETCH_ASSOC)],
                 JSON_UNESCAPED_UNICODE);

@@ -267,8 +267,10 @@ function pr_list_employees(PDO $pdo, array $opts = []): array
     $where  = [];
     $params = [];
     if ($q !== '') {
-        $where[]      = '(s.full_name LIKE :q OR e.employee_no LIKE :q OR e.tax_id LIKE :q)';
-        $params[':q'] = '%' . $q . '%';
+        $where[]            = '(s.full_name LIKE :q1 OR e.employee_no LIKE :q2 OR e.tax_id LIKE :q3)';
+        $params[':q1']      = '%' . $q . '%';
+        $params[':q2']      = '%' . $q . '%';
+        $params[':q3']      = '%' . $q . '%';
     }
     if ($active === 0 || $active === 1) {
         $where[]              = 'e.is_active = :active';
