@@ -1,11 +1,7 @@
 <?php
 // admin/staff_login.php — e-Campaign Staff Login (sys_staff)
-if (session_status() === PHP_SESSION_NONE) {
-    ini_set('session.gc_maxlifetime', 7200);
-    ini_set('session.cookie_httponly', 1);
-    ini_set('session.cookie_samesite', 'Lax');
-    session_start();
-}
+require_once __DIR__ . '/../../includes/session_guard.php';
+start_secure_session();
 
 // ถ้า login แล้ว ข้ามไปหน้า index
 if (isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true) {
@@ -98,8 +94,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             if ($staff && password_verify($password, $staff['password_hash'])) {
 
-                if ($staff['account_status'] === 'disabled') {
-                    $error = 'บัญชีนี้ถูกระงับการใช้งาน กรุณาติดต่อผู้ดูแลระบบ';
+                // Whitelist account_status — เฉพาะ 'active' เท่านั้นที่ login ได้
+                // (สถานะอื่นจาก ENUM: disabled / suspended / inactive จะถูก block ทั้งหมด)
+                $accountStatus = strtolower(trim((string)($staff['account_status'] ?? 'active')));
+                if ($accountStatus !== 'active') {
+                    $error = 'บัญชีนี้ไม่พร้อมใช้งาน กรุณาติดต่อผู้ดูแลระบบ';
                 } elseif (!(int)$staff['access_ecampaign'] && !(int)$staff['access_eborrow'] && !(int)$staff['access_insurance'] && !(int)$staff['access_registry'] && !(int)$staff['access_edms'] && !(int)$staff['access_ai'] && !(int)$staff['access_consumables'] && !(int)$staff['access_asset'] && !(int)$staff['access_finance'] && !(int)$staff['access_scholarship'] && !(int)$staff['access_dashboard_admin'] && !(int)$staff['access_monthly_report'] && !(int)$staff['access_nurse_productivity'] && !(int)$staff['access_daily_summary'] && !(int)$staff['access_director_view'] && !(int)$staff['access_identity']) {
                     $error = 'บัญชีนี้ยังไม่ได้รับสิทธิ์เข้าใช้งานระบบใดๆ กรุณาติดต่อผู้ดูแลระบบ';
                 } else {
