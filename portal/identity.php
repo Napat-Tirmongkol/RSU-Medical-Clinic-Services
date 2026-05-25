@@ -21,6 +21,27 @@ layout_start(['section' => 'identity', 'title' => 'Identity & Governance']);
                             style="display:flex;align-items:center;gap:10px;background:#f0fdf4;border:1.5px solid #bbf7d0;border-radius:14px;padding:12px 18px;margin-bottom:20px;font-size:13px;font-weight:700;color:#15803d">
                             <i class="fa-solid fa-circle-check"></i> บันทึกข้อมูลสำเร็จ
                         </div>
+                        <script>
+                        // Swal toast แจ้งเตือนสำเร็จ (เด่นกว่า inline div + auto-dismiss)
+                        (function(){
+                            if (typeof Swal === 'undefined') return;
+                            Swal.fire({
+                                toast: true, position: 'top-end',
+                                icon: 'success',
+                                title: 'บันทึกข้อมูลสำเร็จ',
+                                showConfirmButton: false,
+                                timer: 3000, timerProgressBar: true,
+                            });
+                            // ล้าง ?saved=1 จาก URL bar กัน refresh แล้ว toast ขึ้นซ้ำ
+                            if (window.history && history.replaceState) {
+                                try {
+                                    const u = new URL(window.location.href);
+                                    u.searchParams.delete('saved');
+                                    history.replaceState({}, '', u.toString());
+                                } catch (e) {}
+                            }
+                        })();
+                        </script>
                     <?php endif; ?>
                     <?php if ($idError): ?>
                         <div
