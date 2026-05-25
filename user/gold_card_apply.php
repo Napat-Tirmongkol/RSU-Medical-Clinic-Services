@@ -840,12 +840,32 @@ $__navActive = 'services';
     let signaturePad = null;
     const canvas = document.getElementById('signature-canvas');
     if (canvas) {
+        let lastCanvasWidth = 0;
+
+        // Mobile gotcha: scrolling collapses/expands the address bar which
+        // fires window.resize — but the canvas width hasn't actually changed,
+        // only the viewport height. Skip resize when width is unchanged so
+        // the signature isn't wiped on every scroll.
         function resizeCanvas() {
+            const newWidth = canvas.offsetWidth;
+            if (newWidth === lastCanvasWidth && canvas.width > 0) return;
+            lastCanvasWidth = newWidth;
+
+            // Preserve the existing strokes before we blow away the bitmap.
+            const savedData = signaturePad ? signaturePad.toData() : null;
+
             const ratio = Math.max(window.devicePixelRatio || 1, 1);
-            canvas.width = canvas.offsetWidth * ratio;
+            canvas.width  = newWidth * ratio;
             canvas.height = canvas.offsetHeight * ratio;
             canvas.getContext('2d').scale(ratio, ratio);
-            if (signaturePad) signaturePad.clear();
+
+            if (signaturePad) {
+                signaturePad.clear();
+                if (savedData && savedData.length > 0) {
+                    signaturePad.fromData(savedData);
+                    canvas.classList.toggle('has-signature', !signaturePad.isEmpty());
+                }
+            }
         }
         signaturePad = new SignaturePad(canvas, {
             backgroundColor: 'rgb(255,255,255)',
@@ -856,7 +876,12 @@ $__navActive = 'services';
         signaturePad.addEventListener('endStroke', () => {
             canvas.classList.toggle('has-signature', !signaturePad.isEmpty());
         });
-        window.addEventListener('resize', resizeCanvas);
+        // Debounce so a single resize doesn't fire dozens of times in flight
+        let resizeTimer = null;
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(resizeCanvas, 120);
+        });
         resizeCanvas();
     }
 
