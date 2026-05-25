@@ -31,6 +31,20 @@ if (!hash_equals(CRON_SECRET_TOKEN, $token)) {
 date_default_timezone_set('Asia/Bangkok');
 header('Content-Type: text/plain; charset=utf-8');
 
+// ── Surface fatals as plain-text response so the user sees the real cause
+//    instead of a bare "500 Internal Server Error" with no log access.
+set_exception_handler(function (Throwable $e) {
+    echo "\n[FATAL EXCEPTION] " . get_class($e) . ": " . $e->getMessage() . "\n";
+    echo "  at " . $e->getFile() . ':' . $e->getLine() . "\n";
+});
+register_shutdown_function(function () {
+    $err = error_get_last();
+    if ($err && in_array($err['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR], true)) {
+        echo "\n[FATAL ERROR] " . $err['message'] . "\n";
+        echo "  at " . $err['file'] . ':' . $err['line'] . "\n";
+    }
+});
+
 $projectRoot = dirname(__DIR__);
 require_once $projectRoot . '/config.php';
 require_once $projectRoot . '/line_api/line_richmenu_helper.php';
@@ -50,11 +64,33 @@ echo "Target member menu: {$ids['member']}\n";
 
 try {
     $pdo = db();
-    $sql = "SELECT DISTINCT COALESCE(line_user_id_new, line_user_id) AS uid
-            FROM sys_users
-            WHERE (line_user_id     IS NOT NULL AND line_user_id     != '')
-               OR (line_user_id_new IS NOT NULL AND line_user_id_new != '')
-            ORDER BY id ASC";
+
+    // Detect whether the optional line_user_id_new column exists. It was
+    // added in migrate_line_user_id_new.php to support a future channel
+    // migration — older installs only have line_user_id. The original SQL
+    // referenced both unconditionally and 500'd on prod hosts where the
+    // migration hadn't been run yet.
+    $hasNewCol = false;
+    try {
+        $colCheck = $pdo->query("SHOW COLUMNS FROM sys_users LIKE 'line_user_id_new'");
+        $hasNewCol = $colCheck && $colCheck->fetch() !== false;
+    } catch (Throwable $e) {
+        $hasNewCol = false;
+    }
+
+    if ($hasNewCol) {
+        $sql = "SELECT DISTINCT COALESCE(line_user_id_new, line_user_id) AS uid
+                FROM sys_users
+                WHERE (line_user_id     IS NOT NULL AND line_user_id     != '')
+                   OR (line_user_id_new IS NOT NULL AND line_user_id_new != '')
+                ORDER BY id ASC";
+    } else {
+        echo "  · column line_user_id_new not found — using line_user_id only\n";
+        $sql = "SELECT DISTINCT line_user_id AS uid
+                FROM sys_users
+                WHERE line_user_id IS NOT NULL AND line_user_id != ''
+                ORDER BY id ASC";
+    }
     if ($limit > 0) $sql .= " LIMIT " . $limit;
     $rows = $pdo->query($sql)->fetchAll(PDO::FETCH_COLUMN) ?: [];
 } catch (Throwable $e) {
@@ -69,19 +105,25 @@ $ok = 0; $fail = 0; $skip = 0;
 foreach ($rows as $i => $uid) {
     if (!$uid) { $skip++; continue; }
 
-    if ($dryrun) {
-        $ok++;
-    } else {
-        $r = line_richmenu_link_user((string)$uid, $ids['member']);
-        $r['ok'] ? $ok++ : $fail++;
-        line_richmenu_audit_log(
-            (string)$uid,
-            $r['ok'] ? 'sync_ok' : 'sync_failed',
-            'member',
-            $ids['member'],
-            $r['ok'] ? null : $r['error'],
-            'cron:sync_richmenu'
-        );
+    try {
+        if ($dryrun) {
+            $ok++;
+        } else {
+            $r = line_richmenu_link_user((string)$uid, $ids['member']);
+            $r['ok'] ? $ok++ : $fail++;
+            line_richmenu_audit_log(
+                (string)$uid,
+                $r['ok'] ? 'sync_ok' : 'sync_failed',
+                'member',
+                $ids['member'],
+                $r['ok'] ? null : $r['error'],
+                'cron:sync_richmenu'
+            );
+        }
+    } catch (Throwable $e) {
+        // Don't let one user's failure abort the whole run
+        $fail++;
+        echo "  ✗ user " . substr((string)$uid, 0, 8) . "...: " . $e->getMessage() . "\n";
     }
 
     // กัน LINE rate limit (~50 req/sec) — pause สั้นๆ ทุก 50 รายการ
