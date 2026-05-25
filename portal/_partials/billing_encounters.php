@@ -567,8 +567,10 @@ $beCsrf = get_csrf_token();
             '</tr></thead><tbody>';
 
         d.rows.forEach(r => {
-            const isDraft = r.status === 'draft';
+            const isDraft       = r.status === 'draft';
+            const isFinalized   = r.status === 'finalized';
             const isFinalizable = isDraft;
+            const isInvoiceable = isFinalized;  // gen invoice from finalized only
             const isCancellable = ['draft','finalized'].includes(r.status);
             const isDeletable   = isDraft;
 
@@ -591,6 +593,12 @@ $beCsrf = get_csrf_token();
                         : '<button class="be-icon-btn is-edit" onclick="beOpenModal(' + r.id + ',true)" title="ดู"><i class="fa-solid fa-eye text-xs"></i></button> ') +
                     (isFinalizable
                         ? '<button class="be-icon-btn is-final" onclick="beFinalize(' + r.id + ')" title="ปิดงาน"><i class="fa-solid fa-circle-check text-xs"></i></button> '
+                        : '') +
+                    (isInvoiceable
+                        ? '<button class="be-icon-btn is-final" style="background:#dbeafe;color:#1d4ed8;border-color:#bfdbfe" onclick="beGenInvoice(' + r.id + ',\'' + escapeHtml(r.encounter_no) + '\',' + Number(r.total) + ')" title="ออกใบแจ้งหนี้"><i class="fa-solid fa-file-invoice-dollar text-xs"></i></button> '
+                        : '') +
+                    (r.status === 'invoiced'
+                        ? '<a href="billing_invoices.php?focus_encounter=' + r.id + '" class="be-icon-btn is-edit" style="background:#dbeafe;color:#1d4ed8;border-color:#bfdbfe;text-decoration:none" title="ไปดูใบแจ้งหนี้"><i class="fa-solid fa-file-invoice text-xs"></i></a> '
                         : '') +
                     (isCancellable
                         ? '<button class="be-icon-btn is-cancel" onclick="beCancel(' + r.id + ',\'' + escapeHtml(r.encounter_no) + '\')" title="ยกเลิก"><i class="fa-solid fa-ban text-xs"></i></button> '
@@ -990,6 +998,62 @@ $beCsrf = get_csrf_token();
             .then(d => {
                 if (d.ok) loadEncounters();
                 else Swal.fire({ icon:'error', title:'ยกเลิกไม่ได้', text: d.message || '' });
+            });
+    };
+
+    window.beGenInvoice = async function (id, no, total) {
+        const todayPlus30 = new Date();
+        todayPlus30.setDate(todayPlus30.getDate() + 30);
+        const dueDefault = todayPlus30.toISOString().slice(0, 10);
+
+        const { isConfirmed, value } = await Swal.fire({
+            title: 'ออกใบแจ้งหนี้จาก ' + no,
+            html:
+                '<div style="text-align:left;font-size:14px;line-height:1.6">' +
+                '<p>ยอด <b>' + thBaht(total) + ' ฿</b> · กำหนดประเภทผู้ชำระและวันครบกำหนด</p>' +
+                '<label style="display:block;margin-top:10px;font-size:12px;font-weight:700;color:#475569">ผู้ชำระเงิน</label>' +
+                '<select id="swPayerType" class="swal2-select" style="width:100%">' +
+                '<option value="patient">ผู้ป่วยจ่ายเอง</option>' +
+                '<option value="insurance">ประกัน</option>' +
+                '<option value="gold_card">บัตรทอง</option>' +
+                '<option value="other">อื่นๆ</option>' +
+                '</select>' +
+                '<label style="display:block;margin-top:10px;font-size:12px;font-weight:700;color:#475569">ครบกำหนด</label>' +
+                '<input id="swDueDate" type="date" value="' + dueDefault + '" class="swal2-input" style="margin:0;width:100%">' +
+                '</div>',
+            showCancelButton: true,
+            confirmButtonText: '<i class="fa-solid fa-file-invoice-dollar mr-1"></i> ออกใบแจ้งหนี้',
+            cancelButtonText: 'ยกเลิก',
+            confirmButtonColor: '#1d4ed8',
+            preConfirm: () => ({
+                payer_type: document.getElementById('swPayerType').value,
+                due_date:   document.getElementById('swDueDate').value,
+            }),
+        });
+        if (!isConfirmed) return;
+
+        const fd = new FormData();
+        fd.append('csrf_token',   CSRF);
+        fd.append('action',       'invoice:create_from_encounter');
+        fd.append('encounter_id', id);
+        fd.append('payer_type',   value.payer_type);
+        fd.append('due_date',     value.due_date);
+
+        fetch(AJAX_URL, { method: 'POST', body: fd })
+            .then(r => r.json())
+            .then(d => {
+                if (d.ok) {
+                    Swal.fire({
+                        icon: 'success',
+                        title: d.message,
+                        html: '<a href="billing_invoices.php?focus_invoice=' + d.invoice_id +
+                              '" class="text-blue-600 font-bold">→ ไปดูใบแจ้งหนี้</a>',
+                        confirmButtonText: 'ปิด',
+                    });
+                    loadEncounters();
+                } else {
+                    Swal.fire({ icon: 'error', title: 'ออกใบแจ้งหนี้ไม่ได้', text: d.message || '' });
+                }
             });
     };
 

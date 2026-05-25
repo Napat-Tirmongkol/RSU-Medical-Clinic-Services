@@ -773,6 +773,10 @@
                         <div class="psb-icon"><i class="fa-solid fa-notes-medical" style="color:#059669"></i></div>
                         <span class="psb-label">บันทึกการเข้ารับบริการ</span>
                     </a>
+                    <a class="psb-item <?= $activeSection==='billing_invoices'?'psb-active':'' ?>" data-section="billing_invoices" href="billing_invoices.php">
+                        <div class="psb-icon"><i class="fa-solid fa-file-invoice-dollar" style="color:#059669"></i></div>
+                        <span class="psb-label">ใบแจ้งหนี้ &amp; รับชำระ</span>
+                    </a>
                 </div>
             <?php endif; ?>
 

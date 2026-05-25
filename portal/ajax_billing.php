@@ -52,6 +52,8 @@ try {
     switch ($entity) {
         case 'service':   handle_service($pdo, $verb, $adminId);   break;
         case 'encounter': handle_encounter($pdo, $verb, $adminId); break;
+        case 'invoice':   handle_invoice($pdo, $verb, $adminId);   break;
+        case 'payment':   handle_payment($pdo, $verb, $adminId);   break;
         case 'lookup':    handle_lookup($pdo, $verb);              break;
         default:
             echo json_encode(['ok' => false, 'message' => 'entity ไม่รู้จัก: ' . $entity]);
@@ -516,5 +518,124 @@ function handle_encounter(PDO $pdo, string $verb, int $adminId): void
 
         default:
             echo json_encode(['ok' => false, 'message' => 'encounter action ไม่รู้จัก: ' . $verb]);
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Invoice — list, get, create_from_encounter, void
+// ─────────────────────────────────────────────────────────────────────────────
+
+function handle_invoice(PDO $pdo, string $verb, int $adminId): void
+{
+    switch ($verb) {
+        case 'list': {
+            $res = pb_list_invoices($pdo, [
+                'q'          => $_REQUEST['q']          ?? '',
+                'status'     => $_REQUEST['status']     ?? '',
+                'payer_type' => $_REQUEST['payer_type'] ?? '',
+                'date_from'  => $_REQUEST['date_from']  ?? '',
+                'date_to'    => $_REQUEST['date_to']    ?? '',
+                'patient_id' => (int)($_REQUEST['patient_id'] ?? 0),
+                'page'       => (int)($_REQUEST['page']     ?? 1),
+                'per_page'   => (int)($_REQUEST['per_page'] ?? 20),
+            ]);
+            echo json_encode(['ok' => true] + $res, JSON_UNESCAPED_UNICODE);
+            return;
+        }
+
+        case 'get': {
+            $id = (int)($_REQUEST['id'] ?? 0);
+            if ($id <= 0) { echo json_encode(['ok' => false, 'message' => 'id ไม่ถูกต้อง']); return; }
+            $inv = pb_get_invoice_full($pdo, $id);
+            if (!$inv) { echo json_encode(['ok' => false, 'message' => 'ไม่พบใบแจ้งหนี้']); return; }
+            echo json_encode(['ok' => true, 'row' => $inv], JSON_UNESCAPED_UNICODE);
+            return;
+        }
+
+        case 'create_from_encounter': {
+            $encId = (int)($_POST['encounter_id'] ?? 0);
+            if ($encId <= 0) { echo json_encode(['ok' => false, 'message' => 'encounter_id ไม่ถูกต้อง']); return; }
+            $r = pb_generate_invoice_from_encounter($pdo, $encId, [
+                'payer_type' => $_POST['payer_type'] ?? 'patient',
+                'payer_id'   => $_POST['payer_id']   ?? null,
+                'due_date'   => $_POST['due_date']   ?? '',
+                'notes'      => $_POST['notes']      ?? '',
+            ], $adminId);
+            if ($r['ok']) {
+                echo json_encode(['ok' => true,
+                                  'invoice_id' => $r['invoice_id'],
+                                  'invoice_no' => $r['invoice_no'],
+                                  'message'    => 'ออกใบแจ้งหนี้ ' . $r['invoice_no'] . ' แล้ว'],
+                    JSON_UNESCAPED_UNICODE);
+            } else {
+                echo json_encode(['ok' => false,
+                                  'message' => $r['error'],
+                                  'existing_invoice_id' => $r['existing_invoice_id'] ?? null],
+                    JSON_UNESCAPED_UNICODE);
+            }
+            return;
+        }
+
+        case 'void': {
+            $id = (int)($_POST['id'] ?? 0);
+            if ($id <= 0) { echo json_encode(['ok' => false, 'message' => 'id ไม่ถูกต้อง']); return; }
+            // Refuse to void if any payment recorded (Phase 1D will add refund flow)
+            $cnt = $pdo->prepare("SELECT COUNT(*) FROM sys_billing_payments WHERE invoice_id = :id");
+            $cnt->execute([':id' => $id]);
+            if ((int)$cnt->fetchColumn() > 0) {
+                echo json_encode(['ok' => false,
+                    'message' => 'มีการชำระเงินบางส่วนแล้ว — ยกเลิกใบแจ้งหนี้ไม่ได้ (ต้องคืนเงินก่อน)']);
+                return;
+            }
+            $st = $pdo->prepare("UPDATE sys_billing_invoices
+                                 SET status = 'void' WHERE id = :id AND status != 'void'");
+            $st->execute([':id' => $id]);
+            if ($st->rowCount() === 0) {
+                echo json_encode(['ok' => false, 'message' => 'ใบแจ้งหนี้ถูกยกเลิกอยู่แล้ว']);
+                return;
+            }
+            echo json_encode(['ok' => true, 'message' => 'ยกเลิกใบแจ้งหนี้แล้ว']);
+            return;
+        }
+
+        default:
+            echo json_encode(['ok' => false, 'message' => 'invoice action ไม่รู้จัก: ' . $verb]);
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Payment — list (per invoice), create (with Cash Book sync)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function handle_payment(PDO $pdo, string $verb, int $adminId): void
+{
+    $adminName = (string)($_SESSION['admin_username'] ?? $_SESSION['full_name'] ?? 'system');
+
+    switch ($verb) {
+        case 'create': {
+            $invoiceId = (int)($_POST['invoice_id'] ?? 0);
+            if ($invoiceId <= 0) { echo json_encode(['ok' => false, 'message' => 'invoice_id ไม่ถูกต้อง']); return; }
+            $r = pb_record_payment($pdo, $invoiceId, [
+                'amount'       => $_POST['amount']       ?? 0,
+                'method'       => $_POST['method']       ?? 'cash',
+                'payment_date' => $_POST['payment_date'] ?? date('Y-m-d'),
+                'reference'    => $_POST['reference']    ?? '',
+                'note'         => $_POST['note']         ?? '',
+            ], $adminId, $adminName);
+            if ($r['ok']) {
+                echo json_encode(['ok' => true,
+                                  'payment_id'     => $r['payment_id'],
+                                  'finance_txn_id' => $r['finance_txn_id'],
+                                  'message' => 'รับชำระแล้ว · บันทึกเข้า Cash Book อัตโนมัติ'],
+                    JSON_UNESCAPED_UNICODE);
+            } else {
+                echo json_encode(['ok' => false, 'message' => $r['error']],
+                    JSON_UNESCAPED_UNICODE);
+            }
+            return;
+        }
+
+        default:
+            echo json_encode(['ok' => false, 'message' => 'payment action ไม่รู้จัก: ' . $verb]);
     }
 }

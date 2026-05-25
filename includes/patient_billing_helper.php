@@ -507,3 +507,376 @@ function pb_validate_encounter_header(array $p): array
         'tax'         => $tax,
     ]];
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Invoice + Payment helpers (Phase 1C)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Default income category in sys_finance_categories used when syncing
+ *  billing payments → Cash Book. Matches the seed in ajax_finance.php. */
+const PB_DEFAULT_INCOME_CATEGORY = 'ค่ารักษาผู้ป่วย';
+
+/** Generate next invoice number — INV-{yearBE}-{seq:06d}. Race-tolerant
+ *  via UNIQUE constraint + retry in caller. */
+function pb_next_invoice_no(PDO $pdo): string
+{
+    $yearBE = (int)date('Y') + 543;
+    $prefix = "INV-{$yearBE}-";
+    $st = $pdo->prepare("SELECT invoice_no FROM sys_billing_invoices
+                         WHERE invoice_no LIKE :prefix
+                         ORDER BY id DESC LIMIT 1");
+    $st->execute([':prefix' => $prefix . '%']);
+    $last = (string)($st->fetchColumn() ?: '');
+    $seq  = (preg_match('/(\d{6})$/', $last, $m)) ? ((int)$m[1] + 1) : 1;
+    return sprintf('%s%06d', $prefix, $seq);
+}
+
+/**
+ * Generate an invoice from a finalized encounter. Atomic:
+ *   - Locks the encounter row
+ *   - Refuses if status != 'finalized' or already invoiced
+ *   - Copies totals to invoice header (encounter is the source of truth)
+ *   - Flips encounter.status → 'invoiced'
+ *
+ * @return array{ok:bool, invoice_id?:int, invoice_no?:string, error?:string}
+ */
+function pb_generate_invoice_from_encounter(PDO $pdo, int $encounterId, array $opts, ?int $adminId = null): array
+{
+    pb_ensure_schema($pdo);
+
+    $payerType = $opts['payer_type'] ?? 'patient';
+    if (!isset(PB_PAYER_TYPES[$payerType])) {
+        return ['ok' => false, 'error' => 'payer_type ไม่ถูกต้อง'];
+    }
+    $payerId  = isset($opts['payer_id']) ? (int)$opts['payer_id'] : null;
+    $dueDate  = trim((string)($opts['due_date'] ?? ''));
+    if ($dueDate !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $dueDate)) {
+        return ['ok' => false, 'error' => 'รูปแบบ due_date ไม่ถูกต้อง'];
+    }
+    $notes = trim((string)($opts['notes'] ?? ''));
+
+    $pdo->beginTransaction();
+    try {
+        // Lock encounter
+        $enc = $pdo->prepare("SELECT id, patient_id, status, subtotal, discount, tax, total
+                              FROM sys_billing_encounters WHERE id = :id FOR UPDATE");
+        $enc->execute([':id' => $encounterId]);
+        $e = $enc->fetch(PDO::FETCH_ASSOC);
+        if (!$e) { $pdo->rollBack(); return ['ok' => false, 'error' => 'ไม่พบ encounter']; }
+        if ($e['status'] === 'invoiced') {
+            // Look up existing invoice for friendly error
+            $existing = $pdo->prepare("SELECT id, invoice_no FROM sys_billing_invoices
+                                       WHERE encounter_id = :eid LIMIT 1");
+            $existing->execute([':eid' => $encounterId]);
+            $exist = $existing->fetch(PDO::FETCH_ASSOC);
+            $pdo->rollBack();
+            return ['ok' => false,
+                    'error' => 'encounter นี้ออกใบแจ้งหนี้แล้ว: ' . ($exist['invoice_no'] ?? '?'),
+                    'existing_invoice_id' => $exist['id'] ?? null];
+        }
+        if ($e['status'] !== 'finalized') {
+            $pdo->rollBack();
+            return ['ok' => false,
+                    'error' => "encounter สถานะ '{$e['status']}' ออกใบแจ้งหนี้ไม่ได้ — ต้อง finalized ก่อน"];
+        }
+
+        // Generate invoice number with retry on UNIQUE collision
+        $invoiceId = 0;
+        $invoiceNo = '';
+        $maxRetry = 3;
+        for ($try = 0; $try < $maxRetry; $try++) {
+            $invoiceNo = pb_next_invoice_no($pdo);
+            try {
+                $ins = $pdo->prepare("INSERT INTO sys_billing_invoices
+                    (invoice_no, encounter_id, patient_id, issue_date, due_date,
+                     payer_type, payer_id, subtotal, discount, tax, total, paid_amount,
+                     status, notes, created_by, issued_at)
+                    VALUES
+                    (:no, :eid, :pid, CURDATE(), :due,
+                     :ptype, :pid_payer, :sub, :disc, :tax, :tot, 0,
+                     'issued', :notes, :by, NOW())");
+                $ins->execute([
+                    ':no'         => $invoiceNo,
+                    ':eid'        => $encounterId,
+                    ':pid'        => (int)$e['patient_id'],
+                    ':due'        => $dueDate !== '' ? $dueDate : null,
+                    ':ptype'      => $payerType,
+                    ':pid_payer'  => $payerId ?: null,
+                    ':sub'        => (float)$e['subtotal'],
+                    ':disc'       => (float)$e['discount'],
+                    ':tax'        => (float)$e['tax'],
+                    ':tot'        => (float)$e['total'],
+                    ':notes'      => $notes !== '' ? $notes : null,
+                    ':by'         => $adminId ?: null,
+                ]);
+                $invoiceId = (int)$pdo->lastInsertId();
+                break;
+            } catch (PDOException $ex) {
+                if (($ex->errorInfo[1] ?? 0) === 1062 && $try < $maxRetry - 1) {
+                    continue;
+                }
+                throw $ex;
+            }
+        }
+
+        // Flip encounter status
+        $pdo->prepare("UPDATE sys_billing_encounters
+                       SET status = 'invoiced'
+                       WHERE id = :id AND status = 'finalized'")
+            ->execute([':id' => $encounterId]);
+
+        $pdo->commit();
+        return ['ok' => true, 'invoice_id' => $invoiceId, 'invoice_no' => $invoiceNo];
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        return ['ok' => false, 'error' => 'สร้างใบแจ้งหนี้ไม่สำเร็จ: ' . $e->getMessage()];
+    }
+}
+
+/** List invoices with filters + pagination. */
+function pb_list_invoices(PDO $pdo, array $opts = []): array
+{
+    pb_ensure_schema($pdo);
+
+    $q          = trim((string)($opts['q']         ?? ''));
+    $status     = trim((string)($opts['status']    ?? ''));
+    $payerType  = trim((string)($opts['payer_type'] ?? ''));
+    $dateFrom   = trim((string)($opts['date_from'] ?? ''));
+    $dateTo     = trim((string)($opts['date_to']   ?? ''));
+    $patient    = (int)($opts['patient_id'] ?? 0);
+    $page       = max(1, (int)($opts['page']     ?? 1));
+    $perPage    = max(1, min(200, (int)($opts['per_page'] ?? 20)));
+
+    $where  = [];
+    $params = [];
+    if ($q !== '') {
+        $where[]      = '(i.invoice_no LIKE :q OR u.full_name LIKE :q OR u.student_personnel_id LIKE :q)';
+        $params[':q'] = '%' . $q . '%';
+    }
+    if ($status !== '' && isset(PB_INVOICE_STATUSES[$status])) {
+        $where[]              = 'i.status = :status';
+        $params[':status']    = $status;
+    }
+    if ($payerType !== '' && isset(PB_PAYER_TYPES[$payerType])) {
+        $where[]                = 'i.payer_type = :ptype';
+        $params[':ptype']       = $payerType;
+    }
+    if ($dateFrom !== '') {
+        $where[]              = 'i.issue_date >= :date_from';
+        $params[':date_from'] = $dateFrom;
+    }
+    if ($dateTo !== '') {
+        $where[]              = 'i.issue_date <= :date_to';
+        $params[':date_to']   = $dateTo;
+    }
+    if ($patient > 0) {
+        $where[]               = 'i.patient_id = :patient';
+        $params[':patient']    = $patient;
+    }
+    $whereSql = $where ? 'WHERE ' . implode(' AND ', $where) : '';
+
+    $cntSql = "SELECT COUNT(*)
+               FROM sys_billing_invoices i
+               LEFT JOIN sys_users u ON u.id = i.patient_id
+               {$whereSql}";
+    $cntSt = $pdo->prepare($cntSql);
+    foreach ($params as $k => $v) $cntSt->bindValue($k, $v);
+    $cntSt->execute();
+    $total = (int)$cntSt->fetchColumn();
+
+    $offset = ($page - 1) * $perPage;
+    $sql = "SELECT i.id, i.invoice_no, i.encounter_id, i.patient_id, i.issue_date, i.due_date,
+                   i.payer_type, i.subtotal, i.discount, i.tax, i.total, i.paid_amount, i.status,
+                   i.created_at,
+                   u.full_name AS patient_name, u.student_personnel_id AS patient_code,
+                   (i.total - i.paid_amount) AS balance
+            FROM sys_billing_invoices i
+            LEFT JOIN sys_users u ON u.id = i.patient_id
+            {$whereSql}
+            ORDER BY i.issue_date DESC, i.id DESC
+            LIMIT :limit OFFSET :offset";
+    $st = $pdo->prepare($sql);
+    foreach ($params as $k => $v) $st->bindValue($k, $v);
+    $st->bindValue(':limit',  $perPage, PDO::PARAM_INT);
+    $st->bindValue(':offset', $offset,  PDO::PARAM_INT);
+    $st->execute();
+
+    return [
+        'rows'     => $st->fetchAll(PDO::FETCH_ASSOC),
+        'total'    => $total,
+        'page'     => $page,
+        'per_page' => $perPage,
+        'pages'    => max(1, (int)ceil($total / $perPage)),
+    ];
+}
+
+/** Get one invoice with header + encounter info + line items + payments. */
+function pb_get_invoice_full(PDO $pdo, int $invoiceId): ?array
+{
+    pb_ensure_schema($pdo);
+
+    $hdr = $pdo->prepare("
+        SELECT i.*,
+               u.full_name AS patient_name, u.student_personnel_id AS patient_code,
+               u.phone_number AS patient_phone, u.citizen_id AS patient_citizen,
+               e.encounter_no, e.visit_date, e.provider_id, e.diagnosis,
+               s.full_name AS provider_name
+        FROM sys_billing_invoices i
+        LEFT JOIN sys_users u ON u.id = i.patient_id
+        LEFT JOIN sys_billing_encounters e ON e.id = i.encounter_id
+        LEFT JOIN sys_staff s ON s.id = e.provider_id
+        WHERE i.id = :id
+    ");
+    $hdr->execute([':id' => $invoiceId]);
+    $inv = $hdr->fetch(PDO::FETCH_ASSOC);
+    if (!$inv) return null;
+
+    // Items from the linked encounter (snapshot)
+    $items = [];
+    if (!empty($inv['encounter_id'])) {
+        $st = $pdo->prepare("
+            SELECT id, service_code, service_name, quantity, unit_price, discount, line_total, note
+            FROM sys_billing_encounter_items
+            WHERE encounter_id = :eid
+            ORDER BY id ASC
+        ");
+        $st->execute([':eid' => (int)$inv['encounter_id']]);
+        $items = $st->fetchAll(PDO::FETCH_ASSOC);
+    }
+    $inv['items'] = $items;
+
+    $pay = $pdo->prepare("
+        SELECT id, payment_date, amount, method, reference, note, finance_txn_id, created_at
+        FROM sys_billing_payments
+        WHERE invoice_id = :id
+        ORDER BY payment_date ASC, id ASC
+    ");
+    $pay->execute([':id' => $invoiceId]);
+    $inv['payments'] = $pay->fetchAll(PDO::FETCH_ASSOC);
+
+    return $inv;
+}
+
+/**
+ * Record a payment against an invoice, atomically syncing it to Cash Book.
+ *
+ * Consistency model: if Cash Book sync fails, the payment is rolled back too —
+ * we never want a payment row that's invisible to the finance dashboard.
+ *
+ * @return array{ok:bool, payment_id?:int, finance_txn_id?:int, error?:string}
+ */
+function pb_record_payment(PDO $pdo, int $invoiceId, array $payload, ?int $adminId = null, string $adminName = ''): array
+{
+    pb_ensure_schema($pdo);
+
+    $amount = (float)($payload['amount'] ?? 0);
+    if ($amount <= 0)         return ['ok' => false, 'error' => 'จำนวนเงินต้อง > 0'];
+    if ($amount > 9999999.99) return ['ok' => false, 'error' => 'จำนวนเงินเกินขีดจำกัด'];
+
+    $method = (string)($payload['method'] ?? 'cash');
+    if (!isset(PB_PAYMENT_METHODS[$method])) {
+        return ['ok' => false, 'error' => 'วิธีชำระไม่ถูกต้อง'];
+    }
+
+    $payDate = trim((string)($payload['payment_date'] ?? date('Y-m-d')));
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $payDate)) {
+        return ['ok' => false, 'error' => 'รูปแบบวันที่ไม่ถูกต้อง'];
+    }
+
+    $reference = trim((string)($payload['reference'] ?? '')) ?: null;
+    $note      = trim((string)($payload['note']      ?? '')) ?: null;
+
+    $pdo->beginTransaction();
+    try {
+        // Lock invoice
+        $inv = $pdo->prepare("SELECT i.id, i.invoice_no, i.total, i.paid_amount, i.status,
+                                     u.full_name AS patient_name
+                              FROM sys_billing_invoices i
+                              LEFT JOIN sys_users u ON u.id = i.patient_id
+                              WHERE i.id = :id FOR UPDATE");
+        $inv->execute([':id' => $invoiceId]);
+        $i = $inv->fetch(PDO::FETCH_ASSOC);
+        if (!$i) { $pdo->rollBack(); return ['ok' => false, 'error' => 'ไม่พบใบแจ้งหนี้']; }
+        if (in_array($i['status'], ['void', 'draft'], true)) {
+            $pdo->rollBack();
+            return ['ok' => false, 'error' => "ใบแจ้งหนี้สถานะ '{$i['status']}' รับชำระไม่ได้"];
+        }
+
+        $remaining = (float)$i['total'] - (float)$i['paid_amount'];
+        if ($amount > $remaining + 0.005) {  // tiny epsilon for float comparison
+            $pdo->rollBack();
+            return ['ok' => false, 'error' => sprintf(
+                'จำนวนเงินเกินยอดคงค้าง (เหลือ %s ฿)',
+                number_format($remaining, 2)
+            )];
+        }
+
+        // Insert payment (finance_txn_id NULL initially, fill after sync)
+        $insPay = $pdo->prepare("INSERT INTO sys_billing_payments
+            (invoice_id, payment_date, amount, method, reference, note, created_by)
+            VALUES (:iid, :date, :amt, :method, :ref, :note, :by)");
+        $insPay->execute([
+            ':iid'    => $invoiceId,
+            ':date'   => $payDate,
+            ':amt'    => $amount,
+            ':method' => $method,
+            ':ref'    => $reference,
+            ':note'   => $note,
+            ':by'     => $adminId ?: null,
+        ]);
+        $paymentId = (int)$pdo->lastInsertId();
+
+        // Update invoice totals + status
+        $newPaid = (float)$i['paid_amount'] + $amount;
+        if (abs($newPaid - (float)$i['total']) < 0.005) {
+            $newStatus = 'paid';
+        } elseif ($newPaid > 0) {
+            $newStatus = 'partially_paid';
+        } else {
+            $newStatus = $i['status'];
+        }
+        $pdo->prepare("UPDATE sys_billing_invoices
+                       SET paid_amount = :paid, status = :status
+                       WHERE id = :id")
+            ->execute([
+                ':paid'   => $newPaid,
+                ':status' => $newStatus,
+                ':id'     => $invoiceId,
+            ]);
+
+        // Sync to Cash Book — fails rolled back via outer catch
+        require_once __DIR__ . '/finance_sync_helper.php';
+        $desc = sprintf('ค่าบริการคลินิก %s%s',
+            $i['invoice_no'],
+            !empty($i['patient_name']) ? ' · ' . $i['patient_name'] : ''
+        );
+        $sync = finance_sync_upsert($pdo, [
+            'source_module'  => 'billing_payment',
+            'source_id'      => (string)$paymentId,
+            'kind'           => 'income',
+            'amount'         => $amount,
+            'txn_date'       => $payDate,
+            'category_name'  => PB_DEFAULT_INCOME_CATEGORY,
+            'description'    => $desc,
+            'reference'      => $i['invoice_no'],
+            'note'           => $note,
+            'admin_id'       => $adminId,
+        ]);
+        if (!$sync['ok']) {
+            // Hard fail — don't leave an orphan payment
+            throw new RuntimeException('ส่งเข้า Cash Book ไม่ได้: ' . ($sync['error'] ?? 'unknown'));
+        }
+        $txnId = (int)$sync['id'];
+
+        // Link payment ← txn
+        $pdo->prepare("UPDATE sys_billing_payments
+                       SET finance_txn_id = :txn WHERE id = :id")
+            ->execute([':txn' => $txnId, ':id' => $paymentId]);
+
+        $pdo->commit();
+        return ['ok' => true, 'payment_id' => $paymentId, 'finance_txn_id' => $txnId];
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        return ['ok' => false, 'error' => $e->getMessage()];
+    }
+}
