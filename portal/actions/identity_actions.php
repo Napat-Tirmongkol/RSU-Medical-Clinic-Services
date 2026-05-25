@@ -130,8 +130,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $allowedEbRoles = ['admin', 'librarian', 'employee'];
                     if (!in_array($ebRole, $allowedEbRoles, true)) $ebRole = 'employee';
 
-                    // Whitelist e-Campaign role
-                    $allowedEcRoles = ['superadmin', 'admin', 'editor'];
+                    // Whitelist e-Campaign role — ลบ 'superadmin' ออก เพราะ UI dropdown
+                    // (identity.php บรรทัด ~827) มีแค่ editor/admin. Staff ที่ต้องการ
+                    // สิทธิ์ root level ต้องสร้างผ่าน target_type='admin' (sys_admins) แทน.
+                    // Defense-in-depth กัน POST tampering ที่ส่ง ec_role=superadmin ตรงๆ
+                    $allowedEcRoles = ['admin', 'editor'];
                     if (!in_array($ecRole, $allowedEcRoles, true)) $ecRole = 'editor';
 
                     // Ensure new flag columns exist (for existing installs)

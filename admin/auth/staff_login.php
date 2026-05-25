@@ -117,11 +117,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         (int)$staff['id']);
                     $error = 'บัญชีนี้ยังไม่ได้รับสิทธิ์เข้าใช้งานระบบใดๆ กรุณาติดต่อผู้ดูแลระบบ';
                 } else {
-                    // Whitelist ecampaign_role ป้องกัน privilege escalation
-                    $allowedRoles = ['admin', 'editor', 'superadmin'];
-                    $ecRole = in_array($staff['ecampaign_role'], $allowedRoles, true)
-                        ? $staff['ecampaign_role']
-                        : 'editor';
+                    // Whitelist ecampaign_role — ลบ 'superadmin' ออก (UI Identity
+                    // Governance ไม่มี option). กรณีมี legacy data ใน DB ที่
+                    // ecampaign_role='superadmin' จาก POST tampering เก่า → graceful
+                    // downgrade เป็น 'admin' + log เพื่อให้ admin ไปแก้ที่ Identity UI
+                    $allowedRoles = ['admin', 'editor'];
+                    $rawEcRole = $staff['ecampaign_role'] ?? 'editor';
+                    if ($rawEcRole === 'superadmin') {
+                        log_activity('staff_role_downgraded',
+                            "Downgraded ecampaign_role 'superadmin' → 'admin' for staff '{$staff['username']}' (UI ไม่อนุญาต — โปรดแก้ที่ Identity Governance)",
+                            (int)$staff['id']);
+                        $ecRole = 'admin';
+                    } else {
+                        $ecRole = in_array($rawEcRole, $allowedRoles, true) ? $rawEcRole : 'editor';
+                    }
 
                     session_regenerate_id(true);
                     rate_limit_ip_clear('staff_login');
