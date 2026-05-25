@@ -757,6 +757,173 @@ function pb_get_invoice_full(PDO $pdo, int $invoiceId): ?array
     return $inv;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// AR Aging Report (Phase 1D)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Standard 4-bucket aging: 0-30 / 31-60 / 61-90 / 90+ days.
+ * Age is measured from due_date (or issue_date if no due_date) → today.
+ * Only includes invoices with outstanding balance (issued, partially_paid, overdue).
+ * Excludes 'paid' and 'void' rows.
+ *
+ * @return array{
+ *     buckets: array<string, array{count:int, total:float}>,
+ *     summary: array{count:int, total:float, avg_age_days:float, oldest_age_days:int, oldest_invoice_no:?string}
+ * }
+ */
+function pb_ar_aging_summary(PDO $pdo, ?string $payerType = null): array
+{
+    pb_ensure_schema($pdo);
+
+    $where = ["i.status IN ('issued','partially_paid','overdue')",
+              "(i.total - i.paid_amount) > 0.005"];
+    $params = [];
+    if ($payerType && isset(PB_PAYER_TYPES[$payerType])) {
+        $where[]              = 'i.payer_type = :ptype';
+        $params[':ptype']     = $payerType;
+    }
+    $whereSql = 'WHERE ' . implode(' AND ', $where);
+
+    // One pass over outstanding invoices computing both buckets + summary stats
+    $sql = "SELECT
+              DATEDIFF(CURDATE(), COALESCE(i.due_date, i.issue_date)) AS age_days,
+              (i.total - i.paid_amount) AS balance,
+              i.invoice_no
+            FROM sys_billing_invoices i
+            {$whereSql}";
+    $st = $pdo->prepare($sql);
+    foreach ($params as $k => $v) $st->bindValue($k, $v);
+    $st->execute();
+
+    $buckets = [
+        '0-30'  => ['count' => 0, 'total' => 0.0],
+        '31-60' => ['count' => 0, 'total' => 0.0],
+        '61-90' => ['count' => 0, 'total' => 0.0],
+        '90+'   => ['count' => 0, 'total' => 0.0],
+    ];
+    $count = 0; $total = 0.0; $ageSum = 0; $oldest = -1; $oldestNo = null;
+
+    foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        $age = max(0, (int)$row['age_days']);
+        $bal = (float)$row['balance'];
+        $bucket = $age <= 30 ? '0-30'
+                : ($age <= 60 ? '31-60'
+                : ($age <= 90 ? '61-90' : '90+'));
+        $buckets[$bucket]['count']++;
+        $buckets[$bucket]['total'] += $bal;
+
+        $count++;
+        $total  += $bal;
+        $ageSum += $age;
+        if ($age > $oldest) { $oldest = $age; $oldestNo = $row['invoice_no']; }
+    }
+
+    return [
+        'buckets' => $buckets,
+        'summary' => [
+            'count'             => $count,
+            'total'             => $total,
+            'avg_age_days'      => $count > 0 ? round($ageSum / $count, 1) : 0.0,
+            'oldest_age_days'   => $oldest > 0 ? $oldest : 0,
+            'oldest_invoice_no' => $oldestNo,
+        ],
+    ];
+}
+
+/**
+ * Top patients by outstanding balance. Caps at $limit rows.
+ */
+function pb_ar_aging_top_patients(PDO $pdo, int $limit = 10, ?string $payerType = null): array
+{
+    pb_ensure_schema($pdo);
+
+    $where = ["i.status IN ('issued','partially_paid','overdue')",
+              "(i.total - i.paid_amount) > 0.005"];
+    $params = [];
+    if ($payerType && isset(PB_PAYER_TYPES[$payerType])) {
+        $where[]              = 'i.payer_type = :ptype';
+        $params[':ptype']     = $payerType;
+    }
+    $whereSql = 'WHERE ' . implode(' AND ', $where);
+
+    $sql = "SELECT
+              i.patient_id,
+              u.full_name AS patient_name,
+              u.student_personnel_id AS patient_code,
+              u.phone_number AS patient_phone,
+              COUNT(*) AS invoice_count,
+              SUM(i.total - i.paid_amount) AS balance,
+              MAX(DATEDIFF(CURDATE(), COALESCE(i.due_date, i.issue_date))) AS max_age_days
+            FROM sys_billing_invoices i
+            LEFT JOIN sys_users u ON u.id = i.patient_id
+            {$whereSql}
+            GROUP BY i.patient_id, u.full_name, u.student_personnel_id, u.phone_number
+            ORDER BY balance DESC
+            LIMIT :lim";
+    $st = $pdo->prepare($sql);
+    foreach ($params as $k => $v) $st->bindValue($k, $v);
+    $st->bindValue(':lim', $limit, PDO::PARAM_INT);
+    $st->execute();
+    return $st->fetchAll(PDO::FETCH_ASSOC);
+}
+
+/**
+ * Invoices inside a specific aging bucket — for drill-down view.
+ * $bucket = '0-30' | '31-60' | '61-90' | '90+' | 'all'
+ */
+function pb_ar_aging_detail(PDO $pdo, string $bucket, ?string $payerType = null, int $limit = 200): array
+{
+    pb_ensure_schema($pdo);
+
+    $where = ["i.status IN ('issued','partially_paid','overdue')",
+              "(i.total - i.paid_amount) > 0.005"];
+    $params = [];
+    if ($payerType && isset(PB_PAYER_TYPES[$payerType])) {
+        $where[]              = 'i.payer_type = :ptype';
+        $params[':ptype']     = $payerType;
+    }
+    switch ($bucket) {
+        case '0-30':
+            $where[] = 'DATEDIFF(CURDATE(), COALESCE(i.due_date, i.issue_date)) BETWEEN 0 AND 30';
+            break;
+        case '31-60':
+            $where[] = 'DATEDIFF(CURDATE(), COALESCE(i.due_date, i.issue_date)) BETWEEN 31 AND 60';
+            break;
+        case '61-90':
+            $where[] = 'DATEDIFF(CURDATE(), COALESCE(i.due_date, i.issue_date)) BETWEEN 61 AND 90';
+            break;
+        case '90+':
+            $where[] = 'DATEDIFF(CURDATE(), COALESCE(i.due_date, i.issue_date)) > 90';
+            break;
+        case 'all':
+        default:
+            // no extra filter
+            break;
+    }
+    $whereSql = 'WHERE ' . implode(' AND ', $where);
+
+    $sql = "SELECT
+              i.id, i.invoice_no, i.patient_id, i.issue_date, i.due_date,
+              i.payer_type, i.total, i.paid_amount,
+              (i.total - i.paid_amount) AS balance,
+              DATEDIFF(CURDATE(), COALESCE(i.due_date, i.issue_date)) AS age_days,
+              i.status,
+              u.full_name AS patient_name,
+              u.student_personnel_id AS patient_code,
+              u.phone_number AS patient_phone
+            FROM sys_billing_invoices i
+            LEFT JOIN sys_users u ON u.id = i.patient_id
+            {$whereSql}
+            ORDER BY age_days DESC, balance DESC
+            LIMIT :lim";
+    $st = $pdo->prepare($sql);
+    foreach ($params as $k => $v) $st->bindValue($k, $v);
+    $st->bindValue(':lim', $limit, PDO::PARAM_INT);
+    $st->execute();
+    return $st->fetchAll(PDO::FETCH_ASSOC);
+}
+
 /**
  * Record a payment against an invoice, atomically syncing it to Cash Book.
  *

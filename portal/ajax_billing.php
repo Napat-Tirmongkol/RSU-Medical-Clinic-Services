@@ -48,12 +48,19 @@ if ($mutating) {
 
 pb_ensure_schema($pdo);
 
+// aging:export bypasses the JSON header because it streams CSV
+if ($entity === 'aging' && $verb === 'export') {
+    handle_aging_export($pdo);
+    exit;
+}
+
 try {
     switch ($entity) {
         case 'service':   handle_service($pdo, $verb, $adminId);   break;
         case 'encounter': handle_encounter($pdo, $verb, $adminId); break;
         case 'invoice':   handle_invoice($pdo, $verb, $adminId);   break;
         case 'payment':   handle_payment($pdo, $verb, $adminId);   break;
+        case 'aging':     handle_aging($pdo, $verb);               break;
         case 'lookup':    handle_lookup($pdo, $verb);              break;
         default:
             echo json_encode(['ok' => false, 'message' => 'entity ไม่รู้จัก: ' . $entity]);
@@ -638,4 +645,97 @@ function handle_payment(PDO $pdo, string $verb, int $adminId): void
         default:
             echo json_encode(['ok' => false, 'message' => 'payment action ไม่รู้จัก: ' . $verb]);
     }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AR Aging — buckets + drill-down + CSV export
+// ─────────────────────────────────────────────────────────────────────────────
+
+function handle_aging(PDO $pdo, string $verb): void
+{
+    $payerType = trim((string)($_REQUEST['payer_type'] ?? '')) ?: null;
+
+    switch ($verb) {
+        case 'summary': {
+            $sum = pb_ar_aging_summary($pdo, $payerType);
+            $top = pb_ar_aging_top_patients($pdo, 10, $payerType);
+            echo json_encode([
+                'ok'           => true,
+                'buckets'      => $sum['buckets'],
+                'summary'      => $sum['summary'],
+                'top_patients' => $top,
+            ], JSON_UNESCAPED_UNICODE);
+            return;
+        }
+
+        case 'detail': {
+            $bucket = (string)($_REQUEST['bucket'] ?? 'all');
+            $rows = pb_ar_aging_detail($pdo, $bucket, $payerType, 200);
+            echo json_encode(['ok' => true, 'bucket' => $bucket, 'rows' => $rows],
+                JSON_UNESCAPED_UNICODE);
+            return;
+        }
+
+        default:
+            echo json_encode(['ok' => false, 'message' => 'aging action ไม่รู้จัก: ' . $verb]);
+    }
+}
+
+function handle_aging_export(PDO $pdo): void
+{
+    $payerType = trim((string)($_REQUEST['payer_type'] ?? '')) ?: null;
+    $bucket    = (string)($_REQUEST['bucket'] ?? 'all');
+
+    $rows = pb_ar_aging_detail($pdo, $bucket, $payerType, 10000);
+
+    $fname = sprintf('ar_aging_%s_%s.csv',
+        $bucket === 'all' ? 'all' : str_replace('+', 'plus', $bucket),
+        date('Ymd_His'));
+    header('Content-Type: text/csv; charset=utf-8');
+    header('Content-Disposition: attachment; filename="' . $fname . '"');
+
+    $out = fopen('php://output', 'w');
+    fputs($out, "\xEF\xBB\xBF");  // BOM for Excel UTF-8
+
+    fputcsv($out, ['รายงานลูกหนี้คงค้าง (AR Aging)']);
+    fputcsv($out, ['ช่วงอายุ', $bucket]);
+    fputcsv($out, ['ประเภทผู้ชำระ', $payerType ?: 'ทุกประเภท']);
+    fputcsv($out, ['ออก ณ', date('Y-m-d H:i:s')]);
+    fputcsv($out, []);
+
+    fputcsv($out, [
+        'ลำดับ', 'เลขที่ใบ', 'รหัสผู้ป่วย', 'ชื่อผู้ป่วย', 'เบอร์โทร',
+        'ออก', 'ครบกำหนด', 'อายุ (วัน)', 'ยอดสุทธิ', 'ชำระแล้ว', 'คงค้าง',
+        'ผู้ชำระ', 'สถานะ'
+    ]);
+
+    $payerLabels = PB_PAYER_TYPES;
+    $statusLabels = PB_INVOICE_STATUSES;
+    foreach ($rows as $i => $r) {
+        fputcsv($out, [
+            $i + 1,
+            $r['invoice_no'],
+            $r['patient_code'] ?? '',
+            $r['patient_name'] ?? '',
+            $r['patient_phone'] ?? '',
+            $r['issue_date'],
+            $r['due_date'] ?: '—',
+            (int)$r['age_days'],
+            number_format((float)$r['total'], 2, '.', ''),
+            number_format((float)$r['paid_amount'], 2, '.', ''),
+            number_format((float)$r['balance'], 2, '.', ''),
+            $payerLabels[$r['payer_type']] ?? $r['payer_type'],
+            $statusLabels[$r['status']] ?? $r['status'],
+        ]);
+    }
+
+    // Footer
+    fputcsv($out, []);
+    fputcsv($out, ['รวม', '', '', '', '', '', '', '',
+        number_format(array_sum(array_column($rows, 'total')), 2, '.', ''),
+        number_format(array_sum(array_column($rows, 'paid_amount')), 2, '.', ''),
+        number_format(array_sum(array_column($rows, 'balance')), 2, '.', ''),
+        '', '']);
+
+    fclose($out);
 }
