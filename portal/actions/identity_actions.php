@@ -125,6 +125,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if (!in_array($ecRole, $allowedEcRoles, true)) $ecRole = 'editor';
 
                     // Ensure new flag columns exist (for existing installs)
+                    try { $pdo->exec("ALTER TABLE sys_staff ADD COLUMN account_status VARCHAR(20) NOT NULL DEFAULT 'active'"); } catch(PDOException $e) {}
+                    try { $pdo->exec("ALTER TABLE sys_staff ADD COLUMN access_ecampaign TINYINT(1) DEFAULT 1"); } catch(PDOException $e) {}
+                    try { $pdo->exec("ALTER TABLE sys_staff ADD COLUMN ecampaign_role VARCHAR(20) NOT NULL DEFAULT 'editor'"); } catch(PDOException $e) {}
+                    try { $pdo->exec("ALTER TABLE sys_staff ADD COLUMN access_insurance TINYINT(1) DEFAULT 0"); } catch(PDOException $e) {}
+                    try { $pdo->exec("ALTER TABLE sys_staff ADD COLUMN access_system_logs TINYINT(1) DEFAULT 0"); } catch(PDOException $e) {}
+                    try { $pdo->exec("ALTER TABLE sys_staff ADD COLUMN access_site_settings TINYINT(1) DEFAULT 0"); } catch(PDOException $e) {}
                     try { $pdo->exec("ALTER TABLE sys_staff ADD COLUMN access_registry TINYINT(1) DEFAULT 0"); } catch(PDOException $e) {}
                     try { $pdo->exec("ALTER TABLE sys_staff ADD COLUMN access_edms TINYINT(1) DEFAULT 0"); } catch(PDOException $e) {}
                     try { $pdo->exec("ALTER TABLE sys_staff ADD COLUMN access_edms_sla_admin TINYINT(1) DEFAULT 0"); } catch(PDOException $e) {}
@@ -160,7 +166,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                     if ($action === 'add_identity_gov') {
                         $hashed = password_hash($password ?: bin2hex(random_bytes(8)), PASSWORD_DEFAULT);
-                        $pdo->prepare("INSERT INTO sys_staff (full_name, username, email, password_hash, role, position_id, job_title, department_id, access_eborrow, account_status, access_ecampaign, ecampaign_role, access_insurance, access_system_logs, access_site_settings, access_registry, access_edms, access_edms_sla_admin, access_ai, access_consumables, access_asset, access_finance, access_scholarship, access_dashboard_admin, access_monthly_report, access_nurse_productivity, access_daily_summary, access_director_view, access_identity) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+                        // 29 columns / 29 placeholders / 29 values — keep in sync if adding new access_* flag
+                        $pdo->prepare("INSERT INTO sys_staff (full_name, username, email, password_hash, role, position_id, job_title, department_id, access_eborrow, account_status, access_ecampaign, ecampaign_role, access_insurance, access_system_logs, access_site_settings, access_registry, access_edms, access_edms_sla_admin, access_ai, access_consumables, access_asset, access_finance, access_scholarship, access_dashboard_admin, access_monthly_report, access_nurse_productivity, access_daily_summary, access_director_view, access_identity) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
                             ->execute([$fullName, $username, $email, $hashed, $ebRole, $positionId, $jobTitle, $departmentId, $ebAccess, $status, $ecAccess, $ecRole, $insAccess, $logsAccess, $settAccess, $regAccess, $edmsAccess, $edmsSlaAdminAccess, $aiAccess, $consumablesAccess, $assetAccess, $financeAccess, $scholarshipAccess, $dashboardAccess, $monthlyReportAccess, $nurseProductivityAccess, $dailySummaryAccess, $directorViewAccess, $identityAccess]);
                         $targetId = (int)$pdo->lastInsertId();
                         // LINE link on create (rare — admin มี UID เด็กในมือก่อนสร้าง)
@@ -200,6 +207,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
                 }
                 $snapshot = json_encode($auditPayload, JSON_UNESCAPED_UNICODE);
+                // json_encode → false ถ้ามี byte ที่ encode ไม่ได้ — fallback เป็น '{}' กันชน NOT NULL/JSON column
+                if ($snapshot === false) $snapshot = '{}';
                 $pdo->prepare("INSERT INTO sys_access_audit_logs (target_id, target_type, changed_by, justification, change_snapshot) VALUES (?,?,?,?,?)")
                     ->execute([$targetId, $type, $_SESSION['admin_id'], $reason, $snapshot]);
 
@@ -207,8 +216,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 header("Location: index.php?section=identity&tab=" . ($type === 'admin' ? 'admins' : 'staff') . "&saved=1");
                 exit;
             } catch (PDOException $e) {
-                error_log('[identity_actions] save_identity_gov failed: ' . $e->getMessage());
-                $idError = "บันทึกไม่สำเร็จ กรุณาตรวจสอบข้อมูลและลองใหม่";
+                // Log SQL detail สำหรับ admin troubleshoot — error_log จะปรากฏใน Error Logs section
+                error_log('[identity_actions] save_identity_gov ' . $action . ' type=' . $type . ' target=' . $targetId . ' failed: ' . $e->getCode() . ' ' . $e->getMessage());
+                $idError = "บันทึกไม่สำเร็จ: " . $e->getMessage();
             }
         } else { $idError = "กรุณากรอกข้อมูลให้ครบถ้วนและระบุเหตุผลความจำเป็น"; }
     }
