@@ -558,53 +558,103 @@ $vbpCsrf = get_csrf_token();
 
     // Patient typeahead
     let patSearchDeb = null;
-    const patWrap = document.querySelector('#vbpEntryForm .vbp-typeahead');
-    document.getElementById('vbpPatientSearch').addEventListener('input', function() {
+
+    function patTypeaheadShow(html) {
+        const list = document.getElementById('vbpPatientList');
+        list.innerHTML = html;
+        list.classList.add('is-open');
+    }
+
+    function patTypeaheadHide() {
+        document.getElementById('vbpPatientList').classList.remove('is-open');
+    }
+
+    function patTypeaheadQuery(q) {
+        // Show loading state immediately so user knows something's happening
+        patTypeaheadShow('<div class="vbp-typeahead-item" style="color:#94a3b8">' +
+            '<i class="fa-solid fa-spinner fa-spin mr-1"></i> กำลังค้นหา "' + escapeHtml(q) + '"...</div>');
+
+        const url = AJAX_URL + '?action=lookup:patient&q=' + encodeURIComponent(q);
+        fetch(url, { credentials: 'same-origin' })
+            .then(r => {
+                if (!r.ok) {
+                    throw new Error('HTTP ' + r.status + ' จาก ' + url);
+                }
+                return r.text();  // text first so we can show server-side parse errors
+            })
+            .then(text => {
+                let d;
+                try { d = JSON.parse(text); }
+                catch (parseErr) {
+                    console.error('[vitals_bp] non-JSON response:', text.slice(0, 500));
+                    throw new Error('Server ไม่ตอบกลับเป็น JSON — เปิด console ดู response');
+                }
+                if (!d.ok) {
+                    patTypeaheadShow('<div class="vbp-typeahead-item" style="color:#dc2626">' +
+                        '<i class="fa-solid fa-circle-exclamation mr-1"></i> ' +
+                        escapeHtml(d.message || 'ค้นหาไม่สำเร็จ') + '</div>');
+                    return;
+                }
+                if (!d.rows || d.rows.length === 0) {
+                    patTypeaheadShow('<div class="vbp-typeahead-item" style="color:#94a3b8">' +
+                        '<i class="fa-regular fa-face-frown mr-1"></i> ไม่พบผู้ป่วยที่ตรงกับ "' + escapeHtml(q) + '"</div>');
+                    return;
+                }
+                patTypeaheadShow(d.rows.map(r => {
+                    const meta = [
+                        r.student_personnel_id ? 'รหัส ' + r.student_personnel_id : '',
+                        r.phone_number ? '📞 ' + r.phone_number : ''
+                    ].filter(Boolean).join(' · ');
+                    return '<div class="vbp-typeahead-item" data-id="' + r.id +
+                        '" data-name="' + escapeHtml(r.full_name||'') +
+                        '" data-code="' + escapeHtml(r.student_personnel_id||'') + '">' +
+                        '<div>' + escapeHtml(r.full_name||'—') + '</div>' +
+                        (meta ? '<div class="ta-meta">' + escapeHtml(meta) + '</div>' : '') +
+                        '</div>';
+                }).join(''));
+                document.getElementById('vbpPatientList').querySelectorAll('[data-id]').forEach(el => {
+                    el.addEventListener('click', () => {
+                        document.getElementById('vbpPatientId').value = el.dataset.id;
+                        document.getElementById('vbpPatientSearch').value =
+                            el.dataset.name + (el.dataset.code ? ' · ' + el.dataset.code : '');
+                        patTypeaheadHide();
+                        document.getElementById('vbpSys').focus();
+                    });
+                });
+            })
+            .catch(err => {
+                console.error('[vitals_bp typeahead] fetch failed:', err);
+                patTypeaheadShow('<div class="vbp-typeahead-item" style="color:#dc2626">' +
+                    '<i class="fa-solid fa-wifi mr-1"></i> ' + escapeHtml(err.message || 'เชื่อมต่อไม่ได้') + '</div>');
+            });
+    }
+
+    const patSearchEl = document.getElementById('vbpPatientSearch');
+    patSearchEl.addEventListener('input', function() {
         const q = this.value.trim();
         document.getElementById('vbpPatientId').value = '';
         clearTimeout(patSearchDeb);
         if (q === '') {
-            document.getElementById('vbpPatientList').classList.remove('is-open');
+            patTypeaheadHide();
             return;
         }
-        patSearchDeb = setTimeout(() => {
-            fetch(AJAX_URL + '?action=lookup:patient&q=' + encodeURIComponent(q))
-                .then(r => r.json())
-                .then(d => {
-                    const list = document.getElementById('vbpPatientList');
-                    if (!d.ok || !d.rows || d.rows.length === 0) {
-                        list.innerHTML = '<div class="vbp-typeahead-item" style="color:#94a3b8">ไม่พบ</div>';
-                        list.classList.add('is-open');
-                        return;
-                    }
-                    list.innerHTML = d.rows.map(r => {
-                        const meta = [
-                            r.student_personnel_id ? 'รหัส ' + r.student_personnel_id : '',
-                            r.phone_number ? '📞 ' + r.phone_number : ''
-                        ].filter(Boolean).join(' · ');
-                        return '<div class="vbp-typeahead-item" data-id="' + r.id +
-                            '" data-name="' + escapeHtml(r.full_name||'') +
-                            '" data-code="' + escapeHtml(r.student_personnel_id||'') + '">' +
-                            '<div>' + escapeHtml(r.full_name||'—') + '</div>' +
-                            (meta ? '<div class="ta-meta">' + escapeHtml(meta) + '</div>' : '') +
-                            '</div>';
-                    }).join('');
-                    list.classList.add('is-open');
-                    list.querySelectorAll('[data-id]').forEach(el => {
-                        el.addEventListener('click', () => {
-                            document.getElementById('vbpPatientId').value = el.dataset.id;
-                            document.getElementById('vbpPatientSearch').value =
-                                el.dataset.name + (el.dataset.code ? ' · ' + el.dataset.code : '');
-                            list.classList.remove('is-open');
-                            document.getElementById('vbpSys').focus();
-                        });
-                    });
-                });
-        }, 250);
+        patSearchDeb = setTimeout(() => patTypeaheadQuery(q), 250);
     });
+    // Focus on empty field → show a hint
+    patSearchEl.addEventListener('focus', function() {
+        if (this.value.trim() === '') {
+            patTypeaheadShow('<div class="vbp-typeahead-item" style="color:#94a3b8">' +
+                '<i class="fa-solid fa-keyboard mr-1"></i> พิมพ์ชื่อ / รหัสนักศึกษา-บุคลากร / เบอร์โทร / เลขบัตร</div>');
+        }
+    });
+
+    // Close dropdown on outside click. Use the dynamic list ref so this works
+    // even after the modal has been teleported to body.
     document.addEventListener('click', e => {
-        if (patWrap && !patWrap.contains(e.target)) {
-            document.getElementById('vbpPatientList').classList.remove('is-open');
+        const list = document.getElementById('vbpPatientList');
+        if (list && list.classList.contains('is-open')
+            && !list.contains(e.target) && e.target !== patSearchEl) {
+            patTypeaheadHide();
         }
     });
 
