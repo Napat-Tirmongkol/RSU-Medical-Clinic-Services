@@ -92,14 +92,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
 
-            if ($staff && password_verify($password, $staff['password_hash'])) {
+            // Mask username-enumeration timing oracle — ถ้า user ไม่มีจริง ก็ยัง
+            // ต้องเสีย CPU เทียบเท่า password_verify() กัน attacker วัดเวลาตอบ
+            // dummy hash: bcrypt valid + cost ตรงกับ production (PHP 8.x default = 12)
+            // regenerate: php -r "echo password_hash(bin2hex(random_bytes(16)), PASSWORD_DEFAULT);"
+            $dummyHash = '$2y$12$IVQJwsWr.gGbN7/sS3Z9..5ie9lN55IVDUWV.sr70DjTvB0jRbVWu';
+            $passwordOk = password_verify($password, $staff ? $staff['password_hash'] : $dummyHash);
+
+            $ipForLog = $_SERVER['REMOTE_ADDR'] ?? '?';
+
+            if ($staff && $passwordOk) {
 
                 // Whitelist account_status — เฉพาะ 'active' เท่านั้นที่ login ได้
                 // (สถานะอื่นจาก ENUM: disabled / suspended / inactive จะถูก block ทั้งหมด)
                 $accountStatus = strtolower(trim((string)($staff['account_status'] ?? 'active')));
                 if ($accountStatus !== 'active') {
+                    log_activity('staff_login_blocked',
+                        "Blocked login (status={$accountStatus}): username='{$staff['username']}' from IP {$ipForLog}",
+                        (int)$staff['id']);
                     $error = 'บัญชีนี้ไม่พร้อมใช้งาน กรุณาติดต่อผู้ดูแลระบบ';
                 } elseif (!(int)$staff['access_ecampaign'] && !(int)$staff['access_eborrow'] && !(int)$staff['access_insurance'] && !(int)$staff['access_registry'] && !(int)$staff['access_edms'] && !(int)$staff['access_ai'] && !(int)$staff['access_consumables'] && !(int)$staff['access_asset'] && !(int)$staff['access_finance'] && !(int)$staff['access_scholarship'] && !(int)$staff['access_dashboard_admin'] && !(int)$staff['access_monthly_report'] && !(int)$staff['access_nurse_productivity'] && !(int)$staff['access_daily_summary'] && !(int)$staff['access_director_view'] && !(int)$staff['access_identity']) {
+                    log_activity('staff_login_blocked',
+                        "Blocked login (no access flags): username='{$staff['username']}' from IP {$ipForLog}",
+                        (int)$staff['id']);
                     $error = 'บัญชีนี้ยังไม่ได้รับสิทธิ์เข้าใช้งานระบบใดๆ กรุณาติดต่อผู้ดูแลระบบ';
                 } else {
                     // Whitelist ecampaign_role ป้องกัน privilege escalation
@@ -148,6 +163,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             } else {
                 rate_limit_ip_hit('staff_login', 5, 300);
+                // SIEM/intrusion-detection trail — log แม้ไม่รู้ว่า username ถูกหรือผิด
+                // (ไม่ leak ว่ามี user อยู่จริงไหม เพราะ message เดียวกัน)
+                log_activity('staff_login_failed',
+                    "Failed login attempt: username='" . mb_substr($username, 0, 100) . "' from IP {$ipForLog}",
+                    null);
                 $error = 'ชื่อผู้ใช้ หรือ รหัสผ่านไม่ถูกต้อง';
             }
         } catch (PDOException $e) {
