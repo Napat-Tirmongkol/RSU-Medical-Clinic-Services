@@ -144,20 +144,21 @@ try {
     $existingUser = $stmtCheck->fetch();
 
     // PDPA gate (Sec. 24 + Sec. 26):
-    //   First-time registration → BOTH consents required.
-    //   Existing user editing other fields → preserve their original consent
-    //   timestamps, don't force re-consent on every profile edit.
+    //   ทั้ง first-time และ existing user ต้องยอมรับทั้ง 2 ข้อทุกครั้งที่บันทึก —
+    //   ป้องกันกรณีผู้ใช้ uncheck checkbox แล้วกดบันทึก (ก่อนหน้านี้ระบบบันทึก
+    //   เงียบ ๆ โดย preserve timestamp เดิมไว้ ทำให้กลายเป็นข้อความ "กลับมาเป็น
+    //   กดยอมรับ" บนหน้าจอ ซึ่งทำให้ผู้ใช้สับสน). ถ้าต้องการถอนความยินยอม
+    //   จริง ๆ ต้องผ่าน flow แยก (PDPA withdrawal) — บันทึก profile ปกติต้อง
+    //   ยังคงยินยอมอยู่ทั้ง 2 ข้อ.
     $isFirstTime = empty($existingUser);
     $hasPriorGeneral   = !empty($existingUser['consent_general_accepted_at']);
     $hasPriorSensitive = !empty($existingUser['consent_sensitive_accepted_at']);
 
-    if ($isFirstTime) {
-        if (!$consentGeneral) {
-            header('Location: profile.php?error=no_consent_general', true, 303); exit;
-        }
-        if (!$consentSensitive) {
-            header('Location: profile.php?error=no_consent_sensitive', true, 303); exit;
-        }
+    if (!$consentGeneral) {
+        header('Location: profile.php?mode=edit&error=no_consent_general', true, 303); exit;
+    }
+    if (!$consentSensitive) {
+        header('Location: profile.php?mode=edit&error=no_consent_sensitive', true, 303); exit;
     }
     // We only stamp the consent timestamp on the row when the user is actually
     // giving NEW consent. SQL below uses COALESCE(:new, existing) so a return

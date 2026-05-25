@@ -26,6 +26,8 @@ $userData = [
     'emergency_contact_relation' => '',
     'member_id' => '',
     'updated_at' => '',
+    'consent_general_accepted_at'   => null,
+    'consent_sensitive_accepted_at' => null,
 ];
 
 try {
@@ -83,6 +85,8 @@ try {
             'emergency_contact_relation' => $user['emergency_contact_relation'] ?? '',
             'member_id'      => $user['member_id'] ?? '',
             'updated_at'     => $user['updated_at'] ?? '',
+            'consent_general_accepted_at'   => $user['consent_general_accepted_at']   ?? null,
+            'consent_sensitive_accepted_at' => $user['consent_sensitive_accepted_at'] ?? null,
         ]);
     }
 } catch (PDOException $e) { error_log($e->getMessage()); }
@@ -209,8 +213,8 @@ function vh(?string $s): string { return htmlspecialchars((string) $s, ENT_QUOTE
             'no_gender'  => __('profile.lbl_gender'),
             'empty'      => __('profile.toast_error_phone'),
             'empty_student' => __('profile.lbl_id'),
-            'no_consent_general'   => 'กรุณายอมรับเงื่อนไขข้อมูลส่วนบุคคลทั่วไป (มาตรา 24)',
-            'no_consent_sensitive' => 'กรุณายอมรับเงื่อนไขข้อมูลอ่อนไหว (มาตรา 26)',
+            'no_consent_general'   => 'ต้องยอมรับเงื่อนไขข้อมูลส่วนบุคคล (มาตรา 24) ก่อนบันทึก — ระบบไม่ได้บันทึกข้อมูล',
+            'no_consent_sensitive' => 'ต้องยอมรับเงื่อนไขข้อมูลอ่อนไหว (มาตรา 26) ก่อนบันทึก — ระบบไม่ได้บันทึกข้อมูล',
         ];
         $errMsg = $errMap[$err] ?? $err;
     ?>
@@ -663,20 +667,26 @@ function vh(?string $s): string { return htmlspecialchars((string) $s, ENT_QUOTE
                     <p id="pdpa-scroll-hint" class="<?= $isEditing ? 'hidden' : '' ?> text-[11px] font-bold text-amber-600 -mt-2"><i class="fa-solid fa-arrow-down mr-1"></i><?= __('profile.pdpa_scroll_hint') ?></p>
 
                     <!-- Two separate consent checkboxes — required under PDPA Sec. 26
-                         for explicit separate consent on sensitive data -->
+                         for explicit separate consent on sensitive data.
+                         Checkbox state ใช้สถานะจริงจาก DB (consent_*_accepted_at)
+                         แทน $isEditing เพื่อสะท้อนการยินยอมจริง ๆ ที่บันทึกไว้ -->
+                    <?php
+                        $hasConsentGeneral   = !empty($userData['consent_general_accepted_at']);
+                        $hasConsentSensitive = !empty($userData['consent_sensitive_accepted_at']);
+                    ?>
                     <label id="pdpa-agree-wrap" class="flex items-start gap-4 p-5 bg-emerald-50 rounded-3xl border border-emerald-100 cursor-pointer active:scale-95 transition-all <?= !$isEditing ? 'opacity-50 pointer-events-none' : '' ?>">
-                        <input type="checkbox" id="pdpa-agree" name="consent_general" value="1" required <?= $isEditing ? 'checked' : '' ?> <?= $disabled ?> class="mt-0.5 w-6 h-6 rounded-lg text-[#2e9e63] focus:ring-[#2e9e63]">
+                        <input type="checkbox" id="pdpa-agree" name="consent_general" value="1" required <?= $hasConsentGeneral ? 'checked' : '' ?> <?= $disabled ?> class="mt-0.5 w-6 h-6 rounded-lg text-[#2e9e63] focus:ring-[#2e9e63]">
                         <span class="text-xs text-slate-700 font-bold leading-relaxed"><?= __('profile.lbl_agree_general') ?></span>
                     </label>
                     <label id="pdpa-agree-sensitive-wrap" class="flex items-start gap-4 p-5 bg-rose-50 rounded-3xl border border-rose-100 cursor-pointer active:scale-95 transition-all <?= !$isEditing ? 'opacity-50 pointer-events-none' : '' ?>">
-                        <input type="checkbox" id="pdpa-agree-sensitive" name="consent_sensitive" value="1" required <?= $isEditing ? 'checked' : '' ?> <?= $disabled ?> class="mt-0.5 w-6 h-6 rounded-lg text-rose-600 focus:ring-rose-500">
+                        <input type="checkbox" id="pdpa-agree-sensitive" name="consent_sensitive" value="1" required <?= $hasConsentSensitive ? 'checked' : '' ?> <?= $disabled ?> class="mt-0.5 w-6 h-6 rounded-lg text-rose-600 focus:ring-rose-500">
                         <span class="text-xs text-slate-700 font-bold leading-relaxed"><?= __('profile.lbl_agree_sensitive') ?></span>
                     </label>
 
                     <!-- Legacy field for backwards compatibility with any old handlers
                          that still look at `agreed` — gets ticked iff both granular
                          checkboxes are ticked -->
-                    <input type="hidden" id="pdpa-agree-legacy" name="agreed" value="<?= $isEditing ? '1' : '' ?>">
+                    <input type="hidden" id="pdpa-agree-legacy" name="agreed" value="<?= ($hasConsentGeneral && $hasConsentSensitive) ? '1' : '' ?>">
                 </div>
 
                 <?php if ($mode === 'edit'): ?>
