@@ -15,6 +15,13 @@
     <link rel="stylesheet" href="../assets/css/tailwind.min.css">
     <link rel="stylesheet" href="../assets/css/portal.css?v=<?= @filemtime(__DIR__ . '/../assets/css/portal.css') ?: (defined('APP_BUILD') ? APP_BUILD : time()) ?>">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        /* SweetAlert2 z-index must beat the Portal-Escape modals (9000-9999)
+           so confirm/error popups appear ABOVE — otherwise validation alerts
+           render behind the gov / edit / view / pos / priv modals and look
+           like clicks are doing nothing. */
+        .swal2-container { z-index: 10500 !important; }
+    </style>
     <!-- Chart.js — loaded globally so all section pages (nurse_productivity,
          gold_card, activity_dashboard, edms/sla_dashboard, etc.) have access
          without each having to script-tag it. Some partials still load their
