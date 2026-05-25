@@ -495,10 +495,25 @@
             openGovModal('staff', 'edit', st);
         }
 
+        // Teleport modal to <body> on first open. Modals live inside
+        // section-identity after the multi-page refactor; any ancestor
+        // creating a stacking context (transform, filter, backdrop-filter,
+        // contain, perspective) would trap their position:fixed and pin
+        // them inside the content area instead of the viewport.
+        // See CLAUDE.md → "Portal-Escape Pattern" for the full pitfall list.
+        function idPortalEscape(id) {
+            const el = document.getElementById(id);
+            if (el && el.parentElement !== document.body) {
+                document.body.appendChild(el);
+            }
+            return el;
+        }
+
         /**
          * Unified Governance Modal Handler
          */
         function openGovModal(type, mode, data = null) {
+            idPortalEscape('idGovModal');
             const m = document.getElementById('idGovModal');
             const f = document.getElementById('idGovForm');
             const title = document.getElementById('govModalTitle');
@@ -965,6 +980,7 @@
         }
 
         function idOpenEdit(u) {
+            idPortalEscape('idEditModal');
             document.getElementById('id_edit_uid').value = u.id;
             document.getElementById('id_edit_name').value = u.full_name || '';
             document.getElementById('id_edit_citizen').value = u.citizen_id || '';
@@ -980,6 +996,7 @@
             m.style.display = 'flex';
         }
         function idOpenView(u) {
+            idPortalEscape('idViewModal');
             var statusMap = { student: 'นักศึกษา', staff: 'บุคลากร/อาจารย์', teacher: 'อาจารย์', other: 'บุคคลทั่วไป' };
             var genderMap = { male: 'ชาย', female: 'หญิง', other: 'อื่นๆ' };
             // Format helpers — kept inline so this stays a single self-contained

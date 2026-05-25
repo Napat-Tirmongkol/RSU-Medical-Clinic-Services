@@ -661,7 +661,7 @@ layout_start(['section' => 'identity', 'title' => 'Identity & Governance']);
 
                 </div>
                 <?php endif; ?>
-                <div id="idGovModal" style="display:none;position:fixed;inset:0;z-index:300;background:rgba(15,23,42,.6);backdrop-filter:blur(8px);align-items:center;justify-content:center;padding:20px">
+                <div id="idGovModal" style="display:none;position:fixed;inset:0;z-index:9200;background:rgba(15,23,42,.6);backdrop-filter:blur(8px);align-items:center;justify-content:center;padding:20px">
                     <div style="background:#fff;border-radius:28px;width:100%;max-width:720px;overflow:hidden;box-shadow:0 25px 50px -12px rgba(0,0,0,.3);display:flex;flex-direction:column;max-height:90vh">
                         <!-- Modal Header -->
                         <div style="padding:24px 30px;background:linear-gradient(90deg,#f8fafc,#fff);border-bottom:1px solid #f1f5f9;display:flex;align-items:center;justify-content:space-between">
@@ -999,7 +999,7 @@ layout_start(['section' => 'identity', 'title' => 'Identity & Governance']);
                     </div>
 
             <div id="idEditModal"
-                style="display:none;position:fixed;inset:0;z-index:200;background:rgba(15,23,42,.55);backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:20px">
+                style="display:none;position:fixed;inset:0;z-index:9100;background:rgba(15,23,42,.55);backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:20px">
                 <div
                     style="background:#fff;border-radius:24px;width:100%;max-width:480px;overflow:hidden;box-shadow:0 25px 50px -12px rgba(0,0,0,.25)">
                     <div
@@ -1120,7 +1120,7 @@ layout_start(['section' => 'identity', 'title' => 'Identity & Governance']);
 
             <!-- View Modal (Identity) -->
             <div id="idViewModal"
-                style="display:none;position:fixed;inset:0;z-index:200;background:rgba(15,23,42,.55);backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:20px">
+                style="display:none;position:fixed;inset:0;z-index:9100;background:rgba(15,23,42,.55);backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:20px">
                 <div
                     style="background:#fff;border-radius:24px;width:100%;max-width:420px;overflow:hidden;box-shadow:0 25px 50px -12px rgba(0,0,0,.25)">
                     <div
@@ -1147,7 +1147,7 @@ layout_start(['section' => 'identity', 'title' => 'Identity & Governance']);
 
                 <!-- Position (ตำแหน่งงาน) Modal -->
                 <?php if ($adminRole === 'superadmin'): ?>
-                <div id="idPosModal" style="display:none;position:fixed;inset:0;z-index:400;background:rgba(15,23,42,.6);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:20px">
+                <div id="idPosModal" style="display:none;position:fixed;inset:0;z-index:9300;background:rgba(15,23,42,.6);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:20px">
                     <div style="background:#fff;border-radius:24px;width:100%;max-width:540px;max-height:90vh;overflow-y:auto;box-shadow:0 25px 50px -12px rgba(0,0,0,0.25)">
                         <form method="POST" id="idPosForm">
                             <?php csrf_field(); ?>
@@ -1224,7 +1224,7 @@ layout_start(['section' => 'identity', 'title' => 'Identity & Governance']);
                 <?php endif; ?>
 
                 <!-- Add Privilege Modal -->
-                <div id="privModal" style="display:none;position:fixed;inset:0;z-index:500;background:rgba(15,23,42,.6);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:20px">
+                <div id="privModal" style="display:none;position:fixed;inset:0;z-index:9400;background:rgba(15,23,42,.6);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:20px">
                     <div style="background:#fff;border-radius:28px;width:100%;max-width:480px;box-shadow:0 25px 50px -12px rgba(0,0,0,0.25);overflow:hidden">
                         <div style="padding:24px;background:#fcfdfd;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center">
                             <h3 style="margin:0;font-size:18px;font-weight:900;color:#0f172a">🛡️ บันทึกการถือสิทธิ์ระดับสูง</h3>
