@@ -40,61 +40,62 @@ $lineTokenSet = line_chat_load_access_token() !== '';
         </div>
     </div>
 
-    <!-- Filter chips + search -->
-    <div class="px-5 py-3 border-b border-slate-100 bg-white flex items-center gap-2 overflow-x-auto no-scrollbar shrink-0">
-        <button class="lc-chip is-active" data-filter="all" onclick="lcSetFilter('all', this)">ทั้งหมด</button>
-        <button class="lc-chip" data-filter="needs_reply" onclick="lcSetFilter('needs_reply', this)">ต้องตอบ</button>
-        <button class="lc-chip" data-filter="today" onclick="lcSetFilter('today', this)">วันนี้</button>
-        <button class="lc-chip" data-filter="resolved" onclick="lcSetFilter('resolved', this)">ปิดเคสแล้ว</button>
-        <div class="lc-search-wrap ml-auto">
-            <i class="fa-solid fa-magnifying-glass lc-search-icon"></i>
-            <input type="search" id="lcSearchInput" class="lc-search-input" placeholder="ค้นหา ชื่อ / uid / ข้อความ / tag...">
-            <button id="lcSearchClear" class="lc-search-clear hidden" onclick="lcClearSearch()" title="ล้าง">
-                <i class="fa-solid fa-xmark"></i>
-            </button>
-        </div>
-    </div>
-
     <!-- Body -->
     <div class="lc-body flex flex-1 overflow-hidden">
 
-        <!-- Conversation list -->
-        <aside class="lc-side w-80 bg-white border-r border-slate-100 flex flex-col">
-            <div id="lcConvoList" class="flex-1 overflow-y-auto px-2 py-2 space-y-1">
+        <!-- Conversation list sidebar -->
+        <aside class="lc-side bg-white border-r border-slate-100 flex flex-col">
+            <!-- Sidebar header: search + filter chips -->
+            <div class="lc-side-header shrink-0">
+                <div class="lc-search-wrap">
+                    <i class="fa-solid fa-magnifying-glass lc-search-icon"></i>
+                    <input type="search" id="lcSearchInput" class="lc-search-input" placeholder="ค้นหา ชื่อ · uid · ข้อความ · tag">
+                    <button id="lcSearchClear" class="lc-search-clear hidden" onclick="lcClearSearch()" title="ล้าง">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+                <div class="lc-filter-row">
+                    <button class="lc-chip is-active" data-filter="all" onclick="lcSetFilter('all', this)">ทั้งหมด</button>
+                    <button class="lc-chip" data-filter="needs_reply" onclick="lcSetFilter('needs_reply', this)">ต้องตอบ</button>
+                    <button class="lc-chip" data-filter="today" onclick="lcSetFilter('today', this)">วันนี้</button>
+                    <button class="lc-chip" data-filter="resolved" onclick="lcSetFilter('resolved', this)">ปิดแล้ว</button>
+                </div>
+            </div>
+            <div id="lcConvoList" class="flex-1 overflow-y-auto px-1.5 py-1.5">
                 <div class="text-center text-slate-400 text-xs py-8">กำลังโหลด...</div>
             </div>
-            <div id="lcPager" class="border-t border-slate-100 p-2 text-xs text-slate-500 flex items-center justify-between">
+            <div id="lcPager" class="lc-pager shrink-0">
                 <span id="lcPagerSummary">—</span>
                 <div class="flex gap-0.5">
-                    <button class="btn-solid bg-slate-100 text-slate-600 text-xs px-2 py-0.5" onclick="lcPage(1)" title="หน้าแรก">«</button>
-                    <button class="btn-solid bg-slate-100 text-slate-600 text-xs px-2 py-0.5" onclick="lcPage(lcState.page-1)" title="ก่อนหน้า">‹</button>
-                    <button class="btn-solid bg-slate-100 text-slate-600 text-xs px-2 py-0.5" onclick="lcPage(lcState.page+1)" title="ถัดไป">›</button>
-                    <button class="btn-solid bg-slate-100 text-slate-600 text-xs px-2 py-0.5" onclick="lcPage(lcState.pages)" title="สุดท้าย">»</button>
+                    <button class="lc-pager-btn" onclick="lcPage(1)" title="หน้าแรก">«</button>
+                    <button class="lc-pager-btn" onclick="lcPage(lcState.page-1)" title="ก่อนหน้า">‹</button>
+                    <button class="lc-pager-btn" onclick="lcPage(lcState.page+1)" title="ถัดไป">›</button>
+                    <button class="lc-pager-btn" onclick="lcPage(lcState.pages)" title="สุดท้าย">»</button>
                 </div>
             </div>
         </aside>
 
         <!-- Conversation view -->
-        <section class="lc-main flex-1 flex flex-col overflow-hidden">
+        <section id="lcMain" class="lc-main flex-1 flex flex-col overflow-hidden lc-no-convo">
 
-            <!-- Convo header -->
-            <div id="lcConvoHeader" class="px-5 py-3 border-b border-slate-100 bg-white flex items-center justify-between shrink-0">
+            <!-- Convo header (hidden until conversation opened) -->
+            <div id="lcConvoHeader" class="lc-convo-header shrink-0 hidden">
                 <div class="lc-header-row">
                     <div id="lcHeaderPic" class="lc-header-pic">
                         <i class="fa-brands fa-line text-emerald-500"></i>
                     </div>
                     <div class="min-w-0 flex-1">
-                        <div id="lcConvoTitle" class="text-sm font-black text-slate-700 truncate">เลือกบทสนทนา</div>
-                        <div id="lcConvoMeta" class="lc-subtitle text-slate-400 font-bold mt-0.5">หรือคลิก "รีโหลด" ดูบทสนทนาใหม่</div>
+                        <div id="lcConvoTitle" class="lc-convo-title truncate">—</div>
+                        <div id="lcConvoMeta" class="lc-convo-meta truncate">—</div>
                         <div id="lcConvoBadges" class="mt-1 flex items-center gap-1 flex-wrap"></div>
                     </div>
                 </div>
                 <div class="flex items-center gap-2 shrink-0">
-                    <button id="lcResolveBtn" onclick="lcToggleResolved()" class="btn-solid bg-slate-100 text-slate-600 text-xs hidden" title="ปิดเคส / เปิดอีกครั้ง">
+                    <button id="lcResolveBtn" onclick="lcToggleResolved()" class="lc-action-btn" title="ปิดเคส / เปิดอีกครั้ง">
                         <i class="fa-solid fa-circle-check"></i>
-                        <span id="lcResolveLabel" class="ml-1">ปิดเคส</span>
+                        <span id="lcResolveLabel" class="ml-1 hidden sm:inline">ปิดเคส</span>
                     </button>
-                    <button id="lcSidePanelBtn" onclick="lcToggleSidePanel()" class="btn-solid bg-slate-100 text-slate-600 text-xs hidden" title="แสดง/ซ่อนแถบข้าง">
+                    <button id="lcSidePanelBtn" onclick="lcToggleSidePanel()" class="lc-action-btn" title="แสดง/ซ่อนแถบบันทึก & แท็ก">
                         <i class="fa-solid fa-note-sticky"></i>
                     </button>
                 </div>
@@ -104,10 +105,17 @@ $lineTokenSet = line_chat_load_access_token() !== '';
             <div class="lc-main-row flex flex-1 overflow-hidden">
                 <!-- Messages -->
                 <div id="lcMessages" class="flex-1 overflow-y-auto p-5 space-y-3 scroll-smooth">
-                    <div class="lc-empty text-center py-16 text-slate-400">
-                        <i class="fa-brands fa-line text-5xl mb-3 text-emerald-300"></i>
-                        <div class="text-sm font-bold">ยังไม่ได้เลือกบทสนทนา</div>
-                        <div class="text-xs mt-1">เลือกผู้ใช้จากด้านซ้ายเพื่อดูข้อความ</div>
+                    <div class="lc-empty">
+                        <div class="lc-empty-icon">
+                            <i class="fa-brands fa-line"></i>
+                        </div>
+                        <div class="lc-empty-title">เลือกบทสนทนาเพื่อเริ่ม</div>
+                        <div class="lc-empty-sub">เลือกผู้ใช้จากรายการด้านซ้าย — มีตัวกรองและช่องค้นหาช่วยให้หาเร็วขึ้น</div>
+                        <div class="lc-empty-tips">
+                            <div class="lc-empty-tip"><i class="fa-solid fa-magnifying-glass"></i> ค้นหาด้วยชื่อ · uid · ข้อความ · แท็ก</div>
+                            <div class="lc-empty-tip"><i class="fa-solid fa-wand-magic-sparkles" style="color:#a855f7"></i> ใช้ <strong>AI ช่วยร่าง</strong> เมื่อเปิดบทสนทนาแล้ว</div>
+                            <div class="lc-empty-tip"><i class="fa-solid fa-bookmark text-emerald-500"></i> ตั้ง <strong>Template</strong> คำตอบสำเร็จรูปไว้ใช้ซ้ำ</div>
+                        </div>
                     </div>
                 </div>
 
@@ -251,40 +259,52 @@ $lineTokenSet = line_chat_load_access_token() !== '';
 
 <style>
 .lc-shell { min-height: 0; }
-.lc-side { flex-shrink: 0; }
+.lc-side { flex-shrink: 0; width: 320px; }
 .lc-subtitle { font-size: 11px; }
 .lc-disclaimer { font-size: 10px; }
 .lc-send-btn { background: #06c755 !important; color: white !important; }
-.lc-send-btn:hover:not(:disabled) { background: #05a847 !important; }
-.lc-send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.lc-send-btn:hover:not(:disabled) { background: #05a847 !important; box-shadow: 0 4px 12px rgba(6,199,85,.30); }
+.lc-send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
+/* Sidebar header (search + filter chips) */
+.lc-side-header {
+    padding: 10px 12px 8px;
+    background: #fff;
+    border-bottom: 1px solid #f1f5f9;
+}
+.lc-filter-row {
+    display: flex; gap: 5px; margin-top: 8px;
+    overflow-x: auto; padding-bottom: 2px;
+}
+.lc-filter-row::-webkit-scrollbar { height: 0; }
 .lc-chip {
-    padding: 5px 14px; border-radius: 999px;
+    padding: 5px 11px; border-radius: 999px;
     background: #f1f5f9; color: #475569;
-    font-size: 12px; font-weight: 700;
+    font-size: 11.5px; font-weight: 700;
     border: 1.5px solid transparent;
     cursor: pointer; transition: all 0.15s;
-    white-space: nowrap;
+    white-space: nowrap; flex-shrink: 0;
 }
 .lc-chip:hover { background: #e2e8f0; }
 .lc-chip.is-active {
     background: linear-gradient(135deg, #06c755, #00b900);
     color: white;
-    box-shadow: 0 2px 8px rgba(6,199,85,.25);
+    box-shadow: 0 2px 6px rgba(6,199,85,.30);
 }
 
-/* Search input in filter bar */
-.lc-search-wrap { position: relative; flex: 0 1 280px; min-width: 180px; }
-.lc-search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: #94a3b8; font-size: 12px; pointer-events: none; }
+/* Search input — sidebar variant */
+.lc-search-wrap { position: relative; width: 100%; }
+.lc-search-icon { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: #94a3b8; font-size: 12px; pointer-events: none; }
 .lc-search-input {
-    width: 100%; padding: 7px 30px 7px 30px;
-    border-radius: 999px; border: 1.5px solid #e2e8f0; background: #fff;
-    font-size: 12px; font-weight: 600; color: #334155;
-    transition: border-color .15s, box-shadow .15s;
+    width: 100%; padding: 8px 32px 8px 32px;
+    border-radius: 999px; border: 1.5px solid #e2e8f0; background: #f8fafc;
+    font-size: 12.5px; font-weight: 600; color: #334155;
+    transition: border-color .15s, background .15s, box-shadow .15s;
 }
-.lc-search-input:focus { outline: none; border-color: #06c755; box-shadow: 0 0 0 3px rgba(6,199,85,.12); }
+.lc-search-input::placeholder { color: #94a3b8; font-weight: 600; }
+.lc-search-input:focus { outline: none; border-color: #06c755; background: #fff; box-shadow: 0 0 0 3px rgba(6,199,85,.12); }
 .lc-search-clear {
-    position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+    position: absolute; right: 7px; top: 50%; transform: translateY(-50%);
     background: #e2e8f0; color: #64748b; border: none;
     width: 20px; height: 20px; border-radius: 50%;
     display: flex; align-items: center; justify-content: center;
@@ -292,35 +312,143 @@ $lineTokenSet = line_chat_load_access_token() !== '';
 }
 .lc-search-clear:hover { background: #cbd5e1; color: #334155; }
 
+/* Compact convo items (left rail) */
 .lc-convo-item {
-    padding: 10px 12px; border-radius: 10px; cursor: pointer;
+    padding: 9px 10px 9px 13px; border-radius: 10px; cursor: pointer;
     border: 1.5px solid transparent;
-    transition: background 0.15s, border-color 0.15s;
+    transition: background 0.15s, border-color 0.15s, transform 0.15s;
     position: relative;
     display: flex; gap: 10px; align-items: flex-start;
+    margin-bottom: 2px;
 }
-.lc-convo-item:hover { background: #f1f5f9; }
-.lc-convo-item.active { background: rgba(6,199,85,.08); border-color: rgba(6,199,85,.30); }
-.lc-convo-item.is-resolved { opacity: 0.65; }
+.lc-convo-item:hover { background: #f8fafc; }
+.lc-convo-item.active {
+    background: rgba(6,199,85,.08); border-color: rgba(6,199,85,.35);
+}
+.lc-convo-item.active::before {
+    content: ''; position: absolute; left: 0; top: 10px; bottom: 10px;
+    width: 3px; background: #06c755; border-radius: 0 3px 3px 0;
+}
+.lc-convo-item.needs-reply::after {
+    content: ''; position: absolute; top: 14px; right: 12px;
+    width: 8px; height: 8px; border-radius: 50%; background: #ef4444;
+    box-shadow: 0 0 0 3px rgba(239,68,68,.20);
+}
+.lc-convo-item.is-resolved { opacity: 0.55; }
 .lc-convo-item.is-resolved .c-name::before { content: '✓ '; color: #10b981; font-weight: 900; }
-.lc-convo-pic { width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0; background: #f1f5f9; display: flex; align-items: center; justify-content: center; color: #94a3b8; overflow: hidden; }
+.lc-convo-pic {
+    width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0;
+    background: linear-gradient(135deg, #f1f5f9, #e2e8f0);
+    display: flex; align-items: center; justify-content: center;
+    color: #94a3b8; overflow: hidden;
+    box-shadow: 0 1px 3px rgba(15,23,42,.08);
+}
 .lc-convo-pic img { width: 100%; height: 100%; object-fit: cover; }
 .lc-convo-body { flex: 1; min-width: 0; }
-.lc-convo-item .c-name { font-size: 13px; font-weight: 800; color: #334155; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.lc-convo-item .c-uid  { font-size: 10px; color: #94a3b8; font-family: ui-monospace, monospace; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.lc-convo-item .c-preview { font-size: 12px; color: #64748b; margin-top: 4px; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; }
-.lc-convo-item .c-meta { font-size: 10px; color: #94a3b8; font-weight: 600; margin-top: 4px; display: flex; justify-content: space-between; }
-.lc-convo-item .c-badge { background: #ef4444; color: white; font-size: 9px; font-weight: 900; padding: 1px 6px; border-radius: 999px; }
-.lc-convo-item .c-tags { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 4px; }
-.lc-convo-item .c-tag-pill { background: rgba(6,199,85,.12); color: #047857; font-size: 9px; font-weight: 800; padding: 2px 7px; border-radius: 999px; }
+.lc-convo-item .c-row1 {
+    display: flex; align-items: center; gap: 6px;
+}
+.lc-convo-item .c-name {
+    font-size: 13px; font-weight: 800; color: #1e293b;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    flex: 1; min-width: 0;
+}
+.lc-convo-item .c-time {
+    font-size: 10px; color: #94a3b8; font-weight: 700; flex-shrink: 0;
+    padding-right: 14px; /* room for needs-reply dot */
+}
+.lc-convo-item.needs-reply .c-time { padding-right: 18px; }
+.lc-convo-item:not(.needs-reply) .c-time { padding-right: 0; }
+.lc-convo-item .c-preview {
+    font-size: 12px; color: #64748b; margin-top: 3px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    line-height: 1.4;
+}
+.lc-convo-item .c-preview .c-dir { color: #94a3b8; margin-right: 4px; }
+.lc-convo-item .c-preview .c-dir.outbound { color: #06c755; }
+.lc-convo-item .c-meta-row {
+    display: flex; align-items: center; gap: 5px; margin-top: 4px; flex-wrap: wrap;
+}
+.lc-convo-item .c-tag-pill {
+    background: rgba(6,199,85,.12); color: #047857;
+    font-size: 9.5px; font-weight: 800; padding: 1px 6px; border-radius: 999px;
+}
+.lc-convo-item .c-msg-count {
+    font-size: 9.5px; color: #94a3b8; font-weight: 700; margin-left: auto;
+}
+
+/* Pager (sidebar bottom) */
+.lc-pager {
+    border-top: 1px solid #f1f5f9; padding: 8px 10px;
+    font-size: 10.5px; color: #64748b; font-weight: 700;
+    display: flex; align-items: center; justify-content: space-between;
+    background: #fafbfc;
+}
+.lc-pager-btn {
+    background: white; color: #475569; border: 1px solid #e2e8f0;
+    border-radius: 6px; padding: 2px 7px; font-size: 11px; font-weight: 800;
+    cursor: pointer; transition: all .12s;
+}
+.lc-pager-btn:hover { background: #06c755; color: white; border-color: #06c755; }
+.lc-pager-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* Convo header (right side, top) */
+.lc-convo-header {
+    padding: 12px 18px;
+    border-bottom: 1px solid #e2e8f0;
+    background: #fff;
+    display: flex; align-items: center; justify-content: space-between;
+}
+.lc-convo-title { font-size: 14.5px; font-weight: 900; color: #1e293b; }
+.lc-convo-meta { font-size: 10.5px; color: #94a3b8; font-weight: 600; font-family: ui-monospace, monospace; margin-top: 1px; }
+.lc-action-btn {
+    background: #f1f5f9; color: #475569; border: none;
+    border-radius: 8px; padding: 6px 12px; font-size: 12px; font-weight: 700;
+    cursor: pointer; transition: all .15s;
+    display: inline-flex; align-items: center; gap: 4px;
+}
+.lc-action-btn:hover { background: #e2e8f0; color: #1e293b; }
+.lc-action-btn.is-active {
+    background: linear-gradient(135deg, #06c755, #00b900); color: white;
+    box-shadow: 0 2px 8px rgba(6,199,85,.30);
+}
+
+/* When no convo selected — hide input + side panel button */
+.lc-main.lc-no-convo .lc-input-bar { display: none; }
 
 /* Status pills — student/faculty/staff/other */
-.lc-status { font-size: 10px; font-weight: 800; padding: 2px 8px; border-radius: 999px; display: inline-flex; align-items: center; gap: 3px; }
+.lc-status { font-size: 9.5px; font-weight: 800; padding: 1.5px 7px; border-radius: 999px; display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; }
 .lc-status.tone-info   { background: rgba(59,130,246,.12); color: #2563eb; }
 .lc-status.tone-accent { background: rgba(168,85,247,.12); color: #9333ea; }
 .lc-status.tone-amber  { background: rgba(245,158,11,.15); color: #b45309; }
 .lc-status.tone-slate  { background: rgba(100,116,139,.15); color: #475569; }
 .lc-status.tone-emerald { background: rgba(16,185,129,.15); color: #047857; }
+
+/* Empty state — when no convo selected */
+.lc-empty {
+    max-width: 480px; margin: 60px auto; padding: 0 24px;
+    text-align: center; color: #64748b;
+}
+.lc-empty-icon {
+    width: 88px; height: 88px; border-radius: 50%;
+    background: linear-gradient(135deg, rgba(6,199,85,.10), rgba(6,199,85,.05));
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 18px; color: #06c755; font-size: 38px;
+    box-shadow: 0 8px 24px -8px rgba(6,199,85,.40);
+}
+.lc-empty-title { font-size: 18px; font-weight: 900; color: #1e293b; margin-bottom: 6px; letter-spacing: -0.01em; }
+.lc-empty-sub { font-size: 13px; color: #64748b; line-height: 1.6; margin-bottom: 22px; }
+.lc-empty-tips {
+    display: flex; flex-direction: column; gap: 9px;
+    text-align: left; max-width: 380px; margin: 0 auto;
+}
+.lc-empty-tip {
+    padding: 10px 14px; background: #f8fafc; border: 1px solid #e2e8f0;
+    border-radius: 10px; font-size: 12.5px; color: #475569;
+    display: flex; align-items: center; gap: 10px;
+}
+.lc-empty-tip i { color: #64748b; width: 16px; text-align: center; }
+.lc-empty-tip strong { color: #1e293b; font-weight: 800; }
 
 /* Convo header avatar (right panel top) */
 .lc-header-pic { width: 44px; height: 44px; border-radius: 50%; overflow: hidden; flex-shrink: 0; background: #f1f5f9; display: flex; align-items: center; justify-content: center; color: #94a3b8; }
@@ -483,6 +611,9 @@ $lineTokenSet = line_chat_load_access_token() !== '';
     padding: 16px;
 }
 .lc-modal.hidden { display: none !important; }
+/* Override custom display:flex on these classes — Tailwind .hidden must win */
+.lc-template-pop.hidden,
+.lc-convo-header.hidden { display: none !important; }
 .lc-modal-box {
     width: 100%; max-width: 760px;
     max-height: 90vh;
@@ -576,6 +707,30 @@ body[data-theme='dark'] #section-line_chat .lc-bubble-file .fi-name { color:#e2e
 body[data-theme='dark'] #section-line_chat .lc-bubble-location .lc-loc-link { border-top-color:#1e293b; }
 body[data-theme='dark'] #section-line_chat .lc-convo-item .c-tag-pill { background: rgba(6,199,85,.20); color:#34d399; }
 body[data-theme='dark'] .lc-tpl-row .tpl-cat { background: rgba(6,199,85,.20); color:#34d399; }
+/* New polish classes — dark mode */
+body[data-theme='dark'] #section-line_chat .lc-side-header { background:#0f172a; border-bottom-color:#1e293b; }
+body[data-theme='dark'] #section-line_chat .lc-convo-item:hover { background: rgba(148,163,184,.06); }
+body[data-theme='dark'] #section-line_chat .lc-convo-item.active { background: rgba(6,199,85,.14); border-color: rgba(6,199,85,.40); }
+body[data-theme='dark'] #section-line_chat .lc-convo-item .c-name { color:#e2e8f0; }
+body[data-theme='dark'] #section-line_chat .lc-convo-item .c-time,
+body[data-theme='dark'] #section-line_chat .lc-convo-item .c-msg-count { color:#64748b; }
+body[data-theme='dark'] #section-line_chat .lc-convo-item .c-preview { color:#94a3b8; }
+body[data-theme='dark'] #section-line_chat .lc-convo-pic { background: linear-gradient(135deg, rgba(148,163,184,.14), rgba(148,163,184,.08)); }
+body[data-theme='dark'] #section-line_chat .lc-pager { background: rgba(148,163,184,.04); border-top-color:#1e293b; color:#94a3b8; }
+body[data-theme='dark'] #section-line_chat .lc-pager-btn { background:#0b1220; border-color:#1e293b; color:#cbd5e1; }
+body[data-theme='dark'] #section-line_chat .lc-pager-btn:hover { background:#06c755; color:white; border-color:#06c755; }
+body[data-theme='dark'] #section-line_chat .lc-convo-header { background: rgba(15,23,42,.65); border-bottom-color:#1e293b; }
+body[data-theme='dark'] #section-line_chat .lc-convo-title { color:#e2e8f0; }
+body[data-theme='dark'] #section-line_chat .lc-convo-meta { color:#64748b; }
+body[data-theme='dark'] #section-line_chat .lc-action-btn { background: rgba(148,163,184,.14); color:#cbd5e1; }
+body[data-theme='dark'] #section-line_chat .lc-action-btn:hover { background: rgba(148,163,184,.22); color:#e2e8f0; }
+body[data-theme='dark'] #section-line_chat .lc-empty-title { color:#e2e8f0; }
+body[data-theme='dark'] #section-line_chat .lc-empty-sub { color:#94a3b8; }
+body[data-theme='dark'] #section-line_chat .lc-empty-tip { background: rgba(148,163,184,.06); border-color:#1e293b; color:#cbd5e1; }
+body[data-theme='dark'] #section-line_chat .lc-empty-tip i { color:#94a3b8; }
+body[data-theme='dark'] #section-line_chat .lc-empty-tip strong { color:#e2e8f0; }
+body[data-theme='dark'] #section-line_chat .lc-search-input { background:#0b1220; }
+body[data-theme='dark'] #section-line_chat .lc-search-input:focus { background:#0f172a; }
 </style>
 
 <script>
@@ -612,7 +767,7 @@ function lcTeleport(id) {
     return el;
 }
 
-// Relative time formatter — "5 นาทีที่แล้ว"
+// Relative time formatter — "5 นาทีที่แล้ว" (long form)
 function lcRelTime(iso) {
     if (!iso) return '';
     const t = new Date(iso.replace(' ', 'T'));
@@ -622,8 +777,20 @@ function lcRelTime(iso) {
     if (diff < 3600) return Math.floor(diff/60) + ' นาทีที่แล้ว';
     if (diff < 86400) return Math.floor(diff/3600) + ' ชั่วโมงที่แล้ว';
     if (diff < 604800) return Math.floor(diff/86400) + ' วันที่แล้ว';
-    // > 1 wk → fall back to date
     return iso.slice(5, 16).replace('T', ' ');
+}
+
+// Compact relative time — "5น", "3ชม", "2วัน" (for cramped sidebar)
+function lcRelTimeShort(iso) {
+    if (!iso) return '';
+    const t = new Date(iso.replace(' ', 'T'));
+    if (isNaN(t)) return iso;
+    const diff = (Date.now() - t.getTime()) / 1000;
+    if (diff < 60) return 'เมื่อกี้';
+    if (diff < 3600) return Math.floor(diff/60) + 'น';
+    if (diff < 86400) return Math.floor(diff/3600) + 'ชม';
+    if (diff < 604800) return Math.floor(diff/86400) + 'วัน';
+    return iso.slice(5, 10); // MM-DD
 }
 
 async function lcLoadConvos() {
@@ -685,53 +852,62 @@ function lcRenderConvos() {
     const box = document.getElementById('lcConvoList');
     const list = lcState.conversations;
     if (list.length === 0) {
-        const msg = lcState.search ? 'ไม่พบบทสนทนาที่ตรงกับคำค้น' : 'ไม่พบบทสนทนา';
-        box.innerHTML = `<div class="text-center text-slate-400 text-xs py-8">${msg}</div>`;
+        const msg = lcState.search
+            ? `<i class="fa-solid fa-magnifying-glass text-2xl mb-2 block text-slate-300"></i>ไม่พบบทสนทนาที่ตรง<br><span class="text-slate-400" style="font-size:11px">ลองคำค้นอื่น</span>`
+            : `<i class="fa-brands fa-line text-2xl mb-2 block text-emerald-300"></i>ยังไม่มีบทสนทนา`;
+        box.innerHTML = `<div class="text-center text-slate-400 text-xs py-12">${msg}</div>`;
     } else {
         box.innerHTML = list.map(c => {
             const uid = String(c.line_user_id || '');
-            const active = (uid === lcState.currentUid) ? ' active' : '';
-            const resolved = parseInt(c.is_resolved, 10) ? ' is-resolved' : '';
-            const uidShort = lcEsc(uid.slice(0, 12) + '…');
+            const isResolved = parseInt(c.is_resolved, 10);
+            const needsReply = parseInt(c.needs_reply, 10) && !isResolved;
+            const classes = ['lc-convo-item'];
+            if (uid === lcState.currentUid) classes.push('active');
+            if (isResolved) classes.push('is-resolved');
+            if (needsReply) classes.push('needs-reply');
             const name = lcEsc(lcDisplayName(c));
-            const lineName = c.profile_display_name ? `<span class="text-slate-400 font-normal" style="font-size:11px">· ${lcEsc(c.profile_display_name)}</span>` : '';
             const lastMsg = lcEsc(lcPreviewText(c));
+            const dirCls = c.last_msg_direction === 'outbound' ? 'outbound' : '';
             const dirIcon = c.last_msg_direction === 'inbound'
-                ? '<i class="fa-solid fa-arrow-down text-slate-400 mr-1"></i>'
-                : '<i class="fa-solid fa-arrow-up text-emerald-500 mr-1"></i>';
-            const time = lcEsc(lcRelTime(c.last_msg_at));
-            const needBadge = parseInt(c.needs_reply, 10) && !parseInt(c.is_resolved, 10) ? '<span class="c-badge">ต้องตอบ</span>' : '';
+                ? '<i class="fa-solid fa-arrow-down c-dir"></i>'
+                : `<i class="fa-solid fa-reply c-dir ${dirCls}"></i>`;
+            const time = lcEsc(lcRelTimeShort(c.last_msg_at));
             const statusBadge = lcStatusBadgeHtml(c.system_user);
             const pic = lcPicHtml(c.profile_picture_url, true);
             const tags = Array.isArray(c.tags_list) && c.tags_list.length
-                ? `<div class="c-tags">${c.tags_list.slice(0,4).map(t=>`<span class="c-tag-pill">${lcEsc(t)}</span>`).join('')}</div>`
+                ? c.tags_list.slice(0, 3).map(t => `<span class="c-tag-pill">${lcEsc(t)}</span>`).join('')
                 : '';
-            return `<div class="lc-convo-item${active}${resolved}" data-uid="${lcEsc(uid)}">
+            const msgCount = parseInt(c.total_msgs, 10) || 0;
+            return `<div class="${classes.join(' ')}" data-uid="${lcEsc(uid)}" title="${lcEsc(uid)}">
                 <div class="lc-convo-pic">${pic}</div>
                 <div class="lc-convo-body">
-                    <div class="c-name">${name} ${needBadge}</div>
-                    <div class="mt-0.5">${statusBadge} ${lineName}</div>
-                    <div class="c-uid">${uidShort}</div>
+                    <div class="c-row1">
+                        <span class="c-name">${name}</span>
+                        <span class="c-time">${time}</span>
+                    </div>
                     <div class="c-preview">${dirIcon}${lastMsg}</div>
-                    ${tags}
-                    <div class="c-meta"><span>${time}</span><span>${parseInt(c.total_msgs, 10) || 0} ข้อความ</span></div>
+                    <div class="c-meta-row">
+                        ${statusBadge}
+                        ${tags}
+                        <span class="c-msg-count">${msgCount} ข้อความ</span>
+                    </div>
                 </div>
             </div>`;
         }).join('');
     }
     document.getElementById('lcPagerSummary').textContent =
-        `หน้า ${lcState.page}/${lcState.pages} · ${lcState.total} บทสนทนา`;
+        `${lcState.total} บทสนทนา · หน้า ${lcState.page}/${lcState.pages}`;
 }
 
 async function lcOpenConvo(lineUserId) {
     lcState.currentUid = lineUserId;
     lcRenderConvos();
+    document.getElementById('lcMain').classList.remove('lc-no-convo');
+    document.getElementById('lcConvoHeader').classList.remove('hidden');
     document.getElementById('lcReplyInput').disabled = false;
     document.getElementById('lcSendBtn').disabled = false;
     document.getElementById('lcTemplateBtn').disabled = false;
     document.getElementById('lcAiBtn').disabled = false;
-    document.getElementById('lcResolveBtn').classList.remove('hidden');
-    document.getElementById('lcSidePanelBtn').classList.remove('hidden');
     document.getElementById('lcReplyInput').focus();
 
     try {
@@ -777,15 +953,8 @@ function lcUpdateResolveBtn() {
     const btn = document.getElementById('lcResolveBtn');
     const lbl = document.getElementById('lcResolveLabel');
     const isResolved = lcState.currentState && lcState.currentState.is_resolved;
-    if (isResolved) {
-        btn.classList.remove('bg-slate-100', 'text-slate-600');
-        btn.classList.add('bg-emerald-500', 'text-white');
-        lbl.textContent = 'เปิดเคสอีกครั้ง';
-    } else {
-        btn.classList.remove('bg-emerald-500', 'text-white');
-        btn.classList.add('bg-slate-100', 'text-slate-600');
-        lbl.textContent = 'ปิดเคส';
-    }
+    btn.classList.toggle('is-active', !!isResolved);
+    lbl.textContent = isResolved ? 'เปิดเคสอีกครั้ง' : 'ปิดเคส';
 }
 
 function lcRenderMessages(messages) {
@@ -1128,9 +1297,33 @@ async function lcShowTemplateMenu() {
     const pop = lcTeleport('lcTemplatePopover');
     const btn = document.getElementById('lcTemplateBtn');
     const r = btn.getBoundingClientRect();
-    pop.style.left = Math.min(r.left, window.innerWidth - 380) + 'px';
-    pop.style.bottom = (window.innerHeight - r.top + 6) + 'px';
-    pop.style.top = '';
+    const popWidth = 360;
+    const popMaxH = 480;
+    const gap = 8;
+    const vpW = window.innerWidth, vpH = window.innerHeight;
+
+    // Horizontal: try align-left with button, clamp to viewport
+    const left = Math.max(8, Math.min(r.left, vpW - popWidth - 8));
+    pop.style.left = left + 'px';
+    pop.style.right = '';
+
+    // Vertical: prefer above button (popover bottom = btn top - gap).
+    // If there isn't enough room above, flip below button.
+    const spaceAbove = r.top - 8;
+    const spaceBelow = vpH - r.bottom - 8;
+    if (spaceAbove >= 220 || spaceAbove >= spaceBelow) {
+        // Place above — anchor top so we never overflow viewport top
+        const desiredTop = Math.max(8, r.top - gap - popMaxH);
+        pop.style.top = desiredTop + 'px';
+        pop.style.bottom = '';
+        pop.style.maxHeight = Math.min(popMaxH, r.top - gap - 8) + 'px';
+    } else {
+        // Place below
+        pop.style.top = (r.bottom + gap) + 'px';
+        pop.style.bottom = '';
+        pop.style.maxHeight = Math.min(popMaxH, vpH - r.bottom - gap - 8) + 'px';
+    }
+
     pop.classList.remove('hidden');
     lcState.templateMenuOpen = true;
 
