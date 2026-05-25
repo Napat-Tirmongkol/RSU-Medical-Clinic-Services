@@ -178,6 +178,15 @@ function vh(?string $s): string { return htmlspecialchars((string) $s, ENT_QUOTE
         .toast { animation: slideDown .3s cubic-bezier(.16,1,.3,1); }
         @keyframes slideDown { from { transform: translate(-50%, -120%); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
         .pdpa-box { transition: border-color .2s; }
+        /* Sticky form action bar — sits above bottom nav (z-70) + its lifted
+           FAB (which extends ~44px above nav top). Total chrome ≈ 130px from
+           viewport bottom; we use 140px + safe-area to keep buttons clickable. */
+        .profile-actions {
+            bottom: calc(140px + env(safe-area-inset-bottom, 0px));
+            background: linear-gradient(to top, rgba(248,250,255,1) 65%, rgba(248,250,255,0));
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+        }
     </style>
 </head>
 <body class="text-slate-900 pb-32">
@@ -671,9 +680,12 @@ function vh(?string $s): string { return htmlspecialchars((string) $s, ENT_QUOTE
                 </div>
 
                 <?php if ($mode === 'edit'): ?>
-                <div class="flex gap-4">
-                    <a href="<?= $isEditing ? '?mode=view' : 'hub.php' ?>" class="flex-1 h-16 flex items-center justify-center bg-white border border-slate-200 text-slate-400 font-black rounded-2xl"><?= __('profile.btn_cancel') ?></a>
-                    <button type="submit" class="flex-[2] h-16 bg-slate-900 text-white font-black rounded-2xl shadow-xl shadow-slate-200"><?= __('profile.save_btn') ?></button>
+                <!-- Sticky bottom action bar — z-[80] sits ABOVE bottom nav (z-70) and its
+                     lifted FAB so buttons are always clickable on mobile.
+                     Gradient bg fades into form content behind. -->
+                <div class="profile-actions sticky z-[80] flex gap-4 -mx-6 px-6 pt-3 pb-4 mt-2">
+                    <a href="<?= $isEditing ? '?mode=view' : 'hub.php' ?>" class="flex-1 h-14 flex items-center justify-center bg-white border border-slate-200 text-slate-500 font-black rounded-2xl shadow-md active:scale-95 transition-all"><?= __('profile.btn_cancel') ?></a>
+                    <button type="submit" class="flex-[2] h-14 bg-slate-900 text-white font-black rounded-2xl shadow-xl shadow-slate-900/25 active:scale-95 transition-all"><?= __('profile.save_btn') ?></button>
                 </div>
                 <?php endif; ?>
 
