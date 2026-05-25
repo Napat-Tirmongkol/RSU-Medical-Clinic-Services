@@ -7,13 +7,22 @@
  * Logic ตรงกับปุ่ม "Sync ทุก member" ในหน้า admin · ปลอดภัย idempotent
  * (LINE API จะ overwrite binding เดิมด้วย richMenuId เดียวกัน — ไม่มี side effect)
  *
+ * ── Time-budgeted resumable sync ─────────────────────────────────────────────
+ * Each LINE API call takes ~300-500ms (Tokyo round-trip) — cron-job.org free
+ * tier caps at 30s so we can only process ~50-70 users per run. The script
+ * stores `last_processed_id` in sys_richmenu_sync_state and resumes from there
+ * on the next call. When the table is exhausted, the cycle resets to 0 so
+ * the next call starts a fresh pass.
+ *
  * ── วิธีตั้งค่า cron-job.org ──────────────────────────────────────────────────
  *  URL     : https://healthycampus.rsu.ac.th/e-campaignv2/cron/sync_richmenu.php?token=YOUR_SECRET_TOKEN
- *  Schedule: สัปดาห์ละครั้ง (เช่น ทุกวันอาทิตย์ 03:00 Asia/Bangkok)
+ *  Schedule: ทุก 5-10 นาที (แต่ละ call ใช้ ≤25s — กิน cron-job.org 30s ไม่ทัน)
  *
  *  Optional query params:
- *    ?limit=500   จำกัดจำนวน user ที่ sync ต่อรอบ (default = ทั้งหมด)
- *    ?dryrun=1    ไม่เรียก LINE API จริง (log อย่างเดียว)
+ *    ?max_seconds=25  Hard time budget per run (default 25, max 120)
+ *    ?batch=100       Max users to fetch per query (default 100)
+ *    ?dryrun=1        ไม่เรียก LINE API จริง (log อย่างเดียว)
+ *    ?reset=1         บังคับเริ่ม cycle ใหม่จาก id 0
  *
  *  Response: text/plain log — มี HTTP 200 เสมอ (เว้นแต่ config error)
  * ─────────────────────────────────────────────────────────────────────────────
@@ -49,11 +58,15 @@ $projectRoot = dirname(__DIR__);
 require_once $projectRoot . '/config.php';
 require_once $projectRoot . '/line_api/line_richmenu_helper.php';
 
-$limit  = max(0, (int)($_GET['limit'] ?? 0));   // 0 = unlimited
-$dryrun = !empty($_GET['dryrun']);
+$maxSeconds = max(5, min(120, (int)($_GET['max_seconds'] ?? 25)));
+$batch      = max(10, min(1000, (int)($_GET['batch']       ?? 100)));
+$dryrun     = !empty($_GET['dryrun']);
+$reset      = !empty($_GET['reset']);
 
 $startedAt = microtime(true);
-echo '[' . date('Y-m-d H:i:s') . "] sync_richmenu cron started" . ($dryrun ? ' (DRY RUN)' : '') . "\n";
+echo '[' . date('Y-m-d H:i:s') . "] sync_richmenu cron started"
+   . ($dryrun ? ' (DRY RUN)' : '')
+   . " · budget={$maxSeconds}s batch={$batch}\n";
 
 $ids = line_richmenu_get_ids();
 if ($ids['member'] === '') {
@@ -65,11 +78,34 @@ echo "Target member menu: {$ids['member']}\n";
 try {
     $pdo = db();
 
-    // Detect whether the optional line_user_id_new column exists. It was
-    // added in migrate_line_user_id_new.php to support a future channel
-    // migration — older installs only have line_user_id. The original SQL
-    // referenced both unconditionally and 500'd on prod hosts where the
-    // migration hadn't been run yet.
+    // ── State table: tracks resume position across cron calls ────────────
+    $pdo->exec("CREATE TABLE IF NOT EXISTS sys_richmenu_sync_state (
+        id INT PRIMARY KEY DEFAULT 1,
+        last_processed_id INT UNSIGNED NOT NULL DEFAULT 0,
+        cycle_count INT UNSIGNED NOT NULL DEFAULT 0,
+        cycle_started_at TIMESTAMP NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    $pdo->exec("INSERT IGNORE INTO sys_richmenu_sync_state
+                (id, last_processed_id, cycle_count, cycle_started_at)
+                VALUES (1, 0, 0, NOW())");
+    $state = $pdo->query("SELECT last_processed_id, cycle_count, cycle_started_at
+                          FROM sys_richmenu_sync_state WHERE id = 1")
+                 ->fetch(PDO::FETCH_ASSOC) ?: ['last_processed_id' => 0, 'cycle_count' => 0, 'cycle_started_at' => null];
+    $lastId = (int)$state['last_processed_id'];
+
+    if ($reset) {
+        $lastId = 0;
+        $pdo->exec("UPDATE sys_richmenu_sync_state
+                    SET last_processed_id = 0, cycle_started_at = NOW() WHERE id = 1");
+        echo "↻ reset requested — starting cycle from id 0\n";
+    }
+    echo "Resume from sys_users.id > {$lastId}"
+       . " · cycle #" . (int)$state['cycle_count']
+       . ($state['cycle_started_at'] ? " (started {$state['cycle_started_at']})" : '')
+       . "\n";
+
+    // Detect optional line_user_id_new column (added by migrate_line_user_id_new)
     $hasNewCol = false;
     try {
         $colCheck = $pdo->query("SHOW COLUMNS FROM sys_users LIKE 'line_user_id_new'");
@@ -78,41 +114,68 @@ try {
         $hasNewCol = false;
     }
 
+    // Only sync "real" members — skip partial rows where full_name is empty
+    // (avoids case where a half-created row from line callback gets a member
+    // menu before the user has actually registered).
+    $fullNameGuard = "AND full_name IS NOT NULL AND TRIM(full_name) <> ''";
+
     if ($hasNewCol) {
-        $sql = "SELECT DISTINCT COALESCE(line_user_id_new, line_user_id) AS uid
+        $sql = "SELECT id, COALESCE(line_user_id_new, line_user_id) AS uid
                 FROM sys_users
-                WHERE (line_user_id     IS NOT NULL AND line_user_id     != '')
-                   OR (line_user_id_new IS NOT NULL AND line_user_id_new != '')
-                ORDER BY id ASC";
+                WHERE id > :last_id
+                  AND ((line_user_id     IS NOT NULL AND line_user_id     != '')
+                       OR (line_user_id_new IS NOT NULL AND line_user_id_new != ''))
+                  {$fullNameGuard}
+                ORDER BY id ASC
+                LIMIT :lim";
     } else {
         echo "  · column line_user_id_new not found — using line_user_id only\n";
-        $sql = "SELECT DISTINCT line_user_id AS uid
+        $sql = "SELECT id, line_user_id AS uid
                 FROM sys_users
-                WHERE line_user_id IS NOT NULL AND line_user_id != ''
-                ORDER BY id ASC";
+                WHERE id > :last_id
+                  AND line_user_id IS NOT NULL AND line_user_id != ''
+                  {$fullNameGuard}
+                ORDER BY id ASC
+                LIMIT :lim";
     }
-    if ($limit > 0) $sql .= " LIMIT " . $limit;
-    $rows = $pdo->query($sql)->fetchAll(PDO::FETCH_COLUMN) ?: [];
+    $st = $pdo->prepare($sql);
+    $st->bindValue(':last_id', $lastId, PDO::PARAM_INT);
+    $st->bindValue(':lim',     $batch,  PDO::PARAM_INT);
+    $st->execute();
+    $rows = $st->fetchAll(PDO::FETCH_ASSOC);
 } catch (Throwable $e) {
     echo "ERROR: query failed — " . $e->getMessage() . "\n";
     exit;
 }
 
 $total = count($rows);
-echo "Found $total user(s) with line_user_id\n";
+echo "Found {$total} user(s) to process in this run (batch limit {$batch})\n";
 
-$ok = 0; $fail = 0; $skip = 0;
-foreach ($rows as $i => $uid) {
-    if (!$uid) { $skip++; continue; }
+$ok = 0; $fail = 0; $skip = 0; $newLastId = $lastId;
+$timedOut = false;
+foreach ($rows as $i => $row) {
+    $uid    = (string)$row['uid'];
+    $rowId  = (int)$row['id'];
+
+    if (!$uid) { $skip++; $newLastId = $rowId; continue; }
+
+    // Time budget check — exit cleanly so we don't get killed mid-row
+    $elapsed = microtime(true) - $startedAt;
+    if ($elapsed >= $maxSeconds) {
+        $timedOut = true;
+        echo "  ⏱  time budget reached at " . round($elapsed, 1) . "s "
+           . "(processed " . ($i) . " / {$total} this batch)\n";
+        break;
+    }
 
     try {
         if ($dryrun) {
             $ok++;
         } else {
-            $r = line_richmenu_link_user((string)$uid, $ids['member']);
+            $r = line_richmenu_link_user($uid, $ids['member']);
             $r['ok'] ? $ok++ : $fail++;
             line_richmenu_audit_log(
-                (string)$uid,
+                $uid,
                 $r['ok'] ? 'sync_ok' : 'sync_failed',
                 'member',
                 $ids['member'],
@@ -120,27 +183,59 @@ foreach ($rows as $i => $uid) {
                 'cron:sync_richmenu'
             );
         }
+        $newLastId = $rowId;  // only advance on successful (or attempted) row
     } catch (Throwable $e) {
-        // Don't let one user's failure abort the whole run
         $fail++;
-        echo "  ✗ user " . substr((string)$uid, 0, 8) . "...: " . $e->getMessage() . "\n";
+        $newLastId = $rowId;
+        echo "  ✗ user " . substr($uid, 0, 8) . "...: " . $e->getMessage() . "\n";
     }
 
-    // กัน LINE rate limit (~50 req/sec) — pause สั้นๆ ทุก 50 รายการ
-    if (($i + 1) % 50 === 0) {
-        echo "  progress: " . ($i + 1) . " / $total\n";
-        usleep(200000); // 0.2s
+    // Light throttle — LINE rate limit is ~50/sec
+    if (($i + 1) % 25 === 0) usleep(50000);  // 50ms every 25 rows
+}
+
+// ── Update state ────────────────────────────────────────────────────────────
+$cycleDone = false;
+try {
+    $pdo->prepare("UPDATE sys_richmenu_sync_state
+                   SET last_processed_id = :id WHERE id = 1")
+        ->execute([':id' => $newLastId]);
+
+    // If we processed everything available + budget allowed → cycle is done.
+    // Check whether ANY remaining rows beyond newLastId exist; if not, reset.
+    if (!$timedOut && $total < $batch) {
+        // We fetched < batch which means the query exhausted the table.
+        // Wrap to start of cycle.
+        $pdo->exec("UPDATE sys_richmenu_sync_state
+                    SET last_processed_id = 0,
+                        cycle_count = cycle_count + 1,
+                        cycle_started_at = NOW()
+                    WHERE id = 1");
+        $cycleDone = true;
     }
+} catch (Throwable $e) {
+    echo "WARN: state update failed — " . $e->getMessage() . "\n";
 }
 
 $elapsed = round(microtime(true) - $startedAt, 2);
 echo "─────────────────────────────────────\n";
 echo "DONE in {$elapsed}s\n";
-echo "  total:   $total\n";
-echo "  success: $ok\n";
-echo "  failed:  $fail\n";
-echo "  skipped: $skip\n";
+echo "  processed: " . ($ok + $fail) . " (this run)\n";
+echo "  success:   $ok\n";
+echo "  failed:    $fail\n";
+echo "  skipped:   $skip\n";
+echo "  last id:   $newLastId\n";
+if ($cycleDone) {
+    echo "  ✓ cycle complete — next call wraps to id 0\n";
+} elseif ($timedOut) {
+    echo "  → next call resumes from id > $newLastId\n";
+} else {
+    echo "  → more rows available — next call continues\n";
+}
 
 if (!$dryrun && function_exists('log_activity')) {
-    @log_activity('LINE Rich Menu', "Cron sync_richmenu: total=$total ok=$ok fail=$fail (in {$elapsed}s)");
+    @log_activity('LINE Rich Menu',
+        "Cron sync_richmenu: this_run=" . ($ok + $fail) . " ok=$ok fail=$fail "
+        . "last_id=$newLastId" . ($cycleDone ? ' [cycle done]' : '')
+        . " (in {$elapsed}s)");
 }
