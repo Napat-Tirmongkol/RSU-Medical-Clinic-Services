@@ -51,7 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         // PRG redirect ป้องกัน double-submit เวลา refresh
-        header('Location: index.php?section=profile');
+        header('Location: profile.php');
         exit;
     }
 
@@ -83,22 +83,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 
                 if (!$isValid) {
-                    header('Location: index.php?section=error_logs&email_error=1');
+                    header('Location: error_logs.php?email_error=1');
                 } else {
                     $pdo->prepare("INSERT INTO sys_settings (`key`,`value`) VALUES ('admin_alert_email',?) ON DUPLICATE KEY UPDATE `value`=VALUES(`value`)")->execute([$emailVal]);
-                    header('Location: index.php?section=error_logs&saved=1');
+                    header('Location: error_logs.php?saved=1');
                 }
                 exit;
             } elseif ($sectionAction === 'clear') {
                 $cl = $_POST['clear_level'] ?? 'all';
                 if ($cl === 'all') { $pdo->exec("TRUNCATE TABLE sys_error_logs"); }
                 else { $pdo->prepare("DELETE FROM sys_error_logs WHERE level=?")->execute([$cl]); }
-                header('Location: index.php?section=error_logs&cleared=1'); 
+                header('Location: error_logs.php?cleared=1'); 
                 exit;
             } elseif ($sectionAction === 'delete_one') {
                 $lid = (int)($_POST['log_id'] ?? 0);
                 if ($lid > 0) $pdo->prepare("DELETE FROM sys_error_logs WHERE id=?")->execute([$lid]);
-                header('Location: index.php?section=error_logs'); 
+                header('Location: error_logs.php'); 
                 exit;
             } elseif ($sectionAction === 'update_status') {
                 $lid = (int)($_POST['log_id'] ?? 0);
@@ -107,7 +107,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($lid > 0 && in_array($status, ['New', 'Active', 'Resolved'], true)) {
                     $pdo->prepare("UPDATE sys_error_logs SET status=?, resolve_comment=? WHERE id=?")->execute([$status, $comment, $lid]);
                 }
-                header('Location: index.php?section=error_logs&updated=1');
+                header('Location: error_logs.php?updated=1');
                 exit;
             }
         } catch (PDOException $e) {

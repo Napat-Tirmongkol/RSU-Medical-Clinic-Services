@@ -290,7 +290,7 @@ $_el_filterQs = http_build_query(array_filter([
                 <p class="text-xs text-gray-400">ส่ง Error Digest ทุก 30 นาทีเมื่อมี error ใหม่ในระบบ</p>
             </div>
         </div>
-        <form method="POST" action="index.php?section=error_logs" class="flex flex-wrap gap-3 items-end">
+        <form method="POST" action="error_logs.php" class="flex flex-wrap gap-3 items-end">
             <input type="hidden" name="action" value="save_alert_email">
             <div class="flex-1 min-w-[220px]">
                 <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 block">อีเมล Admin (คั่นด้วยคอมม่า , เพื่อส่งหลายคน)</label>
@@ -382,7 +382,7 @@ $_el_filterQs = http_build_query(array_filter([
                 พบ <span class="text-[#0052CC]"><?= number_format($_el_total) ?></span> รายการ
                 <?php if ($_el_level || $_el_search || $_el_date): ?><span class="text-gray-400 font-normal">(กรองแล้ว)</span><?php endif; ?>
             </p>
-            <form method="POST" action="index.php?section=error_logs" onsubmit="return confirm('ยืนยันการลบ log?')">
+            <form method="POST" action="error_logs.php" onsubmit="return confirm('ยืนยันการลบ log?')">
                 <input type="hidden" name="action" value="clear">
                 <div class="flex gap-2">
                     <select name="clear_level" class="py-1.5 px-2 border border-gray-200 rounded-lg text-xs outline-none bg-white">
@@ -468,7 +468,7 @@ $_el_filterQs = http_build_query(array_filter([
                             <code class="text-[10px] text-gray-400"><?= htmlspecialchars($log['ip_address'] ?: '-') ?></code>
                         </td>
                         <td class="px-3 py-3.5">
-                            <form method="POST" action="index.php?section=error_logs">
+                            <form method="POST" action="error_logs.php">
                                 <input type="hidden" name="action" value="delete_one">
                                 <input type="hidden" name="log_id" value="<?= $log['id'] ?>">
                                 <button type="submit" onclick="return confirm('ลบรายการนี้?')"

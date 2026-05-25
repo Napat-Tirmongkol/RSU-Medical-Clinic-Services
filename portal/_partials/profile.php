@@ -252,7 +252,7 @@ $accessLabels = [
     <?php else: ?>
 
         <!-- ข้อมูลบัญชี + แก้ไขชื่อ -->
-        <form method="POST" action="index.php?section=profile" class="pf-card" id="profile-form">
+        <form method="POST" action="profile.php" class="pf-card" id="profile-form">
             <?php csrf_field(); ?>
             <input type="hidden" name="action" value="update_profile">
 
