@@ -51,14 +51,26 @@ function vitals_bp_ensure_schema(PDO $pdo): void
             arm ENUM('left','right') NULL,
             notes VARCHAR(500) NULL,
             classification ENUM('normal','elevated','stage1','stage2','crisis') NULL,
+            source ENUM('staff','self') NOT NULL DEFAULT 'staff',
             recorded_by INT UNSIGNED NULL,
             recorded_by_name VARCHAR(120) NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             KEY idx_patient_date (patient_id, measured_at DESC),
             KEY idx_measured_at (measured_at DESC),
-            KEY idx_classification (classification, measured_at)
+            KEY idx_classification (classification, measured_at),
+            KEY idx_source_date (source, measured_at)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        // Idempotent column add for installs that already have the table.
+        // Wrapped in try/catch — MySQL ≥8.0.29 supports IF NOT EXISTS but
+        // older versions reject it. Catch the error and ignore if the column
+        // already exists.
+        try { $pdo->exec("ALTER TABLE sys_vitals_bp
+                          ADD COLUMN source ENUM('staff','self') NOT NULL DEFAULT 'staff' AFTER classification"); }
+        catch (PDOException) {}
+        try { $pdo->exec("ALTER TABLE sys_vitals_bp
+                          ADD INDEX idx_source_date (source, measured_at)"); }
+        catch (PDOException) {}
         $done = true;
     } catch (Throwable $e) {
         error_log('[vitals_bp_ensure_schema] ' . $e->getMessage());

@@ -429,7 +429,12 @@ $vbpCsrf = get_csrf_token();
                 '<td class="text-sm">' + thDateTime(r.measured_at) + '</td>' +
                 '<td style="text-align:center"><span class="vbp-cls vbp-cls-' + r.classification + '">' +
                     (CLS_LABELS[r.classification] || r.classification) + '</span></td>' +
-                '<td class="text-xs text-slate-500">' + escapeHtml(r.recorded_by_name || '—') + '</td>' +
+                '<td class="text-xs text-slate-500">' +
+                    (r.source === 'self'
+                        ? '<span style="display:inline-block;padding:2px 7px;border-radius:8px;background:#dcfce7;color:#15803d;font-weight:800;font-size:10px;margin-right:4px">✋ ผู้ป่วยจดเอง</span>'
+                        : '') +
+                    escapeHtml(r.recorded_by_name || '—') +
+                '</td>' +
                 '<td style="text-align:center;white-space:nowrap" onclick="event.stopPropagation()">' +
                     '<button class="vbp-icon-btn is-view" onclick="vbpOpenPatient(' + r.patient_id + ')" title="ดู trend ผู้ป่วย"><i class="fa-solid fa-chart-line text-xs"></i></button> ' +
                     '<button class="vbp-icon-btn is-edit" onclick="vbpOpenEntry(' + r.id + ')" title="แก้ไข"><i class="fa-solid fa-pen-to-square text-xs"></i></button> ' +

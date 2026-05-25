@@ -2208,6 +2208,16 @@ $pillTones = [
                         </button>
                         <?php endif; ?>
 
+                        <button onclick="window.location.href='bp_tracker.php'"
+                            class="relative flex flex-col items-start p-5 rounded-2xl bg-gradient-to-br from-rose-50 to-pink-100 border border-rose-200 active:scale-95 transition-all text-left group overflow-hidden">
+                            <div class="absolute -right-4 -top-4 w-16 h-16 bg-rose-200/40 rounded-full blur-xl group-hover:scale-150 transition-transform"></div>
+                            <div class="w-10 h-10 rounded-2xl bg-white flex items-center justify-center mb-3 shadow-sm border border-rose-100 text-rose-600 relative">
+                                <i class="fa-solid fa-heart-pulse text-sm"></i>
+                            </div>
+                            <p class="text-[13px] font-black leading-tight text-slate-800 relative">สมุดความดัน<br>ของฉัน</p>
+                            <span class="text-[9px] font-black text-rose-700 uppercase tracking-widest mt-1 relative">BP Tracker</span>
+                        </button>
+
                         <button onclick="showUpcoming('ชำระค่าบริการ')"
                             class="relative flex flex-col items-start p-5 rounded-2xl bg-slate-50 border border-slate-100 active:scale-95 transition-all text-left opacity-90">
                             <span class="absolute top-3 right-3 px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[8px] font-black uppercase tracking-widest">Soon</span>
