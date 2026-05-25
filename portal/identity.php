@@ -707,7 +707,7 @@ layout_start(['section' => 'identity', 'title' => 'Identity & Governance']);
                                             <label style="display:block;font-size:12px;font-weight:800;color:#475569;margin-bottom:6px">สถานะบัญชี</label>
                                             <select name="status" id="govStatus" class="premium-input" style="width:100%;background-image:none">
                                                 <option value="active">Active</option>
-                                                <option value="suspended">Suspended</option>
+                                                <option value="disabled">Disabled</option>
                                             </select>
                                         </div>
                                     </div>

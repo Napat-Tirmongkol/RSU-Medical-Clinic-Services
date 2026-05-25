@@ -48,7 +48,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $username  = trim($_POST['username'] ?? '');
         $email     = trim($_POST['email'] ?? '');
         $password  = $_POST['password'] ?? '';
-        $status    = $_POST['status'] ?? 'active';
+        // Normalize account_status: form อาจส่ง 'Active' / 'Suspended' / 'active' / 'disabled'
+        // → ทำเป็น lowercase + whitelist กัน truncate บน strict-mode + case-sensitive ENUM
+        $status    = strtolower(trim((string)($_POST['status'] ?? 'active')));
+        if (!in_array($status, ['active', 'disabled', 'suspended', 'inactive'], true)) {
+            $status = 'active';
+        }
         $reason    = trim($_POST['justification'] ?? '');
 
         if ($fullName && $username && $reason) {
@@ -67,6 +72,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($type === 'admin') {
                     // Ensure status column exists in sys_admins for consistency
                     try { $pdo->exec("ALTER TABLE sys_admins ADD COLUMN status VARCHAR(20) DEFAULT 'active' AFTER role"); } catch(PDOException $e) {}
+                    // Normalize legacy ENUM → VARCHAR + lowercase existing values (same as sys_staff)
+                    try {
+                        $pdo->exec("ALTER TABLE sys_admins MODIFY COLUMN status VARCHAR(20) NOT NULL DEFAULT 'active'");
+                        $pdo->exec("UPDATE sys_admins SET status = LOWER(status) WHERE status != LOWER(status)");
+                    } catch (PDOException $e) {}
 
                     $role = $_POST['admin_role'] ?? 'admin';
                     // Whitelist admin role (ป้องกัน privilege escalation จาก POST)
@@ -126,6 +136,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                     // Ensure new flag columns exist (for existing installs)
                     try { $pdo->exec("ALTER TABLE sys_staff ADD COLUMN account_status VARCHAR(20) NOT NULL DEFAULT 'active'"); } catch(PDOException $e) {}
+                    // Normalize column type: legacy installs อาจมี ENUM('Active','Suspended') ที่
+                    // strict-mode + binary collation ทำให้ INSERT 'active' โดน truncate. MODIFY เป็น
+                    // VARCHAR(20) → รับทุก value พร้อม normalize เป็น lowercase ใน UPDATE ด้านล่าง
+                    try {
+                        $pdo->exec("ALTER TABLE sys_staff MODIFY COLUMN account_status VARCHAR(20) NOT NULL DEFAULT 'active'");
+                        $pdo->exec("UPDATE sys_staff SET account_status = LOWER(account_status) WHERE account_status != LOWER(account_status)");
+                    } catch (PDOException $e) {}
                     try { $pdo->exec("ALTER TABLE sys_staff ADD COLUMN access_ecampaign TINYINT(1) DEFAULT 1"); } catch(PDOException $e) {}
                     try { $pdo->exec("ALTER TABLE sys_staff ADD COLUMN ecampaign_role VARCHAR(20) NOT NULL DEFAULT 'editor'"); } catch(PDOException $e) {}
                     try { $pdo->exec("ALTER TABLE sys_staff ADD COLUMN access_insurance TINYINT(1) DEFAULT 0"); } catch(PDOException $e) {}
