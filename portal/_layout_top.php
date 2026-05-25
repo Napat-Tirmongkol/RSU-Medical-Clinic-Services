@@ -923,6 +923,10 @@
                         <div class="psb-icon"><i class="fa-solid fa-hospital" style="color:#0d9488"></i></div>
                         <span class="psb-label">ข้อมูลคลินิก</span>
                     </a>
+                    <a class="psb-item <?= $activeSection==='vitals_bp'?'psb-active':'' ?>" data-section="vitals_bp" href="vitals_bp.php">
+                        <div class="psb-icon"><i class="fa-solid fa-heart-pulse" style="color:#dc2626"></i></div>
+                        <span class="psb-label">สมุดความดันโลหิต</span>
+                    </a>
                     <?php if ($hasScholarship): ?>
                         <a class="psb-item <?= $activeSection==='scholarship'?'psb-active':'' ?>" data-section="scholarship" href="scholarship.php">
                             <div class="psb-icon"><i class="fa-solid fa-graduation-cap" style="color:#10b981"></i></div>
