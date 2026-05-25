@@ -573,10 +573,6 @@
                         <div class="psb-icon"><i class="fa-solid fa-comments" style="color:#a855f7"></i></div>
                         <span class="psb-label">ผู้ช่วยข้อมูล</span>
                     </a>
-                    <a class="psb-item <?= $activeSection==='line_chat'?'psb-active':'' ?>" data-section="line_chat" href="line_chat.php">
-                        <div class="psb-icon"><i class="fa-brands fa-line" style="color:#06c755"></i></div>
-                        <span class="psb-label">LINE Chat</span>
-                    </a>
                     <a class="psb-item <?= $activeSection==='ai_qa_lab'?'psb-active':'' ?>" data-section="ai_qa_lab" href="ai_qa_lab.php">
                         <div class="psb-icon"><i class="fa-solid fa-flask-vial" style="color:#a855f7"></i></div>
                         <span class="psb-label">AI QA Lab</span>
@@ -588,6 +584,21 @@
                     <a class="psb-item <?= $activeSection==='ai_knowledge'?'psb-active':'' ?>" data-section="ai_knowledge" href="ai_knowledge.php">
                         <div class="psb-icon"><i class="fa-solid fa-database" style="color:#10b981"></i></div>
                         <span class="psb-label">AI Knowledge</span>
+                    </a>
+                </div>
+            <?php endif; ?>
+
+            <?php /* ── LINE OFFICIAL ──────────────────────────────────────── */ ?>
+            <?php if (!$registryOnly && ($isSuper || !empty($_SESSION['access_ai']))): ?>
+                <button type="button" class="psb-section-toggle" data-group="line" onclick="togglePsbGroup('line',this)">
+                    <i class="fa-brands fa-line" style="color:#06c755"></i>
+                    <span>LINE Official</span>
+                    <i class="fa-solid fa-chevron-down psb-chevron"></i>
+                </button>
+                <div class="psb-group" data-group="line">
+                    <a class="psb-item <?= $activeSection==='line_chat'?'psb-active':'' ?>" data-section="line_chat" href="line_chat.php">
+                        <div class="psb-icon"><i class="fa-brands fa-line" style="color:#06c755"></i></div>
+                        <span class="psb-label">LINE Chat</span>
                     </a>
                 </div>
             <?php endif; ?>

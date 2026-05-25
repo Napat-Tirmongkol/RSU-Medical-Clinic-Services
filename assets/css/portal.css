@@ -15,6 +15,7 @@
     /* Section accents — each sidebar group gets its own personality */
     --c-acc-overview:  #2e9e63;   /* brand green */
     --c-acc-ai:        #8b5cf6;   /* violet */
+    --c-acc-line:      #06c755;   /* LINE official green */
     --c-acc-security:  #f43f5e;   /* rose */
     --c-acc-insurance: #0ea5e9;   /* sky */
     --c-acc-comm:      #f59e0b;   /* amber */
@@ -509,6 +510,7 @@ a.psb-item.psb-active {
 /* ── Per-section accent palette (cascades into .psb-item via .psb-group) ─── */
 .psb-group[data-group="overview"]   { --acc: var(--c-acc-overview);  --acc-tint: rgba(46,158,99,.10);  --acc-tint-2: rgba(46,158,99,.18); }
 .psb-group[data-group="ai"]         { --acc: var(--c-acc-ai);        --acc-tint: rgba(139,92,246,.10); --acc-tint-2: rgba(139,92,246,.18); }
+.psb-group[data-group="line"]       { --acc: var(--c-acc-line);      --acc-tint: rgba(6,199,85,.10);   --acc-tint-2: rgba(6,199,85,.20); }
 .psb-group[data-group="security"]   { --acc: var(--c-acc-security);  --acc-tint: rgba(244,63,94,.10);  --acc-tint-2: rgba(244,63,94,.18); }
 .psb-group[data-group="insurance"]  { --acc: var(--c-acc-insurance); --acc-tint: rgba(14,165,233,.10); --acc-tint-2: rgba(14,165,233,.18); }
 .psb-group[data-group="comm"]       { --acc: var(--c-acc-comm);      --acc-tint: rgba(245,158,11,.10); --acc-tint-2: rgba(245,158,11,.20); }
@@ -523,6 +525,7 @@ a.psb-item.psb-active {
 /* Pair section toggle with the same accent */
 .psb-section-toggle[data-group="overview"]   { --acc: var(--c-acc-overview); }
 .psb-section-toggle[data-group="ai"]         { --acc: var(--c-acc-ai); }
+.psb-section-toggle[data-group="line"]       { --acc: var(--c-acc-line); }
 .psb-section-toggle[data-group="security"]   { --acc: var(--c-acc-security); }
 .psb-section-toggle[data-group="insurance"]  { --acc: var(--c-acc-insurance); }
 .psb-section-toggle[data-group="comm"]       { --acc: var(--c-acc-comm); }
