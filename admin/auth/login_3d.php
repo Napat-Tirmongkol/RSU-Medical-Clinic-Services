@@ -1,6 +1,7 @@
 <?php
 // admin/auth/login_3d.php
-// 3D Spline + Glassmorphism prototype — visual variant ของ login.php
+// 3D Clinic Scene + Glassmorphism prototype — visual variant ของ login.php
+// Three.js scene ธีมคลินิก (DNA helix + cells + pulse rings + capsule)
 // PHP logic เหมือน login.php ทุกประการ (CSRF / rate limit / session)
 session_start();
 
@@ -79,8 +80,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="stylesheet" href="../../assets/css/rsufont.css">
 
-    <!-- Spline 3D viewer (web component) -->
-    <script type="module" src="https://unpkg.com/@splinetool/viewer@1.9.48/build/spline-viewer.js"></script>
+    <!-- Three.js + custom clinic scene (DNA helix + cells + pulse rings + capsule) -->
+    <script defer src="https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.min.js"></script>
+    <script defer src="../../assets/js/clinic-3d-scene.js"></script>
 
     <style>
         * { font-family: 'Sarabun', sans-serif; box-sizing: border-box; }
@@ -142,19 +144,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             mix-blend-mode: overlay;
         }
 
-        /* ── Layer 3: Spline 3D viewer ── */
-        spline-viewer {
+        /* ── Layer 3: Three.js 3D canvas (clinic scene) ── */
+        .scene3d {
             position: fixed;
             inset: 0;
             width: 100vw;
             height: 100vh;
             z-index: 3;
             opacity: 0;
-            transition: opacity .9s ease;
+            transition: opacity 1.1s ease;
+            display: block;
+            pointer-events: none;     /* clicks pass through to form */
         }
-        spline-viewer.is-ready { opacity: 1; }
-        /* Hide Spline watermark on free tier */
-        spline-viewer::part(logo) { display: none !important; }
+        .scene3d.is-ready { opacity: 1; }
 
         /* ── Layer 4: dark vignette for form contrast ── */
         .vignette {
@@ -480,20 +482,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </head>
 <body>
 
-<!-- Layer 0-2: animated background (always on, beautiful even without Spline) -->
+<!-- Layer 0-2: animated background (always on — fallback ถ้า WebGL ไม่รองรับ) -->
 <div class="bg-fallback"></div>
 <div class="blob blob-1"></div>
 <div class="blob blob-2"></div>
 <div class="blob blob-3"></div>
 <div class="grain"></div>
 
-<!-- Layer 3: Spline 3D scene -->
-<!-- ⚙️ TO CUSTOMIZE: replace SPLINE_SCENE in <script> below with your own scene URL from spline.design -->
-<spline-viewer
-    id="splineBg"
-    loading-anim-type="none"
-    events-target="global">
-</spline-viewer>
+<!-- Layer 3: Three.js clinic scene (DNA helix + cells + pulse rings + capsule) -->
+<canvas id="scene3d" class="scene3d" aria-hidden="true"></canvas>
 
 <!-- Layer 4: vignette overlay for form contrast -->
 <div class="vignette"></div>
@@ -589,29 +586,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 <script>
 // ─────────────────────────────────────────────────────────────────────
-// ⚙️ Spline scene — swap URL ที่นี่ได้เลย
-//   1. ไปที่ https://spline.design/ → สร้าง / เลือก scene
-//   2. File → Export → Code → copy "Scene URL"  (.splinecode)
-//   3. วางทับด้านล่าง
-//   หากปล่อยว่าง / โหลดไม่สำเร็จ → CSS fallback (gradient + blob) จะแสดงอย่างเดียว
+// 🧬 Clinic Scene (Three.js) — ปรับแต่ง element ได้ผ่าน opts
+//   • colorPrimary / colorAccent / colorCapsule = สีหลัก/รอง/แคปซูล
+//   • particles  = จำนวน cells/molecules ลอยใน scene
+//   • helixPairs = ความหนาแน่นของ DNA helix
+//
+//   ถ้าอุปกรณ์ไม่รองรับ WebGL หรือผู้ใช้เปิด prefers-reduced-motion
+//   → scene ไม่โหลด, CSS fallback (gradient + blob) แสดงอย่างเดียว
 // ─────────────────────────────────────────────────────────────────────
-const SPLINE_SCENE = 'https://prod.spline.design/6Wq1Q7YGyM-iab9i/scene.splinecode';
-
-(function initSpline() {
-    if (!SPLINE_SCENE) return;
-    const viewer = document.getElementById('splineBg');
-    if (!viewer) return;
-    viewer.setAttribute('url', SPLINE_SCENE);
-
-    // Fade-in เมื่อ scene พร้อม
-    viewer.addEventListener('load', () => viewer.classList.add('is-ready'));
-
-    // ถ้าโหลดเกิน 6s ไม่ผ่าน → ซ่อนถาวร (CSS fallback ทำหน้าที่แทน)
-    const timer = setTimeout(() => {
-        if (!viewer.classList.contains('is-ready')) viewer.style.display = 'none';
-    }, 6000);
-    viewer.addEventListener('load',  () => clearTimeout(timer));
-    viewer.addEventListener('error', () => { clearTimeout(timer); viewer.style.display = 'none'; });
+(function bootClinicScene() {
+    function start() {
+        if (!window.ClinicScene) return;
+        const canvas = document.getElementById('scene3d');
+        const handle = window.ClinicScene.init(canvas, {
+            colorPrimary: 0x4dc98a,   // brand green
+            colorAccent:  0x06c2a4,   // cyan-teal
+            colorCapsule: 0xff6b6b,   // pill red
+            particles:    180,
+            helixPairs:   48,
+        });
+        if (handle) {
+            // Wait one frame so first render completes before fade-in
+            requestAnimationFrame(() => canvas.classList.add('is-ready'));
+        }
+    }
+    // Both scripts defer-loaded → init after DOMContentLoaded
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', start);
+    } else {
+        start();
+    }
 })();
 
 // ── Password visibility toggle
