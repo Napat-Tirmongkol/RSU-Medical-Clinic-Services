@@ -841,7 +841,7 @@ function toggleNavSection(btn){
         $notifAjaxUrl = (substr($_curDir, -6) === '/admin')
             ? 'ajax/ajax_notifications.php'
             : '../admin/ajax/ajax_notifications.php';
-        $notifErrorUrl   = '../portal/index.php?section=error_logs';
+        $notifErrorUrl   = '../portal/error_logs.php';
         $notifBookingUrl = (substr($_curDir, -6) === '/admin') ? 'bookings.php' : '../admin/bookings.php';
         unset($_curDir);
         ?>

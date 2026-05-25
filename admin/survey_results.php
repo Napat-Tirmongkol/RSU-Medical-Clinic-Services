@@ -177,7 +177,7 @@ require_once __DIR__ . '/includes/header.php';
         <p class="text-[11px] font-black uppercase tracking-widest text-gray-400 mb-1">คำถาม Active</p>
         <p class="text-3xl font-black text-slate-700"><?= count($questions) ?></p>
         <p class="text-xs text-gray-500 mt-1 font-bold">
-            <a href="../portal/index.php?section=clinic_data&cd_view=survey" class="text-pink-600 hover:underline font-black">
+            <a href="../portal/clinic_data.php?cd_view=survey" class="text-pink-600 hover:underline font-black">
                 จัดการคำถาม <i class="fa-solid fa-arrow-up-right-from-square text-[9px]"></i>
             </a>
         </p>

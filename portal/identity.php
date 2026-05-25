@@ -868,6 +868,14 @@ layout_start(['section' => 'identity', 'title' => 'Identity & Governance']);
                                                 </div>
                                                 <input type="checkbox" name="edms_access" id="govEdmsAccess" value="1" style="width:16px;height:16px" onclick="event.stopPropagation()">
                                             </div>
+                                            <!-- EDMS SLA Admin (จัดการ SLA policies + dashboard) -->
+                                            <div onclick="document.getElementById('govEdmsSlaAdminAccess').click()" class="premium-role-card" style="border-radius:14px;border:1.5px solid #e2e8f0;background:#fff;cursor:pointer;padding:12px;transition:all 0.2s;display:flex;align-items:center;justify-content:space-between">
+                                                <div style="display:flex;align-items:center;gap:10px">
+                                                    <i class="fa-solid fa-stopwatch text-sky-500"></i>
+                                                    <span style="font-weight:800;font-size:12px;color:#475569">EDMS SLA Admin (จัดการนโยบาย/Dashboard)</span>
+                                                </div>
+                                                <input type="checkbox" name="edms_sla_admin_access" id="govEdmsSlaAdminAccess" value="1" style="width:16px;height:16px" onclick="event.stopPropagation()">
+                                            </div>
                                             <!-- AI Suite (Assistant / QA Lab / Prompts / Knowledge) -->
                                             <div onclick="document.getElementById('govAiAccess').click()" class="premium-role-card" style="border-radius:14px;border:1.5px solid #e2e8f0;background:#fff;cursor:pointer;padding:12px;transition:all 0.2s;display:flex;align-items:center;justify-content:space-between">
                                                 <div style="display:flex;align-items:center;gap:10px">
