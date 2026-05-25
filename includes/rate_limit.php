@@ -83,6 +83,16 @@ function rate_limit_ip_dir(): string {
 }
 
 function rate_limit_ip_addr(): string {
+    // ใช้ get_real_client_ip() ถ้ามี — ตั้ง TRUSTED_PROXIES ใน secrets.php เพื่อ
+    // อ่าน X-Forwarded-For / CF-Connecting-IP ตอน production อยู่หลัง proxy.
+    // Default = REMOTE_ADDR เปล่า (no behavior change)
+    if (!function_exists('get_real_client_ip')) {
+        $helper = __DIR__ . '/client_ip.php';
+        if (is_file($helper)) @require_once $helper;
+    }
+    if (function_exists('get_real_client_ip')) {
+        return get_real_client_ip();
+    }
     return $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
 }
 

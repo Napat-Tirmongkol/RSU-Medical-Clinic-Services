@@ -80,4 +80,20 @@ return [
     // ตัวอย่าง cron entry:
     //   curl -fsS -H "X-Cron-Secret: <secret>" https://.../e_Borrow/process/send_reminders.php
     'EBORROW_CRON_SECRET'                 => '',
+
+    // --- Trusted Reverse Proxies (CIDR list) ---
+    // ถ้า production deploy อยู่หลัง reverse proxy (nginx, AWS ALB, Cloudflare)
+    // ให้ใส่ CIDR ของ proxy IP เพื่อให้ rate_limit + audit log อ่าน real client IP
+    // จาก X-Forwarded-For / CF-Connecting-IP / X-Real-IP ได้ถูกต้อง
+    //
+    // Header priority: CF-Connecting-IP > X-Real-IP > X-Forwarded-For (left-most)
+    // Default (empty array) = ไม่ trust header ใด ๆ ใช้ REMOTE_ADDR เปล่า — safe default
+    //
+    // ตัวอย่าง:
+    //   Cloudflare:    ['173.245.48.0/20', '103.21.244.0/22', '103.22.200.0/22', ...]
+    //   nginx local:   ['127.0.0.1/32', '::1/128']
+    //   AWS ALB VPC:   ['10.0.0.0/16']
+    //
+    // ⚠️ อย่าใส่ '0.0.0.0/0' เด็ดขาด — เท่ากับให้ทุกคน spoof IP ได้
+    'TRUSTED_PROXIES'                     => [],
 ];
