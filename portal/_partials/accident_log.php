@@ -88,7 +88,10 @@ $csrf = $_SESSION['csrf_token'] ?? '';
 .al-chart-wrap { background:#fff; border:1px solid #e2e8f0; border-radius:14px; padding:16px; margin-bottom:14px; }
 .al-chart-title { font-size:13px; font-weight:800; color:#0f172a; margin-bottom:10px; display:flex; align-items:center; gap:8px; }
 .al-chart-title i { color:#dc2626; }
-#alChart { width:100%; height:260px; }
+/* Chart.js needs a positioned, fixed-height parent — without it the canvas
+   keeps growing on responsive resize and makes the page absurdly tall */
+.al-chart-box { position: relative; width: 100%; height: 260px; }
+.al-chart-box canvas { max-height: 100%; }
 
 /* Table */
 .al-table-wrap { background:#fff; border:1px solid #e2e8f0; border-radius:14px; overflow:hidden; }
@@ -267,7 +270,7 @@ body[data-theme='dark'] .al-pager button { background:#1e293b; border-color:#334
     <!-- Monthly chart -->
     <div class="al-chart-wrap">
         <div class="al-chart-title"><i class="fa-solid fa-chart-column"></i> สถิติรายเดือนในช่วงที่เลือก</div>
-        <canvas id="alChart"></canvas>
+        <div class="al-chart-box"><canvas id="alChart"></canvas></div>
     </div>
 
     <!-- Data table -->
@@ -311,6 +314,7 @@ body[data-theme='dark'] .al-pager button { background:#1e293b; border-color:#334
         rows: [],
         page: 1,
         summary: { day_count:0, total:0, peak:0, peak_date:null, avg_per_day:0 },
+        monthly: [],   // cached for theme-switch re-render without re-fetch
     };
     let chart = null;
 
@@ -381,9 +385,10 @@ body[data-theme='dark'] .al-pager button { background:#1e293b; border-color:#334
                 return (+b.id || 0) - (+a.id || 0);
             });
             state.summary = list.summary;
+            state.monthly = monthly.data || [];
             renderKpi();
             renderTable();
-            renderChart(monthly.data || []);
+            renderChart(state.monthly);
         } catch (e) {
             Swal.fire({ icon:'error', title:'โหลดข้อมูลล้มเหลว', text: e.message || String(e) });
         }
@@ -492,12 +497,11 @@ body[data-theme='dark'] .al-pager button { background:#1e293b; border-color:#334
         });
     }
 
-    // Re-render chart on theme switch
+    // Re-render chart on theme switch — use cached data, no re-fetch
     new MutationObserver(muts => {
         for (const m of muts) {
             if (m.attributeName === 'data-theme') {
-                // Re-fetch (small cost) so chart picks up new theme
-                alLoad();
+                renderChart(state.monthly);
                 break;
             }
         }
