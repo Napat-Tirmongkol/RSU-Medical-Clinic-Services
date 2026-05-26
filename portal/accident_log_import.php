@@ -60,7 +60,20 @@ try {
         INDEX idx_date (entry_date)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
-    $reader = IOFactory::createReaderForFile($_FILES['file']['tmp_name']);
+    // Pick reader by extension (tmp_name has no extension so auto-detect fails)
+    $origName = $_FILES['file']['name'] ?? '';
+    $ext = strtolower(pathinfo($origName, PATHINFO_EXTENSION));
+    if ($ext === 'csv') {
+        $reader = IOFactory::createReader('Csv');
+        $reader->setDelimiter(',');
+        $reader->setEnclosure('"');
+        $reader->setInputEncoding('UTF-8');
+    } elseif ($ext === 'xls') {
+        $reader = IOFactory::createReader('Xls');
+    } else {
+        // .xlsx or unknown — default to Xlsx
+        $reader = IOFactory::createReader('Xlsx');
+    }
     $reader->setReadDataOnly(true);
     $ss = $reader->load($_FILES['file']['tmp_name']);
     $rows = $ss->getActiveSheet()->toArray(null, true, true, false);
@@ -133,6 +146,10 @@ try {
         'skipped'  => $skipped,
     ]);
 } catch (Throwable $e) {
-    error_log('[accident_log_import] ' . $e->getMessage());
-    echo json_encode(['ok' => false, 'message' => 'อ่านไฟล์ไม่ได้ — ตรวจรูปแบบ Excel แล้วลองใหม่']);
+    error_log('[accident_log_import] ' . $e->getMessage() . ' @ ' . $e->getFile() . ':' . $e->getLine());
+    // Surface actual error for admin (this endpoint is admin-only)
+    echo json_encode([
+        'ok' => false,
+        'message' => 'อ่านไฟล์ไม่ได้: ' . $e->getMessage(),
+    ], JSON_UNESCAPED_UNICODE);
 }
