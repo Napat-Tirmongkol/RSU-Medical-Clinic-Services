@@ -62,9 +62,16 @@ $MODULE_LABELS = [
                         <div class="flex-1">
                             <p class="font-semibold text-slate-900">LINE Official Account</p>
                             <p class="text-xs text-slate-500">ส่งเข้า LINE ทุกเช้าตามเวลาที่ตั้ง</p>
-                            <input type="text" name="line_user_id" placeholder="LINE User ID (Uxxxxxxxxxx)"
+                            <input type="text" name="line_user_id" placeholder="U + 32 ตัว hex (เช่น Uabcd1234...)"
+                                   pattern="^U[0-9a-fA-F]{32}$"
                                    value="<?= htmlspecialchars($pref['line_user_id'] ?? '') ?>"
-                                   class="mt-2 w-full max-w-md px-3 py-1.5 rounded-lg border border-slate-200 text-sm" />
+                                   class="mt-2 w-full max-w-md px-3 py-1.5 rounded-lg border border-slate-200 text-sm font-mono" />
+                            <p class="text-[11px] text-slate-400 mt-1.5">
+                                <i class="fa-solid fa-circle-info text-slate-400 mr-0.5"></i>
+                                หา LINE User ID ของตัวเองได้ที่
+                                <a href="?section=line_chat" class="text-emerald-600 hover:underline">LINE Chat</a>
+                                · ต้อง add LINE OA ของคลินิกเป็นเพื่อนก่อน
+                            </p>
                         </div>
                     </label>
                     <label class="mbs-channel">
@@ -76,6 +83,12 @@ $MODULE_LABELS = [
                             <input type="email" name="email" placeholder="you@example.com"
                                    value="<?= htmlspecialchars($pref['email'] ?? '') ?>"
                                    class="mt-2 w-full max-w-md px-3 py-1.5 rounded-lg border border-slate-200 text-sm" />
+                            <p class="text-[11px] text-slate-400 mt-1.5">
+                                <i class="fa-solid fa-circle-info text-slate-400 mr-0.5"></i>
+                                ต้องตั้ง SMTP ที่
+                                <a href="?section=smtp_settings" class="text-emerald-600 hover:underline">SMTP Settings</a>
+                                ก่อน (ถ้ายังไม่ได้ตั้ง · ระบบจะ fallback ไป PHP mail() ซึ่งอาจไม่ทำงาน)
+                            </p>
                         </div>
                     </label>
                 </div>
@@ -292,17 +305,28 @@ body[data-theme='dark'] .mbs-pv-tab.active { background:#1e293b; color:#f1f5f9; 
         const conf = await Swal.fire({
             icon: 'question',
             title: 'ทดสอบส่ง brief วันนี้?',
-            html: 'ระบบจะส่งเข้า LINE/Email ตามที่เปิดในการตั้งค่า · ข้อความจะมี <b>[ทดสอบ]</b> นำหน้า',
+            html: 'ระบบจะ <b>บันทึกการตั้งค่าปัจจุบัน</b> ก่อน แล้วส่งเข้า channel ที่เปิดอยู่<br>ข้อความจะมี <b>[ทดสอบ]</b> นำหน้า',
             showCancelButton: true,
-            confirmButtonText: 'ส่งเลย',
+            confirmButtonText: 'บันทึกและส่ง',
             cancelButtonText: 'ยกเลิก',
             confirmButtonColor: '#059669',
         });
         if (!conf.isConfirmed) return;
 
-        Swal.fire({ title: 'กำลังส่ง...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
+        Swal.fire({ title: 'กำลังบันทึก + ส่ง...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
 
         try {
+            // 1) Auto-save current form first — กัน user ลืมกด "บันทึก"
+            const saveFd = new FormData(document.getElementById('mbs-form'));
+            saveFd.append('csrf_token', CSRF);
+            const sr = await fetch('ajax_morning_brief.php?action=pref:save', { method:'POST', body: saveFd });
+            const sj = await sr.json();
+            if (!sj.ok) {
+                Swal.fire({ icon:'error', title:'บันทึกการตั้งค่าไม่สำเร็จ', text: sj.error || 'unknown' });
+                return;
+            }
+
+            // 2) Then call test_send
             const fd = new FormData();
             fd.append('csrf_token', CSRF);
             const r = await fetch('ajax_morning_brief.php?action=test_send', { method: 'POST', body: fd });
@@ -312,18 +336,36 @@ body[data-theme='dark'] .mbs-pv-tab.active { background:#1e293b; color:#f1f5f9; 
                 return;
             }
             const rs = j.results || {};
-            const lineLine = rs.line.ok
-                ? `✓ LINE → ${rs.line.target}`
-                : `✗ LINE — ${rs.line.error}`;
-            const emailLine = rs.email.ok
-                ? `✓ Email → ${rs.email.target}`
-                : `✗ Email — ${rs.email.error}`;
-            const overall = rs.line.ok || rs.email.ok;
+            // 3-state rendering: sent (green) / skipped-by-pref (gray, info-only) / failed (red)
+            function renderRow(label, r) {
+                if (r.ok) return { color:'#059669', icon:'✓', text: `${label} → ${r.target}` };
+                if (r.skipped) return { color:'#94a3b8', icon:'⊝', text: `${label} (ปิดอยู่) — ${r.error}` };
+                return { color:'#dc2626', icon:'✗', text: `${label} — ${r.error}` };
+            }
+            const lineRow = renderRow('LINE', rs.line);
+            const emailRow = renderRow('Email', rs.email);
+
+            // overall logic:
+            //   any sent → success
+            //   none sent but all skipped (no channel enabled) → info
+            //   none sent and at least one real failure → warning
+            const anySent = rs.line.ok || rs.email.ok;
+            const allSkipped = (!rs.line.ok && rs.line.skipped) && (!rs.email.ok && rs.email.skipped);
+            let icon = 'success', title = 'ส่งเสร็จ';
+            if (!anySent) {
+                if (allSkipped) { icon = 'info'; title = 'ยังไม่ได้เปิด channel ใด · ติ๊ก LINE หรือ Email ในการตั้งค่าก่อน'; }
+                else { icon = 'warning'; title = 'ส่งไม่สำเร็จ — ดูรายละเอียดด้านล่าง'; }
+            }
+
             Swal.fire({
-                icon: overall ? 'success' : 'warning',
-                title: overall ? 'ส่งเสร็จ' : 'ส่งไม่สำเร็จทุก channel',
-                html: `<div style="text-align:left;font-size:14px"><div style="color:${rs.line.ok ? '#059669' : '#dc2626'}">${esc(lineLine)}</div><div style="color:${rs.email.ok ? '#059669' : '#dc2626'};margin-top:.4rem">${esc(emailLine)}</div></div>`,
+                icon: icon,
+                title: title,
+                html: `<div style="text-align:left;font-size:14px;line-height:1.7">
+                    <div style="color:${lineRow.color}"><b>${lineRow.icon}</b> ${esc(lineRow.text)}</div>
+                    <div style="color:${emailRow.color};margin-top:.4rem"><b>${emailRow.icon}</b> ${esc(emailRow.text)}</div>
+                </div>`,
                 confirmButtonColor: '#059669',
+                width: 520,
             });
         } catch(e) {
             Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: String(e) });

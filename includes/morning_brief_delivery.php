@@ -10,6 +10,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/line_helper.php';
+require_once __DIR__ . '/mail_helper.php';
 
 function mb_already_delivered(PDO $pdo, int $briefId, int $sid, string $stype, string $chan): bool {
     $st = $pdo->prepare("SELECT 1 FROM sys_morning_brief_delivery
@@ -225,12 +226,26 @@ function mb_build_email_html(array $brief, array $priorities, bool $isTest = fal
 }
 
 function mb_send_email(string $to, string $subject, string $htmlBody): bool {
-    $headers = [
-        'MIME-Version: 1.0',
-        'Content-Type: text/html; charset=UTF-8',
-        'From: RSU Medical Clinic <noreply@rsu.ac.th>',
-    ];
-    return @mail($to, '=?UTF-8?B?' . base64_encode($subject) . '?=', $htmlBody, implode("\r\n", $headers));
+    // ใช้ send_campaign_email() จาก mail_helper — มี SMTP support + email log
+    // (smtp_send ถ้ามี config, fallback ไป PHP mail() เอง)
+    return send_campaign_email($to, $subject, $htmlBody, 'morning_brief');
+}
+
+/**
+ * Check email pre-requisites — คืน null ถ้า OK, คืน string error ถ้าไม่ OK.
+ * ใช้ใน test_send action เพื่อบอก user ก่อนยิงว่า config อะไรขาดอยู่
+ */
+function mb_check_email_config(): ?string {
+    $secrets = function_exists('get_secrets') ? get_secrets() : [];
+    $host = $secrets['SMTP_HOST'] ?? '';
+    if (empty($host) || empty($secrets['SMTP_USER']) || empty($secrets['SMTP_PASS'])) {
+        // ไม่มี SMTP — ดูว่า mail() ใช้งานได้ไหม
+        if (!function_exists('mail')) return 'ระบบไม่มีฟังก์ชัน mail() · ต้องตั้ง SMTP ใน config/secrets.php';
+        $sm = ini_get('sendmail_path');
+        if (empty($sm)) return 'ระบบยังไม่ได้ตั้ง SMTP · เปิด portal/smtp_settings.php เพื่อตั้งค่า SMTP_HOST/USER/PASS';
+        return null; // mail() น่าจะใช้ได้ — ลองส่งดู
+    }
+    return null;
 }
 
 function mb_resolve_line_token(): string {

@@ -174,32 +174,43 @@ switch ($action) {
 
         $results = [];
 
-        // LINE
-        if (!empty($pref['channel_line']) && !empty($pref['line_user_id'])) {
+        // ── LINE ────────────────────────────────────────────────────────
+        if (empty($pref['channel_line'])) {
+            $results['line'] = ['ok' => false, 'error' => 'ยังไม่ได้เปิด channel LINE ในการตั้งค่า', 'skipped' => true];
+        } elseif (empty($pref['line_user_id'])) {
+            $results['line'] = ['ok' => false, 'error' => 'เปิด channel LINE แล้ว แต่ยังไม่ได้ใส่ LINE User ID (รูปแบบ U + 32 ตัวอักษร)'];
+        } elseif (!preg_match('/^U[0-9a-f]{32}$/i', $pref['line_user_id'])) {
+            $results['line'] = ['ok' => false, 'error' => 'รูปแบบ LINE User ID ไม่ถูกต้อง · ต้องขึ้นต้นด้วย U + 32 ตัว hex'];
+        } else {
             $token = mb_resolve_line_token();
             if (!$token) {
-                $results['line'] = ['ok' => false, 'error' => 'ระบบยังไม่ได้ตั้ง LINE_MESSAGING_CHANNEL_ACCESS_TOKEN'];
+                $results['line'] = ['ok' => false, 'error' => 'ระบบยังไม่ได้ตั้ง LINE_MESSAGING_CHANNEL_ACCESS_TOKEN ใน config/secrets.php'];
             } else {
                 $flex = mb_build_line_flex($brief, $priorities, true);
                 $ok = send_line_push($pref['line_user_id'], [$flex], $token);
                 $results['line'] = $ok
                     ? ['ok' => true, 'target' => $pref['line_user_id']]
-                    : ['ok' => false, 'error' => get_last_line_error() ?: 'LINE API failed'];
+                    : ['ok' => false, 'error' => 'LINE API ปฏิเสธ: ' . (get_last_line_error() ?: 'unknown') . ' · ตรวจว่า user ได้ add LINE OA แล้วหรือยัง'];
             }
-        } else {
-            $results['line'] = ['ok' => false, 'error' => 'ยังไม่ได้เปิด LINE channel หรือใส่ LINE User ID'];
         }
 
-        // Email
-        if (!empty($pref['channel_email']) && !empty($pref['email'])) {
-            $subject = '[ทดสอบ] Morning Brief — ' . ($brief['data']['clinic']['date_thai'] ?? $today);
-            $body = mb_build_email_html($brief, $priorities, true);
-            $ok = mb_send_email($pref['email'], $subject, $body);
-            $results['email'] = $ok
-                ? ['ok' => true, 'target' => $pref['email']]
-                : ['ok' => false, 'error' => 'PHP mail() คืนค่า false — เช็ค SMTP config'];
+        // ── Email ───────────────────────────────────────────────────────
+        if (empty($pref['channel_email'])) {
+            $results['email'] = ['ok' => false, 'error' => 'ยังไม่ได้เปิด channel Email ในการตั้งค่า', 'skipped' => true];
+        } elseif (empty($pref['email'])) {
+            $results['email'] = ['ok' => false, 'error' => 'เปิด channel Email แล้ว แต่ยังไม่ได้ใส่ email address'];
         } else {
-            $results['email'] = ['ok' => false, 'error' => 'ยังไม่ได้เปิด Email channel หรือใส่ email'];
+            $cfgErr = mb_check_email_config();
+            if ($cfgErr) {
+                $results['email'] = ['ok' => false, 'error' => $cfgErr];
+            } else {
+                $subject = '[ทดสอบ] Morning Brief — ' . ($brief['data']['clinic']['date_thai'] ?? $today);
+                $body = mb_build_email_html($brief, $priorities, true);
+                $ok = mb_send_email($pref['email'], $subject, $body);
+                $results['email'] = $ok
+                    ? ['ok' => true, 'target' => $pref['email']]
+                    : ['ok' => false, 'error' => 'SMTP/mail() ส่งไม่ผ่าน · เปิด portal/smtp_settings.php เพื่อตรวจค่า + ดู error_log'];
+            }
         }
 
         _mb_send(['ok' => true, 'results' => $results]);
