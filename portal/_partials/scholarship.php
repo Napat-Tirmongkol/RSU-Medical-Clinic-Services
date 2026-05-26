@@ -109,7 +109,12 @@ $portalCsrf = get_csrf_token();
     .sch-btn--ghost:hover { background:#f8fafc; color:#0f172a; border-color:#cbd5e1; }
     .sch-btn--danger { background:#dc2626; }
     .sch-btn--danger:hover { background:#b91c1c; }
-    .sch-btn--xs { padding:.35rem .65rem; font-size:.75rem; }
+    .sch-btn--xs { padding:.45rem .75rem; font-size:.78rem; min-height:32px; }
+    /* Focus-visible — keyboard nav clarity */
+    .sch-btn:focus-visible, .sch-tab:focus-visible, .sch-sub-btn:focus-visible {
+        outline:2px solid #2e9e63; outline-offset:2px;
+    }
+    .sch-input:focus-visible { outline:none; /* uses ring from :focus */ }
     .sch-status-badge {
         display:inline-flex; align-items:center; padding:.2rem .55rem; border-radius:.375rem;
         font-size:.72rem; font-weight:600;
@@ -277,45 +282,45 @@ $portalCsrf = get_csrf_token();
         $_payoutPendingCnt = (int)$_pStmt->fetchColumn();
     } catch (PDOException) {}
     ?>
-    <div class="flex mb-4 overflow-x-auto border-b border-slate-200">
-        <button class="sch-tab active" data-tab="dashboard">
-            <i class="fa-solid fa-gauge mr-1.5"></i>ภาพรวม
-            <?php if ($cntPending > 0): ?><span class="sch-badge"><?= $cntPending > 99 ? '99+' : $cntPending ?></span><?php endif; ?>
+    <div class="flex mb-4 overflow-x-auto border-b border-slate-200" role="tablist" aria-label="หมวดหมู่นักศึกษาทุน">
+        <button class="sch-tab active" data-tab="dashboard" role="tab" aria-selected="true" aria-controls="sch-pane-dashboard" id="sch-top-dashboard">
+            <i class="fa-solid fa-gauge mr-1.5" aria-hidden="true"></i>ภาพรวม
+            <?php if ($cntPending > 0): ?><span class="sch-badge" aria-label="<?= $cntPending ?> รายการรออนุมัติ"><?= $cntPending > 99 ? '99+' : $cntPending ?></span><?php endif; ?>
         </button>
-        <button class="sch-tab" data-tab="students">
-            <i class="fa-solid fa-graduation-cap mr-1.5"></i>นักศึกษา
+        <button class="sch-tab" data-tab="students" role="tab" aria-selected="false" aria-controls="sch-pane-students" id="sch-top-students">
+            <i class="fa-solid fa-graduation-cap mr-1.5" aria-hidden="true"></i>นักศึกษา
         </button>
-        <button class="sch-tab" data-tab="scheduling">
-            <i class="fa-solid fa-calendar-week mr-1.5"></i>ตารางงาน
+        <button class="sch-tab" data-tab="scheduling" role="tab" aria-selected="false" id="sch-top-scheduling">
+            <i class="fa-solid fa-calendar-week mr-1.5" aria-hidden="true"></i>ตารางงาน
         </button>
-        <button class="sch-tab" data-tab="finance">
-            <i class="fa-solid fa-money-check-dollar mr-1.5"></i>การเงิน
-            <?php if ($_payoutPendingCnt > 0): ?><span class="sch-badge"><?= $_payoutPendingCnt > 99 ? '99+' : $_payoutPendingCnt ?></span><?php endif; ?>
+        <button class="sch-tab" data-tab="finance" role="tab" aria-selected="false" id="sch-top-finance">
+            <i class="fa-solid fa-money-check-dollar mr-1.5" aria-hidden="true"></i>การเงิน
+            <?php if ($_payoutPendingCnt > 0): ?><span class="sch-badge" aria-label="<?= $_payoutPendingCnt ?> รายการจ่ายเงินรอดำเนินการ"><?= $_payoutPendingCnt > 99 ? '99+' : $_payoutPendingCnt ?></span><?php endif; ?>
         </button>
-        <button class="sch-tab" data-tab="settings">
-            <i class="fa-solid fa-gear mr-1.5"></i>ตั้งค่า
+        <button class="sch-tab" data-tab="settings" role="tab" aria-selected="false" aria-controls="sch-pane-settings" id="sch-top-settings">
+            <i class="fa-solid fa-gear mr-1.5" aria-hidden="true"></i>ตั้งค่า
         </button>
     </div>
 
     <!-- Segmented sub-bars (shown contextually based on active top tab) -->
-    <div id="sch-sub-scheduling" class="sch-sub-bar hidden" data-group="scheduling">
-        <button class="sch-sub-btn active" data-sub="calendar">
-            <i class="fa-solid fa-calendar mr-1"></i>ปฏิทิน
+    <div id="sch-sub-scheduling" class="sch-sub-bar hidden" data-group="scheduling" role="tablist" aria-label="มุมมองตารางงาน">
+        <button class="sch-sub-btn active" data-sub="calendar" role="tab" aria-selected="true">
+            <i class="fa-solid fa-calendar mr-1" aria-hidden="true"></i>ปฏิทิน
         </button>
-        <button class="sch-sub-btn" data-sub="shifts">
-            <i class="fa-solid fa-user-clock mr-1"></i>ตารางกะ (กำหนดเอง)
+        <button class="sch-sub-btn" data-sub="shifts" role="tab" aria-selected="false">
+            <i class="fa-solid fa-user-clock mr-1" aria-hidden="true"></i>ตารางกะ (กำหนดเอง)
         </button>
-        <button class="sch-sub-btn" data-sub="slots">
-            <i class="fa-solid fa-layer-group mr-1"></i>เปิดรอบให้จองเอง
+        <button class="sch-sub-btn" data-sub="slots" role="tab" aria-selected="false">
+            <i class="fa-solid fa-layer-group mr-1" aria-hidden="true"></i>เปิดรอบให้จองเอง
         </button>
     </div>
 
-    <div id="sch-sub-finance" class="sch-sub-bar hidden" data-group="finance">
-        <button class="sch-sub-btn active" data-sub="payouts">
-            <i class="fa-solid fa-money-check-dollar mr-1"></i>การจ่ายเงิน
+    <div id="sch-sub-finance" class="sch-sub-bar hidden" data-group="finance" role="tablist" aria-label="มุมมองการเงิน">
+        <button class="sch-sub-btn active" data-sub="payouts" role="tab" aria-selected="true">
+            <i class="fa-solid fa-money-check-dollar mr-1" aria-hidden="true"></i>การจ่ายเงิน
         </button>
-        <button class="sch-sub-btn" data-sub="reports">
-            <i class="fa-solid fa-chart-line mr-1"></i>สรุปชั่วโมง
+        <button class="sch-sub-btn" data-sub="reports" role="tab" aria-selected="false">
+            <i class="fa-solid fa-chart-line mr-1" aria-hidden="true"></i>สรุปชั่วโมง
         </button>
     </div>
 
@@ -377,29 +382,29 @@ $portalCsrf = get_csrf_token();
         <?php endif; ?>
 
         <!-- KPI cards (3 essentials only) -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4" role="group" aria-label="ตัวเลขสำคัญ">
             <div class="sch-kpi">
                 <div class="sch-kpi-head">
-                    <span class="sch-kpi-icon" style="background:#fef2f2;color:#dc2626"><i class="fa-solid fa-bell"></i></span>
+                    <span class="sch-kpi-icon" style="background:#fef2f2;color:#dc2626" aria-hidden="true"><i class="fa-solid fa-bell"></i></span>
                     <span class="sch-kpi-label">รออนุมัติ</span>
                 </div>
-                <p class="sch-kpi-value" id="kpi-pending">–</p>
+                <p class="sch-kpi-value" id="kpi-pending" aria-label="จำนวนรายการรออนุมัติ">–</p>
                 <p class="sch-kpi-foot">รายการ</p>
             </div>
             <div class="sch-kpi">
                 <div class="sch-kpi-head">
-                    <span class="sch-kpi-icon" style="background:#ecfeff;color:#0891b2"><i class="fa-solid fa-calendar-day"></i></span>
+                    <span class="sch-kpi-icon" style="background:#ecfeff;color:#0891b2" aria-hidden="true"><i class="fa-solid fa-calendar-day"></i></span>
                     <span class="sch-kpi-label">กะวันนี้</span>
                 </div>
-                <p class="sch-kpi-value" id="kpi-today">–</p>
+                <p class="sch-kpi-value" id="kpi-today" aria-label="จำนวนกะวันนี้">–</p>
                 <p class="sch-kpi-foot">กะ</p>
             </div>
             <div class="sch-kpi">
                 <div class="sch-kpi-head">
-                    <span class="sch-kpi-icon" style="background:#fef3c7;color:#d97706"><i class="fa-solid fa-money-bill-wave"></i></span>
+                    <span class="sch-kpi-icon" style="background:#fef3c7;color:#d97706" aria-hidden="true"><i class="fa-solid fa-money-bill-wave"></i></span>
                     <span class="sch-kpi-label">ค่าตอบแทนเดือนนี้</span>
                 </div>
-                <p class="sch-kpi-value" id="kpi-month-pay">–</p>
+                <p class="sch-kpi-value" id="kpi-month-pay" aria-label="ยอดค่าตอบแทนเดือนนี้ บาท">–</p>
                 <p class="sch-kpi-foot" id="kpi-pay-rate-foot">บาท</p>
             </div>
         </div>
@@ -412,7 +417,7 @@ $portalCsrf = get_csrf_token();
                     <p class="text-xs text-slate-500 mt-0.5">นักศึกษาขอเข้า-ออกงาน รอการตรวจจากคุณ</p>
                 </div>
                 <div class="flex gap-2">
-                    <input type="text" id="appr-search" placeholder="ค้นหาชื่อ/รหัส" class="sch-input" style="width:220px">
+                    <input type="text" id="appr-search" placeholder="ค้นหาชื่อ/รหัส (Ctrl+K)" class="sch-input" style="width:240px" aria-label="ค้นหารายการรออนุมัติ">
                     <button class="sch-btn sch-btn--ghost" onclick="loadApprovals()" title="รีเฟรช">
                         <i class="fa-solid fa-rotate"></i>
                     </button>
@@ -1103,8 +1108,12 @@ $portalCsrf = get_csrf_token();
     // Top tabs
     document.querySelectorAll('.sch-tab').forEach(btn => {
         btn.addEventListener('click', () => {
-            document.querySelectorAll('.sch-tab').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.sch-tab').forEach(b => {
+                b.classList.remove('active');
+                b.setAttribute('aria-selected', 'false');
+            });
             btn.classList.add('active');
+            btn.setAttribute('aria-selected', 'true');
             const tab = btn.dataset.tab;
 
             // Hide all sub-bars first
@@ -1116,10 +1125,12 @@ $portalCsrf = get_csrf_token();
                 if (bar) bar.classList.remove('hidden');
                 // Activate remembered sub (or default)
                 const sub = subState[tab] || TAB_GROUPS[tab].defaultSub;
-                // Sync sub-bar active state
+                // Sync sub-bar active state + aria-selected
                 if (bar) {
                     bar.querySelectorAll('.sch-sub-btn').forEach(b => {
-                        b.classList.toggle('active', b.dataset.sub === sub);
+                        const on = b.dataset.sub === sub;
+                        b.classList.toggle('active', on);
+                        b.setAttribute('aria-selected', on ? 'true' : 'false');
                     });
                 }
                 activatePane(sub);
@@ -1137,11 +1148,57 @@ $portalCsrf = get_csrf_token();
             btn.addEventListener('click', () => {
                 const sub = btn.dataset.sub;
                 subState[group] = sub;
-                bar.querySelectorAll('.sch-sub-btn').forEach(b => b.classList.remove('active'));
+                bar.querySelectorAll('.sch-sub-btn').forEach(b => {
+                    b.classList.remove('active');
+                    b.setAttribute('aria-selected', 'false');
+                });
                 btn.classList.add('active');
+                btn.setAttribute('aria-selected', 'true');
                 activatePane(sub);
             });
         });
+    });
+
+    // ── Keyboard shortcuts ──
+    // Press 1-5 = switch top tab · Esc = close any open modal · Ctrl/Cmd+K = focus search
+    const TOP_TABS_ORDER = ['dashboard', 'students', 'scheduling', 'finance', 'settings'];
+    document.addEventListener('keydown', (e) => {
+        // Skip when typing in inputs (except for global shortcuts)
+        const inField = e.target.matches('input, textarea, select, [contenteditable]');
+
+        // Esc → close any visible modal
+        if (e.key === 'Escape') {
+            const openModal = document.querySelector('.sch-modal-backdrop.show');
+            if (openModal) {
+                e.preventDefault();
+                openModal.classList.remove('show');
+                return;
+            }
+        }
+
+        // Ctrl/Cmd+K → focus search in current pane
+        if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+            // Try common search input IDs (priority: dashboard approvals → current pane)
+            const activeTab = document.querySelector('.sch-tab.active')?.dataset.tab;
+            const searchByTab = {
+                dashboard: 'appr-search',
+                students: 'stu-search',
+                payouts: 'po-search',
+            };
+            const id = searchByTab[activeTab] || searchByTab[subState[activeTab]];
+            const inp = id && document.getElementById(id);
+            if (inp) { e.preventDefault(); inp.focus(); inp.select && inp.select(); }
+            return;
+        }
+
+        // 1-5 → switch top tab (only when NOT in field)
+        if (!inField && !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey) {
+            const n = parseInt(e.key, 10);
+            if (n >= 1 && n <= TOP_TABS_ORDER.length) {
+                const target = document.querySelector(`.sch-tab[data-tab="${TOP_TABS_ORDER[n-1]}"]`);
+                if (target) { e.preventDefault(); target.click(); }
+            }
+        }
     });
 
     // ── API helper
