@@ -202,6 +202,60 @@ try {
         exit;
     }
 
+    if ($action === 'unlink_all') {
+        // Chunked unlink — UI calls repeatedly with offset until done=true
+        // Reverts users back to OA Console rich menu (or no menu if OA also unset).
+        // Requires explicit confirm token to avoid accidental API hits.
+        $confirm = (string)($_POST['confirm'] ?? '');
+        if ($confirm !== 'UNLINK_ALL_USERS') {
+            echo json_encode(['ok' => false, 'message' => 'confirm token ไม่ถูกต้อง']);
+            exit;
+        }
+        $pdo    = db();
+        $offset = max(0, (int)($_POST['offset'] ?? 0));
+        $batch  = 50;
+
+        $totalRow = $pdo->query("SELECT COUNT(DISTINCT COALESCE(line_user_id_new, line_user_id))
+                                 FROM sys_users
+                                 WHERE (line_user_id IS NOT NULL AND line_user_id != '')
+                                    OR (line_user_id_new IS NOT NULL AND line_user_id_new != '')");
+        $total = (int)($totalRow->fetchColumn() ?: 0);
+
+        $stmt = $pdo->prepare("SELECT DISTINCT COALESCE(line_user_id_new, line_user_id) AS uid
+                               FROM sys_users
+                               WHERE (line_user_id IS NOT NULL AND line_user_id != '')
+                                  OR (line_user_id_new IS NOT NULL AND line_user_id_new != '')
+                               ORDER BY id ASC
+                               LIMIT $batch OFFSET $offset");
+        $stmt->execute();
+        $rows = $stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
+
+        $ok = 0; $fail = 0;
+        foreach ($rows as $uid) {
+            if (!$uid) continue;
+            $r = line_richmenu_unlink_user((string)$uid, 'admin:unlink_all');
+            // LINE returns 404 if user has no menu linked — count as success (already gone)
+            $alreadyGone = (!$r['ok'] && (int)($r['http'] ?? 0) === 404);
+            ($r['ok'] || $alreadyGone) ? $ok++ : $fail++;
+        }
+
+        $processedAfter = $offset + count($rows);
+        $done = $processedAfter >= $total || count($rows) < $batch;
+        if ($done) {
+            log_activity('LINE Rich Menu', "Unlink all users (chunked done): total=$total");
+        }
+        echo json_encode([
+            'ok'        => true,
+            'total'     => $total,
+            'processed' => $processedAfter,
+            'batch_ok'  => $ok,
+            'batch_fail'=> $fail,
+            'done'      => $done,
+            'next_offset' => $done ? null : $processedAfter,
+        ]);
+        exit;
+    }
+
     if ($action === 'audit_recent') {
         // ดู log การ link/unlink 50 รายการล่าสุด — เปิด details ใน UI
         try {

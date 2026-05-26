@@ -517,6 +517,21 @@ $webhookUrl = "$protocol://$host$uri";
         border-color: rgba(139,92,246,.55);
         color: #5b21b6;
     }
+    .rm-bulk-btn-danger {
+        background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+        color: #fff;
+        border: 1px solid rgba(220,38,38,.5);
+        box-shadow: 0 4px 12px rgba(220,38,38,.45), inset 0 1px 0 rgba(255,255,255,.18);
+    }
+    .rm-bulk-btn-danger:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 7px 18px rgba(220,38,38,.55), inset 0 1px 0 rgba(255,255,255,.25);
+    }
+    .rm-bulk-btn-danger:active { transform: translateY(0); }
+    body[data-theme='dark'] .rm-bulk-btn-danger {
+        background: linear-gradient(135deg, #b91c1c 0%, #991b1b 100%);
+        border-color: rgba(248,113,113,.4);
+    }
 
     /* Dark mode */
     body[data-theme='dark'] .rm-bulk-bar {
@@ -1636,6 +1651,11 @@ function sendTestLineP() {
                     <i class="fa-solid fa-arrows-spin"></i>
                     <span>Sync ทุก user</span>
                 </button>
+                <button type="button" onclick="rmUnlinkAll()" class="rm-bulk-btn rm-bulk-btn-danger"
+                    title="ปลดเมนูจาก user ทุกคน → กลับไปใช้เมนู Default จาก LINE OA Console">
+                    <i class="fa-solid fa-link-slash"></i>
+                    <span>Unlink ทุก user</span>
+                </button>
                 <button type="button" onclick="rmShowAudit()" class="rm-bulk-btn rm-bulk-btn-ghost">
                     <i class="fa-solid fa-clock-rotate-left"></i>
                     <span>Audit log</span>
@@ -1844,6 +1864,107 @@ function sendTestLineP() {
                 icon: totalFail > 0 ? 'warning' : 'success',
                 title: 'เสร็จสิ้น',
                 html: `รวม ${total} คน · สำเร็จ <b>${totalOK}</b> · ล้มเหลว <b>${totalFail}</b>`,
+            });
+        } catch (e) {
+            Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: e.message || String(e) });
+        }
+    };
+
+    window.rmUnlinkAll = async function() {
+        // Step 1 — warning + explain consequence
+        const c1 = await Swal.fire({
+            title: 'Unlink rich menu จากทุก user?',
+            html: `
+                <div style="text-align:left;font-size:13px;color:#475569;line-height:1.6">
+                    ระบบจะวน <b>ทุก user</b> ที่มี <code>line_user_id</code> ใน DB →
+                    ส่ง <code>DELETE /v2/bot/user/{userId}/richmenu</code> ที่ LINE
+                    <div style="margin-top:10px;padding:10px 12px;background:#fee2e2;border:1.5px solid #fca5a5;border-radius:10px;font-size:11.5px;color:#7f1d1d">
+                        <b><i class="fa-solid fa-triangle-exclamation"></i> ผลกระทบ:</b>
+                        <ul style="margin:6px 0 0 18px;padding:0;list-style:disc">
+                            <li>user ทุกคนจะ <b>กลับไปเห็นเมนู Default จาก OA Console</b></li>
+                            <li>ถ้า OA Console ไม่ได้ตั้งเมนูไว้ → user จะ <b>ไม่เห็นเมนูเลย</b></li>
+                            <li>ระบบจะไม่ link เมนูใหม่ให้ใครจนกว่าจะเปิด AUTO-SYNC อีกครั้ง</li>
+                        </ul>
+                    </div>
+                    <div style="margin-top:8px;font-size:11.5px;color:#64748b">
+                        <i class="fa-solid fa-circle-info"></i>
+                        แนะนำให้ปิด AUTO-SYNC + ลบ default ก่อน เพื่อให้ flow สมบูรณ์
+                    </div>
+                </div>
+            `,
+            icon: 'warning', showCancelButton: true,
+            confirmButtonText: 'ดำเนินการต่อ',
+            cancelButtonText: 'ยกเลิก',
+            confirmButtonColor: '#dc2626',
+        });
+        if (!c1.isConfirmed) return;
+
+        // Step 2 — require typing UNLINK to confirm
+        const c2 = await Swal.fire({
+            title: 'ยืนยันด้วยข้อความ',
+            html: `
+                <div style="text-align:left;font-size:13px;color:#475569;line-height:1.6;margin-bottom:8px">
+                    พิมพ์ <b style="color:#dc2626;font-family:monospace;letter-spacing:.05em">UNLINK</b> ในช่องด้านล่างเพื่อยืนยัน
+                </div>
+            `,
+            input: 'text',
+            inputPlaceholder: 'พิมพ์ UNLINK',
+            inputAttributes: { autocapitalize: 'characters', autocomplete: 'off' },
+            showCancelButton: true,
+            confirmButtonText: '<i class="fa-solid fa-link-slash"></i> ดำเนินการ',
+            cancelButtonText: 'ยกเลิก',
+            confirmButtonColor: '#dc2626',
+            inputValidator: (v) => (v || '').trim().toUpperCase() === 'UNLINK' ? null : 'ต้องพิมพ์ UNLINK ให้ตรงตัว',
+        });
+        if (!c2.isConfirmed) return;
+
+        let offset = 0, totalOK = 0, totalFail = 0, total = 0, done = false;
+        Swal.fire({
+            title: 'กำลัง unlink...',
+            html: '<div id="rmUnlinkProg" style="font-size:13px;color:#475569">เริ่มต้น…</div>',
+            allowOutsideClick: false,
+            showConfirmButton: false,
+        });
+        const setProg = (msg) => {
+            const el = document.getElementById('rmUnlinkProg');
+            if (el) el.innerHTML = msg;
+        };
+
+        try {
+            while (!done) {
+                const r = await rmPost('unlink_all', { offset, confirm: 'UNLINK_ALL_USERS' });
+                if (!r.ok) {
+                    Swal.fire({ icon: 'error', title: 'ล้มเหลว', text: r.message || '' });
+                    return;
+                }
+                total     = r.total;
+                totalOK   += r.batch_ok;
+                totalFail += r.batch_fail;
+                offset    = r.processed;
+                done      = r.done;
+
+                const pct = total ? Math.min(100, Math.round((offset / total) * 100)) : 100;
+                setProg(`
+                    <div style="margin-bottom:8px"><b>${offset.toLocaleString()}</b> / ${total.toLocaleString()} (${pct}%)</div>
+                    <div style="background:#e2e8f0;border-radius:6px;height:8px;overflow:hidden;margin-bottom:8px">
+                        <div style="width:${pct}%;height:100%;background:#dc2626;transition:width .2s"></div>
+                    </div>
+                    <div style="font-size:11px;color:#64748b">unlink สำเร็จ <b style="color:#16a34a">${totalOK}</b> · ล้มเหลว <b style="color:#dc2626">${totalFail}</b></div>
+                `);
+                if (!done) await new Promise(res => setTimeout(res, 250));
+            }
+
+            Swal.fire({
+                icon: totalFail > 0 ? 'warning' : 'success',
+                title: 'Unlink เสร็จสิ้น',
+                html: `
+                    รวม ${total} คน · สำเร็จ <b>${totalOK}</b> · ล้มเหลว <b>${totalFail}</b>
+                    <div style="margin-top:10px;padding:8px 10px;background:#f0fdf4;border:1px solid #86efac;border-radius:8px;font-size:11.5px;color:#14532d;text-align:left">
+                        <i class="fa-solid fa-circle-check"></i>
+                        ตอนนี้ user จะกลับไปใช้เมนู default จาก LINE OA Console
+                        (ถ้ายังเห็นเมนูเดิม ให้ปิด-เปิดแชต LINE ใหม่ — client cache อาจค้าง 1-2 นาที)
+                    </div>
+                `,
             });
         } catch (e) {
             Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: e.message || String(e) });
