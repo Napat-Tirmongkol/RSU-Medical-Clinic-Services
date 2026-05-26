@@ -1,20 +1,26 @@
 <?php
 /**
- * user/consent_form_preview.php
+ * admin/consent_form_preview.php
  *
- * Standalone visual preview of the vaccine consent form + tablet e-signature.
- * Self-contained — no DB writes, no auth, no session dependency.
- * Open in browser to demo the flow before production wiring.
+ * ADMIN-ONLY preview ของแบบฟอร์ม consent + ลายเซ็นบนแท็บเล็ต
+ * ผ่าน admin auth gate ปกติ (sys_admins หรือ sys_staff admin role)
+ * Self-contained — ไม่มี DB writes, ไม่มี audit logging
  *
- * Two views available via ?view= param:
- *   ?view=patient (default)  — patient fills on own phone (portrait)
- *   ?view=tablet             — clinic tablet handover (landscape, larger signature)
+ * Views via ?view= param:
+ *   ?view=patient (default)  — มือถือคนไข้ (portrait)
+ *   ?view=tablet             — แท็บเล็ตคลินิก (landscape + ช่องเซ็นพยาน)
  *
- * Production note: this file is a PREVIEW ONLY. The real form will use
- * server-side validation, audit logging, and DB persistence per the plan.
+ * Production note: ไฟล์นี้เป็น PREVIEW สำหรับ stakeholder review เท่านั้น
+ * ฟอร์มจริงจะมี CSRF, validation, audit log, DB persistence ตามแผน
  */
 declare(strict_types=1);
+require_once __DIR__ . '/includes/auth.php';
+
 $view = ($_GET['view'] ?? 'patient') === 'tablet' ? 'tablet' : 'patient';
+$_previewer = htmlspecialchars(
+    $_SESSION['admin_name'] ?? $_SESSION['name'] ?? $_SESSION['username'] ?? 'admin',
+    ENT_QUOTES, 'UTF-8'
+);
 
 // Mock data — pretend this was pre-filled from booking + sys_users join
 $mock = [
@@ -585,7 +591,20 @@ $mock = [
       <h1>แบบฟอร์มยินยอมรับการฉีดวัคซีน</h1>
       <div class="sub">RSU Medical Clinic · <?= htmlspecialchars($mock['campaign_title']) ?></div>
     </div>
-    <span class="preview-pill"><i class="fa-solid fa-flask"></i> Preview</span>
+    <span class="preview-pill" title="โหมดทดสอบ — เข้าได้เฉพาะ admin · ดูโดย <?= $_previewer ?>">
+      <i class="fa-solid fa-flask"></i> Admin Preview
+    </span>
+  </div>
+
+  <!-- Admin test mode banner -->
+  <div style="background:linear-gradient(135deg,#fef3c7,#fde68a); border:1.5px solid #fbbf24;
+              border-radius:14px; padding:10px 14px; margin-bottom:14px;
+              display:flex; gap:10px; align-items:center; font-size:12.5px; color:#78350f;">
+    <i class="fa-solid fa-triangle-exclamation" style="font-size:14px;"></i>
+    <div>
+      <strong>โหมดทดสอบสำหรับ admin เท่านั้น</strong> — ยังไม่บังคับใช้กับคนไข้จริง
+      ข้อมูลที่กรอกในหน้านี้จะไม่ถูกบันทึก กดได้ทุกปุ่มเพื่อทดลอง flow
+    </div>
   </div>
 
   <!-- STEPPER -->
