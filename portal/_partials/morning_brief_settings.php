@@ -236,9 +236,13 @@ body[data-theme='dark'] .mbs-pv-tab.active { background:#1e293b; color:#f1f5f9; 
             }
             previewData = j;
             const meta = j.brief_meta;
-            document.getElementById('mbs-pv-date').textContent =
-                meta.date_thai + ' · วัน' + meta.weekday_thai +
-                (meta.model && meta.model !== 'fallback' ? ' · ' + meta.model : '');
+            let metaText = meta.date_thai + ' · วัน' + meta.weekday_thai;
+            if (meta.model === 'fallback') {
+                metaText += ' · ⚠ ใช้ fallback (Gemini ไม่ตอบ)' + (meta.ai_error ? ': ' + meta.ai_error : '');
+            } else if (meta.model) {
+                metaText += ' · ' + meta.model;
+            }
+            document.getElementById('mbs-pv-date').textContent = metaText;
             renderPreview(currentTab);
         } catch(e) {
             document.getElementById('mbs-pv-body').innerHTML = '<p class="text-center text-rose-500 py-8">' + esc(String(e)) + '</p>';

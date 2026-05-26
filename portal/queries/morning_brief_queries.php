@@ -160,28 +160,29 @@ function morning_brief_collect_campaign(PDO $pdo, string $today): array {
     $yesterday = date('Y-m-d', strtotime($today . ' -1 day'));
 
     // วันนี้: schedule total / attended-so-far / cancelled
+    // NULL-safe: COALESCE(b.status, '') กัน NULL NOT IN (...) คืน NULL (ไม่ใช่ TRUE)
     $todayStats = _safe_rows($pdo, "
         SELECT
-            SUM(CASE WHEN s.slot_date = :d1 AND b.status NOT IN ('cancelled','cancelled_by_admin') THEN 1 ELSE 0 END) AS total_scheduled,
-            SUM(CASE WHEN s.slot_date = :d2 AND b.attended_at IS NOT NULL
-                          AND b.status NOT IN ('cancelled','cancelled_by_admin') THEN 1 ELSE 0 END) AS attended,
-            SUM(CASE WHEN s.slot_date = :d3 AND b.status IN ('cancelled','cancelled_by_admin') THEN 1 ELSE 0 END) AS cancelled
+            SUM(CASE WHEN COALESCE(b.status, '') NOT IN ('cancelled','cancelled_by_admin') THEN 1 ELSE 0 END) AS total_scheduled,
+            SUM(CASE WHEN b.attended_at IS NOT NULL
+                          AND COALESCE(b.status, '') NOT IN ('cancelled','cancelled_by_admin') THEN 1 ELSE 0 END) AS attended,
+            SUM(CASE WHEN COALESCE(b.status, '') IN ('cancelled','cancelled_by_admin') THEN 1 ELSE 0 END) AS cancelled
         FROM camp_bookings b
         JOIN camp_slots s ON b.slot_id = s.id
-        WHERE s.slot_date = :d4",
-        [':d1'=>$today, ':d2'=>$today, ':d3'=>$today, ':d4'=>$today]);
+        WHERE s.slot_date = :d",
+        [':d' => $today]);
     $t = $todayStats[0] ?? [];
 
     // เมื่อวาน: no-show rate
     $yStats = _safe_rows($pdo, "
         SELECT
-            SUM(CASE WHEN s.slot_date = :d1 AND b.attended_at IS NULL
-                          AND b.status NOT IN ('cancelled','cancelled_by_admin') THEN 1 ELSE 0 END) AS no_show,
-            SUM(CASE WHEN s.slot_date = :d2 AND b.status NOT IN ('cancelled','cancelled_by_admin') THEN 1 ELSE 0 END) AS scheduled
+            SUM(CASE WHEN b.attended_at IS NULL
+                          AND COALESCE(b.status, '') NOT IN ('cancelled','cancelled_by_admin') THEN 1 ELSE 0 END) AS no_show,
+            SUM(CASE WHEN COALESCE(b.status, '') NOT IN ('cancelled','cancelled_by_admin') THEN 1 ELSE 0 END) AS scheduled
         FROM camp_bookings b
         JOIN camp_slots s ON b.slot_id = s.id
-        WHERE s.slot_date = :d3",
-        [':d1'=>$yesterday, ':d2'=>$yesterday, ':d3'=>$yesterday]);
+        WHERE s.slot_date = :d",
+        [':d' => $yesterday]);
     $y = $yStats[0] ?? [];
     $yNoShow = (int)($y['no_show'] ?? 0);
     $yScheduled = (int)($y['scheduled'] ?? 0);
@@ -190,15 +191,16 @@ function morning_brief_collect_campaign(PDO $pdo, string $today): array {
     // Top 3 campaigns วันนี้
     $top = _safe_rows($pdo, "
         SELECT cl.title, COUNT(b.id) AS booked,
-               SUM(CASE WHEN b.attended_at IS NOT NULL AND b.status NOT IN ('cancelled','cancelled_by_admin') THEN 1 ELSE 0 END) AS attended
+               SUM(CASE WHEN b.attended_at IS NOT NULL
+                         AND COALESCE(b.status, '') NOT IN ('cancelled','cancelled_by_admin') THEN 1 ELSE 0 END) AS attended
         FROM camp_bookings b
         JOIN camp_slots s ON b.slot_id = s.id
         JOIN camp_list cl ON b.campaign_id = cl.id
         WHERE s.slot_date = :d
-          AND b.status NOT IN ('cancelled','cancelled_by_admin')
+          AND COALESCE(b.status, '') NOT IN ('cancelled','cancelled_by_admin')
         GROUP BY cl.id, cl.title
         ORDER BY booked DESC
-        LIMIT 3", [':d'=>$today]);
+        LIMIT 3", [':d' => $today]);
 
     // Active campaigns (ยังเปิดอยู่)
     $active = _safe_int($pdo,

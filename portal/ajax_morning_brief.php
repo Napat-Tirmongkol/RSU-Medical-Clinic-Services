@@ -122,22 +122,18 @@ switch ($action) {
     }
 
     // ── Preview brief in both LINE Flex (JSON) and Email HTML formats ──
-    // ใช้ brief ของวันนี้ — ถ้ายังไม่มีจะ generate ก่อน (ไม่ถือเป็น delivery)
+    // Force-regenerate brief ใหม่ทุกครั้ง — กัน cache เก่าที่มี bug
     case 'preview': {
         $today = date('Y-m-d');
+        $data = morning_brief_collect_all($pdo, $today);
+        $narrative = morning_brief_generate_narrative($data);
+        $data['_ai_priorities'] = $narrative['priorities'] ?? [];
+        if (!empty($narrative['error'])) $data['_ai_error'] = $narrative['error'];
+        morning_brief_save($pdo, $today, $data,
+            $narrative['narrative'] ?? null, $narrative['model'] ?? null,
+            'preview:' . $adminName, $narrative['urgency'] ?? 'normal');
         $brief = morning_brief_get_for_date($pdo, $today);
-        if (!$brief) {
-            $data = morning_brief_collect_all($pdo, $today);
-            $narrative = morning_brief_generate_narrative($data);
-            $data['_ai_priorities'] = $narrative['priorities'] ?? [];
-            morning_brief_save($pdo, $today, $data,
-                $narrative['narrative'] ?? null, $narrative['model'] ?? null,
-                'preview:' . $adminName, $narrative['urgency'] ?? 'normal');
-            $brief = morning_brief_get_for_date($pdo, $today);
-            $brief['ai_priorities'] = $narrative['priorities'] ?? [];
-        } else {
-            $brief['ai_priorities'] = $brief['data']['_ai_priorities'] ?? [];
-        }
+        $brief['ai_priorities'] = $narrative['priorities'] ?? [];
         $priorities = $brief['ai_priorities'] ?? [];
         _mb_send([
             'ok' => true,
@@ -149,6 +145,7 @@ switch ($action) {
                 'model' => $brief['ai_model'] ?? '',
                 'narrative' => $brief['ai_narrative'] ?? '',
                 'priorities' => $priorities,
+                'ai_error' => $narrative['error'] ?? null,
             ],
             'line_flex' => mb_build_line_flex($brief, $priorities, false),
             'email_html' => mb_build_email_html($brief, $priorities, false),
@@ -162,16 +159,15 @@ switch ($action) {
         $today = date('Y-m-d');
         $pref = morning_brief_get_or_create_pref($pdo, $adminId, 'admin');
 
+        // Force-regenerate ก่อนส่ง — ให้แน่ใจว่าข้อมูลใน brief ตรง ณ ปัจจุบัน
+        $data = morning_brief_collect_all($pdo, $today);
+        $narrative = morning_brief_generate_narrative($data);
+        $data['_ai_priorities'] = $narrative['priorities'] ?? [];
+        if (!empty($narrative['error'])) $data['_ai_error'] = $narrative['error'];
+        morning_brief_save($pdo, $today, $data,
+            $narrative['narrative'] ?? null, $narrative['model'] ?? null,
+            'test:' . $adminName, $narrative['urgency'] ?? 'normal');
         $brief = morning_brief_get_for_date($pdo, $today);
-        if (!$brief) {
-            $data = morning_brief_collect_all($pdo, $today);
-            $narrative = morning_brief_generate_narrative($data);
-            $data['_ai_priorities'] = $narrative['priorities'] ?? [];
-            morning_brief_save($pdo, $today, $data,
-                $narrative['narrative'] ?? null, $narrative['model'] ?? null,
-                'test:' . $adminName, $narrative['urgency'] ?? 'normal');
-            $brief = morning_brief_get_for_date($pdo, $today);
-        }
         $priorities = $brief['data']['_ai_priorities'] ?? [];
 
         $results = [];
