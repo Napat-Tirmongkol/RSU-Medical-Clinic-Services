@@ -290,8 +290,6 @@ function build_scholarship_payout_approved_flex(string $studentName, string $per
                     ['type' => 'separator', 'margin' => 'md'],
                     ['type' => 'text', 'text' => '📍 กรุณาติดต่อรับเงินที่ฝ่ายการเงินคลินิก',
                         'size' => 'sm', 'color' => '#0f172a', 'wrap' => true, 'margin' => 'md'],
-                    ['type' => 'text', 'text' => 'เวลาทำการ: ตามเวลาคลินิก',
-                        'size' => 'xs', 'color' => '#94a3b8', 'margin' => 'sm'],
                 ],
             ],
         ],
