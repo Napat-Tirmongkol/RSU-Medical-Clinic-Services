@@ -61,6 +61,23 @@ $portalCsrf = get_csrf_token();
     }
     .sch-tab:hover { background:#f1f5f9; color:#1e293b; }
     .sch-tab.active { background:#10b981; color:#fff; border-color:#10b981; box-shadow:0 4px 10px rgba(16,185,129,.25); }
+    /* Sub-bar (segmented control inside scheduling/finance tabs) */
+    .sch-sub-bar {
+        display:flex; gap:.4rem; margin-bottom:1rem; padding:.3rem;
+        background:#f1f5f9; border-radius:.75rem; width:fit-content;
+    }
+    .sch-sub-bar.hidden { display:none; }
+    .sch-sub-btn {
+        padding:.45rem .9rem; border-radius:.5rem; font-size:.78rem; font-weight:700;
+        color:#64748b; cursor:pointer; transition:all .15s; white-space:nowrap;
+        background:transparent; border:none;
+    }
+    .sch-sub-btn:hover { color:#0f172a; background:rgba(255,255,255,.6); }
+    .sch-sub-btn.active { background:#fff; color:#10b981; box-shadow:0 1px 2px rgba(15,23,42,.06); }
+    body[data-theme='dark'] .sch-sub-bar { background:#0b1220; }
+    body[data-theme='dark'] .sch-sub-btn { color:#94a3b8; }
+    body[data-theme='dark'] .sch-sub-btn:hover { color:#f1f5f9; background:rgba(255,255,255,.04); }
+    body[data-theme='dark'] .sch-sub-btn.active { background:#1e293b; color:#6ee7b7; box-shadow:none; }
     .sch-tab .sch-badge {
         display:inline-flex; align-items:center; justify-content:center;
         min-width:20px; height:18px; padding:0 5px; margin-left:.4rem;
@@ -139,12 +156,9 @@ $portalCsrf = get_csrf_token();
     .cal-slot-row.full { background:#fef3c7; color:#92400e; }
     .cal-slot-row.empty-slot { background:#dcfce7; color:#166534; }
 
-    /* ── Bold & Colorful — tilt-aware lift + icon micro-interaction ── */
-    #section-scholarship .sch-kpi { isolation: isolate; transition: transform .25s cubic-bezier(.16,1,.3,1), box-shadow .25s ease, border-color .25s ease; }
-    #section-scholarship .sch-kpi:hover:not(.fx-tilt) { transform: translateY(-3px); box-shadow: 0 18px 36px -18px rgba(16,185,129,.18); }
-    #section-scholarship .sch-kpi.fx-tilt:hover { --lift: -3px; box-shadow: 0 18px 36px -18px rgba(16,185,129,.30); border-color: rgba(16,185,129,.30); }
-    #section-scholarship .sch-kpi .sch-kpi-icon { transition: transform .25s cubic-bezier(.16,1,.3,1); }
-    #section-scholarship .sch-kpi:hover .sch-kpi-icon { transform: scale(1.08) rotate(-4deg); }
+    /* Subtle hover lift on KPI tiles */
+    #section-scholarship .sch-kpi { transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease; }
+    #section-scholarship .sch-kpi:hover { transform: translateY(-1px); border-color:#cbd5e1; }
 
     /* ── DARK MODE ──────────────────────────────────────────────── */
     body[data-theme='dark'] #section-scholarship .sch-card,
@@ -245,42 +259,29 @@ $portalCsrf = get_csrf_token();
         </div>
     </div>
 
-    <!-- Tabs -->
-    <div class="flex gap-2 mb-5 overflow-x-auto pb-2">
+    <!-- Tabs (5 top-level, consolidated) -->
+    <?php
+    $_curYm = date('Y-m');
+    $_payoutPendingCnt = 0;
+    try {
+        $_pStmt = $pdo->prepare("SELECT COUNT(*) FROM sys_scholarship_payouts WHERE period_ym = :ym AND status = 'pending'");
+        $_pStmt->execute([':ym' => $_curYm]);
+        $_payoutPendingCnt = (int)$_pStmt->fetchColumn();
+    } catch (PDOException) {}
+    ?>
+    <div class="flex gap-2 mb-4 overflow-x-auto pb-2">
         <button class="sch-tab active" data-tab="dashboard">
-            <i class="fa-solid fa-chart-pie mr-1.5"></i>Dashboard
-        </button>
-        <button class="sch-tab" data-tab="approvals">
-            <i class="fa-solid fa-circle-check mr-1.5"></i>รออนุมัติ
+            <i class="fa-solid fa-gauge mr-1.5"></i>ภาพรวม
             <?php if ($cntPending > 0): ?><span class="sch-badge"><?= $cntPending > 99 ? '99+' : $cntPending ?></span><?php endif; ?>
         </button>
         <button class="sch-tab" data-tab="students">
-            <i class="fa-solid fa-graduation-cap mr-1.5"></i>นักศึกษาทุน
+            <i class="fa-solid fa-graduation-cap mr-1.5"></i>นักศึกษา
         </button>
-        <button class="sch-tab" data-tab="shifts">
-            <i class="fa-solid fa-calendar-days mr-1.5"></i>ตารางกะ
+        <button class="sch-tab" data-tab="scheduling">
+            <i class="fa-solid fa-calendar-week mr-1.5"></i>ตารางงาน
         </button>
-        <button class="sch-tab" data-tab="slots">
-            <i class="fa-solid fa-layer-group mr-1.5"></i>เปิดรอบงาน
-        </button>
-        <button class="sch-tab" data-tab="calendar">
-            <i class="fa-solid fa-calendar-week mr-1.5"></i>ปฏิทิน
-        </button>
-        <button class="sch-tab" data-tab="reports">
-            <i class="fa-solid fa-chart-line mr-1.5"></i>รายงาน
-        </button>
-        <?php
-        // นับยอด pending ของเดือนปัจจุบัน เพื่อโชว์ badge
-        $_curYm = date('Y-m');
-        $_payoutPendingCnt = 0;
-        try {
-            $_pStmt = $pdo->prepare("SELECT COUNT(*) FROM sys_scholarship_payouts WHERE period_ym = :ym AND status = 'pending'");
-            $_pStmt->execute([':ym' => $_curYm]);
-            $_payoutPendingCnt = (int)$_pStmt->fetchColumn();
-        } catch (PDOException) {}
-        ?>
-        <button class="sch-tab" data-tab="payouts">
-            <i class="fa-solid fa-money-check-dollar mr-1.5"></i>การจ่ายเงิน
+        <button class="sch-tab" data-tab="finance">
+            <i class="fa-solid fa-money-check-dollar mr-1.5"></i>การเงิน
             <?php if ($_payoutPendingCnt > 0): ?><span class="sch-badge"><?= $_payoutPendingCnt > 99 ? '99+' : $_payoutPendingCnt ?></span><?php endif; ?>
         </button>
         <button class="sch-tab" data-tab="settings">
@@ -288,48 +289,74 @@ $portalCsrf = get_csrf_token();
         </button>
     </div>
 
+    <!-- Segmented sub-bars (shown contextually based on active top tab) -->
+    <div id="sch-sub-scheduling" class="sch-sub-bar hidden" data-group="scheduling">
+        <button class="sch-sub-btn active" data-sub="calendar">
+            <i class="fa-solid fa-calendar mr-1"></i>ปฏิทิน
+        </button>
+        <button class="sch-sub-btn" data-sub="shifts">
+            <i class="fa-solid fa-user-clock mr-1"></i>ตารางกะ (กำหนดเอง)
+        </button>
+        <button class="sch-sub-btn" data-sub="slots">
+            <i class="fa-solid fa-layer-group mr-1"></i>เปิดรอบให้จองเอง
+        </button>
+    </div>
+
+    <div id="sch-sub-finance" class="sch-sub-bar hidden" data-group="finance">
+        <button class="sch-sub-btn active" data-sub="payouts">
+            <i class="fa-solid fa-money-check-dollar mr-1"></i>การจ่ายเงิน
+        </button>
+        <button class="sch-sub-btn" data-sub="reports">
+            <i class="fa-solid fa-chart-line mr-1"></i>สรุปชั่วโมง
+        </button>
+    </div>
+
     <!-- ─── TAB: DASHBOARD ─── -->
     <div class="sch-pane" data-pane="dashboard">
 
-        <!-- KPI cards -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mb-3">
-            <div class="sch-kpi fx-tilt fx-tilt-light" data-tilt="4">
-                <div class="sch-kpi-icon" style="background:#dbeafe;color:#2563eb"><i class="fa-solid fa-graduation-cap"></i></div>
-                <p class="sch-kpi-label">นักศึกษา Active</p>
-                <p class="sch-kpi-value" id="kpi-students">–</p>
-                <p class="sch-kpi-foot">คน</p>
-            </div>
-            <div class="sch-kpi fx-tilt fx-tilt-light" data-tilt="4">
+        <!-- KPI cards (3 essentials only) -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+            <div class="sch-kpi">
                 <div class="sch-kpi-icon" style="background:#fee2e2;color:#dc2626"><i class="fa-solid fa-bell"></i></div>
                 <p class="sch-kpi-label">รออนุมัติ</p>
                 <p class="sch-kpi-value text-rose-600" id="kpi-pending">–</p>
                 <p class="sch-kpi-foot">รายการ</p>
             </div>
-            <div class="sch-kpi fx-tilt fx-tilt-light" data-tilt="4">
+            <div class="sch-kpi">
                 <div class="sch-kpi-icon" style="background:#cffafe;color:#0891b2"><i class="fa-solid fa-calendar-day"></i></div>
                 <p class="sch-kpi-label">กะวันนี้</p>
                 <p class="sch-kpi-value text-cyan-600" id="kpi-today">–</p>
                 <p class="sch-kpi-foot">กะ</p>
             </div>
-        </div>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-5">
-            <div class="sch-kpi fx-tilt fx-tilt-light" data-tilt="4">
-                <div class="sch-kpi-icon" style="background:#d1fae5;color:#059669"><i class="fa-solid fa-graduation-cap"></i></div>
-                <p class="sch-kpi-label">ชม.ทุน เดือนนี้</p>
-                <p class="sch-kpi-value text-emerald-600" id="kpi-month-hours">–</p>
-                <p class="sch-kpi-foot">ชั่วโมง</p>
-            </div>
-            <div class="sch-kpi fx-tilt fx-tilt-light" data-tilt="4">
-                <div class="sch-kpi-icon" style="background:#fef3c7;color:#d97706"><i class="fa-solid fa-coins"></i></div>
-                <p class="sch-kpi-label">ชม.ค่าตอบแทน เดือนนี้</p>
-                <p class="sch-kpi-value text-amber-600" id="kpi-month-paid">–</p>
-                <p class="sch-kpi-foot">ชั่วโมง</p>
-            </div>
-            <div class="sch-kpi fx-tilt fx-tilt-light" data-tilt="4">
+            <div class="sch-kpi">
                 <div class="sch-kpi-icon" style="background:#fef3c7;color:#d97706"><i class="fa-solid fa-money-bill-wave"></i></div>
                 <p class="sch-kpi-label">เงินค่าตอบแทนเดือนนี้</p>
                 <p class="sch-kpi-value text-amber-700" id="kpi-month-pay">–</p>
                 <p class="sch-kpi-foot" id="kpi-pay-rate-foot">บาท</p>
+            </div>
+        </div>
+
+        <!-- ─── Hero: ของต้องทำ (Approval queue) ─── -->
+        <div class="sch-card mb-4" style="border-color:#fecaca">
+            <div class="flex items-center justify-between gap-3 mb-4 flex-wrap">
+                <div class="flex items-center gap-2">
+                    <span class="inline-flex w-9 h-9 rounded-xl bg-rose-100 text-rose-600 items-center justify-center">
+                        <i class="fa-solid fa-bell"></i>
+                    </span>
+                    <div>
+                        <h3 class="text-base font-black text-slate-900">ของต้องทำ — รออนุมัติ</h3>
+                        <p class="text-xs text-slate-500">นักศึกษาขอเข้า-ออกงาน รอการตรวจจากคุณ</p>
+                    </div>
+                </div>
+                <div class="flex gap-2">
+                    <input type="text" id="appr-search" placeholder="ค้นหาชื่อ/รหัส" class="sch-input" style="width:220px">
+                    <button class="sch-btn sch-btn--ghost" onclick="loadApprovals()" title="รีเฟรช">
+                        <i class="fa-solid fa-rotate"></i>
+                    </button>
+                </div>
+            </div>
+            <div id="appr-table-wrap">
+                <p class="text-center text-sm text-slate-400 py-8"><i class="fa-solid fa-spinner fa-spin mr-2"></i>กำลังโหลด…</p>
             </div>
         </div>
 
@@ -379,24 +406,6 @@ $portalCsrf = get_csrf_token();
         <div class="sch-card">
             <h3 class="text-sm font-black text-slate-900 mb-3"><i class="fa-solid fa-clock-rotate-left text-slate-400 mr-1"></i>กิจกรรมล่าสุด</h3>
             <div id="dash-recent-wrap"></div>
-        </div>
-    </div>
-
-    <!-- ─── TAB: APPROVALS ─── -->
-    <div class="sch-pane hidden" data-pane="approvals">
-        <div class="sch-card">
-            <div class="flex items-center justify-between mb-4">
-                <h3 class="text-base font-black text-slate-900">รายการรออนุมัติ</h3>
-                <div class="flex gap-2">
-                    <input type="text" id="appr-search" placeholder="ค้นหาชื่อ/รหัส" class="sch-input" style="width:240px">
-                    <button class="sch-btn sch-btn--ghost" onclick="loadApprovals()">
-                        <i class="fa-solid fa-rotate"></i>รีเฟรช
-                    </button>
-                </div>
-            </div>
-            <div id="appr-table-wrap">
-                <p class="text-center text-sm text-slate-400 py-10"><i class="fa-solid fa-spinner fa-spin mr-2"></i>กำลังโหลด…</p>
-            </div>
         </div>
     </div>
 
@@ -557,19 +566,19 @@ $portalCsrf = get_csrf_token();
 
         <!-- KPI summary -->
         <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
-            <div class="sch-kpi fx-tilt fx-tilt-light" data-tilt="4">
+            <div class="sch-kpi">
                 <div class="sch-kpi-icon" style="background:#fef3c7;color:#d97706"><i class="fa-solid fa-hourglass-half"></i></div>
                 <p class="sch-kpi-label">รอดำเนินการการเงิน</p>
                 <p class="sch-kpi-value text-amber-600" id="po-kpi-pending">–</p>
                 <p class="sch-kpi-foot" id="po-kpi-pending-total">– บาท</p>
             </div>
-            <div class="sch-kpi fx-tilt fx-tilt-light" data-tilt="4">
+            <div class="sch-kpi">
                 <div class="sch-kpi-icon" style="background:#d1fae5;color:#059669"><i class="fa-solid fa-circle-check"></i></div>
                 <p class="sch-kpi-label">การเงินอนุมัติแล้ว</p>
                 <p class="sch-kpi-value text-emerald-600" id="po-kpi-approved">–</p>
                 <p class="sch-kpi-foot" id="po-kpi-approved-total">– บาท</p>
             </div>
-            <div class="sch-kpi fx-tilt fx-tilt-light" data-tilt="4">
+            <div class="sch-kpi">
                 <div class="sch-kpi-icon" style="background:#dbeafe;color:#2563eb"><i class="fa-solid fa-coins"></i></div>
                 <p class="sch-kpi-label">ยอดรวมทั้งเดือน</p>
                 <p class="sch-kpi-value text-blue-600" id="po-kpi-total">–</p>
@@ -994,26 +1003,73 @@ $portalCsrf = get_csrf_token();
 
     let studentsCache = [];
 
-    // Tabs
+    // Tab groups — top tab → sub-panes mapping
+    const TAB_GROUPS = {
+        scheduling: { defaultSub: 'calendar', subs: ['calendar', 'shifts', 'slots'] },
+        finance:    { defaultSub: 'payouts',  subs: ['payouts', 'reports'] },
+    };
+    // Per-group remembered sub-state across top-tab switches
+    const subState = { scheduling: 'calendar', finance: 'payouts' };
+    const PANE_LOADERS = {
+        dashboard: () => { loadDashboard(); loadApprovals(); },
+        students: () => loadStudents(),
+        shifts: () => loadShifts(),
+        slots: () => loadSlots(),
+        calendar: () => loadCalendar(),
+        reports: () => loadReports(),
+        payouts: () => loadPayouts(),
+        settings: () => {},
+    };
+
+    function activatePane(paneName) {
+        document.querySelectorAll('.sch-pane').forEach(p => {
+            p.classList.toggle('hidden', p.dataset.pane !== paneName);
+        });
+        const ld = PANE_LOADERS[paneName];
+        if (ld) ld();
+    }
+
+    // Top tabs
     document.querySelectorAll('.sch-tab').forEach(btn => {
         btn.addEventListener('click', () => {
             document.querySelectorAll('.sch-tab').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             const tab = btn.dataset.tab;
-            document.querySelectorAll('.sch-pane').forEach(p => {
-                p.classList.toggle('hidden', p.dataset.pane !== tab);
+
+            // Hide all sub-bars first
+            document.querySelectorAll('.sch-sub-bar').forEach(b => b.classList.add('hidden'));
+
+            if (TAB_GROUPS[tab]) {
+                // Show sub-bar for this group
+                const bar = document.getElementById('sch-sub-' + tab);
+                if (bar) bar.classList.remove('hidden');
+                // Activate remembered sub (or default)
+                const sub = subState[tab] || TAB_GROUPS[tab].defaultSub;
+                // Sync sub-bar active state
+                if (bar) {
+                    bar.querySelectorAll('.sch-sub-btn').forEach(b => {
+                        b.classList.toggle('active', b.dataset.sub === sub);
+                    });
+                }
+                activatePane(sub);
+            } else {
+                // Simple tab — direct pane
+                activatePane(tab);
+            }
+        });
+    });
+
+    // Sub-bar buttons (segmented controls)
+    document.querySelectorAll('.sch-sub-bar').forEach(bar => {
+        const group = bar.dataset.group;
+        bar.querySelectorAll('.sch-sub-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const sub = btn.dataset.sub;
+                subState[group] = sub;
+                bar.querySelectorAll('.sch-sub-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                activatePane(sub);
             });
-            const loader = ({
-                dashboard: loadDashboard,
-                approvals: loadApprovals,
-                students: loadStudents,
-                shifts: loadShifts,
-                slots: loadSlots,
-                calendar: loadCalendar,
-                reports: loadReports,
-                payouts: loadPayouts,
-            })[tab];
-            if (loader) loader();
         });
     });
 
@@ -1109,15 +1165,12 @@ $portalCsrf = get_csrf_token();
     async function loadDashboard() {
         const j = await api('dashboard', 'get', {});
         if (!j.ok) {
-            document.getElementById('kpi-students').textContent = 'Err';
+            const pe = document.getElementById('kpi-pending'); if (pe) pe.textContent = 'Err';
             return;
         }
-        // KPIs
-        document.getElementById('kpi-students').textContent = j.kpis.active_students;
+        // KPIs (3 essentials only — rest of data still cached for other widgets/charts)
         document.getElementById('kpi-pending').textContent = j.kpis.pending;
         document.getElementById('kpi-today').textContent = j.kpis.today_shifts;
-        document.getElementById('kpi-month-hours').textContent = j.kpis.month_hours.toFixed(1);
-        document.getElementById('kpi-month-paid').textContent = j.kpis.month_paid.toFixed(1);
         document.getElementById('kpi-month-pay').textContent =
             (j.kpis.month_pay || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         // เก็บค่าไว้สำหรับปุ่ม "ส่งเข้าระบบการเงิน"
