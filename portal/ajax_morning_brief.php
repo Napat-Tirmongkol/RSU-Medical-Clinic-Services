@@ -12,6 +12,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/includes/auth.php';
+require_once __DIR__ . '/../includes/morning_brief_delivery.php';
 require_once __DIR__ . '/queries/morning_brief_queries.php';
 require_once __DIR__ . '/services/morning_brief_ai.php';
 
@@ -116,6 +117,92 @@ switch ($action) {
         if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) _mb_send(['ok'=>false,'error'=>'bad date']);
         morning_brief_mark_read($pdo, $adminId, 'admin', $date);
         _mb_send(['ok'=>true]);
+    }
+
+    // ── Preview brief in both LINE Flex (JSON) and Email HTML formats ──
+    // ใช้ brief ของวันนี้ — ถ้ายังไม่มีจะ generate ก่อน (ไม่ถือเป็น delivery)
+    case 'preview': {
+        $today = date('Y-m-d');
+        $brief = morning_brief_get_for_date($pdo, $today);
+        if (!$brief) {
+            $data = morning_brief_collect_all($pdo, $today);
+            $narrative = morning_brief_generate_narrative($data);
+            $data['_ai_priorities'] = $narrative['priorities'] ?? [];
+            morning_brief_save($pdo, $today, $data,
+                $narrative['narrative'] ?? null, $narrative['model'] ?? null,
+                'preview:' . $adminName, $narrative['urgency'] ?? 'normal');
+            $brief = morning_brief_get_for_date($pdo, $today);
+            $brief['ai_priorities'] = $narrative['priorities'] ?? [];
+        } else {
+            $brief['ai_priorities'] = $brief['data']['_ai_priorities'] ?? [];
+        }
+        $priorities = $brief['ai_priorities'] ?? [];
+        _mb_send([
+            'ok' => true,
+            'brief_meta' => [
+                'date' => $brief['brief_date'],
+                'date_thai' => $brief['data']['clinic']['date_thai'] ?? '',
+                'weekday_thai' => $brief['data']['clinic']['weekday_thai'] ?? '',
+                'urgency' => $brief['urgency_level'] ?? 'normal',
+                'model' => $brief['ai_model'] ?? '',
+                'narrative' => $brief['ai_narrative'] ?? '',
+                'priorities' => $priorities,
+            ],
+            'line_flex' => mb_build_line_flex($brief, $priorities, false),
+            'email_html' => mb_build_email_html($brief, $priorities, false),
+        ]);
+    }
+
+    // ── Test send: ส่ง brief ของวันนี้ไปยัง channel ที่ user เปิดไว้ทันที (mark [TEST]) ──
+    case 'test_send': {
+        validate_csrf_or_die();
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') _mb_send(['ok'=>false,'error'=>'POST only']);
+        $today = date('Y-m-d');
+        $pref = morning_brief_get_or_create_pref($pdo, $adminId, 'admin');
+
+        $brief = morning_brief_get_for_date($pdo, $today);
+        if (!$brief) {
+            $data = morning_brief_collect_all($pdo, $today);
+            $narrative = morning_brief_generate_narrative($data);
+            $data['_ai_priorities'] = $narrative['priorities'] ?? [];
+            morning_brief_save($pdo, $today, $data,
+                $narrative['narrative'] ?? null, $narrative['model'] ?? null,
+                'test:' . $adminName, $narrative['urgency'] ?? 'normal');
+            $brief = morning_brief_get_for_date($pdo, $today);
+        }
+        $priorities = $brief['data']['_ai_priorities'] ?? [];
+
+        $results = [];
+
+        // LINE
+        if (!empty($pref['channel_line']) && !empty($pref['line_user_id'])) {
+            $token = mb_resolve_line_token();
+            if (!$token) {
+                $results['line'] = ['ok' => false, 'error' => 'ระบบยังไม่ได้ตั้ง LINE_MESSAGING_CHANNEL_ACCESS_TOKEN'];
+            } else {
+                $flex = mb_build_line_flex($brief, $priorities, true);
+                $ok = send_line_push($pref['line_user_id'], [$flex], $token);
+                $results['line'] = $ok
+                    ? ['ok' => true, 'target' => $pref['line_user_id']]
+                    : ['ok' => false, 'error' => get_last_line_error() ?: 'LINE API failed'];
+            }
+        } else {
+            $results['line'] = ['ok' => false, 'error' => 'ยังไม่ได้เปิด LINE channel หรือใส่ LINE User ID'];
+        }
+
+        // Email
+        if (!empty($pref['channel_email']) && !empty($pref['email'])) {
+            $subject = '[ทดสอบ] Morning Brief — ' . ($brief['data']['clinic']['date_thai'] ?? $today);
+            $body = mb_build_email_html($brief, $priorities, true);
+            $ok = mb_send_email($pref['email'], $subject, $body);
+            $results['email'] = $ok
+                ? ['ok' => true, 'target' => $pref['email']]
+                : ['ok' => false, 'error' => 'PHP mail() คืนค่า false — เช็ค SMTP config'];
+        } else {
+            $results['email'] = ['ok' => false, 'error' => 'ยังไม่ได้เปิด Email channel หรือใส่ email'];
+        }
+
+        _mb_send(['ok' => true, 'results' => $results]);
     }
 
     default:

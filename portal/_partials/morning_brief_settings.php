@@ -115,15 +115,221 @@ $MODULE_LABELS = [
             </div>
 
             <!-- Actions -->
-            <div class="flex items-center justify-end gap-3">
-                <a href="?section=dashboard" class="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-900">ยกเลิก</a>
-                <button type="submit" class="px-5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold">
-                    บันทึก
-                </button>
+            <div class="flex items-center justify-between gap-3 flex-wrap">
+                <div class="flex items-center gap-2">
+                    <button type="button" onclick="mbsPreview()" class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50 text-sm font-medium">
+                        <i class="fa-solid fa-eye"></i>พรีวิว
+                    </button>
+                    <button type="button" onclick="mbsTestSend()" class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50 text-sm font-medium">
+                        <i class="fa-solid fa-paper-plane"></i>ทดสอบส่ง
+                    </button>
+                </div>
+                <div class="flex items-center gap-3">
+                    <a href="?section=dashboard" class="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-900">ยกเลิก</a>
+                    <button type="submit" class="px-5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold">
+                        บันทึก
+                    </button>
+                </div>
             </div>
         </form>
     </div>
 </div>
+
+<!-- ─── Preview Modal ─── -->
+<div id="mbs-preview-modal" class="hidden">
+    <div class="mbs-modal-backdrop" onclick="mbsClosePreview()"></div>
+    <div class="mbs-modal-box">
+        <div class="flex items-center justify-between gap-3 px-5 py-4 border-b border-slate-200">
+            <div class="flex items-center gap-2">
+                <i class="fa-solid fa-eye text-slate-500"></i>
+                <h3 class="font-bold text-slate-900">พรีวิว Morning Brief</h3>
+                <span class="text-xs text-slate-500" id="mbs-pv-date"></span>
+            </div>
+            <button onclick="mbsClosePreview()" class="text-slate-400 hover:text-slate-700 w-8 h-8 rounded-lg hover:bg-slate-100"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="px-5 py-3 border-b border-slate-100">
+            <div class="inline-flex rounded-lg bg-slate-100 p-1">
+                <button class="mbs-pv-tab active" data-pv="line"><i class="fa-brands fa-line mr-1.5"></i>LINE</button>
+                <button class="mbs-pv-tab" data-pv="email"><i class="fa-solid fa-envelope mr-1.5"></i>Email</button>
+            </div>
+        </div>
+        <div class="mbs-pv-content overflow-y-auto" id="mbs-pv-body">
+            <p class="text-center text-slate-400 py-12"><i class="fa-solid fa-spinner fa-spin mr-2"></i>กำลังโหลด…</p>
+        </div>
+    </div>
+</div>
+
+<style>
+#mbs-preview-modal.show { display:block; }
+#mbs-preview-modal .mbs-modal-backdrop { position:fixed; inset:0; background:rgba(15,23,42,.55); backdrop-filter:blur(4px); z-index:9000; }
+#mbs-preview-modal .mbs-modal-box { position:fixed; inset:0; margin:auto; width:min(680px, 92vw); max-height:88vh; background:#fff; border-radius:1rem; box-shadow:0 25px 50px -12px rgba(0,0,0,.25); z-index:9001; display:flex; flex-direction:column; }
+.mbs-pv-tab { padding:.45rem .9rem; border-radius:.4rem; font-size:.8rem; font-weight:600; color:#64748b; background:transparent; border:none; cursor:pointer; }
+.mbs-pv-tab.active { background:#fff; color:#0f172a; box-shadow:0 1px 2px rgba(0,0,0,.06); }
+.mbs-pv-content { padding:1.25rem; flex:1; min-height:0; }
+#mbs-pv-body iframe { width:100%; min-height:540px; border:0; border-radius:.5rem; background:#fff; }
+.mbs-pv-line-bubble { max-width:340px; margin:0 auto; border-radius:.9rem; overflow:hidden; box-shadow:0 4px 12px rgba(15,23,42,.1); border:1px solid #e2e8f0; }
+.mbs-pv-line-header { padding:1rem 1.25rem; color:#fff; }
+.mbs-pv-line-body { padding:1rem 1.25rem; background:#fff; }
+.mbs-pv-line-narrative { font-size:13px; color:#475569; line-height:1.5; }
+.mbs-pv-line-sep { height:1px; background:#e2e8f0; margin:.85rem 0; }
+.mbs-pv-line-priority { margin-bottom:.6rem; }
+.mbs-pv-line-priority-title { font-size:13px; font-weight:700; color:#0f172a; }
+.mbs-pv-line-priority-detail { font-size:11px; color:#64748b; margin-top:.15rem; }
+.mbs-pv-line-kpi-grid { display:grid; grid-template-columns:repeat(3, 1fr); gap:.5rem; margin-top:.5rem; }
+.mbs-pv-line-kpi-label { font-size:10px; color:#94a3b8; text-align:center; }
+.mbs-pv-line-kpi-value { font-size:16px; font-weight:700; color:#0f172a; text-align:center; }
+body[data-theme='dark'] #mbs-preview-modal .mbs-modal-box { background:#0f172a; }
+body[data-theme='dark'] #mbs-preview-modal h3 { color:#f1f5f9; }
+body[data-theme='dark'] .mbs-pv-tab { color:#94a3b8; }
+body[data-theme='dark'] .mbs-pv-tab.active { background:#1e293b; color:#f1f5f9; }
+</style>
+
+<script>
+(function(){
+    const CSRF = '<?= htmlspecialchars($_SESSION['csrf_token'] ?? '') ?>';
+    let previewData = null;
+    let currentTab = 'line';
+
+    function esc(s) { const d = document.createElement('div'); d.textContent = String(s||''); return d.innerHTML; }
+
+    window.mbsClosePreview = function() {
+        document.getElementById('mbs-preview-modal').classList.remove('show');
+    };
+
+    window.mbsPreview = async function() {
+        const m = document.getElementById('mbs-preview-modal');
+        m.classList.add('show');
+        document.getElementById('mbs-pv-date').textContent = '';
+        document.getElementById('mbs-pv-body').innerHTML = '<p class="text-center text-slate-400 py-12"><i class="fa-solid fa-spinner fa-spin mr-2"></i>กำลังโหลด…</p>';
+        try {
+            const r = await fetch('ajax_morning_brief.php?action=preview');
+            const j = await r.json();
+            if (!j.ok) {
+                document.getElementById('mbs-pv-body').innerHTML = '<p class="text-center text-rose-500 py-8">' + esc(j.error || 'โหลดไม่สำเร็จ') + '</p>';
+                return;
+            }
+            previewData = j;
+            const meta = j.brief_meta;
+            document.getElementById('mbs-pv-date').textContent =
+                meta.date_thai + ' · วัน' + meta.weekday_thai +
+                (meta.model && meta.model !== 'fallback' ? ' · ' + meta.model : '');
+            renderPreview(currentTab);
+        } catch(e) {
+            document.getElementById('mbs-pv-body').innerHTML = '<p class="text-center text-rose-500 py-8">' + esc(String(e)) + '</p>';
+        }
+    };
+
+    function renderPreview(which) {
+        if (!previewData) return;
+        const body = document.getElementById('mbs-pv-body');
+        if (which === 'line') {
+            body.innerHTML = renderLineBubble(previewData);
+        } else {
+            const html = previewData.email_html || '';
+            body.innerHTML = '<iframe sandbox srcdoc="' + esc(html).replace(/"/g, '&quot;') + '"></iframe>';
+        }
+    }
+
+    function renderLineBubble(d) {
+        const meta = d.brief_meta;
+        const flex = d.line_flex;
+        const bubble = flex.contents;
+        const header = bubble.header;
+        const body = bubble.body;
+        const bg = header.backgroundColor;
+        const title = (header.contents[0] || {}).text || '';
+        const sub = (header.contents[1] || {}).text || '';
+        let bodyHtml = '';
+        const sch = (meta.priorities || []);
+        bodyHtml += '<p class="mbs-pv-line-narrative">' + esc(meta.narrative) + '</p>';
+        if (sch.length) {
+            bodyHtml += '<div class="mbs-pv-line-sep"></div>';
+            sch.slice(0,4).forEach(p => {
+                bodyHtml += '<div class="mbs-pv-line-priority">'
+                    + '<div class="mbs-pv-line-priority-title">• ' + esc(p.title||'') + '</div>'
+                    + '<div class="mbs-pv-line-priority-detail">' + esc(p.detail||'') + '</div>'
+                    + '</div>';
+            });
+        }
+        // KPIs (extract from flex last box.horizontal)
+        const lastBox = body.contents[body.contents.length - 1];
+        if (lastBox && lastBox.layout === 'horizontal') {
+            bodyHtml += '<div class="mbs-pv-line-sep"></div>';
+            bodyHtml += '<div class="mbs-pv-line-kpi-grid">';
+            lastBox.contents.forEach(c => {
+                const lbl = (c.contents[0] || {}).text || '';
+                const val = (c.contents[1] || {}).text || '';
+                bodyHtml += '<div><div class="mbs-pv-line-kpi-label">' + esc(lbl) + '</div><div class="mbs-pv-line-kpi-value">' + esc(val) + '</div></div>';
+            });
+            bodyHtml += '</div>';
+        }
+        return '<div class="mbs-pv-line-bubble">'
+            + '<div class="mbs-pv-line-header" style="background:' + esc(bg) + '">'
+            + '<div style="font-size:16px;font-weight:700">' + esc(title) + '</div>'
+            + '<div style="font-size:11px;opacity:.9;margin-top:.15rem">' + esc(sub) + '</div>'
+            + '</div>'
+            + '<div class="mbs-pv-line-body">' + bodyHtml + '</div>'
+            + '</div>';
+    }
+
+    document.querySelectorAll('.mbs-pv-tab').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.mbs-pv-tab').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            currentTab = btn.dataset.pv;
+            renderPreview(currentTab);
+        });
+    });
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && document.getElementById('mbs-preview-modal').classList.contains('show')) {
+            mbsClosePreview();
+        }
+    });
+
+    window.mbsTestSend = async function() {
+        const conf = await Swal.fire({
+            icon: 'question',
+            title: 'ทดสอบส่ง brief วันนี้?',
+            html: 'ระบบจะส่งเข้า LINE/Email ตามที่เปิดในการตั้งค่า · ข้อความจะมี <b>[ทดสอบ]</b> นำหน้า',
+            showCancelButton: true,
+            confirmButtonText: 'ส่งเลย',
+            cancelButtonText: 'ยกเลิก',
+            confirmButtonColor: '#059669',
+        });
+        if (!conf.isConfirmed) return;
+
+        Swal.fire({ title: 'กำลังส่ง...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
+
+        try {
+            const fd = new FormData();
+            fd.append('csrf_token', CSRF);
+            const r = await fetch('ajax_morning_brief.php?action=test_send', { method: 'POST', body: fd });
+            const j = await r.json();
+            if (!j.ok) {
+                Swal.fire({ icon: 'error', title: 'ส่งไม่สำเร็จ', text: j.error || 'unknown' });
+                return;
+            }
+            const rs = j.results || {};
+            const lineLine = rs.line.ok
+                ? `✓ LINE → ${rs.line.target}`
+                : `✗ LINE — ${rs.line.error}`;
+            const emailLine = rs.email.ok
+                ? `✓ Email → ${rs.email.target}`
+                : `✗ Email — ${rs.email.error}`;
+            const overall = rs.line.ok || rs.email.ok;
+            Swal.fire({
+                icon: overall ? 'success' : 'warning',
+                title: overall ? 'ส่งเสร็จ' : 'ส่งไม่สำเร็จทุก channel',
+                html: `<div style="text-align:left;font-size:14px"><div style="color:${rs.line.ok ? '#059669' : '#dc2626'}">${esc(lineLine)}</div><div style="color:${rs.email.ok ? '#059669' : '#dc2626'};margin-top:.4rem">${esc(emailLine)}</div></div>`,
+                confirmButtonColor: '#059669',
+            });
+        } catch(e) {
+            Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: String(e) });
+        }
+    };
+})();
+</script>
 
 <style>
 .mbs-channel { display:flex; gap:.85rem; padding:1rem; border-radius:.85rem; border:1.5px solid #e2e8f0; cursor:pointer; transition:border-color .15s; align-items:flex-start; }
