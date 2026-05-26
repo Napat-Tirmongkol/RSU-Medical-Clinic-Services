@@ -241,6 +241,11 @@ $portalCsrf = get_csrf_token();
             <p class="text-sm text-slate-500 mt-1">จัดการนักศึกษา · ตารางงาน · อนุมัติเข้า-ออกงาน · การเงิน</p>
         </div>
         <div class="flex items-center gap-4">
+            <button type="button" onclick="if(window.RsuTour) RsuTour.start(SCH_TOUR_STEPS, 'scholarship')"
+                    class="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-emerald-700 transition-colors"
+                    title="เริ่มทัวร์แนะนำหน้านี้">
+                <i class="fa-solid fa-circle-question"></i>ทัวร์
+            </button>
             <a href="../scholarship_help.php" target="_blank" rel="noopener"
                class="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-emerald-700 transition-colors"
                title="เปิดคู่มือใช้งานในแท็บใหม่">
@@ -316,6 +321,60 @@ $portalCsrf = get_csrf_token();
 
     <!-- ─── TAB: DASHBOARD ─── -->
     <div class="sch-pane" data-pane="dashboard">
+
+        <?php
+        // ── Setup Checklist — แสดงเมื่อยังตั้งค่าไม่ครบ ──
+        $setupItems = [];
+        $payRateOk = (float)($settings['pay_rate_per_hour'] ?? 0) > 0;
+        $gpsRequired = !empty($settings['gps_required']);
+        $gpsOk = !$gpsRequired || (!empty($settings['clinic_lat']) && !empty($settings['clinic_lng']));
+        $studentsOk = $cntStudents > 0;
+        $setupItems[] = ['key' => 'rate', 'done' => $payRateOk,
+            'title' => 'ตั้งอัตราค่าตอบแทน', 'desc' => 'บาทต่อชั่วโมง — ใช้คำนวณยอดจ่ายเงินรายเดือน', 'cta' => 'settings'];
+        $setupItems[] = ['key' => 'gps', 'done' => $gpsOk,
+            'title' => 'ตั้งพิกัด GPS ของคลินิก', 'desc' => 'นักศึกษาจะ clock-in ในพื้นที่คลินิกได้เท่านั้น', 'cta' => 'settings'];
+        $setupItems[] = ['key' => 'students', 'done' => $studentsOk,
+            'title' => 'เพิ่มนักศึกษาทุน', 'desc' => 'เพิ่มอย่างน้อย 1 คนเพื่อเริ่มเก็บชั่วโมง', 'cta' => 'students'];
+
+        $allDone = !in_array(false, array_column($setupItems, 'done'), true);
+        $doneCount = count(array_filter($setupItems, fn($i) => $i['done']));
+        $totalCount = count($setupItems);
+        if (!$allDone):
+        ?>
+        <div class="sch-card mb-4" id="sch-setup-card" style="border-color:#fcd34d; background:#fffbeb">
+            <div class="flex items-center justify-between gap-3 mb-3 flex-wrap">
+                <div>
+                    <h3 class="text-base font-bold text-slate-900">เริ่มใช้งานครั้งแรก</h3>
+                    <p class="text-xs text-slate-600 mt-0.5">ตั้งค่าให้ครบก่อนเริ่มใช้งานจริง <span class="font-semibold text-amber-700"><?= $doneCount ?>/<?= $totalCount ?></span></p>
+                </div>
+                <div class="flex items-center gap-1.5">
+                    <?php for ($i = 0; $i < $totalCount; $i++): ?>
+                        <span class="block w-8 h-1 rounded-full <?= $i < $doneCount ? 'bg-emerald-500' : 'bg-amber-200' ?>"></span>
+                    <?php endfor; ?>
+                </div>
+            </div>
+            <ul class="space-y-2">
+                <?php foreach ($setupItems as $item): ?>
+                    <li class="flex items-center gap-3 px-3 py-2.5 rounded-lg <?= $item['done'] ? 'bg-emerald-50' : 'bg-white border border-amber-200' ?>">
+                        <span class="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center <?= $item['done'] ? 'bg-emerald-500 text-white' : 'border-2 border-amber-400 bg-white' ?>">
+                            <?php if ($item['done']): ?><i class="fa-solid fa-check text-[10px]"></i><?php endif; ?>
+                        </span>
+                        <div class="flex-1 min-w-0">
+                            <p class="text-sm font-semibold <?= $item['done'] ? 'text-slate-500 line-through' : 'text-slate-900' ?>"><?= htmlspecialchars($item['title']) ?></p>
+                            <?php if (!$item['done']): ?>
+                                <p class="text-xs text-slate-500"><?= htmlspecialchars($item['desc']) ?></p>
+                            <?php endif; ?>
+                        </div>
+                        <?php if (!$item['done']): ?>
+                            <button class="text-sm font-semibold text-emerald-700 hover:text-emerald-800 flex items-center gap-1 shrink-0" onclick="schGoTab('<?= $item['cta'] ?>')">
+                                ตั้งค่า <i class="fa-solid fa-arrow-right text-xs"></i>
+                            </button>
+                        <?php endif; ?>
+                    </li>
+                <?php endforeach; ?>
+            </ul>
+        </div>
+        <?php endif; ?>
 
         <!-- KPI cards (3 essentials only) -->
         <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
@@ -768,6 +827,10 @@ $portalCsrf = get_csrf_token();
                         <i class="fa-solid fa-coins mr-1"></i>ค่าตอบแทน
                     </label>
                 </div>
+                <p class="text-[11px] text-slate-500 mt-1.5">
+                    <i class="fa-solid fa-circle-info text-slate-400 mr-1"></i>
+                    <b>ทุน</b> = เก็บชั่วโมงสะสมตามเงื่อนไขทุน · <b>ค่าตอบแทน</b> = จ่ายเป็นเงินตามอัตราที่ตั้งไว้
+                </p>
             </div>
             <div class="grid grid-cols-2 gap-3">
                 <div>
@@ -819,6 +882,10 @@ $portalCsrf = get_csrf_token();
                         <i class="fa-solid fa-coins mr-1"></i>ค่าตอบแทน
                     </label>
                 </div>
+                <p class="text-[11px] text-slate-500 mt-1.5">
+                    <i class="fa-solid fa-circle-info text-slate-400 mr-1"></i>
+                    <b>ทุน</b> = เก็บชั่วโมงให้นักศึกษา · <b>ค่าตอบแทน</b> = จ่ายเงินตามอัตรา (บาท/ชม.)
+                </p>
             </div>
             <div>
                 <label class="sch-label">วันที่</label>
@@ -1323,7 +1390,14 @@ $portalCsrf = get_csrf_token();
         const j = await api('approvals', 'list', { q });
         if (!j.ok) { wrap.innerHTML = `<p class="text-center text-rose-500 py-6">${j.error || 'โหลดไม่สำเร็จ'}</p>`; return; }
         if (j.rows.length === 0) {
-            wrap.innerHTML = '<p class="text-center text-slate-400 py-10"><i class="fa-solid fa-inbox text-2xl block mb-2"></i>ไม่มีรายการรออนุมัติ</p>';
+            wrap.innerHTML = `
+                <div class="text-center py-10 px-4">
+                    <div class="inline-flex w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 items-center justify-center mb-3">
+                        <i class="fa-solid fa-check text-xl"></i>
+                    </div>
+                    <p class="text-sm font-semibold text-slate-900">ไม่มีรายการรออนุมัติ</p>
+                    <p class="text-xs text-slate-500 mt-1">ดีมาก — จัดการเรียบร้อยทุกคำขอแล้ว</p>
+                </div>`;
             return;
         }
         let html = '<table class="sch-table"><thead><tr>'
@@ -1398,7 +1472,17 @@ $portalCsrf = get_csrf_token();
             + j.rows.map(s => `<option value="${s.id}">${escHtml(s.full_name)}</option>`).join('');
 
         if (j.rows.length === 0) {
-            wrap.innerHTML = '<p class="text-center text-slate-400 py-10"><i class="fa-solid fa-graduation-cap text-2xl block mb-2"></i>ยังไม่มีนักศึกษาทุน</p>';
+            wrap.innerHTML = `
+                <div class="text-center py-12 px-4">
+                    <div class="inline-flex w-14 h-14 rounded-full bg-slate-100 text-slate-400 items-center justify-center mb-3">
+                        <i class="fa-solid fa-graduation-cap text-2xl"></i>
+                    </div>
+                    <p class="text-base font-semibold text-slate-900">ยังไม่มีนักศึกษาทุน</p>
+                    <p class="text-xs text-slate-500 mt-1 max-w-sm mx-auto">เพิ่มนักศึกษาทุนคนแรกเพื่อเริ่มเก็บชั่วโมงทำงาน · เลือกจาก user ที่ลงทะเบียนใน LINE แล้ว</p>
+                    <button class="sch-btn mt-4" onclick="openStudentModal()">
+                        <i class="fa-solid fa-plus"></i>เพิ่มนักศึกษาคนแรก
+                    </button>
+                </div>`;
             return;
         }
         let html = '<table class="sch-table"><thead><tr>'
@@ -1755,7 +1839,14 @@ $portalCsrf = get_csrf_token();
         const j = await api('reports', 'summary', data);
         if (!j.ok) { wrap.innerHTML = `<p class="text-center text-rose-500 py-6">${j.error || ''}</p>`; return; }
         if (j.rows.length === 0) {
-            wrap.innerHTML = '<p class="text-center text-slate-400 py-10">ไม่มีข้อมูลในช่วงที่เลือก</p>';
+            wrap.innerHTML = `
+                <div class="text-center py-12 px-4">
+                    <div class="inline-flex w-14 h-14 rounded-full bg-slate-100 text-slate-400 items-center justify-center mb-3">
+                        <i class="fa-solid fa-chart-line text-2xl"></i>
+                    </div>
+                    <p class="text-base font-semibold text-slate-900">ไม่มีข้อมูลในช่วงที่เลือก</p>
+                    <p class="text-xs text-slate-500 mt-1">ลองเลือกช่วงวันที่อื่น หรือรอจนนักศึกษาเริ่มเก็บชั่วโมง</p>
+                </div>`;
             return;
         }
         const rate = parseFloat(j.pay_rate || 0);
@@ -1920,7 +2011,20 @@ $portalCsrf = get_csrf_token();
             status_filter: document.getElementById('slot-status-filter').value,
         });
         if (!j.ok) { wrap.innerHTML = `<p class="text-center text-sm text-rose-500 py-6">${escTxt(j.error || 'โหลดไม่สำเร็จ')}</p>`; return; }
-        if (!j.rows.length) { wrap.innerHTML = '<p class="text-center text-sm text-slate-400 py-10"><i class="fa-solid fa-inbox text-3xl mb-2 block"></i>ยังไม่มีรอบในช่วงนี้</p>'; return; }
+        if (!j.rows.length) {
+            wrap.innerHTML = `
+                <div class="text-center py-12 px-4">
+                    <div class="inline-flex w-14 h-14 rounded-full bg-slate-100 text-slate-400 items-center justify-center mb-3">
+                        <i class="fa-solid fa-layer-group text-2xl"></i>
+                    </div>
+                    <p class="text-base font-semibold text-slate-900">ยังไม่มีรอบงานที่เปิด</p>
+                    <p class="text-xs text-slate-500 mt-1 max-w-sm mx-auto">เปิดรอบงานหลายๆ ช่วงเวลาในวันเดียวกัน แล้วให้นักศึกษาเลือกจองเอง — ไม่ต้องกำหนดตารางทีละคน</p>
+                    <button class="sch-btn mt-4" onclick="openSlotCreateModal()">
+                        <i class="fa-solid fa-plus"></i>เปิดรอบแรก
+                    </button>
+                </div>`;
+            return;
+        }
 
         let html = '<table class="sch-table"><thead><tr>'
             + '<th>วันที่</th><th>เวลา</th><th>ความจุ</th><th>สถานะ</th><th>หมายเหตุ</th><th>จัดการ</th>'
@@ -2429,9 +2533,14 @@ $portalCsrf = get_csrf_token();
     function poRenderTable(rows) {
         const wrap = document.getElementById('po-table-wrap');
         if (!rows || rows.length === 0) {
-            wrap.innerHTML = '<div class="text-center py-12 text-slate-400">'
-                + '<i class="fa-solid fa-inbox text-4xl mb-2 block"></i>'
-                + 'ไม่มีรายการในเดือนนี้ — กดปุ่ม "สร้าง/อัปเดตรายการ" เพื่อคำนวณจากชั่วโมงที่ผ่านมา</div>';
+            wrap.innerHTML = `
+                <div class="text-center py-12 px-4">
+                    <div class="inline-flex w-14 h-14 rounded-full bg-slate-100 text-slate-400 items-center justify-center mb-3">
+                        <i class="fa-solid fa-money-check-dollar text-2xl"></i>
+                    </div>
+                    <p class="text-base font-semibold text-slate-900">ยังไม่มีรายการสำหรับเดือนนี้</p>
+                    <p class="text-xs text-slate-500 mt-1 max-w-sm mx-auto">กดปุ่ม "สร้าง/อัปเดตรายการ" ด้านบน เพื่อสรุปยอดค่าตอบแทนจากชั่วโมงที่นักศึกษาทำงาน</p>
+                </div>`;
             poBulkSet.clear();
             updateBulkBar();
             return;
@@ -2745,6 +2854,29 @@ $portalCsrf = get_csrf_token();
     document.getElementById('po-period')?.addEventListener('change', () => {
         poPage = 1; loadPayouts();
     });
+
+    // ── Navigate to a top tab by name (used by setup checklist CTAs) ──
+    window.schGoTab = function(tabName) {
+        const btn = document.querySelector('.sch-tab[data-tab="' + tabName + '"]');
+        if (btn) btn.click();
+    };
+
+    // ── Guided tour (5 steps — driver.js via RsuTour) ──
+    const SCH_TOUR_STEPS = [
+        { popover: { title: 'นักศึกษาทุน',
+            description: 'จัดการนักศึกษาทุน · เก็บชั่วโมง · อนุมัติเข้า-ออกงาน · จ่ายค่าตอบแทน — ครบในที่เดียว' } },
+        { element: '.sch-tab[data-tab="dashboard"]', popover: { title: 'ภาพรวม',
+            description: 'หน้าแรก — เห็นของต้องอนุมัติ ตัวเลขสำคัญ และกราฟชั่วโมงรายวัน', side: 'bottom' } },
+        { element: '#appr-table-wrap', popover: { title: 'ของต้องทำ',
+            description: 'นักศึกษาส่งคำขอเข้า-ออกงาน รอคุณตรวจที่นี่ — กดอนุมัติ/ปฏิเสธได้ทันที', side: 'top' } },
+        { element: '.sch-tab[data-tab="scheduling"]', popover: { title: 'ตารางงาน',
+            description: 'รวม 3 มุมมอง — ปฏิทินรวม · กำหนดกะให้นักศึกษารายคน · เปิดรอบให้จองเอง', side: 'bottom' } },
+        { element: '.sch-tab[data-tab="finance"]', popover: { title: 'การเงิน',
+            description: 'สรุปยอดค่าตอบแทนรายเดือน · มาร์กสถานะการเงินอนุมัติ · นักศึกษาจะรับ LINE แจ้งเตือนทันที', side: 'bottom' } },
+        { element: '.sch-tab[data-tab="settings"]', popover: { title: 'ตั้งค่าก่อนใช้',
+            description: 'ตั้งอัตราค่าตอบแทน + พิกัด GPS ของคลินิกที่นี่ (จำเป็นสำหรับครั้งแรก)', side: 'bottom' } },
+    ];
+    if (window.RsuTour) RsuTour.maybeAutoStart('scholarship', SCH_TOUR_STEPS);
 
     // ── Init: load default tab (Dashboard)
     loadDashboard();
