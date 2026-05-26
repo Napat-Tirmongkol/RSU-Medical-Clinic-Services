@@ -277,6 +277,13 @@ body[data-theme='dark'] .al-pager button { background:#1e293b; border-color:#334
     <div class="al-table-wrap">
         <div class="al-table-bar">
             <h3>ตารางบันทึก <span id="al-count-badge" style="background:#fee2e2;color:#b91c1c;padding:2px 10px;border-radius:99px;font-size:11px;font-weight:800;margin-left:6px;">0</span></h3>
+            <a href="accident_log_template.php" class="al-btn al-btn-ghost" title="ดาวน์โหลด Excel เปล่าเพื่อกรอกข้อมูล">
+                <i class="fa-solid fa-file-arrow-down"></i> Template
+            </a>
+            <button type="button" class="al-btn al-btn-ghost" onclick="document.getElementById('al-import-file').click()" title="นำเข้าจาก Excel — วันที่ + จำนวน">
+                <i class="fa-solid fa-file-import"></i> Import
+            </button>
+            <input type="file" id="al-import-file" accept=".xlsx,.xls,.csv" style="display:none" onchange="alImportExcel(event)">
             <button class="al-btn al-btn-primary" onclick="alAddRow()">
                 <i class="fa-solid fa-plus"></i> เพิ่มแถว
             </button>
@@ -579,6 +586,62 @@ body[data-theme='dark'] .al-pager button { background:#1e293b; border-color:#334
             await alLoad();
         } catch (e) {
             Swal.fire({ icon:'error', title:'ลบล้มเหลว', text: e.message || String(e) });
+        }
+    };
+
+    /* ───── Excel Import ───── */
+    window.alImportExcel = async function(e) {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+        // Reset input ทันทีกัน same-filename ไม่ตอบ event ถัดไป
+        e.target.value = '';
+
+        if (file.size > 5 * 1024 * 1024) {
+            Swal.fire({ icon:'warning', title:'ไฟล์ใหญ่เกินไป', text:'รองรับสูงสุด 5 MB' });
+            return;
+        }
+
+        const c = await Swal.fire({
+            icon: 'question',
+            title: 'นำเข้าไฟล์นี้?',
+            html: `
+                <div style="text-align:left;font-size:13px;color:#475569;line-height:1.6">
+                    ไฟล์: <b>${file.name.replace(/[<>&]/g,'')}</b>
+                    <div style="margin-top:10px;padding:8px 10px;background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;font-size:11.5px;color:#78350f">
+                        <i class="fa-solid fa-circle-info"></i>
+                        วันที่ที่มีอยู่แล้วในระบบ — <b>จำนวนจะถูกอัปเดตทับ</b> (ไม่เพิ่มเป็นแถวใหม่)
+                    </div>
+                </div>
+            `,
+            showCancelButton: true,
+            confirmButtonText: '<i class="fa-solid fa-file-import"></i> นำเข้า',
+            cancelButtonText: 'ยกเลิก',
+            confirmButtonColor: '#dc2626',
+        });
+        if (!c.isConfirmed) return;
+
+        Swal.fire({ title:'กำลังนำเข้า...', didOpen: () => Swal.showLoading(), allowOutsideClick:false });
+        try {
+            const fd = new FormData();
+            fd.append('csrf_token', CSRF);
+            fd.append('file', file);
+            const r = await fetch('accident_log_import.php', {
+                method: 'POST', body: fd, credentials: 'same-origin',
+            });
+            const j = await r.json().catch(() => ({ ok:false, message:'invalid json' }));
+            if (!j.ok) throw new Error(j.message || 'import failed');
+
+            Swal.fire({
+                icon: 'success', title: 'นำเข้าสำเร็จ',
+                html: `
+                    <div style="text-align:left;font-size:13px;line-height:1.8">
+                        เพิ่มใหม่ <b style="color:#16a34a">${j.inserted}</b> · อัปเดต <b style="color:#0891b2">${j.updated}</b> · ข้าม <b style="color:#94a3b8">${j.skipped}</b> แถว
+                    </div>
+                `,
+            });
+            await alLoad();
+        } catch (err) {
+            Swal.fire({ icon:'error', title:'นำเข้าล้มเหลว', text: err.message || String(err) });
         }
     };
 
