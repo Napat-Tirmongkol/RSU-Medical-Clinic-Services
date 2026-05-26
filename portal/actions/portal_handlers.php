@@ -117,7 +117,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // ── 2. Export handlers for error_logs ────────────────────────────────────────
-if ($activeSection === 'error_logs' && isset($_GET['export'])) {
+// $activeSection is set in _init.php AFTER this file is required, so compute locally.
+$_handlerSection = $activeSection ?? ($_GET['section'] ?? '');
+if ($_handlerSection === 'error_logs' && isset($_GET['export'])) {
     $expFmt    = $_GET['export'];
     $expSearch = trim($_GET['el_search'] ?? '');
     $expLevel  = $_GET['el_level']  ?? '';

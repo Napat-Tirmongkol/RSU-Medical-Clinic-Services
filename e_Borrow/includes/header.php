@@ -58,13 +58,16 @@ $base_url = explode('/e_Borrow', $_SERVER['SCRIPT_NAME'])[0] . '/e_Borrow/';
             } catch (e) { console.error('Theme init error:', e); }
         })();
 
-        // Suppress harmless AbortError from skipped View Transitions
+        // Suppress harmless View Transition errors
         // (เกิดเมื่อนำทางซ้ำเร็วๆ / ไป download / กด back ระหว่าง transition)
         window.addEventListener('unhandledrejection', function(e) {
-            var r = e.reason;
-            if (r && r.name === 'AbortError' && /transition/i.test(r.message || '')) {
-                e.preventDefault();
-            }
+            var r = e.reason; if (!r) return;
+            var msg = String(r.message || '');
+            // AbortError: startViewTransition() skipped by next call
+            if (r.name === 'AbortError' && /transition/i.test(msg)) { e.preventDefault(); return; }
+            // InvalidStateError: cross-doc @view-transition aborted by nav state change
+            if (r.name === 'InvalidStateError'
+                && /transition.*abort|abort.*transition|invalid state/i.test(msg)) { e.preventDefault(); }
         });
     </script>
 

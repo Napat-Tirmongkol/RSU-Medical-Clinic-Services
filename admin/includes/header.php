@@ -29,22 +29,29 @@ if (!function_exists('renderPageHeader')) {
     <title>e-Campaign — Admin</title>
     <link rel="icon" href="../favicon.ico">
 
-    <!-- Suppress harmless AbortError from skipped View Transitions.
-         Must run BEFORE other scripts (Sentry, SweetAlert2) so the listener
-         is registered before any rejection can fire. -->
+    <!-- Suppress harmless View Transition errors that fire when the browser
+         interrupts a transition (rapid clicks, back/forward nav, new-tab open).
+         Must run BEFORE Sentry / SweetAlert2 so the listener catches early. -->
     <script>
         (function() {
-            function isSkippedViewTransition(r) {
+            function isHarmlessViewTransition(r) {
                 if (!r) return false;
                 var name = String(r.name || '');
                 var msg  = String(r.message || r || '');
-                return name === 'AbortError'
-                    && /transition.*skip|skip.*transition/i.test(msg);
+                // AbortError: startViewTransition() superseded by another call
+                if (name === 'AbortError'
+                    && /transition.*skip|skip.*transition/i.test(msg)) return true;
+                // InvalidStateError: cross-doc @view-transition aborted by nav state change
+                // (DOMException code 11 — happens when user clicks back / opens new tab
+                //  / navigates away while a transition is mid-flight)
+                if (name === 'InvalidStateError'
+                    && /transition.*abort|abort.*transition|invalid state/i.test(msg)) return true;
+                return false;
             }
             // Expose for footer error tracker to filter the same way
-            window.__isSkippedViewTransition = isSkippedViewTransition;
+            window.__isSkippedViewTransition = isHarmlessViewTransition;
             window.addEventListener('unhandledrejection', function(e) {
-                if (isSkippedViewTransition(e.reason)) {
+                if (isHarmlessViewTransition(e.reason)) {
                     e.preventDefault();
                     e.stopImmediatePropagation();
                 }
