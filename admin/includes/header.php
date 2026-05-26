@@ -750,6 +750,11 @@ if (!function_exists('renderPageHeader')) {
             ['../admin/time_slots.php', 'fa-calendar-alt',    'รอบเวลา'],
             ['../admin/bookings.php',   'fa-clipboard-check', 'ผู้เข้าร่วม', $pendingBookings],
         ], $cur);
+
+        navSection('experimental', '#a855f7', 'ทดลอง (Admin only)', [
+            ['../admin/consent_form_preview.php',                 'fa-file-signature', 'Consent Form (มือถือ)'],
+            ['../admin/consent_form_preview.php?view=tablet',     'fa-tablet-screen-button', 'Consent Form (แท็บเล็ต)'],
+        ], $cur, true /* startCollapsed */);
         ?>
 
     </nav>
