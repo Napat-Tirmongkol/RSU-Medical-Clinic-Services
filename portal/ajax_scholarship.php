@@ -1029,7 +1029,12 @@ function handle_payouts(PDO $pdo, string $action, int $adminId): void
         if (!$id) { echo json_encode(['ok' => false, 'error' => 'missing id']); return; }
         $newStatus = $action === 'approve' ? 'approved' : 'pending';
         $ok = set_scholarship_payout_status($pdo, $id, $newStatus, $adminId);
-        echo json_encode(['ok' => $ok]);
+        $notified = false;
+        if ($ok && $action === 'approve') {
+            // Best-effort LINE notification → ไม่ break flow ถ้า LINE fail
+            $notified = notify_student_payout_approved($pdo, $id);
+        }
+        echo json_encode(['ok' => $ok, 'line_notified' => $notified]);
         return;
     }
 
@@ -1044,10 +1049,14 @@ function handle_payouts(PDO $pdo, string $action, int $adminId): void
         }
 
         $changed = 0;
+        $changedIds = [];
         $pdo->beginTransaction();
         try {
             foreach ($idList as $id) {
-                if (set_scholarship_payout_status($pdo, $id, $newStatus, $adminId)) $changed++;
+                if (set_scholarship_payout_status($pdo, $id, $newStatus, $adminId)) {
+                    $changed++;
+                    $changedIds[] = $id;
+                }
             }
             $pdo->commit();
         } catch (Throwable $e) {
@@ -1056,7 +1065,16 @@ function handle_payouts(PDO $pdo, string $action, int $adminId): void
             echo json_encode(['ok' => false, 'error' => 'Bulk update failed']);
             return;
         }
-        echo json_encode(['ok' => true, 'changed' => $changed]);
+
+        // LINE notifications — เฉพาะตอน bulk approve (ไม่ใช่ unapprove)
+        // ส่งหลัง commit เพื่อกันถ้า push ช้า/ค้าง จะไม่ lock DB tx
+        $notified = 0;
+        if ($newStatus === 'approved') {
+            foreach ($changedIds as $id) {
+                if (notify_student_payout_approved($pdo, $id)) $notified++;
+            }
+        }
+        echo json_encode(['ok' => true, 'changed' => $changed, 'line_notified' => $notified]);
         return;
     }
 

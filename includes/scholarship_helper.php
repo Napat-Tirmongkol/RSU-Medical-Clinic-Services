@@ -644,6 +644,63 @@ function scholarship_payout_summary(PDO $pdo, string $ym): array
 }
 
 /**
+ * ส่ง LINE notification ให้นักศึกษาว่าค่าตอบแทนพร้อมรับ
+ * Best-effort — return false ถ้า: ไม่มี LINE id, ไม่มี token, push fail
+ * (ไม่ throw — caller สามารถ ignore ผลได้)
+ */
+function notify_student_payout_approved(PDO $pdo, int $payoutId): bool
+{
+    static $tokenCache = null;
+    if ($tokenCache === null) {
+        $tokenCache = '';
+        $secretsPath = __DIR__ . '/../config/secrets.php';
+        if (is_file($secretsPath)) {
+            try {
+                $secrets = require $secretsPath;
+                if (is_array($secrets)) {
+                    $tokenCache = (string)($secrets['LINE_MESSAGING_CHANNEL_ACCESS_TOKEN'] ?? '');
+                }
+            } catch (Throwable $e) {
+                error_log('[notify_student_payout_approved] load token: ' . $e->getMessage());
+            }
+        }
+    }
+    if ($tokenCache === '') return false;
+
+    require_once __DIR__ . '/line_helper.php';
+
+    try {
+        $stmt = $pdo->prepare("SELECT p.period_ym, p.hours_paid, p.amount,
+                u.full_name,
+                COALESCE(NULLIF(u.line_user_id_new, ''), u.line_user_id) AS line_uid
+            FROM sys_scholarship_payouts p
+            INNER JOIN sys_scholarship_students s ON s.id = p.student_id
+            INNER JOIN sys_users u ON u.id = s.user_id
+            WHERE p.id = :id LIMIT 1");
+        $stmt->execute([':id' => $payoutId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        error_log('[notify_student_payout_approved] lookup: ' . $e->getMessage());
+        return false;
+    }
+    if (!$row || empty($row['line_uid'])) return false;
+
+    $flex = build_scholarship_payout_approved_flex(
+        (string)$row['full_name'],
+        scholarship_period_thai((string)$row['period_ym']),
+        (float)$row['hours_paid'],
+        (float)$row['amount']
+    );
+
+    try {
+        return send_line_push((string)$row['line_uid'], [$flex], $tokenCache);
+    } catch (Throwable $e) {
+        error_log('[notify_student_payout_approved] push: ' . $e->getMessage());
+        return false;
+    }
+}
+
+/**
  * เปลี่ยนสถานะ payout (pending ↔ approved)
  * @return bool
  */

@@ -239,6 +239,66 @@ function build_scholarship_notify_flex(int $logId, string $studentName, string $
 }
 
 /**
+ * Flex message แจ้งนักศึกษาว่า "ค่าตอบแทนพร้อมรับที่ฝ่ายการเงิน" หลังการเงินอนุมัติ
+ */
+function build_scholarship_payout_approved_flex(string $studentName, string $periodLabel,
+    float $hoursPaid, float $amount): array
+{
+    $amountTxt = number_format($amount, 2);
+    $hoursTxt  = number_format($hoursPaid, 2);
+    return [
+        'type'    => 'flex',
+        'altText' => "💰 ค่าตอบแทนพร้อมรับ — $studentName ($periodLabel)",
+        'contents' => [
+            'type' => 'bubble',
+            'size' => 'kilo',
+            'header' => [
+                'type'            => 'box',
+                'layout'          => 'vertical',
+                'backgroundColor' => '#059669',
+                'paddingAll'      => '16px',
+                'contents'        => [[
+                    'type'   => 'text',
+                    'text'   => '💰 ค่าตอบแทนพร้อมรับ',
+                    'color'  => '#ffffff',
+                    'weight' => 'bold',
+                    'size'   => 'md',
+                ]],
+            ],
+            'body' => [
+                'type'       => 'box',
+                'layout'     => 'vertical',
+                'spacing'    => 'sm',
+                'paddingAll' => '16px',
+                'contents'   => [
+                    ['type' => 'box', 'layout' => 'baseline', 'spacing' => 'sm', 'contents' => [
+                        ['type' => 'text', 'text' => 'ชื่อ', 'color' => '#64748b', 'size' => 'sm', 'flex' => 2],
+                        ['type' => 'text', 'text' => $studentName, 'size' => 'sm', 'weight' => 'bold', 'flex' => 5, 'wrap' => true],
+                    ]],
+                    ['type' => 'box', 'layout' => 'baseline', 'spacing' => 'sm', 'contents' => [
+                        ['type' => 'text', 'text' => 'เดือน', 'color' => '#64748b', 'size' => 'sm', 'flex' => 2],
+                        ['type' => 'text', 'text' => $periodLabel, 'size' => 'sm', 'flex' => 5, 'wrap' => true],
+                    ]],
+                    ['type' => 'box', 'layout' => 'baseline', 'spacing' => 'sm', 'contents' => [
+                        ['type' => 'text', 'text' => 'ชั่วโมง', 'color' => '#64748b', 'size' => 'sm', 'flex' => 2],
+                        ['type' => 'text', 'text' => "$hoursTxt ชม.", 'size' => 'sm', 'flex' => 5],
+                    ]],
+                    ['type' => 'box', 'layout' => 'baseline', 'spacing' => 'sm', 'contents' => [
+                        ['type' => 'text', 'text' => 'ยอด', 'color' => '#64748b', 'size' => 'sm', 'flex' => 2],
+                        ['type' => 'text', 'text' => "$amountTxt บาท", 'size' => 'md', 'weight' => 'bold', 'color' => '#059669', 'flex' => 5],
+                    ]],
+                    ['type' => 'separator', 'margin' => 'md'],
+                    ['type' => 'text', 'text' => '📍 กรุณาติดต่อรับเงินที่ฝ่ายการเงินคลินิก',
+                        'size' => 'sm', 'color' => '#0f172a', 'wrap' => true, 'margin' => 'md'],
+                    ['type' => 'text', 'text' => 'เวลาทำการ: ตามเวลาคลินิก',
+                        'size' => 'xs', 'color' => '#94a3b8', 'margin' => 'sm'],
+                ],
+            ],
+        ],
+    ];
+}
+
+/**
  * LINE Group registry (เก็บใน sys_site_settings key 'line.groups.discovered')
  *
  * เก็บเป็น JSON array ของ { id, type, name?, joined_at, last_seen_at, member_count? }

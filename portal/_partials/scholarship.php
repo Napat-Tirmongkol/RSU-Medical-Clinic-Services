@@ -2580,6 +2580,10 @@ $portalCsrf = get_csrf_token();
         if (!c.isConfirmed) return;
         const j = await api('payouts', 'approve', { id });
         if (!j.ok) { Swal.fire({ icon: 'error', text: j.error || 'อนุมัติไม่สำเร็จ' }); return; }
+        const lineMsg = j.line_notified
+            ? '<div class="text-xs text-emerald-600 mt-2"><i class="fa-solid fa-circle-check"></i> ส่ง LINE แจ้งนักศึกษาแล้ว</div>'
+            : '<div class="text-xs text-slate-400 mt-2"><i class="fa-solid fa-circle-info"></i> ไม่ได้ส่ง LINE (นักศึกษายังไม่ link หรือ token ไม่พร้อม)</div>';
+        Swal.fire({ icon: 'success', title: 'อนุมัติแล้ว', html: lineMsg, timer: 1800, showConfirmButton: false });
         loadPayouts();
     };
 
@@ -2637,7 +2641,15 @@ $portalCsrf = get_csrf_token();
             ids: Array.from(poBulkSet).join(','), new_status: 'approved',
         });
         if (!j.ok) { Swal.fire({ icon: 'error', text: j.error || 'อนุมัติไม่สำเร็จ' }); return; }
-        Swal.fire({ icon: 'success', title: `อนุมัติแล้ว ${j.changed || 0} รายการ`, timer: 1300, showConfirmButton: false });
+        const lineLine = (j.line_notified > 0)
+            ? `<div class="text-xs text-emerald-600 mt-2"><i class="fa-solid fa-paper-plane"></i> ส่ง LINE แจ้งนักศึกษา ${j.line_notified} คน</div>`
+            : `<div class="text-xs text-slate-400 mt-2"><i class="fa-solid fa-circle-info"></i> ไม่ได้ส่ง LINE (ยังไม่ link หรือ token ไม่พร้อม)</div>`;
+        Swal.fire({
+            icon: 'success',
+            title: `อนุมัติแล้ว ${j.changed || 0} รายการ`,
+            html: lineLine,
+            timer: 2000, showConfirmButton: false,
+        });
         loadPayouts();
     };
 
