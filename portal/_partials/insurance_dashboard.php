@@ -90,6 +90,7 @@ $publicUrl = $publicUrlBase . ($activeWorkbook ? ('?wb=' . urlencode($activeWork
         display:inline-flex; align-items:center; gap:5px;
         backdrop-filter:blur(6px); pointer-events:none;
         animation: idGrabPulse 2s ease-in-out infinite;
+        z-index: 6; /* above km-override-badge if it lingers */
     }
     @keyframes idGrabPulse {
         0%,100% { opacity:.7; }
@@ -98,6 +99,14 @@ $publicUrl = $publicUrlBase . ($activeWorkbook ? ('?wb=' . urlencode($activeWork
     @media (prefers-reduced-motion: reduce) {
         #section-insurance_dashboard .id-edit-mode .id-grab-hint { animation:none; opacity:.85; }
         #section-insurance_dashboard .id-card.id-dragging { transform:none; }
+    }
+    /* Hide KPI override widgets (km-*) while in dashboard edit mode —
+       prevents overlap with .id-edit-overlay (top-right) and id-grab-hint (top-left).
+       In edit mode admin is managing layout/visibility, not values, so the
+       inline override pencil + OVERRIDE badge would just clutter. */
+    #section-insurance_dashboard .id-card.id-edit-mode .km-edit-btn,
+    #section-insurance_dashboard .id-card.id-edit-mode .km-override-badge {
+        display: none !important;
     }
     #section-insurance_dashboard .id-edit-overlay {
         position:absolute; top:.75rem; right:.75rem; display:none;
