@@ -36,31 +36,35 @@ $portalCsrf = get_csrf_token();
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 
 <style>
-    .sch-card { background:#fff; border:1.5px solid #e2e8f0; border-radius:1.25rem; padding:1.5rem; }
+    .sch-card { background:#fff; border:1px solid #e2e8f0; border-radius:1rem; padding:1.5rem; }
     .sch-kpi {
-        background:#fff; border:1.5px solid #e2e8f0; border-radius:1.25rem;
-        padding:1.25rem; position:relative; overflow:hidden;
+        background:#fff; border:1px solid #e2e8f0; border-radius:1rem;
+        padding:1.25rem 1.5rem;
     }
+    /* Icon inline beside label (not floating in corner) */
     .sch-kpi-icon {
-        position:absolute; top:1rem; right:1rem; width:2.5rem; height:2.5rem;
-        border-radius:.75rem; display:flex; align-items:center; justify-content:center;
-        font-size:1.05rem;
+        width:1.75rem; height:1.75rem; border-radius:.5rem;
+        display:inline-flex; align-items:center; justify-content:center;
+        font-size:.85rem; flex-shrink:0;
     }
-    .sch-kpi-label { font-size:.7rem; font-weight:800; color:#64748b; text-transform:uppercase; letter-spacing:.05em; }
-    .sch-kpi-value { font-size:1.875rem; font-weight:900; color:#0f172a; margin-top:.5rem; line-height:1; }
-    .sch-kpi-foot { font-size:.72rem; color:#94a3b8; margin-top:.4rem; }
+    .sch-kpi-head { display:flex; align-items:center; gap:.6rem; }
+    .sch-kpi-label { font-size:.8rem; font-weight:600; color:#64748b; }
+    .sch-kpi-value { font-size:1.75rem; font-weight:700; color:#0f172a; margin-top:.75rem; line-height:1.1; letter-spacing:-.01em; }
+    .sch-kpi-foot { font-size:.75rem; color:#94a3b8; margin-top:.4rem; }
     .sch-rank-pill {
         display:inline-flex; align-items:center; justify-content:center;
         width:1.5rem; height:1.5rem; border-radius:99px;
-        font-size:.7rem; font-weight:900; color:#fff;
+        font-size:.7rem; font-weight:700; color:#fff;
     }
+    /* Tabs: text-only with underline indicator (no solid pill, no shadow) */
     .sch-tab {
-        padding:.65rem 1.1rem; border-radius:.85rem; font-size:.85rem; font-weight:800;
-        color:#475569; cursor:pointer; transition:all .15s; white-space:nowrap;
-        background:transparent; border:1.5px solid transparent;
+        padding:.7rem 0; margin-right:1.5rem; font-size:.9rem; font-weight:600;
+        color:#64748b; cursor:pointer; transition:color .15s; white-space:nowrap;
+        background:transparent; border:none; border-bottom:2px solid transparent;
+        position:relative;
     }
-    .sch-tab:hover { background:#f1f5f9; color:#1e293b; }
-    .sch-tab.active { background:#10b981; color:#fff; border-color:#10b981; box-shadow:0 4px 10px rgba(16,185,129,.25); }
+    .sch-tab:hover { color:#0f172a; }
+    .sch-tab.active { color:#0f172a; border-bottom-color:#2e9e63; }
     /* Sub-bar (segmented control inside scheduling/finance tabs) */
     .sch-sub-bar {
         display:flex; gap:.4rem; margin-bottom:1rem; padding:.3rem;
@@ -80,10 +84,10 @@ $portalCsrf = get_csrf_token();
     body[data-theme='dark'] .sch-sub-btn.active { background:#1e293b; color:#6ee7b7; box-shadow:none; }
     .sch-tab .sch-badge {
         display:inline-flex; align-items:center; justify-content:center;
-        min-width:20px; height:18px; padding:0 5px; margin-left:.4rem;
-        border-radius:99px; background:#f43f5e; color:#fff; font-size:10px; font-weight:900;
+        min-width:18px; height:16px; padding:0 5px; margin-left:.35rem;
+        border-radius:99px; background:#f1f5f9; color:#dc2626; font-size:10px; font-weight:700;
     }
-    .sch-tab.active .sch-badge { background:#fff; color:#10b981; }
+    .sch-tab.active .sch-badge { background:#fef2f2; color:#b91c1c; }
     .sch-input {
         width:100%; padding:.6rem .9rem; background:#f9fafb;
         border:1.5px solid #e5e7eb; border-radius:.65rem;
@@ -97,18 +101,18 @@ $portalCsrf = get_csrf_token();
     .sch-table tbody tr:hover { background:#f8fafc; }
     .sch-btn {
         display:inline-flex; align-items:center; gap:.4rem;
-        padding:.55rem 1rem; border-radius:.65rem; font-size:.8rem; font-weight:800;
-        background:#10b981; color:#fff; border:none; cursor:pointer; transition:all .15s;
+        padding:.55rem 1rem; border-radius:.5rem; font-size:.85rem; font-weight:600;
+        background:#2e9e63; color:#fff; border:none; cursor:pointer; transition:background .15s;
     }
-    .sch-btn:hover { background:#059669; transform:translateY(-1px); box-shadow:0 6px 14px rgba(16,185,129,.25); }
-    .sch-btn--ghost { background:#f1f5f9; color:#475569; }
-    .sch-btn--ghost:hover { background:#e2e8f0; color:#1e293b; box-shadow:none; transform:none; }
-    .sch-btn--danger { background:#f43f5e; }
-    .sch-btn--danger:hover { background:#e11d48; box-shadow:0 6px 14px rgba(244,63,94,.25); }
-    .sch-btn--xs { padding:.35rem .65rem; font-size:.72rem; }
+    .sch-btn:hover { background:#268555; }
+    .sch-btn--ghost { background:#fff; color:#475569; border:1px solid #e2e8f0; }
+    .sch-btn--ghost:hover { background:#f8fafc; color:#0f172a; border-color:#cbd5e1; }
+    .sch-btn--danger { background:#dc2626; }
+    .sch-btn--danger:hover { background:#b91c1c; }
+    .sch-btn--xs { padding:.35rem .65rem; font-size:.75rem; }
     .sch-status-badge {
-        display:inline-flex; align-items:center; padding:.2rem .55rem; border-radius:99px;
-        font-size:.7rem; font-weight:900; text-transform:uppercase; letter-spacing:.04em;
+        display:inline-flex; align-items:center; padding:.2rem .55rem; border-radius:.375rem;
+        font-size:.72rem; font-weight:600;
     }
     .sch-modal-backdrop { position:fixed; inset:0; background:rgba(15,23,42,.5); z-index:200; display:none; align-items:center; justify-content:center; padding:1rem; }
     .sch-modal-backdrop.show { display:flex; }
@@ -133,7 +137,7 @@ $portalCsrf = get_csrf_token();
         background:#fff; border:1.5px solid #e2e8f0;
         cursor:pointer; transition:all .15s; position:relative; overflow:hidden;
     }
-    .cal-cell:hover { border-color:#10b981; box-shadow:0 4px 12px rgba(16,185,129,.12); transform:translateY(-1px); }
+    .cal-cell:hover { border-color:#2e9e63; background:#f0fdf4; }
     .cal-cell.empty { background:#f8fafc; border-color:#f1f5f9; cursor:default; }
     .cal-cell.empty:hover { transform:none; box-shadow:none; border-color:#f1f5f9; }
     .cal-cell.today { border-color:#10b981; box-shadow:inset 0 0 0 1.5px #10b981; }
@@ -233,28 +237,27 @@ $portalCsrf = get_csrf_token();
     <!-- Header -->
     <div class="flex items-center justify-between mb-6">
         <div>
-            <h1 class="text-2xl font-black text-slate-900">นักศึกษาทุน — เก็บชั่วโมงทำงาน</h1>
-            <p class="text-sm text-slate-500 mt-1">จัดการนักศึกษา · ตารางกะ · อนุมัติเข้า-ออกงาน · รายงาน</p>
+            <h1 class="text-2xl font-bold text-slate-900">นักศึกษาทุน</h1>
+            <p class="text-sm text-slate-500 mt-1">จัดการนักศึกษา · ตารางงาน · อนุมัติเข้า-ออกงาน · การเงิน</p>
         </div>
-        <div class="flex items-center gap-3">
+        <div class="flex items-center gap-4">
             <a href="../scholarship_help.php" target="_blank" rel="noopener"
-               class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-black hover:bg-emerald-500 hover:text-white transition-colors"
+               class="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-emerald-700 transition-colors"
                title="เปิดคู่มือใช้งานในแท็บใหม่">
                 <i class="fa-solid fa-book-open"></i>คู่มือ
             </a>
+            <div class="w-px h-8 bg-slate-200"></div>
             <div class="text-right">
-                <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">นักศึกษาทุน</p>
-                <p class="text-lg font-black text-slate-900"><?= number_format($cntStudents) ?> คน</p>
+                <p class="text-xs text-slate-500">นักศึกษา</p>
+                <p class="text-lg font-semibold text-slate-900"><?= number_format($cntStudents) ?> <span class="text-xs font-normal text-slate-500">คน</span></p>
             </div>
-            <div class="w-px h-10 bg-slate-200"></div>
             <div class="text-right">
-                <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">รออนุมัติ</p>
-                <p class="text-lg font-black text-rose-600"><?= number_format($cntPending) ?></p>
+                <p class="text-xs text-slate-500">รออนุมัติ</p>
+                <p class="text-lg font-semibold text-rose-600"><?= number_format($cntPending) ?></p>
             </div>
-            <div class="w-px h-10 bg-slate-200"></div>
             <div class="text-right">
-                <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">กะวันนี้</p>
-                <p class="text-lg font-black text-emerald-600"><?= number_format($cntTodayShifts) ?></p>
+                <p class="text-xs text-slate-500">กะวันนี้</p>
+                <p class="text-lg font-semibold text-emerald-600"><?= number_format($cntTodayShifts) ?></p>
             </div>
         </div>
     </div>
@@ -269,7 +272,7 @@ $portalCsrf = get_csrf_token();
         $_payoutPendingCnt = (int)$_pStmt->fetchColumn();
     } catch (PDOException) {}
     ?>
-    <div class="flex gap-2 mb-4 overflow-x-auto pb-2">
+    <div class="flex mb-4 overflow-x-auto border-b border-slate-200">
         <button class="sch-tab active" data-tab="dashboard">
             <i class="fa-solid fa-gauge mr-1.5"></i>ภาพรวม
             <?php if ($cntPending > 0): ?><span class="sch-badge"><?= $cntPending > 99 ? '99+' : $cntPending ?></span><?php endif; ?>
@@ -317,36 +320,37 @@ $portalCsrf = get_csrf_token();
         <!-- KPI cards (3 essentials only) -->
         <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
             <div class="sch-kpi">
-                <div class="sch-kpi-icon" style="background:#fee2e2;color:#dc2626"><i class="fa-solid fa-bell"></i></div>
-                <p class="sch-kpi-label">รออนุมัติ</p>
-                <p class="sch-kpi-value text-rose-600" id="kpi-pending">–</p>
+                <div class="sch-kpi-head">
+                    <span class="sch-kpi-icon" style="background:#fef2f2;color:#dc2626"><i class="fa-solid fa-bell"></i></span>
+                    <span class="sch-kpi-label">รออนุมัติ</span>
+                </div>
+                <p class="sch-kpi-value" id="kpi-pending">–</p>
                 <p class="sch-kpi-foot">รายการ</p>
             </div>
             <div class="sch-kpi">
-                <div class="sch-kpi-icon" style="background:#cffafe;color:#0891b2"><i class="fa-solid fa-calendar-day"></i></div>
-                <p class="sch-kpi-label">กะวันนี้</p>
-                <p class="sch-kpi-value text-cyan-600" id="kpi-today">–</p>
+                <div class="sch-kpi-head">
+                    <span class="sch-kpi-icon" style="background:#ecfeff;color:#0891b2"><i class="fa-solid fa-calendar-day"></i></span>
+                    <span class="sch-kpi-label">กะวันนี้</span>
+                </div>
+                <p class="sch-kpi-value" id="kpi-today">–</p>
                 <p class="sch-kpi-foot">กะ</p>
             </div>
             <div class="sch-kpi">
-                <div class="sch-kpi-icon" style="background:#fef3c7;color:#d97706"><i class="fa-solid fa-money-bill-wave"></i></div>
-                <p class="sch-kpi-label">เงินค่าตอบแทนเดือนนี้</p>
-                <p class="sch-kpi-value text-amber-700" id="kpi-month-pay">–</p>
+                <div class="sch-kpi-head">
+                    <span class="sch-kpi-icon" style="background:#fef3c7;color:#d97706"><i class="fa-solid fa-money-bill-wave"></i></span>
+                    <span class="sch-kpi-label">ค่าตอบแทนเดือนนี้</span>
+                </div>
+                <p class="sch-kpi-value" id="kpi-month-pay">–</p>
                 <p class="sch-kpi-foot" id="kpi-pay-rate-foot">บาท</p>
             </div>
         </div>
 
         <!-- ─── Hero: ของต้องทำ (Approval queue) ─── -->
-        <div class="sch-card mb-4" style="border-color:#fecaca">
+        <div class="sch-card mb-4">
             <div class="flex items-center justify-between gap-3 mb-4 flex-wrap">
-                <div class="flex items-center gap-2">
-                    <span class="inline-flex w-9 h-9 rounded-xl bg-rose-100 text-rose-600 items-center justify-center">
-                        <i class="fa-solid fa-bell"></i>
-                    </span>
-                    <div>
-                        <h3 class="text-base font-black text-slate-900">ของต้องทำ — รออนุมัติ</h3>
-                        <p class="text-xs text-slate-500">นักศึกษาขอเข้า-ออกงาน รอการตรวจจากคุณ</p>
-                    </div>
+                <div>
+                    <h3 class="text-base font-bold text-slate-900">ของต้องทำ</h3>
+                    <p class="text-xs text-slate-500 mt-0.5">นักศึกษาขอเข้า-ออกงาน รอการตรวจจากคุณ</p>
                 </div>
                 <div class="flex gap-2">
                     <input type="text" id="appr-search" placeholder="ค้นหาชื่อ/รหัส" class="sch-input" style="width:220px">
@@ -365,13 +369,13 @@ $portalCsrf = get_csrf_token();
         $_hasFinance = ($_role === 'superadmin' || $_role === 'admin' || !empty($_SESSION['access_finance']));
         ?>
         <?php if ($_hasFinance): ?>
-        <div class="mb-4 p-3 rounded-xl border border-emerald-200 bg-emerald-50 flex items-center justify-between gap-3 flex-wrap">
-            <div class="flex items-center gap-2 text-sm text-emerald-800">
-                <i class="fa-solid fa-link text-emerald-600"></i>
-                <span>ส่งค่าตอบแทนนักศึกษาทุนของเดือนนี้เข้าระบบการเงิน — รายจ่ายหมวด "เงินเดือน/ค่าจ้าง"</span>
+        <div class="mb-4 px-4 py-3 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-between gap-3 flex-wrap">
+            <div class="flex items-center gap-2 text-sm text-slate-700">
+                <i class="fa-solid fa-link text-slate-400"></i>
+                <span>ส่งค่าตอบแทนเดือนนี้เข้าระบบการเงิน — รายจ่ายหมวด "เงินเดือน/ค่าจ้าง"</span>
             </div>
-            <button onclick="schSendToFinance()" class="px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 text-sm font-bold flex items-center gap-1">
-                <i class="fa-solid fa-money-bill-trend-up"></i> ส่งเข้าระบบการเงิน
+            <button onclick="schSendToFinance()" class="text-sm font-semibold text-emerald-700 hover:text-emerald-800 flex items-center gap-1">
+                ส่งเข้าระบบการเงิน <i class="fa-solid fa-arrow-right text-xs"></i>
             </button>
         </div>
         <?php endif; ?>
@@ -379,11 +383,11 @@ $portalCsrf = get_csrf_token();
         <!-- Charts row -->
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-3 mb-5">
             <div class="sch-card lg:col-span-2">
-                <h3 class="text-sm font-black text-slate-900 mb-3">ชั่วโมงรายวัน 30 วันล่าสุด</h3>
+                <h3 class="text-sm font-semibold text-slate-900 mb-3">ชั่วโมงรายวัน 30 วันล่าสุด</h3>
                 <div style="position:relative;height:280px"><canvas id="chart-daily"></canvas></div>
             </div>
             <div class="sch-card">
-                <h3 class="text-sm font-black text-slate-900 mb-3">สัดส่วนเดือนนี้</h3>
+                <h3 class="text-sm font-semibold text-slate-900 mb-3">สัดส่วนเดือนนี้</h3>
                 <div style="position:relative;height:280px"><canvas id="chart-split"></canvas></div>
             </div>
         </div>
@@ -391,12 +395,12 @@ $portalCsrf = get_csrf_token();
         <!-- Lower row: top + today status -->
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-3 mb-5">
             <div class="sch-card">
-                <h3 class="text-sm font-black text-slate-900 mb-3"><i class="fa-solid fa-trophy text-amber-500 mr-1"></i>Top 5 เดือนนี้</h3>
+                <h3 class="text-sm font-semibold text-slate-900 mb-3"><i class="fa-solid fa-trophy text-amber-500 mr-1"></i>Top 5 เดือนนี้</h3>
                 <div id="dash-top-wrap"></div>
             </div>
             <div class="sch-card">
                 <div class="flex items-center justify-between mb-3">
-                    <h3 class="text-sm font-black text-slate-900"><i class="fa-solid fa-calendar-day text-cyan-500 mr-1"></i>กะวันนี้</h3>
+                    <h3 class="text-sm font-semibold text-slate-900"><i class="fa-solid fa-calendar-day text-cyan-500 mr-1"></i>กะวันนี้</h3>
                 </div>
                 <div id="dash-today-wrap"></div>
             </div>
@@ -404,7 +408,7 @@ $portalCsrf = get_csrf_token();
 
         <!-- Recent activity -->
         <div class="sch-card">
-            <h3 class="text-sm font-black text-slate-900 mb-3"><i class="fa-solid fa-clock-rotate-left text-slate-400 mr-1"></i>กิจกรรมล่าสุด</h3>
+            <h3 class="text-sm font-semibold text-slate-900 mb-3"><i class="fa-solid fa-clock-rotate-left text-slate-400 mr-1"></i>กิจกรรมล่าสุด</h3>
             <div id="dash-recent-wrap"></div>
         </div>
     </div>
@@ -413,7 +417,7 @@ $portalCsrf = get_csrf_token();
     <div class="sch-pane hidden" data-pane="students">
         <div class="sch-card">
             <div class="flex items-center justify-between mb-4">
-                <h3 class="text-base font-black text-slate-900">รายชื่อนักศึกษาทุน</h3>
+                <h3 class="text-base font-semibold text-slate-900">รายชื่อนักศึกษาทุน</h3>
                 <div class="flex gap-2">
                     <input type="text" id="stu-search" placeholder="ค้นหา ชื่อ/รหัส/คณะ" class="sch-input" style="width:280px">
                     <select id="stu-filter-status" class="sch-input" style="width:140px">
@@ -436,7 +440,7 @@ $portalCsrf = get_csrf_token();
     <div class="sch-pane hidden" data-pane="shifts">
         <div class="sch-card">
             <div class="flex items-center justify-between mb-4">
-                <h3 class="text-base font-black text-slate-900">ตารางกะ</h3>
+                <h3 class="text-base font-semibold text-slate-900">ตารางกะ</h3>
                 <div class="flex gap-2">
                     <select id="shift-filter-student" class="sch-input" style="width:220px">
                         <option value="">ทุกคน</option>
@@ -460,7 +464,7 @@ $portalCsrf = get_csrf_token();
         <div class="sch-card">
             <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
                 <div>
-                    <h3 class="text-base font-black text-slate-900">เปิดรอบงานให้นักศึกษาจอง</h3>
+                    <h3 class="text-base font-semibold text-slate-900">เปิดรอบงานให้นักศึกษาจอง</h3>
                     <p class="text-xs text-slate-500 mt-0.5">นักศึกษาจะเลือกรอบที่ว่าง แล้วจองเอง (จองทันที ไม่ต้องอนุมัติ)</p>
                 </div>
                 <div class="flex gap-2 items-center">
@@ -489,14 +493,14 @@ $portalCsrf = get_csrf_token();
         <div class="sch-card">
             <div class="flex items-center justify-between mb-4 flex-wrap gap-3">
                 <div>
-                    <h3 class="text-base font-black text-slate-900">ปฏิทินการทำงาน</h3>
+                    <h3 class="text-base font-semibold text-slate-900">ปฏิทินการทำงาน</h3>
                     <p class="text-xs text-slate-500 mt-0.5">ดูใครจองรอบไหน · เชื่อมวันหยุดจากปฏิทินคลินิก</p>
                 </div>
                 <div class="flex items-center gap-2">
                     <button class="sch-btn sch-btn--ghost" onclick="calNavMonth(-1)" title="เดือนก่อน">
                         <i class="fa-solid fa-chevron-left"></i>
                     </button>
-                    <div id="cal-title" class="px-3 py-1.5 rounded-lg bg-slate-100 text-sm font-black text-slate-700 min-w-[140px] text-center"></div>
+                    <div id="cal-title" class="px-3 py-1.5 rounded-lg bg-slate-100 text-sm font-semibold text-slate-700 min-w-[140px] text-center"></div>
                     <button class="sch-btn sch-btn--ghost" onclick="calNavMonth(1)" title="เดือนถัดไป">
                         <i class="fa-solid fa-chevron-right"></i>
                     </button>
@@ -522,7 +526,7 @@ $portalCsrf = get_csrf_token();
     <div class="sch-pane hidden" data-pane="reports">
         <div class="sch-card">
             <div class="flex items-center justify-between mb-4">
-                <h3 class="text-base font-black text-slate-900">สรุปชั่วโมงทำงาน</h3>
+                <h3 class="text-base font-semibold text-slate-900">สรุปชั่วโมงทำงาน</h3>
                 <div class="flex gap-2">
                     <input type="date" id="rep-from" class="sch-input" style="width:160px" value="<?= date('Y-m-01') ?>">
                     <input type="date" id="rep-to" class="sch-input" style="width:160px" value="<?= date('Y-m-t') ?>">
@@ -608,14 +612,14 @@ $portalCsrf = get_csrf_token();
     <!-- ─── TAB: SETTINGS ─── -->
     <div class="sch-pane hidden" data-pane="settings">
         <div class="sch-card max-w-2xl">
-            <h3 class="text-base font-black text-slate-900 mb-4">ตั้งค่าระบบ</h3>
+            <h3 class="text-base font-semibold text-slate-900 mb-4">ตั้งค่าระบบ</h3>
             <div class="space-y-4">
 
                 <!-- GPS toggle (master switch) -->
                 <label class="flex items-start gap-3 cursor-pointer p-4 rounded-xl bg-emerald-50 border border-emerald-100">
                     <input type="checkbox" id="set-gps-required" <?= (int)$settings['gps_required'] ? 'checked' : '' ?> class="mt-0.5">
                     <div>
-                        <p class="text-sm font-black text-slate-800">ตรวจ GPS ตำแหน่งทำงาน</p>
+                        <p class="text-sm font-semibold text-slate-800">ตรวจ GPS ตำแหน่งทำงาน</p>
                         <p class="text-xs text-slate-500 mt-0.5">เปิด: บังคับให้ user อยู่ในรัศมีคลินิก · ปิด: เจ้าหน้าที่อนุมัติด้วยตนเอง (ไม่ขอ GPS)</p>
                     </div>
                 </label>
@@ -686,7 +690,7 @@ $portalCsrf = get_csrf_token();
 <!-- ─── MODAL: STUDENT ─── -->
 <div class="sch-modal-backdrop" id="student-modal">
     <div class="sch-modal-box">
-        <h3 class="text-lg font-black mb-4" id="student-modal-title">เพิ่มนักศึกษาทุน</h3>
+        <h3 class="text-lg font-semibold mb-4" id="student-modal-title">เพิ่มนักศึกษาทุน</h3>
         <input type="hidden" id="stu-id">
         <div class="space-y-3">
             <div>
@@ -742,24 +746,24 @@ $portalCsrf = get_csrf_token();
 <!-- ─── MODAL: MANUAL ADJUSTMENT ─── -->
 <div class="sch-modal-backdrop" id="adjust-modal">
     <div class="sch-modal-box" style="max-width:640px">
-        <h3 class="text-lg font-black mb-1">ปรับชั่วโมงด้วยมือ</h3>
+        <h3 class="text-lg font-semibold mb-1">ปรับชั่วโมงด้วยมือ</h3>
         <p class="text-xs text-slate-500 mb-4">บวก/ลบ ชั่วโมงสะสมของนักศึกษา (ไม่กระทบ clock log เดิม)</p>
         <input type="hidden" id="adj-student-id">
         <div class="bg-slate-50 rounded-xl px-4 py-3 mb-4">
             <p class="text-xs text-slate-500">นักศึกษา</p>
-            <p class="font-black text-slate-900" id="adj-student-name">-</p>
-            <p class="text-xs text-slate-500 mt-1">ชั่วโมงสะสมปัจจุบัน: <span class="font-black text-emerald-600" id="adj-current-hours">0</span> ชั่วโมง</p>
+            <p class="font-semibold text-slate-900" id="adj-student-name">-</p>
+            <p class="text-xs text-slate-500 mt-1">ชั่วโมงสะสมปัจจุบัน: <span class="font-semibold text-emerald-600" id="adj-current-hours">0</span> ชั่วโมง</p>
         </div>
 
         <div class="space-y-3">
             <div>
                 <label class="sch-label">ประเภท</label>
                 <div class="grid grid-cols-2 gap-2">
-                    <label class="cursor-pointer rounded-xl border-2 border-emerald-200 bg-emerald-50 p-2.5 text-center text-sm font-black text-emerald-700" id="adj-ct-hours-lbl">
+                    <label class="cursor-pointer rounded-xl border-2 border-emerald-200 bg-emerald-50 p-2.5 text-center text-sm font-semibold text-emerald-700" id="adj-ct-hours-lbl">
                         <input type="radio" name="adj-ct" value="hours" checked class="hidden">
                         <i class="fa-solid fa-graduation-cap mr-1"></i>ส่งชั่วโมงทุน
                     </label>
-                    <label class="cursor-pointer rounded-xl border-2 border-amber-200 bg-amber-50 p-2.5 text-center text-sm font-black text-amber-700" id="adj-ct-paid-lbl">
+                    <label class="cursor-pointer rounded-xl border-2 border-amber-200 bg-amber-50 p-2.5 text-center text-sm font-semibold text-amber-700" id="adj-ct-paid-lbl">
                         <input type="radio" name="adj-ct" value="paid" class="hidden">
                         <i class="fa-solid fa-coins mr-1"></i>ค่าตอบแทน
                     </label>
@@ -788,7 +792,7 @@ $portalCsrf = get_csrf_token();
         </div>
 
         <hr class="my-5 border-slate-100">
-        <h4 class="text-sm font-black text-slate-700 mb-3">ประวัติการปรับ</h4>
+        <h4 class="text-sm font-semibold text-slate-700 mb-3">ประวัติการปรับ</h4>
         <div id="adj-history-wrap" class="max-h-64 overflow-y-auto"></div>
     </div>
 </div>
@@ -796,7 +800,7 @@ $portalCsrf = get_csrf_token();
 <!-- ─── MODAL: SHIFT ─── -->
 <div class="sch-modal-backdrop" id="shift-modal">
     <div class="sch-modal-box">
-        <h3 class="text-lg font-black mb-4" id="shift-modal-title">เพิ่มกะ</h3>
+        <h3 class="text-lg font-semibold mb-4" id="shift-modal-title">เพิ่มกะ</h3>
         <input type="hidden" id="shift-id">
         <div class="space-y-3">
             <div>
@@ -806,11 +810,11 @@ $portalCsrf = get_csrf_token();
             <div>
                 <label class="sch-label">ประเภทเวลา</label>
                 <div class="grid grid-cols-2 gap-2">
-                    <label class="cursor-pointer rounded-xl border-2 border-emerald-200 bg-emerald-50 p-2.5 text-center text-sm font-black text-emerald-700" id="shift-ct-hours-lbl">
+                    <label class="cursor-pointer rounded-xl border-2 border-emerald-200 bg-emerald-50 p-2.5 text-center text-sm font-semibold text-emerald-700" id="shift-ct-hours-lbl">
                         <input type="radio" name="shift-ct" value="hours" checked class="hidden">
                         <i class="fa-solid fa-graduation-cap mr-1"></i>ส่งชั่วโมงทุน
                     </label>
-                    <label class="cursor-pointer rounded-xl border-2 border-amber-200 bg-amber-50 p-2.5 text-center text-sm font-black text-amber-700" id="shift-ct-paid-lbl">
+                    <label class="cursor-pointer rounded-xl border-2 border-amber-200 bg-amber-50 p-2.5 text-center text-sm font-semibold text-amber-700" id="shift-ct-paid-lbl">
                         <input type="radio" name="shift-ct" value="paid" class="hidden">
                         <i class="fa-solid fa-coins mr-1"></i>ค่าตอบแทน
                     </label>
@@ -846,7 +850,7 @@ $portalCsrf = get_csrf_token();
 <!-- ── MODAL: Open Slot Rounds (bulk create) ── -->
 <div class="sch-modal-backdrop" id="slot-create-modal">
     <div class="sch-modal-box" style="max-width:640px">
-        <h3 class="text-lg font-black mb-1">เปิดรอบงานใหม่</h3>
+        <h3 class="text-lg font-semibold mb-1">เปิดรอบงานใหม่</h3>
         <p class="text-xs text-slate-500 mb-4">เลือกช่วงวันที่ + กำหนดเวลา · ระบบจะสร้างรอบให้ทุกวันที่เลือกในช่วง</p>
 
         <div class="space-y-4">
@@ -876,7 +880,7 @@ $portalCsrf = get_csrf_token();
                     <?php $days = ['อา','จ','อ','พ','พฤ','ศ','ส']; foreach ($days as $i => $d): ?>
                     <label class="cursor-pointer">
                         <input type="checkbox" class="slot-dow hidden peer" value="<?= $i ?>" checked>
-                        <span class="inline-flex items-center justify-center w-10 h-10 rounded-xl border-2 border-slate-200 bg-white text-sm font-black text-slate-500 peer-checked:bg-emerald-500 peer-checked:text-white peer-checked:border-emerald-500 transition-all"><?= $d ?></span>
+                        <span class="inline-flex items-center justify-center w-10 h-10 rounded-xl border-2 border-slate-200 bg-white text-sm font-semibold text-slate-500 peer-checked:bg-emerald-500 peer-checked:text-white peer-checked:border-emerald-500 transition-all"><?= $d ?></span>
                     </label>
                     <?php endforeach; ?>
                 </div>
@@ -918,7 +922,7 @@ $portalCsrf = get_csrf_token();
 <!-- ── MODAL: Edit Slot ── -->
 <div class="sch-modal-backdrop" id="slot-edit-modal">
     <div class="sch-modal-box">
-        <h3 class="text-lg font-black mb-4">แก้ไขรอบงาน</h3>
+        <h3 class="text-lg font-semibold mb-4">แก้ไขรอบงาน</h3>
         <input type="hidden" id="slot-edit-id">
         <div class="space-y-3">
             <div>
@@ -965,7 +969,7 @@ $portalCsrf = get_csrf_token();
 <div class="sch-modal-backdrop" id="cal-day-modal">
     <div class="sch-modal-box" style="max-width:560px">
         <div class="flex items-start justify-between gap-3 mb-1">
-            <h3 class="text-lg font-black" id="cal-day-title">รายละเอียดวัน</h3>
+            <h3 class="text-lg font-semibold" id="cal-day-title">รายละเอียดวัน</h3>
             <button id="cal-day-add-btn" class="sch-btn" style="padding:.4rem .8rem;font-size:12px;display:none"
                 onclick="addSlotFromDayModal()">
                 <i class="fa-solid fa-plus"></i>เพิ่มรอบในวันนี้
@@ -985,7 +989,7 @@ $portalCsrf = get_csrf_token();
 <!-- ── MODAL: View Slot Bookings ── -->
 <div class="sch-modal-backdrop" id="slot-bookings-modal">
     <div class="sch-modal-box" style="max-width:560px">
-        <h3 class="text-lg font-black mb-1">รายชื่อผู้จองรอบนี้</h3>
+        <h3 class="text-lg font-semibold mb-1">รายชื่อผู้จองรอบนี้</h3>
         <p class="text-xs text-slate-500 mb-4" id="slot-bookings-subtitle"></p>
         <div id="slot-bookings-wrap" class="space-y-2 max-h-96 overflow-y-auto">
             <p class="text-center text-sm text-slate-400 py-6"><i class="fa-solid fa-spinner fa-spin mr-2"></i>กำลังโหลด…</p>
@@ -1244,11 +1248,11 @@ $portalCsrf = get_csrf_token();
                 <div class="flex items-center gap-3 p-2 rounded-xl hover:bg-slate-50">
                     <span class="sch-rank-pill" style="background:${medals[i] || '#64748b'}">${i + 1}</span>
                     <div class="flex-1 min-w-0">
-                        <p class="font-black text-sm text-slate-900 truncate">${escHtml(r.full_name)}</p>
+                        <p class="font-semibold text-sm text-slate-900 truncate">${escHtml(r.full_name)}</p>
                         <p class="text-xs text-slate-500 truncate">${escHtml(r.student_code || '-')} · ${escHtml(r.faculty || '-')}</p>
                     </div>
                     <div class="text-right shrink-0">
-                        <p class="font-black text-sm">${parseFloat(r.total).toFixed(1)} <span class="text-xs text-slate-400 font-normal">ชม.</span></p>
+                        <p class="font-semibold text-sm">${parseFloat(r.total).toFixed(1)} <span class="text-xs text-slate-400 font-normal">ชม.</span></p>
                         <p class="text-[10px] text-slate-500">
                             <span class="text-emerald-600">🎓 ${parseFloat(r.hours_scholarship).toFixed(0)}</span> ·
                             <span class="text-amber-600">🪙 ${parseFloat(r.hours_paid).toFixed(0)}</span>
@@ -1272,7 +1276,7 @@ $portalCsrf = get_csrf_token();
                     ? '<i class="fa-solid fa-coins text-amber-500 text-[10px]" title="ค่าตอบแทน"></i>'
                     : '<i class="fa-solid fa-graduation-cap text-emerald-500 text-[10px]" title="ทุน"></i>';
                 return `<div class="flex items-center gap-3 p-2 rounded-xl bg-slate-50">
-                    <div class="text-xs font-mono font-black text-slate-700 shrink-0" style="min-width:75px">
+                    <div class="text-xs font-mono font-semibold text-slate-700 shrink-0" style="min-width:75px">
                         ${sh.start_time.substr(0,5)}–${sh.end_time.substr(0,5)}
                     </div>
                     <div class="flex-1 min-w-0">
@@ -1329,13 +1333,13 @@ $portalCsrf = get_csrf_token();
             const isIn = r.action === 'clock_in';
             const distHtml = r.distance_m === null
                 ? '<span class="text-slate-400">-</span>'
-                : `${Math.round(r.distance_m)} ม.${!r.within_radius ? ' <span class="text-amber-600 font-black">⚠</span>' : ''}`;
+                : `${Math.round(r.distance_m)} ม.${!r.within_radius ? ' <span class="text-amber-600 font-semibold">⚠</span>' : ''}`;
             const ct = (r.comp_type || 'hours') === 'paid'
                 ? '<span class="sch-status-badge bg-amber-50 text-amber-700"><i class="fa-solid fa-coins mr-1"></i>ค่าตอบแทน</span>'
                 : '<span class="sch-status-badge bg-emerald-50 text-emerald-700"><i class="fa-solid fa-graduation-cap mr-1"></i>ทุน</span>';
             html += `<tr>
                 <td>
-                    <p class="font-black text-slate-900">${escHtml(r.student_name)}</p>
+                    <p class="font-semibold text-slate-900">${escHtml(r.student_name)}</p>
                     <p class="text-xs text-slate-500">${escHtml(r.student_code || '-')} · ${escHtml(r.faculty || '-')}</p>
                 </td>
                 <td>
@@ -1408,7 +1412,7 @@ $portalCsrf = get_csrf_token();
                 ? `${r.hours_total.toFixed(1)} / ${r.max_hours}`
                 : `${r.hours_total.toFixed(1)}`;
             html += `<tr>
-                <td><p class="font-black">${escHtml(r.full_name)}</p></td>
+                <td><p class="font-semibold">${escHtml(r.full_name)}</p></td>
                 <td class="font-mono text-xs">${escHtml(r.student_code || '-')}</td>
                 <td class="text-xs">${escHtml(r.faculty || '-')}</td>
                 <td class="text-xs">${escHtml(r.semester || '-')}</td>
@@ -1683,7 +1687,7 @@ $portalCsrf = get_csrf_token();
             const ctLabel = r.comp_type === 'paid' ? 'ค่าตอบแทน' : 'ทุน';
             const ctColor = r.comp_type === 'paid' ? 'text-amber-600' : 'text-emerald-600';
             html += `<div class="flex items-center gap-2 p-2 rounded-lg bg-slate-50 text-xs">
-                <span class="font-black ${isPos ? 'text-emerald-600' : 'text-rose-600'}" style="min-width:60px">
+                <span class="font-semibold ${isPos ? 'text-emerald-600' : 'text-rose-600'}" style="min-width:60px">
                     ${isPos ? '+' : ''}${delta.toFixed(2)} ชม.
                 </span>
                 <span class="${ctColor} font-bold" style="min-width:75px">[${ctLabel}]</span>
@@ -1769,13 +1773,13 @@ $portalCsrf = get_csrf_token();
             const pct = r.max_hours > 0 ? Math.round((r.hours_scholarship / r.max_hours) * 100) : null;
             const pay = parseFloat(r.hours_paid) * rate;
             html += `<tr>
-                <td><p class="font-black">${escHtml(r.full_name)}</p><p class="text-xs text-slate-500">${escHtml(r.student_code || '-')}</p></td>
+                <td><p class="font-semibold">${escHtml(r.full_name)}</p><p class="text-xs text-slate-500">${escHtml(r.student_code || '-')}</p></td>
                 <td class="text-xs">${escHtml(r.faculty || '-')}</td>
                 <td>${r.checkins}</td>
                 <td class="font-bold text-emerald-700">${parseFloat(r.hours_scholarship).toFixed(2)}</td>
                 <td class="font-bold text-amber-700">${parseFloat(r.hours_paid).toFixed(2)}</td>
                 ${rate > 0 ? `<td class="font-bold text-amber-700">${pay.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>` : ''}
-                <td class="font-black">${parseFloat(r.hours).toFixed(2)}</td>
+                <td class="font-semibold">${parseFloat(r.hours).toFixed(2)}</td>
                 <td class="text-xs">${r.max_hours > 0 ? r.max_hours : '-'}</td>
                 <td>${pct === null ? '-' : `<span class="font-bold ${pct >= 100 ? 'text-emerald-600' : pct >= 50 ? 'text-amber-600' : 'text-slate-500'}">${pct}%</span>`}</td>
             </tr>`;
@@ -1783,11 +1787,11 @@ $portalCsrf = get_csrf_token();
         const totalAll = totalScholar + totalPaid;
         const totalPay = totalPaid * rate;
         html += `</tbody><tfoot><tr style="border-top:2px solid #e2e8f0">
-            <td colspan="3" class="text-right font-black p-3">รวมทั้งหมด</td>
-            <td class="font-black p-3 text-emerald-700">${totalScholar.toFixed(2)}</td>
-            <td class="font-black p-3 text-amber-700">${totalPaid.toFixed(2)}</td>
-            ${rate > 0 ? `<td class="font-black p-3 text-amber-700">${totalPay.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>` : ''}
-            <td class="font-black p-3">${totalAll.toFixed(2)} ชม.</td>
+            <td colspan="3" class="text-right font-semibold p-3">รวมทั้งหมด</td>
+            <td class="font-semibold p-3 text-emerald-700">${totalScholar.toFixed(2)}</td>
+            <td class="font-semibold p-3 text-amber-700">${totalPaid.toFixed(2)}</td>
+            ${rate > 0 ? `<td class="font-semibold p-3 text-amber-700">${totalPay.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>` : ''}
+            <td class="font-semibold p-3">${totalAll.toFixed(2)} ชม.</td>
             <td colspan="2"></td>
         </tr></tfoot></table>`;
         if (rate > 0) {
@@ -1926,15 +1930,15 @@ $portalCsrf = get_csrf_token();
             const capCls = r.booked_count >= r.max_capacity ? 'bg-rose-100 text-rose-700'
                           : pct >= 80 ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700';
             const statusBadge = r.status === 'open'
-                ? '<span class="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-700 text-[11px] font-black">เปิดรับ</span>'
+                ? '<span class="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-700 text-[11px] font-semibold">เปิดรับ</span>'
                 : r.status === 'closed'
-                  ? '<span class="px-2 py-0.5 rounded-md bg-slate-200 text-slate-600 text-[11px] font-black">ปิดรับ</span>'
-                  : '<span class="px-2 py-0.5 rounded-md bg-rose-100 text-rose-700 text-[11px] font-black">ยกเลิก</span>';
+                  ? '<span class="px-2 py-0.5 rounded-md bg-slate-200 text-slate-600 text-[11px] font-semibold">ปิดรับ</span>'
+                  : '<span class="px-2 py-0.5 rounded-md bg-rose-100 text-rose-700 text-[11px] font-semibold">ยกเลิก</span>';
             html += `<tr>
                 <td>${fmtSlotDate(r.slot_date)}</td>
                 <td class="font-mono text-xs">${fmtSlotTime(r.start_time)}–${fmtSlotTime(r.end_time)}</td>
                 <td>
-                    <button class="px-2.5 py-1 rounded-lg ${capCls} text-[12px] font-black hover:opacity-80" onclick="viewSlotBookings(${r.id})">
+                    <button class="px-2.5 py-1 rounded-lg ${capCls} text-[12px] font-semibold hover:opacity-80" onclick="viewSlotBookings(${r.id})">
                         ${r.booked_count}/${r.max_capacity}
                     </button>
                 </td>
@@ -2122,12 +2126,12 @@ $portalCsrf = get_csrf_token();
             const dt = new Date(ts.replace(' ', 'T'));
             const ds = `${dt.getDate().toString().padStart(2,'0')}/${(dt.getMonth()+1).toString().padStart(2,'0')}/${dt.getFullYear()+543} ${dt.getHours().toString().padStart(2,'0')}:${dt.getMinutes().toString().padStart(2,'0')}`;
             const badge = b.status === 'booked'
-                ? '<span class="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-700 text-[10px] font-black">จองแล้ว</span>'
-                : `<span class="px-2 py-0.5 rounded-md bg-slate-200 text-slate-600 text-[10px] font-black">ยกเลิก</span>`;
+                ? '<span class="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-700 text-[10px] font-semibold">จองแล้ว</span>'
+                : `<span class="px-2 py-0.5 rounded-md bg-slate-200 text-slate-600 text-[10px] font-semibold">ยกเลิก</span>`;
             const reason = b.cancel_reason ? `<p class="text-[11px] text-slate-500 mt-0.5">เหตุผล: ${escTxt(b.cancel_reason)}</p>` : '';
             return `<div class="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-100">
                 <div class="flex-1 min-w-0">
-                    <p class="text-sm font-black text-slate-900 truncate">${escTxt(b.student_name)}</p>
+                    <p class="text-sm font-semibold text-slate-900 truncate">${escTxt(b.student_name)}</p>
                     <p class="text-[11px] text-slate-500">รหัส: ${escTxt(b.student_code) || '—'} · ${ds}</p>
                     ${reason}
                 </div>
@@ -2311,7 +2315,7 @@ $portalCsrf = get_csrf_token();
                     : '<div class="flex flex-wrap gap-1.5 mt-2">' + s.bookings.map(b => {
                         const cls = b.attended ? 'bg-blue-100 text-blue-700' : 'bg-emerald-50 text-emerald-700';
                         const icon = b.attended ? '<i class="fa-solid fa-check mr-1 text-[9px]"></i>' : '';
-                        return `<span class="px-2 py-0.5 rounded-md ${cls} text-[11px] font-black" title="${b.attended ? 'เช็คอินแล้ว' : 'ยังไม่เช็คอิน'}">${icon}${escTxt(b.name)}${b.code ? ` <span class="font-normal opacity-70">· ${escTxt(b.code)}</span>` : ''}</span>`;
+                        return `<span class="px-2 py-0.5 rounded-md ${cls} text-[11px] font-semibold" title="${b.attended ? 'เช็คอินแล้ว' : 'ยังไม่เช็คอิน'}">${icon}${escTxt(b.name)}${b.code ? ` <span class="font-normal opacity-70">· ${escTxt(b.code)}</span>` : ''}</span>`;
                       }).join('') + '</div>';
                 const notes = s.notes ? `<p class="text-[11px] text-slate-500 mt-1">${escTxt(s.notes)}</p>` : '';
                 // ใช้ JSON.stringify เพื่อ pass slot data ไปที่ปุ่ม edit (ต้อง escape quotes)
@@ -2327,7 +2331,7 @@ $portalCsrf = get_csrf_token();
                 }).replace(/'/g, '&#39;');
                 return `<div class="p-3 rounded-xl bg-slate-50 border border-slate-100">
                     <div class="flex items-center justify-between gap-2">
-                        <div class="text-sm font-black text-slate-900">${s.start}–${s.end}</div>
+                        <div class="text-sm font-semibold text-slate-900">${s.start}–${s.end}</div>
                         <div class="flex items-center gap-1.5 flex-wrap">
                             <span class="cal-mini-badge ${capCls}">${s.bookings.length}/${s.max}</span>
                             ${attendedTxt}
