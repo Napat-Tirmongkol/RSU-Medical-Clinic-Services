@@ -131,9 +131,9 @@ try {
 
             $st = $pdo->prepare("INSERT INTO sys_accident_daily
                 (entry_date, accident_count, note, created_by, updated_by)
-                VALUES (:d, :c, :n, :u, :u)
+                VALUES (:d, :c, :n, :cu, :uu)
                 ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id)");
-            $st->execute([':d' => $date, ':c' => $count, ':n' => $note, ':u' => $_who]);
+            $st->execute([':d' => $date, ':c' => $count, ':n' => $note, ':cu' => $_who, ':uu' => $_who]);
             $id = (int)$pdo->lastInsertId();
 
             // If row already existed (LAST_INSERT_ID returns existing id), don't overwrite

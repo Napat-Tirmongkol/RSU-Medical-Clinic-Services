@@ -94,7 +94,7 @@ try {
 
     $checkStmt = $pdo->prepare("SELECT id FROM sys_accident_daily WHERE entry_date = :d");
     $insStmt   = $pdo->prepare("INSERT INTO sys_accident_daily
-        (entry_date, accident_count, created_by, updated_by) VALUES (:d, :c, :u, :u)");
+        (entry_date, accident_count, created_by, updated_by) VALUES (:d, :c, :cu, :uu)");
     $updStmt   = $pdo->prepare("UPDATE sys_accident_daily
         SET accident_count = :c, updated_by = :u WHERE id = :id");
 
@@ -131,7 +131,7 @@ try {
             $updStmt->execute([':c' => $count, ':u' => $_who, ':id' => $existId]);
             $updated++;
         } else {
-            $insStmt->execute([':d' => $date, ':c' => $count, ':u' => $_who]);
+            $insStmt->execute([':d' => $date, ':c' => $count, ':cu' => $_who, ':uu' => $_who]);
             $inserted++;
         }
     }
