@@ -311,6 +311,33 @@ if (!function_exists('dashboard_data_sources_catalog')) {
                 'shape'   => 'breakdown',
                 'widgets' => ['bar', 'line'],
             ],
+
+            // ── Productivity พยาบาล — ยอดผู้ป่วย ─────────────────────────
+            'nurse_patients_total' => [
+                'label'   => 'Productivity พยาบาล — ยอดผู้ป่วยรวม (ทุกหน่วยงาน)',
+                'shape'   => 'count',
+                'widgets' => ['kpi'],
+            ],
+            'nurse_patients_avg_daily' => [
+                'label'   => 'Productivity พยาบาล — เฉลี่ยผู้ป่วย/วันที่บันทึก',
+                'shape'   => 'count',
+                'widgets' => ['kpi'],
+            ],
+            'nurse_patients_peak_daily' => [
+                'label'   => 'Productivity พยาบาล — ผู้ป่วยสูงสุดใน 1 วัน',
+                'shape'   => 'count',
+                'widgets' => ['kpi'],
+            ],
+            'nurse_patients_trend_12m' => [
+                'label'   => 'Productivity พยาบาล — Trend ยอดผู้ป่วย 12 เดือนล่าสุด',
+                'shape'   => 'timeseries',
+                'widgets' => ['line', 'area', 'bar'],
+            ],
+            'nurse_patients_by_dept' => [
+                'label'   => 'Productivity พยาบาล — แยกตามหน่วยงาน',
+                'shape'   => 'breakdown',
+                'widgets' => ['bar', 'donut', 'pie'],
+            ],
         ];
     }
 
@@ -824,6 +851,68 @@ if (!function_exists('dashboard_data_sources_catalog')) {
                 foreach ($rows as $r) {
                     $labels[] = 'พ.ศ. ' . (int)$r['year_be'];
                     $values[] = (int)$r['avg_count'];
+                }
+                return ['shape' => 'breakdown', 'labels' => $labels, 'values' => $values];
+            }
+
+            /* ───── Productivity พยาบาล — ยอดผู้ป่วย ───── */
+            case 'nurse_patients_total': {
+                $sql = "SELECT COALESCE(SUM(patients),0) FROM sys_nurse_productivity_daily WHERE 1=1"
+                     . $dateClause('entry_date');
+                $auto = (int)_safe_scalar($pdo, $sql);
+                $val  = $hasFilter ? $auto : kpi_with_override($pdo, $key, $auto);
+                return ['shape' => 'count', 'value' => $val, 'auto' => $auto];
+            }
+
+            case 'nurse_patients_avg_daily': {
+                $sql = "SELECT COALESCE(ROUND(AVG(patients),1),0) FROM sys_nurse_productivity_daily WHERE 1=1"
+                     . $dateClause('entry_date');
+                $auto = (float)_safe_scalar($pdo, $sql);
+                $val  = $hasFilter ? $auto : (float)kpi_with_override($pdo, $key, $auto);
+                return ['shape' => 'count', 'value' => $val, 'auto' => $auto];
+            }
+
+            case 'nurse_patients_peak_daily': {
+                $sql = "SELECT COALESCE(MAX(patients),0) FROM sys_nurse_productivity_daily WHERE 1=1"
+                     . $dateClause('entry_date');
+                $auto = (int)_safe_scalar($pdo, $sql);
+                $val  = $hasFilter ? $auto : kpi_with_override($pdo, $key, $auto);
+                return ['shape' => 'count', 'value' => $val, 'auto' => $auto];
+            }
+
+            case 'nurse_patients_trend_12m': {
+                $rows = _safe_rows($pdo,
+                    "SELECT DATE_FORMAT(entry_date,'%Y-%m') AS ym, SUM(patients) AS total
+                     FROM sys_nurse_productivity_daily
+                     WHERE entry_date >= DATE_SUB(DATE_FORMAT(CURDATE(),'%Y-%m-01'), INTERVAL 11 MONTH)
+                     GROUP BY ym ORDER BY ym ASC");
+                $thaiMo = ['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+                $labels = []; $data = [];
+                foreach ($rows as $r) {
+                    [$y, $m] = explode('-', $r['ym']);
+                    $labels[] = $thaiMo[(int)$m] . ' ' . substr((string)((int)$y + 543), -2);
+                    $data[] = (int)$r['total'];
+                }
+                return ['shape' => 'timeseries', 'labels' => $labels,
+                        'series' => [['name' => 'ผู้ป่วย', 'data' => $data]]];
+            }
+
+            case 'nurse_patients_by_dept': {
+                // กรองด้วย date filter ถ้ามี — รวมยอดผู้ป่วยต่อ dept
+                $where = "1=1" . $dateClause('d.entry_date');
+                $rows = _safe_rows($pdo,
+                    "SELECT COALESCE(dept.name,'ไม่ระบุ') AS dept_name,
+                            SUM(d.patients) AS total
+                     FROM sys_nurse_productivity_daily d
+                     LEFT JOIN sys_departments dept ON dept.id = d.dept_id
+                     WHERE $where
+                     GROUP BY d.dept_id, dept_name
+                     ORDER BY total DESC
+                     LIMIT 20");
+                $labels = []; $values = [];
+                foreach ($rows as $r) {
+                    $labels[] = (string)$r['dept_name'];
+                    $values[] = (int)$r['total'];
                 }
                 return ['shape' => 'breakdown', 'labels' => $labels, 'values' => $values];
             }
