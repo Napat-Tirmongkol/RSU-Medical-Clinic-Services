@@ -49,7 +49,7 @@ if (!$selectedUser) {
             WHERE (first_name != '' OR full_name != '')
               AND (status IS NULL OR status != 'inactive')
             ORDER BY updated_at DESC, id DESC
-            LIMIT 50
+            LIMIT 200
         ")->fetchAll(PDO::FETCH_ASSOC) ?: [];
     } catch (PDOException) { $pickerUsers = []; }
 }
@@ -654,6 +654,108 @@ if ($selectedUser) {
     .step-dot.is-active .lbl { display:inline; }
   }
 
+  /* === Admin user picker (searchable combobox) === */
+  .picker-wrap {
+    background:#fff; border:1.5px solid #e2e8f0; border-radius:16px;
+    padding:14px 16px; margin-bottom:14px;
+    display:flex; gap:14px; align-items:center; flex-wrap:wrap;
+    box-shadow: 0 4px 12px rgba(15,23,42,.04);
+  }
+  .picker-info { display:flex; gap:12px; align-items:center; flex: 1 1 220px; min-width:0; }
+  .picker-ic {
+    width:38px; height:38px; border-radius:12px;
+    background:#f0fdf4; color:#15803d;
+    display:flex; align-items:center; justify-content:center;
+    font-size:15px; flex-shrink:0;
+    border:1.5px solid #bbf7d0;
+  }
+  .picker-text { min-width:0; }
+  .picker-text strong { font-size:13.5px; color:#0f172a; display:block; line-height:1.3; }
+  .picker-sub { font-size:11.5px; color:#64748b; margin-top:2px; line-height:1.4; }
+  .picker-search {
+    position:relative; flex: 1 1 300px; min-width:0;
+  }
+  .picker-search-ic {
+    position:absolute; left:14px; top:50%; transform:translateY(-50%);
+    color:#94a3b8; font-size:13px; pointer-events:none;
+  }
+  #userQuery {
+    width:100%;
+    padding: 11px 38px 11px 38px;
+    border:1.5px solid #e2e8f0;
+    border-radius:12px;
+    font-size:13.5px;
+    font-family: inherit;
+    background:#f8fafc;
+    color:#0f172a;
+    transition: all .15s ease;
+  }
+  #userQuery:focus {
+    outline:none;
+    background:#fff;
+    border-color:#2e9e63;
+    box-shadow: 0 0 0 4px rgba(46,158,99,.12);
+  }
+  .picker-clear {
+    position:absolute; right:8px; top:50%; transform:translateY(-50%);
+    width:26px; height:26px; border-radius:8px;
+    background:#e2e8f0; color:#475569;
+    border:none; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+    font-size:11px;
+  }
+  .picker-clear:hover { background:#cbd5e1; }
+  .picker-dropdown {
+    position:absolute; top:calc(100% + 6px); left:0; right:0;
+    background:#fff;
+    border:1.5px solid #e2e8f0;
+    border-radius:12px;
+    box-shadow: 0 12px 32px rgba(15,23,42,.12);
+    max-height: 320px;
+    overflow-y:auto;
+    z-index: 40;
+    display:none;
+  }
+  .picker-dropdown.is-open { display:block; animation: pickerDrop .18s ease; }
+  @keyframes pickerDrop {
+    from { opacity:0; transform: translateY(-4px); }
+    to   { opacity:1; transform: translateY(0); }
+  }
+  .picker-item {
+    padding: 10px 14px;
+    cursor: pointer;
+    border-bottom: 1px solid #f1f5f9;
+    transition: background .12s ease;
+  }
+  .picker-item:last-child { border-bottom:none; }
+  .picker-item:hover,
+  .picker-item.is-active {
+    background: linear-gradient(135deg,#f0fdf4,#dcfce7);
+  }
+  .picker-item .pi-name {
+    font-size:13.5px; font-weight:700; color:#0f172a; line-height:1.3;
+  }
+  .picker-item .pi-meta {
+    font-size:11.5px; color:#64748b; margin-top:2px;
+    display:flex; gap:8px; flex-wrap:wrap;
+  }
+  .picker-item .pi-meta span {
+    background:#f1f5f9; padding:1px 7px; border-radius:5px;
+    font-weight:600;
+  }
+  .picker-item mark {
+    background:#fef3c7; color:#78350f; padding:0 2px; border-radius:3px;
+    font-weight:800;
+  }
+  .picker-empty {
+    padding:18px; text-align:center; font-size:12.5px; color:#94a3b8;
+  }
+  .picker-empty i { display:block; font-size:24px; margin-bottom:6px; color:#cbd5e1; }
+  @media (max-width: 560px) {
+    .picker-info { flex: 1 1 100%; }
+    .picker-search { flex: 1 1 100%; }
+  }
+
   /* === A11y: respect reduced motion === */
   @media (prefers-reduced-motion: reduce) {
     *,*::before,*::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
@@ -713,28 +815,40 @@ if ($selectedUser) {
       </a>
     </div>
   <?php elseif ($view === 'patient'): ?>
-    <div style="background:#fff; border:1.5px solid #e2e8f0; border-radius:14px;
-                padding:12px 14px; margin-bottom:14px;
-                display:flex; gap:12px; align-items:center; font-size:12.5px;">
-      <i class="fa-solid fa-magnifying-glass" style="font-size:14px; color:#64748b;"></i>
-      <div style="flex:1; color:#475569;">
-        <strong style="color:#0f172a;">เลือก user เพื่อ preview as</strong>
-        — production คนไข้จะ auto-fill จาก profile ตัวเอง · ตอนนี้เป็น mock data
+    <div class="picker-wrap">
+      <div class="picker-info">
+        <div class="picker-ic"><i class="fa-solid fa-magnifying-glass"></i></div>
+        <div class="picker-text">
+          <strong>เลือก user เพื่อ preview as</strong>
+          <div class="picker-sub">production คนไข้จะ auto-fill จาก profile ตัวเอง · ตอนนี้เป็น mock data</div>
+        </div>
       </div>
-      <select id="userPicker" onchange="if(this.value)location.href='?view=<?= $view ?>&user_id='+this.value"
-              style="font-family:inherit; font-size:12px; padding:7px 10px; border-radius:8px;
-                     border:1.5px solid #cbd5e1; background:#fff; color:#0f172a; min-width:220px;">
-        <option value="">— เลือก user จาก sys_users —</option>
-        <?php foreach ($pickerUsers as $u):
-          $disp = trim($u['full_name'] ?: trim(($u['prefix'] ?? '') . ' ' . ($u['first_name'] ?? '') . ' ' . ($u['last_name'] ?? '')));
-          if ($disp === '') continue;
-          $tag = $u['student_personnel_id'] ? ' · ' . $u['student_personnel_id'] : '';
-          if (!empty($u['department'])) $tag .= ' · ' . $u['department'];
-        ?>
-          <option value="<?= (int)$u['id'] ?>"><?= htmlspecialchars($disp . $tag) ?></option>
-        <?php endforeach; ?>
-      </select>
+      <div class="picker-search">
+        <i class="fa-solid fa-magnifying-glass picker-search-ic"></i>
+        <input type="text" id="userQuery"
+               placeholder="พิมพ์ชื่อ / รหัสนักศึกษา / แผนก เพื่อค้นหา..."
+               autocomplete="off" spellcheck="false">
+        <button type="button" id="userClear" class="picker-clear" aria-label="ล้าง" style="display:none;">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+        <div class="picker-dropdown" id="userDropdown" role="listbox"></div>
+      </div>
     </div>
+    <?php
+      // Build JSON for client-side search
+      $pickerJson = [];
+      foreach ($pickerUsers as $u) {
+        $disp = trim($u['full_name'] ?: trim(($u['prefix'] ?? '') . ' ' . ($u['first_name'] ?? '') . ' ' . ($u['last_name'] ?? '')));
+        if ($disp === '') continue;
+        $pickerJson[] = [
+          'id'   => (int)$u['id'],
+          'name' => $disp,
+          'sid'  => $u['student_personnel_id'] ?: '',
+          'dept' => $u['department'] ?: '',
+        ];
+      }
+    ?>
+    <script id="userPickerData" type="application/json"><?= json_encode($pickerJson, JSON_UNESCAPED_UNICODE) ?></script>
   <?php endif; ?>
 
   <!-- STEPPER -->
@@ -1372,7 +1486,115 @@ function renderSummary() {
 }
 
 /* ===== Init ===== */
+/* ===== User picker (searchable combobox) ===== */
+function initUserPicker() {
+  const dataEl = document.getElementById('userPickerData');
+  if (!dataEl) return; // picker not rendered on this view
+  let users = [];
+  try { users = JSON.parse(dataEl.textContent || '[]'); } catch { users = []; }
+  const input    = document.getElementById('userQuery');
+  const dropdown = document.getElementById('userDropdown');
+  const clearBtn = document.getElementById('userClear');
+  if (!input || !dropdown) return;
+  let activeIdx = -1;
+  let lastResults = users.slice(0, 50);
+
+  const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const highlight = (text, q) => {
+    if (!q) return text;
+    const re = new RegExp('(' + escapeRe(q) + ')', 'gi');
+    return text.replace(re, '<mark>$1</mark>');
+  };
+
+  function render(items, q) {
+    activeIdx = -1;
+    if (items.length === 0) {
+      dropdown.innerHTML = `
+        <div class="picker-empty">
+          <i class="fa-solid fa-user-slash"></i>
+          ไม่พบ user ที่ตรงกับ "${q.replace(/[<>&]/g, '')}"
+        </div>`;
+      return;
+    }
+    dropdown.innerHTML = items.map((u, i) => `
+      <div class="picker-item" data-uid="${u.id}" data-idx="${i}" role="option">
+        <div class="pi-name">${highlight(u.name, q)}</div>
+        <div class="pi-meta">
+          ${u.sid  ? `<span><i class="fa-solid fa-id-badge"></i> ${highlight(u.sid, q)}</span>` : ''}
+          ${u.dept ? `<span><i class="fa-solid fa-building"></i> ${highlight(u.dept, q)}</span>` : ''}
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function filter(q) {
+    q = q.trim().toLowerCase();
+    if (!q) return users.slice(0, 50);
+    const tokens = q.split(/\s+/).filter(Boolean);
+    return users.filter(u => {
+      const hay = (u.name + ' ' + u.sid + ' ' + u.dept).toLowerCase();
+      return tokens.every(t => hay.includes(t));
+    }).slice(0, 50);
+  }
+
+  function open() {
+    dropdown.classList.add('is-open');
+    lastResults = filter(input.value);
+    render(lastResults, input.value.trim());
+  }
+  function close() {
+    dropdown.classList.remove('is-open');
+  }
+  function setActive(i) {
+    const items = dropdown.querySelectorAll('.picker-item');
+    if (items.length === 0) return;
+    activeIdx = ((i % items.length) + items.length) % items.length;
+    items.forEach((el, idx) => el.classList.toggle('is-active', idx === activeIdx));
+    items[activeIdx].scrollIntoView({ block: 'nearest' });
+  }
+  function selectByUid(uid) {
+    if (!uid) return;
+    const url = new URL(location.href);
+    url.searchParams.set('user_id', uid);
+    url.searchParams.set('view', <?= json_encode($view) ?>);
+    location.href = url.toString();
+  }
+
+  input.addEventListener('focus', open);
+  input.addEventListener('input', () => {
+    lastResults = filter(input.value);
+    render(lastResults, input.value.trim());
+    dropdown.classList.add('is-open');
+    clearBtn.style.display = input.value ? 'flex' : 'none';
+  });
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowDown') { e.preventDefault(); setActive(activeIdx + 1); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setActive(activeIdx - 1); }
+    else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (activeIdx >= 0 && lastResults[activeIdx]) selectByUid(lastResults[activeIdx].id);
+      else if (lastResults.length === 1) selectByUid(lastResults[0].id);
+    } else if (e.key === 'Escape') { close(); input.blur(); }
+  });
+  dropdown.addEventListener('mousedown', (e) => {
+    const item = e.target.closest('.picker-item');
+    if (!item) return;
+    e.preventDefault();
+    selectByUid(item.getAttribute('data-uid'));
+  });
+  clearBtn.addEventListener('click', () => {
+    input.value = ''; clearBtn.style.display = 'none';
+    lastResults = users.slice(0, 50);
+    render(lastResults, '');
+    input.focus();
+  });
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.picker-search')) close();
+  });
+}
+
 window.addEventListener('DOMContentLoaded', () => {
+  initUserPicker();
   initPad('sigCanvas', 'sigPlaceholder', 'sigStats', 'patient');
   <?php if ($view === 'tablet'): ?>
   initPad('witnessCanvas', 'witnessPlaceholder', 'witnessStats', 'witness');
