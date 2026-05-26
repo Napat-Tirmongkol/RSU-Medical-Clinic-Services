@@ -959,6 +959,10 @@
                     <i class="fa-solid fa-chevron-down psb-chevron"></i>
                 </button>
                 <div class="psb-group" data-group="settings">
+                    <a class="psb-item" data-section="morning_brief_settings" href="morning_brief_settings.php">
+                        <div class="psb-icon"><i class="fa-solid fa-sun" style="color:#d97706"></i></div>
+                        <span class="psb-label">Morning Brief</span>
+                    </a>
                     <a class="psb-item" data-section="settings" href="settings.php">
                         <div class="psb-icon"><i class="fa-solid fa-gear" style="color:#d97706"></i></div>
                         <span class="psb-label">Settings</span>
