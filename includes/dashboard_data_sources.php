@@ -257,6 +257,60 @@ if (!function_exists('dashboard_data_sources_catalog')) {
                 'shape'   => 'timeseries',
                 'widgets' => ['line', 'area', 'bar'],
             ],
+
+            // ── บันทึกอุบัติเหตุ (Accident Log) ──────────────────────────
+            'accident_total' => [
+                'label'   => 'อุบัติเหตุ — รวมในช่วงที่เลือก',
+                'shape'   => 'count',
+                'widgets' => ['kpi'],
+            ],
+            'accident_peak_daily' => [
+                'label'   => 'อุบัติเหตุ — สูงสุดในวันใดวันหนึ่ง',
+                'shape'   => 'count',
+                'widgets' => ['kpi'],
+            ],
+            'accident_avg_per_day' => [
+                'label'   => 'อุบัติเหตุ — เฉลี่ยต่อวัน (วันที่บันทึก)',
+                'shape'   => 'count',
+                'widgets' => ['kpi'],
+            ],
+            'accident_trend_12m' => [
+                'label'   => 'อุบัติเหตุ — Trend 12 เดือนล่าสุด',
+                'shape'   => 'timeseries',
+                'widgets' => ['line', 'area', 'bar'],
+            ],
+            'accident_by_month_current_year' => [
+                'label'   => 'อุบัติเหตุ — แยกรายเดือนของปีนี้',
+                'shape'   => 'breakdown',
+                'widgets' => ['bar', 'donut'],
+            ],
+
+            // ── สถิติบัตรทอง (Gold Card Monthly Stats) ──────────────────
+            'gold_stats_latest' => [
+                'label'   => 'สถิติบัตรทอง — ยอดสมาชิกล่าสุด',
+                'shape'   => 'count',
+                'widgets' => ['kpi'],
+            ],
+            'gold_stats_peak' => [
+                'label'   => 'สถิติบัตรทอง — ยอดสูงสุดที่เคยบันทึก',
+                'shape'   => 'count',
+                'widgets' => ['kpi'],
+            ],
+            'gold_stats_low' => [
+                'label'   => 'สถิติบัตรทอง — ยอดต่ำสุดที่เคยบันทึก',
+                'shape'   => 'count',
+                'widgets' => ['kpi'],
+            ],
+            'gold_stats_trend_12m' => [
+                'label'   => 'สถิติบัตรทอง — Trend ยอดสมาชิก 12 เดือนล่าสุด',
+                'shape'   => 'timeseries',
+                'widgets' => ['line', 'area', 'bar'],
+            ],
+            'gold_stats_yoy_avg' => [
+                'label'   => 'สถิติบัตรทอง — ค่าเฉลี่ยรายปี (YoY)',
+                'shape'   => 'breakdown',
+                'widgets' => ['bar', 'line'],
+            ],
         ];
     }
 
@@ -664,6 +718,115 @@ if (!function_exists('dashboard_data_sources_catalog')) {
 
             case 'campaign_vaccine_via_line_trend':
                 return _resolve_vaccine_line_trend($pdo, $year, $month);
+
+            /* ───── Accident Log ───── */
+            case 'accident_total': {
+                $sql = "SELECT COALESCE(SUM(accident_count),0) FROM sys_accident_daily WHERE 1=1"
+                     . $dateClause('entry_date');
+                $auto = (int)_safe_scalar($pdo, $sql);
+                $val  = $hasFilter ? $auto : kpi_with_override($pdo, $key, $auto);
+                return ['shape' => 'count', 'value' => $val, 'auto' => $auto];
+            }
+
+            case 'accident_peak_daily': {
+                $sql = "SELECT COALESCE(MAX(accident_count),0) FROM sys_accident_daily WHERE 1=1"
+                     . $dateClause('entry_date');
+                $auto = (int)_safe_scalar($pdo, $sql);
+                $val  = $hasFilter ? $auto : kpi_with_override($pdo, $key, $auto);
+                return ['shape' => 'count', 'value' => $val, 'auto' => $auto];
+            }
+
+            case 'accident_avg_per_day': {
+                $sql = "SELECT COALESCE(ROUND(AVG(accident_count),1),0) FROM sys_accident_daily WHERE 1=1"
+                     . $dateClause('entry_date');
+                $auto = (float)_safe_scalar($pdo, $sql);
+                $val  = $hasFilter ? $auto : (float)kpi_with_override($pdo, $key, $auto);
+                return ['shape' => 'count', 'value' => $val, 'auto' => $auto];
+            }
+
+            case 'accident_trend_12m': {
+                // 12 เดือนย้อนหลัง (รวมเดือนปัจจุบัน)
+                $rows = _safe_rows($pdo,
+                    "SELECT DATE_FORMAT(entry_date,'%Y-%m') AS ym, SUM(accident_count) AS total
+                     FROM sys_accident_daily
+                     WHERE entry_date >= DATE_SUB(DATE_FORMAT(CURDATE(),'%Y-%m-01'), INTERVAL 11 MONTH)
+                     GROUP BY ym ORDER BY ym ASC");
+                $thaiMo = ['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+                $labels = []; $data = [];
+                foreach ($rows as $r) {
+                    [$y, $m] = explode('-', $r['ym']);
+                    $labels[] = $thaiMo[(int)$m] . ' ' . substr((string)((int)$y + 543), -2);
+                    $data[] = (int)$r['total'];
+                }
+                return ['shape' => 'timeseries', 'labels' => $labels,
+                        'series' => [['name' => 'อุบัติเหตุ', 'data' => $data]]];
+            }
+
+            case 'accident_by_month_current_year': {
+                $yearCe = (int)date('Y');
+                $rows = _safe_rows($pdo,
+                    "SELECT MONTH(entry_date) AS m, SUM(accident_count) AS total
+                     FROM sys_accident_daily
+                     WHERE YEAR(entry_date) = $yearCe
+                     GROUP BY m ORDER BY m ASC");
+                $thaiMo = ['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+                $map = []; foreach ($rows as $r) $map[(int)$r['m']] = (int)$r['total'];
+                $labels = []; $values = [];
+                for ($m = 1; $m <= 12; $m++) { $labels[] = $thaiMo[$m]; $values[] = $map[$m] ?? 0; }
+                return ['shape' => 'breakdown', 'labels' => $labels, 'values' => $values];
+            }
+
+            /* ───── Gold Card Monthly Stats ───── */
+            case 'gold_stats_latest': {
+                $auto = (int)_safe_scalar($pdo,
+                    "SELECT member_count FROM sys_gold_card_monthly_stats
+                     ORDER BY year_be DESC, month DESC LIMIT 1");
+                $val = $hasFilter ? $auto : kpi_with_override($pdo, $key, $auto);
+                return ['shape' => 'count', 'value' => $val, 'auto' => $auto];
+            }
+
+            case 'gold_stats_peak': {
+                $auto = (int)_safe_scalar($pdo,
+                    "SELECT COALESCE(MAX(member_count),0) FROM sys_gold_card_monthly_stats");
+                $val = $hasFilter ? $auto : kpi_with_override($pdo, $key, $auto);
+                return ['shape' => 'count', 'value' => $val, 'auto' => $auto];
+            }
+
+            case 'gold_stats_low': {
+                $auto = (int)_safe_scalar($pdo,
+                    "SELECT COALESCE(MIN(member_count),0) FROM sys_gold_card_monthly_stats");
+                $val = $hasFilter ? $auto : kpi_with_override($pdo, $key, $auto);
+                return ['shape' => 'count', 'value' => $val, 'auto' => $auto];
+            }
+
+            case 'gold_stats_trend_12m': {
+                // เอา 12 entries ล่าสุดเรียง year+month ASC
+                $rows = _safe_rows($pdo,
+                    "SELECT year_be, month, member_count FROM sys_gold_card_monthly_stats
+                     ORDER BY year_be DESC, month DESC LIMIT 12");
+                $rows = array_reverse($rows);
+                $thaiMo = ['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+                $labels = []; $data = [];
+                foreach ($rows as $r) {
+                    $labels[] = $thaiMo[(int)$r['month']] . ' ' . substr((string)(int)$r['year_be'], -2);
+                    $data[] = (int)$r['member_count'];
+                }
+                return ['shape' => 'timeseries', 'labels' => $labels,
+                        'series' => [['name' => 'ยอดสมาชิก', 'data' => $data]]];
+            }
+
+            case 'gold_stats_yoy_avg': {
+                $rows = _safe_rows($pdo,
+                    "SELECT year_be, ROUND(AVG(member_count)) AS avg_count
+                     FROM sys_gold_card_monthly_stats
+                     GROUP BY year_be ORDER BY year_be ASC");
+                $labels = []; $values = [];
+                foreach ($rows as $r) {
+                    $labels[] = 'พ.ศ. ' . (int)$r['year_be'];
+                    $values[] = (int)$r['avg_count'];
+                }
+                return ['shape' => 'breakdown', 'labels' => $labels, 'values' => $values];
+            }
         }
 
         return ['shape' => 'unknown'];
