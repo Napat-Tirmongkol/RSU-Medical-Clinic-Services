@@ -81,6 +81,22 @@ if ($student) {
     $recentLogs = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 }
 
+// payout history 6 เดือนล่าสุดของนักศึกษาคนนี้ (สำหรับโชว์สถานะค่าตอบแทน)
+$myPayouts = [];
+if ($student) {
+    $stmt = $pdo->prepare("SELECT id, period_ym, hours_paid, pay_rate, amount, status, approved_at, note
+        FROM sys_scholarship_payouts
+        WHERE student_id = :sid
+        ORDER BY period_ym DESC LIMIT 6");
+    $stmt->execute([':sid' => $student['id']]);
+    $myPayouts = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+}
+$curYm = date('Y-m', $now);
+$curPayout = null;
+foreach ($myPayouts as $p) {
+    if ($p['period_ym'] === $curYm) { $curPayout = $p; break; }
+}
+
 $csrfToken = get_csrf_token();
 
 function vh(?string $s): string { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
@@ -391,6 +407,96 @@ $displayName = trim((string)($user['full_name'] ?? ''))
                 <div class="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
                     <div class="h-full bg-gradient-to-r from-emerald-400 to-emerald-600 rounded-full transition-all" style="width: <?= $pct ?>%"></div>
                 </div>
+            </div>
+        <?php endif; ?>
+
+        <!-- ─── สถานะค่าตอบแทน (payout status) ─── -->
+        <?php if (!empty($myPayouts) || ($curPayout === null && $splitMonth['paid'] > 0)): ?>
+            <?php
+            // helper render: badge + ข้อความสำหรับสถานะ
+            $stEmoji  = ['pending' => '⏳', 'approved' => '✅'];
+            $stText   = [
+                'pending'  => 'รอการเงินดำเนินการ',
+                'approved' => 'พร้อมรับเงิน — ฝ่ายการเงิน อาคาร 1',
+            ];
+            $stBgCard = [
+                'pending'  => 'bg-gradient-to-br from-amber-50 to-orange-50 border-amber-200',
+                'approved' => 'bg-gradient-to-br from-emerald-50 to-teal-50 border-emerald-300',
+            ];
+            $stText2  = ['pending' => 'text-amber-700', 'approved' => 'text-emerald-700'];
+            ?>
+            <div class="space-y-3">
+                <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 px-1">สถานะค่าตอบแทน</p>
+
+                <?php if ($curPayout !== null): ?>
+                    <?php
+                    $sStatus = $curPayout['status'];
+                    $sTitle  = scholarship_period_thai($curPayout['period_ym']);
+                    $sAmount = number_format((float)$curPayout['amount'], 2);
+                    $sHours  = number_format((float)$curPayout['hours_paid'], 2);
+                    ?>
+                    <div class="<?= $stBgCard[$sStatus] ?> border rounded-2xl p-4 shadow-sm">
+                        <div class="flex items-center justify-between gap-3 mb-2">
+                            <span class="text-xs font-black uppercase tracking-widest <?= $stText2[$sStatus] ?>">เดือนนี้</span>
+                            <span class="inline-flex items-center gap-1 text-[11px] font-black px-2.5 py-1 rounded-full bg-white/80 <?= $stText2[$sStatus] ?>">
+                                <?= $stEmoji[$sStatus] ?> <?= $stText[$sStatus] ?>
+                            </span>
+                        </div>
+                        <p class="text-base font-black text-slate-900"><?= vh($sTitle) ?></p>
+                        <div class="flex items-baseline justify-between mt-1">
+                            <span class="text-xs text-slate-600"><?= $sHours ?> ชั่วโมง</span>
+                            <span class="text-2xl font-black <?= $stText2[$sStatus] ?>"><?= $sAmount ?> <span class="text-xs">฿</span></span>
+                        </div>
+                        <?php if ($sStatus === 'approved'): ?>
+                            <div class="mt-2 pt-2 border-t border-emerald-200/60 text-[11px] text-emerald-700 font-bold">
+                                <i class="fa-solid fa-location-dot mr-1"></i>มารับเงินได้ที่ฝ่ายการเงิน อาคาร 1
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                <?php elseif ($splitMonth['paid'] > 0): ?>
+                    <!-- เดือนนี้ยังไม่ได้ generate (admin ยังไม่กดสรุปยอด) -->
+                    <div class="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+                        <div class="flex items-center justify-between gap-3 mb-1">
+                            <span class="text-xs font-black uppercase tracking-widest text-slate-500">เดือนนี้</span>
+                            <span class="text-[11px] font-bold px-2.5 py-1 rounded-full bg-white text-slate-500 border border-slate-200">
+                                ยังไม่สรุปยอด
+                            </span>
+                        </div>
+                        <p class="text-xs text-slate-500 leading-relaxed">เจ้าหน้าที่จะสรุปยอดค่าตอบแทนหลังสิ้นเดือน · ติดตามสถานะที่หน้านี้ได้</p>
+                    </div>
+                <?php endif; ?>
+
+                <?php
+                // เดือนย้อนหลัง (ไม่รวมเดือนนี้)
+                $pastPayouts = array_values(array_filter($myPayouts, fn($p) => $p['period_ym'] !== $curYm));
+                if (!empty($pastPayouts)):
+                ?>
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 divide-y divide-slate-100 overflow-hidden">
+                        <div class="px-4 py-2.5 bg-slate-50/70 text-[10px] font-black uppercase tracking-widest text-slate-500">
+                            ย้อนหลัง <?= count($pastPayouts) ?> เดือน
+                        </div>
+                        <?php foreach ($pastPayouts as $p): ?>
+                            <?php
+                            $pSt = $p['status'];
+                            $pTitle = scholarship_period_thai($p['period_ym']);
+                            $pAmount = number_format((float)$p['amount'], 2);
+                            $pStTxt = $pSt === 'approved' ? 'พร้อมรับ' : 'รอการเงิน';
+                            $pStCls = $pSt === 'approved'
+                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                : 'bg-amber-50 text-amber-700 border border-amber-200';
+                            ?>
+                            <div class="flex items-center justify-between gap-3 px-4 py-3">
+                                <div class="min-w-0">
+                                    <p class="text-sm font-black text-slate-800 truncate"><?= vh($pTitle) ?></p>
+                                    <p class="text-[11px] text-slate-500"><?= number_format((float)$p['hours_paid'], 1) ?> ชม. · <?= $pAmount ?> ฿</p>
+                                </div>
+                                <span class="shrink-0 inline-flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-full <?= $pStCls ?>">
+                                    <?= $stEmoji[$pSt] ?? '' ?> <?= $pStTxt ?>
+                                </span>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                <?php endif; ?>
             </div>
         <?php endif; ?>
 
