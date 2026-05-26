@@ -65,8 +65,40 @@ $publicUrl = $publicUrlBase . ($activeWorkbook ? ('?wb=' . urlencode($activeWork
         padding:1.5rem; transition:all .15s; position:relative;
     }
     #section-insurance_dashboard .id-card:hover { box-shadow: 0 8px 25px rgba(0,0,0,.05); }
-    #section-insurance_dashboard .id-card.id-edit-mode { border-style:dashed; border-color:#94a3b8; }
+    #section-insurance_dashboard .id-card.id-edit-mode { border-style:dashed; border-color:#94a3b8; cursor:grab; }
     #section-insurance_dashboard .id-card.id-edit-mode:hover { border-color:#0284c7; box-shadow: 0 0 0 4px rgba(2,132,199,.08); }
+    #section-insurance_dashboard .id-card.id-edit-mode:active { cursor:grabbing; }
+    /* Drag-and-drop visual states (edit mode only) */
+    #section-insurance_dashboard .id-card.id-dragging {
+        opacity:.4; transform:scale(.97);
+        box-shadow: 0 12px 30px rgba(2,132,199,.25) !important;
+    }
+    #section-insurance_dashboard .id-card.id-drop-before::before,
+    #section-insurance_dashboard .id-card.id-drop-after::after {
+        content:''; position:absolute; top:8px; bottom:8px; width:4px;
+        background: linear-gradient(180deg, #0284c7, #38bdf8);
+        border-radius:99px; box-shadow:0 0 12px rgba(2,132,199,.55);
+        z-index:5; pointer-events:none;
+    }
+    #section-insurance_dashboard .id-card.id-drop-before::before { left:-9px; }
+    #section-insurance_dashboard .id-card.id-drop-after::after { right:-9px; }
+    /* Subtle "grab" pill in edit overlay */
+    #section-insurance_dashboard .id-edit-mode .id-grab-hint {
+        position:absolute; top:.75rem; left:.75rem;
+        background:rgba(15,23,42,.85); color:#fff;
+        font-size:10px; font-weight:800; padding:3px 9px; border-radius:99px;
+        display:inline-flex; align-items:center; gap:5px;
+        backdrop-filter:blur(6px); pointer-events:none;
+        animation: idGrabPulse 2s ease-in-out infinite;
+    }
+    @keyframes idGrabPulse {
+        0%,100% { opacity:.7; }
+        50% { opacity:1; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+        #section-insurance_dashboard .id-edit-mode .id-grab-hint { animation:none; opacity:.85; }
+        #section-insurance_dashboard .id-card.id-dragging { transform:none; }
+    }
     #section-insurance_dashboard .id-edit-overlay {
         position:absolute; top:.75rem; right:.75rem; display:none;
         background:rgba(15,23,42,.9); backdrop-filter:blur(8px);
@@ -737,7 +769,23 @@ $publicUrl = $publicUrlBase . ($activeWorkbook ? ('?wb=' . urlencode($activeWork
     let editMode = false;
     window.idToggleEditMode = function() {
         editMode = !editMode;
-        document.querySelectorAll('#idWidgetsGrid .id-card').forEach(c => c.classList.toggle('id-edit-mode', editMode));
+        document.querySelectorAll('#idWidgetsGrid .id-card').forEach(c => {
+            c.classList.toggle('id-edit-mode', editMode);
+            // Drag-drop enabled only in edit mode
+            if (editMode) {
+                c.setAttribute('draggable', 'true');
+                if (!c.querySelector('.id-grab-hint')) {
+                    const hint = document.createElement('span');
+                    hint.className = 'id-grab-hint';
+                    hint.innerHTML = '<i class="fa-solid fa-grip-vertical"></i> ลากเพื่อจัดลำดับ';
+                    c.appendChild(hint);
+                }
+            } else {
+                c.removeAttribute('draggable');
+                const hint = c.querySelector('.id-grab-hint');
+                if (hint) hint.remove();
+            }
+        });
         const btn = document.getElementById('idToggleEditBtn');
         const addBtn = document.getElementById('idAddWidgetBtn');
         const dsBtn = document.getElementById('idDatasetBtn');
@@ -755,6 +803,102 @@ $publicUrl = $publicUrlBase . ($activeWorkbook ? ('?wb=' . urlencode($activeWork
             addBtn.classList.add('hidden'); dsBtn.classList.add('hidden');
         }
     };
+
+    // ── Drag-and-drop reorder (edit mode only) ───────────────────────
+    (() => {
+        const grid = document.getElementById('idWidgetsGrid');
+        if (!grid) return;
+        let dragSrc = null;
+        let lastTarget = null;
+
+        const clearHints = () => {
+            grid.querySelectorAll('.id-drop-before, .id-drop-after').forEach(el => {
+                el.classList.remove('id-drop-before', 'id-drop-after');
+            });
+        };
+
+        grid.addEventListener('dragstart', (e) => {
+            const card = e.target.closest('.id-card.id-edit-mode');
+            if (!card) { e.preventDefault(); return; }
+            dragSrc = card;
+            card.classList.add('id-dragging');
+            e.dataTransfer.effectAllowed = 'move';
+            // Required for Firefox to initiate drag
+            try { e.dataTransfer.setData('text/plain', card.dataset.widgetId || ''); } catch (_) {}
+        });
+
+        grid.addEventListener('dragover', (e) => {
+            if (!dragSrc) return;
+            const card = e.target.closest('.id-card.id-edit-mode');
+            if (!card || card === dragSrc) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            // Decide before/after based on cursor X position
+            const rect = card.getBoundingClientRect();
+            const halfX = rect.left + rect.width / 2;
+            const dropBefore = e.clientX < halfX;
+            if (card !== lastTarget) {
+                clearHints();
+                lastTarget = card;
+            }
+            card.classList.toggle('id-drop-before', dropBefore);
+            card.classList.toggle('id-drop-after', !dropBefore);
+        });
+
+        grid.addEventListener('dragleave', (e) => {
+            // Clear when leaving the grid entirely (relatedTarget is outside grid)
+            if (!grid.contains(e.relatedTarget)) {
+                clearHints();
+                lastTarget = null;
+            }
+        });
+
+        grid.addEventListener('drop', (e) => {
+            if (!dragSrc) return;
+            const card = e.target.closest('.id-card.id-edit-mode');
+            if (!card || card === dragSrc) { clearHints(); return; }
+            e.preventDefault();
+            const rect = card.getBoundingClientRect();
+            const halfX = rect.left + rect.width / 2;
+            if (e.clientX < halfX) {
+                card.parentNode.insertBefore(dragSrc, card);
+            } else {
+                card.parentNode.insertBefore(dragSrc, card.nextSibling);
+            }
+            clearHints();
+            lastTarget = null;
+            persistOrder();
+        });
+
+        grid.addEventListener('dragend', () => {
+            if (dragSrc) dragSrc.classList.remove('id-dragging');
+            dragSrc = null;
+            clearHints();
+            lastTarget = null;
+        });
+
+        function persistOrder() {
+            const ids = Array.from(grid.querySelectorAll('.id-card[data-widget-id]'))
+                .map(c => +c.dataset.widgetId)
+                .filter(Boolean);
+            if (!ids.length) return;
+            adPost('widget', 'reorder', { order: JSON.stringify(ids) })
+                .then(r => {
+                    if (r && r.status === 'ok') {
+                        Swal.fire({
+                            toast: true, position: 'top-end', icon: 'success',
+                            title: 'จัดลำดับใหม่เรียบร้อย',
+                            timer: 1600, showConfirmButton: false,
+                        });
+                    } else {
+                        Swal.fire({ icon: 'error', title: 'บันทึกลำดับล้มเหลว', text: (r && r.message) || 'ไม่ทราบสาเหตุ' });
+                    }
+                })
+                .catch(err => {
+                    Swal.fire({ icon: 'error', title: 'บันทึกลำดับล้มเหลว', text: err.message || String(err) });
+                });
+        }
+    })();
 
     // ── Widget Modal ─────────────────────────────────────────────────
     let selectedType = 'kpi';
