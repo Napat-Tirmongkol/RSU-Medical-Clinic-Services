@@ -94,19 +94,31 @@ $MODULE_LABELS = [
                 </div>
             </div>
 
-            <!-- Delivery time card -->
+            <!-- Delivery schedule card -->
             <div class="rounded-2xl border border-slate-200 bg-white p-6">
-                <h2 class="text-base font-bold text-slate-900 mb-4">เวลาส่ง</h2>
-                <div class="flex items-center gap-3">
-                    <label class="text-sm text-slate-600">ส่งทุกวันเวลา</label>
-                    <select name="delivery_hour" class="px-3 py-1.5 rounded-lg border border-slate-200 text-sm">
-                        <?php for ($h = 5; $h <= 22; $h++): ?>
-                            <option value="<?= $h ?>" <?= (int)$pref['delivery_hour'] === $h ? 'selected' : '' ?>>
-                                <?= sprintf('%02d:00', $h) ?>
-                            </option>
-                        <?php endfor; ?>
-                    </select>
-                    <span class="text-xs text-slate-500">(เฉพาะช่องทาง LINE / Email — Portal เห็นทันทีเมื่อเปิดหน้า)</span>
+                <h2 class="text-base font-bold text-slate-900 mb-4">กำหนดการส่ง</h2>
+                <div class="space-y-4">
+                    <div class="flex items-center gap-3 flex-wrap">
+                        <label class="text-sm text-slate-600 min-w-[90px]">ส่งทุกวันเวลา</label>
+                        <select name="delivery_hour" class="px-3 py-1.5 rounded-lg border border-slate-200 text-sm">
+                            <?php for ($h = 5; $h <= 22; $h++): ?>
+                                <option value="<?= $h ?>" <?= (int)$pref['delivery_hour'] === $h ? 'selected' : '' ?>>
+                                    <?= sprintf('%02d:00', $h) ?>
+                                </option>
+                            <?php endfor; ?>
+                        </select>
+                        <span class="text-xs text-slate-500">(เฉพาะ LINE / Email — Portal เห็นทันทีเมื่อเปิดหน้า)</span>
+                    </div>
+                    <label class="flex items-start gap-3 cursor-pointer p-3 rounded-lg hover:bg-slate-50 border border-slate-100">
+                        <input type="checkbox" name="respect_clinic_calendar" value="1"
+                               <?= !empty($pref['respect_clinic_calendar']) ? 'checked' : '' ?>
+                               style="accent-color:#10b981;width:18px;height:18px;margin-top:.15rem;flex-shrink:0">
+                        <div>
+                            <p class="text-sm font-semibold text-slate-900">อ้างอิงปฏิทินคลินิก</p>
+                            <p class="text-xs text-slate-500 mt-0.5">ส่ง brief เฉพาะวันที่คลินิกเปิด — วันหยุด/วันหยุดพิเศษ ไม่ต้องส่ง (ตรวจจาก
+                                <a href="?section=clinic_data&cd_tab=hours" class="text-emerald-600 hover:underline">ตารางเวลาคลินิก</a>)</p>
+                        </div>
+                    </label>
                 </div>
             </div>
 

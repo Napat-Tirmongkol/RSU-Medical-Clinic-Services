@@ -101,6 +101,8 @@ $summary
 - ถ้า yesterday_no_show_rate > 15 → priority "ตามผู้ขาดนัด" หมวด campaign + urgency อย่างน้อย "normal"
 - ถ้า active_campaigns = 0 และ today_scheduled = 0 → ไม่ต้องพูดถึงแคมเปญ
 - ถ้าทุกอย่างปกติ → urgency = "low" + narrative สั้นๆ ว่าเช้านี้สงบ
+- ถ้า clinic_open=false (คลินิกหยุด) → ขึ้นต้น narrative ว่า "วันนี้คลินิกหยุด"
+  + clinic_note ถ้ามี · ถ้ายังมี pending approvals/SLA breach ก็ยังต้องเตือน
 - ห้ามใส่ข้อมูลที่ไม่มีใน snapshot · ห้ามแต่งตัวเลขใหม่
 - ตอบเป็น JSON object เดียวเท่านั้น ไม่ต้องห่อ markdown
 PROMPT;
@@ -218,10 +220,21 @@ function _mb_fallback(array $data, string $reason = ''): array {
     elseif (count($priorities) >= 4) $urgency = 'high';
     elseif (count($priorities) >= 1) $urgency = 'normal';
 
+    // Prefix if clinic closed
+    $closedPrefix = '';
+    if (($clinic['clinic_open'] ?? null) === false) {
+        $src = $clinic['clinic_source'] ?? '';
+        $srcLabel = $src === 'holiday' ? ' (วันหยุด)' : ($src === 'special' ? ' (พิเศษ)' : '');
+        $closedPrefix = 'วันนี้คลินิกหยุด' . $srcLabel
+                      . ($clinic['clinic_note'] ? ' · ' . $clinic['clinic_note'] : '') . ' · ';
+    }
+
     if ($priorities) {
-        $narrative = 'เช้านี้มี ' . count($priorities) . ' เรื่องที่ต้องดู — ' .
+        $narrative = $closedPrefix . 'เช้านี้มี ' . count($priorities) . ' เรื่องที่ต้องดู — ' .
                      ($priorities[0]['title'] ?? '') .
                      (count($priorities) > 1 ? ' และอีก ' . (count($priorities) - 1) . ' รายการ' : '');
+    } elseif ($closedPrefix) {
+        $narrative = $closedPrefix . 'ไม่มีเรื่องค้างที่ต้องดู พักได้สบายๆ';
     } else {
         $narrative = 'เช้านี้ทุกอย่างดูสงบ ไม่มีเรื่องค้างที่ต้องทำด่วน เริ่มวันด้วยความสบายใจได้เลย';
     }

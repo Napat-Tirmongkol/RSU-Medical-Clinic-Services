@@ -57,6 +57,17 @@ echo "[" . date('Y-m-d H:i:s') . "] morning_brief cron — hour={$hour}" . ($dry
 $pdo = db();
 ensure_morning_brief_schema($pdo);
 
+// ─── Check clinic calendar — ถ้าหยุด จะ skip user ที่ตั้ง respect_clinic_calendar=1 ──
+$clinicStatus = morning_brief_clinic_is_closed($pdo, $today);
+if ($clinicStatus['closed'] && !$force) {
+    echo "🏥 คลินิกหยุดวันนี้ (" . $clinicStatus['source']
+        . ($clinicStatus['note'] ? ' · ' . $clinicStatus['note'] : '') . ")\n";
+    echo "  → จะ skip user ที่ตั้ง respect_clinic_calendar=1 (ส่งเฉพาะคนที่ปิด option นี้)\n";
+    echo "  → ใช้ ?force=1 เพื่อบังคับส่งทุกคน\n\n";
+} elseif ($clinicStatus['closed'] && $force) {
+    echo "🏥 คลินิกหยุดวันนี้ แต่ ?force=1 → จะส่งทุกคน\n\n";
+}
+
 // ─── Resolve LINE token ─────────────────────────────────────────────────────
 $lineToken = mb_resolve_line_token();
 
@@ -90,6 +101,13 @@ foreach ($prefs as $pref) {
     $sid = (int)$pref['staff_id'];
     $stype = $pref['staff_type'];
     echo "[staff_id={$sid} type={$stype}]\n";
+
+    // ── Skip ถ้าคลินิกปิด + user ตั้ง respect_clinic_calendar=1 ──
+    if ($clinicStatus['closed'] && !empty($pref['respect_clinic_calendar']) && !$force) {
+        echo "  → SKIPPED ทั้ง user นี้ (คลินิกหยุด + ตั้ง respect_clinic_calendar)\n";
+        $sent['skipped']++;
+        continue;
+    }
 
     // ── LINE channel ─────────────────────────────────────────────────────
     if (!empty($pref['channel_line']) && !empty($pref['line_user_id'])) {

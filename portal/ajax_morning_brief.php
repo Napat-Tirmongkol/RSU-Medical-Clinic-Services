@@ -91,6 +91,7 @@ switch ($action) {
         $cl = isset($_POST['channel_line'])   ? (int)!!$_POST['channel_line']   : 0;
         $ce = isset($_POST['channel_email'])  ? (int)!!$_POST['channel_email']  : 0;
         $hr = max(0, min(23, (int)($_POST['delivery_hour'] ?? 8)));
+        $rcc = isset($_POST['respect_clinic_calendar']) ? (int)!!$_POST['respect_clinic_calendar'] : 0;
         $modules = array_values(array_intersect(
             ['campaign','scholarship','finance','edms','clinic','inventory'],
             (array)($_POST['modules'] ?? [])
@@ -103,9 +104,10 @@ switch ($action) {
         }
         $st = $pdo->prepare("UPDATE sys_morning_brief_prefs
             SET channel_portal=:cp, channel_line=:cl, channel_email=:ce, delivery_hour=:h,
+                respect_clinic_calendar=:rcc,
                 modules_json=:m, line_user_id=:lu, email=:em, updated_at=NOW()
             WHERE staff_id=:sid AND staff_type='admin'");
-        $st->execute([':cp'=>$cp, ':cl'=>$cl, ':ce'=>$ce, ':h'=>$hr,
+        $st->execute([':cp'=>$cp, ':cl'=>$cl, ':ce'=>$ce, ':h'=>$hr, ':rcc'=>$rcc,
                       ':m'=>json_encode($modules), ':lu'=>($line?:null), ':em'=>($email?:null),
                       ':sid'=>$adminId]);
         _mb_send(['ok'=>true, 'message'=>'บันทึกแล้ว']);

@@ -34,6 +34,7 @@ function ensure_morning_brief_schema(PDO $pdo): void {
         channel_line    TINYINT(1) NOT NULL DEFAULT 0,
         channel_email   TINYINT(1) NOT NULL DEFAULT 0,
         delivery_hour   TINYINT NOT NULL DEFAULT 8,
+        respect_clinic_calendar TINYINT(1) NOT NULL DEFAULT 1,
         modules_json    TEXT NULL,
         line_user_id    VARCHAR(80) NULL,
         email           VARCHAR(180) NULL,
@@ -41,6 +42,20 @@ function ensure_morning_brief_schema(PDO $pdo): void {
         updated_at      DATETIME NOT NULL,
         PRIMARY KEY (staff_id, staff_type)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    // Auto-add column for existing installs (idempotent)
+    try {
+        $pdo->exec("ALTER TABLE sys_morning_brief_prefs
+            ADD COLUMN IF NOT EXISTS respect_clinic_calendar TINYINT(1) NOT NULL DEFAULT 1 AFTER delivery_hour");
+    } catch (PDOException) {
+        // MySQL ก่อน 8.0.29 ไม่รองรับ "ADD COLUMN IF NOT EXISTS" — เช็ค manual แทน
+        try {
+            $st = $pdo->query("SHOW COLUMNS FROM sys_morning_brief_prefs LIKE 'respect_clinic_calendar'");
+            if (!$st->fetch()) {
+                $pdo->exec("ALTER TABLE sys_morning_brief_prefs
+                    ADD COLUMN respect_clinic_calendar TINYINT(1) NOT NULL DEFAULT 1 AFTER delivery_hour");
+            }
+        } catch (PDOException) {}
+    }
     $pdo->exec("CREATE TABLE IF NOT EXISTS sys_morning_brief_delivery (
         id          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
         brief_id    INT UNSIGNED NOT NULL,
@@ -225,12 +240,21 @@ function morning_brief_collect_inventory(PDO $pdo, string $today): array {
 function morning_brief_collect_clinic(PDO $pdo, string $today): array {
     $clinicOpen = null;
     $clinicHours = null;
+    $clinicSource = null;
+    $clinicNote = null;
     try {
+        if (!function_exists('get_clinic_hours_for_date')) {
+            @require_once __DIR__ . '/../../includes/clinic_status_helper.php';
+        }
         if (function_exists('get_clinic_hours_for_date')) {
             $hours = get_clinic_hours_for_date($pdo, $today);
             if ($hours) {
-                $clinicOpen = !empty($hours['is_open']);
-                $clinicHours = ($hours['open_time'] ?? '') . '–' . ($hours['close_time'] ?? '');
+                $clinicOpen = !((int)($hours['closed'] ?? 0) === 1);
+                $clinicHours = $clinicOpen
+                    ? trim(($hours['open_time'] ?? '') . '–' . ($hours['close_time'] ?? ''), '–')
+                    : null;
+                $clinicSource = $hours['source'] ?? null;       // 'holiday'|'special'|'regular'|'no_regular'
+                $clinicNote = trim((string)($hours['note'] ?? '')) ?: null;
             }
         }
     } catch (Throwable) {}
@@ -239,6 +263,8 @@ function morning_brief_collect_clinic(PDO $pdo, string $today): array {
         'weekday_thai'   => _weekday_thai($today),
         'clinic_open'    => $clinicOpen,
         'clinic_hours'   => $clinicHours,
+        'clinic_source'  => $clinicSource,
+        'clinic_note'    => $clinicNote,
         'nurses_today'   => _safe_int($pdo,
             "SELECT COUNT(*) FROM sys_nurse_schedule WHERE shift_date = :d",
             [':d' => $today]),
@@ -328,6 +354,29 @@ function morning_brief_get_or_create_pref(PDO $pdo, int $staffId, string $staffT
     $ins->execute([':sid'=>$staffId, ':st'=>$staffType, ':m'=>json_encode($defaults)]);
     $st->execute([':sid'=>$staffId, ':st'=>$staffType]);
     return $st->fetch(PDO::FETCH_ASSOC) ?: [];
+}
+
+/**
+ * Check ว่าคลินิกปิดวันนั้นหรือไม่ — คืน array ['closed' => bool, 'source' => string, 'note' => string]
+ * source: 'holiday' (วันหยุดกำหนดเอง) · 'regular' (วันหยุดประจำสัปดาห์) · 'special' (เปิดพิเศษ) ฯลฯ
+ */
+function morning_brief_clinic_is_closed(PDO $pdo, string $date): array {
+    if (!function_exists('get_clinic_hours_for_date')) {
+        @require_once __DIR__ . '/../../includes/clinic_status_helper.php';
+    }
+    if (!function_exists('get_clinic_hours_for_date')) {
+        return ['closed' => false, 'source' => 'unknown', 'note' => ''];
+    }
+    try {
+        $h = get_clinic_hours_for_date($pdo, $date);
+        return [
+            'closed' => (int)($h['closed'] ?? 0) === 1,
+            'source' => (string)($h['source'] ?? ''),
+            'note'   => trim((string)($h['note'] ?? '')),
+        ];
+    } catch (Throwable) {
+        return ['closed' => false, 'source' => 'error', 'note' => ''];
+    }
 }
 
 function morning_brief_mark_read(PDO $pdo, int $staffId, string $staffType, string $date): void {

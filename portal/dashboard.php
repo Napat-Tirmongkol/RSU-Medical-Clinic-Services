@@ -132,10 +132,16 @@ layout_start(['section' => 'dashboard', 'title' => 'Dashboard']);
                             const edms = data.edms || {};
                             const inv = data.inventory || {};
 
-                            // Date line
+                            // Date line + clinic status
                             const dt = (clinic.date_thai ? clinic.date_thai + ' · วัน' + clinic.weekday_thai : TODAY);
-                            const opens = (clinic.clinic_open === true) ? 'คลินิกเปิด' :
-                                          (clinic.clinic_open === false) ? 'คลินิกหยุด' : '';
+                            let opens = '';
+                            if (clinic.clinic_open === true) {
+                                opens = 'คลินิกเปิด' + (clinic.clinic_hours ? ' ' + clinic.clinic_hours : '');
+                            } else if (clinic.clinic_open === false) {
+                                const src = clinic.clinic_source === 'holiday' ? ' (วันหยุด)' :
+                                            clinic.clinic_source === 'special' ? ' (พิเศษ)' : '';
+                                opens = 'คลินิกหยุด' + src + (clinic.clinic_note ? ' · ' + clinic.clinic_note : '');
+                            }
                             document.getElementById('mb-date-line').textContent = dt + (opens ? ' · ' + opens : '');
 
                             // Urgency badge
