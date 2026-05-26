@@ -347,6 +347,69 @@ $displayName = trim((string)($user['full_name'] ?? ''))
                 <i class="fa-solid <?= $btnIcon ?> text-4xl block mb-2"></i>
                 <span class="text-base"><?= vh($btnLabel) ?></span>
             </button>
+
+            <!-- ─── Status Banner (clock-in/out ล่าสุดอยู่สถานะอะไร) ─── -->
+            <?php if ($lastLog):
+                $llAction = $lastLog['action'];
+                $llStatus = $lastLog['status'];
+                $llIsIn   = $llAction === 'clock_in';
+                $llTime   = date('H:i', strtotime((string)$lastLog['event_at']));
+                $llActText = $llIsIn ? 'เข้างาน' : 'ออกงาน';
+
+                // กำหนด style + ข้อความ + flag whether to show
+                $sb = null;
+                if ($llStatus === 'pending') {
+                    $sb = [
+                        'cls'  => 'from-amber-50 to-orange-50 border-amber-200',
+                        'icon' => 'fa-hourglass-half text-amber-600',
+                        'pill' => 'bg-amber-100 text-amber-800',
+                        'title'=> '⏳ ส่งคำขอ' . $llActText . 'แล้ว',
+                        'desc' => 'รอเจ้าหน้าที่อนุมัติ · ส่งเมื่อ ' . $llTime . ' น.',
+                        'badge'=> 'รออนุมัติ',
+                    ];
+                } elseif ($llStatus === 'approved' && $llIsIn) {
+                    // approved clock_in → กำลังทำงานอยู่ (ยังไม่ clock_out)
+                    $sb = [
+                        'cls'  => 'from-emerald-50 to-teal-50 border-emerald-200',
+                        'icon' => 'fa-play text-emerald-600',
+                        'pill' => 'bg-emerald-100 text-emerald-800',
+                        'title'=> '🟢 กำลังทำงาน',
+                        'desc' => 'เข้างานแล้วเมื่อ ' . $llTime . ' น. · กด "ออกงาน" เมื่อเสร็จ',
+                        'badge'=> 'อนุมัติแล้ว',
+                    ];
+                } elseif ($llStatus === 'rejected') {
+                    // ดู rejected ล่าสุดของวันนี้เท่านั้น (ไม่ขึ้นถ้านานเกินไป)
+                    $isToday = date('Y-m-d', strtotime((string)$lastLog['event_at'])) === $today;
+                    if ($isToday) {
+                        $sb = [
+                            'cls'  => 'from-rose-50 to-pink-50 border-rose-200',
+                            'icon' => 'fa-circle-xmark text-rose-600',
+                            'pill' => 'bg-rose-100 text-rose-800',
+                            'title'=> '❌ คำขอ' . $llActText . 'ถูกปฏิเสธ',
+                            'desc' => 'เมื่อ ' . $llTime . ' น.' . (!empty($lastLog['reject_reason']) ? ' · เหตุผล: ' . vh($lastLog['reject_reason']) : ''),
+                            'badge'=> 'ไม่อนุมัติ',
+                        ];
+                    }
+                }
+            ?>
+                <?php if ($sb !== null): ?>
+                    <div class="mt-4 mx-auto max-w-md bg-gradient-to-br <?= $sb['cls'] ?> border rounded-2xl p-4 text-left shadow-sm">
+                        <div class="flex items-start gap-3">
+                            <div class="w-9 h-9 rounded-xl bg-white flex items-center justify-center shrink-0 shadow-sm">
+                                <i class="fa-solid <?= $sb['icon'] ?>"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-center justify-between gap-2">
+                                    <p class="text-sm font-black text-slate-800"><?= $sb['title'] ?></p>
+                                    <span class="text-[10px] font-black px-2 py-0.5 rounded-full <?= $sb['pill'] ?> shrink-0"><?= $sb['badge'] ?></span>
+                                </div>
+                                <p class="text-[11px] text-slate-600 mt-0.5 leading-relaxed"><?= $sb['desc'] ?></p>
+                            </div>
+                        </div>
+                    </div>
+                <?php endif; ?>
+            <?php endif; ?>
+
             <p class="text-xs text-slate-400 mt-3 px-8">
                 <?php if (!empty($settings['gps_required'])): ?>
                     <i class="fa-solid fa-location-dot mr-1"></i>
