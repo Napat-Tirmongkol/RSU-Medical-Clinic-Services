@@ -13,6 +13,16 @@
 /* Cards */
 .np-card { background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:16px; }
 
+/* Highlight ที่ใช้ flash row ที่เพิ่งเพิ่มผ่านปุ่ม "เพิ่มแถว" */
+@keyframes npRowFlash {
+    0%   { background-color: #fef9c3; box-shadow: inset 3px 0 0 #f59e0b; }
+    100% { background-color: transparent; box-shadow: inset 3px 0 0 transparent; }
+}
+.np-row-flash td { animation: npRowFlash 1.2s ease-out both; }
+@media (prefers-reduced-motion: reduce) {
+    .np-row-flash td { animation: none; background-color: #fef9c3; }
+}
+
 /* KPI tiles — compact horizontal */
 .np-kpi { display:flex; align-items:center; gap:12px; padding:14px 16px; border-radius:12px; border:1px solid transparent; position:relative; }
 .np-kpi .ic { width:40px; height:40px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0; }
@@ -625,6 +635,12 @@ body[data-theme='dark'] .np-bulk-bar { box-shadow:0 20px 40px -10px rgba(0,0,0,.
     try {
       const r = await api('daily:list', { dept_id: state.deptId, from: $('np-filter-from').value, to: $('np-filter-to').value });
       state.rows = r.data || [];
+      // UI sort newest-first (backend stays ASC for export/print/charts).
+      // Tie-breaker by id DESC so a row added today appears above older same-day rows.
+      state.rows.sort((a, b) => {
+        if (a.entry_date !== b.entry_date) return a.entry_date < b.entry_date ? 1 : -1;
+        return (+b.id || 0) - (+a.id || 0);
+      });
       state.settings = r.settings;
       fillSettingsForm();
       $('np-tab-count-entry').textContent = state.rows.length;
@@ -1010,7 +1026,19 @@ body[data-theme='dark'] .np-bulk-bar { box-shadow:0 20px 40px -10px rgba(0,0,0,.
     try {
       const r = await api('daily:create', { dept_id: state.deptId, entry_date: today, patients: 0, rn_count: '', head_count: '', shift_hours: state.settings?.shift_hours || 7, note: '' }, 'POST');
       toast(r.rn_source === 'schedule' ? 'เพิ่มแถว — RN/หัวหน้าดึงจากตารางเวร' : 'เพิ่มแถวสำเร็จ');
+      // Jump to page 1 so the new row (now sorted newest-first) is immediately visible
+      state.page = 1;
       await refreshAll();
+      // Auto-focus the first editable input of the newly-added row for fast data entry
+      requestAnimationFrame(() => {
+        const firstRow = document.querySelector('#np-entry-body tr[data-id]');
+        if (!firstRow) return;
+        firstRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        firstRow.classList.add('np-row-flash');
+        setTimeout(() => firstRow.classList.remove('np-row-flash'), 1200);
+        const firstInput = firstRow.querySelector('input[type="number"], input[type="text"], input[type="date"]');
+        if (firstInput) firstInput.focus();
+      });
     } catch (e) { errAlert(e); }
   };
 
