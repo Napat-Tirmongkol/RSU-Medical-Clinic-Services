@@ -104,7 +104,9 @@ $csrf = $_SESSION['csrf_token'] ?? '';
     padding:8px 14px; border-radius:10px; font-size:12.5px; font-weight:800;
     border:none; cursor:pointer; display:inline-flex; align-items:center; gap:6px;
     transition: all .15s ease; font-family:inherit;
+    text-decoration: none; /* normalize <a> styling */
 }
+.al-btn:hover { text-decoration: none; }
 .al-btn:active { transform: scale(.97); }
 .al-btn-primary {
     background:linear-gradient(135deg, #dc2626, #b91c1c); color:#fff;
@@ -277,7 +279,9 @@ body[data-theme='dark'] .al-pager button { background:#1e293b; border-color:#334
     <div class="al-table-wrap">
         <div class="al-table-bar">
             <h3>ตารางบันทึก <span id="al-count-badge" style="background:#fee2e2;color:#b91c1c;padding:2px 10px;border-radius:99px;font-size:11px;font-weight:800;margin-left:6px;">0</span></h3>
-            <a href="accident_log_template.php" class="al-btn al-btn-ghost" title="ดาวน์โหลด Excel เปล่าเพื่อกรอกข้อมูล">
+            <a href="accident_log_template.php" target="_blank" rel="noopener"
+               download="accident_log_template.xlsx"
+               class="al-btn al-btn-ghost" title="ดาวน์โหลด Excel เปล่าเพื่อกรอกข้อมูล">
                 <i class="fa-solid fa-file-arrow-down"></i> Template
             </a>
             <button type="button" class="al-btn al-btn-ghost" onclick="document.getElementById('al-import-file').click()" title="นำเข้าจาก Excel — วันที่ + จำนวน">
