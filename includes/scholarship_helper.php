@@ -151,6 +151,29 @@ function ensure_scholarship_schema(PDO $pdo): void
         try { $pdo->exec("ALTER TABLE sys_scholarship_settings ADD COLUMN IF NOT EXISTS cancel_cutoff_hours INT UNSIGNED NOT NULL DEFAULT 24"); } catch (PDOException) {}
         try { $pdo->exec("ALTER TABLE sys_scholarship_shifts ADD COLUMN IF NOT EXISTS slot_id INT UNSIGNED NULL AFTER student_id"); } catch (PDOException) {}
         try { $pdo->exec("ALTER TABLE sys_scholarship_shifts ADD INDEX idx_slot (slot_id)"); } catch (PDOException) {}
+
+        // ── การจ่ายเงินรายเดือน (snapshot ต่อนักศึกษา/เดือน) ──
+        // workflow: pending (รอดำเนินการการเงิน) → approved (การเงินอนุมัติ พร้อมรับ)
+        $pdo->exec("CREATE TABLE IF NOT EXISTS sys_scholarship_payouts (
+            id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            student_id INT UNSIGNED NOT NULL,
+            period_ym CHAR(7) NOT NULL,
+            hours_paid DECIMAL(8,2) NOT NULL DEFAULT 0,
+            pay_rate DECIMAL(8,2) NOT NULL DEFAULT 0,
+            amount DECIMAL(10,2) NOT NULL DEFAULT 0,
+            status ENUM('pending','approved') NOT NULL DEFAULT 'pending',
+            generated_by INT UNSIGNED NULL,
+            generated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            approved_by INT UNSIGNED NULL,
+            approved_at DATETIME NULL,
+            note VARCHAR(255) NOT NULL DEFAULT '',
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY uniq_student_period (student_id, period_ym),
+            KEY idx_period (period_ym),
+            KEY idx_status (status),
+            KEY idx_period_status (period_ym, status)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
     } catch (PDOException $e) {
         error_log('[scholarship_helper] schema migration failed: ' . $e->getMessage());
     }
@@ -466,4 +489,178 @@ function format_scholarship_thai_date(string $date): string
     $m = (int)date('n', $ts);
     $y = (int)date('Y', $ts) + 543;
     return $d . ' ' . $months[$m] . ' ' . $y;
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// MONTHLY PAYOUTS — สถานะการจ่ายเงินรายเดือนให้นักศึกษา
+// 2 สถานะ: pending (รอดำเนินการการเงิน) → approved (การเงินอนุมัติ พร้อมรับ)
+// ─────────────────────────────────────────────────────────────────────
+
+/**
+ * แปลง period_ym ('YYYY-MM') เป็น [from_date, to_date]
+ */
+function scholarship_period_range(string $ym): array
+{
+    if (!preg_match('/^\d{4}-(0[1-9]|1[0-2])$/', $ym)) {
+        $ym = date('Y-m');
+    }
+    $from = $ym . '-01';
+    $to = date('Y-m-t', strtotime($from));
+    return [$from, $to];
+}
+
+/**
+ * แปลง period_ym เป็นชื่อเดือนภาษาไทย พ.ศ.
+ */
+function scholarship_period_thai(string $ym): string
+{
+    if (!preg_match('/^(\d{4})-(0[1-9]|1[0-2])$/', $ym, $m)) return $ym;
+    $months = ['', 'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
+        'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
+    return $months[(int)$m[2]] . ' ' . ((int)$m[1] + 543);
+}
+
+/**
+ * สร้าง/อัปเดต payout records สำหรับเดือนที่ระบุ (idempotent)
+ * - เฉพาะนักศึกษา active ที่มี hours paid > 0
+ * - ถ้ามี record อยู่แล้ว status='pending' → อัปเดต snapshot
+ * - ถ้ามี record อยู่แล้ว status='approved' → คงสภาพ (freeze snapshot)
+ *
+ * คืน: ['created' => N, 'updated' => N, 'skipped_approved' => N]
+ */
+function generate_scholarship_payouts(PDO $pdo, string $ym, ?int $adminId = null): array
+{
+    ensure_scholarship_schema($pdo);
+    [$from, $to] = scholarship_period_range($ym);
+
+    $settings = get_scholarship_settings($pdo);
+    $rate = (float)$settings['pay_rate_per_hour'];
+
+    // ดึงนักศึกษา active ทั้งหมด
+    $students = $pdo->query("SELECT id FROM sys_scholarship_students WHERE status='active'")
+        ->fetchAll(PDO::FETCH_COLUMN) ?: [];
+
+    $stats = ['created' => 0, 'updated' => 0, 'skipped_approved' => 0, 'skipped_zero' => 0];
+
+    $check = $pdo->prepare("SELECT id, status FROM sys_scholarship_payouts
+        WHERE student_id = :sid AND period_ym = :ym LIMIT 1");
+    $ins = $pdo->prepare("INSERT INTO sys_scholarship_payouts
+        (student_id, period_ym, hours_paid, pay_rate, amount, status, generated_by, generated_at)
+        VALUES (:sid, :ym, :hrs, :rate, :amt, 'pending', :gby, NOW())");
+    $upd = $pdo->prepare("UPDATE sys_scholarship_payouts
+        SET hours_paid = :hrs, pay_rate = :rate, amount = :amt,
+            generated_by = :gby, generated_at = NOW()
+        WHERE id = :id AND status = 'pending'");
+
+    foreach ($students as $sid) {
+        $sid = (int)$sid;
+        $hoursPaid = sum_scholarship_hours($pdo, $sid, $from, $to, 'paid');
+        if ($hoursPaid <= 0) { $stats['skipped_zero']++; continue; }
+
+        $amount = round($hoursPaid * $rate, 2);
+
+        $check->execute([':sid' => $sid, ':ym' => $ym]);
+        $existing = $check->fetch(PDO::FETCH_ASSOC);
+
+        if (!$existing) {
+            $ins->execute([
+                ':sid' => $sid, ':ym' => $ym,
+                ':hrs' => $hoursPaid, ':rate' => $rate, ':amt' => $amount,
+                ':gby' => $adminId,
+            ]);
+            $stats['created']++;
+        } elseif ($existing['status'] === 'pending') {
+            $upd->execute([
+                ':id' => (int)$existing['id'],
+                ':hrs' => $hoursPaid, ':rate' => $rate, ':amt' => $amount,
+                ':gby' => $adminId,
+            ]);
+            $stats['updated']++;
+        } else {
+            $stats['skipped_approved']++;
+        }
+    }
+
+    return $stats;
+}
+
+/**
+ * รายการ payout ของเดือนที่ระบุ (join นักศึกษา + user)
+ * @param string|null $statusFilter 'pending'|'approved'|null
+ * @param string|null $search ค้นชื่อ/รหัส
+ */
+function list_scholarship_payouts(PDO $pdo, string $ym, ?string $statusFilter = null, ?string $search = null): array
+{
+    ensure_scholarship_schema($pdo);
+    $sql = "SELECT p.*,
+            u.full_name, s.student_code, s.faculty, s.semester,
+            COALESCE(a.full_name, a.username, '') AS approved_by_name
+        FROM sys_scholarship_payouts p
+        INNER JOIN sys_scholarship_students s ON s.id = p.student_id
+        INNER JOIN sys_users u ON u.id = s.user_id
+        LEFT JOIN sys_admins a ON a.id = p.approved_by
+        WHERE p.period_ym = :ym";
+    $params = [':ym' => $ym];
+
+    if ($statusFilter === 'pending' || $statusFilter === 'approved') {
+        $sql .= " AND p.status = :st";
+        $params[':st'] = $statusFilter;
+    }
+    if ($search !== null && $search !== '') {
+        $sql .= " AND (u.full_name LIKE :q OR s.student_code LIKE :q)";
+        $params[':q'] = '%' . $search . '%';
+    }
+    $sql .= " ORDER BY (p.status='approved') ASC, u.full_name ASC";
+
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+}
+
+/**
+ * สรุปยอด payout ของเดือน (count + sum amount แยก status)
+ */
+function scholarship_payout_summary(PDO $pdo, string $ym): array
+{
+    ensure_scholarship_schema($pdo);
+    $stmt = $pdo->prepare("SELECT status, COUNT(*) AS cnt, COALESCE(SUM(amount),0) AS total
+        FROM sys_scholarship_payouts WHERE period_ym = :ym GROUP BY status");
+    $stmt->execute([':ym' => $ym]);
+    $out = [
+        'pending' => ['cnt' => 0, 'total' => 0.0],
+        'approved' => ['cnt' => 0, 'total' => 0.0],
+        'all' => ['cnt' => 0, 'total' => 0.0],
+    ];
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+        $st = $r['status'];
+        if (isset($out[$st])) {
+            $out[$st]['cnt'] = (int)$r['cnt'];
+            $out[$st]['total'] = (float)$r['total'];
+        }
+        $out['all']['cnt'] += (int)$r['cnt'];
+        $out['all']['total'] += (float)$r['total'];
+    }
+    return $out;
+}
+
+/**
+ * เปลี่ยนสถานะ payout (pending ↔ approved)
+ * @return bool
+ */
+function set_scholarship_payout_status(PDO $pdo, int $payoutId, string $newStatus, ?int $adminId = null): bool
+{
+    ensure_scholarship_schema($pdo);
+    if (!in_array($newStatus, ['pending', 'approved'], true)) return false;
+
+    if ($newStatus === 'approved') {
+        $stmt = $pdo->prepare("UPDATE sys_scholarship_payouts
+            SET status = 'approved', approved_by = :by, approved_at = NOW()
+            WHERE id = :id");
+        return $stmt->execute([':id' => $payoutId, ':by' => $adminId]);
+    }
+    // unapprove → กลับเป็น pending + ล้าง approved info
+    $stmt = $pdo->prepare("UPDATE sys_scholarship_payouts
+        SET status = 'pending', approved_by = NULL, approved_at = NULL
+        WHERE id = :id");
+    return $stmt->execute([':id' => $payoutId]);
 }

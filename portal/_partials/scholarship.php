@@ -269,6 +269,20 @@ $portalCsrf = get_csrf_token();
         <button class="sch-tab" data-tab="reports">
             <i class="fa-solid fa-chart-line mr-1.5"></i>รายงาน
         </button>
+        <?php
+        // นับยอด pending ของเดือนปัจจุบัน เพื่อโชว์ badge
+        $_curYm = date('Y-m');
+        $_payoutPendingCnt = 0;
+        try {
+            $_pStmt = $pdo->prepare("SELECT COUNT(*) FROM sys_scholarship_payouts WHERE period_ym = :ym AND status = 'pending'");
+            $_pStmt->execute([':ym' => $_curYm]);
+            $_payoutPendingCnt = (int)$_pStmt->fetchColumn();
+        } catch (PDOException) {}
+        ?>
+        <button class="sch-tab" data-tab="payouts">
+            <i class="fa-solid fa-money-check-dollar mr-1.5"></i>การจ่ายเงิน
+            <?php if ($_payoutPendingCnt > 0): ?><span class="sch-badge"><?= $_payoutPendingCnt > 99 ? '99+' : $_payoutPendingCnt ?></span><?php endif; ?>
+        </button>
         <button class="sch-tab" data-tab="settings">
             <i class="fa-solid fa-gear mr-1.5"></i>ตั้งค่า
         </button>
@@ -510,6 +524,73 @@ $portalCsrf = get_csrf_token();
                 </div>
             </div>
             <div id="rep-table-wrap">
+                <p class="text-center text-sm text-slate-400 py-10"><i class="fa-solid fa-spinner fa-spin mr-2"></i>กำลังโหลด…</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ─── TAB: PAYOUTS (การจ่ายเงินรายเดือน) ─── -->
+    <div class="sch-pane hidden" data-pane="payouts">
+        <div class="sch-card mb-4">
+            <div class="flex flex-wrap items-end gap-3">
+                <div>
+                    <label class="sch-label">เดือนที่จ่าย</label>
+                    <input type="month" id="po-period" class="sch-input" style="width:180px" value="<?= date('Y-m') ?>">
+                </div>
+                <button class="sch-btn sch-btn--ghost" onclick="loadPayouts()">
+                    <i class="fa-solid fa-magnifying-glass"></i>ดู
+                </button>
+                <button class="sch-btn" onclick="generatePayouts()">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i>สร้าง/อัปเดตรายการ
+                </button>
+                <div class="flex-1"></div>
+                <button class="sch-btn sch-btn--ghost" onclick="exportPayoutsCSV()">
+                    <i class="fa-solid fa-file-csv"></i>ดาวน์โหลด CSV
+                </button>
+            </div>
+            <p class="text-[11px] text-slate-500 mt-3">
+                <i class="fa-solid fa-circle-info"></i>
+                "สร้าง/อัปเดต" คำนวณยอดจากชั่วโมงประเภท "ค่าตอบแทน" (paid) ของเดือนที่เลือก ×
+                อัตราที่ตั้งไว้ในแท็บ "ตั้งค่า" · รายการที่อนุมัติแล้วจะถูกล็อก snapshot ไว้
+            </p>
+        </div>
+
+        <!-- KPI summary -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+            <div class="sch-kpi fx-tilt fx-tilt-light" data-tilt="4">
+                <div class="sch-kpi-icon" style="background:#fef3c7;color:#d97706"><i class="fa-solid fa-hourglass-half"></i></div>
+                <p class="sch-kpi-label">รอดำเนินการการเงิน</p>
+                <p class="sch-kpi-value text-amber-600" id="po-kpi-pending">–</p>
+                <p class="sch-kpi-foot" id="po-kpi-pending-total">– บาท</p>
+            </div>
+            <div class="sch-kpi fx-tilt fx-tilt-light" data-tilt="4">
+                <div class="sch-kpi-icon" style="background:#d1fae5;color:#059669"><i class="fa-solid fa-circle-check"></i></div>
+                <p class="sch-kpi-label">การเงินอนุมัติแล้ว</p>
+                <p class="sch-kpi-value text-emerald-600" id="po-kpi-approved">–</p>
+                <p class="sch-kpi-foot" id="po-kpi-approved-total">– บาท</p>
+            </div>
+            <div class="sch-kpi fx-tilt fx-tilt-light" data-tilt="4">
+                <div class="sch-kpi-icon" style="background:#dbeafe;color:#2563eb"><i class="fa-solid fa-coins"></i></div>
+                <p class="sch-kpi-label">ยอดรวมทั้งเดือน</p>
+                <p class="sch-kpi-value text-blue-600" id="po-kpi-total">–</p>
+                <p class="sch-kpi-foot" id="po-kpi-count">– คน</p>
+            </div>
+        </div>
+
+        <div class="sch-card">
+            <div class="flex flex-wrap items-center gap-2 mb-4">
+                <div class="flex gap-1.5">
+                    <button class="sch-tab po-filter active" data-status="" style="font-size:.78rem; padding:.4rem .85rem">ทั้งหมด</button>
+                    <button class="sch-tab po-filter" data-status="pending" style="font-size:.78rem; padding:.4rem .85rem">รอดำเนินการ</button>
+                    <button class="sch-tab po-filter" data-status="approved" style="font-size:.78rem; padding:.4rem .85rem">อนุมัติแล้ว</button>
+                </div>
+                <div class="flex-1"></div>
+                <input type="text" id="po-search" class="sch-input" placeholder="ค้นชื่อ/รหัสนักศึกษา" style="width:240px">
+                <button class="sch-btn sch-btn--ghost" id="po-bulk-approve" style="display:none" onclick="bulkApprovePayouts()">
+                    <i class="fa-solid fa-check-double"></i>อนุมัติที่เลือก (<span id="po-bulk-count">0</span>)
+                </button>
+            </div>
+            <div id="po-table-wrap">
                 <p class="text-center text-sm text-slate-400 py-10"><i class="fa-solid fa-spinner fa-spin mr-2"></i>กำลังโหลด…</p>
             </div>
         </div>
@@ -930,6 +1011,7 @@ $portalCsrf = get_csrf_token();
                 slots: loadSlots,
                 calendar: loadCalendar,
                 reports: loadReports,
+                payouts: loadPayouts,
             })[tab];
             if (loader) loader();
         });
@@ -2251,6 +2333,341 @@ $portalCsrf = get_csrf_token();
             document.querySelectorAll('.slot-dow').forEach(c => c.checked = true);
         }
     };
+
+    // ────── PAYOUTS (สถานะการจ่ายเงินรายเดือน) ──────
+    const poBulkSet = new Set();
+    let poStatusFilter = '';
+    let poPage = 1;
+    const PO_PAGE_SIZE = 20;
+    let poCache = { rows: [], summary: null, pay_rate: 0 };
+
+    function poStatusBadge(status) {
+        if (status === 'approved') {
+            return '<span class="sch-status-badge" style="background:#d1fae5;color:#065f46">'
+                + '<i class="fa-solid fa-circle-check mr-1"></i>การเงินอนุมัติ (พร้อมรับ)</span>';
+        }
+        return '<span class="sch-status-badge" style="background:#fef3c7;color:#92400e">'
+            + '<i class="fa-solid fa-hourglass-half mr-1"></i>รอดำเนินการการเงิน</span>';
+    }
+
+    function poFmtTHB(n) {
+        return (Number(n) || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function poFmtDateTime(s) {
+        if (!s) return '–';
+        const d = new Date(s.replace(' ', 'T'));
+        if (isNaN(d)) return s;
+        return d.toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' });
+    }
+
+    function poRenderTable(rows) {
+        const wrap = document.getElementById('po-table-wrap');
+        if (!rows || rows.length === 0) {
+            wrap.innerHTML = '<div class="text-center py-12 text-slate-400">'
+                + '<i class="fa-solid fa-inbox text-4xl mb-2 block"></i>'
+                + 'ไม่มีรายการในเดือนนี้ — กดปุ่ม "สร้าง/อัปเดตรายการ" เพื่อคำนวณจากชั่วโมงที่ผ่านมา</div>';
+            poBulkSet.clear();
+            updateBulkBar();
+            return;
+        }
+
+        // Pagination
+        const total = rows.length;
+        const totalPages = Math.max(1, Math.ceil(total / PO_PAGE_SIZE));
+        if (poPage > totalPages) poPage = totalPages;
+        const start = (poPage - 1) * PO_PAGE_SIZE;
+        const slice = rows.slice(start, start + PO_PAGE_SIZE);
+
+        let html = '<div class="overflow-x-auto"><table class="sch-table"><thead><tr>'
+            + '<th style="width:34px"><input type="checkbox" id="po-check-all"></th>'
+            + '<th>นักศึกษา</th>'
+            + '<th>รหัส</th>'
+            + '<th class="text-right">ชั่วโมง</th>'
+            + '<th class="text-right">อัตรา</th>'
+            + '<th class="text-right">ยอดเงิน</th>'
+            + '<th>สถานะ</th>'
+            + '<th>ผู้อนุมัติ</th>'
+            + '<th style="width:200px">การดำเนินการ</th>'
+            + '</tr></thead><tbody>';
+
+        for (const r of slice) {
+            const isPending = r.status === 'pending';
+            const isChecked = poBulkSet.has(r.id);
+            const escName = (r.full_name || '').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+            const escCode = (r.student_code || '').replace(/</g, '&lt;');
+            const escFaculty = (r.faculty || '').replace(/</g, '&lt;');
+            const approvedInfo = r.status === 'approved'
+                ? '<div class="text-xs font-bold text-emerald-700">' + (r.approved_by_name || '–').replace(/</g, '&lt;') + '</div>'
+                  + '<div class="text-[10px] text-slate-400">' + poFmtDateTime(r.approved_at) + '</div>'
+                : '<span class="text-xs text-slate-300">–</span>';
+
+            const noteHtml = r.note
+                ? '<div class="text-[11px] text-slate-500 mt-1"><i class="fa-solid fa-note-sticky"></i> ' + r.note.replace(/</g, '&lt;') + '</div>'
+                : '';
+
+            html += '<tr data-payout-id="' + r.id + '">'
+                + '<td>' + (isPending
+                    ? '<input type="checkbox" class="po-row-check" data-id="' + r.id + '"' + (isChecked ? ' checked' : '') + '>'
+                    : '') + '</td>'
+                + '<td><div class="font-bold text-slate-800">' + escName + '</div>'
+                + (escFaculty ? '<div class="text-[11px] text-slate-400">' + escFaculty + '</div>' : '')
+                + noteHtml
+                + '</td>'
+                + '<td><span class="text-xs font-mono text-slate-600">' + escCode + '</span></td>'
+                + '<td class="text-right font-bold">' + Number(r.hours_paid).toFixed(2) + '</td>'
+                + '<td class="text-right text-slate-500">' + Number(r.pay_rate).toFixed(2) + '</td>'
+                + '<td class="text-right font-bold text-emerald-700">' + poFmtTHB(r.amount) + '</td>'
+                + '<td>' + poStatusBadge(r.status) + '</td>'
+                + '<td>' + approvedInfo + '</td>'
+                + '<td>';
+            if (isPending) {
+                html += '<button class="sch-btn sch-btn--xs" onclick="approvePayout(' + r.id + ')">'
+                    + '<i class="fa-solid fa-circle-check"></i>อนุมัติ</button> '
+                    + '<button class="sch-btn sch-btn--xs sch-btn--ghost" onclick="editPayoutNote(' + r.id + ')" title="แก้หมายเหตุ">'
+                    + '<i class="fa-solid fa-pen"></i></button> '
+                    + '<button class="sch-btn sch-btn--xs sch-btn--danger" onclick="deletePayout(' + r.id + ')" title="ลบ">'
+                    + '<i class="fa-solid fa-trash"></i></button>';
+            } else {
+                html += '<button class="sch-btn sch-btn--xs sch-btn--ghost" onclick="unapprovePayout(' + r.id + ')">'
+                    + '<i class="fa-solid fa-rotate-left"></i>ย้อนกลับ</button>';
+            }
+            html += '</td></tr>';
+        }
+        html += '</tbody></table></div>';
+
+        // Pagination + counter
+        html += '<div class="flex items-center justify-between mt-4">'
+            + '<div class="text-xs text-slate-500">หน้า ' + poPage + ' / ' + totalPages + ' · รวม ' + total + ' รายการ</div>'
+            + '<div class="flex gap-1">' + poPagerHtml(poPage, totalPages) + '</div>'
+            + '</div>';
+
+        wrap.innerHTML = html;
+
+        // Wire pagination
+        wrap.querySelectorAll('.pg-btn[data-page]').forEach(b => {
+            b.addEventListener('click', () => {
+                const p = parseInt(b.dataset.page, 10);
+                if (!isNaN(p) && p !== poPage) { poPage = p; poRenderTable(poCache.rows); }
+            });
+        });
+
+        // Wire checkboxes
+        const checkAll = document.getElementById('po-check-all');
+        if (checkAll) {
+            checkAll.addEventListener('change', () => {
+                wrap.querySelectorAll('.po-row-check').forEach(c => {
+                    c.checked = checkAll.checked;
+                    const id = parseInt(c.dataset.id, 10);
+                    if (checkAll.checked) poBulkSet.add(id); else poBulkSet.delete(id);
+                });
+                updateBulkBar();
+            });
+        }
+        wrap.querySelectorAll('.po-row-check').forEach(c => {
+            c.addEventListener('change', () => {
+                const id = parseInt(c.dataset.id, 10);
+                if (c.checked) poBulkSet.add(id); else poBulkSet.delete(id);
+                updateBulkBar();
+            });
+        });
+    }
+
+    function poPagerHtml(cur, total) {
+        if (total <= 1) return '';
+        const win = 2;
+        const out = [];
+        const btn = (label, page, dis, active) =>
+            `<button class="pg-btn${active ? ' active' : ''}${dis ? ' disabled' : ''}" ${dis ? '' : 'data-page="' + page + '"'}>${label}</button>`;
+        out.push(btn('«', 1, cur === 1));
+        out.push(btn('‹', cur - 1, cur === 1));
+        const lo = Math.max(1, cur - win);
+        const hi = Math.min(total, cur + win);
+        if (lo > 1) out.push('<span class="px-1 text-slate-400">…</span>');
+        for (let p = lo; p <= hi; p++) out.push(btn(String(p), p, false, p === cur));
+        if (hi < total) out.push('<span class="px-1 text-slate-400">…</span>');
+        out.push(btn('›', cur + 1, cur === total));
+        out.push(btn('»', total, cur === total));
+        return out.join('');
+    }
+
+    function updateBulkBar() {
+        const bar = document.getElementById('po-bulk-approve');
+        const cnt = document.getElementById('po-bulk-count');
+        if (poBulkSet.size > 0) {
+            bar.style.display = '';
+            cnt.textContent = String(poBulkSet.size);
+        } else {
+            bar.style.display = 'none';
+        }
+    }
+
+    async function loadPayouts() {
+        const ym = document.getElementById('po-period').value || new Date().toISOString().slice(0, 7);
+        const q = document.getElementById('po-search')?.value || '';
+        const wrap = document.getElementById('po-table-wrap');
+        if (wrap) wrap.innerHTML = '<p class="text-center text-sm text-slate-400 py-10"><i class="fa-solid fa-spinner fa-spin mr-2"></i>กำลังโหลด…</p>';
+
+        const data = { period_ym: ym };
+        if (poStatusFilter) data.status = poStatusFilter;
+        if (q) data.q = q;
+
+        const j = await api('payouts', 'list', data);
+        if (!j.ok) {
+            wrap.innerHTML = '<p class="text-center text-rose-500 py-8">โหลดข้อมูลล้มเหลว: ' + (j.error || '?') + '</p>';
+            return;
+        }
+        poCache = { rows: j.rows || [], summary: j.summary, pay_rate: j.pay_rate };
+        poBulkSet.clear();
+        updateBulkBar();
+        poRenderTable(j.rows || []);
+
+        // KPI
+        const s = j.summary || { pending: { cnt: 0, total: 0 }, approved: { cnt: 0, total: 0 }, all: { cnt: 0, total: 0 } };
+        document.getElementById('po-kpi-pending').textContent = s.pending.cnt + ' คน';
+        document.getElementById('po-kpi-pending-total').textContent = poFmtTHB(s.pending.total) + ' บาท';
+        document.getElementById('po-kpi-approved').textContent = s.approved.cnt + ' คน';
+        document.getElementById('po-kpi-approved-total').textContent = poFmtTHB(s.approved.total) + ' บาท';
+        document.getElementById('po-kpi-total').textContent = poFmtTHB(s.all.total);
+        document.getElementById('po-kpi-count').textContent = s.all.cnt + ' คน';
+    }
+    window.loadPayouts = loadPayouts;
+
+    window.generatePayouts = async function() {
+        const ym = document.getElementById('po-period').value || new Date().toISOString().slice(0, 7);
+        const c = await Swal.fire({
+            icon: 'question', title: 'สร้าง/อัปเดตรายการจ่ายเงิน',
+            html: `<div class="text-left text-sm space-y-1">
+                <div>เดือน: <b>${ym}</b></div>
+                <div class="text-xs text-slate-500 mt-2">ระบบจะคำนวณยอดจากชั่วโมง "ค่าตอบแทน" (paid) × อัตราที่ตั้งไว้</div>
+                <div class="text-xs text-slate-500">รายการที่ "อนุมัติแล้ว" จะถูกล็อก snapshot ไว้ ไม่เปลี่ยน</div>
+            </div>`,
+            showCancelButton: true, confirmButtonText: 'สร้าง', cancelButtonText: 'ยกเลิก',
+            confirmButtonColor: '#10b981',
+        });
+        if (!c.isConfirmed) return;
+        const j = await api('payouts', 'generate', { period_ym: ym });
+        if (!j.ok) { Swal.fire({ icon: 'error', text: j.error || 'สร้างไม่สำเร็จ' }); return; }
+        const st = j.stats || {};
+        Swal.fire({
+            icon: 'success', title: 'สร้างสำเร็จ',
+            html: `<div class="text-left text-sm space-y-1">
+                <div>สร้างใหม่: <b>${st.created || 0}</b></div>
+                <div>อัปเดต snapshot: <b>${st.updated || 0}</b></div>
+                <div>ข้าม (อนุมัติแล้ว): <b>${st.skipped_approved || 0}</b></div>
+                <div>ข้าม (ไม่มีชั่วโมง): <b>${st.skipped_zero || 0}</b></div>
+            </div>`,
+            timer: 2500, showConfirmButton: false,
+        });
+        loadPayouts();
+    };
+
+    window.approvePayout = async function(id) {
+        const c = await Swal.fire({
+            icon: 'question', title: 'การเงินอนุมัติ',
+            text: 'ยืนยันว่ารายการนี้พร้อมให้นักศึกษามารับเงินที่การเงิน?',
+            showCancelButton: true, confirmButtonText: 'อนุมัติ', cancelButtonText: 'ยกเลิก',
+            confirmButtonColor: '#10b981',
+        });
+        if (!c.isConfirmed) return;
+        const j = await api('payouts', 'approve', { id });
+        if (!j.ok) { Swal.fire({ icon: 'error', text: j.error || 'อนุมัติไม่สำเร็จ' }); return; }
+        loadPayouts();
+    };
+
+    window.unapprovePayout = async function(id) {
+        const c = await Swal.fire({
+            icon: 'warning', title: 'ย้อนกลับสถานะ',
+            text: 'ย้อนกลับเป็น "รอดำเนินการการเงิน"?',
+            showCancelButton: true, confirmButtonText: 'ย้อนกลับ', cancelButtonText: 'ยกเลิก',
+            confirmButtonColor: '#f59e0b',
+        });
+        if (!c.isConfirmed) return;
+        const j = await api('payouts', 'unapprove', { id });
+        if (!j.ok) { Swal.fire({ icon: 'error', text: j.error || 'ดำเนินการไม่สำเร็จ' }); return; }
+        loadPayouts();
+    };
+
+    window.editPayoutNote = async function(id) {
+        const row = (poCache.rows || []).find(r => Number(r.id) === Number(id));
+        const cur = row ? (row.note || '') : '';
+        const c = await Swal.fire({
+            title: 'หมายเหตุ', input: 'text', inputValue: cur,
+            inputPlaceholder: 'เช่น โอนเงินผ่านธนาคารแล้ว / รอตรวจสอบ',
+            showCancelButton: true, confirmButtonText: 'บันทึก', cancelButtonText: 'ยกเลิก',
+            confirmButtonColor: '#10b981',
+        });
+        if (!c.isConfirmed) return;
+        const j = await api('payouts', 'update_note', { id, note: c.value ?? '' });
+        if (!j.ok) { Swal.fire({ icon: 'error', text: j.error || 'บันทึกไม่สำเร็จ' }); return; }
+        loadPayouts();
+    };
+
+    window.deletePayout = async function(id) {
+        const c = await Swal.fire({
+            icon: 'warning', title: 'ลบรายการ?',
+            text: 'ลบได้เฉพาะรายการที่ยังไม่อนุมัติ — ระบบจะคำนวณใหม่ตอนกดสร้าง/อัปเดตครั้งถัดไป',
+            showCancelButton: true, confirmButtonText: 'ลบ', cancelButtonText: 'ยกเลิก',
+            confirmButtonColor: '#e11d48',
+        });
+        if (!c.isConfirmed) return;
+        const j = await api('payouts', 'delete', { id });
+        if (!j.ok) { Swal.fire({ icon: 'error', text: j.error || 'ลบไม่สำเร็จ' }); return; }
+        loadPayouts();
+    };
+
+    window.bulkApprovePayouts = async function() {
+        if (poBulkSet.size === 0) return;
+        const c = await Swal.fire({
+            icon: 'question', title: 'อนุมัติทั้งหมดที่เลือก?',
+            text: `จะอนุมัติ ${poBulkSet.size} รายการเป็น "การเงินอนุมัติ (พร้อมรับ)"`,
+            showCancelButton: true, confirmButtonText: 'อนุมัติ', cancelButtonText: 'ยกเลิก',
+            confirmButtonColor: '#10b981',
+        });
+        if (!c.isConfirmed) return;
+        const j = await api('payouts', 'bulk_approve', {
+            ids: Array.from(poBulkSet).join(','), new_status: 'approved',
+        });
+        if (!j.ok) { Swal.fire({ icon: 'error', text: j.error || 'อนุมัติไม่สำเร็จ' }); return; }
+        Swal.fire({ icon: 'success', title: `อนุมัติแล้ว ${j.changed || 0} รายการ`, timer: 1300, showConfirmButton: false });
+        loadPayouts();
+    };
+
+    window.exportPayoutsCSV = function() {
+        const ym = document.getElementById('po-period').value || new Date().toISOString().slice(0, 7);
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = AJAX;
+        form.target = '_blank';
+        const fields = { csrf_token: PORTAL_CSRF, entity: 'payouts', action: 'export_csv', period_ym: ym };
+        for (const [k, v] of Object.entries(fields)) {
+            const i = document.createElement('input');
+            i.type = 'hidden'; i.name = k; i.value = v;
+            form.appendChild(i);
+        }
+        document.body.appendChild(form); form.submit(); form.remove();
+    };
+
+    // Filter chips + search wiring
+    document.querySelectorAll('.po-filter').forEach(b => {
+        b.addEventListener('click', () => {
+            document.querySelectorAll('.po-filter').forEach(x => x.classList.remove('active'));
+            b.classList.add('active');
+            poStatusFilter = b.dataset.status || '';
+            poPage = 1;
+            loadPayouts();
+        });
+    });
+
+    let _poSearchTimer = null;
+    document.getElementById('po-search')?.addEventListener('input', () => {
+        clearTimeout(_poSearchTimer);
+        _poSearchTimer = setTimeout(() => { poPage = 1; loadPayouts(); }, 350);
+    });
+
+    document.getElementById('po-period')?.addEventListener('change', () => {
+        poPage = 1; loadPayouts();
+    });
 
     // ── Init: load default tab (Dashboard)
     loadDashboard();

@@ -34,7 +34,8 @@ if (!isset($_POST['csrf_token']) || !verify_csrf_token($_POST['csrf_token'])) {
 }
 
 // CSV export ใช้ header ต่างหาก
-if ($entity !== 'reports' || $action !== 'export_csv') {
+$isCsvExport = ($entity === 'reports' || $entity === 'payouts') && $action === 'export_csv';
+if (!$isCsvExport) {
     header('Content-Type: application/json; charset=utf-8');
 }
 
@@ -50,6 +51,7 @@ try {
         case 'reports':     handle_reports($pdo, $action); break;
         case 'settings':    handle_settings($pdo, $action); break;
         case 'adjustments': handle_adjustments($pdo, $action, $adminId); break;
+        case 'payouts':     handle_payouts($pdo, $action, $adminId); break;
         default:
             echo json_encode(['ok' => false, 'error' => 'Unknown entity']);
     }
@@ -977,5 +979,136 @@ function handle_settings(PDO $pdo, string $action): void
         echo json_encode(['ok' => true, 'settings' => get_scholarship_settings($pdo)], JSON_UNESCAPED_UNICODE);
         return;
     }
+    echo json_encode(['ok' => false, 'error' => 'Unknown action']);
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// PAYOUTS — สถานะการจ่ายเงินรายเดือนให้นักศึกษา
+// 2 สถานะ: pending (รอดำเนินการการเงิน) → approved (การเงินอนุมัติ พร้อมรับ)
+// ─────────────────────────────────────────────────────────────────────
+function handle_payouts(PDO $pdo, string $action, int $adminId): void
+{
+    $ym = (string)($_POST['period_ym'] ?? $_REQUEST['period_ym'] ?? date('Y-m'));
+    if (!preg_match('/^\d{4}-(0[1-9]|1[0-2])$/', $ym)) {
+        $ym = date('Y-m');
+    }
+
+    if ($action === 'list') {
+        $statusFilter = (string)($_POST['status'] ?? '');
+        if (!in_array($statusFilter, ['pending', 'approved'], true)) $statusFilter = null;
+        $search = trim((string)($_POST['q'] ?? ''));
+
+        $rows = list_scholarship_payouts($pdo, $ym, $statusFilter, $search !== '' ? $search : null);
+        $summary = scholarship_payout_summary($pdo, $ym);
+        $settings = get_scholarship_settings($pdo);
+
+        echo json_encode([
+            'ok' => true,
+            'period_ym' => $ym,
+            'period_label' => scholarship_period_thai($ym),
+            'rows' => $rows,
+            'summary' => $summary,
+            'pay_rate' => (float)$settings['pay_rate_per_hour'],
+        ], JSON_UNESCAPED_UNICODE);
+        return;
+    }
+
+    if ($action === 'generate') {
+        $stats = generate_scholarship_payouts($pdo, $ym, $adminId);
+        echo json_encode([
+            'ok' => true,
+            'period_ym' => $ym,
+            'period_label' => scholarship_period_thai($ym),
+            'stats' => $stats,
+        ], JSON_UNESCAPED_UNICODE);
+        return;
+    }
+
+    if ($action === 'approve' || $action === 'unapprove') {
+        $id = (int)($_POST['id'] ?? 0);
+        if (!$id) { echo json_encode(['ok' => false, 'error' => 'missing id']); return; }
+        $newStatus = $action === 'approve' ? 'approved' : 'pending';
+        $ok = set_scholarship_payout_status($pdo, $id, $newStatus, $adminId);
+        echo json_encode(['ok' => $ok]);
+        return;
+    }
+
+    if ($action === 'bulk_approve') {
+        $ids = $_POST['ids'] ?? '';
+        $idList = array_values(array_filter(array_map('intval', is_array($ids) ? $ids : explode(',', (string)$ids))));
+        if (empty($idList)) { echo json_encode(['ok' => false, 'error' => 'ไม่มีรายการที่เลือก']); return; }
+
+        $newStatus = (string)($_POST['new_status'] ?? 'approved');
+        if (!in_array($newStatus, ['pending', 'approved'], true)) {
+            echo json_encode(['ok' => false, 'error' => 'invalid status']); return;
+        }
+
+        $changed = 0;
+        $pdo->beginTransaction();
+        try {
+            foreach ($idList as $id) {
+                if (set_scholarship_payout_status($pdo, $id, $newStatus, $adminId)) $changed++;
+            }
+            $pdo->commit();
+        } catch (Throwable $e) {
+            $pdo->rollBack();
+            error_log('[scholarship_payouts] bulk error: ' . $e->getMessage());
+            echo json_encode(['ok' => false, 'error' => 'Bulk update failed']);
+            return;
+        }
+        echo json_encode(['ok' => true, 'changed' => $changed]);
+        return;
+    }
+
+    if ($action === 'update_note') {
+        $id = (int)($_POST['id'] ?? 0);
+        $note = mb_substr(trim((string)($_POST['note'] ?? '')), 0, 255);
+        if (!$id) { echo json_encode(['ok' => false, 'error' => 'missing id']); return; }
+        $stmt = $pdo->prepare("UPDATE sys_scholarship_payouts SET note = :n WHERE id = :id");
+        $stmt->execute([':id' => $id, ':n' => $note]);
+        echo json_encode(['ok' => true]);
+        return;
+    }
+
+    if ($action === 'delete') {
+        $id = (int)($_POST['id'] ?? 0);
+        if (!$id) { echo json_encode(['ok' => false, 'error' => 'missing id']); return; }
+        $stmt = $pdo->prepare("DELETE FROM sys_scholarship_payouts WHERE id = :id AND status = 'pending'");
+        $stmt->execute([':id' => $id]);
+        $affected = $stmt->rowCount();
+        echo json_encode([
+            'ok' => $affected > 0,
+            'error' => $affected > 0 ? null : 'ลบไม่ได้ (อาจอนุมัติแล้ว)',
+        ]);
+        return;
+    }
+
+    if ($action === 'export_csv') {
+        $rows = list_scholarship_payouts($pdo, $ym, null, null);
+        $filename = "scholarship_payouts_{$ym}.csv";
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        echo "\xEF\xBB\xBF"; // UTF-8 BOM
+        $out = fopen('php://output', 'w');
+        fputcsv($out, ['ชื่อ', 'รหัสนักศึกษา', 'คณะ', 'ภาคเรียน',
+            'ชั่วโมงค่าตอบแทน', 'อัตรา (บาท/ชม.)', 'ยอดเงิน (บาท)',
+            'สถานะ', 'ผู้อนุมัติ', 'วันที่อนุมัติ', 'หมายเหตุ']);
+        $statusLabel = ['pending' => 'รอดำเนินการการเงิน', 'approved' => 'การเงินอนุมัติ (พร้อมรับ)'];
+        foreach ($rows as $r) {
+            fputcsv($out, [
+                $r['full_name'], $r['student_code'], $r['faculty'], $r['semester'],
+                number_format((float)$r['hours_paid'], 2),
+                number_format((float)$r['pay_rate'], 2),
+                number_format((float)$r['amount'], 2),
+                $statusLabel[$r['status']] ?? $r['status'],
+                $r['approved_by_name'] ?? '',
+                $r['approved_at'] ?? '',
+                $r['note'] ?? '',
+            ]);
+        }
+        fclose($out);
+        return;
+    }
+
     echo json_encode(['ok' => false, 'error' => 'Unknown action']);
 }
