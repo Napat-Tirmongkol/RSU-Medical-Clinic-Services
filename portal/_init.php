@@ -39,6 +39,7 @@ $hasDashboardAdmin    = $isSuper || !empty($_SESSION['access_dashboard_admin']);
 $hasMonthlyReport     = $isSuper || !empty($_SESSION['access_monthly_report']) || !empty($_SESSION['access_director_view']);
 $hasNurseProductivity = $isSuper || ($adminRole === 'admin') || !empty($_SESSION['access_nurse_productivity']);
 $hasAccidentLog       = $isSuper || ($adminRole === 'admin') || !empty($_SESSION['access_nurse_productivity']); // piggyback flag เดียวกัน
+$hasGoldCardStats     = $isSuper || !empty($_SESSION['access_insurance']); // gate เหมือน gold_card.php
 $hasDailySummary      = $isSuper || ($adminRole === 'admin') || !empty($_SESSION['access_daily_summary']);
 $hasAsset             = $isSuper || in_array($_SESSION['role'] ?? '', ['admin','editor'], true) || !empty($_SESSION['access_asset']);
 $hasConsumables       = $isSuper || in_array($_SESSION['role'] ?? '', ['admin','editor'], true) || !empty($_SESSION['access_consumables']);

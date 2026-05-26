@@ -518,6 +518,7 @@
             $hasMonthlyReport  = $isSuper || !empty($_SESSION['access_monthly_report']) || !empty($_SESSION['access_director_view']);
             $hasNurseProductivity = $isSuper || ($adminRole === 'admin') || !empty($_SESSION['access_nurse_productivity']);
             $hasAccidentLog       = $isSuper || ($adminRole === 'admin') || !empty($_SESSION['access_nurse_productivity']); // piggyback flag เดียวกัน
+            $hasGoldCardStats     = $isSuper || !empty($_SESSION['access_insurance']); // gate เหมือน gold_card.php
             $hasDailySummary      = $isSuper || ($adminRole === 'admin') || !empty($_SESSION['access_daily_summary']);
             $hasAsset          = $isSuper || in_array($_SESSION['role'] ?? '', ['admin','editor'], true) || !empty($_SESSION['access_asset']);
             $hasConsumables    = $isSuper || in_array($_SESSION['role'] ?? '', ['admin','editor'], true) || !empty($_SESSION['access_consumables']);
@@ -669,6 +670,12 @@
                         <a class="psb-item <?= $activeSection==='gold_card'?'psb-active':'' ?>" data-section="gold_card" href="gold_card.php">
                             <div class="psb-icon"><i class="fa-solid fa-id-card" style="color:#f59e0b"></i></div>
                             <span class="psb-label">บัตรทอง</span>
+                        </a>
+                    <?php endif; ?>
+                    <?php if ($hasGoldCardStats): ?>
+                        <a class="psb-item <?= $activeSection==='gold_card_stats'?'psb-active':'' ?>" data-section="gold_card_stats" href="gold_card_stats.php">
+                            <div class="psb-icon"><i class="fa-solid fa-chart-line" style="color:#d97706"></i></div>
+                            <span class="psb-label">สถิติบัตรทอง</span>
                         </a>
                     <?php endif; ?>
                     <?php if ($hasRegistry): ?>

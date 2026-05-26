@@ -28,7 +28,7 @@ $known = [
     'gold_card','clinic_data','scholarship','nurse_schedule',
     'manage_insurance_partners','registry_upload','batch_status','profile',
     'activity_dashboard','activity_logs','error_logs','sentry_events',
-    'monthly_report','daily_summary','nurse_productivity','accident_log','documents',
+    'monthly_report','daily_summary','nurse_productivity','accident_log','gold_card_stats','documents',
     'email_logs','smtp_settings','sentry_test','edms','line_settings',
     'privilege_inventory',
 ];
