@@ -32,6 +32,7 @@ function mb_log_delivery(PDO $pdo, int $briefId, int $sid, string $stype, string
 function mb_build_line_flex(array $brief, array $priorities, bool $isTest = false): array {
     $data = $brief['data'] ?? [];
     $clinic = $data['clinic'] ?? [];
+    $camp = $data['campaign'] ?? [];
     $sch = $data['scholarship'] ?? [];
 
     $urgencyColor = [
@@ -57,6 +58,36 @@ function mb_build_line_flex(array $brief, array $priorities, bool $isTest = fals
         'size' => 'sm', 'color' => '#475569', 'wrap' => true, 'margin' => $isTest ? 'sm' : 'none',
     ];
 
+    // Top campaigns block (ถ้ามี)
+    if (!empty($camp['top_campaigns'])) {
+        $bodyContents[] = ['type' => 'separator', 'margin' => 'md'];
+        $bodyContents[] = [
+            'type' => 'text', 'text' => 'แคมเปญวันนี้ (Top ' . count($camp['top_campaigns']) . ')',
+            'size' => 'xs', 'weight' => 'bold', 'color' => '#9a3412', 'margin' => 'md',
+        ];
+        foreach ($camp['top_campaigns'] as $tc) {
+            $bodyContents[] = [
+                'type' => 'box', 'layout' => 'horizontal', 'margin' => 'sm',
+                'contents' => [
+                    ['type' => 'text', 'text' => '· ' . ($tc['title'] ?? ''),
+                     'size' => 'xs', 'color' => '#0f172a', 'wrap' => true, 'flex' => 5],
+                    ['type' => 'text', 'text' => ($tc['booked'] ?? 0) . ' คน',
+                     'size' => 'xs', 'color' => '#64748b', 'align' => 'end', 'flex' => 2],
+                ],
+            ];
+        }
+        if (!empty($camp['yesterday_no_show_rate']) && $camp['yesterday_no_show_rate'] > 0) {
+            $bodyContents[] = [
+                'type' => 'text',
+                'text' => 'ขาดนัดเมื่อวาน ' . $camp['yesterday_no_show'] . '/' . $camp['yesterday_scheduled']
+                          . ' (' . $camp['yesterday_no_show_rate'] . '%)',
+                'size' => 'xxs',
+                'color' => ($camp['yesterday_no_show_rate'] > 15 ? '#dc2626' : '#94a3b8'),
+                'margin' => 'sm',
+            ];
+        }
+    }
+
     if ($priorities) {
         $bodyContents[] = ['type' => 'separator', 'margin' => 'md'];
         foreach (array_slice($priorities, 0, 4) as $p) {
@@ -72,13 +103,18 @@ function mb_build_line_flex(array $brief, array $priorities, bool $isTest = fals
         }
     }
 
+    // KPI footer — prefer campaign today_scheduled if > 0
+    $apptToday = (int)($camp['today_scheduled'] ?? 0) > 0
+        ? (int)$camp['today_scheduled']
+        : (int)($clinic['appointments_today'] ?? 0);
+
     $bodyContents[] = ['type' => 'separator', 'margin' => 'lg'];
     $bodyContents[] = [
         'type' => 'box', 'layout' => 'horizontal', 'margin' => 'md',
         'contents' => [
             _mb_flex_kpi_box('รออนุมัติ', (string)(int)($sch['pending_approvals'] ?? 0)),
             _mb_flex_kpi_box('กะวันนี้', (string)(int)($sch['today_shifts'] ?? 0)),
-            _mb_flex_kpi_box('นัดวันนี้', (string)(int)($clinic['appointments_today'] ?? 0)),
+            _mb_flex_kpi_box('นัดแคมเปญ', (string)$apptToday),
         ],
     ];
 
@@ -120,6 +156,7 @@ function _mb_flex_kpi_box(string $label, string $value): array {
 function mb_build_email_html(array $brief, array $priorities, bool $isTest = false): string {
     $data = $brief['data'] ?? [];
     $clinic = $data['clinic'] ?? [];
+    $camp = $data['campaign'] ?? [];
     $sch = $data['scholarship'] ?? [];
     $edms = $data['edms'] ?? [];
 
@@ -140,12 +177,37 @@ function mb_build_email_html(array $brief, array $priorities, bool $isTest = fal
             . '</li>';
     }
 
+    // Campaign block (Top 3 + no-show)
+    $campHtml = '';
+    if (!empty($camp['top_campaigns'])) {
+        $campHtml = '<div style="margin-top:1.5rem;padding:1rem;background:#fff7ed;border-left:3px solid #ea580c;border-radius:6px">'
+            . '<h3 style="margin:0 0 .65rem;font-size:13px;color:#9a3412">แคมเปญวันนี้</h3>'
+            . '<table style="width:100%;border-collapse:collapse;font-size:13px">';
+        foreach ($camp['top_campaigns'] as $tc) {
+            $campHtml .= '<tr><td style="padding:.2rem 0;color:#0f172a">· ' . $h($tc['title'] ?? '') . '</td>'
+                . '<td style="padding:.2rem 0;text-align:right;color:#64748b;white-space:nowrap">' . (int)($tc['booked'] ?? 0) . ' คน</td></tr>';
+        }
+        $campHtml .= '</table>';
+        if (!empty($camp['yesterday_no_show_rate']) && $camp['yesterday_no_show_rate'] > 0) {
+            $nsColor = $camp['yesterday_no_show_rate'] > 15 ? '#dc2626' : '#94a3b8';
+            $campHtml .= '<p style="margin:.6rem 0 0;font-size:11px;color:' . $nsColor . '">'
+                . 'ขาดนัดเมื่อวาน ' . (int)$camp['yesterday_no_show'] . '/' . (int)$camp['yesterday_scheduled']
+                . ' (' . $camp['yesterday_no_show_rate'] . '%)</p>';
+        }
+        $campHtml .= '</div>';
+    }
+
+    // KPI footer — prefer campaign data
+    $apptToday = (int)($camp['today_scheduled'] ?? 0) > 0
+        ? (int)$camp['today_scheduled']
+        : (int)($clinic['appointments_today'] ?? 0);
+
     $statsHtml = '<table style="width:100%;border-collapse:collapse;margin-top:1rem">'
         . '<tr>'
         . '<td style="padding:.5rem;background:#f8fafc;text-align:center"><div style="font-size:11px;color:#64748b">รออนุมัติ</div><div style="font-size:18px;font-weight:bold">' . (int)($sch['pending_approvals'] ?? 0) . '</div></td>'
         . '<td style="padding:.5rem;background:#f8fafc;text-align:center"><div style="font-size:11px;color:#64748b">กะวันนี้</div><div style="font-size:18px;font-weight:bold">' . (int)($sch['today_shifts'] ?? 0) . '</div></td>'
         . '<td style="padding:.5rem;background:#f8fafc;text-align:center"><div style="font-size:11px;color:#64748b">งาน EDMS</div><div style="font-size:18px;font-weight:bold">' . (int)($edms['tasks_due_today'] ?? 0) . '</div></td>'
-        . '<td style="padding:.5rem;background:#f8fafc;text-align:center"><div style="font-size:11px;color:#64748b">นัดวันนี้</div><div style="font-size:18px;font-weight:bold">' . (int)($clinic['appointments_today'] ?? 0) . '</div></td>'
+        . '<td style="padding:.5rem;background:#f8fafc;text-align:center"><div style="font-size:11px;color:#64748b">นัดแคมเปญ</div><div style="font-size:18px;font-weight:bold">' . $apptToday . '</div></td>'
         . '</tr></table>';
 
     return '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' . $title . '</title></head>'
@@ -156,6 +218,7 @@ function mb_build_email_html(array $brief, array $priorities, bool $isTest = fal
         . '<p style="margin:0 0 1rem;color:#64748b;font-size:13px">' . $h($clinic['weekday_thai'] ?? '') . '</p>'
         . '<p style="line-height:1.6;color:#334155">' . $narrative . '</p>'
         . ($priHtml ? '<h3 style="font-size:14px;color:#0f172a;margin:1.5rem 0 .5rem">สิ่งที่ต้องทำ</h3><ul style="padding-left:1.25rem">' . $priHtml . '</ul>' : '')
+        . $campHtml
         . $statsHtml
         . '<p style="margin-top:1.5rem;font-size:11px;color:#94a3b8;text-align:center">RSU Medical Clinic Services · ' . $h($brief['ai_model'] ?? '') . '</p>'
         . '</div></body></html>';

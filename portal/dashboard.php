@@ -60,6 +60,7 @@ layout_start(['section' => 'dashboard', 'title' => 'Dashboard']);
                         #mb-widget [data-urgency="low"]      { background:#dcfce7; color:#166534; }
                         .mb-priority { display:flex; gap:.75rem; padding:.65rem .85rem; border-radius:.5rem; background:#f8fafc; border:1px solid #e2e8f0; }
                         .mb-priority-icon { flex-shrink:0; width:1.75rem; height:1.75rem; border-radius:.5rem; display:flex; align-items:center; justify-content:center; font-size:.75rem; }
+                        .mb-priority[data-mod="campaign"] .mb-priority-icon { background:#fed7aa; color:#9a3412; }
                         .mb-priority[data-mod="scholarship"] .mb-priority-icon { background:#dcfce7; color:#166534; }
                         .mb-priority[data-mod="finance"] .mb-priority-icon { background:#fef3c7; color:#92400e; }
                         .mb-priority[data-mod="edms"] .mb-priority-icon { background:#e0e7ff; color:#3730a3; }
@@ -85,6 +86,7 @@ layout_start(['section' => 'dashboard', 'title' => 'Dashboard']);
 
                         const URGENCY_LABEL = { low: 'ปกติ', normal: 'มีงานเข้า', high: 'ต้องดูด่วน', critical: 'วิกฤต' };
                         const MOD_ICON = {
+                            campaign: 'fa-calendar-check',
                             scholarship: 'fa-graduation-cap',
                             finance: 'fa-money-check-dollar',
                             edms: 'fa-file-lines',
@@ -93,6 +95,7 @@ layout_start(['section' => 'dashboard', 'title' => 'Dashboard']);
                             other: 'fa-circle-info',
                         };
                         const MOD_LINK = {
+                            campaign: '../admin/daily_report.php',
                             scholarship: '?section=scholarship',
                             finance: '?section=finance',
                             edms: '?section=edms',
@@ -123,6 +126,7 @@ layout_start(['section' => 'dashboard', 'title' => 'Dashboard']);
                         function mbRender(brief, unread) {
                             const data = brief.data || {};
                             const clinic = data.clinic || {};
+                            const camp = data.campaign || {};
                             const sch = data.scholarship || {};
                             const fin = data.finance || {};
                             const edms = data.edms || {};
@@ -168,12 +172,15 @@ layout_start(['section' => 'dashboard', 'title' => 'Dashboard']);
                                 pwrap.innerHTML = '';
                             }
 
-                            // Stats grid (key numbers)
+                            // Stats grid (key numbers) — prefer e-Campaign data, fallback to generic bookings
+                            const apptToday = (Number(camp.today_scheduled || 0) > 0)
+                                ? Number(camp.today_scheduled || 0)
+                                : Number(clinic.appointments_today || 0);
                             const stats = [
                                 { label: 'รออนุมัติ',         value: fmt(sch.pending_approvals) },
                                 { label: 'กะวันนี้',          value: fmt(sch.today_shifts) },
+                                { label: 'นัดแคมเปญวันนี้',   value: fmt(apptToday) },
                                 { label: 'งาน EDMS ครบกำหนด', value: fmt(edms.tasks_due_today) },
-                                { label: 'นัดหมายวันนี้',     value: fmt(clinic.appointments_today) },
                             ];
                             document.getElementById('mb-stats').innerHTML = stats.map(s =>
                                 `<div class="mb-stat">

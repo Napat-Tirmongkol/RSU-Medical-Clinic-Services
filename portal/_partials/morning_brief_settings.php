@@ -21,6 +21,7 @@ $pref = morning_brief_get_or_create_pref($pdo, $adminId, 'admin');
 $modules = json_decode($pref['modules_json'] ?? '[]', true) ?: ['scholarship','finance','edms','clinic','inventory'];
 
 $MODULE_LABELS = [
+    'campaign'    => ['e-Campaign',   'นัดแคมเปญวันนี้ · Top 3 · ขาดนัดเมื่อวาน', 'fa-calendar-check'],
     'scholarship' => ['นักศึกษาทุน', 'รออนุมัติ · กะวันนี้ · ค่าตอบแทนค้าง', 'fa-graduation-cap'],
     'finance'     => ['การเงิน',     'ยอดเข้า-ออกเมื่อวาน · รายการประจำเดือน', 'fa-money-check-dollar'],
     'edms'        => ['สารบรรณ',     'งานครบกำหนด · SLA เกินเวลา', 'fa-file-lines'],

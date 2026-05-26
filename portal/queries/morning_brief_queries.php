@@ -141,6 +141,74 @@ function morning_brief_collect_edms(PDO $pdo, string $today): array {
     ];
 }
 
+function morning_brief_collect_campaign(PDO $pdo, string $today): array {
+    $yesterday = date('Y-m-d', strtotime($today . ' -1 day'));
+
+    // วันนี้: schedule total / attended-so-far / cancelled
+    $todayStats = _safe_rows($pdo, "
+        SELECT
+            SUM(CASE WHEN s.slot_date = :d1 AND b.status NOT IN ('cancelled','cancelled_by_admin') THEN 1 ELSE 0 END) AS total_scheduled,
+            SUM(CASE WHEN s.slot_date = :d2 AND b.attended_at IS NOT NULL
+                          AND b.status NOT IN ('cancelled','cancelled_by_admin') THEN 1 ELSE 0 END) AS attended,
+            SUM(CASE WHEN s.slot_date = :d3 AND b.status IN ('cancelled','cancelled_by_admin') THEN 1 ELSE 0 END) AS cancelled
+        FROM camp_bookings b
+        JOIN camp_slots s ON b.slot_id = s.id
+        WHERE s.slot_date = :d4",
+        [':d1'=>$today, ':d2'=>$today, ':d3'=>$today, ':d4'=>$today]);
+    $t = $todayStats[0] ?? [];
+
+    // เมื่อวาน: no-show rate
+    $yStats = _safe_rows($pdo, "
+        SELECT
+            SUM(CASE WHEN s.slot_date = :d1 AND b.attended_at IS NULL
+                          AND b.status NOT IN ('cancelled','cancelled_by_admin') THEN 1 ELSE 0 END) AS no_show,
+            SUM(CASE WHEN s.slot_date = :d2 AND b.status NOT IN ('cancelled','cancelled_by_admin') THEN 1 ELSE 0 END) AS scheduled
+        FROM camp_bookings b
+        JOIN camp_slots s ON b.slot_id = s.id
+        WHERE s.slot_date = :d3",
+        [':d1'=>$yesterday, ':d2'=>$yesterday, ':d3'=>$yesterday]);
+    $y = $yStats[0] ?? [];
+    $yNoShow = (int)($y['no_show'] ?? 0);
+    $yScheduled = (int)($y['scheduled'] ?? 0);
+    $noShowRate = $yScheduled > 0 ? round($yNoShow / $yScheduled * 100, 1) : 0.0;
+
+    // Top 3 campaigns วันนี้
+    $top = _safe_rows($pdo, "
+        SELECT cl.title, COUNT(b.id) AS booked,
+               SUM(CASE WHEN b.attended_at IS NOT NULL AND b.status NOT IN ('cancelled','cancelled_by_admin') THEN 1 ELSE 0 END) AS attended
+        FROM camp_bookings b
+        JOIN camp_slots s ON b.slot_id = s.id
+        JOIN camp_list cl ON b.campaign_id = cl.id
+        WHERE s.slot_date = :d
+          AND b.status NOT IN ('cancelled','cancelled_by_admin')
+        GROUP BY cl.id, cl.title
+        ORDER BY booked DESC
+        LIMIT 3", [':d'=>$today]);
+
+    // Active campaigns (ยังเปิดอยู่)
+    $active = _safe_int($pdo,
+        "SELECT COUNT(*) FROM camp_list
+         WHERE (end_date IS NULL OR end_date >= :d)
+           AND (start_date IS NULL OR start_date <= :d)
+           AND (status IS NULL OR status NOT IN ('archived','draft'))",
+        [':d'=>$today]);
+
+    return [
+        'today_scheduled' => (int)($t['total_scheduled'] ?? 0),
+        'today_attended'  => (int)($t['attended'] ?? 0),
+        'today_cancelled' => (int)($t['cancelled'] ?? 0),
+        'yesterday_no_show' => $yNoShow,
+        'yesterday_scheduled' => $yScheduled,
+        'yesterday_no_show_rate' => $noShowRate,
+        'active_campaigns' => $active,
+        'top_campaigns' => array_map(fn($r) => [
+            'title'    => (string)$r['title'],
+            'booked'   => (int)$r['booked'],
+            'attended' => (int)($r['attended'] ?? 0),
+        ], $top),
+    ];
+}
+
 function morning_brief_collect_inventory(PDO $pdo, string $today): array {
     return [
         'consumables_low_stock' => _safe_int($pdo,
@@ -205,6 +273,7 @@ function morning_brief_collect_all(PDO $pdo, ?string $date = null): array {
         'brief_date'   => $today,
         'collected_at' => date('Y-m-d H:i:s'),
         'clinic'       => morning_brief_collect_clinic($pdo, $today),
+        'campaign'     => morning_brief_collect_campaign($pdo, $today),
         'scholarship'  => morning_brief_collect_scholarship($pdo, $today),
         'finance'      => morning_brief_collect_finance($pdo, $today),
         'edms'         => morning_brief_collect_edms($pdo, $today),
@@ -252,7 +321,7 @@ function morning_brief_get_or_create_pref(PDO $pdo, int $staffId, string $staffT
     $st->execute([':sid'=>$staffId, ':st'=>$staffType]);
     $row = $st->fetch(PDO::FETCH_ASSOC);
     if ($row) return $row;
-    $defaults = ['scholarship','finance','edms','clinic','inventory'];
+    $defaults = ['campaign','scholarship','finance','edms','clinic','inventory'];
     $ins = $pdo->prepare("INSERT INTO sys_morning_brief_prefs
         (staff_id, staff_type, channel_portal, channel_line, channel_email, delivery_hour, modules_json, updated_at)
         VALUES (:sid, :st, 1, 0, 0, 8, :m, NOW())");

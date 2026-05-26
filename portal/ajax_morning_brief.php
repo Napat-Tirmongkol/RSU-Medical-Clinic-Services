@@ -92,10 +92,10 @@ switch ($action) {
         $ce = isset($_POST['channel_email'])  ? (int)!!$_POST['channel_email']  : 0;
         $hr = max(0, min(23, (int)($_POST['delivery_hour'] ?? 8)));
         $modules = array_values(array_intersect(
-            ['scholarship','finance','edms','clinic','inventory'],
+            ['campaign','scholarship','finance','edms','clinic','inventory'],
             (array)($_POST['modules'] ?? [])
         ));
-        if (!$modules) $modules = ['scholarship','finance','edms','clinic','inventory'];
+        if (!$modules) $modules = ['campaign','scholarship','finance','edms','clinic','inventory'];
         $line  = trim((string)($_POST['line_user_id'] ?? ''));
         $email = trim((string)($_POST['email'] ?? ''));
         if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {

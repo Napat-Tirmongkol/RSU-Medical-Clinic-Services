@@ -97,6 +97,9 @@ $summary
 - ถ้า sla_breached > 0 → urgency อย่างน้อย "high"
 - ถ้า consumables_low_stock > 0 → ใส่ priority หมวด inventory
 - ถ้า recurring_due_today > 0 → priority หมวด finance (ไป generate)
+- ถ้า today_scheduled > 0 (campaign) → ใส่ priority "นัดหมายแคมเปญวันนี้" + ระบุยอดและ top แคมเปญ
+- ถ้า yesterday_no_show_rate > 15 → priority "ตามผู้ขาดนัด" หมวด campaign + urgency อย่างน้อย "normal"
+- ถ้า active_campaigns = 0 และ today_scheduled = 0 → ไม่ต้องพูดถึงแคมเปญ
 - ถ้าทุกอย่างปกติ → urgency = "low" + narrative สั้นๆ ว่าเช้านี้สงบ
 - ห้ามใส่ข้อมูลที่ไม่มีใน snapshot · ห้ามแต่งตัวเลขใหม่
 - ตอบเป็น JSON object เดียวเท่านั้น ไม่ต้องห่อ markdown
@@ -141,12 +144,31 @@ function _mb_parse_response(string $text): ?array {
 // Rule-based fallback ─ ใช้เมื่อ Gemini ไม่ตอบ/ไม่ได้ตั้ง key
 function _mb_fallback(array $data, string $reason = ''): array {
     $clinic = $data['clinic'] ?? [];
+    $camp   = $data['campaign'] ?? [];
     $sch    = $data['scholarship'] ?? [];
     $fin    = $data['finance'] ?? [];
     $edms   = $data['edms'] ?? [];
     $inv    = $data['inventory'] ?? [];
 
     $priorities = [];
+    if (($camp['today_scheduled'] ?? 0) > 0) {
+        $topTitle = $camp['top_campaigns'][0]['title'] ?? '';
+        $detail = 'มีนัด ' . $camp['today_scheduled'] . ' รายการ'
+                . ($topTitle ? ' · เด่นสุด: ' . $topTitle : '');
+        $priorities[] = [
+            'title' => 'นัดหมายแคมเปญวันนี้',
+            'detail' => $detail,
+            'module' => 'campaign',
+        ];
+    }
+    if (($camp['yesterday_no_show_rate'] ?? 0) > 15) {
+        $priorities[] = [
+            'title' => 'ตามผู้ขาดนัดเมื่อวาน',
+            'detail' => 'No-show rate เมื่อวาน ' . $camp['yesterday_no_show_rate'] . '% (' .
+                ($camp['yesterday_no_show'] ?? 0) . '/' . ($camp['yesterday_scheduled'] ?? 0) . ' คน)',
+            'module' => 'campaign',
+        ];
+    }
     if (($sch['pending_approvals'] ?? 0) > 0) {
         $priorities[] = [
             'title' => 'อนุมัติ clock-in นักศึกษาทุน',
