@@ -51,19 +51,26 @@ function morning_brief_generate_narrative(array $data, ?string $apiKey = null): 
         'propertyOrdering' => ['narrative', 'urgency', 'priorities'],
     ];
 
-    $body = [
-        'contents' => [['role' => 'user', 'parts' => [['text' => $prompt]]]],
-        'generationConfig' => [
-            'temperature' => 0.25,
-            'maxOutputTokens' => 2200,
-            'responseMimeType' => 'application/json',
-            'responseSchema' => $responseSchema,
-        ],
+    $genCfgBase = [
+        'temperature' => 0.25,
+        'maxOutputTokens' => 8000,
+        'responseMimeType' => 'application/json',
+        'responseSchema' => $responseSchema,
     ];
 
     $models = ['gemini-2.5-flash', 'gemini-2.0-flash'];
     $raw = ''; $httpCode = 0; $rawText = '';
     foreach ($models as $model) {
+        $genCfg = $genCfgBase;
+        // 2.5 series มี "thinking" mode ที่กิน output budget — ปิดเพื่อให้
+        // เหลือ token ไว้สำหรับ JSON output จริงๆ (2.0 ไม่มี thinking)
+        if (strpos($model, '2.5') !== false) {
+            $genCfg['thinkingConfig'] = ['thinkingBudget' => 0];
+        }
+        $body = [
+            'contents' => [['role' => 'user', 'parts' => [['text' => $prompt]]]],
+            'generationConfig' => $genCfg,
+        ];
         $resp = _mb_call_gemini($apiKey, $model, $body);
         if ($resp['curlErr']) {
             return _mb_fallback($data, 'เชื่อมต่อ Gemini ไม่ได้: ' . $resp['curlErr']);
