@@ -26,17 +26,43 @@ function morning_brief_generate_narrative(array $data, ?string $apiKey = null): 
     }
 
     $prompt = _mb_build_prompt($data);
+    // responseSchema → บังคับโครงสร้าง output ระดับ API (กัน Gemini เพิ่ม prose/preamble)
+    $responseSchema = [
+        'type' => 'OBJECT',
+        'properties' => [
+            'narrative' => ['type' => 'STRING'],
+            'urgency'   => ['type' => 'STRING', 'enum' => ['low','normal','high','critical']],
+            'priorities' => [
+                'type' => 'ARRAY',
+                'items' => [
+                    'type' => 'OBJECT',
+                    'properties' => [
+                        'title'  => ['type' => 'STRING'],
+                        'detail' => ['type' => 'STRING'],
+                        'module' => ['type' => 'STRING',
+                            'enum' => ['campaign','scholarship','finance','edms','inventory','clinic','other']],
+                    ],
+                    'required' => ['title', 'detail', 'module'],
+                    'propertyOrdering' => ['title', 'detail', 'module'],
+                ],
+            ],
+        ],
+        'required' => ['narrative', 'urgency', 'priorities'],
+        'propertyOrdering' => ['narrative', 'urgency', 'priorities'],
+    ];
+
     $body = [
         'contents' => [['role' => 'user', 'parts' => [['text' => $prompt]]]],
         'generationConfig' => [
-            'temperature' => 0.35,
-            'maxOutputTokens' => 1400,
+            'temperature' => 0.25,
+            'maxOutputTokens' => 2200,
             'responseMimeType' => 'application/json',
+            'responseSchema' => $responseSchema,
         ],
     ];
 
     $models = ['gemini-2.5-flash', 'gemini-2.0-flash'];
-    $raw = ''; $httpCode = 0;
+    $raw = ''; $httpCode = 0; $rawText = '';
     foreach ($models as $model) {
         $resp = _mb_call_gemini($apiKey, $model, $body);
         if ($resp['curlErr']) {
@@ -45,14 +71,19 @@ function morning_brief_generate_narrative(array $data, ?string $apiKey = null): 
         $raw = $resp['raw']; $httpCode = $resp['httpCode'];
         if ($httpCode === 200) {
             $j = json_decode($raw, true);
-            $text = $j['candidates'][0]['content']['parts'][0]['text'] ?? '';
-            $parsed = _mb_parse_response($text);
+            $rawText = $j['candidates'][0]['content']['parts'][0]['text'] ?? '';
+            // detect truncation
+            $finishReason = $j['candidates'][0]['finishReason'] ?? '';
+            $parsed = _mb_parse_response($rawText);
             if ($parsed) {
                 $parsed['model'] = $model;
                 $parsed['ok'] = true;
                 return $parsed;
             }
-            return _mb_fallback($data, 'AI ตอบกลับในรูปแบบที่อ่านไม่ได้');
+            $hint = $finishReason === 'MAX_TOKENS'
+                ? ' (ตอบยาวเกิน — เพิ่ม maxOutputTokens)'
+                : ' (ตอบ: "' . mb_substr($rawText, 0, 120) . (mb_strlen($rawText) > 120 ? '…"' : '"') . ')';
+            return _mb_fallback($data, 'AI ตอบกลับในรูปแบบที่อ่านไม่ได้' . $hint);
         }
         if ($httpCode !== 404) break;
     }
@@ -130,10 +161,49 @@ function _mb_call_gemini(string $apiKey, string $model, array $body): array {
 
 function _mb_parse_response(string $text): ?array {
     $text = trim($text);
-    if (preg_match('/```json\s*(.+?)\s*```/s', $text, $m)) $text = $m[1];
-    elseif (preg_match('/```\s*(.+?)\s*```/s', $text, $m)) $text = $m[1];
+    if ($text === '') return null;
+
+    // Strategy 1: ลอง parse ตรงๆ ก่อน (กรณี responseMimeType=application/json ทำงานปกติ)
     $j = json_decode($text, true);
+
+    // Strategy 2: strip markdown fence ```json ... ``` หรือ ``` ... ```
+    if (!is_array($j)) {
+        if (preg_match('/```(?:json)?\s*(.+?)\s*```/s', $text, $m)) {
+            $j = json_decode(trim($m[1]), true);
+        }
+    }
+
+    // Strategy 3: ดึง first {...} object ออกมาด้วย brace matching
+    if (!is_array($j)) {
+        $start = strpos($text, '{');
+        if ($start !== false) {
+            $depth = 0; $end = -1; $inStr = false; $esc = false;
+            for ($i = $start; $i < strlen($text); $i++) {
+                $c = $text[$i];
+                if ($esc) { $esc = false; continue; }
+                if ($c === '\\' && $inStr) { $esc = true; continue; }
+                if ($c === '"') { $inStr = !$inStr; continue; }
+                if ($inStr) continue;
+                if ($c === '{') $depth++;
+                elseif ($c === '}') {
+                    $depth--;
+                    if ($depth === 0) { $end = $i; break; }
+                }
+            }
+            if ($end > $start) {
+                $j = json_decode(substr($text, $start, $end - $start + 1), true);
+            }
+        }
+    }
+
+    // Strategy 4: strip trailing comma + retry (Gemini sometimes adds ,])
+    if (!is_array($j)) {
+        $cleaned = preg_replace('/,(\s*[\]}])/', '$1', $text);
+        $j = json_decode($cleaned, true);
+    }
+
     if (!is_array($j)) return null;
+
     $urgency = strtolower($j['urgency'] ?? 'normal');
     if (!in_array($urgency, ['low','normal','high','critical'], true)) $urgency = 'normal';
     return [
