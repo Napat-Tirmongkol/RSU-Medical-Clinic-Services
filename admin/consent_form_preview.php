@@ -22,18 +22,103 @@ $_previewer = htmlspecialchars(
     ENT_QUOTES, 'UTF-8'
 );
 
-// Mock data — pretend this was pre-filled from booking + sys_users join
-$mock = [
-    'patient_name'    => 'ณภัทร ธีรมงคล',
-    'national_id'     => '1-1037-12345-67-8',
-    'date_of_birth'   => '15 มี.ค. 2546',
-    'mobile'          => '081-234-5678',
-    'student_id'      => '64012345',
-    'faculty'         => 'แพทยศาสตร์ชั้นปีที่ 3',
-    'address'         => '52/3 ซ.พหลโยธิน 87 ต.หลักหก อ.เมือง จ.ปทุมธานี 12000',
-    'campaign_title'  => 'ฉีดวัคซีนไข้หวัดใหญ่ประจำปี 2569',
-    'appointment_at'  => '26 พ.ค. 2569 · 10:30 - 11:00 น.',
-];
+/* ─────────────────────────────────────────────────────────────────────
+ * Preview-as-user data loading (admin only)
+ * Patient view pulls from sys_users when ?user_id=N is provided.
+ * Tablet view ignores user_id since it is staff-facing.
+ * ──────────────────────────────────────────────────────────────────── */
+$pdo = db();
+$selectedUserId = isset($_GET['user_id']) ? (int)$_GET['user_id'] : 0;
+$selectedUser   = null;
+$pickerUsers    = [];
+
+if ($selectedUserId > 0) {
+    try {
+        $st = $pdo->prepare("SELECT * FROM sys_users WHERE id = :id LIMIT 1");
+        $st->execute([':id' => $selectedUserId]);
+        $selectedUser = $st->fetch(PDO::FETCH_ASSOC) ?: null;
+    } catch (PDOException) { /* fail soft to mock */ }
+}
+
+if (!$selectedUser) {
+    // Picker list — recently active users with at least name + phone
+    try {
+        $pickerUsers = $pdo->query("
+            SELECT id, prefix, first_name, last_name, full_name, student_personnel_id, department
+            FROM sys_users
+            WHERE (first_name != '' OR full_name != '')
+              AND (status IS NULL OR status != 'inactive')
+            ORDER BY updated_at DESC, id DESC
+            LIMIT 50
+        ")->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    } catch (PDOException) { $pickerUsers = []; }
+}
+
+/* Format helpers (Thai locale) */
+function _fmt_thai_date(?string $iso): string {
+    if (!$iso || $iso === '0000-00-00') return '—';
+    $t = strtotime($iso);
+    if (!$t) return '—';
+    static $m = ['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+    return (int)date('j', $t) . ' ' . $m[(int)date('n', $t)] . ' ' . (date('Y', $t) + 543);
+}
+function _fmt_thai_id(?string $cid): string {
+    $cid = preg_replace('/\D/', '', (string)$cid);
+    if (strlen($cid) !== 13) return $cid ?: '—';
+    return sprintf('%s-%s-%s-%s-%s',
+        substr($cid,0,1), substr($cid,1,4), substr($cid,5,5), substr($cid,10,2), substr($cid,12,1));
+}
+function _fmt_phone(?string $p): string {
+    $p = preg_replace('/\D/', '', (string)$p);
+    if (strlen($p) === 10) return substr($p,0,3) . '-' . substr($p,3,3) . '-' . substr($p,6,4);
+    return $p ?: '—';
+}
+
+if ($selectedUser) {
+    // Compose preview data from real profile
+    $fullName = trim($selectedUser['full_name'] ?: trim(($selectedUser['prefix'] ?? '') . ' ' . ($selectedUser['first_name'] ?? '') . ' ' . ($selectedUser['last_name'] ?? '')));
+    $medical = trim(($selectedUser['chronic_conditions'] ?? '') . ($selectedUser['allergies'] ? "\nแพ้: " . $selectedUser['allergies'] : ''));
+    $mock = [
+        'patient_name'    => $fullName ?: '—',
+        'national_id'     => _fmt_thai_id($selectedUser['citizen_id'] ?? ''),
+        'date_of_birth'   => _fmt_thai_date($selectedUser['date_of_birth'] ?? null),
+        'mobile'          => _fmt_phone($selectedUser['phone_number'] ?? ''),
+        'student_id'      => $selectedUser['student_personnel_id'] ?: '—',
+        'faculty'         => $selectedUser['department'] ?: '—',
+        'address'         => '— ดึงจาก booking ตอน production (sys_users ไม่ได้เก็บที่อยู่)',
+        'medical'         => $medical ?: '',
+        'campaign_title'  => 'ฉีดวัคซีนไข้หวัดใหญ่ประจำปี 2569 (ตัวอย่าง)',
+        'appointment_at'  => '26 พ.ค. 2569 · 10:30 - 11:00 น. (ตัวอย่าง)',
+        'emergency_name'  => $selectedUser['emergency_contact_name'] ?: '',
+        'emergency_phone' => _fmt_phone($selectedUser['emergency_contact_phone'] ?? ''),
+        'gender'          => $selectedUser['gender'] ?: '',
+        'blood_type'      => $selectedUser['blood_type'] ?: '',
+        'height_cm'       => $selectedUser['height_cm'] ?: '',
+        'weight_kg'       => $selectedUser['weight_kg'] ?: '',
+        'is_real'         => true,
+    ];
+} else {
+    // Fallback mock when no user_id selected
+    $mock = [
+        'patient_name'    => 'ณภัทร ธีรมงคล',
+        'national_id'     => '1-1037-12345-67-8',
+        'date_of_birth'   => '15 มี.ค. 2546',
+        'mobile'          => '081-234-5678',
+        'student_id'      => '64012345',
+        'faculty'         => 'แพทยศาสตร์ชั้นปีที่ 3',
+        'address'         => '52/3 ซ.พหลโยธิน 87 ต.หลักหก อ.เมือง จ.ปทุมธานี 12000',
+        'medical'         => '',
+        'campaign_title'  => 'ฉีดวัคซีนไข้หวัดใหญ่ประจำปี 2569 (ตัวอย่าง)',
+        'appointment_at'  => '26 พ.ค. 2569 · 10:30 - 11:00 น. (ตัวอย่าง)',
+        'emergency_name'  => '',
+        'emergency_phone' => '',
+        'gender'          => '',
+        'blood_type'      => '',
+        'height_cm'       => '',
+        'weight_kg'       => '',
+        'is_real'         => false,
+    ];
+}
 ?><!DOCTYPE html>
 <html lang="th">
 <head>
@@ -577,9 +662,10 @@ $mock = [
 </head>
 <body data-view="<?= $view ?>">
 
+<?php $_uidQs = $selectedUserId > 0 ? '&amp;user_id=' . $selectedUserId : ''; ?>
 <div class="view-switch" role="group" aria-label="สลับมุมมอง preview">
-  <a href="?view=patient" class="<?= $view==='patient'?'is-active':'' ?>">มือถือคนไข้</a>
-  <a href="?view=tablet"  class="<?= $view==='tablet' ?'is-active':'' ?>">แทบเล็ตคลินิก</a>
+  <a href="?view=patient<?= $_uidQs ?>" class="<?= $view==='patient'?'is-active':'' ?>">มือถือคนไข้</a>
+  <a href="?view=tablet<?= $_uidQs ?>"  class="<?= $view==='tablet' ?'is-active':'' ?>">แทบเล็ตคลินิก</a>
 </div>
 
 <div class="shell">
@@ -598,7 +684,7 @@ $mock = [
 
   <!-- Admin test mode banner -->
   <div style="background:linear-gradient(135deg,#fef3c7,#fde68a); border:1.5px solid #fbbf24;
-              border-radius:14px; padding:10px 14px; margin-bottom:14px;
+              border-radius:14px; padding:10px 14px; margin-bottom:10px;
               display:flex; gap:10px; align-items:center; font-size:12.5px; color:#78350f;">
     <i class="fa-solid fa-triangle-exclamation" style="font-size:14px;"></i>
     <div>
@@ -606,6 +692,50 @@ $mock = [
       ข้อมูลที่กรอกในหน้านี้จะไม่ถูกบันทึก กดได้ทุกปุ่มเพื่อทดลอง flow
     </div>
   </div>
+
+  <!-- User picker / preview-as indicator -->
+  <?php if ($selectedUser): ?>
+    <div style="background:linear-gradient(135deg,#eff6ff,#dbeafe); border:1.5px solid #93c5fd;
+                border-radius:14px; padding:10px 14px; margin-bottom:14px;
+                display:flex; gap:12px; align-items:center; font-size:12.5px; color:#1e3a8a;">
+      <i class="fa-solid fa-user-check" style="font-size:14px;"></i>
+      <div style="flex:1;">
+        <strong>กำลังดูเป็น:</strong> <?= htmlspecialchars($mock['patient_name']) ?>
+        <?php if ($mock['student_id'] !== '—'): ?>
+          · <span style="color:#1d4ed8;">รหัส <?= htmlspecialchars($mock['student_id']) ?></span>
+        <?php endif; ?>
+        · <span style="opacity:.75;">ข้อมูลดึงจาก sys_users (id <?= (int)$selectedUserId ?>)</span>
+      </div>
+      <a href="?view=<?= $view ?>" style="background:#fff; border:1.5px solid #93c5fd;
+            color:#1d4ed8; padding:5px 10px; border-radius:8px; font-weight:700;
+            text-decoration:none; font-size:11.5px; display:inline-flex; gap:5px; align-items:center;">
+        <i class="fa-solid fa-arrow-rotate-left"></i> เปลี่ยน user
+      </a>
+    </div>
+  <?php elseif ($view === 'patient'): ?>
+    <div style="background:#fff; border:1.5px solid #e2e8f0; border-radius:14px;
+                padding:12px 14px; margin-bottom:14px;
+                display:flex; gap:12px; align-items:center; font-size:12.5px;">
+      <i class="fa-solid fa-magnifying-glass" style="font-size:14px; color:#64748b;"></i>
+      <div style="flex:1; color:#475569;">
+        <strong style="color:#0f172a;">เลือก user เพื่อ preview as</strong>
+        — production คนไข้จะ auto-fill จาก profile ตัวเอง · ตอนนี้เป็น mock data
+      </div>
+      <select id="userPicker" onchange="if(this.value)location.href='?view=<?= $view ?>&user_id='+this.value"
+              style="font-family:inherit; font-size:12px; padding:7px 10px; border-radius:8px;
+                     border:1.5px solid #cbd5e1; background:#fff; color:#0f172a; min-width:220px;">
+        <option value="">— เลือก user จาก sys_users —</option>
+        <?php foreach ($pickerUsers as $u):
+          $disp = trim($u['full_name'] ?: trim(($u['prefix'] ?? '') . ' ' . ($u['first_name'] ?? '') . ' ' . ($u['last_name'] ?? '')));
+          if ($disp === '') continue;
+          $tag = $u['student_personnel_id'] ? ' · ' . $u['student_personnel_id'] : '';
+          if (!empty($u['department'])) $tag .= ' · ' . $u['department'];
+        ?>
+          <option value="<?= (int)$u['id'] ?>"><?= htmlspecialchars($disp . $tag) ?></option>
+        <?php endforeach; ?>
+      </select>
+    </div>
+  <?php endif; ?>
 
   <!-- STEPPER -->
   <div class="stepper" id="stepper">
@@ -655,19 +785,65 @@ $mock = [
         </div>
       </div>
 
+      <?php if (!empty($mock['is_real'])): ?>
+      <!-- Extra fields shown only when previewing as a real user (from sys_users) -->
+      <div class="info-grid" style="margin-top:10px;">
+        <?php if (!empty($mock['gender']) || !empty($mock['blood_type'])): ?>
+        <div class="info-item">
+          <div class="k">เพศ / กรุ๊ปเลือด</div>
+          <div class="v">
+            <?= htmlspecialchars($mock['gender'] ?: '—') ?>
+            <?php if (!empty($mock['blood_type'])): ?> · กรุ๊ป <?= htmlspecialchars($mock['blood_type']) ?><?php endif; ?>
+          </div>
+        </div>
+        <?php endif; ?>
+        <?php if (!empty($mock['height_cm']) || !empty($mock['weight_kg'])): ?>
+        <div class="info-item">
+          <div class="k">ส่วนสูง / น้ำหนัก</div>
+          <div class="v">
+            <?= htmlspecialchars($mock['height_cm'] ?: '—') ?> ซม. · <?= htmlspecialchars($mock['weight_kg'] ?: '—') ?> กก.
+          </div>
+        </div>
+        <?php endif; ?>
+        <?php if (!empty($mock['emergency_name'])): ?>
+        <div class="info-item" style="grid-column: 1 / -1;">
+          <div class="k">ผู้ติดต่อฉุกเฉิน</div>
+          <div class="v">
+            <?= htmlspecialchars($mock['emergency_name']) ?>
+            <?php if (!empty($mock['emergency_phone'])): ?> · โทร <?= htmlspecialchars($mock['emergency_phone']) ?><?php endif; ?>
+          </div>
+        </div>
+        <?php endif; ?>
+      </div>
+      <?php endif; ?>
+
       <div style="margin-top:14px;">
         <div class="field">
-          <label>เบอร์โทรศัพท์ติดต่อ <span class="req">*</span></label>
+          <label>
+            เบอร์โทรศัพท์ติดต่อ <span class="req">*</span>
+            <?php if (!empty($mock['is_real']) && $mock['mobile'] !== '—'): ?>
+              <span style="background:#dcfce7;color:#15803d;font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:6px;margin-left:6px;">
+                <i class="fa-solid fa-check"></i> จาก profile
+              </span>
+            <?php endif; ?>
+          </label>
           <input type="tel" value="<?= htmlspecialchars($mock['mobile']) ?>">
-          <div class="field-hint">ใช้สำหรับติดต่อกรณีฉุกเฉินหลังฉีดวัคซีน</div>
+          <div class="field-hint">ใช้สำหรับติดต่อกรณีฉุกเฉินหลังฉีดวัคซีน · แก้ไขได้ถ้าต้องการ</div>
         </div>
         <div class="field">
           <label>ที่อยู่ปัจจุบัน <span class="req">*</span></label>
-          <textarea rows="2"><?= htmlspecialchars($mock['address']) ?></textarea>
+          <textarea rows="2"<?= !empty($mock['is_real']) ? ' placeholder="กรอกที่อยู่ — sys_users ไม่ได้เก็บฟิลด์นี้ ให้คนไข้กรอกตอน consent"' : '' ?>><?= !empty($mock['is_real']) ? '' : htmlspecialchars($mock['address']) ?></textarea>
         </div>
         <div class="field">
-          <label>ประวัติโรคประจำตัว / ยาที่กำลังใช้</label>
-          <textarea rows="2" placeholder="เช่น เบาหวาน, ความดันสูง, ยาละลายลิ่มเลือด — ถ้าไม่มีให้เว้นว่าง"></textarea>
+          <label>
+            ประวัติโรคประจำตัว / ยาที่กำลังใช้
+            <?php if (!empty($mock['medical'])): ?>
+              <span style="background:#dcfce7;color:#15803d;font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:6px;margin-left:6px;">
+                <i class="fa-solid fa-check"></i> จาก profile
+              </span>
+            <?php endif; ?>
+          </label>
+          <textarea rows="2" placeholder="เช่น เบาหวาน, ความดันสูง, ยาละลายลิ่มเลือด — ถ้าไม่มีให้เว้นว่าง"><?= htmlspecialchars($mock['medical']) ?></textarea>
         </div>
       </div>
     </div>
