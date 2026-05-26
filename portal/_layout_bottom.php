@@ -2215,9 +2215,9 @@
 (function () {
     const portalSteps = [
         { popover: { title: 'ยินดีต้อนรับสู่ Portal', description: 'ระบบจัดการคลินิก RSU Medical Clinic Services — ทัวร์สั้นๆ ดูเมนูหลักกัน' } },
-        { element: '#portal-sidebar', popover: { title: 'Sidebar เมนู', description: 'เมนูจัดเป็นกลุ่ม (OVERVIEW / AI Suite / สิทธิ์ / ประกัน / สื่อสาร / คลังพัสดุ / ติดตามระบบ / ข้อมูลหลัก / ตั้งค่า) — คลิกหัวกลุ่มเพื่อเปิด/ปิด', side: 'right' } },
+        { element: '#portal-sidebar', popover: { title: 'Sidebar เมนู', description: 'เมนูจัดเป็น 8 กลุ่ม: ภาพรวม / งานคลินิก / รายงาน & ตรวจสอบ / ทรัพยากร / สื่อสาร & AI / ระบบ & สิทธิ์ / ข้อมูลหลัก / ตั้งค่า — คลิกหัวกลุ่มเพื่อเปิด/ปิด', side: 'right' } },
         { element: '#psb-apps-launcher', popover: { title: 'App Launcher (ใหม่!)', description: 'เมนูเปิดทุกระบบ (e-Borrow, ครุภัณฑ์, วัสดุ, Insurance Sync, ISO, LINE ฯลฯ) ย้ายมาอยู่ที่นี่แล้ว — Dashboard เลยโล่งขึ้น', side: 'right' } },
-        { element: '.psb-section-toggle[data-group="inventory"]', popover: { title: 'คลังพัสดุ', description: 'รวมทางเข้า "ครุภัณฑ์สำนักงาน" + "วัสดุสิ้นเปลือง" ไว้กลุ่มเดียว', side: 'right' } },
+        { element: '.psb-section-toggle[data-group="resources"]', popover: { title: 'ทรัพยากร', description: 'รวม "การเงิน + บิลลิ่ง + เงินเดือน" และทางเข้า "คลังพัสดุ" (ครุภัณฑ์ + วัสดุสิ้นเปลือง)', side: 'right' } },
         { element: '[data-section="settings"]', popover: { title: 'ตั้งค่าระบบ', description: 'ที่อยู่ของ Site Settings, Maintenance, LINE, AI ฯลฯ', side: 'right' } },
         { popover: { title: 'เริ่มใช้งานได้เลย', description: 'กดปุ่ม <i class="fa-solid fa-question"></i> มุมขวาล่างเมื่อต้องการดูทัวร์ซ้ำได้ตลอด' } },
     ];

@@ -533,11 +533,17 @@
             // layout_start(). Sidebar + dashboard both read the same values.
             ?>
 
-            <?php /* ── OVERVIEW ───────────────────────────────────────────── */ ?>
+            <?php /* ══════════════════════════════════════════════════════════
+             * SIDEBAR — 8 consolidated groups (refactored from 15)
+             * 1. overview · 2. clinical · 3. reports · 4. resources
+             * 5. comm · 6. system · 7. masterdata · 8. settings
+             * ══════════════════════════════════════════════════════════ */ ?>
+
+            <?php /* ── 1. ภาพรวม (Overview) ─────────────────────────────── */ ?>
             <?php if (!$registryOnly): ?>
                 <button type="button" class="psb-section-toggle" data-group="overview" onclick="togglePsbGroup('overview',this)">
                     <i class="fa-solid fa-chart-line" style="color:#94a3b8"></i>
-                    <span>OVERVIEW</span>
+                    <span>ภาพรวม</span>
                     <i class="fa-solid fa-chevron-down psb-chevron"></i>
                 </button>
                 <div class="psb-group" data-group="overview">
@@ -559,154 +565,238 @@
                 </div>
             <?php endif; ?>
 
-            <?php /* ── AI SUITE ────────────────────────────────────────────── */ ?>
-            <?php if (!$registryOnly && ($isSuper || !empty($_SESSION['access_ai']))): ?>
-                <button type="button" class="psb-section-toggle" data-group="ai" onclick="togglePsbGroup('ai',this)">
-                    <i class="fa-solid fa-wand-magic-sparkles" style="color:#a855f7"></i>
-                    <span>AI Suite</span>
-                    <i class="fa-solid fa-chevron-down psb-chevron"></i>
-                </button>
-                <div class="psb-group" data-group="ai">
-                    <a class="psb-item" data-section="ai_assistant" href="ai_assistant.php">
-                        <div class="psb-icon"><i class="fa-solid fa-wand-magic-sparkles" style="color:#8b5cf6"></i></div>
-                        <span class="psb-label">AI Assistant</span>
-                    </a>
-                    <a class="psb-item <?= $activeSection==='admin_chat'?'psb-active':'' ?>" data-section="admin_chat" href="admin_chat.php">
-                        <div class="psb-icon"><i class="fa-solid fa-comments" style="color:#a855f7"></i></div>
-                        <span class="psb-label">ผู้ช่วยข้อมูล</span>
-                    </a>
-                    <a class="psb-item <?= $activeSection==='ai_qa_lab'?'psb-active':'' ?>" data-section="ai_qa_lab" href="ai_qa_lab.php">
-                        <div class="psb-icon"><i class="fa-solid fa-flask-vial" style="color:#a855f7"></i></div>
-                        <span class="psb-label">AI QA Lab</span>
-                    </a>
-                    <a class="psb-item <?= $activeSection==='ai_prompts'?'psb-active':'' ?>" data-section="ai_prompts" href="ai_prompts.php">
-                        <div class="psb-icon"><i class="fa-solid fa-code" style="color:#a855f7"></i></div>
-                        <span class="psb-label">AI Prompts</span>
-                    </a>
-                    <a class="psb-item <?= $activeSection==='ai_knowledge'?'psb-active':'' ?>" data-section="ai_knowledge" href="ai_knowledge.php">
-                        <div class="psb-icon"><i class="fa-solid fa-database" style="color:#10b981"></i></div>
-                        <span class="psb-label">AI Knowledge</span>
-                    </a>
-                </div>
-            <?php endif; ?>
-
-            <?php /* ── LINE OFFICIAL ──────────────────────────────────────── */ ?>
-            <?php if (!$registryOnly && ($isSuper || !empty($_SESSION['access_ai']))): ?>
-                <button type="button" class="psb-section-toggle" data-group="line" onclick="togglePsbGroup('line',this)">
-                    <i class="fa-brands fa-line" style="color:#06c755"></i>
-                    <span>LINE Official</span>
-                    <i class="fa-solid fa-chevron-down psb-chevron"></i>
-                </button>
-                <div class="psb-group" data-group="line">
-                    <a class="psb-item <?= $activeSection==='line_chat'?'psb-active':'' ?>" data-section="line_chat" href="line_chat.php">
-                        <div class="psb-icon"><i class="fa-brands fa-line" style="color:#06c755"></i></div>
-                        <span class="psb-label">LINE Chat</span>
-                    </a>
-                </div>
-            <?php endif; ?>
-
-            <?php /* ── สิทธิ์ & ความปลอดภัย ──────────────────────────────── */ ?>
+            <?php /* ── 2. งานคลินิก (Clinical Ops) — รวม ประกัน + ยา + ความปลอดภัย ───── */ ?>
             <?php
-            // Gate the group header itself: render only if user can see at least one item inside.
-            // (Empty group toggles confuse users — they expand and find nothing.)
-            $hasSecurityGroup = $isSuper || !empty($_SESSION['access_identity']);
-            if (!$registryOnly && $hasSecurityGroup): ?>
-                <button type="button" class="psb-section-toggle" data-group="security" onclick="togglePsbGroup('security',this)">
-                    <i class="fa-solid fa-shield-halved" style="color:#2563eb"></i>
-                    <span>สิทธิ์ &amp; ความปลอดภัย</span>
+            $_clinicalShow = (!$registryOnly && ($hasInsuranceGroup || $hasAccidentLog
+                || ($isSuper || $adminRole === 'admin' || !empty($_SESSION['access_identity']))));
+            if ($_clinicalShow): ?>
+                <button type="button" class="psb-section-toggle" data-group="clinical" onclick="togglePsbGroup('clinical',this)">
+                    <i class="fa-solid fa-stethoscope" style="color:#0ea5e9"></i>
+                    <span>งานคลินิก</span>
                     <i class="fa-solid fa-chevron-down psb-chevron"></i>
                 </button>
-                <div class="psb-group" data-group="security">
-                    <?php if ($isSuper || !empty($_SESSION['access_identity'])): ?>
-                    <a class="psb-item" data-section="identity" href="identity.php">
-                        <div class="psb-icon"><i class="fa-solid fa-id-card-clip" style="color:#2563eb"></i></div>
-                        <span class="psb-label">Identity &amp; Governance</span>
-                    </a>
+                <div class="psb-group" data-group="clinical">
+                    <?php /* ── Insurance & Gold Card ── */ ?>
+                    <?php if ($hasInsuranceGroup): ?>
+                        <?php if (!$registryOnly && $hasInsurance): ?>
+                            <a class="psb-item <?= $activeSection==='insurance_dashboard'?'psb-active':'' ?>" data-section="insurance_dashboard" href="insurance_dashboard.php">
+                                <div class="psb-icon"><i class="fa-solid fa-chart-pie" style="color:#3b82f6"></i></div>
+                                <span class="psb-label">Dashboard Workbook</span>
+                            </a>
+                            <a class="psb-item" data-section="insurance_sync" href="insurance_sync.php">
+                                <div class="psb-icon"><i class="fa-solid fa-shield-halved" style="color:#0ea5e9"></i></div>
+                                <span class="psb-label">Insurance Hub</span>
+                            </a>
+                            <a class="psb-item <?= $activeSection==='gold_card_pending'?'psb-active':'' ?>" data-section="gold_card_pending" href="gold_card_pending.php">
+                                <div class="psb-icon"><i class="fa-solid fa-hourglass-half" style="color:#3b82f6"></i></div>
+                                <span class="psb-label">ย้ายสิทธิ์บัตรทอง</span>
+                                <?php
+                                $pendingBadgeCount = 0;
+                                try { $pendingBadgeCount = (int)db()->query("SELECT COUNT(*) FROM gold_card_members WHERE status = 'submitted'")->fetchColumn(); }
+                                catch (PDOException) {}
+                                if ($pendingBadgeCount > 0): ?>
+                                    <span class="ml-auto px-2 py-0.5 rounded-full bg-rose-500 text-white text-[10px] font-black"><?= $pendingBadgeCount > 99 ? '99+' : $pendingBadgeCount ?></span>
+                                <?php endif; ?>
+                            </a>
+                            <a class="psb-item <?= $activeSection==='gold_card'?'psb-active':'' ?>" data-section="gold_card" href="gold_card.php">
+                                <div class="psb-icon"><i class="fa-solid fa-id-card" style="color:#f59e0b"></i></div>
+                                <span class="psb-label">บัตรทอง</span>
+                            </a>
+                        <?php endif; ?>
+                        <?php if ($hasGoldCardStats): ?>
+                            <a class="psb-item <?= $activeSection==='gold_card_stats'?'psb-active':'' ?>" data-section="gold_card_stats" href="gold_card_stats.php">
+                                <div class="psb-icon"><i class="fa-solid fa-chart-line" style="color:#d97706"></i></div>
+                                <span class="psb-label">สถิติบัตรทอง</span>
+                            </a>
+                        <?php endif; ?>
+                        <?php if ($hasRegistry): ?>
+                            <a class="psb-item <?= $activeSection==='registry_upload'?'psb-active':'' ?>" data-section="registry_upload" href="registry_upload.php">
+                                <div class="psb-icon"><i class="fa-solid fa-id-card-clip" style="color:#06b6d4"></i></div>
+                                <span class="psb-label">อัพโหลดรายชื่อ (ทะเบียน)</span>
+                            </a>
+                        <?php endif; ?>
+                        <?php if ($hasInsurance): ?>
+                            <a class="psb-item <?= $activeSection==='batch_status'?'psb-active':'' ?>" data-section="batch_status" href="batch_status.php">
+                                <div class="psb-icon"><i class="fa-solid fa-list-check" style="color:#0891b2"></i></div>
+                                <span class="psb-label">สถานะเอกสาร</span>
+                            </a>
+                        <?php endif; ?>
+                        <?php if (!$registryOnly && $isSuper): ?>
+                            <a class="psb-item" data-section="manage_insurance_partners" href="manage_insurance_partners.php">
+                                <div class="psb-icon"><i class="fa-solid fa-handshake" style="color:#10b981"></i></div>
+                                <span class="psb-label">Insurance Partners</span>
+                            </a>
+                        <?php endif; ?>
                     <?php endif; ?>
-                    <?php if ($isSuper): ?>
-                        <a class="psb-item" data-section="privilege_inventory" href="privilege_inventory.php">
-                            <div class="psb-icon"><i class="fa-solid fa-shield-halved" style="color:#10b981"></i></div>
-                            <span class="psb-label">ISO Governance</span>
-                        </a>
-                    <?php endif; ?>
-                    <?php if ($isSuper || !empty($_SESSION['access_identity'])): ?>
-                    <a class="psb-item <?= $activeSection==='pdpa_audit'?'psb-active':'' ?>" data-section="pdpa_audit" href="pdpa_audit.php" data-new-key="pdpa_audit_v1">
-                        <div class="psb-icon"><i class="fa-solid fa-user-shield" style="color:#7c3aed"></i></div>
-                        <span class="psb-label">PDPA Audit</span>
-                        <span class="psb-new-badge">NEW</span>
-                    </a>
-                    <?php endif; ?>
-                </div>
-            <?php endif; ?>
 
-            <?php /* ── ประกันสุขภาพ ─────────────────────────────────────── */ ?>
-            <?php if ($hasInsuranceGroup): ?>
-                <button type="button" class="psb-section-toggle" data-group="insurance" onclick="togglePsbGroup('insurance',this)">
-                    <i class="fa-solid fa-hospital-user" style="color:#0ea5e9"></i>
-                    <span>ประกันสุขภาพ</span>
-                    <i class="fa-solid fa-chevron-down psb-chevron"></i>
-                </button>
-                <div class="psb-group" data-group="insurance">
-                    <?php if (!$registryOnly && $hasInsurance): ?>
-                        <a class="psb-item <?= $activeSection==='insurance_dashboard'?'psb-active':'' ?>" data-section="insurance_dashboard" href="insurance_dashboard.php">
-                            <div class="psb-icon"><i class="fa-solid fa-chart-pie" style="color:#3b82f6"></i></div>
-                            <span class="psb-label">Dashboard Workbook</span>
+                    <?php /* ── ยา / วัคซีน ── */ ?>
+                    <?php if (!$registryOnly && ($isSuper || $adminRole === 'admin' || !empty($_SESSION['access_identity']))): ?>
+                        <div class="psb-divider" aria-hidden="true"></div>
+                        <a class="psb-item <?= $activeSection==='vaccinations'?'psb-active':'' ?>" data-section="vaccinations" href="vaccinations.php" data-new-key="vaccinations_v1">
+                            <div class="psb-icon"><i class="fa-solid fa-syringe" style="color:#0d9488"></i></div>
+                            <span class="psb-label">บันทึกการฉีดวัคซีน</span>
+                            <span class="psb-new-badge">NEW</span>
                         </a>
-                        <a class="psb-item" data-section="insurance_sync" href="insurance_sync.php">
-                            <div class="psb-icon"><i class="fa-solid fa-shield-halved" style="color:#0ea5e9"></i></div>
-                            <span class="psb-label">Insurance Hub</span>
-                        </a>
-                        <a class="psb-item <?= $activeSection==='gold_card_pending'?'psb-active':'' ?>" data-section="gold_card_pending" href="gold_card_pending.php">
-                            <div class="psb-icon"><i class="fa-solid fa-hourglass-half" style="color:#3b82f6"></i></div>
-                            <span class="psb-label">ย้ายสิทธิ์บัตรทอง</span>
-                            <?php
-                            $pendingBadgeCount = 0;
-                            try { $pendingBadgeCount = (int)db()->query("SELECT COUNT(*) FROM gold_card_members WHERE status = 'submitted'")->fetchColumn(); }
-                            catch (PDOException) {}
-                            if ($pendingBadgeCount > 0): ?>
-                                <span class="ml-auto px-2 py-0.5 rounded-full bg-rose-500 text-white text-[10px] font-black"><?= $pendingBadgeCount > 99 ? '99+' : $pendingBadgeCount ?></span>
-                            <?php endif; ?>
-                        </a>
-                        <a class="psb-item <?= $activeSection==='gold_card'?'psb-active':'' ?>" data-section="gold_card" href="gold_card.php">
-                            <div class="psb-icon"><i class="fa-solid fa-id-card" style="color:#f59e0b"></i></div>
-                            <span class="psb-label">บัตรทอง</span>
+                        <a class="psb-item <?= $activeSection==='vaccine_catalog'?'psb-active':'' ?>" data-section="vaccine_catalog" href="vaccine_catalog.php" data-new-key="vaccine_catalog_v1">
+                            <div class="psb-icon"><i class="fa-solid fa-pills" style="color:#0d9488"></i></div>
+                            <span class="psb-label">ประเภทวัคซีน</span>
+                            <span class="psb-new-badge">NEW</span>
                         </a>
                     <?php endif; ?>
-                    <?php if ($hasGoldCardStats): ?>
-                        <a class="psb-item <?= $activeSection==='gold_card_stats'?'psb-active':'' ?>" data-section="gold_card_stats" href="gold_card_stats.php">
-                            <div class="psb-icon"><i class="fa-solid fa-chart-line" style="color:#d97706"></i></div>
-                            <span class="psb-label">สถิติบัตรทอง</span>
-                        </a>
-                    <?php endif; ?>
-                    <?php if ($hasRegistry): ?>
-                        <a class="psb-item <?= $activeSection==='registry_upload'?'psb-active':'' ?>" data-section="registry_upload" href="registry_upload.php">
-                            <div class="psb-icon"><i class="fa-solid fa-id-card-clip" style="color:#06b6d4"></i></div>
-                            <span class="psb-label">อัพโหลดรายชื่อ (ทะเบียน)</span>
-                        </a>
-                    <?php endif; ?>
-                    <?php if ($hasInsurance): ?>
-                        <a class="psb-item <?= $activeSection==='batch_status'?'psb-active':'' ?>" data-section="batch_status" href="batch_status.php">
-                            <div class="psb-icon"><i class="fa-solid fa-list-check" style="color:#0891b2"></i></div>
-                            <span class="psb-label">สถานะเอกสาร</span>
-                        </a>
-                    <?php endif; ?>
-                    <?php if (!$registryOnly && $isSuper): ?>
-                        <a class="psb-item" data-section="manage_insurance_partners" href="manage_insurance_partners.php">
-                            <div class="psb-icon"><i class="fa-solid fa-handshake" style="color:#10b981"></i></div>
-                            <span class="psb-label">Insurance Partners</span>
+
+                    <?php /* ── ความปลอดภัยคลินิก ── */ ?>
+                    <?php if (!$registryOnly && $hasAccidentLog): ?>
+                        <div class="psb-divider" aria-hidden="true"></div>
+                        <a class="psb-item <?= $activeSection==='accident_log'?'psb-active':'' ?>" data-section="accident_log" href="accident_log.php">
+                            <div class="psb-icon"><i class="fa-solid fa-triangle-exclamation" style="color:#dc2626"></i></div>
+                            <span class="psb-label">บันทึกอุบัติเหตุ</span>
                         </a>
                     <?php endif; ?>
                 </div>
             <?php endif; ?>
 
-            <?php /* ── สื่อสาร ──────────────────────────────────────────── */ ?>
-            <?php if (!$registryOnly): ?>
+            <?php /* ── 3. รายงาน & ตรวจสอบ (Reports & Monitoring) — รวม รายงาน + ติดตามระบบ ───── */ ?>
+            <?php if (!$registryOnly && ($hasMonthlyReport || $hasNurseProductivity || $hasDailySummary || $hasSysLogs)): ?>
+                <button type="button" class="psb-section-toggle" data-group="reports" onclick="togglePsbGroup('reports',this)">
+                    <i class="fa-solid fa-clipboard-list" style="color:#f59e0b"></i>
+                    <span>รายงาน &amp; ตรวจสอบ</span>
+                    <i class="fa-solid fa-chevron-down psb-chevron"></i>
+                </button>
+                <div class="psb-group" data-group="reports">
+                    <?php /* ── รายงาน ── */ ?>
+                    <?php if ($hasDailySummary): ?>
+                        <a class="psb-item <?= $activeSection==='daily_summary'?'psb-active':'' ?>" data-section="daily_summary" href="daily_summary.php">
+                            <div class="psb-icon"><i class="fa-solid fa-clipboard-check" style="color:#f59e0b"></i></div>
+                            <span class="psb-label">สรุปงานประจำวัน</span>
+                        </a>
+                    <?php endif; ?>
+                    <?php if ($hasMonthlyReport): ?>
+                        <a class="psb-item <?= $activeSection==='monthly_report'?'psb-active':'' ?>" data-section="monthly_report" href="monthly_report.php">
+                            <div class="psb-icon"><i class="fa-solid fa-calendar-days" style="color:#f59e0b"></i></div>
+                            <span class="psb-label">รายงานประจำเดือน</span>
+                        </a>
+                    <?php endif; ?>
+                    <?php if ($hasNurseProductivity): ?>
+                        <a class="psb-item <?= $activeSection==='nurse_productivity'?'psb-active':'' ?>" data-section="nurse_productivity" href="nurse_productivity.php">
+                            <div class="psb-icon"><i class="fa-solid fa-user-nurse" style="color:#f59e0b"></i></div>
+                            <span class="psb-label">Productivity พยาบาล</span>
+                        </a>
+                    <?php endif; ?>
+
+                    <?php /* ── ติดตามระบบ ── */ ?>
+                    <?php if ($hasSysLogs): ?>
+                        <div class="psb-divider" aria-hidden="true"></div>
+                        <?php if ($isSuper): ?>
+                            <a class="psb-item" data-section="activity_dashboard" href="activity_dashboard.php">
+                                <div class="psb-icon"><i class="fa-solid fa-chart-line" style="color:#8b5cf6"></i></div>
+                                <span class="psb-label">Activity Dashboard</span>
+                            </a>
+                        <?php endif; ?>
+                        <a class="psb-item" data-section="activity_logs" href="activity_logs.php">
+                            <div class="psb-icon"><i class="fa-solid fa-file-lines" style="color:#64748b"></i></div>
+                            <span class="psb-label">Activity Logs</span>
+                        </a>
+                        <a class="psb-item" data-section="error_logs" href="error_logs.php">
+                            <div class="psb-icon"><i class="fa-solid fa-bug" style="color:#ef4444"></i></div>
+                            <span class="psb-label">Error Logs</span>
+                        </a>
+                        <?php if ($isSuper): ?>
+                            <a class="psb-item <?= $activeSection==='sentry_events'?'psb-active':'' ?>" data-section="sentry_events" href="sentry_events.php">
+                                <div class="psb-icon"><i class="fa-solid fa-radiation" style="color:#8b5cf6"></i></div>
+                                <span class="psb-label">Sentry Events</span>
+                            </a>
+                        <?php endif; ?>
+                        <?php if ($isSuper || $adminRole === 'admin' || !empty($_SESSION['access_identity'])): ?>
+                            <a class="psb-item <?= $activeSection==='db_schema'?'psb-active':'' ?>" data-section="db_schema" href="db_schema.php" data-new-key="db_schema_v1">
+                                <div class="psb-icon"><i class="fa-solid fa-diagram-project" style="color:#0891b2"></i></div>
+                                <span class="psb-label">Database Schema</span>
+                                <span class="psb-new-badge">NEW</span>
+                            </a>
+                        <?php endif; ?>
+                        <?php if ($isSuper): ?>
+                            <a class="psb-item <?= $activeSection==='sql_console'?'psb-active':'' ?>" data-section="sql_console" href="sql_console.php" data-new-key="sql_console_v1">
+                                <div class="psb-icon"><i class="fa-solid fa-terminal" style="color:#ea580c"></i></div>
+                                <span class="psb-label">SQL Console <span style="font-size:8px;color:#9a3412;background:#fed7aa;padding:1px 4px;border-radius:3px;margin-left:2px">RO</span></span>
+                                <span class="psb-new-badge">NEW</span>
+                            </a>
+                        <?php endif; ?>
+                    <?php endif; ?>
+                </div>
+            <?php endif; ?>
+
+            <?php /* ── 4. ทรัพยากร (Resources) — รวม การเงิน + คลังพัสดุ ───── */ ?>
+            <?php
+            $hasFinance = $isSuper || $adminRole === 'admin' || !empty($_SESSION['access_finance']);
+            $_resourcesShow = !$registryOnly && ($hasFinance || $hasInventory);
+            if ($_resourcesShow): ?>
+                <button type="button" class="psb-section-toggle" data-group="resources" onclick="togglePsbGroup('resources',this)">
+                    <i class="fa-solid fa-cubes" style="color:#059669"></i>
+                    <span>ทรัพยากร</span>
+                    <i class="fa-solid fa-chevron-down psb-chevron"></i>
+                </button>
+                <div class="psb-group" data-group="resources">
+                    <?php /* ── การเงิน ── */ ?>
+                    <?php if ($hasFinance): ?>
+                        <a class="psb-item <?= $activeSection==='finance'?'psb-active':'' ?>" data-section="finance" href="finance.php">
+                            <div class="psb-icon"><i class="fa-solid fa-book" style="color:#059669"></i></div>
+                            <span class="psb-label">Cash Book</span>
+                        </a>
+                        <a class="psb-item <?= $activeSection==='billing_services'?'psb-active':'' ?>" data-section="billing_services" href="billing_services.php">
+                            <div class="psb-icon"><i class="fa-solid fa-list-check" style="color:#059669"></i></div>
+                            <span class="psb-label">บริการคลินิก</span>
+                        </a>
+                        <a class="psb-item <?= $activeSection==='billing_encounters'?'psb-active':'' ?>" data-section="billing_encounters" href="billing_encounters.php">
+                            <div class="psb-icon"><i class="fa-solid fa-notes-medical" style="color:#059669"></i></div>
+                            <span class="psb-label">บันทึกการเข้ารับบริการ</span>
+                        </a>
+                        <a class="psb-item <?= $activeSection==='billing_invoices'?'psb-active':'' ?>" data-section="billing_invoices" href="billing_invoices.php">
+                            <div class="psb-icon"><i class="fa-solid fa-file-invoice-dollar" style="color:#059669"></i></div>
+                            <span class="psb-label">ใบแจ้งหนี้ &amp; รับชำระ</span>
+                        </a>
+                        <a class="psb-item <?= $activeSection==='billing_ar_aging'?'psb-active':'' ?>" data-section="billing_ar_aging" href="billing_ar_aging.php">
+                            <div class="psb-icon"><i class="fa-solid fa-chart-bar" style="color:#059669"></i></div>
+                            <span class="psb-label">ลูกหนี้คงค้าง (AR)</span>
+                        </a>
+                        <a class="psb-item <?= $activeSection==='payroll_employees'?'psb-active':'' ?>" data-section="payroll_employees" href="payroll_employees.php">
+                            <div class="psb-icon"><i class="fa-solid fa-users-gear" style="color:#059669"></i></div>
+                            <span class="psb-label">Payroll · พนักงาน</span>
+                        </a>
+                        <a class="psb-item <?= $activeSection==='payroll_periods'?'psb-active':'' ?>" data-section="payroll_periods" href="payroll_periods.php">
+                            <div class="psb-icon"><i class="fa-solid fa-calendar-days" style="color:#059669"></i></div>
+                            <span class="psb-label">Payroll · งวดเงินเดือน</span>
+                        </a>
+                    <?php endif; ?>
+
+                    <?php /* ── คลังพัสดุ ── */ ?>
+                    <?php if ($hasInventory): ?>
+                        <div class="psb-divider" aria-hidden="true"></div>
+                        <?php if ($hasAsset): ?>
+                            <a href="../asset/index.php" class="psb-item" style="text-decoration:none">
+                                <div class="psb-icon"><i class="fa-solid fa-boxes-stacked" style="color:#0d9488"></i></div>
+                                <span class="psb-label">ครุภัณฑ์สำนักงาน</span>
+                            </a>
+                        <?php endif; ?>
+                        <?php if ($hasConsumables): ?>
+                            <a href="../consumables/index.php" class="psb-item" style="text-decoration:none">
+                                <div class="psb-icon"><i class="fa-solid fa-box-open" style="color:#2e9e63"></i></div>
+                                <span class="psb-label">วัสดุสิ้นเปลือง</span>
+                            </a>
+                        <?php endif; ?>
+                    <?php endif; ?>
+                </div>
+            <?php endif; ?>
+
+            <?php /* ── 5. สื่อสาร & AI (Communications) — รวม สื่อสาร + AI Suite + LINE ───── */ ?>
+            <?php
+            $_commShow = !$registryOnly; // ประกาศ ใครก็เห็น
+            if ($_commShow): ?>
                 <button type="button" class="psb-section-toggle" data-group="comm" onclick="togglePsbGroup('comm',this)">
                     <i class="fa-solid fa-bullhorn" style="color:#7c3aed"></i>
-                    <span>สื่อสาร</span>
+                    <span>สื่อสาร &amp; AI</span>
                     <i class="fa-solid fa-chevron-down psb-chevron"></i>
                 </button>
                 <div class="psb-group" data-group="comm">
+                    <?php /* ── ประกาศ + EDMS ── */ ?>
                     <a class="psb-item" data-section="announcements" href="announcements.php">
                         <div class="psb-icon"><i class="fa-solid fa-bullhorn" style="color:#7c3aed"></i></div>
                         <span class="psb-label">ประกาศ</span>
@@ -718,7 +808,6 @@
                         $_isSlaDash = ($activeSection === 'edms' && $_edmsView === 'sla_dashboard');
                         $_isSlaPol  = ($activeSection === 'edms' && $_edmsView === 'sla_policies');
                         $_isTasks   = ($activeSection === 'edms' && $_edmsView === 'list' && $_edmsType === 'task');
-                        // parent active เฉพาะตอนอยู่ section=edms และไม่ใช่ sub-view ที่มีปุ่มแยก
                         $_isEdmsParent = ($activeSection === 'edms' && !$_isSlaDash && !$_isSlaPol && !$_isTasks);
                     ?>
                         <a class="psb-item <?= $_isEdmsParent ? 'psb-active' : '' ?>" data-section="edms" href="edms.php" style="position:relative">
@@ -730,222 +819,110 @@
                                 </span>
                             <?php endif; ?>
                         </a>
-                        <?php /* EDMS sub-menu: Tasks — งานที่มอบหมาย (ไม่ใช่เอกสารทางการ) */ ?>
-                        <a class="psb-item <?= $_isTasks ? 'psb-active' : '' ?>"
-                           href="edms.php?view=list&type=task">
+                        <a class="psb-item <?= $_isTasks ? 'psb-active' : '' ?>" href="edms.php?view=list&type=task">
                             <div class="psb-icon"><i class="fa-solid fa-list-check" style="color:#06b6d4"></i></div>
                             <span class="psb-label">— งาน/Tasks</span>
                         </a>
-                        <?php /* EDMS sub-menu: SLA — เป็น sub-section ของ section=edms แต่ highlight แยก */ ?>
-                        <a class="psb-item <?= $_isSlaDash ? 'psb-active' : '' ?>"
-                           href="edms.php?view=sla_dashboard">
+                        <a class="psb-item <?= $_isSlaDash ? 'psb-active' : '' ?>" href="edms.php?view=sla_dashboard">
                             <div class="psb-icon"><i class="fa-solid fa-gauge-high" style="color:#10b981"></i></div>
                             <span class="psb-label">— SLA Dashboard</span>
                         </a>
                         <?php $_canSlaAdmin = ($adminRole === 'superadmin') || !empty($_SESSION['access_edms_sla_admin']); ?>
                         <?php if ($_canSlaAdmin): ?>
-                            <a class="psb-item <?= $_isSlaPol ? 'psb-active' : '' ?>"
-                               href="edms.php?view=sla_policies">
+                            <a class="psb-item <?= $_isSlaPol ? 'psb-active' : '' ?>" href="edms.php?view=sla_policies">
                                 <div class="psb-icon"><i class="fa-solid fa-stopwatch-20" style="color:#a855f7"></i></div>
                                 <span class="psb-label">— นโยบาย SLA</span>
                             </a>
                         <?php endif; ?>
                     <?php endif; ?>
+
+                    <?php /* ── AI Suite ── */ ?>
+                    <?php if ($isSuper || !empty($_SESSION['access_ai'])): ?>
+                        <div class="psb-divider" aria-hidden="true"></div>
+                        <a class="psb-item" data-section="ai_assistant" href="ai_assistant.php">
+                            <div class="psb-icon"><i class="fa-solid fa-wand-magic-sparkles" style="color:#8b5cf6"></i></div>
+                            <span class="psb-label">AI Assistant</span>
+                        </a>
+                        <a class="psb-item <?= $activeSection==='admin_chat'?'psb-active':'' ?>" data-section="admin_chat" href="admin_chat.php">
+                            <div class="psb-icon"><i class="fa-solid fa-comments" style="color:#a855f7"></i></div>
+                            <span class="psb-label">ผู้ช่วยข้อมูล</span>
+                        </a>
+                        <a class="psb-item <?= $activeSection==='ai_qa_lab'?'psb-active':'' ?>" data-section="ai_qa_lab" href="ai_qa_lab.php">
+                            <div class="psb-icon"><i class="fa-solid fa-flask-vial" style="color:#a855f7"></i></div>
+                            <span class="psb-label">AI QA Lab</span>
+                        </a>
+                        <a class="psb-item <?= $activeSection==='ai_prompts'?'psb-active':'' ?>" data-section="ai_prompts" href="ai_prompts.php">
+                            <div class="psb-icon"><i class="fa-solid fa-code" style="color:#a855f7"></i></div>
+                            <span class="psb-label">AI Prompts</span>
+                        </a>
+                        <a class="psb-item <?= $activeSection==='ai_knowledge'?'psb-active':'' ?>" data-section="ai_knowledge" href="ai_knowledge.php">
+                            <div class="psb-icon"><i class="fa-solid fa-database" style="color:#10b981"></i></div>
+                            <span class="psb-label">AI Knowledge</span>
+                        </a>
+
+                        <?php /* ── LINE Official ── */ ?>
+                        <div class="psb-divider" aria-hidden="true"></div>
+                        <a class="psb-item <?= $activeSection==='line_chat'?'psb-active':'' ?>" data-section="line_chat" href="line_chat.php">
+                            <div class="psb-icon"><i class="fa-brands fa-line" style="color:#06c755"></i></div>
+                            <span class="psb-label">LINE Chat</span>
+                        </a>
+                    <?php endif; ?>
                 </div>
             <?php endif; ?>
 
-            <?php /* ── คลังพัสดุ (Inventory) ────────────────────────────── */ ?>
-            <?php if (!$registryOnly && $hasInventory): ?>
-                <button type="button" class="psb-section-toggle" data-group="inventory" onclick="togglePsbGroup('inventory',this)">
-                    <i class="fa-solid fa-warehouse" style="color:#2e9e63"></i>
-                    <span>คลังพัสดุ</span>
-                    <i class="fa-solid fa-chevron-down psb-chevron"></i>
-                </button>
-                <div class="psb-group" data-group="inventory">
-                    <?php if ($hasAsset): ?>
-                        <a href="../asset/index.php" class="psb-item" style="text-decoration:none">
-                            <div class="psb-icon"><i class="fa-solid fa-boxes-stacked" style="color:#0d9488"></i></div>
-                            <span class="psb-label">ครุภัณฑ์สำนักงาน</span>
-                        </a>
-                    <?php endif; ?>
-                    <?php if ($hasConsumables): ?>
-                        <a href="../consumables/index.php" class="psb-item" style="text-decoration:none">
-                            <div class="psb-icon"><i class="fa-solid fa-box-open" style="color:#2e9e63"></i></div>
-                            <span class="psb-label">วัสดุสิ้นเปลือง</span>
-                        </a>
-                    <?php endif; ?>
-                </div>
-            <?php endif; ?>
-
-            <?php /* ── การเงิน ──────────────────────────────────────────── */ ?>
+            <?php /* ── 6. ระบบ & สิทธิ์ (System & Identity) — รวม สิทธิ์ + เอกสาร ───── */ ?>
             <?php
-            $hasFinance = $isSuper || $adminRole === 'admin' || !empty($_SESSION['access_finance']);
-            if (!$registryOnly && $hasFinance): ?>
-                <button type="button" class="psb-section-toggle" data-group="finance" onclick="togglePsbGroup('finance',this)">
-                    <i class="fa-solid fa-money-bill-trend-up" style="color:#059669"></i>
-                    <span>การเงิน</span>
+            $_systemShow = !$registryOnly && ($hasSecurityGroup ?? ($isSuper || !empty($_SESSION['access_identity']))
+                || $isSuper || $adminRole === 'admin');
+            // make sure $hasSecurityGroup is defined (was set in old block — re-define for new block)
+            $hasSecurityGroup = $isSuper || !empty($_SESSION['access_identity']);
+            $_docsShow = (!$registryOnly && ($adminRole === 'superadmin' || $adminRole === 'admin'));
+            if (!$registryOnly && ($hasSecurityGroup || $_docsShow)): ?>
+                <button type="button" class="psb-section-toggle" data-group="system" onclick="togglePsbGroup('system',this)">
+                    <i class="fa-solid fa-shield-halved" style="color:#2563eb"></i>
+                    <span>ระบบ &amp; สิทธิ์</span>
                     <i class="fa-solid fa-chevron-down psb-chevron"></i>
                 </button>
-                <div class="psb-group" data-group="finance">
-                    <a class="psb-item <?= $activeSection==='finance'?'psb-active':'' ?>" data-section="finance" href="finance.php">
-                        <div class="psb-icon"><i class="fa-solid fa-book" style="color:#059669"></i></div>
-                        <span class="psb-label">Cash Book</span>
-                    </a>
-                    <a class="psb-item <?= $activeSection==='billing_services'?'psb-active':'' ?>" data-section="billing_services" href="billing_services.php">
-                        <div class="psb-icon"><i class="fa-solid fa-list-check" style="color:#059669"></i></div>
-                        <span class="psb-label">บริการคลินิก</span>
-                    </a>
-                    <a class="psb-item <?= $activeSection==='billing_encounters'?'psb-active':'' ?>" data-section="billing_encounters" href="billing_encounters.php">
-                        <div class="psb-icon"><i class="fa-solid fa-notes-medical" style="color:#059669"></i></div>
-                        <span class="psb-label">บันทึกการเข้ารับบริการ</span>
-                    </a>
-                    <a class="psb-item <?= $activeSection==='billing_invoices'?'psb-active':'' ?>" data-section="billing_invoices" href="billing_invoices.php">
-                        <div class="psb-icon"><i class="fa-solid fa-file-invoice-dollar" style="color:#059669"></i></div>
-                        <span class="psb-label">ใบแจ้งหนี้ &amp; รับชำระ</span>
-                    </a>
-                    <a class="psb-item <?= $activeSection==='billing_ar_aging'?'psb-active':'' ?>" data-section="billing_ar_aging" href="billing_ar_aging.php">
-                        <div class="psb-icon"><i class="fa-solid fa-chart-bar" style="color:#059669"></i></div>
-                        <span class="psb-label">ลูกหนี้คงค้าง (AR)</span>
-                    </a>
-                    <a class="psb-item <?= $activeSection==='payroll_employees'?'psb-active':'' ?>" data-section="payroll_employees" href="payroll_employees.php">
-                        <div class="psb-icon"><i class="fa-solid fa-users-gear" style="color:#059669"></i></div>
-                        <span class="psb-label">Payroll · พนักงาน</span>
-                    </a>
-                    <a class="psb-item <?= $activeSection==='payroll_periods'?'psb-active':'' ?>" data-section="payroll_periods" href="payroll_periods.php">
-                        <div class="psb-icon"><i class="fa-solid fa-calendar-days" style="color:#059669"></i></div>
-                        <span class="psb-label">Payroll · งวดเงินเดือน</span>
-                    </a>
-                </div>
-            <?php endif; ?>
+                <div class="psb-group" data-group="system">
+                    <?php /* ── Identity & Governance ── */ ?>
+                    <?php if ($hasSecurityGroup): ?>
+                        <?php if ($isSuper || !empty($_SESSION['access_identity'])): ?>
+                            <a class="psb-item" data-section="identity" href="identity.php">
+                                <div class="psb-icon"><i class="fa-solid fa-id-card-clip" style="color:#2563eb"></i></div>
+                                <span class="psb-label">Identity &amp; Governance</span>
+                            </a>
+                        <?php endif; ?>
+                        <?php if ($isSuper): ?>
+                            <a class="psb-item" data-section="privilege_inventory" href="privilege_inventory.php">
+                                <div class="psb-icon"><i class="fa-solid fa-shield-halved" style="color:#10b981"></i></div>
+                                <span class="psb-label">ISO Governance</span>
+                            </a>
+                        <?php endif; ?>
+                        <?php if ($isSuper || !empty($_SESSION['access_identity'])): ?>
+                            <a class="psb-item <?= $activeSection==='pdpa_audit'?'psb-active':'' ?>" data-section="pdpa_audit" href="pdpa_audit.php" data-new-key="pdpa_audit_v1">
+                                <div class="psb-icon"><i class="fa-solid fa-user-shield" style="color:#7c3aed"></i></div>
+                                <span class="psb-label">PDPA Audit</span>
+                                <span class="psb-new-badge">NEW</span>
+                            </a>
+                        <?php endif; ?>
+                    <?php endif; ?>
 
-            <?php /* ── ยา (Pharmacy / Vaccination — Phase 1: vaccines only) ───── */ ?>
-            <?php if (!$registryOnly && ($isSuper || $adminRole === 'admin' || !empty($_SESSION['access_identity']))): ?>
-                <button type="button" class="psb-section-toggle" data-group="pharmacy" onclick="togglePsbGroup('pharmacy',this)">
-                    <i class="fa-solid fa-prescription-bottle-medical" style="color:#0d9488"></i>
-                    <span>ยา</span>
-                    <i class="fa-solid fa-chevron-down psb-chevron"></i>
-                </button>
-                <div class="psb-group" data-group="pharmacy">
-                    <a class="psb-item <?= $activeSection==='vaccinations'?'psb-active':'' ?>" data-section="vaccinations" href="vaccinations.php" data-new-key="vaccinations_v1">
-                        <div class="psb-icon"><i class="fa-solid fa-syringe" style="color:#0d9488"></i></div>
-                        <span class="psb-label">บันทึกการฉีดวัคซีน</span>
-                        <span class="psb-new-badge">NEW</span>
-                    </a>
-                    <a class="psb-item <?= $activeSection==='vaccine_catalog'?'psb-active':'' ?>" data-section="vaccine_catalog" href="vaccine_catalog.php" data-new-key="vaccine_catalog_v1">
-                        <div class="psb-icon"><i class="fa-solid fa-pills" style="color:#0d9488"></i></div>
-                        <span class="psb-label">ประเภทวัคซีน</span>
-                        <span class="psb-new-badge">NEW</span>
-                    </a>
-                </div>
-            <?php endif; ?>
-
-            <?php /* ── ติดตามระบบ ──────────────────────────────────────── */ ?>
-            <?php if (!$registryOnly && $hasSysLogs): ?>
-                <button type="button" class="psb-section-toggle" data-group="monitor" onclick="togglePsbGroup('monitor',this)">
-                    <i class="fa-solid fa-binoculars" style="color:#64748b"></i>
-                    <span>ติดตามระบบ</span>
-                    <i class="fa-solid fa-chevron-down psb-chevron"></i>
-                </button>
-                <div class="psb-group" data-group="monitor">
-                    <?php if (($_SESSION['admin_role'] ?? '') === 'superadmin'): ?>
-                    <a class="psb-item" data-section="activity_dashboard" href="activity_dashboard.php">
-                        <div class="psb-icon"><i class="fa-solid fa-chart-line" style="color:#8b5cf6"></i></div>
-                        <span class="psb-label">Activity Dashboard</span>
-                    </a>
-                    <?php endif; ?>
-                    <a class="psb-item" data-section="activity_logs" href="activity_logs.php">
-                        <div class="psb-icon"><i class="fa-solid fa-file-lines" style="color:#64748b"></i></div>
-                        <span class="psb-label">Activity Logs</span>
-                    </a>
-                    <a class="psb-item" data-section="error_logs" href="error_logs.php">
-                        <div class="psb-icon"><i class="fa-solid fa-bug" style="color:#ef4444"></i></div>
-                        <span class="psb-label">Error Logs</span>
-                    </a>
-                    <?php if ($adminRole === 'superadmin'): ?>
-                    <a class="psb-item <?= $activeSection==='sentry_events'?'psb-active':'' ?>" data-section="sentry_events" href="sentry_events.php">
-                        <div class="psb-icon"><i class="fa-solid fa-radiation" style="color:#8b5cf6"></i></div>
-                        <span class="psb-label">Sentry Events</span>
-                    </a>
-                    <?php endif; ?>
-                    <?php if ($isSuper || $adminRole === 'admin' || !empty($_SESSION['access_identity'])): ?>
-                    <a class="psb-item <?= $activeSection==='db_schema'?'psb-active':'' ?>" data-section="db_schema" href="db_schema.php" data-new-key="db_schema_v1">
-                        <div class="psb-icon"><i class="fa-solid fa-diagram-project" style="color:#0891b2"></i></div>
-                        <span class="psb-label">Database Schema</span>
-                        <span class="psb-new-badge">NEW</span>
-                    </a>
-                    <?php endif; ?>
-                    <?php if ($isSuper): ?>
-                    <a class="psb-item <?= $activeSection==='sql_console'?'psb-active':'' ?>" data-section="sql_console" href="sql_console.php" data-new-key="sql_console_v1">
-                        <div class="psb-icon"><i class="fa-solid fa-terminal" style="color:#ea580c"></i></div>
-                        <span class="psb-label">SQL Console <span style="font-size:8px;color:#9a3412;background:#fed7aa;padding:1px 4px;border-radius:3px;margin-left:2px">RO</span></span>
-                        <span class="psb-new-badge">NEW</span>
-                    </a>
+                    <?php /* ── Documents Library ── */ ?>
+                    <?php if ($_docsShow): ?>
+                        <?php if ($hasSecurityGroup): ?>
+                            <div class="psb-divider" aria-hidden="true"></div>
+                        <?php endif; ?>
+                        <a class="psb-item <?= $activeSection==='documents'?'psb-active':'' ?>" data-section="documents" href="documents.php">
+                            <div class="psb-icon"><i class="fa-solid fa-folder-tree" style="color:#0f7349"></i></div>
+                            <span class="psb-label">คลังเอกสาร</span>
+                        </a>
                     <?php endif; ?>
                 </div>
             <?php endif; ?>
 
-            <?php /* ── รายงาน ─────────────────────────────────────────────── */ ?>
-            <?php if (!$registryOnly && ($hasMonthlyReport || $hasNurseProductivity || $hasDailySummary)): ?>
-                <button type="button" class="psb-section-toggle" data-group="reports" onclick="togglePsbGroup('reports',this)">
-                    <i class="fa-solid fa-clipboard-list" style="color:#f59e0b"></i>
-                    <span>รายงาน</span>
-                    <i class="fa-solid fa-chevron-down psb-chevron"></i>
-                </button>
-                <div class="psb-group" data-group="reports">
-                    <?php if ($hasDailySummary): ?>
-                    <a class="psb-item <?= $activeSection==='daily_summary'?'psb-active':'' ?>" data-section="daily_summary" href="daily_summary.php">
-                        <div class="psb-icon"><i class="fa-solid fa-clipboard-check" style="color:#f59e0b"></i></div>
-                        <span class="psb-label">สรุปงานประจำวัน</span>
-                    </a>
-                    <?php endif; ?>
-                    <?php if ($hasMonthlyReport): ?>
-                    <a class="psb-item <?= $activeSection==='monthly_report'?'psb-active':'' ?>" data-section="monthly_report" href="monthly_report.php">
-                        <div class="psb-icon"><i class="fa-solid fa-calendar-days" style="color:#f59e0b"></i></div>
-                        <span class="psb-label">รายงานประจำเดือน</span>
-                    </a>
-                    <?php endif; ?>
-                    <?php if ($hasNurseProductivity): ?>
-                    <a class="psb-item <?= $activeSection==='nurse_productivity'?'psb-active':'' ?>" data-section="nurse_productivity" href="nurse_productivity.php">
-                        <div class="psb-icon"><i class="fa-solid fa-user-nurse" style="color:#f59e0b"></i></div>
-                        <span class="psb-label">Productivity พยาบาล</span>
-                    </a>
-                    <?php endif; ?>
-                </div>
-            <?php endif; ?>
+            <div style="flex:1"></div> <!-- Spacer to push masterdata + settings to bottom -->
 
-            <?php /* ── ความปลอดภัยคลินิก (Accident / Safety logs) ───────── */ ?>
-            <?php if (!$registryOnly && $hasAccidentLog): ?>
-                <button type="button" class="psb-section-toggle" data-group="safety" onclick="togglePsbGroup('safety',this)">
-                    <i class="fa-solid fa-shield-heart" style="color:#dc2626"></i>
-                    <span>ความปลอดภัยคลินิก</span>
-                    <i class="fa-solid fa-chevron-down psb-chevron"></i>
-                </button>
-                <div class="psb-group" data-group="safety">
-                    <a class="psb-item <?= $activeSection==='accident_log'?'psb-active':'' ?>" data-section="accident_log" href="accident_log.php">
-                        <div class="psb-icon"><i class="fa-solid fa-triangle-exclamation" style="color:#dc2626"></i></div>
-                        <span class="psb-label">บันทึกอุบัติเหตุ</span>
-                    </a>
-                </div>
-            <?php endif; ?>
-
-            <?php /* ── เอกสาร / รายงาน (Document Library) ─────────────────── */ ?>
-            <?php if (!$registryOnly && ($adminRole === 'superadmin' || $adminRole === 'admin')): ?>
-                <button type="button" class="psb-section-toggle" data-group="docs" onclick="togglePsbGroup('docs',this)">
-                    <i class="fa-solid fa-folder-tree" style="color:#0f7349"></i>
-                    <span>เอกสาร</span>
-                    <i class="fa-solid fa-chevron-down psb-chevron"></i>
-                </button>
-                <div class="psb-group" data-group="docs">
-                    <a class="psb-item <?= $activeSection==='documents'?'psb-active':'' ?>" data-section="documents" href="documents.php">
-                        <div class="psb-icon"><i class="fa-solid fa-file-lines" style="color:#0f7349"></i></div>
-                        <span class="psb-label">คลังเอกสาร</span>
-                    </a>
-                </div>
-            <?php endif; ?>
-
-            <div style="flex:1"></div> <!-- Spacer to push settings to bottom -->
-
-            <?php /* ── ข้อมูลหลัก (Master Data) ─────────────────────────── */ ?>
+            <?php /* ── 7. ข้อมูลหลัก (Master Data) ─────────────────────── */ ?>
             <?php if (!$registryOnly && $hasSiteSet): ?>
                 <button type="button" class="psb-section-toggle" data-group="masterdata" onclick="togglePsbGroup('masterdata',this)">
                     <i class="fa-solid fa-database" style="color:#0d9488"></i>
@@ -974,7 +951,7 @@
                 </div>
             <?php endif; ?>
 
-            <?php /* ── ตั้งค่า (ล่างสุด) ─────────────────────────────────── */ ?>
+            <?php /* ── 8. ตั้งค่า (Settings — ล่างสุดเสมอ) ─────────────── */ ?>
             <?php if (!$registryOnly && $hasSiteSet): ?>
                 <button type="button" class="psb-section-toggle" data-group="settings" onclick="togglePsbGroup('settings',this)">
                     <i class="fa-solid fa-gear" style="color:#d97706"></i>

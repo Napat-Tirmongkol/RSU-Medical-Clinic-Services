@@ -521,6 +521,10 @@ a.psb-item.psb-active {
 .psb-group[data-group="docs"]       { --acc: var(--c-acc-docs);      --acc-tint: rgba(100,116,139,.10);--acc-tint-2: rgba(100,116,139,.18); }
 .psb-group[data-group="masterdata"] { --acc: var(--c-acc-masterdata);--acc-tint: rgba(8,145,178,.10);  --acc-tint-2: rgba(8,145,178,.18); }
 .psb-group[data-group="settings"]   { --acc: var(--c-acc-settings);  --acc-tint: rgba(71,85,105,.10);  --acc-tint-2: rgba(71,85,105,.18); }
+/* New consolidated groups (post-refactor — 8 groups instead of 15) */
+.psb-group[data-group="clinical"]   { --acc: #0ea5e9; --acc-tint: rgba(14,165,233,.10); --acc-tint-2: rgba(14,165,233,.18); }
+.psb-group[data-group="resources"]  { --acc: #059669; --acc-tint: rgba(5,150,105,.10);  --acc-tint-2: rgba(5,150,105,.18); }
+.psb-group[data-group="system"]     { --acc: #2563eb; --acc-tint: rgba(37,99,235,.10);  --acc-tint-2: rgba(37,99,235,.18); }
 
 /* Pair section toggle with the same accent */
 .psb-section-toggle[data-group="overview"]   { --acc: var(--c-acc-overview); }
@@ -535,6 +539,9 @@ a.psb-item.psb-active {
 .psb-section-toggle[data-group="reports"]     { --acc: var(--c-acc-report); }
 .psb-section-toggle[data-group="docs"]       { --acc: var(--c-acc-docs); }
 .psb-section-toggle[data-group="masterdata"] { --acc: var(--c-acc-masterdata); }
+.psb-section-toggle[data-group="clinical"]   { --acc: #0ea5e9; }
+.psb-section-toggle[data-group="resources"]  { --acc: #059669; }
+.psb-section-toggle[data-group="system"]     { --acc: #2563eb; }
 .psb-section-toggle[data-group="settings"]   { --acc: var(--c-acc-settings); }
 
 /* ── Collapsible Section Group (dropdown accordion) ───────── */
@@ -599,6 +606,18 @@ a.psb-item.psb-active {
 #portal-sidebar.collapsed .psb-section-toggle { opacity: 0; pointer-events: none; height: 0; padding: 0; margin: 0; }
 #portal-sidebar.collapsed .psb-group { max-height: none !important; opacity: 1 !important; pointer-events: auto !important; }
 #portal-sidebar.collapsed .psb-new-badge { display: none; }
+#portal-sidebar.collapsed .psb-divider { display: none; }
+
+/* Subtle divider between sub-groups inside a consolidated section
+   (e.g. inside "งานคลินิก" between insurance items / pharmacy / safety) */
+.psb-divider {
+    height: 1px;
+    margin: 6px 12px;
+    background: linear-gradient(to right, transparent, rgba(148,163,184,.32), transparent);
+}
+body[data-theme='dark'] .psb-divider {
+    background: linear-gradient(to right, transparent, rgba(148,163,184,.18), transparent);
+}
 
 /* "NEW" badge inside sidebar items */
 .psb-new-badge {
