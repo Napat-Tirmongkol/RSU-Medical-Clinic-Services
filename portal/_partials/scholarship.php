@@ -1029,6 +1029,14 @@ $portalCsrf = get_csrf_token();
     }
     window.__schApi = api;
 
+    // ── Local-timezone date formatter (กัน toISOString() ที่ shift เป็น UTC แล้วได้วันย้อน 1 วัน)
+    function fmtLocalDate(d) {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${dd}`;
+    }
+
     // ────── DASHBOARD ──────
     let dashChartDaily = null, dashChartSplit = null;
     function schChartTheme() {
@@ -1599,7 +1607,7 @@ $portalCsrf = get_csrf_token();
         document.getElementById('adj-current-hours').textContent = parseFloat(currentHours).toFixed(1);
         document.getElementById('adj-delta').value = '';
         document.getElementById('adj-reason').value = '';
-        document.getElementById('adj-date').value = new Date().toISOString().slice(0, 10);
+        document.getElementById('adj-date').value = fmtLocalDate(new Date());
         document.querySelector('input[name="adj-ct"][value="hours"]').checked = true;
         syncAdjCtRadio();
         showModal('adjust-modal');
@@ -1929,7 +1937,7 @@ $portalCsrf = get_csrf_token();
             });
         } else {
             // กดจากปุ่ม "เปิดรอบใหม่" — default เป็นวันนี้
-            const today = new Date().toISOString().slice(0, 10);
+            const today = fmtLocalDate(new Date());
             document.getElementById('slot-bulk-from').value = today;
             document.getElementById('slot-bulk-to').value   = today;
         }
@@ -1951,7 +1959,7 @@ $portalCsrf = get_csrf_token();
         const end = new Date(to + 'T00:00:00');
         while (cur <= end) {
             if (dowSet.has(cur.getDay())) {
-                dates.push(cur.toISOString().slice(0, 10));
+                dates.push(fmtLocalDate(cur));
             }
             cur.setDate(cur.getDate() + 1);
         }
@@ -2101,7 +2109,7 @@ $portalCsrf = get_csrf_token();
         startGrid.setDate(first.getDate() - first.getDay()); // ย้อนไปอาทิตย์
         const endGrid = new Date(last);
         endGrid.setDate(last.getDate() + (6 - last.getDay())); // เดินไปเสาร์
-        const fmt = d => d.toISOString().slice(0, 10);
+        const fmt = fmtLocalDate;
 
         const j = await api('slots', 'calendar', { from: fmt(startGrid), to: fmt(endGrid) });
         if (!j.ok) { wrap.innerHTML = `<p class="text-center text-rose-500 py-6">${escTxt(j.error || 'โหลดไม่สำเร็จ')}</p>`; return; }
@@ -2121,7 +2129,7 @@ $portalCsrf = get_csrf_token();
 
         const cur = new Date(startGrid);
         while (cur <= endGrid) {
-            const dateStr = cur.toISOString().slice(0, 10);
+            const dateStr = fmtLocalDate(cur);
             const dayInfo = calData[dateStr] || { clinic_closed: false, clinic_note: '', slots: [] };
             const inMonth = cur.getMonth() === calMonth;
             const isToday = cur.getTime() === today.getTime();
@@ -2323,11 +2331,11 @@ $portalCsrf = get_csrf_token();
         const fromEl = document.getElementById('slot-bulk-from');
         const toEl   = document.getElementById('slot-bulk-to');
         if (!fromEl.value) {
-            fromEl.value = new Date().toISOString().slice(0, 10);
+            fromEl.value = fmtLocalDate(new Date());
         }
         const from = new Date(fromEl.value + 'T00:00:00');
         from.setDate(from.getDate() + offsetDays);
-        toEl.value = from.toISOString().slice(0, 10);
+        toEl.value = fmtLocalDate(from);
         // ถ้า preset = ช่วงยาว ให้ check DoW ทุกวัน (ผู้ใช้ปรับเองได้)
         if (offsetDays >= 7) {
             document.querySelectorAll('.slot-dow').forEach(c => c.checked = true);
