@@ -55,7 +55,8 @@ if ($activeWorkbook) {
 $_scheme = ((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ? 'https://' : 'http://');
 $_basePath = rtrim(dirname(dirname($_SERVER['SCRIPT_NAME'] ?? '/')), '/');
 $publicUrlBase = $_scheme . ($_SERVER['HTTP_HOST'] ?? 'localhost') . $_basePath . '/public/insurance_dashboard.php';
-$publicUrl = $publicUrlBase . ($activeWorkbook ? ('?wb=' . urlencode($activeWorkbook['slug'])) : '');
+// solo=1 → ซ่อนแถบ workbook tabs ในหน้า public (แชร์ workbook เดียวโดยไม่เปิดเผย workbook อื่นๆ)
+$publicUrl = $publicUrlBase . ($activeWorkbook ? ('?wb=' . urlencode($activeWorkbook['slug']) . '&solo=1') : '');
 ?>
 
 <style>
@@ -479,8 +480,22 @@ $publicUrl = $publicUrlBase . ($activeWorkbook ? ('?wb=' . urlencode($activeWork
             </div>
 
             <div id="idwbPublicUrlPreview" class="bg-slate-50 border border-slate-200 rounded-xl p-3 hidden">
-                <div class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Public URL</div>
-                <div class="text-xs font-mono text-blue-600 break-all" id="idwbPublicUrlText"></div>
+                <div class="flex items-start gap-2">
+                    <div class="flex-1 min-w-0">
+                        <div class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Public URL (Solo — เปิดดู workbook นี้เพียงตัวเดียว)</div>
+                        <div class="text-xs font-mono text-blue-600 break-all" id="idwbPublicUrlText"></div>
+                    </div>
+                    <button type="button" onclick="idCopyPublicUrl(this)"
+                        class="shrink-0 h-7 px-3 rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-[11px] font-black flex items-center gap-1.5 transition"
+                        title="คัดลอกลิงก์">
+                        <i class="fa-solid fa-copy"></i>
+                        <span>คัดลอก</span>
+                    </button>
+                </div>
+                <div class="mt-2 text-[10.5px] text-slate-500 font-bold leading-relaxed">
+                    <i class="fa-solid fa-info-circle text-slate-400"></i>
+                    ลิงก์นี้จะแสดงเฉพาะ workbook นี้ตัวเดียว · ไม่โผล่แท็บของ workbook อื่นที่ public อยู่
+                </div>
             </div>
 
             <div id="idwbError" class="hidden text-xs font-bold text-rose-600 bg-rose-50 border border-rose-100 rounded-xl px-4 py-3"></div>
@@ -1148,13 +1163,41 @@ $publicUrl = $publicUrlBase . ($activeWorkbook ? ('?wb=' . urlencode($activeWork
             p.classList.toggle('wb-selected', p.dataset.color === selectedWBColor));
     }
 
+    window.idCopyPublicUrl = function(btn) {
+        const txt = (document.getElementById('idwbPublicUrlText')?.textContent || '').trim();
+        if (!txt) return;
+        const restore = btn.innerHTML;
+        const done = () => {
+            btn.innerHTML = '<i class="fa-solid fa-check"></i><span>คัดลอกแล้ว</span>';
+            btn.classList.replace('bg-blue-500', 'bg-emerald-500');
+            btn.classList.replace('hover:bg-blue-600', 'hover:bg-emerald-600');
+            setTimeout(() => {
+                btn.innerHTML = restore;
+                btn.classList.replace('bg-emerald-500', 'bg-blue-500');
+                btn.classList.replace('hover:bg-emerald-600', 'hover:bg-blue-600');
+            }, 1500);
+        };
+        if (navigator.clipboard?.writeText) {
+            navigator.clipboard.writeText(txt).then(done).catch(() => {
+                // Fallback: select text in a hidden textarea
+                const ta = document.createElement('textarea');
+                ta.value = txt; ta.style.position = 'fixed'; ta.style.opacity = '0';
+                document.body.appendChild(ta); ta.select();
+                try { document.execCommand('copy'); done(); }
+                catch (e) { Swal.fire({ icon:'warning', title:'คัดลอกไม่ได้', text:'กรุณากดเลือกข้อความเอง' }); }
+                document.body.removeChild(ta);
+            });
+        }
+    };
+
     function updatePublicUrlPreview() {
         const slug = document.getElementById('idwbSlug').value.trim() ||
             slugify(document.getElementById('idwbName').value.trim());
         const isPublic = document.getElementById('idwbIsPublic').checked;
         const wrap = document.getElementById('idwbPublicUrlPreview');
         if (isPublic && slug) {
-            document.getElementById('idwbPublicUrlText').textContent = PUBLIC_URL_BASE + '?wb=' + slug;
+            // solo=1 → ซ่อน tab strip ใน public view (แชร์ workbook เดียว)
+            document.getElementById('idwbPublicUrlText').textContent = PUBLIC_URL_BASE + '?wb=' + slug + '&solo=1';
             wrap.classList.remove('hidden');
         } else {
             wrap.classList.add('hidden');

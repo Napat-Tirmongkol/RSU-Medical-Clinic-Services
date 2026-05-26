@@ -227,9 +227,13 @@ const COLOR_HEX_FULL = {
     purple:'#a855f7', cyan:'#06b6d4', indigo:'#6366f1', slate:'#64748b'
 };
 
+// solo mode: ถ้า URL มี ?solo=1 ซ่อน tab strip → แชร์ workbook เดี่ยวโดย
+// ไม่เปิดเผย workbook อื่นที่เป็น public
+const IS_SOLO = (new URLSearchParams(location.search).get('solo') === '1');
+
 function renderWorkbookTabs(workbooks, activeSlug) {
     const wrap = document.getElementById('ipWorkbookTabs');
-    if (!workbooks || workbooks.length <= 1) { wrap.innerHTML = ''; return; }
+    if (IS_SOLO || !workbooks || workbooks.length <= 1) { wrap.innerHTML = ''; return; }
     let html = '';
     workbooks.forEach(wb => {
         const isActive = wb.slug === activeSlug;
