@@ -517,6 +517,7 @@
             $hasDashboardAdmin = $isSuper || !empty($_SESSION['access_dashboard_admin']);
             $hasMonthlyReport  = $isSuper || !empty($_SESSION['access_monthly_report']) || !empty($_SESSION['access_director_view']);
             $hasNurseProductivity = $isSuper || ($adminRole === 'admin') || !empty($_SESSION['access_nurse_productivity']);
+            $hasAccidentLog       = $isSuper || ($adminRole === 'admin') || !empty($_SESSION['access_nurse_productivity']); // piggyback flag เดียวกัน
             $hasDailySummary      = $isSuper || ($adminRole === 'admin') || !empty($_SESSION['access_daily_summary']);
             $hasAsset          = $isSuper || in_array($_SESSION['role'] ?? '', ['admin','editor'], true) || !empty($_SESSION['access_asset']);
             $hasConsumables    = $isSuper || in_array($_SESSION['role'] ?? '', ['admin','editor'], true) || !empty($_SESSION['access_consumables']);
@@ -902,6 +903,21 @@
                         <span class="psb-label">Productivity พยาบาล</span>
                     </a>
                     <?php endif; ?>
+                </div>
+            <?php endif; ?>
+
+            <?php /* ── ความปลอดภัยคลินิก (Accident / Safety logs) ───────── */ ?>
+            <?php if (!$registryOnly && $hasAccidentLog): ?>
+                <button type="button" class="psb-section-toggle" data-group="safety" onclick="togglePsbGroup('safety',this)">
+                    <i class="fa-solid fa-shield-heart" style="color:#dc2626"></i>
+                    <span>ความปลอดภัยคลินิก</span>
+                    <i class="fa-solid fa-chevron-down psb-chevron"></i>
+                </button>
+                <div class="psb-group" data-group="safety">
+                    <a class="psb-item <?= $activeSection==='accident_log'?'psb-active':'' ?>" data-section="accident_log" href="accident_log.php">
+                        <div class="psb-icon"><i class="fa-solid fa-triangle-exclamation" style="color:#dc2626"></i></div>
+                        <span class="psb-label">บันทึกอุบัติเหตุ</span>
+                    </a>
                 </div>
             <?php endif; ?>
 
