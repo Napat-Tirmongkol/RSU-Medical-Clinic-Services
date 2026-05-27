@@ -715,29 +715,63 @@ foreach ($data['events'] as $idx => $event) {
 
                 // หา admin จาก LINE user ID ที่กดปุ่ม (เพื่อบันทึก approved_by)
                 $approverId = null;
+                $approverName = '';
                 if ($userId) {
                     try {
-                        $aRow = db()->prepare("SELECT id FROM sys_admins WHERE linked_line_user_id = :uid
-                                              OR linked_line_user_id_new = :uid2 LIMIT 1");
+                        $aRow = db()->prepare("SELECT id, full_name, username FROM sys_admins
+                                              WHERE linked_line_user_id = :uid
+                                                 OR linked_line_user_id_new = :uid2 LIMIT 1");
                         $aRow->execute([':uid' => $userId, ':uid2' => $userId]);
                         $aData = $aRow->fetch(PDO::FETCH_ASSOC);
-                        if ($aData) $approverId = (int)$aData['id'];
+                        if ($aData) {
+                            $approverId   = (int)$aData['id'];
+                            $approverName = trim((string)($aData['full_name'] ?: $aData['username'] ?: ''));
+                        }
                     } catch (Throwable $e) {}
                 }
+                // Fallback: ถ้าไม่ได้ link portal admin → ดึง displayName จาก LINE API
+                if ($approverName === '' && $userId) {
+                    try {
+                        if (!function_exists('line_chat_fetch_profile_from_line')) {
+                            @require_once __DIR__ . '/../includes/line_chat_helper.php';
+                        }
+                        if (function_exists('line_chat_fetch_profile_from_line')) {
+                            $profile = line_chat_fetch_profile_from_line($userId);
+                            if ($profile && !empty($profile['displayName'])) {
+                                $approverName = (string)$profile['displayName'] . ' (LINE)';
+                            }
+                        }
+                    } catch (Throwable $e) {}
+                }
+                if ($approverName === '') $approverName = 'ไม่ทราบชื่อ (LINE UID …' . substr($userId, -6) . ')';
 
                 try {
+                    // Auto-migrate: ensure approver_name column exists
+                    try {
+                        $colCheck = db()->query("SHOW COLUMNS FROM sys_scholarship_clock_logs LIKE 'approver_name'");
+                        if (!$colCheck->fetch()) {
+                            db()->exec("ALTER TABLE sys_scholarship_clock_logs
+                                ADD COLUMN approver_name VARCHAR(120) NULL AFTER approved_by");
+                        }
+                    } catch (Throwable $e) {}
+
                     $newStatus = $pbAction === 'approve' ? 'approved' : 'rejected';
                     $reason    = $pbAction === 'reject' ? 'ปฏิเสธผ่าน LINE' : '';
                     $upd = db()->prepare("UPDATE sys_scholarship_clock_logs
-                        SET status = :s, approved_by = :a, approved_at = NOW(), reject_reason = :r
+                        SET status = :s, approved_by = :a, approver_name = :an,
+                            approved_at = NOW(), reject_reason = :r
                         WHERE id = :id AND status = 'pending'");
-                    $upd->execute([':s' => $newStatus, ':a' => $approverId, ':r' => $reason, ':id' => $logId]);
+                    $upd->execute([
+                        ':s' => $newStatus, ':a' => $approverId, ':an' => $approverName,
+                        ':r' => $reason, ':id' => $logId,
+                    ]);
                     $affected = $upd->rowCount();
 
                     if ($affected > 0) {
-                        $icon    = $pbAction === 'approve' ? '✅' : '❌';
-                        $word    = $pbAction === 'approve' ? 'อนุมัติแล้ว' : 'ปฏิเสธแล้ว';
-                        $replyMsg = [['type' => 'text', 'text' => "$icon $word Log #$logId เรียบร้อยค่ะ"]];
+                        $icon = $pbAction === 'approve' ? '✅' : '❌';
+                        $word = $pbAction === 'approve' ? 'อนุมัติแล้ว' : 'ปฏิเสธแล้ว';
+                        $replyMsg = [['type' => 'text',
+                            'text' => "$icon $word · Log #$logId\nโดย: $approverName"]];
                     } else {
                         $replyMsg = [['type' => 'text', 'text' => "⚠️ ไม่พบรายการ #$logId หรืออนุมัติ/ปฏิเสธไปแล้ว"]];
                     }
@@ -747,7 +781,9 @@ foreach ($data['events'] as $idx => $event) {
                 }
 
                 if ($replyToken) send_line_reply($replyToken, $replyMsg, $accessToken);
-                line_webhook_log("scholarship $pbAction via LINE", ['log_id' => $logId, 'approver' => $approverId]);
+                line_webhook_log("scholarship $pbAction via LINE", [
+                    'log_id' => $logId, 'approver_id' => $approverId, 'approver_name' => $approverName,
+                ]);
                 break;
             }
 

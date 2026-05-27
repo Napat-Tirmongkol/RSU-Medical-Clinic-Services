@@ -277,11 +277,31 @@ function handle_approvals(PDO $pdo, string $action, int $adminId): void
         if (!$id) { echo json_encode(['ok' => false, 'error' => 'missing id']); return; }
         $newStatus = $action === 'approve' ? 'approved' : 'rejected';
         $reason = $action === 'reject' ? trim((string)($_POST['reason'] ?? '')) : '';
+        // Resolve approver display name (admin's full_name หรือ username)
+        $approverName = trim((string)($_SESSION['full_name']
+            ?? $_SESSION['admin_username']
+            ?? $_SESSION['admin_name']
+            ?? ''));
+        if ($approverName === '') $approverName = 'admin #' . $adminId;
+
+        // Auto-migrate approver_name column (idempotent)
+        try {
+            $colCheck = $pdo->query("SHOW COLUMNS FROM sys_scholarship_clock_logs LIKE 'approver_name'");
+            if (!$colCheck->fetch()) {
+                $pdo->exec("ALTER TABLE sys_scholarship_clock_logs
+                    ADD COLUMN approver_name VARCHAR(120) NULL AFTER approved_by");
+            }
+        } catch (Throwable) {}
+
         $stmt = $pdo->prepare("UPDATE sys_scholarship_clock_logs
-            SET status = :s, approved_by = :a, approved_at = NOW(), reject_reason = :r
+            SET status = :s, approved_by = :a, approver_name = :an,
+                approved_at = NOW(), reject_reason = :r
             WHERE id = :id AND status = 'pending'");
-        $ok = $stmt->execute([':s' => $newStatus, ':a' => $adminId, ':r' => $reason, ':id' => $id]);
-        echo json_encode(['ok' => $ok && $stmt->rowCount() > 0]);
+        $ok = $stmt->execute([
+            ':s' => $newStatus, ':a' => $adminId, ':an' => $approverName,
+            ':r' => $reason, ':id' => $id,
+        ]);
+        echo json_encode(['ok' => $ok && $stmt->rowCount() > 0, 'approver_name' => $approverName]);
         return;
     }
 
