@@ -2935,7 +2935,8 @@ $portalCsrf = get_csrf_token();
     ];
     if (window.RsuTour) RsuTour.maybeAutoStart('scholarship', SCH_TOUR_STEPS);
 
-    // ── Init: load default tab (Dashboard)
-    loadDashboard();
+    // ── Init: load default tab (Dashboard) — ต้อง trigger PANE_LOADERS
+    // เพื่อให้ทั้ง loadDashboard และ loadApprovals (ของต้องทำ) รัน
+    activatePane('dashboard');
 })();
 </script>
