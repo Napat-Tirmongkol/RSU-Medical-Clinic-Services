@@ -45,6 +45,15 @@ layout_start(['section' => 'dashboard', 'title' => 'Dashboard']);
 
                         <div id="mb-priorities" class="space-y-2 mb-4"></div>
 
+                        <div id="mb-doctors" class="hidden mb-4 p-3 rounded-lg border border-indigo-100 bg-indigo-50/40">
+                            <div class="flex items-center gap-2 mb-2">
+                                <i class="fa-solid fa-user-doctor text-indigo-500"></i>
+                                <p class="text-sm font-semibold text-slate-900">แพทย์ออกตรวจวันนี้</p>
+                                <span id="mb-doctors-count" class="text-xs text-slate-500"></span>
+                            </div>
+                            <div id="mb-doctors-list" class="space-y-1"></div>
+                        </div>
+
                         <div id="mb-stats" class="grid grid-cols-2 md:grid-cols-4 gap-2 pt-4 border-t border-slate-100"></div>
 
                         <div class="flex items-center justify-between mt-3 text-[11px] text-slate-400">
@@ -70,12 +79,20 @@ layout_start(['section' => 'dashboard', 'title' => 'Dashboard']);
                         .mb-stat { padding:.6rem .8rem; border-radius:.5rem; background:#f8fafc; }
                         .mb-stat-label { font-size:.7rem; color:#64748b; }
                         .mb-stat-value { font-size:1.1rem; font-weight:600; color:#0f172a; margin-top:.15rem; }
+                        .mb-doctor-row { display:flex; gap:.5rem; align-items:baseline; font-size:.8rem; line-height:1.5; }
+                        .mb-doctor-time { color:#3730a3; font-weight:600; font-variant-numeric:tabular-nums; min-width:90px; }
+                        .mb-doctor-name { color:#0f172a; flex:1; }
+                        .mb-doctor-room { color:#64748b; font-size:.72rem; }
+                        .mb-doctor-override { display:inline-block; padding:0 .35rem; border-radius:.25rem; background:#fed7aa; color:#9a3412; font-size:.65rem; font-weight:600; margin-left:.35rem; }
                         body[data-theme='dark'] #mb-widget { background:#0f172a; border-color:#1e293b; }
                         body[data-theme='dark'] #mb-widget .mb-priority { background:#1e293b; border-color:#334155; }
                         body[data-theme='dark'] #mb-widget .mb-stat { background:#1e293b; }
                         body[data-theme='dark'] #mb-widget .mb-stat-value { color:#f1f5f9; }
                         body[data-theme='dark'] #mb-widget #mb-narrative { color:#e2e8f0; }
                         body[data-theme='dark'] #mb-widget h3 { color:#f1f5f9; }
+                        body[data-theme='dark'] #mb-widget #mb-doctors { background:rgba(99,102,241,.08); border-color:rgba(99,102,241,.25); }
+                        body[data-theme='dark'] #mb-widget .mb-doctor-name { color:#f1f5f9; }
+                        body[data-theme='dark'] #mb-widget .mb-doctor-time { color:#a5b4fc; }
                     </style>
 
                     <script>
@@ -176,6 +193,27 @@ layout_start(['section' => 'dashboard', 'title' => 'Dashboard']);
                                 }).join('');
                             } else {
                                 pwrap.innerHTML = '';
+                            }
+
+                            // Doctor schedule block
+                            const docList = clinic.doctors_today_list || [];
+                            const docWrap = document.getElementById('mb-doctors');
+                            if (docList.length > 0) {
+                                document.getElementById('mb-doctors-count').textContent = '· ' + docList.length + ' ท่าน';
+                                document.getElementById('mb-doctors-list').innerHTML = docList.map(d => {
+                                    const time = d.time || '–';
+                                    const name = d.name || 'ไม่ระบุชื่อ';
+                                    const room = d.room ? `<span class="mb-doctor-room">@ ${esc(d.room)}</span>` : '';
+                                    const ovr  = d.is_override ? '<span class="mb-doctor-override">พิเศษ</span>' : '';
+                                    return `<div class="mb-doctor-row">
+                                        <span class="mb-doctor-time">${esc(time)}</span>
+                                        <span class="mb-doctor-name">${esc(name)}${ovr}</span>
+                                        ${room}
+                                    </div>`;
+                                }).join('');
+                                docWrap.classList.remove('hidden');
+                            } else {
+                                docWrap.classList.add('hidden');
                             }
 
                             // Stats grid (key numbers) — prefer e-Campaign data, fallback to generic bookings

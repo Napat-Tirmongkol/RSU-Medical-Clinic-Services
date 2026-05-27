@@ -59,6 +59,31 @@ function mb_build_line_flex(array $brief, array $priorities, bool $isTest = fals
         'size' => 'sm', 'color' => '#475569', 'wrap' => true, 'margin' => $isTest ? 'sm' : 'none',
     ];
 
+    // Doctor schedule block (ถ้ามี)
+    if (!empty($clinic['doctors_today_list'])) {
+        $bodyContents[] = ['type' => 'separator', 'margin' => 'md'];
+        $bodyContents[] = [
+            'type' => 'text',
+            'text' => 'แพทย์ออกตรวจวันนี้ (' . count($clinic['doctors_today_list']) . ' ท่าน)',
+            'size' => 'xs', 'weight' => 'bold', 'color' => '#3730a3', 'margin' => 'md',
+        ];
+        foreach (array_slice($clinic['doctors_today_list'], 0, 6) as $d) {
+            $line = ($d['time'] ?? '') . ' ' . ($d['name'] ?? '');
+            if (!empty($d['room'])) $line .= ' @' . $d['room'];
+            $bodyContents[] = [
+                'type' => 'text', 'text' => $line,
+                'size' => 'xs', 'color' => '#475569', 'wrap' => true, 'margin' => 'sm',
+            ];
+        }
+        if (count($clinic['doctors_today_list']) > 6) {
+            $bodyContents[] = [
+                'type' => 'text',
+                'text' => '… และอีก ' . (count($clinic['doctors_today_list']) - 6) . ' ท่าน',
+                'size' => 'xxs', 'color' => '#94a3b8', 'margin' => 'xs',
+            ];
+        }
+    }
+
     // Top campaigns block (ถ้ามี)
     if (!empty($camp['top_campaigns'])) {
         $bodyContents[] = ['type' => 'separator', 'margin' => 'md'];
@@ -178,6 +203,26 @@ function mb_build_email_html(array $brief, array $priorities, bool $isTest = fal
             . '</li>';
     }
 
+    // Doctor schedule block
+    $docHtml = '';
+    if (!empty($clinic['doctors_today_list'])) {
+        $docHtml = '<div style="margin-top:1.5rem;padding:1rem;background:#eef2ff;border-left:3px solid #6366f1;border-radius:6px">'
+            . '<h3 style="margin:0 0 .65rem;font-size:13px;color:#3730a3">แพทย์ออกตรวจวันนี้ (' . count($clinic['doctors_today_list']) . ' ท่าน)</h3>'
+            . '<table style="width:100%;border-collapse:collapse;font-size:13px">';
+        foreach ($clinic['doctors_today_list'] as $d) {
+            $name = $h($d['name'] ?? '');
+            if (!empty($d['is_override'])) {
+                $name .= ' <span style="display:inline-block;padding:0 4px;background:#fed7aa;color:#9a3412;font-size:10px;border-radius:3px">พิเศษ</span>';
+            }
+            $room = !empty($d['room']) ? '<span style="color:#64748b">@ ' . $h($d['room']) . '</span>' : '';
+            $docHtml .= '<tr>'
+                . '<td style="padding:.2rem 0;color:#3730a3;font-variant-numeric:tabular-nums;width:100px;white-space:nowrap">' . $h($d['time'] ?? '') . '</td>'
+                . '<td style="padding:.2rem 0;color:#0f172a">' . $name . ' ' . $room . '</td>'
+                . '</tr>';
+        }
+        $docHtml .= '</table></div>';
+    }
+
     // Campaign block (Top 3 + no-show)
     $campHtml = '';
     if (!empty($camp['top_campaigns'])) {
@@ -219,6 +264,7 @@ function mb_build_email_html(array $brief, array $priorities, bool $isTest = fal
         . '<p style="margin:0 0 1rem;color:#64748b;font-size:13px">' . $h($clinic['weekday_thai'] ?? '') . '</p>'
         . '<p style="line-height:1.6;color:#334155">' . $narrative . '</p>'
         . ($priHtml ? '<h3 style="font-size:14px;color:#0f172a;margin:1.5rem 0 .5rem">สิ่งที่ต้องทำ</h3><ul style="padding-left:1.25rem">' . $priHtml . '</ul>' : '')
+        . $docHtml
         . $campHtml
         . $statsHtml
         . '<p style="margin-top:1.5rem;font-size:11px;color:#94a3b8;text-align:center">RSU Medical Clinic Services · ' . $h($brief['ai_model'] ?? '') . '</p>'

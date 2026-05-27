@@ -138,6 +138,8 @@ $summary
 - ถ้า today_scheduled > 0 (campaign) → ใส่ priority "นัดหมายแคมเปญวันนี้" + ระบุยอดและ top แคมเปญ
 - ถ้า yesterday_no_show_rate > 15 → priority "ตามผู้ขาดนัด" หมวด campaign + urgency อย่างน้อย "normal"
 - ถ้า active_campaigns = 0 และ today_scheduled = 0 → ไม่ต้องพูดถึงแคมเปญ
+- ถ้ามี doctors_today_list → ระบุจำนวนแพทย์ใน narrative แบบสั้น เช่น "วันนี้แพทย์ออกตรวจ N ท่าน"
+  ห้ามใส่เป็น priority (เป็นข้อมูล, ไม่ใช่ action)
 - ถ้าทุกอย่างปกติ → urgency = "low" + narrative สั้นๆ ว่าเช้านี้สงบ
 - ถ้า clinic_open=false (คลินิกหยุด) → ขึ้นต้น narrative ว่า "วันนี้คลินิกหยุด"
   + clinic_note ถ้ามี · ถ้ายังมี pending approvals/SLA breach ก็ยังต้องเตือน

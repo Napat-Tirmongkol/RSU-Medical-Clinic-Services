@@ -260,6 +260,50 @@ function morning_brief_collect_clinic(PDO $pdo, string $today): array {
             }
         }
     } catch (Throwable) {}
+    // ─── Doctor schedule วันนี้ (พร้อมรายชื่อ + เวลา + ห้อง) ──
+    // weekday convention: schema เก็บ 0=อาทิตย์..6=เสาร์ — ใช้ DAYOFWEEK(:d)-1
+    // (ไม่ใช่ WEEKDAY() ที่ MySQL คืน 0=จันทร์)
+    // Exclude staff ที่มี off-record ของวันนั้น
+    $doctorRows = _safe_rows($pdo, "
+        SELECT s.type, s.start_time, s.end_time, s.service_type,
+               COALESCE(ms.title, '')     AS title,
+               COALESCE(ms.full_name, '') AS doctor_name,
+               COALESCE(cr.name, '')      AS room_name
+        FROM sys_doctor_schedule s
+        LEFT JOIN sys_medical_staff ms ON s.staff_id = ms.id
+        LEFT JOIN sys_clinic_rooms  cr ON s.room_id  = cr.id
+        WHERE s.is_active = 1
+          AND (
+            (s.type = 'regular'
+                AND s.weekday = (DAYOFWEEK(:d1) - 1)
+                AND (s.recur_end_date IS NULL OR s.recur_end_date >= :d2))
+            OR
+            (s.type = 'override' AND s.specific_date = :d3)
+          )
+          AND NOT EXISTS (
+            SELECT 1 FROM sys_doctor_schedule s2
+            WHERE s2.staff_id = s.staff_id
+              AND s2.is_active = 1
+              AND s2.type = 'off'
+              AND s2.specific_date = :d4
+          )
+        ORDER BY s.start_time, ms.full_name",
+        [':d1'=>$today, ':d2'=>$today, ':d3'=>$today, ':d4'=>$today]);
+
+    $doctorsList = array_map(function($r) {
+        $name = trim((($r['title'] ?? '') ? $r['title'] . ' ' : '') . ($r['doctor_name'] ?? ''));
+        $st = substr((string)($r['start_time'] ?? ''), 0, 5);
+        $et = substr((string)($r['end_time'] ?? ''), 0, 5);
+        $time = ($st && $et) ? ($st . '–' . $et) : ($st ?: $et ?: '');
+        return [
+            'name'    => $name,
+            'time'    => $time,
+            'room'    => (string)($r['room_name'] ?? ''),
+            'service' => (string)($r['service_type'] ?? ''),
+            'is_override' => ($r['type'] ?? '') === 'override',
+        ];
+    }, $doctorRows);
+
     return [
         'date_thai'      => _format_thai_date($today),
         'weekday_thai'   => _weekday_thai($today),
@@ -270,11 +314,8 @@ function morning_brief_collect_clinic(PDO $pdo, string $today): array {
         'nurses_today'   => _safe_int($pdo,
             "SELECT COUNT(*) FROM sys_nurse_schedule WHERE shift_date = :d",
             [':d' => $today]),
-        'doctors_today'  => _safe_int($pdo,
-            "SELECT COUNT(*) FROM sys_doctor_schedule
-             WHERE (type='regular' AND weekday = WEEKDAY(:d))
-                OR (type='override' AND specific_date = :d)",
-            [':d' => $today]),
+        'doctors_today'  => count($doctorsList),
+        'doctors_today_list' => $doctorsList,
         'appointments_today' => _safe_int($pdo,
             "SELECT COUNT(*) FROM bookings
              WHERE DATE(booking_date) = :d AND status NOT IN ('cancelled','no_show')",
