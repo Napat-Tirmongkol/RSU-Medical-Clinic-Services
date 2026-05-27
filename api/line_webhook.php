@@ -683,11 +683,24 @@ foreach ($data['events'] as $idx => $event) {
                 require_once __DIR__ . '/../line_api/line_richmenu_helper.php';
                 $rmResult = line_richmenu_sync_user((string)$userId, null, 'webhook:follow');
                 if (!$rmResult['ok']) {
-                    line_webhook_log('richmenu sync failed on follow', [
-                        'line_user_id' => line_mask_uid($userId),
-                        'state'        => $rmResult['state'],
-                        'error'        => $rmResult['error'],
-                    ], 'warning');
+                    // แยก case เพื่อลด Sentry noise:
+                    //   - 'disabled'           → admin ปิด feature เอง · silent
+                    //   - richMenuId ว่าง      → config issue · info-level (อยู่ใน sys_error_logs
+                    //                            แต่ไม่ alert Sentry — admin ตั้ง ID ครั้งเดียวก็หาย)
+                    //   - LINE API ปฏิเสธ       → warning + Sentry (token หมดอายุ/user block)
+                    $rmState = (string)($rmResult['state'] ?? '');
+                    $rmErr   = (string)($rmResult['error'] ?? '');
+                    $isConfigIssue = ($rmState === 'disabled')
+                        || str_starts_with($rmErr, 'ยังไม่ได้ตั้ง richMenuId');
+                    line_webhook_log(
+                        $isConfigIssue ? 'richmenu sync skipped (config)' : 'richmenu sync failed on follow',
+                        [
+                            'line_user_id' => line_mask_uid($userId),
+                            'state'        => $rmState,
+                            'error'        => $rmErr,
+                        ],
+                        $isConfigIssue ? 'info' : 'warning'
+                    );
                 }
             }
             break;
