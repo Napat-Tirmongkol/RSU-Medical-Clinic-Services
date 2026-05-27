@@ -6,6 +6,8 @@
  * GET  ?action=list        → คืนรายการกลุ่มและ default_id
  * POST action=set_default  → ตั้ง line.group.default_id
  * POST action=test_push    → ส่งข้อความทดสอบไปยังกลุ่ม
+ * POST action=rename       → เปลี่ยนชื่อ display name ของกลุ่ม (ในระบบเรา)
+ *                            ไม่ได้แก้ชื่อกลุ่มใน LINE จริง — แค่ alias ในระบบ
  */
 declare(strict_types=1);
 require_once __DIR__ . '/../config.php';
@@ -77,6 +79,47 @@ if ($action === 'test_push') {
         'ok'         => $ok,
         'line_error' => $ok ? '' : get_last_line_error(),
     ]);
+    exit;
+}
+
+if ($action === 'rename') {
+    $groupId = trim($_POST['group_id'] ?? '');
+    $newName = trim($_POST['name'] ?? '');
+    if ($groupId === '') {
+        echo json_encode(['ok' => false, 'error' => 'group_id required']); exit;
+    }
+    if (mb_strlen($newName) > 80) {
+        echo json_encode(['ok' => false, 'error' => 'ชื่อกลุ่มยาวเกิน 80 ตัวอักษร']); exit;
+    }
+    try {
+        // อ่าน registry · แก้ name เฉพาะ group ที่ตรง · เขียนกลับ
+        $groups = line_groups_list($pdo);
+        $found = false;
+        foreach ($groups as &$g) {
+            if (($g['id'] ?? '') === $groupId) {
+                $g['name'] = $newName;          // อนุญาตให้ตั้งเป็นค่าว่าง (= ลบ alias)
+                $g['renamed_at'] = date('c');
+                $found = true;
+                break;
+            }
+        }
+        unset($g);
+        if (!$found) {
+            echo json_encode(['ok' => false, 'error' => 'ไม่พบกลุ่ม']); exit;
+        }
+        $payload = json_encode($groups, JSON_UNESCAPED_UNICODE);
+        $stmt = $pdo->prepare("INSERT INTO sys_site_settings (setting_key, setting_value)
+                               VALUES ('line.groups.discovered', :v)
+                               ON DUPLICATE KEY UPDATE setting_value = :v2");
+        $stmt->execute([':v' => $payload, ':v2' => $payload]);
+        if (function_exists('log_activity')) {
+            @log_activity('LINE Group Rename', "Renamed {$groupId} → \"{$newName}\"");
+        }
+        echo json_encode(['ok' => true]);
+    } catch (Throwable $e) {
+        error_log('[ajax_line_groups rename] ' . $e->getMessage());
+        echo json_encode(['ok' => false, 'error' => 'Server error']);
+    }
     exit;
 }
 

@@ -332,7 +332,10 @@ function line_groups_upsert(PDO $pdo, string $groupId, string $type = 'group', ?
         foreach ($groups as &$g) {
             if (($g['id'] ?? '') === $groupId) {
                 $g['last_seen_at'] = $now;
-                if ($name !== null && $name !== '')         $g['name'] = $name;
+                // ไม่เขียนทับ name ถ้า user ตั้งชื่อเองไว้แล้ว (renamed_at มีค่า)
+                if ($name !== null && $name !== '' && empty($g['renamed_at'])) {
+                    $g['name'] = $name;
+                }
                 if ($memberCount !== null)                  $g['member_count'] = $memberCount;
                 $found = true;
                 break;
