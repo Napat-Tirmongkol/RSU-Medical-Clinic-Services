@@ -12,6 +12,186 @@ layout_start(['section' => 'dashboard', 'title' => 'Dashboard']);
             <div id="section-dashboard" class="portal-section" style="">
                 <div class="max-w-[1280px] mx-auto px-5 md:px-8 py-8 space-y-8">
 
+                    <!-- ── PRIORITY PANEL: งานวันนี้ ──────────────────────────────── -->
+                    <?php
+                    // Role-aware capability flags
+                    // - Portal admin (ไม่ใช่ staff) → เห็นทุกอย่างตามเดิม
+                    // - Staff (is_ecampaign_staff) → จำกัดตาม access_* flag ที่ตั้งไว้ตอน login
+                    $canEcampaign  = !$isStaff || !empty($_SESSION['access_ecampaign']);
+                    $canEborrow    = !$isStaff || !empty($_SESSION['access_eborrow']);
+                    $canSystemLogs = !$isStaff || !empty($_SESSION['access_system_logs']);
+
+                    $today_items = [];
+
+                    // e-Campaign signals — เน้น check-in workload วันนี้ (สำหรับ staff)
+                    if ($canEcampaign) {
+                        if ($kpis['pending_today'] > 0) {
+                            $today_items[] = [
+                                'label' => 'รอเช็คอินวันนี้',
+                                'value' => $kpis['pending_today'],
+                                'icon'  => 'fa-clock',
+                                'tone'  => 'warning',
+                                'href'  => '../admin/daily_report.php',
+                            ];
+                        }
+                        if ($kpis['checkins_today'] > 0) {
+                            $today_items[] = [
+                                'label' => 'เช็คอินสำเร็จวันนี้',
+                                'value' => $kpis['checkins_today'],
+                                'icon'  => 'fa-circle-check',
+                                'tone'  => 'success',
+                                'href'  => '../admin/daily_report.php',
+                            ];
+                        }
+                        if ($kpis['slots_today'] > 0) {
+                            $today_items[] = [
+                                'label' => 'Slot นัดหมายวันนี้',
+                                'value' => $kpis['slots_today'],
+                                'icon'  => 'fa-calendar-day',
+                                'tone'  => 'info',
+                                'href'  => '../admin/time_slots.php',
+                            ];
+                        }
+                        if ($kpis['bookings_today'] > 0) {
+                            $today_items[] = [
+                                'label' => 'การจองใหม่ใน 24 ชม.',
+                                'value' => $kpis['bookings_today'],
+                                'icon'  => 'fa-bullhorn',
+                                'tone'  => 'accent',
+                                'href'  => '../admin/bookings.php',
+                            ];
+                        }
+                    }
+
+                    // e-Borrow signals — เฉพาะคนที่มีสิทธิ์ดูแล e-Borrow
+                    if ($canEborrow) {
+                        if ($kpis['borrows'] > 0) {
+                            $today_items[] = [
+                                'label' => 'อุปกรณ์รออนุมัติ',
+                                'value' => $kpis['borrows'],
+                                'icon'  => 'fa-box-open',
+                                'tone'  => 'warning',
+                                'href'  => '../e_Borrow/admin/index.php',
+                            ];
+                        }
+                        if ($kpis['borrows_overdue'] > 0) {
+                            $today_items[] = [
+                                'label' => 'เลยกำหนดคืน',
+                                'value' => $kpis['borrows_overdue'],
+                                'icon'  => 'fa-clock-rotate-left',
+                                'tone'  => 'danger',
+                                'href'  => '../e_Borrow/admin/return_dashboard.php',
+                            ];
+                        }
+                    }
+
+                    // System logs — เฉพาะคนดูแลระบบ
+                    if ($canSystemLogs && $kpis['errors_today'] > 0) {
+                        $today_items[] = [
+                            'label' => 'Error ใหม่ใน 24 ชม.',
+                            'value' => $kpis['errors_today'],
+                            'icon'  => 'fa-bug',
+                            'tone'  => 'danger',
+                            'href'  => 'javascript:switchSection(\'error_logs\')',
+                        ];
+                    }
+
+                    // EDMS / สารบรรณอิเล็กทรอนิกส์ — เฉพาะคนที่ access_edms
+                    if ($hasEdms) {
+                        // 1) เลยกำหนด — เร่งด่วนสุด แสดงก่อน
+                        if ($edmsBreachedMine > 0) {
+                            $today_items[] = [
+                                'label' => 'เลยกำหนดแล้ว — ต้องเร่งด่วน',
+                                'value' => $edmsBreachedMine,
+                                'icon'  => 'fa-circle-exclamation',
+                                'tone'  => 'danger',
+                                'href'  => '?section=edms&edms_view=myinbox&filter=breached',
+                            ];
+                        }
+                        // 2) Warning — ใกล้หมดเวลา
+                        if ($edmsWarningMine > 0) {
+                            $today_items[] = [
+                                'label' => 'ใกล้หมดเวลา — รีบทำให้เสร็จ',
+                                'value' => $edmsWarningMine,
+                                'icon'  => 'fa-triangle-exclamation',
+                                'tone'  => 'warning',
+                                'href'  => '?section=edms&edms_view=myinbox&filter=warning',
+                            ];
+                        }
+                        // 3) Tasks ของฉัน (ถ้ามี — เน้นว่าเป็นงานมอบหมาย)
+                        if ($edmsTaskMine > 0) {
+                            $today_items[] = [
+                                'label' => 'งานที่ต้องทำ',
+                                'value' => $edmsTaskMine,
+                                'icon'  => 'fa-list-check',
+                                'tone'  => 'info',
+                                'href'  => '?section=edms&edms_view=myinbox&filter=open',
+                            ];
+                        }
+                        // 4) เอกสารใน inbox (เฉพาะที่ไม่ใช่ task — กัน double-count)
+                        $_docOnlyInbox = max(0, $edmsInboxBadge - $edmsTaskMine);
+                        if ($_docOnlyInbox > 0) {
+                            $today_items[] = [
+                                'label' => 'เอกสารที่ต้องดำเนินการ',
+                                'value' => $_docOnlyInbox,
+                                'icon'  => 'fa-folder-open',
+                                'tone'  => 'accent',
+                                'href'  => '?section=edms&edms_view=myinbox&filter=open',
+                            ];
+                        }
+                    }
+                    ?>
+                    <section class="au d1">
+                        <?php
+                        // Build 4 hero KPI tiles role-aware
+                        $heroKpis = [];
+                        if ($isStaff && $canEcampaign) {
+                            $heroKpis[] = ['tone'=>'brand', 'icon'=>'fa-circle-check', 'num'=>$kpis['checkins_today'], 'sub'=>'/ '.number_format($kpis['appts_today']), 'label'=>'เช็คอินวันนี้ · จากนัดหมาย'];
+                            $heroKpis[] = ['tone'=>'info',  'icon'=>'fa-calendar-day', 'num'=>$kpis['slots_today'],    'label'=>'Slot วันนี้'];
+                            $heroKpis[] = ['tone'=>'amber', 'icon'=>'fa-clock',        'num'=>$kpis['pending_today'],  'label'=>'รอเช็คอิน'];
+                            $heroKpis[] = ['tone'=>'accent','icon'=>'fa-bullhorn',     'num'=>$kpis['bookings_today'], 'label'=>'จองใหม่ใน 24 ชม.'];
+                        } else {
+                            $heroKpis[] = ['tone'=>'brand', 'icon'=>'fa-users',     'num'=>$kpis['users'],      'label'=>'บุคลากรและนักศึกษา', 'counter'=>true];
+                            $heroKpis[] = ['tone'=>'info',  'icon'=>'fa-bullhorn',  'num'=>$kpis['camps'],      'label'=>'แคมเปญ active'];
+                            $heroKpis[] = ['tone'=>'amber', 'icon'=>'fa-gauge-high','num'=>$kpis['used_quota'], 'sub'=>'/ '.number_format($kpis['total_quota']), 'label'=>'ใช้ไปแล้ว · จาก quota'];
+                            $heroKpis[] = ['tone'=>'rose',  'icon'=>'fa-bug',       'num'=>$kpis['errors_today'],'label'=>'Error ใน 24 ชม.'];
+                        }
+                        $firstName = !empty($_SESSION['admin_username']) ? explode(' ', $_SESSION['admin_username'])[0] : '';
+                        $hour = (int)date('G');
+                        $greet = $hour < 12 ? 'อรุณสวัสดิ์' : ($hour < 17 ? 'สวัสดี' : ($hour < 21 ? 'สวัสดีตอนเย็น' : 'สวัสดีค่ำคืนนี้'));
+                        $thaiMonths = ['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+                        $thaiDays   = ['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์'];
+                        $todayStr   = $thaiDays[(int)date('w')] . ' ' . (int)date('j') . ' ' . $thaiMonths[(int)date('n')] . ' ' . (date('Y')+543);
+                        ?>
+                        <div class="dash-hero">
+                            <div class="dash-hero-glow"></div>
+                            <div class="dash-hero-greet">
+                                <div class="dash-hero-eyebrow">
+                                    <i class="fa-solid fa-calendar-day"></i> <?= $todayStr ?>
+                                    <?php if ($isStaff): ?><span class="dash-hero-role-pill"><i class="fa-solid fa-id-badge"></i> เจ้าหน้าที่</span><?php endif; ?>
+                                </div>
+                                <h1 class="dash-hero-title">
+                                    <?= $greet ?><?= $firstName ? ' <span class="dash-hero-name">' . htmlspecialchars($firstName) . '</span>' : '' ?>
+                                </h1>
+                                <p class="dash-hero-sub">
+                                    ภาพรวมระบบและงานวันนี้ของคุณ — เปิด App Launcher ที่ sidebar เพื่อเข้าระบบอื่นๆ
+                                </p>
+                            </div>
+                            <div class="dash-hero-kpis">
+                                <?php foreach ($heroKpis as $i => $k): ?>
+                                <div class="dash-kpi" data-tone="<?= $k['tone'] ?>" style="animation-delay:<?= 0.1 + $i * 0.08 ?>s">
+                                    <div class="dash-kpi-ic"><i class="fa-solid <?= $k['icon'] ?>"></i></div>
+                                    <div class="dash-kpi-body">
+                                        <div class="dash-kpi-num">
+                                            <span<?= !empty($k['counter']) ? ' id="kpi-users"' : '' ?> data-counter="<?= (int)$k['num'] ?>">0</span><?php if (!empty($k['sub'])): ?><span class="dash-kpi-sub"><?= $k['sub'] ?></span><?php endif; ?>
+                                        </div>
+                                        <div class="dash-kpi-label"><?= htmlspecialchars($k['label']) ?></div>
+                                    </div>
+                                </div>
+                                <?php endforeach; ?>
+                            </div>
+                        </div>
+                    </section>
                     <!-- ── MORNING BRIEF WIDGET ──────────────────────────────────── -->
                     <div id="mb-widget" class="rounded-2xl border border-slate-200 bg-white p-5 hidden">
                         <div class="flex items-start justify-between gap-3 mb-3 flex-wrap">
@@ -276,186 +456,6 @@ layout_start(['section' => 'dashboard', 'title' => 'Dashboard']);
                     })();
                     </script>
 
-                    <!-- ── PRIORITY PANEL: งานวันนี้ ──────────────────────────────── -->
-                    <?php
-                    // Role-aware capability flags
-                    // - Portal admin (ไม่ใช่ staff) → เห็นทุกอย่างตามเดิม
-                    // - Staff (is_ecampaign_staff) → จำกัดตาม access_* flag ที่ตั้งไว้ตอน login
-                    $canEcampaign  = !$isStaff || !empty($_SESSION['access_ecampaign']);
-                    $canEborrow    = !$isStaff || !empty($_SESSION['access_eborrow']);
-                    $canSystemLogs = !$isStaff || !empty($_SESSION['access_system_logs']);
-
-                    $today_items = [];
-
-                    // e-Campaign signals — เน้น check-in workload วันนี้ (สำหรับ staff)
-                    if ($canEcampaign) {
-                        if ($kpis['pending_today'] > 0) {
-                            $today_items[] = [
-                                'label' => 'รอเช็คอินวันนี้',
-                                'value' => $kpis['pending_today'],
-                                'icon'  => 'fa-clock',
-                                'tone'  => 'warning',
-                                'href'  => '../admin/daily_report.php',
-                            ];
-                        }
-                        if ($kpis['checkins_today'] > 0) {
-                            $today_items[] = [
-                                'label' => 'เช็คอินสำเร็จวันนี้',
-                                'value' => $kpis['checkins_today'],
-                                'icon'  => 'fa-circle-check',
-                                'tone'  => 'success',
-                                'href'  => '../admin/daily_report.php',
-                            ];
-                        }
-                        if ($kpis['slots_today'] > 0) {
-                            $today_items[] = [
-                                'label' => 'Slot นัดหมายวันนี้',
-                                'value' => $kpis['slots_today'],
-                                'icon'  => 'fa-calendar-day',
-                                'tone'  => 'info',
-                                'href'  => '../admin/time_slots.php',
-                            ];
-                        }
-                        if ($kpis['bookings_today'] > 0) {
-                            $today_items[] = [
-                                'label' => 'การจองใหม่ใน 24 ชม.',
-                                'value' => $kpis['bookings_today'],
-                                'icon'  => 'fa-bullhorn',
-                                'tone'  => 'accent',
-                                'href'  => '../admin/bookings.php',
-                            ];
-                        }
-                    }
-
-                    // e-Borrow signals — เฉพาะคนที่มีสิทธิ์ดูแล e-Borrow
-                    if ($canEborrow) {
-                        if ($kpis['borrows'] > 0) {
-                            $today_items[] = [
-                                'label' => 'อุปกรณ์รออนุมัติ',
-                                'value' => $kpis['borrows'],
-                                'icon'  => 'fa-box-open',
-                                'tone'  => 'warning',
-                                'href'  => '../e_Borrow/admin/index.php',
-                            ];
-                        }
-                        if ($kpis['borrows_overdue'] > 0) {
-                            $today_items[] = [
-                                'label' => 'เลยกำหนดคืน',
-                                'value' => $kpis['borrows_overdue'],
-                                'icon'  => 'fa-clock-rotate-left',
-                                'tone'  => 'danger',
-                                'href'  => '../e_Borrow/admin/return_dashboard.php',
-                            ];
-                        }
-                    }
-
-                    // System logs — เฉพาะคนดูแลระบบ
-                    if ($canSystemLogs && $kpis['errors_today'] > 0) {
-                        $today_items[] = [
-                            'label' => 'Error ใหม่ใน 24 ชม.',
-                            'value' => $kpis['errors_today'],
-                            'icon'  => 'fa-bug',
-                            'tone'  => 'danger',
-                            'href'  => 'javascript:switchSection(\'error_logs\')',
-                        ];
-                    }
-
-                    // EDMS / สารบรรณอิเล็กทรอนิกส์ — เฉพาะคนที่ access_edms
-                    if ($hasEdms) {
-                        // 1) เลยกำหนด — เร่งด่วนสุด แสดงก่อน
-                        if ($edmsBreachedMine > 0) {
-                            $today_items[] = [
-                                'label' => 'เลยกำหนดแล้ว — ต้องเร่งด่วน',
-                                'value' => $edmsBreachedMine,
-                                'icon'  => 'fa-circle-exclamation',
-                                'tone'  => 'danger',
-                                'href'  => '?section=edms&edms_view=myinbox&filter=breached',
-                            ];
-                        }
-                        // 2) Warning — ใกล้หมดเวลา
-                        if ($edmsWarningMine > 0) {
-                            $today_items[] = [
-                                'label' => 'ใกล้หมดเวลา — รีบทำให้เสร็จ',
-                                'value' => $edmsWarningMine,
-                                'icon'  => 'fa-triangle-exclamation',
-                                'tone'  => 'warning',
-                                'href'  => '?section=edms&edms_view=myinbox&filter=warning',
-                            ];
-                        }
-                        // 3) Tasks ของฉัน (ถ้ามี — เน้นว่าเป็นงานมอบหมาย)
-                        if ($edmsTaskMine > 0) {
-                            $today_items[] = [
-                                'label' => 'งานที่ต้องทำ',
-                                'value' => $edmsTaskMine,
-                                'icon'  => 'fa-list-check',
-                                'tone'  => 'info',
-                                'href'  => '?section=edms&edms_view=myinbox&filter=open',
-                            ];
-                        }
-                        // 4) เอกสารใน inbox (เฉพาะที่ไม่ใช่ task — กัน double-count)
-                        $_docOnlyInbox = max(0, $edmsInboxBadge - $edmsTaskMine);
-                        if ($_docOnlyInbox > 0) {
-                            $today_items[] = [
-                                'label' => 'เอกสารที่ต้องดำเนินการ',
-                                'value' => $_docOnlyInbox,
-                                'icon'  => 'fa-folder-open',
-                                'tone'  => 'accent',
-                                'href'  => '?section=edms&edms_view=myinbox&filter=open',
-                            ];
-                        }
-                    }
-                    ?>
-                    <section class="au d1">
-                        <?php
-                        // Build 4 hero KPI tiles role-aware
-                        $heroKpis = [];
-                        if ($isStaff && $canEcampaign) {
-                            $heroKpis[] = ['tone'=>'brand', 'icon'=>'fa-circle-check', 'num'=>$kpis['checkins_today'], 'sub'=>'/ '.number_format($kpis['appts_today']), 'label'=>'เช็คอินวันนี้ · จากนัดหมาย'];
-                            $heroKpis[] = ['tone'=>'info',  'icon'=>'fa-calendar-day', 'num'=>$kpis['slots_today'],    'label'=>'Slot วันนี้'];
-                            $heroKpis[] = ['tone'=>'amber', 'icon'=>'fa-clock',        'num'=>$kpis['pending_today'],  'label'=>'รอเช็คอิน'];
-                            $heroKpis[] = ['tone'=>'accent','icon'=>'fa-bullhorn',     'num'=>$kpis['bookings_today'], 'label'=>'จองใหม่ใน 24 ชม.'];
-                        } else {
-                            $heroKpis[] = ['tone'=>'brand', 'icon'=>'fa-users',     'num'=>$kpis['users'],      'label'=>'บุคลากรและนักศึกษา', 'counter'=>true];
-                            $heroKpis[] = ['tone'=>'info',  'icon'=>'fa-bullhorn',  'num'=>$kpis['camps'],      'label'=>'แคมเปญ active'];
-                            $heroKpis[] = ['tone'=>'amber', 'icon'=>'fa-gauge-high','num'=>$kpis['used_quota'], 'sub'=>'/ '.number_format($kpis['total_quota']), 'label'=>'ใช้ไปแล้ว · จาก quota'];
-                            $heroKpis[] = ['tone'=>'rose',  'icon'=>'fa-bug',       'num'=>$kpis['errors_today'],'label'=>'Error ใน 24 ชม.'];
-                        }
-                        $firstName = !empty($_SESSION['admin_username']) ? explode(' ', $_SESSION['admin_username'])[0] : '';
-                        $hour = (int)date('G');
-                        $greet = $hour < 12 ? 'อรุณสวัสดิ์' : ($hour < 17 ? 'สวัสดี' : ($hour < 21 ? 'สวัสดีตอนเย็น' : 'สวัสดีค่ำคืนนี้'));
-                        $thaiMonths = ['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
-                        $thaiDays   = ['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์'];
-                        $todayStr   = $thaiDays[(int)date('w')] . ' ' . (int)date('j') . ' ' . $thaiMonths[(int)date('n')] . ' ' . (date('Y')+543);
-                        ?>
-                        <div class="dash-hero">
-                            <div class="dash-hero-glow"></div>
-                            <div class="dash-hero-greet">
-                                <div class="dash-hero-eyebrow">
-                                    <i class="fa-solid fa-calendar-day"></i> <?= $todayStr ?>
-                                    <?php if ($isStaff): ?><span class="dash-hero-role-pill"><i class="fa-solid fa-id-badge"></i> เจ้าหน้าที่</span><?php endif; ?>
-                                </div>
-                                <h1 class="dash-hero-title">
-                                    <?= $greet ?><?= $firstName ? ' <span class="dash-hero-name">' . htmlspecialchars($firstName) . '</span>' : '' ?>
-                                </h1>
-                                <p class="dash-hero-sub">
-                                    ภาพรวมระบบและงานวันนี้ของคุณ — เปิด App Launcher ที่ sidebar เพื่อเข้าระบบอื่นๆ
-                                </p>
-                            </div>
-                            <div class="dash-hero-kpis">
-                                <?php foreach ($heroKpis as $i => $k): ?>
-                                <div class="dash-kpi" data-tone="<?= $k['tone'] ?>" style="animation-delay:<?= 0.1 + $i * 0.08 ?>s">
-                                    <div class="dash-kpi-ic"><i class="fa-solid <?= $k['icon'] ?>"></i></div>
-                                    <div class="dash-kpi-body">
-                                        <div class="dash-kpi-num">
-                                            <span<?= !empty($k['counter']) ? ' id="kpi-users"' : '' ?> data-counter="<?= (int)$k['num'] ?>">0</span><?php if (!empty($k['sub'])): ?><span class="dash-kpi-sub"><?= $k['sub'] ?></span><?php endif; ?>
-                                        </div>
-                                        <div class="dash-kpi-label"><?= htmlspecialchars($k['label']) ?></div>
-                                    </div>
-                                </div>
-                                <?php endforeach; ?>
-                            </div>
-                        </div>
-                    </section>
 
                     <!-- ── PRIORITY: งานต้องทำวันนี้ (clean, no greeting now) ───── -->
                     <section class="au d2">
