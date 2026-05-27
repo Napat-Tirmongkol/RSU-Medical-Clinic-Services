@@ -1178,7 +1178,7 @@ if ($selectedUser) {
       </div>
       <div class="sum-row">
         <div class="k">ลายเซ็น</div>
-        <div class="v ok" id="sumSignature">บันทึกแล้ว · SHA256: <span id="sumHash" style="font-family:monospace;font-size:11px;color:#64748b;">—</span></div>
+        <div class="v ok" id="sumSignature">บันทึกแล้ว · SHA256: <span id="sumHash" style="font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:10.5px;color:#64748b;word-break:break-all;display:inline-block;max-width:340px;line-height:1.35;vertical-align:middle">—</span></div>
       </div>
       <div class="sum-row">
         <div class="k">เวลาที่เซ็น</div>
@@ -1348,7 +1348,7 @@ const CONSENT_QUESTIONS = [
   'ท่าน (เพศหญิง) ตั้งครรภ์ หรือสงสัยว่าตั้งครรภ์ หรือกำลังให้นมบุตรหรือไม่',
 ];
 
-function openFinalDocument() {
+async function openFinalDocument() {
   const content = document.getElementById('finalDocContent');
   // 1. รวบรวมข้อมูล จากฟอร์ม
   const patientName    = <?= json_encode($mock['patient_name']) ?>;
@@ -1378,9 +1378,17 @@ function openFinalDocument() {
   let witnessDataUrl = '';
   try { witnessDataUrl = witness?.toDataURL('image/png') || ''; } catch(e) {}
 
-  // Hash + เวลา (ใช้จาก step 5 ถ้ามี)
-  const hash = document.getElementById('sumHash')?.textContent || '—';
-  const nowStr = new Date().toLocaleString('th-TH', { dateStyle:'long', timeStyle:'medium' });
+  // Hash + เวลา — ใช้จาก cache ของ renderSummary ถ้ามี · ไม่งั้น compute ใหม่
+  let hash, nowStr;
+  if (window._consentHashCache?.hash && !window._consentHashCache.hash.startsWith('⏳')) {
+    hash = window._consentHashCache.hash;
+    nowStr = new Date(window._consentHashCache.timestamp).toLocaleString('th-TH', { dateStyle:'long', timeStyle:'medium' });
+  } else {
+    const tsIso = new Date().toISOString();
+    const result = await computeConsentHash(tsIso);
+    hash = result.hash;
+    nowStr = new Date(tsIso).toLocaleString('th-TH', { dateStyle:'long', timeStyle:'medium' });
+  }
 
   // 2. Render
   content.innerHTML = `
@@ -1648,7 +1656,57 @@ function hasSignature(key) {
 }
 
 /* ===== Summary rendering ===== */
-function renderSummary() {
+/* Patient/vaccine info ที่ใช้ใน canonical payload (inject ตอน render PHP) */
+const CONSENT_PATIENT = <?= json_encode([
+    'name'        => $mock['patient_name'],
+    'code'        => $mock['patient_code'] ?? '',
+    'campaign'    => $mock['campaign_title'],
+    'appointment' => $mock['appointment_at'],
+], JSON_UNESCAPED_UNICODE) ?>;
+
+/**
+ * คำนวณ SHA-256 hex ของข้อมูลยินยอม (canonical payload)
+ * - input เรียง key alphabetical → deterministic
+ * - ใช้ Web Crypto API (ต้อง HTTPS หรือ localhost · ระบบ production อยู่บน HTTPS อยู่แล้ว)
+ * - คืน 64 hex chars หรือข้อความ error
+ */
+async function computeConsentHash(timestampIso) {
+  const answers = [];
+  for (let i = 1; i <= 7; i++) {
+    answers.push(document.querySelector(`input[name="q${i}"]:checked`)?.value || '');
+  }
+  const decision = document.querySelector('input[name="decision"]:checked')?.value || '';
+  let sigDataUrl = '';
+  try { sigDataUrl = document.getElementById('sigCanvas')?.toDataURL('image/png') || ''; } catch(e) {}
+
+  // Canonical: keys เรียง alphabetical · ไม่มี whitespace (JSON.stringify default)
+  const payload = JSON.stringify({
+    appointment: CONSENT_PATIENT.appointment,
+    campaign:    CONSENT_PATIENT.campaign,
+    decision:    decision,
+    patient:     CONSENT_PATIENT.name,
+    patient_code: CONSENT_PATIENT.code,
+    q1: answers[0], q2: answers[1], q3: answers[2], q4: answers[3],
+    q5: answers[4], q6: answers[5], q7: answers[6],
+    signature_image_b64: sigDataUrl,
+    timestamp:   timestampIso,
+  });
+
+  if (!window.crypto?.subtle) {
+    return { ok: false, hash: '— (browser ไม่รองรับ Web Crypto API หรือไม่ใช่ HTTPS)' };
+  }
+  try {
+    const buf = new TextEncoder().encode(payload);
+    const hashBuf = await crypto.subtle.digest('SHA-256', buf);
+    const hashHex = Array.from(new Uint8Array(hashBuf))
+      .map(b => b.toString(16).padStart(2, '0')).join('');
+    return { ok: true, hash: hashHex };
+  } catch (e) {
+    return { ok: false, hash: '— (' + (e.message || 'error') + ')' };
+  }
+}
+
+async function renderSummary() {
   // Count flagged Qs
   const flagged = [];
   for (let i = 1; i <= 7; i++) {
@@ -1689,13 +1747,16 @@ function renderSummary() {
     flaggedBanner.style.display = 'none';
   }
 
-  // Fake hash (real: SHA256 of canonical payload)
-  const fakeHash = Array.from({length:16}, () =>
-    Math.floor(Math.random()*16).toString(16)
-  ).join('') + '…';
-  document.getElementById('sumHash').textContent = fakeHash;
+  // Timestamp + Real SHA-256 hash
+  const tsIso = new Date().toISOString();
   document.getElementById('sumTime').textContent =
-    new Date().toLocaleString('th-TH', { dateStyle:'long', timeStyle:'medium' });
+    new Date(tsIso).toLocaleString('th-TH', { dateStyle:'long', timeStyle:'medium' });
+  document.getElementById('sumHash').textContent = '⏳ กำลังคำนวณ...';
+
+  const result = await computeConsentHash(tsIso);
+  document.getElementById('sumHash').textContent = result.hash;
+  // เก็บไว้ให้ openFinalDocument() ใช้ — ไม่ต้องคำนวณซ้ำ
+  window._consentHashCache = { hash: result.hash, timestamp: tsIso };
 }
 
 /* ===== Init ===== */
