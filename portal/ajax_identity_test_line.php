@@ -112,9 +112,9 @@ $flex = [
             'backgroundColor' => '#dc2626',
             'contents' => [
                 ['type' => 'text', 'text' => '🧪 ข้อความทดสอบ',
-                 'color' => '#fff', 'size' => 'lg', 'weight' => 'bold'],
+                 'color' => '#ffffff', 'size' => 'lg', 'weight' => 'bold'],
                 ['type' => 'text', 'text' => 'RSU Medical Clinic Services',
-                 'color' => '#fff', 'size' => 'xxs', 'margin' => 'xs'],
+                 'color' => '#ffffff', 'size' => 'xxs', 'margin' => 'xs'],
             ],
         ],
         'body' => [

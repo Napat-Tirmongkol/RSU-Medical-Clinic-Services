@@ -155,10 +155,10 @@ function mb_build_line_flex(array $brief, array $priorities, bool $isTest = fals
                 'backgroundColor' => $color,
                 'contents' => [
                     ['type' => 'text', 'text' => $title,
-                     'color' => '#fff', 'size' => 'lg', 'weight' => 'bold'],
+                     'color' => '#ffffff', 'size' => 'lg', 'weight' => 'bold'],
                     ['type' => 'text',
                      'text' => ($clinic['date_thai'] ?? '') . ' · วัน' . ($clinic['weekday_thai'] ?? ''),
-                     'color' => '#fff', 'size' => 'xs', 'margin' => 'xs'],
+                     'color' => '#ffffff', 'size' => 'xs', 'margin' => 'xs'],
                 ],
             ],
             'body' => [
