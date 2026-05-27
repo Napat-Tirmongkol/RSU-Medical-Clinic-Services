@@ -90,12 +90,13 @@ $priorities = $briefData['_ai_priorities'] ?? [];
 
 // ─── Find users to deliver to ───────────────────────────────────────────────
 $st = $pdo->prepare("SELECT * FROM sys_morning_brief_prefs
-    WHERE delivery_hour = :h AND (channel_line = 1 OR channel_email = 1)");
+    WHERE delivery_hour = :h
+      AND (channel_line = 1 OR channel_line_group = 1 OR channel_email = 1)");
 $st->execute([':h' => $hour]);
 $prefs = $st->fetchAll(PDO::FETCH_ASSOC);
 echo "พบ " . count($prefs) . " user(s) ที่ตั้ง delivery_hour=" . sprintf('%02d:00', $hour) . "\n\n";
 
-$sent = ['line' => 0, 'email' => 0, 'skipped' => 0, 'failed' => 0];
+$sent = ['line' => 0, 'line_group' => 0, 'email' => 0, 'skipped' => 0, 'failed' => 0];
 
 foreach ($prefs as $pref) {
     $sid = (int)$pref['staff_id'];
@@ -138,6 +139,34 @@ foreach ($prefs as $pref) {
         }
     }
 
+    // ── LINE Group channel ───────────────────────────────────────────────
+    if (!empty($pref['channel_line_group']) && !empty($pref['line_group_id'])) {
+        if (!$force && mb_already_delivered($pdo, $briefId, $sid, $stype, 'line_group')) {
+            echo "  LINE Group → SKIPPED (already delivered)\n";
+            $sent['skipped']++;
+        } elseif (!$lineToken) {
+            echo "  LINE Group → FAILED (no token)\n";
+            $sent['failed']++;
+            mb_log_delivery($pdo, $briefId, $sid, $stype, 'line_group', 'failed', 'no_token');
+        } else {
+            $flex = mb_build_line_flex($brief, $priorities);
+            if ($dryrun) {
+                echo "  LINE Group → DRY RUN (would push to {$pref['line_group_id']})\n";
+            } else {
+                $ok = send_line_group_push($pref['line_group_id'], [$flex], $lineToken);
+                if ($ok) {
+                    echo "  LINE Group → SENT to {$pref['line_group_id']}\n";
+                    $sent['line_group']++;
+                    mb_log_delivery($pdo, $briefId, $sid, $stype, 'line_group', 'sent', null);
+                } else {
+                    echo "  LINE Group → FAILED · " . get_last_line_error() . "\n";
+                    $sent['failed']++;
+                    mb_log_delivery($pdo, $briefId, $sid, $stype, 'line_group', 'failed', get_last_line_error());
+                }
+            }
+        }
+    }
+
     // ── Email channel ────────────────────────────────────────────────────
     if (!empty($pref['channel_email']) && !empty($pref['email'])) {
         if (!$force && mb_already_delivered($pdo, $briefId, $sid, $stype, 'email')) {
@@ -166,8 +195,9 @@ foreach ($prefs as $pref) {
 
 $elapsed = number_format(microtime(true) - $startedAt, 2);
 echo "\n=== สรุป ===\n";
-echo "LINE sent  : {$sent['line']}\n";
-echo "Email sent : {$sent['email']}\n";
+echo "LINE sent       : {$sent['line']}\n";
+echo "LINE Group sent : {$sent['line_group']}\n";
+echo "Email sent      : {$sent['email']}\n";
 echo "Skipped    : {$sent['skipped']}\n";
 echo "Failed     : {$sent['failed']}\n";
 echo "เวลา       : {$elapsed}s\n";

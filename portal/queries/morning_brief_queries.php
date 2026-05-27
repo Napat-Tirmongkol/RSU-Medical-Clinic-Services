@@ -32,27 +32,28 @@ function ensure_morning_brief_schema(PDO $pdo): void {
         staff_type      ENUM('admin','staff') NOT NULL DEFAULT 'admin',
         channel_portal  TINYINT(1) NOT NULL DEFAULT 1,
         channel_line    TINYINT(1) NOT NULL DEFAULT 0,
+        channel_line_group TINYINT(1) NOT NULL DEFAULT 0,
         channel_email   TINYINT(1) NOT NULL DEFAULT 0,
         delivery_hour   TINYINT NOT NULL DEFAULT 8,
         respect_clinic_calendar TINYINT(1) NOT NULL DEFAULT 1,
         modules_json    TEXT NULL,
         line_user_id    VARCHAR(80) NULL,
+        line_group_id   VARCHAR(80) NULL,
         email           VARCHAR(180) NULL,
         last_read_date  DATE NULL,
         updated_at      DATETIME NOT NULL,
         PRIMARY KEY (staff_id, staff_type)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-    // Auto-add column for existing installs (idempotent)
-    try {
-        $pdo->exec("ALTER TABLE sys_morning_brief_prefs
-            ADD COLUMN IF NOT EXISTS respect_clinic_calendar TINYINT(1) NOT NULL DEFAULT 1 AFTER delivery_hour");
-    } catch (PDOException) {
-        // MySQL ก่อน 8.0.29 ไม่รองรับ "ADD COLUMN IF NOT EXISTS" — เช็ค manual แทน
+    // Auto-add columns สำหรับ install เก่า (idempotent)
+    foreach ([
+        ['respect_clinic_calendar', "TINYINT(1) NOT NULL DEFAULT 1 AFTER delivery_hour"],
+        ['channel_line_group',      "TINYINT(1) NOT NULL DEFAULT 0 AFTER channel_line"],
+        ['line_group_id',           "VARCHAR(80) NULL AFTER line_user_id"],
+    ] as [$col, $def]) {
         try {
-            $st = $pdo->query("SHOW COLUMNS FROM sys_morning_brief_prefs LIKE 'respect_clinic_calendar'");
+            $st = $pdo->query("SHOW COLUMNS FROM sys_morning_brief_prefs LIKE '$col'");
             if (!$st->fetch()) {
-                $pdo->exec("ALTER TABLE sys_morning_brief_prefs
-                    ADD COLUMN respect_clinic_calendar TINYINT(1) NOT NULL DEFAULT 1 AFTER delivery_hour");
+                $pdo->exec("ALTER TABLE sys_morning_brief_prefs ADD COLUMN $col $def");
             }
         } catch (PDOException) {}
     }
@@ -61,7 +62,7 @@ function ensure_morning_brief_schema(PDO $pdo): void {
         brief_id    INT UNSIGNED NOT NULL,
         staff_id    INT UNSIGNED NOT NULL,
         staff_type  ENUM('admin','staff') NOT NULL DEFAULT 'admin',
-        channel     ENUM('portal','line','email') NOT NULL,
+        channel     ENUM('portal','line','line_group','email') NOT NULL,
         status      ENUM('queued','sent','failed','read') NOT NULL DEFAULT 'queued',
         error_msg   TEXT NULL,
         sent_at     DATETIME NULL,
@@ -69,6 +70,11 @@ function ensure_morning_brief_schema(PDO $pdo): void {
         INDEX idx_staff (staff_id, staff_type),
         UNIQUE KEY uniq_brief_staff_chan (brief_id, staff_id, staff_type, channel)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    // Auto-extend ENUM สำหรับ install เก่าที่ยังไม่มี 'line_group'
+    try {
+        $pdo->exec("ALTER TABLE sys_morning_brief_delivery
+            MODIFY COLUMN channel ENUM('portal','line','line_group','email') NOT NULL");
+    } catch (PDOException) {}
     $checked = true;
 }
 
@@ -392,8 +398,9 @@ function morning_brief_get_or_create_pref(PDO $pdo, int $staffId, string $staffT
     if ($row) return $row;
     $defaults = ['campaign','scholarship','finance','edms','clinic','inventory'];
     $ins = $pdo->prepare("INSERT INTO sys_morning_brief_prefs
-        (staff_id, staff_type, channel_portal, channel_line, channel_email, delivery_hour, modules_json, updated_at)
-        VALUES (:sid, :st, 1, 0, 0, 8, :m, NOW())");
+        (staff_id, staff_type, channel_portal, channel_line, channel_line_group, channel_email,
+         delivery_hour, modules_json, updated_at)
+        VALUES (:sid, :st, 1, 0, 0, 0, 8, :m, NOW())");
     $ins->execute([':sid'=>$staffId, ':st'=>$staffType, ':m'=>json_encode($defaults)]);
     $st->execute([':sid'=>$staffId, ':st'=>$staffType]);
     return $st->fetch(PDO::FETCH_ASSOC) ?: [];

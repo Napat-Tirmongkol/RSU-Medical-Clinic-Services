@@ -12,6 +12,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/includes/auth.php';
+require_once __DIR__ . '/../includes/line_helper.php';
 require_once __DIR__ . '/../includes/morning_brief_delivery.php';
 require_once __DIR__ . '/queries/morning_brief_queries.php';
 require_once __DIR__ . '/services/morning_brief_ai.php';
@@ -83,32 +84,56 @@ switch ($action) {
         _mb_send(['ok'=>true, 'pref'=>$pref]);
     }
 
+    // ── List LINE groups/rooms ที่ OA join อยู่ (อ่านจาก line_groups_list registry) ──
+    case 'groups:list': {
+        $groups = line_groups_list($pdo);
+        // Normalize → คืน array ของ { id, name, type, member_count }
+        $out = [];
+        foreach ($groups as $g) {
+            $out[] = [
+                'id'           => (string)($g['group_id'] ?? $g['id'] ?? ''),
+                'name'         => (string)($g['name'] ?? $g['group_name'] ?? ''),
+                'type'         => (string)($g['type'] ?? 'group'),
+                'member_count' => (int)($g['member_count'] ?? 0),
+            ];
+        }
+        // Filter out blank IDs
+        $out = array_values(array_filter($out, fn($g) => !empty($g['id'])));
+        _mb_send(['ok'=>true, 'groups'=>$out]);
+    }
+
     case 'pref:save': {
         validate_csrf_or_die();
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') _mb_send(['ok'=>false,'error'=>'POST only']);
         morning_brief_get_or_create_pref($pdo, $adminId, 'admin');
-        $cp = isset($_POST['channel_portal']) ? (int)!!$_POST['channel_portal'] : 1;
-        $cl = isset($_POST['channel_line'])   ? (int)!!$_POST['channel_line']   : 0;
-        $ce = isset($_POST['channel_email'])  ? (int)!!$_POST['channel_email']  : 0;
-        $hr = max(0, min(23, (int)($_POST['delivery_hour'] ?? 8)));
+        $cp  = isset($_POST['channel_portal'])     ? (int)!!$_POST['channel_portal']     : 1;
+        $cl  = isset($_POST['channel_line'])       ? (int)!!$_POST['channel_line']       : 0;
+        $clg = isset($_POST['channel_line_group']) ? (int)!!$_POST['channel_line_group'] : 0;
+        $ce  = isset($_POST['channel_email'])      ? (int)!!$_POST['channel_email']      : 0;
+        $hr  = max(0, min(23, (int)($_POST['delivery_hour'] ?? 8)));
         $rcc = isset($_POST['respect_clinic_calendar']) ? (int)!!$_POST['respect_clinic_calendar'] : 0;
         $modules = array_values(array_intersect(
             ['campaign','scholarship','finance','edms','clinic','inventory'],
             (array)($_POST['modules'] ?? [])
         ));
         if (!$modules) $modules = ['campaign','scholarship','finance','edms','clinic','inventory'];
-        $line  = trim((string)($_POST['line_user_id'] ?? ''));
-        $email = trim((string)($_POST['email'] ?? ''));
+        $line   = trim((string)($_POST['line_user_id'] ?? ''));
+        $lgroup = trim((string)($_POST['line_group_id'] ?? ''));
+        $email  = trim((string)($_POST['email'] ?? ''));
         if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
             _mb_send(['ok'=>false,'error'=>'email ไม่ถูกต้อง']);
         }
+        if ($lgroup !== '' && !preg_match('/^[CR][0-9a-f]{32}$/i', $lgroup)) {
+            _mb_send(['ok'=>false,'error'=>'LINE Group/Room ID ต้องขึ้นต้นด้วย C หรือ R + 32 ตัว hex']);
+        }
         $st = $pdo->prepare("UPDATE sys_morning_brief_prefs
-            SET channel_portal=:cp, channel_line=:cl, channel_email=:ce, delivery_hour=:h,
-                respect_clinic_calendar=:rcc,
-                modules_json=:m, line_user_id=:lu, email=:em, updated_at=NOW()
+            SET channel_portal=:cp, channel_line=:cl, channel_line_group=:clg, channel_email=:ce,
+                delivery_hour=:h, respect_clinic_calendar=:rcc,
+                modules_json=:m, line_user_id=:lu, line_group_id=:lg, email=:em, updated_at=NOW()
             WHERE staff_id=:sid AND staff_type='admin'");
-        $st->execute([':cp'=>$cp, ':cl'=>$cl, ':ce'=>$ce, ':h'=>$hr, ':rcc'=>$rcc,
-                      ':m'=>json_encode($modules), ':lu'=>($line?:null), ':em'=>($email?:null),
+        $st->execute([':cp'=>$cp, ':cl'=>$cl, ':clg'=>$clg, ':ce'=>$ce, ':h'=>$hr, ':rcc'=>$rcc,
+                      ':m'=>json_encode($modules), ':lu'=>($line?:null),
+                      ':lg'=>($lgroup?:null), ':em'=>($email?:null),
                       ':sid'=>$adminId]);
         _mb_send(['ok'=>true, 'message'=>'บันทึกแล้ว']);
     }
@@ -172,9 +197,9 @@ switch ($action) {
 
         $results = [];
 
-        // ── LINE ────────────────────────────────────────────────────────
+        // ── LINE (ส่วนตัว) ──────────────────────────────────────────────
         if (empty($pref['channel_line'])) {
-            $results['line'] = ['ok' => false, 'error' => 'ยังไม่ได้เปิด channel LINE ในการตั้งค่า', 'skipped' => true];
+            $results['line'] = ['ok' => false, 'error' => 'ยังไม่ได้เปิด channel LINE ส่วนตัว', 'skipped' => true];
         } elseif (empty($pref['line_user_id'])) {
             $results['line'] = ['ok' => false, 'error' => 'เปิด channel LINE แล้ว แต่ยังไม่ได้ใส่ LINE User ID (รูปแบบ U + 32 ตัวอักษร)'];
         } elseif (!preg_match('/^U[0-9a-f]{32}$/i', $pref['line_user_id'])) {
@@ -189,6 +214,24 @@ switch ($action) {
                 $results['line'] = $ok
                     ? ['ok' => true, 'target' => $pref['line_user_id']]
                     : ['ok' => false, 'error' => 'LINE API ปฏิเสธ: ' . (get_last_line_error() ?: 'unknown') . ' · ตรวจว่า user ได้ add LINE OA แล้วหรือยัง'];
+            }
+        }
+
+        // ── LINE Group ──────────────────────────────────────────────────
+        if (empty($pref['channel_line_group'])) {
+            $results['line_group'] = ['ok' => false, 'error' => 'ยังไม่ได้เปิด channel LINE Group', 'skipped' => true];
+        } elseif (empty($pref['line_group_id'])) {
+            $results['line_group'] = ['ok' => false, 'error' => 'เปิด LINE Group แล้ว แต่ยังไม่ได้เลือกกลุ่ม'];
+        } else {
+            $token = mb_resolve_line_token();
+            if (!$token) {
+                $results['line_group'] = ['ok' => false, 'error' => 'ระบบยังไม่ได้ตั้ง LINE_MESSAGING_CHANNEL_ACCESS_TOKEN'];
+            } else {
+                $flex = mb_build_line_flex($brief, $priorities, true);
+                $ok = send_line_group_push($pref['line_group_id'], [$flex], $token);
+                $results['line_group'] = $ok
+                    ? ['ok' => true, 'target' => $pref['line_group_id']]
+                    : ['ok' => false, 'error' => 'LINE Group push ปฏิเสธ: ' . (get_last_line_error() ?: 'unknown') . ' · ตรวจว่า OA อยู่ในกลุ่มแล้วหรือยัง'];
             }
         }
 

@@ -75,6 +75,27 @@ $MODULE_LABELS = [
                         </div>
                     </label>
                     <label class="mbs-channel">
+                        <input type="checkbox" name="channel_line_group" value="1" <?= !empty($pref['channel_line_group']) ? 'checked' : '' ?>>
+                        <span class="mbs-channel-icon" style="background:#dcfce7;color:#06c755"><i class="fa-solid fa-users"></i></span>
+                        <div class="flex-1">
+                            <p class="font-semibold text-slate-900">LINE Group / Room</p>
+                            <p class="text-xs text-slate-500">ส่งเข้ากลุ่ม/ห้องแชท LINE ทุกเช้า (ใช้ร่วมในทีม)</p>
+                            <div class="mt-2 flex gap-2 items-stretch max-w-md">
+                                <select name="line_group_id" id="mbs-group-select" class="flex-1 px-3 py-1.5 rounded-lg border border-slate-200 text-sm">
+                                    <option value="">— เลือกกลุ่ม —</option>
+                                </select>
+                                <button type="button" onclick="mbsReloadGroups()" class="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 text-sm" title="รีโหลดรายการกลุ่ม">
+                                    <i class="fa-solid fa-rotate"></i>
+                                </button>
+                            </div>
+                            <p class="text-[11px] text-slate-400 mt-1.5">
+                                <i class="fa-solid fa-circle-info text-slate-400 mr-0.5"></i>
+                                กลุ่มจะปรากฏอัตโนมัติเมื่อเชิญ LINE OA เข้าไปแล้ว · ดู/ตั้งค่ากลุ่มเริ่มต้นที่
+                                <a href="?section=line_settings" class="text-emerald-600 hover:underline">LINE Settings</a>
+                            </p>
+                        </div>
+                    </label>
+                    <label class="mbs-channel">
                         <input type="checkbox" name="channel_email" value="1" <?= $pref['channel_email'] ? 'checked' : '' ?>>
                         <span class="mbs-channel-icon" style="background:#e0e7ff;color:#3730a3"><i class="fa-solid fa-envelope"></i></span>
                         <div class="flex-1">
@@ -213,10 +234,39 @@ body[data-theme='dark'] .mbs-pv-tab.active { background:#1e293b; color:#f1f5f9; 
 <script>
 (function(){
     const CSRF = '<?= htmlspecialchars($_SESSION['csrf_token'] ?? '') ?>';
+    const SAVED_GROUP_ID = '<?= htmlspecialchars($pref['line_group_id'] ?? '') ?>';
     let previewData = null;
     let currentTab = 'line';
 
     function esc(s) { const d = document.createElement('div'); d.textContent = String(s||''); return d.innerHTML; }
+
+    // โหลดรายการ LINE groups → fill <select id="mbs-group-select">
+    window.mbsReloadGroups = async function(){
+        const sel = document.getElementById('mbs-group-select');
+        if (!sel) return;
+        const prev = sel.value || SAVED_GROUP_ID;
+        sel.innerHTML = '<option value="">กำลังโหลด...</option>';
+        try {
+            const r = await fetch('ajax_morning_brief.php?action=groups:list');
+            const j = await r.json();
+            if (!j.ok || !Array.isArray(j.groups) || j.groups.length === 0) {
+                sel.innerHTML = '<option value="">— ยังไม่มีกลุ่มที่บันทึก (เชิญ LINE OA เข้ากลุ่มก่อน) —</option>';
+                return;
+            }
+            const opts = ['<option value="">— เลือกกลุ่ม —</option>'];
+            j.groups.forEach(g => {
+                const labelType = g.type === 'room' ? 'Room' : 'Group';
+                const count = g.member_count > 0 ? ` · ${g.member_count} คน` : '';
+                const label = `${labelType}: ${g.name || g.id}${count}`;
+                opts.push(`<option value="${esc(g.id)}" ${g.id === prev ? 'selected' : ''}>${esc(label)}</option>`);
+            });
+            sel.innerHTML = opts.join('');
+        } catch(e) {
+            sel.innerHTML = '<option value="">— โหลดไม่สำเร็จ —</option>';
+        }
+    };
+    // Auto-load on page open
+    mbsReloadGroups();
 
     window.mbsClosePreview = function() {
         document.getElementById('mbs-preview-modal').classList.remove('show');
@@ -354,34 +404,37 @@ body[data-theme='dark'] .mbs-pv-tab.active { background:#1e293b; color:#f1f5f9; 
             const rs = j.results || {};
             // 3-state rendering: sent (green) / skipped-by-pref (gray, info-only) / failed (red)
             function renderRow(label, r) {
+                if (!r) return { color:'#94a3b8', icon:'⊝', text: `${label} —` };
                 if (r.ok) return { color:'#059669', icon:'✓', text: `${label} → ${r.target}` };
                 if (r.skipped) return { color:'#94a3b8', icon:'⊝', text: `${label} (ปิดอยู่) — ${r.error}` };
                 return { color:'#dc2626', icon:'✗', text: `${label} — ${r.error}` };
             }
-            const lineRow = renderRow('LINE', rs.line);
-            const emailRow = renderRow('Email', rs.email);
+            const channels = [
+                { key: 'line',       label: 'LINE (ส่วนตัว)' },
+                { key: 'line_group', label: 'LINE Group' },
+                { key: 'email',      label: 'Email' },
+            ];
+            const rows = channels.map(c => ({ ...renderRow(c.label, rs[c.key]), r: rs[c.key] }));
 
-            // overall logic:
-            //   any sent → success
-            //   none sent but all skipped (no channel enabled) → info
-            //   none sent and at least one real failure → warning
-            const anySent = rs.line.ok || rs.email.ok;
-            const allSkipped = (!rs.line.ok && rs.line.skipped) && (!rs.email.ok && rs.email.skipped);
+            // overall logic
+            const anySent = rows.some(x => x.r && x.r.ok);
+            const allSkipped = rows.every(x => x.r && !x.r.ok && x.r.skipped);
             let icon = 'success', title = 'ส่งเสร็จ';
             if (!anySent) {
-                if (allSkipped) { icon = 'info'; title = 'ยังไม่ได้เปิด channel ใด · ติ๊ก LINE หรือ Email ในการตั้งค่าก่อน'; }
+                if (allSkipped) { icon = 'info'; title = 'ยังไม่ได้เปิด channel ใด · ติ๊ก channel ที่ต้องการก่อน'; }
                 else { icon = 'warning'; title = 'ส่งไม่สำเร็จ — ดูรายละเอียดด้านล่าง'; }
             }
+
+            const html = rows.map(x =>
+                `<div style="color:${x.color};margin-top:.4rem"><b>${x.icon}</b> ${esc(x.text)}</div>`
+            ).join('');
 
             Swal.fire({
                 icon: icon,
                 title: title,
-                html: `<div style="text-align:left;font-size:14px;line-height:1.7">
-                    <div style="color:${lineRow.color}"><b>${lineRow.icon}</b> ${esc(lineRow.text)}</div>
-                    <div style="color:${emailRow.color};margin-top:.4rem"><b>${emailRow.icon}</b> ${esc(emailRow.text)}</div>
-                </div>`,
+                html: `<div style="text-align:left;font-size:14px;line-height:1.7">${html}</div>`,
                 confirmButtonColor: '#059669',
-                width: 520,
+                width: 560,
             });
         } catch(e) {
             Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: String(e) });
