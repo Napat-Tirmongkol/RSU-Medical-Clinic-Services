@@ -456,6 +456,151 @@ layout_start(['section' => 'dashboard', 'title' => 'Dashboard']);
                     })();
                     </script>
 
+                    <!-- ── DAILY STATS QUICK-ENTRY ──────────────────────────────────── -->
+                    <div id="ds-widget" class="rounded-2xl border border-slate-200 bg-white p-5">
+                        <div class="flex items-center justify-between gap-3 mb-4 flex-wrap">
+                            <div class="flex items-center gap-2.5">
+                                <span class="inline-flex w-9 h-9 rounded-xl items-center justify-center" style="background:#dbeafe;color:#2563eb">
+                                    <i class="fa-solid fa-clipboard-list"></i>
+                                </span>
+                                <div>
+                                    <h3 class="text-base font-bold text-slate-900">บันทึกประจำวัน</h3>
+                                    <p class="text-xs text-slate-500 mt-0.5" id="ds-date-line"></p>
+                                </div>
+                            </div>
+                            <span id="ds-last-update" class="text-[11px] text-slate-400"></span>
+                        </div>
+
+                        <form id="ds-form" class="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+                            <div class="md:col-span-3">
+                                <label class="block text-xs font-semibold text-slate-600 mb-1">
+                                    <i class="fa-solid fa-user-injured text-blue-500 mr-1"></i>ผู้ป่วยวันนี้
+                                </label>
+                                <div class="relative">
+                                    <input type="number" id="ds-patient" min="0" max="99999" inputmode="numeric"
+                                           class="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm font-semibold focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                                           placeholder="0" autocomplete="off">
+                                    <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 pointer-events-none">คน</span>
+                                </div>
+                            </div>
+                            <div class="md:col-span-3">
+                                <label class="block text-xs font-semibold text-slate-600 mb-1">
+                                    <i class="fa-solid fa-kit-medical text-rose-500 mr-1"></i>อุบัติเหตุ
+                                </label>
+                                <div class="relative">
+                                    <input type="number" id="ds-accident" min="0" max="9999" inputmode="numeric"
+                                           class="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm font-semibold focus:border-rose-500 focus:outline-none focus:ring-2 focus:ring-rose-100"
+                                           placeholder="0" autocomplete="off">
+                                    <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 pointer-events-none">ราย</span>
+                                </div>
+                            </div>
+                            <div class="md:col-span-4">
+                                <label class="block text-xs font-semibold text-slate-600 mb-1">หมายเหตุ <span class="font-normal text-slate-400">(ไม่บังคับ)</span></label>
+                                <input type="text" id="ds-note" maxlength="500"
+                                       class="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                                       placeholder="เช่น มีคนไข้หนัก 2 ราย" autocomplete="off">
+                            </div>
+                            <div class="md:col-span-2">
+                                <button type="submit" id="ds-save-btn"
+                                        class="w-full px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold flex items-center justify-center gap-1.5">
+                                    <i class="fa-solid fa-check"></i> บันทึก
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <style>
+                        body[data-theme='dark'] #ds-widget { background:#0f172a; border-color:#1e293b; }
+                        body[data-theme='dark'] #ds-widget h3 { color:#f1f5f9; }
+                        body[data-theme='dark'] #ds-widget input { background:#1e293b; border-color:#334155; color:#f1f5f9; }
+                        body[data-theme='dark'] #ds-widget label { color:#94a3b8; }
+                    </style>
+
+                    <script>
+                    (function(){
+                        const DS_TODAY = new Date().toISOString().slice(0,10);
+                        const DS_CSRF  = '<?= htmlspecialchars($_SESSION['csrf_token'] ?? '') ?>';
+
+                        // Date line (Thai date)
+                        const dThai = new Date(DS_TODAY + 'T00:00:00').toLocaleDateString('th-TH', {
+                            weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+                        });
+                        document.getElementById('ds-date-line').textContent = dThai;
+
+                        async function dsLoad() {
+                            try {
+                                const r = await fetch('ajax_daily_stats.php?action=get&date=' + DS_TODAY);
+                                const j = await r.json();
+                                if (!j.ok) return;
+                                if (j.row) {
+                                    document.getElementById('ds-patient').value  = j.row.patient_count;
+                                    document.getElementById('ds-accident').value = j.row.accident_count;
+                                    document.getElementById('ds-note').value     = j.row.note || '';
+                                    const t = j.row.updated_at ? j.row.updated_at.slice(11,16) : '';
+                                    const by = j.row.updated_by ? ' โดย ' + j.row.updated_by : '';
+                                    document.getElementById('ds-last-update').textContent =
+                                        'อัปเดตล่าสุด ' + t + by;
+                                } else {
+                                    document.getElementById('ds-last-update').textContent = 'ยังไม่ได้บันทึกวันนี้';
+                                }
+                            } catch(e) { /* silent */ }
+                        }
+
+                        document.getElementById('ds-form').addEventListener('submit', async (e) => {
+                            e.preventDefault();
+                            const btn = document.getElementById('ds-save-btn');
+                            const origHtml = btn.innerHTML;
+                            btn.disabled = true;
+                            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> บันทึก...';
+                            try {
+                                const fd = new FormData();
+                                fd.append('csrf_token', DS_CSRF);
+                                fd.append('date', DS_TODAY);
+                                fd.append('patient_count',  document.getElementById('ds-patient').value || '0');
+                                fd.append('accident_count', document.getElementById('ds-accident').value || '0');
+                                fd.append('note', document.getElementById('ds-note').value);
+                                const r = await fetch('ajax_daily_stats.php?action=save', { method:'POST', body: fd });
+                                const j = await r.json();
+                                if (j.ok) {
+                                    btn.innerHTML = '<i class="fa-solid fa-check"></i> บันทึกแล้ว';
+                                    btn.classList.remove('bg-emerald-600','hover:bg-emerald-700');
+                                    btn.classList.add('bg-emerald-700');
+                                    if (j.row) {
+                                        const t = j.row.updated_at ? j.row.updated_at.slice(11,16) : '';
+                                        const by = j.row.updated_by ? ' โดย ' + j.row.updated_by : '';
+                                        document.getElementById('ds-last-update').textContent = 'อัปเดตล่าสุด ' + t + by;
+                                    }
+                                    setTimeout(() => {
+                                        btn.disabled = false;
+                                        btn.innerHTML = origHtml;
+                                        btn.classList.add('bg-emerald-600','hover:bg-emerald-700');
+                                        btn.classList.remove('bg-emerald-700');
+                                    }, 1600);
+                                } else {
+                                    window.Swal
+                                        ? Swal.fire({ icon:'error', title:'บันทึกไม่สำเร็จ', text: j.error || 'unknown' })
+                                        : alert('บันทึกไม่สำเร็จ: ' + (j.error || 'unknown'));
+                                    btn.disabled = false; btn.innerHTML = origHtml;
+                                }
+                            } catch(e) {
+                                btn.disabled = false; btn.innerHTML = origHtml;
+                                window.Swal && Swal.fire({ icon:'error', title:'เกิดข้อผิดพลาด', text: String(e) });
+                            }
+                        });
+
+                        // Enter key in any input → submit (เร่งความเร็วการกรอก)
+                        ['ds-patient','ds-accident','ds-note'].forEach(id => {
+                            document.getElementById(id).addEventListener('keydown', (e) => {
+                                if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    document.getElementById('ds-form').requestSubmit();
+                                }
+                            });
+                        });
+
+                        dsLoad();
+                    })();
+                    </script>
 
                     <!-- ── PRIORITY: งานต้องทำวันนี้ (clean, no greeting now) ───── -->
                     <section class="au d2">
