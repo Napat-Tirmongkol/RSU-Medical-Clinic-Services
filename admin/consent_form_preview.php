@@ -1305,6 +1305,15 @@ function goStep(delta) {
   currentStep = next;
   updateActionBar();
   if (next === 5) renderSummary();
+  // Resize canvas เมื่อเข้า step 4 (ครั้งแรก canvas ยังโดน display:none
+  // อยู่ตอน init → getBoundingClientRect() คืน 0×0 → buffer ไม่พร้อม)
+  // ใช้ requestAnimationFrame กัน race กับ CSS transition / display change
+  if (next === 4) {
+    requestAnimationFrame(() => {
+      pads.patient?.resize?.() && redraw('patient');
+      pads.witness?.resize?.() && redraw('witness');
+    });
+  }
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -1513,6 +1522,11 @@ function initPad(canvasId, placeholderId, statsId, key) {
   const dpr = window.devicePixelRatio || 1;
   function resize() {
     const rect = canvas.getBoundingClientRect();
+    // ถ้า canvas ยัง hidden อยู่ (display:none) → rect.width/height = 0 → init ไม่ได้
+    // skip + รอให้ goStep() เรียก resize อีกครั้งตอน pane เปิด
+    if (rect.width === 0 || rect.height === 0) return false;
+    // Reset transform กัน scale ทบกัน เวลา resize ซ้ำ
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
     canvas.width = rect.width * dpr;
     canvas.height = rect.height * dpr;
     ctx.scale(dpr, dpr);
@@ -1520,12 +1534,12 @@ function initPad(canvasId, placeholderId, statsId, key) {
     ctx.lineJoin = 'round';
     ctx.strokeStyle = '#0f172a';
     ctx.lineWidth = 2.2;
+    return true;
   }
   resize();
   window.addEventListener('resize', () => {
-    const data = pads[key].strokes;
-    resize();
-    redraw(key);
+    const data = pads[key]?.strokes;
+    if (resize() && data?.length) redraw(key);
   });
 
   pads[key] = {
@@ -1533,6 +1547,7 @@ function initPad(canvasId, placeholderId, statsId, key) {
     drawing: false,
     strokes: [],         // array of strokes; each stroke = array of points
     current: null,
+    resize,               // expose ให้ goStep() เรียกตอน pane เปลี่ยน
   };
 
   const getPos = (e) => {
