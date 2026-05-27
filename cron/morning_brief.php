@@ -139,10 +139,11 @@ foreach ($prefs as $pref) {
         }
     }
 
-    // ── LINE Group channel ───────────────────────────────────────────────
-    if (!empty($pref['channel_line_group']) && !empty($pref['line_group_id'])) {
+    // ── LINE Group channel (รองรับหลายกลุ่ม) ─────────────────────────────
+    $groupIds = json_decode($pref['line_group_ids'] ?? '[]', true) ?: [];
+    if (!empty($pref['channel_line_group']) && !empty($groupIds)) {
         if (!$force && mb_already_delivered($pdo, $briefId, $sid, $stype, 'line_group')) {
-            echo "  LINE Group → SKIPPED (already delivered)\n";
+            echo "  LINE Group → SKIPPED (already delivered to " . count($groupIds) . " group(s))\n";
             $sent['skipped']++;
         } elseif (!$lineToken) {
             echo "  LINE Group → FAILED (no token)\n";
@@ -150,18 +151,31 @@ foreach ($prefs as $pref) {
             mb_log_delivery($pdo, $briefId, $sid, $stype, 'line_group', 'failed', 'no_token');
         } else {
             $flex = mb_build_line_flex($brief, $priorities);
-            if ($dryrun) {
-                echo "  LINE Group → DRY RUN (would push to {$pref['line_group_id']})\n";
-            } else {
-                $ok = send_line_group_push($pref['line_group_id'], [$flex], $lineToken);
-                if ($ok) {
-                    echo "  LINE Group → SENT to {$pref['line_group_id']}\n";
-                    $sent['line_group']++;
-                    mb_log_delivery($pdo, $briefId, $sid, $stype, 'line_group', 'sent', null);
+            $okCount = 0; $failErr = '';
+            foreach ($groupIds as $gid) {
+                if ($dryrun) {
+                    echo "  LINE Group → DRY RUN (would push to {$gid})\n";
+                    continue;
+                }
+                if (send_line_group_push($gid, [$flex], $lineToken)) {
+                    echo "  LINE Group → SENT to {$gid}\n";
+                    $okCount++;
                 } else {
-                    echo "  LINE Group → FAILED · " . get_last_line_error() . "\n";
+                    echo "  LINE Group → FAILED at {$gid} · " . get_last_line_error() . "\n";
+                    $failErr = get_last_line_error();
+                }
+            }
+            if (!$dryrun) {
+                if ($okCount > 0) {
+                    $sent['line_group'] += $okCount;
+                    mb_log_delivery($pdo, $briefId, $sid, $stype, 'line_group', 'sent',
+                        "sent={$okCount}/" . count($groupIds));
+                }
+                if ($okCount < count($groupIds)) {
                     $sent['failed']++;
-                    mb_log_delivery($pdo, $briefId, $sid, $stype, 'line_group', 'failed', get_last_line_error());
+                    if ($okCount === 0) {
+                        mb_log_delivery($pdo, $briefId, $sid, $stype, 'line_group', 'failed', $failErr);
+                    }
                 }
             }
         }

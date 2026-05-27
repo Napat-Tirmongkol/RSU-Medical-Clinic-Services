@@ -38,7 +38,7 @@ function ensure_morning_brief_schema(PDO $pdo): void {
         respect_clinic_calendar TINYINT(1) NOT NULL DEFAULT 1,
         modules_json    TEXT NULL,
         line_user_id    VARCHAR(80) NULL,
-        line_group_id   VARCHAR(80) NULL,
+        line_group_ids  TEXT NULL,
         email           VARCHAR(180) NULL,
         last_read_date  DATE NULL,
         updated_at      DATETIME NOT NULL,
@@ -48,7 +48,7 @@ function ensure_morning_brief_schema(PDO $pdo): void {
     foreach ([
         ['respect_clinic_calendar', "TINYINT(1) NOT NULL DEFAULT 1 AFTER delivery_hour"],
         ['channel_line_group',      "TINYINT(1) NOT NULL DEFAULT 0 AFTER channel_line"],
-        ['line_group_id',           "VARCHAR(80) NULL AFTER line_user_id"],
+        ['line_group_ids',          "TEXT NULL AFTER line_user_id"],
     ] as [$col, $def]) {
         try {
             $st = $pdo->query("SHOW COLUMNS FROM sys_morning_brief_prefs LIKE '$col'");
@@ -57,6 +57,18 @@ function ensure_morning_brief_schema(PDO $pdo): void {
             }
         } catch (PDOException) {}
     }
+    // Migrate ค่าเก่าจาก line_group_id (single) → line_group_ids (JSON array)
+    try {
+        $st = $pdo->query("SHOW COLUMNS FROM sys_morning_brief_prefs LIKE 'line_group_id'");
+        if ($st->fetch()) {
+            $pdo->exec("UPDATE sys_morning_brief_prefs
+                SET line_group_ids = JSON_ARRAY(line_group_id)
+                WHERE (line_group_ids IS NULL OR line_group_ids = '')
+                  AND line_group_id IS NOT NULL AND line_group_id <> ''");
+            // Drop old column หลัง migrate
+            $pdo->exec("ALTER TABLE sys_morning_brief_prefs DROP COLUMN line_group_id");
+        }
+    } catch (PDOException) {}
     $pdo->exec("CREATE TABLE IF NOT EXISTS sys_morning_brief_delivery (
         id          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
         brief_id    INT UNSIGNED NOT NULL,

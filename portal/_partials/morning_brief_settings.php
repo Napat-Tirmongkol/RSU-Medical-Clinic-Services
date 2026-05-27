@@ -78,19 +78,21 @@ $MODULE_LABELS = [
                         <input type="checkbox" name="channel_line_group" value="1" <?= !empty($pref['channel_line_group']) ? 'checked' : '' ?>>
                         <span class="mbs-channel-icon" style="background:#dcfce7;color:#06c755"><i class="fa-solid fa-users"></i></span>
                         <div class="flex-1">
-                            <p class="font-semibold text-slate-900">LINE Group / Room</p>
-                            <p class="text-xs text-slate-500">ส่งเข้ากลุ่ม/ห้องแชท LINE ทุกเช้า (ใช้ร่วมในทีม)</p>
-                            <div class="mt-2 flex gap-2 items-stretch max-w-md">
-                                <select name="line_group_id" id="mbs-group-select" class="flex-1 px-3 py-1.5 rounded-lg border border-slate-200 text-sm">
-                                    <option value="">— เลือกกลุ่ม —</option>
-                                </select>
-                                <button type="button" onclick="mbsReloadGroups()" class="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 text-sm" title="รีโหลดรายการกลุ่ม">
-                                    <i class="fa-solid fa-rotate"></i>
+                            <div class="flex items-center justify-between gap-2 flex-wrap">
+                                <div>
+                                    <p class="font-semibold text-slate-900">LINE Group / Room</p>
+                                    <p class="text-xs text-slate-500">ส่งเข้ากลุ่ม/ห้องแชท LINE ทุกเช้า — เลือกได้หลายกลุ่ม</p>
+                                </div>
+                                <button type="button" onclick="mbsReloadGroups()" class="text-xs text-slate-500 hover:text-emerald-700 flex items-center gap-1" title="รีโหลดรายการกลุ่ม">
+                                    <i class="fa-solid fa-rotate"></i>รีโหลด
                                 </button>
+                            </div>
+                            <div id="mbs-groups-list" class="mt-2 space-y-1.5 max-h-56 overflow-y-auto pr-1">
+                                <p class="text-xs text-slate-400 py-2"><i class="fa-solid fa-spinner fa-spin mr-1"></i>กำลังโหลด...</p>
                             </div>
                             <p class="text-[11px] text-slate-400 mt-1.5">
                                 <i class="fa-solid fa-circle-info text-slate-400 mr-0.5"></i>
-                                กลุ่มจะปรากฏอัตโนมัติเมื่อเชิญ LINE OA เข้าไปแล้ว · ดู/ตั้งค่ากลุ่มเริ่มต้นที่
+                                เชิญ LINE OA เข้ากลุ่ม → กลุ่มจะปรากฏอัตโนมัติ · จัดการที่
                                 <a href="?section=line_settings" class="text-emerald-600 hover:underline">LINE Settings</a>
                             </p>
                         </div>
@@ -234,35 +236,47 @@ body[data-theme='dark'] .mbs-pv-tab.active { background:#1e293b; color:#f1f5f9; 
 <script>
 (function(){
     const CSRF = '<?= htmlspecialchars($_SESSION['csrf_token'] ?? '') ?>';
-    const SAVED_GROUP_ID = '<?= htmlspecialchars($pref['line_group_id'] ?? '') ?>';
+    const SAVED_GROUP_IDS = <?= json_encode(json_decode($pref['line_group_ids'] ?? '[]', true) ?: []) ?>;
     let previewData = null;
     let currentTab = 'line';
 
     function esc(s) { const d = document.createElement('div'); d.textContent = String(s||''); return d.innerHTML; }
 
-    // โหลดรายการ LINE groups → fill <select id="mbs-group-select">
+    // โหลดรายการ LINE groups → render เป็น multi-checkbox list
     window.mbsReloadGroups = async function(){
-        const sel = document.getElementById('mbs-group-select');
-        if (!sel) return;
-        const prev = sel.value || SAVED_GROUP_ID;
-        sel.innerHTML = '<option value="">กำลังโหลด...</option>';
+        const wrap = document.getElementById('mbs-groups-list');
+        if (!wrap) return;
+        wrap.innerHTML = '<p class="text-xs text-slate-400 py-2"><i class="fa-solid fa-spinner fa-spin mr-1"></i>กำลังโหลด...</p>';
+        // Preserve currently checked ids (UI state) ก่อน re-render — กัน user ติ๊กไว้แล้วโดน clear
+        const prevChecked = new Set(Array.from(wrap.querySelectorAll('input[name="line_group_ids[]"]:checked')).map(c => c.value));
+        const selected = prevChecked.size > 0 ? prevChecked : new Set(SAVED_GROUP_IDS);
         try {
             const r = await fetch('ajax_morning_brief.php?action=groups:list');
             const j = await r.json();
             if (!j.ok || !Array.isArray(j.groups) || j.groups.length === 0) {
-                sel.innerHTML = '<option value="">— ยังไม่มีกลุ่มที่บันทึก (เชิญ LINE OA เข้ากลุ่มก่อน) —</option>';
+                wrap.innerHTML = `<p class="text-xs text-slate-500 py-3 px-3 bg-slate-50 rounded border border-dashed border-slate-300">
+                    <i class="fa-solid fa-circle-info mr-1"></i>ยังไม่มีกลุ่มที่บันทึก — เชิญ LINE OA เข้ากลุ่มก่อน
+                </p>`;
                 return;
             }
-            const opts = ['<option value="">— เลือกกลุ่ม —</option>'];
-            j.groups.forEach(g => {
-                const labelType = g.type === 'room' ? 'Room' : 'Group';
-                const count = g.member_count > 0 ? ` · ${g.member_count} คน` : '';
-                const label = `${labelType}: ${g.name || g.id}${count}`;
-                opts.push(`<option value="${esc(g.id)}" ${g.id === prev ? 'selected' : ''}>${esc(label)}</option>`);
-            });
-            sel.innerHTML = opts.join('');
+            wrap.innerHTML = j.groups.map(g => {
+                const isChecked = selected.has(g.id);
+                const typeClass = g.type === 'room' ? 'mbs-group-type-room' : 'mbs-group-type-group';
+                const typeLabel = g.type === 'room' ? 'Room' : 'Group';
+                const memberText = g.member_count > 0 ? `${g.member_count} คน · ` : '';
+                return `<label class="mbs-group-item">
+                    <input type="checkbox" name="line_group_ids[]" value="${esc(g.id)}" ${isChecked ? 'checked' : ''}>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center flex-wrap">
+                            <span class="mbs-group-name">${esc(g.name || '(ไม่ทราบชื่อ)')}</span>
+                            <span class="${typeClass}">${typeLabel}</span>
+                        </div>
+                        <div class="mbs-group-meta" style="font-family:ui-monospace,SFMono-Regular,Consolas,monospace">${memberText}${esc(g.id)}</div>
+                    </div>
+                </label>`;
+            }).join('');
         } catch(e) {
-            sel.innerHTML = '<option value="">— โหลดไม่สำเร็จ —</option>';
+            wrap.innerHTML = `<p class="text-xs text-rose-500 py-2">โหลดไม่สำเร็จ: ${esc(String(e))}</p>`;
         }
     };
     // Auto-load on page open
@@ -402,12 +416,21 @@ body[data-theme='dark'] .mbs-pv-tab.active { background:#1e293b; color:#f1f5f9; 
                 return;
             }
             const rs = j.results || {};
-            // 3-state rendering: sent (green) / skipped-by-pref (gray, info-only) / failed (red)
+            // 3-state rendering + sub-rows ต่อกลุ่ม สำหรับ LINE Group
             function renderRow(label, r) {
-                if (!r) return { color:'#94a3b8', icon:'⊝', text: `${label} —` };
-                if (r.ok) return { color:'#059669', icon:'✓', text: `${label} → ${r.target}` };
-                if (r.skipped) return { color:'#94a3b8', icon:'⊝', text: `${label} (ปิดอยู่) — ${r.error}` };
-                return { color:'#dc2626', icon:'✗', text: `${label} — ${r.error}` };
+                if (!r) return { color:'#94a3b8', icon:'⊝', text: `${label} —`, sub:'' };
+                let sub = '';
+                if (Array.isArray(r.per_group) && r.per_group.length > 0) {
+                    sub = '<div style="margin-top:.25rem;padding-left:1.25rem;font-size:12px">'
+                        + r.per_group.map(g => g.ok
+                            ? `<div style="color:#059669">✓ <code style="font-family:ui-monospace;background:#f1f5f9;padding:1px 4px;border-radius:3px;font-size:11px">…${esc(g.id.slice(-6))}</code></div>`
+                            : `<div style="color:#dc2626">✗ <code style="font-family:ui-monospace;background:#f1f5f9;padding:1px 4px;border-radius:3px;font-size:11px">…${esc(g.id.slice(-6))}</code> — ${esc(g.error || '')}</div>`
+                          ).join('')
+                        + '</div>';
+                }
+                if (r.ok) return { color:'#059669', icon:'✓', text: `${label} → ${r.target}`, sub };
+                if (r.skipped) return { color:'#94a3b8', icon:'⊝', text: `${label} (ปิดอยู่) — ${r.error}`, sub };
+                return { color:'#dc2626', icon:'✗', text: `${label} — ${r.error}`, sub };
             }
             const channels = [
                 { key: 'line',       label: 'LINE (ส่วนตัว)' },
@@ -416,17 +439,19 @@ body[data-theme='dark'] .mbs-pv-tab.active { background:#1e293b; color:#f1f5f9; 
             ];
             const rows = channels.map(c => ({ ...renderRow(c.label, rs[c.key]), r: rs[c.key] }));
 
-            // overall logic
-            const anySent = rows.some(x => x.r && x.r.ok);
+            // overall logic — ดู per_group ด้วย: ถ้ามี group ใดส่งสำเร็จก็นับว่า any sent
+            const anySent = rows.some(x => x.r && (x.r.ok || (Array.isArray(x.r.per_group) && x.r.per_group.some(g => g.ok))));
             const allSkipped = rows.every(x => x.r && !x.r.ok && x.r.skipped);
             let icon = 'success', title = 'ส่งเสร็จ';
             if (!anySent) {
                 if (allSkipped) { icon = 'info'; title = 'ยังไม่ได้เปิด channel ใด · ติ๊ก channel ที่ต้องการก่อน'; }
                 else { icon = 'warning'; title = 'ส่งไม่สำเร็จ — ดูรายละเอียดด้านล่าง'; }
+            } else if (rows.some(x => !x.r?.ok && !x.r?.skipped)) {
+                title = 'ส่งเสร็จ — แต่บางช่องทาง fail';
             }
 
             const html = rows.map(x =>
-                `<div style="color:${x.color};margin-top:.4rem"><b>${x.icon}</b> ${esc(x.text)}</div>`
+                `<div style="color:${x.color};margin-top:.4rem"><b>${x.icon}</b> ${esc(x.text)}</div>${x.sub}`
             ).join('');
 
             Swal.fire({
@@ -454,6 +479,17 @@ body[data-theme='dark'] .mbs-pv-tab.active { background:#1e293b; color:#f1f5f9; 
 .mbs-module:has(input:checked) { border-color:#10b981; background:#f0fdf4; }
 .mbs-module input[type=checkbox] { accent-color:#10b981; width:16px; height:16px; flex-shrink:0; }
 .mbs-module-icon { width:1.75rem; height:1.75rem; border-radius:.5rem; background:#f1f5f9; color:#475569; display:flex; align-items:center; justify-content:center; font-size:.8rem; flex-shrink:0; }
+.mbs-group-item { display:flex; gap:.6rem; padding:.5rem .65rem; border-radius:.45rem; background:#fff; border:1px solid #e2e8f0; cursor:pointer; transition:border-color .12s, background .12s; align-items:center; font-size:.8rem; }
+.mbs-group-item:hover { border-color:#94a3b8; }
+.mbs-group-item:has(input:checked) { border-color:#06c755; background:#f0fdf4; }
+.mbs-group-item input[type=checkbox] { accent-color:#06c755; width:15px; height:15px; flex-shrink:0; }
+.mbs-group-name { font-weight:600; color:#0f172a; }
+.mbs-group-meta { font-size:.65rem; color:#94a3b8; }
+.mbs-group-type-room  { display:inline-block;font-size:9px;font-weight:700;padding:1px 5px;border-radius:99px;background:#e0f2fe;color:#0369a1;margin-left:.25rem; }
+.mbs-group-type-group { display:inline-block;font-size:9px;font-weight:700;padding:1px 5px;border-radius:99px;background:#dcfce7;color:#15803d;margin-left:.25rem; }
+body[data-theme='dark'] .mbs-group-item { background:#0f172a; border-color:#1e293b; }
+body[data-theme='dark'] .mbs-group-item:has(input:checked) { background:rgba(6,199,85,.1); border-color:#06c755; }
+body[data-theme='dark'] .mbs-group-name { color:#f1f5f9; }
 body[data-theme='dark'] .mbs-channel, body[data-theme='dark'] .mbs-module { background:#0f172a; border-color:#1e293b; }
 body[data-theme='dark'] .mbs-channel:has(input:checked), body[data-theme='dark'] .mbs-module:has(input:checked) { background:rgba(16,185,129,.1); border-color:#10b981; }
 body[data-theme='dark'] .mbs-channel p, body[data-theme='dark'] .mbs-module p { color:#f1f5f9; }

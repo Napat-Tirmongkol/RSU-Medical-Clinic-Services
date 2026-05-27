@@ -80,6 +80,7 @@ switch ($action) {
     case 'pref:get': {
         $pref = morning_brief_get_or_create_pref($pdo, $adminId, 'admin');
         $pref['modules'] = json_decode($pref['modules_json'] ?? '[]', true) ?: [];
+        $pref['line_group_ids_arr'] = json_decode($pref['line_group_ids'] ?? '[]', true) ?: [];
         unset($pref['modules_json']);
         _mb_send(['ok'=>true, 'pref'=>$pref]);
     }
@@ -117,23 +118,33 @@ switch ($action) {
             (array)($_POST['modules'] ?? [])
         ));
         if (!$modules) $modules = ['campaign','scholarship','finance','edms','clinic','inventory'];
-        $line   = trim((string)($_POST['line_user_id'] ?? ''));
-        $lgroup = trim((string)($_POST['line_group_id'] ?? ''));
-        $email  = trim((string)($_POST['email'] ?? ''));
+        $line    = trim((string)($_POST['line_user_id'] ?? ''));
+        $lgroups = (array)($_POST['line_group_ids'] ?? []);
+        $email   = trim((string)($_POST['email'] ?? ''));
         if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
             _mb_send(['ok'=>false,'error'=>'email ไม่ถูกต้อง']);
         }
-        if ($lgroup !== '' && !preg_match('/^[CR][0-9a-f]{32}$/i', $lgroup)) {
-            _mb_send(['ok'=>false,'error'=>'LINE Group/Room ID ต้องขึ้นต้นด้วย C หรือ R + 32 ตัว hex']);
+        // Filter + validate group/room IDs
+        $lgroupsClean = [];
+        foreach ($lgroups as $gid) {
+            $gid = trim((string)$gid);
+            if ($gid === '') continue;
+            if (!preg_match('/^[CR][0-9a-f]{32}$/i', $gid)) {
+                _mb_send(['ok'=>false,'error'=>"LINE Group/Room ID ไม่ถูกต้อง: {$gid}"]);
+            }
+            $lgroupsClean[] = $gid;
         }
+        $lgroupsClean = array_values(array_unique($lgroupsClean));
+        $lgroupsJson = !empty($lgroupsClean) ? json_encode($lgroupsClean) : null;
+
         $st = $pdo->prepare("UPDATE sys_morning_brief_prefs
             SET channel_portal=:cp, channel_line=:cl, channel_line_group=:clg, channel_email=:ce,
                 delivery_hour=:h, respect_clinic_calendar=:rcc,
-                modules_json=:m, line_user_id=:lu, line_group_id=:lg, email=:em, updated_at=NOW()
+                modules_json=:m, line_user_id=:lu, line_group_ids=:lgs, email=:em, updated_at=NOW()
             WHERE staff_id=:sid AND staff_type='admin'");
         $st->execute([':cp'=>$cp, ':cl'=>$cl, ':clg'=>$clg, ':ce'=>$ce, ':h'=>$hr, ':rcc'=>$rcc,
                       ':m'=>json_encode($modules), ':lu'=>($line?:null),
-                      ':lg'=>($lgroup?:null), ':em'=>($email?:null),
+                      ':lgs'=>$lgroupsJson, ':em'=>($email?:null),
                       ':sid'=>$adminId]);
         _mb_send(['ok'=>true, 'message'=>'บันทึกแล้ว']);
     }
@@ -217,10 +228,11 @@ switch ($action) {
             }
         }
 
-        // ── LINE Group ──────────────────────────────────────────────────
+        // ── LINE Group (รองรับหลายกลุ่ม — loop ทีละกลุ่ม) ──
+        $groupIds = json_decode($pref['line_group_ids'] ?? '[]', true) ?: [];
         if (empty($pref['channel_line_group'])) {
             $results['line_group'] = ['ok' => false, 'error' => 'ยังไม่ได้เปิด channel LINE Group', 'skipped' => true];
-        } elseif (empty($pref['line_group_id'])) {
+        } elseif (empty($groupIds)) {
             $results['line_group'] = ['ok' => false, 'error' => 'เปิด LINE Group แล้ว แต่ยังไม่ได้เลือกกลุ่ม'];
         } else {
             $token = mb_resolve_line_token();
@@ -228,10 +240,26 @@ switch ($action) {
                 $results['line_group'] = ['ok' => false, 'error' => 'ระบบยังไม่ได้ตั้ง LINE_MESSAGING_CHANNEL_ACCESS_TOKEN'];
             } else {
                 $flex = mb_build_line_flex($brief, $priorities, true);
-                $ok = send_line_group_push($pref['line_group_id'], [$flex], $token);
-                $results['line_group'] = $ok
-                    ? ['ok' => true, 'target' => $pref['line_group_id']]
-                    : ['ok' => false, 'error' => 'LINE Group push ปฏิเสธ: ' . (get_last_line_error() ?: 'unknown') . ' · ตรวจว่า OA อยู่ในกลุ่มแล้วหรือยัง'];
+                $perGroup = [];
+                $sentCount = 0; $failCount = 0;
+                foreach ($groupIds as $gid) {
+                    $ok = send_line_group_push($gid, [$flex], $token);
+                    if ($ok) {
+                        $perGroup[] = ['id' => $gid, 'ok' => true];
+                        $sentCount++;
+                    } else {
+                        $perGroup[] = ['id' => $gid, 'ok' => false, 'error' => get_last_line_error() ?: 'unknown'];
+                        $failCount++;
+                    }
+                }
+                $results['line_group'] = [
+                    'ok' => $failCount === 0,
+                    'target' => $sentCount . '/' . count($groupIds) . ' กลุ่ม',
+                    'per_group' => $perGroup,
+                    'error' => $failCount > 0
+                        ? "ส่งสำเร็จ {$sentCount}/" . count($groupIds) . " กลุ่ม · ดูรายละเอียดต่อกลุ่มด้านล่าง"
+                        : null,
+                ];
             }
         }
 
