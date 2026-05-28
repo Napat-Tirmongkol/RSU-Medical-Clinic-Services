@@ -272,6 +272,24 @@ function handle_approvals(PDO $pdo, string $action, int $adminId): void
         return;
     }
 
+    if ($action === 'set_task_description') {
+        $id = (int)($_POST['id'] ?? 0);
+        if (!$id) { echo json_encode(['ok' => false, 'error' => 'missing id']); return; }
+        $task = trim((string)($_POST['task_description'] ?? ''));
+        if (mb_strlen($task) > 500) $task = mb_substr($task, 0, 500);
+        // Auto-migrate column (idempotent)
+        try {
+            $check = $pdo->query("SHOW COLUMNS FROM sys_scholarship_clock_logs LIKE 'task_description'");
+            if (!$check->fetch()) {
+                $pdo->exec("ALTER TABLE sys_scholarship_clock_logs ADD COLUMN task_description VARCHAR(500) NULL AFTER note");
+            }
+        } catch (Throwable) {}
+        $stmt = $pdo->prepare("UPDATE sys_scholarship_clock_logs SET task_description = :td WHERE id = :id");
+        $ok = $stmt->execute([':td' => ($task ?: null), ':id' => $id]);
+        echo json_encode(['ok' => $ok, 'task_description' => $task]);
+        return;
+    }
+
     if ($action === 'approve' || $action === 'reject') {
         $id = (int)($_POST['id'] ?? 0);
         if (!$id) { echo json_encode(['ok' => false, 'error' => 'missing id']); return; }

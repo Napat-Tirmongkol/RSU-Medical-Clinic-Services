@@ -71,15 +71,27 @@ function ensure_scholarship_schema(PDO $pdo): void
             user_agent VARCHAR(255) NOT NULL DEFAULT '',
             status ENUM('pending','approved','rejected') NOT NULL DEFAULT 'pending',
             approved_by INT UNSIGNED NULL,
+            approver_name VARCHAR(120) NULL,
             approved_at DATETIME NULL,
             reject_reason VARCHAR(255) NOT NULL DEFAULT '',
             note VARCHAR(255) NOT NULL DEFAULT '',
+            task_description VARCHAR(500) NULL,
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             KEY idx_student_event (student_id, event_at),
             KEY idx_shift (shift_id),
             KEY idx_status (status),
             KEY idx_event_at (event_at)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        // Auto-add columns สำหรับ install เก่า (idempotent)
+        foreach ([
+            ['approver_name',    "VARCHAR(120) NULL AFTER approved_by"],
+            ['task_description', "VARCHAR(500) NULL AFTER note"],
+        ] as [$col, $def]) {
+            try {
+                $check = $pdo->query("SHOW COLUMNS FROM sys_scholarship_clock_logs LIKE '$col'");
+                if (!$check->fetch()) $pdo->exec("ALTER TABLE sys_scholarship_clock_logs ADD COLUMN $col $def");
+            } catch (PDOException) {}
+        }
         try { $pdo->exec("ALTER TABLE sys_scholarship_clock_logs ADD COLUMN IF NOT EXISTS comp_type ENUM('hours','paid') NOT NULL DEFAULT 'hours' AFTER action"); } catch (PDOException) {}
 
         $pdo->exec("CREATE TABLE IF NOT EXISTS sys_scholarship_settings (

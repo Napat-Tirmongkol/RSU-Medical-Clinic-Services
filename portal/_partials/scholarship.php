@@ -1561,6 +1561,7 @@ $portalCsrf = get_csrf_token();
                 <td>${stat}</td>
                 <td class="text-right">
                     <button class="sch-btn sch-btn--xs sch-btn--ghost" title="ปรับชั่วโมง" onclick='openAdjustModal(${r.id}, ${JSON.stringify(r.full_name).replaceAll("'","&#39;")}, ${parseFloat(r.hours_total)})'><i class="fa-solid fa-sliders"></i></button>
+                    <button class="sch-btn sch-btn--xs sch-btn--ghost" title="พิมพ์ใบลงเวลา" onclick="openTimesheet(${r.id})"><i class="fa-solid fa-file-invoice"></i></button>
                     <button class="sch-btn sch-btn--xs sch-btn--ghost" title="แก้ไข" onclick='editStudent(${JSON.stringify(r).replaceAll("'","&#39;")})'><i class="fa-solid fa-pen"></i></button>
                     <button class="sch-btn sch-btn--xs sch-btn--danger" title="ลบ" onclick="deleteStudent(${r.id})"><i class="fa-solid fa-trash"></i></button>
                 </td>
@@ -1798,6 +1799,35 @@ $portalCsrf = get_csrf_token();
     document.getElementById('adj-ct-paid-lbl').addEventListener('click', () => {
         document.querySelector('input[name="adj-ct"][value="paid"]').checked = true; syncAdjCtRadio();
     });
+
+    // ── เปิดใบลงเวลา (timesheet) สำหรับนักศึกษา · เลือกเดือนก่อน open ──
+    window.openTimesheet = async function(studentId) {
+        const now = new Date();
+        const months = [];
+        // เดือนปัจจุบัน + 5 เดือนก่อนหน้า
+        for (let i = 0; i < 6; i++) {
+            const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+            const ym = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+            const thai = ['', 'มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน',
+                          'กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'][d.getMonth() + 1];
+            months.push([ym, thai + ' ' + (d.getFullYear() + 543)]);
+        }
+        const { value: month, isConfirmed } = await Swal.fire({
+            title: 'พิมพ์ใบลงเวลา',
+            html: '<p style="font-size:13px;color:#64748b;margin-bottom:8px">เลือกเดือนที่ต้องการพิมพ์</p>',
+            input: 'select',
+            inputOptions: Object.fromEntries(months),
+            inputValue: months[0][0],
+            showCancelButton: true,
+            confirmButtonText: 'เปิดดู / พิมพ์',
+            cancelButtonText: 'ยกเลิก',
+            confirmButtonColor: '#2e9e63',
+        });
+        if (!isConfirmed || !month) return;
+        const url = 'scholarship_timesheet.php?student_id=' + encodeURIComponent(studentId)
+                  + '&month=' + encodeURIComponent(month);
+        window.open(url, '_blank', 'noopener');
+    };
 
     window.openAdjustModal = async function(studentId, studentName, currentHours) {
         document.getElementById('adj-student-id').value = studentId;
