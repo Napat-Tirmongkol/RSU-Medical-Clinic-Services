@@ -164,9 +164,10 @@ table.ts .hours { width: 70px; }
 table.ts .sign { width: 100px; }
 .total-row td { background: #f8fafc; font-weight: 700; }
 
-.footer { margin-top: 24px; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
-.footer .sign-line { width: 200px; border-bottom: 1.5px solid #0f172a; height: 24px; }
-.footer .sign-text { font-size: 12.5px; color: #0f172a; padding-top: 4px; }
+.footer { margin-top: 28px; display: flex; flex-direction: column; align-items: flex-end; }
+.footer .sign-block { width: 340px; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.footer .sign-line { width: 100%; border-bottom: 1.5px solid #0f172a; height: 28px; }
+.footer .sign-text { font-size: 13px; color: #0f172a; padding-top: 4px; text-align: center; }
 .footer .sign-role { font-size: 12px; color: #64748b; }
 
 .task-block { border: 1px solid #475569; padding: 10px 12px; margin: 8px 0; min-height: 60px; }
@@ -241,9 +242,11 @@ table.ts .sign { width: 100px; }
     </table>
 
     <div class="footer">
-        <div class="sign-line"></div>
-        <div class="sign-text">( <?= htmlspecialchars($coordinator ?: '_____________________') ?> )</div>
-        <div class="sign-role">ผู้ประสานงาน</div>
+        <div class="sign-block">
+            <div class="sign-line"></div>
+            <div class="sign-text">( <?= htmlspecialchars($coordinator ?: '________________________________') ?> )</div>
+            <div class="sign-role">ผู้ประสานงาน</div>
+        </div>
     </div>
 </div>
 
