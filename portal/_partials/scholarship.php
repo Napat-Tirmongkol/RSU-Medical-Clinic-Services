@@ -621,6 +621,9 @@ $portalCsrf = get_csrf_token();
                     <i class="fa-solid fa-wand-magic-sparkles"></i>สร้าง/อัปเดตรายการ
                 </button>
                 <div class="flex-1"></div>
+                <button class="sch-btn sch-btn--ghost" onclick="openPayoutSummary()" title="พิมพ์แบบสรุปรวมทุกคน ส่งการเงิน">
+                    <i class="fa-solid fa-file-invoice-dollar"></i>พิมพ์สรุปส่งการเงิน
+                </button>
                 <button class="sch-btn sch-btn--ghost" onclick="exportPayoutsCSV()">
                     <i class="fa-solid fa-file-csv"></i>ดาวน์โหลด CSV
                 </button>
@@ -1799,6 +1802,16 @@ $portalCsrf = get_csrf_token();
     document.getElementById('adj-ct-paid-lbl').addEventListener('click', () => {
         document.querySelector('input[name="adj-ct"][value="paid"]').checked = true; syncAdjCtRadio();
     });
+
+    // ── เปิดแบบสรุปรวมการจ่ายเงิน (ส่งการเงิน) — ใช้เดือนจาก #po-period ──
+    window.openPayoutSummary = function() {
+        const month = document.getElementById('po-period')?.value || '';
+        if (!month || !/^\d{4}-\d{2}$/.test(month)) {
+            Swal.fire({ icon: 'warning', title: 'กรุณาเลือกเดือนที่ต้องการก่อน', timer: 1800, showConfirmButton: false });
+            return;
+        }
+        window.open('scholarship_payroll_summary.php?month=' + encodeURIComponent(month), '_blank', 'noopener');
+    };
 
     // ── เปิดใบลงเวลา (timesheet) สำหรับนักศึกษา · เลือกเดือนก่อน open ──
     window.openTimesheet = async function(studentId) {
