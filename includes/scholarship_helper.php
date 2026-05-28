@@ -110,6 +110,7 @@ function ensure_scholarship_schema(PDO $pdo): void
         // Self-healing: ถ้าตารางมีอยู่แล้วแต่ไม่มี column ใหม่ ให้เพิ่ม
         try { $pdo->exec("ALTER TABLE sys_scholarship_settings ADD COLUMN IF NOT EXISTS gps_required TINYINT(1) NOT NULL DEFAULT 1"); } catch (PDOException) {}
         try { $pdo->exec("ALTER TABLE sys_scholarship_settings ADD COLUMN IF NOT EXISTS pay_rate_per_hour DECIMAL(8,2) NOT NULL DEFAULT 0"); } catch (PDOException) {}
+        try { $pdo->exec("ALTER TABLE sys_scholarship_settings ADD COLUMN IF NOT EXISTS notify_line_group_ids TEXT NULL"); } catch (PDOException) {}
 
         // Seed singleton row
         $pdo->exec("INSERT IGNORE INTO sys_scholarship_settings (id) VALUES (1)");
@@ -212,12 +213,30 @@ function get_scholarship_settings(PDO $pdo): array
     $row['gps_required'] = isset($row['gps_required']) ? (int)$row['gps_required'] : 1;
     $row['pay_rate_per_hour'] = isset($row['pay_rate_per_hour']) ? (float)$row['pay_rate_per_hour'] : 0;
     $row['cancel_cutoff_hours'] = isset($row['cancel_cutoff_hours']) ? (int)$row['cancel_cutoff_hours'] : 24;
+    // Notify LINE groups: JSON array ของ group IDs — decode พร้อมใช้
+    $row['notify_line_group_ids'] = (string)($row['notify_line_group_ids'] ?? '');
+    $row['notify_line_group_ids_arr'] = $row['notify_line_group_ids'] !== ''
+        ? (json_decode($row['notify_line_group_ids'], true) ?: [])
+        : [];
     return $row;
 }
 
 function save_scholarship_settings(PDO $pdo, array $data): bool
 {
     ensure_scholarship_schema($pdo);
+    // Validate + clean group IDs (array → JSON)
+    $rawGroups = $data['notify_line_group_ids'] ?? [];
+    if (is_string($rawGroups)) $rawGroups = json_decode($rawGroups, true) ?: [];
+    $cleanGroups = [];
+    foreach ((array)$rawGroups as $gid) {
+        $gid = trim((string)$gid);
+        if ($gid !== '' && preg_match('/^[CR][0-9a-f]{32}$/i', $gid)) {
+            $cleanGroups[] = $gid;
+        }
+    }
+    $cleanGroups = array_values(array_unique($cleanGroups));
+    $groupsJson = $cleanGroups ? json_encode($cleanGroups) : null;
+
     $stmt = $pdo->prepare("UPDATE sys_scholarship_settings SET
         clinic_lat = :lat,
         clinic_lng = :lng,
@@ -226,7 +245,8 @@ function save_scholarship_settings(PDO $pdo, array $data): bool
         require_approval = :req,
         gps_required = :gps,
         pay_rate_per_hour = :rate,
-        cancel_cutoff_hours = :cutoff
+        cancel_cutoff_hours = :cutoff,
+        notify_line_group_ids = :groups
         WHERE id = 1");
     return $stmt->execute([
         ':lat' => $data['clinic_lat'] !== '' && $data['clinic_lat'] !== null ? (float)$data['clinic_lat'] : null,
@@ -237,6 +257,7 @@ function save_scholarship_settings(PDO $pdo, array $data): bool
         ':gps' => isset($data['gps_required']) ? (!empty($data['gps_required']) ? 1 : 0) : 1,
         ':rate' => max(0, (float)($data['pay_rate_per_hour'] ?? 0)),
         ':cutoff' => max(0, (int)($data['cancel_cutoff_hours'] ?? 24)),
+        ':groups' => $groupsJson,
     ]);
 }
 

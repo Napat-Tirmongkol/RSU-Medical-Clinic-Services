@@ -165,6 +165,14 @@ $portalCsrf = get_csrf_token();
     .cal-slot-row.full { background:#fef3c7; color:#92400e; }
     .cal-slot-row.empty-slot { background:#dcfce7; color:#166534; }
 
+    /* Notify groups multi-checkbox (Settings tab) */
+    .sch-notify-item { display:flex; gap:.6rem; padding:.5rem .65rem; border-radius:.45rem; background:#fff; border:1px solid #e2e8f0; cursor:pointer; transition:border-color .12s, background .12s; align-items:center; }
+    .sch-notify-item:hover { border-color:#94a3b8; }
+    .sch-notify-item:has(input:checked) { border-color:#06c755; background:#f0fdf4; }
+    .sch-notify-item input[type=checkbox] { accent-color:#06c755; width:15px; height:15px; flex-shrink:0; }
+    body[data-theme='dark'] .sch-notify-item { background:#0f172a; border-color:#1e293b; }
+    body[data-theme='dark'] .sch-notify-item:has(input:checked) { background:rgba(6,199,85,.1); border-color:#06c755; }
+
     /* Subtle hover lift on KPI tiles */
     #section-scholarship .sch-kpi { transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease; }
     #section-scholarship .sch-kpi:hover { transform: translateY(-1px); border-color:#cbd5e1; }
@@ -734,6 +742,33 @@ $portalCsrf = get_csrf_token();
                     <p class="text-[11px] text-slate-500 mt-1.5">
                         <i class="fa-solid fa-circle-info"></i>
                         ใช้คำนวณเฉพาะชั่วโมงประเภท "ค่าตอบแทน" (paid) — 0 = ไม่คำนวณเงิน
+                    </p>
+                </div>
+
+                <hr class="border-slate-100 my-2">
+
+                <!-- ─── กลุ่ม LINE ที่จะแจ้งเตือนเมื่อมี clock-in/out รออนุมัติ ─── -->
+                <div class="bg-emerald-50/50 border border-emerald-100 rounded-xl p-4">
+                    <label class="sch-label flex items-center gap-1.5">
+                        <i class="fa-brands fa-line" style="color:#06c755"></i>
+                        กลุ่ม LINE ที่จะแจ้งเตือน (multi-select)
+                    </label>
+                    <p class="text-xs text-slate-500 mb-2.5">
+                        เมื่อนักศึกษา clock-in/out → ส่ง Flex Message พร้อมปุ่มอนุมัติ/ปฏิเสธไปยังกลุ่มที่ติ๊กไว้
+                    </p>
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs text-slate-500" id="set-groups-count">—</span>
+                        <button type="button" onclick="schReloadNotifyGroups()" class="text-xs text-slate-500 hover:text-emerald-700 flex items-center gap-1">
+                            <i class="fa-solid fa-rotate"></i>รีโหลด
+                        </button>
+                    </div>
+                    <div id="set-groups-list" class="space-y-1.5 max-h-56 overflow-y-auto pr-1">
+                        <p class="text-xs text-slate-400 py-2"><i class="fa-solid fa-spinner fa-spin mr-1"></i>กำลังโหลด...</p>
+                    </div>
+                    <p class="text-[11px] text-slate-400 mt-2">
+                        <i class="fa-solid fa-circle-info"></i>
+                        ถ้าไม่ติ๊กกลุ่มใด → ใช้ "กลุ่มหลัก" ของระบบ (ตั้งที่
+                        <a href="?section=line_settings" class="text-emerald-600 hover:underline">LINE Settings</a>)
                     </p>
                 </div>
 
@@ -2025,6 +2060,9 @@ $portalCsrf = get_csrf_token();
     applyGpsToggleState();
 
     window.saveSettings = async function() {
+        // Collect ticked LINE groups
+        const groupIds = Array.from(document.querySelectorAll('input[name="set-notify-groups"]:checked'))
+            .map(el => el.value);
         const data = {
             clinic_lat: document.getElementById('set-lat').value,
             clinic_lng: document.getElementById('set-lng').value,
@@ -2033,11 +2071,63 @@ $portalCsrf = get_csrf_token();
             require_approval: document.getElementById('set-require-approval').checked ? 1 : 0,
             gps_required: document.getElementById('set-gps-required').checked ? 1 : 0,
             pay_rate_per_hour: document.getElementById('set-pay-rate').value || 0,
+            notify_line_group_ids: JSON.stringify(groupIds),
         };
         const j = await api('settings', 'save', data);
         if (j.ok) Swal.fire({ icon:'success', title:'บันทึกแล้ว', timer:1200, showConfirmButton:false });
         else Swal.fire('ไม่สำเร็จ', j.error || '', 'error');
     };
+
+    // ── โหลดรายการ LINE groups เป็น multi-checkbox สำหรับ notify settings ──
+    const SCH_NOTIFY_SAVED = <?= json_encode($settings['notify_line_group_ids_arr'] ?? []) ?>;
+    window.schReloadNotifyGroups = async function() {
+        const wrap = document.getElementById('set-groups-list');
+        if (!wrap) return;
+        wrap.innerHTML = '<p class="text-xs text-slate-400 py-2"><i class="fa-solid fa-spinner fa-spin mr-1"></i>กำลังโหลด...</p>';
+        // Preserve checked state เมื่อ reload (กัน user ติ๊กแล้วโดน clear)
+        const prevChecked = new Set(Array.from(wrap.querySelectorAll('input[name="set-notify-groups"]:checked')).map(c => c.value));
+        const selected = prevChecked.size > 0 ? prevChecked : new Set(SCH_NOTIFY_SAVED);
+        try {
+            const r = await fetch('ajax_morning_brief.php?action=groups:list');
+            const j = await r.json();
+            if (!j.ok || !Array.isArray(j.groups) || j.groups.length === 0) {
+                wrap.innerHTML = `<p class="text-xs text-slate-500 py-3 px-3 bg-slate-50 rounded border border-dashed border-slate-300">
+                    <i class="fa-solid fa-circle-info mr-1"></i>ยังไม่มีกลุ่มที่บันทึก — เชิญ LINE OA เข้ากลุ่มก่อน
+                </p>`;
+                document.getElementById('set-groups-count').textContent = '0 กลุ่ม';
+                return;
+            }
+            wrap.innerHTML = j.groups.map(g => {
+                const checked = selected.has(g.id);
+                const typeBg = g.type === 'room' ? '#e0f2fe' : '#dcfce7';
+                const typeColor = g.type === 'room' ? '#0369a1' : '#15803d';
+                const typeLabel = g.type === 'room' ? 'Room' : 'Group';
+                const memberText = g.member_count > 0 ? `${g.member_count} คน · ` : '';
+                const safeName = (g.name || '(ไม่ทราบชื่อ)').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+                return `<label class="sch-notify-item">
+                    <input type="checkbox" name="set-notify-groups" value="${g.id}" ${checked ? 'checked' : ''}>
+                    <div style="flex:1;min-width:0">
+                        <div style="display:flex;align-items:center;gap:.35rem;flex-wrap:wrap">
+                            <span style="font-weight:600;color:#0f172a;font-size:.85rem">${safeName}</span>
+                            <span style="display:inline-block;font-size:9px;font-weight:700;padding:1px 5px;border-radius:99px;background:${typeBg};color:${typeColor}">${typeLabel}</span>
+                        </div>
+                        <div style="font-size:10px;color:#94a3b8;font-family:ui-monospace,SFMono-Regular,Consolas,monospace">${memberText}${g.id}</div>
+                    </div>
+                </label>`;
+            }).join('');
+            // Update count
+            const updateCount = () => {
+                const n = wrap.querySelectorAll('input[name="set-notify-groups"]:checked').length;
+                document.getElementById('set-groups-count').textContent = n === 0 ? 'ไม่ได้เลือกกลุ่ม' : `เลือก ${n} กลุ่ม`;
+            };
+            wrap.querySelectorAll('input[name="set-notify-groups"]').forEach(c => c.addEventListener('change', updateCount));
+            updateCount();
+        } catch(e) {
+            wrap.innerHTML = `<p class="text-xs text-rose-500 py-2">โหลดไม่สำเร็จ</p>`;
+        }
+    };
+    // Auto-load on tab activate (Settings tab)
+    if (document.getElementById('set-groups-list')) schReloadNotifyGroups();
 
     window.useCurrentLocation = function() {
         if (!navigator.geolocation) { Swal.fire('อุปกรณ์ไม่รองรับ GPS', '', 'error'); return; }

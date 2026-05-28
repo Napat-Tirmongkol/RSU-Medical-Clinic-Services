@@ -201,13 +201,29 @@ try {
 
     // ── LINE Group Notification ───────────────────────────────────────────
     // ส่งแจ้งเตือนพร้อมปุ่มอนุมัติ/ปฏิเสธไปยังกลุ่ม staff เมื่อ status = pending
+    // Group selection priority:
+    //   1. settings.notify_line_group_ids (JSON array) — scholarship-specific
+    //   2. line.group.default_id — fallback (กลุ่มหลักของระบบ)
     if (!empty($settings['require_approval']) && $logId > 0) {
         try {
             $lineSecrets  = require __DIR__ . '/../config/secrets.php';
             $lineToken    = $lineSecrets['LINE_MESSAGING_CHANNEL_ACCESS_TOKEN'] ?? '';
-            $defaultGroup = line_groups_get_default($pdo);
 
-            if ($lineToken !== '' && $defaultGroup !== '') {
+            // Resolve target groups (scholarship-specific → fallback default)
+            $targetGroups = [];
+            $cfgGroups = $settings['notify_line_group_ids_arr'] ?? null;
+            if (!is_array($cfgGroups) && !empty($settings['notify_line_group_ids'])) {
+                $cfgGroups = json_decode((string)$settings['notify_line_group_ids'], true) ?: [];
+            }
+            if (is_array($cfgGroups) && !empty($cfgGroups)) {
+                $targetGroups = array_values(array_filter($cfgGroups, fn($g) => is_string($g) && $g !== ''));
+            }
+            if (empty($targetGroups)) {
+                $defaultGroup = line_groups_get_default($pdo);
+                if ($defaultGroup !== '') $targetGroups = [$defaultGroup];
+            }
+
+            if ($lineToken !== '' && !empty($targetGroups)) {
                 // ดึงข้อมูลนักศึกษา
                 $uRow = $pdo->prepare("SELECT u.full_name FROM sys_scholarship_students ss
                     JOIN sys_users u ON u.id = ss.user_id WHERE ss.id = :sid LIMIT 1");
@@ -225,7 +241,10 @@ try {
                     (bool)$withinRadius,
                     $compType
                 );
-                send_line_group_push($defaultGroup, [$flexMsg], $lineToken);
+                // Push ไปทุกกลุ่มที่ตั้งไว้
+                foreach ($targetGroups as $gid) {
+                    send_line_group_push($gid, [$flexMsg], $lineToken);
+                }
             }
         } catch (Throwable $e) {
             error_log('[scholarship clock LINE notify] ' . $e->getMessage());

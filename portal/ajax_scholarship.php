@@ -1009,6 +1009,7 @@ function handle_settings(PDO $pdo, string $action): void
             'require_approval' => $_POST['require_approval'] ?? 0,
             'gps_required' => $_POST['gps_required'] ?? 0,
             'pay_rate_per_hour' => $_POST['pay_rate_per_hour'] ?? 0,
+            'notify_line_group_ids' => $_POST['notify_line_group_ids'] ?? '[]',
         ]);
         echo json_encode(['ok' => $ok]);
         return;
