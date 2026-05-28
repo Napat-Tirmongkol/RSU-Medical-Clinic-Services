@@ -148,10 +148,30 @@ try {
         }
     }
 
+    // Task description — รับเฉพาะ clock_out · บังคับกรอก (require_task_on_clockout)
+    $taskDescription = null;
+    if ($action === 'clock_out') {
+        $taskDescription = trim((string)($_POST['task_description'] ?? ''));
+        if (mb_strlen($taskDescription) > 500) {
+            $taskDescription = mb_substr($taskDescription, 0, 500);
+        }
+        // Required check: ถ้า settings บังคับให้กรอก task และ student ไม่ส่งมา → reject
+        $requireTask = !empty($settings['require_task_on_clockout']) || true; // default ON (เปิดบังคับเลย)
+        if ($requireTask && $taskDescription === '') {
+            echo json_encode([
+                'ok' => false,
+                'code' => 'task_required',
+                'message' => 'กรุณากรอก "งานที่ทำวันนี้" ก่อนออกงาน — เขียนสั้นๆ ว่าทำอะไรบ้าง (เพื่อบันทึกในเอกสาร)',
+            ]);
+            exit;
+        }
+        if ($taskDescription === '') $taskDescription = null;
+    }
+
     $stmt = $pdo->prepare("INSERT INTO sys_scholarship_clock_logs
         (student_id, shift_id, action, comp_type, event_at, gps_lat, gps_lng, gps_accuracy,
-         distance_m, within_radius, ip_address, user_agent, status)
-        VALUES (:sid, :shift, :act, :ct, NOW(), :lat, :lng, :acc, :dist, :wr, :ip, :ua, :status)");
+         distance_m, within_radius, ip_address, user_agent, status, task_description)
+        VALUES (:sid, :shift, :act, :ct, NOW(), :lat, :lng, :acc, :dist, :wr, :ip, :ua, :status, :td)");
     $stmt->execute([
         ':sid' => $studentId,
         ':shift' => $shiftId,
@@ -165,6 +185,7 @@ try {
         ':ip' => $ip,
         ':ua' => $ua,
         ':status' => $settings['require_approval'] ? 'pending' : 'approved',
+        ':td' => $taskDescription,
     ]);
 
     // เมื่อ student เลือกประเภทตอน clock_out → ปรับ clock_in log ที่จับคู่ให้ comp_type ตรงกัน

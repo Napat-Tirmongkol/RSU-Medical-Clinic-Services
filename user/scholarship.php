@@ -745,31 +745,44 @@ if (btn && !btn.disabled) {
         const action = btn.dataset.action;
         const labelMap = { clock_in: 'เข้างาน', clock_out: 'ออกงาน' };
 
-        // ตอน clock_out → ให้นักศึกษาเลือกประเภทค่าตอบแทนของงานครั้งนี้
+        // ตอน clock_out → ให้นักศึกษาเลือกประเภท + กรอกงานที่ทำ
         // (เลื่อนการเลือกจาก clock_in มาที่ clock_out เพื่อให้ตัดสินใจหลังทำงานจริง)
         let pickedCompType = null;
+        let pickedTaskDescription = null;
         if (action === 'clock_out') {
             const r = await Swal.fire({
-                title: 'จบงาน — เลือกประเภท',
+                title: 'จบงาน — เลือกประเภท + ระบุงาน',
                 html: `
-                    <p style="font-size:.85rem;color:#64748b;margin-bottom:1rem">งานครั้งนี้คุณต้องการรับเป็น</p>
-                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem">
-                        <label style="cursor:pointer;border:2px solid #d1fae5;background:#ecfdf5;border-radius:1rem;padding:1rem;text-align:center;font-weight:800;color:#065f46" id="ct-hours-lbl">
+                    <p style="font-size:.85rem;color:#64748b;margin-bottom:.6rem">งานครั้งนี้คุณต้องการรับเป็น</p>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-bottom:1rem">
+                        <label style="cursor:pointer;border:2px solid #d1fae5;background:#ecfdf5;border-radius:1rem;padding:.85rem;text-align:center;font-weight:800;color:#065f46" id="ct-hours-lbl">
                             <input type="radio" name="ct" value="hours" checked style="display:none">
-                            <i class="fa-solid fa-graduation-cap" style="display:block;font-size:1.25rem;margin-bottom:.25rem"></i>
+                            <i class="fa-solid fa-graduation-cap" style="display:block;font-size:1.15rem;margin-bottom:.2rem"></i>
                             ส่งชั่วโมงทุน
                         </label>
-                        <label style="cursor:pointer;border:2px solid #fef3c7;background:#fffbeb;border-radius:1rem;padding:1rem;text-align:center;font-weight:800;color:#92400e" id="ct-paid-lbl">
+                        <label style="cursor:pointer;border:2px solid #fef3c7;background:#fffbeb;border-radius:1rem;padding:.85rem;text-align:center;font-weight:800;color:#92400e" id="ct-paid-lbl">
                             <input type="radio" name="ct" value="paid" style="display:none">
-                            <i class="fa-solid fa-coins" style="display:block;font-size:1.25rem;margin-bottom:.25rem"></i>
+                            <i class="fa-solid fa-coins" style="display:block;font-size:1.15rem;margin-bottom:.2rem"></i>
                             ค่าตอบแทน
                         </label>
                     </div>
+                    <p style="font-size:.85rem;color:#64748b;margin:.4rem 0 .35rem;text-align:left;font-weight:700">
+                        <i class="fa-solid fa-pen-to-square" style="color:#f43f5e;margin-right:.3rem"></i>
+                        งานที่ทำวันนี้ <span style="color:#f43f5e">*</span>
+                    </p>
+                    <textarea id="task-input" rows="3" maxlength="500"
+                        placeholder="เช่น ช่วยเอกสาร, ส่งใบนัด, ลงทะเบียนผู้ป่วยใหม่"
+                        style="width:100%;padding:.65rem .8rem;border:2px solid #e2e8f0;border-radius:.65rem;font-family:inherit;font-size:.9rem;resize:none;box-sizing:border-box;outline:none"
+                    ></textarea>
+                    <p style="font-size:.7rem;color:#94a3b8;margin:.3rem 0 0;text-align:left">
+                        จะถูกพิมพ์ในใบรายละเอียดการปฏิบัติงานสิ้นเดือน · เขียนสั้นๆ ได้
+                    </p>
                 `,
                 showCancelButton: true,
                 confirmButtonText: 'ถัดไป',
                 cancelButtonText: 'ยกเลิก',
                 confirmButtonColor: '#f43f5e',
+                focusConfirm: false,
                 didOpen: () => {
                     const sync = () => {
                         const v = document.querySelector('input[name="ct"]:checked').value;
@@ -783,11 +796,24 @@ if (btn && !btn.disabled) {
                         document.querySelector('input[name="ct"][value="paid"]').checked = true; sync();
                     });
                     sync();
+                    // Focus textarea ทันที — student พิมพ์ได้เลย
+                    setTimeout(() => document.getElementById('task-input').focus(), 100);
                 },
-                preConfirm: () => document.querySelector('input[name="ct"]:checked').value,
+                preConfirm: () => {
+                    const task = (document.getElementById('task-input').value || '').trim();
+                    if (task === '') {
+                        Swal.showValidationMessage('กรุณากรอก "งานที่ทำวันนี้" ก่อน');
+                        return false;
+                    }
+                    return {
+                        ct: document.querySelector('input[name="ct"]:checked').value,
+                        task: task,
+                    };
+                },
             });
             if (!r.isConfirmed) return;
-            pickedCompType = r.value;
+            pickedCompType = r.value.ct;
+            pickedTaskDescription = r.value.task;
         }
 
         // สรุปก่อนยืนยันออกงาน — โชว์เวลาเข้างาน + ระยะเวลา + ประเภท
@@ -838,12 +864,17 @@ if (btn && !btn.disabled) {
                             <span>เข้างานเมื่อ</span>
                             <span style="font-weight:800;color:#0f172a">${inDisplay}</span>
                         </div>
-                        <div style="display:flex;justify-content:space-between;font-size:.8rem;color:#64748b;margin-bottom:.75rem">
+                        <div style="display:flex;justify-content:space-between;font-size:.8rem;color:#64748b;margin-bottom:.5rem">
                             <span>ประเภท</span>
                             <span style="display:inline-flex;align-items:center;gap:.25rem;padding:.15rem .5rem;border-radius:99px;background:${ctBg};border:1px solid ${ctBorder};color:${ctColor};font-weight:800;font-size:.7rem">
                                 <i class="fa-solid ${ctIcon}"></i>${ctLabel}
                             </span>
                         </div>
+                        ${pickedTaskDescription ? `
+                        <div style="margin-bottom:.75rem;padding:.55rem .65rem;background:#fff;border:1px solid #e2e8f0;border-radius:.5rem">
+                            <div style="font-size:.7rem;color:#64748b;margin-bottom:.2rem">งานที่ทำวันนี้</div>
+                            <div style="font-size:.8rem;color:#0f172a;font-weight:600;line-height:1.5">${pickedTaskDescription.replace(/</g, '&lt;')}</div>
+                        </div>` : ''}
                         <div style="border-top:1px dashed #cbd5e1;padding-top:.75rem">
                             <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:.5rem">
                                 <span style="font-size:.75rem;color:#64748b">ทำงานจริง</span>
@@ -876,6 +907,7 @@ if (btn && !btn.disabled) {
             fd.append('csrf_token', CSRF_TOKEN);
             fd.append('action', action);
             if (pickedCompType) fd.append('comp_type', pickedCompType);
+            if (pickedTaskDescription) fd.append('task_description', pickedTaskDescription);
             if (lat != null) fd.append('lat', lat);
             if (lng != null) fd.append('lng', lng);
             fd.append('accuracy', accuracy || 0);
@@ -892,7 +924,9 @@ if (btn && !btn.disabled) {
                     });
                     location.reload();
                 } else {
-                    Swal.fire('ไม่สำเร็จ', j.error || 'เกิดข้อผิดพลาด', 'error');
+                    // Defensive: ถ้า backend ปฏิเสธเพราะ task_required (frontend ควรกรอง)
+                    const msg = j.message || j.error || 'เกิดข้อผิดพลาด';
+                    Swal.fire('ไม่สำเร็จ', msg, 'error');
                 }
             } catch (err) {
                 Swal.fire('Network Error', 'ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์', 'error');
