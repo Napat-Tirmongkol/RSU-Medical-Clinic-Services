@@ -518,8 +518,10 @@ $gcpCsrfToken = function_exists('get_csrf_token') ? get_csrf_token() : ($_SESSIO
         if (typeof window.gcOpenMemberModal === 'function') {
             window.gcOpenMemberModal(id);
         } else {
-            // Modal ไม่ได้ load → ไป section gold_card แบบ auto-open
-            window.location.href = '?section=gold_card&open_member=' + encodeURIComponent(id);
+            // Bug ก่อนหน้า: ใช้ '?section=...' → query string เพียง append ใน URL
+            // ปัจจุบัน (gold_card_pending.php) · ไม่ trigger portal index router →
+            // page แค่ refresh เดิม ไม่ไปไหน · แก้: ไปตรงที่ gold_card.php
+            window.location.href = 'gold_card.php?open_member=' + encodeURIComponent(id);
         }
     };
 
