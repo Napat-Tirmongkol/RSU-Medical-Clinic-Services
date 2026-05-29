@@ -511,16 +511,13 @@ $gcpCsrfToken = function_exists('get_csrf_token') ? get_csrf_token() : ($_SESSIO
         }
     };
 
-    // เปิด edit modal — modal markup + JS อยู่ใน section gold_card (คนละ partial)
-    // ถ้า user อยู่ใน section อื่น (เช่น gold_card_pending) → ส่งไป section gold_card
-    // พร้อม query string ?open_member=N เพื่อ auto-open modal ทันทีหลังโหลด
+    // เปิด edit modal — modal markup + JS embed อยู่ในหน้านี้แล้ว (gcEmbedHost ด้านล่าง)
+    // gcOpenMemberModal global function ทำงานได้ทันทีโดยไม่ต้อง navigate
     window.gcpOpenDetail = function(id) {
         if (typeof window.gcOpenMemberModal === 'function') {
             window.gcOpenMemberModal(id);
         } else {
-            // Bug ก่อนหน้า: ใช้ '?section=...' → query string เพียง append ใน URL
-            // ปัจจุบัน (gold_card_pending.php) · ไม่ trigger portal index router →
-            // page แค่ refresh เดิม ไม่ไปไหน · แก้: ไปตรงที่ gold_card.php
+            // Fallback: ถ้า embed fail ด้วยเหตุผลใด → navigate ไป gold_card section
             window.location.href = 'gold_card.php?open_member=' + encodeURIComponent(id);
         }
     };
@@ -536,3 +533,11 @@ $gcpCsrfToken = function_exists('get_csrf_token') ? get_csrf_token() : ($_SESSIO
     gcpLoadList(1);
 })();
 </script>
+
+<!-- ─── Embed gold_card partial เพื่อให้ modal + JS handlers พร้อมใช้ใน-page ─── -->
+<!-- Visual UI ของ gold_card section ถูกซ่อน · เก็บแค่ modal markup + global functions  -->
+<!-- (gcOpenMemberModal, gcSwitchTab, gcPost, gcTeleport, ฯลฯ)                          -->
+<!-- gcTeleport จะย้าย modal ไป body ตอนเปิด → render ปกติเมื่อ user คลิก edit          -->
+<div id="gcEmbedHost" style="display:none" aria-hidden="true">
+    <?php include __DIR__ . '/gold_card.php'; ?>
+</div>
