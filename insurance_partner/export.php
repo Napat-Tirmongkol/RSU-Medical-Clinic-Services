@@ -88,7 +88,8 @@ if (($_GET['download'] ?? '') === 'csv') {
     }
 
     if ($batch) {
-        // Members in this specific batch
+        // Members in this specific batch — include policy info สำหรับให้ partner
+        // กรอกเลขกรมธรรม์/วันที่ลงในไฟล์เดียวกัน แล้ว upload กลับได้ทันที
         $where = "m.insurance_company = :cc
                   AND m.member_id IN (
                       SELECT DISTINCT member_id FROM insurance_member_history WHERE sync_id = :sid
@@ -98,7 +99,8 @@ if (($_GET['download'] ?? '') === 'csv') {
             $where .= " AND (m.policy_number IS NULL OR m.policy_number = '')";
         }
         $sql = "
-            SELECT m.member_id, m.full_name, m.citizen_id, m.date_of_birth
+            SELECT m.member_id, m.full_name, m.citizen_id, m.date_of_birth,
+                   m.policy_number, m.coverage_start, m.coverage_end, m.remarks
             FROM insurance_members m
             WHERE $where
             ORDER BY m.full_name ASC
@@ -111,7 +113,8 @@ if (($_GET['download'] ?? '') === 'csv') {
             $where .= " AND (policy_number IS NULL OR policy_number = '')";
         }
         $sql = "
-            SELECT member_id, full_name, citizen_id, date_of_birth
+            SELECT member_id, full_name, citizen_id, date_of_birth,
+                   policy_number, coverage_start, coverage_end, remarks
             FROM insurance_members
             WHERE $where
             ORDER BY full_name ASC
@@ -131,15 +134,21 @@ if (($_GET['download'] ?? '') === 'csv') {
 
     echo "\xEF\xBB\xBF"; // UTF-8 BOM for Excel
 
-    // Insurance company template — strict 7 columns only
+    // Round-trip template — partner กรอก policy_number + วันที่ + หมายเหตุ
+    // ใน CSV ที่ download แล้ว upload กลับผ่าน import_policy.php ได้ทันที
+    // โดยไม่ต้องสลับ column · header ภาษาไทยตรงกับที่ import_policy รองรับ
     $headers = [
         'ลำดับ',
         'คำนำหน้า',
         'ชื่อ',
         'นามสกุล',
         'เลขบัตรประชาชน',
-        'รหัสนักศึกษา',
+        'รหัสนักศึกษา',      // = member_id (required ตอน upload)
         'วันเดือนปี เกิด',
+        'เลขกรมธรรม์',       // = policy_number (required ตอน upload · กรอกใหม่ตรงนี้)
+        'วันเริ่มต้นสิทธิ์',  // = coverage_start (optional · YYYY-MM-DD)
+        'วันสิ้นสุดสิทธิ์',   // = coverage_end (optional · YYYY-MM-DD)
+        'หมายเหตุ',          // = remarks (optional)
     ];
     $csvRow = function (array $cols): void {
         echo implode(',', array_map(fn($c) => '"' . str_replace('"', '""', (string)$c) . '"', $cols)) . "\r\n";
@@ -158,6 +167,10 @@ if (($_GET['download'] ?? '') === 'csv') {
             $row['citizen_id'] ?? '',
             $row['member_id'] ?? '',
             ipp_format_dob($row['date_of_birth'] ?? null),
+            $row['policy_number'] ?? '',
+            $row['coverage_start'] ?? '',
+            $row['coverage_end'] ?? '',
+            $row['remarks'] ?? '',
         ]);
     }
 
