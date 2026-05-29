@@ -2362,6 +2362,16 @@ window.gcToggleApplyEnabled = async function() {
     // ── init ────────────────────────────────────────────────────────
     gcLoadMembers(1);
     loadCharts();
+
+    // Auto-open member modal ถ้ามี ?open_member=N (deep-link จาก gold_card_pending)
+    try {
+        const params = new URLSearchParams(window.location.search);
+        const openId = parseInt(params.get('open_member') || '0', 10);
+        if (openId > 0 && typeof window.gcOpenMemberModal === 'function') {
+            // รอ DOM + member modal markup พร้อม · gcLoadMembers ใช้เวลาเล็กน้อย
+            setTimeout(() => window.gcOpenMemberModal(openId), 150);
+        }
+    } catch (e) { /* silent */ }
 })();
 </script>
 

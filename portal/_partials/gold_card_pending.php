@@ -511,12 +511,15 @@ $gcpCsrfToken = function_exists('get_csrf_token') ? get_csrf_token() : ($_SESSIO
         }
     };
 
-    // เปิด edit modal โดยตรง (modal ถูก relocate ไป body แล้ว — เปิดได้ทุก section)
+    // เปิด edit modal — modal markup + JS อยู่ใน section gold_card (คนละ partial)
+    // ถ้า user อยู่ใน section อื่น (เช่น gold_card_pending) → ส่งไป section gold_card
+    // พร้อม query string ?open_member=N เพื่อ auto-open modal ทันทีหลังโหลด
     window.gcpOpenDetail = function(id) {
         if (typeof window.gcOpenMemberModal === 'function') {
             window.gcOpenMemberModal(id);
         } else {
-            Swal.fire({icon:'error', title:'ไม่สามารถเปิดหน้าต่างแก้ไข', text:'กรุณา refresh หน้าและลองใหม่'});
+            // Modal ไม่ได้ load → ไป section gold_card แบบ auto-open
+            window.location.href = '?section=gold_card&open_member=' + encodeURIComponent(id);
         }
     };
 
