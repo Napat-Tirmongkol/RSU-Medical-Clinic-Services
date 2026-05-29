@@ -330,10 +330,18 @@ try {
     json_ok(['member_id' => $memberId, 'status' => 'submitted']);
 
 } catch (Throwable $e) {
-    $pdo->rollBack();
+    if ($pdo->inTransaction()) $pdo->rollBack();
     // Cleanup partial files
     if (isset($photoAbs) && is_file($photoAbs)) @unlink($photoAbs);
     if (isset($sigAbs) && is_file($sigAbs)) @unlink($sigAbs);
-    error_log('[ajax_gold_card_apply] ' . $e->getMessage());
-    json_err('ส่งใบสมัครไม่สำเร็จ กรุณาลองอีกครั้ง', 500);
+    // Verbose log to PHP error_log + sys_error_logs (ถ้ามี helper)
+    $detail = sprintf('[%s] %s in %s:%d',
+        $e::class, $e->getMessage(), basename($e->getFile()), $e->getLine());
+    error_log('[ajax_gold_card_apply] ' . $detail . "\n" . $e->getTraceAsString());
+    if (function_exists('log_error_to_db')) {
+        @log_error_to_db($detail, 'error', 'user/ajax_gold_card_apply.php', $e->getTraceAsString());
+    }
+    // Return user-friendly message + ส่ง debug info ถ้า session เป็น admin
+    $isAdminDebug = !empty($_SESSION['admin_role']);
+    json_err('ส่งใบสมัครไม่สำเร็จ' . ($isAdminDebug ? ' · ' . $detail : ' กรุณาลองอีกครั้ง'), 500);
 }
