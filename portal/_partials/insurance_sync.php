@@ -238,6 +238,103 @@ $insOver = kpi_override_status($pdo);
             <?php endif; ?>
         </div>
 
+        <!-- ─── Policy upload card — สำหรับคลินิกอัปโหลดเลขกรมธรรม์ตรงๆ ─── -->
+        <div class="xl:col-span-12 min-w-0 bg-gradient-to-br from-amber-50 to-orange-50 rounded-[2rem] border border-amber-200 shadow-sm p-6">
+            <div class="flex items-start gap-3 mb-4">
+                <div class="w-11 h-11 rounded-2xl bg-white shadow-sm flex items-center justify-center text-amber-600 text-lg shrink-0">
+                    <i class="fa-solid fa-file-import"></i>
+                </div>
+                <div class="flex-1">
+                    <h2 class="text-base font-black text-slate-800">อัปโหลดเลขกรมธรรม์ (Bulk)</h2>
+                    <p class="text-xs text-slate-500 font-bold mt-0.5">
+                        คลินิกได้รับ list จากบริษัทประกัน → อัปโหลด CSV ที่นี่ ระบบ update policy_number ของสมาชิกที่ตรง member_id ให้ทันที
+                    </p>
+                </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4 text-xs text-slate-600 font-bold">
+                <div class="bg-white/60 rounded-xl px-3 py-2.5 border border-amber-100">
+                    <i class="fa-solid fa-table-list text-amber-600 mr-1"></i> ต้องมี columns:
+                    <span class="text-slate-900">member_id</span>,
+                    <span class="text-slate-900">policy_number</span>
+                </div>
+                <div class="bg-white/60 rounded-xl px-3 py-2.5 border border-amber-100">
+                    <i class="fa-solid fa-calendar text-amber-600 mr-1"></i> Optional:
+                    coverage_start, coverage_end (YYYY-MM-DD)
+                </div>
+                <div class="bg-white/60 rounded-xl px-3 py-2.5 border border-amber-100">
+                    <i class="fa-solid fa-language text-amber-600 mr-1"></i> รองรับ:
+                    ชื่อไทย (รหัสนักศึกษา, เลขกรมธรรม์, ฯลฯ)
+                </div>
+            </div>
+            <form id="policyUploadForm" enctype="multipart/form-data" class="flex flex-wrap items-center gap-3">
+                <input type="file" id="policyCsvFile" name="csv_file" accept=".csv,text/csv"
+                       class="text-sm font-medium file:mr-3 file:px-4 file:py-2 file:rounded-lg file:border-0 file:bg-amber-600 file:text-white file:font-bold file:cursor-pointer hover:file:bg-amber-700 flex-1 min-w-[240px]">
+                <button type="submit" class="px-5 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold text-sm flex items-center gap-2 shrink-0">
+                    <i class="fa-solid fa-upload"></i> อัปโหลด
+                </button>
+            </form>
+            <div id="policyUploadResult" class="mt-3 hidden"></div>
+        </div>
+
+        <script>
+        (function(){
+            const form = document.getElementById('policyUploadForm');
+            const fileInput = document.getElementById('policyCsvFile');
+            const resultBox = document.getElementById('policyUploadResult');
+            if (!form) return;
+
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                if (!fileInput.files.length) {
+                    Swal.fire({icon:'warning', title:'กรุณาเลือกไฟล์ CSV ก่อน', timer:1500, showConfirmButton:false});
+                    return;
+                }
+                const fd = new FormData(form);
+                fd.append('csrf_token', '<?= htmlspecialchars($_SESSION['csrf_token'] ?? '') ?>');
+
+                const confirm = await Swal.fire({
+                    icon: 'question',
+                    title: 'ยืนยันอัปโหลดเลขกรมธรรม์?',
+                    text: 'ระบบจะอัปเดต policy_number ของสมาชิกที่ตรง member_id ในไฟล์ — ทับค่าเดิม',
+                    showCancelButton: true,
+                    confirmButtonText: 'อัปโหลด',
+                    cancelButtonText: 'ยกเลิก',
+                    confirmButtonColor: '#d97706',
+                });
+                if (!confirm.isConfirmed) return;
+
+                Swal.fire({title:'กำลังอัปโหลด...', didOpen:()=>Swal.showLoading(), allowOutsideClick:false});
+                try {
+                    const r = await fetch('ajax_insurance_policy_upload.php', {method:'POST', body: fd});
+                    const j = await r.json();
+                    if (!j.ok) {
+                        Swal.fire({icon:'error', title:'อัปโหลดไม่สำเร็จ', text: j.error || 'unknown'});
+                        return;
+                    }
+                    const s = j.stats || {};
+                    const errHtml = (s.errors || []).slice(0, 10).map(e =>
+                        `<li style="color:#dc2626">${e.replace(/</g,'&lt;')}</li>`
+                    ).join('');
+                    Swal.fire({
+                        icon: s.error_count > 0 ? 'warning' : 'success',
+                        title: 'เสร็จสิ้น',
+                        html: `<div style="text-align:left;font-size:13px;line-height:1.7">
+                            <div><b>อัปเดตสำเร็จ:</b> ${s.updated || 0} ราย</div>
+                            <div style="color:#94a3b8"><b>ข้าม (ไม่พบ member):</b> ${s.skipped_no_member || 0} ราย</div>
+                            <div style="color:#94a3b8"><b>ข้าม (ไม่มีการเปลี่ยน):</b> ${s.skipped_no_change || 0} ราย</div>
+                            ${s.error_count > 0 ? `<div style="margin-top:8px;color:#dc2626"><b>Errors (${s.error_count}):</b></div><ul style="font-size:11px;margin-top:4px">${errHtml}</ul>` : ''}
+                        </div>`,
+                        confirmButtonColor: '#059669',
+                        width: 560,
+                    });
+                    form.reset();
+                } catch(err) {
+                    Swal.fire({icon:'error', title:'เกิดข้อผิดพลาด', text: String(err)});
+                }
+            });
+        })();
+        </script>
+
 
         <?php /* Legacy upload UI removed — moved to /portal section=registry_upload (Combined Wizard). */ ?>
         <div class="hidden" aria-hidden="true">
