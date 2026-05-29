@@ -105,12 +105,42 @@ foreach ($headerCsv as $i => $h) {
     }
 }
 
-if (!in_array('member_id', $headerMap, true) || !in_array('policy_number', $headerMap, true)) {
+if (!in_array('member_id', $headerMap, true)) {
     echo json_encode([
         'ok' => false,
-        'error' => 'ไฟล์ต้องมี column "member_id" และ "policy_number" (หรือชื่อไทย "รหัสนักศึกษา" และ "เลขกรมธรรม์")',
+        'error' => 'ไฟล์ต้องมี column "member_id" (หรือชื่อไทย "รหัสนักศึกษา" / "รหัสบุคลากร")',
     ]);
     exit;
+}
+
+// ── Form fields (apply ไปทุกแถวในไฟล์) ──
+// ถ้า CSV มี column policy_number → ใช้ค่าใน CSV (per-row)
+// ถ้า CSV ไม่มี → ใช้ form field (uniform for whole batch)
+$formPolicy   = trim((string)($_POST['policy_number'] ?? ''));
+$formCovStart = trim((string)($_POST['coverage_start'] ?? ''));
+$formCovEnd   = trim((string)($_POST['coverage_end']   ?? ''));
+$formRemarks  = trim((string)($_POST['remarks']        ?? ''));
+
+$csvHasPolicy = in_array('policy_number', $headerMap, true);
+
+// ต้องมี policy_number จากที่ใดที่หนึ่ง (CSV หรือ form)
+if (!$csvHasPolicy && $formPolicy === '') {
+    echo json_encode([
+        'ok' => false,
+        'error' => 'กรุณากรอก "เลขกรมธรรม์" ในฟอร์ม หรือเพิ่ม column "policy_number" ใน CSV',
+    ]);
+    exit;
+}
+
+// Validate form date fields
+foreach (['form coverage_start' => $formCovStart, 'form coverage_end' => $formCovEnd] as $label => $val) {
+    if ($val !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $val)) {
+        echo json_encode([
+            'ok' => false,
+            'error' => "{$label} ในฟอร์มต้องเป็น YYYY-MM-DD (ได้รับ: {$val})",
+        ]);
+        exit;
+    }
 }
 
 $pdo = db();
@@ -152,23 +182,29 @@ try {
             if ($key) $row[$key] = trim((string)$val);
         }
         $memberId = $row['member_id'] ?? '';
-        $policyNo = $row['policy_number'] ?? '';
+        // policy_number: CSV row → form fallback
+        $policyNo = !empty($row['policy_number']) ? $row['policy_number'] : $formPolicy;
 
-        if ($memberId === '' || $policyNo === '') {
-            $errors[] = "บรรทัด " . ($ln + 2) . ": member_id หรือ policy_number ว่าง";
+        if ($memberId === '') {
+            $errors[] = "บรรทัด " . ($ln + 2) . ": member_id ว่าง";
+            continue;
+        }
+        if ($policyNo === '') {
+            $errors[] = "บรรทัด " . ($ln + 2) . ": policy_number ว่าง (ไม่มีทั้งใน CSV และฟอร์ม)";
             continue;
         }
 
-        // Validate date format ถ้ามี
-        $covStart = $row['coverage_start'] ?? '';
-        $covEnd   = $row['coverage_end']   ?? '';
+        // coverage_*: CSV row → form fallback
+        $covStart = !empty($row['coverage_start']) ? $row['coverage_start'] : $formCovStart;
+        $covEnd   = !empty($row['coverage_end'])   ? $row['coverage_end']   : $formCovEnd;
         foreach (['coverage_start' => $covStart, 'coverage_end' => $covEnd] as $field => $val) {
             if ($val !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $val)) {
                 $errors[] = "บรรทัด " . ($ln + 2) . ": {$field} ต้องเป็น YYYY-MM-DD (ได้รับ: {$val})";
                 continue 2;
             }
         }
-        $remarks = $row['remarks'] ?? '';
+        // remarks: CSV row → form fallback
+        $remarks = !empty($row['remarks']) ? $row['remarks'] : $formRemarks;
 
         $checkStmt->execute([':mid' => $memberId]);
         $existing = $checkStmt->fetch(PDO::FETCH_ASSOC);

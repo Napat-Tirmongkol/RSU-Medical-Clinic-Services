@@ -247,31 +247,71 @@ $insOver = kpi_override_status($pdo);
                 <div class="flex-1">
                     <h2 class="text-base font-black text-slate-800">อัปโหลดเลขกรมธรรม์ (Bulk)</h2>
                     <p class="text-xs text-slate-500 font-bold mt-0.5">
-                        คลินิกได้รับ list จากบริษัทประกัน → อัปโหลด CSV ที่นี่ ระบบ update policy_number ของสมาชิกที่ตรง member_id ให้ทันที
+                        ไฟล์ CSV ที่มี <span class="text-slate-900">member_id</span> (+ ชื่อ) · กรอกเลขกรมธรรม์ + ช่วงสิทธิ์ในฟอร์มด้านล่าง → ใช้กับทุกแถวในไฟล์
                     </p>
                 </div>
             </div>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4 text-xs text-slate-600 font-bold">
-                <div class="bg-white/60 rounded-xl px-3 py-2.5 border border-amber-100">
-                    <i class="fa-solid fa-table-list text-amber-600 mr-1"></i> ต้องมี columns:
-                    <span class="text-slate-900">member_id</span>,
-                    <span class="text-slate-900">policy_number</span>
+
+            <form id="policyUploadForm" enctype="multipart/form-data" class="space-y-3">
+                <!-- File picker -->
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 mb-1.5">
+                        <i class="fa-solid fa-file-csv text-amber-600 mr-1"></i> ไฟล์ CSV (ต้องมี column member_id)
+                    </label>
+                    <input type="file" id="policyCsvFile" name="csv_file" accept=".csv,text/csv" required
+                           class="w-full text-sm font-medium file:mr-3 file:px-4 file:py-2 file:rounded-lg file:border-0 file:bg-amber-600 file:text-white file:font-bold file:cursor-pointer hover:file:bg-amber-700">
                 </div>
-                <div class="bg-white/60 rounded-xl px-3 py-2.5 border border-amber-100">
-                    <i class="fa-solid fa-calendar text-amber-600 mr-1"></i> Optional:
-                    coverage_start, coverage_end (YYYY-MM-DD)
+
+                <!-- Policy + coverage form fields — ใช้กับทุกแถวในไฟล์ -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+                    <div class="md:col-span-2">
+                        <label class="block text-xs font-bold text-slate-600 mb-1">
+                            <i class="fa-solid fa-id-card text-amber-600 mr-1"></i>
+                            เลขกรมธรรม์ <span class="text-rose-500">*</span>
+                        </label>
+                        <input type="text" name="policy_number" id="policyNumber"
+                               class="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-100"
+                               placeholder="เช่น MTI-2026-001234" autocomplete="off">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 mb-1">
+                            <i class="fa-solid fa-calendar-day text-amber-600 mr-1"></i>
+                            วันเริ่มต้นสิทธิ์
+                        </label>
+                        <input type="date" name="coverage_start" id="coverageStart"
+                               class="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-100">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 mb-1">
+                            <i class="fa-solid fa-calendar-xmark text-amber-600 mr-1"></i>
+                            วันสิ้นสุดสิทธิ์
+                        </label>
+                        <input type="date" name="coverage_end" id="coverageEnd"
+                               class="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-100">
+                    </div>
                 </div>
-                <div class="bg-white/60 rounded-xl px-3 py-2.5 border border-amber-100">
-                    <i class="fa-solid fa-language text-amber-600 mr-1"></i> รองรับ:
-                    ชื่อไทย (รหัสนักศึกษา, เลขกรมธรรม์, ฯลฯ)
+
+                <!-- Remarks (optional) -->
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 mb-1">
+                        <i class="fa-solid fa-comment-dots text-amber-600 mr-1"></i>
+                        หมายเหตุ <span class="font-normal text-slate-400">(ไม่บังคับ)</span>
+                    </label>
+                    <input type="text" name="remarks" id="policyRemarks" maxlength="200"
+                           class="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-100"
+                           placeholder="เช่น ประกัน MTI ปีการศึกษา 2569" autocomplete="off">
                 </div>
-            </div>
-            <form id="policyUploadForm" enctype="multipart/form-data" class="flex flex-wrap items-center gap-3">
-                <input type="file" id="policyCsvFile" name="csv_file" accept=".csv,text/csv"
-                       class="text-sm font-medium file:mr-3 file:px-4 file:py-2 file:rounded-lg file:border-0 file:bg-amber-600 file:text-white file:font-bold file:cursor-pointer hover:file:bg-amber-700 flex-1 min-w-[240px]">
-                <button type="submit" class="px-5 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold text-sm flex items-center gap-2 shrink-0">
-                    <i class="fa-solid fa-upload"></i> อัปโหลด
-                </button>
+
+                <!-- Hint + submit -->
+                <div class="flex items-center justify-between gap-3 flex-wrap pt-1">
+                    <p class="text-[11px] text-slate-500">
+                        <i class="fa-solid fa-circle-info"></i>
+                        ถ้า CSV มี column policy_number อยู่แล้ว → ค่าใน CSV จะมีลำดับก่อนช่องในฟอร์ม
+                    </p>
+                    <button type="submit" class="px-5 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold text-sm flex items-center gap-2 shrink-0">
+                        <i class="fa-solid fa-upload"></i> อัปโหลด
+                    </button>
+                </div>
             </form>
             <div id="policyUploadResult" class="mt-3 hidden"></div>
         </div>
@@ -289,13 +329,32 @@ $insOver = kpi_override_status($pdo);
                     Swal.fire({icon:'warning', title:'กรุณาเลือกไฟล์ CSV ก่อน', timer:1500, showConfirmButton:false});
                     return;
                 }
+                const policy = document.getElementById('policyNumber').value.trim();
+                const covStart = document.getElementById('coverageStart').value;
+                const covEnd = document.getElementById('coverageEnd').value;
+                if (!policy) {
+                    Swal.fire({icon:'warning', title:'กรุณากรอกเลขกรมธรรม์', text:'หรือเพิ่ม column policy_number ใน CSV', timer:2200, showConfirmButton:false});
+                    document.getElementById('policyNumber').focus();
+                    return;
+                }
+                if (covStart && covEnd && covStart > covEnd) {
+                    Swal.fire({icon:'warning', title:'วันเริ่มต้นต้องไม่หลังวันสิ้นสุด'});
+                    return;
+                }
+
                 const fd = new FormData(form);
                 fd.append('csrf_token', '<?= htmlspecialchars($_SESSION['csrf_token'] ?? '') ?>');
 
+                const summaryHtml = `<div style="text-align:left;font-size:13px;line-height:1.8">
+                    <div><b>เลขกรมธรรม์:</b> ${policy.replace(/</g,'&lt;')}</div>
+                    ${covStart ? `<div><b>เริ่มต้น:</b> ${covStart}</div>` : ''}
+                    ${covEnd ? `<div><b>สิ้นสุด:</b> ${covEnd}</div>` : ''}
+                    <div style="color:#94a3b8;margin-top:6px"><i class="fa-solid fa-info-circle"></i> ใช้กับทุก member_id ในไฟล์</div>
+                </div>`;
                 const confirm = await Swal.fire({
                     icon: 'question',
-                    title: 'ยืนยันอัปโหลดเลขกรมธรรม์?',
-                    text: 'ระบบจะอัปเดต policy_number ของสมาชิกที่ตรง member_id ในไฟล์ — ทับค่าเดิม',
+                    title: 'ยืนยันอัปโหลด?',
+                    html: summaryHtml,
                     showCancelButton: true,
                     confirmButtonText: 'อัปโหลด',
                     cancelButtonText: 'ยกเลิก',
