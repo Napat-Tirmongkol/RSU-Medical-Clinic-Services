@@ -238,162 +238,6 @@ $insOver = kpi_override_status($pdo);
             <?php endif; ?>
         </div>
 
-        <!-- ─── Policy upload card — สำหรับคลินิกอัปโหลดเลขกรมธรรม์ตรงๆ ─── -->
-        <div class="xl:col-span-12 min-w-0 bg-gradient-to-br from-amber-50 to-orange-50 rounded-[2rem] border border-amber-200 shadow-sm p-6">
-            <div class="flex items-start gap-3 mb-4">
-                <div class="w-11 h-11 rounded-2xl bg-white shadow-sm flex items-center justify-center text-amber-600 text-lg shrink-0">
-                    <i class="fa-solid fa-file-import"></i>
-                </div>
-                <div class="flex-1">
-                    <h2 class="text-base font-black text-slate-800">อัปโหลดเลขกรมธรรม์ (Bulk)</h2>
-                    <p class="text-xs text-slate-500 font-bold mt-0.5">
-                        ไฟล์ CSV ที่มี <span class="text-slate-900">member_id</span> (+ ชื่อ) · กรอกเลขกรมธรรม์ + ช่วงสิทธิ์ในฟอร์มด้านล่าง → ใช้กับทุกแถวในไฟล์
-                    </p>
-                </div>
-            </div>
-
-            <form id="policyUploadForm" enctype="multipart/form-data" class="space-y-3">
-                <!-- File picker -->
-                <div>
-                    <label class="block text-xs font-bold text-slate-600 mb-1.5">
-                        <i class="fa-solid fa-file-csv text-amber-600 mr-1"></i> ไฟล์ CSV (ต้องมี column member_id)
-                    </label>
-                    <input type="file" id="policyCsvFile" name="csv_file" accept=".csv,text/csv" required
-                           class="w-full text-sm font-medium file:mr-3 file:px-4 file:py-2 file:rounded-lg file:border-0 file:bg-amber-600 file:text-white file:font-bold file:cursor-pointer hover:file:bg-amber-700">
-                </div>
-
-                <!-- Policy + coverage form fields — ใช้กับทุกแถวในไฟล์ -->
-                <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
-                    <div class="md:col-span-2">
-                        <label class="block text-xs font-bold text-slate-600 mb-1">
-                            <i class="fa-solid fa-id-card text-amber-600 mr-1"></i>
-                            เลขกรมธรรม์ <span class="text-rose-500">*</span>
-                        </label>
-                        <input type="text" name="policy_number" id="policyNumber"
-                               class="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-100"
-                               placeholder="เช่น MTI-2026-001234" autocomplete="off">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-bold text-slate-600 mb-1">
-                            <i class="fa-solid fa-calendar-day text-amber-600 mr-1"></i>
-                            วันเริ่มต้นสิทธิ์
-                        </label>
-                        <input type="date" name="coverage_start" id="coverageStart"
-                               class="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-100">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-bold text-slate-600 mb-1">
-                            <i class="fa-solid fa-calendar-xmark text-amber-600 mr-1"></i>
-                            วันสิ้นสุดสิทธิ์
-                        </label>
-                        <input type="date" name="coverage_end" id="coverageEnd"
-                               class="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-100">
-                    </div>
-                </div>
-
-                <!-- Remarks (optional) -->
-                <div>
-                    <label class="block text-xs font-bold text-slate-600 mb-1">
-                        <i class="fa-solid fa-comment-dots text-amber-600 mr-1"></i>
-                        หมายเหตุ <span class="font-normal text-slate-400">(ไม่บังคับ)</span>
-                    </label>
-                    <input type="text" name="remarks" id="policyRemarks" maxlength="200"
-                           class="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-100"
-                           placeholder="เช่น ประกัน MTI ปีการศึกษา 2569" autocomplete="off">
-                </div>
-
-                <!-- Hint + submit -->
-                <div class="flex items-center justify-between gap-3 flex-wrap pt-1">
-                    <p class="text-[11px] text-slate-500">
-                        <i class="fa-solid fa-circle-info"></i>
-                        ถ้า CSV มี column policy_number อยู่แล้ว → ค่าใน CSV จะมีลำดับก่อนช่องในฟอร์ม
-                    </p>
-                    <button type="submit" class="px-5 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold text-sm flex items-center gap-2 shrink-0">
-                        <i class="fa-solid fa-upload"></i> อัปโหลด
-                    </button>
-                </div>
-            </form>
-            <div id="policyUploadResult" class="mt-3 hidden"></div>
-        </div>
-
-        <script>
-        (function(){
-            const form = document.getElementById('policyUploadForm');
-            const fileInput = document.getElementById('policyCsvFile');
-            const resultBox = document.getElementById('policyUploadResult');
-            if (!form) return;
-
-            form.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                if (!fileInput.files.length) {
-                    Swal.fire({icon:'warning', title:'กรุณาเลือกไฟล์ CSV ก่อน', timer:1500, showConfirmButton:false});
-                    return;
-                }
-                const policy = document.getElementById('policyNumber').value.trim();
-                const covStart = document.getElementById('coverageStart').value;
-                const covEnd = document.getElementById('coverageEnd').value;
-                if (!policy) {
-                    Swal.fire({icon:'warning', title:'กรุณากรอกเลขกรมธรรม์', text:'หรือเพิ่ม column policy_number ใน CSV', timer:2200, showConfirmButton:false});
-                    document.getElementById('policyNumber').focus();
-                    return;
-                }
-                if (covStart && covEnd && covStart > covEnd) {
-                    Swal.fire({icon:'warning', title:'วันเริ่มต้นต้องไม่หลังวันสิ้นสุด'});
-                    return;
-                }
-
-                const fd = new FormData(form);
-                fd.append('csrf_token', '<?= htmlspecialchars($_SESSION['csrf_token'] ?? '') ?>');
-
-                const summaryHtml = `<div style="text-align:left;font-size:13px;line-height:1.8">
-                    <div><b>เลขกรมธรรม์:</b> ${policy.replace(/</g,'&lt;')}</div>
-                    ${covStart ? `<div><b>เริ่มต้น:</b> ${covStart}</div>` : ''}
-                    ${covEnd ? `<div><b>สิ้นสุด:</b> ${covEnd}</div>` : ''}
-                    <div style="color:#94a3b8;margin-top:6px"><i class="fa-solid fa-info-circle"></i> ใช้กับทุก member_id ในไฟล์</div>
-                </div>`;
-                const confirm = await Swal.fire({
-                    icon: 'question',
-                    title: 'ยืนยันอัปโหลด?',
-                    html: summaryHtml,
-                    showCancelButton: true,
-                    confirmButtonText: 'อัปโหลด',
-                    cancelButtonText: 'ยกเลิก',
-                    confirmButtonColor: '#d97706',
-                });
-                if (!confirm.isConfirmed) return;
-
-                Swal.fire({title:'กำลังอัปโหลด...', didOpen:()=>Swal.showLoading(), allowOutsideClick:false});
-                try {
-                    const r = await fetch('ajax_insurance_policy_upload.php', {method:'POST', body: fd});
-                    const j = await r.json();
-                    if (!j.ok) {
-                        Swal.fire({icon:'error', title:'อัปโหลดไม่สำเร็จ', text: j.error || 'unknown'});
-                        return;
-                    }
-                    const s = j.stats || {};
-                    const errHtml = (s.errors || []).slice(0, 10).map(e =>
-                        `<li style="color:#dc2626">${e.replace(/</g,'&lt;')}</li>`
-                    ).join('');
-                    Swal.fire({
-                        icon: s.error_count > 0 ? 'warning' : 'success',
-                        title: 'เสร็จสิ้น',
-                        html: `<div style="text-align:left;font-size:13px;line-height:1.7">
-                            <div><b>อัปเดตสำเร็จ:</b> ${s.updated || 0} ราย</div>
-                            <div style="color:#94a3b8"><b>ข้าม (ไม่พบ member):</b> ${s.skipped_no_member || 0} ราย</div>
-                            <div style="color:#94a3b8"><b>ข้าม (ไม่มีการเปลี่ยน):</b> ${s.skipped_no_change || 0} ราย</div>
-                            ${s.error_count > 0 ? `<div style="margin-top:8px;color:#dc2626"><b>Errors (${s.error_count}):</b></div><ul style="font-size:11px;margin-top:4px">${errHtml}</ul>` : ''}
-                        </div>`,
-                        confirmButtonColor: '#059669',
-                        width: 560,
-                    });
-                    form.reset();
-                } catch(err) {
-                    Swal.fire({icon:'error', title:'เกิดข้อผิดพลาด', text: String(err)});
-                }
-            });
-        })();
-        </script>
-
 
         <?php /* Legacy upload UI removed — moved to /portal section=registry_upload (Combined Wizard). */ ?>
         <div class="hidden" aria-hidden="true">
@@ -424,6 +268,163 @@ $insOver = kpi_override_status($pdo);
             <div id="insHistoryPager" class="px-8 py-4 flex justify-center border-t border-slate-100 hidden shrink-0"></div>
         </div>
     </div>
+
+    <!-- ─── Policy upload card — สำหรับคลินิกอัปโหลดเลขกรมธรรม์ตรงๆ ─── -->
+    <div class="min-w-0 bg-gradient-to-br from-amber-50 to-orange-50 rounded-[2rem] border border-amber-200 shadow-sm p-6">
+        <div class="flex items-start gap-3 mb-4">
+            <div class="w-11 h-11 rounded-2xl bg-white shadow-sm flex items-center justify-center text-amber-600 text-lg shrink-0">
+                <i class="fa-solid fa-file-import"></i>
+            </div>
+            <div class="flex-1">
+                <h2 class="text-base font-black text-slate-800">อัปโหลดเลขกรมธรรม์ (Bulk)</h2>
+                <p class="text-xs text-slate-500 font-bold mt-0.5">
+                    ไฟล์ CSV ที่มี <span class="text-slate-900">member_id</span> (+ ชื่อ) · กรอกเลขกรมธรรม์ + ช่วงสิทธิ์ในฟอร์มด้านล่าง → ใช้กับทุกแถวในไฟล์
+                </p>
+            </div>
+        </div>
+
+        <form id="policyUploadForm" enctype="multipart/form-data" class="space-y-3">
+            <!-- File picker -->
+            <div>
+                <label class="block text-xs font-bold text-slate-600 mb-1.5">
+                    <i class="fa-solid fa-file-csv text-amber-600 mr-1"></i> ไฟล์ CSV (ต้องมี column member_id)
+                </label>
+                <input type="file" id="policyCsvFile" name="csv_file" accept=".csv,text/csv" required
+                       class="w-full text-sm font-medium file:mr-3 file:px-4 file:py-2 file:rounded-lg file:border-0 file:bg-amber-600 file:text-white file:font-bold file:cursor-pointer hover:file:bg-amber-700">
+            </div>
+
+            <!-- Policy + coverage form fields — ใช้กับทุกแถวในไฟล์ -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+                <div class="md:col-span-2">
+                    <label class="block text-xs font-bold text-slate-600 mb-1">
+                        <i class="fa-solid fa-id-card text-amber-600 mr-1"></i>
+                        เลขกรมธรรม์ <span class="text-rose-500">*</span>
+                    </label>
+                    <input type="text" name="policy_number" id="policyNumber"
+                           class="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-100"
+                           placeholder="เช่น MTI-2026-001234" autocomplete="off">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 mb-1">
+                        <i class="fa-solid fa-calendar-day text-amber-600 mr-1"></i>
+                        วันเริ่มต้นสิทธิ์
+                    </label>
+                    <input type="date" name="coverage_start" id="coverageStart"
+                           class="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-100">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 mb-1">
+                        <i class="fa-solid fa-calendar-xmark text-amber-600 mr-1"></i>
+                        วันสิ้นสุดสิทธิ์
+                    </label>
+                    <input type="date" name="coverage_end" id="coverageEnd"
+                           class="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-100">
+                </div>
+            </div>
+
+            <!-- Remarks (optional) -->
+            <div>
+                <label class="block text-xs font-bold text-slate-600 mb-1">
+                    <i class="fa-solid fa-comment-dots text-amber-600 mr-1"></i>
+                    หมายเหตุ <span class="font-normal text-slate-400">(ไม่บังคับ)</span>
+                </label>
+                <input type="text" name="remarks" id="policyRemarks" maxlength="200"
+                       class="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-100"
+                       placeholder="เช่น ประกัน MTI ปีการศึกษา 2569" autocomplete="off">
+            </div>
+
+            <!-- Hint + submit -->
+            <div class="flex items-center justify-between gap-3 flex-wrap pt-1">
+                <p class="text-[11px] text-slate-500">
+                    <i class="fa-solid fa-circle-info"></i>
+                    ถ้า CSV มี column policy_number อยู่แล้ว → ค่าใน CSV จะมีลำดับก่อนช่องในฟอร์ม
+                </p>
+                <button type="submit" class="px-5 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold text-sm flex items-center gap-2 shrink-0">
+                    <i class="fa-solid fa-upload"></i> อัปโหลด
+                </button>
+            </div>
+        </form>
+        <div id="policyUploadResult" class="mt-3 hidden"></div>
+    </div>
+
+    <script>
+    (function(){
+        const form = document.getElementById('policyUploadForm');
+        const fileInput = document.getElementById('policyCsvFile');
+        const resultBox = document.getElementById('policyUploadResult');
+        if (!form) return;
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!fileInput.files.length) {
+                Swal.fire({icon:'warning', title:'กรุณาเลือกไฟล์ CSV ก่อน', timer:1500, showConfirmButton:false});
+                return;
+            }
+            const policy = document.getElementById('policyNumber').value.trim();
+            const covStart = document.getElementById('coverageStart').value;
+            const covEnd = document.getElementById('coverageEnd').value;
+            if (!policy) {
+                Swal.fire({icon:'warning', title:'กรุณากรอกเลขกรมธรรม์', text:'หรือเพิ่ม column policy_number ใน CSV', timer:2200, showConfirmButton:false});
+                document.getElementById('policyNumber').focus();
+                return;
+            }
+            if (covStart && covEnd && covStart > covEnd) {
+                Swal.fire({icon:'warning', title:'วันเริ่มต้นต้องไม่หลังวันสิ้นสุด'});
+                return;
+            }
+
+            const fd = new FormData(form);
+            fd.append('csrf_token', '<?= htmlspecialchars($_SESSION['csrf_token'] ?? '') ?>');
+
+            const summaryHtml = `<div style="text-align:left;font-size:13px;line-height:1.8">
+                <div><b>เลขกรมธรรม์:</b> ${policy.replace(/</g,'&lt;')}</div>
+                ${covStart ? `<div><b>เริ่มต้น:</b> ${covStart}</div>` : ''}
+                ${covEnd ? `<div><b>สิ้นสุด:</b> ${covEnd}</div>` : ''}
+                <div style="color:#94a3b8;margin-top:6px"><i class="fa-solid fa-info-circle"></i> ใช้กับทุก member_id ในไฟล์</div>
+            </div>`;
+            const confirm = await Swal.fire({
+                icon: 'question',
+                title: 'ยืนยันอัปโหลด?',
+                html: summaryHtml,
+                showCancelButton: true,
+                confirmButtonText: 'อัปโหลด',
+                cancelButtonText: 'ยกเลิก',
+                confirmButtonColor: '#d97706',
+            });
+            if (!confirm.isConfirmed) return;
+
+            Swal.fire({title:'กำลังอัปโหลด...', didOpen:()=>Swal.showLoading(), allowOutsideClick:false});
+            try {
+                const r = await fetch('ajax_insurance_policy_upload.php', {method:'POST', body: fd});
+                const j = await r.json();
+                if (!j.ok) {
+                    Swal.fire({icon:'error', title:'อัปโหลดไม่สำเร็จ', text: j.error || 'unknown'});
+                    return;
+                }
+                const s = j.stats || {};
+                const errHtml = (s.errors || []).slice(0, 10).map(e =>
+                    `<li style="color:#dc2626">${e.replace(/</g,'&lt;')}</li>`
+                ).join('');
+                Swal.fire({
+                    icon: s.error_count > 0 ? 'warning' : 'success',
+                    title: 'เสร็จสิ้น',
+                    html: `<div style="text-align:left;font-size:13px;line-height:1.7">
+                        <div><b>อัปเดตสำเร็จ:</b> ${s.updated || 0} ราย</div>
+                        <div style="color:#94a3b8"><b>ข้าม (ไม่พบ member):</b> ${s.skipped_no_member || 0} ราย</div>
+                        <div style="color:#94a3b8"><b>ข้าม (ไม่มีการเปลี่ยน):</b> ${s.skipped_no_change || 0} ราย</div>
+                        ${s.error_count > 0 ? `<div style="margin-top:8px;color:#dc2626"><b>Errors (${s.error_count}):</b></div><ul style="font-size:11px;margin-top:4px">${errHtml}</ul>` : ''}
+                    </div>`,
+                    confirmButtonColor: '#059669',
+                    width: 560,
+                });
+                form.reset();
+            } catch(err) {
+                Swal.fire({icon:'error', title:'เกิดข้อผิดพลาด', text: String(err)});
+            }
+        });
+    })();
+    </script>
+
 
     <!-- ── Member List (full width) ── -->
     <div class="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden">
