@@ -823,6 +823,7 @@
 
             const s = pv.summary || {};
             const skipLine = 'ข้าม: ผูกอยู่แล้ว ' + (s.already || 0) + ' · มี UID อื่นแล้ว ' + (s.has_other || 0)
+                + ' · user ยังไม่มี LINE ' + (s.no_line || 0)
                 + ' · UID ชนกับคนอื่น ' + (s.conflict || 0) + ' · UID ผิดรูปแบบ ' + (s.invalid || 0);
 
             if (!s.eligible) {
@@ -836,9 +837,13 @@
 
             const sample = (pv.sample || []).slice(0, 12).map(function (x) {
                 const pos = x.org_position ? ' <span style="color:#94a3b8;font-weight:600">· ' + govLineEsc(x.org_position) + '</span>' : '';
-                return '<div style="display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-bottom:1px solid #f1f5f9;font-size:12px">'
-                    + '<span style="font-weight:700;color:#0f172a">' + govLineEsc(x.staff_name) + pos + '</span>'
-                    + '<span style="color:#64748b;font-family:ui-monospace,monospace;white-space:nowrap">' + govLineEsc(x.line_masked) + '</span></div>';
+                const by = x.by_pid
+                    ? '<span title="จับคู่ด้วยรหัสบุคลากร — แม่นยำ" style="color:#16a34a;font-weight:800">✓ รหัส</span>'
+                    : '<span title="จับคู่ด้วยชื่อ — ควรตรวจทาน" style="color:#d97706;font-weight:800">ชื่อ</span>';
+                return '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:5px 0;border-bottom:1px solid #f1f5f9;font-size:12px">'
+                    + '<span style="font-weight:700;color:#0f172a;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + govLineEsc(x.staff_name) + pos + '</span>'
+                    + '<span style="display:flex;align-items:center;gap:8px;flex-shrink:0">' + by
+                    + '<span style="color:#64748b;font-family:ui-monospace,monospace;white-space:nowrap">' + govLineEsc(x.line_masked) + '</span></span></div>';
             }).join('');
             const more = (s.eligible > 12) ? '<div style="font-size:11px;color:#94a3b8;margin-top:6px">…และอีก ' + (s.eligible - 12) + ' คน</div>' : '';
 
@@ -869,8 +874,8 @@
                     html: '<div style="font-size:13px;color:#475569;text-align:left">เชื่อมใหม่ <b>' + (c.linked || 0) + '</b> คน'
                         + (c.failed ? ' · พลาด ' + c.failed : '')
                         + '<br><span style="font-size:11px;color:#94a3b8">ข้าม: ผูกอยู่แล้ว ' + (c.already || 0)
-                        + ' · มี UID อื่น ' + (c.has_other || 0) + ' · ชนกัน ' + (c.conflict || 0)
-                        + ' · ผิดรูปแบบ ' + (c.invalid || 0) + '</span></div>',
+                        + ' · มี UID อื่น ' + (c.has_other || 0) + ' · user ยังไม่มี LINE ' + (c.no_line || 0)
+                        + ' · ชนกัน ' + (c.conflict || 0) + ' · ผิดรูปแบบ ' + (c.invalid || 0) + '</span></div>',
                     confirmButtonColor: '#16a34a',
                 });
                 location.reload();
