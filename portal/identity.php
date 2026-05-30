@@ -1019,6 +1019,37 @@ layout_start(['section' => 'identity', 'title' => 'Identity & Governance']);
                                 </div>
                             </div>
 
+                            <!-- ─────── LINE Account Link (staff · edit เท่านั้น) ─────── -->
+                            <div id="govLineLinkSection" style="display:none;margin-top:24px;padding:18px;border:1.5px solid #bbf7d0;border-radius:16px;background:#f0fdf4">
+                                <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+                                    <i class="fa-brands fa-line" style="color:#06c755;font-size:18px"></i>
+                                    <span style="font-size:13px;font-weight:900;color:#166534">เชื่อมบัญชี LINE</span>
+                                </div>
+                                <p style="margin:0 0 14px;font-size:11px;color:#15803d;font-weight:600;line-height:1.6">
+                                    จับคู่กับผู้ใช้ใน <b>System Users</b> ที่ผูก LINE ไว้แล้ว (รายชื่อชุดเดียวกัน) — ระบบจะดึง LINE UID มาให้อัตโนมัติ ไม่ต้องพิมพ์เอง ·
+                                    <b>วิธีที่แนะนำ</b> คือให้ staff เชื่อมเองที่หน้าโปรไฟล์ผ่าน LINE Login (ได้ชื่อ/รูป/แจ้งเตือนครบ)
+                                </p>
+
+                                <!-- สถานะปัจจุบัน / ตัวที่เลือก (เติมโดย JS) -->
+                                <div id="govLineCurrent" style="margin-bottom:12px"></div>
+
+                                <!-- ค้นหาใน System Users -->
+                                <div style="display:flex;gap:8px;margin-bottom:10px">
+                                    <input type="text" id="govLineSearch" class="premium-input" autocomplete="off"
+                                           placeholder="ค้นหาชื่อ / รหัส / เลขบัตร ใน System Users"
+                                           onkeydown="if(event.key==='Enter'){event.preventDefault();govLineSearchUsers();}"
+                                           style="flex:1;height:38px;padding:0 12px;font-size:13px;font-weight:700">
+                                    <button type="button" onclick="govLineSearchUsers()"
+                                            style="height:38px;padding:0 16px;border-radius:10px;border:none;background:#06c755;color:#fff;font-weight:800;font-size:13px;cursor:pointer;white-space:nowrap">
+                                        <i class="fa-solid fa-magnifying-glass"></i> ค้นหา
+                                    </button>
+                                </div>
+                                <div id="govLineResults" style="max-height:240px;overflow-y:auto"></div>
+
+                                <!-- ค่า UID ที่จะถูกบันทึก (เติมโดย picker; ปล่อยว่าง = ยกเลิกการเชื่อมเมื่อบันทึก) -->
+                                <input type="hidden" name="linked_line_user_id" id="govLinkedLineUid" value="">
+                            </div>
+
                             <!-- Audit Justification -->
                             <div style="margin-top:30px;padding-top:20px;border-top:1.5px dashed #e2e8f0">
                                 <label style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:900;color:#dc2626;margin-bottom:8px">
