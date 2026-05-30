@@ -662,10 +662,12 @@
 
         // ════════════════════════════════════════════════════════════════════
         // LINE Link picker — จับคู่ Staff กับ System Users (sys_users) ที่ผูก LINE แล้ว
+        // อ้างอิง: (1) ผังองค์กร [staff_id→user_id] = แม่นสุด · (2) ค้นตามชื่อ = fallback
         // เติม #govLinkedLineUid → บันทึกผ่าน save_identity_gov (validate U+32hex +
         // dedupe + audit ฝั่ง server). อ่านอย่างเดียว ไม่เขียน DB จาก JS
         // ════════════════════════════════════════════════════════════════════
         let _govLineStaffId = 0;
+        let _govLineLastRows = [];
 
         function govLineEsc(s) {
             return String(s == null ? '' : s).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
@@ -674,19 +676,21 @@
             uid = String(uid || '');
             return uid.length > 8 ? uid.slice(0, 3) + '…' + uid.slice(-4) : uid;
         }
+        function govLineFindRow(uid) {
+            return _govLineLastRows.find(r => r.line_user_id === uid) || null;
+        }
 
         function govLineInit(name, staffId) {
             _govLineStaffId = parseInt(staffId) || 0;
+            _govLineLastRows = [];
             const results = document.getElementById('govLineResults');
             if (results) results.innerHTML = '';
-            govLineRenderCurrent();
-            const uid = (document.getElementById('govLinkedLineUid')?.value || '').trim();
             const search = document.getElementById('govLineSearch');
-            if (search) {
-                search.value = name || '';
-                // ยังไม่ผูก → auto-search ด้วยชื่อ staff เพื่อช่วย admin หาเร็ว
-                if (!uid && (name || '').trim().length >= 2) govLineSearchUsers();
-            }
+            if (search) search.value = name || '';
+            govLineRenderCurrent();
+            // ยังไม่ผูก → auto-search: ดึงจากผังองค์กร (staff_id) + ชื่อ มาเสนอ
+            const uid = (document.getElementById('govLinkedLineUid')?.value || '').trim();
+            if (!uid && _govLineStaffId > 0) govLineSearchUsers(true);
         }
 
         function govLineRenderCurrent() {
@@ -698,12 +702,20 @@
                     + '<i class="fa-regular fa-circle"></i> ยังไม่เชื่อมบัญชี LINE</div>';
                 return;
             }
+            const cur = govLineFindRow(uid);
+            let curWho = '<div style="font-size:11px;color:#64748b;font-weight:700;font-family:ui-monospace,monospace">' + govLineEsc(govLineMaskUid(uid)) + '</div>';
+            if (cur) {
+                const src = cur.source === 'org_chart'
+                    ? '<span style="color:#16a34a;font-weight:800"><i class="fa-solid fa-sitemap"></i> ผังองค์กร' + (cur.org_position ? ' · ' + govLineEsc(cur.org_position) : '') + '</span>'
+                    : '<span style="color:#64748b;font-weight:700">จับคู่ตามชื่อ</span>';
+                curWho = '<div style="font-size:11px;margin-top:1px;color:#475569;font-weight:700">' + govLineEsc(cur.full_name) + ' · ' + src + '</div>';
+            }
             box.innerHTML =
                 '<div style="display:flex;align-items:center;gap:10px;background:#fff;border:1.5px solid #bbf7d0;border-radius:12px;padding:10px 12px">'
                 + '<i class="fa-brands fa-line" style="color:#06c755;font-size:20px"></i>'
                 + '<div style="flex:1;min-width:0">'
                 + '<div style="font-size:12px;font-weight:900;color:#166534">เชื่อมแล้ว — กด "บันทึก" เพื่อยืนยัน</div>'
-                + '<div style="font-size:11px;color:#64748b;font-weight:700;font-family:ui-monospace,monospace">' + govLineEsc(govLineMaskUid(uid)) + '</div>'
+                + curWho
                 + '</div>'
                 + '<button type="button" onclick="govLineClear()" style="padding:6px 12px;border-radius:9px;border:1.5px solid #fecaca;background:#fff;color:#dc2626;font-weight:800;font-size:11px;cursor:pointer;white-space:nowrap">'
                 + '<i class="fa-solid fa-link-slash"></i> ยกเลิกการเชื่อม</button>'
@@ -716,11 +728,11 @@
             govLineRenderCurrent();
         }
 
-        async function govLineSearchUsers() {
+        async function govLineSearchUsers(auto) {
             const q = (document.getElementById('govLineSearch')?.value || '').trim();
             const results = document.getElementById('govLineResults');
             if (!results) return;
-            if (q.length < 2) {
+            if (q.length < 2 && _govLineStaffId <= 0) {
                 results.innerHTML = '<div style="padding:10px;font-size:12px;color:#94a3b8;font-weight:700">พิมพ์อย่างน้อย 2 ตัวอักษร</div>';
                 return;
             }
@@ -731,23 +743,35 @@
                 const data = await res.json();
                 if (data.status !== 'success') throw new Error(data.message || 'ค้นหาไม่สำเร็จ');
                 const rows = data.data || [];
+                _govLineLastRows = rows;
                 if (!rows.length) {
                     results.innerHTML = '<div style="padding:14px;text-align:center;font-size:12px;color:#94a3b8;font-weight:700">'
-                        + '<i class="fa-solid fa-user-slash"></i> ไม่พบผู้ใช้ที่ผูก LINE ตรงกับคำค้นนี้</div>';
+                        + '<i class="fa-solid fa-user-slash"></i> ไม่พบผู้ใช้ที่ผูก LINE — ลองค้นด้วยชื่ออื่น หรือให้ staff เชื่อมเองที่หน้าโปรไฟล์</div>';
                     return;
                 }
                 results.innerHTML = rows.map(govLineRow).join('');
+
+                // auto-pick: เปิดมาแล้วยังไม่ผูก + มี match จากผังองค์กรที่ใช้ได้ "ตัวเดียว" → เลือกให้เลย
+                if (auto) {
+                    const uidNow = (document.getElementById('govLinkedLineUid')?.value || '').trim();
+                    const orgPicks = rows.filter(r => r.source === 'org_chart' && r.valid_format && !r.linked_to);
+                    if (!uidNow && orgPicks.length === 1) govLinePick(orgPicks[0].line_user_id);
+                }
             } catch (e) {
                 results.innerHTML = '<div style="padding:12px;font-size:12px;color:#dc2626;font-weight:700">ผิดพลาด: ' + govLineEsc(e.message) + '</div>';
             }
         }
 
         function govLineRow(r) {
+            const isOrg = r.source === 'org_chart';
             const pic = r.picture_url
                 ? '<img src="' + govLineEsc(r.picture_url) + '" style="width:38px;height:38px;border-radius:50%;object-fit:cover;flex-shrink:0" onerror="this.style.display=\'none\'">'
                 : '<div style="width:38px;height:38px;border-radius:50%;background:#dcfce7;color:#06c755;display:flex;align-items:center;justify-content:center;flex-shrink:0"><i class="fa-brands fa-line"></i></div>';
             const sid = r.personnel_id ? '<span style="font-family:ui-monospace,monospace">' + govLineEsc(r.personnel_id) + '</span>' : '';
             const statusBadge = r.status ? '<span style="padding:1px 7px;border-radius:99px;background:#f1f5f9;color:#64748b;font-size:10px;font-weight:800">' + govLineEsc(r.status) + '</span>' : '';
+            const orgBadge = isOrg
+                ? '<span style="padding:1px 7px;border-radius:99px;background:#dcfce7;color:#15803d;font-size:10px;font-weight:900"><i class="fa-solid fa-sitemap"></i> ผังองค์กร' + (r.org_position ? ' · ' + govLineEsc(r.org_position) : '') + '</span>'
+                : '';
 
             let action;
             if (!r.valid_format) {
@@ -758,11 +782,11 @@
                 action = '<button type="button" onclick="govLinePick(\'' + govLineEsc(r.line_user_id) + '\')" style="padding:7px 14px;border-radius:9px;border:none;background:#06c755;color:#fff;font-weight:800;font-size:12px;cursor:pointer;white-space:nowrap">เลือก</button>';
             }
 
-            return '<div style="display:flex;align-items:center;gap:10px;padding:8px;border:1px solid #e2e8f0;border-radius:12px;margin-bottom:8px;background:#fff">'
+            return '<div style="display:flex;align-items:center;gap:10px;padding:8px;border:1.5px solid ' + (isOrg ? '#86efac' : '#e2e8f0') + ';border-radius:12px;margin-bottom:8px;background:' + (isOrg ? '#f0fdf4' : '#fff') + '">'
                 + pic
                 + '<div style="flex:1;min-width:0">'
                 + '<div style="font-size:13px;font-weight:800;color:#0f172a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + govLineEsc(r.full_name) + '</div>'
-                + '<div style="display:flex;align-items:center;gap:8px;margin-top:2px;font-size:11px;color:#64748b;font-weight:700">' + sid + statusBadge + '</div>'
+                + '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:3px;font-size:11px;color:#64748b;font-weight:700">' + orgBadge + sid + statusBadge + '</div>'
                 + '</div>'
                 + action
                 + '</div>';
@@ -772,8 +796,10 @@
             const el = document.getElementById('govLinkedLineUid');
             if (el) el.value = uid;
             govLineRenderCurrent();
+            const row = govLineFindRow(uid);
+            const tag = (row && row.source === 'org_chart') ? 'อ้างอิงจากผังองค์กร' : 'จับคู่ตามชื่อ';
             const results = document.getElementById('govLineResults');
-            if (results) results.innerHTML = '<div style="padding:8px 4px;font-size:11px;color:#16a34a;font-weight:800"><i class="fa-solid fa-circle-check"></i> เลือกแล้ว — กด "บันทึก" ด้านล่างเพื่อยืนยันการเชื่อม</div>';
+            if (results) results.innerHTML = '<div style="padding:8px 4px;font-size:11px;color:#16a34a;font-weight:800"><i class="fa-solid fa-circle-check"></i> เลือกแล้ว (' + tag + ') — กด "บันทึก" ด้านล่างเพื่อยืนยัน · หรือ "ค้นหา" เพื่อเปลี่ยน</div>';
         }
 
         /**

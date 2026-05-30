@@ -1026,8 +1026,9 @@ layout_start(['section' => 'identity', 'title' => 'Identity & Governance']);
                                     <span style="font-size:13px;font-weight:900;color:#166534">เชื่อมบัญชี LINE</span>
                                 </div>
                                 <p style="margin:0 0 14px;font-size:11px;color:#15803d;font-weight:600;line-height:1.6">
-                                    จับคู่กับผู้ใช้ใน <b>System Users</b> ที่ผูก LINE ไว้แล้ว (รายชื่อชุดเดียวกัน) — ระบบจะดึง LINE UID มาให้อัตโนมัติ ไม่ต้องพิมพ์เอง ·
-                                    <b>วิธีที่แนะนำ</b> คือให้ staff เชื่อมเองที่หน้าโปรไฟล์ผ่าน LINE Login (ได้ชื่อ/รูป/แจ้งเตือนครบ)
+                                    อ้างอิง <b>ผังองค์กร</b> ก่อน (staff ที่จับคู่กับ user ไว้แล้ว) → ดึง LINE UID มาให้อัตโนมัติ ·
+                                    ถ้ายังไม่ได้จัดผังองค์กร ระบบจะค้นจากชื่อใน <b>System Users</b> ที่ผูก LINE แทน ·
+                                    <b>วิธีที่แนะนำสุด</b> คือให้ staff เชื่อมเองที่หน้าโปรไฟล์ผ่าน LINE Login (ได้ชื่อ/รูป/แจ้งเตือนครบ)
                                 </p>
 
                                 <!-- สถานะปัจจุบัน / ตัวที่เลือก (เติมโดย JS) -->
