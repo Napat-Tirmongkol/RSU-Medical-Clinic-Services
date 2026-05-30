@@ -3,9 +3,9 @@
  * portal/ajax_identity_line_bulk.php
  * Superadmin-only — เชื่อม LINE ให้ staff "ทั้งหมด" โดยอ้างอิงผังองค์กร (sys_org_members)
  *
- * org chart เก็บแค่ user_id (เชื่อมโยงผู้ใช้) ไม่เก็บ staff_id จึง bridge:
- *   sys_org_members.user_id → sys_users u (line_user_id, student_personnel_id)
- *     → sys_staff s  ON s.username = u.student_personnel_id   (fallback: ชื่อตรงกัน)
+ * ผังองค์กรลิงก์สมาชิกกับ "บัญชี staff" (m.staff_id = badge "Linked") ส่วน LINE อยู่ที่ user
+ * จึง bridge:  m.staff_id → sys_staff s (username) → sys_users u (student_personnel_id = s.username)
+ *               → u.line_user_id
  * เชื่อมเฉพาะ staff ที่ "ยังไม่ผูก" (ไม่ทับของเดิม) + dedupe UID
  *
  * Actions (POST, CSRF, superadmin):
@@ -44,24 +44,21 @@ function bulk_mask(string $uid): string
 }
 
 try {
-    // ── 1) ผู้สมัครจากผังองค์กร: member ที่เชื่อมโยง user แล้ว → bridge ไป staff ──
-    //     ลำดับ: personnel-id match มาก่อน (แม่นสุด) แล้วค่อย name match
+    // ── 1) org members ที่ "Linked" (staff_id set) → bridge staff→user ด้วย personnel-id ──
+    //     LEFT JOIN user เพื่อให้ staff ที่ "ไม่มี user/LINE ตรง" ยังโผล่มา (จัดเป็น no_line)
     $sql = "SELECT s.id AS staff_id, s.full_name AS staff_name,
                    IFNULL(s.linked_line_user_id, '') AS cur_uid,
-                   u.id AS user_id, u.full_name AS user_name,
+                   IFNULL(u.full_name, '') AS user_name,
                    IFNULL(u.line_user_id, '') AS uid,
-                   COALESCE(p.title, '') AS org_position,
-                   (u.student_personnel_id IS NOT NULL AND u.student_personnel_id <> '' AND s.username = u.student_personnel_id) AS by_pid
+                   COALESCE(p.title, '') AS org_position
             FROM sys_org_members m
-            JOIN sys_users u ON u.id = m.user_id
-            JOIN sys_staff s ON (
-                    (u.student_personnel_id IS NOT NULL AND u.student_personnel_id <> '' AND s.username = u.student_personnel_id)
-                 OR (s.full_name = u.full_name)
-                 OR (s.full_name = m.full_name)
-            )
+            JOIN sys_staff s ON s.id = m.staff_id
+            LEFT JOIN sys_users u
+                   ON s.username <> '' AND u.student_personnel_id = s.username
+                  AND u.line_user_id IS NOT NULL AND u.line_user_id <> ''
             LEFT JOIN sys_org_positions p ON p.id = m.position_id
-            WHERE m.is_active = 1 AND m.user_id IS NOT NULL
-            ORDER BY by_pid DESC, s.full_name ASC, m.display_order ASC";
+            WHERE m.is_active = 1 AND m.staff_id IS NOT NULL
+            ORDER BY s.full_name ASC, m.display_order ASC";
     $rows = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
 
     // ── 2) UID ที่ถูกผูกอยู่แล้ว (uid → staff_id) สำหรับเช็ค conflict ──
@@ -72,7 +69,7 @@ try {
         $linkMap[(string)$l['linked_line_user_id']] = (int)$l['id'];
     }
 
-    // ── 3) classify (staff คนหนึ่ง = ตัดสินใจครั้งเดียว, personnel-id ชนะ) ──
+    // ── 3) classify (staff คนหนึ่ง = ตัดสินใจครั้งเดียว) ──
     $eligible = [];
     $sample   = [];
     $cnt = ['eligible' => 0, 'already' => 0, 'has_other' => 0, 'conflict' => 0, 'invalid' => 0, 'no_line' => 0];
@@ -82,23 +79,23 @@ try {
     foreach ($rows as $r) {
         $staffId = (int)$r['staff_id'];
         if (isset($seenStaff[$staffId])) continue;
+        $seenStaff[$staffId] = 1;
         $uid    = (string)$r['uid'];
         $curUid = (string)$r['cur_uid'];
 
-        if ($uid === '')                              { $cnt['no_line']++;  $seenStaff[$staffId] = 1; continue; } // user ผูกในผังแต่ไม่มี LINE
-        if (!preg_match('/^U[0-9a-f]{32}$/', $uid))   { $cnt['invalid']++;  $seenStaff[$staffId] = 1; continue; }
-        if ($curUid !== '' && $curUid === $uid)       { $cnt['already']++;  $seenStaff[$staffId] = 1; continue; }
+        if ($uid === '')                            { $cnt['no_line']++;  continue; } // ไม่มี user (ตามรหัส) ที่มี LINE
+        if (!preg_match('/^U[0-9a-f]{32}$/', $uid)) { $cnt['invalid']++;  continue; }
+        if ($curUid !== '' && $curUid === $uid)     { $cnt['already']++;  continue; }
 
         $ownerInDb    = $linkMap[$uid] ?? 0;
         $ownerInBatch = $claimed[$uid] ?? 0;
         if (($ownerInDb && $ownerInDb !== $staffId) || ($ownerInBatch && $ownerInBatch !== $staffId)) {
-            $cnt['conflict']++; $seenStaff[$staffId] = 1; continue;
+            $cnt['conflict']++; continue;
         }
-        if ($curUid !== '' && $curUid !== $uid)       { $cnt['has_other']++; $seenStaff[$staffId] = 1; continue; }
+        if ($curUid !== '' && $curUid !== $uid)     { $cnt['has_other']++; continue; }
 
         $eligible[] = ['staff_id' => $staffId, 'uid' => $uid];
         $claimed[$uid] = $staffId;
-        $seenStaff[$staffId] = 1;
         $cnt['eligible']++;
         if (count($sample) < 50) {
             $sample[] = [
@@ -106,7 +103,6 @@ try {
                 'user_name'    => (string)$r['user_name'],
                 'org_position' => (string)$r['org_position'],
                 'line_masked'  => bulk_mask($uid),
-                'by_pid'       => (int)$r['by_pid'] === 1,
             ];
         }
     }

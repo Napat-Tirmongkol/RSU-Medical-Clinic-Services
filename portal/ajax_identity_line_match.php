@@ -4,10 +4,9 @@
  * Superadmin-only — หา System Users (sys_users) ที่ผูก LINE ไว้แล้ว เพื่อจับคู่กับ Staff
  *
  * แหล่งอ้างอิง 2 ทาง (เรียงความมั่นใจ):
- *   1) ผังองค์กร (sys_org_members) — สมาชิกที่ "เชื่อมโยงผู้ใช้" (user_id) ไว้แล้ว
- *        bridge ไป staff ด้วย personnel-id:  sys_staff.username = sys_users.student_personnel_id
- *        (fallback: ชื่อตรงกัน) — แล้วดึง sys_users.line_user_id
- *      หมายเหตุ: org chart เก็บแค่ user_id (ไม่เก็บ staff_id) จึงต้อง bridge ผ่าน personnel-id/ชื่อ
+ *   1) ผังองค์กร — staff คนนี้เป็นสมาชิกผัง (m.staff_id = id) แล้ว bridge ไป user ด้วย
+ *        personnel-id:  sys_staff.username = sys_users.student_personnel_id  → line_user_id
+ *        (org chart ลิงก์ที่ staff_id; LINE อยู่ที่ user จึงต้อง bridge ผ่าน personnel-id)
  *   2) ค้นตามชื่อ/รหัส/เลขบัตร (fallback) — เผื่อยังไม่ได้จัดผังองค์กร
  *
  * อ่านอย่างเดียว (no write). บันทึกจริงผ่าน save_identity_gov (validate U+32hex + dedupe + audit)
@@ -55,31 +54,20 @@ try {
     $merged = [];   // user_id => row (+ _source, org_position)
     $order  = [];
 
-    // ── 1) ผังองค์กร — bridge ผ่าน personnel-id / ชื่อ (org chart เก็บแค่ user_id) ──
+    // ── 1) ผังองค์กร: staff คนนี้เป็นสมาชิกผัง → bridge ไป user ด้วย personnel-id ──
     if ($staffId > 0) {
         try {
-            $st = $pdo->prepare("SELECT username, full_name FROM sys_staff WHERE id = ? LIMIT 1");
-            $st->execute([$staffId]);
-            $staff = $st->fetch(PDO::FETCH_ASSOC) ?: ['username' => '', 'full_name' => ''];
-            $uname = trim((string)($staff['username'] ?? ''));
-            $fname = trim((string)($staff['full_name'] ?? ''));
-
             $orgSql = "SELECT u.id, u.full_name, u.student_personnel_id, u.status, {$picOrg}, u.line_user_id,
                               COALESCE(p.title, '') AS org_position
                        FROM sys_org_members m
-                       JOIN sys_users u ON u.id = m.user_id
+                       JOIN sys_staff s ON s.id = m.staff_id AND s.id = :sid
+                       JOIN sys_users u ON u.student_personnel_id = s.username AND s.username <> ''
                        LEFT JOIN sys_org_positions p ON p.id = m.position_id
-                       WHERE m.is_active = 1 AND m.user_id IS NOT NULL
+                       WHERE m.is_active = 1
                          AND u.line_user_id IS NOT NULL AND u.line_user_id <> ''
-                         AND ( (:uname <> '' AND u.student_personnel_id = :uname2)
-                               OR (:fname <> '' AND u.full_name = :fname2)
-                               OR (:fname3 <> '' AND m.full_name = :fname4) )
-                       ORDER BY (u.student_personnel_id = :uname3) DESC, m.display_order ASC";
+                       ORDER BY m.display_order ASC, m.id ASC";
             $os = $pdo->prepare($orgSql);
-            $os->execute([
-                ':uname' => $uname, ':uname2' => $uname, ':uname3' => $uname,
-                ':fname' => $fname, ':fname2' => $fname, ':fname3' => $fname, ':fname4' => $fname,
-            ]);
+            $os->execute([':sid' => $staffId]);
             foreach ($os->fetchAll(PDO::FETCH_ASSOC) as $r) {
                 $uid = (int)$r['id'];
                 if (isset($merged[$uid])) continue;

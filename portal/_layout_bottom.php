@@ -837,13 +837,9 @@
 
             const sample = (pv.sample || []).slice(0, 12).map(function (x) {
                 const pos = x.org_position ? ' <span style="color:#94a3b8;font-weight:600">· ' + govLineEsc(x.org_position) + '</span>' : '';
-                const by = x.by_pid
-                    ? '<span title="จับคู่ด้วยรหัสบุคลากร — แม่นยำ" style="color:#16a34a;font-weight:800">✓ รหัส</span>'
-                    : '<span title="จับคู่ด้วยชื่อ — ควรตรวจทาน" style="color:#d97706;font-weight:800">ชื่อ</span>';
                 return '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:5px 0;border-bottom:1px solid #f1f5f9;font-size:12px">'
                     + '<span style="font-weight:700;color:#0f172a;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + govLineEsc(x.staff_name) + pos + '</span>'
-                    + '<span style="display:flex;align-items:center;gap:8px;flex-shrink:0">' + by
-                    + '<span style="color:#64748b;font-family:ui-monospace,monospace;white-space:nowrap">' + govLineEsc(x.line_masked) + '</span></span></div>';
+                    + '<span style="color:#64748b;font-family:ui-monospace,monospace;white-space:nowrap;flex-shrink:0">' + govLineEsc(x.line_masked) + '</span></div>';
             }).join('');
             const more = (s.eligible > 12) ? '<div style="font-size:11px;color:#94a3b8;margin-top:6px">…และอีก ' + (s.eligible - 12) + ' คน</div>' : '';
 
