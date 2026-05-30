@@ -335,9 +335,13 @@ layout_start(['section' => 'identity', 'title' => 'Identity & Governance']);
                     <!-- PANEL: Staff Matrix -->
                     <div id="id-panel-staff" class="id-panel">
                         <div style="background:#fff;border-radius:20px;border:1.5px solid #e2e8f0;overflow:hidden">
-                            <div style="padding:18px 24px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;gap:8px">
+                            <div style="padding:18px 24px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
                                 <div style="width:4px;height:18px;background:#2563eb;border-radius:99px;flex-shrink:0"></div>
                                 <span style="font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.14em;color:#374151">Staff Permission Matrix</span>
+                                <button type="button" onclick="govLineBulkFromOrg()" title="เชื่อม LINE ให้ staff ที่ยังไม่ผูก โดยอ้างอิงผังองค์กร (จับคู่ user ที่ผูก LINE ไว้แล้ว) — ไม่ทับของเดิม"
+                                        style="margin-left:auto;display:inline-flex;align-items:center;gap:7px;padding:8px 14px;border-radius:10px;border:1.5px solid #86efac;background:#f0fdf4;color:#15803d;font-weight:800;font-size:12px;cursor:pointer;white-space:nowrap">
+                                    <i class="fa-brands fa-line" style="color:#06c755"></i> เชื่อม LINE ทั้งหมดจากผังองค์กร
+                                </button>
                             </div>
                             <!-- Matrix Legend -->
                             <div style="padding:12px 24px;background:#f8fafc;border-bottom:1px solid #f1f5f9;display:flex;flex-wrap:wrap;gap:20px;align-items:center">

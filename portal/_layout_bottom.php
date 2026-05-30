@@ -802,6 +802,83 @@
             if (results) results.innerHTML = '<div style="padding:8px 4px;font-size:11px;color:#16a34a;font-weight:800"><i class="fa-solid fa-circle-check"></i> เลือกแล้ว (' + tag + ') — กด "บันทึก" ด้านล่างเพื่อยืนยัน · หรือ "ค้นหา" เพื่อเปลี่ยน</div>';
         }
 
+        // ── Bulk: เชื่อม LINE ให้ staff ทั้งหมดจากผังองค์กร (preview → ยืนยัน → commit) ──
+        async function govLineBulkFromOrg() {
+            const csrf = document.querySelector('input[name="csrf_token"]')?.value || '';
+
+            // 1) preview (ไม่เขียน DB)
+            Swal.fire({ title: 'กำลังตรวจผังองค์กร...', html: 'ดึงรายชื่อ staff ที่จับคู่ user ไว้แล้ว', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+            let pv;
+            try {
+                const fd = new FormData();
+                fd.append('mode', 'preview');
+                fd.append('csrf_token', csrf);
+                const res = await fetch('ajax_identity_line_bulk.php', { method: 'POST', body: fd, credentials: 'same-origin' });
+                pv = await res.json();
+                if (pv.status !== 'success') throw new Error(pv.message || 'ตรวจสอบไม่สำเร็จ');
+            } catch (e) {
+                Swal.fire({ icon: 'error', title: 'ผิดพลาด', text: e.message });
+                return;
+            }
+
+            const s = pv.summary || {};
+            const skipLine = 'ข้าม: ผูกอยู่แล้ว ' + (s.already || 0) + ' · มี UID อื่นแล้ว ' + (s.has_other || 0)
+                + ' · UID ชนกับคนอื่น ' + (s.conflict || 0) + ' · UID ผิดรูปแบบ ' + (s.invalid || 0);
+
+            if (!s.eligible) {
+                Swal.fire({
+                    icon: 'info', title: 'ไม่มีรายการให้เชื่อม',
+                    html: '<div style="font-size:13px;color:#475569;text-align:left">ตรวจจากผังองค์กร ' + (s.staff_total || 0)
+                        + ' คน — ไม่มีใครที่ "ยังไม่ผูก + จับคู่ user ที่มี LINE" พอดี<br><br>' + skipLine + '</div>',
+                });
+                return;
+            }
+
+            const sample = (pv.sample || []).slice(0, 12).map(function (x) {
+                const pos = x.org_position ? ' <span style="color:#94a3b8;font-weight:600">· ' + govLineEsc(x.org_position) + '</span>' : '';
+                return '<div style="display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-bottom:1px solid #f1f5f9;font-size:12px">'
+                    + '<span style="font-weight:700;color:#0f172a">' + govLineEsc(x.staff_name) + pos + '</span>'
+                    + '<span style="color:#64748b;font-family:ui-monospace,monospace;white-space:nowrap">' + govLineEsc(x.line_masked) + '</span></div>';
+            }).join('');
+            const more = (s.eligible > 12) ? '<div style="font-size:11px;color:#94a3b8;margin-top:6px">…และอีก ' + (s.eligible - 12) + ' คน</div>' : '';
+
+            const conf = await Swal.fire({
+                title: 'เชื่อม LINE ' + s.eligible + ' คน?',
+                html: '<div style="text-align:left">'
+                    + '<div style="font-size:12px;color:#15803d;font-weight:800;margin-bottom:8px"><i class="fa-solid fa-sitemap"></i> อ้างอิงผังองค์กร · เชื่อมเฉพาะคนที่ยังไม่ผูก (ไม่ทับของเดิม)</div>'
+                    + '<div style="max-height:240px;overflow:auto;border:1px solid #e2e8f0;border-radius:10px;padding:8px 12px">' + sample + more + '</div>'
+                    + '<div style="font-size:11px;color:#94a3b8;margin-top:8px">' + skipLine + '</div></div>',
+                icon: 'question', showCancelButton: true, reverseButtons: true,
+                confirmButtonText: '<i class="fa-brands fa-line"></i> เชื่อม ' + s.eligible + ' คน',
+                cancelButtonText: 'ยกเลิก', confirmButtonColor: '#06c755',
+            });
+            if (!conf.isConfirmed) return;
+
+            // 2) commit (transaction ฝั่ง server)
+            Swal.fire({ title: 'กำลังเชื่อม...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+            try {
+                const fd = new FormData();
+                fd.append('mode', 'commit');
+                fd.append('csrf_token', csrf);
+                const res = await fetch('ajax_identity_line_bulk.php', { method: 'POST', body: fd, credentials: 'same-origin' });
+                const cm = await res.json();
+                if (cm.status !== 'success') throw new Error(cm.message || 'เชื่อมไม่สำเร็จ');
+                const c = cm.summary || {};
+                await Swal.fire({
+                    icon: 'success', title: 'เชื่อมสำเร็จ ' + (c.linked || 0) + ' คน',
+                    html: '<div style="font-size:13px;color:#475569;text-align:left">เชื่อมใหม่ <b>' + (c.linked || 0) + '</b> คน'
+                        + (c.failed ? ' · พลาด ' + c.failed : '')
+                        + '<br><span style="font-size:11px;color:#94a3b8">ข้าม: ผูกอยู่แล้ว ' + (c.already || 0)
+                        + ' · มี UID อื่น ' + (c.has_other || 0) + ' · ชนกัน ' + (c.conflict || 0)
+                        + ' · ผิดรูปแบบ ' + (c.invalid || 0) + '</span></div>',
+                    confirmButtonColor: '#16a34a',
+                });
+                location.reload();
+            } catch (e) {
+                Swal.fire({ icon: 'error', title: 'ผิดพลาด', text: e.message });
+            }
+        }
+
         /**
          * Position Modal — สร้าง / แก้ไข / ลบ ตำแหน่งงาน
          */
