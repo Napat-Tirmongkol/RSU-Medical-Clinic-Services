@@ -95,6 +95,8 @@ declare(strict_types=1);
                 <a href="#" onclick="cwDownloadTemplate('student'); return false;" style="color:#2563eb; font-weight:800; text-decoration:none;">นักศึกษา</a>
                 <span style="color:#cbd5e1;">·</span>
                 <a href="#" onclick="cwDownloadTemplate('resigned'); return false;" style="color:#dc2626; font-weight:800; text-decoration:none;">คนออก</a>
+                <span style="color:#cbd5e1;">·</span>
+                <a href="#" onclick="cwDownloadTemplate('insurance'); return false;" title="เทมเพลตรูปแบบระบบประกัน — รวมทุกฟิลด์ (ประเภท · ตำแหน่ง · วันคุ้มครอง · เลขกรมธรรม์) ใช้แทนไฟล์บุคลากร/นักศึกษาได้" style="color:#0891b2; font-weight:800; text-decoration:none;"><i class="fa-solid fa-shield-halved mr-1"></i>ระบบประกัน</a>
             </div>
 
             <div style="background:#fef9c3; border:1px solid #fde68a; border-radius:.65rem; padding:.75rem 1rem; font-size:.78rem; color:#78350f; margin-bottom:1rem; line-height:1.55;">
@@ -266,7 +268,10 @@ declare(strict_types=1);
                 <tr><td style="padding:.5rem .75rem;"><code>citizen_id</code></td><td><code>เลขบัตรประชาชน</code> / <code>หมายเลขประจำตัวประชาชน</code> / <code>เลขบัตร</code> / <code>ID_CARD_NO</code></td><td>13 หลัก รับรูปมี <code>-</code> คั่น เช่น <code>3-8206-00056-99-3</code></td></tr>
                 <tr><td style="padding:.5rem .75rem;"><code>full_name</code> หรือ<br>แยก 3 คอลัมน์</td><td><code>ชื่อพนักงาน</code> (รวม) <strong>หรือ</strong> <code>คำนำหน้า</code> + <code>ชื่อ</code> + <code>นามสกุล</code> / <code>สกุล</code></td><td>แยกหรือรวมก็ได้ — ระบบประกอบให้</td></tr>
                 <tr><td style="padding:.5rem .75rem;"><code>position</code></td><td><code>ตำแหน่ง</code> / <code>สังกัด</code> / <code>สาขา</code> / <code>คณะ</code> / <code>หน่วยงาน</code></td><td>ฟิลด์เดียวกันในระบบ</td></tr>
+                <tr><td style="padding:.5rem .75rem;"><code>member_status</code></td><td><code>ประเภท</code></td><td>เว้นว่างได้ — ระบบเติม "บุคลากร" / "นักศึกษา" ตามช่องที่อัพโหลด</td></tr>
                 <tr><td style="padding:.5rem .75rem;"><code>date_of_birth</code></td><td><code>วันเดือนปีเกิด</code> / <code>วันเดือนปี เกิด</code> / <code>วันเกิด</code> / <code>BIRTHDAY</code></td><td>รองรับ ค.ศ. M/D/Y, พ.ศ. d/m/y, ชื่อเดือนไทย เช่น <code>8 มีนาคม 1977</code>, <code>4/8/2505</code></td></tr>
+                <tr><td style="padding:.5rem .75rem;"><code>coverage_start</code> /<br><code>coverage_end</code></td><td><code>วันเริ่มคุ้มครอง</code> / <code>วันเริ่มต้น</code> · <code>วันสิ้นสุดคุ้มครอง</code> / <code>วันสิ้นสุด</code></td><td>เฉพาะเทมเพลต <strong>ระบบประกัน</strong> — รองรับ <code>YYYY-MM-DD</code> และรูปแบบ พ.ศ.</td></tr>
+                <tr><td style="padding:.5rem .75rem;"><code>policy_number</code></td><td><code>เลขกรมธรรม์</code></td><td>เฉพาะเทมเพลต <strong>ระบบประกัน</strong> — เว้นว่างได้ถ้ายังไม่มีเลขกรมธรรม์</td></tr>
                 <tr><td style="padding:.5rem .75rem;"><code>resign_date</code></td><td><code>วันที่ออก</code> / <code>วันลาออก</code> (เฉพาะไฟล์คนออก)</td><td>จะเขียนเป็น <code>coverage_end</code> + แปะหมายเหตุ "ออกเมื่อ ..."</td></tr>
             </tbody>
         </table>
@@ -457,6 +462,16 @@ body[data-theme='dark'] #section-registry_upload .border-cyan-200 { border-color
                     ['member_id', 'citizen_id', 'full_name', 'resign_date'],
                     ['1000099', '1234567890127', 'นายเก่า ลาออก', today],
                     ['1000100', '', 'นางสาวออก จากงาน', today],
+                ],
+            },
+            // รูปแบบ "ระบบประกัน" — รวมทุกฟิลด์ที่ insurance_members เก็บ
+            // (header เป็น alias ที่ตัว parser รู้จัก → ใช้แทนไฟล์บุคลากร/นักศึกษาได้เลย)
+            insurance: {
+                name: 'insurance_members_template.csv',
+                rows: [
+                    ['ลำดับ', 'รหัส', 'ประเภท', 'คำนำหน้า', 'ชื่อ', 'นามสกุล', 'เลขบัตรประชาชน', 'วันเดือนปีเกิด', 'ตำแหน่ง', 'วันเริ่มคุ้มครอง', 'วันสิ้นสุดคุ้มครอง', 'เลขกรมธรรม์', 'หมายเหตุ'],
+                    ['1', '2901035', 'บุคลากร', 'น.ส.', 'สุกัลยา', 'วงศ์ชมบุญ', '3130100300638', '4/8/2505', 'วิทยาลัยศิลปศาสตร์', '2025-06-01', '2026-05-31', 'POL-2569-00123', 'ต่ออายุกรมธรรม์'],
+                    ['2', '6300327', 'นักศึกษา', 'นาย', 'ภฤศธร', 'ภูวภิรมย์ขวัญ', '1100801395116', '6/11/2001', 'คณะแพทยศาสตร์', '2025-06-01', '2026-05-31', '', ''],
                 ],
             },
         };
