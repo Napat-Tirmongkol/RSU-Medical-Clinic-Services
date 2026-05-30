@@ -81,6 +81,22 @@ if ($student) {
     $recentLogs = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 }
 
+// payout history 6 เดือนล่าสุดของนักศึกษาคนนี้ (สำหรับโชว์สถานะค่าตอบแทน)
+$myPayouts = [];
+if ($student) {
+    $stmt = $pdo->prepare("SELECT id, period_ym, hours_paid, pay_rate, amount, status, approved_at, note
+        FROM sys_scholarship_payouts
+        WHERE student_id = :sid
+        ORDER BY period_ym DESC LIMIT 6");
+    $stmt->execute([':sid' => $student['id']]);
+    $myPayouts = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+}
+$curYm = date('Y-m', $now);
+$curPayout = null;
+foreach ($myPayouts as $p) {
+    if ($p['period_ym'] === $curYm) { $curPayout = $p; break; }
+}
+
 $csrfToken = get_csrf_token();
 
 function vh(?string $s): string { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
@@ -331,6 +347,69 @@ $displayName = trim((string)($user['full_name'] ?? ''))
                 <i class="fa-solid <?= $btnIcon ?> text-4xl block mb-2"></i>
                 <span class="text-base"><?= vh($btnLabel) ?></span>
             </button>
+
+            <!-- ─── Status Banner (clock-in/out ล่าสุดอยู่สถานะอะไร) ─── -->
+            <?php if ($lastLog):
+                $llAction = $lastLog['action'];
+                $llStatus = $lastLog['status'];
+                $llIsIn   = $llAction === 'clock_in';
+                $llTime   = date('H:i', strtotime((string)$lastLog['event_at']));
+                $llActText = $llIsIn ? 'เข้างาน' : 'ออกงาน';
+
+                // กำหนด style + ข้อความ + flag whether to show
+                $sb = null;
+                if ($llStatus === 'pending') {
+                    $sb = [
+                        'cls'  => 'from-amber-50 to-orange-50 border-amber-200',
+                        'icon' => 'fa-hourglass-half text-amber-600',
+                        'pill' => 'bg-amber-100 text-amber-800',
+                        'title'=> '⏳ ส่งคำขอ' . $llActText . 'แล้ว',
+                        'desc' => 'รอเจ้าหน้าที่อนุมัติ · ส่งเมื่อ ' . $llTime . ' น.',
+                        'badge'=> 'รออนุมัติ',
+                    ];
+                } elseif ($llStatus === 'approved' && $llIsIn) {
+                    // approved clock_in → กำลังทำงานอยู่ (ยังไม่ clock_out)
+                    $sb = [
+                        'cls'  => 'from-emerald-50 to-teal-50 border-emerald-200',
+                        'icon' => 'fa-play text-emerald-600',
+                        'pill' => 'bg-emerald-100 text-emerald-800',
+                        'title'=> '🟢 กำลังทำงาน',
+                        'desc' => 'เข้างานแล้วเมื่อ ' . $llTime . ' น. · กด "ออกงาน" เมื่อเสร็จ',
+                        'badge'=> 'อนุมัติแล้ว',
+                    ];
+                } elseif ($llStatus === 'rejected') {
+                    // ดู rejected ล่าสุดของวันนี้เท่านั้น (ไม่ขึ้นถ้านานเกินไป)
+                    $isToday = date('Y-m-d', strtotime((string)$lastLog['event_at'])) === $today;
+                    if ($isToday) {
+                        $sb = [
+                            'cls'  => 'from-rose-50 to-pink-50 border-rose-200',
+                            'icon' => 'fa-circle-xmark text-rose-600',
+                            'pill' => 'bg-rose-100 text-rose-800',
+                            'title'=> '❌ คำขอ' . $llActText . 'ถูกปฏิเสธ',
+                            'desc' => 'เมื่อ ' . $llTime . ' น.' . (!empty($lastLog['reject_reason']) ? ' · เหตุผล: ' . vh($lastLog['reject_reason']) : ''),
+                            'badge'=> 'ไม่อนุมัติ',
+                        ];
+                    }
+                }
+            ?>
+                <?php if ($sb !== null): ?>
+                    <div class="mt-4 mx-auto max-w-md bg-gradient-to-br <?= $sb['cls'] ?> border rounded-2xl p-4 text-left shadow-sm">
+                        <div class="flex items-start gap-3">
+                            <div class="w-9 h-9 rounded-xl bg-white flex items-center justify-center shrink-0 shadow-sm">
+                                <i class="fa-solid <?= $sb['icon'] ?>"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-center justify-between gap-2">
+                                    <p class="text-sm font-black text-slate-800"><?= $sb['title'] ?></p>
+                                    <span class="text-[10px] font-black px-2 py-0.5 rounded-full <?= $sb['pill'] ?> shrink-0"><?= $sb['badge'] ?></span>
+                                </div>
+                                <p class="text-[11px] text-slate-600 mt-0.5 leading-relaxed"><?= $sb['desc'] ?></p>
+                            </div>
+                        </div>
+                    </div>
+                <?php endif; ?>
+            <?php endif; ?>
+
             <p class="text-xs text-slate-400 mt-3 px-8">
                 <?php if (!empty($settings['gps_required'])): ?>
                     <i class="fa-solid fa-location-dot mr-1"></i>
@@ -391,6 +470,96 @@ $displayName = trim((string)($user['full_name'] ?? ''))
                 <div class="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
                     <div class="h-full bg-gradient-to-r from-emerald-400 to-emerald-600 rounded-full transition-all" style="width: <?= $pct ?>%"></div>
                 </div>
+            </div>
+        <?php endif; ?>
+
+        <!-- ─── สถานะค่าตอบแทน (payout status) ─── -->
+        <?php if (!empty($myPayouts) || ($curPayout === null && $splitMonth['paid'] > 0)): ?>
+            <?php
+            // helper render: badge + ข้อความสำหรับสถานะ
+            $stEmoji  = ['pending' => '⏳', 'approved' => '✅'];
+            $stText   = [
+                'pending'  => 'รอการเงินดำเนินการ',
+                'approved' => 'พร้อมรับเงิน — ฝ่ายการเงิน อาคาร 1',
+            ];
+            $stBgCard = [
+                'pending'  => 'bg-gradient-to-br from-amber-50 to-orange-50 border-amber-200',
+                'approved' => 'bg-gradient-to-br from-emerald-50 to-teal-50 border-emerald-300',
+            ];
+            $stText2  = ['pending' => 'text-amber-700', 'approved' => 'text-emerald-700'];
+            ?>
+            <div class="space-y-3">
+                <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 px-1">สถานะค่าตอบแทน</p>
+
+                <?php if ($curPayout !== null): ?>
+                    <?php
+                    $sStatus = $curPayout['status'];
+                    $sTitle  = scholarship_period_thai($curPayout['period_ym']);
+                    $sAmount = number_format((float)$curPayout['amount'], 2);
+                    $sHours  = number_format((float)$curPayout['hours_paid'], 2);
+                    ?>
+                    <div class="<?= $stBgCard[$sStatus] ?> border rounded-2xl p-4 shadow-sm">
+                        <div class="flex items-center justify-between gap-3 mb-2">
+                            <span class="text-xs font-black uppercase tracking-widest <?= $stText2[$sStatus] ?>">เดือนนี้</span>
+                            <span class="inline-flex items-center gap-1 text-[11px] font-black px-2.5 py-1 rounded-full bg-white/80 <?= $stText2[$sStatus] ?>">
+                                <?= $stEmoji[$sStatus] ?> <?= $stText[$sStatus] ?>
+                            </span>
+                        </div>
+                        <p class="text-base font-black text-slate-900"><?= vh($sTitle) ?></p>
+                        <div class="flex items-baseline justify-between mt-1">
+                            <span class="text-xs text-slate-600"><?= $sHours ?> ชั่วโมง</span>
+                            <span class="text-2xl font-black <?= $stText2[$sStatus] ?>"><?= $sAmount ?> <span class="text-xs">฿</span></span>
+                        </div>
+                        <?php if ($sStatus === 'approved'): ?>
+                            <div class="mt-2 pt-2 border-t border-emerald-200/60 text-[11px] text-emerald-700 font-bold">
+                                <i class="fa-solid fa-location-dot mr-1"></i>มารับเงินได้ที่ฝ่ายการเงิน อาคาร 1
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                <?php elseif ($splitMonth['paid'] > 0): ?>
+                    <!-- เดือนนี้ยังไม่ได้ generate (admin ยังไม่กดสรุปยอด) -->
+                    <div class="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+                        <div class="flex items-center justify-between gap-3 mb-1">
+                            <span class="text-xs font-black uppercase tracking-widest text-slate-500">เดือนนี้</span>
+                            <span class="text-[11px] font-bold px-2.5 py-1 rounded-full bg-white text-slate-500 border border-slate-200">
+                                ยังไม่สรุปยอด
+                            </span>
+                        </div>
+                        <p class="text-xs text-slate-500 leading-relaxed">เจ้าหน้าที่จะสรุปยอดค่าตอบแทนหลังสิ้นเดือน · ติดตามสถานะที่หน้านี้ได้</p>
+                    </div>
+                <?php endif; ?>
+
+                <?php
+                // เดือนย้อนหลัง (ไม่รวมเดือนนี้)
+                $pastPayouts = array_values(array_filter($myPayouts, fn($p) => $p['period_ym'] !== $curYm));
+                if (!empty($pastPayouts)):
+                ?>
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 divide-y divide-slate-100 overflow-hidden">
+                        <div class="px-4 py-2.5 bg-slate-50/70 text-[10px] font-black uppercase tracking-widest text-slate-500">
+                            ย้อนหลัง <?= count($pastPayouts) ?> เดือน
+                        </div>
+                        <?php foreach ($pastPayouts as $p): ?>
+                            <?php
+                            $pSt = $p['status'];
+                            $pTitle = scholarship_period_thai($p['period_ym']);
+                            $pAmount = number_format((float)$p['amount'], 2);
+                            $pStTxt = $pSt === 'approved' ? 'พร้อมรับ' : 'รอการเงิน';
+                            $pStCls = $pSt === 'approved'
+                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                : 'bg-amber-50 text-amber-700 border border-amber-200';
+                            ?>
+                            <div class="flex items-center justify-between gap-3 px-4 py-3">
+                                <div class="min-w-0">
+                                    <p class="text-sm font-black text-slate-800 truncate"><?= vh($pTitle) ?></p>
+                                    <p class="text-[11px] text-slate-500"><?= number_format((float)$p['hours_paid'], 1) ?> ชม. · <?= $pAmount ?> ฿</p>
+                                </div>
+                                <span class="shrink-0 inline-flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-full <?= $pStCls ?>">
+                                    <?= $stEmoji[$pSt] ?? '' ?> <?= $pStTxt ?>
+                                </span>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                <?php endif; ?>
             </div>
         <?php endif; ?>
 
@@ -576,31 +745,44 @@ if (btn && !btn.disabled) {
         const action = btn.dataset.action;
         const labelMap = { clock_in: 'เข้างาน', clock_out: 'ออกงาน' };
 
-        // ตอน clock_out → ให้นักศึกษาเลือกประเภทค่าตอบแทนของงานครั้งนี้
+        // ตอน clock_out → ให้นักศึกษาเลือกประเภท + กรอกงานที่ทำ
         // (เลื่อนการเลือกจาก clock_in มาที่ clock_out เพื่อให้ตัดสินใจหลังทำงานจริง)
         let pickedCompType = null;
+        let pickedTaskDescription = null;
         if (action === 'clock_out') {
             const r = await Swal.fire({
-                title: 'จบงาน — เลือกประเภท',
+                title: 'จบงาน — เลือกประเภท + ระบุงาน',
                 html: `
-                    <p style="font-size:.85rem;color:#64748b;margin-bottom:1rem">งานครั้งนี้คุณต้องการรับเป็น</p>
-                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem">
-                        <label style="cursor:pointer;border:2px solid #d1fae5;background:#ecfdf5;border-radius:1rem;padding:1rem;text-align:center;font-weight:800;color:#065f46" id="ct-hours-lbl">
+                    <p style="font-size:.85rem;color:#64748b;margin-bottom:.6rem">งานครั้งนี้คุณต้องการรับเป็น</p>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-bottom:1rem">
+                        <label style="cursor:pointer;border:2px solid #d1fae5;background:#ecfdf5;border-radius:1rem;padding:.85rem;text-align:center;font-weight:800;color:#065f46" id="ct-hours-lbl">
                             <input type="radio" name="ct" value="hours" checked style="display:none">
-                            <i class="fa-solid fa-graduation-cap" style="display:block;font-size:1.25rem;margin-bottom:.25rem"></i>
+                            <i class="fa-solid fa-graduation-cap" style="display:block;font-size:1.15rem;margin-bottom:.2rem"></i>
                             ส่งชั่วโมงทุน
                         </label>
-                        <label style="cursor:pointer;border:2px solid #fef3c7;background:#fffbeb;border-radius:1rem;padding:1rem;text-align:center;font-weight:800;color:#92400e" id="ct-paid-lbl">
+                        <label style="cursor:pointer;border:2px solid #fef3c7;background:#fffbeb;border-radius:1rem;padding:.85rem;text-align:center;font-weight:800;color:#92400e" id="ct-paid-lbl">
                             <input type="radio" name="ct" value="paid" style="display:none">
-                            <i class="fa-solid fa-coins" style="display:block;font-size:1.25rem;margin-bottom:.25rem"></i>
+                            <i class="fa-solid fa-coins" style="display:block;font-size:1.15rem;margin-bottom:.2rem"></i>
                             ค่าตอบแทน
                         </label>
                     </div>
+                    <p style="font-size:.85rem;color:#64748b;margin:.4rem 0 .35rem;text-align:left;font-weight:700">
+                        <i class="fa-solid fa-pen-to-square" style="color:#f43f5e;margin-right:.3rem"></i>
+                        งานที่ทำวันนี้ <span style="color:#f43f5e">*</span>
+                    </p>
+                    <textarea id="task-input" rows="3" maxlength="500"
+                        placeholder="เช่น ช่วยเอกสาร, ส่งใบนัด, ลงทะเบียนผู้ป่วยใหม่"
+                        style="width:100%;padding:.65rem .8rem;border:2px solid #e2e8f0;border-radius:.65rem;font-family:inherit;font-size:.9rem;resize:none;box-sizing:border-box;outline:none"
+                    ></textarea>
+                    <p style="font-size:.7rem;color:#94a3b8;margin:.3rem 0 0;text-align:left">
+                        จะถูกพิมพ์ในใบรายละเอียดการปฏิบัติงานสิ้นเดือน · เขียนสั้นๆ ได้
+                    </p>
                 `,
                 showCancelButton: true,
                 confirmButtonText: 'ถัดไป',
                 cancelButtonText: 'ยกเลิก',
                 confirmButtonColor: '#f43f5e',
+                focusConfirm: false,
                 didOpen: () => {
                     const sync = () => {
                         const v = document.querySelector('input[name="ct"]:checked').value;
@@ -614,11 +796,24 @@ if (btn && !btn.disabled) {
                         document.querySelector('input[name="ct"][value="paid"]').checked = true; sync();
                     });
                     sync();
+                    // Focus textarea ทันที — student พิมพ์ได้เลย
+                    setTimeout(() => document.getElementById('task-input').focus(), 100);
                 },
-                preConfirm: () => document.querySelector('input[name="ct"]:checked').value,
+                preConfirm: () => {
+                    const task = (document.getElementById('task-input').value || '').trim();
+                    if (task === '') {
+                        Swal.showValidationMessage('กรุณากรอก "งานที่ทำวันนี้" ก่อน');
+                        return false;
+                    }
+                    return {
+                        ct: document.querySelector('input[name="ct"]:checked').value,
+                        task: task,
+                    };
+                },
             });
             if (!r.isConfirmed) return;
-            pickedCompType = r.value;
+            pickedCompType = r.value.ct;
+            pickedTaskDescription = r.value.task;
         }
 
         // สรุปก่อนยืนยันออกงาน — โชว์เวลาเข้างาน + ระยะเวลา + ประเภท
@@ -669,12 +864,17 @@ if (btn && !btn.disabled) {
                             <span>เข้างานเมื่อ</span>
                             <span style="font-weight:800;color:#0f172a">${inDisplay}</span>
                         </div>
-                        <div style="display:flex;justify-content:space-between;font-size:.8rem;color:#64748b;margin-bottom:.75rem">
+                        <div style="display:flex;justify-content:space-between;font-size:.8rem;color:#64748b;margin-bottom:.5rem">
                             <span>ประเภท</span>
                             <span style="display:inline-flex;align-items:center;gap:.25rem;padding:.15rem .5rem;border-radius:99px;background:${ctBg};border:1px solid ${ctBorder};color:${ctColor};font-weight:800;font-size:.7rem">
                                 <i class="fa-solid ${ctIcon}"></i>${ctLabel}
                             </span>
                         </div>
+                        ${pickedTaskDescription ? `
+                        <div style="margin-bottom:.75rem;padding:.55rem .65rem;background:#fff;border:1px solid #e2e8f0;border-radius:.5rem">
+                            <div style="font-size:.7rem;color:#64748b;margin-bottom:.2rem">งานที่ทำวันนี้</div>
+                            <div style="font-size:.8rem;color:#0f172a;font-weight:600;line-height:1.5">${pickedTaskDescription.replace(/</g, '&lt;')}</div>
+                        </div>` : ''}
                         <div style="border-top:1px dashed #cbd5e1;padding-top:.75rem">
                             <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:.5rem">
                                 <span style="font-size:.75rem;color:#64748b">ทำงานจริง</span>
@@ -707,6 +907,7 @@ if (btn && !btn.disabled) {
             fd.append('csrf_token', CSRF_TOKEN);
             fd.append('action', action);
             if (pickedCompType) fd.append('comp_type', pickedCompType);
+            if (pickedTaskDescription) fd.append('task_description', pickedTaskDescription);
             if (lat != null) fd.append('lat', lat);
             if (lng != null) fd.append('lng', lng);
             fd.append('accuracy', accuracy || 0);
@@ -723,7 +924,9 @@ if (btn && !btn.disabled) {
                     });
                     location.reload();
                 } else {
-                    Swal.fire('ไม่สำเร็จ', j.error || 'เกิดข้อผิดพลาด', 'error');
+                    // Defensive: ถ้า backend ปฏิเสธเพราะ task_required (frontend ควรกรอง)
+                    const msg = j.message || j.error || 'เกิดข้อผิดพลาด';
+                    Swal.fire('ไม่สำเร็จ', msg, 'error');
                 }
             } catch (err) {
                 Swal.fire('Network Error', 'ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์', 'error');

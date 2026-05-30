@@ -154,16 +154,43 @@ if (!$sigInfo || ($sigInfo[2] ?? 0) !== IMAGETYPE_PNG || $sigInfo[0] > 4000 || $
 // ── Check duplicate application ──────────────────────────────────────────────
 try {
     $stmt = $pdo->prepare("
-        SELECT id, status FROM gold_card_members
+        SELECT id, status, linked_user_id FROM gold_card_members
         WHERE (linked_user_id = :uid OR citizen_id = :cid)
-          AND deleted_at IS NULL
         ORDER BY id DESC LIMIT 1
     ");
     $stmt->execute([':uid' => $userId, ':cid' => $citizenId]);
     $exist = $stmt->fetch();
-    if ($exist && in_array($exist['status'] ?? '', ['pending', 'submitted', 'approved', 'active'], true)) {
-        // Don't echo status — prevents account enumeration via probe.
-        json_err('คุณมีใบสมัครอยู่ในระบบแล้ว กรุณาตรวจสอบสถานะที่หน้าโปรไฟล์');
+    if ($exist) {
+        $existStatus     = (string)($exist['status'] ?? '');
+        $existLinkedUser = (int)($exist['linked_user_id'] ?? 0);
+        $existMemberId   = (int)$exist['id'];
+
+        // Active statuses → blocked · ผู้สมัครต้องไป follow-up หน้าโปรไฟล์
+        if (in_array($existStatus, ['pending', 'submitted', 'approved', 'active'], true)) {
+            // Don't echo status — prevents account enumeration via probe.
+            json_err('คุณมีใบสมัครอยู่ในระบบแล้ว กรุณาตรวจสอบสถานะที่หน้าโปรไฟล์');
+        }
+        // เลข citizen_id ลงทะเบียนกับ user อื่น → กัน account takeover / fraud
+        if ($existLinkedUser !== 0 && $existLinkedUser !== $userId) {
+            json_err('เลขบัตรประชาชนนี้ลงทะเบียนกับบัญชีอื่นแล้ว · กรุณาติดต่อเจ้าหน้าที่');
+        }
+        // เจ้าของเดิม + status ที่ไม่ active (rejected/cancelled/expired/deleted)
+        // → hard delete + cleanup เพื่อให้ UNIQUE constraint ไม่บล็อก resubmit
+        // (เก็บ history ไว้ใน gold_card_history table แทน — ไม่หาย audit trail)
+        $pdo->beginTransaction();
+        try {
+            // Move existing doc rows ออกก่อน (กัน FK constraint ถ้ามี)
+            $pdo->prepare("DELETE FROM gold_card_documents WHERE member_id = ?")
+                ->execute([$existMemberId]);
+            // ลบ member เก่า
+            $pdo->prepare("DELETE FROM gold_card_members WHERE id = ?")
+                ->execute([$existMemberId]);
+            $pdo->commit();
+            error_log("[gold_card_apply] resubmit: deleted old member_id={$existMemberId} (status={$existStatus}) for user_id={$userId}");
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            throw $e;
+        }
     }
 } catch (PDOException $e) {
     error_log('[ajax_gold_card_apply duplicate-check] ' . $e->getMessage());
@@ -330,10 +357,18 @@ try {
     json_ok(['member_id' => $memberId, 'status' => 'submitted']);
 
 } catch (Throwable $e) {
-    $pdo->rollBack();
+    if ($pdo->inTransaction()) $pdo->rollBack();
     // Cleanup partial files
     if (isset($photoAbs) && is_file($photoAbs)) @unlink($photoAbs);
     if (isset($sigAbs) && is_file($sigAbs)) @unlink($sigAbs);
-    error_log('[ajax_gold_card_apply] ' . $e->getMessage());
-    json_err('ส่งใบสมัครไม่สำเร็จ กรุณาลองอีกครั้ง', 500);
+    // Verbose log to PHP error_log + sys_error_logs (ถ้ามี helper)
+    $detail = sprintf('[%s] %s in %s:%d',
+        $e::class, $e->getMessage(), basename($e->getFile()), $e->getLine());
+    error_log('[ajax_gold_card_apply] ' . $detail . "\n" . $e->getTraceAsString());
+    if (function_exists('log_error_to_db')) {
+        @log_error_to_db($detail, 'error', 'user/ajax_gold_card_apply.php', $e->getTraceAsString());
+    }
+    // Return user-friendly message + ส่ง debug info ถ้า session เป็น admin
+    $isAdminDebug = !empty($_SESSION['admin_role']);
+    json_err('ส่งใบสมัครไม่สำเร็จ' . ($isAdminDebug ? ' · ' . $detail : ' กรุณาลองอีกครั้ง'), 500);
 }

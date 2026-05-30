@@ -360,12 +360,24 @@ $gcpCsrfToken = function_exists('get_csrf_token') ? get_csrf_token() : ($_SESSIO
         const docs = cur.documents || [];
         const hasApprovalDoc = docs.some(d => d.doc_type === 'approval');
 
-        // Step 2: For approved → ensure PDF attached (inline upload if missing)
+        // Step 2: For approved → ensure proof-of-transfer doc attached (inline upload if missing)
+        // เอกสารที่ต้องแนบ: PDF จากหน่วยงาน/รพ. ที่ออกให้หลังย้ายสิทธิ์เสร็จเรียบร้อย
         if (newStatus === 'approved' && !hasApprovalDoc) {
             const { value: file } = await Swal.fire({
                 icon: 'info',
-                title: 'แนบเอกสารอนุมัติก่อน',
-                html: `<b>${escapeHtml(name)}</b><br><span class="text-slate-500 text-sm">ต้องแนบ "เอกสารอนุมัติจากหน่วยงาน (PDF)" ก่อนกดอนุมัติ</span>`,
+                title: '📎 แนบเอกสารยืนยันการย้ายสิทธิ์',
+                html: `<div style="text-align:left;font-size:13.5px;line-height:1.7">
+                    <p><b>${escapeHtml(name)}</b></p>
+                    <div style="margin-top:10px;padding:10px 14px;background:#fef3c7;border-left:3px solid #f59e0b;border-radius:6px;color:#92400e;font-size:13px">
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+                        <b>ก่อนอนุมัติต้อง</b>แนบเอกสารหลักฐานหลังย้ายสิทธิ์เสร็จเรียบร้อย
+                    </div>
+                    <ul style="margin:10px 0 0 18px;padding:0;font-size:12.5px;color:#475569">
+                        <li>PDF จากหน่วยงาน/รพ. ที่ออกให้</li>
+                        <li>เป็นหลักฐานว่าย้ายสิทธิ์มาที่ RSU แล้วจริง</li>
+                        <li>ขนาดไฟล์ไม่เกิน 20MB</li>
+                    </ul>
+                </div>`,
                 input: 'file',
                 inputAttributes: { accept: 'application/pdf' },
                 showCancelButton: true,
@@ -511,12 +523,14 @@ $gcpCsrfToken = function_exists('get_csrf_token') ? get_csrf_token() : ($_SESSIO
         }
     };
 
-    // เปิด edit modal โดยตรง (modal ถูก relocate ไป body แล้ว — เปิดได้ทุก section)
+    // เปิด edit modal — modal markup + JS embed อยู่ในหน้านี้แล้ว (gcEmbedHost ด้านล่าง)
+    // gcOpenMemberModal global function ทำงานได้ทันทีโดยไม่ต้อง navigate
     window.gcpOpenDetail = function(id) {
         if (typeof window.gcOpenMemberModal === 'function') {
             window.gcOpenMemberModal(id);
         } else {
-            Swal.fire({icon:'error', title:'ไม่สามารถเปิดหน้าต่างแก้ไข', text:'กรุณา refresh หน้าและลองใหม่'});
+            // Fallback: ถ้า embed fail ด้วยเหตุผลใด → navigate ไป gold_card section
+            window.location.href = 'gold_card.php?open_member=' + encodeURIComponent(id);
         }
     };
 
@@ -531,3 +545,11 @@ $gcpCsrfToken = function_exists('get_csrf_token') ? get_csrf_token() : ($_SESSIO
     gcpLoadList(1);
 })();
 </script>
+
+<!-- ─── Embed gold_card partial เพื่อให้ modal + JS handlers พร้อมใช้ใน-page ─── -->
+<!-- Visual UI ของ gold_card section ถูกซ่อน · เก็บแค่ modal markup + global functions  -->
+<!-- (gcOpenMemberModal, gcSwitchTab, gcPost, gcTeleport, ฯลฯ)                          -->
+<!-- gcTeleport จะย้าย modal ไป body ตอนเปิด → render ปกติเมื่อ user คลิก edit          -->
+<div id="gcEmbedHost" style="display:none" aria-hidden="true">
+    <?php include __DIR__ . '/gold_card.php'; ?>
+</div>

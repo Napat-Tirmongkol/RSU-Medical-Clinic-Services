@@ -1164,6 +1164,12 @@
                             <td style="padding:14px 20px">
                                 <div style="font-size:12px;color:#374151;font-weight:600">${u.phone_number || '—'}</div>
                                 <div style="font-size:11px;color:#94a3b8;margin-top:2px">${u.email || '—'}</div>
+                                ${(u.line_user_id_new || u.line_user_id) ? `
+                                    <div style="font-size:10px;color:#06c755;margin-top:3px;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;display:flex;align-items:center;gap:4px"
+                                         title="LINE User ID${u.line_user_id_new ? ' (Provider ใหม่)' : ' (Provider เดิม)'}">
+                                        <i class="fa-brands fa-line"></i>
+                                        <span>${u.line_user_id_new || u.line_user_id}</span>
+                                    </div>` : ''}
                             </td>
                             <td style="padding:14px 20px">
                                 <div style="font-size:12px;font-weight:700;color:#374151">${dateStr}</div>
@@ -1171,6 +1177,14 @@
                             </td>
                             <td style="padding:14px 20px;text-align:right">
                                 <div style="display:flex;gap:6px;justify-content:flex-end">
+                                    ${u.has_line ? `
+                                    <button onclick="idTestLine(${u.id}, '${(u.full_name || '').replace(/'/g, '&apos;')}')"
+                                        style="width:32px;height:32px;border-radius:8px;border:1px solid #d1fae5;background:#f0fdf4;color:#06c755;cursor:pointer;transition:all .15s"
+                                        onmouseover="this.style.background='#dcfce7'"
+                                        onmouseout="this.style.background='#f0fdf4'"
+                                        title="ทดสอบส่งข้อความ LINE">
+                                        <i class="fa-brands fa-line" style="font-size:13px"></i>
+                                    </button>` : ''}
                                     <button onclick='idOpenView(${JSON.stringify(u).replace(/'/g, "&apos;")})'
                                         style="width:32px;height:32px;border-radius:8px;border:1px solid #e2e8f0;background:#fff;color:#64748b;cursor:pointer;transition:all .15s"
                                         title="ดูข้อมูล">
@@ -1194,6 +1208,47 @@
                 }).join('');
                 tbody.innerHTML = html;
             }
+
+            // ── Test LINE push (ปุ่มสีเขียว LINE ในตาราง) ──
+            window.idTestLine = async function(userId, fullName) {
+                const conf = await Swal.fire({
+                    icon: 'question',
+                    title: 'ทดสอบส่งข้อความ LINE',
+                    html: `ส่งข้อความทดสอบไปยัง <b>${fullName || 'user นี้'}</b>?<br><span style="font-size:12px;color:#64748b">ข้อความจะมี [ทดสอบ] นำหน้า · ผู้รับจะรู้ว่าเป็น test</span>`,
+                    showCancelButton: true,
+                    confirmButtonText: 'ส่งเลย',
+                    cancelButtonText: 'ยกเลิก',
+                    confirmButtonColor: '#06c755',
+                });
+                if (!conf.isConfirmed) return;
+
+                Swal.fire({ title: 'กำลังส่ง...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
+
+                try {
+                    const fd = new FormData();
+                    fd.append('csrf_token', portal_CSRF);
+                    fd.append('user_id', String(userId));
+                    const r = await fetch('ajax_identity_test_line.php', { method: 'POST', body: fd });
+                    const j = await r.json();
+                    if (j.ok) {
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'ส่งสำเร็จ',
+                            html: `<div style="text-align:left;font-size:14px"><div>✓ ส่งไปยัง <code style="font-family:ui-monospace;background:#f1f5f9;padding:1px 5px;border-radius:4px">${j.target_masked || '—'}</code></div><div style="margin-top:6px;font-size:12px;color:#64748b">UID source: ${j.source === 'new' ? 'Provider ใหม่' : 'Provider เดิม'}</div></div>`,
+                            confirmButtonColor: '#059669',
+                        });
+                    } else {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'ส่งไม่สำเร็จ',
+                            html: `<div style="text-align:left;font-size:14px">${(j.error || 'unknown').replace(/</g, '&lt;')}${j.target_masked ? `<div style="margin-top:6px;font-size:12px;color:#64748b">UID: <code>${j.target_masked}</code> (${j.source === 'new' ? 'ใหม่' : 'เดิม'})</div>` : ''}</div>`,
+                            confirmButtonColor: '#dc2626',
+                        });
+                    }
+                } catch(e) {
+                    Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: String(e) });
+                }
+            };
 
             function renderPagination(p) {
                 var info = document.getElementById('id-page-info');

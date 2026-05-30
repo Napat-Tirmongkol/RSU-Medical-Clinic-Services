@@ -1178,7 +1178,7 @@ if ($selectedUser) {
       </div>
       <div class="sum-row">
         <div class="k">ลายเซ็น</div>
-        <div class="v ok" id="sumSignature">บันทึกแล้ว · SHA256: <span id="sumHash" style="font-family:monospace;font-size:11px;color:#64748b;">—</span></div>
+        <div class="v ok" id="sumSignature">บันทึกแล้ว · SHA256: <span id="sumHash" style="font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:10.5px;color:#64748b;word-break:break-all;display:inline-block;max-width:340px;line-height:1.35;vertical-align:middle">—</span></div>
       </div>
       <div class="sum-row">
         <div class="k">เวลาที่เซ็น</div>
@@ -1204,11 +1204,77 @@ if ($selectedUser) {
     <button class="btn btn-ghost" id="btnBack" onclick="goStep(-1)">
       <i class="fa-solid fa-arrow-left"></i> ย้อนกลับ
     </button>
+    <button class="btn btn-ghost" id="btnPreviewDoc" onclick="openFinalDocument()" style="display:none">
+      <i class="fa-solid fa-file-pdf"></i> ดูเอกสารสำเร็จ
+    </button>
     <button class="btn btn-primary btn-flex" id="btnNext" onclick="goStep(1)">
       ถัดไป <i class="fa-solid fa-arrow-right"></i>
     </button>
   </div>
 </div>
+
+<!-- ============= FINAL DOCUMENT MODAL (Preview ของไฟล์เอกสารสำเร็จ) ============= -->
+<div id="finalDocModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.65);backdrop-filter:blur(6px);z-index:9000;overflow-y:auto;padding:24px 16px">
+  <div style="max-width:780px;margin:0 auto">
+    <!-- Toolbar -->
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;background:#fff;padding:12px 18px;border-radius:12px 12px 0 0;border-bottom:1px solid #e2e8f0;flex-wrap:wrap" class="no-print">
+      <div style="display:flex;align-items:center;gap:10px">
+        <i class="fa-solid fa-file-pdf" style="color:#dc2626"></i>
+        <strong style="font-size:15px;color:#0f172a">เอกสารยินยอมรับการฉีดวัคซีน — ฉบับสำเร็จ</strong>
+        <span style="font-size:11px;background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:99px;font-weight:700">PREVIEW</span>
+      </div>
+      <div style="display:flex;gap:6px">
+        <button onclick="window.print()" style="padding:7px 14px;border-radius:8px;border:1.5px solid #e2e8f0;background:#fff;color:#0f172a;font-size:13px;font-weight:700;cursor:pointer"><i class="fa-solid fa-print" style="margin-right:5px"></i>พิมพ์</button>
+        <button onclick="closeFinalDocument()" style="padding:7px 14px;border-radius:8px;border:1.5px solid #e2e8f0;background:#fff;color:#64748b;font-size:13px;font-weight:700;cursor:pointer"><i class="fa-solid fa-xmark" style="margin-right:5px"></i>ปิด</button>
+      </div>
+    </div>
+
+    <!-- A4 Document -->
+    <div id="finalDocContent" class="final-doc"></div>
+  </div>
+</div>
+
+<style>
+.final-doc {
+  background:#fff; padding:36px 44px; min-height:1000px;
+  font-family:'Sarabun','Sukhumvit Set',-apple-system,sans-serif;
+  font-size:13px; color:#0f172a; line-height:1.55;
+  border-radius:0 0 12px 12px;
+}
+.final-doc h1 { font-size:18px; font-weight:800; text-align:center; margin:0 0 4px; color:#0f172a; }
+.final-doc .doc-sub { text-align:center; color:#64748b; font-size:12px; margin-bottom:24px }
+.final-doc .doc-section { border-top:1.5px solid #e2e8f0; padding-top:14px; margin-top:18px }
+.final-doc .doc-section:first-of-type { border-top:0; padding-top:0 }
+.final-doc .doc-section-title { font-size:13px; font-weight:800; color:#1e293b; margin-bottom:8px; }
+.final-doc table { width:100%; border-collapse:collapse; }
+.final-doc table.kv td { padding:5px 8px; vertical-align:top; font-size:12.5px }
+.final-doc table.kv td:first-child { color:#64748b; width:32%; }
+.final-doc table.kv td:last-child  { color:#0f172a; font-weight:600; }
+.final-doc .q-list-doc { margin:0; padding:0; list-style:none; }
+.final-doc .q-list-doc li { padding:6px 0; border-bottom:1px dashed #e2e8f0; display:flex; gap:10px; align-items:flex-start; font-size:12.5px }
+.final-doc .q-list-doc li:last-child { border-bottom:0 }
+.final-doc .q-num { font-weight:700; color:#64748b; min-width:30px }
+.final-doc .q-ans { margin-left:auto; font-weight:700; white-space:nowrap }
+.final-doc .q-ans.no  { color:#16a34a; }
+.final-doc .q-ans.yes { color:#dc2626; }
+.final-doc .decision-box { padding:14px 18px; border-radius:8px; text-align:center; font-weight:800; font-size:15px; }
+.final-doc .decision-box.consent { background:#dcfce7; color:#14532d; border:1.5px solid #86efac; }
+.final-doc .decision-box.decline { background:#fee2e2; color:#7f1d1d; border:1.5px solid #fca5a5; }
+.final-doc .sig-display { display:flex; gap:18px; align-items:flex-end; margin-top:10px }
+.final-doc .sig-display .sig-box { flex:1; border-bottom:1.5px solid #94a3b8; padding-bottom:4px; min-height:80px; display:flex; align-items:flex-end; justify-content:center }
+.final-doc .sig-display .sig-box img { max-height:75px; max-width:100%; }
+.final-doc .sig-caption { text-align:center; font-size:11px; color:#64748b; margin-top:4px }
+.final-doc .meta-row { display:flex; gap:18px; font-size:11px; color:#64748b; margin-top:18px; flex-wrap:wrap; padding-top:12px; border-top:1px solid #e2e8f0 }
+.final-doc .meta-row b { color:#0f172a; font-weight:700 }
+.final-doc .doc-hash { font-family:ui-monospace,SFMono-Regular,Consolas,monospace; font-size:10px; word-break:break-all }
+@media print {
+  body * { visibility:hidden }
+  #finalDocModal, #finalDocModal * { visibility:visible }
+  #finalDocModal { position:absolute; inset:0; background:#fff !important; backdrop-filter:none !important; padding:0 !important; overflow:visible !important }
+  #finalDocModal .no-print { display:none !important }
+  .final-doc { border-radius:0; padding:20mm 18mm; min-height:auto; box-shadow:none }
+}
+</style>
 
 <script>
 /* ===== Step navigation ===== */
@@ -1239,11 +1305,22 @@ function goStep(delta) {
   currentStep = next;
   updateActionBar();
   if (next === 5) renderSummary();
+  // Resize canvas เมื่อเข้า step 4 (ครั้งแรก canvas ยังโดน display:none
+  // อยู่ตอน init → getBoundingClientRect() คืน 0×0 → buffer ไม่พร้อม)
+  // ใช้ requestAnimationFrame กัน race กับ CSS transition / display change
+  if (next === 4) {
+    requestAnimationFrame(() => {
+      pads.patient?.resize?.() && redraw('patient');
+      pads.witness?.resize?.() && redraw('witness');
+    });
+  }
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 function updateActionBar() {
   document.getElementById('btnBack').style.visibility = currentStep === 1 ? 'hidden' : 'visible';
+  const previewBtn = document.getElementById('btnPreviewDoc');
+  if (previewBtn) previewBtn.style.display = (currentStep === totalSteps) ? '' : 'none';
   const btn = document.getElementById('btnNext');
   if (currentStep === totalSteps) {
     btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> ส่งและปิดหน้านี้';
@@ -1259,6 +1336,144 @@ function updateActionBar() {
     btn.onclick = () => goStep(1);
   }
 }
+
+/* ===== Final Document Preview — แสดงเอกสารฉบับสำเร็จ ก่อน submit ===== */
+const CONSENT_QUESTIONS = [
+  'ท่านเคยมีอาการแพ้ไข่ไก่ หรือผลิตภัณฑ์จากไข่อย่างรุนแรงหรือไม่',
+  'ท่านเคยแพ้วัคซีนใด ๆ มาก่อน หรือเคยแพ้ยาขั้นรุนแรงหรือไม่',
+  'ขณะนี้ท่านมีไข้ ≥ 38°C หรือมีอาการเจ็บป่วยรุนแรงหรือไม่',
+  'ท่านเพิ่งหายป่วยจากโรคติดเชื้อภายใน 7 วันที่ผ่านมาหรือไม่',
+  'ท่านเพิ่งออกจากโรงพยาบาลภายใน 14 วันที่ผ่านมาหรือไม่',
+  'ท่านมีโรคประจำตัวที่กำลังกำเริบหรือควบคุมไม่ได้หรือไม่',
+  'ท่าน (เพศหญิง) ตั้งครรภ์ หรือสงสัยว่าตั้งครรภ์ หรือกำลังให้นมบุตรหรือไม่',
+];
+
+async function openFinalDocument() {
+  const content = document.getElementById('finalDocContent');
+  // 1. รวบรวมข้อมูล จากฟอร์ม
+  const patientName    = <?= json_encode($mock['patient_name']) ?>;
+  const patientCode    = <?= json_encode($mock['patient_code'] ?? '') ?>;
+  const campaignTitle  = <?= json_encode($mock['campaign_title']) ?>;
+  const appointmentAt  = <?= json_encode($mock['appointment_at']) ?>;
+
+  // คำตอบ 7 ข้อ
+  const answers = [];
+  for (let i = 1; i <= 7; i++) {
+    const v = document.querySelector(`input[name="q${i}"]:checked`)?.value;
+    answers.push(v === '1' ? 'yes' : (v === '0' ? 'no' : 'unanswered'));
+  }
+  const flaggedCount = answers.filter(a => a === 'yes').length;
+
+  // ตัดสินใจ
+  const decisionVal = document.querySelector('input[name="decision"]:checked')?.value || 'unset';
+  const decisionTH  = decisionVal === 'consent' ? 'ยินยอมรับการฉีดวัคซีน'
+                    : decisionVal === 'decline' ? 'ปฏิเสธการรับวัคซีน'
+                    : '— ยังไม่ระบุ —';
+
+  // ลายเซ็น: dataURL จาก canvas
+  const canvas = document.getElementById('sigCanvas');
+  let sigDataUrl = '';
+  try { sigDataUrl = canvas?.toDataURL('image/png') || ''; } catch(e) {}
+  const witness = document.getElementById('witnessCanvas');
+  let witnessDataUrl = '';
+  try { witnessDataUrl = witness?.toDataURL('image/png') || ''; } catch(e) {}
+
+  // Hash + เวลา — ใช้จาก cache ของ renderSummary ถ้ามี · ไม่งั้น compute ใหม่
+  let hash, nowStr;
+  if (window._consentHashCache?.hash && !window._consentHashCache.hash.startsWith('⏳')) {
+    hash = window._consentHashCache.hash;
+    nowStr = new Date(window._consentHashCache.timestamp).toLocaleString('th-TH', { dateStyle:'long', timeStyle:'medium' });
+  } else {
+    const tsIso = new Date().toISOString();
+    const result = await computeConsentHash(tsIso);
+    hash = result.hash;
+    nowStr = new Date(tsIso).toLocaleString('th-TH', { dateStyle:'long', timeStyle:'medium' });
+  }
+
+  // 2. Render
+  content.innerHTML = `
+    <h1>หนังสือยินยอมรับการฉีดวัคซีน</h1>
+    <div class="doc-sub">RSU Medical Clinic · ${esc(campaignTitle)}</div>
+
+    <div class="doc-section">
+      <div class="doc-section-title">ข้อมูลผู้รับวัคซีน</div>
+      <table class="kv">
+        <tr><td>ชื่อ-นามสกุล</td><td>${esc(patientName)}</td></tr>
+        ${patientCode ? `<tr><td>รหัสประจำตัว</td><td>${esc(patientCode)}</td></tr>` : ''}
+        <tr><td>วัคซีนที่ได้รับ</td><td>${esc(campaignTitle)}</td></tr>
+        <tr><td>วัน-เวลานัดหมาย</td><td>${esc(appointmentAt)}</td></tr>
+      </table>
+    </div>
+
+    <div class="doc-section">
+      <div class="doc-section-title">แบบคัดกรองก่อนรับวัคซีน
+        <span style="float:right;font-weight:600;font-size:12px;color:${flaggedCount === 0 ? '#16a34a' : '#dc2626'}">
+          ${flaggedCount === 0 ? 'ผ่านทั้ง 7 ข้อ' : `ตอบ "ใช่" ${flaggedCount} ข้อ`}
+        </span>
+      </div>
+      <ul class="q-list-doc">
+        ${CONSENT_QUESTIONS.map((q, i) => {
+          const a = answers[i];
+          const aLabel = a === 'yes' ? 'ใช่' : (a === 'no' ? 'ไม่ใช่' : '— ไม่ได้ตอบ —');
+          const aCls   = a === 'yes' ? 'yes' : 'no';
+          return `<li>
+            <span class="q-num">${i+1}.</span>
+            <span style="flex:1">${esc(q)}</span>
+            <span class="q-ans ${aCls}">[${a === 'yes' ? '✓' : '○'}] ${aLabel}</span>
+          </li>`;
+        }).join('')}
+      </ul>
+    </div>
+
+    <div class="doc-section">
+      <div class="doc-section-title">การตัดสินใจของผู้รับวัคซีน</div>
+      <div class="decision-box ${decisionVal === 'consent' ? 'consent' : 'decline'}">
+        ${esc(decisionTH)}
+      </div>
+    </div>
+
+    <div class="doc-section">
+      <div class="doc-section-title">ลายเซ็นยืนยัน</div>
+      <div class="sig-display">
+        <div style="flex:1">
+          <div class="sig-box">
+            ${sigDataUrl ? `<img src="${sigDataUrl}" alt="ลายเซ็นผู้รับวัคซีน">` : '<span style="color:#cbd5e1;font-size:11px">— ยังไม่มีลายเซ็น —</span>'}
+          </div>
+          <div class="sig-caption">ลายเซ็นผู้รับวัคซีน<br><b>${esc(patientName)}</b></div>
+        </div>
+        <div style="flex:1">
+          <div class="sig-box">
+            ${witnessDataUrl ? `<img src="${witnessDataUrl}" alt="ลายเซ็นพยาน">` : '<span style="color:#cbd5e1;font-size:11px">— พยาน (ถ้ามี) —</span>'}
+          </div>
+          <div class="sig-caption">ลายเซ็นพยาน / เจ้าหน้าที่</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="meta-row">
+      <div><b>เวลาที่เซ็น:</b> ${esc(nowStr)}</div>
+      <div><b>SHA256:</b> <span class="doc-hash">${esc(hash)}</span></div>
+    </div>
+    <div class="meta-row" style="border-top:0;padding-top:0;margin-top:4px">
+      <div style="color:#94a3b8;font-size:10px">เอกสารฉบับนี้ออกโดยระบบ RSU Medical Clinic Services · ลายเซ็นอิเล็กทรอนิกส์มีผลตามกฎหมาย พ.ร.บ.ธุรกรรมทางอิเล็กทรอนิกส์ พ.ศ. 2544</div>
+    </div>
+  `;
+  document.getElementById('finalDocModal').style.display = 'block';
+  document.body.style.overflow = 'hidden';
+}
+
+function closeFinalDocument() {
+  document.getElementById('finalDocModal').style.display = 'none';
+  document.body.style.overflow = '';
+}
+
+function esc(s) { const d = document.createElement('div'); d.textContent = String(s == null ? '' : s); return d.innerHTML; }
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && document.getElementById('finalDocModal')?.style.display === 'block') {
+    closeFinalDocument();
+  }
+});
 
 function canAdvance(step) {
   if (step === 2) {
@@ -1315,6 +1530,11 @@ function initPad(canvasId, placeholderId, statsId, key) {
   const dpr = window.devicePixelRatio || 1;
   function resize() {
     const rect = canvas.getBoundingClientRect();
+    // ถ้า canvas ยัง hidden อยู่ (display:none) → rect.width/height = 0 → init ไม่ได้
+    // skip + รอให้ goStep() เรียก resize อีกครั้งตอน pane เปิด
+    if (rect.width === 0 || rect.height === 0) return false;
+    // Reset transform กัน scale ทบกัน เวลา resize ซ้ำ
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
     canvas.width = rect.width * dpr;
     canvas.height = rect.height * dpr;
     ctx.scale(dpr, dpr);
@@ -1322,12 +1542,12 @@ function initPad(canvasId, placeholderId, statsId, key) {
     ctx.lineJoin = 'round';
     ctx.strokeStyle = '#0f172a';
     ctx.lineWidth = 2.2;
+    return true;
   }
   resize();
   window.addEventListener('resize', () => {
-    const data = pads[key].strokes;
-    resize();
-    redraw(key);
+    const data = pads[key]?.strokes;
+    if (resize() && data?.length) redraw(key);
   });
 
   pads[key] = {
@@ -1335,6 +1555,7 @@ function initPad(canvasId, placeholderId, statsId, key) {
     drawing: false,
     strokes: [],         // array of strokes; each stroke = array of points
     current: null,
+    resize,               // expose ให้ goStep() เรียกตอน pane เปลี่ยน
   };
 
   const getPos = (e) => {
@@ -1435,7 +1656,57 @@ function hasSignature(key) {
 }
 
 /* ===== Summary rendering ===== */
-function renderSummary() {
+/* Patient/vaccine info ที่ใช้ใน canonical payload (inject ตอน render PHP) */
+const CONSENT_PATIENT = <?= json_encode([
+    'name'        => $mock['patient_name'],
+    'code'        => $mock['patient_code'] ?? '',
+    'campaign'    => $mock['campaign_title'],
+    'appointment' => $mock['appointment_at'],
+], JSON_UNESCAPED_UNICODE) ?>;
+
+/**
+ * คำนวณ SHA-256 hex ของข้อมูลยินยอม (canonical payload)
+ * - input เรียง key alphabetical → deterministic
+ * - ใช้ Web Crypto API (ต้อง HTTPS หรือ localhost · ระบบ production อยู่บน HTTPS อยู่แล้ว)
+ * - คืน 64 hex chars หรือข้อความ error
+ */
+async function computeConsentHash(timestampIso) {
+  const answers = [];
+  for (let i = 1; i <= 7; i++) {
+    answers.push(document.querySelector(`input[name="q${i}"]:checked`)?.value || '');
+  }
+  const decision = document.querySelector('input[name="decision"]:checked')?.value || '';
+  let sigDataUrl = '';
+  try { sigDataUrl = document.getElementById('sigCanvas')?.toDataURL('image/png') || ''; } catch(e) {}
+
+  // Canonical: keys เรียง alphabetical · ไม่มี whitespace (JSON.stringify default)
+  const payload = JSON.stringify({
+    appointment: CONSENT_PATIENT.appointment,
+    campaign:    CONSENT_PATIENT.campaign,
+    decision:    decision,
+    patient:     CONSENT_PATIENT.name,
+    patient_code: CONSENT_PATIENT.code,
+    q1: answers[0], q2: answers[1], q3: answers[2], q4: answers[3],
+    q5: answers[4], q6: answers[5], q7: answers[6],
+    signature_image_b64: sigDataUrl,
+    timestamp:   timestampIso,
+  });
+
+  if (!window.crypto?.subtle) {
+    return { ok: false, hash: '— (browser ไม่รองรับ Web Crypto API หรือไม่ใช่ HTTPS)' };
+  }
+  try {
+    const buf = new TextEncoder().encode(payload);
+    const hashBuf = await crypto.subtle.digest('SHA-256', buf);
+    const hashHex = Array.from(new Uint8Array(hashBuf))
+      .map(b => b.toString(16).padStart(2, '0')).join('');
+    return { ok: true, hash: hashHex };
+  } catch (e) {
+    return { ok: false, hash: '— (' + (e.message || 'error') + ')' };
+  }
+}
+
+async function renderSummary() {
   // Count flagged Qs
   const flagged = [];
   for (let i = 1; i <= 7; i++) {
@@ -1476,13 +1747,16 @@ function renderSummary() {
     flaggedBanner.style.display = 'none';
   }
 
-  // Fake hash (real: SHA256 of canonical payload)
-  const fakeHash = Array.from({length:16}, () =>
-    Math.floor(Math.random()*16).toString(16)
-  ).join('') + '…';
-  document.getElementById('sumHash').textContent = fakeHash;
+  // Timestamp + Real SHA-256 hash
+  const tsIso = new Date().toISOString();
   document.getElementById('sumTime').textContent =
-    new Date().toLocaleString('th-TH', { dateStyle:'long', timeStyle:'medium' });
+    new Date(tsIso).toLocaleString('th-TH', { dateStyle:'long', timeStyle:'medium' });
+  document.getElementById('sumHash').textContent = '⏳ กำลังคำนวณ...';
+
+  const result = await computeConsentHash(tsIso);
+  document.getElementById('sumHash').textContent = result.hash;
+  // เก็บไว้ให้ openFinalDocument() ใช้ — ไม่ต้องคำนวณซ้ำ
+  window._consentHashCache = { hash: result.hash, timestamp: tsIso };
 }
 
 /* ===== Init ===== */

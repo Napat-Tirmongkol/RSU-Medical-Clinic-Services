@@ -36,37 +36,58 @@ $portalCsrf = get_csrf_token();
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 
 <style>
-    .sch-card { background:#fff; border:1.5px solid #e2e8f0; border-radius:1.25rem; padding:1.5rem; }
+    .sch-card { background:#fff; border:1px solid #e2e8f0; border-radius:1rem; padding:1.5rem; }
     .sch-kpi {
-        background:#fff; border:1.5px solid #e2e8f0; border-radius:1.25rem;
-        padding:1.25rem; position:relative; overflow:hidden;
+        background:#fff; border:1px solid #e2e8f0; border-radius:1rem;
+        padding:1.25rem 1.5rem;
     }
+    /* Icon inline beside label (not floating in corner) */
     .sch-kpi-icon {
-        position:absolute; top:1rem; right:1rem; width:2.5rem; height:2.5rem;
-        border-radius:.75rem; display:flex; align-items:center; justify-content:center;
-        font-size:1.05rem;
+        width:1.75rem; height:1.75rem; border-radius:.5rem;
+        display:inline-flex; align-items:center; justify-content:center;
+        font-size:.85rem; flex-shrink:0;
     }
-    .sch-kpi-label { font-size:.7rem; font-weight:800; color:#64748b; text-transform:uppercase; letter-spacing:.05em; }
-    .sch-kpi-value { font-size:1.875rem; font-weight:900; color:#0f172a; margin-top:.5rem; line-height:1; }
-    .sch-kpi-foot { font-size:.72rem; color:#94a3b8; margin-top:.4rem; }
+    .sch-kpi-head { display:flex; align-items:center; gap:.6rem; }
+    .sch-kpi-label { font-size:.8rem; font-weight:600; color:#64748b; }
+    .sch-kpi-value { font-size:1.75rem; font-weight:700; color:#0f172a; margin-top:.75rem; line-height:1.1; letter-spacing:-.01em; }
+    .sch-kpi-foot { font-size:.75rem; color:#94a3b8; margin-top:.4rem; }
     .sch-rank-pill {
         display:inline-flex; align-items:center; justify-content:center;
         width:1.5rem; height:1.5rem; border-radius:99px;
-        font-size:.7rem; font-weight:900; color:#fff;
+        font-size:.7rem; font-weight:700; color:#fff;
     }
+    /* Tabs: text-only with underline indicator (no solid pill, no shadow) */
     .sch-tab {
-        padding:.65rem 1.1rem; border-radius:.85rem; font-size:.85rem; font-weight:800;
-        color:#475569; cursor:pointer; transition:all .15s; white-space:nowrap;
-        background:transparent; border:1.5px solid transparent;
+        padding:.7rem 0; margin-right:1.5rem; font-size:.9rem; font-weight:600;
+        color:#64748b; cursor:pointer; transition:color .15s; white-space:nowrap;
+        background:transparent; border:none; border-bottom:2px solid transparent;
+        position:relative;
     }
-    .sch-tab:hover { background:#f1f5f9; color:#1e293b; }
-    .sch-tab.active { background:#10b981; color:#fff; border-color:#10b981; box-shadow:0 4px 10px rgba(16,185,129,.25); }
+    .sch-tab:hover { color:#0f172a; }
+    .sch-tab.active { color:#0f172a; border-bottom-color:#2e9e63; }
+    /* Sub-bar (segmented control inside scheduling/finance tabs) */
+    .sch-sub-bar {
+        display:flex; gap:.4rem; margin-bottom:1rem; padding:.3rem;
+        background:#f1f5f9; border-radius:.75rem; width:fit-content;
+    }
+    .sch-sub-bar.hidden { display:none; }
+    .sch-sub-btn {
+        padding:.45rem .9rem; border-radius:.5rem; font-size:.78rem; font-weight:700;
+        color:#64748b; cursor:pointer; transition:all .15s; white-space:nowrap;
+        background:transparent; border:none;
+    }
+    .sch-sub-btn:hover { color:#0f172a; background:rgba(255,255,255,.6); }
+    .sch-sub-btn.active { background:#fff; color:#10b981; box-shadow:0 1px 2px rgba(15,23,42,.06); }
+    body[data-theme='dark'] .sch-sub-bar { background:#0b1220; }
+    body[data-theme='dark'] .sch-sub-btn { color:#94a3b8; }
+    body[data-theme='dark'] .sch-sub-btn:hover { color:#f1f5f9; background:rgba(255,255,255,.04); }
+    body[data-theme='dark'] .sch-sub-btn.active { background:#1e293b; color:#6ee7b7; box-shadow:none; }
     .sch-tab .sch-badge {
         display:inline-flex; align-items:center; justify-content:center;
-        min-width:20px; height:18px; padding:0 5px; margin-left:.4rem;
-        border-radius:99px; background:#f43f5e; color:#fff; font-size:10px; font-weight:900;
+        min-width:18px; height:16px; padding:0 5px; margin-left:.35rem;
+        border-radius:99px; background:#f1f5f9; color:#dc2626; font-size:10px; font-weight:700;
     }
-    .sch-tab.active .sch-badge { background:#fff; color:#10b981; }
+    .sch-tab.active .sch-badge { background:#fef2f2; color:#b91c1c; }
     .sch-input {
         width:100%; padding:.6rem .9rem; background:#f9fafb;
         border:1.5px solid #e5e7eb; border-radius:.65rem;
@@ -80,18 +101,23 @@ $portalCsrf = get_csrf_token();
     .sch-table tbody tr:hover { background:#f8fafc; }
     .sch-btn {
         display:inline-flex; align-items:center; gap:.4rem;
-        padding:.55rem 1rem; border-radius:.65rem; font-size:.8rem; font-weight:800;
-        background:#10b981; color:#fff; border:none; cursor:pointer; transition:all .15s;
+        padding:.55rem 1rem; border-radius:.5rem; font-size:.85rem; font-weight:600;
+        background:#2e9e63; color:#fff; border:none; cursor:pointer; transition:background .15s;
     }
-    .sch-btn:hover { background:#059669; transform:translateY(-1px); box-shadow:0 6px 14px rgba(16,185,129,.25); }
-    .sch-btn--ghost { background:#f1f5f9; color:#475569; }
-    .sch-btn--ghost:hover { background:#e2e8f0; color:#1e293b; box-shadow:none; transform:none; }
-    .sch-btn--danger { background:#f43f5e; }
-    .sch-btn--danger:hover { background:#e11d48; box-shadow:0 6px 14px rgba(244,63,94,.25); }
-    .sch-btn--xs { padding:.35rem .65rem; font-size:.72rem; }
+    .sch-btn:hover { background:#268555; }
+    .sch-btn--ghost { background:#fff; color:#475569; border:1px solid #e2e8f0; }
+    .sch-btn--ghost:hover { background:#f8fafc; color:#0f172a; border-color:#cbd5e1; }
+    .sch-btn--danger { background:#dc2626; }
+    .sch-btn--danger:hover { background:#b91c1c; }
+    .sch-btn--xs { padding:.45rem .75rem; font-size:.78rem; min-height:32px; }
+    /* Focus-visible — keyboard nav clarity */
+    .sch-btn:focus-visible, .sch-tab:focus-visible, .sch-sub-btn:focus-visible {
+        outline:2px solid #2e9e63; outline-offset:2px;
+    }
+    .sch-input:focus-visible { outline:none; /* uses ring from :focus */ }
     .sch-status-badge {
-        display:inline-flex; align-items:center; padding:.2rem .55rem; border-radius:99px;
-        font-size:.7rem; font-weight:900; text-transform:uppercase; letter-spacing:.04em;
+        display:inline-flex; align-items:center; padding:.2rem .55rem; border-radius:.375rem;
+        font-size:.72rem; font-weight:600;
     }
     .sch-modal-backdrop { position:fixed; inset:0; background:rgba(15,23,42,.5); z-index:200; display:none; align-items:center; justify-content:center; padding:1rem; }
     .sch-modal-backdrop.show { display:flex; }
@@ -116,7 +142,7 @@ $portalCsrf = get_csrf_token();
         background:#fff; border:1.5px solid #e2e8f0;
         cursor:pointer; transition:all .15s; position:relative; overflow:hidden;
     }
-    .cal-cell:hover { border-color:#10b981; box-shadow:0 4px 12px rgba(16,185,129,.12); transform:translateY(-1px); }
+    .cal-cell:hover { border-color:#2e9e63; background:#f0fdf4; }
     .cal-cell.empty { background:#f8fafc; border-color:#f1f5f9; cursor:default; }
     .cal-cell.empty:hover { transform:none; box-shadow:none; border-color:#f1f5f9; }
     .cal-cell.today { border-color:#10b981; box-shadow:inset 0 0 0 1.5px #10b981; }
@@ -139,12 +165,17 @@ $portalCsrf = get_csrf_token();
     .cal-slot-row.full { background:#fef3c7; color:#92400e; }
     .cal-slot-row.empty-slot { background:#dcfce7; color:#166534; }
 
-    /* ── Bold & Colorful — tilt-aware lift + icon micro-interaction ── */
-    #section-scholarship .sch-kpi { isolation: isolate; transition: transform .25s cubic-bezier(.16,1,.3,1), box-shadow .25s ease, border-color .25s ease; }
-    #section-scholarship .sch-kpi:hover:not(.fx-tilt) { transform: translateY(-3px); box-shadow: 0 18px 36px -18px rgba(16,185,129,.18); }
-    #section-scholarship .sch-kpi.fx-tilt:hover { --lift: -3px; box-shadow: 0 18px 36px -18px rgba(16,185,129,.30); border-color: rgba(16,185,129,.30); }
-    #section-scholarship .sch-kpi .sch-kpi-icon { transition: transform .25s cubic-bezier(.16,1,.3,1); }
-    #section-scholarship .sch-kpi:hover .sch-kpi-icon { transform: scale(1.08) rotate(-4deg); }
+    /* Notify groups multi-checkbox (Settings tab) */
+    .sch-notify-item { display:flex; gap:.6rem; padding:.5rem .65rem; border-radius:.45rem; background:#fff; border:1px solid #e2e8f0; cursor:pointer; transition:border-color .12s, background .12s; align-items:center; }
+    .sch-notify-item:hover { border-color:#94a3b8; }
+    .sch-notify-item:has(input:checked) { border-color:#06c755; background:#f0fdf4; }
+    .sch-notify-item input[type=checkbox] { accent-color:#06c755; width:15px; height:15px; flex-shrink:0; }
+    body[data-theme='dark'] .sch-notify-item { background:#0f172a; border-color:#1e293b; }
+    body[data-theme='dark'] .sch-notify-item:has(input:checked) { background:rgba(6,199,85,.1); border-color:#06c755; }
+
+    /* Subtle hover lift on KPI tiles */
+    #section-scholarship .sch-kpi { transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease; }
+    #section-scholarship .sch-kpi:hover { transform: translateY(-1px); border-color:#cbd5e1; }
 
     /* ── DARK MODE ──────────────────────────────────────────────── */
     body[data-theme='dark'] #section-scholarship .sch-card,
@@ -219,103 +250,189 @@ $portalCsrf = get_csrf_token();
     <!-- Header -->
     <div class="flex items-center justify-between mb-6">
         <div>
-            <h1 class="text-2xl font-black text-slate-900">นักศึกษาทุน — เก็บชั่วโมงทำงาน</h1>
-            <p class="text-sm text-slate-500 mt-1">จัดการนักศึกษา · ตารางกะ · อนุมัติเข้า-ออกงาน · รายงาน</p>
+            <h1 class="text-2xl font-bold text-slate-900">นักศึกษาทุน</h1>
+            <p class="text-sm text-slate-500 mt-1">จัดการนักศึกษา · ตารางงาน · อนุมัติเข้า-ออกงาน · การเงิน</p>
         </div>
-        <div class="flex items-center gap-3">
+        <div class="flex items-center gap-4">
+            <button type="button" onclick="if(window.RsuTour) RsuTour.start(SCH_TOUR_STEPS, 'scholarship')"
+                    class="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-emerald-700 transition-colors"
+                    title="เริ่มทัวร์แนะนำหน้านี้">
+                <i class="fa-solid fa-circle-question"></i>ทัวร์
+            </button>
             <a href="../scholarship_help.php" target="_blank" rel="noopener"
-               class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-black hover:bg-emerald-500 hover:text-white transition-colors"
+               class="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-emerald-700 transition-colors"
                title="เปิดคู่มือใช้งานในแท็บใหม่">
                 <i class="fa-solid fa-book-open"></i>คู่มือ
             </a>
+            <div class="w-px h-8 bg-slate-200"></div>
             <div class="text-right">
-                <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">นักศึกษาทุน</p>
-                <p class="text-lg font-black text-slate-900"><?= number_format($cntStudents) ?> คน</p>
+                <p class="text-xs text-slate-500">นักศึกษา</p>
+                <p class="text-lg font-semibold text-slate-900"><?= number_format($cntStudents) ?> <span class="text-xs font-normal text-slate-500">คน</span></p>
             </div>
-            <div class="w-px h-10 bg-slate-200"></div>
             <div class="text-right">
-                <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">รออนุมัติ</p>
-                <p class="text-lg font-black text-rose-600"><?= number_format($cntPending) ?></p>
+                <p class="text-xs text-slate-500">รออนุมัติ</p>
+                <p class="text-lg font-semibold text-rose-600"><?= number_format($cntPending) ?></p>
             </div>
-            <div class="w-px h-10 bg-slate-200"></div>
             <div class="text-right">
-                <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">กะวันนี้</p>
-                <p class="text-lg font-black text-emerald-600"><?= number_format($cntTodayShifts) ?></p>
+                <p class="text-xs text-slate-500">กะวันนี้</p>
+                <p class="text-lg font-semibold text-emerald-600"><?= number_format($cntTodayShifts) ?></p>
             </div>
         </div>
     </div>
 
-    <!-- Tabs -->
-    <div class="flex gap-2 mb-5 overflow-x-auto pb-2">
-        <button class="sch-tab active" data-tab="dashboard">
-            <i class="fa-solid fa-chart-pie mr-1.5"></i>Dashboard
+    <!-- Tabs (5 top-level, consolidated) -->
+    <?php
+    $_curYm = date('Y-m');
+    $_payoutPendingCnt = 0;
+    try {
+        $_pStmt = $pdo->prepare("SELECT COUNT(*) FROM sys_scholarship_payouts WHERE period_ym = :ym AND status = 'pending'");
+        $_pStmt->execute([':ym' => $_curYm]);
+        $_payoutPendingCnt = (int)$_pStmt->fetchColumn();
+    } catch (PDOException) {}
+    ?>
+    <div class="flex mb-4 overflow-x-auto border-b border-slate-200" role="tablist" aria-label="หมวดหมู่นักศึกษาทุน">
+        <button class="sch-tab active" data-tab="dashboard" role="tab" aria-selected="true" aria-controls="sch-pane-dashboard" id="sch-top-dashboard">
+            <i class="fa-solid fa-gauge mr-1.5" aria-hidden="true"></i>ภาพรวม
+            <?php if ($cntPending > 0): ?><span class="sch-badge" aria-label="<?= $cntPending ?> รายการรออนุมัติ"><?= $cntPending > 99 ? '99+' : $cntPending ?></span><?php endif; ?>
         </button>
-        <button class="sch-tab" data-tab="approvals">
-            <i class="fa-solid fa-circle-check mr-1.5"></i>รออนุมัติ
-            <?php if ($cntPending > 0): ?><span class="sch-badge"><?= $cntPending > 99 ? '99+' : $cntPending ?></span><?php endif; ?>
+        <button class="sch-tab" data-tab="students" role="tab" aria-selected="false" aria-controls="sch-pane-students" id="sch-top-students">
+            <i class="fa-solid fa-graduation-cap mr-1.5" aria-hidden="true"></i>นักศึกษา
         </button>
-        <button class="sch-tab" data-tab="students">
-            <i class="fa-solid fa-graduation-cap mr-1.5"></i>นักศึกษาทุน
+        <button class="sch-tab" data-tab="scheduling" role="tab" aria-selected="false" id="sch-top-scheduling">
+            <i class="fa-solid fa-calendar-week mr-1.5" aria-hidden="true"></i>ตารางงาน
         </button>
-        <button class="sch-tab" data-tab="shifts">
-            <i class="fa-solid fa-calendar-days mr-1.5"></i>ตารางกะ
+        <button class="sch-tab" data-tab="finance" role="tab" aria-selected="false" id="sch-top-finance">
+            <i class="fa-solid fa-money-check-dollar mr-1.5" aria-hidden="true"></i>การเงิน
+            <?php if ($_payoutPendingCnt > 0): ?><span class="sch-badge" aria-label="<?= $_payoutPendingCnt ?> รายการจ่ายเงินรอดำเนินการ"><?= $_payoutPendingCnt > 99 ? '99+' : $_payoutPendingCnt ?></span><?php endif; ?>
         </button>
-        <button class="sch-tab" data-tab="slots">
-            <i class="fa-solid fa-layer-group mr-1.5"></i>เปิดรอบงาน
+        <button class="sch-tab" data-tab="settings" role="tab" aria-selected="false" aria-controls="sch-pane-settings" id="sch-top-settings">
+            <i class="fa-solid fa-gear mr-1.5" aria-hidden="true"></i>ตั้งค่า
         </button>
-        <button class="sch-tab" data-tab="calendar">
-            <i class="fa-solid fa-calendar-week mr-1.5"></i>ปฏิทิน
+    </div>
+
+    <!-- Segmented sub-bars (shown contextually based on active top tab) -->
+    <div id="sch-sub-scheduling" class="sch-sub-bar hidden" data-group="scheduling" role="tablist" aria-label="มุมมองตารางงาน">
+        <button class="sch-sub-btn active" data-sub="calendar" role="tab" aria-selected="true">
+            <i class="fa-solid fa-calendar mr-1" aria-hidden="true"></i>ปฏิทิน
         </button>
-        <button class="sch-tab" data-tab="reports">
-            <i class="fa-solid fa-chart-line mr-1.5"></i>รายงาน
+        <button class="sch-sub-btn" data-sub="shifts" role="tab" aria-selected="false">
+            <i class="fa-solid fa-user-clock mr-1" aria-hidden="true"></i>ตารางกะ (กำหนดเอง)
         </button>
-        <button class="sch-tab" data-tab="settings">
-            <i class="fa-solid fa-gear mr-1.5"></i>ตั้งค่า
+        <button class="sch-sub-btn" data-sub="slots" role="tab" aria-selected="false">
+            <i class="fa-solid fa-layer-group mr-1" aria-hidden="true"></i>เปิดรอบให้จองเอง
+        </button>
+    </div>
+
+    <div id="sch-sub-finance" class="sch-sub-bar hidden" data-group="finance" role="tablist" aria-label="มุมมองการเงิน">
+        <button class="sch-sub-btn active" data-sub="payouts" role="tab" aria-selected="true">
+            <i class="fa-solid fa-money-check-dollar mr-1" aria-hidden="true"></i>การจ่ายเงิน
+        </button>
+        <button class="sch-sub-btn" data-sub="reports" role="tab" aria-selected="false">
+            <i class="fa-solid fa-chart-line mr-1" aria-hidden="true"></i>สรุปชั่วโมง
         </button>
     </div>
 
     <!-- ─── TAB: DASHBOARD ─── -->
     <div class="sch-pane" data-pane="dashboard">
 
-        <!-- KPI cards -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mb-3">
-            <div class="sch-kpi fx-tilt fx-tilt-light" data-tilt="4">
-                <div class="sch-kpi-icon" style="background:#dbeafe;color:#2563eb"><i class="fa-solid fa-graduation-cap"></i></div>
-                <p class="sch-kpi-label">นักศึกษา Active</p>
-                <p class="sch-kpi-value" id="kpi-students">–</p>
-                <p class="sch-kpi-foot">คน</p>
+        <?php
+        // ── Setup Checklist — แสดงเมื่อยังตั้งค่าไม่ครบ ──
+        $setupItems = [];
+        $payRateOk = (float)($settings['pay_rate_per_hour'] ?? 0) > 0;
+        $gpsRequired = !empty($settings['gps_required']);
+        $gpsOk = !$gpsRequired || (!empty($settings['clinic_lat']) && !empty($settings['clinic_lng']));
+        $studentsOk = $cntStudents > 0;
+        $setupItems[] = ['key' => 'rate', 'done' => $payRateOk,
+            'title' => 'ตั้งอัตราค่าตอบแทน', 'desc' => 'บาทต่อชั่วโมง — ใช้คำนวณยอดจ่ายเงินรายเดือน', 'cta' => 'settings'];
+        $setupItems[] = ['key' => 'gps', 'done' => $gpsOk,
+            'title' => 'ตั้งพิกัด GPS ของคลินิก', 'desc' => 'นักศึกษาจะ clock-in ในพื้นที่คลินิกได้เท่านั้น', 'cta' => 'settings'];
+        $setupItems[] = ['key' => 'students', 'done' => $studentsOk,
+            'title' => 'เพิ่มนักศึกษาทุน', 'desc' => 'เพิ่มอย่างน้อย 1 คนเพื่อเริ่มเก็บชั่วโมง', 'cta' => 'students'];
+
+        $allDone = !in_array(false, array_column($setupItems, 'done'), true);
+        $doneCount = count(array_filter($setupItems, fn($i) => $i['done']));
+        $totalCount = count($setupItems);
+        if (!$allDone):
+        ?>
+        <div class="sch-card mb-4" id="sch-setup-card" style="border-color:#fcd34d; background:#fffbeb">
+            <div class="flex items-center justify-between gap-3 mb-3 flex-wrap">
+                <div>
+                    <h3 class="text-base font-bold text-slate-900">เริ่มใช้งานครั้งแรก</h3>
+                    <p class="text-xs text-slate-600 mt-0.5">ตั้งค่าให้ครบก่อนเริ่มใช้งานจริง <span class="font-semibold text-amber-700"><?= $doneCount ?>/<?= $totalCount ?></span></p>
+                </div>
+                <div class="flex items-center gap-1.5">
+                    <?php for ($i = 0; $i < $totalCount; $i++): ?>
+                        <span class="block w-8 h-1 rounded-full <?= $i < $doneCount ? 'bg-emerald-500' : 'bg-amber-200' ?>"></span>
+                    <?php endfor; ?>
+                </div>
             </div>
-            <div class="sch-kpi fx-tilt fx-tilt-light" data-tilt="4">
-                <div class="sch-kpi-icon" style="background:#fee2e2;color:#dc2626"><i class="fa-solid fa-bell"></i></div>
-                <p class="sch-kpi-label">รออนุมัติ</p>
-                <p class="sch-kpi-value text-rose-600" id="kpi-pending">–</p>
+            <ul class="space-y-2">
+                <?php foreach ($setupItems as $item): ?>
+                    <li class="flex items-center gap-3 px-3 py-2.5 rounded-lg <?= $item['done'] ? 'bg-emerald-50' : 'bg-white border border-amber-200' ?>">
+                        <span class="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center <?= $item['done'] ? 'bg-emerald-500 text-white' : 'border-2 border-amber-400 bg-white' ?>">
+                            <?php if ($item['done']): ?><i class="fa-solid fa-check text-[10px]"></i><?php endif; ?>
+                        </span>
+                        <div class="flex-1 min-w-0">
+                            <p class="text-sm font-semibold <?= $item['done'] ? 'text-slate-500 line-through' : 'text-slate-900' ?>"><?= htmlspecialchars($item['title']) ?></p>
+                            <?php if (!$item['done']): ?>
+                                <p class="text-xs text-slate-500"><?= htmlspecialchars($item['desc']) ?></p>
+                            <?php endif; ?>
+                        </div>
+                        <?php if (!$item['done']): ?>
+                            <button class="text-sm font-semibold text-emerald-700 hover:text-emerald-800 flex items-center gap-1 shrink-0" onclick="schGoTab('<?= $item['cta'] ?>')">
+                                ตั้งค่า <i class="fa-solid fa-arrow-right text-xs"></i>
+                            </button>
+                        <?php endif; ?>
+                    </li>
+                <?php endforeach; ?>
+            </ul>
+        </div>
+        <?php endif; ?>
+
+        <!-- KPI cards (3 essentials only) -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4" role="group" aria-label="ตัวเลขสำคัญ">
+            <div class="sch-kpi">
+                <div class="sch-kpi-head">
+                    <span class="sch-kpi-icon" style="background:#fef2f2;color:#dc2626" aria-hidden="true"><i class="fa-solid fa-bell"></i></span>
+                    <span class="sch-kpi-label">รออนุมัติ</span>
+                </div>
+                <p class="sch-kpi-value" id="kpi-pending" aria-label="จำนวนรายการรออนุมัติ">–</p>
                 <p class="sch-kpi-foot">รายการ</p>
             </div>
-            <div class="sch-kpi fx-tilt fx-tilt-light" data-tilt="4">
-                <div class="sch-kpi-icon" style="background:#cffafe;color:#0891b2"><i class="fa-solid fa-calendar-day"></i></div>
-                <p class="sch-kpi-label">กะวันนี้</p>
-                <p class="sch-kpi-value text-cyan-600" id="kpi-today">–</p>
+            <div class="sch-kpi">
+                <div class="sch-kpi-head">
+                    <span class="sch-kpi-icon" style="background:#ecfeff;color:#0891b2" aria-hidden="true"><i class="fa-solid fa-calendar-day"></i></span>
+                    <span class="sch-kpi-label">กะวันนี้</span>
+                </div>
+                <p class="sch-kpi-value" id="kpi-today" aria-label="จำนวนกะวันนี้">–</p>
                 <p class="sch-kpi-foot">กะ</p>
             </div>
-        </div>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-5">
-            <div class="sch-kpi fx-tilt fx-tilt-light" data-tilt="4">
-                <div class="sch-kpi-icon" style="background:#d1fae5;color:#059669"><i class="fa-solid fa-graduation-cap"></i></div>
-                <p class="sch-kpi-label">ชม.ทุน เดือนนี้</p>
-                <p class="sch-kpi-value text-emerald-600" id="kpi-month-hours">–</p>
-                <p class="sch-kpi-foot">ชั่วโมง</p>
-            </div>
-            <div class="sch-kpi fx-tilt fx-tilt-light" data-tilt="4">
-                <div class="sch-kpi-icon" style="background:#fef3c7;color:#d97706"><i class="fa-solid fa-coins"></i></div>
-                <p class="sch-kpi-label">ชม.ค่าตอบแทน เดือนนี้</p>
-                <p class="sch-kpi-value text-amber-600" id="kpi-month-paid">–</p>
-                <p class="sch-kpi-foot">ชั่วโมง</p>
-            </div>
-            <div class="sch-kpi fx-tilt fx-tilt-light" data-tilt="4">
-                <div class="sch-kpi-icon" style="background:#fef3c7;color:#d97706"><i class="fa-solid fa-money-bill-wave"></i></div>
-                <p class="sch-kpi-label">เงินค่าตอบแทนเดือนนี้</p>
-                <p class="sch-kpi-value text-amber-700" id="kpi-month-pay">–</p>
+            <div class="sch-kpi">
+                <div class="sch-kpi-head">
+                    <span class="sch-kpi-icon" style="background:#fef3c7;color:#d97706" aria-hidden="true"><i class="fa-solid fa-money-bill-wave"></i></span>
+                    <span class="sch-kpi-label">ค่าตอบแทนเดือนนี้</span>
+                </div>
+                <p class="sch-kpi-value" id="kpi-month-pay" aria-label="ยอดค่าตอบแทนเดือนนี้ บาท">–</p>
                 <p class="sch-kpi-foot" id="kpi-pay-rate-foot">บาท</p>
+            </div>
+        </div>
+
+        <!-- ─── Hero: ของต้องทำ (Approval queue) ─── -->
+        <div class="sch-card mb-4">
+            <div class="flex items-center justify-between gap-3 mb-4 flex-wrap">
+                <div>
+                    <h3 class="text-base font-bold text-slate-900">ของต้องทำ</h3>
+                    <p class="text-xs text-slate-500 mt-0.5">นักศึกษาขอเข้า-ออกงาน รอการตรวจจากคุณ</p>
+                </div>
+                <div class="flex gap-2">
+                    <input type="text" id="appr-search" placeholder="ค้นหาชื่อ/รหัส (Ctrl+K)" class="sch-input" style="width:240px" aria-label="ค้นหารายการรออนุมัติ">
+                    <button class="sch-btn sch-btn--ghost" onclick="loadApprovals()" title="รีเฟรช">
+                        <i class="fa-solid fa-rotate"></i>
+                    </button>
+                </div>
+            </div>
+            <div id="appr-table-wrap">
+                <p class="text-center text-sm text-slate-400 py-8"><i class="fa-solid fa-spinner fa-spin mr-2"></i>กำลังโหลด…</p>
             </div>
         </div>
 
@@ -324,13 +441,13 @@ $portalCsrf = get_csrf_token();
         $_hasFinance = ($_role === 'superadmin' || $_role === 'admin' || !empty($_SESSION['access_finance']));
         ?>
         <?php if ($_hasFinance): ?>
-        <div class="mb-4 p-3 rounded-xl border border-emerald-200 bg-emerald-50 flex items-center justify-between gap-3 flex-wrap">
-            <div class="flex items-center gap-2 text-sm text-emerald-800">
-                <i class="fa-solid fa-link text-emerald-600"></i>
-                <span>ส่งค่าตอบแทนนักศึกษาทุนของเดือนนี้เข้าระบบการเงิน — รายจ่ายหมวด "เงินเดือน/ค่าจ้าง"</span>
+        <div class="mb-4 px-4 py-3 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-between gap-3 flex-wrap">
+            <div class="flex items-center gap-2 text-sm text-slate-700">
+                <i class="fa-solid fa-link text-slate-400"></i>
+                <span>ส่งค่าตอบแทนเดือนนี้เข้าระบบการเงิน — รายจ่ายหมวด "เงินเดือน/ค่าจ้าง"</span>
             </div>
-            <button onclick="schSendToFinance()" class="px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 text-sm font-bold flex items-center gap-1">
-                <i class="fa-solid fa-money-bill-trend-up"></i> ส่งเข้าระบบการเงิน
+            <button onclick="schSendToFinance()" class="text-sm font-semibold text-emerald-700 hover:text-emerald-800 flex items-center gap-1">
+                ส่งเข้าระบบการเงิน <i class="fa-solid fa-arrow-right text-xs"></i>
             </button>
         </div>
         <?php endif; ?>
@@ -338,11 +455,11 @@ $portalCsrf = get_csrf_token();
         <!-- Charts row -->
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-3 mb-5">
             <div class="sch-card lg:col-span-2">
-                <h3 class="text-sm font-black text-slate-900 mb-3">ชั่วโมงรายวัน 30 วันล่าสุด</h3>
+                <h3 class="text-sm font-semibold text-slate-900 mb-3">ชั่วโมงรายวัน 30 วันล่าสุด</h3>
                 <div style="position:relative;height:280px"><canvas id="chart-daily"></canvas></div>
             </div>
             <div class="sch-card">
-                <h3 class="text-sm font-black text-slate-900 mb-3">สัดส่วนเดือนนี้</h3>
+                <h3 class="text-sm font-semibold text-slate-900 mb-3">สัดส่วนเดือนนี้</h3>
                 <div style="position:relative;height:280px"><canvas id="chart-split"></canvas></div>
             </div>
         </div>
@@ -350,12 +467,12 @@ $portalCsrf = get_csrf_token();
         <!-- Lower row: top + today status -->
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-3 mb-5">
             <div class="sch-card">
-                <h3 class="text-sm font-black text-slate-900 mb-3"><i class="fa-solid fa-trophy text-amber-500 mr-1"></i>Top 5 เดือนนี้</h3>
+                <h3 class="text-sm font-semibold text-slate-900 mb-3"><i class="fa-solid fa-trophy text-amber-500 mr-1"></i>Top 5 เดือนนี้</h3>
                 <div id="dash-top-wrap"></div>
             </div>
             <div class="sch-card">
                 <div class="flex items-center justify-between mb-3">
-                    <h3 class="text-sm font-black text-slate-900"><i class="fa-solid fa-calendar-day text-cyan-500 mr-1"></i>กะวันนี้</h3>
+                    <h3 class="text-sm font-semibold text-slate-900"><i class="fa-solid fa-calendar-day text-cyan-500 mr-1"></i>กะวันนี้</h3>
                 </div>
                 <div id="dash-today-wrap"></div>
             </div>
@@ -363,26 +480,8 @@ $portalCsrf = get_csrf_token();
 
         <!-- Recent activity -->
         <div class="sch-card">
-            <h3 class="text-sm font-black text-slate-900 mb-3"><i class="fa-solid fa-clock-rotate-left text-slate-400 mr-1"></i>กิจกรรมล่าสุด</h3>
+            <h3 class="text-sm font-semibold text-slate-900 mb-3"><i class="fa-solid fa-clock-rotate-left text-slate-400 mr-1"></i>กิจกรรมล่าสุด</h3>
             <div id="dash-recent-wrap"></div>
-        </div>
-    </div>
-
-    <!-- ─── TAB: APPROVALS ─── -->
-    <div class="sch-pane hidden" data-pane="approvals">
-        <div class="sch-card">
-            <div class="flex items-center justify-between mb-4">
-                <h3 class="text-base font-black text-slate-900">รายการรออนุมัติ</h3>
-                <div class="flex gap-2">
-                    <input type="text" id="appr-search" placeholder="ค้นหาชื่อ/รหัส" class="sch-input" style="width:240px">
-                    <button class="sch-btn sch-btn--ghost" onclick="loadApprovals()">
-                        <i class="fa-solid fa-rotate"></i>รีเฟรช
-                    </button>
-                </div>
-            </div>
-            <div id="appr-table-wrap">
-                <p class="text-center text-sm text-slate-400 py-10"><i class="fa-solid fa-spinner fa-spin mr-2"></i>กำลังโหลด…</p>
-            </div>
         </div>
     </div>
 
@@ -390,7 +489,7 @@ $portalCsrf = get_csrf_token();
     <div class="sch-pane hidden" data-pane="students">
         <div class="sch-card">
             <div class="flex items-center justify-between mb-4">
-                <h3 class="text-base font-black text-slate-900">รายชื่อนักศึกษาทุน</h3>
+                <h3 class="text-base font-semibold text-slate-900">รายชื่อนักศึกษาทุน</h3>
                 <div class="flex gap-2">
                     <input type="text" id="stu-search" placeholder="ค้นหา ชื่อ/รหัส/คณะ" class="sch-input" style="width:280px">
                     <select id="stu-filter-status" class="sch-input" style="width:140px">
@@ -413,7 +512,7 @@ $portalCsrf = get_csrf_token();
     <div class="sch-pane hidden" data-pane="shifts">
         <div class="sch-card">
             <div class="flex items-center justify-between mb-4">
-                <h3 class="text-base font-black text-slate-900">ตารางกะ</h3>
+                <h3 class="text-base font-semibold text-slate-900">ตารางกะ</h3>
                 <div class="flex gap-2">
                     <select id="shift-filter-student" class="sch-input" style="width:220px">
                         <option value="">ทุกคน</option>
@@ -437,7 +536,7 @@ $portalCsrf = get_csrf_token();
         <div class="sch-card">
             <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
                 <div>
-                    <h3 class="text-base font-black text-slate-900">เปิดรอบงานให้นักศึกษาจอง</h3>
+                    <h3 class="text-base font-semibold text-slate-900">เปิดรอบงานให้นักศึกษาจอง</h3>
                     <p class="text-xs text-slate-500 mt-0.5">นักศึกษาจะเลือกรอบที่ว่าง แล้วจองเอง (จองทันที ไม่ต้องอนุมัติ)</p>
                 </div>
                 <div class="flex gap-2 items-center">
@@ -466,14 +565,14 @@ $portalCsrf = get_csrf_token();
         <div class="sch-card">
             <div class="flex items-center justify-between mb-4 flex-wrap gap-3">
                 <div>
-                    <h3 class="text-base font-black text-slate-900">ปฏิทินการทำงาน</h3>
+                    <h3 class="text-base font-semibold text-slate-900">ปฏิทินการทำงาน</h3>
                     <p class="text-xs text-slate-500 mt-0.5">ดูใครจองรอบไหน · เชื่อมวันหยุดจากปฏิทินคลินิก</p>
                 </div>
                 <div class="flex items-center gap-2">
                     <button class="sch-btn sch-btn--ghost" onclick="calNavMonth(-1)" title="เดือนก่อน">
                         <i class="fa-solid fa-chevron-left"></i>
                     </button>
-                    <div id="cal-title" class="px-3 py-1.5 rounded-lg bg-slate-100 text-sm font-black text-slate-700 min-w-[140px] text-center"></div>
+                    <div id="cal-title" class="px-3 py-1.5 rounded-lg bg-slate-100 text-sm font-semibold text-slate-700 min-w-[140px] text-center"></div>
                     <button class="sch-btn sch-btn--ghost" onclick="calNavMonth(1)" title="เดือนถัดไป">
                         <i class="fa-solid fa-chevron-right"></i>
                     </button>
@@ -499,7 +598,7 @@ $portalCsrf = get_csrf_token();
     <div class="sch-pane hidden" data-pane="reports">
         <div class="sch-card">
             <div class="flex items-center justify-between mb-4">
-                <h3 class="text-base font-black text-slate-900">สรุปชั่วโมงทำงาน</h3>
+                <h3 class="text-base font-semibold text-slate-900">สรุปชั่วโมงทำงาน</h3>
                 <div class="flex gap-2">
                     <input type="date" id="rep-from" class="sch-input" style="width:160px" value="<?= date('Y-m-01') ?>">
                     <input type="date" id="rep-to" class="sch-input" style="width:160px" value="<?= date('Y-m-t') ?>">
@@ -515,17 +614,87 @@ $portalCsrf = get_csrf_token();
         </div>
     </div>
 
+    <!-- ─── TAB: PAYOUTS (การจ่ายเงินรายเดือน) ─── -->
+    <div class="sch-pane hidden" data-pane="payouts">
+        <div class="sch-card mb-4">
+            <div class="flex flex-wrap items-end gap-3">
+                <div>
+                    <label class="sch-label">เดือนที่จ่าย</label>
+                    <input type="month" id="po-period" class="sch-input" style="width:180px" value="<?= date('Y-m') ?>">
+                </div>
+                <button class="sch-btn sch-btn--ghost" onclick="loadPayouts()">
+                    <i class="fa-solid fa-magnifying-glass"></i>ดู
+                </button>
+                <button class="sch-btn" onclick="generatePayouts()">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i>สร้าง/อัปเดตรายการ
+                </button>
+                <div class="flex-1"></div>
+                <button class="sch-btn sch-btn--ghost" onclick="openPayoutSummary()" title="พิมพ์แบบสรุปรวมทุกคน ส่งการเงิน">
+                    <i class="fa-solid fa-file-invoice-dollar"></i>พิมพ์สรุปส่งการเงิน
+                </button>
+                <button class="sch-btn sch-btn--ghost" onclick="exportPayoutsCSV()">
+                    <i class="fa-solid fa-file-csv"></i>ดาวน์โหลด CSV
+                </button>
+            </div>
+            <p class="text-[11px] text-slate-500 mt-3">
+                <i class="fa-solid fa-circle-info"></i>
+                "สร้าง/อัปเดต" คำนวณยอดจากชั่วโมงประเภท "ค่าตอบแทน" (paid) ของเดือนที่เลือก ×
+                อัตราที่ตั้งไว้ในแท็บ "ตั้งค่า" · รายการที่อนุมัติแล้วจะถูกล็อก snapshot ไว้
+            </p>
+        </div>
+
+        <!-- KPI summary -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+            <div class="sch-kpi">
+                <div class="sch-kpi-icon" style="background:#fef3c7;color:#d97706"><i class="fa-solid fa-hourglass-half"></i></div>
+                <p class="sch-kpi-label">รอดำเนินการการเงิน</p>
+                <p class="sch-kpi-value text-amber-600" id="po-kpi-pending">–</p>
+                <p class="sch-kpi-foot" id="po-kpi-pending-total">– บาท</p>
+            </div>
+            <div class="sch-kpi">
+                <div class="sch-kpi-icon" style="background:#d1fae5;color:#059669"><i class="fa-solid fa-circle-check"></i></div>
+                <p class="sch-kpi-label">การเงินอนุมัติแล้ว</p>
+                <p class="sch-kpi-value text-emerald-600" id="po-kpi-approved">–</p>
+                <p class="sch-kpi-foot" id="po-kpi-approved-total">– บาท</p>
+            </div>
+            <div class="sch-kpi">
+                <div class="sch-kpi-icon" style="background:#dbeafe;color:#2563eb"><i class="fa-solid fa-coins"></i></div>
+                <p class="sch-kpi-label">ยอดรวมทั้งเดือน</p>
+                <p class="sch-kpi-value text-blue-600" id="po-kpi-total">–</p>
+                <p class="sch-kpi-foot" id="po-kpi-count">– คน</p>
+            </div>
+        </div>
+
+        <div class="sch-card">
+            <div class="flex flex-wrap items-center gap-2 mb-4">
+                <div class="flex gap-1.5">
+                    <button class="sch-tab po-filter active" data-status="" style="font-size:.78rem; padding:.4rem .85rem">ทั้งหมด</button>
+                    <button class="sch-tab po-filter" data-status="pending" style="font-size:.78rem; padding:.4rem .85rem">รอดำเนินการ</button>
+                    <button class="sch-tab po-filter" data-status="approved" style="font-size:.78rem; padding:.4rem .85rem">อนุมัติแล้ว</button>
+                </div>
+                <div class="flex-1"></div>
+                <input type="text" id="po-search" class="sch-input" placeholder="ค้นชื่อ/รหัสนักศึกษา" style="width:240px">
+                <button class="sch-btn sch-btn--ghost" id="po-bulk-approve" style="display:none" onclick="bulkApprovePayouts()">
+                    <i class="fa-solid fa-check-double"></i>อนุมัติที่เลือก (<span id="po-bulk-count">0</span>)
+                </button>
+            </div>
+            <div id="po-table-wrap">
+                <p class="text-center text-sm text-slate-400 py-10"><i class="fa-solid fa-spinner fa-spin mr-2"></i>กำลังโหลด…</p>
+            </div>
+        </div>
+    </div>
+
     <!-- ─── TAB: SETTINGS ─── -->
     <div class="sch-pane hidden" data-pane="settings">
         <div class="sch-card max-w-2xl">
-            <h3 class="text-base font-black text-slate-900 mb-4">ตั้งค่าระบบ</h3>
+            <h3 class="text-base font-semibold text-slate-900 mb-4">ตั้งค่าระบบ</h3>
             <div class="space-y-4">
 
                 <!-- GPS toggle (master switch) -->
                 <label class="flex items-start gap-3 cursor-pointer p-4 rounded-xl bg-emerald-50 border border-emerald-100">
                     <input type="checkbox" id="set-gps-required" <?= (int)$settings['gps_required'] ? 'checked' : '' ?> class="mt-0.5">
                     <div>
-                        <p class="text-sm font-black text-slate-800">ตรวจ GPS ตำแหน่งทำงาน</p>
+                        <p class="text-sm font-semibold text-slate-800">ตรวจ GPS ตำแหน่งทำงาน</p>
                         <p class="text-xs text-slate-500 mt-0.5">เปิด: บังคับให้ user อยู่ในรัศมีคลินิก · ปิด: เจ้าหน้าที่อนุมัติด้วยตนเอง (ไม่ขอ GPS)</p>
                     </div>
                 </label>
@@ -578,6 +747,33 @@ $portalCsrf = get_csrf_token();
 
                 <hr class="border-slate-100 my-2">
 
+                <!-- ─── กลุ่ม LINE ที่จะแจ้งเตือนเมื่อมี clock-in/out รออนุมัติ ─── -->
+                <div class="bg-emerald-50/50 border border-emerald-100 rounded-xl p-4">
+                    <label class="sch-label flex items-center gap-1.5">
+                        <i class="fa-brands fa-line" style="color:#06c755"></i>
+                        กลุ่ม LINE ที่จะแจ้งเตือน (multi-select)
+                    </label>
+                    <p class="text-xs text-slate-500 mb-2.5">
+                        เมื่อนักศึกษา clock-in/out → ส่ง Flex Message พร้อมปุ่มอนุมัติ/ปฏิเสธไปยังกลุ่มที่ติ๊กไว้
+                    </p>
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs text-slate-500" id="set-groups-count">—</span>
+                        <button type="button" onclick="schReloadNotifyGroups()" class="text-xs text-slate-500 hover:text-emerald-700 flex items-center gap-1">
+                            <i class="fa-solid fa-rotate"></i>รีโหลด
+                        </button>
+                    </div>
+                    <div id="set-groups-list" class="space-y-1.5 max-h-56 overflow-y-auto pr-1">
+                        <p class="text-xs text-slate-400 py-2"><i class="fa-solid fa-spinner fa-spin mr-1"></i>กำลังโหลด...</p>
+                    </div>
+                    <p class="text-[11px] text-slate-400 mt-2">
+                        <i class="fa-solid fa-circle-info"></i>
+                        ถ้าไม่ติ๊กกลุ่มใด → ใช้ "กลุ่มหลัก" ของระบบ (ตั้งที่
+                        <a href="?section=line_settings" class="text-emerald-600 hover:underline">LINE Settings</a>)
+                    </p>
+                </div>
+
+                <hr class="border-slate-100 my-2">
+
                 <label class="flex items-center gap-3 cursor-pointer p-3 rounded-xl bg-slate-50">
                     <input type="checkbox" id="set-require-approval" <?= (int)$settings['require_approval'] ? 'checked' : '' ?>>
                     <span class="text-sm font-bold text-slate-700">ต้องให้พนักงานอนุมัติทุกครั้ง</span>
@@ -596,7 +792,7 @@ $portalCsrf = get_csrf_token();
 <!-- ─── MODAL: STUDENT ─── -->
 <div class="sch-modal-backdrop" id="student-modal">
     <div class="sch-modal-box">
-        <h3 class="text-lg font-black mb-4" id="student-modal-title">เพิ่มนักศึกษาทุน</h3>
+        <h3 class="text-lg font-semibold mb-4" id="student-modal-title">เพิ่มนักศึกษาทุน</h3>
         <input type="hidden" id="stu-id">
         <div class="space-y-3">
             <div>
@@ -652,28 +848,32 @@ $portalCsrf = get_csrf_token();
 <!-- ─── MODAL: MANUAL ADJUSTMENT ─── -->
 <div class="sch-modal-backdrop" id="adjust-modal">
     <div class="sch-modal-box" style="max-width:640px">
-        <h3 class="text-lg font-black mb-1">ปรับชั่วโมงด้วยมือ</h3>
+        <h3 class="text-lg font-semibold mb-1">ปรับชั่วโมงด้วยมือ</h3>
         <p class="text-xs text-slate-500 mb-4">บวก/ลบ ชั่วโมงสะสมของนักศึกษา (ไม่กระทบ clock log เดิม)</p>
         <input type="hidden" id="adj-student-id">
         <div class="bg-slate-50 rounded-xl px-4 py-3 mb-4">
             <p class="text-xs text-slate-500">นักศึกษา</p>
-            <p class="font-black text-slate-900" id="adj-student-name">-</p>
-            <p class="text-xs text-slate-500 mt-1">ชั่วโมงสะสมปัจจุบัน: <span class="font-black text-emerald-600" id="adj-current-hours">0</span> ชั่วโมง</p>
+            <p class="font-semibold text-slate-900" id="adj-student-name">-</p>
+            <p class="text-xs text-slate-500 mt-1">ชั่วโมงสะสมปัจจุบัน: <span class="font-semibold text-emerald-600" id="adj-current-hours">0</span> ชั่วโมง</p>
         </div>
 
         <div class="space-y-3">
             <div>
                 <label class="sch-label">ประเภท</label>
                 <div class="grid grid-cols-2 gap-2">
-                    <label class="cursor-pointer rounded-xl border-2 border-emerald-200 bg-emerald-50 p-2.5 text-center text-sm font-black text-emerald-700" id="adj-ct-hours-lbl">
+                    <label class="cursor-pointer rounded-xl border-2 border-emerald-200 bg-emerald-50 p-2.5 text-center text-sm font-semibold text-emerald-700" id="adj-ct-hours-lbl">
                         <input type="radio" name="adj-ct" value="hours" checked class="hidden">
                         <i class="fa-solid fa-graduation-cap mr-1"></i>ส่งชั่วโมงทุน
                     </label>
-                    <label class="cursor-pointer rounded-xl border-2 border-amber-200 bg-amber-50 p-2.5 text-center text-sm font-black text-amber-700" id="adj-ct-paid-lbl">
+                    <label class="cursor-pointer rounded-xl border-2 border-amber-200 bg-amber-50 p-2.5 text-center text-sm font-semibold text-amber-700" id="adj-ct-paid-lbl">
                         <input type="radio" name="adj-ct" value="paid" class="hidden">
                         <i class="fa-solid fa-coins mr-1"></i>ค่าตอบแทน
                     </label>
                 </div>
+                <p class="text-[11px] text-slate-500 mt-1.5">
+                    <i class="fa-solid fa-circle-info text-slate-400 mr-1"></i>
+                    <b>ทุน</b> = เก็บชั่วโมงสะสมตามเงื่อนไขทุน · <b>ค่าตอบแทน</b> = จ่ายเป็นเงินตามอัตราที่ตั้งไว้
+                </p>
             </div>
             <div class="grid grid-cols-2 gap-3">
                 <div>
@@ -698,7 +898,7 @@ $portalCsrf = get_csrf_token();
         </div>
 
         <hr class="my-5 border-slate-100">
-        <h4 class="text-sm font-black text-slate-700 mb-3">ประวัติการปรับ</h4>
+        <h4 class="text-sm font-semibold text-slate-700 mb-3">ประวัติการปรับ</h4>
         <div id="adj-history-wrap" class="max-h-64 overflow-y-auto"></div>
     </div>
 </div>
@@ -706,7 +906,7 @@ $portalCsrf = get_csrf_token();
 <!-- ─── MODAL: SHIFT ─── -->
 <div class="sch-modal-backdrop" id="shift-modal">
     <div class="sch-modal-box">
-        <h3 class="text-lg font-black mb-4" id="shift-modal-title">เพิ่มกะ</h3>
+        <h3 class="text-lg font-semibold mb-4" id="shift-modal-title">เพิ่มกะ</h3>
         <input type="hidden" id="shift-id">
         <div class="space-y-3">
             <div>
@@ -716,15 +916,19 @@ $portalCsrf = get_csrf_token();
             <div>
                 <label class="sch-label">ประเภทเวลา</label>
                 <div class="grid grid-cols-2 gap-2">
-                    <label class="cursor-pointer rounded-xl border-2 border-emerald-200 bg-emerald-50 p-2.5 text-center text-sm font-black text-emerald-700" id="shift-ct-hours-lbl">
+                    <label class="cursor-pointer rounded-xl border-2 border-emerald-200 bg-emerald-50 p-2.5 text-center text-sm font-semibold text-emerald-700" id="shift-ct-hours-lbl">
                         <input type="radio" name="shift-ct" value="hours" checked class="hidden">
                         <i class="fa-solid fa-graduation-cap mr-1"></i>ส่งชั่วโมงทุน
                     </label>
-                    <label class="cursor-pointer rounded-xl border-2 border-amber-200 bg-amber-50 p-2.5 text-center text-sm font-black text-amber-700" id="shift-ct-paid-lbl">
+                    <label class="cursor-pointer rounded-xl border-2 border-amber-200 bg-amber-50 p-2.5 text-center text-sm font-semibold text-amber-700" id="shift-ct-paid-lbl">
                         <input type="radio" name="shift-ct" value="paid" class="hidden">
                         <i class="fa-solid fa-coins mr-1"></i>ค่าตอบแทน
                     </label>
                 </div>
+                <p class="text-[11px] text-slate-500 mt-1.5">
+                    <i class="fa-solid fa-circle-info text-slate-400 mr-1"></i>
+                    <b>ทุน</b> = เก็บชั่วโมงให้นักศึกษา · <b>ค่าตอบแทน</b> = จ่ายเงินตามอัตรา (บาท/ชม.)
+                </p>
             </div>
             <div>
                 <label class="sch-label">วันที่</label>
@@ -756,7 +960,7 @@ $portalCsrf = get_csrf_token();
 <!-- ── MODAL: Open Slot Rounds (bulk create) ── -->
 <div class="sch-modal-backdrop" id="slot-create-modal">
     <div class="sch-modal-box" style="max-width:640px">
-        <h3 class="text-lg font-black mb-1">เปิดรอบงานใหม่</h3>
+        <h3 class="text-lg font-semibold mb-1">เปิดรอบงานใหม่</h3>
         <p class="text-xs text-slate-500 mb-4">เลือกช่วงวันที่ + กำหนดเวลา · ระบบจะสร้างรอบให้ทุกวันที่เลือกในช่วง</p>
 
         <div class="space-y-4">
@@ -786,7 +990,7 @@ $portalCsrf = get_csrf_token();
                     <?php $days = ['อา','จ','อ','พ','พฤ','ศ','ส']; foreach ($days as $i => $d): ?>
                     <label class="cursor-pointer">
                         <input type="checkbox" class="slot-dow hidden peer" value="<?= $i ?>" checked>
-                        <span class="inline-flex items-center justify-center w-10 h-10 rounded-xl border-2 border-slate-200 bg-white text-sm font-black text-slate-500 peer-checked:bg-emerald-500 peer-checked:text-white peer-checked:border-emerald-500 transition-all"><?= $d ?></span>
+                        <span class="inline-flex items-center justify-center w-10 h-10 rounded-xl border-2 border-slate-200 bg-white text-sm font-semibold text-slate-500 peer-checked:bg-emerald-500 peer-checked:text-white peer-checked:border-emerald-500 transition-all"><?= $d ?></span>
                     </label>
                     <?php endforeach; ?>
                 </div>
@@ -828,7 +1032,7 @@ $portalCsrf = get_csrf_token();
 <!-- ── MODAL: Edit Slot ── -->
 <div class="sch-modal-backdrop" id="slot-edit-modal">
     <div class="sch-modal-box">
-        <h3 class="text-lg font-black mb-4">แก้ไขรอบงาน</h3>
+        <h3 class="text-lg font-semibold mb-4">แก้ไขรอบงาน</h3>
         <input type="hidden" id="slot-edit-id">
         <div class="space-y-3">
             <div>
@@ -875,7 +1079,7 @@ $portalCsrf = get_csrf_token();
 <div class="sch-modal-backdrop" id="cal-day-modal">
     <div class="sch-modal-box" style="max-width:560px">
         <div class="flex items-start justify-between gap-3 mb-1">
-            <h3 class="text-lg font-black" id="cal-day-title">รายละเอียดวัน</h3>
+            <h3 class="text-lg font-semibold" id="cal-day-title">รายละเอียดวัน</h3>
             <button id="cal-day-add-btn" class="sch-btn" style="padding:.4rem .8rem;font-size:12px;display:none"
                 onclick="addSlotFromDayModal()">
                 <i class="fa-solid fa-plus"></i>เพิ่มรอบในวันนี้
@@ -895,7 +1099,7 @@ $portalCsrf = get_csrf_token();
 <!-- ── MODAL: View Slot Bookings ── -->
 <div class="sch-modal-backdrop" id="slot-bookings-modal">
     <div class="sch-modal-box" style="max-width:560px">
-        <h3 class="text-lg font-black mb-1">รายชื่อผู้จองรอบนี้</h3>
+        <h3 class="text-lg font-semibold mb-1">รายชื่อผู้จองรอบนี้</h3>
         <p class="text-xs text-slate-500 mb-4" id="slot-bookings-subtitle"></p>
         <div id="slot-bookings-wrap" class="space-y-2 max-h-96 overflow-y-auto">
             <p class="text-center text-sm text-slate-400 py-6"><i class="fa-solid fa-spinner fa-spin mr-2"></i>กำลังโหลด…</p>
@@ -913,26 +1117,126 @@ $portalCsrf = get_csrf_token();
 
     let studentsCache = [];
 
-    // Tabs
+    // Tab groups — top tab → sub-panes mapping
+    const TAB_GROUPS = {
+        scheduling: { defaultSub: 'calendar', subs: ['calendar', 'shifts', 'slots'] },
+        finance:    { defaultSub: 'payouts',  subs: ['payouts', 'reports'] },
+    };
+    // Per-group remembered sub-state across top-tab switches
+    const subState = { scheduling: 'calendar', finance: 'payouts' };
+    const PANE_LOADERS = {
+        dashboard: () => { loadDashboard(); loadApprovals(); },
+        students: () => loadStudents(),
+        shifts: () => loadShifts(),
+        slots: () => loadSlots(),
+        calendar: () => loadCalendar(),
+        reports: () => loadReports(),
+        payouts: () => loadPayouts(),
+        settings: () => {},
+    };
+
+    function activatePane(paneName) {
+        document.querySelectorAll('.sch-pane').forEach(p => {
+            p.classList.toggle('hidden', p.dataset.pane !== paneName);
+        });
+        const ld = PANE_LOADERS[paneName];
+        if (ld) ld();
+    }
+
+    // Top tabs
     document.querySelectorAll('.sch-tab').forEach(btn => {
         btn.addEventListener('click', () => {
-            document.querySelectorAll('.sch-tab').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            const tab = btn.dataset.tab;
-            document.querySelectorAll('.sch-pane').forEach(p => {
-                p.classList.toggle('hidden', p.dataset.pane !== tab);
+            document.querySelectorAll('.sch-tab').forEach(b => {
+                b.classList.remove('active');
+                b.setAttribute('aria-selected', 'false');
             });
-            const loader = ({
-                dashboard: loadDashboard,
-                approvals: loadApprovals,
-                students: loadStudents,
-                shifts: loadShifts,
-                slots: loadSlots,
-                calendar: loadCalendar,
-                reports: loadReports,
-            })[tab];
-            if (loader) loader();
+            btn.classList.add('active');
+            btn.setAttribute('aria-selected', 'true');
+            const tab = btn.dataset.tab;
+
+            // Hide all sub-bars first
+            document.querySelectorAll('.sch-sub-bar').forEach(b => b.classList.add('hidden'));
+
+            if (TAB_GROUPS[tab]) {
+                // Show sub-bar for this group
+                const bar = document.getElementById('sch-sub-' + tab);
+                if (bar) bar.classList.remove('hidden');
+                // Activate remembered sub (or default)
+                const sub = subState[tab] || TAB_GROUPS[tab].defaultSub;
+                // Sync sub-bar active state + aria-selected
+                if (bar) {
+                    bar.querySelectorAll('.sch-sub-btn').forEach(b => {
+                        const on = b.dataset.sub === sub;
+                        b.classList.toggle('active', on);
+                        b.setAttribute('aria-selected', on ? 'true' : 'false');
+                    });
+                }
+                activatePane(sub);
+            } else {
+                // Simple tab — direct pane
+                activatePane(tab);
+            }
         });
+    });
+
+    // Sub-bar buttons (segmented controls)
+    document.querySelectorAll('.sch-sub-bar').forEach(bar => {
+        const group = bar.dataset.group;
+        bar.querySelectorAll('.sch-sub-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const sub = btn.dataset.sub;
+                subState[group] = sub;
+                bar.querySelectorAll('.sch-sub-btn').forEach(b => {
+                    b.classList.remove('active');
+                    b.setAttribute('aria-selected', 'false');
+                });
+                btn.classList.add('active');
+                btn.setAttribute('aria-selected', 'true');
+                activatePane(sub);
+            });
+        });
+    });
+
+    // ── Keyboard shortcuts ──
+    // Press 1-5 = switch top tab · Esc = close any open modal · Ctrl/Cmd+K = focus search
+    const TOP_TABS_ORDER = ['dashboard', 'students', 'scheduling', 'finance', 'settings'];
+    document.addEventListener('keydown', (e) => {
+        // Skip when typing in inputs (except for global shortcuts)
+        const inField = e.target.matches('input, textarea, select, [contenteditable]');
+
+        // Esc → close any visible modal
+        if (e.key === 'Escape') {
+            const openModal = document.querySelector('.sch-modal-backdrop.show');
+            if (openModal) {
+                e.preventDefault();
+                openModal.classList.remove('show');
+                return;
+            }
+        }
+
+        // Ctrl/Cmd+K → focus search in current pane
+        if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+            // Try common search input IDs (priority: dashboard approvals → current pane)
+            const activeTab = document.querySelector('.sch-tab.active')?.dataset.tab;
+            const searchByTab = {
+                dashboard: 'appr-search',
+                students: 'stu-search',
+                payouts: 'po-search',
+            };
+            const id = searchByTab[activeTab] || searchByTab[subState[activeTab]];
+            const inp = id && document.getElementById(id);
+            if (inp) { e.preventDefault(); inp.focus(); inp.select && inp.select(); }
+            return;
+        }
+
+        // 1-5 → switch top tab (only when NOT in field)
+        if (!inField && !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey) {
+            const n = parseInt(e.key, 10);
+            if (n >= 1 && n <= TOP_TABS_ORDER.length) {
+                const target = document.querySelector(`.sch-tab[data-tab="${TOP_TABS_ORDER[n-1]}"]`);
+                if (target) { e.preventDefault(); target.click(); }
+            }
+        }
     });
 
     // ── API helper
@@ -946,6 +1250,14 @@ $portalCsrf = get_csrf_token();
         return r.json();
     }
     window.__schApi = api;
+
+    // ── Local-timezone date formatter (กัน toISOString() ที่ shift เป็น UTC แล้วได้วันย้อน 1 วัน)
+    function fmtLocalDate(d) {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${dd}`;
+    }
 
     // ────── DASHBOARD ──────
     let dashChartDaily = null, dashChartSplit = null;
@@ -1019,15 +1331,12 @@ $portalCsrf = get_csrf_token();
     async function loadDashboard() {
         const j = await api('dashboard', 'get', {});
         if (!j.ok) {
-            document.getElementById('kpi-students').textContent = 'Err';
+            const pe = document.getElementById('kpi-pending'); if (pe) pe.textContent = 'Err';
             return;
         }
-        // KPIs
-        document.getElementById('kpi-students').textContent = j.kpis.active_students;
+        // KPIs (3 essentials only — rest of data still cached for other widgets/charts)
         document.getElementById('kpi-pending').textContent = j.kpis.pending;
         document.getElementById('kpi-today').textContent = j.kpis.today_shifts;
-        document.getElementById('kpi-month-hours').textContent = j.kpis.month_hours.toFixed(1);
-        document.getElementById('kpi-month-paid').textContent = j.kpis.month_paid.toFixed(1);
         document.getElementById('kpi-month-pay').textContent =
             (j.kpis.month_pay || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         // เก็บค่าไว้สำหรับปุ่ม "ส่งเข้าระบบการเงิน"
@@ -1101,11 +1410,11 @@ $portalCsrf = get_csrf_token();
                 <div class="flex items-center gap-3 p-2 rounded-xl hover:bg-slate-50">
                     <span class="sch-rank-pill" style="background:${medals[i] || '#64748b'}">${i + 1}</span>
                     <div class="flex-1 min-w-0">
-                        <p class="font-black text-sm text-slate-900 truncate">${escHtml(r.full_name)}</p>
+                        <p class="font-semibold text-sm text-slate-900 truncate">${escHtml(r.full_name)}</p>
                         <p class="text-xs text-slate-500 truncate">${escHtml(r.student_code || '-')} · ${escHtml(r.faculty || '-')}</p>
                     </div>
                     <div class="text-right shrink-0">
-                        <p class="font-black text-sm">${parseFloat(r.total).toFixed(1)} <span class="text-xs text-slate-400 font-normal">ชม.</span></p>
+                        <p class="font-semibold text-sm">${parseFloat(r.total).toFixed(1)} <span class="text-xs text-slate-400 font-normal">ชม.</span></p>
                         <p class="text-[10px] text-slate-500">
                             <span class="text-emerald-600">🎓 ${parseFloat(r.hours_scholarship).toFixed(0)}</span> ·
                             <span class="text-amber-600">🪙 ${parseFloat(r.hours_paid).toFixed(0)}</span>
@@ -1129,7 +1438,7 @@ $portalCsrf = get_csrf_token();
                     ? '<i class="fa-solid fa-coins text-amber-500 text-[10px]" title="ค่าตอบแทน"></i>'
                     : '<i class="fa-solid fa-graduation-cap text-emerald-500 text-[10px]" title="ทุน"></i>';
                 return `<div class="flex items-center gap-3 p-2 rounded-xl bg-slate-50">
-                    <div class="text-xs font-mono font-black text-slate-700 shrink-0" style="min-width:75px">
+                    <div class="text-xs font-mono font-semibold text-slate-700 shrink-0" style="min-width:75px">
                         ${sh.start_time.substr(0,5)}–${sh.end_time.substr(0,5)}
                     </div>
                     <div class="flex-1 min-w-0">
@@ -1176,7 +1485,14 @@ $portalCsrf = get_csrf_token();
         const j = await api('approvals', 'list', { q });
         if (!j.ok) { wrap.innerHTML = `<p class="text-center text-rose-500 py-6">${j.error || 'โหลดไม่สำเร็จ'}</p>`; return; }
         if (j.rows.length === 0) {
-            wrap.innerHTML = '<p class="text-center text-slate-400 py-10"><i class="fa-solid fa-inbox text-2xl block mb-2"></i>ไม่มีรายการรออนุมัติ</p>';
+            wrap.innerHTML = `
+                <div class="text-center py-10 px-4">
+                    <div class="inline-flex w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 items-center justify-center mb-3">
+                        <i class="fa-solid fa-check text-xl"></i>
+                    </div>
+                    <p class="text-sm font-semibold text-slate-900">ไม่มีรายการรออนุมัติ</p>
+                    <p class="text-xs text-slate-500 mt-1">ดีมาก — จัดการเรียบร้อยทุกคำขอแล้ว</p>
+                </div>`;
             return;
         }
         let html = '<table class="sch-table"><thead><tr>'
@@ -1186,13 +1502,13 @@ $portalCsrf = get_csrf_token();
             const isIn = r.action === 'clock_in';
             const distHtml = r.distance_m === null
                 ? '<span class="text-slate-400">-</span>'
-                : `${Math.round(r.distance_m)} ม.${!r.within_radius ? ' <span class="text-amber-600 font-black">⚠</span>' : ''}`;
+                : `${Math.round(r.distance_m)} ม.${!r.within_radius ? ' <span class="text-amber-600 font-semibold">⚠</span>' : ''}`;
             const ct = (r.comp_type || 'hours') === 'paid'
                 ? '<span class="sch-status-badge bg-amber-50 text-amber-700"><i class="fa-solid fa-coins mr-1"></i>ค่าตอบแทน</span>'
                 : '<span class="sch-status-badge bg-emerald-50 text-emerald-700"><i class="fa-solid fa-graduation-cap mr-1"></i>ทุน</span>';
             html += `<tr>
                 <td>
-                    <p class="font-black text-slate-900">${escHtml(r.student_name)}</p>
+                    <p class="font-semibold text-slate-900">${escHtml(r.student_name)}</p>
                     <p class="text-xs text-slate-500">${escHtml(r.student_code || '-')} · ${escHtml(r.faculty || '-')}</p>
                 </td>
                 <td>
@@ -1251,7 +1567,17 @@ $portalCsrf = get_csrf_token();
             + j.rows.map(s => `<option value="${s.id}">${escHtml(s.full_name)}</option>`).join('');
 
         if (j.rows.length === 0) {
-            wrap.innerHTML = '<p class="text-center text-slate-400 py-10"><i class="fa-solid fa-graduation-cap text-2xl block mb-2"></i>ยังไม่มีนักศึกษาทุน</p>';
+            wrap.innerHTML = `
+                <div class="text-center py-12 px-4">
+                    <div class="inline-flex w-14 h-14 rounded-full bg-slate-100 text-slate-400 items-center justify-center mb-3">
+                        <i class="fa-solid fa-graduation-cap text-2xl"></i>
+                    </div>
+                    <p class="text-base font-semibold text-slate-900">ยังไม่มีนักศึกษาทุน</p>
+                    <p class="text-xs text-slate-500 mt-1 max-w-sm mx-auto">เพิ่มนักศึกษาทุนคนแรกเพื่อเริ่มเก็บชั่วโมงทำงาน · เลือกจาก user ที่ลงทะเบียนใน LINE แล้ว</p>
+                    <button class="sch-btn mt-4" onclick="openStudentModal()">
+                        <i class="fa-solid fa-plus"></i>เพิ่มนักศึกษาคนแรก
+                    </button>
+                </div>`;
             return;
         }
         let html = '<table class="sch-table"><thead><tr>'
@@ -1265,7 +1591,7 @@ $portalCsrf = get_csrf_token();
                 ? `${r.hours_total.toFixed(1)} / ${r.max_hours}`
                 : `${r.hours_total.toFixed(1)}`;
             html += `<tr>
-                <td><p class="font-black">${escHtml(r.full_name)}</p></td>
+                <td><p class="font-semibold">${escHtml(r.full_name)}</p></td>
                 <td class="font-mono text-xs">${escHtml(r.student_code || '-')}</td>
                 <td class="text-xs">${escHtml(r.faculty || '-')}</td>
                 <td class="text-xs">${escHtml(r.semester || '-')}</td>
@@ -1273,6 +1599,7 @@ $portalCsrf = get_csrf_token();
                 <td>${stat}</td>
                 <td class="text-right">
                     <button class="sch-btn sch-btn--xs sch-btn--ghost" title="ปรับชั่วโมง" onclick='openAdjustModal(${r.id}, ${JSON.stringify(r.full_name).replaceAll("'","&#39;")}, ${parseFloat(r.hours_total)})'><i class="fa-solid fa-sliders"></i></button>
+                    <button class="sch-btn sch-btn--xs sch-btn--ghost" title="พิมพ์ใบลงเวลา" onclick="openTimesheet(${r.id})"><i class="fa-solid fa-file-invoice"></i></button>
                     <button class="sch-btn sch-btn--xs sch-btn--ghost" title="แก้ไข" onclick='editStudent(${JSON.stringify(r).replaceAll("'","&#39;")})'><i class="fa-solid fa-pen"></i></button>
                     <button class="sch-btn sch-btn--xs sch-btn--danger" title="ลบ" onclick="deleteStudent(${r.id})"><i class="fa-solid fa-trash"></i></button>
                 </td>
@@ -1511,13 +1838,52 @@ $portalCsrf = get_csrf_token();
         document.querySelector('input[name="adj-ct"][value="paid"]').checked = true; syncAdjCtRadio();
     });
 
+    // ── เปิดแบบสรุปรวมการจ่ายเงิน (ส่งการเงิน) — ใช้เดือนจาก #po-period ──
+    window.openPayoutSummary = function() {
+        const month = document.getElementById('po-period')?.value || '';
+        if (!month || !/^\d{4}-\d{2}$/.test(month)) {
+            Swal.fire({ icon: 'warning', title: 'กรุณาเลือกเดือนที่ต้องการก่อน', timer: 1800, showConfirmButton: false });
+            return;
+        }
+        window.open('scholarship_payroll_summary.php?month=' + encodeURIComponent(month), '_blank', 'noopener');
+    };
+
+    // ── เปิดใบลงเวลา (timesheet) สำหรับนักศึกษา · เลือกเดือนก่อน open ──
+    window.openTimesheet = async function(studentId) {
+        const now = new Date();
+        const months = [];
+        // เดือนปัจจุบัน + 5 เดือนก่อนหน้า
+        for (let i = 0; i < 6; i++) {
+            const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+            const ym = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+            const thai = ['', 'มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน',
+                          'กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'][d.getMonth() + 1];
+            months.push([ym, thai + ' ' + (d.getFullYear() + 543)]);
+        }
+        const { value: month, isConfirmed } = await Swal.fire({
+            title: 'พิมพ์ใบลงเวลา',
+            html: '<p style="font-size:13px;color:#64748b;margin-bottom:8px">เลือกเดือนที่ต้องการพิมพ์</p>',
+            input: 'select',
+            inputOptions: Object.fromEntries(months),
+            inputValue: months[0][0],
+            showCancelButton: true,
+            confirmButtonText: 'เปิดดู / พิมพ์',
+            cancelButtonText: 'ยกเลิก',
+            confirmButtonColor: '#2e9e63',
+        });
+        if (!isConfirmed || !month) return;
+        const url = 'scholarship_timesheet.php?student_id=' + encodeURIComponent(studentId)
+                  + '&month=' + encodeURIComponent(month);
+        window.open(url, '_blank', 'noopener');
+    };
+
     window.openAdjustModal = async function(studentId, studentName, currentHours) {
         document.getElementById('adj-student-id').value = studentId;
         document.getElementById('adj-student-name').textContent = studentName;
         document.getElementById('adj-current-hours').textContent = parseFloat(currentHours).toFixed(1);
         document.getElementById('adj-delta').value = '';
         document.getElementById('adj-reason').value = '';
-        document.getElementById('adj-date').value = new Date().toISOString().slice(0, 10);
+        document.getElementById('adj-date').value = fmtLocalDate(new Date());
         document.querySelector('input[name="adj-ct"][value="hours"]').checked = true;
         syncAdjCtRadio();
         showModal('adjust-modal');
@@ -1540,7 +1906,7 @@ $portalCsrf = get_csrf_token();
             const ctLabel = r.comp_type === 'paid' ? 'ค่าตอบแทน' : 'ทุน';
             const ctColor = r.comp_type === 'paid' ? 'text-amber-600' : 'text-emerald-600';
             html += `<div class="flex items-center gap-2 p-2 rounded-lg bg-slate-50 text-xs">
-                <span class="font-black ${isPos ? 'text-emerald-600' : 'text-rose-600'}" style="min-width:60px">
+                <span class="font-semibold ${isPos ? 'text-emerald-600' : 'text-rose-600'}" style="min-width:60px">
                     ${isPos ? '+' : ''}${delta.toFixed(2)} ชม.
                 </span>
                 <span class="${ctColor} font-bold" style="min-width:75px">[${ctLabel}]</span>
@@ -1608,7 +1974,14 @@ $portalCsrf = get_csrf_token();
         const j = await api('reports', 'summary', data);
         if (!j.ok) { wrap.innerHTML = `<p class="text-center text-rose-500 py-6">${j.error || ''}</p>`; return; }
         if (j.rows.length === 0) {
-            wrap.innerHTML = '<p class="text-center text-slate-400 py-10">ไม่มีข้อมูลในช่วงที่เลือก</p>';
+            wrap.innerHTML = `
+                <div class="text-center py-12 px-4">
+                    <div class="inline-flex w-14 h-14 rounded-full bg-slate-100 text-slate-400 items-center justify-center mb-3">
+                        <i class="fa-solid fa-chart-line text-2xl"></i>
+                    </div>
+                    <p class="text-base font-semibold text-slate-900">ไม่มีข้อมูลในช่วงที่เลือก</p>
+                    <p class="text-xs text-slate-500 mt-1">ลองเลือกช่วงวันที่อื่น หรือรอจนนักศึกษาเริ่มเก็บชั่วโมง</p>
+                </div>`;
             return;
         }
         const rate = parseFloat(j.pay_rate || 0);
@@ -1626,13 +1999,13 @@ $portalCsrf = get_csrf_token();
             const pct = r.max_hours > 0 ? Math.round((r.hours_scholarship / r.max_hours) * 100) : null;
             const pay = parseFloat(r.hours_paid) * rate;
             html += `<tr>
-                <td><p class="font-black">${escHtml(r.full_name)}</p><p class="text-xs text-slate-500">${escHtml(r.student_code || '-')}</p></td>
+                <td><p class="font-semibold">${escHtml(r.full_name)}</p><p class="text-xs text-slate-500">${escHtml(r.student_code || '-')}</p></td>
                 <td class="text-xs">${escHtml(r.faculty || '-')}</td>
                 <td>${r.checkins}</td>
                 <td class="font-bold text-emerald-700">${parseFloat(r.hours_scholarship).toFixed(2)}</td>
                 <td class="font-bold text-amber-700">${parseFloat(r.hours_paid).toFixed(2)}</td>
                 ${rate > 0 ? `<td class="font-bold text-amber-700">${pay.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>` : ''}
-                <td class="font-black">${parseFloat(r.hours).toFixed(2)}</td>
+                <td class="font-semibold">${parseFloat(r.hours).toFixed(2)}</td>
                 <td class="text-xs">${r.max_hours > 0 ? r.max_hours : '-'}</td>
                 <td>${pct === null ? '-' : `<span class="font-bold ${pct >= 100 ? 'text-emerald-600' : pct >= 50 ? 'text-amber-600' : 'text-slate-500'}">${pct}%</span>`}</td>
             </tr>`;
@@ -1640,11 +2013,11 @@ $portalCsrf = get_csrf_token();
         const totalAll = totalScholar + totalPaid;
         const totalPay = totalPaid * rate;
         html += `</tbody><tfoot><tr style="border-top:2px solid #e2e8f0">
-            <td colspan="3" class="text-right font-black p-3">รวมทั้งหมด</td>
-            <td class="font-black p-3 text-emerald-700">${totalScholar.toFixed(2)}</td>
-            <td class="font-black p-3 text-amber-700">${totalPaid.toFixed(2)}</td>
-            ${rate > 0 ? `<td class="font-black p-3 text-amber-700">${totalPay.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>` : ''}
-            <td class="font-black p-3">${totalAll.toFixed(2)} ชม.</td>
+            <td colspan="3" class="text-right font-semibold p-3">รวมทั้งหมด</td>
+            <td class="font-semibold p-3 text-emerald-700">${totalScholar.toFixed(2)}</td>
+            <td class="font-semibold p-3 text-amber-700">${totalPaid.toFixed(2)}</td>
+            ${rate > 0 ? `<td class="font-semibold p-3 text-amber-700">${totalPay.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>` : ''}
+            <td class="font-semibold p-3">${totalAll.toFixed(2)} ชม.</td>
             <td colspan="2"></td>
         </tr></tfoot></table>`;
         if (rate > 0) {
@@ -1687,6 +2060,9 @@ $portalCsrf = get_csrf_token();
     applyGpsToggleState();
 
     window.saveSettings = async function() {
+        // Collect ticked LINE groups
+        const groupIds = Array.from(document.querySelectorAll('input[name="set-notify-groups"]:checked'))
+            .map(el => el.value);
         const data = {
             clinic_lat: document.getElementById('set-lat').value,
             clinic_lng: document.getElementById('set-lng').value,
@@ -1695,11 +2071,63 @@ $portalCsrf = get_csrf_token();
             require_approval: document.getElementById('set-require-approval').checked ? 1 : 0,
             gps_required: document.getElementById('set-gps-required').checked ? 1 : 0,
             pay_rate_per_hour: document.getElementById('set-pay-rate').value || 0,
+            notify_line_group_ids: JSON.stringify(groupIds),
         };
         const j = await api('settings', 'save', data);
         if (j.ok) Swal.fire({ icon:'success', title:'บันทึกแล้ว', timer:1200, showConfirmButton:false });
         else Swal.fire('ไม่สำเร็จ', j.error || '', 'error');
     };
+
+    // ── โหลดรายการ LINE groups เป็น multi-checkbox สำหรับ notify settings ──
+    const SCH_NOTIFY_SAVED = <?= json_encode($settings['notify_line_group_ids_arr'] ?? []) ?>;
+    window.schReloadNotifyGroups = async function() {
+        const wrap = document.getElementById('set-groups-list');
+        if (!wrap) return;
+        wrap.innerHTML = '<p class="text-xs text-slate-400 py-2"><i class="fa-solid fa-spinner fa-spin mr-1"></i>กำลังโหลด...</p>';
+        // Preserve checked state เมื่อ reload (กัน user ติ๊กแล้วโดน clear)
+        const prevChecked = new Set(Array.from(wrap.querySelectorAll('input[name="set-notify-groups"]:checked')).map(c => c.value));
+        const selected = prevChecked.size > 0 ? prevChecked : new Set(SCH_NOTIFY_SAVED);
+        try {
+            const r = await fetch('ajax_morning_brief.php?action=groups:list');
+            const j = await r.json();
+            if (!j.ok || !Array.isArray(j.groups) || j.groups.length === 0) {
+                wrap.innerHTML = `<p class="text-xs text-slate-500 py-3 px-3 bg-slate-50 rounded border border-dashed border-slate-300">
+                    <i class="fa-solid fa-circle-info mr-1"></i>ยังไม่มีกลุ่มที่บันทึก — เชิญ LINE OA เข้ากลุ่มก่อน
+                </p>`;
+                document.getElementById('set-groups-count').textContent = '0 กลุ่ม';
+                return;
+            }
+            wrap.innerHTML = j.groups.map(g => {
+                const checked = selected.has(g.id);
+                const typeBg = g.type === 'room' ? '#e0f2fe' : '#dcfce7';
+                const typeColor = g.type === 'room' ? '#0369a1' : '#15803d';
+                const typeLabel = g.type === 'room' ? 'Room' : 'Group';
+                const memberText = g.member_count > 0 ? `${g.member_count} คน · ` : '';
+                const safeName = (g.name || '(ไม่ทราบชื่อ)').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+                return `<label class="sch-notify-item">
+                    <input type="checkbox" name="set-notify-groups" value="${g.id}" ${checked ? 'checked' : ''}>
+                    <div style="flex:1;min-width:0">
+                        <div style="display:flex;align-items:center;gap:.35rem;flex-wrap:wrap">
+                            <span style="font-weight:600;color:#0f172a;font-size:.85rem">${safeName}</span>
+                            <span style="display:inline-block;font-size:9px;font-weight:700;padding:1px 5px;border-radius:99px;background:${typeBg};color:${typeColor}">${typeLabel}</span>
+                        </div>
+                        <div style="font-size:10px;color:#94a3b8;font-family:ui-monospace,SFMono-Regular,Consolas,monospace">${memberText}${g.id}</div>
+                    </div>
+                </label>`;
+            }).join('');
+            // Update count
+            const updateCount = () => {
+                const n = wrap.querySelectorAll('input[name="set-notify-groups"]:checked').length;
+                document.getElementById('set-groups-count').textContent = n === 0 ? 'ไม่ได้เลือกกลุ่ม' : `เลือก ${n} กลุ่ม`;
+            };
+            wrap.querySelectorAll('input[name="set-notify-groups"]').forEach(c => c.addEventListener('change', updateCount));
+            updateCount();
+        } catch(e) {
+            wrap.innerHTML = `<p class="text-xs text-rose-500 py-2">โหลดไม่สำเร็จ</p>`;
+        }
+    };
+    // Auto-load on tab activate (Settings tab)
+    if (document.getElementById('set-groups-list')) schReloadNotifyGroups();
 
     window.useCurrentLocation = function() {
         if (!navigator.geolocation) { Swal.fire('อุปกรณ์ไม่รองรับ GPS', '', 'error'); return; }
@@ -1773,7 +2201,20 @@ $portalCsrf = get_csrf_token();
             status_filter: document.getElementById('slot-status-filter').value,
         });
         if (!j.ok) { wrap.innerHTML = `<p class="text-center text-sm text-rose-500 py-6">${escTxt(j.error || 'โหลดไม่สำเร็จ')}</p>`; return; }
-        if (!j.rows.length) { wrap.innerHTML = '<p class="text-center text-sm text-slate-400 py-10"><i class="fa-solid fa-inbox text-3xl mb-2 block"></i>ยังไม่มีรอบในช่วงนี้</p>'; return; }
+        if (!j.rows.length) {
+            wrap.innerHTML = `
+                <div class="text-center py-12 px-4">
+                    <div class="inline-flex w-14 h-14 rounded-full bg-slate-100 text-slate-400 items-center justify-center mb-3">
+                        <i class="fa-solid fa-layer-group text-2xl"></i>
+                    </div>
+                    <p class="text-base font-semibold text-slate-900">ยังไม่มีรอบงานที่เปิด</p>
+                    <p class="text-xs text-slate-500 mt-1 max-w-sm mx-auto">เปิดรอบงานหลายๆ ช่วงเวลาในวันเดียวกัน แล้วให้นักศึกษาเลือกจองเอง — ไม่ต้องกำหนดตารางทีละคน</p>
+                    <button class="sch-btn mt-4" onclick="openSlotCreateModal()">
+                        <i class="fa-solid fa-plus"></i>เปิดรอบแรก
+                    </button>
+                </div>`;
+            return;
+        }
 
         let html = '<table class="sch-table"><thead><tr>'
             + '<th>วันที่</th><th>เวลา</th><th>ความจุ</th><th>สถานะ</th><th>หมายเหตุ</th><th>จัดการ</th>'
@@ -1783,15 +2224,15 @@ $portalCsrf = get_csrf_token();
             const capCls = r.booked_count >= r.max_capacity ? 'bg-rose-100 text-rose-700'
                           : pct >= 80 ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700';
             const statusBadge = r.status === 'open'
-                ? '<span class="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-700 text-[11px] font-black">เปิดรับ</span>'
+                ? '<span class="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-700 text-[11px] font-semibold">เปิดรับ</span>'
                 : r.status === 'closed'
-                  ? '<span class="px-2 py-0.5 rounded-md bg-slate-200 text-slate-600 text-[11px] font-black">ปิดรับ</span>'
-                  : '<span class="px-2 py-0.5 rounded-md bg-rose-100 text-rose-700 text-[11px] font-black">ยกเลิก</span>';
+                  ? '<span class="px-2 py-0.5 rounded-md bg-slate-200 text-slate-600 text-[11px] font-semibold">ปิดรับ</span>'
+                  : '<span class="px-2 py-0.5 rounded-md bg-rose-100 text-rose-700 text-[11px] font-semibold">ยกเลิก</span>';
             html += `<tr>
                 <td>${fmtSlotDate(r.slot_date)}</td>
                 <td class="font-mono text-xs">${fmtSlotTime(r.start_time)}–${fmtSlotTime(r.end_time)}</td>
                 <td>
-                    <button class="px-2.5 py-1 rounded-lg ${capCls} text-[12px] font-black hover:opacity-80" onclick="viewSlotBookings(${r.id})">
+                    <button class="px-2.5 py-1 rounded-lg ${capCls} text-[12px] font-semibold hover:opacity-80" onclick="viewSlotBookings(${r.id})">
                         ${r.booked_count}/${r.max_capacity}
                     </button>
                 </td>
@@ -1847,7 +2288,7 @@ $portalCsrf = get_csrf_token();
             });
         } else {
             // กดจากปุ่ม "เปิดรอบใหม่" — default เป็นวันนี้
-            const today = new Date().toISOString().slice(0, 10);
+            const today = fmtLocalDate(new Date());
             document.getElementById('slot-bulk-from').value = today;
             document.getElementById('slot-bulk-to').value   = today;
         }
@@ -1869,7 +2310,7 @@ $portalCsrf = get_csrf_token();
         const end = new Date(to + 'T00:00:00');
         while (cur <= end) {
             if (dowSet.has(cur.getDay())) {
-                dates.push(cur.toISOString().slice(0, 10));
+                dates.push(fmtLocalDate(cur));
             }
             cur.setDate(cur.getDate() + 1);
         }
@@ -1979,12 +2420,12 @@ $portalCsrf = get_csrf_token();
             const dt = new Date(ts.replace(' ', 'T'));
             const ds = `${dt.getDate().toString().padStart(2,'0')}/${(dt.getMonth()+1).toString().padStart(2,'0')}/${dt.getFullYear()+543} ${dt.getHours().toString().padStart(2,'0')}:${dt.getMinutes().toString().padStart(2,'0')}`;
             const badge = b.status === 'booked'
-                ? '<span class="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-700 text-[10px] font-black">จองแล้ว</span>'
-                : `<span class="px-2 py-0.5 rounded-md bg-slate-200 text-slate-600 text-[10px] font-black">ยกเลิก</span>`;
+                ? '<span class="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-700 text-[10px] font-semibold">จองแล้ว</span>'
+                : `<span class="px-2 py-0.5 rounded-md bg-slate-200 text-slate-600 text-[10px] font-semibold">ยกเลิก</span>`;
             const reason = b.cancel_reason ? `<p class="text-[11px] text-slate-500 mt-0.5">เหตุผล: ${escTxt(b.cancel_reason)}</p>` : '';
             return `<div class="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-100">
                 <div class="flex-1 min-w-0">
-                    <p class="text-sm font-black text-slate-900 truncate">${escTxt(b.student_name)}</p>
+                    <p class="text-sm font-semibold text-slate-900 truncate">${escTxt(b.student_name)}</p>
                     <p class="text-[11px] text-slate-500">รหัส: ${escTxt(b.student_code) || '—'} · ${ds}</p>
                     ${reason}
                 </div>
@@ -2019,7 +2460,7 @@ $portalCsrf = get_csrf_token();
         startGrid.setDate(first.getDate() - first.getDay()); // ย้อนไปอาทิตย์
         const endGrid = new Date(last);
         endGrid.setDate(last.getDate() + (6 - last.getDay())); // เดินไปเสาร์
-        const fmt = d => d.toISOString().slice(0, 10);
+        const fmt = fmtLocalDate;
 
         const j = await api('slots', 'calendar', { from: fmt(startGrid), to: fmt(endGrid) });
         if (!j.ok) { wrap.innerHTML = `<p class="text-center text-rose-500 py-6">${escTxt(j.error || 'โหลดไม่สำเร็จ')}</p>`; return; }
@@ -2039,7 +2480,7 @@ $portalCsrf = get_csrf_token();
 
         const cur = new Date(startGrid);
         while (cur <= endGrid) {
-            const dateStr = cur.toISOString().slice(0, 10);
+            const dateStr = fmtLocalDate(cur);
             const dayInfo = calData[dateStr] || { clinic_closed: false, clinic_note: '', slots: [] };
             const inMonth = cur.getMonth() === calMonth;
             const isToday = cur.getTime() === today.getTime();
@@ -2168,7 +2609,7 @@ $portalCsrf = get_csrf_token();
                     : '<div class="flex flex-wrap gap-1.5 mt-2">' + s.bookings.map(b => {
                         const cls = b.attended ? 'bg-blue-100 text-blue-700' : 'bg-emerald-50 text-emerald-700';
                         const icon = b.attended ? '<i class="fa-solid fa-check mr-1 text-[9px]"></i>' : '';
-                        return `<span class="px-2 py-0.5 rounded-md ${cls} text-[11px] font-black" title="${b.attended ? 'เช็คอินแล้ว' : 'ยังไม่เช็คอิน'}">${icon}${escTxt(b.name)}${b.code ? ` <span class="font-normal opacity-70">· ${escTxt(b.code)}</span>` : ''}</span>`;
+                        return `<span class="px-2 py-0.5 rounded-md ${cls} text-[11px] font-semibold" title="${b.attended ? 'เช็คอินแล้ว' : 'ยังไม่เช็คอิน'}">${icon}${escTxt(b.name)}${b.code ? ` <span class="font-normal opacity-70">· ${escTxt(b.code)}</span>` : ''}</span>`;
                       }).join('') + '</div>';
                 const notes = s.notes ? `<p class="text-[11px] text-slate-500 mt-1">${escTxt(s.notes)}</p>` : '';
                 // ใช้ JSON.stringify เพื่อ pass slot data ไปที่ปุ่ม edit (ต้อง escape quotes)
@@ -2184,7 +2625,7 @@ $portalCsrf = get_csrf_token();
                 }).replace(/'/g, '&#39;');
                 return `<div class="p-3 rounded-xl bg-slate-50 border border-slate-100">
                     <div class="flex items-center justify-between gap-2">
-                        <div class="text-sm font-black text-slate-900">${s.start}–${s.end}</div>
+                        <div class="text-sm font-semibold text-slate-900">${s.start}–${s.end}</div>
                         <div class="flex items-center gap-1.5 flex-wrap">
                             <span class="cal-mini-badge ${capCls}">${s.bookings.length}/${s.max}</span>
                             ${attendedTxt}
@@ -2241,18 +2682,394 @@ $portalCsrf = get_csrf_token();
         const fromEl = document.getElementById('slot-bulk-from');
         const toEl   = document.getElementById('slot-bulk-to');
         if (!fromEl.value) {
-            fromEl.value = new Date().toISOString().slice(0, 10);
+            fromEl.value = fmtLocalDate(new Date());
         }
         const from = new Date(fromEl.value + 'T00:00:00');
         from.setDate(from.getDate() + offsetDays);
-        toEl.value = from.toISOString().slice(0, 10);
+        toEl.value = fmtLocalDate(from);
         // ถ้า preset = ช่วงยาว ให้ check DoW ทุกวัน (ผู้ใช้ปรับเองได้)
         if (offsetDays >= 7) {
             document.querySelectorAll('.slot-dow').forEach(c => c.checked = true);
         }
     };
 
-    // ── Init: load default tab (Dashboard)
-    loadDashboard();
+    // ────── PAYOUTS (สถานะการจ่ายเงินรายเดือน) ──────
+    const poBulkSet = new Set();
+    let poStatusFilter = '';
+    let poPage = 1;
+    const PO_PAGE_SIZE = 20;
+    let poCache = { rows: [], summary: null, pay_rate: 0 };
+
+    function poStatusBadge(status) {
+        if (status === 'approved') {
+            return '<span class="sch-status-badge" style="background:#d1fae5;color:#065f46">'
+                + '<i class="fa-solid fa-circle-check mr-1"></i>การเงินอนุมัติ (พร้อมรับ)</span>';
+        }
+        return '<span class="sch-status-badge" style="background:#fef3c7;color:#92400e">'
+            + '<i class="fa-solid fa-hourglass-half mr-1"></i>รอดำเนินการการเงิน</span>';
+    }
+
+    function poFmtTHB(n) {
+        return (Number(n) || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function poFmtDateTime(s) {
+        if (!s) return '–';
+        const d = new Date(s.replace(' ', 'T'));
+        if (isNaN(d)) return s;
+        return d.toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' });
+    }
+
+    function poRenderTable(rows) {
+        const wrap = document.getElementById('po-table-wrap');
+        if (!rows || rows.length === 0) {
+            wrap.innerHTML = `
+                <div class="text-center py-12 px-4">
+                    <div class="inline-flex w-14 h-14 rounded-full bg-slate-100 text-slate-400 items-center justify-center mb-3">
+                        <i class="fa-solid fa-money-check-dollar text-2xl"></i>
+                    </div>
+                    <p class="text-base font-semibold text-slate-900">ยังไม่มีรายการสำหรับเดือนนี้</p>
+                    <p class="text-xs text-slate-500 mt-1 max-w-sm mx-auto">กดปุ่ม "สร้าง/อัปเดตรายการ" ด้านบน เพื่อสรุปยอดค่าตอบแทนจากชั่วโมงที่นักศึกษาทำงาน</p>
+                </div>`;
+            poBulkSet.clear();
+            updateBulkBar();
+            return;
+        }
+
+        // Pagination
+        const total = rows.length;
+        const totalPages = Math.max(1, Math.ceil(total / PO_PAGE_SIZE));
+        if (poPage > totalPages) poPage = totalPages;
+        const start = (poPage - 1) * PO_PAGE_SIZE;
+        const slice = rows.slice(start, start + PO_PAGE_SIZE);
+
+        let html = '<div class="overflow-x-auto"><table class="sch-table"><thead><tr>'
+            + '<th style="width:34px"><input type="checkbox" id="po-check-all"></th>'
+            + '<th>นักศึกษา</th>'
+            + '<th>รหัส</th>'
+            + '<th class="text-right">ชั่วโมง</th>'
+            + '<th class="text-right">อัตรา</th>'
+            + '<th class="text-right">ยอดเงิน</th>'
+            + '<th>สถานะ</th>'
+            + '<th>ผู้อนุมัติ</th>'
+            + '<th style="width:200px">การดำเนินการ</th>'
+            + '</tr></thead><tbody>';
+
+        for (const r of slice) {
+            const isPending = r.status === 'pending';
+            const isChecked = poBulkSet.has(r.id);
+            const escName = (r.full_name || '').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+            const escCode = (r.student_code || '').replace(/</g, '&lt;');
+            const escFaculty = (r.faculty || '').replace(/</g, '&lt;');
+            const approvedInfo = r.status === 'approved'
+                ? '<div class="text-xs font-bold text-emerald-700">' + (r.approved_by_name || '–').replace(/</g, '&lt;') + '</div>'
+                  + '<div class="text-[10px] text-slate-400">' + poFmtDateTime(r.approved_at) + '</div>'
+                : '<span class="text-xs text-slate-300">–</span>';
+
+            const noteHtml = r.note
+                ? '<div class="text-[11px] text-slate-500 mt-1"><i class="fa-solid fa-note-sticky"></i> ' + r.note.replace(/</g, '&lt;') + '</div>'
+                : '';
+
+            html += '<tr data-payout-id="' + r.id + '">'
+                + '<td>' + (isPending
+                    ? '<input type="checkbox" class="po-row-check" data-id="' + r.id + '"' + (isChecked ? ' checked' : '') + '>'
+                    : '') + '</td>'
+                + '<td><div class="font-bold text-slate-800">' + escName + '</div>'
+                + (escFaculty ? '<div class="text-[11px] text-slate-400">' + escFaculty + '</div>' : '')
+                + noteHtml
+                + '</td>'
+                + '<td><span class="text-xs font-mono text-slate-600">' + escCode + '</span></td>'
+                + '<td class="text-right font-bold">' + Number(r.hours_paid).toFixed(2) + '</td>'
+                + '<td class="text-right text-slate-500">' + Number(r.pay_rate).toFixed(2) + '</td>'
+                + '<td class="text-right font-bold text-emerald-700">' + poFmtTHB(r.amount) + '</td>'
+                + '<td>' + poStatusBadge(r.status) + '</td>'
+                + '<td>' + approvedInfo + '</td>'
+                + '<td>';
+            if (isPending) {
+                html += '<button class="sch-btn sch-btn--xs" onclick="approvePayout(' + r.id + ')">'
+                    + '<i class="fa-solid fa-circle-check"></i>อนุมัติ</button> '
+                    + '<button class="sch-btn sch-btn--xs sch-btn--ghost" onclick="editPayoutNote(' + r.id + ')" title="แก้หมายเหตุ">'
+                    + '<i class="fa-solid fa-pen"></i></button> '
+                    + '<button class="sch-btn sch-btn--xs sch-btn--danger" onclick="deletePayout(' + r.id + ')" title="ลบ">'
+                    + '<i class="fa-solid fa-trash"></i></button>';
+            } else {
+                html += '<button class="sch-btn sch-btn--xs sch-btn--ghost" onclick="unapprovePayout(' + r.id + ')">'
+                    + '<i class="fa-solid fa-rotate-left"></i>ย้อนกลับ</button>';
+            }
+            html += '</td></tr>';
+        }
+        html += '</tbody></table></div>';
+
+        // Pagination + counter
+        html += '<div class="flex items-center justify-between mt-4">'
+            + '<div class="text-xs text-slate-500">หน้า ' + poPage + ' / ' + totalPages + ' · รวม ' + total + ' รายการ</div>'
+            + '<div class="flex gap-1">' + poPagerHtml(poPage, totalPages) + '</div>'
+            + '</div>';
+
+        wrap.innerHTML = html;
+
+        // Wire pagination
+        wrap.querySelectorAll('.pg-btn[data-page]').forEach(b => {
+            b.addEventListener('click', () => {
+                const p = parseInt(b.dataset.page, 10);
+                if (!isNaN(p) && p !== poPage) { poPage = p; poRenderTable(poCache.rows); }
+            });
+        });
+
+        // Wire checkboxes
+        const checkAll = document.getElementById('po-check-all');
+        if (checkAll) {
+            checkAll.addEventListener('change', () => {
+                wrap.querySelectorAll('.po-row-check').forEach(c => {
+                    c.checked = checkAll.checked;
+                    const id = parseInt(c.dataset.id, 10);
+                    if (checkAll.checked) poBulkSet.add(id); else poBulkSet.delete(id);
+                });
+                updateBulkBar();
+            });
+        }
+        wrap.querySelectorAll('.po-row-check').forEach(c => {
+            c.addEventListener('change', () => {
+                const id = parseInt(c.dataset.id, 10);
+                if (c.checked) poBulkSet.add(id); else poBulkSet.delete(id);
+                updateBulkBar();
+            });
+        });
+    }
+
+    function poPagerHtml(cur, total) {
+        if (total <= 1) return '';
+        const win = 2;
+        const out = [];
+        const btn = (label, page, dis, active) =>
+            `<button class="pg-btn${active ? ' active' : ''}${dis ? ' disabled' : ''}" ${dis ? '' : 'data-page="' + page + '"'}>${label}</button>`;
+        out.push(btn('«', 1, cur === 1));
+        out.push(btn('‹', cur - 1, cur === 1));
+        const lo = Math.max(1, cur - win);
+        const hi = Math.min(total, cur + win);
+        if (lo > 1) out.push('<span class="px-1 text-slate-400">…</span>');
+        for (let p = lo; p <= hi; p++) out.push(btn(String(p), p, false, p === cur));
+        if (hi < total) out.push('<span class="px-1 text-slate-400">…</span>');
+        out.push(btn('›', cur + 1, cur === total));
+        out.push(btn('»', total, cur === total));
+        return out.join('');
+    }
+
+    function updateBulkBar() {
+        const bar = document.getElementById('po-bulk-approve');
+        const cnt = document.getElementById('po-bulk-count');
+        if (poBulkSet.size > 0) {
+            bar.style.display = '';
+            cnt.textContent = String(poBulkSet.size);
+        } else {
+            bar.style.display = 'none';
+        }
+    }
+
+    async function loadPayouts() {
+        const ym = document.getElementById('po-period').value || new Date().toISOString().slice(0, 7);
+        const q = document.getElementById('po-search')?.value || '';
+        const wrap = document.getElementById('po-table-wrap');
+        if (wrap) wrap.innerHTML = '<p class="text-center text-sm text-slate-400 py-10"><i class="fa-solid fa-spinner fa-spin mr-2"></i>กำลังโหลด…</p>';
+
+        const data = { period_ym: ym };
+        if (poStatusFilter) data.status = poStatusFilter;
+        if (q) data.q = q;
+
+        const j = await api('payouts', 'list', data);
+        if (!j.ok) {
+            wrap.innerHTML = '<p class="text-center text-rose-500 py-8">โหลดข้อมูลล้มเหลว: ' + (j.error || '?') + '</p>';
+            return;
+        }
+        poCache = { rows: j.rows || [], summary: j.summary, pay_rate: j.pay_rate };
+        poBulkSet.clear();
+        updateBulkBar();
+        poRenderTable(j.rows || []);
+
+        // KPI
+        const s = j.summary || { pending: { cnt: 0, total: 0 }, approved: { cnt: 0, total: 0 }, all: { cnt: 0, total: 0 } };
+        document.getElementById('po-kpi-pending').textContent = s.pending.cnt + ' คน';
+        document.getElementById('po-kpi-pending-total').textContent = poFmtTHB(s.pending.total) + ' บาท';
+        document.getElementById('po-kpi-approved').textContent = s.approved.cnt + ' คน';
+        document.getElementById('po-kpi-approved-total').textContent = poFmtTHB(s.approved.total) + ' บาท';
+        document.getElementById('po-kpi-total').textContent = poFmtTHB(s.all.total);
+        document.getElementById('po-kpi-count').textContent = s.all.cnt + ' คน';
+    }
+    window.loadPayouts = loadPayouts;
+
+    window.generatePayouts = async function() {
+        const ym = document.getElementById('po-period').value || new Date().toISOString().slice(0, 7);
+        const c = await Swal.fire({
+            icon: 'question', title: 'สร้าง/อัปเดตรายการจ่ายเงิน',
+            html: `<div class="text-left text-sm space-y-1">
+                <div>เดือน: <b>${ym}</b></div>
+                <div class="text-xs text-slate-500 mt-2">ระบบจะคำนวณยอดจากชั่วโมง "ค่าตอบแทน" (paid) × อัตราที่ตั้งไว้</div>
+                <div class="text-xs text-slate-500">รายการที่ "อนุมัติแล้ว" จะถูกล็อก snapshot ไว้ ไม่เปลี่ยน</div>
+            </div>`,
+            showCancelButton: true, confirmButtonText: 'สร้าง', cancelButtonText: 'ยกเลิก',
+            confirmButtonColor: '#10b981',
+        });
+        if (!c.isConfirmed) return;
+        const j = await api('payouts', 'generate', { period_ym: ym });
+        if (!j.ok) { Swal.fire({ icon: 'error', text: j.error || 'สร้างไม่สำเร็จ' }); return; }
+        const st = j.stats || {};
+        Swal.fire({
+            icon: 'success', title: 'สร้างสำเร็จ',
+            html: `<div class="text-left text-sm space-y-1">
+                <div>สร้างใหม่: <b>${st.created || 0}</b></div>
+                <div>อัปเดต snapshot: <b>${st.updated || 0}</b></div>
+                <div>ข้าม (อนุมัติแล้ว): <b>${st.skipped_approved || 0}</b></div>
+                <div>ข้าม (ไม่มีชั่วโมง): <b>${st.skipped_zero || 0}</b></div>
+            </div>`,
+            timer: 2500, showConfirmButton: false,
+        });
+        loadPayouts();
+    };
+
+    window.approvePayout = async function(id) {
+        const c = await Swal.fire({
+            icon: 'question', title: 'การเงินอนุมัติ',
+            text: 'ยืนยันว่ารายการนี้พร้อมให้นักศึกษามารับเงินที่การเงิน?',
+            showCancelButton: true, confirmButtonText: 'อนุมัติ', cancelButtonText: 'ยกเลิก',
+            confirmButtonColor: '#10b981',
+        });
+        if (!c.isConfirmed) return;
+        const j = await api('payouts', 'approve', { id });
+        if (!j.ok) { Swal.fire({ icon: 'error', text: j.error || 'อนุมัติไม่สำเร็จ' }); return; }
+        const lineMsg = j.line_notified
+            ? '<div class="text-xs text-emerald-600 mt-2"><i class="fa-solid fa-circle-check"></i> ส่ง LINE แจ้งนักศึกษาแล้ว</div>'
+            : '<div class="text-xs text-slate-400 mt-2"><i class="fa-solid fa-circle-info"></i> ไม่ได้ส่ง LINE (นักศึกษายังไม่ link หรือ token ไม่พร้อม)</div>';
+        Swal.fire({ icon: 'success', title: 'อนุมัติแล้ว', html: lineMsg, timer: 1800, showConfirmButton: false });
+        loadPayouts();
+    };
+
+    window.unapprovePayout = async function(id) {
+        const c = await Swal.fire({
+            icon: 'warning', title: 'ย้อนกลับสถานะ',
+            text: 'ย้อนกลับเป็น "รอดำเนินการการเงิน"?',
+            showCancelButton: true, confirmButtonText: 'ย้อนกลับ', cancelButtonText: 'ยกเลิก',
+            confirmButtonColor: '#f59e0b',
+        });
+        if (!c.isConfirmed) return;
+        const j = await api('payouts', 'unapprove', { id });
+        if (!j.ok) { Swal.fire({ icon: 'error', text: j.error || 'ดำเนินการไม่สำเร็จ' }); return; }
+        loadPayouts();
+    };
+
+    window.editPayoutNote = async function(id) {
+        const row = (poCache.rows || []).find(r => Number(r.id) === Number(id));
+        const cur = row ? (row.note || '') : '';
+        const c = await Swal.fire({
+            title: 'หมายเหตุ', input: 'text', inputValue: cur,
+            inputPlaceholder: 'เช่น โอนเงินผ่านธนาคารแล้ว / รอตรวจสอบ',
+            showCancelButton: true, confirmButtonText: 'บันทึก', cancelButtonText: 'ยกเลิก',
+            confirmButtonColor: '#10b981',
+        });
+        if (!c.isConfirmed) return;
+        const j = await api('payouts', 'update_note', { id, note: c.value ?? '' });
+        if (!j.ok) { Swal.fire({ icon: 'error', text: j.error || 'บันทึกไม่สำเร็จ' }); return; }
+        loadPayouts();
+    };
+
+    window.deletePayout = async function(id) {
+        const c = await Swal.fire({
+            icon: 'warning', title: 'ลบรายการ?',
+            text: 'ลบได้เฉพาะรายการที่ยังไม่อนุมัติ — ระบบจะคำนวณใหม่ตอนกดสร้าง/อัปเดตครั้งถัดไป',
+            showCancelButton: true, confirmButtonText: 'ลบ', cancelButtonText: 'ยกเลิก',
+            confirmButtonColor: '#e11d48',
+        });
+        if (!c.isConfirmed) return;
+        const j = await api('payouts', 'delete', { id });
+        if (!j.ok) { Swal.fire({ icon: 'error', text: j.error || 'ลบไม่สำเร็จ' }); return; }
+        loadPayouts();
+    };
+
+    window.bulkApprovePayouts = async function() {
+        if (poBulkSet.size === 0) return;
+        const c = await Swal.fire({
+            icon: 'question', title: 'อนุมัติทั้งหมดที่เลือก?',
+            text: `จะอนุมัติ ${poBulkSet.size} รายการเป็น "การเงินอนุมัติ (พร้อมรับ)"`,
+            showCancelButton: true, confirmButtonText: 'อนุมัติ', cancelButtonText: 'ยกเลิก',
+            confirmButtonColor: '#10b981',
+        });
+        if (!c.isConfirmed) return;
+        const j = await api('payouts', 'bulk_approve', {
+            ids: Array.from(poBulkSet).join(','), new_status: 'approved',
+        });
+        if (!j.ok) { Swal.fire({ icon: 'error', text: j.error || 'อนุมัติไม่สำเร็จ' }); return; }
+        const lineLine = (j.line_notified > 0)
+            ? `<div class="text-xs text-emerald-600 mt-2"><i class="fa-solid fa-paper-plane"></i> ส่ง LINE แจ้งนักศึกษา ${j.line_notified} คน</div>`
+            : `<div class="text-xs text-slate-400 mt-2"><i class="fa-solid fa-circle-info"></i> ไม่ได้ส่ง LINE (ยังไม่ link หรือ token ไม่พร้อม)</div>`;
+        Swal.fire({
+            icon: 'success',
+            title: `อนุมัติแล้ว ${j.changed || 0} รายการ`,
+            html: lineLine,
+            timer: 2000, showConfirmButton: false,
+        });
+        loadPayouts();
+    };
+
+    window.exportPayoutsCSV = function() {
+        const ym = document.getElementById('po-period').value || new Date().toISOString().slice(0, 7);
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = AJAX;
+        form.target = '_blank';
+        const fields = { csrf_token: PORTAL_CSRF, entity: 'payouts', action: 'export_csv', period_ym: ym };
+        for (const [k, v] of Object.entries(fields)) {
+            const i = document.createElement('input');
+            i.type = 'hidden'; i.name = k; i.value = v;
+            form.appendChild(i);
+        }
+        document.body.appendChild(form); form.submit(); form.remove();
+    };
+
+    // Filter chips + search wiring
+    document.querySelectorAll('.po-filter').forEach(b => {
+        b.addEventListener('click', () => {
+            document.querySelectorAll('.po-filter').forEach(x => x.classList.remove('active'));
+            b.classList.add('active');
+            poStatusFilter = b.dataset.status || '';
+            poPage = 1;
+            loadPayouts();
+        });
+    });
+
+    let _poSearchTimer = null;
+    document.getElementById('po-search')?.addEventListener('input', () => {
+        clearTimeout(_poSearchTimer);
+        _poSearchTimer = setTimeout(() => { poPage = 1; loadPayouts(); }, 350);
+    });
+
+    document.getElementById('po-period')?.addEventListener('change', () => {
+        poPage = 1; loadPayouts();
+    });
+
+    // ── Navigate to a top tab by name (used by setup checklist CTAs) ──
+    window.schGoTab = function(tabName) {
+        const btn = document.querySelector('.sch-tab[data-tab="' + tabName + '"]');
+        if (btn) btn.click();
+    };
+
+    // ── Guided tour (5 steps — driver.js via RsuTour) ──
+    const SCH_TOUR_STEPS = [
+        { popover: { title: 'นักศึกษาทุน',
+            description: 'จัดการนักศึกษาทุน · เก็บชั่วโมง · อนุมัติเข้า-ออกงาน · จ่ายค่าตอบแทน — ครบในที่เดียว' } },
+        { element: '.sch-tab[data-tab="dashboard"]', popover: { title: 'ภาพรวม',
+            description: 'หน้าแรก — เห็นของต้องอนุมัติ ตัวเลขสำคัญ และกราฟชั่วโมงรายวัน', side: 'bottom' } },
+        { element: '#appr-table-wrap', popover: { title: 'ของต้องทำ',
+            description: 'นักศึกษาส่งคำขอเข้า-ออกงาน รอคุณตรวจที่นี่ — กดอนุมัติ/ปฏิเสธได้ทันที', side: 'top' } },
+        { element: '.sch-tab[data-tab="scheduling"]', popover: { title: 'ตารางงาน',
+            description: 'รวม 3 มุมมอง — ปฏิทินรวม · กำหนดกะให้นักศึกษารายคน · เปิดรอบให้จองเอง', side: 'bottom' } },
+        { element: '.sch-tab[data-tab="finance"]', popover: { title: 'การเงิน',
+            description: 'สรุปยอดค่าตอบแทนรายเดือน · มาร์กสถานะการเงินอนุมัติ · นักศึกษาจะรับ LINE แจ้งเตือนทันที', side: 'bottom' } },
+        { element: '.sch-tab[data-tab="settings"]', popover: { title: 'ตั้งค่าก่อนใช้',
+            description: 'ตั้งอัตราค่าตอบแทน + พิกัด GPS ของคลินิกที่นี่ (จำเป็นสำหรับครั้งแรก)', side: 'bottom' } },
+    ];
+    if (window.RsuTour) RsuTour.maybeAutoStart('scholarship', SCH_TOUR_STEPS);
+
+    // ── Init: load default tab (Dashboard) — ต้อง trigger PANE_LOADERS
+    // เพื่อให้ทั้ง loadDashboard และ loadApprovals (ของต้องทำ) รัน
+    activatePane('dashboard');
 })();
 </script>

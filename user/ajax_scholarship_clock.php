@@ -148,10 +148,30 @@ try {
         }
     }
 
+    // Task description — รับเฉพาะ clock_out · บังคับกรอก (require_task_on_clockout)
+    $taskDescription = null;
+    if ($action === 'clock_out') {
+        $taskDescription = trim((string)($_POST['task_description'] ?? ''));
+        if (mb_strlen($taskDescription) > 500) {
+            $taskDescription = mb_substr($taskDescription, 0, 500);
+        }
+        // Required check: ถ้า settings บังคับให้กรอก task และ student ไม่ส่งมา → reject
+        $requireTask = !empty($settings['require_task_on_clockout']) || true; // default ON (เปิดบังคับเลย)
+        if ($requireTask && $taskDescription === '') {
+            echo json_encode([
+                'ok' => false,
+                'code' => 'task_required',
+                'message' => 'กรุณากรอก "งานที่ทำวันนี้" ก่อนออกงาน — เขียนสั้นๆ ว่าทำอะไรบ้าง (เพื่อบันทึกในเอกสาร)',
+            ]);
+            exit;
+        }
+        if ($taskDescription === '') $taskDescription = null;
+    }
+
     $stmt = $pdo->prepare("INSERT INTO sys_scholarship_clock_logs
         (student_id, shift_id, action, comp_type, event_at, gps_lat, gps_lng, gps_accuracy,
-         distance_m, within_radius, ip_address, user_agent, status)
-        VALUES (:sid, :shift, :act, :ct, NOW(), :lat, :lng, :acc, :dist, :wr, :ip, :ua, :status)");
+         distance_m, within_radius, ip_address, user_agent, status, task_description)
+        VALUES (:sid, :shift, :act, :ct, NOW(), :lat, :lng, :acc, :dist, :wr, :ip, :ua, :status, :td)");
     $stmt->execute([
         ':sid' => $studentId,
         ':shift' => $shiftId,
@@ -165,6 +185,7 @@ try {
         ':ip' => $ip,
         ':ua' => $ua,
         ':status' => $settings['require_approval'] ? 'pending' : 'approved',
+        ':td' => $taskDescription,
     ]);
 
     // เมื่อ student เลือกประเภทตอน clock_out → ปรับ clock_in log ที่จับคู่ให้ comp_type ตรงกัน
@@ -180,13 +201,29 @@ try {
 
     // ── LINE Group Notification ───────────────────────────────────────────
     // ส่งแจ้งเตือนพร้อมปุ่มอนุมัติ/ปฏิเสธไปยังกลุ่ม staff เมื่อ status = pending
+    // Group selection priority:
+    //   1. settings.notify_line_group_ids (JSON array) — scholarship-specific
+    //   2. line.group.default_id — fallback (กลุ่มหลักของระบบ)
     if (!empty($settings['require_approval']) && $logId > 0) {
         try {
             $lineSecrets  = require __DIR__ . '/../config/secrets.php';
             $lineToken    = $lineSecrets['LINE_MESSAGING_CHANNEL_ACCESS_TOKEN'] ?? '';
-            $defaultGroup = line_groups_get_default($pdo);
 
-            if ($lineToken !== '' && $defaultGroup !== '') {
+            // Resolve target groups (scholarship-specific → fallback default)
+            $targetGroups = [];
+            $cfgGroups = $settings['notify_line_group_ids_arr'] ?? null;
+            if (!is_array($cfgGroups) && !empty($settings['notify_line_group_ids'])) {
+                $cfgGroups = json_decode((string)$settings['notify_line_group_ids'], true) ?: [];
+            }
+            if (is_array($cfgGroups) && !empty($cfgGroups)) {
+                $targetGroups = array_values(array_filter($cfgGroups, fn($g) => is_string($g) && $g !== ''));
+            }
+            if (empty($targetGroups)) {
+                $defaultGroup = line_groups_get_default($pdo);
+                if ($defaultGroup !== '') $targetGroups = [$defaultGroup];
+            }
+
+            if ($lineToken !== '' && !empty($targetGroups)) {
                 // ดึงข้อมูลนักศึกษา
                 $uRow = $pdo->prepare("SELECT u.full_name FROM sys_scholarship_students ss
                     JOIN sys_users u ON u.id = ss.user_id WHERE ss.id = :sid LIMIT 1");
@@ -204,7 +241,10 @@ try {
                     (bool)$withinRadius,
                     $compType
                 );
-                send_line_group_push($defaultGroup, [$flexMsg], $lineToken);
+                // Push ไปทุกกลุ่มที่ตั้งไว้
+                foreach ($targetGroups as $gid) {
+                    send_line_group_push($gid, [$flexMsg], $lineToken);
+                }
             }
         } catch (Throwable $e) {
             error_log('[scholarship clock LINE notify] ' . $e->getMessage());

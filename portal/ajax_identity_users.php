@@ -54,8 +54,17 @@ try {
     //    Sensitive columns (health + raw IP/UA) are nulled out below for
     //    non-superadmin viewers — keeping the SELECT shape stable makes
     //    the frontend code branch-free.
+    // Check if line_user_id_new column exists (post-migration)
+    $hasNewLineCol = false;
+    try {
+        $col = $pdo->query("SHOW COLUMNS FROM sys_users LIKE 'line_user_id_new'");
+        $hasNewLineCol = (bool)$col->fetch();
+    } catch (PDOException) {}
+
+    $lineNewCol = $hasNewLineCol ? "line_user_id_new," : "";
+
     $sql = "SELECT id, prefix, full_name, first_name, last_name,
-                   student_personnel_id, citizen_id, line_user_id, member_id,
+                   student_personnel_id, citizen_id, line_user_id, {$lineNewCol} member_id,
                    phone_number, email, department, gender, status, status_other,
                    date_of_birth,
                    blood_type, height_cm, weight_kg, allergies, chronic_conditions,
@@ -98,6 +107,13 @@ try {
     // Same tiered redaction applied to LINE User ID, raw IP, raw UA — these
     // are forensic-grade identifiers that an editor/access_registry viewer
     // doesn't need to see in plain form to do their job.
+    // Always expose has_line flag — frontend ใช้ตัดสินใจว่าจะ enable
+    // ปุ่ม "ทดสอบส่ง LINE" หรือไม่ (ไม่ leak full UID ไปฝั่ง non-superadmin)
+    foreach ($users as &$u) {
+        $u['has_line'] = !empty($u['line_user_id']) || !empty($u['line_user_id_new'] ?? '');
+    }
+    unset($u);
+
     if ($adminRole !== 'superadmin') {
         foreach ($users as &$u) {
             if (!empty($u['citizen_id']) && strlen((string)$u['citizen_id']) >= 4) {
@@ -109,6 +125,10 @@ try {
             if (!empty($u['line_user_id'])) {
                 $lid = (string)$u['line_user_id'];
                 if (strlen($lid) > 6) $u['line_user_id'] = '…' . substr($lid, -6);
+            }
+            if (!empty($u['line_user_id_new'] ?? '')) {
+                $lid = (string)$u['line_user_id_new'];
+                if (strlen($lid) > 6) $u['line_user_id_new'] = '…' . substr($lid, -6);
             }
             // Drop raw forensic evidence from non-superadmin payloads
             $u['consent_ip']         = null;

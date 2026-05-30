@@ -935,6 +935,10 @@ $__navActive = 'services';
             fd.append('phone', form.phone.value.trim());
             fd.append('photo', compressedPhotoBlob, `selfie_${cid}.jpg`);
             fd.append('signature_base64', signaturePad.toDataURL('image/png'));
+            // PDPA consent — backend (line 84-90) requires consent_accepted + consent_version
+            // bug ก่อนหน้า: frontend ไม่ส่ง 2 field นี้ → backend reject แม้ user ติ๊ก checkbox แล้ว
+            fd.append('consent_accepted', '1');
+            fd.append('consent_version', 'pdpa_v2_2025-05');
 
             try {
                 const res = await fetch('ajax_gold_card_apply.php', {

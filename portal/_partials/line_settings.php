@@ -1133,7 +1133,13 @@ $webhookUrl = "$protocol://$host$uri";
                                 ${memberText}เข้าร่วม ${joinedDate} · พบล่าสุด ${lastSeenDate}
                             </div>
                         </div>
-                        <div style="display:flex;gap:8px;flex-shrink:0">
+                        <div style="display:flex;gap:8px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end">
+                            <button type="button" onclick="lineGroupRename('${g.id}', '${(g.name || '').replace(/'/g, '&apos;').replace(/&/g, '&amp;')}')"
+                                style="padding:6px 12px;border-radius:8px;border:1.5px solid #c7d2fe;background:#eef2ff;color:#3730a3;font-size:12px;font-weight:700;cursor:pointer;transition:.15s"
+                                onmouseover="this.style.background='#e0e7ff'" onmouseout="this.style.background='#eef2ff'"
+                                title="เปลี่ยนชื่อกลุ่ม (alias ในระบบ — ไม่ได้แก้ที่ LINE จริง)">
+                                <i class="fa-solid fa-pen-to-square" style="margin-right:4px"></i>เปลี่ยนชื่อ
+                            </button>
                             ${!isDefault ? `<button type="button" onclick="lineGroupSetDefault('${g.id}')"
                                 style="padding:6px 12px;border-radius:8px;border:1.5px solid #22c55e;background:#f0fdf4;color:#15803d;font-size:12px;font-weight:700;cursor:pointer;transition:.15s"
                                 onmouseover="this.style.background='#dcfce7'" onmouseout="this.style.background='#f0fdf4'">
@@ -1173,6 +1179,49 @@ $webhookUrl = "$protocol://$host$uri";
                 lineGroupsLoad();
             } else {
                 Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: r.error || '' });
+            }
+        };
+
+        window.lineGroupRename = async function(groupId, currentName) {
+            // Unescape HTML entities ที่ inline ใส่มาตอน render
+            const div = document.createElement('div');
+            div.innerHTML = currentName || '';
+            const cur = div.textContent;
+
+            const result = await Swal.fire({
+                title: 'เปลี่ยนชื่อกลุ่ม',
+                html: `<p style="font-size:13px;color:#64748b;margin-bottom:8px">ตั้งชื่อให้จำง่ายขึ้น (alias ในระบบเรา — ไม่ได้แก้ชื่อจริงใน LINE)</p>
+                       <p style="font-size:11px;color:#94a3b8;font-family:ui-monospace;background:#f1f5f9;padding:6px 10px;border-radius:6px;word-break:break-all">${groupId}</p>`,
+                input: 'text',
+                inputValue: cur,
+                inputPlaceholder: 'เช่น "ห้องคลินิกหลัก" หรือ "ทีมพยาบาล"',
+                inputAttributes: { maxlength: 80 },
+                showCancelButton: true,
+                confirmButtonText: 'บันทึก',
+                cancelButtonText: 'ยกเลิก',
+                confirmButtonColor: '#22c55e',
+                inputValidator: (v) => {
+                    if (v && v.length > 80) return 'ชื่อยาวเกิน 80 ตัวอักษร';
+                    return null;
+                },
+            });
+            if (!result.isConfirmed) return;
+
+            const fd = new FormData();
+            fd.append('csrf_token', GROUPS_CSRF);
+            fd.append('action', 'rename');
+            fd.append('group_id', groupId);
+            fd.append('name', (result.value || '').trim());
+            try {
+                const r = await fetch(AJAX_GROUPS, { method: 'POST', body: fd }).then(x => x.json());
+                if (r.ok) {
+                    await Swal.fire({ icon: 'success', title: 'เปลี่ยนชื่อสำเร็จ', timer: 1500, showConfirmButton: false });
+                    lineGroupsLoad();
+                } else {
+                    Swal.fire({ icon: 'error', title: 'บันทึกไม่สำเร็จ', text: r.error || 'unknown' });
+                }
+            } catch(e) {
+                Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: String(e) });
             }
         };
 

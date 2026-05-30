@@ -16,6 +16,21 @@ $_role = $adminRole ?? ($_SESSION['admin_role'] ?? '');
 
 $documents = [
     [
+        'key'         => 'scholarship_pitch',
+        'title'       => 'ระบบจัดการนักศึกษาทุน — เอกสารนำเสนอ',
+        'subtitle'    => 'Scholarship Management System · Handout',
+        'description' => 'สรุประบบนักศึกษาทุน 5 หน้า A4 — ปัญหาเดิม · 6 features หลัก · GPS check-in via LINE · approval workflow · auto payout + finance sync · Morning Brief · เปรียบเทียบก่อน/หลัง · เหมาะใช้พิมพ์แจกผู้ฟังหลังการนำเสนอ',
+        'category'    => 'proposal',
+        'access'      => ['superadmin', 'admin', 'editor'],
+        'pages'       => 5,
+        'updated'     => (int)date('j') . ' ' . ['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'][(int)date('n')] . ' ' . (date('Y') + 543),
+        'version'     => 'v1.0',
+        'url'         => '../docs/scholarship_pitch.php',
+        'icon'        => 'fa-graduation-cap',
+        'color'       => '#2e9e63',
+        'bg'          => '#f0fdf4',
+    ],
+    [
         'key'         => 'user_hub_proposal',
         'title'       => 'โครงการพัฒนาระบบบริการสุขภาพออนไลน์สำหรับผู้รับบริการ',
         'subtitle'    => 'User Hub — แพลตฟอร์มเข้าถึงบริการสุขภาพในจุดเดียว',

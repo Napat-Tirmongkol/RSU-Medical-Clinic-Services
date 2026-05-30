@@ -30,7 +30,7 @@ $known = [
     'activity_dashboard','activity_logs','error_logs','sentry_events',
     'monthly_report','daily_summary','nurse_productivity','accident_log','gold_card_stats','documents',
     'email_logs','smtp_settings','sentry_test','edms','line_settings',
-    'privilege_inventory',
+    'privilege_inventory','morning_brief_settings',
 ];
 
 $section = $_GET['section'] ?? 'dashboard';
