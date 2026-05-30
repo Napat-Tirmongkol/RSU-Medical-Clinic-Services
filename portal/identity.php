@@ -363,6 +363,9 @@ layout_start(['section' => 'identity', 'title' => 'Identity & Governance']);
                                 <div style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:#475569">
                                     <i class="fa-solid fa-circle-minus text-slate-200"></i> Disabled
                                 </div>
+                                <div style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:#475569">
+                                    <span style="color:#06c755"><i class="fa-brands fa-line"></i></span> LINE Linked
+                                </div>
                             </div>
                             <div style="overflow-x:auto">
                                 <table style="width:100%;border-collapse:collapse;font-size:13px" id="idStaffTable">
@@ -379,6 +382,7 @@ layout_start(['section' => 'identity', 'title' => 'Identity & Governance']);
                                             <th style="padding:16px 20px;text-align:center;font-size:10px;font-weight:900;color:#64748b;text-transform:uppercase;letter-spacing:.15em;width:80px" title="Asset"><i class="fa-solid fa-warehouse"></i></th>
                                             <th style="padding:16px 20px;text-align:center;font-size:10px;font-weight:900;color:#64748b;text-transform:uppercase;letter-spacing:.15em;width:80px" title="Scholarship"><i class="fa-solid fa-graduation-cap"></i></th>
                                             <th style="padding:16px 20px;text-align:center;font-size:10px;font-weight:900;color:#64748b;text-transform:uppercase;letter-spacing:.15em;width:80px" title="Dashboard Editor"><i class="fa-solid fa-chart-pie"></i></th>
+                                            <th style="padding:16px 20px;text-align:center;font-size:10px;font-weight:900;color:#64748b;text-transform:uppercase;letter-spacing:.15em;width:80px" title="เชื่อมบัญชี LINE"><i class="fa-brands fa-line" style="color:#06c755"></i></th>
                                             <th style="padding:16px 20px;text-align:center;font-size:10px;font-weight:900;color:#64748b;text-transform:uppercase;letter-spacing:.15em;width:100px">Status</th>
                                             <th style="padding:16px 20px;text-align:right;font-size:10px;font-weight:900;color:#64748b;text-transform:uppercase;letter-spacing:.15em">Actions</th>
                                         </tr>
@@ -434,6 +438,12 @@ layout_start(['section' => 'identity', 'title' => 'Identity & Governance']);
                                             $assetIcon = $assetAccess ? '<i class="fa-solid fa-circle-check text-emerald-500"></i>' : '<i class="fa-solid fa-circle-minus text-slate-200"></i>';
                                             $scholarIcon = $scholarAccess ? '<i class="fa-solid fa-circle-check text-emerald-500"></i>' : '<i class="fa-solid fa-circle-minus text-slate-200"></i>';
                                             $dashIcon = $dashAccess ? '<i class="fa-solid fa-circle-check text-emerald-500"></i>' : '<i class="fa-solid fa-circle-minus text-slate-200"></i>';
+
+                                            // LINE link status — เชื่อมเองผ่านหน้า Profile (LINE OAuth); identity ไม่ได้ตั้งค่าให้
+                                            $lineLinked = trim((string)($st['linked_line_user_id'] ?? '')) !== '';
+                                            $lineIcon = $lineLinked
+                                                ? '<div style="background:#f0fdf4;color:#06c755;border:1px solid #bbf7d0;width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;margin:0 auto" title="เชื่อมบัญชี LINE แล้ว"><i class="fa-brands fa-line"></i></div>'
+                                                : '<i class="fa-brands fa-line" style="color:#cbd5e1;font-size:16px" title="ยังไม่เชื่อมบัญชี LINE"></i>';
                                             ?>
                                             <tr style="border-bottom:1px solid #f1f5f9" class="id-staff-row hover:bg-slate-50/50 transition-colors">
                                                 <td style="padding:16px 20px">
@@ -468,6 +478,7 @@ layout_start(['section' => 'identity', 'title' => 'Identity & Governance']);
                                                 <td style="padding:16px 20px;text-align:center"><?= $assetIcon ?></td>
                                                 <td style="padding:16px 20px;text-align:center"><?= $scholarIcon ?></td>
                                                 <td style="padding:16px 20px;text-align:center"><?= $dashIcon ?></td>
+                                                <td style="padding:16px 20px;text-align:center"><?= $lineIcon ?></td>
                                                 <td style="padding:16px 20px;text-align:center">
                                                     <span style="font-size:10px;font-weight:900;padding:4px 10px;border-radius:99px;background:<?= $isActive ? '#f0fdf4;color:#16a34a;border:1px solid #bbf7d0' : '#fef2f2;color:#dc2626;border:1px solid #fecaca' ?>"><?= strtoupper($st['account_status']) ?></span>
                                                 </td>
